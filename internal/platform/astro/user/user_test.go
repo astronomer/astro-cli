@@ -416,7 +416,7 @@ func TestListOrgUsersWithFormat(t *testing.T) {
 		mockClient.On("ListUsersWithResponse", mock.Anything, mock.Anything, listUsersUnscoped()).Return(&ListOrgUsersResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListOrgUsersWithFormat(mockClient, "json", "", buf)
+		err := ListOrgUsersWithFormat(mockClient, "json", buf)
 		assert.NoError(t, err)
 
 		var result UserList

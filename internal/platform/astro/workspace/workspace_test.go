@@ -126,7 +126,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, "json", "", buf)
+		err := ListWithFormat(mockClient, "json", buf)
 		s.NoError(err)
 
 		var result WorkspaceList
@@ -136,12 +136,12 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.AssertExpectations(s.T())
 	})
 
-	s.Run("table output", func() {
+	s.Run("text output", func() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, "table", "", buf)
+		err := ListWithFormat(mockClient, "text", buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "test-workspace")
 		mockClient.AssertExpectations(s.T())

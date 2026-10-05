@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -439,13 +440,38 @@ func TestDeploymentListJSON(t *testing.T) {
 	mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 	astroV1Client = mockV1Client
 
-	cmdArgs := []string{"list", "-a", "--json"}
+	cmdArgs := []string{"list", "-a", "-o", "json"}
 	resp, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 
 	var result deployment.DeploymentList
 	assert.NoError(t, json.Unmarshal([]byte(resp), &result))
 	assert.Len(t, result.Deployments, 2)
+	mockV1Client.AssertExpectations(t)
+}
+
+func TestDeploymentListRejectsRemovedOutputDialect(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	// No client expectations: each is rejected before any API call.
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mockV1Client
+
+	_, err := execDeploymentCmd("list", "-o", "template")
+	assert.EqualError(t, err, `unknown output format "template" (supported: text, json)`)
+	// A bad --output is a usage error here as everywhere: exit 2.
+	assert.True(t, cliout.IsUsage(err), "%v is not a usage error", err)
+
+	_, err = execDeploymentCmd("list", "-o", "table")
+	assert.EqualError(t, err, `unknown output format "table" (supported: text, json)`)
+	assert.True(t, cliout.IsUsage(err), "%v is not a usage error", err)
+
+	_, err = execDeploymentCmd("list", "--json")
+	assert.ErrorContains(t, err, "unknown flag: --json")
+
+	_, err = execDeploymentCmd("list", "--template", "{{.}}")
+	assert.ErrorContains(t, err, "unknown flag: --template")
+
 	mockV1Client.AssertExpectations(t)
 }
 

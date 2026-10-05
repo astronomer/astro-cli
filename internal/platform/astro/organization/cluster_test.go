@@ -108,12 +108,12 @@ func (s *Suite) TestListClusters() {
 func (s *Suite) TestListClustersWithFormat() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	s.Run("table output", func() {
+	s.Run("text output", func() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockClusterListResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, "table", "", buf)
+		err := ListClustersWithFormat(mockV1Client, "text", buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "test-cluster")
 		s.Contains(buf.String(), "us-east-1")
@@ -126,7 +126,7 @@ func (s *Suite) TestListClustersWithFormat() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockClusterListResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, "json", "", buf)
+		err := ListClustersWithFormat(mockV1Client, "json", buf)
 		s.NoError(err)
 
 		var result ClusterList
@@ -147,7 +147,7 @@ func (s *Suite) TestListClustersWithFormat() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, "table", "", buf)
+		err := ListClustersWithFormat(mockV1Client, "text", buf)
 		s.NoError(err)
 		s.Contains(buf.String(), noClustersMsg)
 		mockV1Client.AssertExpectations(s.T())
@@ -158,7 +158,7 @@ func (s *Suite) TestListClustersWithFormat() {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListClustersWithFormat(mockV1Client, "table", "", buf)
+		err := ListClustersWithFormat(mockV1Client, "text", buf)
 		s.ErrorIs(err, errNetwork)
 		mockV1Client.AssertExpectations(s.T())
 	})

@@ -84,7 +84,7 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all Organizations you have access to",
 		Long:    "List all Astro Organizations you have access to.",
 		Example: `  astro organization list
-  astro organization list --json`,
+  astro organization list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationList(cmd, out)
 		},
@@ -193,7 +193,7 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the users in your Astro Organization",
 		Long:    "List all users and their Organization-level roles.",
 		Example: `  astro organization user list
-  astro organization user list --json`,
+  astro organization user list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listUsers(cmd, out)
 		},
@@ -222,14 +222,14 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func organizationList(cmd *cobra.Command, out io.Writer) error {
-	format, err := organizationListOutputFlags.Resolve()
+	format, err := resolveOutput(&organizationListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return organization.ListWithFormat(astroV1Client, format, organizationListOutputFlags.Template, out)
+	return organization.ListWithFormat(astroV1Client, format, out)
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -282,13 +282,13 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 }
 
 func listUsers(cmd *cobra.Command, out io.Writer) error {
-	format, err := organizationUserListOutputFlags.Resolve()
+	format, err := resolveOutput(&organizationUserListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListOrgUsersWithFormat(astroV1Client, format, organizationUserListOutputFlags.Template, out)
+	return user.ListOrgUsersWithFormat(astroV1Client, format, out)
 }
 
 func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -338,7 +338,7 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the teams in your Astro Organization",
 		Long:    "List all the teams in your Astro Organization",
 		Example: `  astro organization team list
-  astro organization team list --json`,
+  astro organization team list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listTeams(cmd, out)
 		},
@@ -348,13 +348,13 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 }
 
 func listTeams(cmd *cobra.Command, out io.Writer) error {
-	format, err := organizationTeamListOutputFlags.Resolve()
+	format, err := resolveOutput(&organizationTeamListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListOrgTeamsWithFormat(astroV1Client, format, organizationTeamListOutputFlags.Template, out)
+	return team.ListOrgTeamsWithFormat(astroV1Client, format, out)
 }
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -849,7 +849,7 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the clusters in your Astro Organization",
 		Long:    "List all the clusters in your Astro Organization. Only Dedicated and Hybrid clusters are listed. Standard Deployments run on clusters that Astronomer manages, so an Organization with only Standard Deployments has no clusters to list.",
 		Example: `  astro organization cluster list
-  astro organization cluster list --json`,
+  astro organization cluster list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listClusters(cmd, out)
 		},
@@ -859,11 +859,11 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 }
 
 func listClusters(cmd *cobra.Command, out io.Writer) error {
-	format, err := organizationClusterListOutputFlags.Resolve()
+	format, err := resolveOutput(&organizationClusterListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return organization.ListClustersWithFormat(astroV1Client, format, organizationClusterListOutputFlags.Template, out)
+	return organization.ListClustersWithFormat(astroV1Client, format, out)
 }

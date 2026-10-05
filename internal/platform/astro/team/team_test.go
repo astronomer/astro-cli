@@ -305,7 +305,7 @@ func (s *Suite) TestListOrgTeamsWithFormat() {
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseOK, nil).Twice()
 
 		buf := new(bytes.Buffer)
-		err := ListOrgTeamsWithFormat(mockClient, "json", "", buf)
+		err := ListOrgTeamsWithFormat(mockClient, "json", buf)
 		s.NoError(err)
 
 		var result TeamList

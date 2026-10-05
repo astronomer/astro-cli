@@ -73,9 +73,9 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Short:   "List the bundles on an Astro Deployment",
 		Long:    "List every DAG and non-DAG bundle registered on an Astro Deployment.",
 		Example: `  astro deployment bundle list --deployment-id <id>
-  astro deployment bundle list --deployment-id <id> --json`,
+  astro deployment bundle list --deployment-id <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := bundleListOutputFlags.Resolve()
+			format, err := resolveOutput(&bundleListOutputFlags)
 			if err != nil {
 				return err
 			}
@@ -84,7 +84,7 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.ListBundlesWithFormat(ws, deploymentID, format, bundleListOutputFlags.Template, out, astroV1Client, astroV1Alpha1Client)
+			return deployment.ListBundlesWithFormat(ws, deploymentID, format, out, astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	bundleListOutputFlags.AddFlags(cmd)

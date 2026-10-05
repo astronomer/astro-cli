@@ -418,7 +418,7 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, mockV1Client, "json", "", buf)
+		err := ListWithFormat(ws, false, mockV1Client, "json", buf)
 		s.NoError(err)
 
 		var result DeploymentList
@@ -427,11 +427,11 @@ func (s *Suite) TestListWithFormat() {
 		mockV1Client.AssertExpectations(s.T())
 	})
 
-	s.Run("table output", func() {
+	s.Run("text output", func() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(ws, false, mockV1Client, "table", "", buf)
+		err := ListWithFormat(ws, false, mockV1Client, "text", buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "test-id-1")
 		mockV1Client.AssertExpectations(s.T())

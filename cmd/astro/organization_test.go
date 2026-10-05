@@ -86,7 +86,7 @@ func TestOrganizationListJSON(t *testing.T) {
 	mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
 	astroV1Client = mockV1Client
 
-	cmdArgs := []string{"list", "--json"}
+	cmdArgs := []string{"list", "-o", "json"}
 	resp, err := execOrganizationCmd(cmdArgs...)
 	assert.NoError(t, err)
 
@@ -142,7 +142,7 @@ func TestOrganizationClusterList(t *testing.T) {
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(mockClusterListResponse(clusters), nil).Once()
 		astroV1Client = mockV1Client
 
-		resp, err := execOrganizationCmd("cluster", "list", "--json")
+		resp, err := execOrganizationCmd("cluster", "list", "-o", "json")
 		assert.NoError(t, err)
 
 		var result organization.ClusterList

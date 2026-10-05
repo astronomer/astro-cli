@@ -56,7 +56,7 @@ func TestDeploymentBundleCreateCmd(t *testing.T) {
 }
 
 func TestDeploymentBundleListCmd(t *testing.T) {
-	t.Run("renders JSON when --json is set", func(t *testing.T) {
+	t.Run("renders JSON when -o json is set", func(t *testing.T) {
 		mockAlpha := setupBundleCmdMocks(t)
 		mockAlpha.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.ListBundlesResponse{
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
@@ -66,7 +66,7 @@ func TestDeploymentBundleListCmd(t *testing.T) {
 			},
 		}, nil).Once()
 
-		out, err := execDeploymentCmd("bundle", "list", "--deployment-id", "test-id-1", "--json")
+		out, err := execDeploymentCmd("bundle", "list", "--deployment-id", "test-id-1", "-o", "json")
 		assert.NoError(t, err)
 		assert.Contains(t, out, "bundles")
 		assert.Contains(t, out, "bundle-1")

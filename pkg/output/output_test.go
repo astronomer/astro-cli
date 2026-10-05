@@ -3,9 +3,10 @@ package output
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
+	"fmt"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,10 +17,12 @@ func TestParseFormat(t *testing.T) {
 		expected Format
 		wantErr  bool
 	}{
-		{"table", FormatTable, false},
-		{"", FormatTable, false},
+		{"text", FormatText, false},
 		{"json", FormatJSON, false},
-		{"template", FormatTemplate, false},
+		// The removed v1 dialect: one spelling per format in v2.
+		{"table", "", true},
+		{"template", "", true},
+		{"", "", true},
 		{"invalid", "", true},
 	}
 
@@ -27,7 +30,7 @@ func TestParseFormat(t *testing.T) {
 		t.Run(tt.input, func(t *testing.T) {
 			got, err := ParseFormat(tt.input)
 			if tt.wantErr {
-				assert.Error(t, err)
+				assert.EqualError(t, err, fmt.Sprintf("unknown output format %q (supported: text, json)", tt.input))
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, got)
@@ -61,56 +64,32 @@ func TestPrinter_PrintJSON(t *testing.T) {
 	assert.Equal(t, float64(42), result["count"]) // JSON numbers are float64
 }
 
-func TestPrinter_PrintTemplate(t *testing.T) {
-	data := map[string]any{
-		"name":  "Alice",
-		"count": 3,
+// TestPrinter_PrintJSONBytes pins the exact bytes -o json writes: two-space
+// indent, no HTML escaping, one trailing newline. Scripts and Astro Desktop
+// parse this, so a change here is a contract change.
+func TestPrinter_PrintJSONBytes(t *testing.T) {
+	type item struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	}
+	type list struct {
+		Items []item `json:"items"`
 	}
 
-	tests := []struct {
-		name     string
-		template string
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "simple template",
-			template: "Hello {{.name}}",
-			expected: "Hello Alice",
-			wantErr:  false,
-		},
-		{
-			name:     "with range",
-			template: "Count: {{.count}}",
-			expected: "Count: 3",
-			wantErr:  false,
-		},
-		{
-			name:     "invalid template",
-			template: "{{.invalid syntax",
-			expected: "",
-			wantErr:  true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			p := New(Options{
-				Format:   FormatTemplate,
-				Template: tt.template,
-				Out:      &buf,
-			})
-
-			err := p.Print(data)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, strings.TrimSpace(buf.String()))
-			}
-		})
-	}
+	var buf bytes.Buffer
+	err := New(Options{Format: FormatJSON, Out: &buf, NoColor: true}).Print(&list{
+		Items: []item{{Name: "a<b>&c", URL: "https://example.com/?x=1&y=2"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, `{
+  "items": [
+    {
+      "name": "a<b>&c",
+      "url": "https://example.com/?x=1&y=2"
+    }
+  ]
+}
+`, buf.String())
 }
 
 func TestOptions_GetOut(t *testing.T) {
@@ -119,36 +98,6 @@ func TestOptions_GetOut(t *testing.T) {
 		opts := Options{Out: &buf}
 		assert.Equal(t, &buf, opts.GetOut())
 	})
-}
-
-func TestResolveFormat(t *testing.T) {
-	tests := []struct {
-		name      string
-		jsonFlag  bool
-		formatStr string
-		expected  Format
-		wantErr   bool
-	}{
-		{"json flag true", true, "", FormatJSON, false},
-		{"json flag true overrides format", true, "table", FormatJSON, false},
-		{"format json", false, "json", FormatJSON, false},
-		{"format table", false, "table", FormatTable, false},
-		{"format template", false, "template", FormatTemplate, false},
-		{"empty defaults to table", false, "", FormatTable, false},
-		{"invalid format", false, "invalid", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ResolveFormat(tt.jsonFlag, tt.formatStr)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, got)
-			}
-		})
-	}
 }
 
 type testItem struct {
@@ -179,7 +128,7 @@ func TestPrinter_PrintTable(t *testing.T) {
 			func(d any) []testItem { return d.(*testList).Items },
 		)
 
-		p := New(Options{Format: FormatTable, Out: &buf, Table: cfg})
+		p := New(Options{Format: FormatText, Out: &buf, Table: cfg})
 		err := p.Print(data)
 		assert.NoError(t, err)
 
@@ -200,7 +149,7 @@ func TestPrinter_PrintTable(t *testing.T) {
 			WithColorRow(func(i testItem) bool { return i.IsCurrent }, [2]string{"\033[1;32m", "\033[0m"}),
 		)
 
-		p := New(Options{Format: FormatTable, Out: &buf, Table: cfg})
+		p := New(Options{Format: FormatText, Out: &buf, Table: cfg})
 		err := p.Print(data)
 		assert.NoError(t, err)
 
@@ -220,7 +169,7 @@ func TestPrinter_PrintTable(t *testing.T) {
 			WithNoResultsMsg("No items found"),
 		)
 
-		p := New(Options{Format: FormatTable, Out: &buf, Table: cfg})
+		p := New(Options{Format: FormatText, Out: &buf, Table: cfg})
 		err := p.Print(emptyData)
 		assert.NoError(t, err)
 		assert.Contains(t, buf.String(), "No items found")
@@ -228,7 +177,7 @@ func TestPrinter_PrintTable(t *testing.T) {
 
 	t.Run("errors without table config", func(t *testing.T) {
 		var buf bytes.Buffer
-		p := New(Options{Format: FormatTable, Out: &buf})
+		p := New(Options{Format: FormatText, Out: &buf})
 		err := p.Print(data)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "table config required")
@@ -290,7 +239,7 @@ func TestPrintData(t *testing.T) {
 		var buf bytes.Buffer
 		err := PrintData(
 			func() (*testList, error) { return data, nil },
-			cfg, FormatJSON, "", &buf,
+			cfg, FormatJSON, &buf,
 		)
 		require.NoError(t, err)
 
@@ -299,11 +248,11 @@ func TestPrintData(t *testing.T) {
 		assert.Equal(t, "alpha", result.Items[0].Name)
 	})
 
-	t.Run("table output", func(t *testing.T) {
+	t.Run("text output", func(t *testing.T) {
 		var buf bytes.Buffer
 		err := PrintData(
 			func() (*testList, error) { return data, nil },
-			cfg, FormatTable, "", &buf,
+			cfg, FormatText, &buf,
 		)
 		require.NoError(t, err)
 		assert.Contains(t, buf.String(), "alpha")
@@ -313,31 +262,62 @@ func TestPrintData(t *testing.T) {
 		var buf bytes.Buffer
 		err := PrintData(
 			func() (*testList, error) { return nil, assert.AnError },
-			cfg, FormatJSON, "", &buf,
+			cfg, FormatJSON, &buf,
 		)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 }
 
-func TestFlags_Resolve(t *testing.T) {
-	t.Run("json flag", func(t *testing.T) {
-		f := Flags{JSON: true}
-		format, err := f.Resolve()
-		assert.NoError(t, err)
+func TestFlags(t *testing.T) {
+	parse := func(t *testing.T, args ...string) (Format, error) {
+		t.Helper()
+		var f Flags
+		cmd := &cobra.Command{Use: "list", RunE: func(*cobra.Command, []string) error { return nil }}
+		f.AddFlags(cmd)
+		if err := cmd.ParseFlags(args); err != nil {
+			return "", err
+		}
+		return f.Resolve()
+	}
+
+	t.Run("defaults to text", func(t *testing.T) {
+		format, err := parse(t)
+		require.NoError(t, err)
+		assert.Equal(t, FormatText, format)
+	})
+
+	t.Run("-o json", func(t *testing.T) {
+		format, err := parse(t, "-o", "json")
+		require.NoError(t, err)
 		assert.Equal(t, FormatJSON, format)
 	})
 
-	t.Run("format string", func(t *testing.T) {
-		f := Flags{Format: "template"}
-		format, err := f.Resolve()
-		assert.NoError(t, err)
-		assert.Equal(t, FormatTemplate, format)
+	t.Run("--output text", func(t *testing.T) {
+		format, err := parse(t, "--output", "text")
+		require.NoError(t, err)
+		assert.Equal(t, FormatText, format)
 	})
 
-	t.Run("default table", func(t *testing.T) {
-		f := Flags{}
-		format, err := f.Resolve()
-		assert.NoError(t, err)
-		assert.Equal(t, FormatTable, format)
+	t.Run("-o template is rejected", func(t *testing.T) {
+		_, err := parse(t, "-o", "template")
+		assert.EqualError(t, err, `unknown output format "template" (supported: text, json)`)
+	})
+
+	t.Run("--json and --template are gone", func(t *testing.T) {
+		_, err := parse(t, "--json")
+		assert.ErrorContains(t, err, "unknown flag: --json")
+		_, err = parse(t, "--template", "{{.}}")
+		assert.ErrorContains(t, err, "unknown flag: --template")
+	})
+
+	t.Run("help text", func(t *testing.T) {
+		var f Flags
+		cmd := &cobra.Command{Use: "list"}
+		f.AddFlags(cmd)
+		flag := cmd.Flags().Lookup("output")
+		require.NotNil(t, flag)
+		assert.Equal(t, "o", flag.Shorthand)
+		assert.Equal(t, "text", flag.DefValue)
+		assert.Equal(t, "Output format: text or json", flag.Usage)
 	})
 }

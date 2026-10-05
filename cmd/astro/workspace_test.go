@@ -85,7 +85,7 @@ func TestWorkspaceListJSON(t *testing.T) {
 	mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 	astroV1Client = mockClient
 
-	cmdArgs := []string{"list", "--json"}
+	cmdArgs := []string{"list", "-o", "json"}
 	resp, err := execWorkspaceCmd(cmdArgs...)
 	assert.NoError(t, err)
 

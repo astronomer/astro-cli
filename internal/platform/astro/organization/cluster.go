@@ -79,9 +79,9 @@ func ListClustersData(astroV1Client astrov1.APIClient) (*ClusterList, error) {
 }
 
 // ListClustersWithFormat lists the Organization's clusters with the specified output format
-func ListClustersWithFormat(astroV1Client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
+func ListClustersWithFormat(astroV1Client astrov1.APIClient, format output.Format, out io.Writer) error {
 	return output.PrintData(
 		func() (*ClusterList, error) { return ListClustersData(astroV1Client) },
-		clusterTableConfig, format, tmpl, out,
+		clusterTableConfig, format, out,
 	)
 }

@@ -975,10 +975,10 @@ var deploymentTeamTableConfig = output.BuildTableConfig(
 )
 
 // ListDeploymentTeamsWithFormat lists deployment teams with the specified output format
-func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string, format output.Format, tmpl string, out io.Writer) error {
+func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string, format output.Format, out io.Writer) error {
 	return output.PrintData(
 		func() (*TeamList, error) { return ListDeploymentTeamsData(client, deploymentID) },
-		deploymentTeamTableConfig, format, tmpl, out,
+		deploymentTeamTableConfig, format, out,
 	)
 }
 
@@ -1021,10 +1021,10 @@ var workspaceTeamTableConfig = output.BuildTableConfig(
 )
 
 // ListWorkspaceTeamsWithFormat lists workspace teams with the specified output format
-func ListWorkspaceTeamsWithFormat(client astrov1.APIClient, workspaceID string, format output.Format, tmpl string, out io.Writer) error {
+func ListWorkspaceTeamsWithFormat(client astrov1.APIClient, workspaceID string, format output.Format, out io.Writer) error {
 	return output.PrintData(
 		func() (*TeamList, error) { return ListWorkspaceTeamsData(client, workspaceID) },
-		workspaceTeamTableConfig, format, tmpl, out,
+		workspaceTeamTableConfig, format, out,
 	)
 }
 
@@ -1067,9 +1067,9 @@ var orgTeamTableConfig = output.BuildTableConfig(
 )
 
 // ListOrgTeamsWithFormat lists organization teams with the specified output format
-func ListOrgTeamsWithFormat(client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
+func ListOrgTeamsWithFormat(client astrov1.APIClient, format output.Format, out io.Writer) error {
 	return output.PrintData(
 		func() (*TeamList, error) { return ListOrgTeamsData(client) },
-		orgTeamTableConfig, format, tmpl, out,
+		orgTeamTableConfig, format, out,
 	)
 }

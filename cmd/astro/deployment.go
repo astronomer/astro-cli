@@ -181,7 +181,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the teams in an Astro Deployment",
 		Long:    "List all teams and their roles in a Deployment.",
 		Example: `  astro deployment team list --deployment-id <deployment-id>
-  astro deployment team list --deployment-id <id> --json`,
+  astro deployment team list --deployment-id <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listDeploymentTeam(cmd, out)
 		},
@@ -211,13 +211,13 @@ func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment-id", "astro deployment list")
 	}
 
-	format, err := deploymentTeamListOutputFlags.Resolve()
+	format, err := resolveOutput(&deploymentTeamListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, format, deploymentTeamListOutputFlags.Template, out)
+	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, format, out)
 }
 
 func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -349,7 +349,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the users in an Astro Deployment",
 		Long:    "List all users and their roles in a Deployment.",
 		Example: `  astro deployment user list --deployment-id <deployment-id>
-  astro deployment user list --deployment-id <id> --json`,
+  astro deployment user list --deployment-id <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listDeploymentUser(cmd, out)
 		},
@@ -400,8 +400,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all Deployments running in your Astronomer Workspace. Switch Workspaces to see other Deployments in your Organization.",
 		Example: `  astro deployment list
   astro deployment list --all
-  astro deployment list --json
-  astro deployment list -o template --template '{{range .Deployments}}{{.Name}}{{"\\n"}}{{end}}'`,
+  astro deployment list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentList(cmd, out)
 		},
@@ -685,6 +684,12 @@ func newDeploymentWakeUpCmd() *cobra.Command {
 }
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
+	// Reject a bad -o before anything that needs a login.
+	format, err := resolveOutput(&deploymentListOutputFlags)
+	if err != nil {
+		return err
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -695,15 +700,10 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 		ws = ""
 	}
 
-	format, err := deploymentListOutputFlags.Resolve()
-	if err != nil {
-		return err
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, format, deploymentListOutputFlags.Template, out)
+	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, format, out)
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -1035,13 +1035,13 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment-id", "astro deployment list")
 	}
 
-	format, err := deploymentUserListOutputFlags.Resolve()
+	format, err := resolveOutput(&deploymentUserListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, format, deploymentUserListOutputFlags.Template, out)
+	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, format, out)
 }
 
 func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {

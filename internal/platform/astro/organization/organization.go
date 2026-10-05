@@ -117,10 +117,10 @@ func ListData(astroV1Client astrov1.APIClient) (*OrganizationList, error) {
 }
 
 // ListWithFormat lists organizations with the specified output format
-func ListWithFormat(astroV1Client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
+func ListWithFormat(astroV1Client astrov1.APIClient, format output.Format, out io.Writer) error {
 	return output.PrintData(
 		func() (*OrganizationList, error) { return ListData(astroV1Client) },
-		organizationTableConfig, format, tmpl, out,
+		organizationTableConfig, format, out,
 	)
 }
 

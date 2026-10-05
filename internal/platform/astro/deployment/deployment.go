@@ -215,10 +215,10 @@ func ListData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient
 }
 
 // ListWithFormat lists deployments with the specified output format
-func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient, format output.Format, tmpl string, out io.Writer) error {
+func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient, format output.Format, out io.Writer) error {
 	return output.PrintData(
 		func() (*DeploymentList, error) { return ListData(ws, fromAllWorkspaces, astroV1Client) },
-		deploymentTableConfig(fromAllWorkspaces, ws), format, tmpl, out,
+		deploymentTableConfig(fromAllWorkspaces, ws), format, out,
 	)
 }
 

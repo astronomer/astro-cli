@@ -1,11 +1,9 @@
 package output
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"text/template"
 
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
@@ -19,12 +17,10 @@ import (
 type Format string
 
 const (
-	// FormatTable outputs in a human-readable table format
-	FormatTable Format = "table"
+	// FormatText outputs the human rendering, a table
+	FormatText Format = "text"
 	// FormatJSON outputs in JSON format
 	FormatJSON Format = "json"
-	// FormatTemplate outputs using a custom Go template
-	FormatTemplate Format = "template"
 )
 
 // TableColumn defines how to extract one column from a data item (type-erased)
@@ -105,15 +101,13 @@ func BuildTableConfig[T any](columns []Column[T], items func(data any) []T, opts
 
 // Options configures how output is formatted
 type Options struct {
-	// Format specifies the output format (table, json, or template)
+	// Format specifies the output format (text or json)
 	Format Format
-	// Template is the Go template string (only used when Format == FormatTemplate)
-	Template string
 	// Out is the writer for output (defaults to os.Stdout)
 	Out io.Writer
 	// NoColor disables colorization
 	NoColor bool
-	// Table configures table rendering (required when Format == FormatTable)
+	// Table configures table rendering (required when Format == FormatText)
 	Table *TableConfig
 }
 
@@ -151,11 +145,9 @@ func (p *Printer) Print(data any) error {
 	switch p.opts.Format {
 	case FormatJSON:
 		return p.printJSON(data)
-	case FormatTemplate:
-		return p.printTemplate(data)
-	case FormatTable:
+	case FormatText:
 		if p.opts.Table == nil {
-			return fmt.Errorf("table config required for table format")
+			return fmt.Errorf("table config required for text format")
 		}
 		return p.printTable(data)
 	default:
@@ -206,87 +198,43 @@ func (p *Printer) printJSON(data any) error {
 	return enc.Encode(data)
 }
 
-// printTemplate executes a Go template against the data
-func (p *Printer) printTemplate(data any) error {
-	if p.opts.Template == "" {
-		return fmt.Errorf("template string is required for template format")
-	}
-
-	tmpl, err := template.New("output").Funcs(templateFuncs()).Parse(p.opts.Template)
-	if err != nil {
-		return fmt.Errorf("parsing template: %w", err)
-	}
-
-	return tmpl.Execute(p.opts.GetOut(), data)
-}
-
-// templateFuncs returns custom template functions
-func templateFuncs() template.FuncMap {
-	return template.FuncMap{
-		"json": func(v any) (string, error) {
-			b, err := json.Marshal(v)
-			if err != nil {
-				return "", err
-			}
-			return string(b), nil
-		},
-	}
-}
-
-// ParseFormat parses a format string into a Format type
+// ParseFormat validates an --output flag value. The wording matches the
+// astro local tree's, so every command rejects a bad -o the same way.
 func ParseFormat(s string) (Format, error) {
-	switch s {
-	case "table", "":
-		return FormatTable, nil
-	case "json":
-		return FormatJSON, nil
-	case "template":
-		return FormatTemplate, nil
+	switch Format(s) {
+	case FormatText, FormatJSON:
+		return Format(s), nil
 	default:
-		return "", fmt.Errorf("invalid format %q (must be table, json, or template)", s)
+		return "", fmt.Errorf("unknown output format %q (supported: text, json)", s)
 	}
 }
 
-// ResolveFormat determines the output format from the JSON shorthand flag and format string.
-func ResolveFormat(jsonFlag bool, formatStr string) (Format, error) {
-	if jsonFlag {
-		return FormatJSON, nil
-	}
-	return ParseFormat(formatStr)
-}
-
-// Flags holds the common output flag values for a command.
+// Flags holds the output flag value for a command.
 type Flags struct {
-	JSON     bool
-	Format   string
-	Template string
+	Format string
 }
 
-// AddFlags registers --json, --output/-o, and --template flags on a cobra command.
+// AddFlags registers --output/-o on a cobra command.
 func (f *Flags) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVar(&f.JSON, "json", false, "Output as JSON")
-	cmd.Flags().StringVarP(&f.Format, "output", "o", "", "Output format (table|json|template)")
-	cmd.Flags().StringVar(&f.Template, "template", "", "Go template string (use with --output template)")
-	cmd.MarkFlagsMutuallyExclusive("json", "output")
+	cmd.Flags().StringVarP(&f.Format, "output", "o", string(FormatText), "Output format: text or json")
 }
 
-// Resolve returns the parsed Format from the flag values.
+// Resolve returns the parsed Format from the flag value.
 func (f *Flags) Resolve() (Format, error) {
-	return ResolveFormat(f.JSON, f.Format)
+	return ParseFormat(f.Format)
 }
 
-// PrintData fetches data via fetchFn and renders it using the given table config, format, template, and writer.
+// PrintData fetches data via fetchFn and renders it using the given table config, format, and writer.
 // This eliminates boilerplate in the common pattern of: fetch data, create printer, call Print.
-func PrintData[T any](fetchFn func() (*T, error), tableCfg *TableConfig, format Format, tmpl string, out io.Writer) error {
+func PrintData[T any](fetchFn func() (*T, error), tableCfg *TableConfig, format Format, out io.Writer) error {
 	data, err := fetchFn()
 	if err != nil {
 		return err
 	}
 
 	return New(Options{
-		Format:   format,
-		Template: tmpl,
-		Out:      out,
-		Table:    tableCfg,
+		Format: format,
+		Out:    out,
+		Table:  tableCfg,
 	}).Print(data)
 }

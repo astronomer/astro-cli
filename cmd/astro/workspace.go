@@ -80,7 +80,7 @@ func newWorkspaceListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all Astro Workspaces in your organization",
 		Long:    "List all Astro Workspaces you have access to in your current Organization. Use 'astro organization switch' to change Organizations.",
 		Example: `  astro workspace list
-  astro workspace list --json`,
+  astro workspace list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceList(cmd, out)
 		},
@@ -211,7 +211,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all users and their roles in a Workspace.",
 		Example: `  astro workspace user list
   astro workspace user list --workspace-id clxxxxxxxxx
-  astro workspace user list --json`,
+  astro workspace user list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceUser(cmd, out)
 		},
@@ -317,7 +317,7 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the teams in an Astro Workspace",
 		Long:    "List all teams and their assigned roles in a Workspace.",
 		Example: `  astro workspace team list
-  astro workspace team list --json`,
+  astro workspace team list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceTeam(cmd, out)
 		},
@@ -575,13 +575,13 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 }
 
 func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
-	format, err := workspaceTeamListOutputFlags.Resolve()
+	format, err := resolveOutput(&workspaceTeamListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", format, workspaceTeamListOutputFlags.Template, out)
+	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", format, out)
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -667,14 +667,14 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 }
 
 func workspaceList(cmd *cobra.Command, out io.Writer) error {
-	format, err := workspaceListOutputFlags.Resolve()
+	format, err := resolveOutput(&workspaceListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.ListWithFormat(astroV1Client, format, workspaceListOutputFlags.Template, out)
+	return workspace.ListWithFormat(astroV1Client, format, out)
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -728,13 +728,13 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 }
 
 func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
-	format, err := workspaceUserListOutputFlags.Resolve()
+	format, err := resolveOutput(&workspaceUserListOutputFlags)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, format, workspaceUserListOutputFlags.Template, out)
+	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, format, out)
 }
 
 func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {

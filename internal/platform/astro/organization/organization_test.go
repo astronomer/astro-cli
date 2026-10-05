@@ -108,7 +108,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, "json", "", buf)
+		err := ListWithFormat(mockClient, "json", buf)
 		s.NoError(err)
 
 		var result OrganizationList
@@ -118,26 +118,14 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.AssertExpectations(s.T())
 	})
 
-	s.Run("table output", func() {
+	s.Run("text output", func() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, "table", "", buf)
+		err := ListWithFormat(mockClient, "text", buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "org1")
-		mockClient.AssertExpectations(s.T())
-	})
-
-	s.Run("template output", func() {
-		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
-
-		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, "template", `{{range .Organizations}}{{.Name}}{{"\n"}}{{end}}`, buf)
-		s.NoError(err)
-		s.Contains(buf.String(), "org1")
-		s.Contains(buf.String(), "org2")
 		mockClient.AssertExpectations(s.T())
 	})
 }
