@@ -128,7 +128,7 @@ func TestEnvAirflowVarLinkSetAndList(t *testing.T) {
 		mockListReturns(mc, &linked)
 		astroV1Client = mc
 
-		out, err := execEnvCmd("airflow-variable", "link", "list", "--airflow-variable-key", "region", "--workspace-id", cuid.New(), "--format", "json")
+		out, err := execEnvCmd("airflow-variable", "link", "list", "--airflow-variable-key", "region", "--workspace-id", cuid.New(), "-o", "json")
 		require.NoError(t, err)
 		var got map[string]any
 		require.NoError(t, json.Unmarshal([]byte(out), &got))

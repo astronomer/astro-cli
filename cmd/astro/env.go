@@ -3,9 +3,11 @@ package astro
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
@@ -27,6 +29,36 @@ func autoLinkPtr(cmd *cobra.Command) *bool {
 		return nil
 	}
 	return &envAutoLink
+}
+
+// addOutputFlag wires -o/--output onto an `astro env` command that renders
+// what it read. It is the format, as everywhere else in the CLI. It used to be
+// a file path here, with the format on --format, which made `--output json`
+// quietly write a file named json.
+func addOutputFlag(cmd *cobra.Command, supported []env.Format) {
+	addOutputFlagTo(cmd, &envOutput, supported)
+}
+
+// addOutputFlagTo is addOutputFlag for a command that keeps its flag values
+// off the shared package variables, as the link groups do.
+func addOutputFlagTo(cmd *cobra.Command, target *string, supported []env.Format) {
+	names := make([]string, len(supported))
+	for i, f := range supported {
+		names[i] = string(f)
+	}
+	usage := "Output format: " + strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+	cmd.Flags().StringVarP(target, "output", "o", string(env.FormatText), usage)
+}
+
+// parseOutput is env.ParseFormat with a bad value marked as a usage error, so
+// it exits 2 and publishes kind usage like a bad --output anywhere else. The
+// platform package cannot mark it itself: internal/ never imports cmd/.
+func parseOutput(s string, supported []env.Format) (env.Format, error) {
+	f, err := env.ParseFormat(s, supported)
+	if err != nil {
+		return "", cliout.Usage(err)
+	}
+	return f, nil
 }
 
 // addScopePersistentFlags wires the workspace/deployment scope flags onto a
@@ -59,8 +91,7 @@ func envScope() (env.Scope, error) {
 var (
 	envWorkspaceID    string
 	envDeploymentID   string
-	envFormat         string
-	envOutputPath     string
+	envOutput         string
 	envIncludeSecrets bool
 	envResolveLinked  bool
 	envYes            bool
@@ -124,8 +155,7 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 			return runEnvList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
-	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
+	addOutputFlag(cmd, env.TextOrJSON)
 	// The scope flags are persistent on each noun rather than on `env`, so a
 	// command sitting directly under the group has to register its own. They
 	// are worded exactly as addScopePersistentFlags words them, and the
@@ -146,28 +176,24 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	// Checked before the parse, which would refuse it with the generic
+	// wording, and before the call: there is no reason to fetch every object
+	// in the scope to then refuse to print it.
+	if envOutput == string(env.FormatDotenv) {
+		cmd.SilenceUsage = true
+		return cliout.Usage(env.ErrInventoryHasNoValues)
+	}
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}
 	cmd.SilenceUsage = true
-	// Checked before the call, not after rendering: there is no reason to
-	// fetch every object in the scope to then refuse to print it. The same
-	// sentinel guards WriteInventory, so the two cannot disagree.
-	if f == env.FormatDotenv {
-		return env.ErrInventoryHasNoValues
-	}
 
 	items, err := env.ListInventory(scope, envResolveLinked, astroV1Client)
 	if err != nil {
 		return err
 	}
-	w, closer, err := openOutput(out)
-	if err != nil {
-		return err
-	}
-	defer closer()
-	return env.WriteInventory(items, f, w)
+	return env.WriteInventory(items, f, out)
 }
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {

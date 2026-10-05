@@ -1152,7 +1152,7 @@ func TestEnvListRefusesDotenv(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	astroV1Client = mc
 
-	_, err := execEnvCmd("list", "--workspace-id", "ws-test", "--format", "dotenv")
+	_, err := execEnvCmd("list", "--workspace-id", "ws-test", "-o", "dotenv")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "has none of")
 }

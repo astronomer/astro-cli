@@ -144,7 +144,7 @@ func newEnvVarLinkListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addLinkVariableFlags(cmd)
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	addOutputFlag(cmd, env.TextOrJSON)
 	return cmd
 }
 
@@ -215,7 +215,7 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}

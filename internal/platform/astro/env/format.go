@@ -9,27 +9,33 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-// Format selects the rendering for env-object output.
+// Format selects how an `astro env` command renders what it read: the
+// value of -o/--output.
 type Format string
 
 const (
-	FormatTable  Format = "table"
+	FormatText   Format = "text"
 	FormatJSON   Format = "json"
-	FormatYAML   Format = "yaml"
 	FormatDotenv Format = "dotenv"
+)
+
+// The formats a command accepts. Every `astro env` read takes text and json;
+// the environment-variable reads take dotenv too, since only an environment
+// variable has the KEY=VALUE shape a .env file is made of.
+var (
+	TextOrJSON     = []Format{FormatText, FormatJSON}
+	TextJSONDotenv = []Format{FormatText, FormatJSON, FormatDotenv}
 )
 
 const (
 	maskedSecret = "****"
 
 	// tableValueMax caps the width of value-style columns in the table view.
-	// JSON/YAML/dotenv output is never truncated; this is a display concession
+	// JSON and dotenv output is never truncated; this is a display concession
 	// so a single 5000-char value doesn't shred the layout.
 	tableValueMax = 60
 )
@@ -50,160 +56,111 @@ func clampTableValue(s string) string {
 	return s
 }
 
-// ParseFormat parses a user-provided string into a Format. Empty string returns the zero value.
-func ParseFormat(s string) (Format, error) {
-	switch Format(s) {
-	case "":
-		return "", nil
-	case FormatTable, FormatJSON, FormatYAML, FormatDotenv:
+// ParseFormat validates an -o/--output value against the formats a command
+// supports.
+func ParseFormat(s string, supported []Format) (Format, error) {
+	if slices.Contains(supported, Format(s)) {
 		return Format(s), nil
-	default:
-		return "", fmt.Errorf("invalid format %q (want: table|json|yaml|dotenv)", s)
 	}
+	return "", unsupportedFormat(s, supported)
 }
 
-// WriteVarList renders a list of ENVIRONMENT_VARIABLE objects in the requested format.
-func WriteVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	switch format {
-	case "", FormatTable:
-		return writeVarTable(envObjs, includeSecrets, out)
-	case FormatDotenv:
-		return writeVarDotenv(envObjs, includeSecrets, out)
-	case FormatJSON:
-		return writeJSON(envObjs, out)
-	case FormatYAML:
-		return writeYAML(envObjs, out)
+// unsupportedFormat is the one wording for a format a command does not take,
+// whether the flag parser or a writer is the one refusing it.
+func unsupportedFormat(s string, supported []Format) error {
+	names := make([]string, len(supported))
+	for i, f := range supported {
+		names[i] = string(f)
 	}
-	return fmt.Errorf("invalid format %q", format)
+	return fmt.Errorf("unknown output format %q (supported: %s)", s, strings.Join(names, ", "))
+}
+
+// write renders v as f. JSON is v itself; text draws the human view of it;
+// dotenv draws the .env view, and is nil for a value that has none, which
+// refuses the format. Every Write* below is this with its own renderers.
+func write(out io.Writer, f Format, v any, text, dotenv func(io.Writer) error) error {
+	switch {
+	case f == FormatText:
+		return text(out)
+	case f == FormatJSON:
+		return writeJSON(v, out)
+	case f == FormatDotenv && dotenv != nil:
+		return dotenv(out)
+	}
+	if dotenv != nil {
+		return unsupportedFormat(string(f), TextJSONDotenv)
+	}
+	return unsupportedFormat(string(f), TextOrJSON)
+}
+
+var errNilObject = errors.New("nil environment object")
+
+// WriteVarList renders a list of ENVIRONMENT_VARIABLE objects.
+func WriteVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
+	return write(out, format, envObjs,
+		func(w io.Writer) error { return writeVarTable(envObjs, includeSecrets, w) },
+		func(w io.Writer) error { return writeVarDotenv(envObjs, includeSecrets, w) })
 }
 
 // WriteVar renders a single ENVIRONMENT_VARIABLE object.
 func WriteVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
 	if envObj == nil {
-		return errors.New("nil environment object")
+		return errNilObject
 	}
-	switch format {
-	case "", FormatTable:
-		return writeVarTable([]astrov1.EnvironmentObject{*envObj}, includeSecrets, out)
-	case FormatDotenv:
-		return writeVarDotenv([]astrov1.EnvironmentObject{*envObj}, includeSecrets, out)
-	case FormatJSON:
-		return writeJSON(envObj, out)
-	case FormatYAML:
-		return writeYAML(envObj, out)
-	}
-	return fmt.Errorf("invalid format %q", format)
+	one := []astrov1.EnvironmentObject{*envObj}
+	return write(out, format, envObj,
+		func(w io.Writer) error { return writeVarTable(one, includeSecrets, w) },
+		func(w io.Writer) error { return writeVarDotenv(one, includeSecrets, w) })
 }
 
-// WriteVarLinks renders a VarLinksReport in the requested format.
+// WriteVarLinks renders a VarLinksReport.
 func WriteVarLinks(report *VarLinksReport, format Format, includeSecrets bool, out io.Writer) error {
-	return writeLinksReport(report, format, func() linksTable { return varLinksTable(report, includeSecrets) }, out)
-}
-
-// writeLinksReport is the format switch both link reports share; only the
-// table differs.
-func writeLinksReport(report any, format Format, table func() linksTable, out io.Writer) error {
-	switch format {
-	case "", FormatTable:
-		t := table()
-		t.write(out)
-		return nil
-	case FormatJSON:
-		return writeJSON(report, out)
-	case FormatYAML:
-		return writeYAML(report, out)
-	case FormatDotenv:
-		return errors.New("dotenv format is not supported for links")
-	}
-	return fmt.Errorf("invalid format %q", format)
+	return write(out, format, report, varLinksTable(report, includeSecrets).write, nil)
 }
 
 // WriteConnList renders a list of CONNECTION objects.
 func WriteConnList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	switch format {
-	case "", FormatTable:
-		return writeConnTable(envObjs, out)
-	case FormatJSON:
-		return writeJSON(envObjs, out)
-	case FormatYAML:
-		return writeYAML(envObjs, out)
-	case FormatDotenv:
-		return errors.New("dotenv format is not supported for connections")
-	}
-	return fmt.Errorf("invalid format %q", format)
+	return write(out, format, envObjs, func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
 }
 
 // WriteConn renders a single CONNECTION object.
 func WriteConn(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) error {
 	if envObj == nil {
-		return errors.New("nil environment object")
+		return errNilObject
 	}
-	if format == FormatJSON {
-		return writeJSON(envObj, out)
-	}
-	if format == FormatYAML {
-		return writeYAML(envObj, out)
-	}
-	return writeConnTable([]astrov1.EnvironmentObject{*envObj}, out)
+	one := []astrov1.EnvironmentObject{*envObj}
+	return write(out, format, envObj, func(w io.Writer) error { return writeConnTable(one, w) }, nil)
 }
 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
 // Same shape as ENVIRONMENT_VARIABLE.
 func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	switch format {
-	case "", FormatTable:
-		return writeAirflowVarTable(envObjs, includeSecrets, out)
-	case FormatJSON:
-		return writeJSON(envObjs, out)
-	case FormatYAML:
-		return writeYAML(envObjs, out)
-	case FormatDotenv:
-		return errors.New("dotenv format is not supported for Airflow variables")
-	}
-	return fmt.Errorf("invalid format %q", format)
+	return write(out, format, envObjs,
+		func(w io.Writer) error { return writeAirflowVarTable(envObjs, includeSecrets, w) }, nil)
 }
 
 // WriteAirflowVar renders a single AIRFLOW_VARIABLE object.
 func WriteAirflowVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
 	if envObj == nil {
-		return errors.New("nil environment object")
+		return errNilObject
 	}
-	if format == FormatJSON {
-		return writeJSON(envObj, out)
-	}
-	if format == FormatYAML {
-		return writeYAML(envObj, out)
-	}
-	return writeAirflowVarTable([]astrov1.EnvironmentObject{*envObj}, includeSecrets, out)
+	one := []astrov1.EnvironmentObject{*envObj}
+	return write(out, format, envObj,
+		func(w io.Writer) error { return writeAirflowVarTable(one, includeSecrets, w) }, nil)
 }
 
 // WriteMetricsExportList renders a list of METRICS_EXPORT objects.
 func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	switch format {
-	case "", FormatTable:
-		return writeMetricsExportTable(envObjs, out)
-	case FormatJSON:
-		return writeJSON(envObjs, out)
-	case FormatYAML:
-		return writeYAML(envObjs, out)
-	case FormatDotenv:
-		return errors.New("dotenv format is not supported for metrics exports")
-	}
-	return fmt.Errorf("invalid format %q", format)
+	return write(out, format, envObjs, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
 }
 
 // WriteMetricsExport renders a single METRICS_EXPORT object.
 func WriteMetricsExport(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) error {
 	if envObj == nil {
-		return errors.New("nil environment object")
+		return errNilObject
 	}
-	if format == FormatJSON {
-		return writeJSON(envObj, out)
-	}
-	if format == FormatYAML {
-		return writeYAML(envObj, out)
-	}
-	return writeMetricsExportTable([]astrov1.EnvironmentObject{*envObj}, out)
+	one := []astrov1.EnvironmentObject{*envObj}
+	return write(out, format, envObj, func(w io.Writer) error { return writeMetricsExportTable(one, w) }, nil)
 }
 
 func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
@@ -329,7 +286,7 @@ type linksTable struct {
 	excludes []string
 }
 
-func (t *linksTable) write(out io.Writer) {
+func (t *linksTable) write(out io.Writer) error {
 	const label = "%-20s%s\n"
 	for _, f := range t.fields {
 		fmt.Fprintf(out, label, f[0]+":", f[1])
@@ -356,14 +313,15 @@ func (t *linksTable) write(out io.Writer) {
 			fmt.Fprintf(out, "  %d. %s\n", i+1, depID)
 		}
 	}
+	return nil
 }
 
-func varLinksTable(report *VarLinksReport, includeSecrets bool) linksTable {
+func varLinksTable(report *VarLinksReport, includeSecrets bool) *linksTable {
 	value := report.WorkspaceValue
 	if report.IsSecret && !includeSecrets {
 		value = maskedSecret + " (secret)"
 	}
-	t := linksTable{
+	t := &linksTable{
 		fields: [][2]string{
 			{"KEY", report.ObjectKey},
 			{"ID", report.ObjectID},
@@ -379,23 +337,25 @@ func varLinksTable(report *VarLinksReport, includeSecrets bool) linksTable {
 	return t
 }
 
-// WriteLinks renders a LinksReport in the requested format.
+// WriteLinks renders a LinksReport.
 func WriteLinks(report *LinksReport, format Format, out io.Writer) error {
-	return writeLinksReport(report, format, func() linksTable {
-		t := linksTable{
-			fields: [][2]string{
-				{"KEY", report.ObjectKey},
-				{"ID", report.ObjectID},
-				{"AUTO-LINK", strconv.FormatBool(report.AutoLinkDeployments)},
-			},
-			overrideHeader: "OVERRIDES",
-			excludes:       report.ExcludeLinks,
-		}
-		for _, l := range report.Links {
-			t.links = append(t.links, [2]string{l.DeploymentID, overridesDisplay(l)})
-		}
-		return t
-	}, out)
+	return write(out, format, report, connLinksTable(report).write, nil)
+}
+
+func connLinksTable(report *LinksReport) *linksTable {
+	t := &linksTable{
+		fields: [][2]string{
+			{"KEY", report.ObjectKey},
+			{"ID", report.ObjectID},
+			{"AUTO-LINK", strconv.FormatBool(report.AutoLinkDeployments)},
+		},
+		overrideHeader: "OVERRIDES",
+		excludes:       report.ExcludeLinks,
+	}
+	for _, l := range report.Links {
+		t.links = append(t.links, [2]string{l.DeploymentID, overridesDisplay(l)})
+	}
+	return t
 }
 
 // overridesDisplay renders a link's overrides as name=value pairs. A field
@@ -547,53 +507,23 @@ func writeJSON(v any, out io.Writer) error {
 	return enc.Encode(v)
 }
 
-func writeYAML(v any, out io.Writer) error {
-	// The generated env-object types only carry JSON tags, so a direct YAML
-	// encode would emit lowercased field names. Round-trip through JSON to
-	// preserve camelCase keys consistently with --format json.
-	jsonBytes, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	var generic any
-	if err := json.Unmarshal(jsonBytes, &generic); err != nil {
-		return err
-	}
-	enc := yaml.NewEncoder(out)
-	defer enc.Close() //nolint:errcheck // best-effort close
-	return enc.Encode(generic)
-}
-
-// WriteInventory renders the cross-kind listing.
-//
-// FormatDotenv is deliberately absent: a dotenv file is KEY=VALUE, and this
-// listing has no values to put on the right of the equals sign. Accepting the
-// flag and emitting keys with empty values would produce a file that, read
-// back through `set --from-file`, is exactly the blank-every-secret shape that
-// path now refuses.
+// WriteInventory renders the cross-kind listing. It has no dotenv view: see
+// ErrInventoryHasNoValues.
 func WriteInventory(items []InventoryItem, format Format, out io.Writer) error {
-	switch format {
-	case "", FormatTable:
-		return writeInventoryTable(items, out)
-	case FormatJSON:
-		return writeJSON(items, out)
-	case FormatYAML:
-		return writeYAML(items, out)
-	case FormatDotenv:
-		return ErrInventoryHasNoValues
-	}
-	return fmt.Errorf("invalid format %q", format)
+	return write(out, format, items, func(w io.Writer) error { return writeInventoryTable(items, w) }, nil)
 }
 
-// ErrInventoryHasNoValues refuses a format that writes values for a listing
-// that has none.
+// ErrInventoryHasNoValues refuses dotenv for the cross-kind listing, with
+// more to say than the generic "unknown output format".
 //
-// It is a sentinel rather than a message built at each site because the check
-// runs twice: once in the command, before paying for the objects, and once
-// here, so a future caller cannot bypass it. Two hand-copied sentences would
-// drift, and the early one is the one users see.
+// A dotenv file is KEY=VALUE, and this listing has no values to put on the
+// right of the equals sign. Emitting keys with empty values would produce a
+// file that, read back through `set --from-file`, is exactly the
+// blank-every-secret shape that path refuses. The command checks for it
+// before paying for the objects; WriteInventory refuses dotenv too, with the
+// generic wording, so a future caller cannot bypass it.
 var ErrInventoryHasNoValues = errors.New(
-	"that format writes values, which a cross-kind listing has none of; " +
+	"-o dotenv writes values, which a cross-kind listing has none of; " +
 		"use it on a single kind, e.g. `astro env variable export`")
 
 func writeInventoryTable(items []InventoryItem, out io.Writer) error {

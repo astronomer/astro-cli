@@ -57,8 +57,7 @@ func newEnvAirflowVarListCmd(out io.Writer) *cobra.Command {
 			return runEnvAirflowVarList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
-	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
+	addOutputFlag(cmd, env.TextOrJSON)
 	return cmd
 }
 
@@ -71,7 +70,7 @@ func newEnvAirflowVarGetCmd(out io.Writer) *cobra.Command {
 			return runEnvAirflowVarGet(cmd, out, args[0])
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	addOutputFlag(cmd, env.TextOrJSON)
 	return cmd
 }
 
@@ -123,7 +122,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}
@@ -136,12 +135,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	w, closer, err := openOutput(out)
-	if err != nil {
-		return err
-	}
-	defer closer()
-	return env.WriteAirflowVarList(objs, f, envIncludeSecrets, w)
+	return env.WriteAirflowVarList(objs, f, envIncludeSecrets, out)
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -149,7 +143,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}

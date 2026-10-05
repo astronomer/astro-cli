@@ -20,16 +20,16 @@ type InventoryItem struct {
 	// `connection`, `airflow-variable`, `metrics-export` — not the API's
 	// enum. A listing that names the command you would type next is worth
 	// more than one that names the wire constant.
-	Kind string `json:"kind" yaml:"kind"`
-	Key  string `json:"key" yaml:"key"`
+	Kind string `json:"kind"`
+	Key  string `json:"key"`
 	// Scope is the platform's own word, WORKSPACE or DEPLOYMENT, because it
 	// is not a command — there is nothing to type it into — and every
 	// per-kind listing already prints it this way.
-	Scope string `json:"scope" yaml:"scope"`
+	Scope string `json:"scope"`
 	// ID is set only when the objects were fetched without link resolution;
 	// a resolved row refers to a link rather than a directly addressable
 	// object, which is why the per-kind tables hide the column too.
-	ID string `json:"id,omitempty" yaml:"id,omitempty"`
+	ID string `json:"id,omitempty"`
 }
 
 // inventoryKind pairs an object type with the noun the CLI spells it with.

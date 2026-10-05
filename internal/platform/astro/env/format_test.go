@@ -8,21 +8,73 @@ import (
 )
 
 func (s *Suite) TestParseFormat() {
-	cases := map[string]Format{
-		"":       Format(""),
-		"table":  FormatTable,
-		"json":   FormatJSON,
-		"yaml":   FormatYAML,
-		"dotenv": FormatDotenv,
-	}
-	for in, want := range cases {
-		got, err := ParseFormat(in)
+	for _, in := range []Format{FormatText, FormatJSON, FormatDotenv} {
+		got, err := ParseFormat(string(in), TextJSONDotenv)
 		s.NoError(err, "input %q", in)
-		s.Equal(want, got, "input %q", in)
+		s.Equal(in, got, "input %q", in)
 	}
 
-	_, err := ParseFormat("xml")
-	s.Error(err)
+	// dotenv only where the command offers it.
+	_, err := ParseFormat("dotenv", TextOrJSON)
+	s.EqualError(err, `unknown output format "dotenv" (supported: text, json)`)
+
+	// yaml went with v2; "" is not a silent text.
+	for _, in := range []string{"yaml", "xml", ""} {
+		_, err := ParseFormat(in, TextJSONDotenv)
+		s.EqualError(err, `unknown output format "`+in+`" (supported: text, json, dotenv)`, "input %q", in)
+	}
+
+	// table went too; text renders it.
+	_, err = ParseFormat("table", TextOrJSON)
+	s.EqualError(err, `unknown output format "table" (supported: text, json)`)
+}
+
+// Every writer goes through one switch, so they agree: json is the value
+// itself (an object for one, an array for a list), and a format the writer
+// has no view for is refused with the parser's own wording.
+func (s *Suite) TestWritersShareOneSwitch() {
+	obj := &astrov1.EnvironmentObject{ObjectKey: "K"}
+	list := []astrov1.EnvironmentObject{*obj}
+	type writer func(Format, *bytes.Buffer) error
+	cases := []struct {
+		name string
+		w    writer
+		// jsonOpens is the first byte of the JSON: '[' for a list, '{' for one.
+		jsonOpens byte
+		dotenv    bool
+	}{
+		{"var", func(f Format, b *bytes.Buffer) error { return WriteVar(obj, f, false, b) }, '{', true},
+		{"var list", func(f Format, b *bytes.Buffer) error { return WriteVarList(list, f, false, b) }, '[', true},
+		{"conn", func(f Format, b *bytes.Buffer) error { return WriteConn(obj, f, b) }, '{', false},
+		{"conn list", func(f Format, b *bytes.Buffer) error { return WriteConnList(list, f, b) }, '[', false},
+		{"airflow var", func(f Format, b *bytes.Buffer) error { return WriteAirflowVar(obj, f, false, b) }, '{', false},
+		{"airflow var list", func(f Format, b *bytes.Buffer) error { return WriteAirflowVarList(list, f, false, b) }, '[', false},
+		{"metrics", func(f Format, b *bytes.Buffer) error { return WriteMetricsExport(obj, f, b) }, '{', false},
+		{"metrics list", func(f Format, b *bytes.Buffer) error { return WriteMetricsExportList(list, f, b) }, '[', false},
+		{"var links", func(f Format, b *bytes.Buffer) error {
+			return WriteVarLinks(&VarLinksReport{ObjectKey: "K"}, f, false, b)
+		}, '{', false},
+		{"links", func(f Format, b *bytes.Buffer) error { return WriteLinks(&LinksReport{ObjectKey: "K"}, f, b) }, '{', false},
+		{"inventory", func(f Format, b *bytes.Buffer) error { return WriteInventory([]InventoryItem{{Key: "K"}}, f, b) }, '[', false},
+	}
+	for _, c := range cases {
+		var text, js bytes.Buffer
+		s.NoError(c.w(FormatText, &text), c.name)
+		s.Contains(text.String(), "K", c.name)
+
+		s.NoError(c.w(FormatJSON, &js), c.name)
+		s.Equal(c.jsonOpens, js.Bytes()[0], c.name)
+		s.Contains(js.String(), `"K"`, c.name)
+
+		s.ErrorContains(c.w("yaml", new(bytes.Buffer)), `unknown output format "yaml" (supported: text, json`, c.name)
+
+		err := c.w(FormatDotenv, new(bytes.Buffer))
+		if c.dotenv {
+			s.NoError(err, c.name)
+		} else {
+			s.EqualError(err, `unknown output format "dotenv" (supported: text, json)`, c.name)
+		}
+	}
 }
 
 func (s *Suite) TestWriteVarDotenv() {
@@ -105,7 +157,7 @@ func (s *Suite) TestWriteVarTableTruncatesLongValues() {
 		{ObjectKey: "MULTI", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "a\nb"}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(objs, FormatTable, false, &buf))
+	s.NoError(WriteVarList(objs, FormatText, false, &buf))
 	out := buf.String()
 	s.NotContains(out, long)   // long value truncated
 	s.Contains(out, "…")       // ellipsis present
@@ -125,7 +177,7 @@ func (s *Suite) TestWriteVarJSONNotTruncated() {
 
 func (s *Suite) TestWriteVarTableEmpty() {
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(nil, FormatTable, false, &buf))
+	s.NoError(WriteVarList(nil, FormatText, false, &buf))
 	s.Contains(strings.ToLower(buf.String()), "no environment variables")
 }
 
@@ -152,7 +204,7 @@ func (s *Suite) TestWriteVarLinksTableSecrets() {
 
 	s.Run("masks workspace value and override without --include-secrets", func() {
 		var buf bytes.Buffer
-		s.NoError(WriteVarLinks(report, FormatTable, false, &buf))
+		s.NoError(WriteVarLinks(report, FormatText, false, &buf))
 		out := buf.String()
 		s.Contains(out, maskedSecret+" (secret)")
 		s.Contains(out, "(hidden, use --include-secrets)")
@@ -162,7 +214,7 @@ func (s *Suite) TestWriteVarLinksTableSecrets() {
 
 	s.Run("shows both with --include-secrets", func() {
 		var buf bytes.Buffer
-		s.NoError(WriteVarLinks(report, FormatTable, true, &buf))
+		s.NoError(WriteVarLinks(report, FormatText, true, &buf))
 		out := buf.String()
 		s.Contains(out, "secret-value")
 		s.Contains(out, "secret-override")
@@ -180,7 +232,7 @@ func (s *Suite) TestWriteVarLinksTableClampsValues() {
 		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &long}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarLinks(report, FormatTable, false, &buf))
+	s.NoError(WriteVarLinks(report, FormatText, false, &buf))
 	out := buf.String()
 	s.NotContains(out, long)
 	s.Contains(out, "line1 ⏎ line2")

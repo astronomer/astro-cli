@@ -24,8 +24,9 @@ const envVarExamples = `
   astro env variable export --workspace-id <ws> > .env
   astro env variable set --workspace-id <ws> --from-file .env
 
-  # list and delete
+  # list, as a table or as JSON for a script, and delete
   astro env variable list --workspace-id <ws>
+  astro env variable list --workspace-id <ws> -o json
   astro env variable delete API_TOKEN --workspace-id <ws> --yes`
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
@@ -66,8 +67,7 @@ func newEnvVarListCmd(out io.Writer) *cobra.Command {
 			return runEnvVarList(cmd, out, "")
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml|dotenv")
-	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
+	addOutputFlag(cmd, env.TextJSONDotenv)
 	return cmd
 }
 
@@ -81,7 +81,6 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 			return runEnvVarList(cmd, out, env.FormatDotenv)
 		},
 	}
-	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
 	return cmd
 }
 
@@ -94,7 +93,7 @@ func newEnvVarGetCmd(out io.Writer) *cobra.Command {
 			return runEnvVarGet(cmd, out, args[0])
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml|dotenv")
+	addOutputFlag(cmd, env.TextJSONDotenv)
 	return cmd
 }
 
@@ -148,7 +147,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format)
 	}
 	f := formatOverride
 	if f == "" {
-		f, err = env.ParseFormat(envFormat)
+		f, err = parseOutput(envOutput, env.TextJSONDotenv)
 		if err != nil {
 			return err
 		}
@@ -162,12 +161,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format)
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	w, closer, err := openOutput(out)
-	if err != nil {
-		return err
-	}
-	defer closer()
-	return env.WriteVarList(objs, f, envIncludeSecrets, w)
+	return env.WriteVarList(objs, f, envIncludeSecrets, out)
 }
 
 func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -175,7 +169,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextJSONDotenv)
 	if err != nil {
 		return err
 	}
@@ -265,15 +259,4 @@ func runEnvVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
 	return nil
-}
-
-func openOutput(out io.Writer) (io.Writer, func(), error) {
-	if envOutputPath == "" || envOutputPath == "-" {
-		return out, func() {}, nil
-	}
-	f, err := os.Create(envOutputPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("opening output file: %w", err)
-	}
-	return f, func() { _ = f.Close() }, nil
 }

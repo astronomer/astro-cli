@@ -47,8 +47,7 @@ func expectAbsent(mc *astrov1_mocks.ClientWithResponsesInterface, key string) {
 func resetEnvFlags() {
 	envWorkspaceID = ""
 	envDeploymentID = ""
-	envFormat = ""
-	envOutputPath = ""
+	envOutput = ""
 	envIncludeSecrets = false
 	envResolveLinked = false
 	envYes = false

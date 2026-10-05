@@ -1,4 +1,3 @@
-//nolint:dupl // Cobra wiring per env-object type is intentionally parallel.
 package astro
 
 import (
@@ -60,8 +59,7 @@ func newEnvMetricsListCmd(out io.Writer) *cobra.Command {
 			return runEnvMetricsList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
-	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
+	addOutputFlag(cmd, env.TextOrJSON)
 	return cmd
 }
 
@@ -74,7 +72,7 @@ func newEnvMetricsGetCmd(out io.Writer) *cobra.Command {
 			return runEnvMetricsGet(cmd, out, args[0])
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	addOutputFlag(cmd, env.TextOrJSON)
 	return cmd
 }
 
@@ -127,7 +125,7 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}
@@ -140,12 +138,7 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	w, closer, err := openOutput(out)
-	if err != nil {
-		return err
-	}
-	defer closer()
-	return env.WriteMetricsExportList(objs, f, w)
+	return env.WriteMetricsExportList(objs, f, out)
 }
 
 func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -153,7 +146,7 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}

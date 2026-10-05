@@ -1,4 +1,3 @@
-//nolint:dupl // Cobra wiring per env-object type is intentionally parallel.
 package astro
 
 import (
@@ -24,8 +23,9 @@ const envConnExamples = `
   astro env connection set db_main --workspace-id <ws> \
     --type postgres --host db.example.com --login admin --port 5432
 
-  # list and delete
+  # list, as a table or as JSON for a script, and delete
   astro env connection list --workspace-id <ws>
+  astro env connection list --workspace-id <ws> -o json
   astro env connection delete db_main --workspace-id <ws> --yes`
 
 func newEnvConnRootCmd(out io.Writer) *cobra.Command {
@@ -62,8 +62,7 @@ func newEnvConnListCmd(out io.Writer) *cobra.Command {
 			return runEnvConnList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
-	cmd.Flags().StringVar(&envOutputPath, "output", "-", "Write output to FILE (use '-' for stdout)")
+	addOutputFlag(cmd, env.TextOrJSON)
 	return cmd
 }
 
@@ -76,7 +75,7 @@ func newEnvConnGetCmd(out io.Writer) *cobra.Command {
 			return runEnvConnGet(cmd, out, args[0])
 		},
 	}
-	cmd.Flags().StringVar(&envFormat, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	addOutputFlag(cmd, env.TextOrJSON)
 	return cmd
 }
 
@@ -145,7 +144,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}
@@ -158,12 +157,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	w, closer, err := openOutput(out)
-	if err != nil {
-		return err
-	}
-	defer closer()
-	return env.WriteConnList(objs, f, w)
+	return env.WriteConnList(objs, f, out)
 }
 
 func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -171,7 +165,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	f, err := env.ParseFormat(envFormat)
+	f, err := parseOutput(envOutput, env.TextOrJSON)
 	if err != nil {
 		return err
 	}

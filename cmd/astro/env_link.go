@@ -35,7 +35,7 @@ type linkFlags struct {
 	objectID, objectKey string
 	deploymentID        string
 	exclude, noCreate   bool
-	format              string
+	output              string
 	value               string
 	conn                struct {
 		connType, host, login, password, schema, extra string
@@ -246,7 +246,7 @@ func newEnvLinkListCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command 
 		},
 	}
 	addLinkObjectFlags(cmd, n, f)
-	cmd.Flags().StringVar(&f.format, "format", string(env.FormatTable), "Output format: table|json|yaml")
+	addOutputFlagTo(cmd, &f.output, env.TextOrJSON)
 	return cmd
 }
 
@@ -317,7 +317,7 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	format, err := env.ParseFormat(f.format)
+	format, err := parseOutput(f.output, env.TextOrJSON)
 	if err != nil {
 		return err
 	}
