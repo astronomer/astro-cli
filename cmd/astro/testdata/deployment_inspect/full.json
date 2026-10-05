@@ -1,0 +1,64 @@
+{
+    "deployment": {
+        "environment_variables": [
+            {
+                "is_secret": false,
+                "key": "PLAIN_VAR",
+                "updated_at": "2026-02-03T04:05:06Z",
+                "value": "plain-value"
+            },
+            {
+                "is_secret": true,
+                "key": "SECRET_VAR",
+                "updated_at": "2026-02-03T04:05:06Z",
+                "value": null
+            }
+        ],
+        "configuration": {
+            "name": "golden-deployment",
+            "description": "pinned by deployment_inspect_golden_test.go",
+            "runtime_version": "13.1.0",
+            "dag_deploy_enabled": true,
+            "ci_cd_enforcement": false,
+            "scheduler_size": "SMALL",
+            "is_high_availability": false,
+            "is_development_mode": true,
+            "executor": "ASTRO",
+            "scheduler_count": 1,
+            "workspace_name": "golden-workspace",
+            "deployment_type": "STANDARD",
+            "cloud_provider": "AWS",
+            "region": "us-east-1",
+            "default_task_pod_cpu": "0.25",
+            "default_task_pod_memory": "0.5Gi",
+            "resource_quota_cpu": "10",
+            "resource_quota_memory": "20Gi",
+            "workload_identity": ""
+        },
+        "worker_queues": [
+            {
+                "name": "default",
+                "max_worker_count": 10,
+                "min_worker_count": 1,
+                "worker_type": "A5"
+            }
+        ],
+        "metadata": {
+            "deployment_id": "clgoldendeploy0001",
+            "workspace_id": "ck05r3bor07h40d02y2hw4n4v",
+            "cluster_id": "N/A",
+            "release_name": "N/A",
+            "airflow_version": "3.1.1",
+            "current_tag": "13.1.0",
+            "status": "HEALTHY",
+            "created_at": "2026-01-02T03:04:05Z",
+            "updated_at": "2026-02-03T04:05:06Z",
+            "deployment_url": "localhost:5000/ck05r3bor07h40d02y2hw4n4v/deployments/clgoldendeploy0001",
+            "webserver_url": "golden.astronomer.run/d0001",
+            "airflow_api_url": "golden.astronomer.run/d0001/api/v2"
+        },
+        "alert_emails": [
+            "alerts@example.com"
+        ]
+    }
+}

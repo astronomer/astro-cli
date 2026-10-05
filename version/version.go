@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -162,9 +163,12 @@ func versionLine() string {
 	return cliCurrentVersion + Current()
 }
 
-// PrintVersion outputs current cli version and git commit if exists
-func PrintVersion() {
-	fmt.Println(versionLine())
+// PrintVersion writes the `astro version` line to w. Its bytes are a contract:
+// astronomer/deploy-action runs `astro version | awk '{print $4}'`, so the
+// version has to stay the fourth whitespace-separated field.
+func PrintVersion(w io.Writer) error {
+	_, err := fmt.Fprintln(w, versionLine())
+	return err
 }
 
 func getCLIReleases(ctx context.Context, client *http.Client, url string) (*astroCLIReleaseResponse, error) {
