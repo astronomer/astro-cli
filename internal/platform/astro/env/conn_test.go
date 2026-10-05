@@ -48,13 +48,21 @@ func (s *Suite) TestDeleteConn() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, _ := config.GetCurrentContext()
 	id := cuid.New()
+	workspaceID := cuid.New()
 
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	// CUID path: no key-to-ID lookup, direct DELETE.
+	// CUID path: fetched by ID to confirm it is the workspace's, then deleted.
+	mc.On("GetEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrov1.GetEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.EnvironmentObject{
+			Id: &id, ObjectKey: "db", ObjectType: astrov1.EnvironmentObjectObjectTypeCONNECTION,
+			Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: workspaceID,
+		},
+	}, nil).Once()
 	mc.On("DeleteEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(&astrov1.DeleteEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 204},
 	}, nil).Once()
 
-	s.NoError(DeleteConn(id, Scope{WorkspaceID: cuid.New()}, mc))
+	s.NoError(DeleteConn(id, Scope{WorkspaceID: workspaceID}, mc))
 	mc.AssertExpectations(s.T())
 }

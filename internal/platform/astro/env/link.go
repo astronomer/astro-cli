@@ -477,6 +477,10 @@ func resolveWorkspaceObject(k linkKind, idOrKey string, scope Scope, includeSecr
 		return nil, errors.New("linking commands require --workspace-id; deployment-scoped objects cannot be linked")
 	}
 	obj, err := getObject(idOrKey, scope, k.objectType, includeSecrets, astroV1Client)
+	var outOfScope *outOfScopeError
+	if errors.As(err, &outOfScope) && outOfScope.obj != nil && outOfScope.obj.Scope != astrov1.EnvironmentObjectScopeWORKSPACE {
+		obj, err = outOfScope.obj, nil
+	}
 	if err != nil {
 		return nil, err
 	}

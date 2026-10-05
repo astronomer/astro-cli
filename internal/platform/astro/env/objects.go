@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -16,6 +17,10 @@ var (
 	ErrScopeNotSpecified = errors.New("--workspace-id or --deployment-id must be specified")
 	ErrScopeAmbiguous    = errors.New("--workspace-id and --deployment-id are mutually exclusive")
 	ErrNotFound          = errors.New("environment object not found")
+	// ErrOutOfScope reports an object addressed by ID that lives outside the
+	// scope the command named, or is of another type than the command handles.
+	// A key is looked up within the scope, so only an ID can reach one.
+	ErrOutOfScope = errors.New("environment object is outside the requested scope")
 )
 
 // getObjectListLimit is the page size for a single-row lookup by key.
@@ -85,12 +90,20 @@ func listObjects(scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObj
 	return objs, nil
 }
 
-// getObject fetches a single env-object by ID or key.
+// getObject fetches a single env-object by ID or key, from the scope's own
+// objects only.
 //
 // The platform has no GET-by-key endpoint; for keys, we filter the list endpoint
 // server-side via ObjectKey and force resolveLinked=false so the returned ID is
-// addressable in subsequent CRUD calls.
+// addressable in subsequent CRUD calls. An ID is fetched directly, which finds
+// the object wherever it lives, so the result is checked against the scope and
+// type the key lookup would have filtered on. Without that check an ID would
+// reach objects a key cannot: a workspace object linked into the deployment
+// named by --deployment-id, say, which every deployment linking it shares.
 func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	if err := scope.Validate(); err != nil {
+		return nil, err
+	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -111,12 +124,15 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 			return nil, err
 		}
+		if resp.JSON200 == nil {
+			return nil, fmt.Errorf("fetching environment object %s: the response carried no body", idOrKey)
+		}
+		if err := checkInScope(resp.JSON200, idOrKey, scope, objectType); err != nil {
+			return nil, err
+		}
 		return resp.JSON200, nil
 	}
 
-	if err := scope.Validate(); err != nil {
-		return nil, err
-	}
 	params := buildListParams(scope, objectType, &idOrKey, false, includeSecrets, getObjectListLimit)
 
 	resp, err := astroV1Client.ListEnvironmentObjectsWithResponse(httpcontext.Background(), c.Organization, params)
@@ -125,6 +141,9 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 	}
 	if err := normalizeListErr(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
+	}
+	if resp.JSON200 == nil {
+		return nil, fmt.Errorf("looking up environment object %q: the response carried no body", idOrKey)
 	}
 	for i := range resp.JSON200.EnvironmentObjects {
 		if resp.JSON200.EnvironmentObjects[i].ObjectKey == idOrKey {
@@ -151,18 +170,56 @@ func deleteObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmen
 	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }
 
-// resolveID returns idOrKey unchanged when it's already a CUID (no network call),
-// otherwise looks up the ID by key. Used by Update / Delete paths so callers
-// passing an ID don't pay for a redundant GET.
+// resolveID returns the ID of the object idOrKey names within the scope. An ID
+// is fetched too, not passed through, so that it is held to the same scope a
+// key is looked up in.
 func resolveID(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) (string, error) {
-	if util.IsCUID(idOrKey) {
-		return idOrKey, nil
-	}
 	existing, err := getObject(idOrKey, scope, objectType, false, astroV1Client)
 	if err != nil {
 		return "", err
 	}
 	return objectID(existing, idOrKey)
+}
+
+// outOfScopeError is checkInScope's refusal. obj is set when the object is of
+// the right type but owned elsewhere, so a caller with its own rule for that
+// case (linking, which only takes workspace objects) can say so instead.
+type outOfScopeError struct {
+	msg string
+	obj *astrov1.EnvironmentObject
+}
+
+func (e *outOfScopeError) Error() string        { return ErrOutOfScope.Error() + ": " + e.msg }
+func (e *outOfScopeError) Is(target error) bool { return target == ErrOutOfScope }
+
+// checkInScope refuses an object fetched by ID that the scope's own key lookup
+// would not have returned: one of another type, or one owned by another
+// workspace or deployment. An object missing its type or scope is refused too,
+// since nothing then shows it is the scope's.
+func checkInScope(obj *astrov1.EnvironmentObject, id string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType) error {
+	want := nounForListType(objectType)
+	if obj.ObjectType == "" || obj.Scope == "" || obj.ScopeEntityId == "" {
+		return &outOfScopeError{msg: fmt.Sprintf("the platform did not say what kind of object %s is or which workspace or deployment owns it", id)}
+	}
+	if obj.ObjectType != astrov1.EnvironmentObjectObjectType(objectType) {
+		return &outOfScopeError{msg: fmt.Sprintf("%s is a %s, not a %s", id, nounForObjectType(obj.ObjectType), want)}
+	}
+	wantScope, wantEntity := astrov1.EnvironmentObjectScopeWORKSPACE, scope.WorkspaceID
+	if scope.DeploymentID != "" {
+		wantScope, wantEntity = astrov1.EnvironmentObjectScopeDEPLOYMENT, scope.DeploymentID
+	}
+	if obj.Scope == wantScope && obj.ScopeEntityId == wantEntity {
+		return nil
+	}
+	owner := strings.ToLower(string(obj.Scope))
+	msg := fmt.Sprintf("%s %s belongs to %s %s, not %s %s. To address it, pass --%s-id %s",
+		want, id, owner, obj.ScopeEntityId, strings.ToLower(string(wantScope)), wantEntity, owner, obj.ScopeEntityId)
+	if obj.Scope == astrov1.EnvironmentObjectScopeWORKSPACE && scope.DeploymentID != "" && objectType != objectTypeMetrics {
+		msg = fmt.Sprintf("%s %s belongs to workspace %s, not deployment %s. To change it everywhere, pass --workspace-id %s. "+
+			"To remove it from just this deployment, use `astro env %s link delete` (or `link set --exclude` if it is auto-linked)",
+			want, id, obj.ScopeEntityId, wantEntity, obj.ScopeEntityId, want)
+	}
+	return &outOfScopeError{msg: msg, obj: obj}
 }
 
 // objectID extracts the object's addressable ID, erroring when the platform

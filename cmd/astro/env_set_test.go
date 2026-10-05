@@ -1199,3 +1199,44 @@ func TestEnvConnExtraAndValueAgreeOnLargeIntegers(t *testing.T) {
 		}
 	}
 }
+
+// An ID names one object anywhere in the organization. Under --deployment-id,
+// a workspace object's ID is refused by delete and set alike: deleting or
+// rewriting it would change every deployment linking it.
+func TestEnvDeleteAndSetRefuseAWorkspaceObjectsIDUnderDeploymentID(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args func(id, depID string) []string
+	}{
+		{"delete", func(id, depID string) []string {
+			return []string{"var", "delete", id, "--deployment-id", depID, "--yes"}
+		}},
+		{"set", func(id, depID string) []string {
+			return []string{"var", "set", id, "--deployment-id", depID, "--value", "x"}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			defer resetEnvFlags()
+
+			id, wsID, depID := cuid.New(), cuid.New(), cuid.New()
+			// Only the lookup is mocked: a delete, update or create panics.
+			mc := new(astrov1_mocks.ClientWithResponsesInterface)
+			mc.On("GetEnvironmentObjectWithResponse", mock.Anything, mock.Anything, id).
+				Return(&astrov1.GetEnvironmentObjectResponse{
+					HTTPResponse: &http.Response{StatusCode: 200},
+					JSON200: &astrov1.EnvironmentObject{
+						Id: &id, ObjectKey: "SHARED", ObjectType: astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE,
+						Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: wsID,
+					},
+				}, nil).Once()
+			astroV1Client = mc
+
+			_, err := execEnvCmd(tc.args(id, depID)...)
+			assert.Error(t, err)
+			assert.Contains(t, err.Error(), "belongs to workspace "+wsID)
+			assert.Contains(t, err.Error(), "--workspace-id "+wsID)
+			mc.AssertExpectations(t)
+		})
+	}
+}
