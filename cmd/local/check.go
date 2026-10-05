@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -34,17 +35,6 @@ func loadCheckedManifest(project string) (*manifest.Manifest, error) {
 		return nil, err
 	}
 	return m, nil
-}
-
-// ExitError carries a process exit code up to main, which is the only place
-// that exits. The command has already rendered everything the user needs, so
-// main propagates the code without printing again (the cmd/otto.go pattern).
-type ExitError struct {
-	Code int
-}
-
-func (e *ExitError) Error() string {
-	return fmt.Sprintf("exit code %d", e.Code)
 }
 
 // nameCheck is the command's name, and the label its progress notes carry.
@@ -121,7 +111,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 		return err
 	}
 	if code := res.ExitCode(strict); code != checks.ExitOK {
-		return &ExitError{Code: code}
+		return &cliout.ExitError{Code: code}
 	}
 	return nil
 }
@@ -178,7 +168,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 		return err
 	}
 	if worst != checks.ExitOK {
-		return &ExitError{Code: worst}
+		return &cliout.ExitError{Code: worst}
 	}
 	return nil
 }
@@ -187,7 +177,7 @@ func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool)
 // as a target report; mwaa and composer run the scratch-venv pre-flight. The
 // progress notes stream in text mode and are dropped in json mode, where the
 // report object carries everything.
-func (c *cli) checkTarget(ctx context.Context, target, project string, env []string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
+func (c *cli) checkTarget(ctx context.Context, target, project string, env []string, m *manifest.Manifest, r cliout.Renderer, strict bool) checks.TargetReport {
 	progress := c.progressFn(r, target)
 	if target == checks.TargetAstro {
 		return c.checkAstroTarget(ctx, project, env, m, r, strict)
@@ -218,7 +208,7 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, env []str
 // checkAstroTarget runs the plain project-venv check and shapes it as a target
 // report, so --target astro reads uniformly beside the platform targets. Its
 // verdict, findings, and env-not-ready handling are today's check exactly.
-func (c *cli) checkAstroTarget(ctx context.Context, project string, env []string, m *manifest.Manifest, r Renderer, strict bool) checks.TargetReport {
+func (c *cli) checkAstroTarget(ctx context.Context, project string, env []string, m *manifest.Manifest, r cliout.Renderer, strict bool) checks.TargetReport {
 	rep := checks.TargetReport{
 		Target:         checks.TargetAstro,
 		AirflowChecked: m.Airflow().Pin,
@@ -249,7 +239,7 @@ func (c *cli) checkAstroTarget(ctx context.Context, project string, env []string
 // plain check and has to stay one: routing only the plain path through the
 // fallback would have a docker-mode project pass here and report "environment
 // not ready" there, for the same project in the same state.
-func (c *cli) check(ctx context.Context, r Renderer, opts checks.Options, m *manifest.Manifest) (res checks.Result, provisioned bool, err error) {
+func (c *cli) check(ctx context.Context, r cliout.Renderer, opts checks.Options, m *manifest.Manifest) (res checks.Result, provisioned bool, err error) {
 	res, err = checks.Run(ctx, opts, c.d.Checks)
 	// Only "there is no interpreter". ErrEnvNotReady also covers one whose
 	// Airflow will not import, and building a fresh environment for that would
@@ -268,7 +258,7 @@ func (c *cli) check(ctx context.Context, r Renderer, opts checks.Options, m *man
 // wrong, and joined with the reason there was no interpreter to begin with:
 // "no uv on this machine" alone leaves out that a start would also have fixed
 // this, which for a standalone project is the shorter road.
-func (c *cli) checkWithBuiltEnv(ctx context.Context, r Renderer, opts checks.Options, m *manifest.Manifest) (checks.Result, error) {
+func (c *cli) checkWithBuiltEnv(ctx context.Context, r cliout.Renderer, opts checks.Options, m *manifest.Manifest) (checks.Result, error) {
 	prov, err := c.provisioner(ctx)
 	if err != nil {
 		return checks.Result{}, errors.Join(noInterpreter(opts.ProjectPath), err)
@@ -317,8 +307,8 @@ func (c *cli) provisioner(ctx context.Context) (checks.Provisioner, error) {
 
 // progressFn streams a target's progress notes in text mode and drops them in
 // json mode, where the final report object is the whole output.
-func (c *cli) progressFn(r Renderer, target string) func(string) {
-	if r.Format == FormatJSON {
+func (c *cli) progressFn(r cliout.Renderer, target string) func(string) {
+	if r.Format == cliout.FormatJSON {
 		return func(string) {}
 	}
 	return func(note string) {
@@ -332,8 +322,8 @@ func (c *cli) progressFn(r Renderer, target string) func(string) {
 // dropping them in json mode would have the command remove hundreds of
 // megabytes and record it nowhere. They go to stderr instead, which leaves the
 // report object on stdout parseable.
-func (c *cli) sweepProgressFn(r Renderer) func(string) {
-	if r.Format == FormatJSON {
+func (c *cli) sweepProgressFn(r cliout.Renderer) func(string) {
+	if r.Format == cliout.FormatJSON {
 		return func(note string) {
 			fmt.Fprintf(c.d.Stderr, "[%s] %s\n", nameCheck, note)
 		}
@@ -384,7 +374,7 @@ type checkSummary struct {
 // renderCheck writes findings then a summary. In json mode each finding is one
 // NDJSON line and the summary is the last; in text mode findings form a table
 // and the summary is one sentence. Both render the same data.
-func renderCheck(r Renderer, res checks.Result, strict, provisioned bool, undeclared []string, workspace string) error {
+func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool, undeclared []string, workspace string) error {
 	summary := checkSummary{
 		Event:         "summary",
 		Provisioned:   provisioned,
@@ -395,7 +385,7 @@ func renderCheck(r Renderer, res checks.Result, strict, provisioned bool, undecl
 		Strict:        strict,
 		Passed:        res.Passed(strict),
 	}
-	if r.Format == FormatJSON {
+	if r.Format == cliout.FormatJSON {
 		for i := range res.Findings {
 			if err := r.Emit(res.Findings[i], nil); err != nil {
 				return err
@@ -843,11 +833,11 @@ func checkSummaryLine(s checkSummary) string {
 // generic object, and the code is 2 rather than 1. Exit 1 means the DAGs failed
 // a check, so a CI job branching on the two must never see it for "you are not
 // in a project directory".
-func blocked(r Renderer, err error) error {
+func blocked(r cliout.Renderer, err error) error {
 	if rerr := renderCheckBlocked(r, err); rerr != nil {
 		return rerr
 	}
-	return &ExitError{Code: checks.ExitEnvNotReady}
+	return &cliout.ExitError{Code: checks.ExitEnvNotReady}
 }
 
 // checkBlocked is the line `astro local check` publishes when it cannot run
@@ -859,7 +849,7 @@ type checkBlocked struct {
 
 // renderCheckBlocked writes the reason check could not reach a verdict. In
 // json mode it is a single structured line; in text mode, the guidance.
-func renderCheckBlocked(r Renderer, err error) error {
+func renderCheckBlocked(r cliout.Renderer, err error) error {
 	msg := err.Error()
 	return r.Emit(checkBlocked{Event: "error", Message: msg}, func(w io.Writer) error {
 		_, werr := fmt.Fprintln(w, msg)
@@ -871,8 +861,8 @@ func renderCheckBlocked(r Renderer, err error) error {
 // one NDJSON line (the TargetReport, findings array and all); in text mode each
 // is a headed block with the version mapping, a findings table, any constraints
 // result, and a one-line verdict.
-func renderTargetChecks(r Renderer, reports []checks.TargetReport, strict bool) error {
-	if r.Format == FormatJSON {
+func renderTargetChecks(r cliout.Renderer, reports []checks.TargetReport, strict bool) error {
+	if r.Format == cliout.FormatJSON {
 		for i := range reports {
 			if err := r.Emit(reports[i], nil); err != nil {
 				return err

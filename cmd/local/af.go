@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // The group every Airflow-facing command family hangs under. `af` is the
@@ -50,10 +52,10 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 			// arrives here and got told its subcommand was unknown for
 			// `astro af` — a different thing, and no route onward.
 			if replacement, ok := devReplacementFor(args[0]); ok {
-				return fmt.Errorf("unknown command %q for %q. Local Airflow lives under `astro local`: use `%s`",
-					args[0], cmd.CommandPath(), replacement)
+				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Local Airflow lives under `astro local`: use `%s`",
+					args[0], cmd.CommandPath(), replacement))
 			}
-			return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
+			return cliout.Usage(fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath()))
 		},
 	}
 	// The group renders no data of its own; the flag is here because every
@@ -61,7 +63,7 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 	// `astro af -o json` should not fail before it can print help. Each family
 	// registers its own below, which shadows this one for everything under it.
 	var output string
-	addOutputFlag(cmd, &output)
+	cliout.AddOutputFlag(cmd, &output)
 	// The families carry the selector flags themselves, one target each. The
 	// group deliberately registers none: a -d on this node would fill a target
 	// no leaf reads, and the run would resolve as if nothing had been said.

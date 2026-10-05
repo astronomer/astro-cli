@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
@@ -390,27 +391,26 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 // or both — then render the result. The v2 logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
 func deployV2(cmd *cobra.Command, args []string) error {
-	// The format is read before the flag refusals so that they can be
-	// reported through deployV2Err like every other v2 deploy failure.
-	// Refusing first meant `astro deploy --pytest --output json` exited 1
-	// with an empty stdout and plain text on stderr, while every other
-	// refusal on this path published {"error":..., "code":1} — so a script
-	// that reads stdout to find out what went wrong got nothing, which is the
-	// same silence these refusals exist to break.
+	// The format is read before the flag refusals, so a bad --output is the
+	// usage error reported rather than whichever refusal came first. Every
+	// failure below, refusals included, reaches a json-mode caller as the one
+	// {"error","code","kind"} object on stdout: the root reports it
+	// (cliout.Execute). A script reading stdout to find out what went wrong is
+	// who these refusals exist for.
 	format, err := parseDeployFormat(deployOutput)
 	if err != nil {
 		return err
 	}
 	cmd.SilenceUsage = true
 	if rerr := refuseFlagsV2DeployIgnores(cmd); rerr != nil {
-		return deployV2Err(cmd, format, rerr)
+		return deployV2Err(cmd, rerr)
 	}
 
 	out := cmd.OutOrStdout()
 
 	m, err := manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
 	if err != nil {
-		return deployV2Err(cmd, format, err)
+		return deployV2Err(cmd, err)
 	}
 
 	// --build-secret is refused HERE, not in internal/deploy, and gated on the
@@ -433,12 +433,12 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Changed("build-secret") {
 		switch {
 		case dags:
-			return deployV2Err(cmd, format, errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image"))
+			return deployV2Err(cmd, errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image"))
 		case imageName != "":
-			return deployV2Err(cmd, format, errors.New("--build-secret has no effect with --image-name: the image is already built"))
+			return deployV2Err(cmd, errors.New("--build-secret has no effect with --image-name: the image is already built"))
 		case m.Astro.Dockerfile == "":
 			if err := util.CheckGeneratedBuildSecrets(buildSecrets); err != nil {
-				return deployV2Err(cmd, format, err)
+				return deployV2Err(cmd, err)
 			}
 		}
 	}
@@ -450,7 +450,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 
 	login, err := loginForDeploy(cmd.Context(), m.Astro.LoginDomain())
 	if err != nil {
-		return deployV2Err(cmd, format, err)
+		return deployV2Err(cmd, err)
 	}
 
 	// --workspace wins over the legacy --workspace-id when both are set.
@@ -527,7 +527,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		},
 	}, newV2Deployer(&login, cmd.InOrStdin(), errOut))
 	if err != nil {
-		return deployV2Err(cmd, format, err)
+		return deployV2Err(cmd, err)
 	}
 
 	if res.Git.Uncommitted {
@@ -596,7 +596,7 @@ func parseDeployFormat(s string) (deployFormat, error) {
 	case formatJSON:
 		return formatJSON, nil
 	default:
-		return "", fmt.Errorf("unknown output format %q (supported: text, json)", s)
+		return "", cliout.Usage(fmt.Errorf("unknown output format %q (supported: text, json)", s))
 	}
 }
 
@@ -670,26 +670,15 @@ func deployTargetName(res *v2deploy.Result) string {
 	return fmt.Sprintf("%s (deployment %s)", res.LinkName, res.DeploymentID)
 }
 
-// deployV2Err renders a v2 deploy failure. In json mode it writes the
-// {"error","code"} object to stdout and silences cobra's error output so the
-// object is the only thing on the streams; in text mode it returns the error
-// for cobra to print. It returns the error either way, so the process still
-// exits non-zero.
-func deployV2Err(cmd *cobra.Command, format deployFormat, err error) error {
+// deployV2Err returns a v2 deploy failure for the root to report: the
+// {"error","code","kind"} object on stdout in json mode, cobra's "Error:" in
+// text mode (cliout.Execute, as for every command).
+func deployV2Err(cmd *cobra.Command, err error) error {
 	if goerrors.Is(err, v2deploy.ErrAborted) {
 		// The user was asked and said no. Reading their own answer back at them
 		// as "Error: no deployment selected" adds nothing; the exit code carries
-		// the whole message. Only an interactive run can reach here, so this
-		// never eats the object json mode promises.
-		cmd.SilenceErrors = true
-		return err
-	}
-	if format == formatJSON {
-		//nolint:errcheck // the command already failed; a write error changes nothing
-		json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
-			Error string `json:"error"`
-			Code  int    `json:"code"`
-		}{Error: err.Error(), Code: 1})
+		// the whole message. Only an interactive run can reach here, which is
+		// text mode, so this never eats the object json mode promises.
 		cmd.SilenceErrors = true
 	}
 	return err

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/openapi"
@@ -225,7 +226,7 @@ type apiExchange struct {
 
 // writeExchange prints the answer with its status and headers: the block an
 // HTTP response starts with, then the body, or the one object json mode takes.
-func writeExchange(r Renderer, resp airflowapi.Response) error {
+func writeExchange(r cliout.Renderer, resp airflowapi.Response) error {
 	exchange := apiExchange{StatusCode: resp.StatusCode, Headers: map[string]string{}}
 	for key, values := range resp.Header {
 		exchange.Headers[strings.ToLower(key)] = strings.Join(values, ", ")

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -101,7 +102,7 @@ func TestAHibernatingDeploymentPublishesItsKind(t *testing.T) {
 	if err := execute(t, d, afName, "dags", "list", "-d", "prod", "--output", "json"); err == nil {
 		t.Fatal("a hibernating Deployment answered")
 	}
-	var published jsonError
+	var published cliout.ErrorObject
 	if err := json.Unmarshal(stdout.Bytes(), &published); err != nil {
 		t.Fatalf("decode %q: %v", stdout, err)
 	}

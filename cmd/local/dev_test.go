@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -54,10 +55,11 @@ func testDeps(t *testing.T) (d Deps, stdout *bytes.Buffer) {
 func execute(t *testing.T, d Deps, args ...string) error {
 	t.Helper()
 	root := newRootCmd(d)
-	root.SetArgs(args)
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})
-	return root.Execute()
+	// Through the reporting every root uses, so a json-mode failure publishes
+	// here exactly what it publishes from the binary.
+	return cliout.Execute(context.Background(), root, args, d.Stdout, ProblemKinds)
 }
 
 // TestDevStubNamesTheReplacement drives the real table rather than a copy of

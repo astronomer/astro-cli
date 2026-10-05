@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -90,7 +91,7 @@ func (c *cli) runUpgradeAirflow(ctx context.Context, version string, withOtto bo
 	if err != nil {
 		return err
 	}
-	if withOtto && r.Format == FormatJSON {
+	if withOtto && r.Format == cliout.FormatJSON {
 		return fmt.Errorf("--%s starts an interactive session, so it cannot be combined with --output json", flagWithOtto)
 	}
 	if withOtto && c.d.LaunchOtto == nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/pack"
@@ -85,7 +86,7 @@ var publishedPayloads = []schemaCase{
 	{"use-listing", useListing{}},
 	{"use-link-row", useLinkRow{}},
 	{"link-result", linkResult{}},
-	{"error", jsonError{}},
+	{"error", cliout.ErrorObject{}},
 	{"event", event{}},
 	{"open-url", urlResult{}},
 	{"check-blocked", checkBlocked{}},

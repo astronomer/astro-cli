@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/pack"
@@ -31,7 +32,7 @@ const defaultPackagePlatform = "linux/amd64"
 func NewPackageCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
 	cmd := newPackageCmd(c)
-	addOutputFlag(cmd, &c.output)
+	cliout.AddOutputFlag(cmd, &c.output)
 	markSkipPreRun(cmd)
 	return cmd
 }

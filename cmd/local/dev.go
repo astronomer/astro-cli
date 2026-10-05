@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -90,7 +91,7 @@ func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
 	})
 	if devWantsJSON(args) {
-		r := Renderer{Format: FormatJSON, Out: c.d.Stdout}
+		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout}
 		if err := r.Emit(payload, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, renderDevRemoved(payload))
 			return werr

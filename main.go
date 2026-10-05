@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,7 +9,7 @@ import (
 	"github.com/spf13/afero"
 
 	"github.com/astronomer/astro-cli/cmd"
-	"github.com/astronomer/astro-cli/cmd/local"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
@@ -27,28 +26,14 @@ func main() {
 
 	ctx := signalContext()
 
-	if err := cmd.NewRootCmd().ExecuteContext(ctx); err != nil {
-		// Interrupted rather than failed. The command has already unwound —
-		// `astro local start` tears its half-created containers back down on the
-		// way out — so there is nothing to report and nothing the user did wrong.
-		// 130 is what a shell reports for a process ended by SIGINT.
-		//
-		// Keyed on the context alone, not on the error's identity. A canceled
-		// run rarely surfaces context.Canceled: Ctrl-C reaches the whole
-		// foreground process group, so what usually comes back is an exec error
-		// from `docker compose` dying, and matching on that would print a stack
-		// of noise for something the user asked for. If the context is done, the
-		// error is a consequence of that.
-		if ctx.Err() != nil {
-			os.Exit(exitInterrupted)
-		}
-		// A command that carries its own exit code (e.g. `astro local check`)
-		// has already rendered everything the user needs; propagate the code.
-		var exit *local.ExitError
-		if errors.As(err, &exit) {
-			os.Exit(exit.Code)
-		}
-		os.Exit(1)
+	// The command has already reported its failure by the output contract
+	// (cliout.Execute); what is left is the exit status. 130 for an interrupt —
+	// the command has already unwound, and `astro local start` tears its
+	// half-created containers back down on the way out — 2 for a usage error,
+	// a command's own code when it carries one (`astro local check`), and 1
+	// otherwise. cliout.ExitCode holds the table.
+	if err := cmd.Execute(ctx); err != nil {
+		os.Exit(cliout.ExitCode(ctx, err))
 	}
 
 	// platform specific terminal initialization:
@@ -56,9 +41,6 @@ func main() {
 	// for most of the architectures there's no requirements:
 	ansi.InitConsole()
 }
-
-// exitInterrupted is the conventional shell code for a process ended by SIGINT.
-const exitInterrupted = 130
 
 // signalContext returns a context canceled on the first interrupt, and restores
 // default signal handling once that has happened.

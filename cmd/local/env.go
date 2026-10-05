@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/localenv"
@@ -183,7 +184,7 @@ func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}
 	if hint := removedVerbHint(cmd, args[0]); hint != "" {
-		return errors.New(hint)
+		return cliout.Usage(errors.New(hint))
 	}
 	msg := fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath())
 	// SuggestionsFor, unlike cobra's internal findSuggestions, does not apply
@@ -196,7 +197,7 @@ func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
 			msg += "\t" + s + "\n"
 		}
 	}
-	return errors.New(msg)
+	return cliout.Usage(errors.New(msg))
 }
 
 // removedVerbHint names the replacement for a verb-first form this tree used
@@ -862,7 +863,7 @@ func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) erro
 // do, the one the resolution chain would use wins, the order being the chain's
 // within one scope: the project .env outranks the project vault. A note on
 // stderr names the other copy. The manifest is not read.
-func (c *cli) getScoped(r Renderer, scope *scopeFlags, kind localenv.Kind, name string) error {
+func (c *cli) getScoped(r cliout.Renderer, scope *scopeFlags, kind localenv.Kind, name string) error {
 	stores, err := c.scopeStores(scope)
 	if err != nil {
 		return err
@@ -905,7 +906,7 @@ func (c *cli) getScoped(r Renderer, scope *scopeFlags, kind localenv.Kind, name 
 
 // getResolved reads a value through the full chain and reports the winning
 // source.
-func (c *cli) getResolved(r Renderer, kind localenv.Kind, name string) error {
+func (c *cli) getResolved(r cliout.Renderer, kind localenv.Kind, name string) error {
 	projectDir, _ := c.discoverProject() //nolint:errcheck // no project just means the chain skips the project file
 	src, err := localenv.LoadSources(os.Environ(), projectDir)
 	if err != nil {
@@ -1027,7 +1028,7 @@ func declaredSpec(schema *envschema.Schema, kind localenv.Kind, name string) (en
 // emitValue prints a get. The text form's stdout is the value alone, so
 // `$(astro local env ... get NAME)` keeps working; a global's reach goes to
 // stderr beside it.
-func (c *cli) emitValue(r Renderer, v envValue) error {
+func (c *cli) emitValue(r cliout.Renderer, v envValue) error {
 	return r.Emit(v, func(w io.Writer) error {
 		if v.Reach != nil {
 			fmt.Fprintf(c.d.Stderr, "Reach: %s\n", v.Reach.text())
@@ -1265,7 +1266,7 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 		}
 		items = kept
 	}
-	if r.Format == FormatJSON {
+	if r.Format == cliout.FormatJSON {
 		for i := range items {
 			if err := r.Emit(items[i], nil); err != nil {
 				return err

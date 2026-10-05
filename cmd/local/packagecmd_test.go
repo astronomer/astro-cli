@@ -62,7 +62,7 @@ func TestPackageStagedTargetErrors(t *testing.T) {
 func TestPackageStagedTargetJSONError(t *testing.T) {
 	d, out := testDeps(t)
 	writeManifest(t, &d, t.TempDir())
-	// json mode still fails, and the shared wrapper writes one error object.
+	// json mode still fails, and the root's error report writes one error object.
 	_ = execute(t, d, "package", "oss", "--output", "json")
 	var obj struct {
 		Error string `json:"error"`

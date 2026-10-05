@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
@@ -164,9 +165,9 @@ func (q *query) runRunsTriggerWait(ctx context.Context, dagID string, trigger ai
 	}
 	switch {
 	case timedOut:
-		return &ExitError{Code: exitWaitTimeout}
+		return &cliout.ExitError{Code: exitWaitTimeout}
 	case run.State != stateSuccess:
-		return &ExitError{Code: exitRunFailed}
+		return &cliout.ExitError{Code: exitRunFailed}
 	}
 	return nil
 }

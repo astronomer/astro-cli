@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
@@ -32,8 +33,8 @@ func (q *query) envSourcedNote(kind localenv.Kind) string {
 }
 
 // noteEnvSourced closes a text listing with envSourcedNote on stderr.
-func (q *query) noteEnvSourced(r Renderer, kind localenv.Kind) {
-	if r.Format == FormatText {
+func (q *query) noteEnvSourced(r cliout.Renderer, kind localenv.Kind) {
+	if r.Format == cliout.FormatText {
 		fmt.Fprintln(q.d.Stderr, "note: "+q.envSourcedNote(kind))
 	}
 }

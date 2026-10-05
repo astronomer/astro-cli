@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
@@ -141,13 +143,24 @@ func setupV2DeployWith(t *testing.T, d v2deploy.Deployer, toml string) {
 // a test can read the rendered output instead of the process's real streams.
 func execDeployCapture(args ...string) (string, error) {
 	testUtil.SetupOSArgsForGinkgo()
-	cmd := NewDeployCmd()
+	root := deployUnderRoot()
 	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	cmd.SetErr(&buf)
-	cmd.SetArgs(args)
-	_, err := cmd.ExecuteC()
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	// Through the reporting the root does, so a json-mode failure is the
+	// object a user gets.
+	err := cliout.Execute(context.Background(), root, append([]string{"deploy"}, args...), &buf, nil)
 	return buf.String(), err
+}
+
+// deployUnderRoot mounts deploy under a root, as the CLI does. Execute treats
+// a failing root differently from a failing subcommand (it forces the root's
+// SilenceUsage for the run), so deploy run as the root would not be the
+// command a user runs.
+func deployUnderRoot() *cobra.Command {
+	root := &cobra.Command{Use: "astro"}
+	root.AddCommand(NewDeployCmd())
+	return root
 }
 
 // execDeployIO runs the deploy command with its three streams under the test's
@@ -156,13 +169,12 @@ func execDeployCapture(args ...string) (string, error) {
 // one and a progress line on the other.
 func execDeployIO(answers string, args ...string) (out, errOut string, err error) {
 	testUtil.SetupOSArgsForGinkgo()
-	cmd := NewDeployCmd()
+	root := deployUnderRoot()
 	var outBuf, errBuf bytes.Buffer
-	cmd.SetOut(&outBuf)
-	cmd.SetErr(&errBuf)
-	cmd.SetIn(strings.NewReader(answers))
-	cmd.SetArgs(args)
-	_, err = cmd.ExecuteC()
+	root.SetOut(&outBuf)
+	root.SetErr(&errBuf)
+	root.SetIn(strings.NewReader(answers))
+	err = cliout.Execute(context.Background(), root, append([]string{"deploy"}, args...), &outBuf, nil)
 	return outBuf.String(), errBuf.String(), err
 }
 

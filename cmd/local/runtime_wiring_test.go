@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -120,7 +121,7 @@ func TestCheckRefusesADockerfileOfAnotherAirflow(t *testing.T) {
 			wiringProject(t, &d, mismatchedDockerfile, "astrocrpublic.azurecr.io/runtime:3.3-8")
 
 			err := execute(t, d, args...)
-			var exit *ExitError
+			var exit *cliout.ExitError
 			if !errors.As(err, &exit) || exit.Code != checks.ExitEnvNotReady {
 				t.Fatalf("err = %v, want exit %d", err, checks.ExitEnvNotReady)
 			}

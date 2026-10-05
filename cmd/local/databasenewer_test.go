@@ -38,8 +38,8 @@ func TestADatabaseANewerAirflowUpgradedIsToldAboutReset(t *testing.T) {
 		if !errors.Is(err, localrt.ErrDatabaseNewerThanAirflow) {
 			t.Error("the advice swallowed the sentinel, so the json kind can no longer be read from it")
 		}
-		if got := problemKind(err); got != KindDatabaseNewerThanAirflow {
-			t.Errorf("problemKind() = %q, want %q", got, KindDatabaseNewerThanAirflow)
+		if got := ProblemKinds.Of(err); got != KindDatabaseNewerThanAirflow {
+			t.Errorf("ProblemKinds.Of() = %q, want %q", got, KindDatabaseNewerThanAirflow)
 		}
 	})
 

@@ -2,12 +2,17 @@ package local
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -23,8 +28,8 @@ import (
 // the predicate matches a wrapped error never ran against it — which is the
 // one thing worth proving. Driving every case off the table, and requiring an
 // entry here for each row, means a new kind cannot be added without a sample.
-func sampleFor(kind ProblemKind) (error, bool) {
-	samples := map[ProblemKind]error{
+func sampleFor(kind cliout.ProblemKind) (error, bool) {
+	samples := map[cliout.ProblemKind]error{
 		KindNoProject:                &project.NotFoundError{Start: "/somewhere"},
 		KindForeignMode:              localrt.ErrForeignMode,
 		KindAlreadyRunning:           localrt.ErrAlreadyRunning,
@@ -50,15 +55,15 @@ func sampleFor(kind ProblemKind) (error, bool) {
 // variable. A resolver matching only the bare value would publish no kind for
 // any real failure.
 func TestEveryProblemKindResolvesThroughAWrap(t *testing.T) {
-	for _, p := range problemKinds {
-		t.Run(string(p.kind), func(t *testing.T) {
-			sample, ok := sampleFor(p.kind)
+	for _, p := range ProblemKinds {
+		t.Run(string(p.Kind), func(t *testing.T) {
+			sample, ok := sampleFor(p.Kind)
 			if !ok {
-				t.Fatalf("no sample error for %q; add one so this kind is actually exercised", p.kind)
+				t.Fatalf("no sample error for %q; add one so this kind is actually exercised", p.Kind)
 			}
 			wrapped := fmt.Errorf("while starting: %w; and some advice", sample)
-			if got := problemKind(wrapped); got != p.kind {
-				t.Errorf("problemKind() = %q, want %q", got, p.kind)
+			if got := ProblemKinds.Of(wrapped); got != p.Kind {
+				t.Errorf("ProblemKinds.Of() = %q, want %q", got, p.Kind)
 			}
 		})
 	}
@@ -72,7 +77,7 @@ func TestEveryProblemKindResolvesThroughAWrap(t *testing.T) {
 // match the const block, say — would silently change what a joined failure
 // publishes. Pinned here so it cannot.
 func TestProblemKindOrderIsPinned(t *testing.T) {
-	want := []ProblemKind{
+	want := []cliout.ProblemKind{
 		KindNoProject,
 		KindForeignMode,
 		KindAlreadyRunning,
@@ -86,12 +91,12 @@ func TestProblemKindOrderIsPinned(t *testing.T) {
 		KindDeploymentUnhealthy,
 		KindAirflowUnavailable,
 	}
-	if len(problemKinds) != len(want) {
-		t.Fatalf("%d kinds in the table, %d pinned here", len(problemKinds), len(want))
+	if len(ProblemKinds) != len(want) {
+		t.Fatalf("%d kinds in the table, %d pinned here", len(ProblemKinds), len(want))
 	}
-	for i, p := range problemKinds {
-		if p.kind != want[i] {
-			t.Errorf("row %d is %q, pinned as %q", i, p.kind, want[i])
+	for i, p := range ProblemKinds {
+		if p.Kind != want[i] {
+			t.Errorf("row %d is %q, pinned as %q", i, p.Kind, want[i])
 		}
 	}
 }
@@ -104,8 +109,8 @@ func TestProblemKindOrderIsPinned(t *testing.T) {
 // so it is asserted rather than left to the pin above.
 func TestTheMoreSpecificKindWinsWhenBothMatch(t *testing.T) {
 	both := errors.Join(localrt.ErrAlreadyRunning, localrt.ErrForeignMode)
-	if got := problemKind(both); got != KindForeignMode {
-		t.Errorf("problemKind() = %q, want %q — the mode is why a restart will not help", got, KindForeignMode)
+	if got := ProblemKinds.Of(both); got != KindForeignMode {
+		t.Errorf("ProblemKinds.Of() = %q, want %q — the mode is why a restart will not help", got, KindForeignMode)
 	}
 }
 
@@ -116,8 +121,8 @@ func TestTheMoreSpecificKindWinsWhenBothMatch(t *testing.T) {
 // two ways. Pinned rather than trusted, because the next kind is added by
 // somebody who has not read this file.
 func TestProblemKindsAreSpelledLikeCheckFindings(t *testing.T) {
-	for _, p := range problemKinds {
-		k := string(p.kind)
+	for _, p := range ProblemKinds {
+		k := string(p.Kind)
 		if k != strings.ToLower(k) || strings.ContainsAny(k, " -.") {
 			t.Errorf("kind %q should be lower snake_case, as check findings are", k)
 		}
@@ -130,17 +135,32 @@ func TestProblemKindsAreSpelledLikeCheckFindings(t *testing.T) {
 // on kind should fall through to the prose when there is nothing to branch on,
 // and an absent field is the only thing that says so unambiguously.
 func TestAnUnclassifiedFailurePublishesNoKind(t *testing.T) {
-	if got := problemKind(errors.New("the manifest could not be parsed")); got != "" {
-		t.Errorf("problemKind() = %q, want empty", got)
+	if got := ProblemKinds.Of(errors.New("the manifest could not be parsed")); got != "" {
+		t.Errorf("ProblemKinds.Of() = %q, want empty", got)
 	}
-	if got := problemKind(nil); got != "" {
-		t.Errorf("problemKind(nil) = %q, want empty", got)
+	if got := ProblemKinds.Of(nil); got != "" {
+		t.Errorf("ProblemKinds.Of(nil) = %q, want empty", got)
 	}
+}
+
+// emitJSONError fails a json-mode command with err and reports it the way
+// every command's failure is reported — through cliout.Execute, with this
+// package's table — so the object asserted on is the one a user would see.
+func emitJSONError(w io.Writer, err error) {
+	var output string
+	cmd := &cobra.Command{
+		Use:  "fail",
+		RunE: func(*cobra.Command, []string) error { return err },
+	}
+	cliout.AddOutputFlag(cmd, &output)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+	cliout.Execute(context.Background(), cmd, []string{"-o", "json"}, w, ProblemKinds)
 }
 
 // And the kind reaches the object a failed command actually writes.
 //
-// The resolver being right is worth nothing if emitJSONError does not ask it —
+// The resolver being right is worth nothing if the error report does not ask it —
 // which is the way wiring fails: nothing breaks, the field is simply never
 // there. Asserted on the emitted JSON rather than on the struct, because the
 // field name and its omitempty are part of what is being promised.
@@ -149,7 +169,7 @@ func TestTheEmittedErrorObjectCarriesTheKind(t *testing.T) {
 		var out bytes.Buffer
 		emitJSONError(&out, fmt.Errorf("a start gave up: %w", localrt.ErrHealthTimeout))
 
-		var got jsonError
+		var got cliout.ErrorObject
 		if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 			t.Fatalf("the emitted object is not JSON: %v\n%s", err, out.String())
 		}
@@ -181,7 +201,7 @@ func TestNotBeingInAProjectIsNamed(t *testing.T) {
 	var out bytes.Buffer
 	emitJSONError(&out, &project.NotFoundError{Start: "/tmp/somewhere"})
 
-	var got jsonError
+	var got cliout.ErrorObject
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
 		t.Fatalf("the emitted object is not JSON: %v\n%s", err, out.String())
 	}
@@ -204,12 +224,12 @@ func TestNotBeingInAProjectIsNamed(t *testing.T) {
 // missed every query. Asserted on the package's own error value, because the
 // wrapping is what was missing and a table of sentinels cannot see it.
 func TestTheCLIsOwnNotRunningErrorsAreNamed(t *testing.T) {
-	if got := problemKind(errNoLocalAirflow); got != KindNotRunning {
+	if got := ProblemKinds.Of(errNoLocalAirflow); got != KindNotRunning {
 		t.Errorf("the query commands' error resolves to %q, want %q", got, KindNotRunning)
 	}
 	// open builds its own, naming the state it found.
 	opened := fmt.Errorf("%w: local Airflow is %s; run `x` first", localrt.ErrNotRunning, "stopped")
-	if got := problemKind(opened); got != KindNotRunning {
+	if got := ProblemKinds.Of(opened); got != KindNotRunning {
 		t.Errorf("open's error resolves to %q, want %q", got, KindNotRunning)
 	}
 }
@@ -218,7 +238,7 @@ func TestTheCLIsOwnNotRunningErrorsAreNamed(t *testing.T) {
 // under the same kind as a directory with no pyproject.toml at all.
 func TestNoAstroSectionIsNoProject(t *testing.T) {
 	err := fmt.Errorf("start: %w", &project.NoAstroSectionError{Dir: "/somewhere"})
-	if got := problemKind(err); got != KindNoProject {
-		t.Fatalf("problemKind = %q, want %q", got, KindNoProject)
+	if got := ProblemKinds.Of(err); got != KindNoProject {
+		t.Fatalf("ProblemKinds.Of = %q, want %q", got, KindNoProject)
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/checks"
 )
 
@@ -137,7 +138,7 @@ func TestTargetMWAAConstraintsConflictFails(t *testing.T) {
 	d.Provisioner = func(context.Context) (checks.Provisioner, error) { return prov, nil }
 
 	err := execute(t, d, "local", "check", "--target", "mwaa")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
 		t.Fatalf("a constraints conflict should exit 1, got %v", err)
 	}
@@ -186,9 +187,9 @@ func TestTargetCheckUnknownTargetErrors(t *testing.T) {
 	err := execute(t, d, "local", "check", "--target", "gcp")
 	// No verdict was reached, so it takes the same door as every other outcome
 	// of that kind: message on stdout, exit 2 rather than the DAG-failure 1.
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	if exit.Code != checks.ExitEnvNotReady {
 		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
@@ -204,7 +205,7 @@ func TestTargetCheckImportErrorExitsCode1(t *testing.T) {
 		ImportErrors: []checks.ReportImportErr{{File: "dags/bad.py", Message: "boom"}},
 	}}
 	err := execute(t, d, "local", "check", "--target", "composer")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
 		t.Fatalf("an import error in a target check should exit 1, got %v", err)
 	}
@@ -281,9 +282,9 @@ func TestCheckImportErrorFailsWithCode1(t *testing.T) {
 		ImportErrors: []checks.ReportImportErr{{File: "dags/bad.py", Message: "boom\ntraceback"}},
 	}}
 	err := execute(t, d, "local", "check")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	if exit.Code != checks.ExitChecksFailed {
 		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitChecksFailed)
@@ -315,7 +316,7 @@ func TestCheckStrictTurnsWarningIntoFailure(t *testing.T) {
 	d2, _ := checkDeps(t)
 	d2.Checks = stubParser{report: slow}
 	err := execute(t, d2, "local", "check", "--strict")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
 		t.Fatalf("strict slow parse must fail with code 1, got %v", err)
 	}
@@ -337,9 +338,9 @@ func TestCheckReportsAManifestProblemBeforeTheEnvironment(t *testing.T) {
 	d.Checks = stubParser{err: wrapNotReady()}
 
 	err := execute(t, d, "local", "check")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	// Exit 2, not 1: no verdict was reached. 1 means the DAGs failed a check,
 	// and a CI job branching on the two must not read a manifest typo as one.
@@ -369,9 +370,9 @@ func TestCheckManifestProblemJSONCarriesAnErrorEvent(t *testing.T) {
 	// instead of "the manifest was not reported first".
 	d.Checks = stubParser{err: wrapNotReady()}
 
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if err := execute(t, d, "local", "check", "--output", "json"); !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	var got struct {
 		Event   string `json:"event"`
@@ -410,9 +411,9 @@ func TestCheckAndTargetAstroAgreeOnAnInvalidManifest(t *testing.T) {
 			// key named, and exit 2 — "no verdict reached" — rather than 1,
 			// which means the DAGs failed a check.
 			err := execute(t, d, args...)
-			var exit *ExitError
+			var exit *cliout.ExitError
 			if !errors.As(err, &exit) {
-				t.Fatalf("want ExitError, got %v", err)
+				t.Fatalf("want cliout.ExitError, got %v", err)
 			}
 			if exit.Code != checks.ExitEnvNotReady {
 				t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
@@ -438,9 +439,9 @@ func TestCheckImportErrorShowsTheExceptionThenTheFrames(t *testing.T) {
 		ImportErrors: []checks.ReportImportErr{{File: "dags/bad.py", Message: traceback}},
 	}}
 
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 
 	got := out.String()
@@ -838,9 +839,9 @@ func TestCheckCapsTheTracebackDump(t *testing.T) {
 	d, out := checkDeps(t)
 	d.Checks = stubParser{report: report}
 
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 
 	got := out.String()
@@ -877,9 +878,9 @@ func TestCheckTracebackBudgetIsSharedAcrossTargets(t *testing.T) {
 	d, out := targetDeps(t)
 	d.CheckVenv = stubTargetParser{report: report}
 
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if err := execute(t, d, "local", "check", "--target", "composer,mwaa"); !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 
 	got := out.String()
@@ -899,9 +900,9 @@ func TestCheckPrintsNoTracebackForASingleLineMessage(t *testing.T) {
 		ImportErrors: []checks.ReportImportErr{{File: "dags/bad.py", Message: "ModuleNotFoundError: no module\n"}},
 	}}
 
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	if n := strings.Count(out.String(), "ModuleNotFoundError"); n != 1 {
 		t.Errorf("message appears %d times, want once (in the row): %q", n, out.String())
@@ -919,9 +920,9 @@ func TestCheckKeepsTheTableAlignedAroundATab(t *testing.T) {
 		},
 	}}
 
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if err := execute(t, d, "local", "check"); !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	rowA, ok := lineContaining(out.String(), "dags/a.py")
 	if !ok {
@@ -950,9 +951,9 @@ func TestCheckEnvNotReadyExitsCode2(t *testing.T) {
 	// The error must wrap ErrEnvNotReady so errors.Is routes it to code 2.
 	d.Checks = stubParser{err: wrapNotReady()}
 	err := execute(t, d, "local", "check")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	if exit.Code != checks.ExitEnvNotReady {
 		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
@@ -984,7 +985,7 @@ func TestCheckJSONEmitsNDJSONFindingsAndSummary(t *testing.T) {
 		},
 	}}
 	err := execute(t, d, "local", "check", "--output", "json")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) {
 		t.Fatalf("failing check should still carry an exit code: %v", err)
 	}
@@ -1078,7 +1079,7 @@ func TestCheckIsBlockedByAnEnvDeclarationThatDoesNotParse(t *testing.T) {
 	}
 
 	err = execute(t, d, "local", "check")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitEnvNotReady {
 		t.Fatalf("want exit %d, got %v", checks.ExitEnvNotReady, err)
 	}

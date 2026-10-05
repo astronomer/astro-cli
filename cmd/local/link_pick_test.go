@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // pickRun is what a picker case reads back: the output streams, and what the
@@ -123,7 +125,7 @@ func TestLinkPickersNeverPromptARunThatCannotBeAsked(t *testing.T) {
 			err := execute(t, d, append([]string{"link"}, tc.args...)...)
 			require.Error(t, err)
 			if slices.Contains(tc.args, "json") {
-				var e jsonError
+				var e cliout.ErrorObject
 				require.NoError(t, json.Unmarshal(run.out.Bytes(), &e), "decode %q", run.out.String())
 				assert.Contains(t, e.Error, tc.want)
 			} else {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/zalando/go-keyring"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -293,9 +294,9 @@ func TestRunPropagatesChildExitCode(t *testing.T) {
 	d.Runtime = attachRuntime{af: runAirflow{runErr: childErr}}
 
 	err := execute(t, d, "local", "run", "false")
-	var carried *ExitError
+	var carried *cliout.ExitError
 	if !errors.As(err, &carried) {
-		t.Fatalf("want *ExitError, got %T: %v", err, err)
+		t.Fatalf("want *cliout.ExitError, got %T: %v", err, err)
 	}
 	if carried.Code != 7 {
 		t.Errorf("exit code = %d, want 7", carried.Code)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
@@ -383,7 +384,7 @@ func TestJSONRunsNeverPrompt(t *testing.T) {
 	d, _, errOut := instanceDeps(t, dir)
 	d.Stdin = strings.NewReader("2\n")
 	d.Interactive = func() bool { return true }
-	c := &cli{d: d, output: string(FormatJSON)}
+	c := &cli{d: d, output: string(cliout.FormatJSON)}
 
 	_, err := c.resolveDeployment(deploymentFlags{})
 	var ambiguous *instances.AmbiguousError

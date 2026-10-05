@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Renderer.Emit is documented as "the single output path for every v2
-// command", and until recently it was not: four payloads went around it with
+// Renderer.Emit (cmd/cliout) is documented as "the single output path for
+// every v2 command", and until recently it was not: four payloads went around it with
 // their own encoder, and a payload that goes around Emit is one nothing can
 // observe.
 //
@@ -28,7 +29,8 @@ import (
 //
 //   - json.NewEncoder, json.Marshal and json.MarshalIndent
 //   - under any local name the encoding/json import is bound to, alias or not
-//   - anywhere in the package, including at file scope, not only inside funcs
+//   - anywhere in this package and in cmd/cliout, where Emit lives, including
+//     at file scope, not only inside funcs
 //   - everywhere except the body of Renderer.Emit itself
 //
 // It does not know whether a given call publishes anything. A legitimate
@@ -40,18 +42,28 @@ const jsonEscapeDirective = "//astro:non-output-json"
 func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 	banned := map[string]bool{"NewEncoder": true, "Marshal": true, "MarshalIndent": true}
 
-	entries, err := os.ReadDir(".")
-	require.NoError(t, err)
+	var sources []string
+	for _, dir := range []string{".", filepath.Join("..", "cliout")} {
+		entries, err := os.ReadDir(dir)
+		require.NoError(t, err)
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+				continue
+			}
+			sources = append(sources, filepath.Join(dir, name))
+		}
+	}
 
 	fset := token.NewFileSet()
 	var outside []string
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
+	sawEmit := false
+	for _, name := range sources {
 		file, perr := parser.ParseFile(fset, name, nil, parser.ParseComments)
 		require.NoError(t, perr)
+		if emitBodyRange(file).from != token.NoPos {
+			sawEmit = true
+		}
 
 		// Whatever this file calls encoding/json. An alias defeated the first
 		// version of this test outright.
@@ -83,6 +95,10 @@ func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 		})
 	}
 
+	// The exemption is found by shape, so a move or rename of Emit would leave
+	// the guard exempting nothing and still pass. Finding it is the check that
+	// the scan is still looking where the door is.
+	assert.True(t, sawEmit, "Renderer.Emit was not found in the scanned sources: %v", sources)
 	assert.Empty(t, outside,
 		"JSON encoded outside Renderer.Emit. Every published payload leaves by\n"+
 			"one door, so that a test can see what a command actually emits.\n"+

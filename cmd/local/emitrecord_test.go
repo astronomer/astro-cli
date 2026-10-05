@@ -8,6 +8,8 @@ import (
 	"sort"
 	"sync"
 	"testing"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // What a command actually emits, watched at the door.
@@ -25,7 +27,7 @@ import (
 //   - every named struct reaching Emit is pinned. NOT that a given command
 //     emits its own type: swapping `astro use` from useResult to some other
 //     ALREADY-PINNED type passes here. Binding a surface to a type needs the
-//     pair recorded, and the Renderer does not know which surface it is.
+//     pair recorded, and the cliout.Renderer does not know which surface it is.
 //   - no anonymous struct reaches Emit, since an anonymous shape cannot be
 //     pinned at all.
 //   - the watching is still happening. Without that, everything above is
@@ -72,7 +74,7 @@ var emitted = struct {
 // afterwards. A single test cannot: the point is what every OTHER test
 // emitted.
 func TestMain(m *testing.M) {
-	emitObserver = recordEmitted
+	cliout.EmitObserver = recordEmitted
 
 	code := m.Run()
 
@@ -182,7 +184,7 @@ func problemsIn(named map[reflect.Type]bool, anonymous map[string]bool, floor in
 	var out []string
 	if len(named) < floor {
 		out = append(out, fmt.Sprintf(
-			"only %d payload shapes were seen reaching Renderer.Emit, below the floor of %d.\n"+
+			"only %d payload shapes were seen reaching cliout.Renderer.Emit, below the floor of %d.\n"+
 				"    Either the observer is no longer wired up — in which case every other\n"+
 				"    check here is passing on an empty tally — or a lot of command tests\n"+
 				"    stopped running. If the drop is real and intended, lower\n"+
@@ -193,7 +195,7 @@ func problemsIn(named map[reflect.Type]bool, anonymous map[string]bool, floor in
 			continue
 		}
 		out = append(out, fmt.Sprintf(
-			"a command passed %s through Renderer.Emit and no golden pins it.\n"+
+			"a command passed %s through cliout.Renderer.Emit and no golden pins it.\n"+
 				"    Add it to publishedPayloads and run `make update-schemas`; a shape\n"+
 				"    that reaches stdout is a contract whether or not anybody meant it\n"+
 				"    to be. If a test is exercising Emit rather than publishing, name\n"+
@@ -204,7 +206,7 @@ func problemsIn(named map[reflect.Type]bool, anonymous map[string]bool, floor in
 			continue
 		}
 		out = append(out, fmt.Sprintf(
-			"a command passed the anonymous struct %s through Renderer.Emit.\n"+
+			"a command passed the anonymous struct %s through cliout.Renderer.Emit.\n"+
 				"    An anonymous shape cannot be pinned, so nothing will notice it\n"+
 				"    changing. Give it a name and add it to publishedPayloads.", name))
 	}

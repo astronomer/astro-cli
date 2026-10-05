@@ -98,9 +98,15 @@ var v1Internal = []string{
 
 // v2All lists every v2 package barred from importing config/ or the v1 cmd
 // tree.
-var v2All = append([]string{
+var v2All = append(v2Cmd, v2BelowCmd...)
+
+// v2Cmd lists the v2 packages in the cmd/ layer. They may import each other,
+// and nothing else under cmd/. cmd/cliout is the output contract the whole
+// CLI shares; it is v2 code that the v1 tree imports, never the reverse.
+var v2Cmd = []string{
+	"cmd/cliout",
 	"cmd/local",
-}, v2BelowCmd...)
+}
 
 // platformSeams are the packages under internal/ allowed to import
 // internal/platform/. Each exists to be the one place in the tree that reaches
@@ -313,13 +319,22 @@ func TestV2PackagesNeverImportConfigOrV1Cmd(t *testing.T) {
 				// as the v2 composition root and went when that root
 				// moved onto cmd/ proper; the name now holds the v1
 				// Astro command tree, which is exactly what this forbids.
-				if strings.HasPrefix(imp, modulePrefix+"cmd") &&
-					!strings.HasPrefix(imp, modulePrefix+"cmd/local") {
+				if strings.HasPrefix(imp, modulePrefix+"cmd") && !importsV2Cmd(imp) {
 					t.Errorf("%s imports %s: v2 packages never import the v1 cmd tree", rel, imp)
 				}
 			}
 		})
 	}
+}
+
+// importsV2Cmd reports whether imp is one of the v2 cmd packages, or below one.
+func importsV2Cmd(imp string) bool {
+	for _, pkg := range v2Cmd {
+		if imp == modulePrefix+pkg || strings.HasPrefix(imp, modulePrefix+pkg+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // authDoors are the packages that carry an expensive auth chain. Each exists so

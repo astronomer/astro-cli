@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -25,7 +26,7 @@ import (
 // nothing about whether a build exists, unless the pin has moved off the
 // build's release (stalePin). An index that has none takes the settings out,
 // and Airflow then comes from PyPI.
-func (c *cli) refreshAstroBuild(ctx context.Context, r Renderer, wd string) {
+func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd string) {
 	proj, err := project.Discover(wd)
 	if err != nil {
 		return

@@ -6,6 +6,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -18,7 +19,7 @@ import (
 // A pool that does not go in is a warning, never a failed start: Airflow is
 // up, and every Dag not using that pool runs. A pool the manifest does not
 // list is left alone.
-func (c *cli) applyPools(ctx context.Context, r Renderer, st localrt.Status, pools map[string]manifest.Pool) {
+func (c *cli) applyPools(ctx context.Context, r cliout.Renderer, st localrt.Status, pools map[string]manifest.Pool) {
 	if len(pools) == 0 {
 		return
 	}
@@ -35,7 +36,7 @@ func (c *cli) applyPools(ctx context.Context, r Renderer, st localrt.Status, poo
 	}
 }
 
-func warnPool(r Renderer, what, key string, err error) {
+func warnPool(r cliout.Renderer, what, key string, err error) {
 	emitWarning(r, event{
 		Event:  "warning",
 		Text:   fmt.Sprintf("%s: %v", what, err),

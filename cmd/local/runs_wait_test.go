@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // A run's life as each generation reports it, one body per check.
@@ -47,7 +49,7 @@ func exitCode(t *testing.T, err error) int {
 	if err == nil {
 		return 0
 	}
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if errors.As(err, &exit) {
 		return exit.Code
 	}
@@ -219,7 +221,7 @@ func TestTriggerWaitFailsWhenACheckFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("a failed check must fail the command")
 	}
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if errors.As(err, &exit) {
 		t.Fatalf("err = %v, want a failure rather than a run status", err)
 	}

@@ -1,187 +1,18 @@
 package local
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"time"
 
-	"github.com/spf13/cobra"
-
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
-// Format selects how a command renders its results.
-type Format string
-
-const (
-	FormatText Format = "text"
-	FormatJSON Format = "json"
-)
-
-// ParseFormat validates an --output flag value.
-func ParseFormat(s string) (Format, error) {
-	switch Format(s) {
-	case FormatText, FormatJSON:
-		return Format(s), nil
-	default:
-		return "", fmt.Errorf("unknown output format %q (supported: text, json)", s)
-	}
-}
-
-// Renderer writes command results. Emit is the single output path for every
-// v2 command: json mode encodes the value as one line — so repeated calls
-// on a streaming surface form NDJSON — and text mode runs the text renderer
-// over the same value. Human output is a rendering of the same data, never
-// a separate code path.
-type Renderer struct {
-	Format Format
-	Out    io.Writer
-}
-
-// Emit writes v. In text mode it calls text, which must render v and
-// nothing else.
-//
-// A nil text renderer is only legal on a streaming surface, where the
-// caller has already established it is in json mode and the human rendering
-// is a table written once at the end. Reaching text mode with nil is a
-// programming error, and it panics rather than writing nothing.
-//
-// Deliberately not a silent no-op. An earlier version of this returned nil
-// there, on the theory that it made the caller's `if r.Format == FormatJSON`
-// branch unnecessary. It does not: delete that branch from emitRows, envList
-// or renderCheck and a no-op turns `astro local list` into an empty table
-// with exit 0 — a human sees nothing and is told nothing. The branch is
-// load-bearing, and a panic is what says so when it goes missing.
-func (r Renderer) Emit(v any, text func(w io.Writer) error) error {
-	if emitObserver != nil {
-		emitObserver(v)
-	}
-	if r.Format == FormatJSON {
-		return json.NewEncoder(r.Out).Encode(v)
-	}
-	if text == nil {
-		panic("Renderer.Emit: text mode with no text renderer — this value is " +
-			"json-only, so the caller must not reach here in text mode. The " +
-			"`if r.Format == FormatJSON` branch around a streaming Emit is what " +
-			"prevents it.")
-	}
-	return text(r.Out)
-}
-
-// emitObserver, when set, is handed every value Emit publishes. It is nil in
-// production and exists for one test: the schema goldens pin Go types, and
-// nothing in them can tell you a command still emits the type its golden
-// holds. Watching the door is the only way to know, and the door is only
-// worth watching because everything now goes through it — see
-// TestEmitIsTheOnlyJSONEncoder.
-var emitObserver func(any)
-
-// addOutputFlag registers the shared --output flag on cmd's persistent
-// flags, so one registration covers a whole command family.
-func addOutputFlag(cmd *cobra.Command, target *string) {
-	cmd.PersistentFlags().StringVarP(target, "output", "o", string(FormatText), "Output format: text or json")
-}
-
-// wrapErrorOutput makes every leaf under cmd honor --output json on its failure
-// path: a failed command emits one JSON error object on stdout instead of only
-// cobra's plaintext "Error:" on stderr. Applied once over the whole v2 tree so
-// every command shares the behavior. Streaming commands still emit their own
-// NDJSON; this adds the terminal error object when the command returns an error.
-func wrapErrorOutput(d Deps, cmd *cobra.Command) {
-	for _, sub := range cmd.Commands() {
-		wrapErrorOutput(d, sub)
-	}
-	inner := cmd.RunE
-	if inner == nil {
-		return
-	}
-	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		err := inner(cmd, args)
-		if err == nil {
-			return nil
-		}
-		// The command already wrote a richer JSON object (a plan-build failure's
-		// structured payload); carry the exit non-zero without a second object.
-		var shown errJSONShown
-		if errors.As(err, &shown) {
-			cmd.SilenceErrors = true
-			return err
-		}
-		// A command that carries its own exit code has already rendered its
-		// result (check's NDJSON summary, for one) and main turns the code into
-		// the exit status; keep cobra from printing "Error: exit code N" over it.
-		var exit *ExitError
-		if errors.As(err, &exit) {
-			cmd.SilenceErrors = true
-			return err
-		}
-		if cmdOutputFormat(cmd) == FormatJSON {
-			emitJSONError(d.Stdout, err)
-			// The object is on stdout; silence cobra so json mode stays a single
-			// object and nothing lands on stderr.
-			cmd.SilenceErrors = true
-		}
-		return err
-	}
-}
-
-// cmdOutputFormat reads the resolved --output value off cmd, defaulting to text
-// when the flag is absent (the dev stub parses it itself) or unparseable.
-func cmdOutputFormat(cmd *cobra.Command) Format {
-	f := cmd.Flags().Lookup("output")
-	if f == nil {
-		return FormatText
-	}
-	format, err := ParseFormat(f.Value.String())
-	if err != nil {
-		return FormatText
-	}
-	return format
-}
-
-// errJSONShown marks an error whose command already wrote its own JSON object
-// to stdout, so wrapErrorOutput does not add the generic one on top.
-type errJSONShown struct{ err error }
-
-func (e errJSONShown) Error() string { return e.err.Error() }
-func (e errJSONShown) Unwrap() error { return e.err }
-
-// jsonError is the object a failed command writes in json mode. Named rather
-// than anonymous so it is a declared type the schema pins can hold: this is
-// the shape every `--output json` failure publishes, and it was the one
-// payload nothing could see.
-type jsonError struct {
-	Error string `json:"error"`
-	Code  int    `json:"code"`
-	// Kind is the stable name for WHICH failure this is, for a consumer that
-	// wants to branch. Error is prose and will be reworded; Kind is contract.
-	// Absent when the failure has no kind yet — see problemKind, which does not
-	// invent one.
-	Kind ProblemKind `json:"kind,omitempty"`
-}
-
-// emitJSONError writes the single JSON error object a failed command reports in
-// json mode.
-//
-// Through a Renderer rather than its own encoder, so that every published
-// payload leaves by one door. The door is what makes the shape observable:
-// a test can record what passes through Emit, and a payload that goes
-// around it is one nothing can see.
-//
-// The text renderer writes nothing because there is nothing to write: in
-// text mode cobra prints the error itself, and the caller only reaches here
-// having decided the format is json. Spelled out rather than passed as nil
-// so that a later caller in text mode gets silence by intent instead of a
-// panic.
-func emitJSONError(w io.Writer, err error) {
-	//nolint:errcheck // the command already failed; a write error changes nothing
-	Renderer{Format: FormatJSON, Out: w}.Emit(
-		jsonError{Error: err.Error(), Code: 1, Kind: problemKind(err)},
-		func(io.Writer) error { return nil },
-	)
-}
+// The output contract itself — the formats, the Renderer and its single door,
+// the json error object, the exit codes — is shared by the whole CLI and lives
+// in cmd/cliout. What is here is v2's own: the progress events its streaming
+// surfaces emit.
 
 // event is one progress update on a streaming surface (start, logs). In
 // json mode each event is one NDJSON line.
@@ -207,7 +38,7 @@ type event struct {
 // callbacks bridges localrt progress into the renderer. Write errors are
 // dropped: callbacks have no error channel, and a broken pipe surfaces on
 // the command's own final write.
-func (c *cli) callbacks(r Renderer) localrt.Callbacks {
+func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 	return localrt.Callbacks{
 		OnState: func(s localrt.State, err error) {
 			e := event{Event: "state", State: s}

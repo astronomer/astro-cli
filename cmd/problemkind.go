@@ -1,0 +1,77 @@
+package cmd
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"os"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/local"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/pkg/httputil"
+)
+
+// The kinds a cloud command can fail with. They sit beside cmd/local's, in the
+// same vocabulary (see cliout.ProblemKind), and are composed with them below.
+const (
+	// KindUnauthenticated: there is no usable login — none was ever made, or
+	// the API refused the token (401). Log in and try again.
+	KindUnauthenticated cliout.ProblemKind = "unauthenticated"
+	// KindForbidden: the login is good but does not carry the permission this
+	// needs (403).
+	KindForbidden cliout.ProblemKind = "forbidden"
+	// KindNotFound: the API has no such object, or will not admit to one this
+	// login can see (404).
+	KindNotFound cliout.ProblemKind = "not_found"
+	// KindConflict: the API refused because the object already exists or is
+	// in a state the change cannot apply to (409). The Environment Manager's
+	// create, update and delete document it.
+	KindConflict cliout.ProblemKind = "conflict"
+	// KindAPIUnavailable: the API failed on its side (5xx). Transient as far as
+	// the CLI can tell; try again.
+	KindAPIUnavailable cliout.ProblemKind = "api_unavailable"
+)
+
+// cloudKinds recognizes cloud failures.
+//
+// Every Astro API failure goes through httputil.NormalizeAPIError, which
+// returns a *httputil.StatusError carrying the response status, so the status
+// is the reliable handle and the API's message is left as prose. Before any
+// request, the two "never logged in" errors are sentinels: config's, from the
+// v1 tree's context lookup, and astrosession's, from v2's.
+//
+// APC (Houston) failures are not classified: its GraphQL client reports
+// errors as text, with nothing typed to assert.
+var cloudKinds = cliout.Kinds{
+	{Kind: KindUnauthenticated, Match: func(err error) bool {
+		return errors.Is(err, config.ErrGetHomeString) ||
+			errors.Is(err, astrosession.ErrLoggedOut) ||
+			httputil.HasStatus(err, http.StatusUnauthorized)
+	}},
+	{Kind: KindForbidden, Match: status(http.StatusForbidden)},
+	{Kind: KindNotFound, Match: status(http.StatusNotFound)},
+	{Kind: KindConflict, Match: status(http.StatusConflict)},
+	{Kind: KindAPIUnavailable, Match: func(err error) bool {
+		var se *httputil.StatusError
+		return errors.As(err, &se) && se.StatusCode >= http.StatusInternalServerError
+	}},
+}
+
+func status(code int) func(error) bool {
+	return func(err error) bool { return httputil.HasStatus(err, code) }
+}
+
+// problemKinds is every kind the CLI publishes, in the order they are tried.
+// v2's come first: they are the more specific, and an Astro Deployment's
+// Airflow that does not answer (deployment_hibernating, ...) is a better
+// answer than the status underneath it.
+var problemKinds = append(append(cliout.Kinds{}, local.ProblemKinds...), cloudKinds...)
+
+// Execute builds the root for this machine and runs it against the process's
+// arguments under the output contract (cliout.Execute). The error it returns
+// is for cliout.ExitCode; it has already been reported.
+func Execute(ctx context.Context) error {
+	return cliout.Execute(ctx, NewRootCmd(), os.Args[1:], os.Stdout, problemKinds)
+}

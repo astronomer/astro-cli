@@ -2,14 +2,17 @@ package local
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // AddCmds returns every top-level v2 command, ready to register on a root.
 // Each carries the skip-pre-run annotation on all its leaves, so the v1
 // root's pre-run (config load, telemetry, network) never runs for them:
 // `astro local` works offline with no account. Usage is silenced tree-wide so
-// a failed command shows just its error; the error itself stays unsilenced,
-// so whichever root mounts this tree prints it.
+// a failed command shows just its error. How the error is reported — prose on
+// stderr, or one json object under --output json — is the root's, through
+// cliout.Execute, so it is the same for every command in the CLI.
 func AddCmds(d Deps) []*cobra.Command {
 	cmds := []*cobra.Command{
 		NewLocalCmd(d),
@@ -29,7 +32,6 @@ func AddCmds(d Deps) []*cobra.Command {
 	cmds = append(cmds, rootAliasCmds(d)...)
 	for _, cmd := range cmds {
 		silenceUsage(cmd)
-		wrapErrorOutput(d, cmd)
 	}
 	return cmds
 }
@@ -86,7 +88,7 @@ func rootAliasCmds(d Deps) []*cobra.Command {
 		// The alias answers when typed but stays out of the root list, which
 		// already carries `local` one line away.
 		cmd.Hidden = true
-		addOutputFlag(cmd, &c.output)
+		cliout.AddOutputFlag(cmd, &c.output)
 		markSkipPreRun(cmd)
 		cmds = append(cmds, cmd)
 	}

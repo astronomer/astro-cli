@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/checks"
 )
 
@@ -44,7 +45,7 @@ func checkExit(t *testing.T, err error) int {
 	if err == nil {
 		return checks.ExitOK
 	}
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) {
 		t.Fatalf("want an exit code, got %v", err)
 	}

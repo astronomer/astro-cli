@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -86,7 +87,7 @@ func NewLinkCmd(d Deps) *cobra.Command {
 		Args: cobra.NoArgs,
 	}
 	cmd.AddCommand(newLinkAddCmd(c), newLinkRemoveCmd(c), newLinkDefaultCmd(c))
-	addOutputFlag(cmd, &c.output)
+	cliout.AddOutputFlag(cmd, &c.output)
 	markSkipPreRun(cmd)
 	return cmd
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
@@ -269,7 +270,7 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 // there to answer, and json output has to stay a stream a program can parse —
 // a prompt on stderr with the run blocked on stdin is not that.
 func (c *cli) mayPrompt() bool {
-	return c.interactive() && c.output != string(FormatJSON)
+	return c.interactive() && c.output != string(cliout.FormatJSON)
 }
 
 // pickAndPin asks which deployment to use and writes the answer to the pin, so

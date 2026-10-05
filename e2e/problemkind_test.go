@@ -3,17 +3,18 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 )
 
 // A failed command names its failure, through the built binary.
 //
-// The unit tests call emitJSONError directly, which proves the resolver and
-// the envelope but not that cobra's wrapper still reaches them. That is the
-// way this feature breaks: nothing errors, the field is simply never there
-// again. Running the real binary is also how `no_project` was found in the
-// first place — every kind written before it presumed you were already in a
-// project, and the failure a script meets first had no name.
+// The unit tests drive cliout.Execute over a root they build, which proves the
+// resolver and the envelope but not that the binary's own root still reaches
+// them. That is the way this feature breaks: nothing errors, the field is
+// simply never there again. Running the real binary is also how `no_project`
+// was found in the first place — every kind written before it presumed you
+// were already in a project, and the failure a script meets first had no name.
 //
 // Tier 0: an empty directory and one command. There is nothing to start.
 func TestAFailedCommandPublishesItsKind(t *testing.T) {
@@ -45,5 +46,38 @@ func TestAFailedCommandPublishesItsKind(t *testing.T) {
 				"If it is meant to be public, run `make update-schemas` and commit the golden.\npinned: %v",
 				k, sortedKeys(anyMap(pinned)))
 		}
+	}
+}
+
+// A command invoked wrongly exits 2, in either mode, and names it `usage` in
+// json mode — through the binary, because exit statuses are main's and only a
+// subprocess sees them. Both trees: the v2 one, and a cloud command, whose
+// flag error is reported before its pre-run reads any login.
+//
+// Tier 0: nothing runs; the flag parse fails first.
+func TestAUsageErrorExitsTwo(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+
+	for _, args := range [][]string{
+		{"local", "status", "--bogus"},
+		{"deployment", "list", "--bogus"},
+		{"bogus"},
+	} {
+		r := p.run(args...)
+		if r.ExitCode != 2 {
+			t.Errorf("`astro %s` exited %d, want 2\n%s", strings.Join(args, " "), r.ExitCode, r.output())
+		}
+	}
+
+	r := p.run("local", "status", "--bogus", "--output", "json")
+	if r.ExitCode != 2 {
+		t.Fatalf("exit %d, want 2\n%s", r.ExitCode, r.output())
+	}
+	var emitted map[string]any
+	r.requireJSON(&emitted)
+	if emitted["kind"] != "usage" || emitted["code"] != float64(2) {
+		t.Errorf("want kind usage and code 2, got %v", emitted)
 	}
 }

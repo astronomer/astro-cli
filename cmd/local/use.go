@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -20,7 +21,7 @@ import (
 func NewUseCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
 	cmd := newUseCmd(c)
-	addOutputFlag(cmd, &c.output)
+	cliout.AddOutputFlag(cmd, &c.output)
 	markSkipPreRun(cmd)
 	return cmd
 }

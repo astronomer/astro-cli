@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/instances"
 )
@@ -167,7 +168,7 @@ func newQueryCmd(d Deps, t target, cmd *cobra.Command, builders ...func(*query) 
 		if len(args) == 0 {
 			return cmd.Help()
 		}
-		return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
+		return cliout.Usage(fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath()))
 	}
 	// Every leaf is built over the one query, so they share the family's flags.
 	for _, build := range builders {
@@ -236,7 +237,7 @@ func argName(names []string, i int) string {
 // to see every leaf already added.
 func attachTarget(q *query, cmd *cobra.Command) {
 	q.t.register(cmd)
-	addOutputFlag(cmd, &q.cli.output)
+	cliout.AddOutputFlag(cmd, &q.cli.output)
 	cmd.Long += "\n\n" + q.t.note()
 	explainOutages(q.cli, cmd)
 	markSkipPreRun(cmd)
@@ -246,14 +247,14 @@ func attachTarget(q *query, cmd *cobra.Command) {
 // the Airflow this command acts on, and open a client on it. The format is
 // checked first so a misspelled --output fails before anything reaches the
 // network.
-func (q *query) open(ctx context.Context) (Renderer, *airflowapi.Client, error) {
+func (q *query) open(ctx context.Context) (cliout.Renderer, *airflowapi.Client, error) {
 	r, err := q.renderer()
 	if err != nil {
-		return Renderer{}, nil, err
+		return cliout.Renderer{}, nil, err
 	}
 	client, err := q.t.open(ctx, q.cli)
 	if err != nil {
-		return Renderer{}, nil, err
+		return cliout.Renderer{}, nil, err
 	}
 	return r, client, nil
 }
@@ -306,7 +307,7 @@ func listPages[T any](opts airflowapi.ListOptions, page func(airflowapi.ListOpti
 // emitList pages through a list endpoint and renders what it got. A table
 // carries no count, so in text mode the rows left past the listing are named
 // on stderr; json rows stay one object per line with nothing added.
-func emitList[Wire, Row any](q *query, r Renderer, opts airflowapi.ListOptions,
+func emitList[Wire, Row any](q *query, r cliout.Renderer, opts airflowapi.ListOptions,
 	page func(airflowapi.ListOptions) ([]Wire, int, error), row func(Wire) Row, text func(io.Writer, []Row) error,
 ) error {
 	wire, total, err := listPages(opts, page)
@@ -318,14 +319,14 @@ func emitList[Wire, Row any](q *query, r Renderer, opts airflowapi.ListOptions,
 
 // emitListed renders rows listPages collected, for a command that rearranges
 // them first.
-func emitListed[Row any](q *query, r Renderer, opts airflowapi.ListOptions, rows []Row, total int,
+func emitListed[Row any](q *query, r cliout.Renderer, opts airflowapi.ListOptions, rows []Row, total int,
 	text func(io.Writer, []Row) error,
 ) error {
 	if err := emitRows(r, rows, text); err != nil {
 		return err
 	}
 	next := opts.Offset + len(rows)
-	if r.Format == FormatText && next < total {
+	if r.Format == cliout.FormatText && next < total {
 		fmt.Fprintf(q.d.Stderr, "showing %d of %d; use --offset %d or --limit %d\n", len(rows), total, next, total-opts.Offset)
 	}
 	return nil
@@ -391,7 +392,7 @@ func renderFields(w io.Writer, fields []field) error {
 
 // emitDetail renders one object: the value itself in json mode, its fields as
 // label/value lines in text.
-func emitDetail[T any](r Renderer, v T, fields func(T) []field) error {
+func emitDetail[T any](r cliout.Renderer, v T, fields func(T) []field) error {
 	return r.Emit(v, func(w io.Writer) error { return renderFields(w, fields(v)) })
 }
 

@@ -11,24 +11,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
-func TestParseFormat(t *testing.T) {
-	for _, ok := range []string{"text", "json"} {
-		if _, err := ParseFormat(ok); err != nil {
-			t.Errorf("ParseFormat(%q) = %v", ok, err)
-		}
-	}
-	if _, err := ParseFormat("yaml"); err == nil {
-		t.Error("ParseFormat(yaml) should fail")
-	}
-}
-
 func TestEmitJSONIsOneLine(t *testing.T) {
 	out := &bytes.Buffer{}
-	r := Renderer{Format: FormatJSON, Out: out}
+	r := cliout.Renderer{Format: cliout.FormatJSON, Out: out}
 	st := localrt.Status{ProjectPath: "/p", State: localrt.StateRunning, Port: 8080}
 	if err := r.Emit(st, func(io.Writer) error { t.Fatal("text renderer must not run in json mode"); return nil }); err != nil {
 		t.Fatal(err)
@@ -48,7 +38,7 @@ func TestEmitJSONIsOneLine(t *testing.T) {
 
 func TestEmitStreamsNDJSON(t *testing.T) {
 	out := &bytes.Buffer{}
-	r := Renderer{Format: FormatJSON, Out: out}
+	r := cliout.Renderer{Format: cliout.FormatJSON, Out: out}
 	for i := range 3 {
 		e := event{Event: "log", Component: "scheduler", Text: fmt.Sprintf("line %d", i)}
 		if err := r.Emit(e, nil); err != nil {
@@ -69,7 +59,7 @@ func TestEmitStreamsNDJSON(t *testing.T) {
 
 func TestEmitTextRendersSameValue(t *testing.T) {
 	out := &bytes.Buffer{}
-	r := Renderer{Format: FormatText, Out: out}
+	r := cliout.Renderer{Format: cliout.FormatText, Out: out}
 	l := localrt.LogLine{Component: "scheduler", Time: time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC), Text: "heartbeat"}
 	if err := r.Emit(logEvent(l), func(w io.Writer) error { return renderLogLine(w, l) }); err != nil {
 		t.Fatal(err)
@@ -98,7 +88,7 @@ func TestWarnStandaloneOmissionsPackages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Text mode: a warning line, or nothing.
 			text := &bytes.Buffer{}
-			warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, tc.plan)
+			warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatText, Out: text}, tc.plan)
 			if tc.wantWarn {
 				if !strings.Contains(text.String(), "warning: this project declares OS packages") {
 					t.Errorf("text output missing the warning: %q", text.String())
@@ -109,7 +99,7 @@ func TestWarnStandaloneOmissionsPackages(t *testing.T) {
 
 			// JSON mode: a single warning event line, or nothing.
 			jsonOut := &bytes.Buffer{}
-			warnStandaloneOmissions(Renderer{Format: FormatJSON, Out: jsonOut}, tc.plan)
+			warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatJSON, Out: jsonOut}, tc.plan)
 			if !tc.wantWarn {
 				if jsonOut.Len() != 0 {
 					t.Errorf("expected no JSON warning, got %q", jsonOut.String())
@@ -189,7 +179,7 @@ func TestStatusJSONIsLowercaseAndOmitsZeroFields(t *testing.T) {
 	// use lowercase keys and drop those zero fields (no PascalCase, no leaked
 	// 0001-01-01 timestamp), matching the rest of the v2 surface.
 	out := &bytes.Buffer{}
-	r := Renderer{Format: FormatJSON, Out: out}
+	r := cliout.Renderer{Format: cliout.FormatJSON, Out: out}
 	st := localrt.Status{ProjectPath: "/p", State: localrt.StateStopped}
 	if err := r.Emit(st, nil); err != nil {
 		t.Fatal(err)
@@ -262,7 +252,7 @@ func TestWarnStandaloneDockerfile(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			text := &bytes.Buffer{}
-			warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, tc.plan)
+			warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatText, Out: text}, tc.plan)
 			if !tc.wantWarn {
 				if text.Len() != 0 {
 					t.Errorf("expected no warning, got %q", text.String())
@@ -289,7 +279,7 @@ func TestWarnStandaloneDockerfile(t *testing.T) {
 // the one that changes what the user should do.
 func TestWarnStandaloneReportsBothOmissions(t *testing.T) {
 	text := &bytes.Buffer{}
-	warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, localrt.Plan{
+	warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatText, Out: text}, localrt.Plan{
 		Dockerfile: "Dockerfile",
 		Packages:   []string{"libpq-dev"},
 	})
@@ -330,13 +320,13 @@ func TestWarnStandaloneOmissionsExactText(t *testing.T) {
 	const overrideText = "this project has a docker-compose.override.yml; standalone mode runs no containers, so none of its services run and nothing it sets is applied. Run in Docker mode (--docker) to use it"
 
 	text := &bytes.Buffer{}
-	warnStandaloneOmissions(Renderer{Format: FormatText, Out: text}, plan)
+	warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatText, Out: text}, plan)
 	if want := "warning: " + dockerfileText + "\nwarning: " + packagesText + "\nwarning: " + overrideText + "\n"; text.String() != want {
 		t.Errorf("text output:\n got %q\nwant %q", text.String(), want)
 	}
 
 	jsonOut := &bytes.Buffer{}
-	warnStandaloneOmissions(Renderer{Format: FormatJSON, Out: jsonOut}, plan)
+	warnStandaloneOmissions(cliout.Renderer{Format: cliout.FormatJSON, Out: jsonOut}, plan)
 	lines := strings.Split(strings.TrimSpace(jsonOut.String()), "\n")
 	if len(lines) != 3 {
 		t.Fatalf("want three JSON warning lines, got %q", jsonOut.String())
@@ -414,7 +404,7 @@ func TestWarnEnvValuesText(t *testing.T) {
 	for _, tc := range envWarningCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			out := &bytes.Buffer{}
-			warnEnvValues(Renderer{Format: FormatText, Out: out}, tc.warnings)
+			warnEnvValues(cliout.Renderer{Format: cliout.FormatText, Out: out}, tc.warnings)
 			if len(tc.wantText) == 0 {
 				if out.Len() != 0 {
 					t.Fatalf("expected no output, got %q", out.String())
@@ -439,7 +429,7 @@ func TestWarnEnvValuesJSON(t *testing.T) {
 	for _, tc := range envWarningCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			out := &bytes.Buffer{}
-			warnEnvValues(Renderer{Format: FormatJSON, Out: out}, tc.warnings)
+			warnEnvValues(cliout.Renderer{Format: cliout.FormatJSON, Out: out}, tc.warnings)
 			if len(tc.warnings) == 0 {
 				if out.Len() != 0 {
 					t.Fatalf("expected no output, got %q", out.String())

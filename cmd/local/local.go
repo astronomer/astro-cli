@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -62,12 +63,12 @@ type cli struct {
 	opened instances.Instance
 }
 
-func (c *cli) renderer() (Renderer, error) {
-	f, err := ParseFormat(c.output)
+func (c *cli) renderer() (cliout.Renderer, error) {
+	f, err := cliout.ParseFormat(c.output)
 	if err != nil {
-		return Renderer{}, err
+		return cliout.Renderer{}, err
 	}
-	return Renderer{Format: f, Out: c.d.Stdout}, nil
+	return cliout.Renderer{Format: f, Out: c.d.Stdout}, nil
 }
 
 // projectPath discovers the project that contains the working directory,
@@ -136,12 +137,12 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			// out of v1 habit, get named rather than refused: `init` moved up
 			// to `astro init`, and `ps` was always `status`.
 			if replacement, ok := devReplacementFor(args[0]); ok {
-				return fmt.Errorf("unknown command %q for %q. Use `%s`", args[0], cmd.CommandPath(), replacement)
+				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use `%s`", args[0], cmd.CommandPath(), replacement))
 			}
-			return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
+			return cliout.Usage(fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath()))
 		},
 	}
-	addOutputFlag(cmd, &c.output)
+	cliout.AddOutputFlag(cmd, &c.output)
 	cmd.AddCommand(
 		newStartCmd(c),
 		newStopCmd(c),
@@ -277,8 +278,8 @@ const schedulesOffNote = "Schedules are off locally: DAGs run only when you trig
 // noteSchedulesOff tells a text-mode user that DAGs will not run on their
 // schedules, unless the project turned them back on. On stderr, like the port
 // notice, so stdout stays the status.
-func (c *cli) noteSchedulesOff(r Renderer, p localrt.Plan, mode localrt.Mode) {
-	if r.Format == FormatJSON || schedulesOn(p, mode) {
+func (c *cli) noteSchedulesOff(r cliout.Renderer, p localrt.Plan, mode localrt.Mode) {
+	if r.Format == cliout.FormatJSON || schedulesOn(p, mode) {
 		return
 	}
 	fmt.Fprintln(c.d.Stderr, schedulesOffNote)
@@ -310,7 +311,7 @@ const runtimeKey = "tool.astro.runtime"
 // read the catalog for is a warning. Standalone installs the requirement and
 // builds no image, so the build decides nothing there and is not checked; a
 // declared Dockerfile never has one beside it.
-func (c *cli) checkRuntimeBuild(ctx context.Context, r Renderer, p localrt.Plan) error {
+func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan) error {
 	if p.Mode != localrt.ModeDocker || p.Runtime == "" || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
 		return nil
 	}
@@ -329,7 +330,7 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r Renderer, p localrt.Plan)
 // warnLocalFilesInImage warns, before a Docker-mode start builds the project's
 // own Dockerfile, about the per-machine files that build would copy into the
 // image (scaffold.LocalFilesWarning). Standalone builds no image.
-func warnLocalFilesInImage(r Renderer, p localrt.Plan) {
+func warnLocalFilesInImage(r cliout.Renderer, p localrt.Plan) {
 	if p.Mode != localrt.ModeDocker {
 		return
 	}
@@ -342,7 +343,7 @@ func warnLocalFilesInImage(r Renderer, p localrt.Plan) {
 // [tool.astro.targets.<name>] key nothing reads, most likely a misspelling of
 // one that is. The key and reason ride as their own fields, as an env warning's
 // do, so a json consumer need not parse the prose.
-func warnManifest(r Renderer, warnings []manifest.Problem) {
+func warnManifest(r cliout.Renderer, warnings []manifest.Problem) {
 	for _, w := range warnings {
 		emitWarning(r, event{
 			Event:  "warning",
@@ -364,7 +365,7 @@ func warnManifest(r Renderer, warnings []manifest.Problem) {
 // Both callers reach it: runStart and runRestart. `astro local restart` has no
 // --docker flag of its own, so the messages name Docker mode as the thing to run
 // in rather than a flag to add to the command in hand.
-func warnStandaloneOmissions(r Renderer, p localrt.Plan) {
+func warnStandaloneOmissions(r cliout.Renderer, p localrt.Plan) {
 	for _, o := range p.StandaloneOmissions() {
 		emitWarning(r, event{Event: "warning", Text: omissionText(o)})
 	}
@@ -398,7 +399,7 @@ func omissionText(o localrt.Omission) string {
 //
 // Not gated on mode, unlike warnStandaloneOmissions: a value of the wrong shape
 // is the wrong shape in Docker too.
-func warnEnvValues(r Renderer, warnings []envschema.Violation) {
+func warnEnvValues(r cliout.Renderer, warnings []envschema.Violation) {
 	for _, v := range warnings {
 		// The section, key and reason ride as their own fields as well as in
 		// the prose, so a machine consumer does not have to regex
@@ -418,7 +419,7 @@ func warnEnvValues(r Renderer, warnings []envschema.Violation) {
 // command in a stopped project was allowed past, with the cause the resolver
 // found, so a Dag that fails on one later is not a mystery. doing names what
 // went ahead: "started" or "running".
-func warnWithout(r Renderer, doing string, missing []envresolve.Missing) {
+func warnWithout(r cliout.Renderer, doing string, missing []envresolve.Missing) {
 	for _, m := range missing {
 		reason := "no source on this machine"
 		if m.SourceNote != "" {
@@ -441,7 +442,7 @@ func warnWithout(r Renderer, doing string, missing []envresolve.Missing) {
 // the rest, which Airflow simply does not get this time.
 // warnPython reports a requires-python the runtime build ships no Python for:
 // the venv goes ahead, and an image of the project would be refused.
-func warnPython(r Renderer, note string) {
+func warnPython(r cliout.Renderer, note string) {
 	if note == "" {
 		return
 	}
@@ -462,7 +463,7 @@ func (c *cli) pythonCatalog(ctx context.Context) func() *runtimeversions.Catalog
 	return func() *runtimeversions.Catalog { return c.d.RuntimeCatalog(ctx) }
 }
 
-func warnWorkspaceUnread(r Renderer, note string) {
+func warnWorkspaceUnread(r cliout.Renderer, note string) {
 	if note == "" {
 		return
 	}
@@ -487,7 +488,7 @@ func sectionLabel(s envschema.Section) string {
 // emitWarning is the one definition of what a warning looks like on the wire,
 // in both modes. Every warning source goes through it, so the shape cannot
 // drift between them.
-func emitWarning(r Renderer, e event) {
+func emitWarning(r cliout.Renderer, e event) {
 	//nolint:errcheck // a warning write failure surfaces on the command's own output
 	r.Emit(e, func(w io.Writer) error {
 		_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
@@ -498,14 +499,14 @@ func emitWarning(r Renderer, e event) {
 // reportBuildError renders a plan-build failure. A *plan.MissingEnvError in
 // json mode emits its structured payload on stdout; every failure is returned
 // so the exit code is non-zero and the runner prints the message.
-func (c *cli) reportBuildError(r Renderer, err error) error {
+func (c *cli) reportBuildError(r cliout.Renderer, err error) error {
 	var missing *plan.MissingEnvError
-	if errors.As(err, &missing) && r.Format == FormatJSON {
+	if errors.As(err, &missing) && r.Format == cliout.FormatJSON {
 		//nolint:errcheck // the returned err is what fails the command
 		r.Emit(missing.Payload(), func(io.Writer) error { return nil })
-		// The payload is the JSON error object; mark it so the shared wrapper
-		// does not print a second, plainer one over it.
-		return errJSONShown{err}
+		// The payload is the JSON error object; mark it so the root's error report
+		// (cliout.Execute) does not print a second, plainer one over it.
+		return cliout.JSONShown(err)
 	}
 	return err
 }
@@ -758,7 +759,7 @@ func (c *cli) runList(all, clean bool) error {
 	return emitRows(r, rows, renderListTable)
 }
 
-func (c *cli) runListClean(r Renderer) error {
+func (c *cli) runListClean(r cliout.Renderer) error {
 	// PruneStale is best-effort, so a failure and a removal are not
 	// alternatives: report both, or someone told only "Error: ..." reruns the
 	// command against records it already cleaned and reads the same error as
@@ -829,8 +830,8 @@ func buildListRows(statuses []localrt.Status, all bool, now time.Time) []listRow
 // the output is NDJSON, not one array), the text renderer once otherwise. It is
 // generic because every listing surface wants exactly this and only differs in
 // what a row is.
-func emitRows[T any](r Renderer, rows []T, text func(io.Writer, []T) error) error {
-	if r.Format == FormatJSON {
+func emitRows[T any](r cliout.Renderer, rows []T, text func(io.Writer, []T) error) error {
+	if r.Format == cliout.FormatJSON {
 		for _, row := range rows {
 			if err := r.Emit(row, nil); err != nil {
 				return err
@@ -1028,7 +1029,7 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 		})
 	}
 	// On stderr: stdout belongs to the command being run.
-	stderr := Renderer{Format: FormatText, Out: c.d.Stderr}
+	stderr := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
 	warnWorkspaceUnread(stderr, built.WorkspaceNote)
 	warnWithout(stderr, "running", local)
 	warnWorkspaceSkipped(stderr, workspace)
@@ -1037,7 +1038,7 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 
 // warnWorkspaceSkipped reports, in one line, the required values an offline
 // run went without because only the Environment Manager holds them.
-func warnWorkspaceSkipped(r Renderer, missing []envresolve.Missing) {
+func warnWorkspaceSkipped(r cliout.Renderer, missing []envresolve.Missing) {
 	if len(missing) == 0 {
 		return
 	}
@@ -1076,7 +1077,7 @@ func (c *cli) runExec(ctx context.Context, argv []string, withWorkspace bool) er
 	if errors.As(err, &exitErr) {
 		// The wrapped command failed and has already written its own output;
 		// carry its exit code out so a caller sees the real status, not 1.
-		return &ExitError{Code: exitErr.ExitCode()}
+		return &cliout.ExitError{Code: exitErr.ExitCode()}
 	}
 	return err
 }

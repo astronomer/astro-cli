@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/checks"
 )
 
@@ -132,9 +133,9 @@ func TestCheckFailingToBuildAnEnvironmentStillExitsCode2(t *testing.T) {
 	}
 
 	err := execute(t, d, "local", "check")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) {
-		t.Fatalf("want ExitError, got %v", err)
+		t.Fatalf("want cliout.ExitError, got %v", err)
 	}
 	if exit.Code != checks.ExitEnvNotReady {
 		t.Errorf("exit code = %d, want %d", exit.Code, checks.ExitEnvNotReady)
@@ -192,7 +193,7 @@ func TestCheckDoesNotPaperOverABrokenProjectEnvironment(t *testing.T) {
 	}
 
 	err = execute(t, d, "local", "check")
-	var exit *ExitError
+	var exit *cliout.ExitError
 	if !errors.As(err, &exit) || exit.Code != checks.ExitEnvNotReady {
 		t.Fatalf("a broken project environment should still stop the check, got %v", err)
 	}
