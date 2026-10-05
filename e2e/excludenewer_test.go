@@ -43,7 +43,7 @@ import (
 //
 // The format is the one the bump script writes and matches: midnight UTC as
 // an RFC 3339 timestamp.
-const pinnedExcludeNewer = "2026-09-24T00:00:00Z"
+const pinnedExcludeNewer = "2026-10-05T00:00:00Z"
 
 // excludeNewerEnv overrides pinnedExcludeNewer for one run. Unset or empty
 // takes the constant; "none" resolves against live PyPI, which is what the
