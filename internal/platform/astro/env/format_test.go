@@ -29,6 +29,23 @@ func (s *Suite) TestParseFormat() {
 	s.EqualError(err, `unknown output format "table" (supported: text, json)`)
 }
 
+// An empty scope lists nothing, and nothing is [] in json, not null: a script
+// loops over -o json without a null check. The lists arrive nil from the pager.
+func (s *Suite) TestEmptyListsAreJSONArrays() {
+	type writer func(*bytes.Buffer) error
+	for name, w := range map[string]writer{
+		"var list":         func(b *bytes.Buffer) error { return WriteVarList(nil, FormatJSON, false, b) },
+		"conn list":        func(b *bytes.Buffer) error { return WriteConnList(nil, FormatJSON, b) },
+		"airflow var list": func(b *bytes.Buffer) error { return WriteAirflowVarList(nil, FormatJSON, false, b) },
+		"metrics list":     func(b *bytes.Buffer) error { return WriteMetricsExportList(nil, FormatJSON, b) },
+		"inventory":        func(b *bytes.Buffer) error { return WriteInventory(nil, FormatJSON, b) },
+	} {
+		var js bytes.Buffer
+		s.NoError(w(&js), name)
+		s.Equal("[]\n", js.String(), name)
+	}
+}
+
 // Every writer goes through one switch, so they agree: json is the value
 // itself (an object for one, an array for a list), and a format the writer
 // has no view for is refused with the parser's own wording.

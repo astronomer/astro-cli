@@ -95,9 +95,20 @@ func write(out io.Writer, f Format, v any, text, dotenv func(io.Writer) error) e
 
 var errNilObject = errors.New("nil environment object")
 
+// nonNil is s, or an empty slice when s is nil. A list with nothing in it is
+// [] in json, not null: a script loops over -o json without a null check.
+// The lists arrive nil when the scope is empty, because the pager collecting
+// them starts from a nil slice.
+func nonNil[T any](s []T) []T {
+	if s == nil {
+		return []T{}
+	}
+	return s
+}
+
 // WriteVarList renders a list of ENVIRONMENT_VARIABLE objects.
 func WriteVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, envObjs,
+	return write(out, format, nonNil(envObjs),
 		func(w io.Writer) error { return writeVarTable(envObjs, includeSecrets, w) },
 		func(w io.Writer) error { return writeVarDotenv(envObjs, includeSecrets, w) })
 }
@@ -120,7 +131,7 @@ func WriteVarLinks(report *VarLinksReport, format Format, includeSecrets bool, o
 
 // WriteConnList renders a list of CONNECTION objects.
 func WriteConnList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, envObjs, func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
+	return write(out, format, nonNil(envObjs), func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
 }
 
 // WriteConn renders a single CONNECTION object.
@@ -135,7 +146,7 @@ func WriteConn(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
 // Same shape as ENVIRONMENT_VARIABLE.
 func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, envObjs,
+	return write(out, format, nonNil(envObjs),
 		func(w io.Writer) error { return writeAirflowVarTable(envObjs, includeSecrets, w) }, nil)
 }
 
@@ -151,7 +162,7 @@ func WriteAirflowVar(envObj *astrov1.EnvironmentObject, format Format, includeSe
 
 // WriteMetricsExportList renders a list of METRICS_EXPORT objects.
 func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, envObjs, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
+	return write(out, format, nonNil(envObjs), func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
 }
 
 // WriteMetricsExport renders a single METRICS_EXPORT object.
@@ -510,7 +521,7 @@ func writeJSON(v any, out io.Writer) error {
 // WriteInventory renders the cross-kind listing. It has no dotenv view: see
 // ErrInventoryHasNoValues.
 func WriteInventory(items []InventoryItem, format Format, out io.Writer) error {
-	return write(out, format, items, func(w io.Writer) error { return writeInventoryTable(items, w) }, nil)
+	return write(out, format, nonNil(items), func(w io.Writer) error { return writeInventoryTable(items, w) }, nil)
 }
 
 // ErrInventoryHasNoValues refuses dotenv for the cross-kind listing, with
