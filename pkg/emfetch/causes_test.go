@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Every cause's exact text. docs/v2-workspace-link.md words them and both apps
+// Every cause's exact text. docs/workspace-link.md words them and both apps
 // report them, so a change here is a change to the contract: these strings are
 // written out rather than built, so a reworded template fails here instead of
 // agreeing with itself.

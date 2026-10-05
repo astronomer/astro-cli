@@ -3,7 +3,7 @@
 // lifecycle. an earlier fix rule is that anything both modes need lives here, never
 // copied — one copy is how "works in docker, broken in standalone" stops shipping.
 // Like the engines it serves, it follows the layer rules in
-// docs/v2-architecture.md: nothing here prints.
+// docs/architecture.md: nothing here prints.
 //
 // State callbacks and line splitting used to live here too. They moved up to the
 // contract package (rt.OnState, rt.LineWriter) because they exist to feed

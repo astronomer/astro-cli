@@ -2,7 +2,7 @@
 // that holds its Airflow values, the provider chain that resolves them, and
 // the set/get/list/delete operations behind `astro local env`.
 //
-// It writes plain files — no keyring, no encryption (docs/v2-secrets.md). The
+// It writes plain files — no keyring, no encryption (docs/secrets.md). The
 // encrypted tiers are internal/vaultenv's, and they are passed INTO the chain
 // this package assembles rather than built here, which is what keeps that true:
 //

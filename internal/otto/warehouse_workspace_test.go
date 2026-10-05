@@ -18,7 +18,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// linkWorkspace writes a manifest linking a workspace in the v2 project at
+// linkWorkspace writes a manifest linking a workspace in the project at
 // dir and answers its reads with conns, as the Environment Manager does: one
 // list per object type, connections under CONNECTION.
 func (s *ConfigSuite) linkWorkspace(dir string, fail bool, conns ...astrov1.EnvironmentObject) {

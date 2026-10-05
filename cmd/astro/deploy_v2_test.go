@@ -44,8 +44,8 @@ func resetDeployFlagVars() {
 	dags = false
 	image = false
 	imageName = ""
-	v2Deployment = ""
-	v2Workspace = ""
+	manifestDeployment = ""
+	manifestWorkspace = ""
 	noDagsBaseDir = false
 	waitForDeploy = false
 	forceDeploy = false
@@ -57,7 +57,7 @@ func resetDeployFlagVars() {
 	deployOutput = string(formatText)
 }
 
-// v2ManifestWithDefaultLink is a v2 project with two links, one marked default.
+// v2ManifestWithDefaultLink is a project with two links, one marked default.
 // Deploy never resolves from the marker, so the render tests below
 // name their target with --deployment; the marker's only job here is
 // preselecting the prompt, which TestDeployV2PromptPreselectsDefault drives.
@@ -113,7 +113,7 @@ func (f *fakeCmdDeployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageR
 	return f.img, f.imgErr
 }
 
-// setupV2Deploy points config.WorkingPath at a fresh v2 project (one default
+// setupV2Deploy points config.WorkingPath at a fresh project (one default
 // link) and swaps the transport for d, restoring both on cleanup. Each test
 // gets its own mock.
 func setupV2Deploy(t *testing.T, d v2deploy.Deployer) {
@@ -289,7 +289,7 @@ func TestDeployV2JSONManifestErrorNoUsage(t *testing.T) {
 	resetDeployFlagVars()
 
 	// [tool.astro] with no airflow version fails manifest validation. It still
-	// routes to the v2 path, which fails at manifest.Load, so this locks in that
+	// routes to the manifest path, which fails at manifest.Load, so this locks in that
 	// json mode still keeps stdout/stderr to the one error object.
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"),
@@ -673,9 +673,9 @@ func TestDeployRoutesV2Project(t *testing.T) {
 	t.Cleanup(func() { config.WorkingPath = orig })
 
 	// The manifest names no deployment and the run is non-interactive (go test
-	// has no TTY), so the v2 path stops at selection asking for --deployment —
-	// before any build or transport work. That message is unique to the v2 path,
-	// so it proves routing did not fall through to v1.
+	// has no TTY), so the manifest path stops at selection asking for --deployment —
+	// before any build or transport work. That message is unique to the manifest path,
+	// so it proves routing did not fall through to the 1.x path.
 	err := execDeployCmd()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--deployment")
@@ -685,7 +685,7 @@ func TestDeployRoutesV1Project(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
-	dir := t.TempDir() // no pyproject.toml, so not a v2 project
+	dir := t.TempDir() // no pyproject.toml, so not a project
 
 	orig := config.WorkingPath
 	config.WorkingPath = dir
@@ -707,16 +707,16 @@ func TestDeployRoutesV1Project(t *testing.T) {
 
 	err := execDeployCmd("test-deployment-id", "-f", "--workspace-id", "test-ws")
 	require.NoError(t, err)
-	assert.True(t, called, "a v1 project should run the v1 deploy path")
+	assert.True(t, called, "a 1.x project should run the 1.x deploy path")
 }
 
-// Eight flags reach astro deploy that the v2 path never reads. Accepting them
+// Eight flags reach astro deploy that the manifest path never reads. Accepting them
 // silently means a deploy someone believes ran their tests, shipped from a
 // DAGs path it never looked at, or saved a target it did not save. Each is
 // refused with what to do instead until an earlier fix ports the ones worth porting.
 //
 // Eight rather than nine: --build-secret is deliberately NOT in this table any
-// more, because the v2 path READS it now. It still needs a project Dockerfile
+// more, because the manifest path READS it now. It still needs a project Dockerfile
 // to be mounted into, and that refusal lives with the other build-secret
 // checks in TestDeployV2BuildSecretRefusals — gated on the flag being given,
 // which is why it cannot be a row here.
@@ -728,7 +728,7 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 		{[]string{"--pytest"}, "uv run pytest"},
 		{[]string{"--parse"}, "astro local check"},
 		{[]string{"--dags-path", "./elsewhere"}, "not supported yet"},
-		{[]string{"--dag-bundle-name", "nightly"}, "not supported on a v2 project yet"},
+		{[]string{"--dag-bundle-name", "nightly"}, "not supported here yet"},
 		{[]string{"--test", "tests/test_dags.py"}, "uv run pytest"},
 		{[]string{"--env", ".env.ci"}, "runs no tests"},
 		{[]string{"--save"}, "always asks"},
@@ -748,7 +748,7 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 
 			out, err := execDeployCapture(append([]string{actionDeploymentID}, tc.args...)...)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "has no effect when deploying a v2 project")
+			assert.Contains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
 			assert.Contains(t, err.Error(), tc.want)
 			assert.NotContains(t, out, "Usage:", "a refusal prints the error, not the help")
 		})
@@ -756,7 +756,7 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 }
 
 // --force and --prompt are read by neither path but refused by neither either.
-// The v2 path has no uncommitted-changes gate for --force to open, and it always
+// The manifest path has no uncommitted-changes gate for --force to open, and it always
 // asks, which is what --prompt requested — so both get the outcome the flag
 // asked for and refusing them would break CI that passes them out of habit.
 func TestDeployAcceptsForceAndPromptOnAV2Project(t *testing.T) {
@@ -773,26 +773,26 @@ func TestDeployAcceptsForceAndPromptOnAV2Project(t *testing.T) {
 
 			err := execDeployCmd(flag)
 			if err != nil {
-				assert.NotContains(t, err.Error(), "has no effect when deploying a v2 project")
+				assert.NotContains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
 			}
 		})
 	}
 }
 
-// The same flags still work on a v1 project, where the v1 deploy path reads
-// them. The refusal is on the v2 branch only.
+// The same flags still work on a 1.x project, where the 1.x deploy path reads
+// them. The refusal is on the manifest branch only.
 func TestDeployAllowsThoseFlagsOnAV1Project(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
-	dir := t.TempDir() // no pyproject.toml, so the v1 path
+	dir := t.TempDir() // no pyproject.toml, so the 1.x path
 	orig := config.WorkingPath
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = orig })
 
 	err := execDeployCmd("--pytest")
 	if err != nil {
-		assert.NotContains(t, err.Error(), "has no effect when deploying a v2 project")
+		assert.NotContains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
 	}
 }
 
@@ -807,7 +807,7 @@ func TestDeployAllowsThoseFlagsOnAV1Project(t *testing.T) {
 //     whenever the project declared a Dockerfile.
 //   - the env-var row is the important one. ResolveBuildSecrets reads
 //     BUILD_SECRET_INPUT whether or not the flag was given, so a refusal keyed on
-//     the resolved slice hard-failed every ordinary v2 deploy on any runner
+//     the resolved slice hard-failed every ordinary manifest deploy on any runner
 //     exporting that variable. No flag, no Dockerfile, and an error telling the
 //     user to declare one they never wanted.
 func TestDeployV2BuildSecretRefusals(t *testing.T) {
@@ -914,7 +914,7 @@ func TestDeployV2PositionalAndFlagMustAgree(t *testing.T) {
 	assert.Contains(t, err.Error(), "name one")
 }
 
-// Each shape astronomer/deploy-action v0.16.0 runs, against a v2 project.
+// Each shape astronomer/deploy-action v0.16.0 runs, against a project.
 func TestDeployV2DeployActionInvocations(t *testing.T) {
 	withDockerfile := strings.Replace(v2ManifestWithDefaultLink, "[tool.astro]\n", "[tool.astro]\ndockerfile = \"Dockerfile\"\n", 1)
 	for _, tc := range []struct {
@@ -980,7 +980,7 @@ workspace = "clw-ws"
 test = {deployment = 'clx-prod', default = true}
 `
 
-// setupDeployOnStage is a v2 project on astronomer.io deployed while the CLI is
+// setupDeployOnStage is a project on astronomer.io deployed while the CLI is
 // switched to astronomer-stage.io. It returns where the login the deploy picked
 // is recorded.
 func setupDeployOnStage(t *testing.T, toml string) *deployLogin {

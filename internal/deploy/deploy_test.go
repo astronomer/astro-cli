@@ -599,8 +599,8 @@ func TestRun_CarriesTheDeclaredDockerfile(t *testing.T) {
 
 // --build-secret reaches the image build when the project declares a Dockerfile.
 //
-// This replaces a blanket refusal of the flag on every v2 project. That refusal
-// was right about the rule and wrong about the reason: it said a v2 project
+// This replaces a blanket refusal of the flag on every project. That refusal
+// was right about the rule and wrong about the reason: it said a project
 // "cannot declare" a Dockerfile, which stopped being true when [tool.astro]
 // dockerfile landed.
 func TestRun_CarriesBuildSecretsWithADeclaredDockerfile(t *testing.T) {

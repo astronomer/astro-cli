@@ -2,7 +2,7 @@
 // publishes through a temp file and a rename, so a reader sees the old contents
 // or the new ones and never half of either.
 //
-// It is a sub-module rather than root-module internal/ because the v2 state
+// It is a sub-module rather than root-module internal/ because the core's state
 // writers are spread across modules — pkg/localrt's record store, pkg/proxy's
 // routes and record files, pkg/secrets' vault, internal/userstate — and every
 // one of them is written by both the CLI and Astro Desktop.

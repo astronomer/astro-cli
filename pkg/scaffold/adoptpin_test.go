@@ -11,7 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// adoptable writes a v1 project (a Dockerfile naming an Airflow 2 runtime)
+// adoptable writes a 1.x project (a Dockerfile naming an Airflow 2 runtime)
 // around a pyproject.toml pinned however the caller says.
 func adoptable(t *testing.T, deps string) string {
 	t.Helper()

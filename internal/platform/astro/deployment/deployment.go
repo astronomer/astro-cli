@@ -694,7 +694,7 @@ const (
 	hybridSchedulerReplicasMax = 4
 )
 
-func validateHybridResources(schedulerAU, schedulerReplicas int, _ astrov1.DeploymentOptions) bool { //nolint:gocritic // intentional in this v1 code
+func validateHybridResources(schedulerAU, schedulerReplicas int, _ astrov1.DeploymentOptions) bool { //nolint:gocritic // intentional in this shell code
 	if schedulerAU > hybridSchedulerAuMax || schedulerAU < hybridSchedulerAuMin {
 		fmt.Printf("\nScheduler AUs must be between a min of %d and a max of %d AUs\n", hybridSchedulerAuMin, hybridSchedulerAuMax)
 		return false
@@ -2181,7 +2181,7 @@ func GetCoreCloudProvider(cloudProvider string) astrov1.GetDeploymentOptionsPara
 	return coreCloudProvider
 }
 
-func isDevelopmentDeployment(deployment astrov1.Deployment) bool { //nolint:gocritic // intentional in this v1 code
+func isDevelopmentDeployment(deployment astrov1.Deployment) bool { //nolint:gocritic // intentional in this shell code
 	return deployment.IsDevelopmentMode != nil && *deployment.IsDevelopmentMode
 }
 

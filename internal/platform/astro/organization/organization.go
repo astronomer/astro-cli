@@ -172,7 +172,7 @@ func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*
 }
 
 func SwitchWithContext(domain string, targetOrg *astrov1.Organization, astroV1Client astrov1.APIClient, out io.Writer) error {
-	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
+	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 
 	// reset org context
 	orgProduct := "HYBRID"
@@ -192,7 +192,7 @@ func SwitchWithContext(domain string, targetOrg *astrov1.Organization, astroV1Cl
 	if err := c.SetContextKey("user_email", c.UserEmail); err != nil {
 		return err
 	}
-	c, _ = context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
+	c, _ = context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 	// call check user session which will trigger workspace switcher flow
 	err := CheckUserSession(&c, astroV1Client, out)
 	if err != nil {
@@ -341,6 +341,6 @@ func pluralize(count int) string {
 }
 
 func IsOrgHosted() bool {
-	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
+	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 	return c.OrganizationProduct == "HOSTED"
 }

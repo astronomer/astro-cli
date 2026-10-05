@@ -30,7 +30,7 @@ const warehouseReadTimeout = 8 * time.Second
 // stands in a fake Environment Manager.
 var workspaceClients emenv.ClientFactory = emenv.Clients
 
-// workspaceConnections is the native connections the v2 project at projectDir
+// workspaceConnections is the native connections the project at projectDir
 // gets from its linked workspace, read with secret values, since a warehouse
 // without credentials cannot be queried. Nil, with no read, when the manifest
 // links no workspace.
@@ -49,7 +49,7 @@ func workspaceConnections(projectDir string) ([]connmodel.Connection, error) {
 // vault's that reach the checkout, then, at the lowest precedence, the linked
 // workspace's, as a start layers them and as Astro Desktop feeds its
 // warehouses. A connection id the vault holds keeps the vault's. v2 is whether
-// projectDir is a v2 project, which is what can link a workspace.
+// projectDir is a project, which is what can link a workspace.
 //
 // The workspace read is bounded by warehouseReadTimeout, and
 // a failure is logged and leaves those warehouses out: a launch never waits on
@@ -91,7 +91,7 @@ var warehouseDir = connwarehouse.ConfigDir
 // does. The warehouses are returned even when the file write fails, since the
 // values reach Otto either way; a .env scrub failure is the usual cause.
 //
-// The checkout is the enclosing v2 project, or cwd itself otherwise: a v1
+// The checkout is the enclosing project, or cwd itself otherwise: a 1.x
 // project's links and scoped entries name its own directory, and a directory
 // that is no project matches only the globals with no link row.
 func writeWarehouses(cwd string) []connwarehouse.Materialized {
@@ -103,7 +103,7 @@ func writeWarehouses(cwd string) []connwarehouse.Materialized {
 	} else {
 		var notFound *project.NotFoundError
 		if !errors.As(err, &notFound) {
-			logger.Debugf("otto: discovering v2 project for warehouses: %v", err)
+			logger.Debugf("otto: discovering the project for warehouses: %v", err)
 		}
 	}
 	dir, err := warehouseDir()

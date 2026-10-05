@@ -177,7 +177,7 @@ func TestUnknownLocalSubcommandFails(t *testing.T) {
 func TestStatusJSONIsLowercaseAndOmitsZeroFields(t *testing.T) {
 	// A stopped status carries no pid, port, or start time; the json shape must
 	// use lowercase keys and drop those zero fields (no PascalCase, no leaked
-	// 0001-01-01 timestamp), matching the rest of the v2 surface.
+	// 0001-01-01 timestamp), matching the rest of the core surface.
 	out := &bytes.Buffer{}
 	r := cliout.Renderer{Format: cliout.FormatJSON, Out: out}
 	st := localrt.Status{ProjectPath: "/p", State: localrt.StateStopped}

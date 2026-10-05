@@ -57,7 +57,7 @@ func (s *ConfigSuite) TestNewConfigFromContext() {
 	s.NotEmpty(cfg.Domain)
 }
 
-// Inside a v2 project that names its workspace's organization, Otto runs in
+// Inside a project that names its workspace's organization, Otto runs in
 // that organization; one that names none, and no project at all, keep the
 // login's.
 func (s *ConfigSuite) TestNewConfigFromContextTakesTheProjectsOrganization() {
@@ -229,7 +229,7 @@ func (s *ConfigSuite) TestDetectAirflow_V2ProjectNoRecord() {
 
 func (s *ConfigSuite) TestDetectAirflow_V2WinsOverV1Route() {
 	// A directory can carry both a v2 state record and a stale v1 route (a
-	// project migrated in place). The v2 project's own Airflow wins.
+	// project migrated in place). The project's own Airflow wins.
 	v2srv := s.startFakeAirflow()
 	defer v2srv.Close()
 	v1srv := s.startFakeAirflow()

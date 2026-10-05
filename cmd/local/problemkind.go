@@ -9,7 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
-// The kinds a v2 command can fail with. The mechanism they plug into — the
+// The kinds a core command can fail with. The mechanism they plug into — the
 // ProblemKind type, the ordered table, what earns a kind — is the whole CLI's
 // and lives in cmd/cliout; the root composes this table with its own.
 //
@@ -64,7 +64,7 @@ const (
 	KindAirflowUnavailable cliout.ProblemKind = "airflow_unavailable"
 )
 
-// ProblemKinds maps a v2 failure to the name it publishes under. The root
+// ProblemKinds maps a core command's failure to the name it publishes under. The root
 // composes it with the cloud kinds and hands the result to cliout.Execute.
 //
 // Order decides (see cliout.Kinds), and is pinned by a test, so tidying this

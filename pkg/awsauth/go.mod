@@ -2,7 +2,7 @@ module github.com/astronomer/astro-cli/pkg/awsauth
 
 go 1.26.1
 
-// Declared exceptions to the sibling rule (docs/v2-architecture.md): a door
+// Declared exceptions to the sibling rule (docs/architecture.md): a door
 // implements pkg/instances' Provider, so it names that package's Instance,
 // Deps and Provider types; it returns pkg/airflowapi's Transport and
 // CredentialSource; and — test-only — it names pkg/manifest's auth method to

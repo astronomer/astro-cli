@@ -1,6 +1,6 @@
 // Package localrt runs local Airflow. It is the runtime behind `astro local`
 // and behind Astro Desktop, so it follows the shared sub-module rules
-// (docs/v2-architecture.md): no printing, no exiting, and no in-repo imports
+// (docs/architecture.md): no printing, no exiting, and no in-repo imports
 // except pkg/airflowrt, the primitives it orchestrates. Progress flows
 // through Callbacks; results flow through typed errors.
 //

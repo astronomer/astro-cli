@@ -81,7 +81,7 @@ func Switch(domain string) error {
 }
 
 func Delete(domain string, noPrompt bool) error {
-	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this v1 path
+	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this shell code
 	if currentCtx.Domain != "" && currentCtx.Domain == domain && !noPrompt {
 		i, err := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--force"))
 		if err != nil {
@@ -150,7 +150,7 @@ func ListContext(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	//nolint:gocritic // intentional in this v1 code
+	//nolint:gocritic // intentional in this shell code
 	for ctxKey, ctx := range contexts.Contexts {
 		if ctx.Domain != "" {
 			domain = ctx.Domain

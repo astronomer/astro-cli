@@ -48,7 +48,7 @@ type Options struct {
 	// It is a constructor rather than a client because the workspace comes from
 	// the manifest, which this package is what reads. Taking the Astro client
 	// directly would make every plan build import a platform, which the layer
-	// rules forbid below cmd/ (docs/v2-architecture.md).
+	// rules forbid below cmd/ (docs/architecture.md).
 	WorkspaceProvider func(astro *manifest.Astro, reveal bool) envresolve.Provider
 	// AllowMissing starts even when a required value has no source, instead
 	// of returning *MissingEnvError: `--allow-missing`, and Astro Desktop's

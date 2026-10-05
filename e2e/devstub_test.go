@@ -211,9 +211,9 @@ func TestDevJSONFlagSpellings(t *testing.T) {
 	}
 }
 
-// A classic v1 project that also keeps a pyproject.toml for tool settings is
+// A classic 1.x project that also keeps a pyproject.toml for tool settings is
 // still v1, so the stub leads with the conversion: `uv run pytest` does not
-// work until `astro init` has made the directory a v2 project.
+// work until `astro init` has made the directory a project.
 func TestDevInAV1ProjectLeadsWithTheConversion(t *testing.T) {
 	tier(t, 0)
 
@@ -229,7 +229,7 @@ func TestDevInAV1ProjectLeadsWithTheConversion(t *testing.T) {
 	p.run("dev", "pytest").
 		requireFailure().
 		requireStderr("Convert with `astro init`, then use `uv run pytest`").
-		requireStderr("astro v1 project (Dockerfile and .astro/)")
+		requireStderr("project made by Astro CLI 1.x (Dockerfile and .astro/)")
 
 	var payload struct {
 		Convert   string `json:"convert"`

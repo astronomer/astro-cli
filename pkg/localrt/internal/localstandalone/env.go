@@ -26,7 +26,7 @@ const goosDarwin = "darwin"
 // fully layered Env on top, then the version- and platform-specific blocks,
 // the per-project JWT secret, and finally the dev-mode settings: defaults
 // wherever the environment so far left a key unset, and the loopback bind
-// over everything (docs/v2-architecture.md, "Defaults").
+// over everything (docs/architecture.md, "Defaults").
 //
 // The engine adds no AIRFLOW__CORE__FERNET_KEY of its own, deliberately. When
 // no key is configured the first time Airflow (2 or 3) is imported under
@@ -114,7 +114,7 @@ func devEnv(env []string) []string {
 }
 
 // devDefaults are the Airflow settings local dev runs with unless the project
-// or the shell sets them (docs/v2-architecture.md, "Dev-mode Airflow defaults"): fast DAG rescan and zero
+// or the shell sets them (docs/architecture.md, "Dev-mode Airflow defaults"): fast DAG rescan and zero
 // default task retries. In Airflow 3 the dag-processor is a separate
 // component with its own config section, where dag_dir_list_interval is named
 // refresh_interval, so both the scheduler and dag_processor intervals are set.
@@ -124,7 +124,7 @@ func devEnv(env []string) []string {
 // one-DAG project; at 3 it idles at 1-2% and a saved change shows within ~5s.
 //
 // DAGs are created UNPAUSED but the scheduler creates no runs of its own,
-// as docs/v2-architecture.md describes.
+// as docs/architecture.md describes.
 //
 // Paused-at-creation is a deployment default. It stops a DAG that lands on a
 // shared scheduler from running before anyone has looked at it. Locally there

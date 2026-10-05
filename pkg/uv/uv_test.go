@@ -1,7 +1,7 @@
 package uv
 
 // Plain stdlib testing on purpose: pkg/uv is a shared sub-module and keeps
-// its dependency list empty (docs/v2-architecture.md), so no testify here.
+// its dependency list empty (docs/architecture.md), so no testify here.
 // Tests seam the uv binary with fake shell scripts, so most skip on Windows.
 
 import (

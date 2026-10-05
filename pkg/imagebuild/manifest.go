@@ -9,7 +9,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// ManifestBuild is the part of a v2 project manifest that decides which image
+// ManifestBuild is the part of a project manifest that decides which image
 // the project builds. It is declared in rt, so the local runtime's image seam
 // (rt.ImageBuilder.Request) takes the same type without importing this
 // package; see rt.ManifestBuild for its fields.

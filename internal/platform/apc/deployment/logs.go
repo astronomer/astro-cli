@@ -37,7 +37,7 @@ func SubscribeDeploymentLog(deploymentID, component, search string, since time.D
 	// Calculate timestamp as now - since e.g:
 	// (2019-04-02 17:51:03.780819 +0000 UTC - 2 mins) = 2019-04-02 17:49:03.780819 +0000 UTC
 	timestamp := time.Now().UTC().Add(-since)
-	request, _ := houston.BuildDeploymentLogsSubscribeRequest(deploymentID, component, search, timestamp) //nolint:errcheck // error deliberately ignored in this v1 path
+	request, _ := houston.BuildDeploymentLogsSubscribeRequest(deploymentID, component, search, timestamp) //nolint:errcheck // error deliberately ignored in this shell code
 	cl, err := config.GetCurrentContext()
 	if err != nil {
 		return err

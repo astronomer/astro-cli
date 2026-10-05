@@ -1,7 +1,7 @@
 // Package localstate owns the on-disk record of a running local Airflow:
 // one runtime.json under rt.StateDir(projectPath), next to (never
 // inside) userstate's state.json of per-user preferences. The record is how
-// tools coordinate through disk (docs/v2-architecture.md, "Local state"):
+// tools coordinate through disk (docs/architecture.md, "Local state"):
 // any process can discover, inspect, or stop an Airflow another one
 // started. Both engines — docker and standalone —
 // read and write this same record; mode-specific behavior stays in the

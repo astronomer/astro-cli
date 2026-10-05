@@ -9,7 +9,7 @@
 // CheckValues judge it. Composition happens in each consumer. This module is a
 // declared exception to the no-sibling-imports rule — it imports pkg/airflowenv
 // for the three name predicates the parser validates against — see
-// docs/v2-architecture.md.
+// docs/architecture.md.
 //
 // # The grammar
 //

@@ -81,5 +81,5 @@ Global Flags:
 
 // annotateDeployFlag sets a group annotation on a flag for grouped help display.
 func annotateDeployFlag(cmd *cobra.Command, name, group string) {
-	cmd.Flags().SetAnnotation(name, "group", []string{group}) //nolint:errcheck // error deliberately ignored in this v1 path
+	cmd.Flags().SetAnnotation(name, "group", []string{group}) //nolint:errcheck // error deliberately ignored in this shell code
 }

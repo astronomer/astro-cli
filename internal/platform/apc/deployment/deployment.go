@@ -534,7 +534,7 @@ func RuntimeMigrate(deploymentID string, client houston.ClientInterface, out io.
 
 	var latestRuntimeRelease *semver.Version
 	for idx := range runtimeReleases {
-		runtimeVersion, _ := semver.NewVersion(runtimeReleases[idx].Version) //nolint:errcheck // error deliberately ignored in this v1 path
+		runtimeVersion, _ := semver.NewVersion(runtimeReleases[idx].Version) //nolint:errcheck // error deliberately ignored in this shell code
 		if latestRuntimeRelease == nil {
 			latestRuntimeRelease = runtimeVersion
 		} else if runtimeVersion != nil && !latestRuntimeRelease.GreaterThan(runtimeVersion) {
@@ -617,7 +617,7 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 	var filteredVersions []string
 
 	for _, v := range airflowVersions {
-		vv, _ := semver.NewVersion(v) //nolint:errcheck // error deliberately ignored in this v1 path
+		vv, _ := semver.NewVersion(v) //nolint:errcheck // error deliberately ignored in this shell code
 		// false means no colors
 		if currentAirflowVersion.LessThan(vv) {
 			filteredVersions = append(filteredVersions, v)

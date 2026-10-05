@@ -130,7 +130,7 @@ func ResolveBuildSecrets(flagSecrets []string, fallbacks ...string) []string {
 	return nil
 }
 
-// ResolveProjectBuildSecrets returns the build secrets for a build of a v2
+// ResolveProjectBuildSecrets returns the build secrets for a build of a
 // project's own Dockerfile: the --build-secret flags, else BUILD_SECRET_INPUT,
 // else declared, the project's [tool.astro] build-secrets (Astro.BuildSecretSpecs). Each source replaces the ones
 // after it rather than adding to them.

@@ -2,7 +2,7 @@ module github.com/astronomer/astro-cli/pkg/checks
 
 go 1.26.1
 
-// Declared exception to the sibling rule (docs/v2-architecture.md): the
+// Declared exception to the sibling rule (docs/architecture.md): the
 // target-aware pre-flight check picks which Airflow version to check against
 // from pkg/platformversions, the shared table of what MWAA and Composer offer.
 // A copy of that table would be a second answer to which versions exist, and

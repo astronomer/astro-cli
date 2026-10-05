@@ -6,8 +6,8 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
-// AddCmds returns every top-level v2 command, ready to register on a root.
-// Each carries the skip-pre-run annotation on all its leaves, so the v1
+// AddCmds returns every top-level core command, ready to register on a root.
+// Each carries the skip-pre-run annotation on all its leaves, so the shell
 // root's pre-run (config load, telemetry, network) never runs for them:
 // `astro local` works offline with no account. Usage is silenced tree-wide so
 // a failed command shows just its error. How the error is reported — prose on

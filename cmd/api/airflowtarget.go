@@ -26,7 +26,7 @@ import (
 // The command used to have its own answer — a localhost default, --api-url, and
 // an Astro deployment lookup behind --deployment-id — and its own hand-rolled
 // version probe and token mint. It now shares the one the query commands use
-// (docs/v2-instances.md): -d/--deployment names a deployment link the project's
+// (docs/instances.md): -d/--deployment names a deployment link the project's
 // manifest declares, --url reaches an Airflow no project declares, and both
 // resolve through pkg/instances, so an MWAA, Composer, or token-minting
 // Airflow is reachable here for free. The old flags were removed in v2.
@@ -241,7 +241,7 @@ func linkTarget(ctx context.Context, opts *AirflowOptions, instance *instances.I
 
 // instanceDeps hands resolution what it needs from the process: the login and
 // the coordinate lookups, both for domain, the project's Astro host. cmd/api is
-// a v1 package, so it wires the two implementations directly rather than
+// a shell package, so it wires the two implementations directly rather than
 // through a seam the way cmd/local has to.
 //
 // The Google chain rides along when the lookup exposes one, so a Composer link

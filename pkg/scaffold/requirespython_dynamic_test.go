@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// dockerfileProject is a v1 project (an Airflow 2 runtime tag) around a
+// dockerfileProject is a 1.x project (an Airflow 2 runtime tag) around a
 // manifest the caller supplies.
 func dockerfileProject(t *testing.T, manifest string) string {
 	t.Helper()

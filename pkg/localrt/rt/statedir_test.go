@@ -1,7 +1,7 @@
 package rt
 
 // Plain stdlib testing on purpose: pkg/localrt is a shared sub-module and
-// keeps its dependency list near-empty (docs/v2-architecture.md), so no
+// keeps its dependency list near-empty (docs/architecture.md), so no
 // testify here.
 
 import (

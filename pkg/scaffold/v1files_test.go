@@ -357,8 +357,8 @@ func TestReadV1ProjectFailsOnAnUnreadableFile(t *testing.T) {
 	assert.Contains(t, err.Error(), "requirements.txt")
 }
 
-// The greenfield conversion: a v1 project with no pyproject.toml at all, which
-// is what a real Astro v1 project looks like.
+// The greenfield conversion: a 1.x project with no pyproject.toml at all, which
+// is what a real 1.x project looks like.
 func TestPlanConvertsAV1ProjectWithNoManifest(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, body string) {
@@ -607,7 +607,7 @@ func TestAdoptCarriesPackagesAlongsideAnotherToolsKey(t *testing.T) {
 
 // The greenfield arm deduplicates by distribution name, the way adopt does.
 //
-// Only adopt guarded against this, and greenfield is the arm a real v1 project
+// Only adopt guarded against this, and greenfield is the arm a real 1.x project
 // takes. A requirements.txt naming one distribution twice produced two entries
 // for it; manifest.Parse accepts that, then uv intersects the specifiers and the
 // environment is unsatisfiable at the first start.
@@ -729,7 +729,7 @@ func TestDockerfileSecretMountsAreReported(t *testing.T) {
 
 // The greenfield conversion says what it absorbed.
 //
-// A real v1 project has no pyproject.toml, so it takes this arm, where Plan
+// A real 1.x project has no pyproject.toml, so it takes this arm, where Plan
 // hardcodes the manifest's label to the filename: `astro init` printed
 // "pyproject.toml" and never mentioned that the requirements and packages had
 // just been moved into it. The rarer adopt arm did say so.

@@ -76,8 +76,8 @@ var (
 )
 
 var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive // intentional in this v1 code
-	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive // intentional in this v1 code
+	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive // intentional in this shell code
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive // intentional in this shell code
 )
 
 var (
@@ -1091,7 +1091,7 @@ func setupClientDependencyFiles(buildDir string) error {
 }
 
 // DeployClientImage handles the client deploy functionality
-func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this v1 code
+func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this shell code
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return errors.Wrap(err, "failed to get current context")
@@ -1215,7 +1215,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 
 // validateClientImageRuntimeVersion validates that the client image runtime version
 // is not newer than the deployment runtime version
-func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this v1 code
+func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this shell code
 	// Skip validation if no deployment ID provided
 	if deployInput.DeploymentID == "" {
 		return nil

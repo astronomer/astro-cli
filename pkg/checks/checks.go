@@ -5,7 +5,7 @@
 // (parse_dags.py) against the project's own uv-managed .venv Python, and this
 // package never writes the user's tree.
 //
-// Following the layer rules in docs/v2-architecture.md, nothing here prints
+// Following the layer rules in docs/architecture.md, nothing here prints
 // or exits: Run returns a typed Result and the cmd layer renders it and maps
 // the exit code. Exit codes are plain integers compared as integers, distinct
 // for "environment not ready" and "checks failed" — an earlier fix failures-report-

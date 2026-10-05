@@ -222,7 +222,7 @@ func TestNotFoundErrorPointsAtInit(t *testing.T) {
 	assert.NotContains(t, err.Error(), "v1")
 }
 
-// A v1 project has no marker, so Discover fails in it; the error says it is v1
+// A 1.x project has no marker, so Discover fails in it; the error says it is v1
 // and that `astro init` upgrades it, from the project root or below it.
 func TestDiscoverInV1ProjectNamesIt(t *testing.T) {
 	root := t.TempDir()
@@ -236,7 +236,7 @@ func TestDiscoverInV1ProjectNamesIt(t *testing.T) {
 		var nf *NotFoundError
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.V1Dir)
-		assert.Contains(t, err.Error(), "this directory holds an Astro v1 project")
+		assert.Contains(t, err.Error(), "this directory holds a project made by Astro CLI 1.x")
 		assert.Contains(t, err.Error(), "Run `astro init` here")
 	})
 	t.Run("below the root", func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestDiscoverInV1ProjectNamesIt(t *testing.T) {
 		var nf *NotFoundError
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.V1Dir)
-		assert.Contains(t, err.Error(), root+" holds an Astro v1 project")
+		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
 		assert.Contains(t, err.Error(), "Run `astro init` in "+root)
 	})
 }
@@ -263,7 +263,7 @@ func TestLoadError(t *testing.T) {
 		assert.Contains(t, err.Error(), "no [tool.astro] section")
 		assert.Contains(t, err.Error(), "`astro init`")
 	})
-	t.Run("a tools-only pyproject in a v1 project", func(t *testing.T) {
+	t.Run("a tools-only pyproject in a 1.x project", func(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
 		require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
@@ -273,7 +273,7 @@ func TestLoadError(t *testing.T) {
 		require.ErrorAs(t, err, &ns)
 		assert.True(t, ns.V1)
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
-		assert.Contains(t, err.Error(), "Astro v1 project")
+		assert.Contains(t, err.Error(), "project made by Astro CLI 1.x")
 		assert.Contains(t, err.Error(), "Run `astro init` here")
 
 		// From below the root, `astro init` "here" would scaffold a second
@@ -360,40 +360,40 @@ func writeManifest(t *testing.T, dir, content string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, Marker), []byte(content), 0o600))
 }
 
-func TestIsV2(t *testing.T) {
+func TestHasManifest(t *testing.T) {
 	t.Run("valid manifest", func(t *testing.T) {
 		dir := t.TempDir()
 		writeManifest(t, dir, v2Manifest)
-		assert.True(t, IsV2(dir))
+		assert.True(t, HasManifest(dir))
 	})
 	t.Run("valid manifest beside a Dockerfile is still v2", func(t *testing.T) {
 		dir := t.TempDir()
 		writeManifest(t, dir, v2Manifest)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-		assert.True(t, IsV2(dir))
+		assert.True(t, HasManifest(dir))
 	})
 	t.Run("missing pyproject", func(t *testing.T) {
-		assert.False(t, IsV2(t.TempDir()))
+		assert.False(t, HasManifest(t.TempDir()))
 	})
 	t.Run("pyproject without tool.astro", func(t *testing.T) {
 		dir := t.TempDir()
 		writeManifest(t, dir, "[project]\nname = \"demo\"\n")
-		assert.False(t, IsV2(dir))
+		assert.False(t, HasManifest(dir))
 	})
 	t.Run("pyproject that only configures tools", func(t *testing.T) {
 		dir := t.TempDir()
 		writeManifest(t, dir, toolsOnlyPyproject)
-		assert.False(t, IsV2(dir))
+		assert.False(t, HasManifest(dir))
 	})
 	t.Run("tool.astro present but invalid still counts as v2", func(t *testing.T) {
 		dir := t.TempDir()
 		writeManifest(t, dir, "[project]\nname = \"demo\"\n\n[tool.astro]\n")
-		assert.True(t, IsV2(dir))
+		assert.True(t, HasManifest(dir))
 	})
 	t.Run("unparseable pyproject counts as v2", func(t *testing.T) {
 		dir := t.TempDir()
 		writeManifest(t, dir, "this is not : valid = toml [[[\n")
-		assert.True(t, IsV2(dir))
+		assert.True(t, HasManifest(dir))
 	})
 }

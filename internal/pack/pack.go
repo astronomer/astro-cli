@@ -1,12 +1,12 @@
 // Package pack builds the artifact a given Airflow platform consumes from a v2
 // project's manifest, without shipping it — the build stage of a CI pipeline
-// (docs/v2-deploy.md, section 4). Each platform eats a different shape (Astro a
+// (docs/deploy.md, section 4). Each platform eats a different shape (Astro a
 // container image, MWAA and Composer a directory laid out for a bucket, OSS a
 // plain image or bundle), so a target is a first-class argument, not a hidden
 // assumption. One small Target interface fronts them all, so adding a platform
 // is adding a file, not editing a switch.
 //
-// It keeps to the v2 layer rules (docs/v2-architecture.md): nothing here prints
+// It keeps to the core's layer rules (docs/architecture.md): nothing here prints
 // or exits. A target validates the manifest for its platform, builds an
 // artifact with a named Kind, and reports a Result the caller renders as text
 // or json. Docker and the network reach it only through injected seams, so the
@@ -47,7 +47,7 @@ const (
 // discovered project, the loaded manifest, and the flags, then hands it to a
 // target.
 type Request struct {
-	// ProjectDir is the v2 project root (where dags/ and pyproject.toml live).
+	// ProjectDir is the project root (where dags/ and pyproject.toml live).
 	ProjectDir string
 	// Manifest is the loaded pyproject.toml: the Airflow pin, the project's
 	// dependencies and OS packages. A target validates it for its platform.
@@ -107,7 +107,7 @@ type Result struct {
 	NextSteps []string `json:"next_steps,omitempty"`
 }
 
-// Target packages a v2 project for one Airflow platform. Build validates the
+// Target packages a project for one Airflow platform. Build validates the
 // manifest for the platform, produces the artifact, and reports it; build
 // output streams through cb.
 type Target interface {
@@ -126,7 +126,7 @@ type Registry struct {
 // NewRegistry builds the registry over a fully-built astro target. mwaa and
 // composer are built here too — they touch only the filesystem, so they need no
 // injected engine. oss stays a staged stub: named so the command lists it, but
-// erroring "not built yet" until its stage lands (docs/v2-deploy.md, section 4).
+// erroring "not built yet" until its stage lands (docs/deploy.md, section 4).
 func NewRegistry(astro Target) *Registry {
 	targets := []Target{
 		astro,

@@ -60,7 +60,7 @@ type provider struct {
 	workspaceID string
 	// domain is the Astro host the workspace lives on, from the manifest. It
 	// picks the stored login the read uses, whatever host the CLI's current
-	// context names — docs/v2-workspace-link.md.
+	// context names — docs/workspace-link.md.
 	domain string
 	// organization is the manifest's `organization`, empty when it names
 	// none; org is the one load chose from it and the login, through
@@ -219,7 +219,7 @@ func (p *provider) Diagnose(key string) string {
 }
 
 // cause is c's text for this provider's domain and workspace, worded as
-// docs/v2-workspace-link.md words it. The words are pkg/emfetch's, so Astro
+// docs/workspace-link.md words it. The words are pkg/emfetch's, so Astro
 // Desktop shows the same text and a failure reads the same from either app.
 func (p *provider) cause(c emfetch.Cause) string {
 	return c.TextFor(p.read())
@@ -446,7 +446,7 @@ func statusError(wantSecrets bool, resp *astrov1.ListEnvironmentObjectsResponse)
 
 // classify turns a fetch error into the outage a user sees: each named failure
 // mode gets its own short label, and the remediation cause pkg/emfetch words
-// as docs/v2-workspace-link.md does. Each names the domain, because the
+// as docs/workspace-link.md does. Each names the domain, because the
 // commonest wrong answer — a production workspace asked of a dev host — is
 // fixed by the login, not by the manifest.
 func (p *provider) classify(err error) *outage {

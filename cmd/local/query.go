@@ -260,7 +260,7 @@ func (q *query) open(ctx context.Context) (cliout.Renderer, *airflowapi.Client, 
 }
 
 // listFlags is the pagination and ordering every Airflow list endpoint takes.
-// --offset carries no shorthand because -o is --output across the whole v2
+// --offset carries no shorthand because -o is --output across the whole core
 // tree.
 type listFlags struct {
 	limit   int

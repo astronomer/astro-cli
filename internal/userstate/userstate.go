@@ -32,7 +32,7 @@ type State struct {
 	// Instance is the pin `astro use` writes: the name of a manifest deployment
 	// link. It is one layer of deployment resolution, below the --deployment
 	// flag and ASTRO_DEPLOYMENT and above the manifest's default link
-	// (docs/v2-instances.md). The field keeps its older name so state written
+	// (docs/instances.md). The field keeps its older name so state written
 	// by an earlier build still reads.
 	Instance string `json:"instance,omitempty"`
 	// Port is the preferred webserver port. The runtime may pick another;

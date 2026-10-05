@@ -36,7 +36,7 @@ type devRemoved struct {
 	// Notes say what became of a flag the typed command carried that has no
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
-	// Convert is the command that converts a v1 project in place, set with
+	// Convert is the command that converts a 1.x project in place, set with
 	// V1Project.
 	Convert string `json:"convert,omitempty"`
 }
@@ -134,7 +134,7 @@ func devWantsJSON(args []string) bool {
 	return false
 }
 
-// devReplacementFor finds the v2 command for an `astro dev` subcommand. The
+// devReplacementFor finds the `astro local` command for an `astro dev` subcommand. The
 // table is ordered longest-prefix first, so the first match wins.
 //
 // It is shared with the af group, which answers to `airflow` — the spelling
@@ -330,7 +330,7 @@ func renderDevRemoved(p devRemoved) string {
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
 	if p.V1Project {
-		fmt.Fprintf(&b, "\n\nThis directory holds an astro v1 project (Dockerfile and .astro/). "+
+		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
 			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
 			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
 	}

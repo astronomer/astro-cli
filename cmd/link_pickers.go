@@ -25,7 +25,7 @@ import (
 // test can drive a session that needs refreshing without an identity provider.
 var (
 	// ensureLinkLogin is the check the root's pre-run gives every cloud
-	// command, `astro deploy` and `astro deployment list` among them. The v2
+	// command, `astro deploy` and `astro deployment list` among them. The core
 	// tree skips that pre-run, so without this the pickers would send
 	// whatever token is on disk, expired or not.
 	ensureLinkLogin = astroCmd.EnsureLogin
@@ -44,11 +44,11 @@ func wireLinkPickers(d *local.Deps, platform string, client astrov1.APIClient, o
 	withLinkPickers(d, client, out)
 }
 
-// withLinkPickers wires `astro link`'s Astro pickers into the v2 deps. They are
+// withLinkPickers wires `astro link`'s Astro pickers into the core deps. They are
 // the pickers `astro deploy` already asks with, through the same v1 client and
 // the same current login: the Deployment list an unlinked project deploys from,
 // and the workspace list `astro workspace switch` offers. cmd/local cannot
-// import them itself (the v2 tree never reads config/), so the root wires them
+// import them itself (the core tree never reads config/), so the root wires them
 // here, as it wires the rest of the platform.
 func withLinkPickers(d *local.Deps, client astrov1.APIClient, out io.Writer) {
 	d.CurrentWorkspace = func() string {
@@ -102,7 +102,7 @@ func withLinkPickers(d *local.Deps, client astrov1.APIClient, out io.Writer) {
 // withLinkLogin runs call with a usable login. It runs deploy's login check
 // first; a call the platform still refuses with 401 gets the token renewed and
 // one more try; and a 401 after that is the session expired, named as the
-// workspace link names it (docs/v2-workspace-link.md), never as "not found".
+// workspace link names it (docs/workspace-link.md), never as "not found".
 func withLinkLogin(client astrov1.APIClient, call func() error) error {
 	if err := ensureLinkLogin(client); err != nil {
 		return loginCheckFailed(err)

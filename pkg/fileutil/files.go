@@ -204,7 +204,7 @@ func ReadFileToString(filename string) (string, error) {
 // This function finds all files of a specific extension
 func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 	var files []string
-	filepath.Walk(folderPath, func(path string, f os.FileInfo, _ error) error { //nolint:errcheck // error deliberately ignored in this v1 path
+	filepath.Walk(folderPath, func(path string, f os.FileInfo, _ error) error { //nolint:errcheck // error deliberately ignored in this shell code
 		if f != nil && !f.IsDir() {
 			r, err := regexp.MatchString(ext, f.Name())
 			if err == nil && r {
@@ -325,8 +325,8 @@ func UploadFile(args *UploadFileArguments) error {
 			}
 			continue
 		}
-		defer response.Body.Close()          //nolint:gocritic // intentional in this v1 code
-		data, _ := io.ReadAll(response.Body) //nolint:errcheck // error deliberately ignored in this v1 path
+		defer response.Body.Close()          //nolint:gocritic // intentional in this shell code
+		data, _ := io.ReadAll(response.Body) //nolint:errcheck // error deliberately ignored in this shell code
 		responseStatusCode := response.StatusCode
 
 		// Return success for 2xx status code
@@ -336,7 +336,7 @@ func UploadFile(args *UploadFileArguments) error {
 			break
 		}
 
-		strippedOutData, _ := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"}) //nolint:errcheck // error deliberately ignored in this v1 path
+		strippedOutData, _ := util.StripOutKeysFromJSONByteArray(data, []string{"exceptions", "args", "path", "status"}) //nolint:errcheck // error deliberately ignored in this shell code
 		currentUploadError = fmt.Errorf("file upload failed. Status code: %d and Message: %s", responseStatusCode, string(strippedOutData))
 
 		// don't retry for 4xx since it is a client side error

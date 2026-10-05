@@ -180,7 +180,7 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, astroV1Cli
 	return nil
 }
 
-func getDeploymentInfo(deploymentObj astrov1.Deployment) (map[string]interface{}, error) { //nolint:gocritic // signature kept as-is for this v1 code
+func getDeploymentInfo(deploymentObj astrov1.Deployment) (map[string]interface{}, error) { //nolint:gocritic // signature kept as-is for this shell code
 	deploymentURL, err := deployment.GetDeploymentURL(deploymentObj.Id, deploymentObj.WorkspaceId)
 	if err != nil {
 		return nil, err

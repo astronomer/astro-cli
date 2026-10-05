@@ -29,7 +29,7 @@ var (
 		}
 	}`
 
-	//nolint:gosec // reviewed; not a new risk in this v1 code
+	//nolint:gosec // reviewed; not a new risk in this shell code
 	TokenBasicCreateRequest = `
 	mutation createBasicToken($identity: String, $password: String!) {
 		createToken(identity: $identity, password: $password) {

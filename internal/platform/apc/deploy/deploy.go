@@ -86,7 +86,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 		return deploymentID, err
 	}
 
-	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
+	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 	cloudDomain := c.Domain
 	nextTag := ""
 	releaseName := ""
@@ -177,7 +177,7 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 	vars := make(map[string]interface{})
 	vars["clusterId"] = deploymentInfo.ClusterID
 	// ignoring the error as user can be connected to platform where runtime is not enabled
-	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases)(vars) //nolint:errcheck // error deliberately ignored in this v1 path
+	runtimeReleases, _ := houston.Call(houstonClient.GetRuntimeReleases)(vars) //nolint:errcheck // error deliberately ignored in this shell code
 	var validTags string
 	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredAirflowVersion != "" && !deploymentConfig.IsValidTag(tag) {
 		validTags = strings.Join(deploymentConfig.GetValidTags(tag), ", ")
@@ -234,7 +234,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
 		token = c.Token
-		platformVersion, _ := houstonClient.GetPlatformVersion(nil) //nolint:errcheck // error deliberately ignored in this v1 path
+		platformVersion, _ := houstonClient.GetPlatformVersion(nil) //nolint:errcheck // error deliberately ignored in this shell code
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			var err error
 			registry, err = getDeploymentRegistryURL(deploymentInfo.Urls)
@@ -273,8 +273,8 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		if useShaAsTag {
 			remoteImage = fmt.Sprintf("%s@%s", registry, sha)
 		}
-		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel) //nolint:errcheck // error deliberately ignored in this v1 path
-		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel) //nolint:errcheck // error deliberately ignored in this v1 path
+		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel) //nolint:errcheck // error deliberately ignored in this shell code
+		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel) //nolint:errcheck // error deliberately ignored in this shell code
 		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
 		_, err = houston.Call(houstonClient.UpdateDeploymentImage)(req)
 		return err
@@ -602,7 +602,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		defer os.Remove(dagsTarGzPath) //nolint:errcheck // best-effort cleanup
 	}
 
-	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
+	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 
 	headers := map[string]string{
 		"authorization": c.Token,

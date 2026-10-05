@@ -705,7 +705,7 @@ func TestStarterDagNeedsAirflow3(t *testing.T) {
 		})
 	}
 
-	// The flag is the least likely of the four sources. Adopting a v1 project
+	// The flag is the least likely of the four sources. Adopting a 1.x project
 	// whose Dockerfile names an Airflow 2 runtime is the ordinary way a 2 pin
 	// arrives, and it reaches the same decision by a different road.
 	t.Run("adopted from an Airflow 2 Dockerfile", func(t *testing.T) {

@@ -23,7 +23,7 @@ import (
 // path: no row reaches every project, a row reaches only the paths it names. A
 // link to a project reaches its git worktrees too, because a checkout matches a
 // link by its own path or by its project home (localrt.ProjectHome). See
-// docs/v2-secrets.md.
+// docs/secrets.md.
 
 const (
 	envLinkStatusLinked   = "linked"

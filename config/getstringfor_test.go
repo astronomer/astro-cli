@@ -24,6 +24,6 @@ func (s *Suite) TestGetStringForReadsTheNamedProject() {
 
 	s.Equal("podman", CFG.DockerCommand.GetStringFor("pinned"), "the project's own setting")
 	s.Equal("docker", CFG.DockerCommand.GetStringFor("unpinned"), "a project config without it falls back to global")
-	s.Equal("docker", CFG.DockerCommand.GetStringFor("no-config-here"), "a v2 project has no .astro/config.yaml")
+	s.Equal("docker", CFG.DockerCommand.GetStringFor("no-config-here"), "a project with a pyproject.toml has no .astro/config.yaml")
 	s.Equal("docker", CFG.DockerCommand.GetStringFor(""), "no project asks for the global value")
 }

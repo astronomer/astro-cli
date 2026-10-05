@@ -107,7 +107,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 		// check if user provided a valid cloud domain
 		if !context.IsCloudDomain(domain) {
 			// get the domain from context as an extra check
-			ctx, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this v1 path
+			ctx, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 			if context.IsCloudDomain(ctx.Domain) {
 				fmt.Fprintf(out, "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}

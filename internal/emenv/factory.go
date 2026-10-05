@@ -14,7 +14,7 @@ import (
 
 // Login is the stored login a read uses: the one for the manifest's domain,
 // whatever the CLI's current context names. Its own type, not config.Context,
-// so the v2 packages that wire the provider never import config/.
+// so the core packages that wire the provider never import config/.
 type Login struct {
 	Domain string
 	Token  string

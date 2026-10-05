@@ -1,7 +1,7 @@
 //go:build windows
 
 // Windows stub: the MVP runs local Airflow on Windows in docker mode only
-// (docs/v2-architecture.md, "Platform support"). The API matches the
+// (docs/architecture.md, "Platform support"). The API matches the
 // Unix implementation so callers compile without build tags; anything that
 // would need a standalone process returns ErrWindowsUnsupported.
 package localstandalone

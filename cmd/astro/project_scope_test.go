@@ -41,7 +41,7 @@ deployment = %q
 default = true
 `, projectWS, projectDep)
 
-// inProject runs the test from inside a v2 project holding manifest, and puts
+// inProject runs the test from inside a project holding manifest, and puts
 // back every value the project hook and the commands under it set.
 func inProject(t *testing.T, pyproject string) {
 	t.Helper()

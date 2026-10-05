@@ -43,7 +43,7 @@ func convertWithConfig(t *testing.T, body string) (res *Result, about []string) 
 // The .astro/config.yaml note is about project.deployment, so it is reported on
 // that key and not on the file.
 //
-// The file is in every v1 project, because `astro dev init` writes it, while
+// The file is in every 1.x project, because `astro dev init` writes it, while
 // project.deployment is written only by `astro deploy --save` and that flag
 // defaults to false. Keying the note on the file therefore told nearly every
 // conversion to go and move a Deployment its config did not name.

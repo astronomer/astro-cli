@@ -2,7 +2,7 @@
 // pyproject.toml manifest — written fresh, or adopted where one is already
 // there — the standard directories, .gitignore, and AGENTS.md (with CLAUDE.md
 // as a symlink to it outside Windows). It follows the layer rules in
-// docs/v2-architecture.md: it returns data and errors, never prints, never
+// docs/architecture.md: it returns data and errors, never prints, never
 // exits.
 package scaffold
 
@@ -706,7 +706,7 @@ func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]b
 
 // migratedLabels describes what a greenfield manifest absorbed from the v1 files.
 //
-// Without this the common case said nothing. A real v1 project has no
+// Without this the common case said nothing. A real 1.x project has no
 // pyproject.toml, so it takes the greenfield arm, where Plan hardcodes the
 // manifest's label to the filename — so `astro init` printed "pyproject.toml"
 // and never mentioned that thirty requirement lines and a list of apt packages
@@ -875,7 +875,7 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 	// "flask", which are the same PEP 503 name — produced two entries for it.
 	// manifest.Parse accepts that, then uv intersects the specifiers and the
 	// environment is unsatisfiable at the first start. Only the adopt arm
-	// guarded against it, and greenfield is the arm a real v1 project takes.
+	// guarded against it, and greenfield is the arm a real 1.x project takes.
 	deps := []any{airflowRequirement(version)}
 	seen := map[string]bool{}
 	for _, d := range v1.dependencies {
@@ -1001,7 +1001,7 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 // that is not the name the project gave for itself.
 //
 // Three sources, in this order: --name, because it is the only one somebody
-// typed on purpose; the name .astro/config.yaml states, because a v1 project
+// typed on purpose; the name .astro/config.yaml states, because a 1.x project
 // that calls itself orders-pipeline is called orders-pipeline whatever the
 // directory it sits in happens to be; and the directory, which is all a
 // greenfield scaffold has to go on.
@@ -1124,7 +1124,7 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	// constant and is concatenated rather than joined.
 	var out []string
 	// Reported on the target being there, never on the file being there. The
-	// file is in every v1 project, `project.deployment` is in very few, and the
+	// file is in every 1.x project, `project.deployment` is in very few, and the
 	// note keyed on the wrong one: it told most conversions to move a
 	// Deployment their config did not name.
 	//

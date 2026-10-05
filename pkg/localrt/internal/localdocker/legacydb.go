@@ -49,7 +49,7 @@ const metadataVolumeKey = "postgres_data"
 // which is half of the v1 volume name.
 //
 // Read directly rather than through astro-cli's config package because a pkg/
-// sub-module may not import the parent module (docs/v2-architecture.md), and
+// sub-module may not import the parent module (docs/architecture.md), and
 // because this is one field of a file that is on its way out.
 type v1Config struct {
 	Project struct {

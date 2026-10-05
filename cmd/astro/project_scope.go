@@ -22,11 +22,11 @@ import (
 // id, so a link name in that place resolves the way --deployment-id does.
 const deploymentArgAnnotation = "astro.deployment-arg"
 
-// projectWorkspaceID is the workspace a command inside a v2 project falls back
+// projectWorkspaceID is the workspace a command inside a project falls back
 // to before the context's. followProject sets it; coalesceWorkspace reads it.
 var projectWorkspaceID string
 
-// projectPick is what a v2 project decided for a command the user left open.
+// projectPick is what a project decided for a command the user left open.
 type projectPick struct {
 	// workspace is the default workspace, "" when the project picks none.
 	workspace string
@@ -40,7 +40,7 @@ type projectPick struct {
 }
 
 // followProjectPreRun is the pre-run of `astro env` and `astro deployment`:
-// inside a v2 project they act on the project's workspace, on its host, and
+// inside a project they act on the project's workspace, on its host, and
 // take a link name wherever they take a Deployment id. group is the command
 // the hook is set on, so the hook can run the one above it, which cobra would
 // otherwise skip.
@@ -76,7 +76,7 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 	}
 }
 
-// followProject reads the v2 project around the working directory, if any, and
+// followProject reads the project around the working directory, if any, and
 // resolves the command's Deployment reference and default workspace from it.
 // A link name given as --deployment-id, --deployment-name or a Deployment-id
 // argument is replaced in place by the link's Deployment id.

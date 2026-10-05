@@ -51,7 +51,7 @@ func TestAFailedCommandPublishesItsKind(t *testing.T) {
 
 // A command invoked wrongly exits 2, in either mode, and names it `usage` in
 // json mode — through the binary, because exit statuses are main's and only a
-// subprocess sees them. Both trees: the v2 one, and a cloud command, whose
+// subprocess sees them. Both trees: the core one, and a cloud command, whose
 // flag error is reported before its pre-run reads any login.
 //
 // Tier 0: nothing runs; the flag parse fails first.

@@ -53,7 +53,7 @@ func (s *Suite) withAstroHome(dir string) {
 // Reading the home config must not create one.
 //
 // InitConfig runs unconditionally from main, before cobra has parsed argv, so
-// this ran for every command — including the v2 tree, which reads no v1
+// this ran for every command — including the core tree, which reads no config/
 // setting at all. Measured before the change, on a home with no .astro in it:
 // one `astro init` left a 54-line config.yaml and a config.yaml.lock behind,
 // and so did `astro version`.

@@ -56,14 +56,14 @@ var (
 	ConfigDir = ".astro"
 
 	// HomePath is the path to a users home directory
-	HomePath, _ = fileutil.GetHomeDir() //nolint:errcheck // error deliberately ignored in this v1 path
+	HomePath, _ = fileutil.GetHomeDir() //nolint:errcheck // error deliberately ignored in this shell code
 	// HomeConfigPath is the path to the users global config directory
 	HomeConfigPath = filepath.Join(HomePath, ConfigDir)
 	// HomeConfigFile is the global config file
 	HomeConfigFile = filepath.Join(HomeConfigPath, ConfigFileNameWithExt)
 
 	// WorkingPath is the path to the working directory
-	WorkingPath, _ = fileutil.GetWorkingDir() //nolint:errcheck // error deliberately ignored in this v1 path
+	WorkingPath, _ = fileutil.GetWorkingDir() //nolint:errcheck // error deliberately ignored in this shell code
 
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
@@ -190,7 +190,7 @@ func initHome(fs afero.Fs) {
 	// the defaults registered just above, so the file it left behind carried
 	// no value this process did not already have — but InitConfig runs
 	// unconditionally from main, before cobra has looked at argv. Every
-	// command that never touches v1 config paid for it: `astro init` in a
+	// command that never touches the home config paid for it: `astro init` in a
 	// home with no .astro left a 54-line config.yaml and a config.yaml.lock
 	// behind it.
 	//
@@ -327,7 +327,7 @@ func saveConfig(v *viper.Viper, file string) error {
 	if !locked {
 		return fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
 	}
-	defer func() { _ = lock.Unlock() }() //nolint:errcheck // error deliberately ignored in this v1 path
+	defer func() { _ = lock.Unlock() }() //nolint:errcheck // error deliberately ignored in this shell code
 
 	// viper's WriteConfigAs creates a new file 0644. Both configs are made
 	// 0600 instead: the home one holds the API token, and the project one has

@@ -13,8 +13,8 @@ import (
 // of them for something it can parse, and a failure under it is one json
 // object (cliout.Execute).
 //
-// The v2 tree has held to that since it landed (cmd/local's
-// TestTreeInvariants). The v1 trees did not, so the commands that still lack
+// The core tree has held to that since it landed (cmd/local's
+// TestTreeInvariants). The shell trees did not, so the commands that still lack
 // one are listed below, by platform and full command path. The list may only
 // shrink: an entry that no longer exists, or that has gained the flag, fails
 // TestOutputFlagAllowlistOnlyShrinks until it is deleted, so it cannot sit

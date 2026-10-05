@@ -111,7 +111,7 @@ func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
 		},
 		DeploymentID: "test-deployment-id",
 		IncludeDags:  true,
-		Description:  "a v2 image deploy",
+		Description:  "a manifest image deploy",
 	}, client)
 	require.NoError(t, err)
 

@@ -2,7 +2,7 @@ module github.com/astronomer/astro-cli/pkg/instances
 
 go 1.26.1
 
-// Three declared exceptions to the sibling rule (docs/v2-architecture.md), each
+// Three declared exceptions to the sibling rule (docs/architecture.md), each
 // on grounds an existing exception already uses.
 //
 // pkg/airflowrt and pkg/manifest are already direct desktop requires;

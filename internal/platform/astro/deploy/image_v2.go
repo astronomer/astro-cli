@@ -26,7 +26,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// ImageDeployV2Input is the resolved input for a v2 project's image deploy. The
+// ImageDeployV2Input is the resolved input for a project's image deploy. The
 // deployment is already chosen (internal/deploy). The image is either built from
 // the manifest fields or adopted from a prebuilt local image (ImageName); a
 // "both" deploy (IncludeDags) also ships the dags/ tarball.
@@ -69,7 +69,7 @@ type ImageDeployV2Result struct {
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
-// (docs/v2-deploy.md, section 5). An image deploy needs a container builder;
+// (docs/deploy.md, section 5). An image deploy needs a container builder;
 // dags-only does not.
 var errNoDocker = errors.New("an image deploy needs Docker, but no running container engine was found. Start Docker and try again, or run 'astro deploy --dags' to deploy just your DAGs (no Docker needed). Server-side builds are coming")
 
@@ -85,13 +85,13 @@ var (
 	buildNow = time.Now
 )
 
-// DeployImageV2 builds (or adopts) a v2 project's image, pushes it to the
+// DeployImageV2 builds (or adopts) a project's image, pushes it to the
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
-// tarball. It reuses the v1 transport (createDeploy, the registry push in
+// tarball. It reuses the 1.x transport (createDeploy, the registry push in
 // airflow.DockerImage.Push, deployDags, finalize) and, like DeployDagsV2,
 // neither prints nor exits — it returns a result for cmd to render.
 //
-// Docker is required and checked before any transport work (docs/v2-deploy.md, section 5).
+// Docker is required and checked before any transport work (docs/deploy.md, section 5).
 //
 //nolint:gocritic // value input keeps this seam symmetric with DeployDagsV2
 func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (ImageDeployV2Result, error) {
@@ -222,8 +222,8 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ImageDeployV2In
 	return dep, allowed, nil
 }
 
-// uploadDeployDags tars and uploads a v2 project's dags/ directory to the
-// created deploy's upload URL and returns the tarball version. Both v2 paths use
+// uploadDeployDags tars and uploads a project's dags/ directory to the
+// created deploy's upload URL and returns the tarball version. Both manifest paths use
 // it: the dags-only deploy and a "both" image deploy, which ships the tarball to
 // fit the image just pushed.
 func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *astrov1.Deployment, created *astrov1.Deploy, noDagsBaseDir bool) (string, error) {
@@ -439,7 +439,7 @@ func downgradeError(tag, currentVersion string, raise func(string) string) error
 
 // checkRuntimeVersion is v1's ValidRuntimeVersion without the prints: it returns
 // a descriptive error instead of printing the reason (and leaving the caller to
-// exit), so the v2 path stays print-free below cmd — the same move
+// exit), so the manifest path stays print-free below cmd — the same move
 // finalizeDeployV2 makes for finalize. The rules are identical: no downgrade,
 // the version must be one the deployment allows, and an Airflow 2-to-3 jump
 // needs the deployment at Runtime 12.0.0 or higher. raise, when set, names the
@@ -474,10 +474,10 @@ func checkAirflow3Floor(currentVersion, tag string) error {
 	return nil
 }
 
-// finalizeDeployV2 marks a v2 deploy final. It carries the dag tarball version
+// finalizeDeployV2 marks a manifest deploy final. It carries the dag tarball version
 // only when one exists (a "both" or dags-only deploy), so an image-only deploy
 // finalizes with an empty request. It is the v1 finalizeDeploy without the
-// prints, so the v2 path renders in cmd and stays ready for --output json.
+// prints, so the manifest path renders in cmd and stays ready for --output json.
 func finalizeDeployV2(organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
 	req := astrov1.FinalizeDeployRequest{}
 	if dagTarballVersion != "" {

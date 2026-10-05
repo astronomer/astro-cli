@@ -1,6 +1,6 @@
-// Package local is the v2 command tree: `astro local *`, `astro init`, the
+// Package local is the core command tree: `astro local *`, `astro init`, the
 // root aliases `astro start/stop/logs`, and the `astro dev` removal stub.
-// It follows the cmd/ layer rules in docs/v2-architecture.md: parse flags,
+// It follows the cmd/ layer rules in docs/architecture.md: parse flags,
 // call one function, render output. All process state (stdio, the runtime,
 // the working directory) arrives through Deps, built once in main; nothing
 // here reads config at import time or holds mutable package state.
@@ -34,8 +34,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// Deps is everything the v2 commands need from the process. The composition
-// root (the v1 root, cmd/root.go) builds it once through NewDeps and hands it
+// Deps is everything the core commands need from the process. The composition
+// root (the shell root, cmd/root.go) builds it once through NewDeps and hands it
 // down.
 type Deps struct {
 	Stdin  io.Reader
@@ -212,14 +212,14 @@ func stdoutIsTerminal() bool {
 }
 
 // skipPreRunAnnotation mirrors internal/telemetry.SkipPreRunAnnotation. It
-// is spelled out here because v2 packages never import config/, which
-// internal/telemetry pulls in. The v1 root's PersistentPreRunE checks this
+// is spelled out here because core packages never import config/, which
+// internal/telemetry pulls in. The shell root's PersistentPreRunE checks this
 // annotation on the invoked command, so `astro local` stays offline: no
 // network call runs before the command does.
 const skipPreRunAnnotation = "skipPreRun"
 
 // markSkipPreRun annotates cmd and every descendant. Cobra annotations do
-// not inherit, and the v1 root reads the annotation off the leaf command.
+// not inherit, and the shell root reads the annotation off the leaf command.
 func markSkipPreRun(cmd *cobra.Command) {
 	if cmd.Annotations == nil {
 		cmd.Annotations = map[string]string{}
@@ -235,7 +235,7 @@ var errAborted = errors.New("aborted")
 
 // proxyDaemon adapts airflow/proxy's daemon lifecycle to the engines'
 // localrt.ProxyDaemon seam. It lives at the composition layer because
-// airflow/proxy pulls in config, which the v2 engines must not import; they
+// airflow/proxy pulls in config, which the core engines must not import; they
 // see only the interface.
 type proxyDaemon struct{}
 
@@ -246,7 +246,7 @@ func (proxyDaemon) EnsureRunning() (string, error) {
 func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
 
 // newProxyDaemon returns the daemon seam, or nil on Windows, where the proxy
-// is unsupported (docs/v2-architecture.md, "Platform support"): the engines skip the daemon and Airflow stays
+// is unsupported (docs/architecture.md, "Platform support"): the engines skip the daemon and Airflow stays
 // reachable on its direct localhost port.
 func newProxyDaemon() localrt.ProxyDaemon {
 	if runtime.GOOS == "windows" {

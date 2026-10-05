@@ -104,7 +104,7 @@ func distroRank(distro string) int {
 }
 
 // GetDefaultImageTag returns default airflow image tag
-func GetDefaultImageTag(httpClient *Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) { //nolint:gocritic // intentional in this v1 code
+func GetDefaultImageTag(httpClient *Client, airflowVersion string, runtimeVersion string, excludeAirflow3 bool) (string, error) { //nolint:gocritic // intentional in this shell code
 	r := Request{}
 
 	resp, err := r.DoWithClient(httpClient)

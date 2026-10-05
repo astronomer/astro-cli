@@ -62,7 +62,7 @@ Use "astro api [command] --help" for more information about a command.`,
 			return nil
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			_ = cmd.Help() //nolint:errcheck // error deliberately ignored in this v1 path
+			_ = cmd.Help() //nolint:errcheck // error deliberately ignored in this shell code
 		},
 	}
 

@@ -15,7 +15,7 @@
 // so neither can cross a module boundary — and the switch that routes a kind
 // to its lookup.
 //
-// It is its own package because of the layer rules (docs/v2-architecture.md):
+// It is its own package because of the layer rules (docs/architecture.md):
 // pkg/instances and cmd/local may not import config/ or the cloud
 // clients, and this does both. internal/astrosession and internal/emenv sit
 // outside the same list for the same reason. The command tree wires this into
@@ -169,7 +169,7 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 
 // Organization reads the org out of the login for domain, or out of the
 // current login context when domain is empty. It is the same read
-// internal/emenv makes for the same reason, and the one a v2 deploy makes to
+// internal/emenv makes for the same reason, and the one a manifest deploy makes to
 // reach a Deployment on the project's host.
 // The organization is the piece ASTRO_API_TOKEN alone cannot supply: it lives
 // in the login context, and a CI machine that never ran `astro login` has none.

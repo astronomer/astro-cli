@@ -85,7 +85,7 @@ func autoUpdateEnabled() bool {
 // 5s LatestVersion timeout does not repeat on every launch when the CDN is
 // unreachable; LatestKnown is preserved so the hint still works.
 func refreshUpdateCacheIfStale() {
-	state, _ := readUpdateState() //nolint:errcheck // error deliberately ignored in this v1 path
+	state, _ := readUpdateState() //nolint:errcheck // error deliberately ignored in this shell code
 	if state.Channel == Channel() {
 		if t, err := time.Parse(time.RFC3339, state.LastCheck); err == nil {
 			if time.Since(t) < updateCheckInterval {
@@ -102,7 +102,7 @@ func refreshUpdateCacheIfStale() {
 	if latest, err := LatestVersion(); err == nil {
 		state.LatestKnown = latest
 	}
-	_ = writeUpdateState(state) //nolint:errcheck // error deliberately ignored in this v1 path
+	_ = writeUpdateState(state) //nolint:errcheck // error deliberately ignored in this shell code
 }
 
 func readUpdateState() (updateState, error) {

@@ -218,6 +218,6 @@ func spawnTelemetrySender(payload sharedtel.TelemetryPayload, apiURL string) {
 	}
 
 	if cmd.Process != nil {
-		_ = cmd.Process.Release() //nolint:errcheck // error deliberately ignored in this v1 path
+		_ = cmd.Process.Release() //nolint:errcheck // error deliberately ignored in this shell code
 	}
 }

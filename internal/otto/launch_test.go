@@ -317,7 +317,7 @@ func (s *ConfigSuite) TestPrependPathMatchesWindowsCase() {
 	s.Equal([]string{"Path=x", "PATH=/l"}, env)
 }
 
-// A v2 project's Airflow gets its URL and no default account; Otto resolves
+// A project's Airflow gets its URL and no default account; Otto resolves
 // that project's credentials itself.
 func (s *ConfigSuite) TestStartV2AirflowGetsNoAccount() {
 	s.prepareLaunch()

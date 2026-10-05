@@ -11,7 +11,7 @@ import (
 
 // The output contract itself — the formats, the Renderer and its single door,
 // the json error object, the exit codes — is shared by the whole CLI and lives
-// in cmd/cliout. What is here is v2's own: the progress events its streaming
+// in cmd/cliout. What is here is cmd/local's own: the progress events its streaming
 // surfaces emit.
 
 // event is one progress update on a streaming surface (start, logs). In

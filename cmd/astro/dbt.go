@@ -104,7 +104,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to verify dbt project path is not within an Astro project: %w", err)
 	}
 	if !withinAstroProject {
-		withinAstroProject = isWithinV2Project(dbtProjectPath)
+		withinAstroProject = isWithinManifestProject(dbtProjectPath)
 	}
 	if withinAstroProject {
 		return fmt.Errorf("dbt project is within an Astro project. Use 'astro deploy' to deploy your Astro project")

@@ -127,7 +127,7 @@ func isAuthTokenCmd(cmd *cobra.Command) bool {
 // EnsureLogin runs the login check Setup gives every cloud command before it
 // calls the API: an API token, then API keys, then the current login, whose
 // access token is refreshed when it is about to expire (and, with no login at
-// all, the login flow). A command that skips the root's pre-run, as the v2 tree
+// all, the login flow). A command that skips the root's pre-run, as the core tree
 // does, calls this before its own API calls.
 func EnsureLogin(astroV1Client astrov1.APIClient) error {
 	return ensureLogin(false, astroV1Client)
@@ -315,7 +315,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	expireTime, _ := c.GetExpiresIn() //nolint:errcheck // error deliberately ignored in this v1 path
+	expireTime, _ := c.GetExpiresIn() //nolint:errcheck // error deliberately ignored in this shell code
 	// check if user is logged in
 	if c.Token == "Bearer " || c.Token == "" || c.Domain == "" {
 		// guide the user through the login process if not logged in
@@ -622,7 +622,7 @@ func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) 
 }
 
 func workspaceOrDeploymentIDFlagSet(cmd *cobra.Command) bool {
-	wsID, _ := cmd.Flags().GetString("workspace-id")   //nolint:errcheck // error deliberately ignored in this v1 path
-	depID, _ := cmd.Flags().GetString("deployment-id") //nolint:errcheck // error deliberately ignored in this v1 path
+	wsID, _ := cmd.Flags().GetString("workspace-id")   //nolint:errcheck // error deliberately ignored in this shell code
+	depID, _ := cmd.Flags().GetString("deployment-id") //nolint:errcheck // error deliberately ignored in this shell code
 	return wsID != "" || depID != ""
 }

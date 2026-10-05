@@ -23,7 +23,7 @@ import (
 // runtimeVersionLabel is the label the runtime base image carries with its
 // exact version (e.g. "3.1-17"), the same label the deploy path reads to
 // validate against a deployment (airflow.RuntimeImageLabel). airflowVersionLabel
-// is the older fallback the v1 code drops to when the runtime label is absent.
+// is the older fallback the shell's deploy code drops to when the runtime label is absent.
 // package reads them to name the artifact and to report the version.
 const (
 	runtimeVersionLabel = "io.astronomer.docker.runtime.version"
@@ -32,7 +32,7 @@ const (
 
 // ErrNoDocker reports that the astro target could not reach a container engine.
 // The astro artifact is an image, and building one needs Docker; the message
-// says so plainly and points at the Docker-free path (docs/v2-deploy.md,
+// says so plainly and points at the Docker-free path (docs/deploy.md,
 // section 5).
 var ErrNoDocker = errors.New("building the astro package image needs Docker, but no engine is reachable; start Docker and try again (a dags-only `astro deploy --dags` needs no Docker, and remote builds are coming)")
 

@@ -66,7 +66,7 @@ func TestInitPinsAnInterpreterTheAirflowCanRun(t *testing.T) {
 	}
 }
 
-// A v1 project converts through the same scaffold, and every v1 project is an
+// A 1.x project converts through the same scaffold, and every 1.x project is an
 // Airflow 2 one — so this is the path a migrating user actually takes.
 func TestConvertingAV1ProjectBoundsTheInterpreter(t *testing.T) {
 	dir := t.TempDir()

@@ -26,7 +26,7 @@ import (
 // arrives the way every other optional dependency in this tree arrives: on
 // Deps, wired at the composition root beside Session, Locator and HTTPClient.
 // Not a package-level registry with init() side effects — that would be the
-// only non-test init() in the v2 source, it makes a forgotten blank import a
+// only non-test init() in the core, it makes a forgotten blank import a
 // run-time failure rather than a compile error, and a process-global map that
 // resolution reads is a data race waiting for the first caller that registers
 // outside init().

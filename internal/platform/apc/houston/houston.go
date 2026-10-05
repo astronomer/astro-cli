@@ -24,7 +24,7 @@ var (
 	HoustonConnectionErrMsg = "cannot connect to APC. Try to log in with astro login or check your internet connection and user permissions.\n\nDetails: %w"
 
 	errInaptPermissionsMsg       = "You do not have the appropriate permissions for that"
-	errAuthTokenRefreshFailedMsg = "AUTH_TOKEN_REFRESH_FAILED" //nolint:gosec // reviewed; not a new risk in this v1 code
+	errAuthTokenRefreshFailedMsg = "AUTH_TOKEN_REFRESH_FAILED" //nolint:gosec // reviewed; not a new risk in this shell code
 	ErrVerboseInaptPermissions   = errors.New("you do not have the appropriate permissions for that: Your token has expired. Please log in again")
 )
 

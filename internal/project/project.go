@@ -1,6 +1,6 @@
 // Package project finds the astro project containing a directory and
 // derives its identity. A project is any directory holding a pyproject.toml
-// (the v2 manifest); identity is the sha256 of the symlink-resolved absolute
+// (the manifest); identity is the sha256 of the symlink-resolved absolute
 // path, which keys all per-project state. Hostnames are display labels only.
 package project
 
@@ -24,16 +24,16 @@ import (
 // is manifest.Marker.
 const Marker = manifest.Marker
 
-// initCommand is what turns a directory into a project, and a v1 project into
-// a v2 one, in place.
+// initCommand is what turns a directory, a 1.x project included, into a
+// project in place.
 const initCommand = "astro init"
 
 // NotFoundError reports that no project marker was found in the start
 // directory or any of its parents.
 type NotFoundError struct {
 	Start string
-	// V1Dir is the nearest directory on the walk up that holds an astro v1
-	// project (see IsV1), or empty when there is none. A v1 project has no
+	// V1Dir is the nearest directory on the walk up that holds a 1.x project
+	// (see IsV1), or empty when there is none. A 1.x project has no
 	// marker, so without this the error would only say what is missing, not
 	// that `astro init` upgrades what is there.
 	V1Dir string
@@ -48,14 +48,14 @@ func (e *NotFoundError) Error() string {
 }
 
 // NoAstroSectionError reports a project root whose pyproject.toml has no
-// [tool.astro] table: a Python project, often an astro v1 one keeping ruff or
-// pytest settings there, that is not yet an astro v2 project. It wraps
+// [tool.astro] table: a Python project, often a 1.x one keeping ruff or
+// pytest settings there, that is not yet an astro project. It wraps
 // manifest.ErrNoAstroSection, so callers matching the sentinel still match.
 type NoAstroSectionError struct {
 	// Start is the directory the command ran in, Dir or one below it.
 	Start string
 	Dir   string
-	// V1 is whether Dir also holds an astro v1 project (see IsV1).
+	// V1 is whether Dir also holds a 1.x project (see IsV1).
 	V1 bool
 }
 
@@ -70,14 +70,14 @@ func (e *NoAstroSectionError) Error() string {
 
 func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection }
 
-// v1Message says that v1Dir holds an astro v1 project and how to upgrade it,
+// v1Message says that v1Dir holds a 1.x project and how to upgrade it,
 // naming the directory only when it is not the one the command ran in.
 func v1Message(start, v1Dir string) string {
 	where, there := "this directory", "here"
 	if v1Dir != start {
 		where, there = v1Dir, "in "+v1Dir
 	}
-	return fmt.Sprintf("%s holds an Astro v1 project (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
+	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
 		"Run `%s` %s to upgrade it in place", where, initCommand, there)
 }
 
@@ -112,7 +112,7 @@ type Project struct {
 
 // Discover walks up from startDir looking for a directory that contains
 // Marker and returns it as the project. It returns *NotFoundError when the
-// walk reaches the filesystem root without a match, naming the nearest v1
+// walk reaches the filesystem root without a match, naming the nearest 1.x
 // project it passed on the way.
 func Discover(startDir string) (*Project, error) {
 	abs, err := filepath.Abs(startDir)
@@ -166,13 +166,13 @@ func New(dir string) (*Project, error) {
 	}, nil
 }
 
-// IsV2 reports whether dir holds a v2 project: a pyproject.toml carrying a
-// [tool.astro] table. A pyproject that fails to parse, or one whose
-// [tool.astro] fails validation, still counts as v2 — it is a v2 project with a
-// manifest to fix, and the v2 path gives the clearer error. A pyproject without
-// [tool.astro] (a plain Python project, or one that only configures tools such
-// as ruff or pytest) and a missing pyproject are not v2.
-func IsV2(dir string) bool {
+// HasManifest reports whether dir's pyproject.toml carries a [tool.astro]
+// table, the manifest. A pyproject that fails to parse, or one whose
+// [tool.astro] fails validation, still counts — it is a project with a
+// manifest to fix, and the code that loads the manifest gives the clearer
+// error. A pyproject without [tool.astro] (a plain Python project, or one that
+// only configures tools such as ruff or pytest) and a missing pyproject do not.
+func HasManifest(dir string) bool {
 	_, err := manifest.Load(filepath.Join(dir, Marker))
 	switch {
 	case err == nil:
@@ -184,25 +184,26 @@ func IsV2(dir string) bool {
 	}
 }
 
-// IsV1 reports whether dir holds an astro v1 project: the old Dockerfile
-// layout with a .astro/ directory, and no v2 manifest. A Dockerfile on its own
-// marks some container project, not necessarily v1, so it does not qualify —
-// `astro dev` must not claim such a directory is v1. A pyproject.toml does not
-// rule v1 out: plenty of v1 repositories keep one for ruff or pytest settings,
-// and only one that IsV2 accepts makes the directory a v2 project. `astro init`
-// does not consult this: it makes a v1 directory a v2 project too, and reports
-// the v1 files it could not read rather than refusing them.
+// IsV1 reports whether dir holds a 1.x project: the old Dockerfile
+// layout with a .astro/ directory, and no manifest. A Dockerfile on its own
+// marks some container project, not necessarily a 1.x one, so it does not
+// qualify — `astro dev` must not claim such a directory is 1.x. A
+// pyproject.toml does not rule 1.x out: plenty of 1.x repositories keep one
+// for ruff or pytest settings, and only one that HasManifest accepts makes the
+// directory a project with a manifest. `astro init` does not consult this: it
+// converts a 1.x directory too, and reports the 1.x files it could not read
+// rather than refusing them.
 func IsV1(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
 		return false
 	}
 	info, err := os.Stat(filepath.Join(dir, ".astro"))
-	return err == nil && info.IsDir() && !IsV2(dir)
+	return err == nil && info.IsDir() && !HasManifest(dir)
 }
 
 // ID returns the identity key for a project directory: the sha256 hex of
 // its symlink-resolved absolute path. It is a thin wrapper over
-// localrt.ProjectID, which owns project identity (docs/v2-architecture.md).
+// localrt.ProjectID, which owns project identity (docs/architecture.md).
 func ID(dir string) (string, error) {
 	return localrt.ProjectID(dir)
 }

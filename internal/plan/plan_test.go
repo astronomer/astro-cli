@@ -603,7 +603,7 @@ TOKEN = {}
 //
 // The empty case is half the point. Plan.Dockerfile switches docker mode from a
 // generated image to running the project's file, so a value appearing when the
-// manifest declared none would take every ordinary v2 project down the wrong
+// manifest declared none would take every ordinary project down the wrong
 // path — and the failure would be a docker build error naming nothing about the
 // manifest.
 //

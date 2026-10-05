@@ -135,9 +135,9 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	cmd.Flags().BoolVar(&opts.GenerateCurl, "generate", false, "Output a curl command instead of executing the request")
 	cmd.PersistentFlags().StringVar(&opts.SpecURL, "spec-url", "", "OpenAPI spec URL or file path (overrides default Cloud API spec)")
 	cmd.PersistentFlags().StringVar(&opts.SpecTokenEnvVar, "spec-token-env-var", "", "Environment variable containing auth token for fetching the spec")
-	//nolint:errcheck // error deliberately ignored in this v1 path
+	//nolint:errcheck // error deliberately ignored in this shell code
 	cmd.PersistentFlags().MarkHidden("spec-url")
-	//nolint:errcheck // error deliberately ignored in this v1 path
+	//nolint:errcheck // error deliberately ignored in this shell code
 	cmd.PersistentFlags().MarkHidden("spec-token-env-var")
 
 	// Add list and describe subcommands (cloud-specific to support lazy cache init)

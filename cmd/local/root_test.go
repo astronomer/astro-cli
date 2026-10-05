@@ -4,9 +4,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newRootCmd builds the whole v2 command surface on one standalone root: the
+// newRootCmd builds the whole core command surface on one standalone root: the
 // `astro local` tree, `astro init`, the root aliases, and the `astro dev`
-// stub. Production mounts these on the v1 root through AddCmds (cmd/root.go);
+// stub. Production mounts these on the shell root through AddCmds (cmd/root.go);
 // this root is the self-contained entry the package tests drive.
 func newRootCmd(d Deps) *cobra.Command {
 	root := &cobra.Command{

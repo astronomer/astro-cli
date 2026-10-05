@@ -62,11 +62,11 @@ func newRemoteDeployCmd() *cobra.Command {
 		Short: "Deploy a client image to the remote registry",
 		Long:  "Build and deploy a client image to the configured remote registry. This command assumes you have already authenticated with the registry.",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// A v2 project has no .astro/config.yaml, so the v1 check would
+			// A project with a pyproject.toml has no .astro/config.yaml, so the 1.x check would
 			// reject it. astro deploy grew this bypass and its sibling here
-			// never did, which left remote deploy refusing every v2 project
+			// never did, which left remote deploy refusing every such project
 			// with advice to run astro dev init, a command v2 removed.
-			if project.IsV2(config.WorkingPath) {
+			if project.HasManifest(config.WorkingPath) {
 				return nil
 			}
 			return utils.EnsureProjectDir(cmd, args)

@@ -141,14 +141,14 @@ type Astro struct {
 	// if unset; read it through WorkspaceDomain, which applies the default, or
 	// LoginDomain, which does not. It names the login a `source = "workspace"` value is read with and
 	// an astro-auth deployment link proves itself with — see
-	// docs/v2-workspace-link.md.
+	// docs/workspace-link.md.
 	Domain string
 	// Organization is [tool.astro] organization, the id of the Astro
 	// organization Workspace lives in. Empty if unset; read it through
 	// WorkspaceOrganization, which falls back to the login's own organization.
 	// A login's token reads every organization the user belongs to, so naming
 	// the workspace's lets a project be read without `astro organization
-	// switch`. See docs/v2-workspace-link.md.
+	// switch`. See docs/workspace-link.md.
 	Organization string
 	// Target is [tool.astro] target, the default target every link inherits
 	// when the link sets none. Empty if unset (links then fall back to
@@ -240,7 +240,7 @@ type Link struct {
 	// picked one: the last layer of the query commands' resolution rule, and
 	// the entry `astro deploy` highlights in its prompt. It does not decide a
 	// deploy — deploy always asks, and this only moves the cursor
-	// (docs/v2-instances.md, "Deploy always asks"). At most one link in a manifest may set
+	// (docs/instances.md, "Deploy always asks"). At most one link in a manifest may set
 	// it.
 	Default bool
 }

@@ -39,31 +39,31 @@ import (
 )
 
 var (
-	forceDeploy       bool
-	forcePrompt       bool
-	saveDeployConfig  bool
-	pytest            bool
-	parse             bool
-	dags              bool
-	waitForDeploy     bool
-	waitTime          time.Duration
-	image             bool
-	dagsPath          string
-	pytestFile        string
-	envFile           string
-	imageName         string
-	deploymentName    string
-	deployDescription string
-	noDagsBaseDir     bool
-	dagBundleName     string
-	nonDags           bool
-	nonDagsMountPath  string
-	nonDagsBundleType string
-	nonDagsBundlePath string
-	v2Deployment      string
-	v2Workspace       string
-	deployOutput      string
-	deployExample     = `
+	forceDeploy        bool
+	forcePrompt        bool
+	saveDeployConfig   bool
+	pytest             bool
+	parse              bool
+	dags               bool
+	waitForDeploy      bool
+	waitTime           time.Duration
+	image              bool
+	dagsPath           string
+	pytestFile         string
+	envFile            string
+	imageName          string
+	deploymentName     string
+	deployDescription  string
+	noDagsBaseDir      bool
+	dagBundleName      string
+	nonDags            bool
+	nonDagsMountPath   string
+	nonDagsBundleType  string
+	nonDagsBundlePath  string
+	manifestDeployment string
+	manifestWorkspace  string
+	deployOutput       string
+	deployExample      = `
 Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
 
   $ astro deploy <deployment ID>
@@ -98,10 +98,10 @@ func NewDeployCmd() *cobra.Command {
 			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
 				return nil
 			}
-			// A v2 project has no .astro/config.yaml, so the v1 EnsureProjectDir
-			// check would reject it. The v2 path loads and validates the manifest
-			// itself, so skip the v1 check and let deploy() route.
-			if project.IsV2(config.WorkingPath) {
+			// A project with a pyproject.toml has no .astro/config.yaml, so the 1.x EnsureProjectDir
+			// check would reject it. The manifest path loads and validates the manifest
+			// itself, so skip the 1.x check and let deploy() route.
+			if project.HasManifest(config.WorkingPath) {
 				return nil
 			}
 			// A DAG-only deploy sourcing its DAGs from --dags-path does not read anything
@@ -139,9 +139,9 @@ func NewDeployCmd() *cobra.Command {
 	// No -d shorthand: on this command -d has meant --dags since v1, and moving
 	// it would turn `astro deploy -d` from a DAG-only deploy into a target
 	// selector. -d/--deployment is the spelling everywhere the letter is free.
-	cmd.Flags().StringVar(&v2Deployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id. For v2 projects (a pyproject.toml with [tool.astro])")
-	cmd.Flags().StringVar(&v2Workspace, "workspace", "", "Workspace for the deploy, overriding the context. For v2 projects (a pyproject.toml with [tool.astro])")
-	cmd.Flags().StringVar(&deployOutput, "output", string(formatText), "Output format for v2 projects: text or json")
+	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id. In a project with a pyproject.toml ([tool.astro])")
+	cmd.Flags().StringVar(&manifestWorkspace, "workspace", "", "Workspace for the deploy, overriding the context. In a project with a pyproject.toml ([tool.astro])")
+	cmd.Flags().StringVar(&deployOutput, "output", string(formatText), "Output format in a project with a pyproject.toml ([tool.astro]): text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-DAG bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
@@ -188,18 +188,18 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 	return pytestFile
 }
 
-// v2DeployIgnores are the flags astro deploy accepts that the v2 path never
-// reads, mapped to what to do instead. Each was built for the v1 deploy, and
-// on a v2 project nothing carries it: not the Request built below, and not
+// manifestDeployIgnores are the flags astro deploy accepts that the manifest path never
+// reads, mapped to what to do instead. Each was built for the 1.x deploy, and
+// on the manifest path nothing carries it: not the Request built below, and not
 // internal/deploy, which contains no reference to any of them.
 //
 // Refusing beats ignoring. A deploy that quietly skipped --pytest is a deploy
 // someone believes ran their tests, and the flag having no effect is exactly
 // the thing they cannot see. Porting them is an earlier fix.
 //
-// --force and --prompt are deliberately absent: the v2 path reads neither, but
+// --force and --prompt are deliberately absent: the manifest path reads neither, but
 // neither leaves a false belief behind. There is no uncommitted-changes gate on
-// this path for --force to open, and a v2 deploy always asks, which is what
+// this path for --force to open, and a manifest deploy always asks, which is what
 // --prompt was for. Both get the outcome the flag asked for.
 //
 // --build-secret has LEFT this list, which is the one entry that went the other
@@ -209,36 +209,36 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 // about what the project declares rather than about which version it is, gated on
 // the flag being given rather than on a resolved value, since
 // util.ResolveBuildSecrets also reads BUILD_SECRET_INPUT from the environment.
-var v2DeployIgnores = []struct {
+var manifestDeployIgnores = []struct {
 	flag string
 	do   string
 }{
 	{"pytest", "run your tests before deploying: `uv run pytest && astro deploy`"},
 	{"parse", "check your DAGs before deploying: `astro local check && astro deploy`"},
 	{"dags-path", "deploy from the project directory; a DAGs path other than dags/ is not supported yet"},
-	{"dag-bundle-name", "named DAG bundles are not supported on a v2 project yet"},
+	{"dag-bundle-name", "named DAG bundles are not supported here yet"},
 	{"test", "run your tests before deploying: `uv run pytest <path> && astro deploy`"},
-	{"env", "a v2 deploy runs no tests, so it reads no test env file; run `uv run pytest` yourself"},
-	{"save", "a v2 deploy always asks; mark a link `default = true` in [tool.astro.deployments] to move the cursor"},
+	{"env", "this deploy runs no tests, so it reads no test env file; run `uv run pytest` yourself"},
+	{"save", "this deploy always asks; mark a link `default = true` in [tool.astro.deployments] to move the cursor"},
 	{"deployment-name", "name the target with --deployment, which takes a link name or a Deployment id"},
 }
 
-// refuseFlagsV2DeployIgnores stops a v2 deploy that was given a flag it would
+// refuseFlagsManifestDeployIgnores stops a manifest deploy that was given a flag it would
 // silently drop.
-func refuseFlagsV2DeployIgnores(cmd *cobra.Command) error {
-	for _, ignored := range v2DeployIgnores {
+func refuseFlagsManifestDeployIgnores(cmd *cobra.Command) error {
+	for _, ignored := range manifestDeployIgnores {
 		if cmd.Flags().Changed(ignored.flag) {
-			return fmt.Errorf("--%s has no effect when deploying a v2 project (a pyproject.toml with [tool.astro]): %s", ignored.flag, ignored.do)
+			return fmt.Errorf("--%s has no effect when deploying a project with a pyproject.toml ([tool.astro]): %s", ignored.flag, ignored.do)
 		}
 	}
 	return nil
 }
 
 func deploy(cmd *cobra.Command, args []string) error {
-	// Route by project type. A v2 project (a pyproject.toml with [tool.astro])
-	// takes the new v2 deploy path; everything else runs the v1 path below,
+	// Route by project type. A project with a pyproject.toml ([tool.astro])
+	// takes the manifest deploy path; everything else runs the 1.x path below,
 	// unchanged. project detection lives in internal/project.
-	if project.IsV2(config.WorkingPath) {
+	if project.HasManifest(config.WorkingPath) {
 		return deployV2(cmd, args)
 	}
 
@@ -360,7 +360,7 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to verify bundle path is not within an Astro project: %w", err)
 	}
 	if !withinAstroProject {
-		withinAstroProject = isWithinV2Project(nonDagsBundlePath)
+		withinAstroProject = isWithinManifestProject(nonDagsBundlePath)
 	}
 	if withinAstroProject {
 		return errors.New("bundle path is within an Astro project. Non-DAG bundles must be a separate directory")
@@ -386,9 +386,9 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 	return DeployBundle(deployBundleInput)
 }
 
-// deployV2 runs the v2 deploy path: load the manifest, gather flags and
+// deployV2 runs the manifest deploy path: load the manifest, gather flags and
 // context, resolve the deployment, and run the deploy — dags-only, image-only,
-// or both — then render the result. The v2 logic lives in internal/deploy; this
+// or both — then render the result. The manifest deploy's logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
 func deployV2(cmd *cobra.Command, args []string) error {
 	// The format is read before the flag refusals, so a bad --output is the
@@ -402,7 +402,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	cmd.SilenceUsage = true
-	if rerr := refuseFlagsV2DeployIgnores(cmd); rerr != nil {
+	if rerr := refuseFlagsManifestDeployIgnores(cmd); rerr != nil {
 		return deployV2Err(cmd, rerr)
 	}
 
@@ -419,14 +419,14 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	//
 	//   - ResolveBuildSecrets reads BUILD_SECRET_INPUT whether or not the flag was
 	//     given, so a refusal keyed on the resolved slice broke every ordinary
-	//     v2 deploy on any runner that exports that variable — no flag, no
+	//     manifest deploy on any runner that exports that variable — no flag, no
 	//     Dockerfile, and a hard error telling the user to declare one they never
 	//     wanted. cmd.Flags().Changed is what the old refusal used.
 	//   - --dags never reaches runImage, so a refusal there let
 	//     `--dags --build-secret` succeed with the flag silently dropped.
 	//   - --image-name returns before any build, so the same silent drop applied
-	//     whenever the project happened to declare a Dockerfile. The v1 body has a
-	//     cross-flag guard listing build-secret, but a v2 project branches away
+	//     whenever the project happened to declare a Dockerfile. The 1.x body has a
+	//     cross-flag guard listing build-secret, but a manifest deploy branches away
 	//     before reaching it.
 	//
 	// One place, before anything is resolved or prompted for.
@@ -454,7 +454,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	}
 
 	// --workspace wins over the legacy --workspace-id when both are set.
-	overrideWorkspace := v2Workspace
+	overrideWorkspace := manifestWorkspace
 	if overrideWorkspace == "" {
 		overrideWorkspace = workspaceID
 	}
@@ -467,7 +467,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 
 	// Only a run that is going to ask has any use for the ambient layers, and
 	// reading the pin is not free — it creates the project's state directory.
-	willPrompt := interactive && linkName == "" && v2Deployment == ""
+	willPrompt := interactive && linkName == "" && manifestDeployment == ""
 	preselect, preselectFrom := deployPreselect(config.WorkingPath, willPrompt)
 
 	errOut := cmd.ErrOrStderr()
@@ -475,7 +475,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
-		Deployment:       v2Deployment,
+		Deployment:       manifestDeployment,
 		Preselect:        preselect,
 		PreselectFrom:    preselectFrom,
 		WorkspaceID:      overrideWorkspace,
@@ -488,7 +488,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		WaitTime:         waitTime,
 		NoDagsBaseDir:    noDagsBaseDir,
 		Interactive:      interactive,
-		// The v1 path's resolution, so a CI job setting BUILD_SECRET_INPUT
+		// The 1.x path's resolution, so a CI job setting BUILD_SECRET_INPUT
 		// keeps working across the version boundary rather than silently
 		// losing its secrets on the day the project converts. With neither the
 		// flag nor the variable, the manifest's build-secrets apply.
@@ -504,7 +504,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		// once the target is settled, so a deploy says what it is about to act
 		// on the way `astro af dags list` does. The second says an image build
 		// can run for minutes with no transport output yet; the transport
-		// itself stays silent (v2 layer rules). It prints only once the
+		// itself stays silent (the core's layer rules). It prints only once the
 		// deployment has cleared the deploy, so a deploy refused before the
 		// build claims no build.
 		//
@@ -580,7 +580,7 @@ func deployPreselect(projectDir string, willPrompt bool) (name, from string) {
 	return state.Instance, v2deploy.PinnedBy
 }
 
-// deployFormat selects how the v2 deploy path renders its result.
+// deployFormat selects how the manifest deploy path renders its result.
 type deployFormat string
 
 const (
@@ -588,7 +588,7 @@ const (
 	formatJSON deployFormat = "json"
 )
 
-// parseDeployFormat validates the --output value for the v2 deploy path.
+// parseDeployFormat validates the --output value for the manifest deploy path.
 func parseDeployFormat(s string) (deployFormat, error) {
 	switch deployFormat(s) {
 	case formatText:
@@ -625,7 +625,7 @@ type deployGitJSON struct {
 	CommitURL string `json:"commit_url,omitempty"`
 }
 
-// renderV2Deploy writes a finished v2 deploy: one JSON object in json mode, a
+// renderV2Deploy writes a finished manifest deploy: one JSON object in json mode, a
 // plain summary in text mode. Both render the same Result, so the two modes
 // never drift.
 func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) error {
@@ -670,7 +670,7 @@ func deployTargetName(res *v2deploy.Result) string {
 	return fmt.Sprintf("%s (deployment %s)", res.LinkName, res.DeploymentID)
 }
 
-// deployV2Err returns a v2 deploy failure for the root to report: the
+// deployV2Err returns a manifest deploy failure for the root to report: the
 // {"error","code","kind"} object on stdout in json mode, cobra's "Error:" in
 // text mode (cliout.Execute, as for every command).
 func deployV2Err(cmd *cobra.Command, err error) error {
@@ -684,7 +684,7 @@ func deployV2Err(cmd *cobra.Command, err error) error {
 	return err
 }
 
-// deployLogin is the Astro login a v2 deploy runs under, and the client bound
+// deployLogin is the Astro login a manifest deploy runs under, and the client bound
 // to its host and token.
 type deployLogin struct {
 	context config.Context
@@ -694,7 +694,7 @@ type deployLogin struct {
 	current bool
 }
 
-// loginForDeploy picks the login a v2 deploy runs under from domain, the
+// loginForDeploy picks the login a manifest deploy runs under from domain, the
 // project's Astro host (manifest.Astro.LoginDomain): the login stored for that
 // host, even while the CLI is switched to another, the same one `astro af`
 // reads an astro link with. Every Deployment the deploy reaches, a link's or a
@@ -727,7 +727,7 @@ func loginForDeploy(ctx context.Context, domain string) (deployLogin, error) {
 	}, nil
 }
 
-// newV2Deployer builds the transport the v2 deploy path drives. It is a var so a
+// newV2Deployer builds the transport the manifest deploy path drives. It is a var so a
 // test can swap in a fake and exercise the whole cmd path — flag parsing,
 // selection, and rendering — with no real daemon, registry, or API.
 var newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
@@ -752,7 +752,7 @@ const deployPromptAttempts = 3
 // ConfirmTarget asks which deployment to ship to. Every interactive deploy that
 // did not name its target comes through here — a pin, ASTRO_DEPLOYMENT, or a
 // `default = true` marker moves the cursor and never skips the question
-// (docs/v2-instances.md, "Deploy always asks").
+// (docs/instances.md, "Deploy always asks").
 //
 // The highlight is labeled with what put it there, not with one word for all
 // three: a cursor sitting on an entry because a variable is exported in this
@@ -828,7 +828,7 @@ func (d v2Deployer) ResolveUnlinked(workspaceID string) (string, error) {
 	return dep.Id, nil
 }
 
-// DeployDags reuses the v1 dags-only transport for the v2 project's dags/.
+// DeployDags reuses the 1.x dags-only transport for the project's dags/.
 func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, error) {
 	res, err := astrodeploy.DeployDagsV2(astrodeploy.DagDeployV2Input{
 		Login:         &d.login.context,
@@ -895,20 +895,21 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 	}, nil
 }
 
-// isWithinV2Project reports whether path sits at or inside a v2 project.
+// isWithinManifestProject reports whether path sits at or inside a project
+// with a pyproject.toml ([tool.astro]).
 //
-// config.IsWithinProjectDir only knows the v1 marker, .astro/config.yaml, so it
-// answers false at every level of a v2 project. That left both containment
-// refusals in this package unreachable for exactly the projects v2 users have:
+// config.IsWithinProjectDir only knows the 1.x marker, .astro/config.yaml, so it
+// answers false at every level of a project with a pyproject.toml. That left both containment
+// refusals in this package unreachable for exactly the projects that have a manifest:
 // a dbt project or a non-DAG bundle nested inside one shipped where the check
 // meant to stop it.
-func isWithinV2Project(path string) bool {
+func isWithinManifestProject(path string) bool {
 	abs, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
 		return false
 	}
 	for dir := abs; ; {
-		if project.IsV2(dir) {
+		if project.HasManifest(dir) {
 			return true
 		}
 		parent := filepath.Dir(dir)

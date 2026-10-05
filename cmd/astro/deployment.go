@@ -126,7 +126,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Create or manage Deployments running on Astro according to your Organization and Workspace permissions.",
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment (default: the project's workspace in a v2 project, else the current one)")
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
 	cmd.AddCommand(
 		newDeploymentListCmd(out),
 		newDeploymentDeleteCmd(),

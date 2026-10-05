@@ -1,11 +1,11 @@
-// Package deploy holds the v2 deploy logic that `astro deploy` routes into
-// when the working directory is a v2 project (a pyproject.toml with a
-// [tool.astro] table, which internal/project's IsV2 checks). It settles which
+// Package deploy holds the manifest deploy logic that `astro deploy` routes into
+// when the working directory is a project (a pyproject.toml with a
+// [tool.astro] table, which internal/project's HasManifest checks). It settles which
 // deployment to ship to — named on the command line, or asked for and answered
 // — and drives the deploy through an injected transport: a dags-only deploy, an
 // image deploy, or both.
 //
-// The package keeps to the v2 layer rules (docs/v2-architecture.md): it never
+// The package keeps to the core's layer rules (docs/architecture.md): it never
 // prints, never exits, and never touches config, Docker, or the network
 // directly. cmd owns flag parsing, config, and rendering; the deploy transport
 // arrives as an interface, so the logic here stays unit-testable with a fake.
@@ -27,10 +27,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-// Request is the resolved input for a v2 deploy. cmd fills it from flags, args,
+// Request is the resolved input for a manifest deploy. cmd fills it from flags, args,
 // the manifest, and the current context, then hands it to Run.
 type Request struct {
-	// ProjectDir is the v2 project root (where dags/ and pyproject.toml live).
+	// ProjectDir is the project root (where dags/ and pyproject.toml live).
 	ProjectDir string
 	// Manifest is the loaded pyproject.toml: deployment links, the Airflow pin,
 	// the project's dependencies and OS packages.
@@ -47,7 +47,7 @@ type Request struct {
 	// Preselect is what the ambient layers point at: ASTRO_DEPLOYMENT, then the
 	// project's `astro use` pin. It moves the cursor in the prompt and does
 	// nothing else — a deploy is never decided by state the user cannot see on
-	// the command line (docs/v2-instances.md, "Deploy always asks").
+	// the command line (docs/instances.md, "Deploy always asks").
 	Preselect string
 	// PreselectFrom names where Preselect came from, for the prompt's label:
 	// the env var's name, or "pinned". Ignored when Preselect is empty.
@@ -104,7 +104,7 @@ type Request struct {
 	Warn func(string)
 }
 
-// Result is what a finished v2 deploy reports back to cmd for rendering. Text
+// Result is what a finished manifest deploy reports back to cmd for rendering. Text
 // output ships now; the struct is what --output json will serialize later.
 type Result struct {
 	DeploymentID string
@@ -196,7 +196,7 @@ type ImageResult struct {
 
 // Deployer is the seam onto the deploy transport. The CLI wires it to the
 // cloud/deploy transport (create deploy, build and push the image, upload the
-// dag tarball, finalize); tests supply a fake. The interface keeps the v2 logic
+// dag tarball, finalize); tests supply a fake. The interface keeps the manifest deploy's logic
 // free of config, Docker, and the network so it stays unit-testable.
 type Deployer interface {
 	// ConfirmTarget presents the project's deployable links and returns the
@@ -220,7 +220,7 @@ type Deployer interface {
 	DeployImage(*ImageDeploy) (ImageResult, error)
 }
 
-// Run resolves the deployment and drives the deploy for a v2 project: a
+// Run resolves the deployment and drives the deploy for a project: a
 // dags-only deploy (--dags), an image-only deploy (--image), or the default
 // "both" (image + dags).
 //
@@ -398,7 +398,7 @@ var ErrAborted = errors.New("no deployment selected")
 // resolveTarget settles which deployment this run ships to.
 //
 // Deploy is the one command that never resolves from ambient state
-// (docs/v2-instances.md, "Deploy always asks"): shipping code is too consequential to
+// (docs/instances.md, "Deploy always asks"): shipping code is too consequential to
 // decide from a pin, an exported variable, or a marker in a file nobody looked
 // at. So there are exactly two ways here — the target is named on the command
 // line, or an interactive run is asked and answers. A pin, ASTRO_DEPLOYMENT, or

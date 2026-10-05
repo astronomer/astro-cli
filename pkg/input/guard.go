@@ -10,7 +10,7 @@ import (
 // The guard is the one place a run says it may not be asked anything.
 //
 // A process-level setting rather than a context value, because the questions
-// are asked from deep in the v1 platform packages, through call chains that
+// are asked from deep in the shell platform packages, through call chains that
 // carry no context — threading one to each of them would be a signature change
 // on every function between a command and its prompt, for a fact that is the
 // same for the whole run. A run is one command, so one setting is the right

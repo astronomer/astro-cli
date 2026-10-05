@@ -34,11 +34,12 @@ package airflowrt
 // Not a secret: fixed, published, local-only development credentials. Airflow's
 // own `users create` takes them on a command line.
 //
-// Known gap, not covered by any test here: otto's v1 detection path
+// Known gap, not covered by any test here: otto's 1.x detection path
 // (internal/otto/config.go) hands out this pair for any Airflow it finds through
-// the v1 proxy routes, including a non-macOS standalone Airflow 2 whose password
-// was generated. The v2 path refuses that case explicitly; the v1 path has no
-// Airflow-major or mode information to refuse it with.
+// the 1.x proxy routes, including a non-macOS standalone Airflow 2 whose password
+// was generated. Otto's path for a project with a manifest refuses that case
+// explicitly; the 1.x path has no Airflow-major or mode information to refuse it
+// with.
 const (
 	Airflow2AdminUser     = "admin"
 	Airflow2AdminPassword = "admin"

@@ -27,7 +27,7 @@ type Config struct {
 	Domain       string
 	Organization string
 	AirflowURL   string
-	// AirflowV2 is true when AirflowURL is a v2 project's Airflow, which Otto
+	// AirflowV2 is true when AirflowURL is a project's Airflow, which Otto
 	// authenticates to itself: no username and password are injected for it.
 	AirflowV2 bool
 }
@@ -50,7 +50,7 @@ func NewConfigFromContext() *Config {
 }
 
 // projectOrganization is the organization Otto runs in: the one the current
-// directory's v2 project names for its workspace, else fallback, the login's.
+// directory's project names for its workspace, else fallback, the login's.
 // It is chosen the way the workspace reads choose it
 // (manifest.Astro.WorkspaceOrganization), so Otto asks about the organization
 // the project's values come from. A manifest that does not load names none.
@@ -71,7 +71,7 @@ func projectOrganization(fallback string) string {
 }
 
 // DetectAirflow returns a URL to the Airflow belonging to the current project
-// directory, or "" if there is none, and whether it is a v2 project's. The nearest enclosing v2 project's
+// directory, or "" if there is none, and whether it is a project's. The nearest enclosing project's
 // running Airflow wins — even over a v1 route registered on cwd itself;
 // otherwise the v1 proxy routes decide.
 func DetectAirflow() (url string, v2 bool) {
@@ -85,7 +85,7 @@ func DetectAirflow() (url string, v2 bool) {
 	return detectV1Airflow(cwd), false
 }
 
-// detectV2Airflow reports the running local Airflow of the v2 project cwd
+// detectV2Airflow reports the running local Airflow of the project cwd
 // sits in, or "" when there is none. The health probe subsumes an engine
 // liveness check — a stale record fails it the same way a stopped Airflow
 // does. localhost:<port> rather than the record's hostname URL: the hostname
@@ -96,7 +96,7 @@ func detectV2Airflow(cwd string) string {
 	if err != nil {
 		var notFound *project.NotFoundError
 		if !errors.As(err, &notFound) {
-			logger.Debugf("otto: discovering v2 project: %v", err)
+			logger.Debugf("otto: discovering the project: %v", err)
 		}
 		return ""
 	}
@@ -222,7 +222,7 @@ func (c *Config) BuildEnv() []string {
 		// it with, so such a route still gets a pair that will 401. See the
 		// gap noted in pkg/airflowrt/account.go.
 		//
-		// A v2 project's Airflow gets no pair: Otto reads that project's
+		// A project's Airflow gets no pair: Otto reads that project's
 		// credentials itself, and a default pair here would override them.
 		set("AIRFLOW_USERNAME", airflowrt.Airflow2AdminUser)
 		set("AIRFLOW_PASSWORD", airflowrt.Airflow2AdminPassword)

@@ -23,7 +23,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
-// publishedPayloads is every shape a v2 command writes under `--output
+// publishedPayloads is every shape a core command writes under `--output
 // json`. Named for the surface rather than the Go type, because the type is
 // an implementation detail and the command is what somebody depends on.
 //

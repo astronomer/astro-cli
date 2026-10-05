@@ -31,7 +31,7 @@ func apiFailure(status int) error {
 var cloudSamples = map[cliout.ProblemKind][]error{
 	KindUnauthenticated: {
 		apiFailure(http.StatusUnauthorized),
-		// The v1 tree's "no context" — what a never-logged-in machine gets —
+		// The shell tree's "no context" — what a never-logged-in machine gets —
 		// arrives wrapped by github.com/pkg/errors, as cmd/astro wraps it.
 		pkgerrors.Wrap(config.ErrGetHomeString, "failed to get current Workspace"),
 		astrosession.ErrLoggedOut,
@@ -105,7 +105,7 @@ func executeRoot(root *cobra.Command, args ...string) (stdout, stderr string, er
 }
 
 // The contract is applied at the root, so it reaches every command in both
-// trees, not only the v2 one.
+// trees, not only the core one.
 func TestACloudCommandFailsAsOneJSONObject(t *testing.T) {
 	for platform, root := range rootsUnderTest(t) {
 		t.Run(platform, func(t *testing.T) {

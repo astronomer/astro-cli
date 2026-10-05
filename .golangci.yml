@@ -105,14 +105,14 @@ linters:
       - legacy
     rules:
       # forbidigo backs up the archlint go test (internal/archlint): below the
-      # cmd/ layer, v2 packages must report through callbacks and return errors,
-      # not print/exit/log-fatal. Scope it to the v2 packages archlint guards
-      # that live in this module, so it stays a lint-time guard for v2 and never
-      # fires on the v1 tree, which prints by design. The v2 pkg/* modules have
-      # their own go.mod and aren't reached by a root run, so archlint (which
-      # walks the tree) is their only guard.
-      # Keep this list in sync with v2BelowCmd and v2ConfigReaders in
-      # internal/archlint/archlint_test.go when a new internal/ v2 package lands.
+      # cmd/ layer, core packages must report through callbacks and return
+      # errors, not print/exit/log-fatal. Scope it to the core packages archlint
+      # guards that live in this module, so it stays a lint-time guard for the
+      # core and never fires on the shell, which prints by design. The core
+      # pkg/* modules have their own go.mod and aren't reached by a root run,
+      # so archlint (which walks the tree) is their only guard.
+      # Keep this list in sync with coreBelowCmd and coreConfigReaders in
+      # internal/archlint/archlint_test.go when a new internal/ core package lands.
       - linters: [forbidigo]
         path-except: ^internal/(apirequest|astrosession|containercfg|deploy|emenv|envresolve|instancelocate|localenv|pack|plan|project|userstate|vaultenv)/
       - linters:
@@ -134,10 +134,10 @@ linters:
         text: 'shadow: declaration of .err. shadows declaration'
       - path: (.+)\.go$
         text: 'sloppyTestFuncName: function cleanUpInitFiles should be of form'
-      # v2 tree: Deps and the contract structs (localrt's Plan, Callbacks and
+      # Core packages: Deps and the contract structs (localrt's Plan, Callbacks and
       # Record, envresolve Inputs, plan.Options, airflowapi's per-call options,
       # imagebuild.Request, proxy.Route, instances.Instance) are passed by value
-      # on purpose (docs/v2-architecture.md), so hugeParam does not apply.
+      # on purpose (docs/architecture.md), so hugeParam does not apply.
       # `instance` is a prefix in BOTH groups: it covers instances and
       # instancelocate. Do not "fix" either to a plural.
       # `local` used to be one too, covering
@@ -146,8 +146,8 @@ linters:
       # but `make lint-submodules` runs each one from its own directory and
       # golangci-lint still reports paths relative to THIS file — so one
       # repo-rooted pattern covers both runs. cmd/astro was listed here for the
-      # short-lived v2 composition root; the name now holds
-      # the v1 Astro tree, which gets no v2 exemption.
+      # short-lived core composition root; the name now
+      # holds the shell Astro tree, which gets no core exemption.
       - linters: [gocritic]
         path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack|plan)|pkg/(airflowapi|imagebuild|instance|awsauth|googleauth|localrt|proxy))
         text: 'hugeParam:'

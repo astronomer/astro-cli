@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A v1 project keeps its own name.
+// A 1.x project keeps its own name.
 //
 // It states one in .astro/config.yaml, and a conversion used the directory's
 // base name instead — so a project called orders-pipeline sitting in a

@@ -241,7 +241,7 @@ default = true
 	}
 }
 
-// kindsManifest carries one link of every kind, as docs/v2-instances.md
+// kindsManifest carries one link of every kind, as docs/instances.md
 // spells them.
 const kindsManifest = `
 [project]

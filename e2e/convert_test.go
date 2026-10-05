@@ -54,14 +54,14 @@ type initResult struct {
 	Advisory []string `json:"advisories"`
 }
 
-// v1Case is one v1 project and what converting it has to produce.
+// v1Case is one 1.x project and what converting it has to produce.
 type v1Case struct {
 	name  string
 	files map[string]string
 
 	airflow string
 	adopted bool
-	// projectName is the [project] name the run must choose. A v1 project
+	// projectName is the [project] name the run must choose. A 1.x project
 	// states one in .astro/config.yaml, and taking the directory instead
 	// renames somebody's project.
 	projectName string
@@ -167,7 +167,7 @@ func v1Cases() []v1Case {
 			// A modern runtime tag names the Airflow version, so there is
 			// nothing left to say about the Dockerfile and it goes with the
 			// rest. The case that covers a conversion deleting a Dockerfile at
-			// all, which is the shape every Airflow 3 v1 project carries.
+			// all, which is the shape every Airflow 3 1.x project carries.
 			name: "a runtime tag that names the Airflow version",
 			files: map[string]string{
 				"Dockerfile":       runtime3,
@@ -395,7 +395,7 @@ func v1Cases() []v1Case {
 			// What `astro dev init` actually left behind: a project config, a
 			// DAG, a .gitignore. What is already there is kept and reported as
 			// skipped, rather than written over.
-			name: "a real v1 repository",
+			name: "a real 1.x repository",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: orders-pipeline\n",
 				"Dockerfile":         runtime2,
@@ -404,7 +404,7 @@ func v1Cases() []v1Case {
 			},
 			airflow: "2",
 			// The project keeps the name it calls itself, not the directory's.
-			// A v1 project named orders-pipeline in a directory called
+			// A 1.x project named orders-pipeline in a directory called
 			// something else is still orders-pipeline — it is the manifest's
 			// identity, and what `astro package` names an artifact after.
 			projectName: "orders-pipeline",
@@ -422,11 +422,11 @@ func v1Cases() []v1Case {
 			// carried. The case below is the one that earns the note.
 		},
 		{
-			// A v1 repository that also keeps a pyproject.toml, holding only
-			// tool settings. Common in real v1 repositories, and not a v2
+			// A 1.x repository that also keeps a pyproject.toml, holding only
+			// tool settings. Common in real 1.x repositories, and not a v2
 			// project: the conversion adopts the file, carries the v1 lists into
 			// it, and leaves the tool tables as they were.
-			name: "a v1 repository whose pyproject.toml only configures tools",
+			name: "a 1.x repository whose pyproject.toml only configures tools",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: orders-pipeline\n",
 				"Dockerfile":         runtime3,
@@ -443,10 +443,10 @@ func v1Cases() []v1Case {
 		},
 		{
 			// The same file after `astro deploy --save`. The saved target is
-			// the one thing here a v2 project wants, so the note states the
+			// the one thing here a project wants, so the note states the
 			// whole manifest entry for it, table name included, rather than
 			// pointing at the section it belongs in.
-			name: "a v1 project with a saved deploy target",
+			name: "a 1.x project with a saved deploy target",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
 					"  deployment: cm1orders\n  workspace: cm1ws\n",
@@ -464,7 +464,7 @@ func v1Cases() []v1Case {
 			// Both ids in their Astro shape: the saved target is carried as a
 			// link, the way `astro link add` writes one, so it is an advisory
 			// and not a note.
-			name: "a v1 project whose saved deploy target can be linked",
+			name: "a 1.x project whose saved deploy target can be linked",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
 					"  deployment: cm1ordersdeployment000001\n  workspace: cm1ordersworkspace0000001\n",

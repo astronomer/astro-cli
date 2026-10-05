@@ -1,4 +1,4 @@
-// Package containercfg is the v2 tree's one read of the container.binary
+// Package containercfg is the core tree's one read of the container.binary
 // setting, so cmd/local can hand it to pkg/localrt and internal/pack as a seam
 // without importing config/ itself. Binary is the CLI's half of
 // localrt.Config.ContainerBinary; Astro Desktop fills the same field from its
@@ -11,8 +11,8 @@ import (
 )
 
 // Binary returns container.binary for the project at projectPath: the
-// project's .astro/config.yaml when it sets one (a v1 project; a v2 project
-// has no such file), the global config otherwise. "" means unset, which
+// project's .astro/config.yaml when it sets one (a 1.x project; a project
+// with a pyproject.toml has no such file), the global config otherwise. "" means unset, which
 // pkg/container takes as auto-detect. An empty projectPath asks for the global
 // value.
 func Binary(projectPath string) string {

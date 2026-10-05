@@ -19,7 +19,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// v2ProjectDir builds a throwaway v2 project with a dags/ directory holding one
+// v2ProjectDir builds a throwaway project with a dags/ directory holding one
 // DAG file, and returns its root.
 func v2ProjectDir(t *testing.T) string {
 	t.Helper()
@@ -84,7 +84,7 @@ func TestDeployDagsV2_Success(t *testing.T) {
 	res, err := DeployDagsV2(DagDeployV2Input{
 		ProjectDir:   v2ProjectDir(t),
 		DeploymentID: "test-deployment-id",
-		Description:  "a v2 dags deploy",
+		Description:  "a manifest dags deploy",
 	}, client)
 	require.NoError(t, err)
 

@@ -11,8 +11,8 @@
 // nothing here is generated. Both modes are supported; neither is a ramp off
 // the other.
 //
-// It was lifted out of internal/localdocker so the v2 deploy path can build the
-// same image the local Docker engine builds (docs/v2-deploy.md,
+// It was lifted out of internal/localdocker so the manifest deploy path can build the
+// same image the local Docker engine builds (docs/deploy.md,
 // section 1). Its inputs are manifest-shaped — Python dependencies, OS packages,
 // a runtime base image, a tag — so it depends on neither localdocker nor a
 // deploy package; each caller resolves the manifest to a Request and hands it
@@ -20,7 +20,7 @@
 // Airflow version to that base and lives here now that both the local Docker
 // engine and deploy resolve it the same way.
 //
-// Per the layer rules (docs/v2-architecture.md) it prints nothing and never
+// Per the layer rules (docs/architecture.md) it prints nothing and never
 // exits: build output flows through rt.Callbacks and a failed install
 // returns a named error.
 package imagebuild
@@ -459,7 +459,7 @@ func isAstroBase(ref string) bool {
 }
 
 // The registries an Astro Runtime base comes from. Spelled here rather than
-// imported from airflow/: that is the v1 tree, and pkg/* does not depend on it.
+// imported from airflow/: that is shell code, and pkg/* does not depend on it.
 const (
 	astroRegistryHost  = "astrocrpublic.azurecr.io"
 	quayAstronomerRepo = "quay.io/astronomer"

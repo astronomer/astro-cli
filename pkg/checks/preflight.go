@@ -188,7 +188,7 @@ func (r *TargetReport) ExitCode(strict bool) int {
 // reports each target and still picks a single exit code. progress receives
 // human notes for the text renderer to stream.
 //
-//nolint:gocritic // hugeParam: PreflightInput is a contract struct, passed by value like the v2 ones (docs/v2-architecture.md).
+//nolint:gocritic // hugeParam: PreflightInput is a contract struct, passed by value like the v2 ones (docs/architecture.md).
 func Preflight(ctx context.Context, target string, in PreflightInput, prov Provisioner, parser TargetParser, strict bool, progress func(string)) TargetReport {
 	// A consumer with nowhere to stream notes passes nil, and this function
 	// promises never to return an error — so it must not panic on one either.

@@ -148,7 +148,7 @@ func EnsureRunning(port string) (string, error) {
 		default:
 			// Version mismatch — restart the daemon
 			logger.Debugf("proxy daemon version %q doesn't match CLI version %q, restarting", ver, version.CurrVersion)
-			StopDaemon() //nolint:errcheck // error deliberately ignored in this v1 path
+			StopDaemon() //nolint:errcheck // error deliberately ignored in this shell code
 		}
 	}
 
@@ -225,7 +225,7 @@ func probeProxy(port, host string) (resp *http.Response, body []byte, ok bool) {
 // CLI's proxy daemon, which re-execs itself with ServeSubcommand. It's the
 // fallback for daemons that didn't record a port (older CLIs).
 var processLooksLikeProxy = func(pid int) bool {
-	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output() //nolint:gosec // reviewed; not a new risk in this v1 code
+	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output() //nolint:gosec // reviewed; not a new risk in this shell code
 	if err != nil {
 		return false
 	}
@@ -274,19 +274,19 @@ var StartDaemon = func(port string) (string, error) {
 
 	bound, err := waitForPortFile()
 	if err != nil {
-		syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this v1 path
-		cmd.Process.Release()              //nolint:errcheck // error deliberately ignored in this v1 path
+		syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this shell code
+		cmd.Process.Release()              //nolint:errcheck // error deliberately ignored in this shell code
 		return "", fmt.Errorf("proxy daemon did not start: %w (see %s)", err, logFilePath())
 	}
 
 	if err := writePIDFile(pid, bound); err != nil {
-		syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
-		cmd.Process.Release()              //nolint:errcheck // error deliberately ignored in this v1 path
+		syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this shell code
+		cmd.Process.Release()              //nolint:errcheck // error deliberately ignored in this shell code
 		return "", fmt.Errorf("error writing proxy PID file: %w", err)
 	}
 
 	// Release the process so it doesn't become a zombie
-	cmd.Process.Release() //nolint:errcheck // error deliberately ignored in this v1 path
+	cmd.Process.Release() //nolint:errcheck // error deliberately ignored in this shell code
 
 	logger.Debugf("proxy daemon started (PID %d) on port %s", pid, bound)
 	return bound, nil
@@ -362,7 +362,7 @@ func StopDaemon() error {
 	}
 
 	logger.Debugf("stopping proxy daemon (PID %d)", pid)
-	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
+	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this shell code
 	waitForExit(pid)
 	removeDaemonFiles()
 	return nil
@@ -379,7 +379,7 @@ func waitForExit(pid int) {
 			return
 		}
 	}
-	syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this v1 path
+	syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // error deliberately ignored in this shell code
 	time.Sleep(stopPollWait)
 }
 
@@ -475,6 +475,6 @@ func claimDaemonForStop() (int, bool) {
 	// race: a start holding this lock next finds nothing to adopt and brings
 	// up a daemon of its own.
 	removeDaemonFiles()
-	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this v1 path
+	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // error deliberately ignored in this shell code
 	return pid, true
 }

@@ -259,7 +259,7 @@ func quitOnInterrupt() (stop func()) {
 func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLink, signup, force bool) (Result, error) {
 	// Generate PKCE verifier and challenge
 	token := make([]byte, 32)                            //nolint:mnd // the value is clear from context
-	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // reviewed; not a new risk in this v1 code
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // reviewed; not a new risk in this shell code
 	r.Read(token)
 	verifier := util.Base64URLEncode(token)
 	hash32 := sha256.Sum256([]byte(verifier)) // Sum256 returns a [32]byte
@@ -752,7 +752,7 @@ func completeLogin(domain string, authConfig Config, res Result, astroV1Client a
 // Logout logs a user out of the docker registry. Will need to logout of Astro next.
 func Logout(domain string, out io.Writer) {
 	domain = domainutil.FormatDomain(domain)
-	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this v1 path
+	c, _ := context.GetContext(domain) //nolint:errcheck // falls back to the zero context in this shell code
 
 	err := c.SignOut()
 	if err != nil {

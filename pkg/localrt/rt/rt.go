@@ -181,7 +181,7 @@ const (
 // — it must not require in-memory state from the process that started it.
 // Proxy routes are derived from it (Route.ProjectDir = ProjectPath,
 // Route.Port = itoa(Port)); routes.json itself stays a compatibility view.
-// The json tags keep this in step with the rest of the v2 surface: lowercase
+// The json tags keep this in step with the rest of the core surface: lowercase
 // keys, and the fields a stopped Airflow zeroes (pid, port, startedAt) drop out
 // rather than reporting a false 0 or a zero-value timestamp.
 type Status struct {

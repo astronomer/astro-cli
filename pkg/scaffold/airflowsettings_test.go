@@ -48,7 +48,7 @@ func (w *recordingWriter) HasSecret(_ secrets.Kind, name string) (bool, error) {
 	return ok, w.hasErr
 }
 
-// v1WithSettings is a v1 project carrying an airflow_settings.yaml.
+// v1WithSettings is a 1.x project carrying an airflow_settings.yaml.
 func v1WithSettings(t *testing.T, settings string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -101,7 +101,7 @@ func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
 	require.NotContains(t, string(manifest), "optional")
 
 	// The Variable's value is in the vault too, and the manifest declares it
-	// secret with no default. v1 projects kept this file out of version
+	// secret with no default. 1.x projects kept this file out of version
 	// control, so a default here would commit a token that never was.
 	require.Equal(t, secrets.KindVar, writer.kinds["batch_size"])
 	require.Equal(t, "50", writer.stored["batch_size"])
@@ -757,7 +757,7 @@ func TestAURIConnectionIsDeclaredAsItsScheme(t *testing.T) {
 }
 
 // v1StockSettings is the airflow_settings.yaml v1's `astro dev init` wrote,
-// byte for byte. The v1 project template kept it out of git, so most v1
+// byte for byte. The 1.x project template kept it out of git, so most v1
 // checkouts still hold it untouched.
 const v1StockSettings = `# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
 # NOTE: json dicts can be added to the conn_extra field as yaml key value pairs. See the example below.

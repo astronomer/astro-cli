@@ -227,7 +227,7 @@ func DockerComposeInit(airflowHome, envFile, dockerfile, imageName string) (*Doc
 
 // proxyDiscriminator is what AddRoute folds into this project's hostname
 // when another project already holds it: the leading characters of the
-// project's path hash, the same identity the v2 tree keys on, so the two
+// project's path hash, the same identity the core tree keys on, so the two
 // agree about which project a qualified name belongs to.
 //
 // Empty when the path has no id, which AddRoute reads as "no way to tell
@@ -439,7 +439,7 @@ func (d *DockerCompose) Start(opts *airflowTypes.StartOptions) error {
 		}
 		route := pkgproxy.Route{
 			Hostname: proxyHostname,
-			// So a v1 project whose directory shares a base name with
+			// So a 1.x project whose directory shares a base name with
 			// another project gets a name of its own rather than none at
 			// all. AddRoute folds this in only when the plain name is
 			// already taken.
@@ -558,7 +558,7 @@ func (d *DockerCompose) Stop(waitForExit bool) error {
 			logger.Debug("timed out waiting for postgres container to be in exited state")
 			return nil
 		case <-ticker.C:
-			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{ //nolint:errcheck // error deliberately ignored in this v1 path
+			psInfo, _ := d.composeService.Ps(context.Background(), d.projectName, api.PsOptions{ //nolint:errcheck // error deliberately ignored in this shell code
 				All: true,
 			})
 			for i := range psInfo {
@@ -694,7 +694,7 @@ func (d *DockerCompose) Run(args []string, user string) error {
 		return errors.New("exec ID is empty")
 	}
 
-	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, container.ExecStartOptions{}) //nolint:errcheck // error deliberately ignored in this v1 path
+	resp, _ := d.cliClient.ContainerExecAttach(context.Background(), execID, container.ExecStartOptions{}) //nolint:errcheck // error deliberately ignored in this shell code
 
 	if err := docker.ExecPipe(resp, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		return err
@@ -1826,7 +1826,7 @@ func fetchAirflowJWTToken(baseURL string) (string, error) {
 		"password": "admin",
 	})
 
-	resp, err := http.Post(tokenURL, "application/json", bytes.NewReader(reqBody)) //nolint:gosec // reviewed; not a new risk in this v1 code
+	resp, err := http.Post(tokenURL, "application/json", bytes.NewReader(reqBody)) //nolint:gosec // reviewed; not a new risk in this shell code
 	if err != nil {
 		return "", fmt.Errorf("error fetching token: %w", err)
 	}

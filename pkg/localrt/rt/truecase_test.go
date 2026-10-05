@@ -2,7 +2,7 @@ package rt
 
 // Plain stdlib testing, like its neighbors: pkg/localrt is a shared
 // sub-module and keeps its dependency list near-empty
-// (docs/v2-architecture.md), and mixing styles inside one package is the
+// (docs/architecture.md), and mixing styles inside one package is the
 // thing that rule exists to stop.
 
 import (

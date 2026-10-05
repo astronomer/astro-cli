@@ -44,7 +44,7 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
 		Short:             "Manage CLI settings for this machine",
-		Long:              "Manage CLI settings, stored globally with -g or in a v1 project's .astro/config.yaml. Run `astro config list` to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
+		Long:              "Manage CLI settings, stored globally with -g or in a 1.x project's .astro/config.yaml. Run `astro config list` to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
 		PersistentPreRunE: ensureGlobalFlag,
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
@@ -83,7 +83,7 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List CLI settings",
-		Long:  "List every CLI setting with its value and where the value comes from: project (a v1 project's .astro/config.yaml), global, or default. With -g, list the global values only",
+		Long:  "List every CLI setting with its value and where the value comes from: project (a 1.x project's .astro/config.yaml), global, or default. With -g, list the global values only",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return configList(out)
@@ -113,7 +113,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	}
 	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " -g"
 	cmd.SilenceUsage = true
-	if project.IsV2(config.WorkingPath) {
+	if project.HasManifest(config.WorkingPath) {
 		return fmt.Errorf(configUseInV2ProjectMsg, args[0], cmd.Name(), c)
 	}
 	return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)

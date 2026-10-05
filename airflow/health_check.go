@@ -38,7 +38,7 @@ var checkWebserverHealth = func(url string, timeout time.Duration, component str
 		// This fires on every tick of our timer to run the healthcheck.
 		// We return successfully from this function when we get a 200 status code.
 		case <-ticker.C:
-			statusCode, _ := healthCheck(ctx, client, url) //nolint:errcheck // error deliberately ignored in this v1 path
+			statusCode, _ := healthCheck(ctx, client, url) //nolint:errcheck // error deliberately ignored in this shell code
 			if statusCode == http.StatusOK {
 				return nil
 			}

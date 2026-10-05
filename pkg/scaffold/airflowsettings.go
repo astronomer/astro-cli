@@ -22,7 +22,7 @@ import (
 // SettingsRelPath is the v1 file this transform reads.
 const SettingsRelPath = "airflow_settings.yaml"
 
-// A v1 project declares its Airflow connections, Variables and pools in
+// A 1.x project declares its Airflow connections, Variables and pools in
 // airflow_settings.yaml, in cleartext, in a file v1 kept out of version control.
 // v2 splits that content by what it is rather than where it came from.
 //

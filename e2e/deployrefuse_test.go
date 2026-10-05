@@ -8,16 +8,16 @@ import (
 	"testing"
 )
 
-// `astro deploy` in a v2 project refuses the flags it would otherwise drop.
+// `astro deploy` in a project refuses the flags it would otherwise drop.
 //
-// The v1 deploy accepted these and did something with them; the v2 path does
+// The 1.x deploy accepted these and did something with them; the manifest path does
 // not, and the failure worth preventing is the silent one — a CI job passing
 // --pytest, watching the deploy succeed, and believing tests ran. Each refusal
 // therefore names the flag and says what to do instead, and the text is the
 // feature here rather than the exit code.
 //
 // Tier 0: nothing on this path is contacted. One scaffold serves every case,
-// because refuseFlagsV2DeployIgnores runs before the manifest is read and
+// because refuseFlagsManifestDeployIgnores runs before the manifest is read and
 // mutates nothing — each subtest takes a view bound to its own T so a failure
 // stays in its own case.
 func TestDeployRefusesTheFlagsAV2ProjectIgnores(t *testing.T) {
@@ -39,8 +39,8 @@ func TestDeployRefusesTheFlagsAV2ProjectIgnores(t *testing.T) {
 		{[]string{"--dags-path", "somewhere"}, "deploy from the project directory"},
 		{[]string{"--dag-bundle-name", "bundle"}, "named DAG bundles are not supported"},
 		{[]string{"--test", "tests/"}, "run your tests before deploying"},
-		{[]string{"--env", ".env.test"}, "a v2 deploy runs no tests"},
-		{[]string{"--save"}, "a v2 deploy always asks"},
+		{[]string{"--env", ".env.test"}, "this deploy runs no tests"},
+		{[]string{"--save"}, "this deploy always asks"},
 		{[]string{"--deployment-name", "prod"}, "name the target with --deployment"},
 	} {
 		flag := strings.TrimPrefix(tc.args[0], "--")
@@ -59,14 +59,14 @@ func TestDeployRefusesTheFlagsAV2ProjectIgnores(t *testing.T) {
 			if !strings.Contains(r.Stderr, tc.says) {
 				t.Errorf("the refusal should say what to do instead (%q)\n%s", tc.says, r.output())
 			}
-			if !strings.Contains(r.Stderr, "v2 project") {
-				t.Errorf("the refusal should say a v2 project is why\n%s", r.output())
+			if !strings.Contains(r.Stderr, "a project with a pyproject.toml") {
+				t.Errorf("the refusal should say the pyproject.toml is why\n%s", r.output())
 			}
 		})
 	}
 
 	// And in json mode the refusal is an object, like every other failure on
-	// this path. It was not: refuseFlagsV2DeployIgnores ran before the format
+	// this path. It was not: refuseFlagsManifestDeployIgnores ran before the format
 	// was parsed, so `--output json` exited 1 with an empty stdout while the
 	// build-secret refusal below published {"error":...}. A script reading
 	// stdout to learn what went wrong got nothing — the same silence these
@@ -172,7 +172,7 @@ func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 }
 
 // v2ProjectForDeploy is a scaffolded project, which is all `astro deploy`
-// needs to take the v2 path: project.IsV2 looks for a pyproject.toml carrying
+// needs to take the manifest path: project.HasManifest looks for a pyproject.toml carrying
 // [tool.astro].
 func v2ProjectForDeploy(t *testing.T) *project {
 	t.Helper()

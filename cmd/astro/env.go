@@ -65,8 +65,8 @@ func parseOutput(s string, supported []env.Format) (env.Format, error) {
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
 // are uniform across types.
 func addScopePersistentFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace in a v2 project, else the current one)")
-	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name in a v2 project")
+	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
+	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
 	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Show secret values (org policy must allow it)")
 	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 }
@@ -165,8 +165,8 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	//
 	// --include-secrets is deliberately absent: it asks the platform to unmask
 	// values, and this listing has no column to put one in.
-	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace in a v2 project, else the current one)")
-	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name in a v2 project")
+	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
+	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
 	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 	return cmd
 }

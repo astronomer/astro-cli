@@ -6,7 +6,7 @@ import (
 )
 
 // Cause is why a value declared `source = "workspace"` is missing after a start
-// read the workspace: the causes docs/v2-workspace-link.md lists.
+// read the workspace: the causes docs/workspace-link.md lists.
 //
 // The Astro CLI and Astro Desktop both report them, so the text lives here, in
 // the reader both already share, and a workspace that cannot be read reads the

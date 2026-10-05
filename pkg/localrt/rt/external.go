@@ -7,7 +7,7 @@ import "time"
 // is reporting it so the rest of the toolchain can see it.
 //
 // It exists because the runtime record is the interop contract — "tools
-// coordinate through disk, not through each other" (docs/v2-architecture.md) —
+// coordinate through disk, not through each other" (docs/architecture.md) —
 // and until now only an engine inside pkg/localrt could write one. Astro Desktop
 // supervises standalone Airflow itself, with its own process supervisor, restart
 // policy and idle-cool timer, so it had no way to publish a record at all. Two

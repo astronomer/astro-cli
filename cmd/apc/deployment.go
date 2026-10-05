@@ -481,7 +481,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	if clusterID != "" {
-		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws}) //nolint:errcheck // error deliberately ignored in this v1 path
+		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws}) //nolint:errcheck // error deliberately ignored in this shell code
 	}
 
 	// Silence Usage as we have now validated command input

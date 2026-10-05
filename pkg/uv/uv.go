@@ -1,7 +1,7 @@
 // Package uv drives the uv package manager (https://docs.astral.sh/uv/) for
 // astro projects: creating the project venv, locking, syncing, and running
 // commands inside the environment. It is a shared sub-module, so the rules
-// from docs/v2-architecture.md apply: no printing, no exiting, stdlib only.
+// from docs/architecture.md apply: no printing, no exiting, stdlib only.
 //
 // uv operates on the project directory and reads pyproject.toml itself; this
 // package never parses the manifest (that is pkg/manifest, one layer up) —

@@ -11,15 +11,15 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// v1DashDExceptions are the v1 flags that spell -d as something other than a
+// v1DashDExceptions are the shell flags that spell -d as something other than a
 // deployment. They are grandfathered, not endorsed: an earlier fix settled -d for
-// --deployment across the v2 tree, harmonizing with v1's own --deployment-id,
+// --deployment across the core tree, harmonizing with the shell's own --deployment-id,
 // and every one of these predates that. Nothing may be added — a new flag
 // wanting -d for something else is the collision this test exists to catch,
 // and an entry that goes away is a line to delete.
 //
 // The exemption is by flag name, not by command, which is the known weakness:
-// a new `--description` taking -d anywhere in the v1 tree inherits this pass
+// a new `--description` taking -d anywhere in the shell tree inherits this pass
 // without anyone deciding it should. Keying on command path instead would mean
 // listing every one of the dozen-odd places `--description` already appears,
 // and re-listing them whenever one moves. Named here so the next person to
@@ -32,14 +32,14 @@ var v1DashDExceptions = map[string]bool{
 }
 
 // TestDashDMeansDeploymentOutsideTheAllowlist guards the seam the per-tree test
-// cannot see: cmd/local enforces one meaning per shorthand inside the v2 tree,
-// but that tree mounts on the v1 root, where older commands spell -d several
-// other ways. an earlier fix settled -d for the deployment selector, matching v1's
+// cannot see: cmd/local enforces one meaning per shorthand inside the core tree,
+// but that tree mounts on the shell root, where older commands spell -d several
+// other ways. an earlier fix settled -d for the deployment selector, matching the shell's
 // own --deployment-id, so every new -d has to be one of those two; the
 // survivors are grandfathered by name above.
 //
 // This checks -d alone rather than every letter. The two trees disagree about
-// plenty of shorthands (-r, -c, -f, -t all mean one thing in v1 and another in
+// plenty of shorthands (-r, -c, -f, -t all mean one thing in the shell and another in
 // the query surface), and reconciling those is its own decision with its own
 // compatibility cost — not something to smuggle in under a test.
 func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
@@ -54,7 +54,7 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 		})
 	}
 	if v2["d"] != "deployment" {
-		t.Fatalf("-d in the v2 tree is --%s, want --deployment", v2["d"])
+		t.Fatalf("-d in the core tree is --%s, want --deployment", v2["d"])
 	}
 
 	for platform, root := range rootsUnderTest(t) {

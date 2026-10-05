@@ -1,7 +1,7 @@
 package airflowapi
 
 // Plain stdlib testing on purpose: pkg/airflowapi is a shared sub-module and
-// keeps its dependency list near-empty (docs/v2-architecture.md), so no
+// keeps its dependency list near-empty (docs/architecture.md), so no
 // testify here. httptest stands in for both Airflow generations.
 
 import (

@@ -11,7 +11,7 @@ import _ "embed"
 // It imports only airflow.sdk and the standard library, and that is a
 // requirement rather than a coincidence. Under v1 a project's dependencies came
 // from a fat runtime image, so the example could `import requests` and call an
-// API. A v2 project installs exactly what [project.dependencies] names, which
+// API. A project installs exactly what [project.dependencies] names, which
 // this scaffold writes as apache-airflow alone — so an example carrying a
 // third-party import would fail to load on the first `astro local start`, which
 // is a worse first run than no example at all.

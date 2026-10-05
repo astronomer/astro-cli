@@ -97,7 +97,7 @@ func (s *CmdSuite) TestConfigInV1ProjectWithPyprojectKeepsProjectScope() {
 }
 
 // initConfigFiles loads config from an in-memory home config and, when
-// project is not empty, a v1 project config in a fresh working directory.
+// project is not empty, a 1.x project config in a fresh working directory.
 func (s *CmdSuite) initConfigFiles(home, project string) {
 	fs := afero.NewMemMapFs()
 	projectDir := filepath.Join(s.T().TempDir(), "proj")

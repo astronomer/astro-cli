@@ -29,7 +29,7 @@ var (
 	// ConfigFileType is the config file extension
 	ConfigFileType = "yaml"
 	// WorkingPath is the path to the working directory
-	WorkingPath, _ = fileutil.GetWorkingDir() //nolint:errcheck // error deliberately ignored in this v1 path
+	WorkingPath, _ = fileutil.GetWorkingDir() //nolint:errcheck // error deliberately ignored in this shell code
 
 	// viperSettings is the viper object in a project directory
 	viperSettings *viper.Viper
@@ -146,7 +146,7 @@ func airflowAPIRequest(method, requestURL, authHeader string, body []byte) (resp
 		return nil, 0, fmt.Errorf("error making request to %s: %w", requestURL, err)
 	}
 	defer resp.Body.Close()
-	respBody, _ = io.ReadAll(resp.Body) //nolint:errcheck // error deliberately ignored in this v1 path
+	respBody, _ = io.ReadAll(resp.Body) //nolint:errcheck // error deliberately ignored in this shell code
 	return respBody, resp.StatusCode, nil
 }
 

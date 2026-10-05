@@ -15,7 +15,7 @@ import (
 )
 
 // Renderer.Emit (cmd/cliout) is documented as "the single output path for
-// every v2 command", and until recently it was not: four payloads went around it with
+// every core command", and until recently it was not: four payloads went around it with
 // their own encoder, and a payload that goes around Emit is one nothing can
 // observe.
 //

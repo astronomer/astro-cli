@@ -2,7 +2,7 @@ package airflow
 
 import (
 	"bytes"
-	"crypto/md5" //nolint:gosec // reviewed; not a new risk in this v1 code
+	"crypto/md5" //nolint:gosec // reviewed; not a new risk in this shell code
 	"fmt"
 	"html/template"
 	"io"

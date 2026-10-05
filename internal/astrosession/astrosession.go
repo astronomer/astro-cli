@@ -1,7 +1,7 @@
-// Package astrosession reads the Astro login for the v2 tree: the bearer an
+// Package astrosession reads the Astro login for the core tree: the bearer an
 // `astro` instance proves itself with. It exists as its own package for one
-// reason — it touches config/, which every other v2 package is barred from
-// (docs/v2-architecture.md) — so the read stays in one place and the packages
+// reason — it touches config/, which every other core package is barred from
+// (docs/architecture.md) — so the read stays in one place and the packages
 // that need a token take it as a seam. internal/emenv reads the same logins
 // through it.
 //
@@ -26,13 +26,13 @@ import (
 
 // EnvAPIToken is the Astro API token CI supplies instead of a login on the
 // machine. It is read here rather than only by the caller that wants a bearer,
-// so "is there an identity" has one answer across the v2 tree.
+// so "is there an identity" has one answer across the core tree.
 const EnvAPIToken = "ASTRO_API_TOKEN" //nolint:gosec // the name of a variable, not a credential
 
 // The two ways a session can be unusable. Both name both ways back, because a
 // machine with no login has two.
 //
-// ErrLoggedOut is exported so every v2 reader of the session says the same
+// ErrLoggedOut is exported so every core reader of the session says the same
 // sentence: a machine with no login should not get one answer from the
 // credential path and a different one from the coordinate lookup.
 var (
@@ -45,7 +45,7 @@ var (
 var ErrSessionExpired = errors.New("session expired")
 
 // NotLoggedInTo is the outage for a domain with no stored login, worded as
-// docs/v2-workspace-link.md words it, so a workspace read and a deployment link
+// docs/workspace-link.md words it, so a workspace read and a deployment link
 // fail with the same sentence. The words are pkg/emfetch's, which Astro Desktop
 // reports too.
 func NotLoggedInTo(domain string) error {
@@ -77,7 +77,7 @@ func Rejected(domain string) error {
 // it the same way) — so "is anyone logged in" is a question about what follows
 // the scheme, not about whether the field is set.
 //
-// It is exported so every v2 reader of the session answers that question the
+// It is exported so every core reader of the session answers that question the
 // same way: `astro local start` deciding whether to consult Environment Manager
 // and a query command deciding whether it has a bearer must not disagree.
 func Credential(stored string) string {

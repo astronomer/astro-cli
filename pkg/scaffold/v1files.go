@@ -114,11 +114,11 @@ type v1Instance struct {
 }
 
 // v1Config is the three fields of .astro/config.yaml this reads. The rest of
-// the file is v1 CLI configuration that a v2 project does not carry.
+// the file is v1 CLI configuration that a project does not carry.
 //
 // Deployment is `project.deployment`, and reading it is what keeps the note
 // about it honest. The note used to fire on the file merely existing, which is
-// every v1 project, since `astro dev init` wrote it, while the key it spoke
+// every 1.x project, since `astro dev init` wrote it, while the key it spoke
 // about is set only by `astro deploy --save`, whose flag defaults to false. So
 // a conversion was routinely told to move a Deployment the file did not name.
 //
@@ -153,11 +153,11 @@ func yamlString(v any) string {
 	return strings.TrimSpace(s)
 }
 
-// v1ConfigRelPath is where a v1 project states its own name.
+// v1ConfigRelPath is where a 1.x project states its own name.
 const v1ConfigRelPath = ".astro/config.yaml"
 
 // readV1Project reads whatever v1 files dir has. A missing file is not an
-// error: most of these are optional even in a v1 project.
+// error: most of these are optional even in a 1.x project.
 //
 // A file that exists and cannot be READ is an error, though. Silently treating
 // an unreadable requirements.txt as an empty one would convert the project to a
@@ -185,7 +185,7 @@ func readV1Project(dir string) (*v1Project, error) {
 	}
 
 	// The project's own name, which is the one thing in .astro/config.yaml a
-	// v2 project keeps, and the Deployment id that decides whether this file
+	// project keeps, and the Deployment id that decides whether this file
 	// gets a note at all. Not added to present: the file holds v1 CLI
 	// configuration this conversion neither reads nor replaces, so it is not a
 	// candidate for retirement, and recording it there would offer it for

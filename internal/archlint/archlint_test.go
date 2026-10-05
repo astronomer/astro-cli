@@ -1,10 +1,15 @@
-// Package archlint enforces the v2 layer rules from docs/v2-architecture.md
-// as a plain go test, so `go test ./...` and CI catch violations without
-// extra tooling:
+// Package archlint enforces the layer rules from docs/architecture.md as a
+// plain go test, so `go test ./...` and CI catch violations without extra
+// tooling.
+//
+// The rules divide the tree in two, after "functional core, imperative
+// shell". Core packages return data and typed errors and leave the I/O to
+// their caller. Shell packages do the I/O themselves: they print, prompt and
+// read config/, and are mostly code inherited from Astro CLI 1.x. The rules:
 //
 //  1. Nothing under internal/ imports cmd/.
-//  2. v2 packages below cmd/ never print, exit, or log fatally.
-//  3. v2 packages never import config/ (or the v1 cmd tree).
+//  2. Core packages below cmd/ never print, exit, or log fatally.
+//  3. Core packages never import config/ (or the shell cmd tree).
 //  4. Only the named seams import internal/platform/.
 //
 // Closed value sets (localrt.Mode, localrt.State, ...) are covered by the
@@ -28,10 +33,10 @@ import (
 
 const modulePrefix = "github.com/astronomer/astro-cli/"
 
-// v2BelowCmd lists v2 packages below the cmd/ layer, where printing and
-// exiting are review-blocking. Extend as v2 packages land (internal/plan,
-// ...).
-var v2BelowCmd = []string{
+// coreBelowCmd lists the core packages below the cmd/ layer, where printing
+// and exiting are review-blocking. Extend as core packages land
+// (internal/plan, ...).
+var coreBelowCmd = []string{
 	"internal/apirequest",
 	"internal/deploy",
 	"internal/envresolve",
@@ -69,41 +74,43 @@ var v2BelowCmd = []string{
 	"pkg/airflowrt",
 }
 
-// v2ConfigReaders lists the v2 packages that read config/ on purpose. Each
+// coreConfigReaders lists the core packages that read config/ on purpose. Each
 // exists so exactly one place in the tree touches it — the login session, the
 // Environment Manager provider, the coordinate lookups — and the packages that
 // need what they read take them as a seam instead. They are below cmd/, so the
 // no-printing rule applies; the no-config rule cannot.
-var v2ConfigReaders = []string{
+var coreConfigReaders = []string{
 	"internal/astrosession",
 	"internal/containercfg",
 	"internal/emenv",
 	"internal/instancelocate",
 }
 
-// v1Internal lists the packages under internal/ that predate v2 and are held
-// to none of its rules. It exists so the check below can tell "this package is
-// v1" from "somebody added a v2 package and forgot to register it".
-var v1Internal = []string{
+// shellInternal lists the shell packages under internal/: they predate the
+// core and are held to none of its rules. It exists so the check below can
+// tell "this package is shell" from "somebody added a core package and forgot
+// to register it".
+var shellInternal = []string{
 	"internal/archlint",
 	"internal/otto",
 	"internal/telemetry",
-	// Both control-plane platforms: v1 code that prints and reads config/,
+	// Both control-plane platforms: shell code that prints and reads config/,
 	// moved under internal/ without being rewritten. The subtree form says
-	// "every package here is v1" in one line; a v2 package added under
+	// "every package here is shell" in one line; a core package added under
 	// internal/platform (local, when it lands) has to name itself.
 	"internal/platform/apc/...",
 	"internal/platform/astro/...",
 }
 
-// v2All lists every v2 package barred from importing config/ or the v1 cmd
-// tree.
-var v2All = append(v2Cmd, v2BelowCmd...)
+// corePackages lists every core package barred from importing config/ or the
+// shell cmd tree.
+var corePackages = append(coreCmd, coreBelowCmd...)
 
-// v2Cmd lists the v2 packages in the cmd/ layer. They may import each other,
-// and nothing else under cmd/. cmd/cliout is the output contract the whole
-// CLI shares; it is v2 code that the v1 tree imports, never the reverse.
-var v2Cmd = []string{
+// coreCmd lists the core packages in the cmd/ layer. They may import each
+// other, and nothing else under cmd/. cmd/cliout is the output contract the
+// whole CLI shares; it is core code that the shell tree imports, never the
+// reverse.
+var coreCmd = []string{
 	"cmd/cliout",
 	"cmd/local",
 }
@@ -111,7 +118,7 @@ var v2Cmd = []string{
 // platformSeams are the packages under internal/ allowed to import
 // internal/platform/. Each exists to be the one place in the tree that reaches
 // a platform, so the packages needing what it fetches take it as a seam
-// instead — the same posture as v2ConfigReaders above, and for the same reason.
+// instead — the same posture as coreConfigReaders above, and for the same reason.
 // instancelocate's own doc comment says so in as many words.
 //
 // A package earns a place here by being that door for something, not by
@@ -125,7 +132,7 @@ var platformSeams = []string{
 // TestOnlyTheSeamsReachIntoAPlatform is the rule the internal/platform layout
 // exists for: logic that is not about one platform takes an interface, and
 // cmd/ wires the implementation. Anything else is coupling that spreads
-// quietly, and unlike "is this package v1 or v2" it is decidable from the
+// quietly, and unlike "is this package core or shell" it is decidable from the
 // import path with no list to maintain.
 //
 // Test files are exempt on purpose. The rule is about the production
@@ -161,14 +168,14 @@ func TestOnlyTheSeamsReachIntoAPlatform(t *testing.T) {
 
 // TestEveryInternalPackageIsAccountedFor: the lists above are what the rules
 // are made of, and a rule nobody is on is not a rule. A new package under
-// internal/ has to say which it is — a v2 package, a v2 package that reads
-// config/ on purpose, or one of the v1 ones — so that forgetting is a failing
+// internal/ has to say which it is — a core package, a core package that reads
+// config/ on purpose, or one of the shell ones — so that forgetting is a failing
 // test rather than a package that quietly obeys nothing.
 func TestEveryInternalPackageIsAccountedFor(t *testing.T) {
 	root := repoRoot(t)
 	known := map[string]bool{}
 	var subtrees []string
-	for _, pkg := range slices.Concat(v2BelowCmd, v2ConfigReaders, v1Internal) {
+	for _, pkg := range slices.Concat(coreBelowCmd, coreConfigReaders, shellInternal) {
 		if prefix, ok := strings.CutSuffix(pkg, "/..."); ok {
 			subtrees = append(subtrees, prefix+"/")
 			continue
@@ -188,7 +195,7 @@ func TestEveryInternalPackageIsAccountedFor(t *testing.T) {
 	}
 	for _, pkg := range accountablePackages(t, root, "internal") {
 		if !covered(pkg) {
-			t.Errorf("%s is in none of v2BelowCmd, v2ConfigReaders, or v1Internal: add it to the one it belongs to (and to .golangci.yml's forbidigo path list if it is a v2 package)", pkg)
+			t.Errorf("%s is in none of coreBelowCmd, coreConfigReaders, or shellInternal: add it to the one it belongs to (and to .golangci.yml's forbidigo path list if it is a core package)", pkg)
 		}
 	}
 }
@@ -200,7 +207,7 @@ func TestEveryInternalPackageIsAccountedFor(t *testing.T) {
 // holding no .go files is a grouping directory (internal/platform), so the
 // packages under it are named individually. Without that, adding one grouping
 // directory to a list would exempt everything anyone ever puts inside it, and
-// internal/platform holds both v1 and v2 code on purpose.
+// internal/platform holds both shell and core code on purpose.
 func accountablePackages(t *testing.T, root, dir string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(filepath.Join(root, dir))
@@ -303,33 +310,33 @@ func TestInternalNeverImportsCmd(t *testing.T) {
 	})
 }
 
-func TestV2PackagesNeverImportConfigOrV1Cmd(t *testing.T) {
+func TestCorePackagesNeverImportConfigOrShellCmd(t *testing.T) {
 	root := repoRoot(t)
-	for _, pkg := range v2All {
+	for _, pkg := range corePackages {
 		goFiles(t, root, pkg, func(rel string) {
 			for _, imp := range imports(t, filepath.Join(root, rel)) {
 				if strings.HasPrefix(imp, modulePrefix+"config") {
-					t.Errorf("%s imports %s: v2 packages never import config/", rel, imp)
+					t.Errorf("%s imports %s: core packages never import config/", rel, imp)
 				}
-				// The v1 cmd package: everything directly under cmd/,
-				// plus its v1 subpackages. The v2 tree may import its
+				// The shell cmd package: everything directly under cmd/,
+				// plus its shell subpackages. The core tree may import its
 				// own packages.
 				//
 				// cmd/astro is not among them. A cmd/astro existed briefly
-				// as the v2 composition root and went when that root
-				// moved onto cmd/ proper; the name now holds the v1
+				// as the core's composition root and went when that
+				// root moved onto cmd/ proper; the name now holds the shell
 				// Astro command tree, which is exactly what this forbids.
-				if strings.HasPrefix(imp, modulePrefix+"cmd") && !importsV2Cmd(imp) {
-					t.Errorf("%s imports %s: v2 packages never import the v1 cmd tree", rel, imp)
+				if strings.HasPrefix(imp, modulePrefix+"cmd") && !importsCoreCmd(imp) {
+					t.Errorf("%s imports %s: core packages never import the shell cmd tree", rel, imp)
 				}
 			}
 		})
 	}
 }
 
-// importsV2Cmd reports whether imp is one of the v2 cmd packages, or below one.
-func importsV2Cmd(imp string) bool {
-	for _, pkg := range v2Cmd {
+// importsCoreCmd reports whether imp is one of the core cmd packages, or below one.
+func importsCoreCmd(imp string) bool {
+	for _, pkg := range coreCmd {
 		if imp == modulePrefix+pkg || strings.HasPrefix(imp, modulePrefix+pkg+"/") {
 			return true
 		}
@@ -443,7 +450,7 @@ func lintSubmodules(t *testing.T, root string) []string {
 		}
 	}
 	if line == "" {
-		t.Fatal("no LINT_SUBMODULES in the Makefile: this test reads it to know which modules are held to v2 lint standards")
+		t.Fatal("no LINT_SUBMODULES in the Makefile: this test reads it to know which modules are held to core lint standards")
 	}
 	mods := strings.Fields(line)
 	if len(mods) == 0 {
@@ -478,40 +485,40 @@ func TestEveryPkgSubmoduleIsLinted(t *testing.T) {
 		if !listed[mod] {
 			t.Errorf("%s is a module of its own and is not in LINT_SUBMODULES, so nothing lints it: "+
 				"a root golangci-lint run does not descend into a nested module. Add it to LINT_SUBMODULES "+
-				"in the Makefile, and to v2BelowCmd above", mod)
+				"in the Makefile, and to coreBelowCmd above", mod)
 		}
 	}
 }
 
-// Every module we lint to v2 standards is also held to the no-print rule.
+// Every module we lint to core standards is also held to the no-print rule.
 //
 // The gap this closes: accountablePackages walks `internal` only, so while this
-// package lived at internal/checks, deleting its v2BelowCmd entry failed
+// package lived at internal/checks, deleting its coreBelowCmd entry failed
 // TestEveryInternalPackageIsAccountedFor. Promoted to pkg/checks, deleting the
-// entry silently disabled TestV2PackagesBelowCmdNeverPrintOrExit for it and no
+// entry silently disabled TestCorePackagesBelowCmdNeverPrintOrExit for it and no
 // test objected — and forbidigo cannot backstop it, since .golangci.yml anchors
 // that rule at ^internal/.
 //
 // LINT_SUBMODULES is the right set to tie this to: it is exactly the list of
-// sub-modules we have decided to hold to v2 lint standards, so a module joining
+// sub-modules we have decided to hold to core lint standards, so a module joining
 // it and not the no-print rule is an oversight rather than a decision.
 //
 // Deliberately NOT "every pkg/ directory": many name no rule at all, most of
-// them v1 helpers that print by design (ansi, printutil, spinner). Classifying
-// those is worth doing and is its own change. Every v2 sub-module is already
+// them shell helpers that print by design (ansi, printutil, spinner). Classifying
+// those is worth doing and is its own change. Every core sub-module is already
 // here, because TestEveryPkgSubmoduleIsLinted puts it in LINT_SUBMODULES and
 // this test then requires it here.
 func TestEveryLintedSubmoduleIsHeldToTheNoPrintRule(t *testing.T) {
 	root := repoRoot(t)
-	registered := make(map[string]bool, len(v2BelowCmd))
-	for _, p := range v2BelowCmd {
+	registered := make(map[string]bool, len(coreBelowCmd))
+	for _, p := range coreBelowCmd {
 		registered[p] = true
 	}
 	for _, m := range lintSubmodules(t, root) {
 		if !registered[m] {
-			t.Errorf("%s is in LINT_SUBMODULES but not in v2BelowCmd, so nothing enforces that it does not print "+
+			t.Errorf("%s is in LINT_SUBMODULES but not in coreBelowCmd, so nothing enforces that it does not print "+
 				"or exit: a root golangci-lint run does not descend into a sub-module, and forbidigo is anchored "+
-				"at ^internal/. Add it to v2BelowCmd", m)
+				"at ^internal/. Add it to coreBelowCmd", m)
 		}
 	}
 }
@@ -540,9 +547,9 @@ var forbiddenCalls = map[string]map[string]bool{
 	"log": {"Fatal": true, "Fatalf": true, "Fatalln": true, "Panic": true, "Panicf": true, "Panicln": true},
 }
 
-func TestV2PackagesBelowCmdNeverPrintOrExit(t *testing.T) {
+func TestCorePackagesBelowCmdNeverPrintOrExit(t *testing.T) {
 	root := repoRoot(t)
-	for _, pkg := range slices.Concat(v2BelowCmd, v2ConfigReaders) {
+	for _, pkg := range slices.Concat(coreBelowCmd, coreConfigReaders) {
 		goFiles(t, root, pkg, func(rel string) {
 			if strings.HasSuffix(rel, "_test.go") {
 				return

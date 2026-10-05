@@ -49,7 +49,7 @@ var ErrNoSuchLink = errors.New("no such link")
 
 // ErrWorkspaceDomainRequired reports SetWorkspaceLink linking a workspace with
 // no domain. The domain picks the login the workspace is read with
-// (docs/v2-workspace-link.md), so a link without one cannot be written.
+// (docs/workspace-link.md), so a link without one cannot be written.
 var ErrWorkspaceDomainRequired = errors.New("linking a workspace needs the Astro domain it lives on")
 
 // Link is one deployment link as a caller describes it: the name it is keyed
@@ -317,7 +317,7 @@ func SetDefaultLink(dir string, wrap func(run func() error) error, name string) 
 // did: without that, a switch would read deployment clx1 in ws_A as clx1 in
 // ws_B, and an unlink would leave a link the parser refuses. The domain and the
 // organization do not reach a deployment link: those are looked up with the
-// current login, never [tool.astro] domain (docs/v2-workspace-link.md), so
+// current login, never [tool.astro] domain (docs/workspace-link.md), so
 // changing or removing either does not move a pinned link. Linking the
 // workspace already linked copies nothing. pinned names the links the old
 // value was written onto, sorted, and is empty when nothing was written.

@@ -72,7 +72,7 @@ const (
 	testNewVolume      = testComposeProject + "_" + metadataVolumeKey
 )
 
-// legacyProject writes the .astro/config.yaml a v1 project would have and
+// legacyProject writes the .astro/config.yaml a 1.x project would have and
 // returns the directory and the volume `astro dev` would have made for it.
 func legacyProject(t *testing.T, body string) (projectPath, legacyVolume string) {
 	t.Helper()
@@ -232,7 +232,7 @@ func TestAStartTellsAProjectArrivingFromAstroDev(t *testing.T) {
 			noted = true
 		}
 	}
-	assert.True(t, noted, "a first start of a v1 project must say where its old database is; lines were %v", lines)
+	assert.True(t, noted, "a first start of a 1.x project must say where its old database is; lines were %v", lines)
 
 	name, err := composeProjectName(projectPath)
 	require.NoError(t, err)

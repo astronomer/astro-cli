@@ -140,7 +140,7 @@ type setInput struct {
 // so no name is unreachable because it collides with a subcommand.
 //
 // The nouns and their aliases are `astro env`'s, word for word, so a token
-// names the same object on both sides of the CLI. See docs/v2-secrets.md.
+// names the same object on both sides of the CLI. See docs/secrets.md.
 func newEnvCmd(c *cli) *cobra.Command {
 	scope := &scopeFlags{}
 	cmd := &cobra.Command{
@@ -148,7 +148,7 @@ func newEnvCmd(c *cli) *cobra.Command {
 		Short: "Manage environment values for local Airflow",
 		// Wrapped by hand at the same width as `astro env --help`, which cobra
 		// does not do for us. The keyring requirement and --plain are on
-		// `set --help`, and the files' 0600 mode is in docs/v2-secrets.md.
+		// `set --help`, and the files' 0600 mode is in docs/secrets.md.
 		Long: "Manage environment values for local Airflow: environment variables,\n" +
 			"connections, and Airflow variables.\n\n" +
 			"Values are stored in the encrypted vault, for the project or with --global for\n" +

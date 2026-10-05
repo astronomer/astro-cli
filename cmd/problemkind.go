@@ -41,8 +41,8 @@ const (
 // Every Astro API failure goes through httputil.NormalizeAPIError, which
 // returns a *httputil.StatusError carrying the response status, so the status
 // is the reliable handle and the API's message is left as prose. Before any
-// request, the "no login" errors are sentinels: config's, from the v1 tree's
-// context lookup; astrosession's, from v2's; and auth's ErrLoginNeeded, for a
+// request, the "no login" errors are sentinels: config's, from the shell tree's
+// context lookup; astrosession's, from the core's; and auth's ErrLoginNeeded, for a
 // login a run under --output json may not start.
 //
 // APC (Houston) failures are not classified: its GraphQL client reports
@@ -68,7 +68,7 @@ func status(code int) func(error) bool {
 }
 
 // problemKinds is every kind the CLI publishes, in the order they are tried.
-// v2's come first: they are the more specific, and an Astro Deployment's
+// cmd/local's come first: they are the more specific, and an Astro Deployment's
 // Airflow that does not answer (deployment_hibernating, ...) is a better
 // answer than the status underneath it.
 var problemKinds = append(append(cliout.Kinds{}, local.ProblemKinds...), cloudKinds...)

@@ -2,7 +2,7 @@ module github.com/astronomer/astro-cli/pkg/instancelocate
 
 go 1.26.1
 
-// Declared exceptions to the sibling rule (docs/v2-architecture.md): the
+// Declared exceptions to the sibling rule (docs/architecture.md): the
 // lookup takes and returns pkg/instances' Instance, which is the link it
 // resolves; it reaches pkg/googleauth for the Application Default Credentials
 // chain a Composer lookup runs under, plus the account advice its 403 carries,

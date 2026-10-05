@@ -3,7 +3,7 @@ module github.com/astronomer/astro-cli/pkg/localrt
 go 1.26.1
 
 // The engines under internal/ need these. All six are declared in
-// docs/v2-architecture.md's exception list (localrt -> airflowrt predates this
+// docs/architecture.md's exception list (localrt -> airflowrt predates this
 // change; proxy, container, uv, and fsatomic were added with it; manifest with
 // hot install's constraints) — localrt orchestrates shared primitives, and
 // re-implementing route publishing, engine detection, venv management, atomic

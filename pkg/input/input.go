@@ -19,7 +19,7 @@ func Text(promptText string, opts ...Option) (string, error) {
 	if promptText != "" {
 		fmt.Print(promptText)
 	}
-	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this v1 path
+	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this shell code
 	return strings.Trim(text, "\r\n"), nil
 }
 
@@ -47,7 +47,7 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s (y/n) ", promptText)
 
-	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this v1 path
+	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this shell code
 	return strings.Trim(text, "\r\n") == "y", nil
 }
 

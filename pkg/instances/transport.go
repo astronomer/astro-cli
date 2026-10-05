@@ -13,7 +13,7 @@ import (
 
 // Deps is what the network-touching half of resolution needs from the process.
 // Every field is a seam, so the logic stays testable and the layer rules hold
-// (docs/v2-architecture.md).
+// (docs/architecture.md).
 //
 // Astro's session and the coordinate lookups live behind a seam because
 // reading them touches config/ and the cloud clients, which this layer may not

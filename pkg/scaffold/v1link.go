@@ -8,14 +8,14 @@ import (
 )
 
 // V1LinkName is the name the conversion gives the deployment link it writes
-// for a v1 project's saved deploy target.
+// for a 1.x project's saved deploy target.
 const V1LinkName = "default"
 
 // astroIDRe is the shape of an Astro Deployment or workspace id: a CUID, c and
 // 24 lowercase alphanumerics (pkg/util.IsCUID, which this module cannot import).
 var astroIDRe = regexp.MustCompile(`^c[a-z0-9]{24}$`)
 
-// deployLink is the link a v1 project's saved deploy target becomes, and
+// deployLink is the link a 1.x project's saved deploy target becomes, and
 // whether it can become one.
 //
 // It can when .astro/config.yaml names both an Astro Deployment id and the

@@ -59,7 +59,7 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 		},
 	}
 	// The group renders no data of its own; the flag is here because every
-	// runnable v2 command can reach one (TestTreeInvariants), and because
+	// runnable core command can reach one (TestTreeInvariants), and because
 	// `astro af -o json` should not fail before it can print help. Each family
 	// registers its own below, which shadows this one for everything under it.
 	var output string

@@ -109,7 +109,7 @@ func TestDevStubV1Notice(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	const notice = "astro v1 project (Dockerfile and .astro/)"
+	const notice = "project made by Astro CLI 1.x (Dockerfile and .astro/)"
 
 	t.Run("Dockerfile and .astro gets the v1 notice", func(t *testing.T) {
 		dir := t.TempDir()
@@ -144,14 +144,14 @@ func TestDevStubV1Notice(t *testing.T) {
 		if err == nil {
 			t.Fatal("astro dev must still fail")
 		}
-		if strings.Contains(err.Error(), "astro v1 project") {
+		if strings.Contains(err.Error(), "Astro CLI 1.x") {
 			t.Errorf("a Dockerfile-only dir must not be called v1: %v", err)
 		}
 	})
 }
 
-// v1ProjectWithToolsPyproject is a classic v1 project that also keeps a
-// pyproject.toml for tool settings only, which many v1 repositories do.
+// v1ProjectWithToolsPyproject is a classic 1.x project that also keeps a
+// pyproject.toml for tool settings only, which many 1.x repositories do.
 func v1ProjectWithToolsPyproject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -176,7 +176,7 @@ func TestDevStubLeadsWithTheConversionInAV1Project(t *testing.T) {
 
 	err := execute(t, d, "dev", "pytest")
 	if err == nil || !strings.Contains(err.Error(), "Convert with `astro init`, then use `uv run pytest`") {
-		t.Errorf("a v1 project should be told to convert before using the replacement: %v", err)
+		t.Errorf("a 1.x project should be told to convert before using the replacement: %v", err)
 	}
 
 	err = execute(t, d, "dev", "init")
@@ -211,7 +211,7 @@ func TestDevStubJSONNamesTheConversion(t *testing.T) {
 	}
 
 	if got, v1 := convert(t, v1ProjectWithToolsPyproject(t)); got != "astro init" || !v1 {
-		t.Errorf("v1 project: convert = %q, v1_project = %v; want astro init, true", got, v1)
+		t.Errorf("1.x project: convert = %q, v1_project = %v; want astro init, true", got, v1)
 	}
 	if got, v1 := convert(t, t.TempDir()); got != "" || v1 {
 		t.Errorf("empty dir: convert = %q, v1_project = %v; want neither", got, v1)
@@ -309,7 +309,7 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 			notes: []string{restartNote},
 		},
 		{
-			name: "a v1 project with a build secret converts to a Docker-mode build",
+			name: "a 1.x project with a build secret converts to a Docker-mode build",
 			args: []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
 			dc:   devContext{v1: true, buildSecret: true},
 			want: "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",

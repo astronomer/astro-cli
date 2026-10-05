@@ -36,7 +36,7 @@ type ImageBuilder interface {
 	Build(ctx context.Context, req BuildRequest, cb Callbacks) (string, error)
 }
 
-// ManifestBuild is the part of a v2 project manifest that decides which image
+// ManifestBuild is the part of a project manifest that decides which image
 // the project builds, and is imagebuild.ManifestBuild (an alias): declared
 // here so ImageBuilder can take it without importing imagebuild.
 //

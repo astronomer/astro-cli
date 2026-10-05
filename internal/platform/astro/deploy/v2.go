@@ -11,14 +11,14 @@ import (
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
-// DagDeployV2Input is the resolved input for a v2 project's dags-only deploy.
+// DagDeployV2Input is the resolved input for a project's dags-only deploy.
 // The deployment is already chosen; this reuses the v1 dags transport (create
 // deploy, upload the tarball, finalize) against the project's dags/ directory.
 type DagDeployV2Input struct {
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment lives on; nil is the current context.
 	Login *config.Context
-	// ProjectDir is the v2 project root; dags/ sits under it.
+	// ProjectDir is the project root; dags/ sits under it.
 	ProjectDir    string
 	DeploymentID  string
 	Description   string
@@ -36,14 +36,14 @@ type DagDeployV2Result struct {
 	Git               DeployGitV2
 }
 
-// DeployGitV2 is what a v2 deploy recorded about the commit it shipped.
+// DeployGitV2 is what a manifest deploy recorded about the commit it shipped.
 type DeployGitV2 struct {
 	// Commit is the git metadata sent with the deploy, nil when none was.
 	Commit      *astrov1.CreateDeployGitRequest
 	Uncommitted bool
 }
 
-// readDeployGitV2 reads the git metadata a v2 deploy records, under v1's
+// readDeployGitV2 reads the git metadata a manifest deploy records, under v1's
 // rules: none when deploy.git_metadata is off, and none when the tree has
 // uncommitted changes, since HEAD would not describe the files deployed. The
 // commit message comes back as the description fallback.
@@ -65,9 +65,9 @@ func descriptionOrCommitMessage(description, commitMessage string) string {
 	return commitMessage
 }
 
-// DeployDagsV2 deploys only the dags/ directory of a v2 project to an already
+// DeployDagsV2 deploys only the dags/ directory of a project to an already
 // resolved deployment. It reads the runtime version and type from the
-// server-side deployment — a v2 project ships no image, so a dags-only deploy
+// server-side deployment — a project ships no image, so a dags-only deploy
 // must fit the image already running — then reuses the v1 dags transport.
 //
 // Unlike the v1 Deploy(), it neither prints nor exits: it returns a result for
@@ -129,7 +129,7 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 	}, nil
 }
 
-// loginOrCurrent is the login a v2 deploy runs under: the one cmd picked for
+// loginOrCurrent is the login a manifest deploy runs under: the one cmd picked for
 // the project's host, else the current context.
 func loginOrCurrent(login *config.Context) (config.Context, error) {
 	if login != nil {
