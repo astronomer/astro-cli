@@ -111,6 +111,10 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.A
 		Header:         []string{"#", "PROJECT NAME", "ID"},
 	}
 
+	about := []input.Option{input.About("a project"), input.AnsweredBy("--project-id")}
+	if err := input.MayAsk("\n> ", about...); err != nil {
+		return astrov1alpha1.AstroIdeProject{}, err
+	}
 	fmt.Println("\nPlease select the project from the list below:")
 
 	for i := range projects {
@@ -122,7 +126,10 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.A
 	}
 
 	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about...)
+	if err != nil {
+		return astrov1alpha1.AstroIdeProject{}, err
+	}
 	choiceInt, err := strconv.Atoi(choice)
 	if err != nil || choiceInt < 1 || choiceInt > len(projects) {
 		return astrov1alpha1.AstroIdeProject{}, ErrInvalidProjectSelection
@@ -132,8 +139,15 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.A
 
 // createNewProject creates a new project and returns its ID
 func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, organizationID, workspaceID string, out io.Writer) (string, error) {
+	about := input.About("a name for the new project")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return "", err
+	}
 	fmt.Println("Enter project name:")
-	name := input.Text("\n> ")
+	name, err := input.Text("\n> ", about)
+	if err != nil {
+		return "", err
+	}
 
 	req := astrov1alpha1.CreateAstroIdeProjectRequest{
 		Name: &name,
@@ -274,8 +288,15 @@ func openProjectInBrowser(client astrov1alpha1.APIClient, organizationID, worksp
 func resolveProjectID(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID string, force bool, out io.Writer) (string, error) {
 	// Handle project creation or selection
 	if projectID == "" && !force {
+		ask := []input.Option{input.About("whether to create a new project"), input.AnsweredBy("--project-id")}
+		if err := input.MayAsk("\n> ", ask...); err != nil {
+			return "", err
+		}
 		fmt.Println("Do you want to create a new project? (y/n)")
-		choice := input.Text("\n> ")
+		choice, err := input.Text("\n> ", ask...)
+		if err != nil {
+			return "", err
+		}
 		if choice == "y" || choice == "Y" {
 			return createNewProject(client, v1Client, organizationID, workspaceID, out)
 		}
@@ -503,7 +524,10 @@ func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organiz
 		return fmt.Errorf("failed to read current directory: %w", err)
 	}
 	if len(entries) > 0 {
-		proceed, _ := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", config.WorkingPath)) //nolint:errcheck // a prompt failure falls through to the empty response
+		proceed, err := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", config.WorkingPath))
+		if err != nil {
+			return err
+		}
 
 		if !proceed {
 			return fmt.Errorf("import canceled by user")

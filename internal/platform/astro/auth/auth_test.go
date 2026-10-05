@@ -23,6 +23,7 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -757,10 +758,22 @@ func readAll(t *testing.T, f *os.File) string {
 // captureStdout collects what f prints to stdout.
 func captureStdout(t *testing.T, f func()) string {
 	t.Helper()
+	return captureFile(t, &os.Stdout, f)
+}
+
+func captureStderr(t *testing.T, f func()) string {
+	t.Helper()
+	return captureFile(t, &os.Stderr, f)
+}
+
+// captureFile returns what f writes to *stream, which it swaps for a pipe
+// while f runs.
+func captureFile(t *testing.T, stream **os.File, f func()) string {
+	t.Helper()
 	r, w, err := os.Pipe()
 	assert.NoError(t, err)
-	previous := os.Stdout
-	os.Stdout = w
+	previous := *stream
+	*stream = w
 	done := make(chan string, 1)
 	go func() {
 		var buf bytes.Buffer
@@ -768,7 +781,7 @@ func captureStdout(t *testing.T, f func()) string {
 		done <- buf.String()
 	}()
 	f()
-	os.Stdout = previous
+	*stream = previous
 	w.Close()
 	out := <-done
 	r.Close()
@@ -1179,6 +1192,22 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		mockV1Client.AssertExpectations(t)
 	})
 
+	// The question can come from the login inside any command, and only
+	// `astro login` has --signup, so the refusal names the command too.
+	t.Run("a run that may not ask is refused, naming astro login", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		t.Cleanup(input.SetGuard(func() string { return "with --output json it cannot" }))
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Once()
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(noOrgs(), nil).Once()
+
+		ctx := config.Context{Domain: "test-domain"}
+		err := checkUserSession(&ctx, mockV1Client, new(bytes.Buffer), false)
+		assert.True(t, input.IsRequired(err), "err: %v", err)
+		assert.ErrorContains(t, err, "pass --signup to astro login")
+		mockV1Client.AssertExpectations(t)
+	})
+
 	t.Run("a failed creation stops the login", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		stubCreateOrganization(t, http.StatusForbidden, "not allowed")
@@ -1192,6 +1221,39 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 		assert.ErrorContains(t, err, "not allowed")
 		mockV1Client.AssertExpectations(t)
 	})
+}
+
+// A browser login prints to stdout and then waits, for Enter or for the
+// browser's callback. A run that may not ask (a command under --output json
+// whose login check finds no usable login) is refused before either, printing
+// nothing, as unauthenticated rather than a question a flag could answer.
+func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	stubRefresh(t, astroauth.TokenResponse{}, errMock)
+	t.Cleanup(input.SetGuard(func() string { return "with --output json it cannot" }))
+	previous := authenticator
+	t.Cleanup(func() { authenticator = previous })
+	authenticator = Authenticator{
+		callbackHandler: func() (string, error) {
+			t.Error("the browser login started")
+			return "", errMock
+		},
+	}
+
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	stdout := os.Stdout
+	os.Stdout = w
+	err = Login("astronomer.io", "", new(astrov1_mocks.ClientWithResponsesInterface), io.Discard, false, false, false)
+	os.Stdout = stdout
+	w.Close()
+	printed, readErr := io.ReadAll(r)
+	assert.NoError(t, readErr)
+
+	assert.ErrorIs(t, err, ErrLoginNeeded)
+	assert.False(t, input.IsRequired(err), "no flag answers a login, so it is not input_required")
+	assert.ErrorContains(t, err, "with --output json it cannot — run `astro login` first, or set ASTRO_API_TOKEN")
+	assert.Empty(t, string(printed), "nothing reaches stdout")
 }
 
 func TestLogin(t *testing.T) {
@@ -1492,14 +1554,22 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		refreshes := stubRefresh(t, astroauth.TokenResponse{AccessToken: "refreshed", ExpiresIn: 3600}, nil)
 		mockV1Client := checkUserSessionMocks()
 
-		out := captureStdout(t, func() {
-			assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+		var out string
+		errOut := captureStderr(t, func() {
+			out = captureStdout(t, func() {
+				assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+			})
 		})
 
 		assert.Equal(t, 0, *browserLogins)
 		assert.Equal(t, 1, *refreshes)
-		assert.Contains(t, out, "Using your saved login for astronomer.io")
-		assert.Contains(t, out, "test@astronomer.test")
+		// All on stderr: inside another command's login check, stdout is that
+		// command's own output.
+		assert.Contains(t, errOut, "Using your saved login for astronomer.io")
+		assert.Contains(t, errOut, "Logging in as")
+		assert.Contains(t, errOut, "test@astronomer.test")
+		assert.Contains(t, errOut, "Successfully authenticated to Astronomer")
+		assert.Empty(t, out, "a reused login prints nothing on stdout")
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
 		assert.Equal(t, domain, c.Domain)

@@ -206,8 +206,11 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	case updateAction:
 		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			if !force {
-				i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
-					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(name)))
+				i, err := input.Confirm(
+					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(name)), input.AnsweredBy("--force"))
+				if err != nil {
+					return err
+				}
 
 				if !i {
 					fmt.Fprintf(out, "Canceling worker queue %s\n", action)
@@ -404,7 +407,10 @@ func selectWorkerMachine(workerType string, workerMachines []astrov1.WorkerMachi
 		}
 
 		tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-		choice := input.Text("\n> ")
+		choice, err := input.Text("\n> ", input.About("a worker type"), input.AnsweredBy("--worker-type"))
+		if err != nil {
+			return astrov1.WorkerMachine{}, err
+		}
 		selectedPool, ok := machineMap[choice]
 		if !ok {
 			// returning an error as choice was not in nodePoolMap
@@ -458,7 +464,10 @@ func selectNodePool(workerType string, nodePools []astrov1.NodePool, out io.Writ
 		}
 
 		tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-		choice := input.Text("\n> ")
+		choice, err := input.Text("\n> ", input.About("a worker type"), input.AnsweredBy("--worker-type"))
+		if err != nil {
+			return "", err
+		}
 		selectedPool, ok := nodePoolMap[choice]
 		if !ok {
 			// returning an error as choice was not in nodePoolMap
@@ -531,8 +540,11 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 
 	if QueueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
 		if !force {
-			i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
-				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)))
+			i, err := input.Confirm(
+				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)), input.AnsweredBy("--force"))
+			if err != nil {
+				return err
+			}
 
 			if !i {
 				fmt.Fprintf(out, "Canceling worker queue deletion\n")
@@ -627,7 +639,10 @@ func selectQueue(queueListIndex *[]astrov1.WorkerQueue, out io.Writer) (string, 
 	}
 
 	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", input.About("a worker queue"), input.AnsweredBy("--name"))
+	if err != nil {
+		return "", err
+	}
 	queueToDelete, ok := queueMap[choice]
 	if !ok {
 		// returning an error as choice was not in queueMap
@@ -715,7 +730,10 @@ func getQueueName(name, action string, requestedDeployment *astrov1.Deployment, 
 		switch action {
 		case createAction:
 			// prompt for name if one was not provided
-			queueName = input.Text("Enter a name for the worker queue\n> ")
+			queueName, err = input.Text("Enter a name for the worker queue\n> ", input.AnsweredBy("--name"))
+			if err != nil {
+				return "", err
+			}
 		case updateAction:
 			// user selects a queue as no name was provided
 			queueName, err = selectQueue(requestedDeployment.WorkerQueues, out)

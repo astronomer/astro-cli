@@ -33,12 +33,13 @@ var (
 	teamPaginationLimit         = 100
 )
 
-func confirmOperation(force bool) bool {
+// confirmOperation asks before changing an IDP-managed team, unless force. A
+// run that may not ask returns the refusal rather than an answer.
+func confirmOperation(force bool) (bool, error) {
 	if force {
-		return true
+		return true, nil
 	}
-	y, _ := input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?") //nolint:errcheck // a prompt failure falls through to the empty response
-	return y
+	return input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--force"))
 }
 
 func CreateTeam(name, description, role string, out io.Writer, client astrov1.APIClient) error {
@@ -47,8 +48,15 @@ func CreateTeam(name, description, role string, out io.Writer, client astrov1.AP
 		return err
 	}
 	if name == "" {
+		prompt := ansi.Bold("\nTeam name: ")
+		if err := input.MayAsk(prompt, input.About("a Team name"), input.AnsweredBy("--name")); err != nil {
+			return err
+		}
 		fmt.Println("Please specify a name for your Team")
-		name = input.Text(ansi.Bold("\nTeam name: "))
+		name, err = input.Text(prompt, input.About("a Team name"), input.AnsweredBy("--name"))
+		if err != nil {
+			return err
+		}
 		if name == "" {
 			return ErrNoTeamNameProvided
 		}
@@ -226,7 +234,10 @@ func UpdateTeam(id, name, description, role string, force bool, out io.Writer, c
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation(force)
+		y, err := confirmOperation(force)
+		if err != nil {
+			return err
+		}
 		if !y {
 			return nil
 		}
@@ -322,6 +333,10 @@ func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 		Header:         []string{"#", "TEAMNAME", "ID"},
 	}
 
+	about := input.About("a team")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return astrov1.Team{}, err
+	}
 	fmt.Println("\nPlease select a team:")
 
 	teamMap := map[string]astrov1.Team{}
@@ -336,7 +351,10 @@ func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 	}
 
 	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about)
+	if err != nil {
+		return astrov1.Team{}, err
+	}
 	selected, ok := teamMap[choice]
 	if !ok {
 		return astrov1.Team{}, ErrInvalidTeamKey
@@ -469,7 +487,10 @@ func Delete(id string, force bool, out io.Writer, client astrov1.APIClient) erro
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation(force)
+		y, err := confirmOperation(force)
+		if err != nil {
+			return err
+		}
 		if !y {
 			return nil
 		}
@@ -541,7 +562,10 @@ func RemoveUser(teamID, teamMemberID string, force bool, out io.Writer, client a
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation(force)
+		y, err := confirmOperation(force)
+		if err != nil {
+			return err
+		}
 		if !y {
 			return nil
 		}
@@ -614,7 +638,10 @@ func AddUser(teamID, userID string, force bool, out io.Writer, client astrov1.AP
 		}
 	}
 	if team.IsIdpManaged {
-		y := confirmOperation(force)
+		y, err := confirmOperation(force)
+		if err != nil {
+			return err
+		}
 		if !y {
 			return nil
 		}
@@ -667,6 +694,10 @@ func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, err
 		Header:         []string{"#", "FULLNAME", "EMAIL", "ID"},
 	}
 
+	about := input.About("a team member")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return astrov1.TeamMember{}, err
+	}
 	fmt.Println("\nPlease select the teamMember who's membership you'd like to modify:")
 
 	teamMemberMap := map[string]astrov1.TeamMember{}
@@ -687,7 +718,10 @@ func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, err
 	}
 
 	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about)
+	if err != nil {
+		return astrov1.TeamMember{}, err
+	}
 	selected, ok := teamMemberMap[choice]
 	if !ok {
 		return astrov1.TeamMember{}, ErrInvalidTeamMemberKey

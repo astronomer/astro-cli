@@ -17,11 +17,25 @@ var (
 // Create verifies input before sending a CreateUser API call to houston
 func Create(email, password string, client houston.ClientInterface, out io.Writer) error {
 	if email == "" {
-		email = input.Text("Email: ")
+		var err error
+		email, err = input.Text("Email: ", input.AnsweredBy("--email"))
+		if err != nil {
+			return err
+		}
 	}
 	if password == "" {
-		inputPassword, _ := input.Password("Password: ")           //nolint:errcheck // a prompt failure falls through to the empty response
-		inputPassword2, _ := input.Password("Re-enter Password: ") //nolint:errcheck // a prompt failure falls through to the empty response
+		inputPassword, err := input.Password("Password: ", input.AnsweredBy("--password"))
+		// Only a refusal stops here; a read that fails falls through to the
+		// empty answer, as it always has.
+		if input.IsRequired(err) {
+			return err
+		}
+		inputPassword2, err := input.Password("Re-enter Password: ", input.AnsweredBy("--password"))
+		// Only a refusal stops here; a read that fails falls through to the
+		// empty answer, as it always has.
+		if input.IsRequired(err) {
+			return err
+		}
 		if inputPassword != inputPassword2 {
 			return errPasswordMismatch
 		}

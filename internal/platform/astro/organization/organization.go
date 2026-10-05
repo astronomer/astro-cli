@@ -152,8 +152,17 @@ func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*
 
 		deployMap[strconv.Itoa(index)] = or[i]
 	}
+	// Refused before the table is drawn, so a run that cannot ask prints
+	// nothing it would then have to explain.
+	about := input.About("an organization")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return nil, err
+	}
 	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about)
+	if err != nil {
+		return nil, err
+	}
 	selected, ok := deployMap[choice]
 	if !ok {
 		return nil, errInvalidOrganizationKey

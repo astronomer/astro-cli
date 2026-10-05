@@ -193,7 +193,10 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 			msg = fmt.Sprintf(warningInvalidNameTagEmptyRecommendations, tag)
 		}
 
-		i, _ := input.Confirm(msg) //nolint:errcheck // a prompt failure falls through to the empty response
+		i, err := input.Confirm(msg)
+		if err != nil {
+			return err
+		}
 		if !i {
 			fmt.Println("Canceling deploy...")
 			os.Exit(1)
@@ -434,7 +437,10 @@ func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsI
 		}
 
 		tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-		choice := input.Text("\n> ")
+		choice, err := input.Text("\n> ", input.About("a deployment"), input.AnsweredBy("the deployment ID as an argument"))
+		if err != nil {
+			return deploymentID, deployments, err
+		}
 		selected, ok := deployMap[choice]
 		if !ok {
 			return deploymentID, deployments, errInvalidDeploymentSelected
@@ -569,7 +575,10 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 
 	// Alert the user if dags folder is empty
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-		i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?") //nolint:errcheck // a prompt failure falls through to the empty response
+		i, err := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+		if err != nil {
+			return err
+		}
 		if !i {
 			return ErrEmptyDagFolderUserCancelledOperation
 		}

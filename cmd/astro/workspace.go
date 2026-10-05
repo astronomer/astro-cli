@@ -486,7 +486,11 @@ func addOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Writer) 
 	}
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the API token. Possible values are " + allowedWorkspaceRoleNamesProse + ": ")
+		answer, err := input.Text("Enter a role for the API token. Possible values are "+allowedWorkspaceRoleNamesProse+": ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		tokenRole = answer
 	}
 	cmd.SilenceUsage = true
 
@@ -501,7 +505,11 @@ func updateOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the new Workspace API token. Possible values are " + allowedWorkspaceRoleNamesProse + ": ")
+		answer, err := input.Text("Enter a role for the new Workspace API token. Possible values are "+allowedWorkspaceRoleNamesProse+": ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		tokenRole = answer
 	}
 	cmd.SilenceUsage = true
 
@@ -740,7 +748,11 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 
 	if updateWorkspaceRole == "" {
 		// no role was provided so ask the user for it
-		updateWorkspaceRole = input.Text("Enter a user Workspace role(" + allowedWorkspaceRoleNamesProse + ") to update user: ")
+		answer, err := input.Text("Enter a user Workspace role("+allowedWorkspaceRoleNamesProse+") to update user: ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		updateWorkspaceRole = answer
 	}
 
 	cmd.SilenceUsage = true
@@ -768,7 +780,11 @@ func listWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 	if tokenName == "" {
 		// no role was provided so ask the user for it
-		tokenName = input.Text("Enter a name for the new Workspace API token: ")
+		answer, err := input.Text("Enter a name for the new Workspace API token: ", input.AnsweredBy("--name"))
+		if err != nil {
+			return err
+		}
+		tokenName = answer
 	}
 	if tokenRole == "" {
 		fmt.Println("select a Workspace Role for the new API token:")
@@ -875,8 +891,15 @@ func selectWorkspaceRole() (string, error) {
 		tokenRolesMap[strconv.Itoa(index)] = validWorkspaceRoles[i]
 	}
 
+	ask := []input.Option{input.About("a role"), input.AnsweredBy("--role")}
+	if err := input.MayAsk("\n> ", ask...); err != nil {
+		return "", err
+	}
 	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", ask...)
+	if err != nil {
+		return "", err
+	}
 	selected, ok := tokenRolesMap[choice]
 	if !ok {
 		return "", errInvalidWorkspaceRoleKey

@@ -295,7 +295,11 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	if updateDeploymentRole == "" {
 		// no role was provided so ask the user for it
-		updateDeploymentRole = input.Text("Enter a Deployment role or custom role name to update team: ")
+		answer, err := input.Text("Enter a Deployment role or custom role name to update team: ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		updateDeploymentRole = answer
 	}
 
 	cmd.SilenceUsage = true
@@ -1054,7 +1058,11 @@ func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 
 	if updateDeploymentRole == "" {
 		// no role was provided so ask the user for it
-		updateDeploymentRole = input.Text("Enter a user Deployment role or custom role name to update user: ")
+		answer, err := input.Text("Enter a user Deployment role or custom role name to update user: ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		updateDeploymentRole = answer
 	}
 
 	cmd.SilenceUsage = true
@@ -1319,7 +1327,11 @@ func addOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+		answer, err := input.Text("Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		tokenRole = answer
 	}
 	cmd.SilenceUsage = true
 
@@ -1337,7 +1349,11 @@ func updateOrgTokenToDeploymentRole(cmd *cobra.Command, args []string, out io.Wr
 	}
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+		answer, err := input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		tokenRole = answer
 	}
 	cmd.SilenceUsage = true
 
@@ -1356,7 +1372,11 @@ func addWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.W
 
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+		answer, err := input.Text("Enter a role for the API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		tokenRole = answer
 	}
 
 	cmd.SilenceUsage = true
@@ -1375,7 +1395,11 @@ func updateWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+		answer, err := input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		tokenRole = answer
 	}
 
 	cmd.SilenceUsage = true
@@ -1510,12 +1534,20 @@ func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 	}
 	if tokenName == "" {
 		// no role was provided so ask the user for it
-		tokenName = input.Text("Enter a name for the new Deployment API token: ")
+		answer, err := input.Text("Enter a name for the new Deployment API token: ", input.AnsweredBy("--name"))
+		if err != nil {
+			return err
+		}
+		tokenName = answer
 	}
 
 	if tokenRole == "" {
 		// no role was provided so ask the user for it
-		tokenRole = input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ")
+		answer, err := input.Text("Enter a role for the new Deployment API token (Possible values are DEPLOYMENT_ADMIN or a custom role name): ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		tokenRole = answer
 	}
 
 	cmd.SilenceUsage = true

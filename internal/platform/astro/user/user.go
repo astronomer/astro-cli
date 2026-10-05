@@ -165,6 +165,12 @@ func userRoleForScope(user astrov1.User, roleEntity, scopeID string) string { //
 }
 
 func SelectUser(users []astrov1.User, roleEntity string) (astrov1.User, error) {
+	// Refused before the table is drawn, so a run that cannot ask prints
+	// nothing it would then have to explain.
+	about := input.About("a user")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return astrov1.User{}, err
+	}
 	roleColumn := "ORGANIZATION ROLE"
 	switch roleEntity {
 	case "workspace":
@@ -197,7 +203,10 @@ func SelectUser(users []astrov1.User, roleEntity string) (astrov1.User, error) {
 	}
 
 	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about)
+	if err != nil {
+		return astrov1.User{}, err
+	}
 	selected, ok := userMap[choice]
 	if !ok {
 		return astrov1.User{}, ErrInvalidUserKey

@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -217,7 +218,7 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 // picker refuses one.
 func (c *cli) pickLink(title, none, current, mark, missing string) (string, error) {
 	if !c.mayPrompt() {
-		return "", errors.New(missing)
+		return "", input.Required(errors.New(missing))
 	}
 	_, _, m, err := c.linkProject()
 	if err != nil {

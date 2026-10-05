@@ -10,14 +10,16 @@ import (
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 // The kinds a cloud command can fail with. They sit beside cmd/local's, in the
 // same vocabulary (see cliout.ProblemKind), and are composed with them below.
 const (
-	// KindUnauthenticated: there is no usable login — none was ever made, or
-	// the API refused the token (401). Log in and try again.
+	// KindUnauthenticated: there is no usable login — none was ever made, the
+	// API refused the token (401), or one was needed and this run may not
+	// start a browser login (--output json). Log in and try again.
 	KindUnauthenticated cliout.ProblemKind = "unauthenticated"
 	// KindForbidden: the login is good but does not carry the permission this
 	// needs (403).
@@ -39,8 +41,9 @@ const (
 // Every Astro API failure goes through httputil.NormalizeAPIError, which
 // returns a *httputil.StatusError carrying the response status, so the status
 // is the reliable handle and the API's message is left as prose. Before any
-// request, the two "never logged in" errors are sentinels: config's, from the
-// v1 tree's context lookup, and astrosession's, from v2's.
+// request, the "no login" errors are sentinels: config's, from the v1 tree's
+// context lookup; astrosession's, from v2's; and auth's ErrLoginNeeded, for a
+// login a run under --output json may not start.
 //
 // APC (Houston) failures are not classified: its GraphQL client reports
 // errors as text, with nothing typed to assert.
@@ -48,6 +51,7 @@ var cloudKinds = cliout.Kinds{
 	{Kind: KindUnauthenticated, Match: func(err error) bool {
 		return errors.Is(err, config.ErrGetHomeString) ||
 			errors.Is(err, astrosession.ErrLoggedOut) ||
+			errors.Is(err, astroAuth.ErrLoginNeeded) ||
 			httputil.HasStatus(err, http.StatusUnauthorized)
 	}},
 	{Kind: KindForbidden, Match: status(http.StatusForbidden)},

@@ -280,9 +280,15 @@ func RotateToken(id, name, workspaceID string, cleanOutput, force bool, out io.W
 	}
 
 	if !force {
+		question := fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name))
+		if err := input.MayAsk(question, input.AnsweredBy("--force")); err != nil {
+			return err
+		}
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
-		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
-			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
+		i, err := input.Confirm(question, input.AnsweredBy("--force"))
+		if err != nil {
+			return err
+		}
 
 		if !i {
 			fmt.Println("Canceling token rotation")
@@ -331,12 +337,20 @@ func DeleteToken(id, name, workspaceID string, force bool, out io.Writer, client
 	if !force {
 		var msg string
 		if isWS {
-			fmt.Println("WARNING: API token deletion cannot be undone.")
 			msg = fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))
 		} else {
 			msg = fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Workspace?", ansi.Bold(token.Name))
 		}
-		i, _ := input.Confirm(msg) //nolint:errcheck // a prompt failure falls through to the empty response
+		if err := input.MayAsk(msg, input.AnsweredBy("--force")); err != nil {
+			return err
+		}
+		if isWS {
+			fmt.Println("WARNING: API token deletion cannot be undone.")
+		}
+		i, err := input.Confirm(msg, input.AnsweredBy("--force"))
+		if err != nil {
+			return err
+		}
 		if !i {
 			if isWS {
 				fmt.Println("Canceling API Token deletion")
@@ -400,8 +414,15 @@ func selectTokens(workspaceID string, apiTokens []astrov1.ApiToken) (astrov1.Api
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
 
+	about := input.About("an API token")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return astrov1.ApiToken{}, err
+	}
 	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about)
+	if err != nil {
+		return astrov1.ApiToken{}, err
+	}
 
 	selected, ok := apiTokensMap[choice]
 	if !ok {

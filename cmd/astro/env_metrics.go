@@ -11,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 const envMetricsExamples = `
@@ -225,8 +226,14 @@ func runEnvMetricsDelete(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	}
 	cmd.SilenceUsage = true
 
-	if !envYes && !confirmTTY(fmt.Sprintf("Delete metrics export %q?", idOrKey)) {
-		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
+	if !envYes {
+		ok, err := confirmTTY(fmt.Sprintf("Delete metrics export %q?", idOrKey))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errAbortedDelete
+		}
 	}
 	if err := env.DeleteMetricsExport(idOrKey, scope, astroV1Client); err != nil {
 		return err
@@ -271,7 +278,7 @@ func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {
 	case cmd.Flags().Changed("password"):
 		in.Password = &envMetricsPassword
 	case envMetricsAuthType == string(astrov1.CreateEnvironmentObjectMetricsExportRequestAuthTypeBASIC):
-		pw, err := readSecretValue("", "Password")
+		pw, err := readSecretValue("", "Password", input.AnsweredBy("--password, or pipe it on stdin"))
 		if err != nil {
 			return nil, err
 		}

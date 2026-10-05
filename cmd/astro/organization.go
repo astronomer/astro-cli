@@ -270,7 +270,11 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 		email = strings.ToLower(args[0])
 	} else {
 		// no email was provided so ask the user for it
-		email = input.Text("enter email address to invite a user: ")
+		answer, err := input.Text("enter email address to invite a user: ", input.AnsweredBy("the email address as an argument"))
+		if err != nil {
+			return err
+		}
+		email = answer
 	}
 
 	cmd.SilenceUsage = true
@@ -298,7 +302,11 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	if updateRole == "" {
 		// no role was provided so ask the user for it
-		updateRole = input.Text("enter a user Organization role(" + allowedOrganizationRoleNames + ") to update user: ")
+		answer, err := input.Text("enter a user Organization role("+allowedOrganizationRoleNames+") to update user: ", input.AnsweredBy("--role"))
+		if err != nil {
+			return err
+		}
+		updateRole = answer
 	}
 
 	cmd.SilenceUsage = true
@@ -698,7 +706,11 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	if tokenName == "" {
 		// no role was provided so ask the user for it
-		tokenName = input.Text("Enter a name for the new Organization API token: ")
+		answer, err := input.Text("Enter a name for the new Organization API token: ", input.AnsweredBy("--name"))
+		if err != nil {
+			return err
+		}
+		tokenName = answer
 	}
 	if tokenRole == "" {
 		fmt.Println("select a Organization Role for the new API token:")
@@ -762,8 +774,15 @@ func selectOrganizationRole() (string, error) {
 		tokenRolesMap[strconv.Itoa(index)] = validOrganizationRoles[i]
 	}
 
+	ask := []input.Option{input.About("a role"), input.AnsweredBy("--role")}
+	if err := input.MayAsk("\n> ", ask...); err != nil {
+		return "", err
+	}
 	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", ask...)
+	if err != nil {
+		return "", err
+	}
 	selected, ok := tokenRolesMap[choice]
 	if !ok {
 		return "", errInvalidOrganizationRoleKey

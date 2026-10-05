@@ -121,7 +121,10 @@ func PaginatedListRoles(workspaceID, cursorID string, take, pageNumber int, clie
 	}
 
 	// Houston query does not send back total records in response to calculate if its last page or not
-	selectedOption := promptPaginatedOption(previousCursorID, nextCursorID, take, totalUsers, pageNumber, false)
+	selectedOption, err := promptPaginatedOption(previousCursorID, nextCursorID, take, totalUsers, pageNumber, false)
+	if err != nil {
+		return err
+	}
 	if selectedOption.Quit {
 		return nil
 	}

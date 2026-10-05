@@ -153,7 +153,10 @@ var GetWorkspaceSelectionID = func(client houston.ClientInterface, out io.Writer
 		deployMap[strconv.Itoa(index)] = ws[i]
 	}
 	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", input.About("a workspace"))
+	if err != nil {
+		return "", err
+	}
 	selected, ok := deployMap[choice]
 	if !ok {
 		return "", errInvalidWorkspaceKey
@@ -163,7 +166,7 @@ var GetWorkspaceSelectionID = func(client houston.ClientInterface, out io.Writer
 }
 
 // workspacesPromptPaginatedOption Show pagination option based on page size and total record
-var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int) workspacePaginationOptions {
+var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int) (workspacePaginationOptions, error) {
 	for {
 		gotoOptionMessage := defaultWorkspacePaginationOptions
 		gotoOptions := make(map[string]workspacePaginationOptions)
@@ -187,16 +190,19 @@ var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int
 			gotoOptionMessage = workspacePaginationWithQuitOptions
 		}
 
-		in := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n" + gotoOptionMessage)
+		in, err := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n"+gotoOptionMessage, input.About("a workspace, or which page to show next"), input.AnsweredBy("the workspace ID as an argument"))
+		if err != nil {
+			return workspacePaginationOptions{}, err
+		}
 		value, found := gotoOptions[in]
 		i, err := strconv.ParseInt(in, 10, 8)
 
 		if found {
-			return value
+			return value, nil
 		} else if err == nil && int(i) > pageSize*pageNumber {
 			userSelection := gotoOptions["q"]
 			userSelection.userSelection = int(i) - pageSize*pageNumber
-			return userSelection
+			return userSelection, nil
 		}
 		fmt.Print("\nInvalid option")
 	}
@@ -244,7 +250,10 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 	totalRecords := len(ws)
 
 	if pageSize > 0 {
-		selectedOption := workspacesPromptPaginatedOption(pageSize, pageNumber, totalRecords)
+		selectedOption, err := workspacesPromptPaginatedOption(pageSize, pageNumber, totalRecords)
+		if err != nil {
+			return workspaceSelection{err: err}
+		}
 		if selectedOption.quit {
 			if selectedOption.userSelection == 0 {
 				return workspaceSelection{id: "", quit: true, err: nil}
@@ -254,7 +263,10 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 		return getWorkspaceSelection(selectedOption.pageSize, selectedOption.pageNumber, client, out)
 	}
 
-	in := input.Text("\n> ")
+	in, err := input.Text("\n> ", input.About("a workspace"), input.AnsweredBy("the workspace ID as an argument"))
+	if err != nil {
+		return workspaceSelection{err: err}
+	}
 	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return workspaceSelection{id: "", quit: false, err: fmt.Errorf("cannot parse %s to int: %w", in, err)}

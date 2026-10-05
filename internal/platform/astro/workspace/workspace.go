@@ -90,6 +90,12 @@ func ListWithFormat(client astrov1.APIClient, format output.Format, tmpl string,
 }
 
 var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (string, error) {
+	// Refused before anything is listed or drawn: a run that cannot ask
+	// prints nothing it would then have to explain.
+	about := input.About("a workspace")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return "", err
+	}
 	tab := printutil.Table{
 		Padding:        []int{5, 44, 50},
 		DynamicPadding: true,
@@ -118,7 +124,10 @@ var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (strin
 		deployMap[strconv.Itoa(index)] = ws[i]
 	}
 	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about)
+	if err != nil {
+		return "", err
+	}
 	selected, ok := deployMap[choice]
 	if !ok {
 		return "", errInvalidWorkspaceKey
@@ -342,6 +351,11 @@ func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) 
 		return workspaces[0], nil
 	}
 
+	about := input.About("the workspace to update")
+	if err := input.MayAsk("\n> ", about); err != nil {
+		return astrov1.Workspace{}, err
+	}
+
 	table := printutil.Table{
 		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
 		DynamicPadding: true,
@@ -363,7 +377,10 @@ func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) 
 	}
 
 	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", about)
+	if err != nil {
+		return astrov1.Workspace{}, err
+	}
 	selected, ok := workspaceMap[choice]
 	if !ok {
 		return astrov1.Workspace{}, errInvalidWorkspaceKey

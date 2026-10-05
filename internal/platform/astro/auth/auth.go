@@ -62,6 +62,12 @@ var (
 	// with access_denied and puts the real message in error_description, so the
 	// description is the only thing that tells this apart from a real refusal.
 	ErrEmailVerificationPending = errors.New("your account is created but your email address is not verified yet")
+
+	// ErrLoginNeeded reports a run that needed a browser login and may not
+	// start one, such as any command under --output json. It is not an
+	// input.RequiredError: no flag answers it, and a script branches on it as
+	// unauthenticated, the same as an expired session.
+	ErrLoginNeeded = errors.New("this command needs you to log in")
 )
 
 // The length the generated organization name is held to: a shorter one gets a
@@ -486,7 +492,13 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		// preselects yes; it already declared the intent.
 		create := signup
 		if !create {
-			create, _ = input.Confirm(noOrganizationPrompt(c.Domain, out)) //nolint:errcheck // a read error answers no, same as declining
+			// A read error answers no, same as declining; a run that may not
+			// ask is refused instead, since that is neither answer.
+			var askErr error
+			create, askErr = input.Confirm(noOrganizationPrompt(c.Domain, out), input.AnsweredBy("--signup to astro login"))
+			if input.IsRequired(askErr) {
+				return askErr
+			}
 		}
 		if !create {
 			return err
@@ -513,6 +525,8 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 	if err != nil {
 		return err
 	}
+	// The notes below are login progress, so stderr: this also runs inside any
+	// command's login check, where stdout is the command's own output.
 	if len(workspaces) == 1 {
 		w := workspaces[0]
 		err = c.SetContextKey("workspace", w.Id)
@@ -524,7 +538,7 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		if err != nil {
 			return err
 		}
-		fmt.Printf(configSetDefaultWorkspace, w.Name)
+		fmt.Fprintf(os.Stderr, configSetDefaultWorkspace, w.Name)
 	}
 	if len(workspaces) > 1 {
 		// try to switch to last used workspace in context
@@ -534,13 +548,13 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		}
 		if !isSwitched {
 			// show switch menu with available workspace IDs
-			fmt.Println("\n" + cliChooseWorkspace)
+			fmt.Fprintln(os.Stderr, "\n"+cliChooseWorkspace)
 			err := workspace.Switch("", astroV1Client, out)
 			if err != nil {
-				fmt.Print(cliSetWorkspaceExample)
+				fmt.Fprint(os.Stderr, cliSetWorkspaceExample)
 			}
 		} else {
-			fmt.Printf(configSetDefaultWorkspace, w.Name)
+			fmt.Fprintf(os.Stderr, configSetDefaultWorkspace, w.Name)
 		}
 	}
 	return nil
@@ -581,8 +595,20 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 
 	if token == "" && !force && !signup {
 		if res, ok := authenticator.savedLogin(domain, authConfig); ok {
-			fmt.Printf("Using your saved login for %s\n", domain)
+			// stderr: this can run inside any command's login check, where
+			// stdout is the command's own output (one object under -o json).
+			fmt.Fprintf(os.Stderr, "Using your saved login for %s\n", domain)
 			return completeLogin(domain, authConfig, res, astroV1Client, out, false)
+		}
+	}
+
+	// A browser login prints to stdout and then waits: on Enter at a terminal,
+	// on the browser's callback otherwise. A run that may not ask can do
+	// neither, so it is refused before anything is printed.
+	if token == "" {
+		var refused *input.RequiredError
+		if errors.As(input.MayAsk("Log in to Astro"), &refused) {
+			return fmt.Errorf("%w; %s — run `astro login` first, or set ASTRO_API_TOKEN", ErrLoginNeeded, refused.Reason)
 		}
 	}
 
@@ -710,14 +736,16 @@ func completeLogin(domain string, authConfig Config, res Result, astroV1Client a
 		return err
 	}
 
-	fmt.Printf("Logging in as %s\n", ansi.Green(res.UserEmail))
+	// Progress, so stderr: this also runs inside any command's login check,
+	// where stdout is the command's own output (one object under -o json).
+	fmt.Fprintf(os.Stderr, "Logging in as %s\n", ansi.Green(res.UserEmail))
 
 	err = checkUserSession(&c, astroV1Client, out, signup)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(registryAuthSuccessMsg)
+	fmt.Fprintln(os.Stderr, registryAuthSuccessMsg)
 	return nil
 }
 

@@ -83,7 +83,10 @@ func Switch(domain string) error {
 func Delete(domain string, noPrompt bool) error {
 	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this v1 path
 	if currentCtx.Domain != "" && currentCtx.Domain == domain && !noPrompt {
-		i, _ := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain)) //nolint:errcheck // a prompt failure falls through to the empty response
+		i, err := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--force"))
+		if err != nil {
+			return err
+		}
 		if !i {
 			fmt.Println(cancelCtxDeleteMsg)
 			return nil

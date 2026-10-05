@@ -258,8 +258,12 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 	sel, err := set.Select(req)
 	if err != nil {
 		var ambiguous *instances.AmbiguousError
-		if !errors.As(err, &ambiguous) || !c.mayPrompt() {
+		if !errors.As(err, &ambiguous) {
 			return instances.Selection{}, err
+		}
+		if !c.mayPrompt() {
+			// The question this run would have asked at a terminal.
+			return instances.Selection{}, input.Required(err)
 		}
 		return c.pickAndPin(dir, set, ambiguous.Choices)
 	}
@@ -317,7 +321,7 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 		answer := strings.TrimSpace(line)
 		if err != nil && answer == "" {
 			if errors.Is(err, io.EOF) {
-				return "", &instances.AmbiguousError{Choices: choices}
+				return "", input.Required(&instances.AmbiguousError{Choices: choices})
 			}
 			return "", err
 		}

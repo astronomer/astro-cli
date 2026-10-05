@@ -253,8 +253,14 @@ func runEnvConnDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	if !envYes && !confirmTTY(fmt.Sprintf("Delete connection %q?", idOrKey)) {
-		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
+	if !envYes {
+		ok, err := confirmTTY(fmt.Sprintf("Delete connection %q?", idOrKey))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errAbortedDelete
+		}
 	}
 	if err := env.DeleteConn(idOrKey, scope, astroV1Client); err != nil {
 		return err

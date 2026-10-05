@@ -20,7 +20,7 @@ type PaginationOptions struct {
 }
 
 // PromptPaginatedOption Show pagination option based on page size and total record
-func PromptPaginatedOption(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) PaginationOptions {
+func PromptPaginatedOption(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) (PaginationOptions, error) {
 	for {
 		pageSize := Abs(take)
 		gotoOptionMessage := defaultPaginationOptions
@@ -41,10 +41,13 @@ func PromptPaginatedOption(previousCursorID, nextCursorID string, take, totalRec
 			gotoOptionMessage = paginationWithNextQuitOptions
 		}
 
-		in := input.Text("\n\nPlease select one of the following options\n" + gotoOptionMessage)
+		in, err := input.Text("\n\nPlease select one of the following options\n"+gotoOptionMessage, input.About("which page to show next"))
+		if err != nil {
+			return PaginationOptions{}, err
+		}
 		value, found := gotoOptions[in]
 		if found {
-			return value
+			return value, nil
 		}
 		fmt.Print("\nInvalid option")
 	}

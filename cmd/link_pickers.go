@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/pkg/httputil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -83,6 +84,9 @@ func withLinkPickers(d *local.Deps, client astrov1.APIClient, out io.Writer) {
 	}
 	d.PickWorkspace = func() (string, error) {
 		var id string
+		if err := input.MayAsk("Select a Workspace", input.About("a workspace"), input.AnsweredBy("--workspace")); err != nil {
+			return "", err
+		}
 		err := withLinkLogin(client, func() error {
 			// Titled the way the Deployment picker is; `astro workspace
 			// switch` asks with the same table and no title.

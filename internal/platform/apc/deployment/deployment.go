@@ -253,7 +253,10 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 
 	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
-	in := input.Text("\n> ")
+	in, err := input.Text("\n> ", input.About("a Kubernetes namespace"))
+	if err != nil {
+		return "", err
+	}
 	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return "", ErrParsingInt{in: in}
@@ -265,7 +268,10 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 }
 
 func getDeploymentNamespaceName() (string, error) {
-	namespaceName := input.Text("\nKubernetes Namespace Name: ")
+	namespaceName, err := input.Text("\nKubernetes Namespace Name: ")
+	if err != nil {
+		return "", err
+	}
 	noSpaceString := strings.ReplaceAll(namespaceName, " ", "")
 	if noSpaceString == "" {
 		return "", ErrKubernetesNamespaceNotSpecified
@@ -621,7 +627,10 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 
 	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 
-	in := input.Text("\n> ")
+	in, err := input.Text("\n> ", input.About("an Airflow version"), input.AnsweredBy("--desired-airflow-version"))
+	if err != nil {
+		return "", err
+	}
 	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return "", err
@@ -673,7 +682,10 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string
 
 	t.Print(out) //nolint:errcheck // best-effort render to the terminal
 
-	in := input.Text("\n> ")
+	in, err := input.Text("\n> ", input.About("a Runtime version"), input.AnsweredBy("--desired-runtime-version"))
+	if err != nil {
+		return "", err
+	}
 	i, err := strconv.ParseInt(in, 10, 64)
 	if err != nil {
 		return "", err
@@ -884,7 +896,10 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 	}
 
 	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice := input.Text("\n> ")
+	choice, err := input.Text("\n> ", input.About("a deployment"))
+	if err != nil {
+		return houston.Deployment{}, err
+	}
 	selected, ok := deployMap[choice]
 	if !ok {
 		return houston.Deployment{}, ErrInvalidDeploymentKey

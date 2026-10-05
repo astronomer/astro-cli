@@ -25,7 +25,10 @@ import (
 //
 // Passing the value via flag is supported but discouraged for secret values,
 // since it puts the value in shell history.
-func readSecretValue(flagValue, prompt string) (string, error) {
+//
+// opts describe the prompt for a run that may not ask (--output json): it is
+// refused, naming the flag in opts, rather than read.
+func readSecretValue(flagValue, prompt string, opts ...input.Option) (string, error) {
 	if flagValue != "" {
 		return flagValue, nil
 	}
@@ -36,7 +39,7 @@ func readSecretValue(flagValue, prompt string) (string, error) {
 		}
 		return strings.TrimRight(string(b), "\r\n"), nil
 	}
-	return input.Password(prompt + ": ")
+	return input.Password(prompt+": ", opts...)
 }
 
 // readSetValue resolves the value for a `set`, refusing to invent one.
@@ -56,7 +59,7 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 	if cmd.Flags().Changed(flagName) {
 		return flagValue, nil
 	}
-	v, err := readSecretValue(flagValue, prompt)
+	v, err := readSecretValue(flagValue, prompt, input.AnsweredBy("--"+flagName+", or pipe the value on stdin"))
 	if err != nil {
 		return "", err
 	}
@@ -66,15 +69,24 @@ func readSetValue(cmd *cobra.Command, flagName, flagValue, prompt string) (strin
 	return v, nil
 }
 
+// errAbortedDelete is a delete that was not confirmed: answered no, or asked
+// where nobody could answer.
+var errAbortedDelete = errors.New("aborted: pass --yes (or confirm interactively) to delete")
+
 // confirmTTY returns true if the user confirms y/Y at an interactive prompt.
-// On a non-TTY it returns false without reading anything; callers must require
-// an explicit --yes flag for non-interactive use.
-func confirmTTY(prompt string) bool {
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		return false
+// On a non-TTY it reads nothing and returns errAbortedDelete, marked as a
+// question this run could not ask; callers must require an explicit --yes
+// flag for non-interactive use. A run that may not ask at all (--output json)
+// returns that refusal, naming --yes, rather than an answer.
+func confirmTTY(prompt string) (bool, error) {
+	yes := input.AnsweredBy("--yes")
+	if err := input.MayAsk(prompt, yes); err != nil {
+		return false, err
 	}
-	ok, _ := input.Confirm(prompt) //nolint:errcheck // a prompt failure falls through to the empty response
-	return ok
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return false, input.Required(errAbortedDelete)
+	}
+	return input.Confirm(prompt, yes)
 }
 
 // hasPipedStdin reports whether stdin appears to be a pipe rather than a TTY.

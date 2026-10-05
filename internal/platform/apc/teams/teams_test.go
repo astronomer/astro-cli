@@ -103,8 +103,8 @@ func (s *Suite) TestPaginatedList() {
 		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
-		promptPaginatedOption = func(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) utils.PaginationOptions {
-			return utils.PaginationOptions{Quit: true}
+		promptPaginatedOption = func(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) (utils.PaginationOptions, error) {
+			return utils.PaginationOptions{Quit: true}, nil
 		}
 
 		err := PaginatedList(mockClient, buf, ListTeamLimit, 0, "")
@@ -120,12 +120,12 @@ func (s *Suite) TestPaginatedList() {
 		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "test-id-1", Take: 1}).Return(houston.ListTeamsResp{Count: 2, Teams: []houston.Team{{ID: "test-id-2", Name: "test-name-2"}}}, nil).Once()
 
 		try := 0
-		promptPaginatedOption = func(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) utils.PaginationOptions {
+		promptPaginatedOption = func(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) (utils.PaginationOptions, error) {
 			if try == 0 {
 				try++
-				return utils.PaginationOptions{Quit: false, PageSize: 1, PageNumber: 1, CursorID: "test-id-1"}
+				return utils.PaginationOptions{Quit: false, PageSize: 1, PageNumber: 1, CursorID: "test-id-1"}, nil
 			}
-			return utils.PaginationOptions{Quit: true}
+			return utils.PaginationOptions{Quit: true}, nil
 		}
 
 		err := PaginatedList(mockClient, buf, 1, 0, "")

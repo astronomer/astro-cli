@@ -251,8 +251,14 @@ func runEnvVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	}
 	cmd.SilenceUsage = true
 
-	if !envYes && !confirmTTY(fmt.Sprintf("Delete environment variable %q?", idOrKey)) {
-		return errors.New("aborted: pass --yes (or confirm interactively) to delete")
+	if !envYes {
+		ok, err := confirmTTY(fmt.Sprintf("Delete environment variable %q?", idOrKey))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errAbortedDelete
+		}
 	}
 	if err := env.DeleteVar(idOrKey, scope, astroV1Client); err != nil {
 		return err

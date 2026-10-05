@@ -365,7 +365,8 @@ func (s *Suite) TestShowListRolesPaginatedOption() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		value := promptPaginatedOption(wsID, wsID, paginationPageSize, 10, 0, false)
+		value, err := promptPaginatedOption(wsID, wsID, paginationPageSize, 10, 0, false)
+		s.NoError(err)
 		s.Equal(value.Quit, true)
 	})
 }

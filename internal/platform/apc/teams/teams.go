@@ -161,7 +161,10 @@ func PaginatedList(client houston.ClientInterface, out io.Writer, pageSize, page
 		lastPage = true
 	}
 
-	selectedOption := promptPaginatedOption(previousCursor, nextCursor, pageSize, totalTeams, pageNumber, lastPage)
+	selectedOption, err := promptPaginatedOption(previousCursor, nextCursor, pageSize, totalTeams, pageNumber, lastPage)
+	if err != nil {
+		return err
+	}
 	if selectedOption.Quit {
 		return nil
 	}

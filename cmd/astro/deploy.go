@@ -783,7 +783,7 @@ func (d v2Deployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.
 		}
 		if err != nil && answer == "" {
 			if goerrors.Is(err, io.EOF) {
-				return "", errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")
+				return "", input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>"))
 			}
 			return "", err
 		}

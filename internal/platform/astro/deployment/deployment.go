@@ -394,7 +394,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	// name input
 	if name == "" {
 		fmt.Println("Please specify a name for your Deployment")
-		name = input.Text(ansi.Bold("\nDeployment name: "))
+		name, err = input.Text(ansi.Bold("\nDeployment name: "), input.AnsweredBy("--name"))
+		if err != nil {
+			return err
+		}
 		if name == "" {
 			return errors.New("you must give your Deployment a name")
 		}
@@ -762,7 +765,10 @@ func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient)
 		}
 
 		regionsTab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-		choice := input.Text("\n> ")
+		choice, err := input.Text("\n> ", input.About("a Region"), input.AnsweredBy("--region"))
+		if err != nil {
+			return "", err
+		}
 		selected, ok := regionMap[choice]
 		if !ok {
 			return "", ErrInvalidRegionKey
@@ -808,7 +814,10 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 		}
 
 		clusterTab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-		choice := input.Text("\n> ")
+		choice, err := input.Text("\n> ", input.About("a Cluster"), input.AnsweredBy("--cluster-id"))
+		if err != nil {
+			return "", err
+		}
 		selected, ok := clusterMap[choice]
 		if !ok {
 			return "", ErrInvalidClusterKey
@@ -955,7 +964,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if !canCiCdDeploy(c.Token) {
 			fmt.Printf("\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start." +
 				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.")
-			y, _ := input.Confirm("\n\nAre you sure you want to continue?") //nolint:errcheck // a prompt failure falls through to the empty response
+			y, err := input.Confirm("\n\nAre you sure you want to continue?", input.AnsweredBy("--force"))
+			if err != nil {
+				return err
+			}
 
 			if !y {
 				fmt.Println("Canceling Deployment update")
@@ -1368,8 +1380,11 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	// confirm changes with user only if force=false
 	if !force {
 		if confirmWithUser {
-			y, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
-				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Name)))
+			y, err := input.Confirm(
+				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+			if err != nil {
+				return err
+			}
 
 			if !y {
 				fmt.Println("Canceling Deployment update")
@@ -1571,8 +1586,11 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 
 	// prompt user
 	if !forceDelete {
-		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
-			fmt.Sprintf("\nAre you sure you want to delete the %s Deployment?", ansi.Bold(currentDeployment.Name)))
+		i, err := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to delete the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+		if err != nil {
+			return err
+		}
 
 		if !i {
 			fmt.Println("Canceling deployment deletion")
@@ -1615,8 +1633,11 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 
 	// prompt user
 	if !force {
-		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
-			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.Bold(action), ansi.Bold(currentDeployment.Name)))
+		i, err := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.Bold(action), ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+		if err != nil {
+			return err
+		}
 
 		if !i {
 			fmt.Printf("\nCanceling %s override", action)
@@ -1682,8 +1703,11 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 
 	// prompt user
 	if !force {
-		i, _ := input.Confirm( //nolint:errcheck // a prompt failure falls through to the empty response
-			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.Bold(currentDeployment.Name)))
+		i, err := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+		if err != nil {
+			return err
+		}
 
 		if !i {
 			fmt.Println("Canceling hibernation override removal")
@@ -1985,6 +2009,12 @@ var SelectDeployment = func(deployments []astrov1.Deployment, message string) (a
 		}
 
 		return deployments[0], nil
+	}
+
+	// Refused before the table is drawn, so a run that may not ask writes
+	// nothing of the question either. The picker reads its answer itself.
+	if err := input.MayAsk(message, input.About("a Deployment")); err != nil {
+		return astrov1.Deployment{}, err
 	}
 
 	tab := printutil.Table{

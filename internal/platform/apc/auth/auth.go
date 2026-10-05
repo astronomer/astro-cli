@@ -49,7 +49,13 @@ var (
 // basicAuth handles authentication with the houston api
 func basicAuth(username, password string, ctx *config.Context, client houston.ClientInterface) (string, error) {
 	if password == "" {
-		password, _ = input.Password(inputPassword) //nolint:errcheck // a prompt failure falls through to the empty response
+		var err error
+		password, err = input.Password(inputPassword)
+		// Only a refusal stops here; a read that fails falls through to the
+		// empty answer, as it always has.
+		if input.IsRequired(err) {
+			return "", err
+		}
 	}
 
 	return houston.Call(client.AuthenticateWithBasicAuth)(houston.BasicAuthRequest{Username: username, Password: password, Ctx: ctx})
@@ -77,7 +83,10 @@ var switchToLastUsedWorkspace = func(client houston.ClientInterface, c *config.C
 }
 
 // oAuth handles oAuth with houston api
-func oAuth(oAuthURL string) string {
+func oAuth(oAuthURL string) (string, error) {
+	if err := input.MayAsk(inputOAuthToken, input.About("the OAuth token from "+oAuthURL)); err != nil {
+		return "", err
+	}
 	fmt.Printf("\n" + houstonOAuthRedirect + "\n")
 	fmt.Println(oAuthURL + "\n")
 	return input.Text(inputOAuthToken)
@@ -188,7 +197,10 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 	}
 
 	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
-		username = input.Text(inputUsername)
+		username, err = input.Text(inputUsername)
+		if err != nil {
+			return err
+		}
 	}
 
 	token, err = getAuthToken(username, password, authConfig, ctx, client)
@@ -303,7 +315,10 @@ func getAuthToken(username, password string, authConfig *houston.AuthConfig, ctx
 	var err error
 	if username == "" {
 		if len(authConfig.AuthProviders) > 0 {
-			token = oAuth(ctx.GetSoftwareAppURL() + "/token")
+			token, err = oAuth(ctx.GetSoftwareAppURL() + "/token")
+			if err != nil {
+				return "", err
+			}
 		} else {
 			return "", errOAuthDisabled
 		}

@@ -509,7 +509,10 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 
 	// If it's a dag_deploy type, validate from the user first
 	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
-		y, _ := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg) //nolint:errcheck // a prompt failure falls through to the empty response
+		y, err := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg, input.AnsweredBy("--force"))
+		if err != nil {
+			return err
+		}
 		if !y {
 			fmt.Println("canceling deployment create..")
 			return nil
@@ -553,7 +556,10 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Deletions are always hard deletes now (PLX-575): all data associated with
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding.
-	i, _ := input.Confirm(cliDeploymentHardDeletePrompt) //nolint:errcheck // a prompt failure falls through to the empty response
+	i, err := input.Confirm(cliDeploymentHardDeletePrompt)
+	if err != nil {
+		return err
+	}
 	if !i {
 		fmt.Println("Exit: This command was not executed and your Deployment was not deleted.")
 		return nil
@@ -588,7 +594,10 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	i, _ := input.Confirm(cliDeploymentUnadoptPrompt) //nolint:errcheck // a prompt failure falls through to the empty response
+	i, err := input.Confirm(cliDeploymentUnadoptPrompt)
+	if err != nil {
+		return err
+	}
 	if !i {
 		fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
 		return nil
@@ -611,6 +620,22 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	return deployment.List(ws, allDeployments, houstonClient, out, clusterID)
+}
+
+// confirmDagDeploymentTypeChange asks before an update moves a deployment onto
+// or off dag_deploy, and reports whether to go on. Any other change needs no
+// answer; --force skips the question.
+func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
+	var prompt string
+	switch {
+	case current != houston.DagOnlyDeploymentType && next == houston.DagOnlyDeploymentType:
+		prompt = UpdateDeploymentTypeToDagDeployPromptMsg
+	case current == houston.DagOnlyDeploymentType && next != houston.DagOnlyDeploymentType:
+		prompt = UpdateDeploymentTypeFromDagDeployPromptMsg
+	default:
+		return true, nil
+	}
+	return input.Confirm(prompt, input.AnsweredBy("--force"))
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
@@ -646,22 +671,13 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 
 	// new dag deployment type or current dag deployment type is dag_deploy, confirm from user
 	if !skipPrompt {
-		// non dag_deploy to dag_deploy
-		if deploymentInfo.DagDeployment.Type != houston.DagOnlyDeploymentType && dagDeploymentType == houston.DagOnlyDeploymentType {
-			y, _ := input.Confirm(UpdateDeploymentTypeToDagDeployPromptMsg) //nolint:errcheck // a prompt failure falls through to the empty response
-			if !y {
-				fmt.Println("canceling deployment update..")
-				return nil
-			}
+		proceed, err := confirmDagDeploymentTypeChange(deploymentInfo.DagDeployment.Type, dagDeploymentType)
+		if err != nil {
+			return err
 		}
-
-		// dag_deploy to non dag_deploy
-		if deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType && dagDeploymentType != houston.DagOnlyDeploymentType {
-			y, _ := input.Confirm(UpdateDeploymentTypeFromDagDeployPromptMsg) //nolint:errcheck // a prompt failure falls through to the empty response
-			if !y {
-				fmt.Println("canceling deployment update..")
-				return nil
-			}
+		if !proceed {
+			fmt.Println("canceling deployment update..")
+			return nil
 		}
 	}
 

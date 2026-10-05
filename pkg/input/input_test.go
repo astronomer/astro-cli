@@ -45,7 +45,9 @@ func (s *Suite) TestText() {
 			stdin := os.Stdin
 			os.Stdin = r
 
-			s.Equal(tt.want, Text(tt.args.promptText))
+			got, err := Text(tt.args.promptText)
+			s.NoError(err)
+			s.Equal(tt.want, got)
 
 			// Restore stdin right after the test.
 			os.Stdin = stdin

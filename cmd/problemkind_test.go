@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
@@ -34,6 +35,8 @@ var cloudSamples = map[cliout.ProblemKind][]error{
 		// arrives wrapped by github.com/pkg/errors, as cmd/astro wraps it.
 		pkgerrors.Wrap(config.ErrGetHomeString, "failed to get current Workspace"),
 		astrosession.ErrLoggedOut,
+		// A login a run under --output json may not start, as Login words it.
+		fmt.Errorf("%w; with --output json it cannot — run `astro login` first", astroAuth.ErrLoginNeeded),
 	},
 	KindForbidden:      {apiFailure(http.StatusForbidden)},
 	KindNotFound:       {apiFailure(http.StatusNotFound)},

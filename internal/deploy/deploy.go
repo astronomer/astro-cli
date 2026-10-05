@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -428,9 +429,11 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		// project's Airflow.
 		return Target{}, fmt.Errorf("astro deploy ships to Astro Deployments, and this project links none%s", nonAstroLinks(links))
 	case !req.Interactive:
-		return Target{}, fmt.Errorf("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>. "+
+		// The question an interactive run asks, refused: input_required under
+		// --output json, in deploy's own words.
+		return Target{}, input.Required(fmt.Errorf("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>. "+
 			"Deploy never picks for you — `astro use`, %s, or `default = true` only preselect the prompt. Deployable links: %s",
-			deploymentEnvVar, strings.Join(deployable, ", "))
+			deploymentEnvVar, strings.Join(deployable, ", ")))
 	}
 
 	choices := make([]Choice, 0, len(deployable))
@@ -474,7 +477,7 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 		return Target{}, errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
 	}
 	if !req.Interactive {
-		return Target{}, errors.New("this project links no deployment and this run cannot be asked: pass --deployment <name or id>")
+		return Target{}, input.Required(errors.New("this project links no deployment and this run cannot be asked: pass --deployment <name or id>"))
 	}
 	id, err := d.ResolveUnlinked(workspaceID)
 	if err != nil {

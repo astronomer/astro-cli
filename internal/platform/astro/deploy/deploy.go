@@ -33,6 +33,9 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
+// noDagsPrompt is asked before a deploy with no DAGs replaces the existing ones.
+const noDagsPrompt = "Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?"
+
 const (
 	parse                  = "parse"
 	astroDomain            = "astronomer.io"
@@ -349,7 +352,10 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 	if deployInput.Dags {
 		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?") //nolint:errcheck // a prompt failure falls through to the empty response
+			i, err := input.Confirm(noDagsPrompt, input.AnsweredBy("--force"))
+			if err != nil {
+				return err
+			}
 
 			if !i {
 				fmt.Println("Canceling deploy...")
@@ -428,7 +434,10 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?") //nolint:errcheck // a prompt failure falls through to the empty response
+			i, err := input.Confirm(noDagsPrompt, input.AnsweredBy("--force"))
+			if err != nil {
+				return err
+			}
 
 			if !i {
 				fmt.Println("Canceling deploy...")

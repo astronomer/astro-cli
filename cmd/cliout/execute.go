@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 // The process exit statuses Execute's caller ends with. A command may carry
@@ -69,6 +71,8 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 	root.SilenceErrors, root.SilenceUsage = true, true
 	defer func() { root.SilenceErrors, root.SilenceUsage = quietErrors, quietUsage }()
 
+	defer input.SetGuard(refuseUnderJSON(root, args))()
+
 	root.SetArgs(args)
 	cmd, err := root.ExecuteContextC(ctx)
 	if err == nil {
@@ -107,6 +111,35 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 		root.Println(cmd.UsageString())
 	}
 	return err
+}
+
+// refuseUnderJSON is the prompt guard for one run: a command whose --output is
+// json asks nothing (pkg/input.SetGuard). A question on a terminal with the
+// run blocked on stdin is not a result a program can parse, and an agent or a
+// script driving the CLI has nobody at the keyboard to answer it — it hangs.
+// The answer has to come with the invocation instead, and the refusal says
+// which flag carries it.
+//
+// The command is found the way cobra will find it, before it runs, and its
+// flag read only when a question comes up: by then cobra has parsed it, so
+// the guard answers from the value the command itself sees, with no reading
+// of raw arguments.
+func refuseUnderJSON(root *cobra.Command, args []string) func() string {
+	find := root.Find
+	if root.TraverseChildren {
+		find = root.Traverse
+	}
+	cmd, _, err := find(args)
+	if err != nil || cmd == nil {
+		return nil
+	}
+	return func() string {
+		f := cmd.Flag("output")
+		if f == nil || f.Value.String() != string(FormatJSON) {
+			return ""
+		}
+		return "with --output json it cannot"
+	}
 }
 
 // markUsageErrors makes the usage errors cobra produces through a hook

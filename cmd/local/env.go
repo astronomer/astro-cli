@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
@@ -1488,7 +1489,11 @@ func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, fields *connFields,
 		}
 		return strings.TrimRight(string(b), "\r\n"), nil
 	}
-	fmt.Fprintf(c.d.Stderr, "Value for %s %s: ", localenv.Noun(kind), name)
+	prompt := fmt.Sprintf("Value for %s %s: ", localenv.Noun(kind), name)
+	if err := input.MayAsk(prompt, input.AnsweredBy("--value or --stdin")); err != nil {
+		return "", err
+	}
+	fmt.Fprint(c.d.Stderr, prompt) //nolint:errcheck // a failed write to the terminal still reads the answer
 	b, err := term.ReadPassword(int(f.Fd()))
 	fmt.Fprintln(c.d.Stderr)
 	if err != nil {

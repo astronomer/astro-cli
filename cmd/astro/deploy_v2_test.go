@@ -634,6 +634,22 @@ func TestDeployV2PinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
 	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
 }
 
+// Under --output json a deploy that names nothing is not asked, even at a
+// terminal with an answer waiting: it fails as input_required, in deploy's own
+// words, and exits 1 as it always has.
+func TestDeployV2JSONNeverAsksForTheTarget(t *testing.T) {
+	setupV2Deploy(t, &fakeCmdDeployer{})
+	interactiveDeploy(t)
+
+	out, errOut, err := execDeployIO("1\n", "--output", "json")
+	require.Error(t, err)
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, string(cliout.KindInputRequired), m["kind"])
+	assert.Equal(t, float64(cliout.ExitFailure), m["code"])
+	assert.Contains(t, m["error"], "a deploy must name the deployment it ships to")
+	assert.NotContains(t, errOut, "Deploy to which deployment?")
+}
+
 // decodeOneJSON parses out as a single JSON object and fails if it is not
 // exactly one — a json-mode command emits one object and nothing else.
 func decodeOneJSON(t *testing.T, out string) map[string]any {

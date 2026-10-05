@@ -1,6 +1,10 @@
 package cliout
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/astronomer/astro-cli/pkg/input"
+)
 
 // ProblemKind is the stable name a failure is published under in json mode.
 //
@@ -23,6 +27,18 @@ type ProblemKind string
 // wins over every other kind: a usage error never reached the code that could
 // fail any other way.
 const KindUsage ProblemKind = "usage"
+
+// KindInputRequired: the command needed an answer it would have asked for at
+// a terminal, and this run could not ask — under --output json no command
+// prompts (Execute's guard), and some refuse without a terminal too. The
+// message names what was asked and, where the command knows it, the flag that
+// answers it. Exit status 1, like any failure: the question can come after
+// the command has started work (a v1 DAG deploy asks about an empty dags/
+// after creating its deploy record), so "nothing ran" (usage's 2) is not a
+// promise it can keep, and the same refusal without a terminal has always
+// exited 1.
+// Also cliout's own, because pkg/input is what recognizes one.
+const KindInputRequired ProblemKind = "input_required"
 
 // KindRule names one failure: Match recognizes it, Kind is what it publishes.
 //
@@ -60,6 +76,9 @@ func (k Kinds) Of(err error) ProblemKind {
 	}
 	if IsUsage(err) {
 		return KindUsage
+	}
+	if input.IsRequired(err) {
+		return KindInputRequired
 	}
 	for _, r := range k {
 		if r.Match(err) {

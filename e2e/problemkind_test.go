@@ -81,3 +81,32 @@ func TestAUsageErrorExitsTwo(t *testing.T) {
 		t.Errorf("want kind usage and code 2, got %v", emitted)
 	}
 }
+
+// A command running with --output json never prompts: the question it would
+// have asked fails as input_required, naming the flag that answers it, and the
+// process exits 1 rather than waiting on stdin — through the binary, because
+// the guard is installed by the binary's own root.
+//
+// Tier 0: `astro local reset` asks before it looks for a project, so a bare
+// directory reaches the question.
+func TestAJSONRunNeverPrompts(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+
+	r := p.run("local", "reset", "--output", "json")
+	if r.ExitCode != 1 {
+		t.Fatalf("exit %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	var emitted map[string]any
+	r.requireJSON(&emitted)
+	if emitted["kind"] != "input_required" || emitted["code"] != float64(1) {
+		t.Errorf("want kind input_required and code 1, got %v", emitted)
+	}
+	if msg, _ := emitted["error"].(string); !strings.Contains(msg, "--yes") {
+		t.Errorf("the refusal should name --yes: %q", msg)
+	}
+	if strings.Contains(r.Stderr, "[y/N]") {
+		t.Errorf("a json run asked its question\n%s", r.output())
+	}
+}
