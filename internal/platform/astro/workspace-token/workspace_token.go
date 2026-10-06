@@ -33,16 +33,17 @@ const (
 )
 
 var (
-	errWorkspaceTokenInDeployment = errors.New("this Workspace API token has already been added to the Deployment with that role")
-	ErrWorkspaceTokenNotFound     = errors.New("no Workspace API token was found for the API token name you provided")
-	errOrgTokenInWorkspace        = errors.New("this Organization API token has already been added to the Workspace with that role")
-	errWrongTokenTypeSelected     = errors.New("the token selected is not of the type you are trying to modify")
+	errWorkspaceTokenRoleSet  = errors.New("this Workspace API token already has that role on the Workspace")
+	ErrWorkspaceTokenNotFound = errors.New("no Workspace API token was found for the API token name you provided")
+	errOrgTokenInWorkspace    = errors.New("this Organization API token has already been added to the Workspace with that role")
+	errWrongTokenTypeSelected = errors.New("the token selected is not of the type you are trying to modify")
 )
 
 const (
 	workspaceEntity = "WORKSPACE"
 
-	pickHeading        = "\nPlease select the Workspace API token you would like to add to the Deployment:"
+	// The plain choice has no heading here: the picker asks it in words
+	// that suit the command, which this package does not know.
 	pickSharedNameHead = "\nThere are more than one API tokens with name %s. Please select an API token:"
 )
 
@@ -120,12 +121,20 @@ func CreateToken(name, description, role, workspaceID string, expiration int, cl
 }
 
 // UpdateToken updates a Workspace-scoped API token's name and description,
-// and sets its Workspace role: role, or, when role is "", the role it already
-// holds. An empty newName or description keeps the token's own.
+// and its role on the Workspace when role is not "". An empty newName or
+// description keeps the token's own; an empty role leaves the role alone, and
+// no role change is sent.
 //
-// The name and description are sent first, and a role the token already
-// holds is refused only after them, so that refusal comes after the rename.
+// A role that is not a Workspace role is refused before anything is asked or
+// sent, and a role the token already holds on the Workspace before anything
+// is sent. The role is changed before the name and description, so a role
+// the API refuses leaves the token as it was.
 func UpdateToken(id, name, newName, description, role, workspaceID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
+	if role != "" {
+		if err := user.IsWorkspaceRoleValid(role); err != nil {
+			return apitoken.Update{}, err
+		}
+	}
 	workspaceID, organizationID, err := Target(workspaceID)
 	if err != nil {
 		return apitoken.Update{}, err
@@ -137,33 +146,26 @@ func UpdateToken(id, name, newName, description, role, workspaceID string, pick 
 		return apitoken.Update{}, err
 	}
 
+	currentRole := workspaceRoleOf(&token, workspaceID)
+	if role != "" && role == currentRole {
+		return apitoken.Update{}, errWorkspaceTokenRoleSet
+	}
+	if role != "" {
+		if err := setWorkspaceRole(&token, workspaceID, role, organizationID, client); err != nil {
+			return apitoken.Update{}, err
+		}
+	}
+
 	updated, err := updateNameAndDescription(&token, newName, description, organizationID, client)
 	if err != nil {
 		return apitoken.Update{}, err
 	}
 
-	// Determine the new/effective workspace role.
-	currentRole := workspaceRoleOf(&token, workspaceID)
-	newRole := role
-	if newRole == "" {
-		newRole = currentRole
+	newRole := currentRole
+	if role != "" {
+		newRole = role
 	}
-	result := apitoken.Update{Token: apitoken.FromAPI(&updated, newRole), PreviousName: token.Name}
-	if newRole == "" {
-		// No existing role and none requested — nothing to mutate on the roles side.
-		return result, nil
-	}
-	if err := user.IsWorkspaceRoleValid(newRole); err != nil {
-		return apitoken.Update{}, err
-	}
-	// Short-circuit: requested role is already set.
-	if role != "" && currentRole == role {
-		return apitoken.Update{}, errWorkspaceTokenInDeployment
-	}
-	if err := setWorkspaceRole(&token, workspaceID, newRole, organizationID, client); err != nil {
-		return apitoken.Update{}, err
-	}
-	return result, nil
+	return apitoken.Update{Token: apitoken.FromAPI(&updated, newRole), PreviousName: token.Name}, nil
 }
 
 // updateNameAndDescription sends token's new name and description, an empty
@@ -314,7 +316,7 @@ func getWorkspaceToken(id, name, workspaceID string, tokens []astrov1.ApiToken, 
 	roleOf := workspaceRoleReader(workspaceID)
 	switch {
 	case id == "" && name == "":
-		token, err = apitoken.Pick(pick, pickHeading, tokens, roleOf)
+		token, err = apitoken.Pick(pick, "", tokens, roleOf)
 		if err != nil {
 			return astrov1.ApiToken{}, err
 		}
@@ -369,10 +371,16 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 // FindToken finds the token a command means: the one with id, else the one
 // named name among the tokens with a role on the Workspace, else the one a
 // person picks through pick. tokenTypes, when not empty, are the scopes the
-// command may act on. workspaceID is taken as given: the tokens offered are
-// the current Workspace's when it is "", and then show no Workspace role.
+// command may act on. The Workspace is the current one when workspaceID is
+// "", and the tokens offered are shown with their role on it.
 func FindToken(id, name, workspaceID, organizationID string, tokenTypes []TokenType, pick apitoken.Picker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
 	if id == "" {
+		// Resolved here, not only in the list, so the roles offered are the
+		// ones on the Workspace listed.
+		workspaceID, _, err = Target(workspaceID)
+		if err != nil {
+			return token, err
+		}
 		tokens, err := getWorkspaceTokens(workspaceID, tokenTypes, client)
 		if err != nil {
 			return token, err

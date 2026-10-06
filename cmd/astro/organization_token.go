@@ -43,7 +43,7 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
 	// roles takes no --name: only the token ID answers its picker.
-	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker(out, ""), astroV1Client)
+	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker(out, "", "Please select the Organization API token whose roles you would like to list:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,8 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	res, err := organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, organizationTokenPicker(out, "--name"), astroV1Client)
+	res, err := organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole,
+		organizationTokenPicker(out, "--name", "Please select the Organization API token you would like to update:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -108,7 +109,8 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	token, err := organization.FindCurrentToken(tokenID, name, organizationTokenPicker(out, "--name"), astroV1Client)
+	pick := organizationTokenPicker(out, "--name", "Please select the Organization API token you would like to rotate:")
+	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -128,9 +130,8 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	if err != nil {
 		return err
 	}
-	// The text names the token by the --name it was given, which is empty
-	// for a rotate by ID, as it always has.
-	return renderTokenSecret(format, out, &rotated, "Organization", "rotated", name, cleanTokenOutput)
+	// Named as found, which a rotate by ID knows only after the lookup.
+	return renderTokenSecret(format, out, &rotated, "Organization", "rotated", token.Name, cleanTokenOutput)
 }
 
 func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -140,7 +141,8 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	token, err := organization.FindCurrentToken(tokenID, name, organizationTokenPicker(out, "--name"), astroV1Client)
+	pick := organizationTokenPicker(out, "--name", "Please select the Organization API token you would like to delete:")
+	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
 	}

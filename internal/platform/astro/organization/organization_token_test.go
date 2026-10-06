@@ -483,13 +483,23 @@ func (s *Suite) TestUpdateToken() {
 		s.Error(err)
 	})
 
-	s.Run("error path when organization role is invalid", func() {
+	s.Run("a role that is not an Organization role is refused before any call", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		// No call is registered: any request would panic the mock.
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		_, err := UpdateToken("token1", "", "renamed", "", "Invalid Role", s.noPicking(), mockClient)
+		s.Equal(user.ErrInvalidOrganizationRole.Error(), err.Error())
+	})
+
+	s.Run("a role the token already holds is refused before any change", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		// Only the lookup is registered: a rename or a role write would
+		// panic the mock.
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOK, nil)
-		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
-		_, err := UpdateToken("token1", "", "", "", "Invalid Role", s.noPicking(), mockClient)
-		s.Equal(user.ErrInvalidOrganizationRole.Error(), err.Error())
+		_, err := UpdateToken("token1", "", "renamed", "", "ORGANIZATION_MEMBER", s.noPicking(), mockClient)
+		s.Equal(errOrgTokenRoleSet, err)
+		s.Equal("this Organization API token already has that role on the Organization", err.Error())
 	})
 
 	s.Run("applying an organization role reports it", func() {
@@ -508,10 +518,12 @@ func (s *Suite) TestUpdateToken() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOK, nil)
-		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseOK, nil)
+		// No rename is registered: the role goes first, so a refused role
+		// leaves the name as it was.
 		mockClient.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateAPITokenRolesResponseError, nil)
-		_, err := UpdateToken("token1", "", "", "", "ORGANIZATION_MEMBER", s.noPicking(), mockClient)
+		_, err := UpdateToken("token1", "", "renamed", "", "ORGANIZATION_OWNER", s.noPicking(), mockClient)
 		s.ErrorContains(err, "failed to update token")
+		mockClient.AssertNotCalled(s.T(), "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	s.Run("error path - wrong token type", func() {
@@ -712,13 +724,13 @@ func (s *Suite) TestGetOrganizationToken() {
 		s.Equal(astrov1.ApiToken{}, token)
 	})
 
-	s.Run("the picker hears why it is asked", func() {
+	s.Run("the plain choice leaves its question to the picker", func() {
 		var heading string
 		_, err := getOrganizationToken("", "", apiTokens, func(h string, _ []apitoken.Token) (int, error) {
 			heading = h
 			return 0, nil
 		})
 		s.NoError(err)
-		s.Equal(pickHeading, heading)
+		s.Empty(heading)
 	})
 }

@@ -92,7 +92,8 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	res, err := workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID, workspaceTokenPicker(out, "--name"), astroV1Client)
+	res, err := workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID,
+		workspaceTokenPicker(out, "--name", "Please select the Workspace API token you would like to update:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -111,7 +112,8 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		return err
 	}
 	tokenTypes := []workspacetoken.TokenType{workspacetoken.TokenTypeWORKSPACE}
-	token, err := workspacetoken.FindToken(tokenID, name, ws, org, tokenTypes, workspaceTokenPicker(out, "--name"), astroV1Client)
+	pick := workspaceTokenPicker(out, "--name", "Please select the Workspace API token you would like to rotate:")
+	token, err := workspacetoken.FindToken(tokenID, name, ws, org, tokenTypes, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -131,9 +133,8 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	// The text names the token by the --name it was given, which is empty
-	// for a rotate by ID, as it always has.
-	return renderTokenSecret(format, out, &rotated, "Workspace", "rotated", name, cleanTokenOutput)
+	// Named as found, which a rotate by ID knows only after the lookup.
+	return renderTokenSecret(format, out, &rotated, "Workspace", "rotated", token.Name, cleanTokenOutput)
 }
 
 func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -147,7 +148,8 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	token, err := workspacetoken.FindToken(tokenID, name, ws, org, nil, workspaceTokenPicker(out, "--name"), astroV1Client)
+	pick := workspaceTokenPicker(out, "--name", "Please select the API token you would like to delete from the Workspace:")
+	token, err := workspacetoken.FindToken(tokenID, name, ws, org, nil, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -200,7 +202,8 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 		}
 	}
 	cmd.SilenceUsage = true
-	token, err := organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, organizationTokenPicker(out, "--org-token-name"), astroV1Client)
+	pick := organizationTokenPicker(out, "--org-token-name", "Please select the Organization API token you would like to add to the Workspace:")
+	token, err := organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -237,9 +240,9 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	cmd.SilenceUsage = true
 
-	pick := workspaceTokenPicker(out, "--org-token-name")
+	pick := workspaceTokenPicker(out, "--org-token-name", "Please select the Organization API token whose Workspace role you would like to update:")
 	if operation == tokenRoleAdd {
-		pick = organizationTokenPicker(out, "--org-token-name")
+		pick = organizationTokenPicker(out, "--org-token-name", "Please select the Organization API token you would like to add to the Workspace:")
 	}
 	token, err := workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, operation, pick, astroV1Client)
 	if err != nil {
@@ -255,7 +258,8 @@ func removeOrganizationTokenWorkspaceRole(cmd *cobra.Command, args []string, out
 	}
 	tokenArg(args, &orgTokenID)
 	cmd.SilenceUsage = true
-	removal, err := workspacetoken.RemoveOrgTokenWorkspaceRole(orgTokenID, orgTokenName, workspaceID, workspaceTokenPicker(out, "--org-token-name"), astroV1Client)
+	pick := workspaceTokenPicker(out, "--org-token-name", "Please select the Organization API token you would like to remove from the Workspace:")
+	removal, err := workspacetoken.RemoveOrgTokenWorkspaceRole(orgTokenID, orgTokenName, workspaceID, pick, astroV1Client)
 	if err != nil {
 		return err
 	}

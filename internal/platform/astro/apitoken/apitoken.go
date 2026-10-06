@@ -108,9 +108,11 @@ type RoleList struct {
 	Roles []Role `json:"roles"`
 }
 
-// Picker asks a person to choose one of tokens and returns its index. heading
-// says why they are being asked. A family calls it only when the command was
-// given neither a token ID nor a name, or the name given is shared.
+// Picker asks a person to choose one of tokens and returns its index. A family
+// calls it only when the command was given neither a token ID nor a name, with
+// heading "", or when the name given is shared, with heading saying so. The
+// picker asks the plain choice in its own words, because only the command
+// knows what the token is wanted for.
 type Picker func(heading string, tokens []Token) (int, error)
 
 // Roles flattens a token's roles pointer to a usable slice.

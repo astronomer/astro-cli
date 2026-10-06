@@ -3,6 +3,7 @@ package astro
 import (
 	"encoding/json"
 	"io"
+	"net/http"
 	"testing"
 	"time"
 
@@ -190,10 +191,9 @@ var (
 
 // What `astro workspace token` prints in text: what it printed before it
 // gained --output, recorded byte for byte against v2 and checked here by
-// meaning. Three quirks are kept, not fixed: a rotate by ID names an empty
-// token, the Workspace picker always asks for a token "to add to the
-// Deployment", and an update to a role the token holds says "the Deployment"
-// after it has already sent the new name.
+// meaning, less the quirks a later change fixed. A rotate by ID names the
+// token it found, each picker asks for a token for what the command is doing,
+// and an update to a role the token holds is refused before anything is sent.
 func TestWorkspaceTokenText(t *testing.T) {
 	ws, org := wsOrgTokenFixtures()
 	both := []astrov1.ApiToken{ws, org}
@@ -201,7 +201,6 @@ func TestWorkspaceTokenText(t *testing.T) {
 	twin.Id = "tok-ws-2"
 	renamed := ws
 	renamed.Name = "ws-token-2"
-	wsPickHeading := "Please select the Workspace API token you would like to add to the Deployment:"
 
 	runTokenCases(t, []tokenCase{
 		{name: "list", root: newWorkspaceCmd, client: fakeTokens(both), args: []string{"workspace", "token", "list"}, check: listsRows("ID", wsTokRow, orgTokRow)},
@@ -222,7 +221,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			name: "update through the picker", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{ws}, updatesToken(ws, ws)), answers: "1\n",
 			args: []string{"workspace", "token", "update", "--description", "d"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, wsPickHeading, "> Astro Workspace API token ws-token was successfully updated")
+				requireInOrder(t, out, "Please select the Workspace API token you would like to update:", "> Astro Workspace API token ws-token was successfully updated")
 				assert.Equal(t, []map[string]string{withNumber("1", wsTokRow)}, tableRows(t, out, "#"))
 			},
 		},
@@ -232,12 +231,22 @@ func TestWorkspaceTokenText(t *testing.T) {
 			check: says("There are more than one API tokens with name ws-token. Please select an API token:", "> Astro Workspace API token ws-token was successfully updated"),
 		},
 		{
-			name: "update to the role it holds", root: newWorkspaceCmd, client: fakeTokens(both, updatesToken(ws, ws)),
-			args:    []string{"workspace", "token", "update", "tok-ws", "--role", "WORKSPACE_MEMBER"},
+			// That nothing is sent: TestWorkspaceOrganizationTokenUpdateRefusesBeforeChanging.
+			name: "update to the role it holds", root: newWorkspaceCmd, client: fakeTokens(both),
+			args:    []string{"workspace", "token", "update", "tok-ws", "--new-name", "ws-token-2", "--role", "WORKSPACE_MEMBER"},
 			check:   func(t *testing.T, out string) { assert.Empty(t, out) },
-			wantErr: "this Workspace API token has already been added to the Deployment with that role",
+			wantErr: "this Workspace API token already has that role on the Workspace",
 		},
-		{name: "rotate --yes by id names an empty token", root: newWorkspaceCmd, client: fakeTokens(both, rotatesToken(ws)), args: []string{"workspace", "token", "rotate", "tok-ws", "--yes"}, check: secretShown("Workspace", "rotated", "")},
+		// Named by its ID, the token is still reported by its name.
+		{name: "rotate --yes by id", root: newWorkspaceCmd, client: fakeTokens(both, rotatesToken(ws)), args: []string{"workspace", "token", "rotate", "tok-ws", "--yes"}, check: secretShown("Workspace", "rotated", "ws-token")},
+		{
+			name: "rotate through the picker", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{ws}, rotatesToken(ws)), answers: "1\n",
+			args: []string{"workspace", "token", "rotate", "--yes"},
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out, "Please select the Workspace API token you would like to rotate:", "> ")
+				secretShown("Workspace", "rotated", "ws-token")(t, out)
+			},
+		},
 		{
 			name: "rotate confirmed by name", root: newWorkspaceCmd, client: fakeTokens(both, rotatesToken(ws)), answers: "y\n",
 			args: []string{"workspace", "token", "rotate", "--name", "ws-token"},
@@ -277,7 +286,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			name: "delete through the picker", root: newWorkspaceCmd, client: fakeTokens(both, deletesToken("tok-ws")), answers: "1\n",
 			args: []string{"workspace", "token", "delete", "--yes"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, wsPickHeading, "> Astro Workspace API token ws-token was successfully deleted")
+				requireInOrder(t, out, "Please select the API token you would like to delete from the Workspace:", "> Astro Workspace API token ws-token was successfully deleted")
 				assert.Equal(t, []map[string]string{withNumber("1", wsTokRow), withNumber("2", orgTokRow)}, tableRows(t, out, "#"))
 			},
 		},
@@ -303,7 +312,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			name: "add through the picker", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{orgOnly(org)}, setsRoles("tok-org")), answers: "1\n",
 			args: []string{"workspace", "token", "add", "--role", "WORKSPACE_MEMBER"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the Organization API token you would like to update:", "> Astro Organization API token org-token was successfully added to the Workspace")
+				requireInOrder(t, out, "Please select the Organization API token you would like to add to the Workspace:", "> Astro Organization API token org-token was successfully added to the Workspace")
 				assert.Equal(t, []map[string]string{orgPickRow}, tableRows(t, out, "#"))
 			},
 		},
@@ -318,7 +327,7 @@ func TestWorkspaceTokenText(t *testing.T) {
 			name: "organization-token add through the picker", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{orgOnly(org)}, setsRoles("tok-org")), answers: "1\n",
 			args: []string{"workspace", "token", "organization-token", "add", "--role", "WORKSPACE_MEMBER"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the Organization API token you would like to update:", "> Astro Organization API token org-token was successfully added/updated to the Workspace")
+				requireInOrder(t, out, "Please select the Organization API token you would like to add to the Workspace:", "> Astro Organization API token org-token was successfully added/updated to the Workspace")
 				assert.Equal(t, []map[string]string{orgPickRow}, tableRows(t, out, "#"))
 			},
 		},
@@ -327,11 +336,16 @@ func TestWorkspaceTokenText(t *testing.T) {
 			name: "organization-token update through the picker", root: newWorkspaceCmd, client: fakeTokens(both, setsRoles("tok-org")), answers: "1\n",
 			args: []string{"workspace", "token", "organization-token", "update", "--role", "WORKSPACE_OWNER"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, wsPickHeading, "> Astro Organization API token org-token was successfully added/updated to the Workspace")
+				requireInOrder(t, out, "Please select the Organization API token whose Workspace role you would like to update:", "> Astro Organization API token org-token was successfully added/updated to the Workspace")
 				assert.Equal(t, []map[string]string{withNumber("1", orgTokRow)}, tableRows(t, out, "#"))
 			},
 		},
 		{name: "organization-token remove", root: newWorkspaceCmd, client: fakeTokens(both, setsRoles("tok-org")), args: []string{"workspace", "token", "organization-token", "remove", "tok-org"}, check: says("Astro Organization API token org-token was successfully removed from the Workspace")},
+		{
+			name: "organization-token remove through the picker", root: newWorkspaceCmd, client: fakeTokens([]astrov1.ApiToken{org}, setsRoles("tok-org")), answers: "1\n",
+			args:  []string{"workspace", "token", "organization-token", "remove"},
+			check: says("Please select the Organization API token you would like to remove from the Workspace:", "> Astro Organization API token org-token was successfully removed from the Workspace"),
+		},
 	})
 }
 
@@ -357,10 +371,9 @@ func TestWorkspaceOrgTokenListReadsWorkspaceID(t *testing.T) {
 func TestDeploymentTokenPicksWithTheOtherFamiliesTables(t *testing.T) {
 	ws, org := wsOrgTokenFixtures()
 	d := "--deployment=" + tokDeploymentID
-	// The deployment family names no Workspace here, so the Workspace picker
-	// shows no Workspace role, as it always has.
-	wsNoRole := withNumber("1", wsTokRow)
-	wsNoRole["WORKSPACE ROLE"] = ""
+	// The deployment family names no Workspace here. The tokens offered are
+	// the current Workspace's, and so are the roles shown with them.
+	wsPicked := withNumber("1", wsTokRow)
 
 	runTokenCases(t, []tokenCase{
 		{
@@ -368,22 +381,22 @@ func TestDeploymentTokenPicksWithTheOtherFamiliesTables(t *testing.T) {
 			args: []string{"deployment", "token", "workspace-token", "add", d, "--role", "DEPLOYMENT_ADMIN"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out, "Please select the Workspace API token you would like to add to the Deployment:", "> Astro Workspace API token ws-token was successfully added/updated to the Deployment")
-				assert.Equal(t, []map[string]string{wsNoRole}, tableRows(t, out, "#"))
+				assert.Equal(t, []map[string]string{wsPicked}, tableRows(t, out, "#"))
 			},
 		},
 		{
 			name: "workspace-token remove", root: newDeploymentRootCmd, client: fakeTokens([]astrov1.ApiToken{ws}, setsRoles("tok-ws")), answers: "1\n",
 			args: []string{"deployment", "token", "workspace-token", "remove", d},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the Workspace API token you would like to add to the Deployment:", "> Astro Workspace API token ws-token was successfully removed from the Deployment")
-				assert.Equal(t, []map[string]string{wsNoRole}, tableRows(t, out, "#"))
+				requireInOrder(t, out, "Please select the Workspace API token you would like to remove from the Deployment:", "> Astro Workspace API token ws-token was successfully removed from the Deployment")
+				assert.Equal(t, []map[string]string{wsPicked}, tableRows(t, out, "#"))
 			},
 		},
 		{
 			name: "organization-token add", root: newDeploymentRootCmd, client: fakeTokens([]astrov1.ApiToken{orgOnly(org)}, setsRoles("tok-org")), answers: "1\n",
 			args: []string{"deployment", "token", "organization-token", "add", d, "--role", "DEPLOYMENT_ADMIN"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the Organization API token you would like to update:", "> Astro Organization API token org-token was successfully added/updated to the Deployment")
+				requireInOrder(t, out, "Please select the Organization API token you would like to add to the Deployment:", "> Astro Organization API token org-token was successfully added/updated to the Deployment")
 				assert.Equal(t, []map[string]string{orgPickRow}, tableRows(t, out, "#"))
 			},
 		},
@@ -391,7 +404,7 @@ func TestDeploymentTokenPicksWithTheOtherFamiliesTables(t *testing.T) {
 }
 
 // What `astro organization token` prints in text, checked by meaning as for
-// the Workspace family. A rotate by ID names an empty token, as it always has.
+// the Workspace family, with the same quirks fixed.
 func TestOrganizationTokenText(t *testing.T) {
 	ws, org := wsOrgTokenFixtures()
 	orgs := []astrov1.ApiToken{org}
@@ -405,7 +418,6 @@ func TestOrganizationTokenText(t *testing.T) {
 		{"ENTITY_TYPE": "ORGANIZATION", "ENTITY_ID": "test-org-id", "ROLE": "ORGANIZATION_MEMBER"},
 		{"ENTITY_TYPE": "WORKSPACE", "ENTITY_ID": curWorkspaceID, "ROLE": "WORKSPACE_OPERATOR"},
 	}
-	orgPickHeading := "Please select the Organization API token you would like to update:"
 
 	runTokenCases(t, []tokenCase{
 		{name: "list", root: newOrganizationCmd, client: fakeTokens(orgs), args: []string{"organization", "token", "list"}, check: listsRows("ID", orgListRow)},
@@ -417,7 +429,7 @@ func TestOrganizationTokenText(t *testing.T) {
 			check: func(t *testing.T, out string) {
 				// The roles' header shares the prompt's line ("> "), so
 				// they are read in order rather than as a table.
-				requireInOrder(t, out, orgPickHeading, "> ", "ENTITY_TYPE", "ENTITY_ID", "ROLE",
+				requireInOrder(t, out, "Please select the Organization API token whose roles you would like to list:", "> ", "ENTITY_TYPE", "ENTITY_ID", "ROLE",
 					"ORGANIZATION", "test-org-id", "ORGANIZATION_MEMBER",
 					"WORKSPACE", curWorkspaceID, "WORKSPACE_OPERATOR")
 				assert.Equal(t, []map[string]string{orgPickRow}, tableRows(t, out, "#"))
@@ -438,11 +450,27 @@ func TestOrganizationTokenText(t *testing.T) {
 			name: "update through the picker", root: newOrganizationCmd, client: fakeTokens(orgs, updatesToken(org, org)), answers: "1\n",
 			args: []string{"organization", "token", "update", "--description", "d"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, orgPickHeading, "> Astro Organization API token org-token was successfully updated")
+				requireInOrder(t, out, "Please select the Organization API token you would like to update:", "> Astro Organization API token org-token was successfully updated")
 				assert.Equal(t, []map[string]string{orgPickRow}, tableRows(t, out, "#"))
 			},
 		},
-		{name: "rotate --yes by id names an empty token", root: newOrganizationCmd, client: fakeTokens(orgs, rotatesToken(org)), args: []string{"organization", "token", "rotate", "tok-org", "--yes"}, check: secretShown("Organization", "rotated", "")},
+		{
+			// That nothing is sent: TestWorkspaceOrganizationTokenUpdateRefusesBeforeChanging.
+			name: "update to the role it holds", root: newOrganizationCmd, client: fakeTokens(orgs),
+			args:    []string{"organization", "token", "update", "tok-org", "--new-name", "org-token-2", "--role", "ORGANIZATION_MEMBER"},
+			check:   func(t *testing.T, out string) { assert.Empty(t, out) },
+			wantErr: "this Organization API token already has that role on the Organization",
+		},
+		// Named by its ID, the token is still reported by its name.
+		{name: "rotate --yes by id", root: newOrganizationCmd, client: fakeTokens(orgs, rotatesToken(org)), args: []string{"organization", "token", "rotate", "tok-org", "--yes"}, check: secretShown("Organization", "rotated", "org-token")},
+		{
+			name: "rotate through the picker", root: newOrganizationCmd, client: fakeTokens(orgs, rotatesToken(org)), answers: "1\n",
+			args: []string{"organization", "token", "rotate", "--yes"},
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out, "Please select the Organization API token you would like to rotate:", "> ")
+				secretShown("Organization", "rotated", "org-token")(t, out)
+			},
+		},
 		{
 			name: "rotate confirmed by name", root: newOrganizationCmd, client: fakeTokens(orgs, rotatesToken(org)), answers: "y\n",
 			args: []string{"organization", "token", "rotate", "--name", "org-token"},
@@ -469,6 +497,11 @@ func TestOrganizationTokenText(t *testing.T) {
 			name: "delete declined", root: newOrganizationCmd, client: fakeTokens(orgs), answers: "n\n",
 			args:  []string{"organization", "token", "delete", "tok-org"},
 			check: says("WARNING: API token deletion cannot be undone.", "Are you sure you want to delete the org-token API token? (y/n)", "Canceling API Token deletion"),
+		},
+		{
+			name: "delete through the picker", root: newOrganizationCmd, client: fakeTokens(orgs, deletesToken("tok-org")), answers: "1\n",
+			args:  []string{"organization", "token", "delete", "--yes"},
+			check: says("Please select the Organization API token you would like to delete:", "> Astro Organization API token org-token was successfully deleted"),
 		},
 		{
 			name: "delete a workspace token", root: newOrganizationCmd, client: fakeTokens([]astrov1.ApiToken{ws}),
@@ -777,5 +810,136 @@ func TestWorkspaceOrganizationTokenOutputUsage(t *testing.T) {
 		r := execAstroCmd(t, tokenMock(t), "", run.root, run.args...)
 		require.Error(t, r.err, run.args)
 		assert.Equal(t, cliout.ExitUsage, r.code, run.args)
+	}
+}
+
+// changesNothing registers, with Maybe, every call that would change tok, so
+// a call the command should not make is caught by AssertNotCalled rather
+// than by a mock panic that would abort the package's run.
+func changesNothing(m *astrov1_mocks.ClientWithResponsesInterface, tok astrov1.ApiToken) { //nolint:gocritic // a test fixture
+	m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &tok}, nil).Maybe()
+	m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(rolesOK(), nil).Maybe()
+}
+
+func assertNothingChanged(t *testing.T, m *astrov1_mocks.ClientWithResponsesInterface) {
+	t.Helper()
+	m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// A refused role leaves the token as it was, in both families: a role that is
+// not one is refused before any request, a role the token already holds
+// before anything that changes it, and a role the API refuses before the name
+// and description are sent.
+func TestWorkspaceOrganizationTokenUpdateRefusesBeforeChanging(t *testing.T) {
+	ws, org := jsonWsOrgTokenFixtures()
+	families := []struct {
+		name     string
+		root     func(io.Writer) *cobra.Command
+		tok      astrov1.ApiToken
+		update   []string
+		heldRole string
+		held     string
+	}{
+		{
+			name: "workspace", root: newWorkspaceCmd, tok: ws,
+			update:   []string{"workspace", "token", "update", "tok-ws", "--new-name", "ws-token-2", "--description", "new words"},
+			heldRole: "WORKSPACE_MEMBER", held: "this Workspace API token already has that role on the Workspace",
+		},
+		{
+			name: "organization", root: newOrganizationCmd, tok: org,
+			update:   []string{"organization", "token", "update", "tok-org", "--new-name", "org-token-2", "--description", "new words"},
+			heldRole: "ORGANIZATION_MEMBER", held: "this Organization API token already has that role on the Organization",
+		},
+	}
+	for _, f := range families {
+		for _, format := range []string{"text", "json"} {
+			t.Run(f.name+"/a role it already holds/"+format, func(t *testing.T) {
+				m := tokenMock(t, f.tok)
+				changesNothing(m, f.tok)
+				r := execAstroCmd(t, m, "", f.root, append(f.update, "--role", f.heldRole, "-o", format)...)
+				require.Error(t, r.err)
+				assert.Equal(t, f.held, r.err.Error())
+				assert.Equal(t, cliout.ExitFailure, r.code)
+				assertNothingChanged(t, m)
+				if format == "json" {
+					var got errorJSON
+					decodeOne(t, r.stdout, &got)
+					assert.Equal(t, f.held, got.Error)
+				} else {
+					assert.Empty(t, r.stdout)
+				}
+			})
+		}
+
+		t.Run(f.name+"/a role that is not one", func(t *testing.T) {
+			m := tokenMock(t, f.tok)
+			changesNothing(m, f.tok)
+			r := execAstroCmd(t, m, "", f.root, append(f.update, "--role", "NOT_A_ROLE")...)
+			require.Error(t, r.err)
+			assert.Contains(t, r.err.Error(), "requested role is invalid")
+			assert.Empty(t, m.Calls, "refused before any request, the lookup included")
+		})
+
+		t.Run(f.name+"/a role the API refuses", func(t *testing.T) {
+			m := tokenMock(t, f.tok)
+			m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &f.tok}, nil).Maybe()
+			m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, f.tok.Id, mock.Anything).Return(&astrov1.UpdateApiTokenRolesResponse{
+				HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
+				Body:         []byte(`{"message":"you may not grant that role"}`),
+			}, nil)
+			// A valid role the token does not hold, which the API then refuses.
+			role := "WORKSPACE_OWNER"
+			if f.name == "organization" {
+				role = "ORGANIZATION_OWNER"
+			}
+			r := execAstroCmd(t, m, "", f.root, append(f.update, "--role", role)...)
+			require.Error(t, r.err)
+			assert.Contains(t, r.err.Error(), "you may not grant that role")
+			m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			assert.Empty(t, r.stdout)
+		})
+	}
+}
+
+// A Workspace token update changes only what it was given: without --role it
+// sends no role change, and --role has no default for a help text to
+// misstate. The Organization family already sent none.
+func TestWorkspaceOrganizationTokenUpdateWithoutRole(t *testing.T) {
+	ws, org := jsonWsOrgTokenFixtures()
+	for _, f := range []struct {
+		name string
+		root func(io.Writer) *cobra.Command
+		tok  astrov1.ApiToken
+		args []string
+		role string
+	}{
+		{"workspace", newWorkspaceCmd, ws, []string{"workspace", "token", "update", "tok-ws", "--description", "new words"}, "WORKSPACE_MEMBER"},
+		{"organization", newOrganizationCmd, org, []string{"organization", "token", "update", "tok-org", "--description", "new words"}, "ORGANIZATION_MEMBER"},
+	} {
+		update, _, err := f.root(io.Discard).Find(f.args[1:3])
+		require.NoError(t, err)
+		role := update.Flags().Lookup("role")
+		require.NotNil(t, role)
+		assert.Empty(t, role.DefValue, "%s: --role has no default", f.name)
+		assert.Contains(t, role.Usage, "Without it, the token keeps its role", f.name)
+
+		for _, format := range []string{"text", "json"} {
+			t.Run(f.name+"/"+format, func(t *testing.T) {
+				m := tokenMock(t, f.tok)
+				m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, f.tok.Id, mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &f.tok}, nil)
+				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(rolesOK(), nil).Maybe()
+
+				r := execAstroCmd(t, m, "", f.root, append(f.args, "-o", format)...)
+				require.NoError(t, r.err)
+				m.AssertCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, f.tok.Id, mock.Anything)
+				m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				if format == "json" {
+					var got tokenJSON
+					decodeOne(t, r.stdout, &got)
+					assert.Equal(t, f.role, got.Role, "the role it kept")
+				}
+			})
+		}
 	}
 }

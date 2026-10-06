@@ -22,6 +22,7 @@ var (
 	ErrInvalidName               = errors.New("no name provided for the organization token. Retry with a valid name")
 	errOrganizationTokenNotFound = errors.New("organization token specified was not found")
 	errOrgTokenInWorkspace       = errors.New("this Organization API token has already been added to the Workspace with that role")
+	errOrgTokenRoleSet           = errors.New("this Organization API token already has that role on the Organization")
 	errWrongTokenTypeSelected    = errors.New("the token selected is not of the type you are trying to modify")
 )
 
@@ -29,7 +30,8 @@ const (
 	organizationEntity = "ORGANIZATION"
 	tokenPaginationLim = 100
 
-	pickHeading        = "\nPlease select the Organization API token you would like to update:"
+	// The plain choice has no heading here: the picker asks it in words
+	// that suit the command, which this package does not know.
 	pickSharedNameHead = "\nThere are more than one API tokens with name %s. Please select an API token:"
 )
 
@@ -117,7 +119,7 @@ func listOrgScopedAPITokens(client astrov1.APIClient) ([]astrov1.ApiToken, error
 func getOrganizationToken(id, name string, tokens []astrov1.ApiToken, pick apitoken.Picker) (token astrov1.ApiToken, err error) {
 	switch {
 	case id == "" && name == "":
-		token, err = apitoken.Pick(pick, pickHeading, tokens, orgRoleOf)
+		token, err = apitoken.Pick(pick, "", tokens, orgRoleOf)
 		if err != nil {
 			return astrov1.ApiToken{}, err
 		}
@@ -265,11 +267,22 @@ func CreateToken(name, description, role string, expiration int, client astrov1.
 	return apitoken.WithSecret(apitoken.FromAPI(created, role), created), nil
 }
 
-// UpdateToken updates an Organization-scoped API token. Name/description are updated via
-// UpdateApiToken; a role change is written via UpdateApiTokenRoles (full role-set replacement).
-// The name and description are sent first, so a role that is not valid is
-// refused after them.
+// UpdateToken updates an Organization-scoped API token's name and
+// description, through UpdateApiToken, and its Organization role when role is
+// not "", through UpdateApiTokenRoles (which replaces the whole role set). An
+// empty newName or description keeps the token's own; an empty role leaves
+// the role alone, and no role change is sent.
+//
+// A role that is not an Organization role is refused before anything is
+// asked or sent, and a role the token already holds before anything is sent.
+// The role is changed before the name and description, so a role the API
+// refuses leaves the token as it was.
 func UpdateToken(id, name, newName, description, role string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
+	if role != "" {
+		if err := user.IsOrganizationRoleValid(role); err != nil {
+			return apitoken.Update{}, err
+		}
+	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return apitoken.Update{}, err
@@ -277,6 +290,21 @@ func UpdateToken(id, name, newName, description, role string, pick apitoken.Pick
 	token, err := FindToken(id, name, ctx.Organization, pick, client)
 	if err != nil {
 		return apitoken.Update{}, err
+	}
+
+	currentRole := orgRoleOf(&token)
+	if role != "" && role == currentRole {
+		return apitoken.Update{}, errOrgTokenRoleSet
+	}
+	if role != "" {
+		newRoles := apitoken.WithRole(apitoken.Roles(&token), astrov1.ApiTokenRoleEntityTypeORGANIZATION, ctx.Organization, role)
+		rolesResp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), ctx.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
+		if err != nil {
+			return apitoken.Update{}, err
+		}
+		if err := astrov1.NormalizeAPIError(rolesResp.HTTPResponse, rolesResp.Body); err != nil {
+			return apitoken.Update{}, err
+		}
 	}
 
 	updateReq := astrov1.UpdateApiTokenJSONRequestBody{}
@@ -308,19 +336,8 @@ func UpdateToken(id, name, newName, description, role string, pick apitoken.Pick
 		updated.Name, updated.Description = updateReq.Name, *updateReq.Description
 	}
 
-	newRole := orgRoleOf(&token)
+	newRole := currentRole
 	if role != "" {
-		if err := user.IsOrganizationRoleValid(role); err != nil {
-			return apitoken.Update{}, err
-		}
-		newRoles := apitoken.WithRole(apitoken.Roles(&token), astrov1.ApiTokenRoleEntityTypeORGANIZATION, ctx.Organization, role)
-		rolesResp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), ctx.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
-		if err != nil {
-			return apitoken.Update{}, err
-		}
-		if err := astrov1.NormalizeAPIError(rolesResp.HTTPResponse, rolesResp.Body); err != nil {
-			return apitoken.Update{}, err
-		}
 		newRole = role
 	}
 	return apitoken.Update{Token: apitoken.FromAPI(&updated, newRole), PreviousName: token.Name}, nil

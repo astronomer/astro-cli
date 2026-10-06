@@ -177,7 +177,7 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 		got, err := FindToken("", "", deploymentID, nil, pick, resultClient(a, b))
 		require.NoError(t, err)
 		assert.Equal(t, "t2", got.Id)
-		assert.Equal(t, "\nPlease select the Deployment API token:", heading)
+		assert.Empty(t, heading, "the picker asks the plain choice in its own words")
 		require.Len(t, offered, 2)
 		assert.Equal(t, "DEPLOYMENT_MEMBER", offered[1].Role)
 	})

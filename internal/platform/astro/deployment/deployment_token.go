@@ -41,7 +41,8 @@ var (
 const deploymentEntity = "DEPLOYMENT"
 
 const (
-	pickHeading        = "\nPlease select the Deployment API token:"
+	// The plain choice has no heading here: the picker asks it in words
+	// that suit the command, which this package does not know.
 	pickSharedNameHead = "\nThere are more than one API tokens with name %s. Please select an API token:"
 )
 
@@ -285,7 +286,7 @@ func getDeploymentToken(id, name, deploymentID string, tokens []astrov1.ApiToken
 	roleOf := deploymentRoleReader(deploymentID)
 	switch {
 	case id == "" && name == "":
-		token, err = apitoken.Pick(pick, pickHeading, tokens, roleOf)
+		token, err = apitoken.Pick(pick, "", tokens, roleOf)
 		if err != nil {
 			return astrov1.ApiToken{}, err
 		}

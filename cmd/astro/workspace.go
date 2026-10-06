@@ -368,7 +368,7 @@ func newWorkspaceTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the "+
-		"token. Possible values are "+allowedWorkspaceRoleNamesProse)
+		"token. Possible values are "+allowedWorkspaceRoleNamesProse+". Without it, the token keeps its role")
 	return cmd
 }
 

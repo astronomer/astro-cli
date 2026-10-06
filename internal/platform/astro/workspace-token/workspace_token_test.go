@@ -429,9 +429,8 @@ func (s *Suite) TestUpdateToken() {
 
 	s.Run("error path when workspace role is invalid returns an error", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		// No call is registered: the role is refused before any request.
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseOK, nil)
-		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil)
 
 		_, err := UpdateToken("token1", "", "", "", "Invalid Role", "", pickIndex(1), mockClient)
 		s.Equal(user.ErrInvalidWorkspaceRole.Error(), err.Error())

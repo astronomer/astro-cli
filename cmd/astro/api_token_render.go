@@ -96,15 +96,20 @@ func renderTokenLine(format cliout.Format, out io.Writer, v any, line string) er
 
 // newTokenPicker asks a person to choose a token from the numbered table
 // table lays out, refusing an answer that is not one of its numbers with
-// invalid. Under --output json it refuses before it writes anything, naming
+// invalid. Its heading is question, which says what the command will do with
+// the token, unless the platform gave one of its own (a name several tokens
+// share). Under --output json it refuses before it writes anything, naming
 // the token ID or nameFlag as what answers it (the token ID alone when
 // nameFlag is "", for a command with no name flag).
-func newTokenPicker(out io.Writer, table func([]apitoken.Token) *cliout.Table, invalid error, nameFlag string) apitoken.Picker {
+func newTokenPicker(out io.Writer, table func([]apitoken.Token) *cliout.Table, invalid error, nameFlag, question string) apitoken.Picker {
 	answers := "the token ID"
 	if nameFlag != "" {
 		answers += " or " + nameFlag
 	}
 	return func(heading string, tokens []apitoken.Token) (int, error) {
+		if heading == "" {
+			heading = "\n" + question
+		}
 		about := input.About("an API token")
 		answeredBy := input.AnsweredBy(answers)
 		if err := input.MayAsk("\n> ", about, answeredBy); err != nil {
@@ -133,24 +138,27 @@ var (
 	errInvalidOrganizationTokenKey = errors.New("invalid Organization API token selection")
 )
 
-// deploymentTokenPicker picks among a Deployment's tokens, by their role on it.
+// deploymentTokenPicker picks among a Deployment's tokens, by their role on
+// it. Its question names no action; it has always been the same for every
+// command that asks it.
 func deploymentTokenPicker(out io.Writer, nameFlag string) apitoken.Picker {
 	return newTokenPicker(out, func(tokens []apitoken.Token) *cliout.Table {
 		return tokenTable(tokens, deploymentRoleHeader, true)
-	}, errInvalidDeploymentTokenKey, nameFlag)
+	}, errInvalidDeploymentTokenKey, nameFlag, "Please select the Deployment API token:")
 }
 
-// workspaceTokenPicker picks among a Workspace's tokens, by their role on it.
-func workspaceTokenPicker(out io.Writer, nameFlag string) apitoken.Picker {
+// workspaceTokenPicker picks among a Workspace's tokens, by their role on it,
+// asking question.
+func workspaceTokenPicker(out io.Writer, nameFlag, question string) apitoken.Picker {
 	return newTokenPicker(out, func(tokens []apitoken.Token) *cliout.Table {
 		return tokenTable(tokens, workspaceRoleHeader, true)
-	}, errInvalidWorkspaceTokenKey, nameFlag)
+	}, errInvalidWorkspaceTokenKey, nameFlag, question)
 }
 
-// organizationTokenPicker picks among the Organization's tokens. Its table
-// has always been shorter than the others: no ID, scope or creator, and the
-// lifetime the token was created with.
-func organizationTokenPicker(out io.Writer, nameFlag string) apitoken.Picker {
+// organizationTokenPicker picks among the Organization's tokens, asking
+// question. Its table has always been shorter than the others: no ID, scope
+// or creator, and the lifetime the token was created with.
+func organizationTokenPicker(out io.Writer, nameFlag, question string) apitoken.Picker {
 	return newTokenPicker(out, func(tokens []apitoken.Token) *cliout.Table {
 		tab := &cliout.Table{Header: []string{"#", "NAME", "DESCRIPTION", "ROLE", "EXPIRES"}}
 		for i := range tokens {
@@ -162,7 +170,7 @@ func organizationTokenPicker(out io.Writer, nameFlag string) apitoken.Picker {
 			tab.AddRow(strconv.Itoa(i+1), t.Name, t.Description, t.Role, expires)
 		}
 		return tab
-	}, errInvalidOrganizationTokenKey, nameFlag)
+	}, errInvalidOrganizationTokenKey, nameFlag, question)
 }
 
 // confirmTokenChange asks question, after warning when there is one. Under

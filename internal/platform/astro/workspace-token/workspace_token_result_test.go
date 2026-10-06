@@ -141,11 +141,42 @@ func TestUpdateTokenResult(t *testing.T) {
 		m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "t1", mock.Anything).Return(&astrov1.UpdateApiTokenResponse{
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &after,
 		}, nil)
-		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t1", mock.Anything).Return(rolesOK(), nil)
 
 		got, err := UpdateToken("t1", "", "uno", "", "", "", noPicking(t), m)
 		require.NoError(t, err)
 		assert.Equal(t, "WORKSPACE_MEMBER", got.Token.Role)
+		m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+// An update whose role is refused changes nothing: the mocks register no
+// call that changes anything unless the case says so, and any such call
+// would panic them.
+func TestUpdateTokenRefusesBeforeChanging(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	before := resultToken("t1", "one", astrov1.ApiTokenScopeWORKSPACE, "WORKSPACE_MEMBER")
+
+	t.Run("a role that is not a Workspace role", func(t *testing.T) {
+		m := new(astrov1_mocks.ClientWithResponsesInterface)
+		_, err := UpdateToken("", "", "uno", "", "NOT_A_ROLE", "", noPicking(t), m)
+		require.Error(t, err)
+		m.AssertExpectations(t)
+	})
+
+	t.Run("a role it already holds", func(t *testing.T) {
+		m := resultClient(before)
+		_, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_MEMBER", "", noPicking(t), m)
+		assert.EqualError(t, err, "this Workspace API token already has that role on the Workspace")
+	})
+
+	t.Run("a role the API refuses", func(t *testing.T) {
+		m := resultClient(before)
+		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t1", mock.Anything).Return(&astrov1.UpdateApiTokenRolesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusBadRequest}, Body: []byte(`{"message":"no such role"}`),
+		}, nil)
+		_, err := UpdateToken("t1", "", "uno", "", "WORKSPACE_OWNER", "", noPicking(t), m)
+		require.Error(t, err)
+		m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
 
@@ -226,8 +257,21 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 		got, err := FindToken("", "", workspaceID, "test-org-id", nil, pick, resultClient(a, b))
 		require.NoError(t, err)
 		assert.Equal(t, "t2", got.Id)
-		assert.Equal(t, "\nPlease select the Workspace API token you would like to add to the Deployment:", heading)
+		assert.Empty(t, heading, "the picker asks the plain choice in its own words")
 		require.Len(t, offered, 2)
+		assert.Equal(t, "WORKSPACE_OWNER", offered[1].Role)
+	})
+
+	t.Run("naming no Workspace offers each role on the current one", func(t *testing.T) {
+		var offered []apitoken.Token
+		pick := func(_ string, tokens []apitoken.Token) (int, error) {
+			offered = tokens
+			return 0, nil
+		}
+		_, err := FindToken("", "", "", "test-org-id", nil, pick, resultClient(a, b))
+		require.NoError(t, err)
+		require.Len(t, offered, 2)
+		assert.Equal(t, "WORKSPACE_MEMBER", offered[0].Role)
 		assert.Equal(t, "WORKSPACE_OWNER", offered[1].Role)
 	})
 
