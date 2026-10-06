@@ -1,16 +1,16 @@
 {
-  "objectKey": "x",
-  "objectId": "x",
-  "workspaceValue": "x",
-  "isSecret": true,
-  "autoLinkDeployments": true,
+  "object_key": "x",
+  "object_id": "x",
+  "workspace_value": "x",
+  "is_secret": true,
+  "auto_link_deployments": true,
   "links": [
     {
-      "deploymentId": "x",
-      "overrideValue": "x"
+      "deployment_id": "x",
+      "override_value": "x"
     }
   ],
-  "excludeLinks": [
+  "exclude_links": [
     "x"
   ]
 }

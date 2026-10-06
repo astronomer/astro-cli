@@ -1,19 +1,19 @@
 {
-  "objectKey": "x",
-  "objectId": "x",
-  "autoLinkDeployments": true,
+  "object_key": "x",
+  "object_id": "x",
+  "auto_link_deployments": true,
   "links": [
     {
-      "deploymentId": "x",
+      "deployment_id": "x",
       "overrides": {
         "x": null
       },
-      "setFields": [
+      "set_fields": [
         "x"
       ]
     }
   ],
-  "excludeLinks": [
+  "exclude_links": [
     "x"
   ]
 }

@@ -79,16 +79,16 @@ var errNilObject = errors.New("nil environment object")
 // publishedPayloads): a map's key is data, which a golden cannot see.
 type (
 	VariableList struct {
-		Variables []astrov1.EnvironmentObject `json:"variables"`
+		Variables []ObjectInfo `json:"variables"`
 	}
 	ConnectionList struct {
-		Connections []astrov1.EnvironmentObject `json:"connections"`
+		Connections []ObjectInfo `json:"connections"`
 	}
 	AirflowVariableList struct {
-		AirflowVariables []astrov1.EnvironmentObject `json:"airflow_variables"`
+		AirflowVariables []ObjectInfo `json:"airflow_variables"`
 	}
 	MetricsExportList struct {
-		MetricsExports []astrov1.EnvironmentObject `json:"metrics_exports"`
+		MetricsExports []ObjectInfo `json:"metrics_exports"`
 	}
 	// InventoryList is `astro env list`, every kind at once.
 	InventoryList struct {
@@ -108,7 +108,7 @@ func nonNil[T any](s []T) []T {
 
 // WriteVarList renders a list of ENVIRONMENT_VARIABLE objects.
 func WriteVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, VariableList{Variables: nonNil(envObjs)},
+	return write(out, format, VariableList{Variables: newObjectInfos(envObjs)},
 		func(w io.Writer) error { return writeVarTable(envObjs, includeSecrets, w) },
 		func(w io.Writer) error { return writeVarDotenv(envObjs, includeSecrets, w) })
 }
@@ -119,7 +119,7 @@ func WriteVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets b
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, envObj,
+	return write(out, format, newObjectInfo(envObj),
 		func(w io.Writer) error { return writeVarTable(one, includeSecrets, w) },
 		func(w io.Writer) error { return writeVarDotenv(one, includeSecrets, w) })
 }
@@ -131,7 +131,7 @@ func WriteVarLinks(report *VarLinksReport, format Format, includeSecrets bool, o
 
 // WriteConnList renders a list of CONNECTION objects.
 func WriteConnList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, ConnectionList{Connections: nonNil(envObjs)}, func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
+	return write(out, format, ConnectionList{Connections: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
 }
 
 // WriteConn renders a single CONNECTION object.
@@ -140,13 +140,13 @@ func WriteConn(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) 
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, envObj, func(w io.Writer) error { return writeConnTable(one, w) }, nil)
+	return write(out, format, newObjectInfo(envObj), func(w io.Writer) error { return writeConnTable(one, w) }, nil)
 }
 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
 // Same shape as ENVIRONMENT_VARIABLE.
 func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, AirflowVariableList{AirflowVariables: nonNil(envObjs)},
+	return write(out, format, AirflowVariableList{AirflowVariables: newObjectInfos(envObjs)},
 		func(w io.Writer) error { return writeAirflowVarTable(envObjs, includeSecrets, w) }, nil)
 }
 
@@ -156,13 +156,13 @@ func WriteAirflowVar(envObj *astrov1.EnvironmentObject, format Format, includeSe
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, envObj,
+	return write(out, format, newObjectInfo(envObj),
 		func(w io.Writer) error { return writeAirflowVarTable(one, includeSecrets, w) }, nil)
 }
 
 // WriteMetricsExportList renders a list of METRICS_EXPORT objects.
 func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, MetricsExportList{MetricsExports: nonNil(envObjs)}, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
+	return write(out, format, MetricsExportList{MetricsExports: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
 }
 
 // WriteMetricsExport renders a single METRICS_EXPORT object.
@@ -171,7 +171,7 @@ func WriteMetricsExport(envObj *astrov1.EnvironmentObject, format Format, out io
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, envObj, func(w io.Writer) error { return writeMetricsExportTable(one, w) }, nil)
+	return write(out, format, newObjectInfo(envObj), func(w io.Writer) error { return writeMetricsExportTable(one, w) }, nil)
 }
 
 func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {

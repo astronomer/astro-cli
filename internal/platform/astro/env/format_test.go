@@ -196,7 +196,7 @@ func (s *Suite) TestWriteVarJSON() {
 	var buf bytes.Buffer
 	s.NoError(WriteVarList(objs, FormatJSON, false, &buf))
 	out := buf.String()
-	s.Contains(out, `"objectKey": "FOO"`)
+	s.Contains(out, `"object_key": "FOO"`)
 	s.Contains(out, id)
 }
 

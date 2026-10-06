@@ -62,7 +62,7 @@ func TestEnvOutputIsTheFormat(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal([]byte(out), &got), out)
 			require.Len(t, got.Variables, 1)
-			assert.Equal(t, "FOO", got.Variables[0]["objectKey"])
+			assert.Equal(t, "FOO", got.Variables[0]["object_key"])
 			requireNothingWritten(t, dir)
 			mc.AssertExpectations(t)
 		})

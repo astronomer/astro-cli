@@ -12,7 +12,6 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
-	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
@@ -79,7 +78,7 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "env-connection-list", Value: env.ConnectionList{}},
 	{Name: "env-airflow-variable-list", Value: env.AirflowVariableList{}},
 	{Name: "env-metrics-export-list", Value: env.MetricsExportList{}},
-	{Name: "env-object", Value: astrov1.EnvironmentObject{}},
+	{Name: "env-object", Value: env.ObjectInfo{}},
 	{Name: "env-variable-link-list", Value: env.VarLinksReport{}},
 	{Name: "env-link-list", Value: env.LinksReport{}},
 }

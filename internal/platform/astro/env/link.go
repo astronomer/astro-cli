@@ -205,19 +205,19 @@ func (o *LinkOverride) request(kind LinkKind) (req *astrov1.UpdateEnvironmentObj
 // VarLinksReport is the consolidated view of how a workspace-scoped env var is
 // attached (or excluded) across deployments. Returned by ListVarLinks.
 type VarLinksReport struct {
-	ObjectKey           string    `json:"objectKey"`
-	ObjectID            string    `json:"objectId"`
-	WorkspaceValue      string    `json:"workspaceValue"`
-	IsSecret            bool      `json:"isSecret"`
-	AutoLinkDeployments bool      `json:"autoLinkDeployments"`
+	ObjectKey           string    `json:"object_key"`
+	ObjectID            string    `json:"object_id"`
+	WorkspaceValue      string    `json:"workspace_value"`
+	IsSecret            bool      `json:"is_secret"`
+	AutoLinkDeployments bool      `json:"auto_link_deployments"`
 	Links               []VarLink `json:"links"`
-	ExcludeLinks        []string  `json:"excludeLinks"`
+	ExcludeLinks        []string  `json:"exclude_links"`
 }
 
 // VarLink describes one explicit Link entry on a workspace env var.
 type VarLink struct {
-	DeploymentID  string  `json:"deploymentId"`
-	OverrideValue *string `json:"overrideValue,omitempty"`
+	DeploymentID  string  `json:"deployment_id"`
+	OverrideValue *string `json:"override_value,omitempty"`
 }
 
 // LinksReport is the link state of a workspace connection or Airflow
@@ -225,18 +225,18 @@ type VarLink struct {
 // so the overrides are a map, and SetFields names the ones set even when
 // they are secret and so absent from Overrides.
 type LinksReport struct {
-	ObjectKey           string       `json:"objectKey"`
-	ObjectID            string       `json:"objectId"`
-	AutoLinkDeployments bool         `json:"autoLinkDeployments"`
+	ObjectKey           string       `json:"object_key"`
+	ObjectID            string       `json:"object_id"`
+	AutoLinkDeployments bool         `json:"auto_link_deployments"`
 	Links               []ObjectLink `json:"links"`
-	ExcludeLinks        []string     `json:"excludeLinks"`
+	ExcludeLinks        []string     `json:"exclude_links"`
 }
 
 // ObjectLink is one explicit link in a LinksReport.
 type ObjectLink struct {
-	DeploymentID string         `json:"deploymentId"`
+	DeploymentID string         `json:"deployment_id"`
 	Overrides    map[string]any `json:"overrides,omitempty"`
-	SetFields    []string       `json:"setFields,omitempty"`
+	SetFields    []string       `json:"set_fields,omitempty"`
 }
 
 // LinkVar sets a workspace-scoped env var's link to a deployment.

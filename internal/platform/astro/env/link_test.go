@@ -453,7 +453,7 @@ func (s *Suite) TestListVarLinksEmptyMarshalsAsArrays() {
 	b, err := json.Marshal(report)
 	s.NoError(err)
 	s.Contains(string(b), `"links":[]`)
-	s.Contains(string(b), `"excludeLinks":[]`)
+	s.Contains(string(b), `"exclude_links":[]`)
 	mc.AssertExpectations(s.T())
 }
 

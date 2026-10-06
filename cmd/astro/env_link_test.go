@@ -132,12 +132,12 @@ func TestEnvAirflowVarLinkSetAndList(t *testing.T) {
 		require.NoError(t, err)
 		var got map[string]any
 		require.NoError(t, json.Unmarshal([]byte(out), &got))
-		assert.Equal(t, "region", got["objectKey"])
-		assert.Equal(t, []any{}, got["excludeLinks"])
+		assert.Equal(t, "region", got["object_key"])
+		assert.Equal(t, []any{}, got["exclude_links"])
 		assert.Equal(t, []any{map[string]any{
-			"deploymentId": depID,
-			"overrides":    map[string]any{"value": "eu-west-1"},
-			"setFields":    []any{"value"},
+			"deployment_id": depID,
+			"overrides":     map[string]any{"value": "eu-west-1"},
+			"set_fields":    []any{"value"},
 		}}, got["links"])
 		mc.AssertExpectations(t)
 	})
