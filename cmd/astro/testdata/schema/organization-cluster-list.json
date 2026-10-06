@@ -3,7 +3,7 @@
     {
       "name": "x",
       "id": "x",
-      "cloudProvider": "x",
+      "cloud_provider": "x",
       "region": "x",
       "type": "x",
       "status": "x"

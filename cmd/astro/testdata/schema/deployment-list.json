@@ -2,18 +2,18 @@
   "deployments": [
     {
       "name": "x",
-      "workspaceName": "x",
+      "workspace_name": "x",
       "namespace": "x",
-      "clusterName": "x",
-      "cloudProvider": "x",
+      "cluster_name": "x",
+      "cloud_provider": "x",
       "region": "x",
-      "deploymentId": "x",
-      "runtimeVersion": "x",
-      "airflowVersion": "x",
-      "isDagDeployEnabled": true,
-      "isCicdEnforced": true,
+      "deployment_id": "x",
+      "runtime_version": "x",
+      "airflow_version": "x",
+      "dag_deploy_enabled": true,
+      "ci_cd_enforcement": true,
       "type": "x",
-      "isRemoteExecutionEnabled": true
+      "is_remote_execution_enabled": true
     }
   ]
 }
