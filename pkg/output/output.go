@@ -1,28 +1,24 @@
+// Package output renders the cloud lists' tables. It does not encode json:
+// a list's result goes to the command's Renderer, whose json is the CLI's
+// one encoder (cmd/cliout), and this package draws only the text view.
 package output
 
 import (
 	"fmt"
 	"io"
-	"os"
-
-	"github.com/fatih/color"
-	"github.com/mattn/go-isatty"
-	jsoncolor "github.com/neilotoole/jsoncolor"
 
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-// Format is the rendering a Printer draws. It is not parsed here: the cmd
-// layer parses -o/--output with cliout.ParseFormat, the one parser, and
-// converts the result. A pkg/ package cannot import cmd/ to take its type.
-type Format string
-
-const (
-	// FormatText outputs the human rendering, a table
-	FormatText Format = "text"
-	// FormatJSON outputs in JSON format
-	FormatJSON Format = "json"
-)
+// Emitter is the door a command's result leaves by: the value, which it
+// publishes as json when the command was asked for json, and the text
+// renderer it runs otherwise. cmd/cliout.Renderer is the implementation the
+// CLI runs. It lives in cmd/, which nothing below cmd/ may import, so the
+// command hands its Renderer down as this, and the json layout (pretty and
+// colored on a terminal, compact when piped) is decided in one place.
+type Emitter interface {
+	Emit(v any, text func(w io.Writer) error) error
+}
 
 // TableColumn defines how to extract one column from a data item (type-erased)
 type TableColumn struct {
@@ -100,65 +96,11 @@ func BuildTableConfig[T any](columns []Column[T], items func(data any) []T, opts
 	return tc
 }
 
-// Options configures how output is formatted
-type Options struct {
-	// Format specifies the output format (text or json)
-	Format Format
-	// Out is the writer for output (defaults to os.Stdout)
-	Out io.Writer
-	// NoColor disables colorization
-	NoColor bool
-	// Table configures table rendering (required when Format == FormatText)
-	Table *TableConfig
-}
-
-// GetOut returns the output writer, defaulting to os.Stdout
-func (o *Options) GetOut() io.Writer {
-	if o.Out != nil {
-		return o.Out
-	}
-	return os.Stdout
-}
-
-// IsColorEnabled returns true if color output should be enabled
-func (o *Options) IsColorEnabled() bool {
-	if o.NoColor || color.NoColor {
-		return false
-	}
-	if f, ok := o.GetOut().(*os.File); ok {
-		return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
-	}
-	return false
-}
-
-// Printer provides consistent output formatting across commands
-type Printer struct {
-	opts Options
-}
-
-// New creates a new Printer with the given options
-func New(opts Options) *Printer {
-	return &Printer{opts: opts}
-}
-
-// Print outputs data according to the configured format
-func (p *Printer) Print(data any) error {
-	switch p.opts.Format {
-	case FormatJSON:
-		return p.printJSON(data)
-	case FormatText:
-		if p.opts.Table == nil {
-			return fmt.Errorf("table config required for text format")
-		}
-		return p.printTable(data)
-	default:
-		return fmt.Errorf("unsupported output format: %s", p.opts.Format)
-	}
-}
-
 // printTable renders data as a table using printutil.Table
-func (p *Printer) printTable(data any) error {
-	cfg := p.opts.Table
+func printTable(cfg *TableConfig, data any, out io.Writer) error {
+	if cfg == nil {
+		return fmt.Errorf("table config required for text format")
+	}
 	items := cfg.Items(data)
 
 	headers := make([]string, len(cfg.Columns))
@@ -183,33 +125,17 @@ func (p *Printer) printTable(data any) error {
 		tab.AddRow(row, colored)
 	}
 
-	return tab.Print(p.opts.GetOut())
+	return tab.Print(out)
 }
 
-// printJSON outputs data as JSON (with optional colorization)
-func (p *Printer) printJSON(data any) error {
-	enc := jsoncolor.NewEncoder(p.opts.GetOut())
-	enc.SetIndent("", "  ")
-	enc.SetEscapeHTML(false)
-
-	if p.opts.IsColorEnabled() {
-		enc.SetColors(jsoncolor.DefaultColors())
-	}
-
-	return enc.Encode(data)
-}
-
-// PrintData fetches data via fetchFn and renders it using the given table config, format, and writer.
-// This eliminates boilerplate in the common pattern of: fetch data, create printer, call Print.
-func PrintData[T any](fetchFn func() (*T, error), tableCfg *TableConfig, format Format, out io.Writer) error {
+// PrintData fetches data via fetchFn and publishes it through r: as json, or
+// as the table tableCfg describes. This eliminates boilerplate in the common
+// pattern of: fetch data, then render it in the format the command was asked
+// for.
+func PrintData[T any](fetchFn func() (*T, error), tableCfg *TableConfig, r Emitter) error {
 	data, err := fetchFn()
 	if err != nil {
 		return err
 	}
-
-	return New(Options{
-		Format: format,
-		Out:    out,
-		Table:  tableCfg,
-	}).Print(data)
+	return r.Emit(data, func(w io.Writer) error { return printTable(tableCfg, data, w) })
 }

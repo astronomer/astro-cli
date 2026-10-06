@@ -73,6 +73,7 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 
 	defer input.SetGuard(refuseUnderJSON(root, args))()
 
+	ResetStream()
 	root.SetArgs(args)
 	cmd, err := root.ExecuteContextC(ctx)
 	if err == nil {

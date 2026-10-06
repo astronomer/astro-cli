@@ -8,7 +8,6 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/pkg/output"
 )
 
 var (
@@ -86,7 +85,7 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.ListBundlesWithFormat(ws, deploymentID, output.Format(format), out, astroV1Client, astroV1Alpha1Client)
+			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: format, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &bundleListOutput)

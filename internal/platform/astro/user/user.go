@@ -634,10 +634,10 @@ func userTableConfigWithRoleColumn(roleHeader string, role func(UserInfo) string
 var deploymentUserTableConfig = userTableConfigWithRoleColumn("DEPLOYMENT ROLE", func(u UserInfo) string { return u.DeploymentRole })
 
 // ListDeploymentUsersWithFormat lists deployment users with the specified output format
-func ListDeploymentUsersWithFormat(client astrov1.APIClient, deploymentID string, format output.Format, out io.Writer) error {
+func ListDeploymentUsersWithFormat(client astrov1.APIClient, deploymentID string, r output.Emitter) error {
 	return output.PrintData(
 		func() (*UserList, error) { return ListDeploymentUsersData(client, deploymentID) },
-		deploymentUserTableConfig, format, out,
+		deploymentUserTableConfig, r,
 	)
 }
 
@@ -667,10 +667,10 @@ func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*User
 var workspaceUserTableConfig = userTableConfigWithRoleColumn("WORKSPACE ROLE", func(u UserInfo) string { return u.WorkspaceRole })
 
 // ListWorkspaceUsersWithFormat lists workspace users with the specified output format
-func ListWorkspaceUsersWithFormat(client astrov1.APIClient, workspaceID string, format output.Format, out io.Writer) error {
+func ListWorkspaceUsersWithFormat(client astrov1.APIClient, workspaceID string, r output.Emitter) error {
 	return output.PrintData(
 		func() (*UserList, error) { return ListWorkspaceUsersData(client, workspaceID) },
-		workspaceUserTableConfig, format, out,
+		workspaceUserTableConfig, r,
 	)
 }
 
@@ -702,9 +702,9 @@ func ListOrgUsersData(client astrov1.APIClient) (*UserList, error) {
 var orgUserTableConfig = userTableConfigWithRoleColumn("ORGANIZATION ROLE", func(u UserInfo) string { return u.OrgRole })
 
 // ListOrgUsersWithFormat lists organization users with the specified output format
-func ListOrgUsersWithFormat(client astrov1.APIClient, format output.Format, out io.Writer) error {
+func ListOrgUsersWithFormat(client astrov1.APIClient, r output.Emitter) error {
 	return output.PrintData(
 		func() (*UserList, error) { return ListOrgUsersData(client) },
-		orgUserTableConfig, format, out,
+		orgUserTableConfig, r,
 	)
 }

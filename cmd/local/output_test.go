@@ -36,12 +36,14 @@ func TestEmitJSONIsOneLine(t *testing.T) {
 	}
 }
 
+// A stream is NDJSON whatever the terminal: StyleColor is what a result gets
+// on one, and an event ignores it.
 func TestEmitStreamsNDJSON(t *testing.T) {
 	out := &bytes.Buffer{}
-	r := cliout.Renderer{Format: cliout.FormatJSON, Out: out}
+	r := cliout.Renderer{Format: cliout.FormatJSON, Out: out, Style: cliout.StyleColor}
 	for i := range 3 {
 		e := event{Event: "log", Component: "scheduler", Text: fmt.Sprintf("line %d", i)}
-		if err := r.Emit(e, nil); err != nil {
+		if err := r.EmitEvent(e, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -55,6 +57,47 @@ func TestEmitStreamsNDJSON(t *testing.T) {
 			t.Errorf("line is not standalone JSON: %v: %q", err, l)
 		}
 	}
+}
+
+// What a terminal gets, through the commands themselves: a result is
+// indented, and a stream (check's findings and summary here; stop's state
+// event in lifecycle_test.go, which is Unix-only) stays one object per line.
+// A stream that went through Emit instead of EmitEvent fails here, which
+// nothing off a terminal can show.
+func TestStreamsStayOneLineOnATerminal(t *testing.T) {
+	assertNDJSON := func(t *testing.T, out string) {
+		t.Helper()
+		lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+		if len(lines) == 0 || lines[0] == "" {
+			t.Fatalf("no output")
+		}
+		for _, l := range lines {
+			if !json.Valid([]byte(l)) {
+				t.Errorf("line is not one json object: %q\nin:\n%s", l, out)
+			}
+		}
+	}
+
+	t.Run("check", func(t *testing.T) {
+		d, out := checkDeps(t)
+		d.JSONStyle = cliout.StyleColor
+		if err := execute(t, d, "local", "check", "--output", "json"); err != nil {
+			t.Fatal(err)
+		}
+		assertNDJSON(t, out.String())
+	})
+
+	t.Run("a result is indented", func(t *testing.T) {
+		dir := envProject(t, "\n[tool.astro.env]\nAPI_URL = {}\n")
+		d, out, _ := envDeps(t, dir, "")
+		d.JSONStyle = cliout.StyleIndented
+		if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(out.String(), "{\n  \"") || !json.Valid(out.Bytes()) {
+			t.Errorf("want one indented json object, got:\n%s", out.String())
+		}
+	})
 }
 
 func TestEmitTextRendersSameValue(t *testing.T) {

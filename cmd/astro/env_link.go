@@ -334,7 +334,7 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	return env.WriteLinks(report, env.Format(format), out)
+	return env.WriteLinks(report, cliout.Renderer{Format: format, Out: out})
 }
 
 // article prefixes a noun with "a" or "an".

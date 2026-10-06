@@ -255,6 +255,19 @@ func TestStopWithNothingRunningSucceeds(t *testing.T) {
 	}
 }
 
+// stop's state event is a stream record, so it is one line on a terminal
+// too, where a result would be indented (TestStreamsStayOneLineOnATerminal).
+func TestStopEventIsOneLineOnATerminal(t *testing.T) {
+	d, stdout, _ := stoppedProject(t, "")
+	d.JSONStyle = cliout.StyleColor
+	if err := execute(t, d, "local", "stop", "-o", "json"); err != nil {
+		t.Fatal(err)
+	}
+	if got := stdout.String(); strings.Count(got, "\n") != 1 || !json.Valid([]byte(got)) {
+		t.Errorf("want one compact json line, got %q", got)
+	}
+}
+
 // --clean on a stopped project still fails: it asked for state to be removed,
 // and a stop that finds no record has no mode to remove it for.
 func TestStopCleanWithNothingRunningNamesReset(t *testing.T) {

@@ -3,7 +3,6 @@ package deployment
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -215,10 +214,10 @@ func ListData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient
 }
 
 // ListWithFormat lists deployments with the specified output format
-func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient, format output.Format, out io.Writer) error {
+func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient, r output.Emitter) error {
 	return output.PrintData(
 		func() (*DeploymentList, error) { return ListData(ws, fromAllWorkspaces, astroV1Client) },
-		deploymentTableConfig(fromAllWorkspaces, ws), format, out,
+		deploymentTableConfig(fromAllWorkspaces, ws), r,
 	)
 }
 

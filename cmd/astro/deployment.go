@@ -21,7 +21,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/output"
 )
 
 const (
@@ -222,7 +221,7 @@ func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, output.Format(format), out)
+	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: format, Out: out})
 }
 
 func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -721,7 +720,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, output.Format(format), out)
+	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: format, Out: out})
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -1046,7 +1045,7 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, output.Format(format), out)
+	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: format, Out: out})
 }
 
 func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {

@@ -91,7 +91,7 @@ func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
 	})
 	if devWantsJSON(args) {
-		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout}
+		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout, Style: c.d.JSONStyle}
 		if err := r.Emit(payload, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, renderDevRemoved(payload))
 			return werr

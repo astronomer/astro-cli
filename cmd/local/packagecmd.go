@@ -141,7 +141,9 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 	if note != "" {
 		res.Warnings = append(res.Warnings, note)
 	}
-	return r.Emit(res, func(w io.Writer) error {
+	// An event rather than a result: an image build streamed its progress
+	// before it, and this ends that stream, so it is one line too.
+	return r.EmitEvent(res, func(w io.Writer) error {
 		if err := renderPackage(w, res, m.Astro.Deployments); err != nil {
 			return err
 		}

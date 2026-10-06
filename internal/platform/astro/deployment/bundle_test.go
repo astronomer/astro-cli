@@ -184,7 +184,7 @@ func (s *Suite) TestListBundlesWithFormat() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(listResponse, nil).Once()
 
-		err := ListBundlesWithFormat(ws, testBundleDeploymentID, "text", out, mockV1Client, mockV1Alpha1Client)
+		err := ListBundlesWithFormat(ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "BUNDLE ID")
 		s.Contains(out.String(), "bundle-1")
@@ -199,7 +199,7 @@ func (s *Suite) TestListBundlesWithFormat() {
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(listResponse, nil).Once()
 
-		err := ListBundlesWithFormat(ws, testBundleDeploymentID, "json", out, mockV1Client, mockV1Alpha1Client)
+		err := ListBundlesWithFormat(ws, testBundleDeploymentID, testUtil.Renderer{JSON: true, Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "bundles")
 		s.Contains(out.String(), "bundle-1")
@@ -232,7 +232,7 @@ func (s *Suite) TestListBundlesWithFormat() {
 			return p != nil && p.Offset != nil && *p.Offset == 1
 		})).Return(page2, nil).Once()
 
-		err := ListBundlesWithFormat(ws, testBundleDeploymentID, "text", out, mockV1Client, mockV1Alpha1Client)
+		err := ListBundlesWithFormat(ws, testBundleDeploymentID, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "bundle-1")
 		s.Contains(out.String(), "bundle-2")

@@ -139,7 +139,7 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteMetricsExportList(objs, env.Format(f), out)
+	return env.WriteMetricsExportList(objs, cliout.Renderer{Format: f, Out: out})
 }
 
 func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -157,7 +157,7 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteMetricsExport(obj, env.Format(f), out)
+	return env.WriteMetricsExport(obj, cliout.Renderer{Format: f, Out: out})
 }
 
 // runEnvMetricsSet upserts, with one asymmetry the other nouns do not have:

@@ -455,6 +455,7 @@ func overrideMap(o *astrov1.UpdateEnvironmentObjectOverridesRequest) (map[string
 	default:
 		return nil, nil
 	}
+	//astro:non-output-json — a round trip to a map, never written anywhere.
 	b, err := json.Marshal(typed)
 	if err != nil {
 		return nil, err

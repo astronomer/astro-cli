@@ -136,7 +136,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteAirflowVarList(objs, env.Format(f), envIncludeSecrets, out)
+	return env.WriteAirflowVarList(objs, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -154,7 +154,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	return env.WriteAirflowVar(obj, env.Format(f), envIncludeSecrets, out)
+	return env.WriteAirflowVar(obj, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
 }
 
 func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {

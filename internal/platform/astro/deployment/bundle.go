@@ -290,12 +290,12 @@ func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath 
 }
 
 // ListBundlesWithFormat prints every bundle on a deployment in the requested format.
-func ListBundlesWithFormat(wsID, deploymentID string, format output.Format, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+func ListBundlesWithFormat(wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	return output.PrintData(
 		func() (*BundleList, error) {
 			return ListBundlesData(wsID, deploymentID, astroV1Client, astroV1Alpha1Client)
 		},
-		bundleTableConfig(), format, out,
+		bundleTableConfig(), r,
 	)
 }
 

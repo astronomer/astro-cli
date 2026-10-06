@@ -12,7 +12,7 @@ import (
 // Pass "-" as the path to read from stdin. Delegates parsing to subosito/gotenv,
 // which handles quoted values, multi-line values, escape sequences (\n, \r, \t,
 // \$, \", \\), comments, blank lines, and a leading `export ` prefix. The
-// returned map round-trips with output produced by WriteVarList(FormatDotenv).
+// returned map round-trips with output produced by WriteVarDotenv.
 //
 // Keys must follow POSIX shell variable naming (alphanumerics + underscore,
 // not starting with a digit). Platform objects with non-POSIX keys (e.g.

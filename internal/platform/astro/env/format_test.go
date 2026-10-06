@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/output"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // An empty scope lists nothing, and nothing is [] in json, not null: a script
@@ -17,52 +19,51 @@ func (s *Suite) TestEmptyListsAreJSONArrays() {
 		key string
 		w   writer
 	}{
-		"var list":         {"variables", func(b *bytes.Buffer) error { return WriteVarList(nil, FormatJSON, false, b) }},
-		"conn list":        {"connections", func(b *bytes.Buffer) error { return WriteConnList(nil, FormatJSON, b) }},
-		"airflow var list": {"airflow_variables", func(b *bytes.Buffer) error { return WriteAirflowVarList(nil, FormatJSON, false, b) }},
-		"metrics list":     {"metrics_exports", func(b *bytes.Buffer) error { return WriteMetricsExportList(nil, FormatJSON, b) }},
-		"inventory":        {"objects", func(b *bytes.Buffer) error { return WriteInventory(nil, FormatJSON, b) }},
+		"var list":         {"variables", func(b *bytes.Buffer) error { return WriteVarList(nil, false, jsonTo(b)) }},
+		"conn list":        {"connections", func(b *bytes.Buffer) error { return WriteConnList(nil, jsonTo(b)) }},
+		"airflow var list": {"airflow_variables", func(b *bytes.Buffer) error { return WriteAirflowVarList(nil, false, jsonTo(b)) }},
+		"metrics list":     {"metrics_exports", func(b *bytes.Buffer) error { return WriteMetricsExportList(nil, jsonTo(b)) }},
+		"inventory":        {"objects", func(b *bytes.Buffer) error { return WriteInventory(nil, jsonTo(b)) }},
 	} {
 		var js bytes.Buffer
 		s.NoError(c.w(&js), name)
-		s.Equal("{\n  \""+c.key+"\": []\n}\n", js.String(), name)
+		s.JSONEq(`{"`+c.key+`": []}`, js.String(), name)
 	}
 }
 
-// Every writer goes through one switch, so they agree: json is one object,
-// the value itself for one and the list under its named key for a list, and a
-// format the writer has no view for is refused with the parser's own wording.
-func (s *Suite) TestWritersShareOneSwitch() {
+// Every writer hands the Renderer the same kind of value: one object, the
+// value itself for one and the list under its named key for a list, and a
+// text view of the same data.
+func (s *Suite) TestWritersPublishOneObject() {
 	obj := &astrov1.EnvironmentObject{ObjectKey: "K"}
 	list := []astrov1.EnvironmentObject{*obj}
-	type writer func(Format, *bytes.Buffer) error
+	type writer func(output.Emitter) error
 	cases := []struct {
 		name string
 		w    writer
 		// listKey is the key a list's json holds it under, "" for one object.
 		listKey string
-		dotenv  bool
 	}{
-		{"var", func(f Format, b *bytes.Buffer) error { return WriteVar(obj, f, false, b) }, "", true},
-		{"var list", func(f Format, b *bytes.Buffer) error { return WriteVarList(list, f, false, b) }, "variables", true},
-		{"conn", func(f Format, b *bytes.Buffer) error { return WriteConn(obj, f, b) }, "", false},
-		{"conn list", func(f Format, b *bytes.Buffer) error { return WriteConnList(list, f, b) }, "connections", false},
-		{"airflow var", func(f Format, b *bytes.Buffer) error { return WriteAirflowVar(obj, f, false, b) }, "", false},
-		{"airflow var list", func(f Format, b *bytes.Buffer) error { return WriteAirflowVarList(list, f, false, b) }, "airflow_variables", false},
-		{"metrics", func(f Format, b *bytes.Buffer) error { return WriteMetricsExport(obj, f, b) }, "", false},
-		{"metrics list", func(f Format, b *bytes.Buffer) error { return WriteMetricsExportList(list, f, b) }, "metrics_exports", false},
-		{"var links", func(f Format, b *bytes.Buffer) error {
-			return WriteVarLinks(&VarLinksReport{ObjectKey: "K"}, f, false, b)
-		}, "", false},
-		{"links", func(f Format, b *bytes.Buffer) error { return WriteLinks(&LinksReport{ObjectKey: "K"}, f, b) }, "", false},
-		{"inventory", func(f Format, b *bytes.Buffer) error { return WriteInventory([]InventoryItem{{Key: "K"}}, f, b) }, "objects", false},
+		{"var", func(r output.Emitter) error { return WriteVar(obj, false, r) }, ""},
+		{"var list", func(r output.Emitter) error { return WriteVarList(list, false, r) }, "variables"},
+		{"conn", func(r output.Emitter) error { return WriteConn(obj, r) }, ""},
+		{"conn list", func(r output.Emitter) error { return WriteConnList(list, r) }, "connections"},
+		{"airflow var", func(r output.Emitter) error { return WriteAirflowVar(obj, false, r) }, ""},
+		{"airflow var list", func(r output.Emitter) error { return WriteAirflowVarList(list, false, r) }, "airflow_variables"},
+		{"metrics", func(r output.Emitter) error { return WriteMetricsExport(obj, r) }, ""},
+		{"metrics list", func(r output.Emitter) error { return WriteMetricsExportList(list, r) }, "metrics_exports"},
+		{"var links", func(r output.Emitter) error {
+			return WriteVarLinks(&VarLinksReport{ObjectKey: "K"}, false, r)
+		}, ""},
+		{"links", func(r output.Emitter) error { return WriteLinks(&LinksReport{ObjectKey: "K"}, r) }, ""},
+		{"inventory", func(r output.Emitter) error { return WriteInventory([]InventoryItem{{Key: "K"}}, r) }, "objects"},
 	}
 	for _, c := range cases {
 		var text, js bytes.Buffer
-		s.NoError(c.w(FormatText, &text), c.name)
+		s.NoError(c.w(textTo(&text)), c.name)
 		s.Contains(text.String(), "K", c.name)
 
-		s.NoError(c.w(FormatJSON, &js), c.name)
+		s.NoError(c.w(jsonTo(&js)), c.name)
 		var top map[string]json.RawMessage
 		s.Require().NoError(json.Unmarshal(js.Bytes(), &top), c.name)
 		if c.listKey != "" {
@@ -72,17 +73,14 @@ func (s *Suite) TestWritersShareOneSwitch() {
 			s.Len(items, 1, c.name)
 		}
 		s.Contains(js.String(), `"K"`, c.name)
-
-		s.EqualError(c.w("yaml", new(bytes.Buffer)), "unsupported output format: yaml", c.name)
-
-		err := c.w(FormatDotenv, new(bytes.Buffer))
-		if c.dotenv {
-			s.NoError(err, c.name)
-		} else {
-			s.EqualError(err, "unsupported output format: dotenv", c.name)
-		}
 	}
 }
+
+// jsonTo and textTo stand in for the command's cliout.Renderer, which this
+// package may not import.
+func jsonTo(b *bytes.Buffer) testUtil.Renderer { return testUtil.Renderer{JSON: true, Out: b} }
+
+func textTo(b *bytes.Buffer) testUtil.Renderer { return testUtil.Renderer{Out: b} }
 
 func (s *Suite) TestWriteVarDotenv() {
 	objs := []astrov1.EnvironmentObject{
@@ -92,7 +90,7 @@ func (s *Suite) TestWriteVarDotenv() {
 
 	s.Run("hides secrets by default", func() {
 		var buf bytes.Buffer
-		s.NoError(WriteVarList(objs, FormatDotenv, false, &buf))
+		s.NoError(WriteVarDotenv(objs, false, &buf))
 		out := buf.String()
 		s.Contains(out, "FOO=bar\n")
 		s.Contains(out, "SECRET_KEY=  # secret, use --include-secrets")
@@ -101,7 +99,7 @@ func (s *Suite) TestWriteVarDotenv() {
 
 	s.Run("includes secrets when asked", func() {
 		var buf bytes.Buffer
-		s.NoError(WriteVarList(objs, FormatDotenv, true, &buf))
+		s.NoError(WriteVarDotenv(objs, true, &buf))
 		out := buf.String()
 		s.Contains(out, "FOO=bar")
 		s.Contains(out, "SECRET_KEY=shh")
@@ -119,7 +117,7 @@ func (s *Suite) TestWriteVarDotenvEscapesSpecialChars() {
 		{ObjectKey: "WITH_DOLLAR", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "user $HOME"}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(objs, FormatDotenv, true, &buf))
+	s.NoError(WriteVarDotenv(objs, true, &buf))
 	out := buf.String()
 
 	s.Contains(out, "PLAIN=simple\n")
@@ -164,7 +162,7 @@ func (s *Suite) TestWriteVarTableTruncatesLongValues() {
 		{ObjectKey: "MULTI", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "a\nb"}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(objs, FormatText, false, &buf))
+	s.NoError(WriteVarList(objs, false, textTo(&buf)))
 	out := buf.String()
 	s.NotContains(out, long)   // long value truncated
 	s.Contains(out, "…")       // ellipsis present
@@ -178,13 +176,13 @@ func (s *Suite) TestWriteVarJSONNotTruncated() {
 		{ObjectKey: "LONG", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: long}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(objs, FormatJSON, false, &buf))
+	s.NoError(WriteVarList(objs, false, jsonTo(&buf)))
 	s.Contains(buf.String(), long) // JSON output preserves the full value
 }
 
 func (s *Suite) TestWriteVarTableEmpty() {
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(nil, FormatText, false, &buf))
+	s.NoError(WriteVarList(nil, false, textTo(&buf)))
 	s.Contains(strings.ToLower(buf.String()), "no environment variables")
 }
 
@@ -194,10 +192,12 @@ func (s *Suite) TestWriteVarJSON() {
 		{Id: &id, ObjectKey: "FOO", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "bar"}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(objs, FormatJSON, false, &buf))
-	out := buf.String()
-	s.Contains(out, `"object_key": "FOO"`)
-	s.Contains(out, id)
+	s.NoError(WriteVarList(objs, false, jsonTo(&buf)))
+	var got VariableList
+	s.Require().NoError(json.Unmarshal(buf.Bytes(), &got))
+	s.Require().Len(got.Variables, 1)
+	s.Equal("FOO", got.Variables[0].ObjectKey)
+	s.Contains(buf.String(), id)
 }
 
 func (s *Suite) TestWriteVarLinksTableSecrets() {
@@ -211,7 +211,7 @@ func (s *Suite) TestWriteVarLinksTableSecrets() {
 
 	s.Run("masks workspace value and override without --include-secrets", func() {
 		var buf bytes.Buffer
-		s.NoError(WriteVarLinks(report, FormatText, false, &buf))
+		s.NoError(WriteVarLinks(report, false, textTo(&buf)))
 		out := buf.String()
 		s.Contains(out, maskedSecret+" (secret)")
 		s.Contains(out, "(hidden, use --include-secrets)")
@@ -221,7 +221,7 @@ func (s *Suite) TestWriteVarLinksTableSecrets() {
 
 	s.Run("shows both with --include-secrets", func() {
 		var buf bytes.Buffer
-		s.NoError(WriteVarLinks(report, FormatText, true, &buf))
+		s.NoError(WriteVarLinks(report, true, textTo(&buf)))
 		out := buf.String()
 		s.Contains(out, "secret-value")
 		s.Contains(out, "secret-override")
@@ -239,7 +239,7 @@ func (s *Suite) TestWriteVarLinksTableClampsValues() {
 		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &long}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarLinks(report, FormatText, false, &buf))
+	s.NoError(WriteVarLinks(report, false, textTo(&buf)))
 	out := buf.String()
 	s.NotContains(out, long)
 	s.Contains(out, "line1 ⏎ line2")

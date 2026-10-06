@@ -108,7 +108,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, "json", buf)
+		err := ListWithFormat(mockClient, testUtil.Renderer{JSON: true, Out: buf})
 		s.NoError(err)
 
 		var result OrganizationList
@@ -123,7 +123,7 @@ func (s *Suite) TestListWithFormat() {
 		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := ListWithFormat(mockClient, "text", buf)
+		err := ListWithFormat(mockClient, testUtil.Renderer{Out: buf})
 		s.NoError(err)
 		s.Contains(buf.String(), "org1")
 		mockClient.AssertExpectations(s.T())

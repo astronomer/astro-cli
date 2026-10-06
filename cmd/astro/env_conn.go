@@ -158,7 +158,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteConnList(objs, env.Format(f), out)
+	return env.WriteConnList(objs, cliout.Renderer{Format: f, Out: out})
 }
 
 func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -176,7 +176,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteConn(obj, env.Format(f), out)
+	return env.WriteConn(obj, cliout.Renderer{Format: f, Out: out})
 }
 
 // runEnvConnSet upserts. Update is tried first and a not-found falls through

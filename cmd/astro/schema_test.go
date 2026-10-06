@@ -53,11 +53,10 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "deployment-token", Value: deployment.TokenInfo{}},
 	{Name: "deployment-token-removal", Value: deployment.TokenRemoval{}},
 
-	// The lists printed through pkg/output rather than cliout.Renderer.Emit.
-	// The same encoding/json shape, indented; nothing watches that door, so
-	// these entries are kept by hand. One golden per type: `deployment user
-	// list`, `workspace user list` and `organization user list` publish the
-	// same UserList, and likewise the team lists.
+	// The lists pkg/output renders, which hand their result to the command's
+	// cliout.Renderer. One golden per type: `deployment user list`,
+	// `workspace user list` and `organization user list` publish the same
+	// UserList, and likewise the team lists.
 	{Name: "deployment-list", Value: deployment.DeploymentList{}},
 	{Name: "deployment-bundle-list", Value: deployment.BundleList{}},
 	{Name: "workspace-list", Value: workspace.WorkspaceList{}},
@@ -66,8 +65,8 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "user-list", Value: user.UserList{}},
 	{Name: "team-list", Value: team.TeamList{}},
 
-	// astro env: written by internal/platform/astro/env's own encoder, not
-	// through cliout.Renderer.Emit, so these too are kept by hand. The four
+	// astro env: internal/platform/astro/env renders the text and hands the
+	// result to the command's cliout.Renderer, as pkg/output does. The four
 	// per-kind lists carry the same object under different keys, and the key
 	// is the contract, so each list is its own golden. `get` on every kind
 	// publishes the one object; `variable link list` publishes its own link
@@ -106,17 +105,18 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // fails it when a named type reached Emit that no golden pins, or an
 // anonymous struct reached it at all, since that shape cannot be pinned.
 //
-// Blind to what the suite does not run, and to pkg/output's lists and the
-// `astro env` writers, which encode for themselves and do not pass through
-// Emit: their entries above are the only thing pinning them. cmd/local's emitrecord_test.go does the same for its
-// tree, with the reasoning at length.
+// Blind to what the suite does not run. pkg/output's lists and the `astro
+// env` writers pass through Emit too, since they take the command's Renderer.
+// cmd/local's emitrecord_test.go does the same for its tree, with the
+// reasoning at length.
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Five shapes reach Emit in this package's tests today (the
-// variable list and modify results, the token list, a token, a removal). Raise
-// it as conversions land; lower it only saying why.
-const minWatchedPayloads = 5
+// would be silent. Seventeen shapes reach Emit in this package's tests today:
+// the deployment variable and token results, the pkg/output lists and the
+// `astro env` payloads their tests reach, and the error object. Raise it as
+// conversions land; lower it only saying why.
+const minWatchedPayloads = 17
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

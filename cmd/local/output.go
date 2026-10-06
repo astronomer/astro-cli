@@ -46,7 +46,7 @@ func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 				e.Error = err.Error()
 			}
 			//nolint:errcheck // see the comment above
-			r.Emit(e, func(w io.Writer) error {
+			r.EmitEvent(e, func(w io.Writer) error {
 				if err != nil {
 					_, werr := fmt.Fprintf(w, "airflow: %s (%s)\n", s, err)
 					return werr
@@ -57,7 +57,7 @@ func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 		},
 		OnLine: func(l localrt.LogLine) {
 			//nolint:errcheck // see the comment above
-			r.Emit(logEvent(l), func(w io.Writer) error {
+			r.EmitEvent(logEvent(l), func(w io.Writer) error {
 				return renderLogLine(w, l)
 			})
 		},

@@ -30,7 +30,7 @@ func (s *Suite) TestObjectInfoIsTheAPIObjectInSnakeCase() {
 		want = snakeKeys(want)
 
 		var out bytes.Buffer
-		s.Require().NoError(WriteConn(o, FormatJSON, &out))
+		s.Require().NoError(WriteConn(o, jsonTo(&out)))
 		var got any
 		s.Require().NoError(json.Unmarshal(out.Bytes(), &got))
 

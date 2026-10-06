@@ -68,7 +68,7 @@ func (c *cli) renderer() (cliout.Renderer, error) {
 	if err != nil {
 		return cliout.Renderer{}, err
 	}
-	return cliout.Renderer{Format: f, Out: c.d.Stdout}, nil
+	return cliout.Renderer{Format: f, Out: c.d.Stdout, Style: c.d.JSONStyle}, nil
 }
 
 // projectPath discovers the project that contains the working directory,
@@ -263,7 +263,9 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 		return err
 	}
 	c.applyPools(ctx, r, st, built.Pools)
-	return r.Emit(st, func(w io.Writer) error {
+	// The status ends the event stream the start wrote, so it is a line of
+	// it: NDJSON on a terminal too.
+	return r.EmitEvent(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})
 }
@@ -490,7 +492,7 @@ func sectionLabel(s envschema.Section) string {
 // drift between them.
 func emitWarning(r cliout.Renderer, e event) {
 	//nolint:errcheck // a warning write failure surfaces on the command's own output
-	r.Emit(e, func(w io.Writer) error {
+	r.EmitEvent(e, func(w io.Writer) error {
 		_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
 		return werr
 	})
@@ -542,7 +544,7 @@ func (c *cli) runStop(ctx context.Context, opts localrt.StopOptions) error {
 		// Nothing to stop is the state the caller asked for, so it succeeds,
 		// the way `docker compose stop` does.
 		e := event{Event: "state", State: localrt.StateStopped, AlreadyStopped: true}
-		return r.Emit(e, func(w io.Writer) error {
+		return r.EmitEvent(e, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, "airflow: already stopped")
 			return werr
 		})
@@ -554,7 +556,7 @@ func (c *cli) runStop(ctx context.Context, opts localrt.StopOptions) error {
 		return err
 	}
 	e := event{Event: "state", State: localrt.StateStopped}
-	return r.Emit(e, func(w io.Writer) error {
+	return r.EmitEvent(e, func(w io.Writer) error {
 		_, werr := fmt.Fprintln(w, "airflow: stopped")
 		return werr
 	})
@@ -652,7 +654,9 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 		return err
 	}
 	c.applyPools(ctx, r, st, built.Pools)
-	return r.Emit(st, func(w io.Writer) error {
+	// The status ends the event stream the start wrote, so it is a line of
+	// it: NDJSON on a terminal too.
+	return r.EmitEvent(st, func(w io.Writer) error {
 		return renderStatus(w, st)
 	})
 }
@@ -924,7 +928,7 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 		Components: components,
 		Tail:       tail,
 		OnLine: func(l localrt.LogLine) {
-			if err := r.Emit(logEvent(l), func(w io.Writer) error {
+			if err := r.EmitEvent(logEvent(l), func(w io.Writer) error {
 				return renderLogLine(w, l)
 			}); err != nil && emitErr == nil {
 				emitErr = err

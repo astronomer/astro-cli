@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Renderer.Emit (cmd/cliout) is documented as "the single output path for
-// every core command", and until recently it was not: four payloads went around it with
+// Renderer.Emit (cmd/cliout), with its stream twin EmitEvent, is documented as
+// "the single output path for every core command", and until recently it was not: four payloads went around it with
 // their own encoder, and a payload that goes around Emit is one nothing can
 // observe.
 //
@@ -27,11 +27,15 @@ import (
 // What this guard covers, precisely, because a guard whose reach is vague is
 // one people assume more of than it delivers:
 //
-//   - json.NewEncoder, json.Marshal and json.MarshalIndent
-//   - under any local name the encoding/json import is bound to, alias or not
-//   - anywhere in this package and in cmd/cliout, where Emit lives, including
-//     at file scope, not only inside funcs
-//   - everywhere except the body of Renderer.Emit itself
+//   - json.NewEncoder, json.Marshal and json.MarshalIndent, and
+//     jsoncolor.NewEncoder, which colors the same output on a terminal
+//   - under any local name either import is bound to, alias or not
+//   - anywhere in this package, in cmd/cliout, where Emit lives, and in the
+//     two renderers below cmd/ that the Astro tree hands its Renderer to
+//     (pkg/output and internal/platform/astro/env), including at file scope,
+//     not only inside funcs
+//   - everywhere except the body of Renderer.emit, the one method Emit and
+//     EmitEvent both lead through
 //
 // It does not know whether a given call publishes anything. A legitimate
 // non-output encoder — an HTTP request body, a cache file — says so with the
@@ -43,7 +47,12 @@ func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 	banned := map[string]bool{"NewEncoder": true, "Marshal": true, "MarshalIndent": true}
 
 	var sources []string
-	for _, dir := range []string{".", filepath.Join("..", "cliout")} {
+	for _, dir := range []string{
+		".",
+		filepath.Join("..", "cliout"),
+		filepath.Join("..", "..", "pkg", "output"),
+		filepath.Join("..", "..", "internal", "platform", "astro", "env"),
+	} {
 		entries, err := os.ReadDir(dir)
 		require.NoError(t, err)
 		for _, e := range entries {
@@ -65,8 +74,8 @@ func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 			sawEmit = true
 		}
 
-		// Whatever this file calls encoding/json. An alias defeated the first
-		// version of this test outright.
+		// Whatever this file calls encoding/json or jsoncolor. An alias
+		// defeated the first version of this test outright.
 		jsonNames := jsonImportNames(t, file)
 		if len(jsonNames) == 0 {
 			continue
@@ -98,9 +107,9 @@ func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 	// The exemption is found by shape, so a move or rename of Emit would leave
 	// the guard exempting nothing and still pass. Finding it is the check that
 	// the scan is still looking where the door is.
-	assert.True(t, sawEmit, "Renderer.Emit was not found in the scanned sources: %v", sources)
+	assert.True(t, sawEmit, "Renderer.emit was not found in the scanned sources: %v", sources)
 	assert.Empty(t, outside,
-		"JSON encoded outside Renderer.Emit. Every published payload leaves by\n"+
+		"JSON encoded outside Renderer.emit. Every published payload leaves by\n"+
 			"one door, so that a test can see what a command actually emits.\n"+
 			"Route this through Emit. If it is not output at all — a request\n"+
 			"body, a cache file — put %s on or above the line,\n"+
@@ -108,28 +117,36 @@ func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 		jsonEscapeDirective)
 }
 
-// jsonImportNames returns the local names encoding/json is bound to in this
-// file: "json" normally, whatever the alias says otherwise, and nothing at
-// all if the file does not import it.
+// jsonImportNames returns the local names encoding/json and jsoncolor are
+// bound to in this file: "json" or "jsoncolor" normally, whatever the alias
+// says otherwise, and nothing at all if the file imports neither.
 func jsonImportNames(t *testing.T, file *ast.File) map[string]bool {
 	t.Helper()
 	names := map[string]bool{}
 	for _, imp := range file.Imports {
 		path, err := strconv.Unquote(imp.Path.Value)
 		require.NoError(t, err)
-		if path != "encoding/json" {
+		def, ok := jsonEncoderImports[path]
+		if !ok {
 			continue
 		}
 		if imp.Name != nil {
 			names[imp.Name.Name] = true
 		} else {
-			names["json"] = true
+			names[def] = true
 		}
 	}
 	return names
 }
 
-// posRange is the source span of Renderer.Emit, the one place allowed to
+// jsonEncoderImports maps each package that can encode json for output to
+// the name it binds by default.
+var jsonEncoderImports = map[string]string{
+	"encoding/json":                   "json",
+	"github.com/neilotoole/jsoncolor": "jsoncolor",
+}
+
+// posRange is the source span of Renderer.emit, the one place allowed to
 // hold an encoder.
 type posRange struct{ from, to token.Pos }
 
@@ -137,13 +154,13 @@ func (p posRange) contains(pos token.Pos) bool {
 	return p.from != token.NoPos && pos >= p.from && pos <= p.to
 }
 
-// emitBodyRange finds Renderer.Emit by its receiver, not by its name. A
+// emitBodyRange finds Renderer.emit by its receiver, not by its name alone. A
 // second type with its own Emit method was a legal second door in the first
 // version of this test.
 func emitBodyRange(file *ast.File) posRange {
 	for _, decl := range file.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || fn.Name.Name != "Emit" || fn.Recv == nil || len(fn.Recv.List) != 1 {
+		if !ok || fn.Name.Name != "emit" || fn.Recv == nil || len(fn.Recv.List) != 1 {
 			continue
 		}
 		recv := fn.Recv.List[0].Type

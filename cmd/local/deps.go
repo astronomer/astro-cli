@@ -21,6 +21,7 @@ import (
 	"golang.org/x/term"
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/emenv"
@@ -110,6 +111,12 @@ type Deps struct {
 	// terminal on stdin and still wants the report, not a picker it cannot see.
 	// nil means not a terminal.
 	OutputTerminal func() bool
+
+	// JSONStyle lays out a json result. The zero value, cliout.StyleAuto, is
+	// production's: decided from Stdout, indented and colored on a terminal,
+	// compact anywhere else. A test is never on a terminal, so it sets this to
+	// see what a terminal gets. A stream's events are one line either way.
+	JSONStyle cliout.Style
 
 	// AirflowDefault is the Airflow `astro init` gives a project that states
 	// none: the series, the requires-python its runtime ships with (empty for

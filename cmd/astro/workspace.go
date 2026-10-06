@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	workspacetoken "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -585,7 +584,7 @@ func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", output.Format(format), out)
+	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", cliout.Renderer{Format: format, Out: out})
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -679,7 +678,7 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.ListWithFormat(astroV1Client, output.Format(format), out)
+	return workspace.ListWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -739,7 +738,7 @@ func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, output.Format(format), out)
+	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: format, Out: out})
 }
 
 func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {

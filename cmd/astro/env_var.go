@@ -79,7 +79,7 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 		Long: "Write the scope's environment variables as KEY=VALUE lines. Secret values are\n" +
 			"left blank unless --include-secrets is set.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvVarList(cmd, out, env.FormatDotenv)
+			return runEnvVarList(cmd, out, formatDotenv)
 		},
 	}
 	return cmd
@@ -141,19 +141,17 @@ func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format) error {
+func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride cliout.Format) error {
 	scope, err := envScope()
 	if err != nil {
 		return err
 	}
 	f := formatOverride
 	if f == "" {
-		var parsed cliout.Format
-		parsed, err = cliout.ParseFormat(envOutput, formatDotenv)
+		f, err = cliout.ParseFormat(envOutput, formatDotenv)
 		if err != nil {
 			return err
 		}
-		f = env.Format(parsed)
 	}
 	cmd.SilenceUsage = true
 
@@ -164,7 +162,10 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format)
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteVarList(objs, f, envIncludeSecrets, out)
+	if f == formatDotenv {
+		return env.WriteVarDotenv(objs, envIncludeSecrets, out)
+	}
+	return env.WriteVarList(objs, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
 }
 
 func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -182,7 +183,10 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteVar(obj, env.Format(f), envIncludeSecrets, out)
+	if f == formatDotenv && obj != nil {
+		return env.WriteVarDotenv([]astrov1.EnvironmentObject{*obj}, envIncludeSecrets, out)
+	}
+	return env.WriteVar(obj, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
 }
 
 func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {

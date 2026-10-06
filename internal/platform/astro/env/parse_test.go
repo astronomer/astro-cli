@@ -23,7 +23,7 @@ func (s *Suite) TestParseDotenvRoundTripsExport() {
 		{ObjectKey: "WITH_EXPORT", EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: "export ME"}},
 	}
 	var buf bytes.Buffer
-	s.NoError(WriteVarList(objs, FormatDotenv, true, &buf))
+	s.NoError(WriteVarDotenv(objs, true, &buf))
 
 	dir := s.T().TempDir()
 	path := filepath.Join(dir, ".env")

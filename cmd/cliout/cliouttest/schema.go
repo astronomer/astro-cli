@@ -20,14 +20,17 @@
 package cliouttest
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"testing"
 	"time"
 	"unsafe"
 
+	jsoncolor "github.com/neilotoole/jsoncolor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +104,38 @@ func Check(t *testing.T, dir string, c Case) {
 			"Scripts, agents and Astro Desktop read this. If the change is\n"+
 			"deliberate, run `make update-schemas` and say so\n"+
 			"in the commit; if it is not, this is the bug.", c.Name)
+
+	checkColorSafe(t, c.Name, value)
 }
+
+// checkColorSafe fails when coloring v on a terminal would change more than
+// color. The colored encoder (jsoncolor) mangles some shapes plain encoding/json
+// handles, such as maps with integer keys and fields tagged `,string`, writing
+// escape codes inside the strings; a published type with one of those would
+// break only on a terminal, where no test runs. Stripped of its color, the
+// colored output must decode to the same value as the plain output. It need
+// not match byte for byte: jsoncolor re-encodes a type's own MarshalJSON
+// output with its keys sorted, which reorders keys and changes nothing a
+// reader can rely on.
+func checkColorSafe(t *testing.T, name string, v any) {
+	t.Helper()
+	var plain, colored bytes.Buffer
+	enc := json.NewEncoder(&plain)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	require.NoError(t, enc.Encode(v))
+	cenc := jsoncolor.NewEncoder(&colored)
+	cenc.SetEscapeHTML(false)
+	cenc.SetIndent("", "  ")
+	cenc.SetColors(jsoncolor.DefaultColors())
+	require.NoError(t, cenc.Encode(v))
+	assert.JSONEq(t, plain.String(), ansiEscape.ReplaceAllString(colored.String(), ""),
+		"the %s payload does not survive color on a terminal: jsoncolor writes it "+
+			"differently from encoding/json. Change the type's shape (no integer map "+
+			"keys, no `,string` tags) rather than this check.", name)
+}
+
+var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 // Orphans lists the goldens under dir that no case names.
 //

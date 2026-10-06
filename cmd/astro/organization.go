@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -232,7 +231,7 @@ func organizationList(cmd *cobra.Command, out io.Writer) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return organization.ListWithFormat(astroV1Client, output.Format(format), out)
+	return organization.ListWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
@@ -291,7 +290,7 @@ func listUsers(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListOrgUsersWithFormat(astroV1Client, output.Format(format), out)
+	return user.ListOrgUsersWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
 }
 
 func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -357,7 +356,7 @@ func listTeams(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListOrgTeamsWithFormat(astroV1Client, output.Format(format), out)
+	return team.ListOrgTeamsWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
 }
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -868,5 +867,5 @@ func listClusters(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return organization.ListClustersWithFormat(astroV1Client, output.Format(format), out)
+	return organization.ListClustersWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
 }

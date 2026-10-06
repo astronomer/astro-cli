@@ -36,7 +36,7 @@ func autoLinkPtr(cmd *cobra.Command) *bool {
 // is made of. -o is the format here, as everywhere else in the CLI. It used
 // to be a file path, with the format on --format, which made `--output json`
 // quietly write a file named json.
-const formatDotenv = cliout.Format(env.FormatDotenv)
+const formatDotenv cliout.Format = "dotenv"
 
 // addScopePersistentFlags wires the workspace/deployment scope flags onto a
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
@@ -160,7 +160,7 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	// Checked before the parse, which would refuse it with the generic
 	// wording, and before the call: there is no reason to fetch every object
 	// in the scope to then refuse to print it.
-	if envOutput == string(env.FormatDotenv) {
+	if envOutput == string(formatDotenv) {
 		cmd.SilenceUsage = true
 		return cliout.Usage(env.ErrInventoryHasNoValues)
 	}
@@ -174,7 +174,7 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteInventory(items, env.Format(f), out)
+	return env.WriteInventory(items, cliout.Renderer{Format: f, Out: out})
 }
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {

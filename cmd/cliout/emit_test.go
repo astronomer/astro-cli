@@ -2,9 +2,13 @@ package cliout
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"os"
+	"regexp"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,4 +54,129 @@ func TestEmitTextModeRunsTheRenderer(t *testing.T) {
 		return err
 	}))
 	assert.Equal(t, "rendered", out.String())
+}
+
+// layoutCase is a result with what the json layouts have to keep intact:
+// nesting, a list, and characters an HTML-escaping encoder would rewrite.
+type layoutCase struct {
+	Items []layoutItem `json:"items"`
+}
+
+type layoutItem struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+var layoutValue = layoutCase{Items: []layoutItem{{Name: "a<b>&c", URL: "https://example.com/?x=1&y=2"}}}
+
+const layoutLine = `{"items":[{"name":"a<b>&c","url":"https://example.com/?x=1&y=2"}]}` + "\n"
+
+// Off a terminal a result is one compact line, and the bytes are the
+// contract a script reads: no indentation, no HTML escaping, one trailing
+// newline. A buffer is never a terminal, so the zero Style lands here.
+func TestEmitResultIsCompactOffATerminal(t *testing.T) {
+	for _, style := range []Style{StyleAuto, StyleCompact} {
+		var out bytes.Buffer
+		require.NoError(t, Renderer{Format: FormatJSON, Out: &out, Style: style}.Emit(layoutValue, nil))
+		assert.Equal(t, layoutLine, out.String(), "style %d", style)
+	}
+}
+
+// On a terminal it is indented two spaces, and colored unless color is off.
+// Only whitespace and color change: the same value decodes from each.
+func TestEmitResultIsIndentedOnATerminal(t *testing.T) {
+	var out bytes.Buffer
+	require.NoError(t, Renderer{Format: FormatJSON, Out: &out, Style: StyleIndented}.Emit(layoutValue, nil))
+	assert.Equal(t, `{
+  "items": [
+    {
+      "name": "a<b>&c",
+      "url": "https://example.com/?x=1&y=2"
+    }
+  ]
+}
+`, out.String())
+
+	var colored bytes.Buffer
+	require.NoError(t, Renderer{Format: FormatJSON, Out: &colored, Style: StyleColor}.Emit(layoutValue, nil))
+	assert.Contains(t, colored.String(), "\x1b[", "StyleColor writes ANSI color")
+	assert.Equal(t, out.String(), ansiEscape.ReplaceAllString(colored.String(), ""),
+		"with the color stripped, StyleColor is StyleIndented byte for byte")
+}
+
+var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// An event is one line whatever the Renderer's Style says: a stream stays
+// NDJSON on a terminal, where a result would be indented.
+func TestEmitEventIsAlwaysOneLine(t *testing.T) {
+	t.Cleanup(ResetStream)
+	for _, style := range []Style{StyleAuto, StyleCompact, StyleIndented, StyleColor} {
+		var out bytes.Buffer
+		r := Renderer{Format: FormatJSON, Out: &out, Style: style}
+		require.NoError(t, r.EmitEvent(layoutValue, nil))
+		require.NoError(t, r.EmitEvent(layoutValue, nil))
+		assert.Equal(t, layoutLine+layoutLine, out.String(), "style %d", style)
+	}
+}
+
+// Once a run has streamed, a result after it is one more line of the stream,
+// not an indented object: a failed `astro local start -o json` ends with its
+// error object on one line, on a terminal too. A new run starts afresh.
+func TestAResultAfterAStreamIsOneLine(t *testing.T) {
+	t.Cleanup(ResetStream)
+	ResetStream()
+	var out bytes.Buffer
+	r := Renderer{Format: FormatJSON, Out: &out, Style: StyleColor}
+	require.NoError(t, r.EmitEvent(layoutValue, nil))
+	require.NoError(t, r.Emit(layoutValue, nil))
+	assert.Equal(t, layoutLine+layoutLine, out.String())
+
+	ResetStream()
+	out.Reset()
+	require.NoError(t, Renderer{Format: FormatJSON, Out: &out, Style: StyleIndented}.Emit(layoutValue, nil))
+	assert.Contains(t, out.String(), "\n  ", "with no stream, a result is laid out as its style says")
+}
+
+// Execute clears a previous run's stream, so a result in this run is laid out
+// by its own style.
+func TestExecuteStartsWithNoStream(t *testing.T) {
+	t.Cleanup(ResetStream)
+	var out bytes.Buffer
+	require.NoError(t, Renderer{Format: FormatJSON, Out: &out}.EmitEvent(layoutValue, nil))
+	root := &cobra.Command{Use: "astro", RunE: func(*cobra.Command, []string) error { return nil }}
+	require.NoError(t, Execute(context.Background(), root, nil, io.Discard, nil))
+	assert.False(t, streamStarted.Load())
+}
+
+// EmitEvent's text mode is Emit's: the renderer, over the same value.
+func TestEmitEventTextModeRunsTheRenderer(t *testing.T) {
+	var out bytes.Buffer
+	require.NoError(t, Renderer{Format: FormatText, Out: &out}.EmitEvent("ignored", func(w io.Writer) error {
+		_, err := io.WriteString(w, "rendered")
+		return err
+	}))
+	assert.Equal(t, "rendered", out.String())
+}
+
+// Both doors are watched.
+func TestEmitObserverSeesResultsAndEvents(t *testing.T) {
+	var seen []any
+	EmitObserver = func(v any) { seen = append(seen, v) }
+	t.Cleanup(func() { EmitObserver = nil })
+
+	r := Renderer{Format: FormatJSON, Out: io.Discard}
+	require.NoError(t, r.Emit("result", nil))
+	require.NoError(t, r.EmitEvent("event", nil))
+	assert.Equal(t, []any{"result", "event"}, seen)
+}
+
+// StyleFor decides from the writer: anything that is not a terminal is
+// compact, which is what keeps every test, pipe and redirect on one line.
+func TestStyleForIsCompactOffATerminal(t *testing.T) {
+	assert.Equal(t, StyleCompact, StyleFor(&bytes.Buffer{}))
+
+	f, err := os.CreateTemp(t.TempDir(), "out")
+	require.NoError(t, err)
+	t.Cleanup(func() { f.Close() })
+	assert.Equal(t, StyleCompact, StyleFor(f), "a regular file is not a terminal")
 }

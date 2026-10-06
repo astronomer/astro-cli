@@ -1,7 +1,6 @@
 package env
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,20 +9,8 @@ import (
 	"strings"
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-)
-
-// Format selects how an `astro env` command renders what it read: the
-// value of -o/--output. It is not parsed here: the cmd layer parses the flag
-// with cliout.ParseFormat, the one parser, declaring dotenv as an extra where
-// the command offers it, and converts the result. internal/ never imports
-// cmd/, so this package cannot take cliout's type.
-type Format string
-
-const (
-	FormatText   Format = "text"
-	FormatJSON   Format = "json"
-	FormatDotenv Format = "dotenv"
 )
 
 const (
@@ -51,23 +38,15 @@ func clampTableValue(s string) string {
 	return s
 }
 
-// write renders v as f. JSON is v itself (a list's v is its named list type);
-// text draws the human view of it; dotenv draws the .env view, and is nil for
-// a value that has none, which refuses the format. Every Write* below is this with its own renderers.
+// Every Write* below hands the command's Renderer (r) the value -o json
+// publishes, which is v itself (a list's v is its named list type), and the
+// text renderer that draws the human view of it. Which one runs, and how the
+// json is laid out, is the Renderer's: cmd/cliout's, which this package may
+// not import, so it takes it as an output.Emitter and never encodes json
+// itself.
 //
-// The refusal is a guard for a caller that skipped the parse, not the
-// message a user sees: the command has already rejected an unknown -o.
-func write(out io.Writer, f Format, v any, text, dotenv func(io.Writer) error) error {
-	switch {
-	case f == FormatText:
-		return text(out)
-	case f == FormatJSON:
-		return writeJSON(v, out)
-	case f == FormatDotenv && dotenv != nil:
-		return dotenv(out)
-	}
-	return fmt.Errorf("unsupported output format: %s", f)
-}
+// dotenv is not a format these take. Only `astro env variable list` and `get`
+// offer it, and they write it with WriteVarDotenv instead of calling these.
 
 var errNilObject = errors.New("nil environment object")
 
@@ -107,71 +86,69 @@ func nonNil[T any](s []T) []T {
 }
 
 // WriteVarList renders a list of ENVIRONMENT_VARIABLE objects.
-func WriteVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, VariableList{Variables: newObjectInfos(envObjs)},
-		func(w io.Writer) error { return writeVarTable(envObjs, includeSecrets, w) },
-		func(w io.Writer) error { return writeVarDotenv(envObjs, includeSecrets, w) })
+func WriteVarList(envObjs []astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
+	return r.Emit(VariableList{Variables: newObjectInfos(envObjs)},
+		func(w io.Writer) error { return writeVarTable(envObjs, includeSecrets, w) })
 }
 
 // WriteVar renders a single ENVIRONMENT_VARIABLE object.
-func WriteVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
+func WriteVar(envObj *astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
 	if envObj == nil {
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, newObjectInfo(envObj),
-		func(w io.Writer) error { return writeVarTable(one, includeSecrets, w) },
-		func(w io.Writer) error { return writeVarDotenv(one, includeSecrets, w) })
+	return r.Emit(newObjectInfo(envObj),
+		func(w io.Writer) error { return writeVarTable(one, includeSecrets, w) })
 }
 
 // WriteVarLinks renders a VarLinksReport.
-func WriteVarLinks(report *VarLinksReport, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, report, varLinksTable(report, includeSecrets).write, nil)
+func WriteVarLinks(report *VarLinksReport, includeSecrets bool, r output.Emitter) error {
+	return r.Emit(report, varLinksTable(report, includeSecrets).write)
 }
 
 // WriteConnList renders a list of CONNECTION objects.
-func WriteConnList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, ConnectionList{Connections: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
+func WriteConnList(envObjs []astrov1.EnvironmentObject, r output.Emitter) error {
+	return r.Emit(ConnectionList{Connections: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeConnTable(envObjs, w) })
 }
 
 // WriteConn renders a single CONNECTION object.
-func WriteConn(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) error {
+func WriteConn(envObj *astrov1.EnvironmentObject, r output.Emitter) error {
 	if envObj == nil {
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, newObjectInfo(envObj), func(w io.Writer) error { return writeConnTable(one, w) }, nil)
+	return r.Emit(newObjectInfo(envObj), func(w io.Writer) error { return writeConnTable(one, w) })
 }
 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
 // Same shape as ENVIRONMENT_VARIABLE.
-func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, AirflowVariableList{AirflowVariables: newObjectInfos(envObjs)},
-		func(w io.Writer) error { return writeAirflowVarTable(envObjs, includeSecrets, w) }, nil)
+func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
+	return r.Emit(AirflowVariableList{AirflowVariables: newObjectInfos(envObjs)},
+		func(w io.Writer) error { return writeAirflowVarTable(envObjs, includeSecrets, w) })
 }
 
 // WriteAirflowVar renders a single AIRFLOW_VARIABLE object.
-func WriteAirflowVar(envObj *astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
+func WriteAirflowVar(envObj *astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
 	if envObj == nil {
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, newObjectInfo(envObj),
-		func(w io.Writer) error { return writeAirflowVarTable(one, includeSecrets, w) }, nil)
+	return r.Emit(newObjectInfo(envObj),
+		func(w io.Writer) error { return writeAirflowVarTable(one, includeSecrets, w) })
 }
 
 // WriteMetricsExportList renders a list of METRICS_EXPORT objects.
-func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, MetricsExportList{MetricsExports: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
+func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, r output.Emitter) error {
+	return r.Emit(MetricsExportList{MetricsExports: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) })
 }
 
 // WriteMetricsExport renders a single METRICS_EXPORT object.
-func WriteMetricsExport(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) error {
+func WriteMetricsExport(envObj *astrov1.EnvironmentObject, r output.Emitter) error {
 	if envObj == nil {
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return write(out, format, newObjectInfo(envObj), func(w io.Writer) error { return writeMetricsExportTable(one, w) }, nil)
+	return r.Emit(newObjectInfo(envObj), func(w io.Writer) error { return writeMetricsExportTable(one, w) })
 }
 
 func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
@@ -224,7 +201,10 @@ func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out
 	return nil
 }
 
-func writeVarDotenv(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
+// WriteVarDotenv writes ENVIRONMENT_VARIABLE objects as a .env file, the -o
+// dotenv that `astro env variable list` and `get` offer. A secret's value is
+// left blank, with a comment, unless includeSecrets.
+func WriteVarDotenv(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
 	for i := range envObjs {
 		o := &envObjs[i]
 		if o.EnvironmentVariable == nil {
@@ -349,8 +329,8 @@ func varLinksTable(report *VarLinksReport, includeSecrets bool) *linksTable {
 }
 
 // WriteLinks renders a LinksReport.
-func WriteLinks(report *LinksReport, format Format, out io.Writer) error {
-	return write(out, format, report, connLinksTable(report).write, nil)
+func WriteLinks(report *LinksReport, r output.Emitter) error {
+	return r.Emit(report, connLinksTable(report).write)
 }
 
 func connLinksTable(report *LinksReport) *linksTable {
@@ -512,18 +492,12 @@ func ptrStr(s *string) string {
 	return *s
 }
 
-func writeJSON(v any, out io.Writer) error {
-	enc := json.NewEncoder(out)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v)
-}
-
 // WriteInventory renders the cross-kind listing. Its json key is "objects":
 // the rows are environment objects of every kind, which is what the platform
 // and the empty table ("No environment objects found") call them, and each
 // row's kind says which. It has no dotenv view: see ErrInventoryHasNoValues.
-func WriteInventory(items []InventoryItem, format Format, out io.Writer) error {
-	return write(out, format, InventoryList{Objects: nonNil(items)}, func(w io.Writer) error { return writeInventoryTable(items, w) }, nil)
+func WriteInventory(items []InventoryItem, r output.Emitter) error {
+	return r.Emit(InventoryList{Objects: nonNil(items)}, func(w io.Writer) error { return writeInventoryTable(items, w) })
 }
 
 // ErrInventoryHasNoValues refuses dotenv for the cross-kind listing, with
@@ -533,8 +507,8 @@ func WriteInventory(items []InventoryItem, format Format, out io.Writer) error {
 // right of the equals sign. Emitting keys with empty values would produce a
 // file that, read back through `set --from-file`, is exactly the
 // blank-every-secret shape that path refuses. The command checks for it
-// before paying for the objects; WriteInventory refuses dotenv too, with the
-// generic wording, so a future caller cannot bypass it.
+// before paying for the objects; WriteInventory has no dotenv to reach, since
+// only WriteVarDotenv writes one.
 var ErrInventoryHasNoValues = errors.New(
 	"-o dotenv writes values, which a cross-kind listing has none of; " +
 		"use it on a single kind, e.g. `astro env variable export`")

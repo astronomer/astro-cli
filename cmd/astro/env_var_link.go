@@ -232,5 +232,5 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteVarLinks(report, env.Format(f), envIncludeSecrets, out)
+	return env.WriteVarLinks(report, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
 }

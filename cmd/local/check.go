@@ -387,11 +387,11 @@ func renderCheck(r cliout.Renderer, res checks.Result, strict, provisioned bool,
 	}
 	if r.Format == cliout.FormatJSON {
 		for i := range res.Findings {
-			if err := r.Emit(res.Findings[i], nil); err != nil {
+			if err := r.EmitEvent(res.Findings[i], nil); err != nil {
 				return err
 			}
 		}
-		return r.Emit(summary, nil)
+		return r.EmitEvent(summary, nil)
 	}
 	budget := maxTracebacks
 	if err := renderFindingsTable(r.Out, res.Findings, &budget); err != nil {
@@ -851,7 +851,7 @@ type checkBlocked struct {
 // json mode it is a single structured line; in text mode, the guidance.
 func renderCheckBlocked(r cliout.Renderer, err error) error {
 	msg := err.Error()
-	return r.Emit(checkBlocked{Event: "error", Message: msg}, func(w io.Writer) error {
+	return r.EmitEvent(checkBlocked{Event: "error", Message: msg}, func(w io.Writer) error {
 		_, werr := fmt.Fprintln(w, msg)
 		return werr
 	})
@@ -864,7 +864,7 @@ func renderCheckBlocked(r cliout.Renderer, err error) error {
 func renderTargetChecks(r cliout.Renderer, reports []checks.TargetReport, strict bool) error {
 	if r.Format == cliout.FormatJSON {
 		for i := range reports {
-			if err := r.Emit(reports[i], nil); err != nil {
+			if err := r.EmitEvent(reports[i], nil); err != nil {
 				return err
 			}
 		}
