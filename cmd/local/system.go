@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 )
 
@@ -238,33 +240,27 @@ func (q *query) runConfig(ctx context.Context, section string) error {
 // [section] header, then key = value under it. A section with no options
 // prints nothing, and a configuration with no options at all says so.
 func renderConfig(w io.Writer, rows []configSectionRow) error {
-	printed := 0
-	for _, row := range rows {
-		if len(row.Options) == 0 {
-			continue
-		}
-		if printed > 0 {
-			if _, err := fmt.Fprintln(w); err != nil {
-				return err
+	return cliout.WriteText(w, func(b *bufio.Writer) {
+		printed := 0
+		for _, row := range rows {
+			if len(row.Options) == 0 {
+				continue
+			}
+			if printed > 0 {
+				fmt.Fprintln(b)
+			}
+			printed++
+			fmt.Fprintf(b, "[%s]\n", row.Name)
+			for _, o := range row.Options {
+				line := o.Key + " = " + o.Value
+				if o.Source != "" {
+					line += "  # " + o.Source
+				}
+				fmt.Fprintln(b, line)
 			}
 		}
-		printed++
-		if _, err := fmt.Fprintf(w, "[%s]\n", row.Name); err != nil {
-			return err
+		if printed == 0 {
+			fmt.Fprintln(b, "This Airflow reported no configuration.")
 		}
-		for _, o := range row.Options {
-			line := o.Key + " = " + o.Value
-			if o.Source != "" {
-				line += "  # " + o.Source
-			}
-			if _, err := fmt.Fprintln(w, line); err != nil {
-				return err
-			}
-		}
-	}
-	if printed == 0 {
-		_, err := fmt.Fprintln(w, "This Airflow reported no configuration.")
-		return err
-	}
-	return nil
+	})
 }

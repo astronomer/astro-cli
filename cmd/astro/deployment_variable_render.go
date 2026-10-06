@@ -5,8 +5,8 @@ package astro
 // in json.
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 
@@ -15,7 +15,6 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 // deploymentVariableOutput is --output for the whole `deployment variable`
@@ -49,24 +48,19 @@ func strayStdoutToStderr(format cliout.Format) (restore func()) {
 const maskedSecret = "****"
 
 // renderVariables prints the variable table, or says there are none.
-func renderVariables(out io.Writer, vars []deployment.VariableInfo, empty string) {
-	if len(vars) == 0 {
-		fmt.Fprintln(out, "\n"+empty)
-		return
-	}
-	table := printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "KEY", "VALUE", "SECRET"},
+func renderVariables(b *bufio.Writer, vars []deployment.VariableInfo, empty string) {
+	table := cliout.Table{
+		Header: []string{"#", "KEY", "VALUE", "SECRET"},
+		Empty:  "\n" + empty,
 	}
 	for i, v := range vars {
 		value := v.Value
 		if v.IsSecret {
 			value = maskedSecret
 		}
-		table.AddRow([]string{strconv.Itoa(i + 1), v.Key, value, strconv.FormatBool(v.IsSecret)}, false)
+		table.AddRow(strconv.Itoa(i+1), v.Key, value, strconv.FormatBool(v.IsSecret))
 	}
-	table.Print(out) //nolint:errcheck // best-effort render to the terminal
+	table.Render(b)
 }
 
 // renderOutcomes prints one line per input, in the order the inputs were given.
@@ -74,21 +68,21 @@ func renderVariables(out io.Writer, vars []deployment.VariableInfo, empty string
 // Every line goes to the same writer. Under the old shape half of these went to
 // the caller's writer and half to bare stdout, so a captured run saw only some
 // of them.
-func renderOutcomes(out io.Writer, outcomes []deployment.VariableOutcome) {
+func renderOutcomes(b *bufio.Writer, outcomes []deployment.VariableOutcome) {
 	for _, o := range outcomes {
 		switch o.Kind {
 		case deployment.VariableCreated:
-			fmt.Fprintf(out, "adding variable %s\n", o.Key)
+			fmt.Fprintf(b, "adding variable %s\n", o.Key)
 		case deployment.VariableUpdated:
-			fmt.Fprintf(out, "updating variable %s\n", o.Key)
+			fmt.Fprintf(b, "updating variable %s\n", o.Key)
 		case deployment.VariableSkippedExists:
-			fmt.Fprintf(out, "key %s already exists, skipping creation. Use the update command to update existing variables\n", o.Key)
+			fmt.Fprintf(b, "key %s already exists, skipping creation. Use the update command to update existing variables\n", o.Key)
 		case deployment.VariableInvalid:
 			subject := o.Input
 			if subject == "" {
 				subject = o.Key
 			}
-			fmt.Fprintf(out, "%s not created or updated: %s\n", subject, o.Reason)
+			fmt.Fprintf(b, "%s not created or updated: %s\n", subject, o.Reason)
 		}
 	}
 }
@@ -125,12 +119,12 @@ func quoteList(in []string) string {
 // The outcomes come first, then the Deployment's list under a heading: the two
 // answer different questions, and without the heading the table reads as more
 // output about the inputs rather than the state they left behind.
-func renderVariableModify(out io.Writer, res *deployment.VariableModifyResult) {
-	renderOutcomes(out, res.Outcomes)
+func renderVariableModify(b *bufio.Writer, res *deployment.VariableModifyResult) {
+	renderOutcomes(b, res.Outcomes)
 	if len(res.Variables) > 0 {
-		fmt.Fprintln(out, "\nUpdated list of your Deployment's variables:")
+		fmt.Fprintln(b, "\nUpdated list of your Deployment's variables:")
 	}
-	renderVariables(out, res.Variables, "No variables for this Deployment")
+	renderVariables(b, res.Variables, "No variables for this Deployment")
 }
 
 // emitVariableList publishes `variable list`'s result: {"variables": [...]} in
@@ -147,10 +141,9 @@ func emitVariableList(cmd *cobra.Command, r cliout.Renderer, vars *deployment.De
 		}
 		fmt.Fprintf(notice, "\nThe following environment variables were saved to the file %s,\nsecret environment variables were saved only with a key:\n\n", envFile)
 	}
-	return r.Emit(vars, func(w io.Writer) error {
-		renderVariables(w, vars.Variables, "No variables found")
-		return nil
-	})
+	return r.Emit(vars, cliout.Text(func(b *bufio.Writer) {
+		renderVariables(b, vars.Variables, "No variables found")
+	}))
 }
 
 // emitVariableModify publishes a create or update run's result and picks its
@@ -162,10 +155,9 @@ func emitVariableList(cmd *cobra.Command, r cliout.Renderer, vars *deployment.De
 // print a second, plainer object after it. In text the error stays unmarked,
 // so the root prints it on stderr as it always has.
 func emitVariableModify(r cliout.Renderer, res *deployment.VariableModifyResult) error {
-	if err := r.Emit(res, func(w io.Writer) error {
-		renderVariableModify(w, res)
-		return nil
-	}); err != nil {
+	if err := r.Emit(res, cliout.Text(func(b *bufio.Writer) {
+		renderVariableModify(b, res)
+	})); err != nil {
 		return err
 	}
 	err := errInvalidInputs(res)

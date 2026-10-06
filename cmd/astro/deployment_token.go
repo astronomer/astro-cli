@@ -5,6 +5,7 @@ package astro
 // sure) and decides how the answer looks, in text and in json.
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -17,7 +18,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 // deploymentTokenOutput is the --output of the whole `deployment token`
@@ -56,46 +56,53 @@ func tokenFormat() (cliout.Format, error) {
 }
 
 func renderTokenList(format cliout.Format, out io.Writer, tokens []deployment.TokenInfo) error {
-	return cliout.Renderer{Format: format, Out: out}.Emit(deploymentTokenList{Tokens: tokens}, func(w io.Writer) error {
-		tab := &printutil.Table{
-			DynamicPadding: true,
-			Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
+	tab := tokenTable(tokens, false)
+	return cliout.Renderer{Format: format, Out: out}.Emit(deploymentTokenList{Tokens: tokens}, cliout.Text(tab.Render))
+}
+
+// tokenTable lays tokens out for a list, or, numbered, for the picker.
+func tokenTable(tokens []deployment.TokenInfo, numbered bool) *cliout.Table {
+	header := []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"}
+	if numbered {
+		header = append([]string{"#"}, header...)
+	}
+	tab := &cliout.Table{Header: header}
+	for i := range tokens {
+		t := &tokens[i]
+		row := []string{t.ID, t.Name, t.Description, t.Scope, t.Role, deployment.TimeAgo(t.CreatedAt), t.CreatedBy}
+		if numbered {
+			row = append([]string{strconv.Itoa(i + 1)}, row...)
 		}
-		for i := range tokens {
-			t := &tokens[i]
-			tab.AddRow([]string{t.ID, t.Name, t.Description, t.Scope, t.Role, deployment.TimeAgo(t.CreatedAt), t.CreatedBy}, false)
-		}
-		return tab.Print(w)
-	})
+		tab.AddRow(row...)
+	}
+	return tab
 }
 
 // renderTokenSecret renders a token that carries its secret: the new one, or
 // the rotated one. verb and name complete the text's first line; clean prints
 // the bare secret instead, for a script.
 func renderTokenSecret(format cliout.Format, out io.Writer, t *deployment.TokenInfo, verb, name string, clean bool) error {
-	return cliout.Renderer{Format: format, Out: out}.Emit(t, func(w io.Writer) error {
+	return cliout.Renderer{Format: format, Out: out}.Emit(t, cliout.Text(func(b *bufio.Writer) {
 		if clean {
 			if t.Token != "" {
-				fmt.Fprintln(w, t.Token)
+				fmt.Fprintln(b, t.Token)
 			}
-			return nil
+			return
 		}
-		fmt.Fprintf(w, "\nAstro Deployment API token %s was successfully %s\n", name, verb)
-		fmt.Fprintln(w, "Copy and paste this API token for your records.")
+		fmt.Fprintf(b, "\nAstro Deployment API token %s was successfully %s\n", name, verb)
+		fmt.Fprintln(b, "Copy and paste this API token for your records.")
 		if t.Token != "" {
-			fmt.Fprintln(w, "\n"+t.Token)
+			fmt.Fprintln(b, "\n"+t.Token)
 		}
-		fmt.Fprintln(w, "\nYou will not be shown this API token value again.")
-		return nil
-	})
+		fmt.Fprintln(b, "\nYou will not be shown this API token value again.")
+	}))
 }
 
 // renderTokenLine renders v as one line of text, or as itself in json.
 func renderTokenLine(format cliout.Format, out io.Writer, v any, line string) error {
-	return cliout.Renderer{Format: format, Out: out}.Emit(v, func(w io.Writer) error {
-		_, err := fmt.Fprintln(w, line)
-		return err
-	})
+	return cliout.Renderer{Format: format, Out: out}.Emit(v, cliout.Text(func(b *bufio.Writer) {
+		fmt.Fprintln(b, line)
+	}))
 }
 
 // tokenPicker asks a person to choose a token from a numbered table. Under
@@ -107,16 +114,11 @@ func tokenPicker(out io.Writer) deployment.TokenPicker {
 		if err := input.MayAsk("\n> ", about, answeredBy); err != nil {
 			return 0, err
 		}
-		fmt.Fprintln(out, heading)
-		tab := &printutil.Table{
-			DynamicPadding: true,
-			Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
-		}
-		for i := range tokens {
-			t := &tokens[i]
-			tab.AddRow([]string{strconv.Itoa(i + 1), t.ID, t.Name, t.Description, t.Scope, t.Role, deployment.TimeAgo(t.CreatedAt), t.CreatedBy}, false)
-		}
-		tab.Print(out) //nolint:errcheck // best-effort render to the terminal
+		tab := tokenTable(tokens, true)
+		cliout.WriteText(out, func(b *bufio.Writer) { //nolint:errcheck // best-effort render to the terminal; the answer is read either way
+			fmt.Fprintln(b, heading)
+			tab.Render(b)
+		})
 		choice, err := input.Text("\n> ", about, answeredBy)
 		if err != nil {
 			return 0, err

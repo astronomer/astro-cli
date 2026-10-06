@@ -258,6 +258,22 @@ func TestDeploymentVariableListTextUnchanged(t *testing.T) {
 	m.AssertExpectations(t)
 }
 
+// A value holding a line break stays on its own row: the break prints as a
+// space, so the cells after it are not pushed onto a line of their own.
+func TestDeploymentVariableListTextKeepsAValueOnItsRow(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	multiline := "first\nsecond"
+	withDeploymentVariables(t, &[]astrov1.DeploymentEnvironmentVariable{{Key: "PEM", Value: &multiline}})
+	m := listMocks()
+	astroV1Client = m
+
+	run := runVariableCmd(t, "variable", "list", "--deployment-id", "test-id-1")
+
+	assert.Equal(t, 0, run.code)
+	requireRow(t, run.stdout, "1", "PEM", "first", "second", "false")
+	m.AssertExpectations(t)
+}
+
 func TestDeploymentVariableCreateJSON(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

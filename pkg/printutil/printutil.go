@@ -8,7 +8,13 @@ import (
 	"strings"
 )
 
-// Table represents a table to be printed
+// Table represents a table to be printed.
+//
+// It is the old way, inherited from Astro CLI 1.x. New code prints a list with
+// cliout.Table (cmd/cliout/text.go), which lays out the same columns with
+// text/tabwriter and writes through cliout.Text's bufio.Writer, so a renderer
+// checks one error instead of none. The remaining uses move over a command
+// family at a time; Pick, the numbered row picker, stays here until they do.
 type Table struct {
 	// A slice of ints defining the padding for each column
 	Padding         []int
