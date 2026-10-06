@@ -450,6 +450,61 @@ func TestDeploymentListJSON(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 }
 
+// TestDeploymentListJSONKeysAreSnakeCase pins the keys `deployment list -o
+// json` publishes. Decoding into deployment.DeploymentList cannot catch a key
+// rename, since the struct's own tags decode it; reading the raw object does.
+// The 1.x camelCase keys (deploymentId, isDagDeployEnabled, ...) became these
+// in 2.0, with the names `deployment inspect` uses for the same facts.
+func TestDeploymentListJSONKeysAreSnakeCase(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	// Its own fixture: the shared mock's slice is sorted in place by ListData
+	// and its rows are reused by other tests, so under -shuffle their shape
+	// depends on what ran first.
+	standard, hybrid := astrov1.DeploymentTypeSTANDARD, astrov1.DeploymentTypeHYBRID
+	region, provider, cluster, ws := "us-east-1", astrov1.DeploymentCloudProvider("AWS"), "test-cluster", "ws-name"
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListDeploymentsResponse{
+		HTTPResponse: &http.Response{StatusCode: 200},
+		JSON200: &astrov1.DeploymentsPaginated{Deployments: []astrov1.Deployment{
+			{Id: "dep-standard", Name: "b", Type: &standard, Region: &region, CloudProvider: &provider, WorkspaceName: &ws},
+			{Id: "dep-hybrid", Name: "a", Type: &hybrid, ClusterName: &cluster, WorkspaceName: &ws},
+		}},
+	}, nil).Once()
+	astroV1Client = mockV1Client
+
+	resp, err := execDeploymentCmd("list", "-a", "-o", "json")
+	require.NoError(t, err)
+
+	var got struct {
+		Deployments []map[string]any `json:"deployments"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(resp), &got))
+	require.Len(t, got.Deployments, 2) // sorted by name, descending: b, then a
+
+	always := []string{
+		"name", "workspace_name", "namespace", "deployment_id", "runtime_version", "airflow_version",
+		"dag_deploy_enabled", "ci_cd_enforcement", "type", "is_remote_execution_enabled",
+	}
+	keys := func(m map[string]any) []string {
+		out := make([]string, 0, len(m))
+		for k := range m {
+			out = append(out, k)
+		}
+		return out
+	}
+	// The standard deployment has a region and provider but no cluster; the
+	// hybrid one the reverse. Those three are omitempty.
+	assert.ElementsMatch(t, append(append([]string{}, always...), "cloud_provider", "region"), keys(got.Deployments[0]))
+	assert.ElementsMatch(t, append(append([]string{}, always...), "cluster_name"), keys(got.Deployments[1]))
+	assert.Equal(t, "dep-standard", got.Deployments[0]["deployment_id"])
+	assert.Equal(t, "AWS", got.Deployments[0]["cloud_provider"])
+	assert.Equal(t, "ws-name", got.Deployments[0]["workspace_name"])
+	assert.Equal(t, "dep-hybrid", got.Deployments[1]["deployment_id"])
+	assert.Equal(t, "test-cluster", got.Deployments[1]["cluster_name"])
+	mockV1Client.AssertExpectations(t)
+}
+
 func TestDeploymentListRejectsRemovedOutputDialect(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

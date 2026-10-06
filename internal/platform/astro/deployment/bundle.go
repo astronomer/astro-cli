@@ -4,6 +4,7 @@ import (
 	httpContext "context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -29,34 +30,69 @@ var (
 
 // BundleList is the wire shape for `bundle list` output.
 type BundleList struct {
-	Bundles []astrov1alpha1.DeploymentBundle `json:"bundles"`
+	Bundles []BundleInfo `json:"bundles"`
+}
+
+// BundleInfo is one bundle in `bundle list` output: the API's
+// DeploymentBundle field for field, under the CLI's snake_case keys rather
+// than the API's camelCase ones. A field the API left out stays out.
+type BundleInfo struct {
+	ID                string    `json:"id"`
+	Type              string    `json:"type"`
+	IsDagBundle       *bool     `json:"is_dag_bundle,omitempty"`
+	Name              *string   `json:"name,omitempty"`
+	NonDagBundleType  *string   `json:"non_dag_bundle_type,omitempty"`
+	NonDagMountPath   *string   `json:"non_dag_mount_path,omitempty"`
+	DagBundleIDs      *[]string `json:"dag_bundle_ids,omitempty"`
+	CurrentVersion    *string   `json:"current_version,omitempty"`
+	DesiredVersion    *string   `json:"desired_version,omitempty"`
+	DeletionIsPending *bool     `json:"deletion_is_pending,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
+	return BundleInfo{
+		ID:                b.Id,
+		Type:              string(b.Type),
+		IsDagBundle:       b.IsDagBundle,
+		Name:              b.Name,
+		NonDagBundleType:  b.NonDagBundleType,
+		NonDagMountPath:   b.NonDagMountPath,
+		DagBundleIDs:      b.DagBundleIds,
+		CurrentVersion:    b.CurrentVersion,
+		DesiredVersion:    b.DesiredVersion,
+		DeletionIsPending: b.DeletionIsPending,
+		CreatedAt:         b.CreatedAt,
+		UpdatedAt:         b.UpdatedAt,
+	}
 }
 
 func bundleTableConfig() *output.TableConfig {
-	columns := []output.Column[astrov1alpha1.DeploymentBundle]{
-		{Header: "BUNDLE ID", Value: func(b astrov1alpha1.DeploymentBundle) string { return b.Id }},
-		{Header: "IS DAG BUNDLE", Value: func(b astrov1alpha1.DeploymentBundle) string {
+	columns := []output.Column[BundleInfo]{
+		{Header: "BUNDLE ID", Value: func(b BundleInfo) string { return b.ID }},
+		{Header: "IS DAG BUNDLE", Value: func(b BundleInfo) string {
 			return fmt.Sprintf("%t", b.IsDagBundle != nil && *b.IsDagBundle)
 		}},
-		{Header: "NAME", Value: func(b astrov1alpha1.DeploymentBundle) string {
+		{Header: "NAME", Value: func(b BundleInfo) string {
 			if b.Name == nil {
 				return notApplicable
 			}
 			return orNA(*b.Name)
 		}},
-		{Header: "MOUNT PATH", Value: func(b astrov1alpha1.DeploymentBundle) string {
+		{Header: "MOUNT PATH", Value: func(b BundleInfo) string {
 			if b.NonDagMountPath == nil {
 				return notApplicable
 			}
 			return orNA(*b.NonDagMountPath)
 		}},
-		{Header: "CURRENT VERSION", Value: func(b astrov1alpha1.DeploymentBundle) string {
+		{Header: "CURRENT VERSION", Value: func(b BundleInfo) string {
 			if b.CurrentVersion == nil {
 				return notApplicable
 			}
 			return orNA(*b.CurrentVersion)
 		}},
-		{Header: "DESIRED VERSION", Value: func(b astrov1alpha1.DeploymentBundle) string {
+		{Header: "DESIRED VERSION", Value: func(b BundleInfo) string {
 			if b.DesiredVersion == nil {
 				return notApplicable
 			}
@@ -65,7 +101,7 @@ func bundleTableConfig() *output.TableConfig {
 	}
 	return output.BuildTableConfig(
 		columns,
-		func(d any) []astrov1alpha1.DeploymentBundle { return d.(*BundleList).Bundles },
+		func(d any) []BundleInfo { return d.(*BundleList).Bundles },
 		output.WithNoResultsMsg("No bundles found on this deployment"),
 	)
 }
@@ -175,7 +211,11 @@ func ListBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient,
 		return nil, err
 	}
 
-	return &BundleList{Bundles: bundles}, nil
+	infos := make([]BundleInfo, 0, len(bundles))
+	for i := range bundles {
+		infos = append(infos, bundleToInfo(&bundles[i]))
+	}
+	return &BundleList{Bundles: infos}, nil
 }
 
 // listAllBundles pages through every bundle on a deployment.

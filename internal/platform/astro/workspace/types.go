@@ -4,7 +4,7 @@ package workspace
 type WorkspaceInfo struct {
 	Name      string `json:"name"`
 	ID        string `json:"id"`
-	IsCurrent bool   `json:"isCurrent"`
+	IsCurrent bool   `json:"is_current"`
 }
 
 // WorkspaceList represents a list of workspaces for output formatting
