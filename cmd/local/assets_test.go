@@ -29,7 +29,7 @@ func TestAssetsListReadsDatasetsOnAirflow2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("assets list on airflow 2: %v", err)
 	}
-	if row := decodeNDJSON(t, out)[0]; row["uri"] != "s3://orders/gold" {
+	if row := decodeRows(t, out, "assets")[0]; row["uri"] != "s3://orders/gold" {
 		t.Errorf("row = %v", row)
 	}
 }

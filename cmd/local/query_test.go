@@ -239,21 +239,40 @@ func queryDeps(t *testing.T) (d Deps, stdout, stderr *bytes.Buffer) {
 	return d, stdout, stderr
 }
 
-// decodeNDJSON reads a json-mode listing: one object per line, which is what
-// emitRows writes so a consumer can stream it.
-func decodeNDJSON(t *testing.T, out string) []map[string]any {
+// decodeList reads a json-mode listing: one object, the whole of stdout, with
+// the rows under key as an array — never null, never missing, which is what
+// emitRows promises. It returns the object too, for the envelope's counts.
+func decodeList(t *testing.T, out, key string) (rows []map[string]any, envelope map[string]any) {
 	t.Helper()
-	var rows []map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if line == "" {
-			continue
-		}
-		var row map[string]any
-		if err := json.Unmarshal([]byte(line), &row); err != nil {
-			t.Fatalf("line %q is not json: %v", line, err)
+	dec := json.NewDecoder(strings.NewReader(out))
+	if err := dec.Decode(&envelope); err != nil {
+		t.Fatalf("output %q is not one json object: %v", out, err)
+	}
+	if dec.More() {
+		t.Fatalf("output %q holds more than one json value; a list is one object", out)
+	}
+	raw, ok := envelope[key]
+	if !ok {
+		t.Fatalf("output %q has no %q key", out, key)
+	}
+	list, ok := raw.([]any)
+	if !ok {
+		t.Fatalf("%q is %T, want an array: %q", key, raw, out)
+	}
+	for _, item := range list {
+		row, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("a row under %q is %T, want an object: %q", key, item, out)
 		}
 		rows = append(rows, row)
 	}
+	return rows, envelope
+}
+
+// decodeRows is decodeList for a test that reads only the rows.
+func decodeRows(t *testing.T, out, key string) []map[string]any {
+	t.Helper()
+	rows, _ := decodeList(t, out, key)
 	return rows
 }
 

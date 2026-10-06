@@ -124,7 +124,7 @@ func TestListDefaultHidesStale(t *testing.T) {
 	}
 }
 
-func TestListJSONIsOneObjectPerLine(t *testing.T) {
+func TestListJSONIsOneObjectWithTheProjects(t *testing.T) {
 	d, out := testDeps(t)
 	d.Runtime = stubRuntime{list: []localrt.Status{
 		{ProjectPath: "/proj/a", Mode: localrt.ModeDocker, State: localrt.StateRunning, Port: 8080, Hostname: "a.localhost", StartedAt: time.Now().Add(-time.Hour)},
@@ -133,16 +133,28 @@ func TestListJSONIsOneObjectPerLine(t *testing.T) {
 	if err := execute(t, d, "local", "list", "--all", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
-	if len(lines) != 2 {
-		t.Fatalf("want one JSON object per row, got %d lines:\n%s", len(lines), out.String())
+	var list localList
+	if err := json.Unmarshal(out.Bytes(), &list); err != nil {
+		t.Fatalf("output is not one JSON object: %v: %q", err, out.String())
 	}
-	var first listRow
-	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
-		t.Fatalf("line is not standalone JSON: %v: %q", err, lines[0])
+	if len(list.Projects) != 2 {
+		t.Fatalf("want both records under projects, got %d:\n%s", len(list.Projects), out.String())
 	}
-	if first.Project != "/proj/a" || first.State != "running" {
+	if first := list.Projects[0]; first.Project != "/proj/a" || first.State != "running" {
 		t.Errorf("first row decoded wrong: %+v", first)
+	}
+}
+
+// An empty list is the object with an empty array: never null, never nothing
+// at all, so a consumer's `.projects[]` reads zero rows rather than failing.
+func TestListJSONWithNothingRunningIsAnEmptyArray(t *testing.T) {
+	d, out := testDeps(t)
+	d.Runtime = stubRuntime{}
+	if err := execute(t, d, "local", "list", "--output", "json"); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != `{"projects":[]}` {
+		t.Errorf("empty list = %q, want {\"projects\":[]}", got)
 	}
 }
 

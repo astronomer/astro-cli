@@ -15,7 +15,7 @@ const twoDAGsAF3 = `{"dags":[
 	{"dag_id":"reports","is_paused":true,"owners":["analytics"],"timetable_summary":"@weekly"}
 ],"total_entries":2}`
 
-func TestDagsListRendersATableAndNDJSON(t *testing.T) {
+func TestDagsListRendersATableAndOneJSONObject(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dags", twoDAGsAF3)
 
@@ -37,7 +37,7 @@ func TestDagsListRendersATableAndNDJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dags list -o json: %v", err)
 	}
-	rows := decodeNDJSON(t, out)
+	rows := decodeRows(t, out, "dags")
 	if len(rows) != 2 {
 		t.Fatalf("got %d rows, want 2:\n%s", len(rows), out)
 	}
@@ -62,7 +62,7 @@ func TestDagsListFoldsTheGenerationsIntoOneShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dags list: %v", err)
 	}
-	row := decodeNDJSON(t, out)[0]
+	row := decodeRows(t, out, "dags")[0]
 	if row["schedule"] != "Every day" {
 		t.Errorf("airflow 2's timetable_description did not reach schedule: %v", row)
 	}
@@ -140,7 +140,7 @@ func TestDagsStatsCountsRunsByState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dags stats -o json: %v", err)
 	}
-	row := decodeNDJSON(t, out)[0]
+	row := decodeRows(t, out, "dags")[0]
 	stats, ok := row["stats"].(map[string]any)
 	if !ok || stats["success"] != float64(12) {
 		t.Errorf("row = %v", row)
@@ -233,7 +233,7 @@ func TestDagsListPagesPastTheServerCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dags list --limit 500: %v", err)
 	}
-	if rows := decodeNDJSON(t, out); len(rows) != 179 {
+	if rows := decodeRows(t, out, "dags"); len(rows) != 179 {
 		t.Fatalf("got %d rows, want all 179", len(rows))
 	}
 	var pages []string
@@ -287,8 +287,12 @@ func TestDagsListNamesTheRowsItLeftOut(t *testing.T) {
 			if err != nil {
 				t.Fatalf("dags list -o json: %v", err)
 			}
-			if rows := decodeNDJSON(t, out); len(rows) != tc.rows {
-				t.Errorf("json has %d rows, want %d", len(rows), tc.rows)
+			// What the footer says in text, the envelope says in json: the
+			// collection's total beside what this page carries.
+			rows, envelope := decodeList(t, out, "dags")
+			if len(rows) != tc.rows || envelope["total_dags"] != float64(179) || envelope["returned_count"] != float64(tc.rows) {
+				t.Errorf("json has %d rows, total_dags %v, returned_count %v; want %d of 179",
+					len(rows), envelope["total_dags"], envelope["returned_count"], tc.rows)
 			}
 			if strings.Contains(errOut, "showing") {
 				t.Errorf("json mode wrote the text footer: %q", errOut)

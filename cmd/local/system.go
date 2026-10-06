@@ -102,7 +102,8 @@ func (q *query) runProviders(ctx context.Context) error {
 	if err != nil {
 		return notServed("its providers", err)
 	}
-	return emitRows(r, mapRows(list.Providers, newProviderRow), func(w io.Writer, rows []providerRow) error {
+	rows := mapRows(list.Providers, newProviderRow)
+	return emitRows(r, rows, len(rows), newProviderList, func(w io.Writer, rows []providerRow) error {
 		return renderTable(w, rows, "No providers on this Airflow.",
 			[]string{"PACKAGE", "VERSION", "DESCRIPTION"},
 			func(row providerRow) []string {
@@ -154,7 +155,7 @@ func (q *query) runPlugins(ctx context.Context, opts airflowapi.ListOptions) err
 	return notServed("its plugins", emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Plugin, int, error) {
 		list, err := client.ListPlugins(ctx, page)
 		return list.Plugins, list.TotalEntries, err
-	}, newPluginRow, func(w io.Writer, rows []pluginRow) error {
+	}, newPluginRow, newPluginList, func(w io.Writer, rows []pluginRow) error {
 		return renderTable(w, rows, "No plugins on this Airflow.",
 			[]string{"NAME", "SOURCE", "PROVIDES"},
 			func(row pluginRow) []string {
@@ -189,7 +190,8 @@ func newConfigCmd(d Deps, t target) *cobra.Command {
 }
 
 // configOptionRow is one configuration option: one row per option rather than
-// one object per section, so a listing filters and greps line by line.
+// one object per section, so the text table greps line by line and the json
+// `options` array filters with a single jq select.
 type configOptionRow struct {
 	Section string `json:"section"`
 	Key     string `json:"key"`
@@ -220,7 +222,7 @@ func (q *query) runConfig(ctx context.Context, section string) error {
 	rows := mapRows(config.Options, func(o airflowapi.ConfigOption) configOptionRow {
 		return configOptionRow{Section: o.Section, Key: o.Key, Value: o.Value, Source: o.Source}
 	})
-	return emitRows(r, rows, renderConfig)
+	return emitRows(r, rows, len(rows), newConfigOptionList, renderConfig)
 }
 
 // renderConfig writes the options the way airflow.cfg lays them out: a

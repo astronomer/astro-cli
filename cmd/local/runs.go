@@ -153,7 +153,7 @@ func (q *query) runRunsList(ctx context.Context, dagID string, opts airflowapi.L
 		filtered.ListOptions = page
 		list, err := client.ListDAGRuns(ctx, dagID, filtered)
 		return list.DAGRuns, list.TotalEntries, err
-	}, newRunRow, renderRunTable)
+	}, newRunRow, newRunList, renderRunTable)
 }
 
 func renderRunTable(w io.Writer, rows []runRow) error {
@@ -211,7 +211,7 @@ func (q *query) runRunsTasks(ctx context.Context, dagID, runID string, f listFla
 	if f.orderBy == "" {
 		groupMappedInstances(rows)
 	}
-	return emitListed(q, r, f.options(), rows, total, renderRunTaskTable)
+	return emitListed(q, r, f.options(), rows, total, newTaskInstanceList, renderRunTaskTable)
 }
 
 // renderRunTaskTable drops the dag and run columns renderTaskInstanceTable

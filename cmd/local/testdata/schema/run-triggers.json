@@ -1,0 +1,19 @@
+{
+  "dag_id": "x",
+  "dag_run_id": "x",
+  "triggered_by_events": [
+    {
+      "id": -1,
+      "uri": "x",
+      "asset_id": -1,
+      "source_dag_id": "x",
+      "source_task_id": "x",
+      "source_run_id": "x",
+      "timestamp": "x",
+      "created_dagruns": [
+        "x"
+      ]
+    }
+  ],
+  "event_count": -1
+}

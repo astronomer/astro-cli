@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "kind": "x",
+      "name": "x",
+      "required": true,
+      "secret": true,
+      "description": "x",
+      "source": "x",
+      "orphan": true,
+      "project": "x",
+      "invalid": "x",
+      "remove_hint": "x",
+      "applied": true,
+      "not_linked_here": true,
+      "links_down": "x",
+      "link_hint": "x",
+      "declare_hint": "x",
+      "set_hint": "x",
+      "undeclare_hint": "x"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "total_providers": -1,
+  "returned_count": -1,
+  "providers": [
+    {
+      "package_name": "x",
+      "version": "x",
+      "description": "x",
+      "documentation_url": "x"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "total_dags": -1,
+  "returned_count": -1,
+  "dags": [
+    {
+      "dag_id": "x",
+      "dag_display_name": "x",
+      "is_paused": true,
+      "schedule": "x",
+      "owners": [
+        "x"
+      ],
+      "tags": [
+        "x"
+      ],
+      "description": "x",
+      "fileloc": "x",
+      "next_run": "x",
+      "last_parsed_time": "x",
+      "max_active_runs": -1,
+      "max_active_tasks": -1,
+      "has_import_errors": true
+    }
+  ]
+}

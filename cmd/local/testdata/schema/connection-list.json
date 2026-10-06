@@ -1,0 +1,15 @@
+{
+  "total_connections": -1,
+  "returned_count": -1,
+  "connections": [
+    {
+      "connection_id": "x",
+      "conn_type": "x",
+      "host": "x",
+      "port": -1,
+      "schema": "x",
+      "login": "x",
+      "description": "x"
+    }
+  ]
+}

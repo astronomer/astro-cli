@@ -258,7 +258,7 @@ func newAPIListCmd(c *cli) *cobra.Command {
 			"specification.\n\n" +
 			"A filter, as an argument or with --filter, keeps the endpoints whose path, method, operation id, " +
 			"summary or tag contains it, ignoring case. Paths are shown relative to the API base, the form " +
-			"`astro local api` takes them in. --output json prints one object per endpoint.",
+			"`astro local api` takes them in. --output json prints one object, its endpoints under an endpoints key.",
 		Example: "  astro local api ls\n" +
 			"  astro local api ls --filter variable\n" +
 			"  astro local api ls dagRun --verbose",
@@ -277,7 +277,8 @@ func newAPIListCmd(c *cli) *cobra.Command {
 				return err
 			}
 			endpoints = openapi.FilterEndpoints(endpoints, filter)
-			return emitRows(r, apirequest.Rows(endpoints), func(w io.Writer, _ []apirequest.EndpointRow) error {
+			rows := apirequest.Rows(endpoints)
+			return emitRows(r, rows, len(rows), newEndpointList, func(w io.Writer, _ []apirequest.EndpointRow) error {
 				apirequest.WriteEndpoints(w, endpoints, filter, verbose)
 				return nil
 			})

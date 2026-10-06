@@ -150,7 +150,7 @@ func (q *query) runDagsList(ctx context.Context, opts airflowapi.ListDAGsOptions
 		filtered.ListOptions = page
 		list, err := client.ListDAGs(ctx, filtered)
 		return list.DAGs, list.TotalEntries, err
-	}, newDAGRow, renderDAGTable)
+	}, newDAGRow, newDAGList, renderDAGTable)
 }
 
 func renderDAGTable(w io.Writer, rows []dagRow) error {
@@ -278,7 +278,8 @@ func (q *query) runDagsStats(ctx context.Context, dagIDs []string) error {
 	if err != nil {
 		return notServed("DAG run statistics", err)
 	}
-	return emitRows(r, dagStatRows(stats), renderDAGStatsTable)
+	rows := dagStatRows(stats)
+	return emitRows(r, rows, len(rows), newDAGStatList, renderDAGStatsTable)
 }
 
 // dagStatRows turns the client's per-state counts into rows. `astro af dags stats`

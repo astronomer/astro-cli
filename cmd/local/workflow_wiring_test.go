@@ -33,7 +33,7 @@ func TestAssetsTriggersListsTheEventsBehindARun(t *testing.T) {
 			if err != nil {
 				t.Fatalf("assets triggers: %v", err)
 			}
-			row := decodeNDJSON(t, out)[0]
+			row := decodeRows(t, out, "triggered_by_events")[0]
 			if row["uri"] != "s3://orders/gold" || row["asset_id"] != float64(2) || row["source_run_id"] != "manual__1" {
 				t.Errorf("row = %v, want both spellings folded into the event row", row)
 			}

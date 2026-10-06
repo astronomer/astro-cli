@@ -27,9 +27,14 @@ func TestDagsErrorsListsImportErrorsOnBothGenerations(t *testing.T) {
 			if err != nil {
 				t.Fatalf("dags errors: %v", err)
 			}
-			rows := decodeNDJSON(t, out)
+			// The standalone af's shape, which Otto's DAG validation reads:
+			// total_import_errors and import_errors in one object.
+			rows, envelope := decodeList(t, out, "import_errors")
 			if len(rows) != 1 {
 				t.Fatalf("rows = %v", rows)
+			}
+			if envelope["total_import_errors"] != float64(1) || envelope["returned_count"] != float64(1) {
+				t.Errorf("envelope = %v, want total_import_errors and returned_count of 1", envelope)
 			}
 			row := rows[0]
 			if row["filename"] != "/dags/broken.py" || row["import_error_id"] != float64(7) ||
@@ -61,21 +66,27 @@ func TestDagsErrorsAndWarningsSayWhenThereAreNone(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/importErrors", `{"import_errors":[],"total_entries":0}`)
 	stub.route(http.MethodGet, "/api/v2/dagWarnings", `{"dag_warnings":[],"total_entries":0}`)
-	for args, want := range map[string]string{
-		"errors":   "No import errors on this Airflow.",
-		"warnings": "No DAG warnings on this Airflow.",
+	for args, want := range map[string]struct{ text, key string }{
+		"errors":   {"No import errors on this Airflow.", "import_errors"},
+		"warnings": {"No DAG warnings on this Airflow.", "dag_warnings"},
 	} {
 		out, _, err := runQuery(t, stub, "dags", args)
 		if err != nil {
 			t.Fatalf("dags %s: %v", args, err)
 		}
-		if !strings.Contains(out, want) {
-			t.Errorf("dags %s = %q, want %q", args, out, want)
+		if !strings.Contains(out, want.text) {
+			t.Errorf("dags %s = %q, want %q", args, out, want.text)
 		}
-		// And json prints no rows at all, rather than an empty object.
+		// And json prints the object with an empty list and zero counts, so
+		// `jq '.import_errors | length'` reads 0 rather than failing on
+		// nothing.
 		out, _, err = runQuery(t, stub, "dags", args, "-o", "json")
-		if err != nil || strings.TrimSpace(out) != "" {
-			t.Errorf("dags %s -o json = %q, %v; want nothing", args, out, err)
+		if err != nil {
+			t.Fatalf("dags %s -o json: %v", args, err)
+		}
+		rows, envelope := decodeList(t, out, want.key)
+		if len(rows) != 0 || envelope["total_"+want.key] != float64(0) || envelope["returned_count"] != float64(0) {
+			t.Errorf("dags %s -o json = %q, want an empty %s with zero counts", args, out, want.key)
 		}
 	}
 }
@@ -107,7 +118,7 @@ func TestDagsWarningsListsWarnings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if row := decodeNDJSON(t, out)[0]; row["dag_id"] != "orders_etl" || row["warning_type"] != "non-existent pool" {
+			if row := decodeRows(t, out, "dag_warnings")[0]; row["dag_id"] != "orders_etl" || row["warning_type"] != "non-existent pool" {
 				t.Errorf("row = %v", row)
 			}
 		})

@@ -5,7 +5,6 @@ package e2e
 import (
 	"encoding/json"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -74,20 +73,16 @@ type runRow struct {
 	RunType string `json:"run_type"`
 }
 
-// runs lists every run on the project's Airflow, one JSON row per line.
+// runs lists every run on the project's Airflow: one object, the runs under
+// dag_runs, the standalone af's key.
 func (p *project) runs() []runRow {
 	p.t.Helper()
-	out := p.run("local", "af", "runs", "list", "--output", "json").requireSuccess().Stdout
-	var rows []runRow
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		if line == "" {
-			continue
-		}
-		var r runRow
-		if err := json.Unmarshal([]byte(line), &r); err != nil {
-			p.t.Fatalf("runs list row is not JSON: %v\n%s", err, line)
-		}
-		rows = append(rows, r)
+	var list struct {
+		DAGRuns *[]runRow `json:"dag_runs"`
 	}
-	return rows
+	p.run("local", "af", "runs", "list", "--output", "json").requireSuccess().requireJSON(&list)
+	if list.DAGRuns == nil {
+		p.t.Fatal("runs list published no dag_runs array")
+	}
+	return *list.DAGRuns
 }

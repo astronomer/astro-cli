@@ -44,7 +44,7 @@ func (q *query) runDagsErrors(ctx context.Context, opts airflowapi.ListOptions) 
 	return notServed("import errors", emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.ImportError, int, error) {
 		list, err := client.ListImportErrors(ctx, page)
 		return list.ImportErrors, list.TotalEntries, err
-	}, newImportErrorRow, renderImportErrors))
+	}, newImportErrorRow, newImportErrorList, renderImportErrors))
 }
 
 // renderImportErrors writes each error as its file and then its whole
@@ -108,7 +108,7 @@ func (q *query) runDagsWarnings(ctx context.Context, opts airflowapi.ListOptions
 	return notServed("DAG warnings", emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.DAGWarning, int, error) {
 		list, err := client.ListDAGWarnings(ctx, page)
 		return list.DAGWarnings, list.TotalEntries, err
-	}, newDAGWarningRow, renderDAGWarningTable))
+	}, newDAGWarningRow, newDAGWarningList, renderDAGWarningTable))
 }
 
 func renderDAGWarningTable(w io.Writer, rows []dagWarningRow) error {

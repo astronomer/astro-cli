@@ -1,0 +1,12 @@
+{
+  "total_dag_warnings": -1,
+  "returned_count": -1,
+  "dag_warnings": [
+    {
+      "dag_id": "x",
+      "warning_type": "x",
+      "message": "x",
+      "timestamp": "x"
+    }
+  ]
+}

@@ -132,7 +132,8 @@ func (q *query) runTasksList(ctx context.Context, dagID string) error {
 	if err != nil {
 		return err
 	}
-	return emitRows(r, mapRows(list.Tasks, newTaskRow), renderTaskTable)
+	rows := mapRows(list.Tasks, newTaskRow)
+	return emitRows(r, rows, len(rows), newTaskList, renderTaskTable)
 }
 
 func renderTaskTable(w io.Writer, rows []taskRow) error {

@@ -1,0 +1,15 @@
+{
+  "total_plugins": -1,
+  "returned_count": -1,
+  "plugins": [
+    {
+      "name": "x",
+      "source": "x",
+      "components": {
+        "x": [
+          "x"
+        ]
+      }
+    }
+  ]
+}

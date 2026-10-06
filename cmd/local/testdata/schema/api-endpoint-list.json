@@ -1,0 +1,18 @@
+{
+  "endpoints": [
+    {
+      "method": "x",
+      "path": "x",
+      "operationId": "x",
+      "summary": "x",
+      "tags": [
+        "x"
+      ],
+      "deprecated": true,
+      "pathParameters": [
+        "x"
+      ]
+    }
+  ],
+  "count": -1
+}

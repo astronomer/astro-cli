@@ -756,7 +756,7 @@ func (c *cli) runList(all, clean bool) error {
 		return err
 	}
 	rows := buildListRows(statuses, all, time.Now())
-	return emitRows(r, rows, renderListTable)
+	return emitRows(r, rows, len(rows), newLocalList, renderListTable)
 }
 
 func (c *cli) runListClean(r cliout.Renderer) error {
@@ -767,7 +767,7 @@ func (c *cli) runListClean(r cliout.Renderer) error {
 	removed, pruneErr := c.d.Runtime.PruneStale()
 	// Everything PruneStale returns is stale by definition; show it all.
 	rows := buildListRows(removed, true, time.Now())
-	if err := emitRows(r, rows, renderRemovedRows); err != nil {
+	if err := emitRows(r, rows, len(rows), newLocalRemoved, renderRemovedRows); err != nil {
 		return errors.Join(err, pruneErr)
 	}
 	return pruneErr
@@ -824,22 +824,6 @@ func buildListRows(statuses []localrt.Status, all bool, now time.Time) []listRow
 		rows = append(rows, row)
 	}
 	return rows
-}
-
-// emitRows renders a table of rows: one JSON object per line in json mode (so
-// the output is NDJSON, not one array), the text renderer once otherwise. It is
-// generic because every listing surface wants exactly this and only differs in
-// what a row is.
-func emitRows[T any](r cliout.Renderer, rows []T, text func(io.Writer, []T) error) error {
-	if r.Format == cliout.FormatJSON {
-		for _, row := range rows {
-			if err := r.Emit(row, nil); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	return r.Emit(rows, func(w io.Writer) error { return text(w, rows) })
 }
 
 func renderListTable(w io.Writer, rows []listRow) error {

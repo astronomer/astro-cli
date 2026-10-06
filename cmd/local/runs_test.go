@@ -42,7 +42,7 @@ func TestRunsListRendersAndAsksMostRecentFirst(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runs list -o json: %v", err)
 	}
-	row := decodeNDJSON(t, out)[0]
+	row := decodeRows(t, out, "dag_runs")[0]
 	if row["dag_run_id"] != "manual__2024-05-01" || row["state"] != "success" {
 		t.Errorf("row = %v", row)
 	}

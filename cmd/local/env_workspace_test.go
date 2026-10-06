@@ -81,12 +81,11 @@ func TestEnvListShowsWorkspaceSource(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	var item struct {
-		Name, Source string
+	entries := decodeEnvList(t, out.String())
+	if len(entries) != 1 {
+		t.Fatalf("want one entry:\n%s", out.String())
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(out.String())), &item); err != nil {
-		t.Fatalf("json: %v\n%s", err, out.String())
-	}
+	item := entries[0]
 	if item.Name != "DATA_WAREHOUSE_URI" || item.Source != "workspace (cmws)" {
 		t.Fatalf("list item = %+v, want workspace source", item)
 	}
@@ -187,12 +186,11 @@ func TestEnvListLoggedOutUnavailable(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	var item struct {
-		Name, Source string
+	entries := decodeEnvList(t, out.String())
+	if len(entries) != 1 {
+		t.Fatalf("want one entry:\n%s", out.String())
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(out.String())), &item); err != nil {
-		t.Fatalf("json: %v\n%s", err, out.String())
-	}
+	item := entries[0]
 	if !strings.HasPrefix(item.Source, "workspace (unavailable:") {
 		t.Fatalf("source = %q, want an unavailable workspace label", item.Source)
 	}

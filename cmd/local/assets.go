@@ -86,7 +86,7 @@ func (q *query) runAssetsList(ctx context.Context, opts airflowapi.ListAssetsOpt
 	return notServed("assets", emitList(q, r, opts.ListOptions, func(page airflowapi.ListOptions) ([]airflowapi.Asset, int, error) {
 		list, err := client.ListAssets(ctx, airflowapi.ListAssetsOptions{ListOptions: page, URIPattern: opts.URIPattern})
 		return list.Assets, list.TotalEntries, err
-	}, newAssetRow, renderAssetTable))
+	}, newAssetRow, newAssetList, renderAssetTable))
 }
 
 func renderAssetTable(w io.Writer, rows []assetRow) error {
@@ -173,7 +173,7 @@ func (q *query) runAssetsEvents(ctx context.Context, opts airflowapi.ListAssetEv
 		filtered.ListOptions = page
 		list, err := client.ListAssetEvents(ctx, filtered)
 		return list.AssetEvents, list.TotalEntries, err
-	}, newAssetEventRow, renderAssetEventTable))
+	}, newAssetEventRow, newAssetEventList, renderAssetEventTable))
 }
 
 func renderAssetEventTable(w io.Writer, rows []assetEventRow) error {
@@ -202,7 +202,11 @@ func (q *query) runAssetsTriggers(ctx context.Context, dagID, runID string) erro
 	if err != nil {
 		return notServed("the asset events behind a run", err)
 	}
-	return emitRows(r, mapRows(list.AssetEvents, newAssetEventRow), func(w io.Writer, rows []assetEventRow) error {
+	triggers := func(rows []assetEventRow, total int) runTriggers {
+		return runTriggers{DAGID: dagID, RunID: runID, Events: rows, EventCount: total}
+	}
+	rows := mapRows(list.AssetEvents, newAssetEventRow)
+	return emitRows(r, rows, len(rows), triggers, func(w io.Writer, rows []assetEventRow) error {
 		return renderAssetEvents(w, rows, "No asset events started this run.")
 	})
 }

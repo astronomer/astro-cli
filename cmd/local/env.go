@@ -1267,15 +1267,9 @@ func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error 
 		}
 		items = kept
 	}
-	if r.Format == cliout.FormatJSON {
-		for i := range items {
-			if err := r.Emit(items[i], nil); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-	return r.Emit(items, func(w io.Writer) error { return renderEnvList(w, items, only) })
+	return emitRows(r, items, len(items), newEnvList, func(w io.Writer, items []localenv.ListItem) error {
+		return renderEnvList(w, items, only)
+	})
 }
 
 // listOptions is the full resolution chain a listing of projectDir reads: the

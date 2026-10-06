@@ -1,7 +1,6 @@
 package local
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -31,12 +30,7 @@ func TestListShowsUndeclaredVaultEntries(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows := map[string][]localenv.ListItem{}
-	dec := json.NewDecoder(strings.NewReader(out.String()))
-	for dec.More() {
-		var it localenv.ListItem
-		if err := dec.Decode(&it); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+	for _, it := range decodeEnvList(t, out.String()) {
 		rows[it.Name] = append(rows[it.Name], it)
 	}
 	got := rows["db_main"]
@@ -107,12 +101,7 @@ func TestListMarksUndeclaredGlobalVaultEntryApplied(t *testing.T) {
 		t.Fatal(err)
 	}
 	var row localenv.ListItem
-	dec := json.NewDecoder(strings.NewReader(out.String()))
-	for dec.More() {
-		var it localenv.ListItem
-		if err := dec.Decode(&it); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+	for _, it := range decodeEnvList(t, out.String()) {
 		if it.Name == "shared_db" {
 			row = it
 		}

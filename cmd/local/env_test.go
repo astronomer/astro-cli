@@ -55,6 +55,28 @@ func envDeps(t *testing.T, dir, stdin string) (d Deps, stdout, stderr *bytes.Buf
 	return d, stdout, stderr
 }
 
+// decodeEnvList reads `astro local env list --output json`: one object, its
+// rows under "entries". Strict about the envelope, because decoding a
+// different shape into a ListItem fails silently into a zero row.
+func decodeEnvList(t *testing.T, out string) []localenv.ListItem {
+	t.Helper()
+	var list struct {
+		Entries *[]localenv.ListItem `json:"entries"`
+	}
+	dec := json.NewDecoder(strings.NewReader(out))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&list); err != nil {
+		t.Fatalf("env list output %q is not one {\"entries\": [...]} object: %v", out, err)
+	}
+	if dec.More() {
+		t.Fatalf("env list output %q holds more than one json value", out)
+	}
+	if list.Entries == nil {
+		t.Fatalf("env list output %q has no entries array", out)
+	}
+	return *list.Entries
+}
+
 func TestEnvSetGetRoundTrip(t *testing.T) {
 	dir := envProject(t, "")
 
@@ -150,26 +172,19 @@ func TestEnvListJSONShapeAndOrphan(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	// NDJSON: one object per line.
+	// One object, the rows under "entries".
 	var declared, orphan bool
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
-		var it struct {
-			Kind, Name, Source string
-			Orphan             bool
-		}
-		if err := json.Unmarshal([]byte(line), &it); err != nil {
-			t.Fatalf("line %q: %v", line, err)
-		}
+	for _, it := range decodeEnvList(t, out.String()) {
 		if it.Name == "API_URL" && it.Source == "project" && !it.Orphan {
 			declared = true
 		}
 		if it.Name == "LEFTOVER" && it.Orphan {
 			orphan = true
 		}
-		// No line ever carries a value key.
-		if strings.Contains(line, "\"value\"") {
-			t.Errorf("list output leaked a value: %s", line)
-		}
+	}
+	// No row ever carries a value key.
+	if strings.Contains(out.String(), "\"value\"") {
+		t.Errorf("list output leaked a value: %s", out.String())
 	}
 	if !declared || !orphan {
 		t.Fatalf("declared=%v orphan=%v\n%s", declared, orphan, out.String())
@@ -277,13 +292,8 @@ func TestEnvListMarksUndeclaredGlobalApplied(t *testing.T) {
 	if err := execute(t, d, "local", "env", "list", "--output", "json"); err != nil {
 		t.Fatal(err)
 	}
-	dec := json.NewDecoder(out)
 	rows := map[string]localenv.ListItem{}
-	for dec.More() {
-		var it localenv.ListItem
-		if err := dec.Decode(&it); err != nil {
-			t.Fatal(err)
-		}
+	for _, it := range decodeEnvList(t, out.String()) {
 		rows[it.Name] = it
 	}
 	if a := rows["STRAY"].Applied; a == nil || !*a {
@@ -414,12 +424,7 @@ func TestEnvListShowsTheDescription(t *testing.T) {
 		t.Fatal(err)
 	}
 	rows := map[string]localenv.ListItem{}
-	dec := json.NewDecoder(strings.NewReader(out.String()))
-	for dec.More() {
-		var it localenv.ListItem
-		if err := dec.Decode(&it); err != nil {
-			t.Fatalf("decode %q: %v", out.String(), err)
-		}
+	for _, it := range decodeEnvList(t, out.String()) {
 		rows[it.Name] = it
 	}
 	if it := rows["API_TOKEN"]; !it.Required || !it.Secret || it.Description != "Token for\nthe API" {
@@ -604,14 +609,7 @@ func TestListNarrowsByNounAndStillHasACrossKindForm(t *testing.T) {
 			t.Fatal(err)
 		}
 		var seen []localenv.Kind
-		for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
-			if line == "" {
-				continue
-			}
-			var it localenv.ListItem
-			if err := json.Unmarshal([]byte(line), &it); err != nil {
-				t.Fatalf("decode %q: %v", line, err)
-			}
+		for _, it := range decodeEnvList(t, out.String()) {
 			seen = append(seen, it.Kind)
 		}
 		return seen

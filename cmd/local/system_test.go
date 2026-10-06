@@ -51,7 +51,7 @@ func TestProvidersListsEachInstalledProvider(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			row := decodeNDJSON(t, out)[0]
+			row := decodeRows(t, out, "providers")[0]
 			if row["package_name"] != "apache-airflow-providers-standard" || row["version"] != "1.2.0" {
 				t.Errorf("row = %v", row)
 			}
@@ -74,7 +74,7 @@ func TestPluginsListsWhatEachContributes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	row := decodeNDJSON(t, out)[0]
+	row := decodeRows(t, out, "plugins")[0]
 	components, _ := row["components"].(map[string]any)
 	if row["name"] != "metrics" || len(components) != 2 || components["listeners"] != nil {
 		t.Errorf("row = %v, want the two kinds it contributes and not the empty one", row)
@@ -98,7 +98,7 @@ func TestConfigListsOptionsAndExplainsARefusal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := decodeNDJSON(t, out)
+	rows := decodeRows(t, out, "options")
 	if len(rows) != 3 || rows[0]["section"] != "core" || rows[0]["key"] != "executor" || rows[2]["source"] != "env var" {
 		t.Errorf("rows = %v", rows)
 	}

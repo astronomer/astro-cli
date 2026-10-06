@@ -59,12 +59,14 @@ type envTierRow struct {
 
 func listJSON(t *testing.T, out string) map[string]envTierRow {
 	t.Helper()
+	var list struct {
+		Entries []envTierRow `json:"entries"`
+	}
+	if err := json.Unmarshal([]byte(out), &list); err != nil {
+		t.Fatalf("json: %v\n%s", err, out)
+	}
 	rows := map[string]envTierRow{}
-	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		var r envTierRow
-		if err := json.Unmarshal([]byte(line), &r); err != nil {
-			t.Fatalf("json: %v\n%s", err, out)
-		}
+	for _, r := range list.Entries {
 		rows[r.Kind+":"+r.Name] = r
 	}
 	return rows

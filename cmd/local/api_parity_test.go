@@ -233,7 +233,7 @@ func TestLocalAPIListFiltersTheAirflowsOwnSpec(t *testing.T) {
 			if err != nil {
 				t.Fatalf("local api ls: %v", err)
 			}
-			rows := decodeNDJSON(t, out)
+			rows := decodeRows(t, out, "endpoints")
 			var paths []string
 			for _, row := range rows {
 				paths = append(paths, row["path"].(string))
@@ -274,7 +274,7 @@ func TestLocalAPIListReadsAirflow2sSpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("local api ls: %v", err)
 	}
-	rows := decodeNDJSON(t, out)
+	rows := decodeRows(t, out, "endpoints")
 	if len(rows) != 1 || rows[0]["path"] != "/dags" || rows[0]["operationId"] != "get_dags" {
 		t.Errorf("rows = %v", rows)
 	}

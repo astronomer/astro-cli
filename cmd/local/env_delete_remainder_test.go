@@ -370,9 +370,7 @@ func TestListNotesBothWaysOutOfAnAbsentName(t *testing.T) {
 	d, out, _ = envDeps(t, dir, "")
 	require.NoError(t, execute(t, d, "local", "env", "list", "--output", "json"))
 	rows := map[string]map[string]any{}
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
-		var row map[string]any
-		require.NoError(t, json.Unmarshal([]byte(line), &row))
+	for _, row := range decodeRows(t, out.String(), "entries") {
 		rows[row["name"].(string)] = row
 	}
 	assert.Equal(t, "astro local env variable set DEMO_VAR2", rows["DEMO_VAR2"]["set_hint"])

@@ -1,0 +1,22 @@
+{
+  "total_dag_runs": -1,
+  "returned_count": -1,
+  "dag_runs": [
+    {
+      "dag_id": "x",
+      "dag_run_id": "x",
+      "state": "x",
+      "run_type": "x",
+      "logical_date": "x",
+      "queued_at": "x",
+      "start_date": "x",
+      "end_date": "x",
+      "duration_seconds": 1.5,
+      "triggered_by": "x",
+      "note": "x",
+      "conf": {
+        "x": null
+      }
+    }
+  ]
+}

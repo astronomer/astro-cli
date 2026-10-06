@@ -43,8 +43,8 @@ var publishedPayloads = []schemaCase{
 	{"env-value", envValue{}},
 	{"env-link-result", envLinkResult{}},
 	{"env-declaration", envDeclarationResult{}},
-	// `astro local env list --output json` streams one of these per value,
-	// then the whole slice in text mode. Found by recording what Emit
+	// A row of `astro local env list --output json`'s entries (env-list pins
+	// the envelope). Found by recording what Emit
 	// actually receives during the command tests: it is declared in
 	// internal/localenv, so the AST guard over this directory cannot see
 	// it, and it was missed by eye too.
@@ -101,9 +101,33 @@ var publishedPayloads = []schemaCase{
 	{"check-target-report", checks.TargetReport{}},
 	{"package-result", pack.Result{}},
 	{"start-missing-env", plan.MissingPayload{}},
-	// `astro local api ls --output json`, one per endpoint. The row is
+	// A row of `astro local api ls --output json`'s endpoints. The row is
 	// apirequest's because `astro api airflow ls --json` prints the same one.
 	{"api-endpoint-row", apirequest.EndpointRow{}},
+
+	// Every list publishes one object with its rows under a named key (see
+	// lists.go). The row goldens above pin a row; these pin the key and the
+	// envelope around it, which is what `jq '.dags[]'` reads.
+	{"dag-list", dagList{}},
+	{"dag-stat-list", dagStatList{}},
+	{"import-error-list", importErrorList{}},
+	{"dag-warning-list", dagWarningList{}},
+	{"run-list", runList{}},
+	{"task-instance-list", taskInstanceList{}},
+	{"task-list", taskList{}},
+	{"asset-list", assetList{}},
+	{"asset-event-list", assetEventList{}},
+	{"run-triggers", runTriggers{}},
+	{"connection-list", connectionList{}},
+	{"variable-list", variableList{}},
+	{"pool-list", poolList{}},
+	{"provider-list", providerList{}},
+	{"plugin-list", pluginList{}},
+	{"config-option-list", configOptionList{}},
+	{"api-endpoint-list", endpointList{}},
+	{"local-list", localList{}},
+	{"local-removed", localRemoved{}},
+	{"env-list", envList{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {

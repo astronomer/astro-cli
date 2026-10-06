@@ -1,0 +1,13 @@
+{
+  "total_import_errors": -1,
+  "returned_count": -1,
+  "import_errors": [
+    {
+      "import_error_id": -1,
+      "filename": "x",
+      "stack_trace": "x",
+      "bundle_name": "x",
+      "timestamp": "x"
+    }
+  ]
+}

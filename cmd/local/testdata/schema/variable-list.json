@@ -1,0 +1,11 @@
+{
+  "total_variables": -1,
+  "returned_count": -1,
+  "variables": [
+    {
+      "key": "x",
+      "description": "x",
+      "is_encrypted": true
+    }
+  ]
+}

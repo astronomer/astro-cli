@@ -306,23 +306,24 @@ func listPages[T any](opts airflowapi.ListOptions, page func(airflowapi.ListOpti
 
 // emitList pages through a list endpoint and renders what it got. A table
 // carries no count, so in text mode the rows left past the listing are named
-// on stderr; json rows stay one object per line with nothing added.
-func emitList[Wire, Row any](q *query, r cliout.Renderer, opts airflowapi.ListOptions,
-	page func(airflowapi.ListOptions) ([]Wire, int, error), row func(Wire) Row, text func(io.Writer, []Row) error,
+// on stderr; json carries the collection's total in its envelope instead.
+func emitList[Wire, Row, Env any](q *query, r cliout.Renderer, opts airflowapi.ListOptions,
+	page func(airflowapi.ListOptions) ([]Wire, int, error), row func(Wire) Row,
+	envelope func([]Row, int) Env, text func(io.Writer, []Row) error,
 ) error {
 	wire, total, err := listPages(opts, page)
 	if err != nil {
 		return err
 	}
-	return emitListed(q, r, opts, mapRows(wire, row), total, text)
+	return emitListed(q, r, opts, mapRows(wire, row), total, envelope, text)
 }
 
 // emitListed renders rows listPages collected, for a command that rearranges
 // them first.
-func emitListed[Row any](q *query, r cliout.Renderer, opts airflowapi.ListOptions, rows []Row, total int,
-	text func(io.Writer, []Row) error,
+func emitListed[Row, Env any](q *query, r cliout.Renderer, opts airflowapi.ListOptions, rows []Row, total int,
+	envelope func([]Row, int) Env, text func(io.Writer, []Row) error,
 ) error {
-	if err := emitRows(r, rows, text); err != nil {
+	if err := emitRows(r, rows, total, envelope, text); err != nil {
 		return err
 	}
 	next := opts.Offset + len(rows)

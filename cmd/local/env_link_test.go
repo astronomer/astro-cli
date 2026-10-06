@@ -296,11 +296,7 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 	}
 	out, _ = mustRun(t, dir, "connection", "list", "--output", "json")
 	var plain localenv.ListItem
-	for dec := json.NewDecoder(strings.NewReader(out)); dec.More(); {
-		var it localenv.ListItem
-		if err := dec.Decode(&it); err != nil {
-			t.Fatal(err)
-		}
+	for _, it := range decodeEnvList(t, out) {
 		if it.Name == "declared_db" {
 			plain = it
 		}
@@ -311,12 +307,7 @@ func TestEnvListMarksNotLinkedHere(t *testing.T) {
 
 	out, _ = mustRun(t, dir, "list", "--all", "--output", "json")
 	rows := map[string]localenv.ListItem{}
-	dec := json.NewDecoder(strings.NewReader(out))
-	for dec.More() {
-		var it localenv.ListItem
-		if err := dec.Decode(&it); err != nil {
-			t.Fatal(err)
-		}
+	for _, it := range decodeEnvList(t, out) {
 		rows[it.Name] = it
 	}
 	for _, name := range []string{"warehouse", "declared_db"} {

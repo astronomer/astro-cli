@@ -125,7 +125,7 @@ func (q *query) runConnectionsList(ctx context.Context, opts airflowapi.ListOpti
 	err = emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Connection, int, error) {
 		list, err := client.ListConnections(ctx, page)
 		return list.Connections, list.TotalEntries, err
-	}, newConnectionListRow, renderConnectionTable)
+	}, newConnectionListRow, newConnectionList, renderConnectionTable)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func (q *query) runVariablesList(ctx context.Context, opts airflowapi.ListOption
 		return list.Variables, list.TotalEntries, err
 	}, func(v airflowapi.Variable) variableListRow {
 		return variableListRow{Key: v.Key, Description: v.Description, IsEncrypted: v.IsEncrypted}
-	}, renderVariableTable)
+	}, newVariableList, renderVariableTable)
 	if err != nil {
 		return err
 	}
@@ -348,7 +348,7 @@ func (q *query) runPoolsList(ctx context.Context, opts airflowapi.ListOptions) e
 	return emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.Pool, int, error) {
 		list, err := client.ListPools(ctx, page)
 		return list.Pools, list.TotalEntries, err
-	}, newPoolRow, renderPoolTable)
+	}, newPoolRow, newPoolList, renderPoolTable)
 }
 
 func renderPoolTable(w io.Writer, rows []poolRow) error {

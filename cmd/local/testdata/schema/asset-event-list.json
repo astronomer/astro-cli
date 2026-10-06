@@ -1,0 +1,18 @@
+{
+  "total_asset_events": -1,
+  "returned_count": -1,
+  "asset_events": [
+    {
+      "id": -1,
+      "uri": "x",
+      "asset_id": -1,
+      "source_dag_id": "x",
+      "source_task_id": "x",
+      "source_run_id": "x",
+      "timestamp": "x",
+      "created_dagruns": [
+        "x"
+      ]
+    }
+  ]
+}
