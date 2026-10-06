@@ -12,7 +12,9 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
@@ -64,6 +66,22 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "organization-cluster-list", Value: organization.ClusterList{}},
 	{Name: "user-list", Value: user.UserList{}},
 	{Name: "team-list", Value: team.TeamList{}},
+
+	// astro env: written by internal/platform/astro/env's own encoder, not
+	// through cliout.Renderer.Emit, so these too are kept by hand. The four
+	// per-kind lists carry the same object under different keys, and the key
+	// is the contract, so each list is its own golden. `get` on every kind
+	// publishes the one object; `variable link list` publishes its own link
+	// report, and `connection link list` and `airflow-variable link list`
+	// share the other.
+	{Name: "env-list", Value: env.InventoryList{}},
+	{Name: "env-variable-list", Value: env.VariableList{}},
+	{Name: "env-connection-list", Value: env.ConnectionList{}},
+	{Name: "env-airflow-variable-list", Value: env.AirflowVariableList{}},
+	{Name: "env-metrics-export-list", Value: env.MetricsExportList{}},
+	{Name: "env-object", Value: astrov1.EnvironmentObject{}},
+	{Name: "env-variable-link-list", Value: env.VarLinksReport{}},
+	{Name: "env-link-list", Value: env.LinksReport{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -89,8 +107,9 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // fails it when a named type reached Emit that no golden pins, or an
 // anonymous struct reached it at all, since that shape cannot be pinned.
 //
-// Blind to what the suite does not run, and to pkg/output's lists, which do
-// not pass through Emit. cmd/local's emitrecord_test.go does the same for its
+// Blind to what the suite does not run, and to pkg/output's lists and the
+// `astro env` writers, which encode for themselves and do not pass through
+// Emit: their entries above are the only thing pinning them. cmd/local's emitrecord_test.go does the same for its
 // tree, with the reasoning at length.
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally

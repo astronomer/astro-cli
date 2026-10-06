@@ -1,0 +1,142 @@
+{
+  "connections": [
+    {
+      "airflowVariable": {
+        "isSecret": true,
+        "value": "x"
+      },
+      "autoLinkDeployments": true,
+      "connection": {
+        "connectionAuthType": {
+          "airflowType": "x",
+          "authMethodName": "x",
+          "description": "x",
+          "guidePath": "x",
+          "id": "x",
+          "name": "x",
+          "parameters": [
+            {
+              "airflowParamName": "x",
+              "dataType": "x",
+              "description": "x",
+              "example": "x",
+              "friendlyName": "x",
+              "isInExtra": true,
+              "isRequired": true,
+              "isSecret": true,
+              "pattern": "x"
+            }
+          ],
+          "providerLogo": "x",
+          "providerPackageName": "x"
+        },
+        "extra": {
+          "x": null
+        },
+        "host": "x",
+        "login": "x",
+        "password": "x",
+        "port": -1,
+        "schema": "x",
+        "type": "x"
+      },
+      "createdAt": "x",
+      "createdBy": {
+        "apiTokenName": "x",
+        "avatarUrl": "x",
+        "fullName": "x",
+        "id": "x",
+        "subjectType": "x",
+        "username": "x"
+      },
+      "description": "x",
+      "environmentVariable": {
+        "isSecret": true,
+        "value": "x"
+      },
+      "excludeLinks": [
+        {
+          "scope": "x",
+          "scopeEntityId": "x"
+        }
+      ],
+      "id": "x",
+      "links": [
+        {
+          "airflowVariableOverrides": {
+            "value": "x"
+          },
+          "connectionOverrides": {
+            "extra": {
+              "x": null
+            },
+            "host": "x",
+            "login": "x",
+            "password": "x",
+            "port": -1,
+            "schema": "x",
+            "type": "x"
+          },
+          "environmentVariableOverrides": {
+            "value": "x"
+          },
+          "metricsExportOverrides": {
+            "authType": "x",
+            "basicToken": "x",
+            "endpoint": "x",
+            "exporterType": "x",
+            "headers": {
+              "x": "x"
+            },
+            "labels": {
+              "x": "x"
+            },
+            "password": "x",
+            "sigV4AssumeArn": "x",
+            "sigV4StsRegion": "x",
+            "username": "x"
+          },
+          "scope": "x",
+          "scopeEntityId": "x",
+          "setFields": [
+            "x"
+          ]
+        }
+      ],
+      "metricsExport": {
+        "authType": "x",
+        "basicToken": "x",
+        "endpoint": "x",
+        "exporterType": "x",
+        "headers": {
+          "x": "x"
+        },
+        "labels": {
+          "x": "x"
+        },
+        "password": "x",
+        "sigV4AssumeArn": "x",
+        "sigV4StsRegion": "x",
+        "username": "x"
+      },
+      "objectKey": "x",
+      "objectType": "x",
+      "scope": "x",
+      "scopeEntityId": "x",
+      "setFields": [
+        "x"
+      ],
+      "sourceScope": "x",
+      "sourceScopeEntityId": "x",
+      "updatedAt": "x",
+      "updatedBy": {
+        "apiTokenName": "x",
+        "avatarUrl": "x",
+        "fullName": "x",
+        "id": "x",
+        "subjectType": "x",
+        "username": "x"
+      }
+    }
+  ]
+}

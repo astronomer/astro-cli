@@ -1,0 +1,19 @@
+{
+  "objectKey": "x",
+  "objectId": "x",
+  "autoLinkDeployments": true,
+  "links": [
+    {
+      "deploymentId": "x",
+      "overrides": {
+        "x": null
+      },
+      "setFields": [
+        "x"
+      ]
+    }
+  ],
+  "excludeLinks": [
+    "x"
+  ]
+}

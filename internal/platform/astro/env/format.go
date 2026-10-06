@@ -51,7 +51,7 @@ func clampTableValue(s string) string {
 	return s
 }
 
-// write renders v as f. JSON is v itself (a list's v comes from listJSON);
+// write renders v as f. JSON is v itself (a list's v is its named list type);
 // text draws the human view of it; dotenv draws the .env view, and is nil for
 // a value that has none, which refuses the format. Every Write* below is this with its own renderers.
 //
@@ -71,22 +71,44 @@ func write(out io.Writer, f Format, v any, text, dotenv func(io.Writer) error) e
 
 var errNilObject = errors.New("nil environment object")
 
-// listJSON is a list as -o json publishes it: one object holding the list
-// under key, `{"variables": [...]}`, the shape every list in the CLI takes,
+// The lists as -o json publishes them: one object holding the list under a
+// named key, `{"variables": [...]}`, the shape every list in the CLI takes,
 // so a field (a total, a page token) can join it later without breaking a
-// reader. The list is [] when empty, never null, so a script loops over it
+// reader. One named type per key, rather than a map built from the key,
+// because a type is what a schema golden can pin (cmd/astro's
+// publishedPayloads): a map's key is data, which a golden cannot see.
+type (
+	VariableList struct {
+		Variables []astrov1.EnvironmentObject `json:"variables"`
+	}
+	ConnectionList struct {
+		Connections []astrov1.EnvironmentObject `json:"connections"`
+	}
+	AirflowVariableList struct {
+		AirflowVariables []astrov1.EnvironmentObject `json:"airflow_variables"`
+	}
+	MetricsExportList struct {
+		MetricsExports []astrov1.EnvironmentObject `json:"metrics_exports"`
+	}
+	// InventoryList is `astro env list`, every kind at once.
+	InventoryList struct {
+		Objects []InventoryItem `json:"objects"`
+	}
+)
+
+// nonNil makes a list [] when empty, never null, so a script loops over it
 // without a null check: it arrives nil when the scope is empty, because the
 // pager collecting it starts from a nil slice.
-func listJSON[T any](key string, s []T) map[string][]T {
+func nonNil[T any](s []T) []T {
 	if s == nil {
-		s = []T{}
+		return []T{}
 	}
-	return map[string][]T{key: s}
+	return s
 }
 
 // WriteVarList renders a list of ENVIRONMENT_VARIABLE objects.
 func WriteVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, listJSON("variables", envObjs),
+	return write(out, format, VariableList{Variables: nonNil(envObjs)},
 		func(w io.Writer) error { return writeVarTable(envObjs, includeSecrets, w) },
 		func(w io.Writer) error { return writeVarDotenv(envObjs, includeSecrets, w) })
 }
@@ -109,7 +131,7 @@ func WriteVarLinks(report *VarLinksReport, format Format, includeSecrets bool, o
 
 // WriteConnList renders a list of CONNECTION objects.
 func WriteConnList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, listJSON("connections", envObjs), func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
+	return write(out, format, ConnectionList{Connections: nonNil(envObjs)}, func(w io.Writer) error { return writeConnTable(envObjs, w) }, nil)
 }
 
 // WriteConn renders a single CONNECTION object.
@@ -124,7 +146,7 @@ func WriteConn(envObj *astrov1.EnvironmentObject, format Format, out io.Writer) 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
 // Same shape as ENVIRONMENT_VARIABLE.
 func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, format Format, includeSecrets bool, out io.Writer) error {
-	return write(out, format, listJSON("airflow_variables", envObjs),
+	return write(out, format, AirflowVariableList{AirflowVariables: nonNil(envObjs)},
 		func(w io.Writer) error { return writeAirflowVarTable(envObjs, includeSecrets, w) }, nil)
 }
 
@@ -140,7 +162,7 @@ func WriteAirflowVar(envObj *astrov1.EnvironmentObject, format Format, includeSe
 
 // WriteMetricsExportList renders a list of METRICS_EXPORT objects.
 func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, format Format, out io.Writer) error {
-	return write(out, format, listJSON("metrics_exports", envObjs), func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
+	return write(out, format, MetricsExportList{MetricsExports: nonNil(envObjs)}, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) }, nil)
 }
 
 // WriteMetricsExport renders a single METRICS_EXPORT object.
@@ -501,7 +523,7 @@ func writeJSON(v any, out io.Writer) error {
 // and the empty table ("No environment objects found") call them, and each
 // row's kind says which. It has no dotenv view: see ErrInventoryHasNoValues.
 func WriteInventory(items []InventoryItem, format Format, out io.Writer) error {
-	return write(out, format, listJSON("objects", items), func(w io.Writer) error { return writeInventoryTable(items, w) }, nil)
+	return write(out, format, InventoryList{Objects: nonNil(items)}, func(w io.Writer) error { return writeInventoryTable(items, w) }, nil)
 }
 
 // ErrInventoryHasNoValues refuses dotenv for the cross-kind listing, with

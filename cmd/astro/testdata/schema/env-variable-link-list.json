@@ -1,0 +1,16 @@
+{
+  "objectKey": "x",
+  "objectId": "x",
+  "workspaceValue": "x",
+  "isSecret": true,
+  "autoLinkDeployments": true,
+  "links": [
+    {
+      "deploymentId": "x",
+      "overrideValue": "x"
+    }
+  ],
+  "excludeLinks": [
+    "x"
+  ]
+}

@@ -3,9 +3,14 @@ package astro
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"os"
+	"regexp"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,12 +25,17 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// The `astro deployment token` family: what each command publishes under
-// --output json, and that its text is the bytes it printed before it gained
-// one. The text cases were recorded on v2 before the platform package stopped
-// printing, with stdout captured whole (the old code wrote some lines to the
-// command's writer and some to bare stdout), so a line that moved or changed
-// fails here.
+// What the `astro deployment token` family does, in both formats.
+//
+// The json shapes are pinned once, by the goldens in testdata/schema
+// (deployment-token*.json, `make update-schemas`). These tests decode what a
+// run printed and assert what it means: the exit code, which tokens a list
+// holds and with what role, that a list never carries a secret and a create
+// or a rotate does, what a removal did. In text they assert the messages, in
+// the order a person reads them, and each table cell under its header, not
+// how the table pads it: nothing parses that spacing. The one text pinned
+// byte for byte is --clean-output, which a script captures whole as the
+// token.
 
 const (
 	tokDeploymentID = "cldep000000000000000000001"
@@ -111,6 +121,7 @@ type tokenRun struct {
 	stdout string
 	stderr string
 	err    error
+	code   int
 }
 
 // execTokenCmd runs `astro deployment <args>` the way the CLI does: through
@@ -148,65 +159,158 @@ func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args .
 	root.AddCommand(newDeploymentRootCmd(outW))
 	root.SetOut(outW)
 	root.SetErr(&errBuf)
-	runErr := cliout.Execute(context.Background(), root, append([]string{"deployment"}, args...), outW, nil)
+	ctx := context.Background()
+	runErr := cliout.Execute(ctx, root, append([]string{"deployment"}, args...), outW, nil)
 
 	os.Stdout, os.Stdin = prevOut, prevIn
 	require.NoError(t, outW.Close())
 	stdout := <-captured
 	_ = inR.Close()
 	_ = outR.Close()
-	return tokenRun{stdout: stdout, stderr: errBuf.String(), err: runErr}
+	return tokenRun{stdout: stdout, stderr: errBuf.String(), err: runErr, code: cliout.ExitCode(ctx, runErr)}
 }
 
-// The text each command printed on v2 before the conversion, byte for byte,
-// except where three quirks were since fixed: an update without --role keeps
-// the role without sending it, an update refuses a role the token already
-// holds before changing anything, and a rotate by id names the token.
-func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
+// headerCell is one column title in a table header: words joined by single
+// spaces, so DEPLOYMENT ROLE is one title and the run of spaces after it is
+// the padding.
+var headerCell = regexp.MustCompile(`\S+(?: \S+)*`)
+
+// tableRows reads the table in out whose header starts with first the way a
+// person does: each cell is whatever sits under its column's title, trimmed.
+// It fails if there is no such header. The rows end at the first blank line.
+// So a cell in the wrong column, or a missing row, fails, while a change to
+// how wide the padding is does not.
+func tableRows(t *testing.T, out, first string) []map[string]string {
+	t.Helper()
+	lines := strings.Split(out, "\n")
+	for i, header := range lines {
+		if f := strings.Fields(header); len(f) == 0 || f[0] != first {
+			continue
+		}
+		spans := headerCell.FindAllStringIndex(header, -1)
+		rows := []map[string]string{}
+		for _, line := range lines[i+1:] {
+			if strings.TrimSpace(line) == "" {
+				break
+			}
+			row := map[string]string{}
+			for c, span := range spans {
+				end := len(line)
+				if c+1 < len(spans) {
+					end = min(spans[c+1][0], len(line))
+				}
+				if start := span[0]; start < end {
+					row[header[span[0]:span[1]]] = strings.TrimSpace(line[start:end])
+				} else {
+					row[header[span[0]:span[1]]] = ""
+				}
+			}
+			rows = append(rows, row)
+		}
+		return rows
+	}
+	t.Fatalf("no table headed %q in:\n%s", first, out)
+	return nil
+}
+
+// requireInOrder fails unless each of parts appears in out, each after the
+// one before it.
+func requireInOrder(t *testing.T, out string, parts ...string) {
+	t.Helper()
+	rest := out
+	for _, p := range parts {
+		i := strings.Index(rest, p)
+		require.GreaterOrEqual(t, i, 0, "%q missing, or out of order, in:\n%s", p, out)
+		rest = rest[i+len(p):]
+	}
+}
+
+// requireLine fails unless line is a whole line of out: the secret a person
+// copies stands alone, with nothing they would have to trim.
+func requireLine(t *testing.T, out, line string) {
+	t.Helper()
+	require.Contains(t, strings.Split(out, "\n"), line, "no line %q in:\n%s", line, out)
+}
+
+// The rows each kind of token shows in a Deployment's list: the role is its
+// role on this Deployment, whatever else it holds.
+func listRow(id, name, desc, scope, role, created, by string) map[string]string {
+	return map[string]string{
+		"ID": id, "NAME": name, "DESCRIPTION": desc, "SCOPE": scope,
+		"DEPLOYMENT ROLE": role, "CREATED": created, "CREATED BY": by,
+	}
+}
+
+var (
+	depRow = listRow("tok-dep", "ci-deploy", "Deploys from CI", "DEPLOYMENT", "DEPLOYMENT_ADMIN", "2 days ago", "Ada Lovelace")
+	wsRow  = listRow("tok-ws", "ws-token", "", "WORKSPACE", "DEPLOYMENT_MEMBER", "3 hours ago", "bootstrap")
+	orgRow = listRow("tok-org", "org-token", "Org wide", "ORGANIZATION", "DEPLOYMENT_ADMIN", "10 minutes ago", "")
+)
+
+// What each command prints in text: the same messages, in the same order, as
+// before it gained --output, except where three quirks were since fixed:
+// an update without --role keeps the role without sending it, an update
+// refuses a role the token already holds before changing anything, and a
+// rotate by id names the token.
+func TestDeploymentTokenText(t *testing.T) {
 	dep, ws, org := tokenFixtures()
 	d := "--deployment=" + tokDeploymentID
 
-	listAll := "" +
-		" ID          NAME          DESCRIPTION         SCOPE            DEPLOYMENT ROLE       CREATED            CREATED BY       \n" +
-		" tok-dep     ci-deploy     Deploys from CI     DEPLOYMENT       DEPLOYMENT_ADMIN      2 days ago         Ada Lovelace     \n" +
-		" tok-ws      ws-token                          WORKSPACE        DEPLOYMENT_MEMBER     3 hours ago        bootstrap        \n" +
-		" tok-org     org-token     Org wide            ORGANIZATION     DEPLOYMENT_ADMIN      10 minutes ago                      \n"
+	// What a create or a rotate prints around the secret.
+	secretShown := func(verb string) func(t *testing.T, out string) {
+		return func(t *testing.T, out string) {
+			requireInOrder(t, out,
+				"Astro Deployment API token ci-deploy was successfully "+verb,
+				"Copy and paste this API token for your records.",
+				tokSecret,
+				"You will not be shown this API token value again.")
+			requireLine(t, out, tokSecret)
+		}
+	}
+	says := func(parts ...string) func(t *testing.T, out string) {
+		return func(t *testing.T, out string) { requireInOrder(t, out, parts...) }
+	}
+	lists := func(rows ...map[string]string) func(t *testing.T, out string) {
+		return func(t *testing.T, out string) {
+			assert.Equal(t, append([]map[string]string{}, rows...), tableRows(t, out, "ID"))
+		}
+	}
+	// --clean-output exists to be captured whole as the token
+	// (`TOKEN=$(astro deployment token create ... --clean-output)`), so here
+	// the bytes are the contract: the secret and a newline, nothing else.
+	cleanOutput := func(t *testing.T, out string) { assert.Equal(t, tokSecret+"\n", out) }
 
 	cases := []struct {
 		name    string
 		client  func(t *testing.T) astrov1.APIClient
 		answers string
 		args    []string
-		want    string
+		check   func(t *testing.T, stdout string)
 		wantErr string
 	}{
 		{
 			name:   "list",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep, ws, org) },
 			args:   []string{"token", "list", d},
-			want:   listAll,
+			check:  lists(depRow, wsRow, orgRow),
 		},
 		{
 			name:   "list empty",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t) },
 			args:   []string{"token", "list", d},
-			want:   " ID     NAME     DESCRIPTION     SCOPE     DEPLOYMENT ROLE     CREATED     CREATED BY     \n",
+			check:  lists(),
 		},
 		{
 			name:   "organization-token list",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep, ws, org) },
 			args:   []string{"token", "organization-token", "list", d},
-			want: "" +
-				" ID          NAME          DESCRIPTION     SCOPE            DEPLOYMENT ROLE      CREATED            CREATED BY     \n" +
-				" tok-org     org-token     Org wide        ORGANIZATION     DEPLOYMENT_ADMIN     10 minutes ago                    \n",
+			check:  lists(orgRow),
 		},
 		{
 			name:   "workspace-token list",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep, ws, org) },
 			args:   []string{"token", "workspace-token", "list", d},
-			want: "" +
-				" ID         NAME         DESCRIPTION     SCOPE         DEPLOYMENT ROLE       CREATED         CREATED BY     \n" +
-				" tok-ws     ws-token                     WORKSPACE     DEPLOYMENT_MEMBER     3 hours ago     bootstrap      \n",
+			check:  lists(wsRow),
 		},
 		{
 			name: "create",
@@ -215,11 +319,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("CreateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.CreateApiTokenResponse{HTTPResponse: ok200(), JSON200: withSecret(dep)}, nil)
 				return m
 			},
-			args: []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN"},
-			want: "\nAstro Deployment API token ci-deploy was successfully created\n" +
-				"Copy and paste this API token for your records.\n" +
-				"\n" + tokSecret + "\n" +
-				"\nYou will not be shown this API token value again.\n",
+			args:  []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN"},
+			check: secretShown("created"),
 		},
 		{
 			name: "create --clean-output",
@@ -228,8 +329,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("CreateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.CreateApiTokenResponse{HTTPResponse: ok200(), JSON200: withSecret(dep)}, nil)
 				return m
 			},
-			args: []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN", "--clean-output"},
-			want: tokSecret + "\n",
+			args:  []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN", "--clean-output"},
+			check: cleanOutput,
 		},
 		{
 			name: "update",
@@ -241,8 +342,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "update", "tok-dep", d, "--new-name", "ci-deploy-2", "--role", "DEPLOYMENT_MEMBER"},
-			want: "Astro Deployment API token ci-deploy was successfully updated\n",
+			args:  []string{"token", "update", "tok-dep", d, "--new-name", "ci-deploy-2", "--role", "DEPLOYMENT_MEMBER"},
+			check: says("Astro Deployment API token ci-deploy was successfully updated"),
 		},
 		{
 			name: "update through the picker",
@@ -254,10 +355,16 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 			},
 			answers: "1\n",
 			args:    []string{"token", "update", d, "--role", "DEPLOYMENT_MEMBER"},
-			want: "\nPlease select the Deployment API token:\n" +
-				" #     ID          NAME          DESCRIPTION         SCOPE          DEPLOYMENT ROLE      CREATED        CREATED BY       \n" +
-				" 1     tok-dep     ci-deploy     Deploys from CI     DEPLOYMENT     DEPLOYMENT_ADMIN     2 days ago     Ada Lovelace     \n" +
-				"\n> Astro Deployment API token ci-deploy was successfully updated\n",
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out,
+					"Please select the Deployment API token:",
+					"> Astro Deployment API token ci-deploy was successfully updated")
+				picker := map[string]string{"#": "1"}
+				for k, v := range depRow {
+					picker[k] = v
+				}
+				assert.Equal(t, []map[string]string{picker}, tableRows(t, out, "#"))
+			},
 		},
 		{
 			// That no role change is sent: TestDeploymentTokenUpdateWithoutRole.
@@ -267,29 +374,27 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &dep}, nil)
 				return m
 			},
-			args: []string{"token", "update", "tok-dep", d, "--description", "new words"},
-			want: "Astro Deployment API token ci-deploy was successfully updated\n",
+			args:  []string{"token", "update", "tok-dep", d, "--description", "new words"},
+			check: says("Astro Deployment API token ci-deploy was successfully updated"),
 		},
 		{
 			// That nothing is sent: TestDeploymentTokenUpdateRefusesBeforeChanging.
 			name:    "update to the role it already has",
 			client:  func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) },
 			args:    []string{"token", "update", "tok-dep", d, "--new-name", "ci-deploy-2", "--role", "DEPLOYMENT_ADMIN"},
+			check:   func(t *testing.T, out string) { assert.Empty(t, out) },
 			wantErr: "this Deployment API token already has that role on the Deployment",
 		},
 		{
+			// Named by its id, the token is still reported by its name.
 			name: "rotate --yes by id",
 			client: func(t *testing.T) astrov1.APIClient {
 				m := tokenMock(t, dep)
 				m.On("RotateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep").Return(&astrov1.RotateApiTokenResponse{HTTPResponse: ok200(), JSON200: withSecret(dep)}, nil)
 				return m
 			},
-			args: []string{"token", "rotate", "tok-dep", d, "--yes"},
-			// Named by its id, the token is still reported by its name.
-			want: "\nAstro Deployment API token ci-deploy was successfully rotated\n" +
-				"Copy and paste this API token for your records.\n" +
-				"\n" + tokSecret + "\n" +
-				"\nYou will not be shown this API token value again.\n",
+			args:  []string{"token", "rotate", "tok-dep", d, "--yes"},
+			check: secretShown("rotated"),
 		},
 		{
 			name: "rotate confirmed by name",
@@ -300,12 +405,13 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 			},
 			answers: "y\n",
 			args:    []string{"token", "rotate", d, "--name", "ci-deploy"},
-			want: "WARNING: API Token rotation will invalidate the current token and cannot be undone.\n" +
-				"\nAre you sure you want to rotate the ci-deploy API token? (y/n) " +
-				"\nAstro Deployment API token ci-deploy was successfully rotated\n" +
-				"Copy and paste this API token for your records.\n" +
-				"\n" + tokSecret + "\n" +
-				"\nYou will not be shown this API token value again.\n",
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out,
+					"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
+					"Are you sure you want to rotate the ci-deploy API token? (y/n)",
+					"Astro Deployment API token ci-deploy was successfully rotated")
+				secretShown("rotated")(t, out)
+			},
 		},
 		{
 			name: "rotate --clean-output",
@@ -314,17 +420,22 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("RotateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep").Return(&astrov1.RotateApiTokenResponse{HTTPResponse: ok200(), JSON200: withSecret(dep)}, nil)
 				return m
 			},
-			args: []string{"token", "rotate", "tok-dep", d, "--yes", "--clean-output"},
-			want: tokSecret + "\n",
+			args:  []string{"token", "rotate", "tok-dep", d, "--yes", "--clean-output"},
+			check: cleanOutput,
 		},
 		{
+			// The client mocks no rotate, so going on after "n" would panic.
 			name:    "rotate declined",
 			client:  func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) },
 			answers: "n\n",
 			args:    []string{"token", "rotate", "tok-dep", d},
-			want: "WARNING: API Token rotation will invalidate the current token and cannot be undone.\n" +
-				"\nAre you sure you want to rotate the ci-deploy API token? (y/n) " +
-				"Canceling token rotation\n",
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out,
+					"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
+					"Are you sure you want to rotate the ci-deploy API token? (y/n)",
+					"Canceling token rotation")
+				assert.NotContains(t, out, tokSecret)
+			},
 		},
 		{
 			name: "delete --yes",
@@ -334,7 +445,10 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				return m
 			},
 			args: []string{"token", "delete", "tok-dep", d, "--yes"},
-			want: "Astro Deployment API token ci-deploy was successfully deleted\n",
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out, "Astro Deployment API token ci-deploy was successfully deleted")
+				assert.NotContains(t, out, "Are you sure", "--yes answers the question")
+			},
 		},
 		{
 			name: "delete confirmed",
@@ -345,20 +459,24 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 			},
 			answers: "y\n",
 			args:    []string{"token", "delete", "tok-dep", d},
-			want: "WARNING: API token deletion cannot be undone.\n" +
-				"\nAre you sure you want to delete the ci-deploy API token? (y/n) " +
-				"Astro Deployment API token ci-deploy was successfully deleted\n",
+			check: says(
+				"WARNING: API token deletion cannot be undone.",
+				"Are you sure you want to delete the ci-deploy API token? (y/n)",
+				"Astro Deployment API token ci-deploy was successfully deleted"),
 		},
 		{
 			name:    "delete declined",
 			client:  func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) },
 			answers: "n\n",
 			args:    []string{"token", "delete", "tok-dep", d},
-			want: "WARNING: API token deletion cannot be undone.\n" +
-				"\nAre you sure you want to delete the ci-deploy API token? (y/n) " +
-				"Canceling API Token deletion\n",
+			check: says(
+				"WARNING: API token deletion cannot be undone.",
+				"Are you sure you want to delete the ci-deploy API token? (y/n)",
+				"Canceling API Token deletion"),
 		},
 		{
+			// A Workspace token is not the Deployment's to delete: deleting it
+			// here removes it from the Deployment, and says so.
 			name: "delete a workspace token removes it",
 			client: func(t *testing.T) astrov1.APIClient {
 				m := tokenMock(t, ws)
@@ -367,16 +485,21 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 			},
 			answers: "y\n",
 			args:    []string{"token", "delete", "tok-ws", d},
-			want: "\nAre you sure you want to remove the ws-token API token from the Deployment? (y/n) " +
-				"Astro API token ws-token was successfully removed from the Deployment\n",
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out,
+					"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)",
+					"Astro API token ws-token was successfully removed from the Deployment")
+				assert.NotContains(t, out, "WARNING", "a removal can be undone")
+			},
 		},
 		{
 			name:    "remove declined",
 			client:  func(t *testing.T) astrov1.APIClient { return tokenMock(t, ws) },
 			answers: "n\n",
 			args:    []string{"token", "delete", "tok-ws", d},
-			want: "\nAre you sure you want to remove the ws-token API token from the Deployment? (y/n) " +
-				"Canceling API Token removal\n",
+			check: says(
+				"Are you sure you want to remove the ws-token API token from the Deployment? (y/n)",
+				"Canceling API Token removal"),
 		},
 		{
 			name: "organization-token add",
@@ -387,8 +510,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "organization-token", "add", "tok-org", d, "--role", "DEPLOYMENT_ADMIN"},
-			want: "Astro Organization API token org-token was successfully added/updated to the Deployment\n",
+			args:  []string{"token", "organization-token", "add", "tok-org", d, "--role", "DEPLOYMENT_ADMIN"},
+			check: says("Astro Organization API token org-token was successfully added/updated to the Deployment"),
 		},
 		{
 			name: "organization-token update",
@@ -397,8 +520,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "organization-token", "update", "tok-org", d, "--role", "DEPLOYMENT_MEMBER"},
-			want: "Astro Organization API token org-token was successfully added/updated to the Deployment\n",
+			args:  []string{"token", "organization-token", "update", "tok-org", d, "--role", "DEPLOYMENT_MEMBER"},
+			check: says("Astro Organization API token org-token was successfully added/updated to the Deployment"),
 		},
 		{
 			name: "organization-token remove",
@@ -407,8 +530,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "organization-token", "remove", "tok-org", d},
-			want: "Astro Organization API token org-token was successfully removed from the Deployment\n",
+			args:  []string{"token", "organization-token", "remove", "tok-org", d},
+			check: says("Astro Organization API token org-token was successfully removed from the Deployment"),
 		},
 		{
 			name: "workspace-token add",
@@ -419,8 +542,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "workspace-token", "add", "tok-ws", d, "--role", "DEPLOYMENT_MEMBER"},
-			want: "Astro Workspace API token ws-token was successfully added/updated to the Deployment\n",
+			args:  []string{"token", "workspace-token", "add", "tok-ws", d, "--role", "DEPLOYMENT_MEMBER"},
+			check: says("Astro Workspace API token ws-token was successfully added/updated to the Deployment"),
 		},
 		{
 			name: "workspace-token update",
@@ -429,8 +552,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "workspace-token", "update", "tok-ws", d, "--role", "DEPLOYMENT_ADMIN"},
-			want: "Astro Workspace API token ws-token was successfully added/updated to the Deployment\n",
+			args:  []string{"token", "workspace-token", "update", "tok-ws", d, "--role", "DEPLOYMENT_ADMIN"},
+			check: says("Astro Workspace API token ws-token was successfully added/updated to the Deployment"),
 		},
 		{
 			name: "workspace-token remove",
@@ -439,8 +562,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "workspace-token", "remove", "tok-ws", d},
-			want: "Astro Workspace API token ws-token was successfully removed from the Deployment\n",
+			args:  []string{"token", "workspace-token", "remove", "tok-ws", d},
+			check: says("Astro Workspace API token ws-token was successfully removed from the Deployment"),
 		},
 	}
 	for _, tc := range cases {
@@ -449,65 +572,178 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 			if tc.wantErr != "" {
 				require.Error(t, r.err)
 				assert.Equal(t, tc.wantErr, r.err.Error())
+				assert.Equal(t, cliout.ExitFailure, r.code)
 			} else {
 				require.NoError(t, r.err)
+				assert.Equal(t, 0, r.code)
 			}
-			assert.Equal(t, tc.want, r.stdout)
+			tc.check(t, r.stdout)
 		})
 	}
 }
 
-// jsonTokenFixtures are tokenFixtures at fixed times, so their json is exact.
-// The Workspace token expires; the others do not.
+// The json as a consumer reads it. The pointers are the fields that may be
+// absent: a token's secret, only after a create or a rotate, and when a
+// token expires, only for one that does.
+type (
+	tokenJSON struct {
+		ID          string     `json:"id"`
+		Name        string     `json:"name"`
+		Description string     `json:"description"`
+		Scope       string     `json:"scope"`
+		Role        string     `json:"role"`
+		CreatedAt   time.Time  `json:"created_at"`
+		CreatedBy   string     `json:"created_by"`
+		ExpiresAt   *time.Time `json:"expires_at"`
+		Token       *string    `json:"token"`
+	}
+	tokenListJSON struct {
+		Tokens []tokenJSON `json:"tokens"`
+	}
+	tokenRemovalJSON struct {
+		ID           string `json:"id"`
+		Name         string `json:"name"`
+		Scope        string `json:"scope"`
+		DeploymentID string `json:"deployment_id"`
+		Action       string `json:"action"`
+	}
+	errorJSON struct {
+		Error string `json:"error"`
+		Code  int    `json:"code"`
+		Kind  string `json:"kind"`
+	}
+)
+
+var tokCreated = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+
+// tokenKeys is the set of keys a token publishes, which decoding cannot show:
+// an absent key and a null one decode alike. description is always there;
+// role, created_by, expires_at and token only when they have a value, so a
+// dropped omitempty turns up here as an unexpected key.
+func tokenKeys(tok *tokenJSON) []string {
+	keys := []string{"created_at", "description", "id", "name", "scope"}
+	if tok.Role != "" {
+		keys = append(keys, "role")
+	}
+	if tok.CreatedBy != "" {
+		keys = append(keys, "created_by")
+	}
+	if tok.ExpiresAt != nil {
+		keys = append(keys, "expires_at")
+	}
+	if tok.Token != nil {
+		keys = append(keys, "token")
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+// objectKeys is the keys of one decoded json object, sorted.
+func objectKeys(fields map[string]json.RawMessage) []string {
+	return slices.Sorted(maps.Keys(fields))
+}
+
+// jsonTokenFixtures are tokenFixtures at a fixed time, so a decoded token
+// compares equal. The Workspace token expires; the others do not.
 func jsonTokenFixtures() (dep, ws, org astrov1.ApiToken) {
 	dep, ws, org = tokenFixtures()
-	created := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	dep.CreatedAt, ws.CreatedAt, org.CreatedAt = created, created, created
+	dep.CreatedAt, ws.CreatedAt, org.CreatedAt = tokCreated, tokCreated, tokCreated
 	ws.EndAt = tokPtr(time.Date(2027, 1, 2, 0, 0, 0, 0, time.UTC))
 	return dep, ws, org
 }
 
-const (
-	depJSON = `{"id":"tok-dep","name":"ci-deploy","description":"Deploys from CI","scope":"DEPLOYMENT","role":"DEPLOYMENT_ADMIN","created_at":"2026-01-02T03:04:05Z","created_by":"Ada Lovelace"`
-	wsJSON  = `{"id":"tok-ws","name":"ws-token","description":"","scope":"WORKSPACE","role":"DEPLOYMENT_MEMBER","created_at":"2026-01-02T03:04:05Z","created_by":"bootstrap","expires_at":"2027-01-02T00:00:00Z"}`
-	orgJSON = `{"id":"tok-org","name":"org-token","description":"Org wide","scope":"ORGANIZATION","role":"DEPLOYMENT_ADMIN","created_at":"2026-01-02T03:04:05Z"}`
+// What jsonTokenFixtures publish, each with its role on this Deployment.
+var (
+	depTokenJSON = tokenJSON{
+		ID: "tok-dep", Name: "ci-deploy", Description: "Deploys from CI", Scope: "DEPLOYMENT",
+		Role: "DEPLOYMENT_ADMIN", CreatedAt: tokCreated, CreatedBy: "Ada Lovelace",
+	}
+	wsTokenJSON = tokenJSON{
+		ID: "tok-ws", Name: "ws-token", Scope: "WORKSPACE",
+		Role: "DEPLOYMENT_MEMBER", CreatedAt: tokCreated, CreatedBy: "bootstrap",
+		ExpiresAt: tokPtr(time.Date(2027, 1, 2, 0, 0, 0, 0, time.UTC)),
+	}
+	orgTokenJSON = tokenJSON{
+		ID: "tok-org", Name: "org-token", Description: "Org wide", Scope: "ORGANIZATION",
+		Role: "DEPLOYMENT_ADMIN", CreatedAt: tokCreated,
+	}
 )
 
-// What each command publishes under --output json, byte for byte, and that it
-// publishes nothing else: stdout is the one object, stderr is empty.
+// with returns tok changed by edit, leaving the shared fixture alone.
+func (tok tokenJSON) with(edit func(*tokenJSON)) tokenJSON { //nolint:gocritic // a test fixture
+	edit(&tok)
+	return tok
+}
+
+// What each command publishes under --output json, and that it publishes
+// nothing else: stdout is the one object, stderr is empty, the exit is 0.
 func TestDeploymentTokenJSON(t *testing.T) {
 	dep, ws, org := jsonTokenFixtures()
 	d := "--deployment=" + tokDeploymentID
+
+	lists := func(want ...tokenJSON) func(t *testing.T, stdout string) {
+		return func(t *testing.T, stdout string) {
+			var got tokenListJSON
+			fields := decodeOne(t, stdout, &got)
+			assert.Equal(t, want, got.Tokens)
+			var raw []map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(fields["tokens"], &raw))
+			require.Len(t, raw, len(want))
+			for i := range want {
+				assert.Equal(t, tokenKeys(&want[i]), objectKeys(raw[i]), "keys of token %d", i)
+			}
+		}
+	}
+	isToken := func(want tokenJSON) func(t *testing.T, stdout string) {
+		return func(t *testing.T, stdout string) {
+			var got tokenJSON
+			fields := decodeOne(t, stdout, &got)
+			assert.Equal(t, want, got)
+			assert.Equal(t, tokenKeys(&want), objectKeys(fields), "keys of the token")
+		}
+	}
+	removal := func(id, name, scope, action string) func(t *testing.T, stdout string) {
+		return func(t *testing.T, stdout string) {
+			var got tokenRemovalJSON
+			decodeOne(t, stdout, &got)
+			assert.Equal(t, tokenRemovalJSON{ID: id, Name: name, Scope: scope, DeploymentID: tokDeploymentID, Action: action}, got)
+		}
+	}
+	withSecretJSON := func(tok *tokenJSON) { tok.Token = tokPtr(tokSecret) }
 
 	cases := []struct {
 		name   string
 		client func(t *testing.T) astrov1.APIClient
 		args   []string
-		want   string
+		check  func(t *testing.T, stdout string)
 	}{
 		{
 			name:   "list",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep, ws, org) },
 			args:   []string{"token", "list", d},
-			want:   `{"tokens":[` + depJSON + `},` + wsJSON + `,` + orgJSON + `]}`,
+			check:  lists(depTokenJSON, wsTokenJSON, orgTokenJSON),
 		},
 		{
 			name:   "list empty",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t) },
 			args:   []string{"token", "list", d},
-			want:   `{"tokens":[]}`,
+			check: func(t *testing.T, stdout string) {
+				var got tokenListJSON
+				fields := decodeOne(t, stdout, &got)
+				assert.JSONEq(t, `[]`, string(fields["tokens"]), "an empty array, not null and not a missing key")
+			},
 		},
 		{
 			name:   "organization-token list",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep, ws, org) },
 			args:   []string{"token", "organization-token", "list", d},
-			want:   `{"tokens":[` + orgJSON + `]}`,
+			check:  lists(orgTokenJSON),
 		},
 		{
 			name:   "workspace-token list",
 			client: func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep, ws, org) },
 			args:   []string{"token", "workspace-token", "list", d},
-			want:   `{"tokens":[` + wsJSON + `]}`,
+			check:  lists(wsTokenJSON),
 		},
 		{
 			name: "create carries the secret",
@@ -516,8 +752,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("CreateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.CreateApiTokenResponse{HTTPResponse: ok200(), JSON200: withSecret(dep)}, nil)
 				return m
 			},
-			args: []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN"},
-			want: depJSON + `,"token":"` + tokSecret + `"}`,
+			args:  []string{"token", "create", d, "--name", "ci-deploy", "--role", "DEPLOYMENT_ADMIN"},
+			check: isToken(depTokenJSON.with(withSecretJSON)),
 		},
 		{
 			name: "update is the token as it now is",
@@ -530,7 +766,9 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				return m
 			},
 			args: []string{"token", "update", "tok-dep", d, "--new-name", "ci-deploy-2", "--role", "DEPLOYMENT_MEMBER"},
-			want: `{"id":"tok-dep","name":"ci-deploy-2","description":"Deploys from CI","scope":"DEPLOYMENT","role":"DEPLOYMENT_MEMBER","created_at":"2026-01-02T03:04:05Z","created_by":"Ada Lovelace"}`,
+			check: isToken(depTokenJSON.with(func(tok *tokenJSON) {
+				tok.Name, tok.Role = "ci-deploy-2", "DEPLOYMENT_MEMBER"
+			})),
 		},
 		{
 			name: "rotate carries the new secret",
@@ -539,8 +777,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("RotateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep").Return(&astrov1.RotateApiTokenResponse{HTTPResponse: ok200(), JSON200: withSecret(dep)}, nil)
 				return m
 			},
-			args: []string{"token", "rotate", "tok-dep", d, "--yes"},
-			want: depJSON + `,"token":"` + tokSecret + `"}`,
+			args:  []string{"token", "rotate", "tok-dep", d, "--yes"},
+			check: isToken(depTokenJSON.with(withSecretJSON)),
 		},
 		{
 			name: "delete",
@@ -549,8 +787,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("DeleteApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep").Return(&astrov1.DeleteApiTokenResponse{HTTPResponse: ok200()}, nil)
 				return m
 			},
-			args: []string{"token", "delete", "tok-dep", d, "--yes"},
-			want: `{"id":"tok-dep","name":"ci-deploy","scope":"DEPLOYMENT","deployment_id":"` + tokDeploymentID + `","action":"deleted"}`,
+			args:  []string{"token", "delete", "tok-dep", d, "--yes"},
+			check: removal("tok-dep", "ci-deploy", "DEPLOYMENT", "deleted"),
 		},
 		{
 			name: "delete of a workspace token removes it",
@@ -559,8 +797,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "delete", "tok-ws", d, "--yes"},
-			want: `{"id":"tok-ws","name":"ws-token","scope":"WORKSPACE","deployment_id":"` + tokDeploymentID + `","action":"removed"}`,
+			args:  []string{"token", "delete", "tok-ws", d, "--yes"},
+			check: removal("tok-ws", "ws-token", "WORKSPACE", "removed"),
 		},
 		{
 			name: "organization-token add",
@@ -571,8 +809,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "organization-token", "add", "tok-org", d, "--role", "DEPLOYMENT_ADMIN"},
-			want: orgJSON,
+			args:  []string{"token", "organization-token", "add", "tok-org", d, "--role", "DEPLOYMENT_ADMIN"},
+			check: isToken(orgTokenJSON),
 		},
 		{
 			name: "organization-token update",
@@ -581,8 +819,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "organization-token", "update", "tok-org", d, "--role", "DEPLOYMENT_MEMBER"},
-			want: `{"id":"tok-org","name":"org-token","description":"Org wide","scope":"ORGANIZATION","role":"DEPLOYMENT_MEMBER","created_at":"2026-01-02T03:04:05Z"}`,
+			args:  []string{"token", "organization-token", "update", "tok-org", d, "--role", "DEPLOYMENT_MEMBER"},
+			check: isToken(orgTokenJSON.with(func(tok *tokenJSON) { tok.Role = "DEPLOYMENT_MEMBER" })),
 		},
 		{
 			name: "organization-token remove",
@@ -591,8 +829,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-org", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "organization-token", "remove", "tok-org", d},
-			want: `{"id":"tok-org","name":"org-token","scope":"ORGANIZATION","deployment_id":"` + tokDeploymentID + `","action":"removed"}`,
+			args:  []string{"token", "organization-token", "remove", "tok-org", d},
+			check: removal("tok-org", "org-token", "ORGANIZATION", "removed"),
 		},
 		{
 			name: "workspace-token add",
@@ -603,8 +841,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "workspace-token", "add", "tok-ws", d, "--role", "DEPLOYMENT_MEMBER"},
-			want: wsJSON,
+			args:  []string{"token", "workspace-token", "add", "tok-ws", d, "--role", "DEPLOYMENT_MEMBER"},
+			check: isToken(wsTokenJSON),
 		},
 		{
 			name: "workspace-token update",
@@ -613,8 +851,8 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "workspace-token", "update", "tok-ws", d, "--role", "DEPLOYMENT_ADMIN"},
-			want: `{"id":"tok-ws","name":"ws-token","description":"","scope":"WORKSPACE","role":"DEPLOYMENT_ADMIN","created_at":"2026-01-02T03:04:05Z","created_by":"bootstrap","expires_at":"2027-01-02T00:00:00Z"}`,
+			args:  []string{"token", "workspace-token", "update", "tok-ws", d, "--role", "DEPLOYMENT_ADMIN"},
+			check: isToken(wsTokenJSON.with(func(tok *tokenJSON) { tok.Role = "DEPLOYMENT_ADMIN" })),
 		},
 		{
 			name: "workspace-token remove",
@@ -623,27 +861,34 @@ func TestDeploymentTokenJSON(t *testing.T) {
 				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-ws", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
-			args: []string{"token", "workspace-token", "remove", "tok-ws", d},
-			want: `{"id":"tok-ws","name":"ws-token","scope":"WORKSPACE","deployment_id":"` + tokDeploymentID + `","action":"removed"}`,
+			args:  []string{"token", "workspace-token", "remove", "tok-ws", d},
+			check: removal("tok-ws", "ws-token", "WORKSPACE", "removed"),
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := execTokenCmd(t, tc.client(t), "", append(tc.args, "-o", "json")...)
 			require.NoError(t, r.err)
-			assert.Equal(t, tc.want+"\n", r.stdout)
+			assert.Equal(t, 0, r.code)
+			tc.check(t, r.stdout)
 			assert.Empty(t, r.stderr)
 		})
 	}
 }
 
-// A list never carries a secret, even when the API sent one.
+// A list never carries a secret, even when the API sent one: no element has
+// a token key at all.
 func TestDeploymentTokenListCarriesNoSecret(t *testing.T) {
 	dep, _, _ := jsonTokenFixtures()
 	r := execTokenCmd(t, tokenMock(t, *withSecret(dep)), "", "token", "list", "--deployment="+tokDeploymentID, "-o", "json")
 	require.NoError(t, r.err)
+	var got struct {
+		Tokens []map[string]json.RawMessage `json:"tokens"`
+	}
+	decodeOne(t, r.stdout, &got)
+	require.Len(t, got.Tokens, 1)
+	assert.NotContains(t, got.Tokens[0], "token")
 	assert.NotContains(t, r.stdout, tokSecret)
-	assert.NotContains(t, r.stdout, `"token"`)
 }
 
 // Under --output json a command that would ask something fails as
@@ -676,10 +921,12 @@ func TestDeploymentTokenJSONNeverAsks(t *testing.T) {
 			// An answer is waiting, so a prompt that did read would go on.
 			r := execTokenCmd(t, tc.client(t), "y\n1\n", append(tc.args, "-o", "json")...)
 			require.Error(t, r.err)
-			assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), r.err))
-			m := decodeOneJSON(t, r.stdout)
-			assert.Equal(t, string(cliout.KindInputRequired), m["kind"])
-			assert.Contains(t, m["error"], tc.answered)
+			assert.Equal(t, cliout.ExitFailure, r.code)
+			var got errorJSON
+			decodeOne(t, r.stdout, &got)
+			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
+			assert.Equal(t, cliout.ExitFailure, got.Code, "the code it reports is the one it exits with")
+			assert.Contains(t, got.Error, tc.answered)
 			assert.Empty(t, r.stderr)
 		})
 	}
@@ -697,14 +944,14 @@ func TestDeploymentTokenOutputUsage(t *testing.T) {
 	} {
 		r := execTokenCmd(t, tokenMock(t), "", args...)
 		require.Error(t, r.err, args)
-		assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(context.Background(), r.err), args)
+		assert.Equal(t, cliout.ExitUsage, r.code, args)
 	}
 }
 
 // An update changes only what it was given. Without --role it sends no role
 // change at all, and --role has no default for a help text to misstate.
 func TestDeploymentTokenUpdateWithoutRole(t *testing.T) {
-	dep, _, _ := tokenFixtures()
+	dep, _, _ := jsonTokenFixtures()
 	d := "--deployment=" + tokDeploymentID
 
 	update, _, err := newDeploymentRootCmd(io.Discard).Find([]string{"token", "update"})
@@ -725,7 +972,9 @@ func TestDeploymentTokenUpdateWithoutRole(t *testing.T) {
 			m.AssertCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything)
 			m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			if format == "json" {
-				assert.Equal(t, "DEPLOYMENT_ADMIN", decodeOneJSON(t, r.stdout)["role"], "the role it kept")
+				var got tokenJSON
+				decodeOne(t, r.stdout, &got)
+				assert.Equal(t, "DEPLOYMENT_ADMIN", got.Role, "the role it kept")
 			}
 		})
 	}
@@ -747,7 +996,7 @@ func TestDeploymentTokenUpdateRefusesBeforeChanging(t *testing.T) {
 		r := execTokenCmd(t, m, "", append(rename, "--role", "DEPLOYMENT_ADMIN")...)
 		require.Error(t, r.err)
 		assert.Equal(t, "this Deployment API token already has that role on the Deployment", r.err.Error())
-		assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), r.err))
+		assert.Equal(t, cliout.ExitFailure, r.code)
 		m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		assert.Empty(t, r.stdout)
