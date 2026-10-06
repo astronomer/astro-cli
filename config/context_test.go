@@ -174,13 +174,29 @@ contexts:
 `)
 	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
 	InitConfig(fs)
-	ctx := Context{Domain: "exmaple.com"}
+	ctx := Context{Domain: "example.com"}
 	err := ctx.DeleteContext()
 	s.NoError(err)
+	s.False(ctx.ContextExists())
+	s.True((&Context{Domain: "test.com"}).ContextExists())
+
+	err = ctx.DeleteContext()
+	s.ErrorIs(err, ErrContextNotExist)
+	s.ErrorContains(err, "example.com")
 
 	ctx = Context{}
 	err = ctx.DeleteContext()
 	s.ErrorIs(err, ErrCtxConfigErr)
+}
+
+// Before any login the config has no contexts section; deleting a context
+// then is an error naming it, not a panic on the missing section.
+func (s *Suite) TestDeleteContextWithoutConfig() {
+	InitConfig(afero.NewMemMapFs())
+	ctx := Context{Domain: "nope.example.com"}
+	err := ctx.DeleteContext()
+	s.ErrorIs(err, ErrContextNotExist)
+	s.ErrorContains(err, "nope.example.com")
 }
 
 func (s *Suite) TestResetCurrentContext() {

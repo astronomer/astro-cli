@@ -100,18 +100,30 @@ func (s *Suite) TestIsCloudContext() {
 }
 
 func (s *Suite) TestDelete() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	err := Delete("astronomer.io", true)
 	s.NoError(err)
+
+	err = Delete("astronomer.io", true)
+	s.ErrorIs(err, config.ErrContextNotExist)
 
 	err = Delete("", false)
 	s.ErrorIs(err, config.ErrCtxConfigErr)
 }
 
 func (s *Suite) TestDeleteContext() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err := DeleteContext(&cobra.Command{}, []string{"astronomer.io"}, false)
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	err := DeleteContext(&cobra.Command{}, []string{"astronomer.io"}, true)
 	s.NoError(err)
+}
+
+func (s *Suite) TestDeleteContextWithoutConfig() {
+	testUtil.InitTestConfig(testUtil.Initial)
+	cmd := &cobra.Command{}
+	err := DeleteContext(cmd, []string{"nope.example.com"}, true)
+	s.ErrorIs(err, config.ErrContextNotExist)
+	s.ErrorContains(err, "nope.example.com")
+	s.True(cmd.SilenceUsage, "a missing context is not a usage error")
 }
 
 func (s *Suite) TestGetContext() {

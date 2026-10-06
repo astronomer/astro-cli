@@ -1,6 +1,7 @@
 package context
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -95,6 +96,11 @@ func Delete(domain string, noPrompt bool) error {
 
 	c := config.Context{Domain: domain}
 	err := c.DeleteContext()
+	if errors.Is(err, config.ErrContextNotExist) {
+		// The error names the context already; the prefix below would print
+		// it twice, half on stdout and half on stderr.
+		return err
+	}
 	if err != nil {
 		fmt.Printf(failCtxDeleteMsg, domain)
 		return err

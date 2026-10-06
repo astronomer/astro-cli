@@ -13,6 +13,9 @@ import (
 
 var (
 	ErrCtxConfigErr = errors.New("context config invalid, no domain specified")
+	// ErrContextNotExist is returned for a context the config does not hold,
+	// including when there is no config at all.
+	ErrContextNotExist = errors.New("context does not exist")
 
 	ErrGetHomeString = errors.New("no context set, have you authenticated to Astro or APC? Run astro login and try again")
 	errNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
@@ -374,9 +377,15 @@ func (c *Context) DeleteContext() error {
 	if err != nil {
 		return err
 	}
+	// Before any login the config has no contexts section at all, so there
+	// is nothing to delete and nothing to assert a map type on.
+	if !c.ContextExists() {
+		return fmt.Errorf("%w: %s", ErrContextNotExist, c.Domain)
+	}
 	// Since viper does not have a way to unset or delete a key,
-	// hence getting all contexts and delete the required context
-	contexts := viperHome.Get(contextsKey).(map[string]interface{})
+	// hence getting all contexts and delete the required context.
+	// GetStringMap, not a type assertion on Get: it never returns nil.
+	contexts := viperHome.GetStringMap(contextsKey)
 	delete(contexts, cKey)
 	viperHome.Set(contextsKey, contexts)
 	err = saveConfig(viperHome, HomeConfigFile)
