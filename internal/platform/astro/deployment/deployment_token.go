@@ -33,6 +33,7 @@ var (
 	ErrDeploymentTokenNotFound    = errors.New("no Deployment API token was found for the API token name you provided")
 	errWorkspaceTokenInDeployment = errors.New("this Workspace API token has already been added to the Deployment with that role")
 	errOrgTokenInDeployment       = errors.New("this Organization API token has already been added to the Deployment with that role")
+	errDeploymentTokenRoleSet     = errors.New("this Deployment API token already has that role on the Deployment")
 	errWrongTokenTypeSelected     = errors.New("the token selected is not of the type you are trying to modify")
 )
 
@@ -218,7 +219,15 @@ func CreateToken(name, description, role, deploymentID string, expiration int, c
 	return withSecret(tokenInfo(created, role), created), nil
 }
 
-// UpdateToken updates a Deployment-scoped API token's name/description and optionally its deployment role.
+// UpdateToken updates a Deployment-scoped API token's name and description,
+// and its role on the Deployment when role is not "". An empty newName or
+// description keeps the token's own; an empty role leaves the role alone, and
+// no role change is sent.
+//
+// A role the token already holds on the Deployment is refused before anything
+// is sent, as the workspace-token and organization-token adds and updates
+// refuse theirs. The role is changed before the name and description, so a
+// role the API refuses leaves the token as it was.
 func UpdateToken(id, name, newName, description, role, deploymentID string, pick TokenPicker, client astrov1.APIClient) (TokenUpdate, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -230,6 +239,16 @@ func UpdateToken(id, name, newName, description, role, deploymentID string, pick
 	token, err := FindToken(id, name, deploymentID, tokenTypes, pick, client)
 	if err != nil {
 		return TokenUpdate{}, err
+	}
+
+	currentRole := deploymentRoleOf(token, deploymentID)
+	if role != "" && role == currentRole {
+		return TokenUpdate{}, errDeploymentTokenRoleSet
+	}
+	if role != "" {
+		if err := setDeploymentRole(token, deploymentID, role, organizationID, client); err != nil {
+			return TokenUpdate{}, err
+		}
 	}
 
 	updateReq := astrov1.UpdateApiTokenJSONRequestBody{}
@@ -261,18 +280,9 @@ func UpdateToken(id, name, newName, description, role, deploymentID string, pick
 		updated.Name, updated.Description = updateReq.Name, *updateReq.Description
 	}
 
-	newRole := role
-	if newRole == "" {
-		newRole = deploymentRoleOf(token, deploymentID)
-	}
-	if newRole != "" {
-		// Short-circuit: requested role is already set.
-		if role != "" && deploymentRoleOf(token, deploymentID) == role {
-			return TokenUpdate{}, errWorkspaceTokenInDeployment
-		}
-		if err := setDeploymentRole(token, deploymentID, newRole, organizationID, client); err != nil {
-			return TokenUpdate{}, err
-		}
+	newRole := currentRole
+	if role != "" {
+		newRole = role
 	}
 	return TokenUpdate{Token: tokenInfo(&updated, newRole), PreviousName: token.Name}, nil
 }

@@ -24,6 +24,12 @@ import (
 // family, registered once on its group.
 var deploymentTokenOutput string
 
+// deploymentTokenUpdateRole is `deployment token update --role`. It is its own
+// variable, not the tokenRole the other token commands share: each of them
+// re-registers that one with its own default, so a default given here would
+// be overwritten by whichever registered last. "" leaves the role alone.
+var deploymentTokenUpdateRole string
+
 var (
 	errInvalidDeploymentTokenKey = errors.New("invalid Deployment API token selection")
 	errCleanOutputWithJSON       = errors.New("--clean-output prints the bare token for a script, and --output json the whole token with it in a \"token\" field; use one")
@@ -163,7 +169,7 @@ func runDeploymentTokenCreate(format cliout.Format, out io.Writer) error {
 }
 
 func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
-	res, err := deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, deploymentID, tokenPicker(out), astroV1Client)
+	res, err := deployment.UpdateToken(tokenID, name, tokenName, tokenDescription, deploymentTokenUpdateRole, deploymentID, tokenPicker(out), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -192,9 +198,7 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// The text names the --name given, not the token: a rotate by id has
-	// always printed an empty name here.
-	return renderTokenSecret(format, out, &rotated, "rotated", name, cleanTokenOutput)
+	return renderTokenSecret(format, out, &rotated, "rotated", token.Name, cleanTokenOutput)
 }
 
 func runDeploymentTokenDelete(format cliout.Format, out io.Writer) error {

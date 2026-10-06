@@ -1157,7 +1157,7 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [TOKEN_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment API token",
-		Long:    "Update a Deployment API token's name, description, or role. Identify the token by its ID (positional argument) or current name (--name).",
+		Long:    "Update a Deployment API token's name, description, or role. Identify the token by its ID (positional argument) or current name (--name). Only what you pass changes: without --role the token keeps its role, and a --role the token already holds is refused before anything changes.",
 		Example: `
   $ astro deployment token update <token-id> --deployment <deployment-id> --new-name my-new-token-name --role DEPLOYMENT_ADMIN
 `,
@@ -1168,8 +1168,8 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&tokenRole, "role", "r", "DEPLOYMENT_ADMIN", "The new role for the "+
-		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name")
+	cmd.Flags().StringVarP(&deploymentTokenUpdateRole, "role", "r", "", "The new role for the "+
+		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name. Without it, the token keeps its role")
 	return cmd
 }
 

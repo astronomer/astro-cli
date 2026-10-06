@@ -158,7 +158,10 @@ func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args .
 	return tokenRun{stdout: stdout, stderr: errBuf.String(), err: runErr}
 }
 
-// The text each command printed on v2 before the conversion, byte for byte.
+// The text each command printed on v2 before the conversion, byte for byte,
+// except where three quirks were since fixed: an update without --role keeps
+// the role without sending it, an update refuses a role the token already
+// holds before changing anything, and a rotate by id names the token.
 func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 	dep, ws, org := tokenFixtures()
 	d := "--deployment=" + tokDeploymentID
@@ -257,30 +260,22 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				"\n> Astro Deployment API token ci-deploy was successfully updated\n",
 		},
 		{
-			// --role's help says it defaults to DEPLOYMENT_ADMIN, but the
-			// variable behind it is shared with commands registered later
-			// whose default is "", so an update without --role keeps the role.
+			// That no role change is sent: TestDeploymentTokenUpdateWithoutRole.
 			name: "update without --role keeps the role",
 			client: func(t *testing.T) astrov1.APIClient {
 				m := tokenMock(t, dep)
 				m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &dep}, nil)
-				m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything).Return(rolesOK(), nil)
 				return m
 			},
 			args: []string{"token", "update", "tok-dep", d, "--description", "new words"},
 			want: "Astro Deployment API token ci-deploy was successfully updated\n",
 		},
 		{
-			// The name and description are updated before the role is
-			// compared, so this has changed them by the time it fails.
-			name: "update to the role it already has",
-			client: func(t *testing.T) astrov1.APIClient {
-				m := tokenMock(t, dep)
-				m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &dep}, nil)
-				return m
-			},
-			args:    []string{"token", "update", "tok-dep", d, "--role", "DEPLOYMENT_ADMIN"},
-			wantErr: "this Workspace API token has already been added to the Deployment with that role",
+			// That nothing is sent: TestDeploymentTokenUpdateRefusesBeforeChanging.
+			name:    "update to the role it already has",
+			client:  func(t *testing.T) astrov1.APIClient { return tokenMock(t, dep) },
+			args:    []string{"token", "update", "tok-dep", d, "--new-name", "ci-deploy-2", "--role", "DEPLOYMENT_ADMIN"},
+			wantErr: "this Deployment API token already has that role on the Deployment",
 		},
 		{
 			name: "rotate --yes by id",
@@ -290,8 +285,8 @@ func TestDeploymentTokenTextIsUnchanged(t *testing.T) {
 				return m
 			},
 			args: []string{"token", "rotate", "tok-dep", d, "--yes"},
-			// The name printed is the --name given, so a rotate by id names nobody.
-			want: "\nAstro Deployment API token  was successfully rotated\n" +
+			// Named by its id, the token is still reported by its name.
+			want: "\nAstro Deployment API token ci-deploy was successfully rotated\n" +
 				"Copy and paste this API token for your records.\n" +
 				"\n" + tokSecret + "\n" +
 				"\nYou will not be shown this API token value again.\n",
@@ -704,4 +699,72 @@ func TestDeploymentTokenOutputUsage(t *testing.T) {
 		require.Error(t, r.err, args)
 		assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(context.Background(), r.err), args)
 	}
+}
+
+// An update changes only what it was given. Without --role it sends no role
+// change at all, and --role has no default for a help text to misstate.
+func TestDeploymentTokenUpdateWithoutRole(t *testing.T) {
+	dep, _, _ := tokenFixtures()
+	d := "--deployment=" + tokDeploymentID
+
+	update, _, err := newDeploymentRootCmd(io.Discard).Find([]string{"token", "update"})
+	require.NoError(t, err)
+	role := update.Flags().Lookup("role")
+	require.NotNil(t, role)
+	assert.Empty(t, role.DefValue, "--role has no default")
+	assert.Contains(t, role.Usage, "Without it, the token keeps its role")
+
+	for _, format := range []string{"text", "json"} {
+		t.Run(format, func(t *testing.T) {
+			m := tokenMock(t, dep)
+			m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &dep}, nil)
+			m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(rolesOK(), nil).Maybe()
+
+			r := execTokenCmd(t, m, "", "token", "update", "tok-dep", d, "--description", "new words", "-o", format)
+			require.NoError(t, r.err)
+			m.AssertCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything)
+			m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			if format == "json" {
+				assert.Equal(t, "DEPLOYMENT_ADMIN", decodeOneJSON(t, r.stdout)["role"], "the role it kept")
+			}
+		})
+	}
+}
+
+// A refused role leaves the token as it was: a role it already holds is
+// refused before anything is sent, and a role the API refuses is refused
+// before the name and description are sent.
+func TestDeploymentTokenUpdateRefusesBeforeChanging(t *testing.T) {
+	dep, _, _ := tokenFixtures()
+	d := "--deployment=" + tokDeploymentID
+	rename := []string{"token", "update", "tok-dep", d, "--new-name", "ci-deploy-2", "--description", "new words"}
+
+	t.Run("a role it already holds", func(t *testing.T) {
+		m := tokenMock(t, dep)
+		m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &dep}, nil).Maybe()
+		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(rolesOK(), nil).Maybe()
+
+		r := execTokenCmd(t, m, "", append(rename, "--role", "DEPLOYMENT_ADMIN")...)
+		require.Error(t, r.err)
+		assert.Equal(t, "this Deployment API token already has that role on the Deployment", r.err.Error())
+		assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), r.err))
+		m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		m.AssertNotCalled(t, "UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		assert.Empty(t, r.stdout)
+	})
+
+	t.Run("a role the API refuses", func(t *testing.T) {
+		m := tokenMock(t, dep)
+		m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateApiTokenResponse{HTTPResponse: ok200(), JSON200: &dep}, nil).Maybe()
+		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "tok-dep", mock.Anything).Return(&astrov1.UpdateApiTokenRolesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusBadRequest},
+			Body:         []byte(`{"message":"role NOT_A_ROLE does not exist"}`),
+		}, nil)
+
+		r := execTokenCmd(t, m, "", append(rename, "--role", "NOT_A_ROLE")...)
+		require.Error(t, r.err)
+		assert.Contains(t, r.err.Error(), "NOT_A_ROLE")
+		m.AssertNotCalled(t, "UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		assert.Empty(t, r.stdout)
+	})
 }
