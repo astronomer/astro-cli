@@ -1,6 +1,7 @@
 package local
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -123,27 +124,74 @@ func TestDagsSourcePrintsTheFile(t *testing.T) {
 func TestDagsStatsCountsRunsByState(t *testing.T) {
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/dagStats", `{"dags":[
-		{"dag_id":"orders_etl","stats":[{"state":"success","count":12},{"state":"failed","count":1}]}
+		{"dag_id":"orders_etl","dag_display_name":"Orders ETL","stats":[{"state":"success","count":12},{"state":"failed","count":1}]}
 	],"total_entries":1}`)
 
 	out, _, err := runQuery(t, stub, "dags", "stats")
 	if err != nil {
 		t.Fatalf("dags stats: %v", err)
 	}
-	for _, want := range []string{"DAG_ID", "SUCCESS", "FAILED", "orders_etl", "12"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("table is missing %q:\n%s", want, out)
-		}
+	// The table is what it was when stats were a map: one column per state,
+	// sorted, whatever order Airflow sent them in.
+	if want := "DAG_ID      FAILED  SUCCESS\norders_etl  1       12\n"; out != want {
+		t.Errorf("table = %q, want %q", out, want)
 	}
 
 	out, _, err = runQuery(t, stub, "dags", "stats", "-o", "json")
 	if err != nil {
 		t.Fatalf("dags stats -o json: %v", err)
 	}
-	row := decodeRows(t, out, "dags")[0]
-	stats, ok := row["stats"].(map[string]any)
-	if !ok || stats["success"] != float64(12) {
-		t.Errorf("row = %v", row)
+	// The standalone af passes Airflow's dagStats response through, so each
+	// row's stats are a list of {state, count} in the order Airflow sent them,
+	// not a map keyed by state.
+	var got struct {
+		DAGs []struct {
+			DAGID          string `json:"dag_id"`
+			DAGDisplayName string `json:"dag_display_name"`
+			Stats          []struct {
+				State string `json:"state"`
+				Count int    `json:"count"`
+			} `json:"stats"`
+		} `json:"dags"`
+		TotalEntries int `json:"total_entries"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output %q: %v", out, err)
+	}
+	if got.TotalEntries != 1 || len(got.DAGs) != 1 {
+		t.Fatalf("json = %+v, want one DAG and total_entries 1", got)
+	}
+	row := got.DAGs[0]
+	if row.DAGID != "orders_etl" || row.DAGDisplayName != "Orders ETL" {
+		t.Errorf("row = %+v", row)
+	}
+	if len(row.Stats) != 2 || row.Stats[0].State != "success" || row.Stats[0].Count != 12 ||
+		row.Stats[1].State != "failed" || row.Stats[1].Count != 1 {
+		t.Errorf("stats = %+v, want [{success 12} {failed 1}] in Airflow's order", row.Stats)
+	}
+}
+
+// No DAGs with stats is an empty list under the key and a zero total, and the
+// table says so in a sentence.
+func TestDagsStatsWithNothingToCount(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/dagStats", `{"dags":[],"total_entries":0}`)
+
+	out, _, err := runQuery(t, stub, "dags", "stats", "-o", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, envelope := decodeList(t, out, "dags")
+	if len(rows) != 0 || envelope["total_entries"] != float64(0) {
+		t.Errorf("json = %v, want dags [] and total_entries 0", envelope)
+	}
+
+	out, _, err = runQuery(t, stub, "dags", "stats")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "No DAG run statistics on this Airflow.") {
+		t.Errorf("text = %q", out)
 	}
 }
 

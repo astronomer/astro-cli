@@ -125,8 +125,19 @@ func TestHealthDAGStatsJSONAgreesWithTheText(t *testing.T) {
 	if stats["dags_with_runs"] != float64(1) {
 		t.Errorf("dags_with_runs = %v, want 1", stats["dags_with_runs"])
 	}
-	if dags, _ := stats["dags"].([]any); len(dags) != 2 {
-		t.Errorf("dags = %v, want both rows kept", stats["dags"])
+	dags, _ := stats["dags"].([]any)
+	if len(dags) != 2 {
+		t.Fatalf("dags = %v, want both rows kept", stats["dags"])
+	}
+	// The rows are dags stats' rows, Airflow's {state, count} list, which is
+	// what af's health passes through as well.
+	first, _ := dags[0].(map[string]any)
+	counts, _ := first["stats"].([]any)
+	if len(counts) != 1 {
+		t.Fatalf("dags[0].stats = %v, want one {state, count}", first["stats"])
+	}
+	if c, _ := counts[0].(map[string]any); c["state"] != "success" || c["count"] != float64(3) {
+		t.Errorf("dags[0].stats[0] = %v, want success 3", counts[0])
 	}
 }
 

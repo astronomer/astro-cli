@@ -110,23 +110,27 @@ func TestListPluginsNamesWhatEachContributes(t *testing.T) {
 	}
 }
 
-func TestConfigFlattensSectionsAndReadsBothValueShapes(t *testing.T) {
+func TestConfigKeepsSectionsAndReadsBothValueShapes(t *testing.T) {
 	stub := newAF3Stub(t)
 	stub.route(http.MethodGet, "/api/v2/config", `{"sections":[
 		{"name":"core","options":[{"key":"executor","value":"LocalExecutor"},{"key":"fernet_key","value":["< hidden >","env var"]}]},
-		{"name":"api","options":[{"key":"expose_config","value":"True"}]}]}`)
+		{"name":"api","options":[{"key":"expose_config","value":"True"}]},
+		{"name":"empty","options":[]}]}`)
 
 	config, err := stub.client().Config(t.Context(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []ConfigOption{
-		{Section: "core", Key: "executor", Value: "LocalExecutor"},
-		{Section: "core", Key: "fernet_key", Value: "< hidden >", Source: "env var"},
-		{Section: "api", Key: "expose_config", Value: "True"},
+	want := []ConfigSection{
+		{Name: "core", Options: []ConfigOption{
+			{Key: "executor", Value: "LocalExecutor"},
+			{Key: "fernet_key", Value: "< hidden >", Source: "env var"},
+		}},
+		{Name: "api", Options: []ConfigOption{{Key: "expose_config", Value: "True"}}},
+		{Name: "empty", Options: []ConfigOption{}},
 	}
-	if !reflect.DeepEqual(config.Options, want) {
-		t.Errorf("options = %+v\nwant %+v", config.Options, want)
+	if !reflect.DeepEqual(config.Sections, want) {
+		t.Errorf("sections = %+v\nwant %+v", config.Sections, want)
 	}
 	if q := stub.lastRequest().Query; q.Has("section") {
 		t.Errorf("query = %v, want no section filter", q)

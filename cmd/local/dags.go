@@ -261,12 +261,31 @@ func newDagsStatsCmd(q *query) *cobra.Command {
 	return cmd
 }
 
-// dagStatRow is one DAG's run counts. The states are a map rather than fixed
-// fields because Airflow's set of run states is its own to change, and a
-// reader asking for counts wants whatever this instance actually has.
+// dagStatRow is one DAG's run counts, in Airflow's own dagStats shape, which
+// the standalone af passes through: a list of {state, count} in the order
+// Airflow sent them. The states are entries rather than fixed fields because
+// Airflow's set of run states is its own to change, and a reader asking for
+// counts wants whatever this instance actually has.
 type dagStatRow struct {
-	DAGID string         `json:"dag_id"`
-	Stats map[string]int `json:"stats"`
+	DAGID string `json:"dag_id"`
+	// DAGDisplayName is sent by Airflow 3 only.
+	DAGDisplayName string          `json:"dag_display_name,omitempty"`
+	Stats          []dagStateCount `json:"stats"`
+}
+
+// dagStateCount is how many runs of one DAG sit in one state.
+type dagStateCount struct {
+	State string `json:"state"`
+	Count int    `json:"count"`
+}
+
+// counts sums the row's runs by state, for a reader that looks a state up.
+func (row dagStatRow) counts() map[string]int {
+	byState := make(map[string]int, len(row.Stats))
+	for _, s := range row.Stats {
+		byState[s.State] += s.Count
+	}
+	return byState
 }
 
 func (q *query) runDagsStats(ctx context.Context, dagIDs []string) error {
@@ -286,9 +305,9 @@ func (q *query) runDagsStats(ctx context.Context, dagIDs []string) error {
 // and the health report read the same endpoint, so they share the shape.
 func dagStatRows(stats airflowapi.DAGStats) []dagStatRow {
 	return mapRows(stats.DAGs, func(stat airflowapi.DAGStat) dagStatRow {
-		row := dagStatRow{DAGID: stat.DAGID, Stats: map[string]int{}}
+		row := dagStatRow{DAGID: stat.DAGID, DAGDisplayName: stat.DAGDisplayName, Stats: make([]dagStateCount, 0, len(stat.Stats))}
 		for _, s := range stat.Stats {
-			row.Stats[s.State] = s.Count
+			row.Stats = append(row.Stats, dagStateCount{State: s.State, Count: s.Count})
 		}
 		return row
 	})
@@ -300,8 +319,8 @@ func renderDAGStatsTable(w io.Writer, rows []dagStatRow) error {
 	// never a list compiled here.
 	states := map[string]bool{}
 	for _, row := range rows {
-		for state := range row.Stats {
-			states[state] = true
+		for _, s := range row.Stats {
+			states[s.State] = true
 		}
 	}
 	columns := make([]string, 0, len(states))
@@ -314,8 +333,9 @@ func renderDAGStatsTable(w io.Writer, rows []dagStatRow) error {
 		func(row dagStatRow) []string {
 			cells := make([]string, 0, len(columns)+1)
 			cells = append(cells, row.DAGID)
+			byState := row.counts()
 			for _, state := range columns {
-				cells = append(cells, count(row.Stats[state]))
+				cells = append(cells, count(byState[state]))
 			}
 			return cells
 		})

@@ -154,8 +154,10 @@ type DAGStats struct {
 
 // DAGStat is one DAG's run counts.
 type DAGStat struct {
-	DAGID string          `json:"dag_id"`
-	Stats []DAGStateCount `json:"stats"`
+	DAGID string `json:"dag_id"`
+	// DAGDisplayName is the DAG's display name. Only Airflow 3 sends it.
+	DAGDisplayName string          `json:"dag_display_name,omitempty"`
+	Stats          []DAGStateCount `json:"stats"`
 }
 
 // DAGStateCount is how many runs of a DAG sit in one state.

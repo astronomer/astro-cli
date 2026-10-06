@@ -1,7 +1,9 @@
 package local
 
 import (
+	"encoding/json"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -98,19 +100,24 @@ func TestConfigListsOptionsAndExplainsARefusal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rows := decodeRows(t, out, "options")
-	if len(rows) != 3 || rows[0]["section"] != "core" || rows[0]["key"] != "executor" || rows[2]["source"] != "env var" {
-		t.Errorf("rows = %v", rows)
+	// af's `config show` shape: Airflow's sections, each with its options
+	// nested inside, and the count of sections beside them.
+	got := decodeConfig(t, out)
+	want := configJSON{Total: 2, Sections: []configJSONSection{
+		{Name: "core", Options: []configJSONOption{{Key: "executor", Value: "LocalExecutor"}, {Key: "parallelism", Value: "32"}}},
+		{Name: "api", Options: []configJSONOption{{Key: "expose_config", Value: "True", Source: "env var"}}},
+	}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("json = %+v\nwant %+v", got, want)
 	}
-	out, _, err = runQuery(t, stub, "config", "--section", "core")
+
+	// The text is airflow.cfg's layout, as it always was.
+	out, _, err = runQuery(t, stub, "config")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "[core]\nexecutor = LocalExecutor\nparallelism = 32\n\n[api]\nexpose_config = True  # env var") {
-		t.Errorf("text = %q", out)
-	}
-	if reqs := stub.requestsTo(http.MethodGet, "/api/v2/config"); !strings.Contains(reqs[len(reqs)-1].Query, "section=core") {
-		t.Errorf("--section did not reach Airflow: %v", reqs)
+	if want := "[core]\nexecutor = LocalExecutor\nparallelism = 32\n\n[api]\nexpose_config = True  # env var\n"; out != want {
+		t.Errorf("text = %q, want %q", out, want)
 	}
 
 	// Off by default on both generations, so the refusal names the setting.
@@ -120,4 +127,102 @@ func TestConfigListsOptionsAndExplainsARefusal(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "expose_config") {
 		t.Fatalf("err = %v, want it to name expose_config", err)
 	}
+}
+
+// --section is Airflow's own filter, so the json holds the one section
+// Airflow answered with, and the text that section alone.
+func TestConfigSectionShowsOnlyThatSection(t *testing.T) {
+	stub := newAirflowStub(t)
+	stub.route(http.MethodGet, "/api/v2/config", `{"sections":[
+		{"name":"core","options":[{"key":"executor","value":"LocalExecutor"}]}]}`)
+
+	out, _, err := runQuery(t, stub, "config", "--section", "core", "-o", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reqs := stub.requestsTo(http.MethodGet, "/api/v2/config"); !strings.Contains(reqs[len(reqs)-1].Query, "section=core") {
+		t.Errorf("--section did not reach Airflow: %v", reqs)
+	}
+	want := configJSON{Total: 1, Sections: []configJSONSection{
+		{Name: "core", Options: []configJSONOption{{Key: "executor", Value: "LocalExecutor"}}},
+	}}
+	if got := decodeConfig(t, out); !reflect.DeepEqual(got, want) {
+		t.Errorf("json = %+v\nwant %+v", got, want)
+	}
+
+	out, _, err = runQuery(t, stub, "config", "--section", "core")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "[core]\nexecutor = LocalExecutor\n"; out != want {
+		t.Errorf("text = %q, want %q", out, want)
+	}
+}
+
+// No configuration is sections [] and a zero count, never null or missing; a
+// section Airflow sends with no options keeps its [] too. The text says there
+// is nothing, as it did before.
+func TestConfigWithNothingToShow(t *testing.T) {
+	for _, tc := range []struct {
+		name, payload string
+		sections      []configJSONSection
+	}{
+		{"no sections", `{"sections":[]}`, []configJSONSection{}},
+		{"no options", `{"sections":[{"name":"core","options":[]}]}`, []configJSONSection{{Name: "core", Options: []configJSONOption{}}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			stub := newAirflowStub(t)
+			stub.route(http.MethodGet, "/api/v2/config", tc.payload)
+
+			out, _, err := runQuery(t, stub, "config", "-o", "json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := configJSON{Total: len(tc.sections), Sections: tc.sections}
+			if got := decodeConfig(t, out); !reflect.DeepEqual(got, want) {
+				t.Errorf("json = %+v\nwant %+v", got, want)
+			}
+
+			out, _, err = runQuery(t, stub, "config")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "This Airflow reported no configuration.\n"; out != want {
+				t.Errorf("text = %q, want %q", out, want)
+			}
+		})
+	}
+}
+
+type configJSON struct {
+	Total    int                 `json:"total_sections"`
+	Sections []configJSONSection `json:"sections"`
+}
+
+type configJSONSection struct {
+	Name    string             `json:"name"`
+	Options []configJSONOption `json:"options"`
+}
+
+type configJSONOption struct {
+	Key    string `json:"key"`
+	Value  string `json:"value"`
+	Source string `json:"source"`
+}
+
+// decodeConfig reads `config -o json`, failing on a sections or options key
+// that is missing or null rather than letting either decode as empty.
+func decodeConfig(t *testing.T, out string) configJSON {
+	t.Helper()
+	_, envelope := decodeList(t, out, "sections")
+	for _, s := range envelope["sections"].([]any) {
+		if _, ok := s.(map[string]any)["options"].([]any); !ok {
+			t.Fatalf("a section's options are not a list: %q", out)
+		}
+	}
+	var got configJSON
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output %q: %v", out, err)
+	}
+	return got
 }

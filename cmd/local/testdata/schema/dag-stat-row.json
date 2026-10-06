@@ -1,6 +1,10 @@
 {
   "dag_id": "x",
-  "stats": {
-    "x": -1
-  }
+  "dag_display_name": "x",
+  "stats": [
+    {
+      "state": "x",
+      "count": -1
+    }
+  ]
 }

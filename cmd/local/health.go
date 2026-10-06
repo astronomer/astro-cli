@@ -279,8 +279,8 @@ func readHealthDAGStats(ctx context.Context, client *airflowapi.Client) healthDA
 	section := healthDAGStats{Available: true, DAGs: dagStatRows(stats)}
 	for _, row := range section.DAGs {
 		runs := 0
-		for _, n := range row.Stats {
-			runs += n
+		for _, s := range row.Stats {
+			runs += s.Count
 		}
 		section.Runs += runs
 		if runs > 0 {
@@ -464,8 +464,8 @@ func dagStatsDetail(section healthDAGStats) string {
 	// failed=0 is an answer, and cmd/local/query.go makes the same call.
 	totals := map[string]int{}
 	for _, row := range section.DAGs {
-		for state, n := range row.Stats {
-			totals[state] += n
+		for _, s := range row.Stats {
+			totals[s.State] += s.Count
 		}
 	}
 	parts := make([]string, 0, len(totals))

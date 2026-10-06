@@ -162,19 +162,25 @@ func componentNames(raw json.RawMessage) []string {
 
 // ConfigOption is one configuration value.
 type ConfigOption struct {
-	Section string
-	Key     string
-	Value   string
+	Key   string
+	Value string
 	// Source is where the value came from ("airflow.cfg", "env var",
 	// "default"), when Airflow says. Only Airflow 3 does, and only when asked
 	// to display sources.
 	Source string
 }
 
-// Config is an Airflow's configuration, flattened to one entry per option in
-// the order Airflow listed them.
-type Config struct {
+// ConfigSection is one section of the configuration, such as [core], with
+// its options in the order Airflow listed them.
+type ConfigSection struct {
+	Name    string
 	Options []ConfigOption
+}
+
+// Config is an Airflow's configuration, nested by section the way its config
+// endpoint sends it, in the order Airflow listed them.
+type Config struct {
+	Sections []ConfigSection
 }
 
 // Config reads an Airflow's configuration, or one section of it.
@@ -200,12 +206,14 @@ func (c *Client) Config(ctx context.Context, section string) (Config, error) {
 	if err := c.get(ctx, "/config", query, &wire); err != nil {
 		return Config{}, err
 	}
-	var config Config
+	config := Config{Sections: make([]ConfigSection, 0, len(wire.Sections))}
 	for _, s := range wire.Sections {
+		section := ConfigSection{Name: s.Name, Options: make([]ConfigOption, 0, len(s.Options))}
 		for _, o := range s.Options {
 			value, source := configValue(o.Value)
-			config.Options = append(config.Options, ConfigOption{Section: s.Name, Key: o.Key, Value: value, Source: source})
+			section.Options = append(section.Options, ConfigOption{Key: o.Key, Value: value, Source: source})
 		}
+		config.Sections = append(config.Sections, section)
 	}
 	return config, nil
 }

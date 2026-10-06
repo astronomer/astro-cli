@@ -53,8 +53,7 @@ func newDAGList(rows []dagRow, total int) dagList { return dagList{total, len(ro
 
 // dagStatList is `astro af dags stats`. af prints Airflow's own dagStats
 // response, `{"dags": [...], "total_entries": n}`, so the key and the count
-// are Airflow's names. A row's stats are a state-to-count map here rather
-// than af's list of {state, count}; see dagStatRow.
+// are Airflow's names, and so is a row's shape; see dagStatRow.
 type dagStatList struct {
 	DAGs  []dagStatRow `json:"dags"`
 	Total int          `json:"total_entries"`
@@ -194,15 +193,16 @@ type pluginList struct {
 
 func newPluginList(rows []pluginRow, total int) pluginList { return pluginList{total, len(rows), rows} }
 
-// configOptionList is `astro af config`. af's `config show` publishes
-// Airflow's nested `sections`; this command's rows are one per option, so it
-// does not borrow that key for a different shape.
-type configOptionList struct {
-	Options []configOptionRow `json:"options"`
+// configSectionList is `astro af config`, af's `config show`: Airflow's own
+// nesting, one entry per section with its options inside, and af's count of
+// the sections beside it.
+type configSectionList struct {
+	Total    int                `json:"total_sections"`
+	Sections []configSectionRow `json:"sections"`
 }
 
-func newConfigOptionList(rows []configOptionRow, _ int) configOptionList {
-	return configOptionList{rows}
+func newConfigSectionList(rows []configSectionRow, total int) configSectionList {
+	return configSectionList{total, rows}
 }
 
 // endpointList is `astro local api ls`. The key and the count are af's `api

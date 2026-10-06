@@ -189,13 +189,19 @@ func newConfigCmd(d Deps, t target) *cobra.Command {
 	})
 }
 
-// configOptionRow is one configuration option: one row per option rather than
-// one object per section, so the text table greps line by line and the json
-// `options` array filters with a single jq select.
+// configSectionRow is one section of the configuration with its options
+// inside, the nesting Airflow's config endpoint sends and af's `config show`
+// prints, so `jq '.sections[] | select(.name == "core") | .options'` reads
+// both the same way.
+type configSectionRow struct {
+	Name    string            `json:"name"`
+	Options []configOptionRow `json:"options"`
+}
+
+// configOptionRow is one configuration option within its section.
 type configOptionRow struct {
-	Section string `json:"section"`
-	Key     string `json:"key"`
-	Value   string `json:"value"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 	// Source is where the value came from, when Airflow says; see
 	// airflowapi.ConfigOption.
 	Source string `json:"source,omitempty"`
@@ -219,39 +225,46 @@ func (q *query) runConfig(ctx context.Context, section string) error {
 	if err != nil {
 		return err
 	}
-	rows := mapRows(config.Options, func(o airflowapi.ConfigOption) configOptionRow {
-		return configOptionRow{Section: o.Section, Key: o.Key, Value: o.Value, Source: o.Source}
+	rows := mapRows(config.Sections, func(s airflowapi.ConfigSection) configSectionRow {
+		// mapRows never returns nil, so a section with no options publishes [].
+		return configSectionRow{Name: s.Name, Options: mapRows(s.Options, func(o airflowapi.ConfigOption) configOptionRow {
+			return configOptionRow{Key: o.Key, Value: o.Value, Source: o.Source}
+		})}
 	})
-	return emitRows(r, rows, len(rows), newConfigOptionList, renderConfig)
+	return emitRows(r, rows, len(rows), newConfigSectionList, renderConfig)
 }
 
 // renderConfig writes the options the way airflow.cfg lays them out: a
-// [section] header, then key = value under it.
-func renderConfig(w io.Writer, rows []configOptionRow) error {
-	if len(rows) == 0 {
-		_, err := fmt.Fprintln(w, "This Airflow reported no configuration.")
-		return err
-	}
-	section := ""
-	for i, row := range rows {
-		if i == 0 || row.Section != section {
-			if i > 0 {
-				if _, err := fmt.Fprintln(w); err != nil {
-					return err
-				}
-			}
-			section = row.Section
-			if _, err := fmt.Fprintf(w, "[%s]\n", section); err != nil {
+// [section] header, then key = value under it. A section with no options
+// prints nothing, and a configuration with no options at all says so.
+func renderConfig(w io.Writer, rows []configSectionRow) error {
+	printed := 0
+	for _, row := range rows {
+		if len(row.Options) == 0 {
+			continue
+		}
+		if printed > 0 {
+			if _, err := fmt.Fprintln(w); err != nil {
 				return err
 			}
 		}
-		line := row.Key + " = " + row.Value
-		if row.Source != "" {
-			line += "  # " + row.Source
-		}
-		if _, err := fmt.Fprintln(w, line); err != nil {
+		printed++
+		if _, err := fmt.Fprintf(w, "[%s]\n", row.Name); err != nil {
 			return err
 		}
+		for _, o := range row.Options {
+			line := o.Key + " = " + o.Value
+			if o.Source != "" {
+				line += "  # " + o.Source
+			}
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return err
+			}
+		}
+	}
+	if printed == 0 {
+		_, err := fmt.Fprintln(w, "This Airflow reported no configuration.")
+		return err
 	}
 	return nil
 }
