@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 )
 
 const (
@@ -830,7 +831,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 		// --yes answers the file path's own confirmation, so it is allowed
 		// beside the file like --wait.
 		if onlyFlagsSet(cmd, "wait", "wait-time", "deployment-file", "yes", "verbosity") {
-			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, waitForStatus, waitTimeForDeployment, forceUpdate)
+			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out), waitForStatus, waitTimeForDeployment, forceUpdate)
 		}
 		return errFlag
 	}
@@ -855,6 +856,20 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment)
+}
+
+// deploymentFileEcho is the Renderer `deployment create|update
+// --deployment-file` prints the deployment it made or changed through, in the
+// format of the file it read: a JSON file's echo is a json result, from the
+// CLI's one encoder, so it is pretty on a terminal and one line when piped;
+// a YAML file's is the deployment's YAML, as `deployment inspect` prints it.
+func deploymentFileEcho(out io.Writer) fromfile.Echo {
+	return func(fromJSON bool) output.Emitter {
+		if fromJSON {
+			return cliout.Renderer{Format: cliout.FormatJSON, Out: out}
+		}
+		return cliout.Renderer{Format: cliout.FormatText, Out: out}
+	}
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -882,7 +897,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		// --yes answers the file path's own confirmation. Counting every set
 		// flag also refused it, and the global --verbosity with it.
 		if onlyFlagsSet(cmd, "deployment-file", "yes", "verbosity") {
-			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, false, 0*time.Second, forceUpdate)
+			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out), false, 0*time.Second, forceUpdate)
 		}
 		return errFlag
 	}

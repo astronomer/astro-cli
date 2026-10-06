@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/output"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -452,7 +454,7 @@ func (s *Suite) TestCreateOrUpdate() {
 	)
 
 	s.Run("returns an error if file does not exist", func() {
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorContains(err, "open deployment.yaml: no such file or directory")
 	})
 	s.Run("returns an error if file exists but user provides incorrect path", func() {
@@ -461,7 +463,7 @@ func (s *Suite) TestCreateOrUpdate() {
 		err = fileutil.WriteStringToFile(filePath, data)
 		s.NoError(err)
 		defer afero.NewOsFs().RemoveAll("./2")
-		err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("1/deployment.yaml", "create", nil, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorContains(err, "open 1/deployment.yaml: no such file or directory")
 	})
 	s.Run("returns an error if file is empty", func() {
@@ -469,7 +471,7 @@ func (s *Suite) TestCreateOrUpdate() {
 		data = ""
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errEmptyFile)
 		s.ErrorContains(err, "deployment.yaml has no content")
 	})
@@ -478,7 +480,7 @@ func (s *Suite) TestCreateOrUpdate() {
 		data = "test"
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorContains(err, "error unmarshaling JSON:")
 	})
 	s.Run("returns an error if required fields are missing", func() {
@@ -533,7 +535,7 @@ deployment:
 `
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", nil, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorContains(err, "missing required field: deployment.configuration.name")
 	})
 	s.Run("returns an error if getting context fails", func() {
@@ -593,7 +595,7 @@ deployment:
 
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorContains(err, "no context set")
 	})
 	s.Run("returns an error if cluster does not exist", func() {
@@ -653,7 +655,7 @@ deployment:
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errNotFound)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -714,7 +716,7 @@ deployment:
 		fileutil.WriteStringToFile(filePath, data)
 		defer afero.NewOsFs().Remove(filePath)
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, errTest).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errTest)
 	})
 	s.Run("returns an error if listing deployment fails", func() {
@@ -776,7 +778,7 @@ deployment:
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errTest).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errTest)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -848,7 +850,7 @@ deployment:
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.NotNil(out)
 		mockV1Client.AssertExpectations(s.T())
@@ -917,7 +919,7 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.NotNil(out)
 		mockV1Client.AssertExpectations(s.T())
@@ -1000,7 +1002,7 @@ deployment:
 		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, errTest).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errTest)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -1068,7 +1070,7 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
@@ -1124,7 +1126,7 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
@@ -1197,7 +1199,7 @@ deployment:
 		canCiCdDeploy = func(string) bool { return true }
 		filePath = writeDeploymentFile(s.T(), data)
 		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeDEDICATED, astrov1.GetDeploymentOptionsParamsCloudProviderGCP, true, &deploymentResponse)
-		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.Require().NoError(err)
 		s.JSONEq(fmt.Sprintf(`{
 			"type": "DEDICATED",
@@ -1335,7 +1337,7 @@ deployment:
 `
 		filePath = writeDeploymentFile(s.T(), data)
 		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeDEDICATED, "", true, &deploymentResponseRemoteExecution)
-		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.Require().NoError(err)
 		s.JSONEq(fmt.Sprintf(`{
 			"type": "DEDICATED",
@@ -1471,10 +1473,10 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
-		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
-		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
+		s.Contains(out.String(), "\"configuration\":{\"name\":\"test-deployment-label\"")
+		s.Contains(out.String(), "\"metadata\":{\"deployment_id\":\"test-deployment-id\"")
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("reads the json file and creates a hosted standard deployment", func() {
@@ -1554,7 +1556,7 @@ deployment:
 		deploymentResponse.JSON200.Type = &standardType
 		filePath = writeDeploymentFile(s.T(), data)
 		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeSTANDARD, astrov1.GetDeploymentOptionsParamsCloudProviderAWS, false, &deploymentResponse)
-		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.Require().NoError(err)
 		s.JSONEq(fmt.Sprintf(`{
 			"type": "STANDARD",
@@ -1620,9 +1622,9 @@ deployment:
 			},
 			"workerQueues": %s
 		}`, hostedQueuesJSON), requestJSON(s.T(), sent.updated))
-		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
-		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
-		s.Contains(out.String(), "\"is_development_mode\": true")
+		s.Contains(out.String(), "\"configuration\":{\"name\":\"test-deployment-label\"")
+		s.Contains(out.String(), "\"metadata\":{\"deployment_id\":\"test-deployment-id\"")
+		s.Contains(out.String(), "\"is_development_mode\":true")
 	})
 	s.Run("reads the json file and creates a hosted standard deployment with astro executor", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -1702,7 +1704,7 @@ deployment:
 		deploymentResponse.JSON200.Executor = &executorAstro
 		filePath = writeDeploymentFile(s.T(), data)
 		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeSTANDARD, astrov1.GetDeploymentOptionsParamsCloudProviderAWS, false, &deploymentResponse)
-		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.Require().NoError(err)
 		s.JSONEq(fmt.Sprintf(`{
 			"type": "STANDARD",
@@ -1768,10 +1770,10 @@ deployment:
 			},
 			"workerQueues": %s
 		}`, hostedQueuesJSON), requestJSON(s.T(), sent.updated))
-		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
-		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
-		s.Contains(out.String(), "\"is_development_mode\": true")
-		s.Contains(out.String(), "\"executor\": \"ASTRO\"")
+		s.Contains(out.String(), "\"configuration\":{\"name\":\"test-deployment-label\"")
+		s.Contains(out.String(), "\"metadata\":{\"deployment_id\":\"test-deployment-id\"")
+		s.Contains(out.String(), "\"is_development_mode\":true")
+		s.Contains(out.String(), "\"executor\":\"ASTRO\"")
 	})
 	s.Run("returns an error if listing workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -1830,7 +1832,7 @@ deployment:
 		defer afero.NewOsFs().Remove(filePath)
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&EmptyListWorkspacesResponseOK, errTest).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errTest)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -1892,7 +1894,7 @@ deployment:
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(1)
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorContains(err, "deployment: test-deployment-label already exists: use deployment update --deployment-file deployment.yaml instead")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -1970,7 +1972,7 @@ deployment:
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.Error(err)
 		s.ErrorContains(err, "worker queue option is invalid: worker concurrency")
 		mockV1Client.AssertExpectations(s.T())
@@ -2054,7 +2056,7 @@ deployment:
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(1)
 		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, errCreateFailed).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errCreateFailed)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2120,7 +2122,7 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2175,7 +2177,7 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2262,7 +2264,7 @@ deployment:
 		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2346,12 +2348,85 @@ deployment:
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
 		mockV1Client.AssertExpectations(s.T())
+	})
+	// remoteExecutionUpdate runs `deployment update --deployment-file` for a
+	// dedicated deployment whose remote execution is on, from a file that
+	// carries remoteExecutionSection in its configuration, and returns the
+	// update request it sent.
+	remoteExecutionUpdate := func(remoteExecutionSection string) astrov1.UpdateDeploymentRequest {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		path := writeDeploymentFile(s.T(), `
+deployment:
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 3.0-1
+    executor: AstroExecutor
+    scheduler_size: small
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+    deployment_type: DEDICATED
+`+remoteExecutionSection)
+		var updated astrov1.UpdateDeploymentRequest
+		mockV1Client.On("ListClustersWithResponse", mock.Anything, mockOrgID, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mockOrgID, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		// before the update, after it, and to inspect the result
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mockOrgID, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
+		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mockOrgID, "test-deployment-id", mock.Anything).Run(func(args mock.Arguments) {
+			updated = args.Get(3).(astrov1.UpdateDeploymentRequest)
+		}).Return(&mockUpdateDeploymentResponse, nil).Once()
+		// once before the update, once after it, and once to inspect the result
+		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mockOrgID, "test-deployment-id").Return(&deploymentResponseRemoteExecution, nil).Times(3)
+		mockV1Client.On("GetClusterWithResponse", mock.Anything, mockOrgID, clusterID).Return(&mockGetClusterResponse, nil).Once()
+		out := new(bytes.Buffer)
+		s.Require().NoError(CreateOrUpdate(path, "update", mockV1Client, out, echoTo(out), false, 0, false))
+		return updated
+	}
+	// what an update of the remote-execution deployment sends besides its
+	// remoteExecution, from either file remoteExecutionUpdate writes
+	const remoteExecutionUpdateJSON = `{
+		"type": "DEDICATED",
+		"name": "test-deployment-label",
+		"description": "description",
+		"workspaceId": "test-ws-id",
+		"executor": "ASTRO",
+		"schedulerSize": "SMALL",
+		"isCicdEnforced": false,
+		"isDagDeployEnabled": false,
+		"isHighAvailability": false,
+		"contactEmails": null,
+		"environmentVariables": [],
+		"remoteExecution": %s
+	}`
+	s.Run("an update from a file without remote_execution keeps the deployment's remote execution config", func() {
+		updated := remoteExecutionUpdate("")
+		s.JSONEq(fmt.Sprintf(remoteExecutionUpdateJSON, `{
+			"enabled": true,
+			"allowedIpAddressRanges": ["0.0.0.0/0"],
+			"taskLogBucket": "task-log-bucket",
+			"taskLogUrlPattern": "task-log-url-pattern"
+		}`), requestJSON(s.T(), updated))
+	})
+	s.Run("an update from a file with remote_execution sends the file's remote execution config", func() {
+		updated := remoteExecutionUpdate(`    remote_execution:
+      enabled: true
+      allowed_ip_address_ranges:
+        - 10.0.0.0/8
+      task_log_bucket: other-bucket
+      task_log_url_pattern: other-pattern
+`)
+		s.JSONEq(fmt.Sprintf(remoteExecutionUpdateJSON, `{
+			"enabled": true,
+			"allowedIpAddressRanges": ["10.0.0.0/8"],
+			"taskLogBucket": "other-bucket",
+			"taskLogUrlPattern": "other-pattern"
+		}`), requestJSON(s.T(), updated))
 	})
 	s.Run("return an error when enabling dag deploy for ci-cd enforced deployment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -2424,7 +2499,7 @@ deployment:
 			return false
 		}
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		defer testUtil.MockUserInput(s.T(), "n")()
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
@@ -2500,7 +2575,7 @@ deployment:
 			return false
 		}
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, true)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, true)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
@@ -2585,7 +2660,7 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "test-deployment-label")
 		s.Contains(out.String(), "description 1")
@@ -2675,7 +2750,7 @@ deployment:
 		)).Return(&mockUpdateDeploymentResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, out, echoTo(out), false, 0*time.Second, false)
 		s.NoError(err)
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "\n        description: description 1")
@@ -2742,7 +2817,7 @@ deployment:
 		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(2)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorContains(err, "deployment: test-deployment-label does not exist: use deployment create --deployment-file deployment.yaml instead")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2821,7 +2896,7 @@ deployment:
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.Error(err)
 		s.ErrorContains(err, "worker queue option is invalid: worker concurrency")
 		mockV1Client.AssertExpectations(s.T())
@@ -2902,7 +2977,7 @@ deployment:
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, errUpdateFailed).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 
-		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, nil, false, 0*time.Second, false)
+		err = CreateOrUpdate("deployment.yaml", "update", mockV1Client, nil, echoTo(nil), false, 0*time.Second, false)
 		s.ErrorIs(err, errUpdateFailed)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -2929,7 +3004,8 @@ type sentRequests struct {
 // create and update bodies. A dedicated deployment also looks its cluster
 // up, by name before the create and by id when inspecting the result.
 // optionsType and optionsCloud are what the create's GetDeploymentOptions
-// call must carry; the two worker-queue validations ask with no parameters.
+// call must carry, an empty optionsCloud meaning no cloudProvider at all; the
+// two worker-queue validations ask with no parameters.
 // inspected is what GetDeployment returns once the deployment exists.
 func expectHostedCreateFromFile(client *astrov1_mocks.ClientWithResponsesInterface, optionsType astrov1.GetDeploymentOptionsParamsDeploymentType, optionsCloud astrov1.GetDeploymentOptionsParamsCloudProvider, dedicated bool, inspected *astrov1.GetDeploymentResponse) *sentRequests {
 	sent := &sentRequests{}
@@ -2946,6 +3022,9 @@ func expectHostedCreateFromFile(client *astrov1_mocks.ClientWithResponsesInterfa
 		return p.DeploymentType == nil && p.CloudProvider == nil
 	})).Return(&GetDeploymentOptionsResponseOK, nil).Twice()
 	client.On("GetDeploymentOptionsWithResponse", mock.Anything, mockOrgID, mock.MatchedBy(func(p *astrov1.GetDeploymentOptionsParams) bool {
+		if optionsCloud == "" {
+			return p.DeploymentType != nil && *p.DeploymentType == optionsType && p.CloudProvider == nil
+		}
 		return p.DeploymentType != nil && *p.DeploymentType == optionsType && p.CloudProvider != nil && *p.CloudProvider == optionsCloud
 	})).Return(&GetDeploymentOptionsResponseOK, nil).Once()
 	client.On("CreateDeploymentWithResponse", mock.Anything, mockOrgID, mock.Anything).Run(func(args mock.Arguments) {
@@ -2957,6 +3036,14 @@ func expectHostedCreateFromFile(client *astrov1_mocks.ClientWithResponsesInterfa
 	// once before the update, once after it, and once to inspect the result
 	client.On("GetDeploymentWithResponse", mock.Anything, mockOrgID, "test-deployment-id").Return(inspected, nil).Times(3)
 	return sent
+}
+
+// echoTo is the Echo a test hands CreateOrUpdate: a stand-in for the
+// command's Renderer that writes to out, in json mode for a JSON file.
+func echoTo(out io.Writer) Echo {
+	return func(fromJSON bool) output.Emitter {
+		return testUtil.Renderer{JSON: fromJSON, Out: out}
+	}
 }
 
 // requestJSON renders a request body as the JSON the client would send.

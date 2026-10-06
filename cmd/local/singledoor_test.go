@@ -31,9 +31,10 @@ import (
 //     jsoncolor.NewEncoder, which colors the same output on a terminal
 //   - under any local name either import is bound to, alias or not
 //   - anywhere in this package, in cmd/cliout, where Emit lives, and in the
-//     two renderers below cmd/ that the Astro tree hands its Renderer to
-//     (pkg/output and internal/platform/astro/env), including at file scope,
-//     not only inside funcs
+//     renderers below cmd/ that the Astro tree hands its Renderer to
+//     (pkg/output, internal/platform/astro/env, and the deployment inspect
+//     and deployment-file packages), including at file scope, not only
+//     inside funcs
 //   - everywhere except the body of Renderer.emit, the one method Emit and
 //     EmitEvent both lead through
 //
@@ -52,6 +53,8 @@ func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 		filepath.Join("..", "cliout"),
 		filepath.Join("..", "..", "pkg", "output"),
 		filepath.Join("..", "..", "internal", "platform", "astro", "env"),
+		filepath.Join("..", "..", "internal", "platform", "astro", "deployment", "inspect"),
+		filepath.Join("..", "..", "internal", "platform", "astro", "deployment", "fromfile"),
 	} {
 		entries, err := os.ReadDir(dir)
 		require.NoError(t, err)

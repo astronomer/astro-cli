@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/output"
 )
 
 var (
@@ -38,7 +39,6 @@ var (
 )
 
 const (
-	jsonFormat      = "json"
 	createAction    = "create"
 	updateAction    = "update"
 	defaultQueue    = "default"
@@ -48,21 +48,26 @@ const (
 	standardType    = "STANDARD"
 )
 
+// Echo is how CreateOrUpdate prints the deployment it made or changed: it
+// returns the command's Renderer, in json mode when the file it read was JSON
+// and printing the deployment's YAML otherwise.
+type Echo func(fromJSON bool) output.Emitter
+
 // CreateOrUpdate takes a file and creates a deployment with the confiuration specified in the file.
 // inputFile can be in yaml or json format
 // It returns an error if any required information is missing or incorrectly specified.
-func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, out io.Writer, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
+func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, out io.Writer, echo Echo, waitForStatus bool, waitTime time.Duration, force bool) error { //nolint:gocognit // v1 complexity, refactor tracked separately
 	var (
-		err                                           error
-		errHelp, clusterID, workspaceID, outputFormat string
-		dataBytes                                     []byte
-		formattedDeployment                           inspect.FormattedDeployment
-		existingDeployment                            astrov1.Deployment
-		existingDeployments                           []astrov1.Deployment
-		nodePools                                     []astrov1.NodePool
-		jsonOutput                                    bool
-		dagDeploy                                     bool
-		envVars                                       []astrov1.DeploymentEnvironmentVariableRequest
+		err                             error
+		errHelp, clusterID, workspaceID string
+		dataBytes                       []byte
+		formattedDeployment             inspect.FormattedDeployment
+		existingDeployment              astrov1.Deployment
+		existingDeployments             []astrov1.Deployment
+		nodePools                       []astrov1.NodePool
+		jsonOutput                      bool
+		dagDeploy                       bool
+		envVars                         []astrov1.DeploymentEnvironmentVariableRequest
 	)
 
 	// get file contents as []byte
@@ -180,10 +185,8 @@ func CreateOrUpdate(inputFile, action string, astroV1Client astrov1.APIClient, o
 	if err != nil {
 		return err
 	}
-	if jsonOutput {
-		outputFormat = jsonFormat
-	}
-	return inspect.Inspect(workspaceID, "", existingDeployment.Id, outputFormat, astroV1Client, out, "", false, true)
+	// echo the deployment in the format of the file it came from
+	return inspect.Print(workspaceID, "", existingDeployment.Id, astroV1Client, out, echo(jsonOutput), "", false, true)
 }
 
 // createOrUpdateDeployment transforms an inspect.FormattedDeployment into a v1 CreateDeploymentInput or
@@ -291,7 +294,11 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 
 			deploymentOptionsParams := astrov1.GetDeploymentOptionsParams{
 				DeploymentType: &coreDeploymentType,
-				CloudProvider:  &coreCloudProvider,
+			}
+			// a file without a cloud_provider asks without one, rather than
+			// for the empty cloudProvider no API accepts
+			if coreCloudProvider != "" {
+				deploymentOptionsParams.CloudProvider = &coreCloudProvider
 			}
 
 			configOption, err := deployment.GetDeploymentOptions("", deploymentOptionsParams, astroV1Client)
@@ -541,11 +548,23 @@ func createOrUpdateDeployment(deploymentFromFile *inspect.FormattedDeployment, c
 		resourceQuotaMemory := deployment.UpdateResourceQuotaMemory(deploymentFromFile.Deployment.Configuration.ResourceQuotaMemory, existingDeployment)
 		var remoteExecution *astrov1.DeploymentRemoteExecutionRequest
 		if deployment.IsRemoteExecutionEnabled(existingDeployment) {
-			remoteExecution = &astrov1.DeploymentRemoteExecutionRequest{
-				Enabled:                true,
-				AllowedIpAddressRanges: deploymentFromFile.Deployment.Configuration.RemoteExecution.AllowedIPAddressRanges,
-				TaskLogBucket:          deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogBucket,
-				TaskLogUrlPattern:      deploymentFromFile.Deployment.Configuration.RemoteExecution.TaskLogURLPattern,
+			if fromFile := deploymentFromFile.Deployment.Configuration.RemoteExecution; fromFile != nil {
+				remoteExecution = &astrov1.DeploymentRemoteExecutionRequest{
+					Enabled:                true,
+					AllowedIpAddressRanges: fromFile.AllowedIPAddressRanges,
+					TaskLogBucket:          fromFile.TaskLogBucket,
+					TaskLogUrlPattern:      fromFile.TaskLogURLPattern,
+				}
+			} else {
+				// a file that leaves remote_execution out keeps the
+				// Deployment's: the update sends what it already has
+				existing := existingDeployment.RemoteExecution
+				remoteExecution = &astrov1.DeploymentRemoteExecutionRequest{
+					Enabled:                true,
+					AllowedIpAddressRanges: &existing.AllowedIpAddressRanges,
+					TaskLogBucket:          existing.TaskLogBucket,
+					TaskLogUrlPattern:      existing.TaskLogUrlPattern,
+				}
 			}
 		}
 		if deployment.IsDeploymentStandard(deploymentType) {

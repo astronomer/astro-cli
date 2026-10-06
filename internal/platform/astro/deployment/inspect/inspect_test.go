@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -259,20 +260,12 @@ func errReturningYAMLMarshal(v interface{}) ([]byte, error) {
 	return []byte{}, errMarshal
 }
 
-func errReturningJSONMarshal(v interface{}, prefix, indent string) ([]byte, error) {
-	return []byte{}, errMarshal
-}
-
 func errorReturningDecode(input, output interface{}) error {
 	return errMarshal
 }
 
 func restoreDecode(replace func(input, output interface{}) error) {
 	decodeToStruct = replace
-}
-
-func restoreJSONMarshal(replace func(v interface{}, prefix, indent string) ([]byte, error)) {
-	jsonMarshal = replace
 }
 
 func restoreYAMLMarshal(replace func(v interface{}) ([]byte, error)) {
@@ -292,7 +285,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
@@ -305,7 +298,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", true, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
@@ -318,7 +311,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "json", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "json", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
@@ -331,7 +324,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "json", mockV1Client, out, "", true, false)
+		err := printAs(workspaceID, deploymentID, "json", mockV1Client, out, "", true, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
 		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
@@ -344,7 +337,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "configuration.cluster_name", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.cluster_name", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), *deploymentResponse.ClusterName)
 		mockV1Client.AssertExpectations(t)
@@ -356,7 +349,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", "", "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, "", "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentName)
 		mockV1Client.AssertExpectations(t)
@@ -366,7 +359,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, errGetDeployment).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -374,7 +367,7 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -384,7 +377,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "no-exist-information", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "no-exist-information", false, false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, "", out.String())
 		mockV1Client.AssertExpectations(t)
@@ -398,7 +391,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorIs(t, err, errMarshal)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -406,7 +399,7 @@ func TestInspect(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		out := new(bytes.Buffer)
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 		mockV1Client.AssertExpectations(t)
 	})
@@ -421,7 +414,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err = Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err = printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "N/A")
 		assert.Contains(t, out.String(), deploymentName)
@@ -433,7 +426,7 @@ func TestInspect(t *testing.T) {
 	t.Run("when no deployments in workspace", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
-		err := Inspect(workspaceID, "", "", "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, "", "yaml", mockV1Client, out, "", false, false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -444,7 +437,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, out.String(), "")
 		mockV1Client.AssertExpectations(t)
@@ -456,7 +449,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, true)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, true)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), workloadIdentity)
 		mockV1Client.AssertExpectations(t)
@@ -480,7 +473,7 @@ func TestInspectRemoteExecutionAPIURL(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&resp, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Maybe()
 		out := new(bytes.Buffer)
-		err := Inspect("test-ws-id", "", deploymentID, outputFormat, mockV1Client, out, requestedField, template, false)
+		err := printAs("test-ws-id", deploymentID, outputFormat, mockV1Client, out, requestedField, template, false)
 		mockV1Client.AssertExpectations(t)
 		return out.String(), err
 	}
@@ -1300,7 +1293,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		// testing we get valid json
 		err = json.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
 		assert.NoError(t, err)
-		assert.Equal(t, expectedDeployment, string(actualPrintableDeployment), "tag and order should match")
+		assert.Equal(t, compactJSON(t, expectedDeployment), string(actualPrintableDeployment), "tag and order should match")
 	})
 	t.Run("returns an error if decoding to struct fails", func(t *testing.T) {
 		originalDecode := decodeToStruct
@@ -1325,19 +1318,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
 		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
-		assert.ErrorIs(t, err, errMarshal)
-		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
-	})
-	t.Run("returns an error if marshaling json fails", func(t *testing.T) {
-		originalMarshal := jsonMarshal
-		jsonMarshal = errReturningJSONMarshal
-		defer restoreJSONMarshal(originalMarshal)
-		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
-		assert.NoError(t, err)
-		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
-		expectedPrintableDeployment = []byte{}
-		actualPrintableDeployment, err := formatPrintableDeployment("json", false, getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
@@ -1568,18 +1548,34 @@ func TestGetTemplate(t *testing.T) {
 	})
 }
 
-// formatPrintableDeployment is the bytes Inspect prints for a printable map,
-// without the newline it ends them with: the pieces Print composes, through
-// the deployment-file echo's Emitter, which is the one path that still holds
-// the four-space JSON these tests pin.
+// formatPrintableDeployment is the bytes Print hands its Renderer for a
+// printable map, without the newline it ends them with: the YAML, or with
+// outputFormat "json" the value a stand-in for the Renderer encodes compactly,
+// as the CLI's one encoder does off a terminal.
 func formatPrintableDeployment(outputFormat string, template bool, printableDeployment map[string]interface{}) ([]byte, error) {
 	formatted, err := formatDeployment(template, printableDeployment)
 	if err != nil {
 		return []byte{}, err
 	}
 	var buf bytes.Buffer
-	if err := (fileEcho{json: outputFormat == jsonFormat, out: &buf}).Emit(formatted, writeYAML(&formatted)); err != nil {
+	if err := (testUtil.Renderer{JSON: outputFormat == "json", Out: &buf}).Emit(formatted, writeYAML(&formatted)); err != nil {
 		return []byte{}, err
 	}
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+}
+
+// printAs runs Print the way a command does, with a stand-in for its
+// Renderer in json mode when outputFormat is "json".
+func printAs(wsID, deploymentID, outputFormat string, astroV1Client astrov1.APIClient, out io.Writer, requestedField string, template, showWorkloadIdentity bool) error {
+	r := testUtil.Renderer{JSON: outputFormat == "json", Out: out}
+	return Print(wsID, "", deploymentID, astroV1Client, out, r, requestedField, template, showWorkloadIdentity)
+}
+
+// compactJSON is s on one line, the layout formatPrintableDeployment's json
+// comes in.
+func compactJSON(t *testing.T, s string) string {
+	t.Helper()
+	var buf bytes.Buffer
+	require.NoError(t, json.Compact(&buf, []byte(s)))
+	return buf.String()
 }

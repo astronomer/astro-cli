@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -22,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -1151,6 +1154,43 @@ func TestDeploymentUpdate(t *testing.T) {
 		_, err := execDeploymentCmd("update", "--deployment-file", writeDeploymentFile(t))
 		assert.NoError(t, err)
 		m.AssertExpectations(t)
+	})
+	// The deployment an update from a file echoes, in the format of that
+	// file: its YAML, or a json result from the CLI's one encoder.
+	echoFromFile := func(t *testing.T, name string, data []byte) string {
+		t.Helper()
+		m := newCreateUpdateMock(t)
+		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
+		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		path := filepath.Join(t.TempDir(), name)
+		require.NoError(t, os.WriteFile(path, data, 0o600))
+		out, err := execDeploymentCmd("update", "--deployment-file", path)
+		require.NoError(t, err)
+		m.AssertExpectations(t)
+		return out
+	}
+	t.Run("echoes a deployment updated from a JSON file as one json result", func(t *testing.T) {
+		data, err := yaml.YAMLToJSON([]byte(deploymentFileYAML))
+		require.NoError(t, err)
+		out := echoFromFile(t, "test-deployment.json", data)
+		// a result, and a test's stdout is not a terminal: one compact line
+		assert.Equal(t, 1, strings.Count(out, "\n"), out)
+		assert.True(t, strings.HasPrefix(out, `{"deployment":{`), out)
+		var echoed inspect.FormattedDeployment
+		require.NoError(t, json.Unmarshal([]byte(out), &echoed))
+		assert.Equal(t, deploymentResponse.JSON200.Name, echoed.Deployment.Configuration.Name)
+	})
+	t.Run("echoes a deployment updated from a YAML file as YAML", func(t *testing.T) {
+		out := echoFromFile(t, "test-deployment.yaml", []byte(deploymentFileYAML))
+		assert.True(t, strings.HasPrefix(out, "deployment:\n"), out)
+		var echoed inspect.FormattedDeployment
+		require.NoError(t, yaml.Unmarshal([]byte(out), &echoed))
+		assert.Equal(t, deploymentResponse.JSON200.Name, echoed.Deployment.Configuration.Name)
 	})
 	t.Run("returns an error if updating a deployment from file fails", func(t *testing.T) {
 		newCreateUpdateMock(t)
