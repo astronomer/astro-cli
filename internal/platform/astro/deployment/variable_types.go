@@ -12,6 +12,8 @@ package deployment
 // The shape follows pkg/checks (Result and Finding): one record per thing that happened, plus
 // the counts the caller needs to render a summary and pick an exit code.
 
+import "encoding/json"
+
 // VariableOutcomeKind is what happened to one input.
 type VariableOutcomeKind string
 
@@ -28,9 +30,9 @@ const (
 )
 
 // VariableOutcome is what happened to one input key. It is the unit the cmd
-// layer renders as one line of text. The json tags are for a structured
-// caller; these commands have no --output json yet. Fields not relevant to a
-// Kind stay zero and omit from JSON.
+// layer renders as one line of text, and one entry of the "outcomes" that
+// `--output json` publishes. Fields not relevant to a Kind stay zero and omit
+// from JSON.
 type VariableOutcome struct {
 	Kind VariableOutcomeKind `json:"kind"`
 	// Key is the variable this is about. Empty when the input carried no
@@ -47,9 +49,24 @@ type VariableOutcome struct {
 // Value is never carried: the API does not return it, and a masked string is a
 // rendering decision that belongs in cmd.
 type VariableInfo struct {
-	Key      string `json:"key"`
-	Value    string `json:"value,omitempty"`
-	IsSecret bool   `json:"is_secret"`
+	Key      string
+	Value    string
+	IsSecret bool
+}
+
+// MarshalJSON always publishes value: the string for a plain variable, even
+// an empty one, and null for a secret. Omitting it when empty made `KEY=""`
+// indistinguishable from a secret, and a script reading value broke on it.
+func (v VariableInfo) MarshalJSON() ([]byte, error) {
+	var value *string
+	if !v.IsSecret {
+		value = &v.Value
+	}
+	return json.Marshal(struct {
+		Key      string  `json:"key"`
+		Value    *string `json:"value"`
+		IsSecret bool    `json:"is_secret"`
+	}{v.Key, value, v.IsSecret})
 }
 
 // DeploymentVariables is a Deployment's environment variables, in the order

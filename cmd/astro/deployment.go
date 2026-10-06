@@ -562,6 +562,7 @@ func newDeploymentVariableRootCmd(out io.Writer) *cobra.Command {
 
 For variables shared across deployments or scoped to a workspace, see 'astro env variable'.`,
 	}
+	cliout.AddOutputFlag(cmd, &deploymentVariableOutput)
 	cmd.AddCommand(
 		newDeploymentVariableListCmd(out),
 		newDeploymentVariableCreateCmd(out),
@@ -928,6 +929,12 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
+	format, err := cliout.ParseFormat(deploymentVariableOutput)
+	if err != nil {
+		return err
+	}
+	defer strayStdoutToStderr(format)()
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -940,49 +947,41 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	if useEnvFile {
-		fmt.Fprintf(out, "\nThe following environment variables were saved to the file %s,\nsecret environment variables were saved only with a key:\n\n", envFile)
-	}
-	renderVariables(out, vars.Variables, "No variables found")
-	return nil
+	return emitVariableList(cmd, cliout.Renderer{Format: format, Out: out}, vars)
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid Workspace")
-	}
-
-	variableList := args
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	res, err := deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile,
-		deploymentName, variableList, useEnvFile, makeSecret, false, astroV1Client)
-	if err != nil {
-		return err
-	}
-	return renderVariableModify(out, res)
+	return deploymentVariableModify(cmd, args, out, false, "failed to find a valid Workspace")
 }
 
 func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+	return deploymentVariableModify(cmd, args, out, true, "failed to find a valid workspace")
+}
+
+// deploymentVariableModify is create and update, which differ only in whether
+// an existing key takes the new value, and in the capital of their workspace
+// error, which is kept as it was.
+func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, update bool, wsErr string) error {
+	format, err := cliout.ParseFormat(deploymentVariableOutput)
+	if err != nil {
+		return err
+	}
+	defer strayStdoutToStderr(format)()
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
+		return errors.Wrap(err, wsErr)
 	}
-
-	variableList := args
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
 	res, err := deployment.VariableModify(deploymentID, variableKey, variableValue, ws, envFile,
-		deploymentName, variableList, useEnvFile, makeSecret, true, astroV1Client)
+		deploymentName, args, useEnvFile, makeSecret, update, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return renderVariableModify(out, res)
+	return emitVariableModify(cliout.Renderer{Format: format, Out: out}, res)
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernating bool) error {

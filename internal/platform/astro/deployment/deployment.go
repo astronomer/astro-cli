@@ -2013,7 +2013,7 @@ var SelectDeployment = func(deployments []astrov1.Deployment, message string) (a
 
 	// Refused before the table is drawn, so a run that may not ask writes
 	// nothing of the question either. The picker reads its answer itself.
-	if err := input.MayAsk(message, input.About("a Deployment")); err != nil {
+	if err := input.MayAsk(message, input.About("a Deployment"), input.AnsweredBy("--deployment")); err != nil {
 		return astrov1.Deployment{}, err
 	}
 

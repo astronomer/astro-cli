@@ -94,7 +94,9 @@ func VariableModify(
 		oldKeyList = append(oldKeyList, oldEnvironmentVariables[i].Key)
 	}
 
-	result := &VariableModifyResult{}
+	// Both lists start empty rather than nil: they are published as json, where
+	// a list is always an array, never null.
+	result := &VariableModifyResult{Outcomes: []VariableOutcome{}, Variables: []VariableInfo{}}
 
 	switch {
 	case variableKey != "" && variableValue != "":
