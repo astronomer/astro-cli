@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	semver "github.com/Masterminds/semver/v3"
@@ -906,11 +907,14 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
 		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
 		s.NoError(err)
-		expected := `#     AIRFLOW VERSION                  
-1     Astronomer-Certified-1.10.7      
-2     Astronomer-Certified-1.10.10     
-3     Astronomer-Certified-1.10.12     
- NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION                    
+		rows, rest := s.picked(buf.String())
+		s.Equal([][]string{
+			{"#", "AIRFLOW", "VERSION"},
+			{"1", "Astronomer-Certified-1.10.7"},
+			{"2", "Astronomer-Certified-1.10.10"},
+			{"3", "Astronomer-Certified-1.10.12"},
+		}, rows)
+		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION                    
  test     burning-terrestrial-5940     v0.0.0     ckggzqj5f4157qtc9lescmehm     Astronomer-Certified-1.10.10     
 
 The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.
@@ -918,7 +922,7 @@ To cancel, run:
  $ astro deployment airflow upgrade --cancel
 
 `
-		s.Equal(expected, buf.String())
+		s.Equal(expected, rest)
 		api.AssertExpectations(s.T())
 	})
 }
@@ -1035,13 +1039,28 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
 		s.NoError(err)
-		expected := `#     AVAILABLE KUBERNETES NAMESPACES     
-1     test1                               
-2     test2                               
-`
-		s.Equal(expected, buf.String())
+		rows, rest := s.picked(buf.String())
+		s.Equal([][]string{{"#", "AVAILABLE", "KUBERNETES", "NAMESPACES"}, {"1", "test1"}, {"2", "test2"}}, rows)
+		s.Empty(rest)
 		s.Equal("test1", name)
 		api.AssertExpectations(s.T())
+	})
+
+	// Not a number is a parse failure; a number that is no row, or one
+	// spelled other than plainly, is out of range. Neither indexes the list.
+	s.Run("an answer that is no row", func() {
+		for answer, want := range map[string]error{
+			"x\n":  ErrParsingInt{in: "x"},
+			"01\n": ErrParsingInt{in: "01"},
+			"0\n":  ErrNumberOutOfRange,
+			"3\n":  ErrNumberOutOfRange,
+		} {
+			api := new(mocks.ClientInterface)
+			api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
+			testUtil.MockUserInput(s.T(), answer)
+			_, err := getDeploymentSelectionNamespaces(api, new(bytes.Buffer), "testClusterID")
+			s.Equal(want, err, "answer %q", answer)
+		}
 	})
 
 	s.Run("no namespace", func() {
@@ -1306,9 +1325,9 @@ To cancel, run:
 		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
 		s.NoError(err)
-		expected := `#     RUNTIME VERSION     
-1     Runtime-4.2.5       
- NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
+		rows, rest := s.picked(buf.String())
+		s.Equal([][]string{{"#", "RUNTIME", "VERSION"}, {"1", "Runtime-4.2.5"}}, rows)
+		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
  test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
 
 The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.
@@ -1316,7 +1335,7 @@ To cancel, run:
  $ astro deployment runtime upgrade --cancel
 
 `
-		s.Equal(expected, buf.String())
+		s.Equal(expected, rest)
 		api.AssertExpectations(s.T())
 	})
 }
@@ -1631,4 +1650,15 @@ func (s *Suite) TestMeetsRuntimeUpgradeReqs() {
 			}
 		})
 	}
+}
+
+// picked splits what a picker wrote from what followed it: the cells of each
+// line of its table, and the rest of out after its "> " prompt.
+func (s *Suite) picked(out string) (rows [][]string, rest string) {
+	table, rest, found := strings.Cut(out, "\n\n> ")
+	s.Require().True(found, "no picker prompt in %q", out)
+	for _, line := range strings.Split(table, "\n") {
+		rows = append(rows, strings.Fields(line))
+	}
+	return rows, rest
 }

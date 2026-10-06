@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -125,13 +127,6 @@ func GetCurrentWorkspace() (string, error) {
 }
 
 var GetWorkspaceSelectionID = func(client houston.ClientInterface, out io.Writer) (string, error) {
-	tab := printutil.Table{
-		Padding:        []int{5, 44, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-
 	var c config.Context
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -143,26 +138,19 @@ var GetWorkspaceSelectionID = func(client houston.ClientInterface, out io.Writer
 		return "", err
 	}
 
-	deployMap := map[string]houston.Workspace{}
-	for i := range ws {
-		index := i + 1
-
-		color := c.Workspace == ws[i].ID
-		tab.AddRow([]string{strconv.Itoa(index), ws[i].Label, ws[i].ID}, color)
-
-		deployMap[strconv.Itoa(index)] = ws[i]
+	list := picker.List{
+		Header:  []string{"NAME", "ID"},
+		Ask:     []input.Option{input.About("a workspace")},
+		Invalid: errInvalidWorkspaceKey,
 	}
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", input.About("a workspace"))
+	for i := range ws {
+		list.AddRow(c.Workspace == ws[i].ID, ws[i].Label, ws[i].ID)
+	}
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	selected, ok := deployMap[choice]
-	if !ok {
-		return "", errInvalidWorkspaceKey
-	}
-
-	return selected.ID, nil
+	return ws[i].ID, nil
 }
 
 // workspacesPromptPaginatedOption Show pagination option based on page size and total record

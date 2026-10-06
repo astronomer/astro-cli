@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -328,38 +329,20 @@ func RemoveWorkspaceTeam(id, workspaceID string, out io.Writer, client astrov1.A
 }
 
 func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
-	table := printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"#", "TEAMNAME", "ID"},
+	list := picker.List{
+		Title:   "\nPlease select a team:",
+		Header:  []string{"TEAMNAME", "ID"},
+		Ask:     []input.Option{input.About("a team")},
+		Invalid: ErrInvalidTeamKey,
 	}
-
-	about := input.About("a team")
-	if err := input.MayAsk("\n> ", about); err != nil {
-		return astrov1.Team{}, err
-	}
-	fmt.Println("\nPlease select a team:")
-
-	teamMap := map[string]astrov1.Team{}
 	for i := range teams {
-		index := i + 1
-		table.AddRow([]string{
-			strconv.Itoa(index),
-			teams[i].Name,
-			teams[i].Id,
-		}, false)
-		teamMap[strconv.Itoa(index)] = teams[i]
+		list.AddRow(false, teams[i].Name, teams[i].Id)
 	}
-
-	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", about)
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return astrov1.Team{}, err
 	}
-	selected, ok := teamMap[choice]
-	if !ok {
-		return astrov1.Team{}, ErrInvalidTeamKey
-	}
-	return selected, nil
+	return teams[i], nil
 }
 
 // listTeams paginates through GET /teams with optional workspaceId/deploymentId filters.
@@ -689,44 +672,24 @@ func AddUser(teamID, userID string, force bool, out io.Writer, client astrov1.AP
 }
 
 func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, error) {
-	table := printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"#", "FULLNAME", "EMAIL", "ID"},
+	list := picker.List{
+		Title:   "\nPlease select the teamMember who's membership you'd like to modify:",
+		Header:  []string{"FULLNAME", "EMAIL", "ID"},
+		Ask:     []input.Option{input.About("a team member")},
+		Invalid: ErrInvalidTeamMemberKey,
 	}
-
-	about := input.About("a team member")
-	if err := input.MayAsk("\n> ", about); err != nil {
-		return astrov1.TeamMember{}, err
-	}
-	fmt.Println("\nPlease select the teamMember who's membership you'd like to modify:")
-
-	teamMemberMap := map[string]astrov1.TeamMember{}
 	for i := range teamMembers {
-		index := i + 1
 		var fullName string
 		if teamMembers[i].FullName != nil {
 			fullName = *teamMembers[i].FullName
 		}
-
-		table.AddRow([]string{
-			strconv.Itoa(index),
-			fullName,
-			teamMembers[i].Username,
-			teamMembers[i].UserId,
-		}, false)
-		teamMemberMap[strconv.Itoa(index)] = teamMembers[i]
+		list.AddRow(false, fullName, teamMembers[i].Username, teamMembers[i].UserId)
 	}
-
-	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", about)
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return astrov1.TeamMember{}, err
 	}
-	selected, ok := teamMemberMap[choice]
-	if !ok {
-		return astrov1.TeamMember{}, ErrInvalidTeamMemberKey
-	}
-	return selected, nil
+	return teamMembers[i], nil
 }
 
 func ListTeamUsers(teamID string, out io.Writer, client astrov1.APIClient) (err error) {

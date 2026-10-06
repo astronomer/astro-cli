@@ -3,7 +3,6 @@ package astro
 import (
 	"io"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -14,7 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var (
@@ -744,33 +743,17 @@ func coalesceWorkspace() (string, error) {
 }
 
 func selectWorkspaceRole() (string, error) {
-	tokenRolesMap := map[string]string{}
-	tab := &printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "ROLE"},
+	list := picker.List{
+		Header:  []string{"ROLE"},
+		Ask:     []input.Option{input.About("a role"), input.AnsweredBy("--role")},
+		Invalid: errInvalidWorkspaceRoleKey,
 	}
-	for i := range validWorkspaceRoles {
-		index := i + 1
-		tab.AddRow([]string{
-			strconv.Itoa(index),
-			validWorkspaceRoles[i],
-		}, false)
-		tokenRolesMap[strconv.Itoa(index)] = validWorkspaceRoles[i]
+	for _, role := range validWorkspaceRoles {
+		list.AddRow(false, role)
 	}
-
-	ask := []input.Option{input.About("a role"), input.AnsweredBy("--role")}
-	if err := input.MayAsk("\n> ", ask...); err != nil {
-		return "", err
-	}
-	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", ask...)
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	selected, ok := tokenRolesMap[choice]
-	if !ok {
-		return "", errInvalidWorkspaceRoleKey
-	}
-	return selected, nil
+	return validWorkspaceRoles[i], nil
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -15,7 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var (
@@ -165,12 +164,6 @@ func userRoleForScope(user astrov1.User, roleEntity, scopeID string) string { //
 }
 
 func SelectUser(users []astrov1.User, roleEntity string) (astrov1.User, error) {
-	// Refused before the table is drawn, so a run that cannot ask prints
-	// nothing it would then have to explain.
-	about := input.About("a user")
-	if err := input.MayAsk("\n> ", about); err != nil {
-		return astrov1.User{}, err
-	}
 	roleColumn := "ORGANIZATION ROLE"
 	switch roleEntity {
 	case "workspace":
@@ -179,39 +172,26 @@ func SelectUser(users []astrov1.User, roleEntity string) (astrov1.User, error) {
 		roleColumn = "DEPLOYMENT ROLE"
 	}
 
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"#", "FULLNAME", "EMAIL", "ID", roleColumn, "CREATE DATE"},
+	list := picker.List{
+		Title:   "\nPlease select the user:",
+		Header:  []string{"FULLNAME", "EMAIL", "ID", roleColumn, "CREATE DATE"},
+		Ask:     []input.Option{input.About("a user")},
+		Invalid: ErrInvalidUserKey,
 	}
-
-	fmt.Println("\nPlease select the user:")
-
-	userMap := map[string]astrov1.User{}
 	for i := range users {
-		index := i + 1
-		table.AddRow([]string{
-			strconv.Itoa(index),
+		list.AddRow(false,
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
 			userRoleForScope(users[i], roleEntity, ""),
 			users[i].CreatedAt.Format(time.RFC3339),
-		}, false)
-
-		userMap[strconv.Itoa(index)] = users[i]
+		)
 	}
-
-	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", about)
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return astrov1.User{}, err
 	}
-	selected, ok := userMap[choice]
-	if !ok {
-		return astrov1.User{}, ErrInvalidUserKey
-	}
-	return selected, nil
+	return users[i], nil
 }
 
 // GetOrgUsers returns a list of all organization users.

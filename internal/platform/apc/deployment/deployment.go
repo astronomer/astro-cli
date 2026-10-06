@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/settings"
 )
@@ -32,6 +33,9 @@ var (
 	errHostNotPresent                  = errors.New("git repository host not present in known hosts file")
 
 	ErrInvalidDeploymentKey = errors.New("invalid Deployment selected")
+
+	errInvalidAirflowVersionSelection = errors.New("invalid Airflow version selection")
+	errInvalidRuntimeVersionSelection = errors.New("invalid Runtime version selection")
 
 	errDeploymentNotOnRuntime     = errors.New("deployment is not using Runtime image, please migrate to Runtime image via `astro deployment runtime migrate` before trying to upgrade Runtime version")
 	errDeploymentNotOnAirflow     = errors.New("deployment is not using Airflow image, please make sure deployment is using Airflow image before trying to upgrade Airflow version")
@@ -227,14 +231,7 @@ func Unadopt(id string, client houston.ClientInterface, out io.Writer) error {
 
 // list all available namespaces
 func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Writer, clusterID string) (string, error) {
-	tab := &printutil.Table{
-		Padding:        []int{30},
-		DynamicPadding: true,
-		Header:         []string{"AVAILABLE KUBERNETES NAMESPACES"},
-	}
-
 	logger.Debug("checking namespaces available for platform")
-	tab.GetUserInput = true
 
 	names, err := houston.Call(client.GetAvailableNamespaces)(map[string]interface{}{"clusterID": clusterID})
 	if err != nil {
@@ -245,26 +242,24 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 		return "", ErrKubernetesNamespaceNotAvailable
 	}
 
-	for _, namespace := range names {
-		name := namespace.Name
-
-		tab.AddRow([]string{name}, false)
+	list := picker.List{
+		Header: []string{"AVAILABLE KUBERNETES NAMESPACES"},
+		Ask:    []input.Option{input.About("a Kubernetes namespace")},
+		InvalidAnswer: func(in string) error {
+			if n, err := strconv.Atoi(in); err != nil || strconv.Itoa(n) != in {
+				return ErrParsingInt{in: in}
+			}
+			return ErrNumberOutOfRange
+		},
 	}
-
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	in, err := input.Text("\n> ", input.About("a Kubernetes namespace"))
+	for _, namespace := range names {
+		list.AddRow(false, namespace.Name)
+	}
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	i, err := strconv.ParseInt(in, 10, 64)
-	if err != nil {
-		return "", ErrParsingInt{in: in}
-	}
-	if i > int64(len(names)) {
-		return "", ErrNumberOutOfRange
-	}
-	return names[i-1].Name, nil
+	return names[i].Name, nil
 }
 
 func getDeploymentNamespaceName() (string, error) {
@@ -607,35 +602,27 @@ func getAirflowVersionSelection(airflowVersion string, client houston.ClientInte
 	}
 	airflowVersions := config.AirflowVersions
 
-	t := &printutil.Table{
-		Padding:        []int{10},
-		DynamicPadding: true,
-		Header:         []string{"AIRFLOW VERSION"},
+	list := picker.List{
+		Header:  []string{"AIRFLOW VERSION"},
+		Ask:     []input.Option{input.About("an Airflow version"), input.AnsweredBy("--desired-airflow-version")},
+		Invalid: errInvalidAirflowVersionSelection,
 	}
-	t.GetUserInput = true
 
 	var filteredVersions []string
 
 	for _, v := range airflowVersions {
 		vv, _ := semver.NewVersion(v) //nolint:errcheck // error deliberately ignored in this shell code
-		// false means no colors
 		if currentAirflowVersion.LessThan(vv) {
 			filteredVersions = append(filteredVersions, v)
-			t.AddRow([]string{fmt.Sprintf("%s-%s", certifiedImageType, v)}, false)
+			list.AddRow(false, fmt.Sprintf("%s-%s", certifiedImageType, v))
 		}
 	}
 
-	t.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	in, err := input.Text("\n> ", input.About("an Airflow version"), input.AnsweredBy("--desired-airflow-version"))
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	i, err := strconv.ParseInt(in, 10, 64)
-	if err != nil {
-		return "", err
-	}
-	return filteredVersions[i-1], nil
+	return filteredVersions[i], nil
 }
 
 func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string, client houston.ClientInterface, out io.Writer) (string, error) {
@@ -656,12 +643,11 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string
 		return "", err
 	}
 
-	t := &printutil.Table{
-		Padding:        []int{10},
-		DynamicPadding: true,
-		Header:         []string{"RUNTIME VERSION"},
+	list := picker.List{
+		Header:  []string{"RUNTIME VERSION"},
+		Ask:     []input.Option{input.About("a Runtime version"), input.AnsweredBy("--desired-runtime-version")},
+		Invalid: errInvalidRuntimeVersionSelection,
 	}
-	t.GetUserInput = true
 
 	var filteredVersions []string
 
@@ -676,21 +662,15 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string
 		}
 		if currentRuntimeVersion.LessThan(runtimeVersion) && !currentAirflowVersion.GreaterThan(airflowVersion) {
 			filteredVersions = append(filteredVersions, v.Version)
-			t.AddRow([]string{fmt.Sprintf("%s-%s", runtimeImageType, v.Version)}, false)
+			list.AddRow(false, fmt.Sprintf("%s-%s", runtimeImageType, v.Version))
 		}
 	}
 
-	t.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	in, err := input.Text("\n> ", input.About("a Runtime version"), input.AnsweredBy("--desired-runtime-version"))
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	i, err := strconv.ParseInt(in, 10, 64)
-	if err != nil {
-		return "", err
-	}
-	return filteredVersions[i-1], nil
+	return filteredVersions[i], nil
 }
 
 func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error {
@@ -875,34 +855,22 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 		return deployments[0], nil
 	}
 
-	tab := printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
-	}
-
-	fmt.Println(message)
-
 	sort.Slice(deployments, func(i, j int) bool {
 		return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
 	})
 
-	deployMap := map[string]houston.Deployment{}
-	for i := range deployments {
-		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID}, false)
-
-		deployMap[strconv.Itoa(index)] = deployments[i]
+	list := picker.List{
+		Title:   message,
+		Header:  []string{"DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID"},
+		Ask:     []input.Option{input.About("a deployment")},
+		Invalid: ErrInvalidDeploymentKey,
 	}
-
-	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", input.About("a deployment"))
+	for i := range deployments {
+		list.AddRow(false, deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID)
+	}
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return houston.Deployment{}, err
 	}
-	selected, ok := deployMap[choice]
-	if !ok {
-		return houston.Deployment{}, ErrInvalidDeploymentKey
-	}
-	return selected, nil
+	return deployments[i], nil
 }

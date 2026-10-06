@@ -73,6 +73,8 @@ var coreBelowCmd = []string{
 	"pkg/telemetry",
 	"pkg/proxy",
 	"pkg/airflowrt",
+	"pkg/picker",
+	"pkg/texttable",
 }
 
 // coreConfigReaders lists the core packages that read config/ on purpose. Each

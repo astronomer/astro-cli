@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,7 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
@@ -232,17 +231,17 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 		return "", errors.New("this project links no Deployments yet: link one with astro link add")
 	}
 	slices.Sort(names)
-	tab := printutil.Table{
-		Padding:        []int{5, 30, 10, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "KIND", "DEPLOYMENT, ENVIRONMENT OR URL"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	list := picker.List{
+		Title:   title,
+		Header:  []string{"NAME", "KIND", "DEPLOYMENT, ENVIRONMENT OR URL"},
+		Ask:     []input.Option{input.About("a link")},
+		Invalid: errInvalidLinkSelection,
 	}
 	// The mark column exists only when some row carries one; otherwise every
 	// row would end in blank padding.
 	marked := mark != "" && slices.Contains(names, current)
 	if marked {
-		tab.Header = append(tab.Header, "")
+		list.Header = append(list.Header, "")
 	}
 	row := func(cells ...string) []string {
 		if marked {
@@ -250,21 +249,21 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 		}
 		return cells
 	}
-	for i, name := range names {
+	for _, name := range names {
 		l := m.Astro.Deployments[name]
-		cells := row(strconv.Itoa(i+1), name, string(l.Kind()), linkWhere(&l))
+		cells := row(name, string(l.Kind()), linkWhere(&l))
 		if marked && name == current {
 			cells[len(cells)-1] = mark
 		}
-		tab.AddRow(cells, name == current)
+		list.AddRow(name == current, cells...)
 	}
 	if none != "" {
-		tab.AddRow(row(strconv.Itoa(len(names)+1), "none", "", none), false)
+		list.AddRow(false, row("none", "", none)...)
 	}
-	i, ok := tab.Pick(c.d.Stdout, c.d.Stdin, title)
+	i, err := list.Pick(c.d.Stdout, c.d.Stdin)
 	switch {
-	case !ok:
-		return "", errInvalidLinkSelection
+	case err != nil:
+		return "", err
 	case i == len(names):
 		return "", nil
 	}

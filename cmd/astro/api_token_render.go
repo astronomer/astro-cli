@@ -11,11 +11,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var errCleanOutputWithJSON = errors.New("--clean-output prints the bare token for a script, and --output json the whole token with it in a \"token\" field; use one")
@@ -44,26 +46,20 @@ func tokenFormatOf(output string) (cliout.Format, error) {
 
 // renderTokenList renders a token list, its role column headed roleHeader.
 func renderTokenList(format cliout.Format, out io.Writer, tokens []apitoken.Token, roleHeader string) error {
-	tab := tokenTable(tokens, roleHeader, false)
+	tab := &cliout.Table{Header: tokenHeader(roleHeader)}
+	for i := range tokens {
+		tab.AddRow(tokenRow(&tokens[i])...)
+	}
 	return cliout.Renderer{Format: format, Out: out}.Emit(apitoken.List{Tokens: tokens}, cliout.Text(tab.Render))
 }
 
-// tokenTable lays tokens out for a list, or, numbered, for a picker.
-func tokenTable(tokens []apitoken.Token, roleHeader string, numbered bool) *cliout.Table {
-	header := []string{"ID", "NAME", "DESCRIPTION", "SCOPE", roleHeader, "CREATED", "CREATED BY"}
-	if numbered {
-		header = append([]string{"#"}, header...)
-	}
-	tab := &cliout.Table{Header: header}
-	for i := range tokens {
-		t := &tokens[i]
-		row := []string{t.ID, t.Name, t.Description, t.Scope, t.Role, apitoken.TimeAgo(t.CreatedAt), t.CreatedBy}
-		if numbered {
-			row = append([]string{strconv.Itoa(i + 1)}, row...)
-		}
-		tab.AddRow(row...)
-	}
-	return tab
+// tokenHeader and tokenRow lay a token out, for a list and for a picker.
+func tokenHeader(roleHeader string) []string {
+	return []string{"ID", "NAME", "DESCRIPTION", "SCOPE", roleHeader, "CREATED", "CREATED BY"}
+}
+
+func tokenRow(t *apitoken.Token) []string {
+	return []string{t.ID, t.Name, t.Description, t.Scope, t.Role, apitoken.TimeAgo(t.CreatedAt), t.CreatedBy}
 }
 
 // renderTokenSecret renders a token that carries its secret: the new one, or
@@ -94,14 +90,15 @@ func renderTokenLine(format cliout.Format, out io.Writer, v any, line string) er
 	}))
 }
 
-// newTokenPicker asks a person to choose a token from the numbered table
-// table lays out, refusing an answer that is not one of its numbers with
-// invalid. Its heading is question, which says what the command will do with
-// the token, unless the platform gave one of its own (a name several tokens
-// share). Under --output json it refuses before it writes anything, naming
-// the token ID or nameFlag as what answers it (the token ID alone when
-// nameFlag is "", for a command with no name flag).
-func newTokenPicker(out io.Writer, table func([]apitoken.Token) *cliout.Table, invalid error, nameFlag, question string) apitoken.Picker {
+// newTokenPicker asks a person to choose a token from a numbered table of
+// the columns header names, each token's cells laid out by row, refusing an
+// answer that is not one of its numbers with invalid. Its heading is
+// question, which says what the command will do with the token, unless the
+// platform gave one of its own (a name several tokens share). Under --output
+// json it refuses before it writes anything, naming the token ID or nameFlag
+// as what answers it (the token ID alone when nameFlag is "", for a command
+// with no name flag).
+func newTokenPicker(out io.Writer, header []string, row func(*apitoken.Token) []string, invalid error, nameFlag, question string) apitoken.Picker {
 	answers := "the token ID"
 	if nameFlag != "" {
 		answers += " or " + nameFlag
@@ -110,25 +107,16 @@ func newTokenPicker(out io.Writer, table func([]apitoken.Token) *cliout.Table, i
 		if heading == "" {
 			heading = "\n" + question
 		}
-		about := input.About("an API token")
-		answeredBy := input.AnsweredBy(answers)
-		if err := input.MayAsk("\n> ", about, answeredBy); err != nil {
-			return 0, err
+		list := picker.List{
+			Title:   heading,
+			Header:  header,
+			Ask:     []input.Option{input.About("an API token"), input.AnsweredBy(answers)},
+			Invalid: invalid,
 		}
-		tab := table(tokens)
-		cliout.WriteText(out, func(b *bufio.Writer) { //nolint:errcheck // best-effort render to the terminal; the answer is read either way
-			fmt.Fprintln(b, heading)
-			tab.Render(b)
-		})
-		choice, err := input.Text("\n> ", about, answeredBy)
-		if err != nil {
-			return 0, err
+		for i := range tokens {
+			list.AddRow(false, row(&tokens[i])...)
 		}
-		n, err := strconv.Atoi(choice)
-		if err != nil || n < 1 || n > len(tokens) || strconv.Itoa(n) != choice {
-			return 0, invalid
-		}
-		return n - 1, nil
+		return list.Pick(out, os.Stdin)
 	}
 }
 
@@ -142,34 +130,25 @@ var (
 // it. Its question names no action; it has always been the same for every
 // command that asks it.
 func deploymentTokenPicker(out io.Writer, nameFlag string) apitoken.Picker {
-	return newTokenPicker(out, func(tokens []apitoken.Token) *cliout.Table {
-		return tokenTable(tokens, deploymentRoleHeader, true)
-	}, errInvalidDeploymentTokenKey, nameFlag, "Please select the Deployment API token:")
+	return newTokenPicker(out, tokenHeader(deploymentRoleHeader), tokenRow, errInvalidDeploymentTokenKey, nameFlag, "Please select the Deployment API token:")
 }
 
 // workspaceTokenPicker picks among a Workspace's tokens, by their role on it,
 // asking question.
 func workspaceTokenPicker(out io.Writer, nameFlag, question string) apitoken.Picker {
-	return newTokenPicker(out, func(tokens []apitoken.Token) *cliout.Table {
-		return tokenTable(tokens, workspaceRoleHeader, true)
-	}, errInvalidWorkspaceTokenKey, nameFlag, question)
+	return newTokenPicker(out, tokenHeader(workspaceRoleHeader), tokenRow, errInvalidWorkspaceTokenKey, nameFlag, question)
 }
 
 // organizationTokenPicker picks among the Organization's tokens, asking
 // question. Its table has always been shorter than the others: no ID, scope
 // or creator, and the lifetime the token was created with.
 func organizationTokenPicker(out io.Writer, nameFlag, question string) apitoken.Picker {
-	return newTokenPicker(out, func(tokens []apitoken.Token) *cliout.Table {
-		tab := &cliout.Table{Header: []string{"#", "NAME", "DESCRIPTION", "ROLE", "EXPIRES"}}
-		for i := range tokens {
-			t := &tokens[i]
-			expires := ""
-			if t.ExpiryPeriodInDays != nil {
-				expires = strconv.Itoa(*t.ExpiryPeriodInDays)
-			}
-			tab.AddRow(strconv.Itoa(i+1), t.Name, t.Description, t.Role, expires)
+	return newTokenPicker(out, []string{"NAME", "DESCRIPTION", "ROLE", "EXPIRES"}, func(t *apitoken.Token) []string {
+		expires := ""
+		if t.ExpiryPeriodInDays != nil {
+			expires = strconv.Itoa(*t.ExpiryPeriodInDays)
 		}
-		return tab
+		return []string{t.Name, t.Description, t.Role, expires}
 	}, errInvalidOrganizationTokenKey, nameFlag, question)
 }
 

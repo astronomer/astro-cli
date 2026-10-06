@@ -24,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -738,12 +739,6 @@ func ListClusterOptions(cloudProvider string, astroV1Client astrov1.APIClient) (
 }
 
 func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient) (newRegion string, err error) {
-	regionsTab := printutil.Table{
-		Padding:        []int{5, 30},
-		DynamicPadding: true,
-		Header:         []string{"#", "REGION"},
-	}
-
 	// get all regions for the cloud provider
 	options, err := ListClusterOptions(cloudProvider, astroV1Client)
 	if err != nil {
@@ -752,28 +747,20 @@ func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient)
 	regions := options[0].Regions
 
 	if region == "" {
-		fmt.Println("\nPlease select a Region for your Deployment:")
-
-		regionMap := map[string]astrov1.ProviderRegion{}
-
-		for i := range regions {
-			index := i + 1
-			regionsTab.AddRow([]string{strconv.Itoa(index), regions[i].Name}, false)
-
-			regionMap[strconv.Itoa(index)] = regions[i]
+		list := picker.List{
+			Title:   "\nPlease select a Region for your Deployment:",
+			Header:  []string{"REGION"},
+			Ask:     []input.Option{input.About("a Region"), input.AnsweredBy("--region")},
+			Invalid: ErrInvalidRegionKey,
 		}
-
-		regionsTab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-		choice, err := input.Text("\n> ", input.About("a Region"), input.AnsweredBy("--region"))
+		for i := range regions {
+			list.AddRow(false, regions[i].Name)
+		}
+		i, err := list.Pick(os.Stdout, os.Stdin)
 		if err != nil {
 			return "", err
 		}
-		selected, ok := regionMap[choice]
-		if !ok {
-			return "", ErrInvalidRegionKey
-		}
-
-		region = selected.Name
+		region = regions[i].Name
 	}
 
 	// validate region
@@ -790,39 +777,26 @@ func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient)
 }
 
 func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APIClient) (newClusterID string, err error) {
-	clusterTab := printutil.Table{
-		Padding:        []int{5, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
-	}
-
 	cs, err := organization.ListClusters(organizationID, astroV1Client)
 	if err != nil {
 		return "", err
 	}
 	// select cluster
 	if clusterID == "" {
-		fmt.Println("\nPlease select a Cluster for your Deployment:")
-
-		clusterMap := map[string]astrov1.Cluster{}
-		for i := range cs {
-			index := i + 1
-			clusterTab.AddRow([]string{strconv.Itoa(index), cs[i].Name, string(cs[i].CloudProvider), cs[i].Id}, false)
-
-			clusterMap[strconv.Itoa(index)] = cs[i]
+		list := picker.List{
+			Title:   "\nPlease select a Cluster for your Deployment:",
+			Header:  []string{"CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
+			Ask:     []input.Option{input.About("a Cluster"), input.AnsweredBy("--cluster-id")},
+			Invalid: ErrInvalidClusterKey,
 		}
-
-		clusterTab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-		choice, err := input.Text("\n> ", input.About("a Cluster"), input.AnsweredBy("--cluster-id"))
+		for i := range cs {
+			list.AddRow(false, cs[i].Name, string(cs[i].CloudProvider), cs[i].Id)
+		}
+		i, err := list.Pick(os.Stdout, os.Stdin)
 		if err != nil {
 			return "", err
 		}
-		selected, ok := clusterMap[choice]
-		if !ok {
-			return "", ErrInvalidClusterKey
-		}
-
-		clusterID = selected.Id
+		clusterID = cs[i].Id
 	}
 
 	// validate cluster
@@ -2010,30 +1984,22 @@ var SelectDeployment = func(deployments []astrov1.Deployment, message string) (a
 		return deployments[0], nil
 	}
 
-	// Refused before the table is drawn, so a run that may not ask writes
-	// nothing of the question either. The picker reads its answer itself.
-	if err := input.MayAsk(message, input.About("a Deployment"), input.AnsweredBy("--deployment")); err != nil {
-		return astrov1.Deployment{}, err
-	}
-
-	tab := printutil.Table{
-		Padding:        []int{5, 30, 30, 30, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID", "DAG DEPLOY ENABLED"},
-	}
-
 	sort.Slice(deployments, func(i, j int) bool {
 		return deployments[i].CreatedAt.Before(deployments[j].CreatedAt)
 	})
 
-	for i := range deployments {
-		tab.AddRow([]string{strconv.Itoa(i + 1), deployments[i].Name, deployments[i].Namespace, deployments[i].Id, strconv.FormatBool(deployments[i].IsDagDeployEnabled)}, false)
+	list := picker.List{
+		Title:   message,
+		Header:  []string{"DEPLOYMENT NAME", "RELEASE NAME", "DEPLOYMENT ID", "DAG DEPLOY ENABLED"},
+		Ask:     []input.Option{input.About("a Deployment"), input.AnsweredBy("--deployment")},
+		Invalid: ErrInvalidDeploymentKey,
 	}
-
-	// The same table picker `astro link` asks with.
-	i, ok := tab.Pick(os.Stdout, os.Stdin, message)
-	if !ok {
-		return astrov1.Deployment{}, ErrInvalidDeploymentKey
+	for i := range deployments {
+		list.AddRow(false, deployments[i].Name, deployments[i].Namespace, deployments[i].Id, strconv.FormatBool(deployments[i].IsDagDeployEnabled))
+	}
+	i, err := list.Pick(os.Stdout, os.Stdin)
+	if err != nil {
+		return astrov1.Deployment{}, err
 	}
 	return deployments[i], nil
 }

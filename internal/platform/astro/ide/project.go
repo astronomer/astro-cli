@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
@@ -105,36 +105,20 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.A
 		return projects[0], nil
 	}
 
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"#", "PROJECT NAME", "ID"},
+	list := picker.List{
+		Title:   "\nPlease select the project from the list below:",
+		Header:  []string{"PROJECT NAME", "ID"},
+		Ask:     []input.Option{input.About("a project"), input.AnsweredBy("--project-id")},
+		Invalid: ErrInvalidProjectSelection,
 	}
-
-	about := []input.Option{input.About("a project"), input.AnsweredBy("--project-id")}
-	if err := input.MayAsk("\n> ", about...); err != nil {
-		return astrov1alpha1.AstroIdeProject{}, err
-	}
-	fmt.Println("\nPlease select the project from the list below:")
-
 	for i := range projects {
-		table.AddRow([]string{
-			strconv.Itoa(i + 1),
-			projects[i].Name,
-			projects[i].Id,
-		}, false)
+		list.AddRow(false, projects[i].Name, projects[i].Id)
 	}
-
-	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", about...)
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return astrov1alpha1.AstroIdeProject{}, err
 	}
-	choiceInt, err := strconv.Atoi(choice)
-	if err != nil || choiceInt < 1 || choiceInt > len(projects) {
-		return astrov1alpha1.AstroIdeProject{}, ErrInvalidProjectSelection
-	}
-	return projects[choiceInt-1], nil
+	return projects[i], nil
 }
 
 // createNewProject creates a new project and returns its ID

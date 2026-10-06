@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,7 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -125,13 +124,6 @@ func ListWithFormat(astroV1Client astrov1.APIClient, r output.Emitter) error {
 }
 
 func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
-	tab := printutil.Table{
-		Padding:        []int{5, 44, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-
 	var c config.Context
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -143,32 +135,19 @@ func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*
 		return nil, err
 	}
 
-	deployMap := map[string]astrov1.Organization{}
+	list := picker.List{
+		Header:  []string{"NAME", "ID"},
+		Ask:     []input.Option{input.About("an organization")},
+		Invalid: errInvalidOrganizationKey,
+	}
 	for i := range or {
-		index := i + 1
-
-		color := c.Organization == or[i].Id
-		tab.AddRow([]string{strconv.Itoa(index), or[i].Name, or[i].Id}, color)
-
-		deployMap[strconv.Itoa(index)] = or[i]
+		list.AddRow(c.Organization == or[i].Id, or[i].Name, or[i].Id)
 	}
-	// Refused before the table is drawn, so a run that cannot ask prints
-	// nothing it would then have to explain.
-	about := input.About("an organization")
-	if err := input.MayAsk("\n> ", about); err != nil {
-		return nil, err
-	}
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", about)
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return nil, err
 	}
-	selected, ok := deployMap[choice]
-	if !ok {
-		return nil, errInvalidOrganizationKey
-	}
-
-	return &selected, nil
+	return &or[i], nil
 }
 
 func SwitchWithContext(domain string, targetOrg *astrov1.Organization, astroV1Client astrov1.APIClient, out io.Writer) error {

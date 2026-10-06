@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,7 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var (
@@ -693,34 +692,19 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func selectOrganizationRole() (string, error) {
-	tokenRolesMap := map[string]string{}
-	tab := &printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"#", "ROLE"},
+	list := picker.List{
+		Header:  []string{"ROLE"},
+		Ask:     []input.Option{input.About("a role"), input.AnsweredBy("--role")},
+		Invalid: errInvalidOrganizationRoleKey,
 	}
-	for i := range validOrganizationRoles {
-		index := i + 1
-		tab.AddRow([]string{
-			strconv.Itoa(index),
-			validOrganizationRoles[i],
-		}, false)
-		tokenRolesMap[strconv.Itoa(index)] = validOrganizationRoles[i]
+	for _, role := range validOrganizationRoles {
+		list.AddRow(false, role)
 	}
-
-	ask := []input.Option{input.About("a role"), input.AnsweredBy("--role")}
-	if err := input.MayAsk("\n> ", ask...); err != nil {
-		return "", err
-	}
-	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", ask...)
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	selected, ok := tokenRolesMap[choice]
-	if !ok {
-		return "", errInvalidOrganizationRoleKey
-	}
-	return selected, nil
+	return validOrganizationRoles[i], nil
 }
 
 func newOrganizationRoleRootCmd(out io.Writer) *cobra.Command {

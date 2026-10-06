@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -13,7 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 const (
@@ -389,35 +390,22 @@ func selectWorkerMachine(workerType string, workerMachines []astrov1.WorkerMachi
 
 	switch workerType {
 	case "":
-		tab := printutil.Table{
-			Padding:        []int{5, 30, 20, 50},
-			DynamicPadding: true,
-			Header:         []string{"#", "WORKER TYPE", "CPU", "Memory"},
+		list := picker.List{
+			Title:  "No worker type was specified. Select the worker type to use",
+			Header: []string{"WORKER TYPE", "CPU", "Memory"},
+			Ask:    []input.Option{input.About("a worker type"), input.AnsweredBy("--worker-type")},
+			InvalidAnswer: func(choice string) error {
+				return fmt.Errorf("%w: invalid worker type: %s selected", errInvalidAstroMachine, choice)
+			},
 		}
-
-		fmt.Println("No worker type was specified. Select the worker type to use")
-
-		machineMap := map[string]astrov1.WorkerMachine{}
-
 		for i := range workerMachines {
-			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), string(workerMachines[i].Name), workerMachines[i].Spec.Cpu + " vCPU", workerMachines[i].Spec.Memory}, false)
-
-			machineMap[strconv.Itoa(index)] = workerMachines[i]
+			list.AddRow(false, string(workerMachines[i].Name), workerMachines[i].Spec.Cpu+" vCPU", workerMachines[i].Spec.Memory)
 		}
-
-		tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-		choice, err := input.Text("\n> ", input.About("a worker type"), input.AnsweredBy("--worker-type"))
+		i, err := list.Pick(out, os.Stdin)
 		if err != nil {
 			return astrov1.WorkerMachine{}, err
 		}
-		selectedPool, ok := machineMap[choice]
-		if !ok {
-			// returning an error as choice was not in nodePoolMap
-			errToReturn = fmt.Errorf("%w: invalid worker type: %s selected", errInvalidAstroMachine, choice)
-			return astrov1.WorkerMachine{}, errToReturn
-		}
-		return selectedPool, nil
+		return workerMachines[i], nil
 	default:
 		for _, workerMachine = range workerMachines {
 			if strings.EqualFold(string(workerMachine.Name), workerType) {
@@ -443,38 +431,26 @@ func selectNodePool(workerType string, nodePools []astrov1.NodePool, out io.Writ
 	message = "No worker type was specified. Select the worker type to use"
 	switch workerType {
 	case "":
-		tab := printutil.Table{
-			Padding:        []int{5, 30, 20, 50},
-			DynamicPadding: true,
-			Header:         []string{"#", "WORKER TYPE", "ISDEFAULT", "ID"},
-		}
-
-		fmt.Println(message)
-
 		sort.Slice(nodePools, func(i, j int) bool {
 			return nodePools[i].CreatedAt.Before(nodePools[j].CreatedAt)
 		})
 
-		nodePoolMap := map[string]astrov1.NodePool{}
+		list := picker.List{
+			Title:  message,
+			Header: []string{"WORKER TYPE", "ISDEFAULT", "ID"},
+			Ask:    []input.Option{input.About("a worker type"), input.AnsweredBy("--worker-type")},
+			InvalidAnswer: func(choice string) error {
+				return fmt.Errorf("%w: invalid worker type: %s selected", errInvalidNodePool, choice)
+			},
+		}
 		for i := range nodePools {
-			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), nodePools[i].NodeInstanceType, strconv.FormatBool(nodePools[i].IsDefault), nodePools[i].Id}, false)
-
-			nodePoolMap[strconv.Itoa(index)] = nodePools[i]
+			list.AddRow(false, nodePools[i].NodeInstanceType, strconv.FormatBool(nodePools[i].IsDefault), nodePools[i].Id)
 		}
-
-		tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-		choice, err := input.Text("\n> ", input.About("a worker type"), input.AnsweredBy("--worker-type"))
+		i, err := list.Pick(out, os.Stdin)
 		if err != nil {
-			return "", err
+			return nodePoolID, err
 		}
-		selectedPool, ok := nodePoolMap[choice]
-		if !ok {
-			// returning an error as choice was not in nodePoolMap
-			errToReturn = fmt.Errorf("%w: invalid worker type: %s selected", errInvalidNodePool, choice)
-			return nodePoolID, errToReturn
-		}
-		return selectedPool.Id, nil
+		return nodePools[i].Id, nil
 	default:
 		// Get the nodePoolID for pool that matches workerType
 		for i := range nodePools {
@@ -606,50 +582,30 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 // user can select a queue to delete from the list and the name of the selected queue is returned
 // An errInvalidQueue is returned if a user chooses a queue not on the list
 func selectQueue(queueListIndex *[]astrov1.WorkerQueue, out io.Writer) (string, error) {
-	var (
-		errToReturn        error
-		queueName, message string
-		queueToDelete      astrov1.WorkerQueue
-		queueList          []astrov1.WorkerQueue
-	)
-	if queueListIndex != nil {
-		queueList = *queueListIndex
-	} else {
+	if queueListIndex == nil {
 		return "", errNoWorkerQueues
 	}
-
-	tab := printutil.Table{
-		Padding:        []int{5, 30, 20, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "WORKER QUEUE", "ISDEFAULT", "ID"},
-	}
-
-	fmt.Println(message)
+	queueList := *queueListIndex
 
 	sort.Slice(queueList, func(i, j int) bool {
 		return queueList[i].Name < queueList[j].Name
 	})
 
-	queueMap := map[string]astrov1.WorkerQueue{}
-	for i := range queueList {
-		index := i + 1
-		tab.AddRow([]string{strconv.Itoa(index), queueList[i].Name, strconv.FormatBool(queueList[i].IsDefault), queueList[i].Id}, false)
-
-		queueMap[strconv.Itoa(index)] = queueList[i]
+	list := picker.List{
+		Header: []string{"WORKER QUEUE", "ISDEFAULT", "ID"},
+		Ask:    []input.Option{input.About("a worker queue"), input.AnsweredBy("--name")},
+		InvalidAnswer: func(choice string) error {
+			return fmt.Errorf("%w: invalid worker queue: %s selected", errInvalidQueue, choice)
+		},
 	}
-
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", input.About("a worker queue"), input.AnsweredBy("--name"))
+	for i := range queueList {
+		list.AddRow(false, queueList[i].Name, strconv.FormatBool(queueList[i].IsDefault), queueList[i].Id)
+	}
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	queueToDelete, ok := queueMap[choice]
-	if !ok {
-		// returning an error as choice was not in queueMap
-		errToReturn = fmt.Errorf("%w: invalid worker queue: %s selected", errInvalidQueue, choice)
-		return queueName, errToReturn
-	}
-	return queueToDelete.Name, nil
+	return queueList[i].Name, nil
 }
 
 // updateQueueList is used to merge existingQueues with the queueToUpdate. Based on the executor for the deployment, it

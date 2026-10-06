@@ -16,7 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var (
@@ -92,15 +92,13 @@ func ListWithFormat(client astrov1.APIClient, r output.Emitter) error {
 var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (string, error) {
 	// Refused before anything is listed or drawn: a run that cannot ask
 	// prints nothing it would then have to explain.
-	about := input.About("a workspace")
-	if err := input.MayAsk("\n> ", about); err != nil {
-		return "", err
+	list := picker.List{
+		Header:  []string{"NAME", "ID"},
+		Ask:     []input.Option{input.About("a workspace")},
+		Invalid: errInvalidWorkspaceKey,
 	}
-	tab := printutil.Table{
-		Padding:        []int{5, 44, 50},
-		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	if err := input.MayAsk("\n> ", list.Ask...); err != nil {
+		return "", err
 	}
 
 	var c config.Context
@@ -114,26 +112,14 @@ var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (strin
 		return "", err
 	}
 
-	deployMap := map[string]astrov1.Workspace{}
 	for i := range ws {
-		index := i + 1
-
-		color := c.Workspace == ws[i].Id
-		tab.AddRow([]string{strconv.Itoa(index), ws[i].Name, ws[i].Id}, color)
-
-		deployMap[strconv.Itoa(index)] = ws[i]
+		list.AddRow(c.Workspace == ws[i].Id, ws[i].Name, ws[i].Id)
 	}
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", about)
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return "", err
 	}
-	selected, ok := deployMap[choice]
-	if !ok {
-		return "", errInvalidWorkspaceKey
-	}
-
-	return selected.Id, nil
+	return ws[i].Id, nil
 }
 
 func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) error {
@@ -351,41 +337,20 @@ func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) 
 		return workspaces[0], nil
 	}
 
-	about := input.About("the workspace to update")
-	if err := input.MayAsk("\n> ", about); err != nil {
-		return astrov1.Workspace{}, err
+	list := picker.List{
+		Title:   "\nPlease select the workspace you would like to update:",
+		Header:  []string{"WORKSPACENAME", "ID", "CICD ENFORCEMENT"},
+		Ask:     []input.Option{input.About("the workspace to update")},
+		Invalid: errInvalidWorkspaceKey,
 	}
-
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"#", "WORKSPACENAME", "ID", "CICD ENFORCEMENT"},
-	}
-
-	fmt.Println("\nPlease select the workspace you would like to update:")
-
-	workspaceMap := map[string]astrov1.Workspace{}
 	for i := range workspaces {
-		index := i + 1
-		table.AddRow([]string{
-			strconv.Itoa(index),
-			workspaces[i].Name,
-			workspaces[i].Id,
-			strconv.FormatBool(workspaces[i].CicdEnforcedDefault),
-		}, false)
-		workspaceMap[strconv.Itoa(index)] = workspaces[i]
+		list.AddRow(false, workspaces[i].Name, workspaces[i].Id, strconv.FormatBool(workspaces[i].CicdEnforcedDefault))
 	}
-
-	table.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", about)
+	i, err := list.Pick(os.Stdout, os.Stdin)
 	if err != nil {
 		return astrov1.Workspace{}, err
 	}
-	selected, ok := workspaceMap[choice]
-	if !ok {
-		return astrov1.Workspace{}, errInvalidWorkspaceKey
-	}
-	return selected, nil
+	return workspaces[i], nil
 }
 
 // GetWorkspaces returns every Workspace in the current Organization, paging

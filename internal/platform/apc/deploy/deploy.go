@@ -6,7 +6,6 @@ import (
 	neturl "net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -22,7 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var (
@@ -73,12 +72,6 @@ const (
 	airflowImageLabel                 = "io.astronomer.docker.airflow.version"
 	composeSkipImageBuildingPromptMsg = "Skipping building image since --image-name flag is used..."
 )
-
-var tab = printutil.Table{
-	Padding:        []int{5, 30, 30, 50},
-	DynamicPadding: true,
-	Header:         []string{"#", "LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
-}
 
 func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
@@ -424,28 +417,20 @@ func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsI
 			return deploymentID, deployments, errDeploymentNotFound
 		}
 
-		fmt.Printf(houstonDeploymentHeader, cloudDomain)
-		fmt.Println(houstonSelectDeploymentPrompt)
-
-		deployMap := map[string]houston.Deployment{}
-		for i := range deployments {
-			deployment := deployments[i]
-			index := i + 1
-			tab.AddRow([]string{strconv.Itoa(index), deployment.Label, deployment.ReleaseName, currentWorkspace.Label, deployment.ID}, false)
-
-			deployMap[strconv.Itoa(index)] = deployment
+		list := picker.List{
+			Title:   fmt.Sprintf(houstonDeploymentHeader, cloudDomain) + houstonSelectDeploymentPrompt,
+			Header:  []string{"LABEL", "DEPLOYMENT NAME", "WORKSPACE", "DEPLOYMENT ID"},
+			Ask:     []input.Option{input.About("a deployment"), input.AnsweredBy("the deployment ID as an argument")},
+			Invalid: errInvalidDeploymentSelected,
 		}
-
-		tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-		choice, err := input.Text("\n> ", input.About("a deployment"), input.AnsweredBy("the deployment ID as an argument"))
+		for i := range deployments {
+			list.AddRow(false, deployments[i].Label, deployments[i].ReleaseName, currentWorkspace.Label, deployments[i].ID)
+		}
+		i, err := list.Pick(os.Stdout, os.Stdin)
 		if err != nil {
 			return deploymentID, deployments, err
 		}
-		selected, ok := deployMap[choice]
-		if !ok {
-			return deploymentID, deployments, errInvalidDeploymentSelected
-		}
-		deploymentID = selected.ID
+		deploymentID = deployments[i].ID
 	}
 	return deploymentID, deployments, nil
 }

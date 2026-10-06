@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,8 +16,9 @@ import (
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
-	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var (
@@ -133,20 +133,20 @@ func pickContext(in io.Reader, out io.Writer) (string, error) {
 	slices.Sort(domains)
 
 	current, _ := config.GetCurrentDomain() //nolint:errcheck // with no current context no row is highlighted
-	tab := printutil.Table{
-		Padding:        []int{5, 36, 36},
-		DynamicPadding: true,
-		Header:         []string{"#", "DOMAIN", "USER"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+	list := picker.List{
+		Title:   "Switch to which context?",
+		Header:  []string{"DOMAIN", "USER"},
+		Ask:     []input.Option{input.About("a context"), input.AnsweredBy("the domain as an argument")},
+		Invalid: errInvalidContextSelection,
 	}
 	// The mark column exists only when a row carries one; otherwise every row
 	// would end in blank padding.
 	marked := os.Getenv("ASTRO_DOMAIN") != "" && slices.Contains(domains, current)
 	if marked {
-		tab.Header = append(tab.Header, "")
+		list.Header = append(list.Header, "")
 	}
-	for i, domain := range domains {
-		cells := []string{strconv.Itoa(i + 1), domain, emails[domain]}
+	for _, domain := range domains {
+		cells := []string{domain, emails[domain]}
 		if marked {
 			mark := ""
 			if domain == current {
@@ -154,11 +154,11 @@ func pickContext(in io.Reader, out io.Writer) (string, error) {
 			}
 			cells = append(cells, mark)
 		}
-		tab.AddRow(cells, domain == current)
+		list.AddRow(domain == current, cells...)
 	}
-	i, ok := tab.Pick(out, in, "Switch to which context?")
-	if !ok {
-		return "", errInvalidContextSelection
+	i, err := list.Pick(out, in)
+	if err != nil {
+		return "", err
 	}
 	return domains[i], nil
 }

@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -210,12 +211,12 @@ func (s *Suite) TestGetWorkspaceSelectionId() {
 		s.Fail("Unexpected error: %s", err)
 	}
 
-	// Check the output buffer
-	expectedOutput := ` #     NAME            ID      
- 1     Workspace 1     123     
- 2     Workspace 2     456     
-`
-	s.Equal(expectedOutput, buf.String())
+	// Check the output buffer: the numbered rows, then the prompt.
+	lines := strings.Split(buf.String(), "\n")
+	s.Equal([]string{"#", "NAME", "ID"}, strings.Fields(lines[0]))
+	s.Equal([]string{"1", "Workspace", "1", "123"}, strings.Fields(lines[1]))
+	s.Equal([]string{"2", "Workspace", "2", "456"}, strings.Fields(lines[2]))
+	s.True(strings.HasSuffix(buf.String(), "\n\n> "), buf.String())
 
 	// Check the selected workspace ID
 	s.Equal("123", workspaceID)
@@ -223,7 +224,7 @@ func (s *Suite) TestGetWorkspaceSelectionId() {
 	testUtil.MockUserInput(s.T(), "7\n")
 	// Call the function
 	_, err = GetWorkspaceSelectionID(api, buf)
-	s.Error(err)
+	s.ErrorIs(err, errInvalidWorkspaceKey)
 }
 
 func (s *Suite) TestGetCurrentWorkspace() {
