@@ -124,10 +124,17 @@ type tokenRun struct {
 	code   int
 }
 
-// execTokenCmd runs `astro deployment <args>` the way the CLI does: through
-// cliout.Execute, with os.Stdout captured whole (the command's writer is the
-// same stdout, as in production) and stdin answering any question with answers.
+// execTokenCmd runs `astro deployment <args>` the way execAstroCmd does.
 func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args ...string) tokenRun {
+	t.Helper()
+	return execAstroCmd(t, client, answers, newDeploymentRootCmd, append([]string{"deployment"}, args...)...)
+}
+
+// execAstroCmd runs `astro <args>` under the one command newRoot builds, the
+// way the CLI does: through cliout.Execute, with os.Stdout captured whole (the
+// command's writer is the same stdout, as in production) and stdin answering
+// any question with answers.
+func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoot func(io.Writer) *cobra.Command, args ...string) tokenRun {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	testUtil.SetupOSArgsForGinkgo()
@@ -156,11 +163,11 @@ func execTokenCmd(t *testing.T, client astrov1.APIClient, answers string, args .
 
 	var errBuf bytes.Buffer
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
-	root.AddCommand(newDeploymentRootCmd(outW))
+	root.AddCommand(newRoot(outW))
 	root.SetOut(outW)
 	root.SetErr(&errBuf)
 	ctx := context.Background()
-	runErr := cliout.Execute(ctx, root, append([]string{"deployment"}, args...), outW, nil)
+	runErr := cliout.Execute(ctx, root, args, outW, nil)
 
 	os.Stdout, os.Stdin = prevOut, prevIn
 	require.NoError(t, outW.Close())

@@ -114,7 +114,7 @@ linters:
       # Keep this list in sync with coreBelowCmd and coreConfigReaders in
       # internal/archlint/archlint_test.go when a new internal/ core package lands.
       - linters: [forbidigo]
-        path-except: ^internal/(apirequest|astrosession|containercfg|deploy|emenv|envresolve|instancelocate|localenv|pack|plan|project|userstate|vaultenv)/
+        path-except: ^internal/(apirequest|astrosession|containercfg|deploy|emenv|envresolve|instancelocate|localenv|pack|plan|platform/astro/apitoken|project|userstate|vaultenv)/
       - linters:
           - dupl
           - errcheck

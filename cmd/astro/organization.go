@@ -568,6 +568,7 @@ func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
 		newOrganizationTokenDeleteCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&organizationID, "organization-id", "", "organization where you would like to manage tokens")
+	cliout.AddOutputFlag(cmd, &organizationTokenOutput)
 	return cmd
 }
 
@@ -689,76 +690,6 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
 
 	return cmd
-}
-
-func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
-	cmd.SilenceUsage = true
-	return organization.ListTokens(astroV1Client, out)
-}
-
-func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer) error {
-	if len(args) > 0 {
-		// make sure the id is lowercase
-		tokenID = strings.ToLower(args[0])
-	}
-	cmd.SilenceUsage = true
-	return organization.ListTokenRoles(tokenID, astroV1Client, out)
-}
-
-func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
-	if tokenName == "" {
-		// no role was provided so ask the user for it
-		answer, err := input.Text("Enter a name for the new Organization API token: ", input.AnsweredBy("--name"))
-		if err != nil {
-			return err
-		}
-		tokenName = answer
-	}
-	if tokenRole == "" {
-		fmt.Println("select a Organization Role for the new API token:")
-		// no role was provided so ask the user for it
-		var err error
-		tokenRole, err = selectOrganizationRole()
-		if err != nil {
-			return err
-		}
-	}
-	cmd.SilenceUsage = true
-
-	return organization.CreateToken(tokenName, tokenDescription, tokenRole, tokenExpiration, cleanTokenOutput, out, astroV1Client)
-}
-
-func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	// if an id was provided in the args we use it
-	if len(args) > 0 {
-		// make sure the id is lowercase
-		tokenID = strings.ToLower(args[0])
-	}
-
-	cmd.SilenceUsage = true
-	return organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, out, astroV1Client)
-}
-
-func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	// if an id was provided in the args we use it
-	if len(args) > 0 {
-		// make sure the id is lowercase
-		tokenID = strings.ToLower(args[0])
-	}
-
-	cmd.SilenceUsage = true
-	return organization.RotateToken(tokenID, name, cleanTokenOutput, forceRotate, out, astroV1Client)
-}
-
-func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	// if an id was provided in the args we use it
-	if len(args) > 0 {
-		// make sure the id is lowercase
-		tokenID = strings.ToLower(args[0])
-	}
-
-	cmd.SilenceUsage = true
-	return organization.DeleteToken(tokenID, name, forceDelete, out, astroV1Client)
 }
 
 func selectOrganizationRole() (string, error) {

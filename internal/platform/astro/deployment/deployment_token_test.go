@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -237,23 +238,23 @@ var (
 )
 
 // pickSecond answers a picker the way a person typing "2" would.
-func pickSecond(string, []TokenInfo) (int, error) { return 1, nil }
+func pickSecond(string, []apitoken.Token) (int, error) { return 1, nil }
 
 // findAndRotate and findAndDelete are what the commands do: find the token,
 // then act on it.
-func findAndRotate(id, name string, client astrov1.APIClient) (TokenInfo, error) {
+func findAndRotate(id, name string, client astrov1.APIClient) (apitoken.Token, error) {
 	tokenTypes := []DeploymentTokenType{DeploymentTokenTypeDEPLOYMENT}
 	token, err := FindToken(id, name, deploymentID, tokenTypes, pickSecond, client)
 	if err != nil {
-		return TokenInfo{}, err
+		return apitoken.Token{}, err
 	}
 	return RotateToken(token, deploymentID, client)
 }
 
-func findAndDelete(id, name string, client astrov1.APIClient) (TokenRemoval, error) {
+func findAndDelete(id, name string, client astrov1.APIClient) (apitoken.DeploymentRemoval, error) {
 	token, err := FindToken(id, name, deploymentID, nil, pickSecond, client)
 	if err != nil {
-		return TokenRemoval{}, err
+		return apitoken.DeploymentRemoval{}, err
 	}
 	return DeleteToken(token, deploymentID, client)
 }
@@ -517,7 +518,7 @@ func (s *Suite) TestDeleteToken() {
 		mockClient.On("DeleteApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&DeleteDeploymentAPITokenResponseOK, nil)
 		res, err := findAndDelete("token1", "", mockClient)
 		s.NoError(err)
-		s.Equal(TokenDeleted, res.Action)
+		s.Equal(apitoken.Deleted, res.Action)
 	})
 
 	s.Run("error path when there is no context", func() {
@@ -594,33 +595,6 @@ func (s *Suite) TestGetDeploymentToken() {
 		token, err := getDeploymentToken("", "Nonexistent Token", "testDeployment", apiTokens, pickSecond)
 		s.Equal(ErrDeploymentTokenNotFound, err)
 		s.Equal(astrov1.ApiToken{}, token)
-	})
-}
-
-func (s *Suite) TestTimeAgo() {
-	currentTime := time.Now()
-
-	s.Run("return 'Just now' for current time", func() {
-		result := TimeAgo(currentTime)
-		s.Equal("Just now", result)
-	})
-
-	s.Run("return '30 minutes ago' for 30 minutes ago", func() {
-		pastTime := currentTime.Add(-30 * time.Minute)
-		result := TimeAgo(pastTime)
-		s.Equal("30 minutes ago", result)
-	})
-
-	s.Run("return '5 hours ago' for 5 hours ago", func() {
-		pastTime := currentTime.Add(-5 * time.Hour)
-		result := TimeAgo(pastTime)
-		s.Equal("5 hours ago", result)
-	})
-
-	s.Run("return '10 days ago' for 10 days ago", func() {
-		pastTime := currentTime.Add(-10 * 24 * time.Hour)
-		result := TimeAgo(pastTime)
-		s.Equal("10 days ago", result)
 	})
 }
 
@@ -706,7 +680,7 @@ func (s *Suite) TestRemoveWorkspaceTokenDeploymentRole() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		res, err := RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, mockClient)
+		res, err := RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, pickSecond, mockClient)
 		s.NoError(err)
 		s.Equal("Token 1", res.Name)
 	})
@@ -725,7 +699,7 @@ func (s *Suite) TestRemoveWorkspaceTokenDeploymentRole() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		_, err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, mockClient)
+		_, err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, pickSecond, mockClient)
 		s.ErrorContains(err, "failed to list tokens")
 	})
 
@@ -744,7 +718,7 @@ func (s *Suite) TestRemoveWorkspaceTokenDeploymentRole() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		_, err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, mockClient)
+		_, err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, pickSecond, mockClient)
 		s.ErrorContains(err, "failed to get token")
 	})
 
@@ -764,7 +738,7 @@ func (s *Suite) TestRemoveWorkspaceTokenDeploymentRole() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		_, err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, mockClient)
+		_, err = RemoveWorkspaceTokenDeploymentRole("", "", "", deploymentID, pickSecond, mockClient)
 		s.ErrorContains(err, "failed to update token")
 	})
 
@@ -783,7 +757,7 @@ func (s *Suite) TestRemoveWorkspaceTokenDeploymentRole() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		res, err := RemoveWorkspaceTokenDeploymentRole("token-id", "", "", deploymentID, mockClient)
+		res, err := RemoveWorkspaceTokenDeploymentRole("token-id", "", "", deploymentID, pickSecond, mockClient)
 		s.NoError(err)
 		s.Equal("Token 1", res.Name)
 	})
@@ -802,7 +776,7 @@ func (s *Suite) TestRemoveWorkspaceTokenDeploymentRole() {
 		// Restore stdin right after the test.
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
-		_, err = RemoveWorkspaceTokenDeploymentRole("token-id", "", "", deploymentID, mockClient)
+		_, err = RemoveWorkspaceTokenDeploymentRole("token-id", "", "", deploymentID, pickSecond, mockClient)
 		s.ErrorContains(err, "failed to get token")
 	})
 }

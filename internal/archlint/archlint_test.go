@@ -43,6 +43,7 @@ var coreBelowCmd = []string{
 	"internal/localenv",
 	"internal/pack",
 	"internal/plan",
+	"internal/platform/astro/apitoken",
 	"internal/project",
 	"internal/runtimecatalog",
 	"internal/userstate",

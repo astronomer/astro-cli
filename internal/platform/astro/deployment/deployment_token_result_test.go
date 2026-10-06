@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -43,8 +44,8 @@ func resultClient(tokens ...astrov1.ApiToken) *astrov1_mocks.ClientWithResponses
 	return m
 }
 
-func noPicking(t *testing.T) TokenPicker {
-	return func(string, []TokenInfo) (int, error) {
+func noPicking(t *testing.T) apitoken.Picker {
+	return func(string, []apitoken.Token) (int, error) {
 		t.Fatal("the picker was asked, though the command named its token")
 		return 0, nil
 	}
@@ -60,7 +61,7 @@ func TestListTokensResult(t *testing.T) {
 		org.Token = &token // a list must not pass a secret on
 		got, err := ListTokens(resultClient(dep, org), deploymentID, nil)
 		require.NoError(t, err)
-		assert.Equal(t, []TokenInfo{
+		assert.Equal(t, []apitoken.Token{
 			{ID: "t1", Name: "one", Description: "about one", Scope: "DEPLOYMENT", Role: "DEPLOYMENT_ADMIN", CreatedAt: resultCreated, CreatedBy: fullName1},
 			{ID: "t2", Name: "two", Description: "about two", Scope: "ORGANIZATION", Role: "DEPLOYMENT_MEMBER", CreatedAt: resultCreated, CreatedBy: fullName2},
 		}, got)
@@ -96,7 +97,7 @@ func TestCreateTokenResult(t *testing.T) {
 
 	got, err := CreateToken("one", "about one", "DEPLOYMENT_ADMIN", deploymentID, 1, m)
 	require.NoError(t, err)
-	assert.Equal(t, TokenInfo{
+	assert.Equal(t, apitoken.Token{
 		ID: "t1", Name: "one", Description: "about one", Scope: "DEPLOYMENT", Role: "DEPLOYMENT_ADMIN",
 		CreatedAt: resultCreated, CreatedBy: fullName1, ExpiresAt: &end, Token: token,
 	}, got)
@@ -146,7 +147,7 @@ func TestDeleteTokenResult(t *testing.T) {
 		m.On("DeleteApiTokenWithResponse", mock.Anything, mock.Anything, "t1").Return(&DeleteDeploymentAPITokenResponseOK, nil)
 		got, err := DeleteToken(tok, deploymentID, m)
 		require.NoError(t, err)
-		assert.Equal(t, TokenRemoval{ID: "t1", Name: "one", Scope: "DEPLOYMENT", DeploymentID: deploymentID, Action: TokenDeleted}, got)
+		assert.Equal(t, apitoken.DeploymentRemoval{ID: "t1", Name: "one", Scope: "DEPLOYMENT", DeploymentID: deploymentID, Action: apitoken.Deleted}, got)
 	})
 
 	t.Run("any other token loses its Deployment role", func(t *testing.T) {
@@ -157,7 +158,7 @@ func TestDeleteTokenResult(t *testing.T) {
 		})).Return(&UpdateOrganizationAPITokenResponseOK, nil)
 		got, err := DeleteToken(tok, deploymentID, m)
 		require.NoError(t, err)
-		assert.Equal(t, TokenRemoval{ID: "t2", Name: "two", Scope: "WORKSPACE", DeploymentID: deploymentID, Action: TokenRemoved}, got)
+		assert.Equal(t, apitoken.DeploymentRemoval{ID: "t2", Name: "two", Scope: "WORKSPACE", DeploymentID: deploymentID, Action: apitoken.Removed}, got)
 	})
 }
 
@@ -168,8 +169,8 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 
 	t.Run("naming nothing", func(t *testing.T) {
 		var heading string
-		var offered []TokenInfo
-		pick := func(h string, tokens []TokenInfo) (int, error) {
+		var offered []apitoken.Token
+		pick := func(h string, tokens []apitoken.Token) (int, error) {
 			heading, offered = h, tokens
 			return 1, nil
 		}
@@ -183,7 +184,7 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 
 	t.Run("naming a name two tokens share", func(t *testing.T) {
 		var heading string
-		pick := func(h string, _ []TokenInfo) (int, error) {
+		pick := func(h string, _ []apitoken.Token) (int, error) {
 			heading = h
 			return 0, nil
 		}
@@ -195,13 +196,13 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 
 	t.Run("a picker's refusal is the error", func(t *testing.T) {
 		refused := errors.New("cannot ask")
-		pick := func(string, []TokenInfo) (int, error) { return 0, refused }
+		pick := func(string, []apitoken.Token) (int, error) { return 0, refused }
 		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(a, b))
 		assert.ErrorIs(t, err, refused)
 	})
 
 	t.Run("a pick out of range is an error, not a panic", func(t *testing.T) {
-		pick := func(string, []TokenInfo) (int, error) { return 5, nil }
+		pick := func(string, []apitoken.Token) (int, error) { return 5, nil }
 		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(a, b))
 		assert.Error(t, err)
 	})

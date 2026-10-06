@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
@@ -47,12 +48,19 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "deployment-variable", Value: deployment.VariableInfo{Key: "KEY", Value: "value"}, AsGiven: true},
 	{Name: "deployment-variable-secret", Value: deployment.VariableInfo{Key: "KEY", Value: "never published", IsSecret: true}, AsGiven: true},
 
-	// astro deployment token: a list, the token a create, rotate, update or
+	// The API token families: a list, the token a create, rotate, update or
 	// add-role leaves (with its secret only after a create or a rotate), and
-	// what a delete or a remove-role did.
-	{Name: "deployment-token-list", Value: deploymentTokenList{}},
-	{Name: "deployment-token", Value: deployment.TokenInfo{}},
-	{Name: "deployment-token-removal", Value: deployment.TokenRemoval{}},
+	// what a delete or a remove-role did. `deployment token`, `workspace
+	// token` and `organization token` publish the one token and the one list,
+	// pinned once under the names the deployment family gave them first; each
+	// family's removal names its own object, so each has its own golden.
+	{Name: "deployment-token-list", Value: apitoken.List{}},
+	{Name: "deployment-token", Value: apitoken.Token{}},
+	{Name: "deployment-token-removal", Value: apitoken.DeploymentRemoval{}},
+	{Name: "workspace-token-removal", Value: apitoken.WorkspaceRemoval{}},
+	{Name: "organization-token-removal", Value: apitoken.OrganizationRemoval{}},
+	// astro organization token roles.
+	{Name: "organization-token-roles", Value: apitoken.RoleList{}},
 
 	// The lists pkg/output renders, which hand their result to the command's
 	// cliout.Renderer. One golden per type: `deployment user list`,
@@ -225,6 +233,6 @@ func TestEmitProblemsReportsWhatIsUnpinned(t *testing.T) {
 	)
 	assert.Len(t, got, 3, "the floor, the named type and the anonymous one")
 
-	pinned := map[reflect.Type]bool{reflect.TypeOf(deployment.TokenInfo{}): true}
+	pinned := map[reflect.Type]bool{reflect.TypeOf(apitoken.Token{}): true}
 	assert.Empty(t, emitProblems(pinned, nil, 1), "a pinned type, above the floor")
 }

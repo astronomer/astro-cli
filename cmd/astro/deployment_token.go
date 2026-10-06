@@ -2,19 +2,18 @@ package astro
 
 // Running and rendering `astro deployment token`. The platform package returns
 // what each command did; this file asks the questions (which token, are you
-// sure) and decides how the answer looks, in text and in json.
+// sure) and decides how the answer looks, in text and in json, with the
+// helpers the three token families share (api_token_render.go).
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -30,128 +29,15 @@ var deploymentTokenOutput string
 // be overwritten by whichever registered last. "" leaves the role alone.
 var deploymentTokenUpdateRole string
 
-var (
-	errInvalidDeploymentTokenKey = errors.New("invalid Deployment API token selection")
-	errCleanOutputWithJSON       = errors.New("--clean-output prints the bare token for a script, and --output json the whole token with it in a \"token\" field; use one")
-)
-
-// deploymentTokenList is what a token list publishes.
-type deploymentTokenList struct {
-	Tokens []deployment.TokenInfo `json:"tokens"`
-}
-
-// tokenFormat parses the family's --output. A command calls it before it asks
-// anything, so a bad value fails as usage before a prompt. --clean-output
-// (create and rotate) is a text format of its own, so it and json together
-// are a usage error rather than one silently winning.
+// tokenFormat parses the deployment token family's --output.
 func tokenFormat() (cliout.Format, error) {
-	format, err := cliout.ParseFormat(deploymentTokenOutput)
-	if err != nil {
-		return "", err
-	}
-	if format == cliout.FormatJSON && cleanTokenOutput {
-		return "", cliout.Usage(errCleanOutputWithJSON)
-	}
-	return format, nil
+	return tokenFormatOf(deploymentTokenOutput)
 }
 
-func renderTokenList(format cliout.Format, out io.Writer, tokens []deployment.TokenInfo) error {
-	tab := tokenTable(tokens, false)
-	return cliout.Renderer{Format: format, Out: out}.Emit(deploymentTokenList{Tokens: tokens}, cliout.Text(tab.Render))
-}
-
-// tokenTable lays tokens out for a list, or, numbered, for the picker.
-func tokenTable(tokens []deployment.TokenInfo, numbered bool) *cliout.Table {
-	header := []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"}
-	if numbered {
-		header = append([]string{"#"}, header...)
-	}
-	tab := &cliout.Table{Header: header}
-	for i := range tokens {
-		t := &tokens[i]
-		row := []string{t.ID, t.Name, t.Description, t.Scope, t.Role, deployment.TimeAgo(t.CreatedAt), t.CreatedBy}
-		if numbered {
-			row = append([]string{strconv.Itoa(i + 1)}, row...)
-		}
-		tab.AddRow(row...)
-	}
-	return tab
-}
-
-// renderTokenSecret renders a token that carries its secret: the new one, or
-// the rotated one. verb and name complete the text's first line; clean prints
-// the bare secret instead, for a script.
-func renderTokenSecret(format cliout.Format, out io.Writer, t *deployment.TokenInfo, verb, name string, clean bool) error {
-	return cliout.Renderer{Format: format, Out: out}.Emit(t, cliout.Text(func(b *bufio.Writer) {
-		if clean {
-			if t.Token != "" {
-				fmt.Fprintln(b, t.Token)
-			}
-			return
-		}
-		fmt.Fprintf(b, "\nAstro Deployment API token %s was successfully %s\n", name, verb)
-		fmt.Fprintln(b, "Copy and paste this API token for your records.")
-		if t.Token != "" {
-			fmt.Fprintln(b, "\n"+t.Token)
-		}
-		fmt.Fprintln(b, "\nYou will not be shown this API token value again.")
-	}))
-}
-
-// renderTokenLine renders v as one line of text, or as itself in json.
-func renderTokenLine(format cliout.Format, out io.Writer, v any, line string) error {
-	return cliout.Renderer{Format: format, Out: out}.Emit(v, cliout.Text(func(b *bufio.Writer) {
-		fmt.Fprintln(b, line)
-	}))
-}
-
-// tokenPicker asks a person to choose a token from a numbered table. Under
-// --output json it refuses before it writes anything.
-func tokenPicker(out io.Writer) deployment.TokenPicker {
-	return func(heading string, tokens []deployment.TokenInfo) (int, error) {
-		about := input.About("an API token")
-		answeredBy := input.AnsweredBy("the token ID or --name")
-		if err := input.MayAsk("\n> ", about, answeredBy); err != nil {
-			return 0, err
-		}
-		tab := tokenTable(tokens, true)
-		cliout.WriteText(out, func(b *bufio.Writer) { //nolint:errcheck // best-effort render to the terminal; the answer is read either way
-			fmt.Fprintln(b, heading)
-			tab.Render(b)
-		})
-		choice, err := input.Text("\n> ", about, answeredBy)
-		if err != nil {
-			return 0, err
-		}
-		n, err := strconv.Atoi(choice)
-		if err != nil || n < 1 || n > len(tokens) || strconv.Itoa(n) != choice {
-			return 0, errInvalidDeploymentTokenKey
-		}
-		return n - 1, nil
-	}
-}
-
-// mayPickElsewhere refuses, under --output json, a command that names no token
-// and would pick one through another family's picker (the workspace-token and
-// organization packages'), which prints its heading before it checks whether
-// it may ask. In text mode it does nothing.
-func mayPickElsewhere(id, name, nameFlag string) error {
-	if id != "" || name != "" {
-		return nil
-	}
-	return input.MayAsk("\n> ", input.About("an API token"), input.AnsweredBy("the token ID or "+nameFlag))
-}
-
-// confirmTokenChange asks question, after warning when there is one. Under
-// --output json it refuses, naming --yes, before it writes anything.
-func confirmTokenChange(out io.Writer, warning, question string) (bool, error) {
-	if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
-		return false, err
-	}
-	if warning != "" {
-		fmt.Fprintln(out, warning)
-	}
-	return input.Confirm(question, input.AnsweredBy("--yes"))
+// tokenPicker picks among the Deployment's tokens, a choice the token ID or
+// --name answers.
+func tokenPicker(out io.Writer) apitoken.Picker {
+	return deploymentTokenPicker(out, "--name")
 }
 
 func runDeploymentTokenList(format cliout.Format, out io.Writer, tokenTypes ...deployment.DeploymentTokenType) error {
@@ -159,7 +45,7 @@ func runDeploymentTokenList(format cliout.Format, out io.Writer, tokenTypes ...d
 	if err != nil {
 		return err
 	}
-	return renderTokenList(format, out, tokens)
+	return renderTokenList(format, out, tokens, deploymentRoleHeader)
 }
 
 func runDeploymentTokenCreate(format cliout.Format, out io.Writer) error {
@@ -167,7 +53,7 @@ func runDeploymentTokenCreate(format cliout.Format, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, &created, "created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(format, out, &created, "Deployment", "created", tokenName, cleanTokenOutput)
 }
 
 func runDeploymentTokenUpdate(format cliout.Format, out io.Writer) error {
@@ -200,7 +86,7 @@ func runDeploymentTokenRotate(format cliout.Format, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, &rotated, "rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(format, out, &rotated, "Deployment", "rotated", token.Name, cleanTokenOutput)
 }
 
 func runDeploymentTokenDelete(format cliout.Format, out io.Writer) error {
@@ -230,7 +116,7 @@ func runDeploymentTokenDelete(format cliout.Format, out io.Writer) error {
 		return err
 	}
 	line := fmt.Sprintf("Astro API token %s was successfully removed from the Deployment", removal.Name)
-	if removal.Action == deployment.TokenDeleted {
+	if removal.Action == apitoken.Deleted {
 		line = fmt.Sprintf("Astro Deployment API token %s was successfully deleted", removal.Name)
 	}
 	return renderTokenLine(format, out, removal, line)
@@ -281,25 +167,26 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 }
 
 // runDeploymentTokenUpsert adds or updates the Deployment role of a Workspace
-// or Organization token.
+// or Organization token. An add picks among the Workspace's or the
+// Organization's tokens, with that family's picker; an update among the
+// Deployment's.
 func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operation string) error {
 	var (
-		token deployment.TokenInfo
+		token apitoken.Token
 		err   error
 	)
-	if operation == tokenRoleAdd {
-		nameFlag, id := "--org-token-name", orgTokenID
-		if kind == tokenKindWorkspace {
-			nameFlag, id = "--workspace-token-name", workspaceTokenID
-		}
-		if err := mayPickElsewhere(id, orgTokenName, nameFlag); err != nil {
-			return err
-		}
-	}
 	if kind == tokenKindWorkspace {
-		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, operation, tokenPicker(out), astroV1Client)
+		pick := deploymentTokenPicker(out, "--workspace-token-name")
+		if operation == tokenRoleAdd {
+			pick = workspaceTokenPicker(out, "--workspace-token-name")
+		}
+		token, err = deployment.UpsertWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, tokenRole, workspaceID, deploymentID, operation, pick, astroV1Client)
 	} else {
-		token, err = deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, operation, tokenPicker(out), astroV1Client)
+		pick := deploymentTokenPicker(out, "--org-token-name")
+		if operation == tokenRoleAdd {
+			pick = organizationTokenPicker(out, "--org-token-name")
+		}
+		token, err = deployment.UpsertOrgTokenDeploymentRole(orgTokenID, orgTokenName, tokenRole, deploymentID, operation, pick, astroV1Client)
 	}
 	if err != nil {
 		return err
@@ -311,16 +198,15 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 // Organization token.
 func runDeploymentTokenRemove(format cliout.Format, out io.Writer, kind string) error {
 	var (
-		removal deployment.TokenRemoval
+		removal apitoken.DeploymentRemoval
 		err     error
 	)
 	if kind == tokenKindWorkspace {
-		if err := mayPickElsewhere(workspaceTokenID, orgTokenName, "--workspace-token-name"); err != nil {
-			return err
-		}
-		removal, err = deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, workspaceID, deploymentID, astroV1Client)
+		pick := workspaceTokenPicker(out, "--workspace-token-name")
+		removal, err = deployment.RemoveWorkspaceTokenDeploymentRole(workspaceTokenID, orgTokenName, workspaceID, deploymentID, pick, astroV1Client)
 	} else {
-		removal, err = deployment.RemoveOrgTokenDeploymentRole(orgTokenID, orgTokenName, deploymentID, tokenPicker(out), astroV1Client)
+		pick := deploymentTokenPicker(out, "--org-token-name")
+		removal, err = deployment.RemoveOrgTokenDeploymentRole(orgTokenID, orgTokenName, deploymentID, pick, astroV1Client)
 	}
 	if err != nil {
 		return err
