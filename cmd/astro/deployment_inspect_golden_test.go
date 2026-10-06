@@ -93,6 +93,10 @@ func goldenInspectDeployment() astrov1.Deployment {
 // --key values included, because deploy-action parses those bytes — but
 // `make update-schemas` regenerates them too, so there is one command for
 // every golden. Read the diff: a changed golden is a changed contract.
+//
+// The json goldens are one line. -o json is a result through cliout's one
+// encoder, compact unless stdout is a terminal, and a test never is; on a
+// terminal the same keys and values come out indented and colored.
 func TestDeploymentInspectPrintsPinnedBytes(t *testing.T) {
 	const id = "clgoldendeploy0001"
 	for _, tc := range []struct {

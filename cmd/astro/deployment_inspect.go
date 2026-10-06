@@ -74,5 +74,10 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	// clean output
 	deployment.CleanOutput = cleanOutput
 
-	return inspect.Inspect(wsID, deploymentName, deploymentID, string(format), astroV1Client, out, requestedField, template, showWorkloadIdentity)
+	// json goes through the CLI's one encoder, so it is pretty on a terminal
+	// and compact when piped like every other result; yaml (and text, which
+	// is yaml) is the renderer's text. --key bypasses both and prints the bare
+	// value to out, as it always has.
+	r := cliout.Renderer{Format: format, Out: out}
+	return inspect.Print(wsID, deploymentName, deploymentID, astroV1Client, out, r, requestedField, template, showWorkloadIdentity)
 }

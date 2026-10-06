@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
@@ -80,6 +81,17 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "env-object", Value: env.ObjectInfo{}},
 	{Name: "env-variable-link-list", Value: env.VarLinksReport{}},
 	{Name: "env-link-list", Value: env.LinksReport{}},
+
+	// astro deploy --output json, in a project with a manifest: the one
+	// object a finished deploy prints.
+	{Name: "deploy", Value: deployJSON{}},
+
+	// astro deployment inspect -o json, and -o json --template, which is the
+	// same shape with metadata dropped. Its keys predate the CLI's json rules
+	// and are snake_case already; the --deployment-file round trip and
+	// astronomer/deploy-action read them, so they do not move. The bytes of
+	// every inspect output are pinned too, in testdata/deployment_inspect.
+	{Name: "deployment-inspect", Value: inspect.FormattedDeployment{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -112,11 +124,12 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Seventeen shapes reach Emit in this package's tests today:
+// would be silent. Nineteen shapes reach Emit in this package's tests today:
 // the deployment variable and token results, the pkg/output lists and the
-// `astro env` payloads their tests reach, and the error object. Raise it as
+// `astro env` payloads their tests reach, the manifest deploy's result,
+// deployment inspect's deployment, and the error object. Raise it as
 // conversions land; lower it only saying why.
-const minWatchedPayloads = 17
+const minWatchedPayloads = 19
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

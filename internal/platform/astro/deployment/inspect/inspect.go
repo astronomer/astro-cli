@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/output"
 )
 
 type deploymentMetadata struct {
@@ -121,11 +122,24 @@ const (
 	notApplicable = "N/A"
 )
 
+// Inspect prints a deployment the way `astro deployment create|update
+// --deployment-file` echoes the one it made: YAML, or JSON indented four
+// spaces when the file it read was JSON. That echo is not an --output surface
+// and keeps the bytes it has always printed; `astro deployment inspect`
+// renders through Print with its cliout.Renderer instead.
 func Inspect(wsID, deploymentName, deploymentID, outputFormat string, astroV1Client astrov1.APIClient, out io.Writer, requestedField string, template, showWorkloadIdentity bool) error {
+	return Print(wsID, deploymentName, deploymentID, astroV1Client, out, fileEcho{json: outputFormat == jsonFormat, out: out}, requestedField, template, showWorkloadIdentity)
+}
+
+// Print prints a deployment. The whole deployment is handed to r, the
+// command's cliout.Renderer: in json mode r encodes it, and in any other mode
+// r runs the YAML renderer here, which is what inspect's default, -o text and
+// -o yaml all print. A --key prints the bare value to out in every mode,
+// which is how deploy-action reads it.
+func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIClient, out io.Writer, r output.Emitter, requestedField string, template, showWorkloadIdentity bool) error {
 	var (
 		requestedDeployment                                                        astrov1.Deployment
 		err                                                                        error
-		infoToPrint                                                                []byte
 		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
 	)
 	// get or select the deployment
@@ -169,15 +183,34 @@ func Inspect(wsID, deploymentName, deploymentID, outputFormat string, astroV1Cli
 			return err
 		}
 		fmt.Fprintln(out, value)
-	} else {
-		// print the entire deployment in outputFormat
-		infoToPrint, err = formatPrintableDeployment(outputFormat, template, printableDeployment)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(out, string(infoToPrint))
+		return nil
 	}
-	return nil
+	// print the entire deployment
+	formatted, err := formatDeployment(template, printableDeployment)
+	if err != nil {
+		return err
+	}
+	return r.Emit(formatted, writeYAML(&formatted))
+}
+
+// fileEcho is the Emitter Inspect hands Print: YAML through the text
+// renderer, or the four-space indented JSON the deployment-file echo has
+// always printed.
+type fileEcho struct {
+	json bool
+	out  io.Writer
+}
+
+func (e fileEcho) Emit(v any, text func(io.Writer) error) error {
+	if !e.json {
+		return text(e.out)
+	}
+	b, err := jsonMarshal(v, "", "    ")
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(e.out, string(b))
+	return err
 }
 
 func getDeploymentInfo(deploymentObj astrov1.Deployment) (map[string]interface{}, error) { //nolint:gocritic // signature kept as-is for this shell code
@@ -393,33 +426,31 @@ func getHibernationSchedulesMap(sourceHibernationSchedules []astrov1.DeploymentH
 	return hibernationSchedulesMap
 }
 
-func formatPrintableDeployment(outputFormat string, template bool, printableDeployment map[string]interface{}) ([]byte, error) {
-	var (
-		infoToPrint     []byte
-		err             error
-		formatWithOrder FormattedDeployment
-	)
-
+// formatDeployment orders the printable map into the FormattedDeployment both
+// formats print, cut down to a template when one was asked for.
+func formatDeployment(template bool, printableDeployment map[string]interface{}) (FormattedDeployment, error) {
+	var formatWithOrder FormattedDeployment
 	// use mapstructure to decode to a struct
-	err = decodeToStruct(printableDeployment, &formatWithOrder)
-	if err != nil {
-		return []byte{}, err
+	if err := decodeToStruct(printableDeployment, &formatWithOrder); err != nil {
+		return FormattedDeployment{}, err
 	}
 	if template {
 		formatWithOrder = getTemplate(&formatWithOrder)
 	}
-	switch outputFormat {
-	case jsonFormat:
-		if infoToPrint, err = jsonMarshal(formatWithOrder, "", "    "); err != nil {
-			return []byte{}, err
+	return formatWithOrder, nil
+}
+
+// writeYAML is the text renderer: the deployment as YAML, the bytes
+// deploy-action and `--deployment-file` read.
+func writeYAML(d *FormattedDeployment) func(io.Writer) error {
+	return func(w io.Writer) error {
+		b, err := yamlMarshal(d)
+		if err != nil {
+			return err
 		}
-	default:
-		// always yaml by default
-		if infoToPrint, err = yamlMarshal(formatWithOrder); err != nil {
-			return []byte{}, err
-		}
+		_, err = fmt.Fprintln(w, string(b))
+		return err
 	}
-	return infoToPrint, nil
 }
 
 // getSpecificField is used to find the requestedField in a deployment.

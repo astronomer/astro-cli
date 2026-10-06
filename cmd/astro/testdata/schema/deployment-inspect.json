@@ -1,0 +1,86 @@
+{
+  "deployment": {
+    "environment_variables": [
+      {
+        "is_secret": true,
+        "key": "x",
+        "updated_at": "x",
+        "value": "x"
+      }
+    ],
+    "configuration": {
+      "name": "x",
+      "description": "x",
+      "runtime_version": "x",
+      "dag_deploy_enabled": true,
+      "ci_cd_enforcement": true,
+      "scheduler_size": "x",
+      "is_high_availability": true,
+      "is_development_mode": true,
+      "executor": "x",
+      "scheduler_au": -1,
+      "scheduler_count": -1,
+      "cluster_name": "x",
+      "workspace_name": "x",
+      "deployment_type": "x",
+      "cloud_provider": "x",
+      "region": "x",
+      "default_task_pod_cpu": "x",
+      "default_task_pod_memory": "x",
+      "resource_quota_cpu": "x",
+      "resource_quota_memory": "x",
+      "default_worker_type": "x",
+      "workload_identity": "x",
+      "remote_execution": {
+        "enabled": true,
+        "allowed_ip_address_ranges": [
+          "x"
+        ],
+        "task_log_bucket": "x",
+        "task_log_url_pattern": "x"
+      }
+    },
+    "worker_queues": [
+      {
+        "name": "x",
+        "max_worker_count": -1,
+        "min_worker_count": -1,
+        "worker_concurrency": -1,
+        "worker_type": "x",
+        "pod_cpu": "x",
+        "pod_ram": "x",
+        "pod_ephemeral_storage": "x"
+      }
+    ],
+    "metadata": {
+      "deployment_id": "x",
+      "workspace_id": "x",
+      "cluster_id": "x",
+      "release_name": "x",
+      "airflow_version": "x",
+      "current_tag": "x",
+      "status": "x",
+      "created_at": "2026-07-21T10:30:00Z",
+      "updated_at": "2026-07-21T10:30:00Z",
+      "deployment_url": "x",
+      "webserver_url": "x",
+      "airflow_api_url": "x",
+      "remote_execution_api_url": "x",
+      "hibernation_override": {
+        "is_hibernating": true,
+        "override_until": "2026-07-21T10:30:00Z"
+      }
+    },
+    "alert_emails": [
+      "x"
+    ],
+    "hibernation_schedules": [
+      {
+        "hibernate_at": "x",
+        "wake_at": "x",
+        "description": "x",
+        "enabled": true
+      }
+    ]
+  }
+}

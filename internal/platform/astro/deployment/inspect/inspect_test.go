@@ -1567,3 +1567,19 @@ func TestGetTemplate(t *testing.T) {
 		assert.Equal(t, expected, actual)
 	})
 }
+
+// formatPrintableDeployment is the bytes Inspect prints for a printable map,
+// without the newline it ends them with: the pieces Print composes, through
+// the deployment-file echo's Emitter, which is the one path that still holds
+// the four-space JSON these tests pin.
+func formatPrintableDeployment(outputFormat string, template bool, printableDeployment map[string]interface{}) ([]byte, error) {
+	formatted, err := formatDeployment(template, printableDeployment)
+	if err != nil {
+		return []byte{}, err
+	}
+	var buf bytes.Buffer
+	if err := (fileEcho{json: outputFormat == jsonFormat, out: &buf}).Emit(formatted, writeYAML(&formatted)); err != nil {
+		return []byte{}, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+}

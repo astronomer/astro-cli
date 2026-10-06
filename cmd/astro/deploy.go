@@ -3,7 +3,6 @@ package astro
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	goerrors "errors"
 	"fmt"
 	"io"
@@ -616,36 +615,39 @@ type deployGitJSON struct {
 // renderManifestDeploy writes a finished manifest deploy: one JSON object in json mode, a
 // plain summary in text mode. Both render the same Result, so the two modes
 // never drift.
+//
+// The object is a result, not the end of a stream: a manifest deploy emits no
+// stream record before it (build progress and warnings go to stderr, and json
+// mode drops the announce and progress lines), so it is laid out the way
+// every result is, pretty on a terminal and one line when piped.
 func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy.Result) error {
-	if format == cliout.FormatJSON {
-		obj := deployJSON{
-			Deployment:       res.DeploymentID,
-			Link:             res.LinkName,
-			Workspace:        res.WorkspaceID,
-			Type:             res.Type,
-			ImageTag:         res.ImageTag,
-			DagBundleVersion: res.DagTarballVersion,
-			RuntimeVersion:   res.RuntimeVersion,
-			URL:              res.URL,
+	obj := deployJSON{
+		Deployment:       res.DeploymentID,
+		Link:             res.LinkName,
+		Workspace:        res.WorkspaceID,
+		Type:             res.Type,
+		ImageTag:         res.ImageTag,
+		DagBundleVersion: res.DagTarballVersion,
+		RuntimeVersion:   res.RuntimeVersion,
+		URL:              res.URL,
+	}
+	if c := res.Git.Commit; c != nil {
+		obj.Git = &deployGitJSON{CommitSHA: c.SHA, Branch: c.Branch, CommitURL: c.URL}
+	}
+	return cliout.Renderer{Format: format, Out: w}.Emit(obj, cliout.Text(func(b *bufio.Writer) {
+		target := deployTargetName(res)
+		switch res.Type {
+		case "dag-only":
+			fmt.Fprintf(b, "Deployed DAGs (version %s) to %s.\n", res.DagTarballVersion, target)
+		case "image-only":
+			fmt.Fprintf(b, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
+		default: // image-and-dag
+			fmt.Fprintf(b, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
 		}
-		if c := res.Git.Commit; c != nil {
-			obj.Git = &deployGitJSON{CommitSHA: c.SHA, Branch: c.Branch, CommitURL: c.URL}
+		if res.URL != "" {
+			fmt.Fprintf(b, "Deployment: %s\n", res.URL)
 		}
-		return json.NewEncoder(w).Encode(obj)
-	}
-	target := deployTargetName(res)
-	switch res.Type {
-	case "dag-only":
-		fmt.Fprintf(w, "Deployed DAGs (version %s) to %s.\n", res.DagTarballVersion, target)
-	case "image-only":
-		fmt.Fprintf(w, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
-	default: // image-and-dag
-		fmt.Fprintf(w, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
-	}
-	if res.URL != "" {
-		fmt.Fprintf(w, "Deployment: %s\n", res.URL)
-	}
-	return nil
+	}))
 }
 
 // deployTargetName is what the summary line calls where the code went: the link
