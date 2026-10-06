@@ -458,7 +458,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		// build standard input
 		if IsDeploymentStandard(deploymentType) {
 			var requestedCloudProvider astrov1.CreateStandardDeploymentRequestCloudProvider
-			switch cloudProvider {
+			switch strings.ToLower(cloudProvider) {
 			case gcpCloud:
 				requestedCloudProvider = astrov1.CreateStandardDeploymentRequestCloudProviderGCP
 			case awsCloud:
@@ -712,7 +712,7 @@ func ListClusterOptions(cloudProvider string, astroV1Client astrov1.APIClient) (
 		return nil, err
 	}
 	var provider astrov1.GetClusterOptionsParamsProvider
-	switch cloudProvider {
+	switch strings.ToLower(cloudProvider) {
 	case gcpCloud:
 		provider = astrov1.GetClusterOptionsParamsProviderGCP
 	case awsCloud:

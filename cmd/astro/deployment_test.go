@@ -7,12 +7,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/cmd/cliout"
@@ -21,7 +22,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -525,19 +525,133 @@ func TestDeploymentLogsMultipleComponents(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 }
 
+// deploymentFileYAML is a --deployment-file template naming the cluster and
+// workspace the fixtures above list.
+const deploymentFileYAML = `
+deployment:
+  environment_variables:
+    - is_secret: false
+      key: foo
+      updated_at: NOW
+      value: bar
+    - is_secret: true
+      key: bar
+      updated_at: NOW+1
+      value: baz
+  configuration:
+    name: test-deployment-label
+    description: description
+    runtime_version: 6.0.0
+    dag_deploy_enabled: true
+    executor: CeleryExecutor
+    scheduler_au: 5
+    scheduler_count: 3
+    cluster_name: test-cluster
+    workspace_name: test-workspace
+    deployment_type: HYBRID
+  worker_queues:
+    - name: default
+      is_default: true
+      max_worker_count: 130
+      min_worker_count: 12
+      worker_concurrency: 180
+      worker_type: test-worker-1
+    - name: test-queue-1
+      is_default: false
+      max_worker_count: 175
+      min_worker_count: 8
+      worker_concurrency: 176
+      worker_type: test-worker-2
+  metadata:
+    deployment_id: test-deployment-id
+    workspace_id: test-ws-id
+    cluster_id: cluster-id
+    release_name: great-release-name
+    airflow_version: 2.4.0
+    status: UNHEALTHY
+    created_at: 2022-11-17T13:25:55.275697-08:00
+    updated_at: 2022-11-17T13:25:55.275697-08:00
+    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
+    webserver_url: some-url
+  alert_emails:
+    - test1@test.com
+    - test2@test.com
+`
+
+// writeDeploymentFile writes deploymentFileYAML to a temporary file and
+// returns its path.
+func writeDeploymentFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test-deployment.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(deploymentFileYAML), 0o600))
+	return path
+}
+
+// newCreateUpdateMock gives a subtest its own mock client, so one subtest's
+// unmet or leftover expectations cannot pass or fail another's. It also
+// resets the command state a previous run leaves behind: the remote-execution
+// values derived from flags, and --type, which outside a hosted organization
+// is not registered and so not reset by building the command.
+func newCreateUpdateMock(t *testing.T) *astrov1_mocks.ClientWithResponsesInterface {
+	t.Helper()
+	m := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = m
+	allowedIPAddressRanges, taskLogBucket, taskLogURLPattern = nil, nil, nil
+	deploymentType = standard
+	return m
+}
+
+// setHostedOrg makes the current context a hosted organization's, which
+// registers the hosted-only create and update flags.
+func setHostedOrg(t *testing.T, ws string) {
+	t.Helper()
+	ctx, err := context.GetCurrentContext()
+	require.NoError(t, err)
+	for k, v := range map[string]string{
+		"organization_product":    "HOSTED",
+		"organization":            "test-org-id",
+		"organization_short_name": "test-org",
+		"workspace":               ws,
+	} {
+		require.NoError(t, ctx.SetContextKey(k, v))
+	}
+}
+
+// createRequest matches a CreateDeployment request whose variant, decoded by
+// as, satisfies check.
+func createRequest[T any](as func(astrov1.CreateDeploymentRequest) (T, error), check func(T) bool) any {
+	return mock.MatchedBy(func(r astrov1.CreateDeploymentRequest) bool {
+		v, err := as(r)
+		return err == nil && check(v)
+	})
+}
+
+// updateRequest is createRequest for an UpdateDeployment request.
+func updateRequest[T any](as func(astrov1.UpdateDeploymentRequest) (T, error), check func(T) bool) any {
+	return mock.MatchedBy(func(r astrov1.UpdateDeploymentRequest) bool {
+		v, err := as(r)
+		return err == nil && check(v)
+	})
+}
+
+// hybridCreate matches a hybrid CreateDeployment request that satisfies check.
+func hybridCreate(check func(astrov1.CreateHybridDeploymentRequest) bool) any {
+	return createRequest(astrov1.CreateDeploymentRequest.AsCreateHybridDeploymentRequest, func(r astrov1.CreateHybridDeploymentRequest) bool {
+		return r.Type != nil && *r.Type == astrov1.CreateHybridDeploymentRequestTypeHYBRID && check(r)
+	})
+}
+
 func TestDeploymentCreate(t *testing.T) {
-	t.Skip("legacy pre-migration test: relies on lowercase cloud provider input; production isValidCloudProvider now compares to uppercase ClusterCloudProvider constants")
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 	ws := "workspace-id"
-	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	mockResponse := &airflowversions.Response{
 		RuntimeVersions: map[string]airflowversions.RuntimeVersion{
 			"4.2.5": {Metadata: airflowversions.RuntimeVersionMetadata{AirflowVersion: "2.2.5", Channel: "stable"}, Migrations: airflowversions.RuntimeVersionMigrations{}},
 		},
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
 		return &http.Response{
@@ -546,756 +660,457 @@ func TestDeploymentCreate(t *testing.T) {
 			Header:     make(http.Header),
 		}
 	})
+
+	// A hybrid create: options, the workspace, the cluster, then the create.
+	expectHybridCreate := func(m *astrov1_mocks.ClientWithResponsesInterface, request any) {
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		m.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, request).Return(&mockCreateDeploymentResponse, nil).Once()
+	}
+
 	t.Run("creates a deployment when dag-deploy is disabled", func(t *testing.T) {
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-
-		cmdArgs := []string{"create", "--name", "test", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		_, err = execDeploymentCmd(cmdArgs...)
+		m := newCreateUpdateMock(t)
+		expectHybridCreate(m, hybridCreate(func(r astrov1.CreateHybridDeploymentRequest) bool {
+			return r.Name == "test" && r.ClusterId != nil && *r.ClusterId == csID && r.IsDagDeployEnabled != nil && !*r.IsDagDeployEnabled
+		}))
+		_, err := execDeploymentCmd("create", "--name", "test", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable")
 		assert.NoError(t, err)
-
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("creates a deployment when dag deploy is enabled", func(t *testing.T) {
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable"}
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		_, err = execDeploymentCmd(cmdArgs...)
+		m := newCreateUpdateMock(t)
+		expectHybridCreate(m, hybridCreate(func(r astrov1.CreateHybridDeploymentRequest) bool {
+			return r.IsDagDeployEnabled != nil && *r.IsDagDeployEnabled
+		}))
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "enable")
 		assert.NoError(t, err)
-
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("creates a deployment when executor is specified", func(t *testing.T) {
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubernetesExecutor"}
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		_, err = execDeploymentCmd(cmdArgs...)
+		m := newCreateUpdateMock(t)
+		expectHybridCreate(m, hybridCreate(func(r astrov1.CreateHybridDeploymentRequest) bool {
+			return r.Executor != nil && *r.Executor == astrov1.CreateHybridDeploymentRequestExecutorKUBERNETES
+		}))
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubernetesExecutor")
 		assert.NoError(t, err)
-
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("creates a deployment with default executor", func(t *testing.T) {
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable"}
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		_, err = execDeploymentCmd(cmdArgs...)
+		m := newCreateUpdateMock(t)
+		expectHybridCreate(m, hybridCreate(func(r astrov1.CreateHybridDeploymentRequest) bool {
+			return r.Executor != nil && *r.Executor == astrov1.CreateHybridDeploymentRequestExecutorCELERY
+		}))
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable")
 		assert.NoError(t, err)
-
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
+	})
+	t.Run("creates a deployment with ci-cd enforcement", func(t *testing.T) {
+		m := newCreateUpdateMock(t)
+		expectHybridCreate(m, hybridCreate(func(r astrov1.CreateHybridDeploymentRequest) bool {
+			return r.IsCicdEnforced != nil && *r.IsCicdEnforced
+		}))
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cicd-enforcement", "enable")
+		assert.NoError(t, err)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error if dag-deploy flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value"}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-	})
-	t.Run("returns an error if type flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", "some-value"}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "some-value")
+		assert.ErrorContains(t, err, "Invalid --dag-deploy value")
 	})
 	t.Run("returns an error if cicd-enforcement flag has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cicd-enforcement", "some-value"}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--cicd-enforcement", "some-value")
+		assert.ErrorContains(t, err, "Invalid --cicd-enforcement value")
 	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubeExecutor"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--dag-deploy", "disable", "--executor", "KubeExecutor")
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
 	t.Run("returns an error if remote-execution-enabled flag is set but org is not hosted", func(t *testing.T) {
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--remote-execution-enabled"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--remote-execution-enabled")
 		assert.ErrorContains(t, err, "unknown flag: --remote-execution-enabled")
 	})
 	t.Run("creates a deployment from file", func(t *testing.T) {
-		filePath := "./test-deployment.yaml"
-		data := `
-deployment:
-  environment_variables:
-    - is_secret: false
-      key: foo
-      updated_at: NOW
-      value: bar
-    - is_secret: true
-      key: bar
-      updated_at: NOW+1
-      value: baz
-  configuration:
-    name: test-deployment-label
-    description: description
-    runtime_version: 6.0.0
-    dag_deploy_enabled: true
-    executor: CeleryExecutor
-    scheduler_au: 5
-    scheduler_count: 3
-    cluster_name: test-cluster
-    workspace_name: test-workspace
-    deployment_type: HYBRID
-  worker_queues:
-    - name: default
-      is_default: true
-      max_worker_count: 130
-      min_worker_count: 12
-      worker_concurrency: 180
-      worker_type: test-worker-1
-    - name: test-queue-1
-      is_default: false
-      max_worker_count: 175
-      min_worker_count: 8
-      worker_concurrency: 176
-      worker_type: test-worker-2
-  metadata:
-    deployment_id: test-deployment-id
-    workspace_id: test-ws-id
-    cluster_id: cluster-id
-    release_name: great-release-name
-    airflow_version: 2.4.0
-    status: UNHEALTHY
-    created_at: 2022-11-17T13:25:55.275697-08:00
-    updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
-    webserver_url: some-url
-  alert_emails:
-    - test1@test.com
-    - test2@test.com
-`
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		m := newCreateUpdateMock(t)
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
+		m.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-
-		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml"}
-		astroV1Client = mockV1Client
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd("create", "--deployment-file", writeDeploymentFile(t))
 		assert.NoError(t, err)
-
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error if creating a deployment from file fails", func(t *testing.T) {
-		cmdArgs := []string{"create", "--deployment-file", "test-file-name.json"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--deployment-file", "test-file-name.json")
 		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
 	})
 	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
-		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--deployment-file", "test-deployment.yaml", "--description", "fail")
 		assert.ErrorIs(t, err, errFlag)
 	})
 	t.Run("creates a deployment from file when supported flags are set", func(t *testing.T) {
-		filePath := "./test-deployment.yaml"
-		data := `
-deployment:
-  environment_variables:
-    - is_secret: false
-      key: foo
-      updated_at: NOW
-      value: bar
-    - is_secret: true
-      key: bar
-      updated_at: NOW+1
-      value: baz
-  configuration:
-    name: test-deployment-label
-    description: description
-    runtime_version: 6.0.0
-    dag_deploy_enabled: true
-    executor: CeleryExecutor
-    scheduler_au: 5
-    scheduler_count: 3
-    cluster_name: test-cluster
-    workspace_name: test-workspace
-    deployment_type: HYBRID
-  worker_queues:
-    - name: default
-      is_default: true
-      max_worker_count: 130
-      min_worker_count: 12
-      worker_concurrency: 180
-      worker_type: test-worker-1
-    - name: test-queue-1
-      is_default: false
-      max_worker_count: 175
-      min_worker_count: 8
-      worker_concurrency: 176
-      worker_type: test-worker-2
-  metadata:
-    deployment_id: test-deployment-id
-    workspace_id: test-ws-id
-    cluster_id: cluster-id
-    release_name: great-release-name
-    airflow_version: 2.4.0
-    status: UNHEALTHY
-    created_at: 2022-11-17T13:25:55.275697-08:00
-    updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
-    webserver_url: some-url
-  alert_emails:
-    - test1@test.com
-    - test2@test.com
-`
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
+		m := newCreateUpdateMock(t)
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
+		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
+		m.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
+		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
+		// With no Airflow API URL, --wait has no Airflow to probe once healthy.
 		unprobedDeployment := *deploymentResponse.JSON200
 		unprobedDeployment.WebServerAirflowApiUrl = ""
 		unprobedResponse := deploymentResponse
 		unprobedResponse.JSON200 = &unprobedDeployment
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&unprobedResponse, nil).Times(4)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&unprobedResponse, nil).Times(4)
+		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		origSleep := deployment.SleepTime
-		origTick := deployment.TickNum
-		deployment.SleepTime = 0
-		deployment.TickNum = 1
-		defer func() {
-			deployment.SleepTime = origSleep
-			deployment.TickNum = origTick
-		}()
+		origSleep, origTick := deployment.SleepTime, deployment.TickNum
+		deployment.SleepTime, deployment.TickNum = 0, 1
+		t.Cleanup(func() { deployment.SleepTime, deployment.TickNum = origSleep, origTick })
 
-		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--wait", "--verbosity", "debug"}
-		astroV1Client = mockV1Client
-		_, err = execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd("create", "--deployment-file", writeDeploymentFile(t), "--wait", "--verbosity", "debug")
 		assert.NoError(t, err)
-
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error if from-file is specified with supported and unsupported flags", func(t *testing.T) {
-		cmdArgs := []string{"create", "--deployment-file", "test-deployment.yaml", "--wait", "--description", "fail"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--deployment-file", "test-deployment.yaml", "--wait", "--description", "fail")
 		assert.ErrorIs(t, err, errFlag)
 	})
-	t.Run("creates a deployment with cloud provider and region", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("organization_short_name", "test-org")
-		ctx.SetContextKey("workspace", ws)
 
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
-			"--cloud-provider", "gcp", "--region", "us-central1",
+	// A standard create: options, the workspace, then the create. Each case
+	// gives --region, so none is selected.
+	expectStandardCreate := func(m *astrov1_mocks.ClientWithResponsesInterface, check func(astrov1.CreateStandardDeploymentRequest) bool) {
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		m.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, createRequest(astrov1.CreateDeploymentRequest.AsCreateStandardDeploymentRequest, func(r astrov1.CreateStandardDeploymentRequest) bool {
+			return r.Type != nil && *r.Type == astrov1.CreateStandardDeploymentRequestTypeSTANDARD && check(r)
+		})).Return(&mockCreateDeploymentResponse, nil).Once()
+	}
+	gcpIn := func(region string) func(astrov1.CreateStandardDeploymentRequest) bool {
+		return func(r astrov1.CreateStandardDeploymentRequest) bool {
+			return r.CloudProvider != nil && *r.CloudProvider == astrov1.CreateStandardDeploymentRequestCloudProviderGCP &&
+				r.Region != nil && *r.Region == region
 		}
-		_, err = execDeploymentCmd(cmdArgs...)
+	}
+
+	t.Run("creates a deployment with cloud provider and region", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectStandardCreate(m, gcpIn("us-central1"))
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable", "--cloud-provider", "gcp", "--region", "us-central1")
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
+	})
+	// The provider is validated case-insensitively, so an upper-case one has
+	// to reach the request too rather than become an empty provider.
+	t.Run("creates a deployment with an upper-case cloud provider", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectStandardCreate(m, gcpIn("us-central1"))
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable", "--cloud-provider", "GCP", "--region", "us-central1")
+		assert.NoError(t, err)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization_short_name", "test-org")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
-			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value",
-		}
-		_, err = execDeploymentCmd(cmdArgs...)
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--high-availability", "some-value")
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
 	t.Run("returns an error with incorrect development-mode value", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization_short_name", "test-org")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
-			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--development-mode", "some-value",
-		}
-		_, err = execDeploymentCmd(cmdArgs...)
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "gcp", "--region", "us-east1", "--development-mode", "some-value")
 		assert.ErrorContains(t, err, "Invalid --development-mode value")
 	})
 	t.Run("returns an error if cloud provider is not valid", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
-			"--executor", "KubernetesExecutor", "--cloud-provider", "ibm",
-		}
-		_, err = execDeploymentCmd(cmdArgs...)
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--dag-deploy", "disable",
+			"--executor", "KubernetesExecutor", "--cloud-provider", "ibm")
 		assert.ErrorContains(t, err, "ibm is not a valid cloud provider. It can only be gcp")
 	})
+	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
+	t.Run("returns an error if cluster-id is provided with explicit standard deployment", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", standard)
+		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
+	})
+	t.Run("returns an error if remote execution settings are given without remote execution", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--task-log-bucket", "test-bucket")
+		assert.ErrorContains(t, err, "flag --task-log-bucket cannot be used when remote execution is disabled")
+	})
+
+	// A dedicated create with no --cluster-id: options, the workspace, then a
+	// cluster picked from the list.
+	expectDedicatedCreate := func(m *astrov1_mocks.ClientWithResponsesInterface, check func(astrov1.CreateDedicatedDeploymentRequest) bool) {
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		m.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, createRequest(astrov1.CreateDeploymentRequest.AsCreateDedicatedDeploymentRequest, func(r astrov1.CreateDedicatedDeploymentRequest) bool {
+			return r.Type != nil && *r.Type == astrov1.CreateDedicatedDeploymentRequestTypeDEDICATED &&
+				r.ClusterId != nil && *r.ClusterId == csID && check(r)
+		})).Return(&mockCreateDeploymentResponse, nil).Once()
+	}
+
 	t.Run("creates a hosted dedicated deployment", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectDedicatedCreate(m, func(r astrov1.CreateDedicatedDeploymentRequest) bool {
+			re := r.RemoteExecution
+			return re != nil && re.Enabled &&
+				re.AllowedIpAddressRanges != nil && len(*re.AllowedIpAddressRanges) == 1 && (*re.AllowedIpAddressRanges)[0] == "0.0.0.0/0" &&
+				re.TaskLogBucket != nil && *re.TaskLogBucket == "test-bucket" &&
+				re.TaskLogUrlPattern != nil && *re.TaskLogUrlPattern == "test-url-pattern" &&
+				// Remote execution leaves DAG-only deploys off by default.
+				r.IsDagDeployEnabled != nil && !*r.IsDagDeployEnabled
+		})
+		defer testUtil.MockUserInput(t, "1")() // the first cluster
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--remote-execution-enabled",
+			"--allowed-ip-address-ranges", "0.0.0.0/0", "--task-log-bucket", "test-bucket", "--task-log-url-pattern", "test-url-pattern")
 		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		ctx.SetContextKey("organization_short_name", "test-org")
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--remote-execution-enabled", "--allowed-ip-address-ranges", "0.0.0.0/0", "--task-log-bucket", "test-bucket", "--task-log-url-pattern", "test-url-pattern",
-		}
-
-		// Mock user input for deployment name and wait for status
-		defer testUtil.MockUserInput(t, "test-name")()
-		defer testUtil.MockUserInput(t, "1")()
-
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error if incorrect cluster type is passed for a hosted dedicated deployment", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		astroV1Client = mockV1Client
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--type", "wrong-value",
-		}
-
-		_, err = execDeploymentCmd(cmdArgs...)
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--type", "wrong-value")
 		assert.ErrorContains(t, err, "Invalid --type value")
-		mockV1Client.AssertExpectations(t)
 	})
-
 	t.Run("creates an extra large deployment", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectDedicatedCreate(m, func(r astrov1.CreateDedicatedDeploymentRequest) bool {
+			return r.SchedulerSize != nil && *r.SchedulerSize == astrov1.CreateDedicatedDeploymentRequestSchedulerSizeEXTRALARGE
+		})
+		defer testUtil.MockUserInput(t, "1")() // the first cluster
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--scheduler-size", "extra_large")
 		assert.NoError(t, err)
-		extraLarge := astrov1.DeploymentSchedulerSizeEXTRALARGE
-		mockCreateDeploymentResponse.JSON200.SchedulerSize = &extraLarge
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		ctx.SetContextKey("organization_short_name", "test-org")
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--scheduler-size", "extra-large",
-		}
-
-		// Mock user input for deployment name and wait for status
-		defer testUtil.MockUserInput(t, "test-name")()
-		defer testUtil.MockUserInput(t, "1")()
-
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
-
 	t.Run("creates a hosted deployment with workload identity", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
 		workloadIdentity := "arn:aws:iam::1234567890:role/unit-test-1"
-		mockCreateDeploymentResponse.JSON200.EffectiveWorkloadIdentity = &workloadIdentity
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		ctx.SetContextKey("organization_short_name", "test-org")
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(i astrov1.CreateDeploymentRequest) bool {
-			input, _ := i.AsCreateStandardDeploymentRequest()
-			return input.WorkloadIdentity != nil && *input.WorkloadIdentity == workloadIdentity
-		})).Return(&mockCreateDeploymentResponse, nil).Once()
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		cmdArgs := []string{
-			"create", "--name", "test-name", "--workspace-id", ws, "--type", "standard", "--workload-identity", workloadIdentity, "--cloud-provider", "aws", "--region", "us-west-2",
-		}
-
-		_, err = execDeploymentCmd(cmdArgs...)
+		expectStandardCreate(m, func(r astrov1.CreateStandardDeploymentRequest) bool {
+			return r.WorkloadIdentity != nil && *r.WorkloadIdentity == workloadIdentity &&
+				r.CloudProvider != nil && *r.CloudProvider == astrov1.CreateStandardDeploymentRequestCloudProviderAWS
+		})
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--type", "standard", "--workload-identity", workloadIdentity, "--cloud-provider", "aws", "--region", "us-west-2")
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 }
 
 func TestDeploymentUpdate(t *testing.T) {
-	t.Skip("legacy pre-migration test: mock expectations drift from v1 command flow")
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 	ws := "test-ws-id"
 
+	// An update by id: the Deployment is listed and fetched, then options,
+	// then the update.
+	expectUpdate := func(m *astrov1_mocks.ClientWithResponsesInterface, current *astrov1.GetDeploymentResponse, request any) {
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(current, nil).Once()
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
+		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, request).Return(&mockUpdateDeploymentResponse, nil).Once()
+	}
+	// A hybrid Deployment's update also reads its cluster.
+	expectHybridUpdate := func(m *astrov1_mocks.ClientWithResponsesInterface, current *astrov1.GetDeploymentResponse, check func(astrov1.UpdateHybridDeploymentRequest) bool) {
+		expectUpdate(m, current, updateRequest(astrov1.UpdateDeploymentRequest.AsUpdateHybridDeploymentRequest, check))
+		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+	}
+	standardUpdate := func(check func(astrov1.UpdateStandardDeploymentRequest) bool) any {
+		return updateRequest(astrov1.UpdateDeploymentRequest.AsUpdateStandardDeploymentRequest, check)
+	}
+
 	t.Run("updates the deployment successfully", func(t *testing.T) {
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-
-		cmdArgs := []string{"update", "test-id-1", "--name", "test", "--workspace-id", ws, "--yes"}
-		_, err := execDeploymentCmd(cmdArgs...)
+		m := newCreateUpdateMock(t)
+		expectHybridUpdate(m, &deploymentResponse, func(r astrov1.UpdateHybridDeploymentRequest) bool { return r.Name == "test" })
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test", "--workspace-id", ws, "--yes")
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("updates the deployment successfully to enable ci-cd enforcement", func(t *testing.T) {
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "enable"}
-		_, err := execDeploymentCmd(cmdArgs...)
+		m := newCreateUpdateMock(t)
+		expectHybridUpdate(m, &deploymentResponse, func(r astrov1.UpdateHybridDeploymentRequest) bool { return r.IsCicdEnforced })
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "enable")
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("updates the deployment successfully to disable ci-cd enforcement", func(t *testing.T) {
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "disable"}
-		_, err := execDeploymentCmd(cmdArgs...)
+		m := newCreateUpdateMock(t)
+		enforced := *deploymentResponse.JSON200
+		enforced.IsCicdEnforced = true
+		current := deploymentResponse
+		current.JSON200 = &enforced
+		expectHybridUpdate(m, &current, func(r astrov1.UpdateHybridDeploymentRequest) bool { return !r.IsCicdEnforced })
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "disable")
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
+	})
+	// Changing DAG deploys under CI/CD enforcement asks first, since the CLI
+	// cannot deploy the DAGs afterwards. Declining leaves the Deployment as it
+	// was; --yes answers the question.
+	t.Run("declining the ci-cd enforcement question updates nothing", func(t *testing.T) {
+		// A user's token, which carries no deploy permissions. The check
+		// strips "Bearer " by position, so the token needs it.
+		ctx, err := context.GetCurrentContext()
+		require.NoError(t, err)
+		require.NoError(t, ctx.SetContextKey("token", "Bearer token"))
+		t.Cleanup(func() { testUtil.InitTestConfig(testUtil.LocalPlatform) })
+		m := newCreateUpdateMock(t)
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Once()
+		defer testUtil.MockUserInput(t, "n")()
+		_, err = execDeploymentCmd("update", "test-id-1", "--workspace-id", ws, "--cicd-enforcement", "enable", "--dag-deploy", "enable")
+		assert.NoError(t, err)
+		m.AssertExpectations(t)
+		m.AssertNotCalled(t, "UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+	t.Run("--yes answers the ci-cd enforcement question", func(t *testing.T) {
+		m := newCreateUpdateMock(t)
+		expectHybridUpdate(m, &deploymentResponse, func(r astrov1.UpdateHybridDeploymentRequest) bool {
+			return r.IsCicdEnforced && r.IsDagDeployEnabled
+		})
+		_, err := execDeploymentCmd("update", "test-id-1", "--workspace-id", ws, "--cicd-enforcement", "enable", "--dag-deploy", "enable", "--yes")
+		assert.NoError(t, err)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error if ci-cd enforcement has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "some-value"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-	})
-	t.Run("returns an error if type enforcement has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--type", "some-value"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "some-value")
+		assert.ErrorContains(t, err, "Invalid --cicd-enforcement value")
 	})
 	t.Run("returns an error if dag-deploy has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--dag-deploy", "some-value"}
-		_, err := execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--dag-deploy", "some-value")
+		assert.ErrorContains(t, err, "Invalid --dag-deploy value")
 	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--executor", "KubeExecutor"}
-		_, err := execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--executor", "KubeExecutor")
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
 	t.Run("returns an error when getting workspace fails", func(t *testing.T) {
+		newCreateUpdateMock(t)
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		ctx.Workspace = ""
-		err = ctx.SetContext()
-		assert.NoError(t, err)
+		require.NoError(t, ctx.SetContext())
 		defer testUtil.InitTestConfig(testUtil.LocalPlatform)
-		expectedOut := "Usage:\n"
-		cmdArgs := []string{"update", "-n", "doesnotexist"}
-		resp, err := execDeploymentCmd(cmdArgs...)
+		resp, err := execDeploymentCmd("update", "-n", "doesnotexist")
 		assert.ErrorContains(t, err, "failed to find a valid Workspace")
-		assert.Contains(t, resp, expectedOut)
+		assert.Contains(t, resp, "Usage:\n")
 	})
 	t.Run("updates a deployment from file", func(t *testing.T) {
-		filePath := "./test-deployment.yaml"
-		data := `
-deployment:
-  environment_variables:
-    - is_secret: false
-      key: foo
-      updated_at: NOW
-      value: bar
-    - is_secret: true
-      key: bar
-      updated_at: NOW+1
-      value: baz
-  configuration:
-    name: test-deployment-label
-    description: description
-    runtime_version: 6.0.0
-    dag_deploy_enabled: true
-    executor: CeleryExecutor
-    scheduler_au: 5
-    scheduler_count: 3
-    cluster_name: test-cluster
-    workspace_name: test-workspace
-    deployment_type: HYBRID
-  worker_queues:
-    - name: default
-      is_default: true
-      max_worker_count: 130
-      min_worker_count: 12
-      worker_concurrency: 180
-      worker_type: test-worker-1
-    - name: test-queue-1
-      is_default: false
-      max_worker_count: 175
-      min_worker_count: 8
-      worker_concurrency: 176
-      worker_type: test-worker-2
-  metadata:
-    deployment_id: test-deployment-id
-    workspace_id: test-ws-id
-    cluster_id: cluster-id
-    release_name: great-release-name
-    airflow_version: 2.4.0
-    status: UNHEALTHY
-    created_at: 2022-11-17T13:25:55.275697-08:00
-    updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
-    webserver_url: some-url
-  alert_emails:
-    - test1@test.com
-    - test2@test.com
-`
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		m := newCreateUpdateMock(t)
+		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
+		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
+		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
+		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
+		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
-		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml"}
-		astroV1Client = mockV1Client
-		_, err := execDeploymentCmd(cmdArgs...)
+		_, err := execDeploymentCmd("update", "--deployment-file", writeDeploymentFile(t))
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error if updating a deployment from file fails", func(t *testing.T) {
-		cmdArgs := []string{"update", "--deployment-file", "test-file-name.json"}
-		_, err := execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("update", "--deployment-file", "test-file-name.json")
 		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
 	})
 	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
-		cmdArgs := []string{"update", "--deployment-file", "test-deployment.yaml", "--description", "fail"}
-		_, err := execDeploymentCmd(cmdArgs...)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("update", "--deployment-file", "test-deployment.yaml", "--description", "fail")
 		assert.ErrorIs(t, err, errFlag)
 	})
 	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectUpdate(m, &hostedDeploymentResponse, standardUpdate(func(r astrov1.UpdateStandardDeploymentRequest) bool {
+			return r.SchedulerSize == astrov1.UpdateStandardDeploymentRequestSchedulerSizeSMALL
+		}))
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--yes")
 		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
-
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--yes"}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 	t.Run("returns an error with incorrect high-availability value", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--yes"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--yes")
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
 	t.Run("returns an error with incorrect development-mode value", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--development-mode", "some-value", "--yes"}
-		_, err = execDeploymentCmd(cmdArgs...)
+		setHostedOrg(t, ws)
+		newCreateUpdateMock(t)
+		_, err := execDeploymentCmd("update", "test-id", "--name", "test-name", "--workspace-id", ws, "--development-mode", "some-value", "--yes")
 		assert.ErrorContains(t, err, "Invalid --development-mode value")
 	})
-	t.Run("returns an error if cluster-id is provided with implicit standard deployment", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
-	})
-	t.Run("returns an error if cluster-id is provided with explicit standard deployment", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{"create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--type", standard}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.Error(t, err)
-		assert.ErrorContains(t, err, "flag --cluster-id cannot be used to create a standard deployment")
-	})
-
 	t.Run("updates a deployment with extra large scheduler size", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectUpdate(m, &hostedDeploymentResponse, standardUpdate(func(r astrov1.UpdateStandardDeploymentRequest) bool {
+			return r.SchedulerSize == astrov1.UpdateStandardDeploymentRequestSchedulerSizeEXTRALARGE
+		}))
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--yes")
 		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
-
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--yes"}
-		_, err = execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
-
 	t.Run("updates a hosted deployment with workload identity", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
 		workloadIdentity := "arn:aws:iam::1234567890:role/unit-test-1"
-		mockUpdateDeploymentResponse.JSON200.EffectiveWorkloadIdentity = &workloadIdentity
-
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astrov1.UpdateDeploymentRequest) bool {
-			input, _ := i.AsUpdateDedicatedDeploymentRequest()
-			return input.WorkloadIdentity != nil && *input.WorkloadIdentity == workloadIdentity
-		})).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
-
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		cmdArgs := []string{
-			"update", "test-id-1", "--name", "test-name", "--workload-identity", workloadIdentity,
-		}
-
-		_, err = execDeploymentCmd(cmdArgs...)
+		expectUpdate(m, &hostedDeploymentResponse, standardUpdate(func(r astrov1.UpdateStandardDeploymentRequest) bool {
+			return r.WorkloadIdentity != nil && *r.WorkloadIdentity == workloadIdentity
+		}))
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workload-identity", workloadIdentity)
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
-
 	t.Run("updates a hosted dedicated deployment with remote execution config", func(t *testing.T) {
-		ctx, err := context.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.SetContextKey("organization_product", "HOSTED")
-		ctx.SetContextKey("organization", "test-org-id")
-		ctx.SetContextKey("workspace", ws)
-
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
 		taskLogBucket := "test-bucket"
 		taskLogURLPattern := "test-url-pattern"
-		allowedIPAddressRanges := []string{"1.2.3.4/32"}
-		mockUpdateDeploymentResponse.JSON200.RemoteExecution = &astrov1.DeploymentRemoteExecution{
-			Enabled:                true,
-			AllowedIpAddressRanges: allowedIPAddressRanges,
-			TaskLogBucket:          &taskLogBucket,
-			TaskLogUrlPattern:      &taskLogURLPattern,
-		}
-
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(i astrov1.UpdateDeploymentRequest) bool {
-			input, _ := i.AsUpdateDedicatedDeploymentRequest()
-			return input.RemoteExecution != nil && input.RemoteExecution.Enabled &&
-				input.RemoteExecution.AllowedIpAddressRanges != nil && (*input.RemoteExecution.AllowedIpAddressRanges)[0] == allowedIPAddressRanges[0] &&
-				input.RemoteExecution.TaskLogBucket != nil && *input.RemoteExecution.TaskLogBucket == taskLogBucket &&
-				input.RemoteExecution.TaskLogUrlPattern != nil && *input.RemoteExecution.TaskLogUrlPattern == taskLogURLPattern
-		})).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDedicatedDeploymentResponse, nil).Times(1)
-
-		astroV1Client = mockV1Client
-		astroV1Client = mockV1Client
-		cmdArgs := []string{
-			"update", "test-id-1", "--name", "test-name", "--allowed-ip-address-ranges", "1.2.3.4/32", "--task-log-bucket", taskLogBucket, "--task-log-url-pattern", taskLogURLPattern,
-		}
-
-		_, err = execDeploymentCmd(cmdArgs...)
+		allowedIPAddressRange := "1.2.3.4/32"
+		expectUpdate(m, &hostedDedicatedDeploymentResponse, updateRequest(astrov1.UpdateDeploymentRequest.AsUpdateDedicatedDeploymentRequest, func(r astrov1.UpdateDedicatedDeploymentRequest) bool {
+			re := r.RemoteExecution
+			return re != nil && re.Enabled &&
+				re.AllowedIpAddressRanges != nil && len(*re.AllowedIpAddressRanges) == 1 && (*re.AllowedIpAddressRanges)[0] == allowedIPAddressRange &&
+				re.TaskLogBucket != nil && *re.TaskLogBucket == taskLogBucket &&
+				re.TaskLogUrlPattern != nil && *re.TaskLogUrlPattern == taskLogURLPattern
+		}))
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--allowed-ip-address-ranges", allowedIPAddressRange,
+			"--task-log-bucket", taskLogBucket, "--task-log-url-pattern", taskLogURLPattern)
 		assert.NoError(t, err)
-		mockV1Client.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t)
+		m.AssertExpectations(t)
 	})
 }
 
@@ -1666,8 +1481,8 @@ func TestIsValidCloudProvider(t *testing.T) {
 
 // --yes answers the --deployment-file path's own confirmation and --verbosity
 // is global, so neither is refused beside the file; the missing file is what
-// fails, after the flag check. Any other flag still is. (TestDeploymentCreate
-// and TestDeploymentUpdate are skipped, so this guard has its own test.)
+// fails, after the flag check. Any other flag still is. TestDeploymentCreate
+// and TestDeploymentUpdate pass the file only beside --wait and --verbosity.
 func TestDeploymentFromFileTakesYes(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
