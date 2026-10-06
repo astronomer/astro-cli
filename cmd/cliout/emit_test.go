@@ -84,7 +84,11 @@ func TestEmitResultIsCompactOffATerminal(t *testing.T) {
 
 // On a terminal it is indented two spaces, and colored unless color is off.
 // Only whitespace and color change: the same value decodes from each.
+//
+// With no stream started: streamStarted is package state, and a test that
+// ran an EmitEvent before this one would turn the result compact.
 func TestEmitResultIsIndentedOnATerminal(t *testing.T) {
+	ResetStream()
 	var out bytes.Buffer
 	require.NoError(t, Renderer{Format: FormatJSON, Out: &out, Style: StyleIndented}.Emit(layoutValue, nil))
 	assert.Equal(t, `{
@@ -163,6 +167,7 @@ func TestEmitObserverSeesResultsAndEvents(t *testing.T) {
 	var seen []any
 	EmitObserver = func(v any) { seen = append(seen, v) }
 	t.Cleanup(func() { EmitObserver = nil })
+	t.Cleanup(ResetStream)
 
 	r := Renderer{Format: FormatJSON, Out: io.Discard}
 	require.NoError(t, r.Emit("result", nil))
