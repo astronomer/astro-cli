@@ -233,6 +233,12 @@ func getOrganizationToken(id, name, message string, tokens []astrov1.ApiToken) (
 		if len(matchedTokens) == 1 {
 			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
+			// Refused before the heading, so a run that may not ask (-o json)
+			// writes nothing of the question to stdout.
+			if err := input.MayAsk(fmt.Sprintf("Several API tokens are named %s; which one?", name),
+				input.About("an API token"), input.AnsweredBy("the token's ID instead of its name")); err != nil {
+				return astrov1.ApiToken{}, err
+			}
 			fmt.Printf("\nThere are more than one API tokens with name %s. Please select an API token:\n", name)
 			token, err = selectTokens(matchedTokens)
 			if err != nil {

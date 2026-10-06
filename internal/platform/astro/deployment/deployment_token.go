@@ -1,22 +1,21 @@
 package deployment
 
+// The `astro deployment token` family. Every function here returns what it did
+// and leaves the rendering, and every question, to its caller: cmd/astro prints
+// the text, publishes the json, and asks a person to pick a token or confirm a
+// rotation or a deletion. Nothing in this file prints or reads stdin.
+
 import (
 	httpContext "context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	workspaceService "github.com/astronomer/astro-cli/internal/platform/astro/workspace-token"
-	"github.com/astronomer/astro-cli/pkg/ansi"
-	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 // DeploymentTokenType narrows ListTokens results by token Scope (client-side filter,
@@ -30,32 +29,70 @@ const (
 	deploymentTokenPaginationLim                        = 100
 )
 
-func newTokenTableOut() *printutil.Table {
-	return &printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
-	}
-}
-
-func newTokenSelectionTableOut() *printutil.Table {
-	return &printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
-	}
-}
-
 var (
-	errInvalidDeploymentTokenKey  = errors.New("invalid Deployment API token selection")
 	ErrDeploymentTokenNotFound    = errors.New("no Deployment API token was found for the API token name you provided")
 	errWorkspaceTokenInDeployment = errors.New("this Workspace API token has already been added to the Deployment with that role")
 	errOrgTokenInDeployment       = errors.New("this Organization API token has already been added to the Deployment with that role")
 	errWrongTokenTypeSelected     = errors.New("the token selected is not of the type you are trying to modify")
 )
 
+const deploymentEntity = "DEPLOYMENT"
+
+// TokenInfo is an API token as a token command reports it. Role is the role
+// the token holds on the object the command is about, which for this family
+// is the Deployment it named; the Workspace and Organization token families
+// can report theirs in the same shape, reading Role for their own object.
+type TokenInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Scope       string `json:"scope"`
+	Role        string `json:"role,omitempty"`
+	// CreatedBy is the creator's full name, or the name of the API token that
+	// created it.
+	CreatedAt time.Time  `json:"created_at"`
+	CreatedBy string     `json:"created_by,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	// Token is the secret, set only by a create or a rotate: the one time the
+	// API returns it, so the one time a caller can keep it.
+	Token string `json:"token,omitempty"`
+}
+
+// TokenAction is what a delete or a remove did to a token.
+type TokenAction string
+
 const (
-	deploymentEntity   = "DEPLOYMENT"
-	workspaceEntity    = "WORKSPACE"
-	organizationEntity = "ORGANIZATION"
+	// TokenDeleted: the token no longer exists. Only a Deployment-scoped
+	// token is deleted.
+	TokenDeleted TokenAction = "deleted"
+	// TokenRemoved: the token exists, without its role on the Deployment.
+	TokenRemoved TokenAction = "removed"
+)
+
+// TokenRemoval names the token a delete or a remove acted on, and what it did.
+type TokenRemoval struct {
+	ID           string      `json:"id"`
+	Name         string      `json:"name"`
+	Scope        string      `json:"scope"`
+	DeploymentID string      `json:"deployment_id"`
+	Action       TokenAction `json:"action"`
+}
+
+// TokenUpdate is the token an update left, and the name it had before, which
+// is the name the text confirmation reports.
+type TokenUpdate struct {
+	Token        TokenInfo
+	PreviousName string
+}
+
+// TokenPicker asks a person to choose one of tokens and returns its index.
+// heading says why they are being asked. It is called only when the command
+// was given neither a token ID nor a name, or the name given is shared.
+type TokenPicker func(heading string, tokens []TokenInfo) (int, error)
+
+const (
+	pickHeading        = "\nPlease select the Deployment API token:"
+	pickSharedNameHead = "\nThere are more than one API tokens with name %s. Please select an API token:"
 )
 
 // tokenRoles flattens a token's roles pointer to a usable slice.
@@ -66,12 +103,11 @@ func tokenRoles(t astrov1.ApiToken) []astrov1.ApiTokenRole { //nolint:gocritic /
 	return *t.Roles
 }
 
-// roleForEntity returns the first role whose (entityType, entityId) matches, or "".
+// deploymentRoleOf returns the token's role on deploymentID, or "".
 func deploymentRoleOf(t astrov1.ApiToken, deploymentID string) string { //nolint:gocritic // ApiToken is large; helper returns a short string
 	const entityType = astrov1.ApiTokenRoleEntityTypeDEPLOYMENT
-	entityID := deploymentID
 	for _, r := range tokenRoles(t) {
-		if r.EntityType == entityType && r.EntityId == entityID {
+		if r.EntityType == entityType && r.EntityId == deploymentID {
 			return r.Role
 		}
 	}
@@ -99,48 +135,65 @@ func upsertDeploymentRole(existing []astrov1.ApiTokenRole, deploymentID, role st
 	return out
 }
 
-// ListTokens lists tokens with a role in the given deployment. tokenTypes (if non-nil) filters by Scope.
-func ListTokens(client astrov1.APIClient, deploymentID string, tokenTypes *[]DeploymentTokenType, out io.Writer) error {
-	apiTokens, err := getDeploymentTokens(deploymentID, tokenTypes, client)
-	if err != nil {
-		return err
+// tokenInfo reports t with role as its role, and no secret.
+func tokenInfo(t *astrov1.ApiToken, role string) TokenInfo {
+	info := TokenInfo{
+		ID:          t.Id,
+		Name:        t.Name,
+		Description: t.Description,
+		Scope:       string(t.Scope),
+		Role:        role,
+		CreatedAt:   t.CreatedAt,
+		ExpiresAt:   t.EndAt,
 	}
-
-	tab := newTokenTableOut()
-	for i := range apiTokens {
-		created := TimeAgo(apiTokens[i].CreatedAt)
-		var createdBy string
-		if apiTokens[i].CreatedBy != nil {
-			switch {
-			case apiTokens[i].CreatedBy.FullName != nil:
-				createdBy = *apiTokens[i].CreatedBy.FullName
-			case apiTokens[i].CreatedBy.ApiTokenName != nil:
-				createdBy = *apiTokens[i].CreatedBy.ApiTokenName
-			}
+	if t.CreatedBy != nil {
+		switch {
+		case t.CreatedBy.FullName != nil:
+			info.CreatedBy = *t.CreatedBy.FullName
+		case t.CreatedBy.ApiTokenName != nil:
+			info.CreatedBy = *t.CreatedBy.ApiTokenName
 		}
-		tab.AddRow([]string{
-			apiTokens[i].Id,
-			apiTokens[i].Name,
-			apiTokens[i].Description,
-			string(apiTokens[i].Scope),
-			deploymentRoleOf(apiTokens[i], deploymentID),
-			created,
-			createdBy,
-		}, false)
 	}
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return info
 }
 
-// CreateToken creates a Deployment-scoped API token.
-func CreateToken(name, description, role, deploymentID string, expiration int, cleanOutput bool, out io.Writer, client astrov1.APIClient) error {
+// tokenInfos reports tokens with their roles on deploymentID, never nil.
+func tokenInfos(tokens []astrov1.ApiToken, deploymentID string) []TokenInfo {
+	infos := make([]TokenInfo, 0, len(tokens))
+	for i := range tokens {
+		infos = append(infos, tokenInfo(&tokens[i], deploymentRoleOf(tokens[i], deploymentID)))
+	}
+	return infos
+}
+
+// withSecret adds the secret the API returned with t, if it returned one.
+func withSecret(info TokenInfo, t *astrov1.ApiToken) TokenInfo { //nolint:gocritic // a value in, a value out
+	if t.Token != nil {
+		info.Token = *t.Token
+	}
+	return info
+}
+
+// ListTokens lists tokens with a role in the given deployment. tokenTypes, when
+// not empty, keeps only those scopes. The list is empty, never nil, when there
+// are none.
+func ListTokens(client astrov1.APIClient, deploymentID string, tokenTypes []DeploymentTokenType) ([]TokenInfo, error) {
+	apiTokens, err := getDeploymentTokens(deploymentID, tokenTypes, client)
+	if err != nil {
+		return nil, err
+	}
+	return tokenInfos(apiTokens, deploymentID), nil
+}
+
+// CreateToken creates a Deployment-scoped API token and returns it with its
+// secret.
+func CreateToken(name, description, role, deploymentID string, expiration int, client astrov1.APIClient) (TokenInfo, error) {
 	if name == "" {
-		return ErrInvalidTokenName
+		return TokenInfo{}, ErrInvalidTokenName
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 
 	dID := deploymentID
@@ -156,39 +209,27 @@ func CreateToken(name, description, role, deploymentID string, expiration int, c
 	}
 	resp, err := client.CreateApiTokenWithResponse(httpContext.Background(), ctx.Organization, req)
 	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
+		return TokenInfo{}, err
 	}
-	token := resp.JSON200
-	if cleanOutput {
-		if token.Token != nil {
-			fmt.Println(*token.Token)
-		}
-	} else {
-		fmt.Fprintf(out, "\nAstro Deployment API token %s was successfully created\n", name)
-		fmt.Println("Copy and paste this API token for your records.")
-		if token.Token != nil {
-			fmt.Println("\n" + *token.Token)
-		}
-		fmt.Println("\nYou will not be shown this API token value again.")
-	}
-	return nil
+	created := resp.JSON200
+	return withSecret(tokenInfo(created, role), created), nil
 }
 
 // UpdateToken updates a Deployment-scoped API token's name/description and optionally its deployment role.
-func UpdateToken(id, name, newName, description, role, deploymentID string, out io.Writer, client astrov1.APIClient) error {
+func UpdateToken(id, name, newName, description, role, deploymentID string, pick TokenPicker, client astrov1.APIClient) (TokenUpdate, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenUpdate{}, err
 	}
 	organizationID := ctx.Organization
 	tokenTypes := []DeploymentTokenType{DeploymentTokenTypeDEPLOYMENT}
 
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deploymentID, organizationID, &tokenTypes, client)
+	token, err := FindToken(id, name, deploymentID, tokenTypes, pick, client)
 	if err != nil {
-		return err
+		return TokenUpdate{}, err
 	}
 
 	updateReq := astrov1.UpdateApiTokenJSONRequestBody{}
@@ -206,188 +247,99 @@ func UpdateToken(id, name, newName, description, role, deploymentID string, out 
 	}
 	resp, err := client.UpdateApiTokenWithResponse(httpContext.Background(), organizationID, token.Id, updateReq)
 	if err != nil {
-		return err
+		return TokenUpdate{}, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
+		return TokenUpdate{}, err
+	}
+	// The token as the update left it: the API's answer, or what was asked
+	// for when it gave none.
+	updated := token
+	if resp.JSON200 != nil {
+		updated = *resp.JSON200
+	} else {
+		updated.Name, updated.Description = updateReq.Name, *updateReq.Description
 	}
 
 	newRole := role
 	if newRole == "" {
 		newRole = deploymentRoleOf(token, deploymentID)
 	}
-	if newRole == "" {
-		fmt.Fprintf(out, "Astro Deployment API token %s was successfully updated\n", token.Name)
-		return nil
+	if newRole != "" {
+		// Short-circuit: requested role is already set.
+		if role != "" && deploymentRoleOf(token, deploymentID) == role {
+			return TokenUpdate{}, errWorkspaceTokenInDeployment
+		}
+		if err := setDeploymentRole(token, deploymentID, newRole, organizationID, client); err != nil {
+			return TokenUpdate{}, err
+		}
 	}
-	// Short-circuit: requested role is already set.
-	if role != "" && deploymentRoleOf(token, deploymentID) == role {
-		return errWorkspaceTokenInDeployment
-	}
-	newRoles := upsertDeploymentRole(tokenRoles(token), deploymentID, newRole)
-	rolesResp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), organizationID, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
-	if err != nil {
-		return err
-	}
-	if err := astrov1.NormalizeAPIError(rolesResp.HTTPResponse, rolesResp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Astro Deployment API token %s was successfully updated\n", token.Name)
-	return nil
+	return TokenUpdate{Token: tokenInfo(&updated, newRole), PreviousName: token.Name}, nil
 }
 
-// RotateToken rotates the secret for a Deployment-scoped API token.
-func RotateToken(id, name, deploymentID string, cleanOutput, force bool, out io.Writer, client astrov1.APIClient) error {
+// RotateToken rotates the secret of token, which FindToken found, and returns
+// it with the new secret.
+func RotateToken(token astrov1.ApiToken, deploymentID string, client astrov1.APIClient) (TokenInfo, error) { //nolint:gocritic // ApiToken is what FindToken returns
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
-	organizationID := ctx.Organization
-	tokenTypes := []DeploymentTokenType{DeploymentTokenTypeDEPLOYMENT}
-
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deploymentID, organizationID, &tokenTypes, client)
+	resp, err := client.RotateApiTokenWithResponse(httpContext.Background(), ctx.Organization, token.Id)
 	if err != nil {
-		return err
-	}
-
-	if !force {
-		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
-		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)), input.AnsweredBy("--yes"))
-		if err != nil {
-			return err
-		}
-
-		if !i {
-			fmt.Println("Canceling token rotation")
-			return nil
-		}
-	}
-	resp, err := client.RotateApiTokenWithResponse(httpContext.Background(), organizationID, token.Id)
-	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 	rotated := resp.JSON200
-	if cleanOutput {
-		if rotated.Token != nil {
-			fmt.Println(*rotated.Token)
-		}
-	} else {
-		fmt.Fprintf(out, "\nAstro Deployment API token %s was successfully rotated\n", name)
-		fmt.Println("Copy and paste this API token for your records.")
-		if rotated.Token != nil {
-			fmt.Println("\n" + *rotated.Token)
-		}
-		fmt.Println("\nYou will not be shown this API token value again.")
+	role := deploymentRoleOf(*rotated, deploymentID)
+	if role == "" {
+		role = deploymentRoleOf(token, deploymentID)
 	}
-	return nil
+	return withSecret(tokenInfo(rotated, role), rotated), nil
 }
 
-// DeleteToken deletes a Deployment-scoped token or detaches a non-deployment token from the deployment.
-func DeleteToken(id, name, deploymentID string, force bool, out io.Writer, client astrov1.APIClient) error {
+// DeleteToken deletes token when it is Deployment-scoped, and otherwise
+// removes its role on the Deployment, leaving the token itself.
+func DeleteToken(token astrov1.ApiToken, deploymentID string, client astrov1.APIClient) (TokenRemoval, error) { //nolint:gocritic // ApiToken is what FindToken returns
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenRemoval{}, err
 	}
 	organizationID := ctx.Organization
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deploymentID, organizationID, nil, client)
-	if err != nil {
-		return err
-	}
-	isDep := string(token.Scope) == deploymentEntity
-	if !force {
-		var msg string
-		if isDep {
-			fmt.Println("WARNING: API token deletion cannot be undone.")
-			msg = fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))
-		} else {
-			msg = fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Deployment?", ansi.Bold(token.Name))
-		}
-		i, err := input.Confirm(msg, input.AnsweredBy("--yes"))
-		if err != nil {
-			return err
-		}
-		if !i {
-			if isDep {
-				fmt.Println("Canceling API Token deletion")
-			} else {
-				fmt.Println("Canceling API Token removal")
-			}
-			return nil
-		}
-	}
+	removal := TokenRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), DeploymentID: deploymentID}
 
-	if isDep {
+	if string(token.Scope) == deploymentEntity {
 		resp, err := client.DeleteApiTokenWithResponse(httpContext.Background(), organizationID, token.Id)
 		if err != nil {
-			return err
+			return TokenRemoval{}, err
 		}
 		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-			return err
+			return TokenRemoval{}, err
 		}
-		fmt.Fprintf(out, "Astro Deployment API token %s was successfully deleted\n", token.Name)
-		return nil
+		removal.Action = TokenDeleted
+		return removal, nil
 	}
-	// Detach by removing the deployment role.
-	newRoles := upsertDeploymentRole(tokenRoles(token), deploymentID, "")
-	rolesResp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), organizationID, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
-	if err != nil {
-		return err
+	if err := setDeploymentRole(token, deploymentID, "", organizationID, client); err != nil {
+		return TokenRemoval{}, err
 	}
-	if err := astrov1.NormalizeAPIError(rolesResp.HTTPResponse, rolesResp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Astro API token %s was successfully removed from the Deployment\n", token.Name)
-	return nil
+	removal.Action = TokenRemoved
+	return removal, nil
 }
 
-func selectTokens(deploymentID string, apiTokens []astrov1.ApiToken) (astrov1.ApiToken, error) {
-	apiTokensMap := map[string]astrov1.ApiToken{}
-	tab := newTokenSelectionTableOut()
-	for i := range apiTokens {
-		created := TimeAgo(apiTokens[i].CreatedAt)
-		var createdBy string
-		if apiTokens[i].CreatedBy != nil {
-			switch {
-			case apiTokens[i].CreatedBy.FullName != nil:
-				createdBy = *apiTokens[i].CreatedBy.FullName
-			case apiTokens[i].CreatedBy.ApiTokenName != nil:
-				createdBy = *apiTokens[i].CreatedBy.ApiTokenName
-			}
-		}
-
-		index := i + 1
-		tab.AddRow([]string{
-			strconv.Itoa(index),
-			apiTokens[i].Id,
-			apiTokens[i].Name,
-			apiTokens[i].Description,
-			string(apiTokens[i].Scope),
-			deploymentRoleOf(apiTokens[i], deploymentID),
-			created,
-			createdBy,
-		}, false)
-		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
-	}
-
-	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-	choice, err := input.Text("\n> ", input.About("an API token"), input.AnsweredBy("the token ID or --name"))
+// setDeploymentRole gives token role on deploymentID, or takes its role there
+// away when role is "".
+func setDeploymentRole(token astrov1.ApiToken, deploymentID, role, organizationID string, client astrov1.APIClient) error { //nolint:gocritic // ApiToken is large; called once per command
+	newRoles := upsertDeploymentRole(tokenRoles(token), deploymentID, role)
+	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), organizationID, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
 	if err != nil {
-		return astrov1.ApiToken{}, err
+		return err
 	}
-
-	selected, ok := apiTokensMap[choice]
-	if !ok {
-		return astrov1.ApiToken{}, errInvalidDeploymentTokenKey
-	}
-	return selected, nil
+	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }
 
 // getDeploymentTokens lists tokens with a role in the given deployment, filtered client-side by scope.
-func getDeploymentTokens(deploymentID string, tokenTypes *[]DeploymentTokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
+func getDeploymentTokens(deploymentID string, tokenTypes []DeploymentTokenType, client astrov1.APIClient) ([]astrov1.ApiToken, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -415,11 +367,11 @@ func getDeploymentTokens(deploymentID string, tokenTypes *[]DeploymentTokenType,
 		}
 		offset += limit
 	}
-	if tokenTypes == nil || len(*tokenTypes) == 0 {
+	if len(tokenTypes) == 0 {
 		return tokens, nil
 	}
 	allowed := map[string]struct{}{}
-	for _, t := range *tokenTypes {
+	for _, t := range tokenTypes {
 		allowed[string(t)] = struct{}{}
 	}
 	filtered := tokens[:0]
@@ -431,11 +383,22 @@ func getDeploymentTokens(deploymentID string, tokenTypes *[]DeploymentTokenType,
 	return filtered, nil
 }
 
-func getDeploymentToken(id, name, deploymentID, message string, tokens []astrov1.ApiToken) (token astrov1.ApiToken, err error) {
+// pickToken has pick choose among tokens.
+func pickToken(pick TokenPicker, heading, deploymentID string, tokens []astrov1.ApiToken) (astrov1.ApiToken, error) {
+	i, err := pick(heading, tokenInfos(tokens, deploymentID))
+	if err != nil {
+		return astrov1.ApiToken{}, err
+	}
+	if i < 0 || i >= len(tokens) {
+		return astrov1.ApiToken{}, fmt.Errorf("token picker returned %d of %d tokens", i, len(tokens))
+	}
+	return tokens[i], nil
+}
+
+func getDeploymentToken(id, name, deploymentID string, tokens []astrov1.ApiToken, pick TokenPicker) (token astrov1.ApiToken, err error) {
 	switch {
 	case id == "" && name == "":
-		fmt.Println(message)
-		token, err = selectTokens(deploymentID, tokens)
+		token, err = pickToken(pick, pickHeading, deploymentID, tokens)
 		if err != nil {
 			return astrov1.ApiToken{}, err
 		}
@@ -458,8 +421,7 @@ func getDeploymentToken(id, name, deploymentID, message string, tokens []astrov1
 		if len(matchedTokens) == 1 {
 			token = matchedTokens[0]
 		} else if len(matchedTokens) > 1 {
-			fmt.Printf("\nThere are more than one API tokens with name %s. Please select an API token:\n", name)
-			token, err = selectTokens(deploymentID, matchedTokens)
+			token, err = pickToken(pick, fmt.Sprintf(pickSharedNameHead, name), deploymentID, matchedTokens)
 			if err != nil {
 				return astrov1.ApiToken{}, err
 			}
@@ -500,13 +462,22 @@ func getTokenByID(id, orgID string, client astrov1.APIClient) (token astrov1.Api
 	return *resp.JSON200, nil
 }
 
-func GetDeploymentTokenFromInputOrUser(id, name, deploymentID, organizationID string, tokenTypes *[]DeploymentTokenType, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+// FindToken finds the token a command means: the one with id, else the one
+// named name among the tokens with a role on the Deployment, else the one a
+// person picks through pick. tokenTypes, when not empty, are the scopes the
+// command may act on.
+func FindToken(id, name, deploymentID string, tokenTypes []DeploymentTokenType, pick TokenPicker, client astrov1.APIClient) (token astrov1.ApiToken, err error) {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return token, err
+	}
+	organizationID := ctx.Organization
 	if id == "" {
 		tokens, err := getDeploymentTokens(deploymentID, tokenTypes, client)
 		if err != nil {
 			return token, err
 		}
-		tokenFromList, err := getDeploymentToken(id, name, deploymentID, "\nPlease select the Deployment API token:", tokens)
+		tokenFromList, err := getDeploymentToken(id, name, deploymentID, tokens, pick)
 		if err != nil {
 			return token, err
 		}
@@ -520,9 +491,9 @@ func GetDeploymentTokenFromInputOrUser(id, name, deploymentID, organizationID st
 			return token, err
 		}
 	}
-	if tokenTypes != nil && len(*tokenTypes) > 0 {
+	if len(tokenTypes) > 0 {
 		stringTokenTypes := []string{}
-		for _, tokenType := range *tokenTypes {
+		for _, tokenType := range tokenTypes {
 			stringTokenTypes = append(stringTokenTypes, string(tokenType))
 		}
 		if !slices.Contains(stringTokenTypes, string(token.Scope)) {
@@ -533,114 +504,95 @@ func GetDeploymentTokenFromInputOrUser(id, name, deploymentID, organizationID st
 }
 
 // RemoveOrgTokenDeploymentRole removes the deployment-scope role from an Organization token.
-func RemoveOrgTokenDeploymentRole(id, name, deploymentID string, out io.Writer, client astrov1.APIClient) error {
+func RemoveOrgTokenDeploymentRole(id, name, deploymentID string, pick TokenPicker, client astrov1.APIClient) (TokenRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenRemoval{}, err
 	}
-	organizationID := ctx.Organization
 	tokenTypes := []DeploymentTokenType{DeploymentTokenTypeORGANIZATION}
-	token, err := GetDeploymentTokenFromInputOrUser(id, name, deploymentID, organizationID, &tokenTypes, client)
+	token, err := FindToken(id, name, deploymentID, tokenTypes, pick, client)
 	if err != nil {
-		return err
+		return TokenRemoval{}, err
 	}
-	newRoles := upsertDeploymentRole(tokenRoles(token), deploymentID, "")
-	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), organizationID, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
-	if err != nil {
-		return err
+	if err := setDeploymentRole(token, deploymentID, "", ctx.Organization, client); err != nil {
+		return TokenRemoval{}, err
 	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Astro Organization API token %s was successfully removed from the Deployment\n", token.Name)
-	return nil
+	return TokenRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), DeploymentID: deploymentID, Action: TokenRemoved}, nil
 }
 
-// RemoveWorkspaceTokenDeploymentRole removes the deployment-scope role from a Workspace token.
-func RemoveWorkspaceTokenDeploymentRole(id, name, workspaceID, deploymentID string, out io.Writer, client astrov1.APIClient) error {
+// RemoveWorkspaceTokenDeploymentRole removes the deployment-scope role from a
+// Workspace token. A token named by neither id nor name is picked from the
+// Workspace's tokens, by the workspace-token package's own picker.
+func RemoveWorkspaceTokenDeploymentRole(id, name, workspaceID, deploymentID string, client astrov1.APIClient) (TokenRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenRemoval{}, err
 	}
 	organizationID := ctx.Organization
 	wsTypes := []workspaceService.TokenType{workspaceService.TokenTypeWORKSPACE}
 	token, err := workspaceService.GetTokenFromInputOrUser(id, name, workspaceID, organizationID, &wsTypes, client)
 	if err != nil {
-		return err
+		return TokenRemoval{}, err
 	}
-	newRoles := upsertDeploymentRole(tokenRoles(token), deploymentID, "")
-	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), organizationID, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
-	if err != nil {
-		return err
+	if err := setDeploymentRole(token, deploymentID, "", organizationID, client); err != nil {
+		return TokenRemoval{}, err
 	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Astro Workspace API token %s was successfully removed from the Deployment\n", token.Name)
-	return nil
+	return TokenRemoval{ID: token.Id, Name: token.Name, Scope: string(token.Scope), DeploymentID: deploymentID, Action: TokenRemoved}, nil
 }
 
-// UpsertWorkspaceTokenDeploymentRole adds/updates a deployment-scope role on a Workspace token.
-func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspaceID, deploymentID, operation string, out io.Writer, client astrov1.APIClient) error {
+// UpsertWorkspaceTokenDeploymentRole adds/updates a deployment-scope role on a
+// Workspace token, and returns the token with that role. An add ("create")
+// finds the token among the Workspace's, through the workspace-token package's
+// own picker; an update finds it among the Deployment's, through pick.
+func UpsertWorkspaceTokenDeploymentRole(id, name, role, workspaceID, deploymentID, operation string, pick TokenPicker, client astrov1.APIClient) (TokenInfo, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 	var token astrov1.ApiToken
 	if operation == "create" {
 		wsTypes := []workspaceService.TokenType{workspaceService.TokenTypeWORKSPACE}
 		token, err = workspaceService.GetTokenFromInputOrUser(id, name, workspaceID, ctx.Organization, &wsTypes, client)
 	} else {
-		depTypes := []DeploymentTokenType{DeploymentTokenTypeWORKSPACE}
-		token, err = GetDeploymentTokenFromInputOrUser(id, name, deploymentID, ctx.Organization, &depTypes, client)
+		token, err = FindToken(id, name, deploymentID, []DeploymentTokenType{DeploymentTokenTypeWORKSPACE}, pick, client)
 	}
 	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 	// Short-circuit: already has this role on the deployment.
 	if deploymentRoleOf(token, deploymentID) == role {
-		return errWorkspaceTokenInDeployment
+		return TokenInfo{}, errWorkspaceTokenInDeployment
 	}
-	newRoles := upsertDeploymentRole(tokenRoles(token), deploymentID, role)
-	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), ctx.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
-	if err != nil {
-		return err
+	if err := setDeploymentRole(token, deploymentID, role, ctx.Organization, client); err != nil {
+		return TokenInfo{}, err
 	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Astro Workspace API token %s was successfully added/updated to the Deployment\n", token.Name)
-	return nil
+	return tokenInfo(&token, role), nil
 }
 
-// UpsertOrgTokenDeploymentRole adds/updates a deployment-scope role on an Organization token.
-func UpsertOrgTokenDeploymentRole(id, name, role, deploymentID, operation string, out io.Writer, client astrov1.APIClient) error {
+// UpsertOrgTokenDeploymentRole adds/updates a deployment-scope role on an
+// Organization token, and returns the token with that role. An add ("create")
+// finds the token among the Organization's, through the organization package's
+// own picker; an update finds it among the Deployment's, through pick.
+func UpsertOrgTokenDeploymentRole(id, name, role, deploymentID, operation string, pick TokenPicker, client astrov1.APIClient) (TokenInfo, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 	var token astrov1.ApiToken
 	if operation == "create" {
 		token, err = organization.GetTokenFromInputOrUser(id, name, ctx.Organization, client)
 	} else {
-		depTypes := []DeploymentTokenType{DeploymentTokenTypeORGANIZATION}
-		token, err = GetDeploymentTokenFromInputOrUser(id, name, deploymentID, ctx.Organization, &depTypes, client)
+		token, err = FindToken(id, name, deploymentID, []DeploymentTokenType{DeploymentTokenTypeORGANIZATION}, pick, client)
 	}
 	if err != nil {
-		return err
+		return TokenInfo{}, err
 	}
 	// Short-circuit: already has this role on the deployment.
 	if deploymentRoleOf(token, deploymentID) == role {
-		return errOrgTokenInDeployment
+		return TokenInfo{}, errOrgTokenInDeployment
 	}
-	newRoles := upsertDeploymentRole(tokenRoles(token), deploymentID, role)
-	resp, err := client.UpdateApiTokenRolesWithResponse(httpContext.Background(), ctx.Organization, token.Id, astrov1.UpdateApiTokenRolesRequest{Roles: newRoles})
-	if err != nil {
-		return err
+	if err := setDeploymentRole(token, deploymentID, role, ctx.Organization, client); err != nil {
+		return TokenInfo{}, err
 	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Astro Organization API token %s was successfully added/updated to the Deployment\n", token.Name)
-	return nil
+	return tokenInfo(&token, role), nil
 }
