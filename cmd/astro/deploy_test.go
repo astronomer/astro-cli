@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,6 +26,38 @@ func execDeployCmd(args ...string) error {
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()
 	return err
+}
+
+// A 1.x project with uncommitted changes is refused with an error, so the
+// deploy that did not happen exits non-zero. It used to print a note and
+// return nil: exit 0, and CI reported a deploy that never ran. --force deploys
+// anyway.
+func TestDeployRefusesUncommittedChanges(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	prev := hasUncommittedChanges
+	hasUncommittedChanges = func(string) bool { return true }
+	t.Cleanup(func() { hasUncommittedChanges = prev })
+
+	deployed := 0
+	DeployImage = func(astrodeploy.InputDeploy, astrov1.APIClient, astrov1alpha1.APIClient) error {
+		deployed++
+		return nil
+	}
+
+	testUtil.SetupOSArgsForGinkgo()
+	cmd := NewDeployCmd()
+	var printed bytes.Buffer
+	cmd.SetOut(&printed)
+	cmd.SetErr(&printed)
+	cmd.SetArgs([]string{"test-deployment-id"})
+	_, err := cmd.ExecuteC()
+	assert.ErrorIs(t, err, errUncommittedChanges)
+	assert.Equal(t, 0, deployed, "a refused deploy ships nothing")
+	assert.NotContains(t, printed.String(), "Usage:", "the refusal is not a usage mistake")
+
+	assert.NoError(t, execDeployCmd("test-deployment-id", "--force"))
+	assert.Equal(t, 1, deployed, "--force deploys anyway")
 }
 
 func TestDeployImage(t *testing.T) {

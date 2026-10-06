@@ -76,11 +76,14 @@ Menu will be presented if you do not specify a deployment ID:
 	DeployImage      = astrodeploy.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
 	buildSecrets     = []string{}
+	// hasUncommittedChanges is a variable so a test does not depend on the
+	// state of the checkout it runs in.
+	hasUncommittedChanges = git.HasUncommittedChanges
+
+	errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy [deployment-id] --force` to deploy anyway")
 )
 
 const (
-	registryUncommitedChangesMsg = "Project directory has uncommitted changes, use `astro deploy [deployment-id] -f` to force deploy."
-
 	deployWaitTime = 300 * time.Second
 
 	imageNameFlag = "image-name"
@@ -141,7 +144,7 @@ func NewDeployCmd() *cobra.Command {
 	// selector. -d/--deployment is the spelling everywhere the letter is free.
 	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id. In a project with a pyproject.toml ([tool.astro])")
 	cmd.Flags().StringVar(&manifestWorkspace, "workspace", "", "Workspace for the deploy, overriding the context. In a project with a pyproject.toml ([tool.astro])")
-	cmd.Flags().StringVar(&deployOutput, "output", string(formatText), "Output format in a project with a pyproject.toml ([tool.astro]): text or json")
+	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format in a project with a pyproject.toml ([tool.astro]): text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-DAG bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
@@ -289,9 +292,12 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if git.HasUncommittedChanges("") && !forceDeploy {
-		fmt.Println(registryUncommitedChangesMsg)
-		return nil
+	// An error, not a printed note: returning nil here made a deploy that never
+	// happened exit 0, so CI reported it as a success.
+	if hasUncommittedChanges("") && !forceDeploy {
+		// Not a usage mistake, so no usage block under the error.
+		cmd.SilenceUsage = true
+		return errUncommittedChanges
 	}
 
 	// case for astro deploy --dags whose default operation should be not running any tests
@@ -397,7 +403,7 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	// {"error","code","kind"} object on stdout: the root reports it
 	// (cliout.Execute). A script reading stdout to find out what went wrong is
 	// who these refusals exist for.
-	format, err := parseDeployFormat(deployOutput)
+	format, err := cliout.ParseFormat(deployOutput)
 	if err != nil {
 		return err
 	}
@@ -463,7 +469,7 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	// stream a program can parse — a question on stderr with the run blocked on
 	// stdin is not that. So json mode is non-interactive whatever stdin is, and
 	// must name its target like any other script.
-	interactive := format == formatText && stdinIsTerminal()
+	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	// Only a run that is going to ask has any use for the ambient layers, and
 	// reading the pin is not free — it creates the project's state directory.
@@ -512,7 +518,7 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 		// context, the progress line is this command's own output — and json
 		// mode drops both, so the single result object is all it adds.
 		Announce: func(target manifestdeploy.Target) {
-			if format != formatText {
+			if format != cliout.FormatText {
 				return
 			}
 			announceDeployTarget(errOut, target)
@@ -521,7 +527,7 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 			}
 		},
 		OnBuild: func() {
-			if format == formatText {
+			if format == cliout.FormatText {
 				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
 			}
 		},
@@ -580,26 +586,6 @@ func deployPreselect(projectDir string, willPrompt bool) (name, from string) {
 	return state.Instance, manifestdeploy.PinnedBy
 }
 
-// deployFormat selects how the manifest deploy path renders its result.
-type deployFormat string
-
-const (
-	formatText deployFormat = "text"
-	formatJSON deployFormat = "json"
-)
-
-// parseDeployFormat validates the --output value for the manifest deploy path.
-func parseDeployFormat(s string) (deployFormat, error) {
-	switch deployFormat(s) {
-	case formatText:
-		return formatText, nil
-	case formatJSON:
-		return formatJSON, nil
-	default:
-		return "", cliout.Usage(fmt.Errorf("unknown output format %q (supported: text, json)", s))
-	}
-}
-
 // deployJSON is the single object `astro deploy --output json` emits when a manifest
 // deploy finishes. Fields that do not apply to a deploy kind are omitted: a
 // dags-only deploy carries no image_tag, an image-only deploy no
@@ -628,8 +614,8 @@ type deployGitJSON struct {
 // renderManifestDeploy writes a finished manifest deploy: one JSON object in json mode, a
 // plain summary in text mode. Both render the same Result, so the two modes
 // never drift.
-func renderManifestDeploy(w io.Writer, format deployFormat, res *manifestdeploy.Result) error {
-	if format == formatJSON {
+func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy.Result) error {
+	if format == cliout.FormatJSON {
 		obj := deployJSON{
 			Deployment:       res.DeploymentID,
 			Link:             res.LinkName,

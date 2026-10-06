@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,43 @@ func execDeployCmd(args ...string) error {
 	defer testUtil.SetupOSArgsForGinkgo()()
 	_, err := cmd.ExecuteC()
 	return err
+}
+
+// A checkout with uncommitted changes is refused with an error, so the deploy
+// that did not happen exits non-zero, with no usage block under it. It used to
+// print a note and return nil: exit 0. --force deploys anyway.
+func (s *Suite) TestDeployRefusesUncommittedChanges() {
+	appConfig = &houston.AppConfig{}
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	prev := hasUncommittedChanges
+	hasUncommittedChanges = func(string) bool { return true }
+	defer func() { hasUncommittedChanges = prev }()
+
+	deployed := 0
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		deployed++
+		return deploymentID, nil
+	}
+	prevDags := DagsOnlyDeploy
+	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		return nil
+	}
+	defer func() { DagsOnlyDeploy = prevDags }()
+
+	cmd := NewDeployCmd()
+	var printed bytes.Buffer
+	cmd.SetOut(&printed)
+	cmd.SetErr(&printed)
+	cmd.SetArgs([]string{"test-deployment-id", "--workspace-id", "test-workspace-id"})
+	restore := testUtil.SetupOSArgsForGinkgo()
+	_, err := cmd.ExecuteC()
+	restore()
+	s.ErrorIs(err, errUncommittedChanges)
+	s.Equal(0, deployed, "a refused deploy ships nothing")
+	s.NotContains(printed.String(), "Usage:", "the refusal is not a usage mistake")
+
+	s.NoError(execDeployCmd("test-deployment-id", "--workspace-id", "test-workspace-id", "--force"))
+	s.Equal(1, deployed, "--force deploys anyway")
 }
 
 func (s *Suite) TestDeploy() {

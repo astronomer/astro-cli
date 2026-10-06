@@ -54,7 +54,7 @@ func resetDeployFlagVars() {
 	deploymentName = ""
 	deployDescription = ""
 	nonDags = false
-	deployOutput = string(formatText)
+	deployOutput = string(cliout.FormatText)
 }
 
 // manifestWithDefaultLink is a project with two links, one marked default.
