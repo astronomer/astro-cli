@@ -991,7 +991,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		cmdArgs := []string{"update", "test-id-1", "--name", "test", "--workspace-id", ws, "--force"}
+		cmdArgs := []string{"update", "test-id-1", "--name", "test", "--workspace-id", ws, "--yes"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -1006,7 +1006,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "enable"}
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "enable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -1021,29 +1021,29 @@ func TestDeploymentUpdate(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "disable"}
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "disable"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("returns an error if ci-cd enforcement has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--cicd-enforcement", "some-value"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--cicd-enforcement", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if type enforcement has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--type", "some-value"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--type", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if dag-deploy has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--dag-deploy", "some-value"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--dag-deploy", "some-value"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.Error(t, err)
 	})
 	t.Run("returns an error if executor has an incorrect value", func(t *testing.T) {
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--force", "--executor", "KubeExecutor"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--yes", "--executor", "KubeExecutor"}
 		_, err := execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "KubeExecutor is not a valid executor")
 	})
@@ -1157,7 +1157,7 @@ deployment:
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
 
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--force"}
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "small", "--yes"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -1169,7 +1169,7 @@ deployment:
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--force"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--high-availability", "some-value", "--yes"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "Invalid --high-availability value")
 	})
@@ -1179,7 +1179,7 @@ deployment:
 		ctx.SetContextKey("organization_product", "HOSTED")
 		ctx.SetContextKey("organization", "test-org-id")
 		ctx.SetContextKey("workspace", ws)
-		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--development-mode", "some-value", "--force"}
+		cmdArgs := []string{"update", "test-id", "--name", "test-name", "--workspace-id", ws, "--development-mode", "some-value", "--yes"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.ErrorContains(t, err, "Invalid --development-mode value")
 	})
@@ -1221,7 +1221,7 @@ deployment:
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Times(1)
 
-		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--force"}
+		cmdArgs := []string{"update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--yes"}
 		_, err = execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
@@ -1316,7 +1316,7 @@ func TestDeploymentDelete(t *testing.T) {
 	mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
 	mockV1Client.On("DeleteDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeleteDeploymentResponse, nil).Times(1)
 
-	cmdArgs := []string{"delete", "test-id-1", "--force"}
+	cmdArgs := []string{"delete", "test-id-1", "--yes"}
 	_, err := execDeploymentCmd(cmdArgs...)
 	assert.NoError(t, err)
 	mockV1Client.AssertExpectations(t)
@@ -1474,7 +1474,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 
 			defer testUtil.MockUserInput(t, "1")()
 
-			cmdArgs := []string{tt.command, "", "--force"}
+			cmdArgs := []string{tt.command, "", "--yes"}
 			_, err := execDeploymentCmd(cmdArgs...)
 			assert.NoError(t, err)
 			mockV1Client.AssertExpectations(t)
@@ -1503,7 +1503,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Once()
 			mockV1Client.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
 
-			cmdArgs := []string{tt.command, "test-id-1", "--until", until, "--force"}
+			cmdArgs := []string{tt.command, "test-id-1", "--until", until, "--yes"}
 			_, err = execDeploymentCmd(cmdArgs...)
 			assert.NoError(t, err)
 			mockV1Client.AssertExpectations(t)
@@ -1512,7 +1512,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 		t.Run(fmt.Sprintf("%s with until returns an error if invalid", tt.command), func(t *testing.T) {
 			until := "invalid-duration"
 
-			cmdArgs := []string{tt.command, "test-id-1", "--until", until, "--force"}
+			cmdArgs := []string{tt.command, "test-id-1", "--until", until, "--yes"}
 			_, err := execDeploymentCmd(cmdArgs...)
 			assert.Error(t, err)
 		})
@@ -1541,7 +1541,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Once()
 			mockV1Client.On("UpdateDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
 
-			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--force"}
+			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--yes"}
 			_, err = execDeploymentCmd(cmdArgs...)
 			assert.NoError(t, err)
 			mockV1Client.AssertExpectations(t)
@@ -1550,18 +1550,18 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 		t.Run(fmt.Sprintf("%s with for returns an error if invalid", tt.command), func(t *testing.T) {
 			forDuration := "invalid-duration"
 
-			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--force"}
+			cmdArgs := []string{tt.command, "test-id-1", "--for", forDuration, "--yes"}
 			_, err := execDeploymentCmd(cmdArgs...)
 			assert.Error(t, err)
 		})
 
 		t.Run(fmt.Sprintf("%s refuses --wait-time without --wait", tt.command), func(t *testing.T) {
-			_, err := execDeploymentCmd(tt.command, "test-id-1", "--wait-time", "1m", "--force")
+			_, err := execDeploymentCmd(tt.command, "test-id-1", "--wait-time", "1m", "--yes")
 			assert.ErrorContains(t, err, "cannot use --wait-time with --wait=false")
 		})
 
 		t.Run(fmt.Sprintf("%s refuses --wait with --remove-override", tt.command), func(t *testing.T) {
-			_, err := execDeploymentCmd(tt.command, "test-id-1", "--wait", "--remove-override", "--force")
+			_, err := execDeploymentCmd(tt.command, "test-id-1", "--wait", "--remove-override", "--yes")
 			assert.ErrorContains(t, err, "none of the others can be")
 		})
 
@@ -1579,7 +1579,7 @@ func TestDeploymentHibernateAndWakeUp(t *testing.T) {
 			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&hostedDeploymentResponse, nil).Once()
 			mockV1Client.On("DeleteDeploymentHibernationOverrideWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockResponse, nil).Once()
 
-			cmdArgs := []string{tt.command, "test-id-1", "--remove-override", "--force"}
+			cmdArgs := []string{tt.command, "test-id-1", "--remove-override", "--yes"}
 			_, err := execDeploymentCmd(cmdArgs...)
 			assert.NoError(t, err)
 			mockV1Client.AssertExpectations(t)
@@ -1662,4 +1662,24 @@ func TestIsValidCloudProvider(t *testing.T) {
 		actual := isValidCloudProvider("ibm")
 		assert.False(t, actual)
 	})
+}
+
+// --yes answers the --deployment-file path's own confirmation and --verbosity
+// is global, so neither is refused beside the file; the missing file is what
+// fails, after the flag check. Any other flag still is. (TestDeploymentCreate
+// and TestDeploymentUpdate are skipped, so this guard has its own test.)
+func TestDeploymentFromFileTakesYes(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+
+	for _, verb := range []string{"create", "update"} {
+		for _, extra := range [][]string{{"--yes"}, {"-y"}, {"--verbosity", "debug"}} {
+			args := append([]string{verb, "--deployment-file", "test-file-name.json"}, extra...)
+			_, err := execDeploymentCmd(args...)
+			assert.NotErrorIs(t, err, errFlag, "%v", args)
+			assert.ErrorContains(t, err, "test-file-name.json", "%v", args)
+		}
+		_, err := execDeploymentCmd(verb, "--deployment-file", "test-file-name.json", "--description", "x")
+		assert.ErrorIs(t, err, errFlag, verb)
+	}
 }

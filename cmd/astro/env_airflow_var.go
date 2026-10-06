@@ -15,14 +15,14 @@ import (
 
 const envAirflowVarExamples = `
   # set a variable, creating it if it does not exist
-  astro env airflow-variable set region --workspace-id <ws> --value us-east-1
+  astro env airflow-variable set region --workspace <ws> --value us-east-1
 
   # set many from a dotenv file
-  astro env airflow-variable set --workspace-id <ws> --from-file vars.env
+  astro env airflow-variable set --workspace <ws> --from-file vars.env
 
   # list and delete
-  astro env airflow-variable list --workspace-id <ws>
-  astro env airflow-variable delete region --workspace-id <ws> --yes`
+  astro env airflow-variable list --workspace <ws>
+  astro env airflow-variable delete region --workspace <ws> --yes`
 
 func newEnvAirflowVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

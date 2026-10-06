@@ -33,7 +33,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 		Example: `
   $ astro deployment inspect <deployment-id>
   $ astro deployment inspect <deployment-id> --output json
-  $ astro deployment inspect --deployment-name my-deployment --key configuration.cluster_id
+  $ astro deployment inspect --deployment my-deployment --key configuration.cluster_id
   $ astro deployment inspect <deployment-id> --template > deployment.yaml
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,6 +41,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to inspect.")
+	addDeploymentFlag(cmd.Flags(), "Deployment to inspect: a link name from pyproject.toml, a Deployment id, or a Deployment name")
 	cliout.AddOutputFlag(cmd, &outputFormat, formatYAML)
 	cmd.PersistentFlags().Lookup("output").Usage += ". text prints the deployment as YAML, the same as yaml."
 	cmd.Flags().BoolVarP(&template, "template", "t", false, "Create a template from the deployment being inspected.")

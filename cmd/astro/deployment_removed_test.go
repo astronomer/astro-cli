@@ -18,8 +18,8 @@ func TestRemovedDeploymentObjectGroupsAreTombstones(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"connection list", []string{"connection", "list", "--deployment-id", "d"}, "astro env connection list --deployment-id"},
-		{"con alias", []string{"con", "li", "-d", "d"}, "astro env connection list --deployment-id"},
+		{"connection list", []string{"connection", "list", "--deployment-id", "d"}, "astro env connection list --deployment <deployment-id>"},
+		{"con alias", []string{"con", "li", "-d", "d"}, "astro env connection list --deployment <deployment-id>"},
 		{"connection create", []string{"connections", "create", "--conn-id", "c", "--conn-type", "http"}, "astro env connection set <key>"},
 		{"connection update", []string{"connection", "up", "--conn-id", "c"}, "astro env connection set <key>"},
 		{"connection delete", []string{"connection", "rm", "--conn-id", "c", "-f"}, "astro env connection delete <key>"},

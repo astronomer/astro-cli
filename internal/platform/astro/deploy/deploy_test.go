@@ -640,7 +640,7 @@ func TestDagsDeployByIDFollowsTheDeploymentsWorkspace(t *testing.T) {
 
 	deployInput.WsIDFromFlag = true
 	err := Deploy(deployInput, mockV1Client, nil)
-	assert.EqualError(t, err, "deployment test-deployment-id is in workspace test-ws-id, not workspace context-ws-id given by --workspace-id. Pass --workspace-id test-ws-id, or leave the flag out")
+	assert.EqualError(t, err, "deployment test-deployment-id is in workspace test-ws-id, not workspace context-ws-id given by --workspace. Pass --workspace test-ws-id, or leave the flag out")
 	mockV1Client.AssertNumberOfCalls(t, "CreateDeployWithResponse", 1)
 }
 
@@ -988,7 +988,7 @@ func TestDeployFailure(t *testing.T) {
 	deployInput.WsID = "invalid-workspace"
 	deployInput.WsIDFromFlag = true
 	err = Deploy(deployInput, mockV1Client, nil)
-	assert.EqualError(t, err, "deployment test-deployment-id is in workspace test-ws-id, not workspace invalid-workspace given by --workspace-id. Pass --workspace-id test-ws-id, or leave the flag out")
+	assert.EqualError(t, err, "deployment test-deployment-id is in workspace test-ws-id, not workspace invalid-workspace given by --workspace. Pass --workspace test-ws-id, or leave the flag out")
 	deployInput.WsIDFromFlag = false
 
 	defer testUtil.MockUserInput(t, "y")()

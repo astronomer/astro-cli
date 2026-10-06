@@ -50,18 +50,18 @@ var connLinkNoun = linkNoun{
 	what: "connection",
 	examples: `
   # link a workspace connection to a deployment, pointing it at another host
-  astro env connection link set --connection-key db --workspace-id <ws> \
-    --deployment-id <dep> --host db.prod.internal --port 5432
+  astro env connection link set --connection-key db --workspace <ws> \
+    --deployment <dep> --host db.prod.internal --port 5432
 
   # drop those overrides, keeping the link
-  astro env connection link set --connection-key db --workspace-id <ws> --deployment-id <dep>
+  astro env connection link set --connection-key db --workspace <ws> --deployment <dep>
 
   # opt one deployment out of an auto-linked connection
-  astro env connection link set --connection-key db --workspace-id <ws> --deployment-id <dep> --exclude
+  astro env connection link set --connection-key db --workspace <ws> --deployment <dep> --exclude
 
   # list links, and remove one
-  astro env connection link list --connection-key db --workspace-id <ws>
-  astro env connection link delete --connection-key db --workspace-id <ws> --deployment-id <dep>`,
+  astro env connection link list --connection-key db --workspace <ws>
+  astro env connection link delete --connection-key db --workspace <ws> --deployment <dep>`,
 	addOverrideFlags: func(cmd *cobra.Command, f *linkFlags) {
 		cmd.Flags().StringVarP(&f.conn.connType, "type", "t", "", "The deployment's own connection type")
 		cmd.Flags().StringVar(&f.conn.host, "host", "", "The deployment's own host")
@@ -83,18 +83,18 @@ var airflowVarLinkNoun = linkNoun{
 	what: "Airflow variable",
 	examples: `
   # link a workspace Airflow variable to a deployment, with a value only it sees
-  astro env airflow-variable link set --airflow-variable-key region --workspace-id <ws> \
-    --deployment-id <dep> --value eu-west-1
+  astro env airflow-variable link set --airflow-variable-key region --workspace <ws> \
+    --deployment <dep> --value eu-west-1
 
   # drop that value, keeping the link
-  astro env airflow-variable link set --airflow-variable-key region --workspace-id <ws> --deployment-id <dep>
+  astro env airflow-variable link set --airflow-variable-key region --workspace <ws> --deployment <dep>
 
   # opt one deployment out of an auto-linked Airflow variable
-  astro env airflow-variable link set --airflow-variable-key region --workspace-id <ws> --deployment-id <dep> --exclude
+  astro env airflow-variable link set --airflow-variable-key region --workspace <ws> --deployment <dep> --exclude
 
   # list links, and remove one
-  astro env airflow-variable link list --airflow-variable-key region --workspace-id <ws>
-  astro env airflow-variable link delete --airflow-variable-key region --workspace-id <ws> --deployment-id <dep>`,
+  astro env airflow-variable link list --airflow-variable-key region --workspace <ws>
+  astro env airflow-variable link delete --airflow-variable-key region --workspace <ws> --deployment <dep>`,
 	addOverrideFlags: func(cmd *cobra.Command, f *linkFlags) {
 		cmd.Flags().StringVar(&f.value, "value", "", "The deployment's own value; omit it to clear any it had")
 		cmd.MarkFlagsMutuallyExclusive("value", "exclude")
@@ -210,13 +210,14 @@ func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
 	}
 	addLinkObjectFlags(cmd, n, f)
 	cmd.Flags().StringVar(&f.deploymentID, "deployment-id", "", "ID of the deployment to link (required)")
+	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)")
 	cmd.Flags().BoolVar(&f.exclude, "exclude", false, "Opt the deployment out of an auto-linked "+n.what+" instead")
 	cmd.Flags().BoolVar(&f.noCreate, "no-create", false, "Fail if the deployment is not already linked")
 	// --exclude takes a different path entirely (the platform's exclude-linking
 	// endpoint), which has no create/update distinction for --no-create to
 	// govern. Accepting the pair would have silently ignored the guard.
 	cmd.MarkFlagsMutuallyExclusive("exclude", "no-create")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	n.addOverrideFlags(cmd, f)
 	return cmd
 }
@@ -232,8 +233,9 @@ func newEnvLinkDeleteCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Comman
 	}
 	addLinkObjectFlags(cmd, n, f)
 	cmd.Flags().StringVar(&f.deploymentID, "deployment-id", "", "ID of the deployment to unlink (required)")
+	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)")
 	cmd.Flags().BoolVar(&f.exclude, "exclude", false, "Remove an exclude instead of a link")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

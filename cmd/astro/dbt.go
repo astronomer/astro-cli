@@ -41,6 +41,7 @@ func newDbtCmd() *cobra.Command {
 		newDbtDeleteCmd(),
 		newDbtCleanupCmd(),
 	)
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
@@ -83,6 +84,8 @@ Menu will be presented if you do not specify a deployment ID:
 	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to deploy. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to deploy to")
+	addWorkspaceFlag(cmd.Flags(), "", "Workspace for your Deployment")
+	addDeploymentFlag(cmd.Flags(), "Deployment to deploy to: a Deployment id, or a Deployment name")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVarP(&waitTime, "wait-time", "t", dbtWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
@@ -185,6 +188,8 @@ Menu will be presented if you do not specify a deployment ID:
 	cmd.Flags().StringVarP(&dbtProjectPath, "project-path", "p", "", "Path to the dbt project to delete from the Deployment. Default current directory")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to delete the dbt project from")
+	addWorkspaceFlag(cmd.Flags(), "", "Workspace for your Deployment")
+	addDeploymentFlag(cmd.Flags(), "Deployment to delete the dbt project from: a Deployment id, or a Deployment name")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Description to store on the deploy")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVarP(&waitTime, "wait-time", "t", dbtWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
@@ -286,6 +291,10 @@ func resolveDeploymentIDFromArgsFlags(args []string, workspaceID, deploymentName
 	// if provided, use the deployment ID from the command argument
 	if len(args) > 0 {
 		return args[0], nil
+	}
+	// or the one given as --deployment
+	if deploymentArg != "" {
+		return deploymentArg, nil
 	}
 
 	// otherwise, prompt the user to select a deployment

@@ -164,7 +164,7 @@ func TestNewDeploymentWorkerQueueDeleteCmd(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(2)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		cmdArgs := []string{"worker-queue", "delete", "-n", "test-worker-queue-1", "-f"}
+		cmdArgs := []string{"worker-queue", "delete", "-n", "test-worker-queue-1", "-y"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOutMessage)
@@ -206,7 +206,7 @@ func TestNewDeploymentWorkerQueueUpdateCmd(t *testing.T) {
 		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
 
 		// updating min count
-		cmdArgs := []string{"worker-queue", "update", "-n", "default", "-t", "test-worker-1", "--min-count", "0", "-f"}
+		cmdArgs := []string{"worker-queue", "update", "-n", "default", "-t", "test-worker-1", "--min-count", "0", "-y"}
 		resp, err := execDeploymentCmd(cmdArgs...)
 		assert.NoError(t, err)
 		assert.Contains(t, resp, expectedOutMessage)

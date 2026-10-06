@@ -185,6 +185,6 @@ func newContextDeleteCmd() *cobra.Command {
 		Args: cobra.ExactArgs(1),
 	}
 
-	cmd.Flags().BoolVarP(&noPrompt, "force", "f", false, "Don't prompt a user before context delete; assume \"yes\" as answer to all prompts and run non-interactively.")
+	cmd.Flags().BoolVarP(&noPrompt, "yes", "y", false, "Don't ask for confirmation before deleting the current context")
 	return cmd
 }

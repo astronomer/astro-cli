@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -147,7 +148,8 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id")
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
-	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace-id", "W", "", "Override workspace ID for deployment lookup")
+	cmd.PersistentFlags().StringVar(&opts.WorkspaceID, "workspace-id", "", "Override workspace ID for deployment lookup")
+	utils.AddPreferredFlag(cmd.PersistentFlags(), "workspace", "W", "Workspace to look the Deployment up in, overriding the context's", "workspace-id")
 	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")
@@ -177,6 +179,7 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 	cmd.AddCommand(NewAirflowListCmd(out, opts))
 	cmd.AddCommand(NewAirflowDescribeCmd(out, opts))
 	cmd.AddCommand(NewAirflowSpecCmd(out, opts))
+	utils.BeforeArgs(cmd, func(c *cobra.Command, _ []string) error { return utils.ApplyPreferredFlags(c.Flags(), nil) })
 
 	return cmd
 }

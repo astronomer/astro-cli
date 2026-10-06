@@ -54,7 +54,7 @@ const (
 	parseAndPytest           = "parse-and-all-tests"
 	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys"
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
-	workspaceFlagMismatchMsg = "deployment %s is in workspace %s, not workspace %s given by --workspace-id. Pass --workspace-id %s, or leave the flag out"
+	workspaceFlagMismatchMsg = "deployment %s is in workspace %s, not workspace %s given by --workspace. Pass --workspace %s, or leave the flag out"
 	otherWorkspaceMsg        = "Deployment %s is in workspace %s, not the current workspace %s. Deploying to it there.\n"
 	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
 )

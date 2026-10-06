@@ -446,11 +446,11 @@ func RotateToken(id, name string, cleanOutput, force bool, out io.Writer, client
 
 	if !force {
 		question := fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name))
-		if err := input.MayAsk(question, input.AnsweredBy("--force")); err != nil {
+		if err := input.MayAsk(question, input.AnsweredBy("--yes")); err != nil {
 			return err
 		}
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
-		i, err := input.Confirm(question, input.AnsweredBy("--force"))
+		i, err := input.Confirm(question, input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
@@ -502,13 +502,13 @@ func DeleteToken(id, name string, force bool, out io.Writer, client astrov1.APIC
 		} else {
 			msg = fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Organization?", ansi.Bold(token.Name))
 		}
-		if err := input.MayAsk(msg, input.AnsweredBy("--force")); err != nil {
+		if err := input.MayAsk(msg, input.AnsweredBy("--yes")); err != nil {
 			return err
 		}
 		if isOrg {
 			fmt.Println("WARNING: API token deletion cannot be undone.")
 		}
-		i, err := input.Confirm(msg, input.AnsweredBy("--force"))
+		i, err := input.Confirm(msg, input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}

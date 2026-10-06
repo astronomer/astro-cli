@@ -79,7 +79,8 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 // followProject reads the project around the working directory, if any, and
 // resolves the command's Deployment reference and default workspace from it.
 // A link name given as --deployment-id, --deployment-name or a Deployment-id
-// argument is replaced in place by the link's Deployment id.
+// argument is replaced in place by the link's Deployment id. --deployment
+// reaches here as one of those (see routeDeployment).
 func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 	projectWorkspaceID = ""
 	m, err := projectManifest(config.WorkingPath)
@@ -115,6 +116,12 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 		}
 		// The command's RunE is handed this same slice.
 		args[0] = id
+	case deploymentArg != "":
+		// A Deployment id given as --deployment, standing in for the argument.
+		if id, link, err = projectDeployment(m, deploymentArg); err != nil {
+			return projectPick{}, err
+		}
+		deploymentID = id
 	}
 
 	pick := projectPick{link: link}

@@ -143,7 +143,7 @@ func NewDeployCmd() *cobra.Command {
 	// it would turn `astro deploy -d` from a DAG-only deploy into a target
 	// selector. -d/--deployment is the spelling everywhere the letter is free.
 	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id. In a project with a pyproject.toml ([tool.astro])")
-	cmd.Flags().StringVar(&manifestWorkspace, "workspace", "", "Workspace for the deploy, overriding the context. In a project with a pyproject.toml ([tool.astro])")
+	cmd.Flags().StringVar(&manifestWorkspace, "workspace", "", "Workspace for the deploy, overriding the context")
 	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format in a project with a pyproject.toml ([tool.astro]): text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
@@ -171,6 +171,8 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "non-dags-mount-path", "non-dags")
 	annotateDeployFlag(cmd, "non-dags-bundle-type", "non-dags")
 	annotateDeployFlag(cmd, "non-dags-local-path", "non-dags")
+	utils.MarkPreferredFlag(cmd.Flags(), "workspace", "workspace-id")
+	applyPreferredFlagsIn(cmd)
 	cmd.SetUsageTemplate(deployFlagsUsageTemplate)
 	return cmd
 }

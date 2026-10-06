@@ -71,6 +71,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTokenRootCmd(out),
 		newWorkspaceTeamRootCmd(out),
 	)
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
@@ -95,7 +96,7 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 		Use:     "switch [workspace name/id]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Astro Workspace",
-		Long:    "Switch your active Astro Workspace. Subsequent deployment, user, and team commands run against the selected Workspace unless overridden with --workspace-id.",
+		Long:    "Switch your active Astro Workspace. Subsequent deployment, user, and team commands run against the selected Workspace unless overridden with --workspace.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
   $ astro workspace switch
@@ -182,6 +183,7 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUserAddCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you'd like to manage users")
+	addWorkspaceFlag(cmd.PersistentFlags(), "", "Workspace whose users you'd like to manage")
 
 	return cmd
 }
@@ -211,7 +213,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the users in an Astro Workspace",
 		Long:    "List all users and their roles in a Workspace.",
 		Example: `  astro workspace user list
-  astro workspace user list --workspace-id clxxxxxxxxx
+  astro workspace user list --workspace clxxxxxxxxx
   astro workspace user list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceUser(cmd, out)
@@ -274,6 +276,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceOrgTokenManageCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you would like to manage tokens")
+	addWorkspaceFlag(cmd.PersistentFlags(), "", "Workspace whose tokens you'd like to manage")
 	return cmd
 }
 
@@ -285,7 +288,7 @@ func newWorkspaceTokenListCmd(out io.Writer) *cobra.Command {
 		Long:    "List all API tokens with a role in a Workspace, including both Workspace-scoped tokens and Organization-scoped tokens that have been granted a Workspace role.",
 		Example: `
   $ astro workspace token list
-  $ astro workspace token list --workspace-id clxxxxxxxxx
+  $ astro workspace token list --workspace clxxxxxxxxx
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceToken(cmd, out)
@@ -381,7 +384,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 		Long:    "Rotate a Workspace API token. You can only rotate Workspace API tokens. You cannot rotate Organization API tokens with this command",
 		Example: `
   $ astro workspace token rotate clxxxxxxxxx
-  $ astro workspace token rotate --name "My Token" --force --clean-output
+  $ astro workspace token rotate --name "My Token" --yes --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateWorkspaceToken(cmd, args, out)
@@ -389,7 +392,7 @@ func newWorkspaceTokenRotateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate the Workspace API token without showing a warning")
+	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Workspace API token")
 
 	return cmd
 }
@@ -402,14 +405,14 @@ func newWorkspaceTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Long:    "Delete a Workspace API token or remove an Organization token's Workspace role. Deleting a Workspace token revokes it permanently. Removing an Organization token only revokes its Workspace role — the token continues to work at other scopes.",
 		Example: `
   $ astro workspace token delete clxxxxxxxxx
-  $ astro workspace token delete --name "My Token" --force
+  $ astro workspace token delete --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deleteWorkspaceToken(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete or remove the API token without showing a warning")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
 
 	return cmd
 }
@@ -604,13 +607,14 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 		Long:  "Add a team to an Astro Workspace with a specific role\n$astro workspace team add [id] --role [" + allowedWorkspaceRoleNames + "].",
 		Example: `
   $ astro workspace team add clxxxxxxxxx --role WORKSPACE_MEMBER
-  $ astro workspace team add clxxxxxxxxx --role WORKSPACE_OPERATOR --workspace-id clyyyyyyyyy
+  $ astro workspace team add clxxxxxxxxx --role WORKSPACE_OPERATOR --workspace clyyyyyyyyy
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceTeam(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "The Workspace's unique identifier")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), "w", "The Workspace's unique identifier")
 	cmd.Flags().StringVarP(&addWorkspaceRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
 		"new team. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd

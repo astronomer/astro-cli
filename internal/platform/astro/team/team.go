@@ -39,7 +39,7 @@ func confirmOperation(force bool) (bool, error) {
 	if force {
 		return true, nil
 	}
-	return input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--force"))
+	return input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--yes"))
 }
 
 func CreateTeam(name, description, role string, out io.Writer, client astrov1.APIClient) error {

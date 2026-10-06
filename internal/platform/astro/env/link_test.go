@@ -280,7 +280,7 @@ func (s *Suite) TestExcludeVarIdempotent() {
 func (s *Suite) TestLinkVarRejectsDeploymentScope() {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	err := LinkVar("FOO", Scope{DeploymentID: cuid.New()}, cuid.New(), nil, false, mc)
-	s.ErrorContains(err, "workspace-id")
+	s.ErrorContains(err, "require --workspace;")
 }
 
 func (s *Suite) TestLinkVarRejectsBadDeploymentID() {

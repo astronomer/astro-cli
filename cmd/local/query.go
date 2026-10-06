@@ -106,7 +106,7 @@ func (*deploymentTarget) envList(noun string, opened instances.Instance) string 
 	if id == "" {
 		id = "<id>"
 	}
-	return "astro env " + noun + " list --deployment-id " + id
+	return "astro env " + noun + " list --deployment " + id
 }
 
 func (t *deploymentTarget) open(ctx context.Context, c *cli) (*airflowapi.Client, error) {

@@ -16,19 +16,19 @@ import (
 
 const envVarExamples = `
   # set a variable, creating it if it does not exist
-  astro env variable set API_TOKEN --workspace-id <ws> --value "$TOKEN" --secret
+  astro env variable set API_TOKEN --workspace <ws> --value "$TOKEN" --secret
 
   # fail instead of creating, to catch a mistyped key
-  astro env variable set API_TOKEN --workspace-id <ws> --value "$TOKEN" --no-create
+  astro env variable set API_TOKEN --workspace <ws> --value "$TOKEN" --no-create
 
   # export to a .env file, or set many from one
-  astro env variable export --workspace-id <ws> > .env
-  astro env variable set --workspace-id <ws> --from-file .env
+  astro env variable export --workspace <ws> > .env
+  astro env variable set --workspace <ws> --from-file .env
 
   # list, as a table or as JSON for a script, and delete
-  astro env variable list --workspace-id <ws>
-  astro env variable list --workspace-id <ws> -o json
-  astro env variable delete API_TOKEN --workspace-id <ws> --yes`
+  astro env variable list --workspace <ws>
+  astro env variable list --workspace <ws> -o json
+  astro env variable delete API_TOKEN --workspace <ws> --yes`
 
 func newEnvVarRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

@@ -124,10 +124,10 @@ func TestEnvVarLinkVariableFlagValidation(t *testing.T) {
 	_, err = execEnvCmd("var", "link", "list", "--variable-id", cuid.New(), "--variable-key", "FOO", "--workspace-id", cuid.New())
 	assert.ErrorContains(t, err, "none of the others can be")
 
-	// create requires --deployment-id
+	// create requires --deployment
 	resetEnvFlags()
 	_, err = execEnvCmd("var", "link", "set", "--variable-key", "FOO", "--workspace-id", cuid.New())
-	assert.ErrorContains(t, err, `required flag(s) "deployment-id" not set`)
+	assert.ErrorContains(t, err, `required flag(s) "deployment" not set`)
 
 	// --value and --exclude are mutually exclusive
 	resetEnvFlags()

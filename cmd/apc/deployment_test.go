@@ -255,8 +255,8 @@ func (s *Suite) TestDeploymentCreateCommandDagOnlyDeployEnabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--force"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
-		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy", "--force"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--yes"}, expectedOutput: "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs", expectedError: ""},
+		{cmdArgs: []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dummy", "--yes"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api
@@ -362,7 +362,7 @@ func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 		api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
-		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1", "--force"}
+		cmdArgs := []string{"create", "--label=new-deployment-name", "--executor=celery", "--dag-deployment-type=dag_deploy", "--triggerer-replicas=1", "--yes"}
 		expectedOutput := "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs"
 		houstonClient = api
 		output, err := execDeploymentCmd(cmdArgs...)
@@ -850,8 +850,8 @@ func (s *Suite) TestDeploymentUpdateCommandDagOnlyDeployEnabled() {
 		expectedOutput string
 		expectedError  string
 	}{
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy", "--force"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
-		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=invalid", "--force"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=dag_deploy", "--yes"}, expectedOutput: "Successfully updated deployment", expectedError: ""},
+		{cmdArgs: []string{"update", "cknrml96n02523xr97ygj95n5", "--label=test22222", "--dag-deployment-type=invalid", "--yes"}, expectedOutput: "", expectedError: ErrInvalidDAGDeploymentType.Error()},
 	}
 	for _, tt := range myTests {
 		houstonClient = api

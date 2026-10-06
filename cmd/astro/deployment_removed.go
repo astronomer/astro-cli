@@ -74,16 +74,16 @@ func removedDeploymentObjectGuidance(o removedDeploymentObject, args []string) s
 	envCmd := "astro env " + o.envNoun
 	switch verb {
 	case "list", "li":
-		return head + fmt.Sprintf("  use:  %s list --deployment-id <deployment-id>", envCmd)
+		return head + fmt.Sprintf("  use:  %s list --deployment <deployment-id>", envCmd)
 	case "create", "cr", "update", "up":
-		return head + fmt.Sprintf("  use:  %s set <key> --deployment-id <deployment-id>\n"+
+		return head + fmt.Sprintf("  use:  %s set <key> --deployment <deployment-id>\n"+
 			"`set` creates the object when it does not exist and updates it when it does.", envCmd)
 	case "delete", "rm":
-		return head + fmt.Sprintf("  use:  %s delete <key> --deployment-id <deployment-id>", envCmd)
+		return head + fmt.Sprintf("  use:  %s delete <key> --deployment <deployment-id>", envCmd)
 	case "copy", "cp":
 		return head + fmt.Sprintf("There is no copy. To share one object between Deployments, set it once in the workspace:\n"+
-			"  use:  %s set <key> --workspace-id <workspace-id> --auto-link\n"+
-			"or set it on each Deployment with --deployment-id.", envCmd)
+			"  use:  %s set <key> --workspace <workspace-id> --auto-link\n"+
+			"or set it on each Deployment with --deployment.", envCmd)
 	}
 	return head + fmt.Sprintf("  use:  %s --help\n"+
 		"The Environment Manager holds %ss at workspace or Deployment scope.", envCmd, o.noun)

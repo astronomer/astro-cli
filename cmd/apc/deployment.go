@@ -183,7 +183,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVarP(&skipPrompt, "force", "f", false, SkipUserPromptMsgForCreateDeployment)
+	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, SkipUserPromptMsgForCreateDeployment)
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, runtimeEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
@@ -335,7 +335,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 		},
 	}
 
-	cmd.Flags().BoolVarP(&skipPrompt, "force", "f", false, SkipUserPromptMsgForUpdateDeployment)
+	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, SkipUserPromptMsgForUpdateDeployment)
 
 	var nfsMountDAGDeploymentEnabled, triggererEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
 	if appConfig != nil {
@@ -509,7 +509,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 
 	// If it's a dag_deploy type, validate from the user first
 	if !skipPrompt && dagDeploymentType == houston.DagOnlyDeploymentType {
-		y, err := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg, input.AnsweredBy("--force"))
+		y, err := input.Confirm(CreateDeploymentWithTypeDagDeployPromptMsg, input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
@@ -624,7 +624,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 
 // confirmDagDeploymentTypeChange asks before an update moves a deployment onto
 // or off dag_deploy, and reports whether to go on. Any other change needs no
-// answer; --force skips the question.
+// answer; --yes skips the question.
 func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 	var prompt string
 	switch {
@@ -635,7 +635,7 @@ func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 	default:
 		return true, nil
 	}
-	return input.Confirm(prompt, input.AnsweredBy("--force"))
+	return input.Confirm(prompt, input.AnsweredBy("--yes"))
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {

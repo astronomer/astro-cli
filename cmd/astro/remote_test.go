@@ -266,7 +266,7 @@ func TestRemoteCommandIntegration(t *testing.T) {
 	t.Run("deploy command includes deployment validation example", func(t *testing.T) {
 		deployCmd, _, err := rootCmd.Find([]string{"deploy"})
 		assert.NoError(t, err)
-		assert.Contains(t, deployCmd.Example, "--deployment-id")
+		assert.Contains(t, deployCmd.Example, "--deployment ")
 		assert.Contains(t, deployCmd.Example, "deployment validation")
 	})
 }

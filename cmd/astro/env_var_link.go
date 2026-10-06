@@ -22,18 +22,18 @@ var (
 
 const envVarLinkExamples = `
   # link a workspace variable to a deployment, with a value only it sees
-  astro env variable link set --variable-key DATABASE_URL --workspace-id <ws> \
-    --deployment-id <dep> --value postgres://prod
+  astro env variable link set --variable-key DATABASE_URL --workspace <ws> \
+    --deployment <dep> --value postgres://prod
 
   # drop that value, keeping the link
-  astro env variable link set --variable-key DATABASE_URL --workspace-id <ws> --deployment-id <dep>
+  astro env variable link set --variable-key DATABASE_URL --workspace <ws> --deployment <dep>
 
   # opt one deployment out of an auto-linked variable
-  astro env variable link set --variable-key LOG_LEVEL --workspace-id <ws> --deployment-id <dep> --exclude
+  astro env variable link set --variable-key LOG_LEVEL --workspace <ws> --deployment <dep> --exclude
 
   # list links, and remove one
-  astro env variable link list --variable-key DATABASE_URL --workspace-id <ws>
-  astro env variable link delete --variable-key DATABASE_URL --workspace-id <ws> --deployment-id <dep>`
+  astro env variable link list --variable-key DATABASE_URL --workspace <ws>
+  astro env variable link delete --variable-key DATABASE_URL --workspace <ws> --deployment <dep>`
 
 func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -85,7 +85,7 @@ func linkVariableIDOrKey() (string, error) {
 func newRemovedLinkCreateCmd() *cobra.Command {
 	return removedVerbStub("create", []string{"cr"}, func([]string) string {
 		return "`astro env variable link create` was removed in v2.\n" +
-			"  use:  astro env variable link set --variable-key <key> --deployment-id <id>\n" +
+			"  use:  astro env variable link set --variable-key <key> --deployment <id>\n" +
 			"`set` links the deployment when it is not linked and updates the link when it is. " +
 			"It also treats --value as the whole override, so omitting it now CLEARS an existing " +
 			"override rather than leaving it in place — which is how one is removed. " +
@@ -107,6 +107,7 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	}
 	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to link (required)")
+	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)")
 	cmd.Flags().StringVar(&envLinkValue, "value", "", "The deployment's own value; omit it to clear any it had")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Opt the deployment out of an auto-linked variable instead")
 	cmd.Flags().BoolVar(&envLinkNoCreate, "no-create", false, "Fail if the deployment is not already linked")
@@ -114,7 +115,7 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	// endpoint), which has no create/update distinction for --no-create to
 	// govern. Accepting the pair would have silently ignored the guard.
 	cmd.MarkFlagsMutuallyExclusive("exclude", "no-create")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.MarkFlagsMutuallyExclusive("value", "exclude")
 	return cmd
 }
@@ -130,8 +131,9 @@ func newEnvVarLinkDeleteCmd(out io.Writer) *cobra.Command {
 	}
 	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to unlink (required)")
+	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)")
 	cmd.Flags().BoolVar(&envLinkExclude, "exclude", false, "Remove an exclude instead of a link")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 

@@ -253,7 +253,7 @@ func RotateToken(id, name, deploymentID string, cleanOutput, force bool, out io.
 	if !force {
 		fmt.Println("WARNING: API Token rotation will invalidate the current token and cannot be undone.")
 		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)), input.AnsweredBy("--force"))
+			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)), input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
@@ -306,7 +306,7 @@ func DeleteToken(id, name, deploymentID string, force bool, out io.Writer, clien
 		} else {
 			msg = fmt.Sprintf("\nAre you sure you want to remove the %s API token from the Deployment?", ansi.Bold(token.Name))
 		}
-		i, err := input.Confirm(msg, input.AnsweredBy("--force"))
+		i, err := input.Confirm(msg, input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}

@@ -37,6 +37,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleDeleteCmd(out),
 	)
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "The Deployment whose bundles you'd like to manage. Run 'astro deployment list' to find valid IDs")
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose bundles you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs")
 	return cmd
 }
 
@@ -46,10 +47,10 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
 		Short: "Create a bundle on an Astro Deployment",
 		Long:  "Create a DAG bundle (with --name) or a non-DAG bundle (with --mount-path) on an Astro Deployment.",
 		Example: `  # Create a named DAG bundle
-  astro deployment bundle create --deployment-id <id> --name my-dags
+  astro deployment bundle create --deployment <id> --name my-dags
 
   # Create a non-DAG bundle mounted at a path
-  astro deployment bundle create --deployment-id <id> --mount-path /usr/local/airflow/dbt --bundle-type dbt`,
+  astro deployment bundle create --deployment <id> --mount-path /usr/local/airflow/dbt --bundle-type dbt`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := coalesceWorkspace()
 			if err != nil {
@@ -73,8 +74,8 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List the bundles on an Astro Deployment",
 		Long:    "List every DAG and non-DAG bundle registered on an Astro Deployment.",
-		Example: `  astro deployment bundle list --deployment-id <id>
-  astro deployment bundle list --deployment-id <id> -o json`,
+		Example: `  astro deployment bundle list --deployment <id>
+  astro deployment bundle list --deployment <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			format, err := cliout.ParseFormat(bundleListOutput)
 			if err != nil {
@@ -98,13 +99,13 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 		Short: "Update a bundle on an Astro Deployment",
 		Long:  "Update a bundle's description or, for a non-DAG bundle, the DAG bundles it is served alongside. Identify the bundle by its ID argument, its DAG bundle --name, or its non-DAG --mount-path.",
 		Example: `  # Update a bundle's description, identified by ID
-  astro deployment bundle update <bundle-id> --deployment-id <id> --description "my bundle"
+  astro deployment bundle update <bundle-id> --deployment <id> --description "my bundle"
 
   # Identify a DAG bundle by name instead of ID
-  astro deployment bundle update --deployment-id <id> --name my-dags --description "my bundle"
+  astro deployment bundle update --deployment <id> --name my-dags --description "my bundle"
 
   # Re-associate a non-DAG bundle (identified by mount path) with a different set of DAG bundles
-  astro deployment bundle update --deployment-id <id> --mount-path /usr/local/airflow/dbt --dag-bundle-ids <dag-bundle-id>`,
+  astro deployment bundle update --deployment <id> --mount-path /usr/local/airflow/dbt --dag-bundle-ids <dag-bundle-id>`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := coalesceWorkspace()
@@ -133,13 +134,13 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete a bundle from an Astro Deployment",
 		Long:    "Delete a DAG or non-DAG bundle from an Astro Deployment. Identify the bundle by its ID argument, its DAG bundle --name, or its non-DAG --mount-path.",
 		Example: `  # Delete a bundle identified by ID
-  astro deployment bundle delete <bundle-id> --deployment-id <id>
+  astro deployment bundle delete <bundle-id> --deployment <id>
 
   # Identify a DAG bundle by name
-  astro deployment bundle delete --deployment-id <id> --name my-dags
+  astro deployment bundle delete --deployment <id> --name my-dags
 
   # Identify a non-DAG bundle by mount path
-  astro deployment bundle delete --deployment-id <id> --mount-path /usr/local/airflow/dbt`,
+  astro deployment bundle delete --deployment <id> --mount-path /usr/local/airflow/dbt`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := coalesceWorkspace()
@@ -156,6 +157,6 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the DAG bundle to delete by name, instead of by ID")
 	cmd.Flags().StringVar(&bundleMountPath, "mount-path", "", "Identify the non-DAG bundle to delete by mount path, instead of by ID")
-	cmd.Flags().BoolVarP(&forceBundleDelete, "force", "f", false, "Delete the bundle without confirmation")
+	cmd.Flags().BoolVarP(&forceBundleDelete, "yes", "y", false, "Don't ask for confirmation before deleting the bundle")
 	return cmd
 }

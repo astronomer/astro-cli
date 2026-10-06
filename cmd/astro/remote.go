@@ -39,7 +39,7 @@ Deploy with build secrets:
 
 Deploy with deployment validation:
 
-  $ astro remote deploy --deployment-id my-deployment-id
+  $ astro remote deploy --deployment my-deployment-id
 `
 )
 
@@ -52,6 +52,7 @@ func newRemoteRootCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newRemoteDeployCmd())
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
@@ -79,6 +80,7 @@ func newRemoteDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&remoteImageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag. The image should be present on the local machine.")
 	utils.AddBuildSecretFlag(cmd.Flags(), &remoteBuildSecrets)
 	cmd.Flags().StringVar(&remoteDeploymentID, "deployment-id", "", "Deployment ID to validate client image runtime version against deployment runtime version")
+	addDeploymentFlag(cmd.Flags(), "Deployment whose runtime version the client image is validated against")
 
 	return cmd
 }

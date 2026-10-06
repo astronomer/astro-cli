@@ -125,7 +125,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 			err := k.del(id, Scope{DeploymentID: depID}, mc)
 			s.ErrorIs(err, ErrOutOfScope)
 			s.Contains(err.Error(), "belongs to workspace "+wsID+", not deployment "+depID)
-			s.Contains(err.Error(), "--workspace-id "+wsID)
+			s.Contains(err.Error(), "--workspace "+wsID)
 			if k.name == "metrics-export" {
 				// Metrics exports have no link commands to suggest.
 				s.NotContains(err.Error(), "link")
@@ -148,7 +148,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 
 			err := k.del(id, Scope{DeploymentID: depID}, mc)
 			s.ErrorIs(err, ErrOutOfScope)
-			s.Contains(err.Error(), "--deployment-id "+otherDep)
+			s.Contains(err.Error(), "--deployment "+otherDep)
 			mc.AssertNotCalled(s.T(), "DeleteEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything)
 		})
 
@@ -239,7 +239,7 @@ func (s *Suite) TestInScopeComparesTheScopeKind() {
 }
 
 // Linking only takes workspace objects, so a deployment object's ID gets the
-// linking rule, not a hint to pass --deployment-id (which in a link command
+// linking rule, not a hint to pass --deployment (which in a link command
 // names the link's target).
 func (s *Suite) TestLinkByIDOfADeploymentObjectExplainsLinkingIsWorkspaceOnly() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -254,7 +254,7 @@ func (s *Suite) TestLinkByIDOfADeploymentObjectExplainsLinkingIsWorkspaceOnly() 
 	err := Link(LinkVariable, id, Scope{WorkspaceID: wsID}, target, nil, false, mc)
 	s.Error(err)
 	s.Contains(err.Error(), "only workspace-scoped objects can be linked")
-	s.NotContains(err.Error(), "--deployment-id")
+	s.NotContains(err.Error(), "pass --deployment")
 	mc.AssertNotCalled(s.T(), "UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -271,7 +271,7 @@ func (s *Suite) TestLinkByIDOfAnotherWorkspacesObjectIsRefused() {
 
 	err := Link(LinkVariable, id, Scope{WorkspaceID: wsID}, target, nil, false, mc)
 	s.ErrorIs(err, ErrOutOfScope)
-	s.Contains(err.Error(), "--workspace-id "+otherWS)
+	s.Contains(err.Error(), "--workspace "+otherWS)
 	mc.AssertNotCalled(s.T(), "UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 

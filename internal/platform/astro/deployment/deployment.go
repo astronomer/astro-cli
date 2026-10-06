@@ -964,7 +964,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		if !canCiCdDeploy(c.Token) {
 			fmt.Printf("\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start." +
 				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.")
-			y, err := input.Confirm("\n\nAre you sure you want to continue?", input.AnsweredBy("--force"))
+			y, err := input.Confirm("\n\nAre you sure you want to continue?", input.AnsweredBy("--yes"))
 			if err != nil {
 				return err
 			}
@@ -1381,7 +1381,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if !force {
 		if confirmWithUser {
 			y, err := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 			if err != nil {
 				return err
 			}
@@ -1587,7 +1587,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 	// prompt user
 	if !forceDelete {
 		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to delete the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+			fmt.Sprintf("\nAre you sure you want to delete the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
@@ -1634,7 +1634,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.Bold(action), ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.Bold(action), ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
@@ -1704,7 +1704,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--force"))
+			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}

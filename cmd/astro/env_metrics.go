@@ -16,16 +16,16 @@ import (
 
 const envMetricsExamples = `
   # set a Prometheus export, creating it if it does not exist
-  astro env metrics-export set prom_main --workspace-id <ws> \
+  astro env metrics-export set prom_main --workspace <ws> \
     --endpoint https://prom.example.com/api/v1/write --exporter-type PROMETHEUS \
     --auth-type BASIC --username scraper --password "$PW"
 
   # change labels on one that must already exist
-  astro env metrics-export set prom_main --workspace-id <ws> --label env=prod --no-create
+  astro env metrics-export set prom_main --workspace <ws> --label env=prod --no-create
 
   # list and delete
-  astro env metrics-export list --workspace-id <ws>
-  astro env metrics-export delete prom_main --workspace-id <ws> --yes`
+  astro env metrics-export list --workspace <ws>
+  astro env metrics-export delete prom_main --workspace <ws> --yes`
 
 func newEnvMetricsExportRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

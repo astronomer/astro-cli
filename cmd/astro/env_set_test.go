@@ -1235,7 +1235,7 @@ func TestEnvDeleteAndSetRefuseAWorkspaceObjectsIDUnderDeploymentID(t *testing.T)
 			_, err := execEnvCmd(tc.args(id, depID)...)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), "belongs to workspace "+wsID)
-			assert.Contains(t, err.Error(), "--workspace-id "+wsID)
+			assert.Contains(t, err.Error(), "--workspace "+wsID)
 			mc.AssertExpectations(t)
 		})
 	}

@@ -84,7 +84,7 @@ func Switch(domain string) error {
 func Delete(domain string, noPrompt bool) error {
 	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this shell code
 	if currentCtx.Domain != "" && currentCtx.Domain == domain && !noPrompt {
-		i, err := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--force"))
+		i, err := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}

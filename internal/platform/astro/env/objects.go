@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	ErrScopeNotSpecified = errors.New("--workspace-id or --deployment-id must be specified")
-	ErrScopeAmbiguous    = errors.New("--workspace-id and --deployment-id are mutually exclusive")
+	ErrScopeNotSpecified = errors.New("--workspace or --deployment must be specified")
+	ErrScopeAmbiguous    = errors.New("--workspace and --deployment are mutually exclusive")
 	ErrNotFound          = errors.New("environment object not found")
 	// ErrOutOfScope reports an object addressed by ID that lives outside the
 	// scope the command named, or is of another type than the command handles.
@@ -212,10 +212,10 @@ func checkInScope(obj *astrov1.EnvironmentObject, id string, scope Scope, object
 		return nil
 	}
 	owner := strings.ToLower(string(obj.Scope))
-	msg := fmt.Sprintf("%s %s belongs to %s %s, not %s %s. To address it, pass --%s-id %s",
+	msg := fmt.Sprintf("%s %s belongs to %s %s, not %s %s. To address it, pass --%s %s",
 		want, id, owner, obj.ScopeEntityId, strings.ToLower(string(wantScope)), wantEntity, owner, obj.ScopeEntityId)
 	if obj.Scope == astrov1.EnvironmentObjectScopeWORKSPACE && scope.DeploymentID != "" && objectType != objectTypeMetrics {
-		msg = fmt.Sprintf("%s %s belongs to workspace %s, not deployment %s. To change it everywhere, pass --workspace-id %s. "+
+		msg = fmt.Sprintf("%s %s belongs to workspace %s, not deployment %s. To change it everywhere, pass --workspace %s. "+
 			"To remove it from just this deployment, use `astro env %s link delete` (or `link set --exclude` if it is auto-linked)",
 			want, id, obj.ScopeEntityId, wantEntity, obj.ScopeEntityId, want)
 	}

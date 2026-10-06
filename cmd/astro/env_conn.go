@@ -17,17 +17,17 @@ import (
 
 const envConnExamples = `
   # set from a URI, creating it if it does not exist
-  astro env connection set db_main --workspace-id <ws> \
+  astro env connection set db_main --workspace <ws> \
     --value 'postgres://admin@db.example.com:5432/warehouse' --password "$PW"
 
   # or field by field
-  astro env connection set db_main --workspace-id <ws> \
+  astro env connection set db_main --workspace <ws> \
     --type postgres --host db.example.com --login admin --port 5432
 
   # list, as a table or as JSON for a script, and delete
-  astro env connection list --workspace-id <ws>
-  astro env connection list --workspace-id <ws> -o json
-  astro env connection delete db_main --workspace-id <ws> --yes`
+  astro env connection list --workspace <ws>
+  astro env connection list --workspace <ws> -o json
+  astro env connection delete db_main --workspace <ws> --yes`
 
 func newEnvConnRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

@@ -18,7 +18,7 @@ import (
 // error" from the platform.
 func validateDeploymentID(depID string) error {
 	if depID == "" {
-		return errors.New("--deployment-id cannot be empty")
+		return errors.New("--deployment cannot be empty")
 	}
 	if !util.IsCUID(depID) {
 		return fmt.Errorf("%q is not a valid deployment ID (expected a CUID)", depID)
@@ -474,7 +474,7 @@ func overrideMap(o *astrov1.UpdateEnvironmentObjectOverridesRequest) (map[string
 // the platform refuses links on any other scope with a 400).
 func resolveWorkspaceObject(k linkKind, idOrKey string, scope Scope, includeSecrets bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	if scope.WorkspaceID == "" {
-		return nil, errors.New("linking commands require --workspace-id; deployment-scoped objects cannot be linked")
+		return nil, errors.New("linking commands require --workspace; deployment-scoped objects cannot be linked")
 	}
 	obj, err := getObject(idOrKey, scope, k.objectType, includeSecrets, astroV1Client)
 	var outOfScope *outOfScopeError

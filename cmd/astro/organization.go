@@ -75,6 +75,7 @@ func newOrganizationCmd(out io.Writer) *cobra.Command {
 		newOrganizationRoleRootCmd(out),
 		newOrganizationClusterRootCmd(out),
 	)
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
@@ -99,12 +100,12 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 		Use:     "switch [organization name/id]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Organization",
-		Long:    "Switch your active Organization and reset your Workspace context. After switching, your active Workspace is cleared unless you specify one with --workspace-id. Use --login-link to generate a login URL for switching on a different device.",
+		Long:    "Switch your active Organization and reset your Workspace context. After switching, your active Workspace is cleared unless you specify one with --workspace. Use --login-link to generate a login URL for switching on a different device.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
   $ astro organization switch
   $ astro organization switch my-organization
-  $ astro organization switch --login-link --workspace-id ws123456
+  $ astro organization switch --login-link --workspace ws123456
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationSwitch(cmd, out, args)
@@ -112,7 +113,8 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for organization switch")
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "The Workspace's unique identifier")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), "w", "Workspace to make current after the switch")
 
 	return cmd
 }
@@ -363,7 +365,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [team-id]",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro team",
-		Long:    "Update a team's name, description, or Organization role. For IDP-managed teams, a confirmation prompt is shown unless --force is used. Team names are case-insensitively unique within an Organization.",
+		Long:    "Update a team's name, description, or Organization role. For IDP-managed teams, a confirmation prompt is shown unless --yes is used. Team names are case-insensitively unique within an Organization.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
   $ astro organization team update team123
@@ -379,7 +381,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 		StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team description in quotes \"\"")
 	cmd.Flags().StringVarP(&updateOrganizationRole, "role", "r", "", "The new role for the "+
 		"team. Possible values are "+allowedOrganizationRoleNamesProse)
-	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force update: Skip confirmation for IDP-managed teams")
+	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
 
@@ -446,7 +448,7 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 			return teamDelete(cmd, out, args)
 		},
 	}
-	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force delete: Skip confirmation for IDP-managed teams")
+	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
 
@@ -493,7 +495,7 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
 	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
-	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force remove: Skip confirmation for IDP-managed teams")
+	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
 
@@ -517,7 +519,7 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamID, "team-id", "t", "", "The Team's unique identifier \"\" ")
 	cmd.Flags().StringVarP(&userID, "user-id", "u", "", "The User's unique identifier \"\"")
-	cmd.Flags().BoolVarP(&forceTeam, "force", "f", false, "Force add: Skip confirmation for IDP-managed teams")
+	cmd.Flags().BoolVarP(&forceTeam, "yes", "y", false, "Don't ask for confirmation on an IDP-managed team")
 	return cmd
 }
 
@@ -656,7 +658,7 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 		Long:    "Rotate a Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
 		Example: `
   $ astro organization token rotate token123
-  $ astro organization token rotate --name "My Token" --force
+  $ astro organization token rotate --name "My Token" --yes
   $ astro organization token rotate token123 --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -665,7 +667,7 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceRotate, "force", "f", false, "Rotate the Organization API token without showing a warning")
+	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Organization API token")
 
 	return cmd
 }
@@ -678,14 +680,14 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Long:    "Permanently revoke an Organization API token. All access the token grants — including any Workspace and Deployment roles — is immediately revoked.",
 		Example: `
   $ astro organization token delete token123
-  $ astro organization token delete --name "My Token" --force
+  $ astro organization token delete --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deleteOrganizationToken(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().BoolVarP(&forceDelete, "force", "f", false, "Delete or remove the API token without showing a warning")
+	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
 
 	return cmd
 }

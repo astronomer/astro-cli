@@ -92,13 +92,13 @@ func TestDeploymentBundleUpdateCmd(t *testing.T) {
 }
 
 func TestDeploymentBundleDeleteCmd(t *testing.T) {
-	t.Run("passes the bundle ID arg and skips confirmation with --force", func(t *testing.T) {
+	t.Run("passes the bundle ID arg and skips confirmation with --yes", func(t *testing.T) {
 		mockAlpha := setupBundleCmdMocks(t)
 		mockAlpha.On("DeleteBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1").Return(&astrov1alpha1.DeleteBundleResponse{
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		}, nil).Once()
 
-		out, err := execDeploymentCmd("bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--force")
+		out, err := execDeploymentCmd("bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--yes")
 		assert.NoError(t, err)
 		assert.Contains(t, out, "Deleted bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
@@ -119,7 +119,7 @@ func TestDeploymentBundleDeleteCmd(t *testing.T) {
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		}, nil).Once()
 
-		out, err := execDeploymentCmd("bundle", "delete", "--deployment-id", "test-id-1", "--name", "my-dags", "--force")
+		out, err := execDeploymentCmd("bundle", "delete", "--deployment-id", "test-id-1", "--name", "my-dags", "--yes")
 		assert.NoError(t, err)
 		assert.Contains(t, out, "Deleted bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
