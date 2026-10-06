@@ -49,7 +49,7 @@ func TestASavedDeployTargetBecomesALink(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			res, m := convertedManifest(t, project1xWithConfig(t, config, extra))
-			link, ok := m.Astro.Deployments[V1LinkName]
+			link, ok := m.Astro.Deployments[Link1xName]
 			require.True(t, ok, "links: %v", m.Astro.Deployments)
 			assert.Equal(t, deploymentID1x, link.Deployment)
 			assert.Equal(t, workspaceID1x, link.Workspace)
@@ -58,7 +58,7 @@ func TestASavedDeployTargetBecomesALink(t *testing.T) {
 			for _, n := range res.Notes {
 				assert.NotContains(t, n, "saved deploy target", "a linked target is not left to do")
 			}
-			assert.Contains(t, strings.Join(res.Advisories, "\n"), "[tool.astro.deployments."+V1LinkName+"]")
+			assert.Contains(t, strings.Join(res.Advisories, "\n"), "[tool.astro.deployments."+Link1xName+"]")
 		})
 	}
 }
@@ -76,8 +76,8 @@ func TestTheConversionLinkIsWhatSaveLinkWrites(t *testing.T) {
 	plain := project1xWithConfig(t, "project:\n  name: orders\n", nil)
 	_, err = Run(plain, Options{})
 	require.NoError(t, err)
-	require.NoError(t, SaveLink(plain, nil, Link{Name: V1LinkName, Kind: manifest.KindAstro, Deployment: deploymentID1x, Workspace: workspaceID1x}))
-	require.NoError(t, SetDefaultLink(plain, nil, V1LinkName))
+	require.NoError(t, SaveLink(plain, nil, Link{Name: Link1xName, Kind: manifest.KindAstro, Deployment: deploymentID1x, Workspace: workspaceID1x}))
+	require.NoError(t, SetDefaultLink(plain, nil, Link1xName))
 	linked, err := os.ReadFile(filepath.Join(plain, manifest.Marker))
 	require.NoError(t, err)
 	assert.Equal(t, string(linked), string(converted))

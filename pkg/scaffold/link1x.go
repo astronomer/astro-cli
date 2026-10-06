@@ -7,9 +7,9 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest/tomledit"
 )
 
-// V1LinkName is the name the conversion gives the deployment link it writes
+// Link1xName is the name the conversion gives the deployment link it writes
 // for a 1.x project's saved deploy target.
-const V1LinkName = "default"
+const Link1xName = "default"
 
 // astroIDRe is the shape of an Astro Deployment or workspace id: a CUID, c and
 // 24 lowercase alphanumerics (pkg/util.IsCUID, which this module cannot import).
@@ -27,7 +27,7 @@ func (from1x *project1x) deployLink() (Link, bool) {
 	if !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
 		return Link{}, false
 	}
-	return Link{Name: V1LinkName, Kind: manifest.KindAstro, Deployment: from1x.deployment, Workspace: from1x.workspace}, true
+	return Link{Name: Link1xName, Kind: manifest.KindAstro, Deployment: from1x.deployment, Workspace: from1x.workspace}, true
 }
 
 // setDeployLink writes the saved deploy target as a link marked default, with
