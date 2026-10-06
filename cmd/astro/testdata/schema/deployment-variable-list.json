@@ -1,0 +1,9 @@
+{
+  "variables": [
+    {
+      "key": "x",
+      "value": null,
+      "is_secret": true
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "bundles": [
+    {
+      "createdAt": "2026-07-21T10:30:00Z",
+      "currentVersion": "x",
+      "dagBundleIds": [
+        "x"
+      ],
+      "deletionIsPending": true,
+      "desiredVersion": "x",
+      "id": "x",
+      "isDagBundle": true,
+      "name": "x",
+      "nonDagBundleType": "x",
+      "nonDagMountPath": "x",
+      "type": "x",
+      "updatedAt": "2026-07-21T10:30:00Z"
+    }
+  ]
+}

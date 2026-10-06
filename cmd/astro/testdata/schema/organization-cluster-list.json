@@ -1,0 +1,12 @@
+{
+  "clusters": [
+    {
+      "name": "x",
+      "id": "x",
+      "cloudProvider": "x",
+      "region": "x",
+      "type": "x",
+      "status": "x"
+    }
+  ]
+}

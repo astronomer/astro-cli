@@ -123,13 +123,13 @@ linters:
           - gosec
           - mnd
           - unused
-        # instancestest is test-only code that is not in a _test.go file (an
-        # importable helper package cannot be), so it needs naming here to keep
-        # the exemption it had in the three test files it replaced. Unanchored:
-        # golangci-lint matches this against the path it reports, which is
-        # relative to this config rather than to the module dir that
-        # `make lint-submodules` runs each sub-module from.
-        path: (_test\.go|instancestest/)
+        # instancestest and cliouttest are test-only code that is not in a
+        # _test.go file (an importable helper package cannot be), so they need
+        # naming here to keep the exemption they had in the test files they
+        # replaced. Unanchored: golangci-lint matches this against the path it
+        # reports, which is relative to this config rather than to the module
+        # dir that `make lint-submodules` runs each sub-module from.
+        path: (_test\.go|instancestest/|cliouttest/)
       - path: (.+)\.go$
         text: 'shadow: declaration of .err. shadows declaration'
       - path: (.+)\.go$

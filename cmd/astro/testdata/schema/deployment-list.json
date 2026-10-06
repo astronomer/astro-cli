@@ -1,0 +1,19 @@
+{
+  "deployments": [
+    {
+      "name": "x",
+      "workspaceName": "x",
+      "namespace": "x",
+      "clusterName": "x",
+      "cloudProvider": "x",
+      "region": "x",
+      "deploymentId": "x",
+      "runtimeVersion": "x",
+      "airflowVersion": "x",
+      "isDagDeployEnabled": true,
+      "isCicdEnforced": true,
+      "type": "x",
+      "isRemoteExecutionEnabled": true
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "outcomes": [
+    {
+      "kind": "x",
+      "key": "x",
+      "input": "x",
+      "reason": "x"
+    }
+  ],
+  "variables": [
+    {
+      "key": "x",
+      "value": null,
+      "is_secret": true
+    }
+  ]
+}

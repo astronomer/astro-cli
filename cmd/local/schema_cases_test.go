@@ -5,7 +5,6 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/pack"
@@ -192,25 +192,13 @@ func TestEveryJSONPayloadTypeIsPinned(t *testing.T) {
 }
 
 // A golden nobody generates is a snapshot of a shape that may no longer
-// exist — and e2e/schema_test.go looks these up by filename, so an orphan
-// left behind by a renamed case would keep that test green against a dead
-// file. Renaming a case writes the new golden and leaves the old one; this
-// is what says so.
+// exist; cliouttest.Orphans says why that matters.
 func TestEveryGoldenHasACase(t *testing.T) {
-	expected := map[string]bool{}
-	for _, c := range publishedPayloads {
-		expected[c.name+".json"] = true
+	cases := make([]cliouttest.Case, len(publishedPayloads))
+	for i, c := range publishedPayloads {
+		cases[i] = c.shared()
 	}
-
-	entries, err := os.ReadDir(filepath.Join("testdata", "schema"))
-	require.NoError(t, err)
-
-	var orphans []string
-	for _, e := range entries {
-		if !e.IsDir() && !expected[e.Name()] {
-			orphans = append(orphans, e.Name())
-		}
-	}
+	orphans := cliouttest.Orphans(t, schemaDir, cases)
 	assert.Empty(t, orphans,
 		"these goldens have no case in publishedPayloads, so nothing regenerates\n"+
 			"them and nothing would notice the shape they pin going stale. If the\n"+

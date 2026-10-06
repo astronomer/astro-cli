@@ -12,15 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
-
-// updateInspectGoldensEnv rewrites the goldens instead of comparing. An
-// environment variable rather than a flag: this package's TestMain replaces
-// os.Args before m.Run parses the test flags, so a custom flag never arrives.
-const updateInspectGoldensEnv = "ASTRO_UPDATE_INSPECT_GOLDENS"
 
 // goldenInspectDeployment is the Deployment every golden below renders. It is
 // built here rather than borrowed from deployment_test.go's fixtures, which
@@ -93,11 +89,10 @@ func goldenInspectDeployment() astrov1.Deployment {
 // written before `-o text` existed, so a case that renders the same golden as
 // another is the claim that the two invocations print identical bytes.
 //
-// Regenerate with:
-//
-//	ASTRO_UPDATE_INSPECT_GOLDENS=1 go test ./cmd/astro/
-//
-// and read the diff: a changed golden is a changed contract.
+// They are not schema goldens — they pin the rendered bytes, YAML and the
+// --key values included, because deploy-action parses those bytes — but
+// `make update-schemas` regenerates them too, so there is one command for
+// every golden. Read the diff: a changed golden is a changed contract.
 func TestDeploymentInspectPrintsPinnedBytes(t *testing.T) {
 	const id = "clgoldendeploy0001"
 	for _, tc := range []struct {
@@ -153,13 +148,13 @@ func TestDeploymentInspectPrintsPinnedBytes(t *testing.T) {
 			client.AssertExpectations(t)
 
 			path := filepath.Join("testdata", "deployment_inspect", tc.golden)
-			if os.Getenv(updateInspectGoldensEnv) != "" {
+			if cliouttest.Updating() {
 				require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 				require.NoError(t, os.WriteFile(path, []byte(out), 0o600))
 				return
 			}
 			want, err := os.ReadFile(path)
-			require.NoError(t, err, "missing golden; regenerate with %s=1", updateInspectGoldensEnv)
+			require.NoError(t, err, "missing golden; regenerate with make update-schemas")
 			require.Equal(t, string(want), out, "`astro deployment inspect %s` changed its bytes", strings.Join(tc.args, " "))
 		})
 	}

@@ -42,6 +42,7 @@ DEADCODE_GOOS=${DEADCODE_GOOS:-linux windows}
 # Shared test helpers, compiled into non-test files because tests in other
 # packages import them.
 TEST_SUPPORT=(
+  cmd/cliout/cliouttest/
   pkg/testing/
   config/config_test_utils.go
 )

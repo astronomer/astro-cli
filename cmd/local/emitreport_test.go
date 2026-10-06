@@ -79,20 +79,6 @@ func TestProblemsInHonorsNotAPayload(t *testing.T) {
 	assert.Empty(t, problemsIn(map[reflect.Type]bool{reflect.TypeOf(fixtureOnly{}): true}, nil, 0))
 }
 
-// A self-referential type must not hang the walk. `type Loop []Loop` is
-// legal Go and Elem() on it returns Loop forever.
-func TestPayloadTypeSurvivesASelfReferentialType(t *testing.T) {
-	type Loop []Loop
-	assert.Nil(t, payloadType(reflect.TypeOf(Loop{})))
-}
-
-// A map is not judged here, and the message says so rather than pretending
-// maps are fine.
-func TestPayloadTypeSkipsShapesItDoesNotJudge(t *testing.T) {
-	assert.Nil(t, payloadType(reflect.TypeOf(map[string]string{})))
-	assert.Nil(t, payloadType(reflect.TypeOf("")))
-}
-
 // Every problem names what to do about it, because a guard that only says
 // "no" costs somebody an afternoon.
 func TestEveryProblemSaysWhatToDo(t *testing.T) {

@@ -1,0 +1,14 @@
+{
+  "users": [
+    {
+      "fullName": "x",
+      "email": "x",
+      "id": "x",
+      "createdAt": "2026-07-21T10:30:00Z",
+      "workspaceRole": "x",
+      "deploymentRole": "x",
+      "orgRole": "x",
+      "isIdpManaged": true
+    }
+  ]
+}

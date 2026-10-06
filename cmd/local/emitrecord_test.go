@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 )
 
 // What a command actually emits, watched at the door.
@@ -92,40 +93,11 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// maxUnwrap bounds the walk to the shape behind a value. `type Loop []Loop`
-// and `type P *P` are legal Go, and Elem() on either returns the same type
-// forever — a hang with a reflect stack rather than a diagnostic. schema
-// _test.go's fill bounds the same hazard for the same reason.
-const maxUnwrap = 10
-
-// payloadType returns the shape behind v: the element of a slice or array,
-// the target of a pointer, the struct itself otherwise. The invalid Type
-// means "not a shape this guard judges".
-func payloadType(t reflect.Type) reflect.Type {
-	for range maxUnwrap {
-		switch t.Kind() { //nolint:exhaustive // only the wrappers matter
-		case reflect.Pointer, reflect.Slice, reflect.Array:
-			if t.Elem() == t {
-				return nil // self-referential; nothing to unwrap to
-			}
-			t = t.Elem()
-		case reflect.Struct:
-			return t
-		default:
-			// A map, a bare string, an interface. A map IS a legal payload
-			// shape and this guard does not cover one — see the package
-			// comment; it is a hole, not a judgement that maps are fine.
-			return nil
-		}
-	}
-	return nil
-}
-
 func recordEmitted(v any) {
 	if v == nil {
 		return
 	}
-	t := payloadType(reflect.TypeOf(v))
+	t := cliouttest.PayloadType(reflect.TypeOf(v))
 	if t == nil {
 		return
 	}
@@ -146,7 +118,7 @@ func recordEmitted(v any) {
 func pinnedShapes() map[reflect.Type]bool {
 	out := map[reflect.Type]bool{}
 	for _, c := range publishedPayloads {
-		if t := payloadType(reflect.TypeOf(c.value)); t != nil {
+		if t := cliouttest.PayloadType(reflect.TypeOf(c.value)); t != nil {
 			out[t] = true
 		}
 	}

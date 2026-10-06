@@ -1,0 +1,9 @@
+{
+  "workspaces": [
+    {
+      "name": "x",
+      "id": "x",
+      "isCurrent": true
+    }
+  ]
+}
