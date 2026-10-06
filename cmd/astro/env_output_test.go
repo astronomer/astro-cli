@@ -57,10 +57,12 @@ func TestEnvOutputIsTheFormat(t *testing.T) {
 
 			out, err := execEnvCmd("variable", "list", "--workspace-id", "ws-test", flag, "json")
 			require.NoError(t, err)
-			var got []map[string]any
+			var got struct {
+				Variables []map[string]any `json:"variables"`
+			}
 			require.NoError(t, json.Unmarshal([]byte(out), &got), out)
-			require.Len(t, got, 1)
-			assert.Equal(t, "FOO", got[0]["objectKey"])
+			require.Len(t, got.Variables, 1)
+			assert.Equal(t, "FOO", got.Variables[0]["objectKey"])
 			requireNothingWritten(t, dir)
 			mc.AssertExpectations(t)
 		})

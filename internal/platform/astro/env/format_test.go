@@ -2,6 +2,7 @@ package env
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -9,24 +10,28 @@ import (
 
 // An empty scope lists nothing, and nothing is [] in json, not null: a script
 // loops over -o json without a null check. The lists arrive nil from the pager.
+// The list sits under its named key, as every list in the CLI does.
 func (s *Suite) TestEmptyListsAreJSONArrays() {
 	type writer func(*bytes.Buffer) error
-	for name, w := range map[string]writer{
-		"var list":         func(b *bytes.Buffer) error { return WriteVarList(nil, FormatJSON, false, b) },
-		"conn list":        func(b *bytes.Buffer) error { return WriteConnList(nil, FormatJSON, b) },
-		"airflow var list": func(b *bytes.Buffer) error { return WriteAirflowVarList(nil, FormatJSON, false, b) },
-		"metrics list":     func(b *bytes.Buffer) error { return WriteMetricsExportList(nil, FormatJSON, b) },
-		"inventory":        func(b *bytes.Buffer) error { return WriteInventory(nil, FormatJSON, b) },
+	for name, c := range map[string]struct {
+		key string
+		w   writer
+	}{
+		"var list":         {"variables", func(b *bytes.Buffer) error { return WriteVarList(nil, FormatJSON, false, b) }},
+		"conn list":        {"connections", func(b *bytes.Buffer) error { return WriteConnList(nil, FormatJSON, b) }},
+		"airflow var list": {"airflow_variables", func(b *bytes.Buffer) error { return WriteAirflowVarList(nil, FormatJSON, false, b) }},
+		"metrics list":     {"metrics_exports", func(b *bytes.Buffer) error { return WriteMetricsExportList(nil, FormatJSON, b) }},
+		"inventory":        {"objects", func(b *bytes.Buffer) error { return WriteInventory(nil, FormatJSON, b) }},
 	} {
 		var js bytes.Buffer
-		s.NoError(w(&js), name)
-		s.Equal("[]\n", js.String(), name)
+		s.NoError(c.w(&js), name)
+		s.Equal("{\n  \""+c.key+"\": []\n}\n", js.String(), name)
 	}
 }
 
-// Every writer goes through one switch, so they agree: json is the value
-// itself (an object for one, an array for a list), and a format the writer
-// has no view for is refused with the parser's own wording.
+// Every writer goes through one switch, so they agree: json is one object,
+// the value itself for one and the list under its named key for a list, and a
+// format the writer has no view for is refused with the parser's own wording.
 func (s *Suite) TestWritersShareOneSwitch() {
 	obj := &astrov1.EnvironmentObject{ObjectKey: "K"}
 	list := []astrov1.EnvironmentObject{*obj}
@@ -34,23 +39,23 @@ func (s *Suite) TestWritersShareOneSwitch() {
 	cases := []struct {
 		name string
 		w    writer
-		// jsonOpens is the first byte of the JSON: '[' for a list, '{' for one.
-		jsonOpens byte
-		dotenv    bool
+		// listKey is the key a list's json holds it under, "" for one object.
+		listKey string
+		dotenv  bool
 	}{
-		{"var", func(f Format, b *bytes.Buffer) error { return WriteVar(obj, f, false, b) }, '{', true},
-		{"var list", func(f Format, b *bytes.Buffer) error { return WriteVarList(list, f, false, b) }, '[', true},
-		{"conn", func(f Format, b *bytes.Buffer) error { return WriteConn(obj, f, b) }, '{', false},
-		{"conn list", func(f Format, b *bytes.Buffer) error { return WriteConnList(list, f, b) }, '[', false},
-		{"airflow var", func(f Format, b *bytes.Buffer) error { return WriteAirflowVar(obj, f, false, b) }, '{', false},
-		{"airflow var list", func(f Format, b *bytes.Buffer) error { return WriteAirflowVarList(list, f, false, b) }, '[', false},
-		{"metrics", func(f Format, b *bytes.Buffer) error { return WriteMetricsExport(obj, f, b) }, '{', false},
-		{"metrics list", func(f Format, b *bytes.Buffer) error { return WriteMetricsExportList(list, f, b) }, '[', false},
+		{"var", func(f Format, b *bytes.Buffer) error { return WriteVar(obj, f, false, b) }, "", true},
+		{"var list", func(f Format, b *bytes.Buffer) error { return WriteVarList(list, f, false, b) }, "variables", true},
+		{"conn", func(f Format, b *bytes.Buffer) error { return WriteConn(obj, f, b) }, "", false},
+		{"conn list", func(f Format, b *bytes.Buffer) error { return WriteConnList(list, f, b) }, "connections", false},
+		{"airflow var", func(f Format, b *bytes.Buffer) error { return WriteAirflowVar(obj, f, false, b) }, "", false},
+		{"airflow var list", func(f Format, b *bytes.Buffer) error { return WriteAirflowVarList(list, f, false, b) }, "airflow_variables", false},
+		{"metrics", func(f Format, b *bytes.Buffer) error { return WriteMetricsExport(obj, f, b) }, "", false},
+		{"metrics list", func(f Format, b *bytes.Buffer) error { return WriteMetricsExportList(list, f, b) }, "metrics_exports", false},
 		{"var links", func(f Format, b *bytes.Buffer) error {
 			return WriteVarLinks(&VarLinksReport{ObjectKey: "K"}, f, false, b)
-		}, '{', false},
-		{"links", func(f Format, b *bytes.Buffer) error { return WriteLinks(&LinksReport{ObjectKey: "K"}, f, b) }, '{', false},
-		{"inventory", func(f Format, b *bytes.Buffer) error { return WriteInventory([]InventoryItem{{Key: "K"}}, f, b) }, '[', false},
+		}, "", false},
+		{"links", func(f Format, b *bytes.Buffer) error { return WriteLinks(&LinksReport{ObjectKey: "K"}, f, b) }, "", false},
+		{"inventory", func(f Format, b *bytes.Buffer) error { return WriteInventory([]InventoryItem{{Key: "K"}}, f, b) }, "objects", false},
 	}
 	for _, c := range cases {
 		var text, js bytes.Buffer
@@ -58,7 +63,14 @@ func (s *Suite) TestWritersShareOneSwitch() {
 		s.Contains(text.String(), "K", c.name)
 
 		s.NoError(c.w(FormatJSON, &js), c.name)
-		s.Equal(c.jsonOpens, js.Bytes()[0], c.name)
+		var top map[string]json.RawMessage
+		s.Require().NoError(json.Unmarshal(js.Bytes(), &top), c.name)
+		if c.listKey != "" {
+			s.Len(top, 1, c.name)
+			var items []json.RawMessage
+			s.Require().NoError(json.Unmarshal(top[c.listKey], &items), c.name)
+			s.Len(items, 1, c.name)
+		}
 		s.Contains(js.String(), `"K"`, c.name)
 
 		s.EqualError(c.w("yaml", new(bytes.Buffer)), "unsupported output format: yaml", c.name)
