@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/printutil"
@@ -26,6 +27,30 @@ var unlistedConfigs = map[string]bool{
 	config.CFG.Contexts.Path:         true,
 	config.CFG.CloudAPIToken.Path:    true,
 	config.CFG.PostgresPassword.Path: true,
+}
+
+// removedConfigKeys are the 1.x settings nothing in v2 reads, with what
+// replaces each. `astro config set` refuses them rather than writing a value
+// that would change nothing; a 1.x CLI sharing the config file still reads
+// what it wrote itself.
+var removedConfigKeys = map[string]string{
+	"dev.mode": "Local Airflow runs in standalone mode by default; start it in Docker with `astro local start --docker`. " +
+		"`astro local restart` keeps the mode it is running in.",
+	"proxy.port": "The local proxy listens on 6563, or on another free port when 6563 is taken, and has no setting.",
+	"api-server.port": "Pick the local Airflow port with `astro local start --port <port>`; " +
+		"without it a free port is chosen.",
+	"webserver.port": "Pick the local Airflow port with `astro local start --port <port>`; " +
+		"without it a free port is chosen.",
+}
+
+// refuseRemovedConfigKey fails a set of a removed key the way the removed
+// commands fail: a usage error naming the replacement.
+func refuseRemovedConfigKey(key string) error {
+	replacement, ok := removedConfigKeys[key]
+	if !ok {
+		return nil
+	}
+	return cliout.Usage(fmt.Errorf("`%s` was removed in Astro CLI v2: nothing reads it. %s", key, replacement))
 }
 
 var (
@@ -98,6 +123,14 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
+	// Ahead of the scope checks, so the answer is the same in and out of a
+	// project and with or without -g.
+	if cmd.Name() == "set" {
+		if err := refuseRemovedConfigKey(args[0]); err != nil {
+			cmd.SilenceUsage = true
+			return err
+		}
+	}
 	if globalFlag {
 		return nil
 	}
@@ -159,6 +192,11 @@ func configSet(cmd *cobra.Command, args []string) error {
 
 	if !ok {
 		return errInvalidConfigPath
+	}
+	// The pre-run refuses these first; this keeps the write itself from
+	// ever storing one.
+	if err := refuseRemovedConfigKey(args[0]); err != nil {
+		return err
 	}
 
 	// Silence Usage as we have now validated command input

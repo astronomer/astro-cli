@@ -213,6 +213,8 @@ func TestEnvOutputFlagIsUniform(t *testing.T) {
 		}
 	}
 	walk(root)
-	// list and get for four kinds, three link lists, and the cross-kind list.
-	assert.Equal(t, 12, seen)
+	// list and get for four kinds, three link lists, and the cross-kind list;
+	// then the nine tombstones, create and update for four kinds and link
+	// create, which declare --output so their failure honors it.
+	assert.Equal(t, 21, seen)
 }

@@ -1,10 +1,11 @@
 package astro
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // removedDeploymentObject is one of the groups that wrote Airflow objects
@@ -41,7 +42,7 @@ func newRemovedDeploymentObjectCmds() []*cobra.Command {
 // --deployment-id or --conn-id reaches the guidance instead of dying on the
 // flag.
 func newRemovedDeploymentObjectCmd(o removedDeploymentObject) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:                o.noun,
 		Aliases:            o.aliases,
 		Short:              "Removed in v2 — use the Environment Manager",
@@ -53,9 +54,11 @@ func newRemovedDeploymentObjectCmd(o removedDeploymentObject) *cobra.Command {
 		// project and checks the login: the guidance should not need either.
 		PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
 		RunE: func(_ *cobra.Command, args []string) error {
-			return errors.New(removedDeploymentObjectGuidance(o, args))
+			return removedCmdError(removedDeploymentObjectGuidance(o, args))
 		},
 	}
+	cliout.AddOutputFlag(cmd, new(string))
+	return cmd
 }
 
 // removedDeploymentObjectGuidance names the replacement for the verb typed,

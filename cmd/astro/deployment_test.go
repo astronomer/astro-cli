@@ -521,12 +521,46 @@ func TestDeploymentListRejectsRemovedOutputDialect(t *testing.T) {
 	assert.EqualError(t, err, `unknown output format "table" (supported: text, json)`)
 	assert.True(t, cliout.IsUsage(err), "%v is not a usage error", err)
 
-	_, err = execDeploymentCmd("list", "--json")
-	assert.ErrorContains(t, err, "unknown flag: --json")
-
 	_, err = execDeploymentCmd("list", "--template", "{{.}}")
 	assert.ErrorContains(t, err, "unknown flag: --template")
 
+	mockV1Client.AssertExpectations(t)
+}
+
+// 1.x's --json still works, hidden, as a spelling of --output json, so a
+// script or a skill written for 1.x gets the json it asked for.
+func TestDeploymentListJSONFlagIsOutputJSON(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	for _, args := range [][]string{
+		{"list", "-a", "--json"},
+		{"list", "-a", "--json", "-o", "json"},
+	} {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+		astroV1Client = mockV1Client
+
+		resp, err := execDeploymentCmd(args...)
+		require.NoError(t, err, args)
+		var result deployment.DeploymentList
+		require.NoError(t, json.Unmarshal([]byte(resp), &result), "%v: %s", args, resp)
+		assert.Len(t, result.Deployments, 2)
+		mockV1Client.AssertExpectations(t)
+	}
+
+	cmd := newDeploymentListCmd(io.Discard)
+	assert.True(t, cmd.Flags().Lookup("json").Hidden, "help shows --output, not --json")
+}
+
+// --json beside an --output that is not json is a contradiction, refused as a
+// usage error before any API call, as two spellings that disagree are.
+func TestDeploymentListJSONFlagDisagreeingWithOutput(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mockV1Client
+
+	_, err := execDeploymentCmd("list", "--json", "-o", "text")
+	assert.EqualError(t, err, `--json and --output "text" disagree: pass only --output`)
+	assert.True(t, cliout.IsUsage(err), "%v is not a usage error", err)
 	mockV1Client.AssertExpectations(t)
 }
 

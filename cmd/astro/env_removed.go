@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // removedVerbs are the write verbs v2 folded into `set`, with the short alias
@@ -53,9 +55,10 @@ func newRemovedVerbCmd(verb, noun string) *cobra.Command {
 //
 // Hidden, so help teaches only the surface that exists. Flag parsing off, so
 // an old invocation's --key or --strict reaches the guidance instead of dying
-// on the flag.
+// on the flag. The failure is a usage error, so under --output json it is the
+// one error object every command publishes (removedCmdError).
 func removedVerbStub(verb string, aliases []string, guidance func(args []string) string) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:                verb,
 		Aliases:            aliases,
 		Short:              "Removed in v2 — use `set`, which creates or updates",
@@ -64,9 +67,20 @@ func removedVerbStub(verb string, aliases []string, guidance func(args []string)
 		DisableFlagParsing: true,
 		SilenceUsage:       true,
 		RunE: func(_ *cobra.Command, args []string) error {
-			return errors.New(guidance(args))
+			return removedCmdError(guidance(args))
 		},
 	}
+	cliout.AddOutputFlag(cmd, new(string))
+	return cmd
+}
+
+// removedCmdError is how the env and deployment tombstones fail: a usage error, the kind
+// cobra's unknown command is, so it exits 2 and, under --output json, is
+// published as the error object with kind usage. With flag parsing off the
+// stub's own --output is never set; cliout.Execute reads it from the raw
+// arguments for a usage error, which is why the stub still declares one.
+func removedCmdError(guidance string) error {
+	return cliout.Usage(errors.New(guidance))
 }
 
 // removedVerbGuidance names the replacement for what was actually typed.

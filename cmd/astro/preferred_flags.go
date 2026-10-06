@@ -84,3 +84,30 @@ func routeDeployment(fs *pflag.FlagSet, preferred, v string) (string, bool) {
 	deploymentID = v
 	return "", true
 }
+
+// addJSONFlag registers 1.x's --json on cmd as a hidden spelling of
+// --output json. It is applied in the command's argument check, which runs
+// ahead of every pre-run, so a failure before the command runs is reported
+// as json too. Given beside an --output that is not json, the two disagree,
+// which is a usage error like any old and new spelling that disagree.
+func addJSONFlag(cmd *cobra.Command) {
+	var asJSON bool
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON, the same as --output json")
+	_ = cmd.Flags().MarkHidden("json") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	check := cmd.Args
+	cmd.Args = func(c *cobra.Command, args []string) error {
+		if asJSON {
+			json := string(cliout.FormatJSON)
+			if o := c.Flag("output"); o.Changed && o.Value.String() != json {
+				return cliout.Usage(fmt.Errorf("--json and --output %q disagree: pass only --output", o.Value.String()))
+			}
+			if err := c.Flags().Set("output", json); err != nil {
+				return err
+			}
+		}
+		if check == nil {
+			return nil
+		}
+		return check(c, args)
+	}
+}

@@ -413,6 +413,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	cliout.AddOutputFlag(cmd, &deploymentListOutput)
+	addJSONFlag(cmd)
 	return cmd
 }
 

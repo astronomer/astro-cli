@@ -18,6 +18,7 @@ func AddCmds(d Deps) []*cobra.Command {
 		NewLocalCmd(d),
 		NewInitCmd(d),
 		NewDevCmd(d),
+		newRunRemovedCmd(),
 		NewPackageCmd(d),
 		NewUseCmd(d),
 		NewLinkCmd(d),

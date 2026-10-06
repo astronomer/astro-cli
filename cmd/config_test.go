@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/afero"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -160,4 +161,51 @@ func (s *CmdSuite) TestConfigSetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	_, err := executeCommand("config", "set", "-g", "project.name", "testing")
 	s.NoError(err)
+}
+
+// The 1.x settings nothing in v2 reads are refused, in every scope, as a
+// usage error naming what replaces them, and nothing is written.
+func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
+	for _, tc := range []struct {
+		key, value, want string
+	}{
+		{"dev.mode", "standalone", "astro local start --docker"},
+		{"proxy.port", "6599", "listens on 6563"},
+		{"api-server.port", "8099", "astro local start --port <port>"},
+		{"webserver.port", "8099", "astro local start --port <port>"},
+	} {
+		for _, scope := range []string{"outside a project", "global", "manifest project"} {
+			s.Run(tc.key+" "+scope, func() {
+				testUtil.InitTestConfig(testUtil.LocalPlatform)
+				args := []string{"config", "set", tc.key, tc.value}
+				switch scope {
+				case "outside a project":
+					s.useWorkingPath(s.T().TempDir())
+				case "global":
+					args = append(args, "-g")
+				case "manifest project":
+					s.useManifestProject()
+				}
+				before := config.CFGStrMap[tc.key].GetHomeString()
+
+				_, err := executeCommand(args...)
+				s.Require().Error(err)
+				s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
+				s.ErrorContains(err, "`"+tc.key+"` was removed in Astro CLI v2")
+				s.ErrorContains(err, tc.want)
+				s.Equal(before, config.CFGStrMap[tc.key].GetHomeString(), "the refused value was written")
+			})
+		}
+	}
+}
+
+// configSet guards the write on its own, for a caller that skips the pre-run.
+func (s *CmdSuite) TestConfigSetNeverWritesARemovedKey() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	globalFlag = true
+	s.T().Cleanup(func() { globalFlag = false })
+	before := config.CFG.DevMode.GetHomeString()
+	err := configSet(newConfigSetCmd(nil), []string{"dev.mode", "standalone"})
+	s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
+	s.Equal(before, config.CFG.DevMode.GetHomeString())
 }
