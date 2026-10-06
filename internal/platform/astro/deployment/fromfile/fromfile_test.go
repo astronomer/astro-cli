@@ -2,8 +2,12 @@ package fromfile
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -134,6 +138,7 @@ func MockResponseInit() {
 			ResourceQuotaMemory:  &resourceQuotaMemory,
 			SchedulerSize:        &schedulerTestSize,
 			WorkspaceName:        &workspace1.Name,
+			WorkspaceId:          "test-ws-id",
 			IsCicdEnforced:       true,
 			Region:               &region,
 			CloudProvider:        &cloudProvider,
@@ -169,6 +174,7 @@ func MockResponseInit() {
 			SchedulerAu:        &schedulerAU,
 			SchedulerSize:      &schedulerTestSize,
 			WorkspaceName:      &workspace1.Name,
+			WorkspaceId:        "test-ws-id",
 			RemoteExecution: &astrov1.DeploymentRemoteExecution{
 				Enabled:                true,
 				AllowedIpAddressRanges: []string{"0.0.0.0/0"},
@@ -292,6 +298,18 @@ func MockResponseInit() {
 	GetDeploymentOptionsResponseOK = astrov1.GetDeploymentOptionsResponse{
 		JSON200: &astrov1.DeploymentOptions{
 			ResourceQuotas: astrov1.ResourceQuotaOptions{
+				DefaultPodSize: astrov1.ResourceOption{
+					Cpu: astrov1.ResourceRange{
+						Ceiling: "1CPU",
+						Default: "0.25CPU",
+						Floor:   "0.25CPU",
+					},
+					Memory: astrov1.ResourceRange{
+						Ceiling: "2GI",
+						Default: "0.5GI",
+						Floor:   "0.5GI",
+					},
+				},
 				ResourceQuota: astrov1.ResourceOption{
 					Cpu: astrov1.ResourceRange{
 						Ceiling: "2CPU",
@@ -417,6 +435,9 @@ func (s *Suite) TearDownSubTest() {
 
 	// reset mocks
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+
+	// undo any subtest's stub of the ci-cd check
+	canCiCdDeploy = deployment.CanCiCdDeploy
 
 	// reset responses object
 	MockResponseInit()
@@ -1110,10 +1131,8 @@ deployment:
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("reads the yaml file and creates a hosted dedicated deployment", func() {
-		s.T().Skip("TODO(v1-migration): mock expectations need rework after collapsing the two clients into a single astroV1Client; the ordering of GetDeploymentOptionsResponse returns is no longer applicable.")
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
-		filePath = "./deployment.yaml"
 		data = `
 deployment:
   environment_variables:
@@ -1136,8 +1155,6 @@ deployment:
     scheduler_size: small
     cluster_name: test-cluster
     workspace_name: test-workspace
-    cloud_provider: gcp
-    scheduler_size: small
     deployment_type: DEDICATED
     cloud_provider: gcp
     is_high_availability: true
@@ -1176,50 +1193,97 @@ deployment:
       description: hibernation schedule 1
       enabled: true
 `
-		canCiCdDeploy = func(astroAPIToken string) bool {
-			return true
-		}
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
-			func(input astrov1.CreateDeploymentRequest) bool {
-				request, _ := input.AsCreateDedicatedDeploymentRequest()
-				schedules := *request.ScalingSpec.HibernationSpec.Schedules
-				schedule := schedules[0]
-				return request.Name == "test-deployment-label" && *request.IsCicdEnforced && *request.IsHighAvailability && *request.IsDevelopmentMode && schedule.IsEnabled && *schedule.Description == "hibernation schedule 1" && schedule.HibernateAtCron == "1 * * * *" && schedule.WakeAtCron == "2 * * * *"
+		deploymentResponse.JSON200.Type = &dedicatedType
+		canCiCdDeploy = func(string) bool { return true }
+		filePath = writeDeploymentFile(s.T(), data)
+		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeDEDICATED, astrov1.GetDeploymentOptionsParamsCloudProviderGCP, true, &deploymentResponse)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		s.Require().NoError(err)
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "DEDICATED",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"clusterId": "test-cluster-id",
+			"astroRuntimeVersion": "6.0.0",
+			"executor": "CELERY",
+			"schedulerSize": "SMALL",
+			"isCicdEnforced": true,
+			"isDagDeployEnabled": true,
+			"isDevelopmentMode": true,
+			"isHighAvailability": true,
+			"defaultTaskPodCpu": "0.25CPU",
+			"defaultTaskPodMemory": "0.5GI",
+			"resourceQuotaCpu": "1CPU",
+			"resourceQuotaMemory": "1GI",
+			"scalingSpec": {
+				"hibernationSpec": {
+					"schedules": [
+						{
+							"description": "hibernation schedule 1",
+							"hibernateAtCron": "1 * * * *",
+							"isEnabled": true,
+							"wakeAtCron": "2 * * * *"
+						}
+					]
+				}
 			},
-		)).Return(&mockCreateDeploymentResponse, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
-			func(input astrov1.UpdateDeploymentRequest) bool {
-				request, _ := input.AsUpdateDedicatedDeploymentRequest()
-				schedules := *request.ScalingSpec.HibernationSpec.Schedules
-				schedule := schedules[0]
-				return request.Name == "test-deployment-label" && request.IsCicdEnforced && request.IsHighAvailability && schedule.IsEnabled && *schedule.Description == "hibernation schedule 1" && schedule.HibernateAtCron == "1 * * * *" && schedule.WakeAtCron == "2 * * * *"
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.created))
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "DEDICATED",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"executor": "CELERY",
+			"schedulerSize": "SMALL",
+			"isCicdEnforced": true,
+			"isDagDeployEnabled": true,
+			"isHighAvailability": true,
+			"defaultTaskPodCpu": "defaultTaskPodCPU",
+			"defaultTaskPodMemory": "defaultTaskPodMemory",
+			"resourceQuotaCpu": "resourceQuotaCPU",
+			"resourceQuotaMemory": "ResourceQuotaMemory",
+			"contactEmails": [
+				"test1@test.com",
+				"test2@test.com"
+			],
+			"environmentVariables": [
+				{
+					"isSecret": false,
+					"key": "foo",
+					"value": "bar"
+				},
+				{
+					"isSecret": true,
+					"key": "bar",
+					"value": "baz"
+				}
+			],
+			"scalingSpec": {
+				"hibernationSpec": {
+					"schedules": [
+						{
+							"description": "hibernation schedule 1",
+							"hibernateAtCron": "1 * * * *",
+							"isEnabled": true,
+							"wakeAtCron": "2 * * * *"
+						}
+					]
+				}
 			},
-		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(&deploymentResponse, nil).Times(3)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
-		s.NoError(err)
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.updated))
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
 		s.Contains(out.String(), "ci_cd_enforcement: true")
 		s.Contains(out.String(), "is_high_availability: true")
 		s.Contains(out.String(), "is_development_mode: true")
 		s.Contains(out.String(), "hibernation_schedules:\n        - hibernate_at: 1 * * * *\n          wake_at: 2 * * * *\n          description: hibernation schedule 1\n          enabled: true\n\n")
-		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("reads the yaml file and creates a hosted dedicated deployment with remote execution config", func() {
-		s.T().Skip("TODO(v1-migration): mock expectations need rework after collapsing the two clients into a single astroV1Client; the ordering of GetDeploymentOptionsResponse returns is no longer applicable.")
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
-		filePath = "./deployment.yaml"
 		data = `
 deployment:
   configuration:
@@ -1269,37 +1333,61 @@ deployment:
     - test1@test.com
     - test2@test.com
 `
-		canCiCdDeploy = func(astroAPIToken string) bool {
-			return true
-		}
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
-			func(input astrov1.CreateDeploymentRequest) bool {
-				request, _ := input.AsCreateDedicatedDeploymentRequest()
-				return request.Name == "test-deployment-label" && request.RemoteExecution != nil
+		filePath = writeDeploymentFile(s.T(), data)
+		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeDEDICATED, "", true, &deploymentResponseRemoteExecution)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		s.Require().NoError(err)
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "DEDICATED",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"clusterId": "test-cluster-id",
+			"astroRuntimeVersion": "3.0-1",
+			"executor": "ASTRO",
+			"schedulerSize": "SMALL",
+			"isCicdEnforced": false,
+			"isDagDeployEnabled": false,
+			"isDevelopmentMode": false,
+			"isHighAvailability": true,
+			"remoteExecution": {
+				"allowedIpAddressRanges": [
+					"0.0.0.0/0"
+				],
+				"enabled": true,
+				"taskLogBucket": "task-log-bucket",
+				"taskLogUrlPattern": "task-log-url-pattern"
 			},
-		)).Return(&mockCreateDeploymentResponse, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(
-			func(input astrov1.UpdateDeploymentRequest) bool {
-				request, _ := input.AsUpdateDedicatedDeploymentRequest()
-				return request.Name == "test-deployment-label" && request.RemoteExecution != nil
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.created))
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "DEDICATED",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"executor": "ASTRO",
+			"schedulerSize": "SMALL",
+			"isCicdEnforced": false,
+			"isDagDeployEnabled": false,
+			"isHighAvailability": true,
+			"contactEmails": [
+				"test1@test.com",
+				"test2@test.com"
+			],
+			"environmentVariables": [],
+			"remoteExecution": {
+				"allowedIpAddressRanges": [
+					"0.0.0.0/0"
+				],
+				"enabled": true,
+				"taskLogBucket": "task-log-bucket",
+				"taskLogUrlPattern": "task-log-url-pattern"
 			},
-		)).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, "test-deployment-id").Return(&deploymentResponseRemoteExecution, nil).Times(3)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
-		s.NoError(err)
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.updated))
 		s.Contains(out.String(), "configuration:\n        name: test-deployment-label")
 		s.Contains(out.String(), "metadata:\n        deployment_id: test-deployment-id")
 		s.Contains(out.String(), "remote_execution:\n            enabled: true\n            allowed_ip_address_ranges:\n                - 0.0.0.0/0\n            task_log_bucket: task-log-bucket\n            task_log_url_pattern: task-log-url-pattern\n")
-		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("reads the json file and creates a deployment", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -1390,10 +1478,8 @@ deployment:
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("reads the json file and creates a hosted standard deployment", func() {
-		s.T().Skip("TODO(v1-migration): mock expectations need rework after collapsing the two clients into a single astroV1Client; the ordering of GetDeploymentOptionsResponse returns is no longer applicable.")
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
-		filePath = "./deployment.yaml"
 		data = `{
     "deployment": {
         "environment_variables": [
@@ -1466,35 +1552,81 @@ deployment:
 		deploymentResponse.JSON200.ClusterId = nil
 		standardType := astrov1.DeploymentTypeSTANDARD
 		deploymentResponse.JSON200.Type = &standardType
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
-			func(input astrov1.CreateDeploymentRequest) bool {
-				request, err := input.AsCreateStandardDeploymentRequest()
-				s.NoError(err)
-				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
-					request.Type != nil && *request.Type == astrov1.CreateStandardDeploymentRequestTypeSTANDARD
+		filePath = writeDeploymentFile(s.T(), data)
+		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeSTANDARD, astrov1.GetDeploymentOptionsParamsCloudProviderAWS, false, &deploymentResponse)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		s.Require().NoError(err)
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "STANDARD",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"cloudProvider": "AWS",
+			"region": "test-region",
+			"astroRuntimeVersion": "6.0.0",
+			"executor": "CELERY",
+			"schedulerSize": "LARGE",
+			"isCicdEnforced": false,
+			"isDagDeployEnabled": true,
+			"isDevelopmentMode": true,
+			"isHighAvailability": false,
+			"workloadIdentity": "test-workload-identity",
+			"defaultTaskPodCpu": "0.25CPU",
+			"defaultTaskPodMemory": "0.5GI",
+			"resourceQuotaCpu": "1CPU",
+			"resourceQuotaMemory": "1GI",
+			"scalingSpec": {
+				"hibernationSpec": {
+					"schedules": []
+				}
 			},
-		)).Return(&mockCreateDeploymentResponse, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
-		s.NoError(err)
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.created))
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "STANDARD",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"executor": "CELERY",
+			"schedulerSize": "LARGE",
+			"isCicdEnforced": false,
+			"isDagDeployEnabled": true,
+			"isHighAvailability": false,
+			"workloadIdentity": "test-workload-identity",
+			"defaultTaskPodCpu": "defaultTaskPodCPU",
+			"defaultTaskPodMemory": "defaultTaskPodMemory",
+			"resourceQuotaCpu": "resourceQuotaCPU",
+			"resourceQuotaMemory": "ResourceQuotaMemory",
+			"contactEmails": [
+				"test1@test.com",
+				"test2@test.com"
+			],
+			"environmentVariables": [
+				{
+					"isSecret": false,
+					"key": "foo",
+					"value": "bar"
+				},
+				{
+					"isSecret": true,
+					"key": "bar",
+					"value": "baz"
+				}
+			],
+			"scalingSpec": {
+				"hibernationSpec": {
+					"schedules": []
+				}
+			},
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.updated))
 		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
 		s.Contains(out.String(), "\"is_development_mode\": true")
-		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("reads the json file and creates a hosted standard deployment with astro executor", func() {
-		s.T().Skip("TODO(v1-migration): mock expectations need rework after collapsing the two clients into a single astroV1Client; the ordering of GetDeploymentOptionsResponse returns is no longer applicable.")
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		out := new(bytes.Buffer)
-		filePath = "./deployment.yaml"
 		data = `{
     "deployment": {
         "environment_variables": [
@@ -1568,30 +1700,78 @@ deployment:
 		standardType := astrov1.DeploymentTypeSTANDARD
 		deploymentResponse.JSON200.Type = &standardType
 		deploymentResponse.JSON200.Executor = &executorAstro
-		fileutil.WriteStringToFile(filePath, data)
-		defer afero.NewOsFs().Remove(filePath)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseAlphaOK, nil).Times(1)
-		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		mockV1Client.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(
-			func(input astrov1.CreateDeploymentRequest) bool {
-				request, err := input.AsCreateStandardDeploymentRequest()
-				s.NoError(err)
-				return request.WorkloadIdentity != nil && *request.WorkloadIdentity == "test-workload-identity" &&
-					request.Type != nil && *request.Type == astrov1.CreateStandardDeploymentRequestTypeSTANDARD && request.Executor != nil && *request.Executor == astrov1.CreateStandardDeploymentRequestExecutorASTRO
+		filePath = writeDeploymentFile(s.T(), data)
+		sent := expectHostedCreateFromFile(mockV1Client, astrov1.GetDeploymentOptionsParamsDeploymentTypeSTANDARD, astrov1.GetDeploymentOptionsParamsCloudProviderAWS, false, &deploymentResponse)
+		err = CreateOrUpdate(filePath, "create", mockV1Client, out, false, 0*time.Second, false)
+		s.Require().NoError(err)
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "STANDARD",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"cloudProvider": "AWS",
+			"region": "test-region",
+			"astroRuntimeVersion": "3.0-1",
+			"executor": "ASTRO",
+			"schedulerSize": "LARGE",
+			"isCicdEnforced": false,
+			"isDagDeployEnabled": true,
+			"isDevelopmentMode": true,
+			"isHighAvailability": false,
+			"workloadIdentity": "test-workload-identity",
+			"defaultTaskPodCpu": "0.25CPU",
+			"defaultTaskPodMemory": "0.5GI",
+			"resourceQuotaCpu": "1CPU",
+			"resourceQuotaMemory": "1GI",
+			"scalingSpec": {
+				"hibernationSpec": {
+					"schedules": []
+				}
 			},
-		)).Return(&mockCreateDeploymentResponse, nil).Once()
-		mockV1Client.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		err = CreateOrUpdate("deployment.yaml", "create", mockV1Client, out, false, 0*time.Second, false)
-		s.NoError(err)
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.created))
+		s.JSONEq(fmt.Sprintf(`{
+			"type": "STANDARD",
+			"name": "test-deployment-label",
+			"description": "description",
+			"workspaceId": "test-ws-id",
+			"executor": "ASTRO",
+			"schedulerSize": "LARGE",
+			"isCicdEnforced": false,
+			"isDagDeployEnabled": true,
+			"isHighAvailability": false,
+			"workloadIdentity": "test-workload-identity",
+			"defaultTaskPodCpu": "defaultTaskPodCPU",
+			"defaultTaskPodMemory": "defaultTaskPodMemory",
+			"resourceQuotaCpu": "resourceQuotaCPU",
+			"resourceQuotaMemory": "ResourceQuotaMemory",
+			"contactEmails": [
+				"test1@test.com",
+				"test2@test.com"
+			],
+			"environmentVariables": [
+				{
+					"isSecret": false,
+					"key": "foo",
+					"value": "bar"
+				},
+				{
+					"isSecret": true,
+					"key": "bar",
+					"value": "baz"
+				}
+			],
+			"scalingSpec": {
+				"hibernationSpec": {
+					"schedules": []
+				}
+			},
+			"workerQueues": %s
+		}`, hostedQueuesJSON), requestJSON(s.T(), sent.updated))
 		s.Contains(out.String(), "\"configuration\": {\n            \"name\": \"test-deployment-label\"")
 		s.Contains(out.String(), "\"metadata\": {\n            \"deployment_id\": \"test-deployment-id\"")
 		s.Contains(out.String(), "\"is_development_mode\": true")
 		s.Contains(out.String(), "\"executor\": \"ASTRO\"")
-		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error if listing workspace fails", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -2726,6 +2906,78 @@ deployment:
 		s.ErrorIs(err, errUpdateFailed)
 		mockV1Client.AssertExpectations(s.T())
 	})
+}
+
+// hostedQueuesJSON is the workerQueues a hosted create or update sends for
+// the two a5 queues the hosted deployment files declare.
+const hostedQueuesJSON = `[
+	{"id":"","name":"default","isDefault":true,"astroMachine":"A5","minWorkerCount":12,"maxWorkerCount":130,"workerConcurrency":10},
+	{"id":"","name":"test-queue-1","isDefault":false,"astroMachine":"A5","minWorkerCount":8,"maxWorkerCount":175,"workerConcurrency":10}
+]`
+
+// sentRequests holds the bodies a create-from-file sent to the API: the
+// create itself, and the update that follows it to set the env vars and
+// alert emails the create endpoint does not take.
+type sentRequests struct {
+	created astrov1.CreateDeploymentRequest
+	updated astrov1.UpdateDeploymentRequest
+}
+
+// expectHostedCreateFromFile expects, in order, every call a
+// `deployment create --deployment-file` makes for a hosted deployment whose
+// file has worker queues and env vars or alert emails, and records the
+// create and update bodies. A dedicated deployment also looks its cluster
+// up, by name before the create and by id when inspecting the result.
+// optionsType and optionsCloud are what the create's GetDeploymentOptions
+// call must carry; the two worker-queue validations ask with no parameters.
+// inspected is what GetDeployment returns once the deployment exists.
+func expectHostedCreateFromFile(client *astrov1_mocks.ClientWithResponsesInterface, optionsType astrov1.GetDeploymentOptionsParamsDeploymentType, optionsCloud astrov1.GetDeploymentOptionsParamsCloudProvider, dedicated bool, inspected *astrov1.GetDeploymentResponse) *sentRequests {
+	sent := &sentRequests{}
+	if dedicated {
+		client.On("ListClustersWithResponse", mock.Anything, mockOrgID, mock.Anything).Return(&mockListClustersResponse, nil).Once()
+		client.On("GetClusterWithResponse", mock.Anything, mockOrgID, clusterID).Return(&mockGetClusterResponse, nil).Once()
+	}
+	client.On("ListWorkspacesWithResponse", mock.Anything, mockOrgID, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+	// the first listing, before the create, must not find the deployment;
+	// the next two, after it, must
+	client.On("ListDeploymentsWithResponse", mock.Anything, mockOrgID, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
+	client.On("ListDeploymentsWithResponse", mock.Anything, mockOrgID, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Twice()
+	client.On("GetDeploymentOptionsWithResponse", mock.Anything, mockOrgID, mock.MatchedBy(func(p *astrov1.GetDeploymentOptionsParams) bool {
+		return p.DeploymentType == nil && p.CloudProvider == nil
+	})).Return(&GetDeploymentOptionsResponseOK, nil).Twice()
+	client.On("GetDeploymentOptionsWithResponse", mock.Anything, mockOrgID, mock.MatchedBy(func(p *astrov1.GetDeploymentOptionsParams) bool {
+		return p.DeploymentType != nil && *p.DeploymentType == optionsType && p.CloudProvider != nil && *p.CloudProvider == optionsCloud
+	})).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+	client.On("CreateDeploymentWithResponse", mock.Anything, mockOrgID, mock.Anything).Run(func(args mock.Arguments) {
+		sent.created = args.Get(2).(astrov1.CreateDeploymentRequest)
+	}).Return(&mockCreateDeploymentResponse, nil).Once()
+	client.On("UpdateDeploymentWithResponse", mock.Anything, mockOrgID, "test-deployment-id", mock.Anything).Run(func(args mock.Arguments) {
+		sent.updated = args.Get(3).(astrov1.UpdateDeploymentRequest)
+	}).Return(&mockUpdateDeploymentResponse, nil).Once()
+	// once before the update, once after it, and once to inspect the result
+	client.On("GetDeploymentWithResponse", mock.Anything, mockOrgID, "test-deployment-id").Return(inspected, nil).Times(3)
+	return sent
+}
+
+// requestJSON renders a request body as the JSON the client would send.
+func requestJSON(t *testing.T, body json.Marshaler) string {
+	t.Helper()
+	b, err := body.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// writeDeploymentFile writes data to a deployment file in a fresh temp dir
+// and returns its path.
+func writeDeploymentFile(t *testing.T, data string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "deployment.yaml")
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 // TestWaitForStatus verifies the behavior of createOrUpdateDeployment when the
