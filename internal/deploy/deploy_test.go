@@ -79,7 +79,7 @@ func TestResolveTarget(t *testing.T) {
 		assert.Zero(t, d.asked)
 	})
 
-	// --deployment meant a Deployment id before it learned link names, and v1
+	// --deployment meant a Deployment id before it learned link names, and the 1.x path
 	// spells the same thing --deployment-id, so a CI job passing one keeps
 	// working.
 	t.Run("--deployment falls through to a deployment id", func(t *testing.T) {
@@ -562,7 +562,7 @@ func TestRun_TransportErrorPropagates(t *testing.T) {
 //
 // This is the layer that reads the manifest, and it had no test: a mutant that
 // stopped carrying the field survived the whole internal/deploy suite, because
-// the cloud/deploy tests construct ImageDeployV2Input directly and never
+// the cloud/deploy tests construct ManifestImageDeployInput directly and never
 // exercise runImage. Without the carry a tier-3 project deploys a generated
 // image with its own build silently dropped.
 //

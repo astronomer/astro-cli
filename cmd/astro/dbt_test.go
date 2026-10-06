@@ -151,7 +151,7 @@ func (s *DbtSuite) TestDbtDeploy_WithinAstroProject() {
 // A project with a pyproject.toml carries no .astro/config.yaml, so the 1.x walk answers false at
 // every level of it. Before this, a dbt project nested inside one bundled and
 // deployed instead of being refused.
-func (s *DbtSuite) TestDbtDeploy_WithinV2Project() {
+func (s *DbtSuite) TestDbtDeploy_WithinManifestProject() {
 	projectDir := s.T().TempDir()
 	manifest := "[project]\nname = \"demo\"\n\n[tool.astro]\n"
 	assert.NoError(s.T(), os.WriteFile(filepath.Join(projectDir, "pyproject.toml"), []byte(manifest), 0o600))

@@ -307,7 +307,7 @@ func TestQueryFamiliesShareTheSelectorFlags(t *testing.T) {
 // reused -t for tags, task ids, and try numbers in commands that sit next to
 // each other; carrying that over would make -t unreadable, and -o would shadow
 // --output outright. Nothing enforces this in cobra, so it is enforced here.
-func TestShorthandsMeanOneThingEachAcrossTheV2Tree(t *testing.T) {
+func TestShorthandsMeanOneThingEachAcrossTheCoreTree(t *testing.T) {
 	d, _ := testDeps(t)
 	// meaning maps a shorthand to the flag name that claimed it, and where.
 	type claim struct{ flag, where string }

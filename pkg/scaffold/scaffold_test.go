@@ -430,7 +430,7 @@ func TestRunRefusesAnAirflowRangeInTheManifest(t *testing.T) {
 	assert.Equal(t, existing, string(out))
 }
 
-func TestRunConvertsAV1ProjectAndListsOnlyWhatIsLeft(t *testing.T) {
+func TestRunConvertsA1xProjectAndListsOnlyWhatIsLeft(t *testing.T) {
 	dir := t.TempDir()
 	for name, body := range map[string]string{
 		"Dockerfile":            "FROM quay.io/astronomer/astro-runtime:9\n",

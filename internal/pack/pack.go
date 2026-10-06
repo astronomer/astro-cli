@@ -1,4 +1,4 @@
-// Package pack builds the artifact a given Airflow platform consumes from a v2
+// Package pack builds the artifact a given Airflow platform consumes from a
 // project's manifest, without shipping it — the build stage of a CI pipeline
 // (docs/deploy.md, section 4). Each platform eats a different shape (Astro a
 // container image, MWAA and Composer a directory laid out for a bucket, OSS a

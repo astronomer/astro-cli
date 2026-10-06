@@ -188,7 +188,7 @@ type Request struct {
 	// dependency layer.
 	//
 	// Dependencies and Packages are ignored here rather than rejected. A caller
-	// reading a v2 manifest has them populated whichever tier the project
+	// reading a manifest has them populated whichever tier the project
 	// chose, and a Dockerfile project installs its own.
 	Dockerfile string
 	Context    string

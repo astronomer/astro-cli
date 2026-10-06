@@ -187,7 +187,7 @@ func SaveLink(dir string, wrap func(run func() error) error, l Link) error {
 }
 
 // edit is SaveLink's change to the manifest, for a link already trimmed and
-// validated. The v1 conversion applies it to the manifest it is building, so
+// validated. The 1.x conversion applies it to the manifest it is building, so
 // a converted project's link is written exactly as `astro link add` writes one.
 //
 //nolint:gocritic // hugeParam: by value, as SaveLink holds it

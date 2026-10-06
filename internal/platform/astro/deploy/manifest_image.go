@@ -26,11 +26,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
-// ImageDeployV2Input is the resolved input for a project's image deploy. The
+// ManifestImageDeployInput is the resolved input for a project's image deploy. The
 // deployment is already chosen (internal/deploy). The image is either built from
 // the manifest fields or adopted from a prebuilt local image (ImageName); a
 // "both" deploy (IncludeDags) also ships the dags/ tarball.
-type ImageDeployV2Input struct {
+type ManifestImageDeployInput struct {
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment and its registry live on; nil is the current context.
 	Login *config.Context
@@ -58,14 +58,14 @@ type ImageDeployV2Input struct {
 	WaitTime      time.Duration
 }
 
-// ImageDeployV2Result reports the outcome for cmd to render.
-type ImageDeployV2Result struct {
+// ManifestImageDeployResult reports the outcome for cmd to render.
+type ManifestImageDeployResult struct {
 	WorkspaceID       string
 	RuntimeVersion    string
 	ImageTag          string
 	DagTarballVersion string
 	URL               string
-	Git               DeployGitV2
+	Git               ManifestDeployGit
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -85,34 +85,34 @@ var (
 	buildNow = time.Now
 )
 
-// DeployImageV2 builds (or adopts) a project's image, pushes it to the
+// DeployManifestImage builds (or adopts) a project's image, pushes it to the
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
 // tarball. It reuses the 1.x transport (createDeploy, the registry push in
-// airflow.DockerImage.Push, deployDags, finalize) and, like DeployDagsV2,
+// airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
 // neither prints nor exits — it returns a result for cmd to render.
 //
 // Docker is required and checked before any transport work (docs/deploy.md, section 5).
 //
-//nolint:gocritic // value input keeps this seam symmetric with DeployDagsV2
-func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (ImageDeployV2Result, error) {
+//nolint:gocritic // value input keeps this seam symmetric with DeployManifestDags
+func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIClient) (ManifestImageDeployResult, error) {
 	ctx := context.Background()
 
 	cmd := newImageBuildCommander()
 	bin, env, err := ensureContainerEngine(ctx, cmd)
 	if err != nil {
-		return ImageDeployV2Result{}, err
+		return ManifestImageDeployResult{}, err
 	}
 
 	c, err := loginOrCurrent(in.Login)
 	if err != nil {
-		return ImageDeployV2Result{}, err
+		return ManifestImageDeployResult{}, err
 	}
 
 	// A prebuilt image need not match the working tree, so it records no commit.
-	var gitInfo DeployGitV2
+	var gitInfo ManifestDeployGit
 	var commitMessage string
 	if in.ImageName == "" {
-		gitInfo, commitMessage = readDeployGitV2(in.Build.ProjectDir)
+		gitInfo, commitMessage = readManifestDeployGit(in.Build.ProjectDir)
 	}
 
 	var req imagebuild.Request
@@ -121,7 +121,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		// every other consumer that builds from a manifest.
 		req, err = imagebuild.ForManifest(in.Build, in.Catalog)
 		if err != nil {
-			return ImageDeployV2Result{}, err
+			return ManifestImageDeployResult{}, err
 		}
 	}
 	planned := planRuntime(&in, &req)
@@ -130,10 +130,10 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	// minutes, and again on the built image's label, which is the authority.
 	dep, allowed, err := checkDeployment(ctx, &c, &in, astroV1Client)
 	if err != nil {
-		return ImageDeployV2Result{}, err
+		return ManifestImageDeployResult{}, err
 	}
 	if err := checkPlannedRuntime(dep.AstroRuntimeVersion, &planned, allowed); err != nil {
-		return ImageDeployV2Result{}, err
+		return ManifestImageDeployResult{}, err
 	}
 
 	if in.ImageName == "" && in.OnBuild != nil {
@@ -141,10 +141,10 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	}
 	localImage, runtimeVersion, err := prepareDeployImage(ctx, &in, &req, cmd, bin, env)
 	if err != nil {
-		return ImageDeployV2Result{}, err
+		return ManifestImageDeployResult{}, err
 	}
 	if err := checkRuntimeVersion(dep.AstroRuntimeVersion, runtimeVersion, allowed, planned.raise); err != nil {
-		return ImageDeployV2Result{}, err
+		return ManifestImageDeployResult{}, err
 	}
 
 	deployType := astrov1.CreateDeployRequestTypeIMAGEONLY
@@ -158,17 +158,17 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 		Git:         gitInfo.Commit,
 	}, astroV1Client)
 	if err != nil {
-		return ImageDeployV2Result{}, explainHibernating(err, &dep)
+		return ManifestImageDeployResult{}, explainHibernating(err, &dep)
 	}
 	if created.ImageRepository == "" || created.ImageTag == "" {
-		return ImageDeployV2Result{}, errors.New("no image repository or tag received from Astro")
+		return ManifestImageDeployResult{}, errors.New("no image repository or tag received from Astro")
 	}
 
 	// Push the built/adopted image under the returned repository:tag with the
 	// existing registry auth (CLI username + context token).
 	remoteImage := fmt.Sprintf("%s:%s", created.ImageRepository, created.ImageTag)
 	if _, err := airflowImageHandler(localImage).Push(remoteImage, registryUsername, c.Token, false); err != nil {
-		return ImageDeployV2Result{}, err
+		return ManifestImageDeployResult{}, err
 	}
 
 	// A "both" deploy also ships the dags tarball, fitting the image just pushed.
@@ -176,21 +176,21 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 	if in.IncludeDags {
 		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 		if err != nil {
-			return ImageDeployV2Result{}, err
+			return ManifestImageDeployResult{}, err
 		}
 	}
 
-	if err := finalizeDeployV2(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
-		return ImageDeployV2Result{}, err
+	if err := finalizeManifestDeploy(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
+		return ManifestImageDeployResult{}, err
 	}
 
 	if in.Wait {
 		if err := deployment.HealthPollIn(dep.OrganizationId, c.Token, dep.Id, sleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
-			return ImageDeployV2Result{}, err
+			return ManifestImageDeployResult{}, err
 		}
 	}
 
-	return ImageDeployV2Result{
+	return ManifestImageDeployResult{
 		WorkspaceID:       dep.WorkspaceId,
 		RuntimeVersion:    runtimeVersion,
 		ImageTag:          created.ImageTag,
@@ -204,7 +204,7 @@ func DeployImageV2(in ImageDeployV2Input, astroV1Client astrov1.APIClient) (Imag
 // cicd enforcement and dag-deploy enablement for a "both" deploy. It also
 // returns the runtime versions the deployment offers, which the image's
 // runtime is checked against.
-func checkDeployment(ctx context.Context, c *config.Context, in *ImageDeployV2Input, astroV1Client astrov1.APIClient) (astrov1.Deployment, []string, error) {
+func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, []string, error) {
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
@@ -254,7 +254,7 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 // With a prebuilt image (--image-name) it validates the image exists locally and
 // carries a runtime label; otherwise it builds req, ForManifest's request, at
 // linux/amd64.
-func prepareDeployImage(ctx context.Context, in *ImageDeployV2Input, req *imagebuild.Request, cmd imagebuild.Commander, bin string, env []string) (localImage, runtimeVersion string, err error) {
+func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *imagebuild.Request, cmd imagebuild.Commander, bin string, env []string) (localImage, runtimeVersion string, err error) {
 	if in.ImageName != "" {
 		// A registry image name says nothing about its base, so read the label
 		// off the local image: docker inspect fails when it is not present, which
@@ -357,7 +357,7 @@ type plannedRuntime struct {
 //
 // A runtime build and a FROM have to agree with the apache-airflow pin's
 // series, so a fix that moves either to another series names the pin too.
-func planRuntime(in *ImageDeployV2Input, req *imagebuild.Request) plannedRuntime {
+func planRuntime(in *ManifestImageDeployInput, req *imagebuild.Request) plannedRuntime {
 	switch {
 	case in.ImageName != "":
 		return plannedRuntime{raise: func(minimum string) string {
@@ -437,10 +437,10 @@ func downgradeError(tag, currentVersion string, raise func(string) string) error
 	return errors.New(msg)
 }
 
-// checkRuntimeVersion is v1's ValidRuntimeVersion without the prints: it returns
+// checkRuntimeVersion is the 1.x path's ValidRuntimeVersion without the prints: it returns
 // a descriptive error instead of printing the reason (and leaving the caller to
 // exit), so the manifest path stays print-free below cmd — the same move
-// finalizeDeployV2 makes for finalize. The rules are identical: no downgrade,
+// finalizeManifestDeploy makes for finalize. The rules are identical: no downgrade,
 // the version must be one the deployment allows, and an Airflow 2-to-3 jump
 // needs the deployment at Runtime 12.0.0 or higher. raise, when set, names the
 // fix for a downgrade.
@@ -474,11 +474,11 @@ func checkAirflow3Floor(currentVersion, tag string) error {
 	return nil
 }
 
-// finalizeDeployV2 marks a manifest deploy final. It carries the dag tarball version
+// finalizeManifestDeploy marks a manifest deploy final. It carries the dag tarball version
 // only when one exists (a "both" or dags-only deploy), so an image-only deploy
-// finalizes with an empty request. It is the v1 finalizeDeploy without the
+// finalizes with an empty request. It is the 1.x path's finalizeDeploy without the
 // prints, so the manifest path renders in cmd and stays ready for --output json.
-func finalizeDeployV2(organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
+func finalizeManifestDeploy(organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
 	req := astrov1.FinalizeDeployRequest{}
 	if dagTarballVersion != "" {
 		req.DagTarballVersion = &dagTarballVersion

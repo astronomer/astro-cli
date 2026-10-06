@@ -212,9 +212,9 @@ func TestDevJSONFlagSpellings(t *testing.T) {
 }
 
 // A classic 1.x project that also keeps a pyproject.toml for tool settings is
-// still v1, so the stub leads with the conversion: `uv run pytest` does not
+// still 1.x, so the stub leads with the conversion: `uv run pytest` does not
 // work until `astro init` has made the directory a project.
-func TestDevInAV1ProjectLeadsWithTheConversion(t *testing.T) {
+func TestDevInA1xProjectLeadsWithTheConversion(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
@@ -232,11 +232,11 @@ func TestDevInAV1ProjectLeadsWithTheConversion(t *testing.T) {
 		requireStderr("project made by Astro CLI 1.x (Dockerfile and .astro/)")
 
 	var payload struct {
-		Convert   string `json:"convert"`
-		V1Project bool   `json:"v1_project"`
+		Convert     string `json:"convert"`
+		Is1xProject bool   `json:"v1_project"`
 	}
 	p.run("dev", "pytest", "--output", "json").requireFailure().requireJSON(&payload)
-	if payload.Convert != "astro init" || !payload.V1Project {
-		t.Errorf("convert = %q, v1_project = %v; want astro init, true", payload.Convert, payload.V1Project)
+	if payload.Convert != "astro init" || !payload.Is1xProject {
+		t.Errorf("convert = %q, v1_project = %v; want astro init, true", payload.Convert, payload.Is1xProject)
 	}
 }

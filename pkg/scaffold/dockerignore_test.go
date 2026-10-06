@@ -25,9 +25,9 @@ var wantDockerignoreRules = []string{
 	"plugins/fix_local_executor_pickle.py",
 }
 
-// v1Dockerignore is the .dockerignore v1's `astro dev init` wrote, which a
+// dockerignore1x is the .dockerignore 1.x's `astro dev init` wrote, which a
 // converted project still carries.
-const v1Dockerignore = "astro\n.git\n.env\nairflow_settings.yaml\nlogs/\n.venv\nairflow.db\nairflow.cfg\n"
+const dockerignore1x = "astro\n.git\n.env\nairflow_settings.yaml\nlogs/\n.venv\nairflow.db\nairflow.cfg\n"
 
 func writeProjectFile(t *testing.T, dir, rel, content string) {
 	t.Helper()
@@ -61,14 +61,14 @@ func TestPlanDockerignore(t *testing.T) {
 			readDockerignoreFile(t, dir))
 	})
 
-	t.Run("a v1 file keeps its lines and gains only what it misses", func(t *testing.T) {
+	t.Run("a 1.x file keeps its lines and gains only what it misses", func(t *testing.T) {
 		dir := t.TempDir()
-		writeProjectFile(t, dir, ".dockerignore", v1Dockerignore)
+		writeProjectFile(t, dir, ".dockerignore", dockerignore1x)
 		c := applyDockerignore(t, dir)
 		require.NotNil(t, c)
 		assert.Equal(t, UpdateFile, c.Kind)
 		assert.Equal(t, []string{".dockerignore (added the per-machine rules)"}, c.Labels)
-		assert.Equal(t, v1Dockerignore+"\n"+dockerignoreHeader+strings.Join(wantDockerignoreRules[2:], "\n")+"\n",
+		assert.Equal(t, dockerignore1x+"\n"+dockerignoreHeader+strings.Join(wantDockerignoreRules[2:], "\n")+"\n",
 			readDockerignoreFile(t, dir),
 			".venv and .env are already excluded, however they are spelled")
 	})
@@ -95,7 +95,7 @@ func TestPlanDockerignore(t *testing.T) {
 
 	t.Run("a second run changes nothing", func(t *testing.T) {
 		dir := t.TempDir()
-		writeProjectFile(t, dir, ".dockerignore", v1Dockerignore)
+		writeProjectFile(t, dir, ".dockerignore", dockerignore1x)
 		applyDockerignore(t, dir)
 		assert.Nil(t, applyDockerignore(t, dir))
 	})
@@ -145,9 +145,9 @@ func TestLocalFilesWarning(t *testing.T) {
 			LocalFilesWarning(dir, "Dockerfile"))
 	})
 
-	t.Run("a v1 ignore file leaves the .astro ones", func(t *testing.T) {
+	t.Run("a 1.x ignore file leaves the .astro ones", func(t *testing.T) {
 		dir := localStateProject(t)
-		writeProjectFile(t, dir, ".dockerignore", v1Dockerignore)
+		writeProjectFile(t, dir, ".dockerignore", dockerignore1x)
 		assert.Equal(t, []string{".astro/standalone", ".astro/config.local.yaml"}, unignoredLocalFiles(dir, ".dockerignore"))
 	})
 
@@ -217,13 +217,13 @@ func TestPlanWritesDockerignoreForAKeptDockerfile(t *testing.T) {
 			if tc.dockerfile != "" {
 				writeProjectFile(t, dir, "Dockerfile", tc.dockerfile)
 			}
-			writeProjectFile(t, dir, ".dockerignore", v1Dockerignore)
+			writeProjectFile(t, dir, ".dockerignore", dockerignore1x)
 
 			res, err := Run(dir, Options{})
 			require.NoError(t, err)
 
 			if !tc.want {
-				assert.Equal(t, v1Dockerignore, readDockerignoreFile(t, dir))
+				assert.Equal(t, dockerignore1x, readDockerignoreFile(t, dir))
 				assert.NotContains(t, res.Updated, ".dockerignore (added the per-machine rules)")
 				return
 			}

@@ -19,11 +19,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
 
-// SettingsRelPath is the v1 file this transform reads.
+// SettingsRelPath is the 1.x file this transform reads.
 const SettingsRelPath = "airflow_settings.yaml"
 
 // A 1.x project declares its Airflow connections, Variables and pools in
-// airflow_settings.yaml, in cleartext, in a file v1 kept out of version control.
+// airflow_settings.yaml, in cleartext, in a file the 1.x CLI kept out of version control.
 // v2 splits that content by what it is rather than where it came from.
 //
 // # Connections go to the vault, and are declared
@@ -43,8 +43,8 @@ const SettingsRelPath = "airflow_settings.yaml"
 //
 // An Airflow Variable's value takes the same path as a connection's: the vault
 // at the project's scope, and a declaration in the manifest that carries no
-// value and is marked secret. The v1 file offers no way to mark a Variable
-// secret, it routinely holds API tokens, and v1's project template kept the
+// value and is marked secret. The 1.x file offers no way to mark a Variable
+// secret, it routinely holds API tokens, and 1.x's project template kept the
 // file out of version control — so a declared default would commit tokens that
 // were never committed before. Every one is marked secret rather than
 // guessed at from its name, so the declaration says where the value lives and
@@ -54,7 +54,7 @@ const SettingsRelPath = "airflow_settings.yaml"
 //
 // A pool holds no secret, so it goes into the manifest as written: its name,
 // its slots and its description. `astro local start` creates or updates each
-// one, which is what v1 did with this file on every start. A file whose pools
+// one, which is what the 1.x CLI did with this file on every start. A file whose pools
 // and values are all carried is retired.
 
 // carriedSettings is what airflow_settings.yaml yielded.
@@ -98,7 +98,7 @@ type carriedPools struct {
 	advisories []string
 }
 
-// settingsDoc is the v1 file's shape. Deliberately a local type rather than a
+// settingsDoc is the 1.x file's shape. Deliberately a local type rather than a
 // borrow from the root module's settings package: that one is built on viper
 // and drags in docker and the platform clients, and this module is a leaf.
 type settingsDoc struct {
@@ -112,7 +112,7 @@ type settingsDoc struct {
 // settingsConn holds conn_port and conn_extra as `any` rather than their real
 // types, and that is not laziness.
 //
-// v1 read this file through viper, which coerces: `conn_port: "5432"` was an
+// The 1.x CLI read this file through viper, which coerces: `conn_port: "5432"` was an
 // int and `conn_extra: '{"sslmode":"require"}'` was a map, because Airflow's
 // own extra is a JSON string and people write it that way. yaml.v3 decoding
 // into a typed struct refuses both — and refuses them by failing the decode of
@@ -173,7 +173,7 @@ func readAirflowSettings(data []byte) carriedSettings {
 	return out
 }
 
-// readPools carries each pool Airflow can take. v1 skipped a pool it could not
+// readPools carries each pool Airflow can take. The 1.x CLI skipped a pool it could not
 // create, with a line saying so; here the entry is named in a note instead,
 // and the file stays.
 func readPools(pools []settingsPool) carriedPools {
@@ -217,7 +217,7 @@ func readPools(pools []settingsPool) carriedPools {
 	return c
 }
 
-// poolSlot accepts what v1 accepted, an integer or a string holding one, and
+// poolSlot accepts what the 1.x CLI accepted, an integer or a string holding one, and
 // what Airflow accepts: a number above zero, or -1 for no limit.
 func poolSlot(v any) (int, error) {
 	var n int
@@ -315,7 +315,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 		if value == "" {
 			// Nothing to store. The declaration still goes in, so the project
 			// says the connection is expected and refuses to start until it is
-			// set — which is what an empty entry in the v1 file amounted to
+			// set — which is what an empty entry in the 1.x file amounted to
 			// anyway, minus the part where nothing said so.
 			c.advisories = append(c.advisories, id+
 				": declared as a required connection, with no value to carry. "+
@@ -360,7 +360,7 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 			continue
 		}
 		if v.Value == "" {
-			// Nothing to store, and nothing to require either. v1 skipped an
+			// Nothing to store, and nothing to require either. The 1.x CLI skipped an
 			// empty Variable rather than create it, so a Dag that reads it with
 			// a fallback ran as if it were unset. Declaring it required would
 			// turn that working project into one that refuses to start, so it
@@ -383,7 +383,7 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 }
 
 // blankConn reports that an entry with no conn_id has nothing else filled in
-// either. v1 skipped such an entry, and the airflow_settings.yaml that v1's
+// either. The 1.x CLI skipped such an entry, and the airflow_settings.yaml that 1.x's
 // `astro dev init` wrote holds one, so it is skipped here too. That template's
 // placeholder conn_extra counts as blank; any other extra does not.
 func blankConn(sc *settingsConn) bool {
@@ -434,7 +434,7 @@ func connClues(sc *settingsConn) string {
 // read back.
 //
 // conn_uri wins over the broken-out fields when both are set, because that is
-// how the v1 file spells a connection whose parts it did not enumerate — and
+// how the 1.x file spells a connection whose parts it did not enumerate — and
 // merging the two would invent a connection the user never wrote.
 //
 // It also reports the conn_type it resolved, which for a URI is its scheme and
@@ -482,7 +482,7 @@ func connValue(sc *settingsConn) (value, connType string, err error) {
 	return encoded, connType, nil
 }
 
-// connPort accepts what v1 accepted: an integer, or a string holding one.
+// connPort accepts what the 1.x CLI accepted: an integer, or a string holding one.
 func connPort(v any) (int, error) {
 	switch p := v.(type) {
 	case nil:
@@ -503,7 +503,7 @@ func connPort(v any) (int, error) {
 	}
 }
 
-// connExtra accepts what v1 accepted: a mapping, or a string holding the JSON
+// connExtra accepts what the 1.x CLI accepted: a mapping, or a string holding the JSON
 // object Airflow itself stores an extra as.
 func connExtra(v any) (map[string]any, error) {
 	switch e := v.(type) {

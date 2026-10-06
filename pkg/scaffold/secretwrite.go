@@ -173,7 +173,7 @@ func (cs *Changeset) applySecrets() error {
 		// one place the two values for one name are ever compared. An equal
 		// one is carried as though nothing were held.
 		//
-		// What is carried here is whatever was written into a v1 file, which
+		// What is carried here is whatever was written into a 1.x file, which
 		// may be months stale or a placeholder. What is already in the vault
 		// was put there deliberately, by this user, through `astro local env
 		// <noun> set` or the app. Writing the committed one over it destroys

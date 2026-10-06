@@ -18,7 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
-	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
+	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
@@ -26,7 +26,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-const v2ManifestForRouting = `[project]
+const manifestForRouting = `[project]
 name = "demo"
 dependencies = ["apache-airflow==3.1.*"]
 
@@ -57,11 +57,11 @@ func resetDeployFlagVars() {
 	deployOutput = string(formatText)
 }
 
-// v2ManifestWithDefaultLink is a project with two links, one marked default.
+// manifestWithDefaultLink is a project with two links, one marked default.
 // Deploy never resolves from the marker, so the render tests below
 // name their target with --deployment; the marker's only job here is
-// preselecting the prompt, which TestDeployV2PromptPreselectsDefault drives.
-const v2ManifestWithDefaultLink = `[project]
+// preselecting the prompt, which TestDeployManifestPromptPreselectsDefault drives.
+const manifestWithDefaultLink = `[project]
 name = "demo"
 dependencies = ["apache-airflow==3.1.*", "pandas"]
 
@@ -80,32 +80,32 @@ deployment = "clx-dev"
 // fakeCmdDeployer stands in for the real transport so a cmd-level test drives
 // flag parsing, selection, and rendering without a daemon, registry, or API.
 type fakeCmdDeployer struct {
-	dag    v2deploy.DagResult
-	img    v2deploy.ImageResult
+	dag    manifestdeploy.DagResult
+	img    manifestdeploy.ImageResult
 	dagErr error
 	imgErr error
 	// refuseBeforeBuild returns imgErr the way the transport refuses a deploy
 	// the deployment will not take: before the build starts.
 	refuseBeforeBuild bool
-	dagInput          *v2deploy.DagDeploy
-	imgInput          *v2deploy.ImageDeploy
+	dagInput          *manifestdeploy.DagDeploy
+	imgInput          *manifestdeploy.ImageDeploy
 }
 
-func (f *fakeCmdDeployer) ConfirmTarget([]v2deploy.Choice, v2deploy.Preselect) (string, error) {
+func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, manifestdeploy.Preselect) (string, error) {
 	return "", errors.New("the transport should not be asked when the target is named")
 }
 
 func (f *fakeCmdDeployer) ResolveUnlinked(string) (string, error) { return "", nil }
 
-func (f *fakeCmdDeployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, error) {
+func (f *fakeCmdDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	f.dagInput = in
 	return f.dag, f.dagErr
 }
 
-func (f *fakeCmdDeployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult, error) {
+func (f *fakeCmdDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestdeploy.ImageResult, error) {
 	f.imgInput = in
 	if f.refuseBeforeBuild {
-		return v2deploy.ImageResult{}, f.imgErr
+		return manifestdeploy.ImageResult{}, f.imgErr
 	}
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
@@ -113,16 +113,16 @@ func (f *fakeCmdDeployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageR
 	return f.img, f.imgErr
 }
 
-// setupV2Deploy points config.WorkingPath at a fresh project (one default
+// setupManifestDeploy points config.WorkingPath at a fresh project (one default
 // link) and swaps the transport for d, restoring both on cleanup. Each test
 // gets its own mock.
-func setupV2Deploy(t *testing.T, d v2deploy.Deployer) {
+func setupManifestDeploy(t *testing.T, d manifestdeploy.Deployer) {
 	t.Helper()
-	setupV2DeployWith(t, d, v2ManifestWithDefaultLink)
+	setupManifestDeployWith(t, d, manifestWithDefaultLink)
 }
 
-// setupV2DeployWith is setupV2Deploy over a manifest of the test's choosing.
-func setupV2DeployWith(t *testing.T, d v2deploy.Deployer, toml string) {
+// setupManifestDeployWith is setupManifestDeploy over a manifest of the test's choosing.
+func setupManifestDeployWith(t *testing.T, d manifestdeploy.Deployer, toml string) {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
@@ -134,9 +134,9 @@ func setupV2DeployWith(t *testing.T, d v2deploy.Deployer, toml string) {
 	config.WorkingPath = dir
 	t.Cleanup(func() { config.WorkingPath = origPath })
 
-	origDeployer := newV2Deployer
-	newV2Deployer = func(*deployLogin, io.Reader, io.Writer) v2deploy.Deployer { return d }
-	t.Cleanup(func() { newV2Deployer = origDeployer })
+	origDeployer := newManifestDeployer
+	newManifestDeployer = func(*deployLogin, io.Reader, io.Writer) manifestdeploy.Deployer { return d }
+	t.Cleanup(func() { newManifestDeployer = origDeployer })
 }
 
 // execDeployCapture runs the deploy command with stdout and stderr captured, so
@@ -187,8 +187,8 @@ func interactiveDeploy(t *testing.T) {
 	t.Cleanup(func() { stdinIsTerminal = orig })
 }
 
-func TestDeployV2JSONImageAndDag(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{
+func TestDeployManifestJSONImageAndDag(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
 		WorkspaceID:       "clw-ws",
 		RuntimeVersion:    "3.1-2",
 		ImageTag:          "deploy-2026-07-23T18-40",
@@ -209,8 +209,8 @@ func TestDeployV2JSONImageAndDag(t *testing.T) {
 	assert.Equal(t, "https://cloud.astronomer.io/deployments/clx-dep", m["url"])
 }
 
-func TestDeployV2JSONImageOnly(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{
+func TestDeployManifestJSONImageOnly(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
 		WorkspaceID:    "clw-ws",
 		RuntimeVersion: "3.1-2",
 		ImageTag:       "deploy-2026-07-23T18-40",
@@ -228,8 +228,8 @@ func TestDeployV2JSONImageOnly(t *testing.T) {
 	assert.False(t, hasDag, "image-only deploy should omit dag_bundle_version")
 }
 
-func TestDeployV2JSONDagsOnly(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{dag: v2deploy.DagResult{
+func TestDeployManifestJSONDagsOnly(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{dag: manifestdeploy.DagResult{
 		WorkspaceID:       "clw-ws",
 		RuntimeVersion:    "3.1-2",
 		DagTarballVersion: "3-1690000000",
@@ -247,15 +247,15 @@ func TestDeployV2JSONDagsOnly(t *testing.T) {
 	assert.False(t, hasImage, "dags-only deploy should omit image_tag")
 }
 
-func TestDeployV2JSONImageName(t *testing.T) {
-	fake := &fakeCmdDeployer{img: v2deploy.ImageResult{
+func TestDeployManifestJSONImageName(t *testing.T) {
+	fake := &fakeCmdDeployer{img: manifestdeploy.ImageResult{
 		WorkspaceID:       "clw-ws",
 		RuntimeVersion:    "3.1-2",
 		ImageTag:          "deploy-2026-07-23T18-40",
 		DagTarballVersion: "3-1690000000",
 		URL:               "https://cloud.astronomer.io/deployments/clx-dep",
 	}}
-	setupV2Deploy(t, fake)
+	setupManifestDeploy(t, fake)
 
 	out, err := execDeployCapture("--deployment", "prod", "--image-name", "astro-package/demo:3.1-2-abc", "--output", "json")
 	require.NoError(t, err)
@@ -271,8 +271,8 @@ func TestDeployV2JSONImageName(t *testing.T) {
 	assert.Equal(t, "3-1690000000", m["dag_bundle_version"])
 }
 
-func TestDeployV2JSONError(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{imgErr: errors.New("build boom")})
+func TestDeployManifestJSONError(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: errors.New("build boom")})
 
 	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
 	require.Error(t, err)
@@ -284,7 +284,7 @@ func TestDeployV2JSONError(t *testing.T) {
 	assert.NotContains(t, out, "Error:")
 }
 
-func TestDeployV2JSONManifestErrorNoUsage(t *testing.T) {
+func TestDeployManifestJSONManifestErrorNoUsage(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
@@ -308,8 +308,8 @@ func TestDeployV2JSONManifestErrorNoUsage(t *testing.T) {
 	assert.NotContains(t, out, "Error:")
 }
 
-func TestDeployV2TextUnchanged(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{
+func TestDeployManifestTextUnchanged(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
 		WorkspaceID:       "clw-ws",
 		RuntimeVersion:    "3.1-2",
 		ImageTag:          "deploy-2026-07-23T18-40",
@@ -333,9 +333,9 @@ func TestDeployV2TextUnchanged(t *testing.T) {
 // The announce line lands before the build line and after the target is
 // settled, so the order a reader sees is: what I am about to act on, then what
 // I am doing to it.
-func TestDeployV2AnnouncesBeforeItBuilds(t *testing.T) {
+func TestDeployManifestAnnouncesBeforeItBuilds(t *testing.T) {
 	interactiveDeploy(t)
-	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
@@ -348,8 +348,8 @@ func TestDeployV2AnnouncesBeforeItBuilds(t *testing.T) {
 
 // A deployment named by id has no link name to show, so the line carries the id
 // alone rather than an empty parenthetical.
-func TestDeployV2AnnouncesAnIDWithNoLinkName(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+func TestDeployManifestAnnouncesAnIDWithNoLinkName(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
 
 	out, errOut, err := execDeployIO("", "--deployment", "clx-not-a-link")
 	require.NoError(t, err)
@@ -359,20 +359,20 @@ func TestDeployV2AnnouncesAnIDWithNoLinkName(t *testing.T) {
 
 // A declined prompt exits non-zero and says nothing: the user was asked and
 // answered, and reading their answer back as an error adds nothing.
-func TestDeployV2DeclinedPromptIsQuiet(t *testing.T) {
+func TestDeployManifestDeclinedPromptIsQuiet(t *testing.T) {
 	interactiveDeploy(t)
-	newPromptDeploy(t, &v2deploy.ImageResult{})
+	newPromptDeploy(t, &manifestdeploy.ImageResult{})
 
 	// Three answers that are not choices, which is how the prompt gives up.
 	out, _, err := execDeployIO("nope\nnope\nnope\n")
-	require.ErrorIs(t, err, v2deploy.ErrAborted)
+	require.ErrorIs(t, err, manifestdeploy.ErrAborted)
 	assert.Empty(t, out)
 }
 
 // The link name reaches the json object, so a consumer sees what the person
 // typed and not only the id they would have to look up.
-func TestDeployV2JSONCarriesTheLinkName(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+func TestDeployManifestJSONCarriesTheLinkName(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
 
 	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
 	require.NoError(t, err)
@@ -382,8 +382,8 @@ func TestDeployV2JSONCarriesTheLinkName(t *testing.T) {
 }
 
 // A target named by id has no link, and the field is omitted rather than empty.
-func TestDeployV2JSONOmitsAnAbsentLinkName(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+func TestDeployManifestJSONOmitsAnAbsentLinkName(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
 
 	out, err := execDeployCapture("--deployment", "clx-not-a-link", "--output", "json")
 	require.NoError(t, err)
@@ -392,11 +392,11 @@ func TestDeployV2JSONOmitsAnAbsentLinkName(t *testing.T) {
 	assert.False(t, has)
 }
 
-func TestDeployV2JSONCarriesTheCommit(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{
+func TestDeployManifestJSONCarriesTheCommit(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
 		ImageTag:          "tag",
 		DagTarballVersion: "3-1",
-		Git: v2deploy.Git{Commit: &v2deploy.Commit{
+		Git: manifestdeploy.Git{Commit: &manifestdeploy.Commit{
 			SHA:    "0123abcd",
 			Branch: "main",
 			URL:    "https://github.com/account/repo/commit/0123abcd",
@@ -413,8 +413,8 @@ func TestDeployV2JSONCarriesTheCommit(t *testing.T) {
 	}, m["git"])
 }
 
-func TestDeployV2JSONOmitsGitWhenNoCommitIsRecorded(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
+func TestDeployManifestJSONOmitsGitWhenNoCommitIsRecorded(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}})
 
 	out, err := execDeployCapture("--deployment", "prod", "--output", "json")
 	require.NoError(t, err)
@@ -423,24 +423,24 @@ func TestDeployV2JSONOmitsGitWhenNoCommitIsRecorded(t *testing.T) {
 	assert.False(t, has)
 }
 
-func TestToV2DeployGit(t *testing.T) {
+func TestToManifestDeployGit(t *testing.T) {
 	branch, url := "main", "https://github.com/account/repo/commit/0123abcd"
-	got := toV2DeployGit(astrodeploy.DeployGitV2{Commit: &astrov1.CreateDeployGitRequest{
+	got := toManifestDeployGit(astrodeploy.ManifestDeployGit{Commit: &astrov1.CreateDeployGitRequest{
 		CommitSha: "0123abcd",
 		Branch:    &branch,
 		CommitUrl: &url,
 	}})
-	assert.Equal(t, v2deploy.Git{Commit: &v2deploy.Commit{SHA: "0123abcd", Branch: branch, URL: url}}, got)
+	assert.Equal(t, manifestdeploy.Git{Commit: &manifestdeploy.Commit{SHA: "0123abcd", Branch: branch, URL: url}}, got)
 
-	assert.Equal(t, v2deploy.Git{Uncommitted: true}, toV2DeployGit(astrodeploy.DeployGitV2{Uncommitted: true}))
+	assert.Equal(t, manifestdeploy.Git{Uncommitted: true}, toManifestDeployGit(astrodeploy.ManifestDeployGit{Uncommitted: true}))
 }
 
-func TestDeployV2NotesUncommittedChanges(t *testing.T) {
+func TestDeployManifestNotesUncommittedChanges(t *testing.T) {
 	for _, format := range []string{"text", "json"} {
 		t.Run(format, func(t *testing.T) {
-			setupV2Deploy(t, &fakeCmdDeployer{dag: v2deploy.DagResult{
+			setupManifestDeploy(t, &fakeCmdDeployer{dag: manifestdeploy.DagResult{
 				DagTarballVersion: "3-1",
-				Git:               v2deploy.Git{Uncommitted: true},
+				Git:               manifestdeploy.Git{Uncommitted: true},
 			}})
 
 			out, errOut, err := execDeployIO("", "prod", "--dags", "--output", format)
@@ -455,9 +455,9 @@ func TestDeployV2NotesUncommittedChanges(t *testing.T) {
 // the manifest's marker for the cursor, and saying "default" over an entry an
 // exported variable chose tells the reader their committed file says something
 // it does not.
-func TestDeployV2PromptNamesWhatMovedTheCursor(t *testing.T) {
+func TestDeployManifestPromptNamesWhatMovedTheCursor(t *testing.T) {
 	interactiveDeploy(t)
-	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 	t.Setenv(instances.EnvVar, "dev")
 
 	out, errOut, err := execDeployIO("\n")
@@ -470,10 +470,10 @@ func TestDeployV2PromptNamesWhatMovedTheCursor(t *testing.T) {
 
 // A link may legally be called "2". Typing its name must select it, not the
 // second entry in the list.
-func TestDeployV2NumericLinkNameSelectsItself(t *testing.T) {
+func TestDeployManifestNumericLinkNameSelectsItself(t *testing.T) {
 	interactiveDeploy(t)
-	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}}}
-	setupV2DeployWith(t, fake, `[project]
+	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}}}
+	setupManifestDeployWith(t, fake, `[project]
 name = "demo"
 dependencies = ["apache-airflow==3.1.*"]
 
@@ -486,12 +486,12 @@ deployment = "clx-two"
 [tool.astro.deployments.prod]
 deployment = "clx-prod"
 `)
-	origDeployer := newV2Deployer
-	newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-		fake.prompt = v2Deployer{login: login, in: in, errOut: errOut}
+	origDeployer := newManifestDeployer
+	newManifestDeployer = func(login *deployLogin, in io.Reader, errOut io.Writer) manifestdeploy.Deployer {
+		fake.prompt = manifestDeployer{login: login, in: in, errOut: errOut}
 		return fake
 	}
-	t.Cleanup(func() { newV2Deployer = origDeployer })
+	t.Cleanup(func() { newManifestDeployer = origDeployer })
 
 	// Sorted, "2" is offered first and "prod" second. Reading the answer as a
 	// number would ship to prod.
@@ -516,33 +516,33 @@ func TestDeployPreselectSkipsTheDiskWhenNoQuestionIsComing(t *testing.T) {
 }
 
 // promptDeployer answers nothing itself; the prompt under test is the real
-// v2Deployer.ConfirmTarget, wired to the streams execDeployIO controls.
+// manifestDeployer.ConfirmTarget, wired to the streams execDeployIO controls.
 type promptDeployer struct {
 	fakeCmdDeployer
-	prompt v2deploy.Deployer
+	prompt manifestdeploy.Deployer
 }
 
-func (p *promptDeployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.Preselect) (string, error) {
+func (p *promptDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
 	return p.prompt.ConfirmTarget(choices, preselect)
 }
 
 // newPromptDeploy wires the real prompt onto the command's own streams, so a
 // test drives the question a user would actually see.
-func newPromptDeploy(t *testing.T, img *v2deploy.ImageResult) {
+func newPromptDeploy(t *testing.T, img *manifestdeploy.ImageResult) {
 	t.Helper()
 	fake := &promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: *img}}
-	setupV2Deploy(t, fake)
-	orig := newV2Deployer
-	newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-		fake.prompt = v2Deployer{login: login, in: in, errOut: errOut}
+	setupManifestDeploy(t, fake)
+	orig := newManifestDeployer
+	newManifestDeployer = func(login *deployLogin, in io.Reader, errOut io.Writer) manifestdeploy.Deployer {
+		fake.prompt = manifestDeployer{login: login, in: in, errOut: errOut}
 		return fake
 	}
-	t.Cleanup(func() { newV2Deployer = orig })
+	t.Cleanup(func() { newManifestDeployer = orig })
 }
 
-func TestDeployV2PromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
+func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	interactiveDeploy(t)
-	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 
 	// The manifest marks prod default, so the prompt highlights it — and still
 	// asks. An empty answer takes the highlighted entry.
@@ -556,13 +556,13 @@ func TestDeployV2PromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
 }
 
-func TestDeployV2PromptWithOneLinkOffersOneNumber(t *testing.T) {
+func TestDeployManifestPromptWithOneLinkOffersOneNumber(t *testing.T) {
 	var errOut bytes.Buffer
-	prompt := v2Deployer{in: strings.NewReader("\n"), errOut: &errOut}
+	prompt := manifestDeployer{in: strings.NewReader("\n"), errOut: &errOut}
 
 	name, err := prompt.ConfirmTarget(
-		[]v2deploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
-		v2deploy.Preselect{Name: "test", From: "default = true"},
+		[]manifestdeploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
+		manifestdeploy.Preselect{Name: "test", From: "default = true"},
 	)
 	require.NoError(t, err)
 
@@ -571,9 +571,9 @@ func TestDeployV2PromptWithOneLinkOffersOneNumber(t *testing.T) {
 	assert.NotContains(t, errOut.String(), "1-1")
 }
 
-func TestDeployV2PromptTakesTheOtherLink(t *testing.T) {
+func TestDeployManifestPromptTakesTheOtherLink(t *testing.T) {
 	interactiveDeploy(t)
-	newPromptDeploy(t, &v2deploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 
 	out, _, err := execDeployIO("dev\n")
 	require.NoError(t, err)
@@ -583,16 +583,16 @@ func TestDeployV2PromptTakesTheOtherLink(t *testing.T) {
 // The known ordering wart this issue names: the build line used to print before
 // anything had been decided, so a deploy nobody agreed to still announced that
 // it was building an image.
-func TestDeployV2AbortedPromptSaysNothingAboutBuilding(t *testing.T) {
+func TestDeployManifestAbortedPromptSaysNothingAboutBuilding(t *testing.T) {
 	interactiveDeploy(t)
 	fake := &promptDeployer{}
-	setupV2Deploy(t, fake)
-	origDeployer := newV2Deployer
-	newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-		fake.prompt = v2Deployer{login: login, in: in, errOut: errOut}
+	setupManifestDeploy(t, fake)
+	origDeployer := newManifestDeployer
+	newManifestDeployer = func(login *deployLogin, in io.Reader, errOut io.Writer) manifestdeploy.Deployer {
+		fake.prompt = manifestDeployer{login: login, in: in, errOut: errOut}
 		return fake
 	}
-	t.Cleanup(func() { newV2Deployer = origDeployer })
+	t.Cleanup(func() { newManifestDeployer = origDeployer })
 
 	// Closed stdin: nobody answered.
 	out, _, err := execDeployIO("")
@@ -604,16 +604,16 @@ func TestDeployV2AbortedPromptSaysNothingAboutBuilding(t *testing.T) {
 
 // A deploy the deployment refuses before the build builds nothing, so it says
 // nothing about building.
-func TestDeployV2RefusedBeforeTheBuildSaysNothingAboutBuilding(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{imgErr: errors.New("cannot deploy Astro Runtime 3.2"), refuseBeforeBuild: true})
+func TestDeployManifestRefusedBeforeTheBuildSaysNothingAboutBuilding(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{imgErr: errors.New("cannot deploy Astro Runtime 3.2"), refuseBeforeBuild: true})
 
 	out, err := execDeployCapture("--deployment", "prod")
 	require.ErrorContains(t, err, "cannot deploy Astro Runtime 3.2")
 	assert.NotContains(t, out, "Building your project image")
 }
 
-func TestDeployV2NonInteractiveMustNameTheTarget(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{})
+func TestDeployManifestNonInteractiveMustNameTheTarget(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{})
 
 	out, err := execDeployCapture()
 	require.Error(t, err)
@@ -625,8 +625,8 @@ func TestDeployV2NonInteractiveMustNameTheTarget(t *testing.T) {
 
 // A pin is ambient state, and ambient state never decides a deploy — not even
 // the one the query commands would resolve to.
-func TestDeployV2PinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{})
+func TestDeployManifestPinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{})
 	t.Setenv(instances.EnvVar, "prod")
 
 	_, err := execDeployCapture()
@@ -637,8 +637,8 @@ func TestDeployV2PinDoesNotDecideANonInteractiveDeploy(t *testing.T) {
 // Under --output json a deploy that names nothing is not asked, even at a
 // terminal with an answer waiting: it fails as input_required, in deploy's own
 // words, and exits 1 as it always has.
-func TestDeployV2JSONNeverAsksForTheTarget(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{})
+func TestDeployManifestJSONNeverAsksForTheTarget(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{})
 	interactiveDeploy(t)
 
 	out, errOut, err := execDeployIO("1\n", "--output", "json")
@@ -661,12 +661,12 @@ func decodeOneJSON(t *testing.T, out string) map[string]any {
 	return m
 }
 
-func TestDeployRoutesV2Project(t *testing.T) {
+func TestDeployRoutesManifestProject(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(v2ManifestForRouting), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifestForRouting), 0o600))
 
 	orig := config.WorkingPath
 	config.WorkingPath = dir
@@ -681,7 +681,7 @@ func TestDeployRoutesV2Project(t *testing.T) {
 	assert.Contains(t, err.Error(), "--deployment")
 }
 
-func TestDeployRoutesV1Project(t *testing.T) {
+func TestDeployRoutes1xProject(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
@@ -718,9 +718,9 @@ func TestDeployRoutesV1Project(t *testing.T) {
 // Eight rather than nine: --build-secret is deliberately NOT in this table any
 // more, because the manifest path READS it now. It still needs a project Dockerfile
 // to be mounted into, and that refusal lives with the other build-secret
-// checks in TestDeployV2BuildSecretRefusals — gated on the flag being given,
+// checks in TestDeployManifestBuildSecretRefusals — gated on the flag being given,
 // which is why it cannot be a row here.
-func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
+func TestDeployRefusesFlagsTheManifestPathIgnores(t *testing.T) {
 	cases := []struct {
 		args []string
 		want string
@@ -741,7 +741,7 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 			resetDeployFlagVars()
 
 			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(v2ManifestForRouting), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifestForRouting), 0o600))
 			orig := config.WorkingPath
 			config.WorkingPath = dir
 			t.Cleanup(func() { config.WorkingPath = orig })
@@ -759,14 +759,14 @@ func TestDeployRefusesFlagsTheV2PathIgnores(t *testing.T) {
 // The manifest path has no uncommitted-changes gate for --force to open, and it always
 // asks, which is what --prompt requested — so both get the outcome the flag
 // asked for and refusing them would break CI that passes them out of habit.
-func TestDeployAcceptsForceAndPromptOnAV2Project(t *testing.T) {
+func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
 	for _, flag := range []string{"--force", "--prompt"} {
 		t.Run(flag, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
 
 			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(v2ManifestForRouting), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifestForRouting), 0o600))
 			orig := config.WorkingPath
 			config.WorkingPath = dir
 			t.Cleanup(func() { config.WorkingPath = orig })
@@ -781,7 +781,7 @@ func TestDeployAcceptsForceAndPromptOnAV2Project(t *testing.T) {
 
 // The same flags still work on a 1.x project, where the 1.x deploy path reads
 // them. The refusal is on the manifest branch only.
-func TestDeployAllowsThoseFlagsOnAV1Project(t *testing.T) {
+func TestDeployAllowsThoseFlagsOnA1xProject(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	resetDeployFlagVars()
 
@@ -810,7 +810,7 @@ func TestDeployAllowsThoseFlagsOnAV1Project(t *testing.T) {
 //     the resolved slice hard-failed every ordinary manifest deploy on any runner
 //     exporting that variable. No flag, no Dockerfile, and an error telling the
 //     user to declare one they never wanted.
-func TestDeployV2BuildSecretRefusals(t *testing.T) {
+func TestDeployManifestBuildSecretRefusals(t *testing.T) {
 	const manifestWithDockerfile = "[project]\nname = 'p'\nversion = '0.1.0'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\ndockerfile = 'Dockerfile'\n"
 
 	for _, tc := range []struct {
@@ -823,7 +823,7 @@ func TestDeployV2BuildSecretRefusals(t *testing.T) {
 	}{
 		{
 			name:    "no dockerfile declared",
-			body:    v2ManifestForRouting,
+			body:    manifestForRouting,
 			args:    []string{"--build-secret", "id=pypi"},
 			wantErr: "reads only the netrc build secret",
 		},
@@ -843,7 +843,7 @@ func TestDeployV2BuildSecretRefusals(t *testing.T) {
 			// The flag was not given. An ambient variable must not turn an
 			// ordinary deploy into an error about a Dockerfile.
 			name:     "BUILD_SECRET_INPUT set but no flag",
-			body:     v2ManifestForRouting,
+			body:     manifestForRouting,
 			args:     nil,
 			env:      "id=pypi,src=/tmp/x",
 			wantPass: true,
@@ -882,21 +882,21 @@ func TestDeployV2BuildSecretRefusals(t *testing.T) {
 // astronomer/deploy-action runs `astro deploy $DEPLOYMENT_ID ...`, so the
 // positional takes a Deployment id the way --deployment does, whatever links the
 // project declares.
-func TestDeployV2PositionalDeploymentID(t *testing.T) {
+func TestDeployManifestPositionalDeploymentID(t *testing.T) {
 	linkTo := func(dep string) string {
-		return v2ManifestForRouting + "workspace = \"clw-ws\"\n\n[tool.astro.deployments.test]\ndeployment = \"" + dep + "\"\n"
+		return manifestForRouting + "workspace = \"clw-ws\"\n\n[tool.astro.deployments.test]\ndeployment = \"" + dep + "\"\n"
 	}
 	for _, tc := range []struct {
 		name     string
 		manifest string
 	}{
-		{"no links", v2ManifestForRouting},
+		{"no links", manifestForRouting},
 		{"a link to another deployment", linkTo("clx-other")},
 		{"a link to the same deployment", linkTo(actionDeploymentID)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := &fakeCmdDeployer{}
-			setupV2DeployWith(t, fake, tc.manifest)
+			setupManifestDeployWith(t, fake, tc.manifest)
 
 			_, err := execDeployCapture(actionDeploymentID, "--dags")
 			require.NoError(t, err)
@@ -906,8 +906,8 @@ func TestDeployV2PositionalDeploymentID(t *testing.T) {
 	}
 }
 
-func TestDeployV2PositionalAndFlagMustAgree(t *testing.T) {
-	setupV2Deploy(t, &fakeCmdDeployer{})
+func TestDeployManifestPositionalAndFlagMustAgree(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{})
 
 	_, err := execDeployCapture("clx-a", "--deployment", "clx-b", "--dags")
 	require.Error(t, err)
@@ -915,8 +915,8 @@ func TestDeployV2PositionalAndFlagMustAgree(t *testing.T) {
 }
 
 // Each shape astronomer/deploy-action v0.16.0 runs, against a project.
-func TestDeployV2DeployActionInvocations(t *testing.T) {
-	withDockerfile := strings.Replace(v2ManifestWithDefaultLink, "[tool.astro]\n", "[tool.astro]\ndockerfile = \"Dockerfile\"\n", 1)
+func TestDeployManifestDeployActionInvocations(t *testing.T) {
+	withDockerfile := strings.Replace(manifestWithDefaultLink, "[tool.astro]\n", "[tool.astro]\ndockerfile = \"Dockerfile\"\n", 1)
 	for _, tc := range []struct {
 		name        string
 		manifest    string
@@ -925,8 +925,8 @@ func TestDeployV2DeployActionInvocations(t *testing.T) {
 		wantImage   bool
 		includeDags bool
 	}{
-		{name: "dags", manifest: v2ManifestWithDefaultLink, args: []string{actionDeploymentID, "--wait", "--dags", "--force"}, wantDags: true},
-		{name: "image", manifest: v2ManifestWithDefaultLink, args: []string{actionDeploymentID, "--wait", "--image", "--force"}, wantImage: true},
+		{name: "dags", manifest: manifestWithDefaultLink, args: []string{actionDeploymentID, "--wait", "--dags", "--force"}, wantDags: true},
+		{name: "image", manifest: manifestWithDefaultLink, args: []string{actionDeploymentID, "--wait", "--image", "--force"}, wantImage: true},
 		{
 			name:        "image and dags",
 			manifest:    withDockerfile,
@@ -937,7 +937,7 @@ func TestDeployV2DeployActionInvocations(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fake := &fakeCmdDeployer{}
-			setupV2DeployWith(t, fake, tc.manifest)
+			setupManifestDeployWith(t, fake, tc.manifest)
 			t.Setenv("Y", "secret")
 			require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600))
 
@@ -968,7 +968,7 @@ func TestDeployV2DeployActionInvocations(t *testing.T) {
 	}
 }
 
-const v2ManifestOnProd = `[project]
+const manifestOnProd = `[project]
 name = "demo"
 dependencies = ["apache-airflow==3.1.*"]
 
@@ -987,12 +987,12 @@ func setupDeployOnStage(t *testing.T, toml string) *deployLogin {
 	t.Helper()
 	t.Setenv(astrosession.EnvAPIToken, "")
 	t.Setenv("ASTRO_DOMAIN", "")
-	fake := &fakeCmdDeployer{dag: v2deploy.DagResult{DagTarballVersion: "v1"}}
-	setupV2DeployWith(t, fake, toml)
+	fake := &fakeCmdDeployer{dag: manifestdeploy.DagResult{DagTarballVersion: "v1"}}
+	setupManifestDeployWith(t, fake, toml)
 	testUtil.InitTestConfig(testUtil.CloudStagePlatform)
 
 	picked := new(deployLogin)
-	newV2Deployer = func(login *deployLogin, _ io.Reader, _ io.Writer) v2deploy.Deployer {
+	newManifestDeployer = func(login *deployLogin, _ io.Reader, _ io.Writer) manifestdeploy.Deployer {
 		*picked = *login
 		return fake
 	}
@@ -1009,10 +1009,10 @@ func logInTo(t *testing.T, domain, token, org string) {
 
 // The project names astronomer.io, so the deploy runs under that login even
 // while the CLI is switched to stage: a link and a bare Deployment id alike.
-func TestDeployV2UsesTheManifestDomainsLogin(t *testing.T) {
+func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 	for _, args := range [][]string{{"test", "--dags"}, {"--deployment", "clx-bare", "--dags"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			picked := setupDeployOnStage(t, v2ManifestOnProd)
+			picked := setupDeployOnStage(t, manifestOnProd)
 			logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
 
 			_, err := execDeployCapture(args...)
@@ -1029,8 +1029,8 @@ func TestDeployV2UsesTheManifestDomainsLogin(t *testing.T) {
 
 // ASTRO_API_TOKEN outranks the stored login, and goes out with its scheme like
 // a stored token, since the deploy's CI/CD check splits it off.
-func TestDeployV2SendsTheAPITokenToTheManifestDomain(t *testing.T) {
-	picked := setupDeployOnStage(t, v2ManifestOnProd)
+func TestDeployManifestSendsTheAPITokenToTheManifestDomain(t *testing.T) {
+	picked := setupDeployOnStage(t, manifestOnProd)
 	logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
 	t.Setenv(astrosession.EnvAPIToken, "ci-token")
 
@@ -1042,8 +1042,8 @@ func TestDeployV2SendsTheAPITokenToTheManifestDomain(t *testing.T) {
 
 // With no login for the project's host the deploy stops before anything is
 // built or uploaded, and names the login that fixes it.
-func TestDeployV2WithNoLoginForTheManifestDomain(t *testing.T) {
-	setupDeployOnStage(t, v2ManifestOnProd)
+func TestDeployManifestWithNoLoginForTheManifestDomain(t *testing.T) {
+	setupDeployOnStage(t, manifestOnProd)
 
 	_, err := execDeployCapture("test", "--dags")
 	require.Error(t, err)
@@ -1052,8 +1052,8 @@ func TestDeployV2WithNoLoginForTheManifestDomain(t *testing.T) {
 
 // A project that names the host the CLI is already on deploys under the
 // current context, as it did before the manifest's domain was read.
-func TestDeployV2OnTheCurrentDomainUsesTheCurrentContext(t *testing.T) {
-	picked := setupDeployOnStage(t, strings.Replace(v2ManifestOnProd, "'astronomer.io'", "'https://cloud.astronomer-stage.io/'", 1))
+func TestDeployManifestOnTheCurrentDomainUsesTheCurrentContext(t *testing.T) {
+	picked := setupDeployOnStage(t, strings.Replace(manifestOnProd, "'astronomer.io'", "'https://cloud.astronomer-stage.io/'", 1))
 
 	_, err := execDeployCapture("test", "--dags")
 	require.NoError(t, err)
@@ -1063,8 +1063,8 @@ func TestDeployV2OnTheCurrentDomainUsesTheCurrentContext(t *testing.T) {
 
 // The workspace-level picker lists Deployments under the current context, so a
 // project on another host is told to name one instead.
-func TestDeployV2PickerRefusesAnotherHost(t *testing.T) {
-	d := v2Deployer{login: &deployLogin{context: config.Context{Domain: "astronomer.io"}}}
+func TestDeployManifestPickerRefusesAnotherHost(t *testing.T) {
+	d := manifestDeployer{login: &deployLogin{context: config.Context{Domain: "astronomer.io"}}}
 	_, err := d.ResolveUnlinked("clw-ws")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--deployment <id>")

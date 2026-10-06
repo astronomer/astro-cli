@@ -17,7 +17,7 @@ import (
 const (
 	configSetSuccessMsg           = "Setting %s to %s successfully\n"
 	configUseOutsideProjectDirMsg = "You are attempting to %s a project config outside of a project directory\n To %s a global config try\n%s\n"
-	configUseInV2ProjectMsg       = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
+	configUseWithManifestMsg      = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
 )
 
 // unlistedConfigs are settings `astro config list` leaves out: contexts is a
@@ -114,7 +114,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " -g"
 	cmd.SilenceUsage = true
 	if project.HasManifest(config.WorkingPath) {
-		return fmt.Errorf(configUseInV2ProjectMsg, args[0], cmd.Name(), c)
+		return fmt.Errorf(configUseWithManifestMsg, args[0], cmd.Name(), c)
 	}
 	return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)
 }

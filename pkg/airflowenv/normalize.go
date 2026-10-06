@@ -107,7 +107,7 @@ func ConnFromURI(connID, uri string) (connmodel.Connection, error) {
 	if q := u.Query(); len(q) > 0 {
 		// __extra__ is an envelope, not an extra. Airflow's own
 		// Connection.get_uri() puts the whole extras object in it, JSON-encoded,
-		// so a v1 file holding an exported URI carries its extras there. Reading
+		// so a 1.x file holding an exported URI carries its extras there. Reading
 		// it as an ordinary parameter stores a connection with one extra named
 		// __extra__ and none of the real ones, which fails to connect for a
 		// reason nothing names.

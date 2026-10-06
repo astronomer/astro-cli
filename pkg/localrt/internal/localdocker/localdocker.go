@@ -152,7 +152,7 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 //
 // The compose file this engine writes is for that image and not for any image:
 // it runs every service as the `astro` user, and the service set comes from the
-// runtime tag. On an ordinary `apache/airflow` base — the shape a v1 repo
+// runtime tag. On an ordinary `apache/airflow` base — the shape a 1.x repo
 // brings, and one nothing else here rejects — the containers never start, and
 // what reaches the person is "starting project containers: exit status 1" over
 // a daemon error about a missing unix user.

@@ -1,6 +1,6 @@
 package scaffold
 
-// DevReplacement maps one v1 `astro dev` subcommand to what replaces it. The
+// DevReplacement maps one 1.x `astro dev` subcommand to what replaces it. The
 // `astro dev` removal stub renders this data as its error text and its JSON
 // payload.
 type DevReplacement struct {
@@ -25,7 +25,7 @@ func DevReplacements() []DevReplacement {
 		{"kill", "astro local reset --yes"},
 		{"pytest", "uv run pytest"},
 		{"init", "astro init"},
-		// There is no "object import" row: v1's import covered connections and
+		// There is no "object import" row: 1.x's import covered connections and
 		// variables together, no single v2 command does, and the honest answer
 		// — the tree — is what the "object" row below already gives. A second
 		// row saying the same thing publishes a duplicate line in the stub's

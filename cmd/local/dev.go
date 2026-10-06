@@ -30,21 +30,21 @@ type devRemoved struct {
 	Typed       string           `json:"typed_command,omitempty"`
 	Replacement string           `json:"replacement,omitempty"`
 	Mapping     []devReplacement `json:"mapping"`
-	// V1Project is set when the current directory looks like an astro v1
+	// Is1xProject is set when the current directory holds a 1.x
 	// project, which the replacements only work in once it is converted.
-	V1Project bool `json:"v1_project,omitempty"`
+	Is1xProject bool `json:"v1_project,omitempty"`
 	// Notes say what became of a flag the typed command carried that has no
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
 	// Convert is the command that converts a 1.x project in place, set with
-	// V1Project.
+	// Is1xProject.
 	Convert string `json:"convert,omitempty"`
 }
 
 // devContext is what the stub reads about the directory it runs in and the
 // command tree it points into.
 type devContext struct {
-	v1 bool
+	is1x bool
 	// dockerfile is set when the current project declares [tool.astro]
 	// dockerfile, which only Docker mode builds.
 	dockerfile bool
@@ -85,7 +85,7 @@ func NewDevCmd(d Deps) *cobra.Command {
 
 func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
-		v1:                 c.isV1Project(),
+		is1x:               c.is1xProject(),
 		dockerfile:         c.declaresDockerfile(),
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
@@ -152,11 +152,11 @@ func devReplacementFor(typed string) (string, bool) {
 func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	mapping := devReplacements()
 	p := devRemoved{
-		Typed:     strings.TrimSpace("astro dev " + typed),
-		Mapping:   mapping,
-		V1Project: dc.v1,
+		Typed:       strings.TrimSpace("astro dev " + typed),
+		Mapping:     mapping,
+		Is1xProject: dc.is1x,
 	}
-	if dc.v1 {
+	if dc.is1x {
 		p.Convert = replaceInit
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
@@ -329,7 +329,7 @@ func renderDevRemoved(p devRemoved) string {
 		seen[e.Command] = true
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
-	if p.V1Project {
+	if p.Is1xProject {
 		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
 			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
 			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
@@ -337,12 +337,12 @@ func renderDevRemoved(p devRemoved) string {
 	return b.String()
 }
 
-// isV1Project reports whether the working directory holds a v1 astro project,
-// per project.IsV1.
-func (c *cli) isV1Project() bool {
+// is1xProject reports whether the working directory holds a 1.x project,
+// per project.Is1xProject.
+func (c *cli) is1xProject() bool {
 	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return false
 	}
-	return project.IsV1(wd)
+	return project.Is1xProject(wd)
 }

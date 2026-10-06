@@ -24,34 +24,34 @@ import (
 // already — that directory is an Astro project, and re-initializing it would
 // overwrite the pin.
 // setProjectName gives an adopted manifest a [project] name, and reports what
-// to tell somebody when the name it ends up with is not the one their v1
+// to tell somebody when the name it ends up with is not the one their 1.x
 // project stated.
 //
 // A manifest that states a name keeps it: it has already said what the project
 // is called, and --name is the only thing that overrules that. Everything else
-// goes through chooseName, so the order --name, then the v1 config, then the
+// goes through chooseName, so the order --name, then the 1.x config, then the
 // directory is written in one place rather than half here.
-func setProjectName(ed tomledit.Editor, dir string, opts Options, v1 *v1Project) (advisory string, err error) {
+func setProjectName(ed tomledit.Editor, dir string, opts Options, from1x *project1x) (advisory string, err error) {
 	raw, has := ed.Get([]string{"project", "name"})
 	stated, _ := raw.(string)
 	if opts.Name == "" && has && stated != "" {
 		// Said twice and differently is worth one line. The manifest wins, and
-		// somebody who has only ever seen the v1 name should not have to work
+		// somebody who has only ever seen the 1.x name should not have to work
 		// out where it went.
-		if v1 != nil && v1.projectName != "" && sanitizeName(v1.projectName) != stated {
+		if from1x != nil && from1x.projectName != "" && sanitizeName(from1x.projectName) != stated {
 			return "kept the name " + stated + " from " + manifest.Marker +
-				", not " + v1.projectName + " from " + v1ConfigRelPath, nil
+				", not " + from1x.projectName + " from " + config1xRelPath, nil
 		}
 		return "", nil
 	}
-	chosen, advisory := chooseName(dir, opts, v1)
+	chosen, advisory := chooseName(dir, opts, from1x)
 	if err := ed.Set([]string{"project", "name"}, chosen); err != nil {
 		return "", err
 	}
 	return advisory, nil
 }
 
-func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
+func adopt(dir string, data []byte, opts Options, from1x *project1x, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
 	path := filepath.Join(dir, manifest.Marker)
 	ed, err := tomledit.NewSurgical(data)
 	if err != nil {
@@ -79,13 +79,13 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// Refused before anything is written, with the line it needs, and before
 	// the default is resolved, so the refusal makes no catalog request.
 	if slices.Contains(asStrings(mustGet(ed, "project", "dynamic")), "dependencies") {
-		example := pickAirflowVersion(opts.AirflowVersion, deps, v1, nil).version
+		example := pickAirflowVersion(opts.AirflowVersion, deps, from1x, nil).version
 		return nil, nil, pin, fmt.Errorf("%s declares its dependencies dynamic, and an Astro project states its Airflow version "+
 			"as the requirement in [project] dependencies: list the dependencies there, starting with %s, and drop "+
 			"dependencies from [project] dynamic", path, airflowRequirement(example))
 	}
-	pick := pickAirflowVersion(opts.AirflowVersion, deps, v1, opts.Default)
-	if err := refuseAdoptedDockerfileOfAnotherAirflow(dir, v1, opts.AirflowVersion, deps); err != nil {
+	pick := pickAirflowVersion(opts.AirflowVersion, deps, from1x, opts.Default)
+	if err := refuseAdoptedDockerfileOfAnotherAirflow(dir, from1x, opts.AirflowVersion, deps); err != nil {
 		return nil, nil, pin, err
 	}
 	version, defaulted := pick.version, pick.defaulted()
@@ -96,7 +96,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 
 	// The manifest's own validation requires a [project] name, and a repo that
 	// was never a Python package often has no [project] table at all.
-	nameAdvisory, err := setProjectName(ed, dir, opts, v1)
+	nameAdvisory, err := setProjectName(ed, dir, opts, from1x)
 	if err != nil {
 		return nil, nil, pin, err
 	}
@@ -105,9 +105,9 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// absent key and one this run just wrote look the same.
 	// A kept Dockerfile's Python is the sharper test of a stated bound, and
 	// the note below makes it.
-	pin.loosePython = v1.buildPython() == "" && statedPythonTooLoose(ed, version)
-	bound := pick.pythonBound(v1)
-	pin.migrationNotes = append(pin.migrationNotes, statedPythonNotTheImagesNote(ed, v1.buildPython(), bound)...)
+	pin.loosePython = from1x.buildPython() == "" && statedPythonTooLoose(ed, version)
+	bound := pick.pythonBound(from1x)
+	pin.migrationNotes = append(pin.migrationNotes, statedPythonNotTheImagesNote(ed, from1x.buildPython(), bound)...)
 	requiresPythonLabel, err := ensureProjectKeys(ed, bound)
 	if err != nil {
 		return nil, nil, pin, err
@@ -118,7 +118,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// it is pinned: the author wrote that specifier, and a requirements.txt in
 	// the same repo is the thing being retired, so "add what is missing" is the
 	// only merge that cannot silently change a pin someone chose.
-	migrated, err := mergeDependencies(ed, v1.dependencies, &pin.migrationNotes)
+	migrated, err := mergeDependencies(ed, from1x.dependencies, &pin.migrationNotes)
 	if err != nil {
 		return nil, nil, pin, err
 	}
@@ -148,8 +148,8 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// asserted the list WAS carried. A branch no input can reach, described by a
 	// comment claiming it was a deliberate decision.
 	migratedPackages := false
-	if len(v1.packages) > 0 {
-		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(v1.packages)); err != nil {
+	if len(from1x.packages) > 0 {
+		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(from1x.packages)); err != nil {
 			return nil, nil, pin, err
 		}
 		migratedPackages = true
@@ -158,7 +158,7 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// it is load-bearing there for the same reason it is in the greenfield arm.
 	// Both arms declare it or the field would only be true of projects that
 	// arrived one particular way.
-	if err := setV1Declarations(ed, v1); err != nil {
+	if err := set1xDeclarations(ed, from1x); err != nil {
 		return nil, nil, pin, err
 	}
 
@@ -196,13 +196,13 @@ func adopt(dir string, data []byte, opts Options, v1 *v1Project, res *Result) (o
 	// Same reason as the greenfield arm's: this is the key that decides whether
 	// the image is generated or built from the user's own file, so a preview
 	// without it hides the most consequential thing the run did.
-	if declaresDockerfile(v1) {
+	if declaresDockerfile(from1x) {
 		labels = append(labels, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
 	}
-	if v1.settings.declares() {
+	if from1x.settings.declares() {
 		labels = append(labels, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
 	}
-	labels = appendLabel(labels, poolsLabel(v1.settings.pools.byName))
+	labels = appendLabel(labels, poolsLabel(from1x.settings.pools.byName))
 	return out, labels, pin, nil
 }
 

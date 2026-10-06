@@ -2,7 +2,7 @@ package localdocker
 
 import (
 	"context"
-	"crypto/md5" //nolint:gosec // reproduces astro-cli v1's project-name hash; not a security boundary
+	"crypto/md5" //nolint:gosec // reproduces Astro CLI 1.x's project-name hash; not a security boundary
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -17,27 +17,27 @@ import (
 
 // Everything in this file exists for one transition: a project that ran under
 // `astro dev` before this runtime existed, starting here for the first time.
-// It has a death date: when no project has a v1 volume left, the whole file
+// It has a death date: when no project has a 1.x volume left, the whole file
 // goes.
 //
 // Compose namespaces a named volume as <compose-project>_<volume>, and the two
-// tools derive the compose project name differently and can never coincide: v1
+// tools derive the compose project name differently and can never coincide: 1.x
 // hashes the working directory with md5 behind the configured project name
 // (airflow/container.go's ProjectNameUnique), this runtime uses
 // composeProjectName. So a project's first start here gets a new, empty
-// metadata database, and the v1 one stays exactly where it was, which is where
-// Astro CLI v1's `astro dev start` still finds it. v2 removed that command, so
+// metadata database, and the 1.x one stays exactly where it was, which is where
+// Astro CLI 1.x's `astro dev start` still finds it. v2 removed that command, so
 // the note names the tool rather than a command this binary refuses.
 //
-// That is deliberate. An earlier version copied the v1 database across, and
-// every guard it needed (a live v1 stack, the Postgres major, custom
+// That is deliberate. An earlier version copied the 1.x database across, and
+// every guard it needed (a live 1.x stack, the Postgres major, custom
 // credentials, an Airflow the copy was too new for, a reset that copied it
 // back) was another way to lose or wedge a database that is local dev data.
 // What is left is telling the user, once, where their old database is, so a
 // fresh one does not read as "my local Airflow lost everything".
 
 // metadataVolumeKey is the volume this runtime's compose spec declares for the
-// Postgres data directory, and the one v1's spec declared too. Compose
+// Postgres data directory, and the one 1.x's spec declared too. Compose
 // namespaces it as <compose-project>_<key>.
 //
 // It must stay equal to the volume key in compose.yaml.tmpl: the note below
@@ -45,40 +45,40 @@ import (
 // the template. TestMetadataVolumeKeyMatchesComposeTemplate pins them together.
 const metadataVolumeKey = "postgres_data"
 
-// v1Config is the part of astro-cli v1's config this reads: the project name,
-// which is half of the v1 volume name.
+// config1x is the part of Astro CLI 1.x's config this reads: the project name,
+// which is half of the 1.x volume name.
 //
 // Read directly rather than through astro-cli's config package because a pkg/
 // sub-module may not import the parent module (docs/architecture.md), and
 // because this is one field of a file that is on its way out.
-type v1Config struct {
+type config1x struct {
 	Project struct {
 		Name string `yaml:"name"`
 	} `yaml:"project"`
 }
 
-// readV1Config loads a project's config the way v1 resolved it: the project's
+// read1xConfig loads a project's config the way the 1.x CLI resolved it: the project's
 // own .astro/config.yaml, falling back to the home config for the name, which
 // is what cfg.GetString does.
 //
-// A project without a config never ran under v1, so an absent file is "nothing
+// A project without a config never ran under 1.x, so an absent file is "nothing
 // to say" rather than an error.
-func readV1Config(projectPath string) (v1Config, bool) {
-	cfg, ok := readV1ConfigFile(filepath.Join(projectPath, ".astro", "config.yaml"))
+func read1xConfig(projectPath string) (config1x, bool) {
+	cfg, ok := read1xConfigFile(filepath.Join(projectPath, ".astro", "config.yaml"))
 	if !ok {
 		return cfg, false
 	}
 	if cfg.Project.Name == "" {
-		if home, ok := readV1ConfigFile(v1HomeConfigPath()); ok {
+		if home, ok := read1xConfigFile(home1xConfigPath()); ok {
 			cfg.Project.Name = home.Project.Name
 		}
 	}
 	return cfg, true
 }
 
-// v1HomeConfigPath mirrors config.initHome: $ASTRO_HOME/.astro/config.yaml when
+// home1xConfigPath mirrors config.initHome: $ASTRO_HOME/.astro/config.yaml when
 // that is set, ~/.astro/config.yaml otherwise.
-func v1HomeConfigPath() string {
+func home1xConfigPath() string {
 	base := os.Getenv("ASTRO_HOME")
 	if base == "" {
 		home, err := os.UserHomeDir()
@@ -90,8 +90,8 @@ func v1HomeConfigPath() string {
 	return filepath.Join(base, ".astro", "config.yaml")
 }
 
-func readV1ConfigFile(path string) (v1Config, bool) {
-	var cfg v1Config
+func read1xConfigFile(path string) (config1x, bool) {
+	var cfg config1x
 	if path == "" {
 		return cfg, false
 	}
@@ -105,15 +105,15 @@ func readV1ConfigFile(path string) (v1Config, bool) {
 	return cfg, true
 }
 
-// validV1ImageName matches docker's grammar for a single image-name path
-// component, copied from airflow/container.go so this reproduces v1's naming
+// valid1xImageName matches docker's grammar for a single image-name path
+// component, copied from airflow/container.go so this reproduces 1.x's naming
 // exactly rather than approximately.
-var validV1ImageName = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*$`)
+var valid1xImageName = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*$`)
 
-// sanitizeV1ImageName is airflow/container.go's sanitizeImageName.
-func sanitizeV1ImageName(s string) string {
+// sanitize1xImageName is airflow/container.go's sanitizeImageName.
+func sanitize1xImageName(s string) string {
 	s = strings.ToLower(s)
-	if validV1ImageName.MatchString(s) {
+	if valid1xImageName.MatchString(s) {
 		return s
 	}
 	var b strings.Builder
@@ -134,27 +134,27 @@ func sanitizeV1ImageName(s string) string {
 	return out
 }
 
-// normalizeV1Name is airflow/container.go's normalizeName, which v1 applied on
+// normalize1xName is airflow/container.go's normalizeName, which 1.x applied on
 // top of the above when it handed the name to compose.
-var v1NameRunes = regexp.MustCompile("[a-z0-9_-]")
+var nameRunes1x = regexp.MustCompile("[a-z0-9_-]")
 
-func normalizeV1Name(s string) string {
+func normalize1xName(s string) string {
 	s = strings.ToLower(s)
-	s = strings.Join(v1NameRunes.FindAllString(s, -1), "")
+	s = strings.Join(nameRunes1x.FindAllString(s, -1), "")
 	return strings.TrimLeft(s, "_-")
 }
 
 // legacyComposeProject is the compose project name `astro dev` would have used
 // for this project directory.
 //
-// v1 hashed os.Getwd() rather than a project path, which is the same thing
+// 1.x hashed os.Getwd() rather than a project path, which is the same thing
 // here: its config loader looks for .astro/config.yaml in the working directory
 // and does not search upward (config.initProject), so `astro dev start` only
 // ever ran from a project root.
 func legacyComposeProject(projectPath, projectName string) string {
-	sum := md5.Sum([]byte(projectPath)) //nolint:gosec // G401: reproducing v1's hash, not protecting anything
+	sum := md5.Sum([]byte(projectPath)) //nolint:gosec // G401: reproducing 1.x's hash, not protecting anything
 	hash := hex.EncodeToString(sum[:])[:6]
-	return normalizeV1Name(sanitizeV1ImageName(projectName + "_" + hash))
+	return normalize1xName(sanitize1xImageName(projectName + "_" + hash))
 }
 
 // legacyMetadataVolume is the volume `astro dev` would have used.
@@ -163,12 +163,12 @@ func legacyMetadataVolume(projectPath, projectName string) string {
 }
 
 // legacyPathSpellings are the spellings of a project path that could have been
-// hashed into a v1 volume name.
+// hashed into a 1.x volume name.
 //
 // composeProjectName resolves symlinks (rt.ProjectID -> CanonicalPath), so this
-// runtime's name is stable across spellings while v1's is not: v1 hashed
+// runtime's name is stable across spellings while 1.x's is not: 1.x hashed
 // whatever os.Getwd() returned. A project reached through a symlink therefore
-// has its v1 volume under one spelling and may be handed the other here, and a
+// has its 1.x volume under one spelling and may be handed the other here, and a
 // name that does not exist is a silent no-op — the worst outcome this file has.
 // Both are tried; the second costs one lookup and only on a miss.
 func legacyPathSpellings(projectPath string) []string {
@@ -211,10 +211,10 @@ func (e *Engine) lookupVolume(ctx context.Context, conn engineConn, name string)
 	return volumeAbsent
 }
 
-// findLegacyVolume looks for a v1 metadata volume across the engines and path
+// findLegacyVolume looks for a 1.x metadata volume across the engines and path
 // spellings it could be under, and reports the engine that has it.
 //
-// Both engines, because v1 honored container.binary: a podman user's `astro
+// Both engines, because 1.x honored container.binary: a podman user's `astro
 // dev` volumes live in podman, and e.preferred() may now resolve to docker.
 // Asking only the preferred engine would make their database invisible with no
 // message at all. Same order findProject uses — preferred first, the other only
@@ -253,7 +253,7 @@ func (e *Engine) findLegacyVolume(ctx context.Context, conn engineConn, projectP
 //
 // Once: only when this runtime has no volume of its own for the project, which
 // is its first start here (and the first after a reset, when "new database" is
-// again what is about to happen). A project that never ran under v1 stops at
+// again what is about to happen). A project that never ran under 1.x stops at
 // the second check, so the common case costs one `volume ls`.
 //
 // Silent on anything it cannot tell. It changes nothing, so the worst a missed
@@ -266,7 +266,7 @@ func (e *Engine) noteLegacyDatabase(ctx context.Context, conn engineConn, projec
 	if e.lookupVolume(ctx, conn, composeProject+"_"+metadataVolumeKey) != volumeAbsent {
 		return
 	}
-	cfg, ok := readV1Config(projectPath)
+	cfg, ok := read1xConfig(projectPath)
 	if !ok || cfg.Project.Name == "" {
 		return
 	}
@@ -278,6 +278,6 @@ func (e *Engine) noteLegacyDatabase(ctx context.Context, conn engineConn, projec
 		Component: "system",
 		Time:      e.now(),
 		Text: fmt.Sprintf("starting with a new local Airflow database. The one `astro dev` used is left untouched in the %s volume %s, "+
-			"and Astro CLI v1 can still start it", legacyConn.bin, legacy),
+			"and Astro CLI 1.x can still start it", legacyConn.bin, legacy),
 	})
 }

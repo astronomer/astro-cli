@@ -15,7 +15,7 @@ import (
 // asserted here rather than in the arms because both arms call this, and the
 // bugs were that they disagreed.
 func TestPickAirflowVersion(t *testing.T) {
-	dockerfile := &v1Project{airflow: "3.1"}
+	dockerfile := &project1x{airflow: "3.1"}
 
 	// The default is the last rung, and resolved only when reached: a project
 	// that states its Airflow must not cause a catalog request.
@@ -24,8 +24,8 @@ func TestPickAirflowVersion(t *testing.T) {
 		lookups++
 		return "3.50", ">=3.13", runtimeversions.SourceCatalog
 	}
-	pick := func(flag string, deps []string, v1 *v1Project) (string, bool) {
-		p := pickAirflowVersion(flag, deps, v1, resolve)
+	pick := func(flag string, deps []string, from1x *project1x) (string, bool) {
+		p := pickAirflowVersion(flag, deps, from1x, resolve)
 		return p.version, p.defaulted()
 	}
 
@@ -49,14 +49,14 @@ func TestPickAirflowVersion(t *testing.T) {
 	// carries, so it is the shape a real adoption meets most often, and it
 	// went to the Dockerfile instead: airflow = "2" written beside
 	// apache-airflow==3.0.*.
-	version, defaulted = pick("", []string{"apache-airflow==3.0.*"}, &v1Project{airflow: "2"})
+	version, defaulted = pick("", []string{"apache-airflow==3.0.*"}, &project1x{airflow: "2"})
 	assert.Equal(t, "3.0", version, "a series the manifest pins outranks a Dockerfile tag")
 	assert.False(t, defaulted)
 
 	// Then the Dockerfile, above a requirements.txt pin: the image tag is what
 	// the project runs today, and a requirements.txt pin is what pip was asked
 	// to install into that image.
-	version, defaulted = pick("", nil, &v1Project{
+	version, defaulted = pick("", nil, &project1x{
 		airflow:      "3.1",
 		dependencies: []string{"apache-airflow==2.9.3"},
 	})
@@ -68,19 +68,19 @@ func TestPickAirflowVersion(t *testing.T) {
 	// project answered differently depending on whether an unrelated
 	// pyproject.toml happened to exist: greenfield read this pin, adopt
 	// defaulted and then dropped it during the merge.
-	version, defaulted = pick("", nil, &v1Project{dependencies: []string{"apache-airflow==2.9.3"}})
+	version, defaulted = pick("", nil, &project1x{dependencies: []string{"apache-airflow==2.9.3"}})
 	assert.Equal(t, "2.9.3", version, "requirements.txt is read on both arms, not just greenfield")
 	assert.False(t, defaulted)
 
 	assert.Zero(t, lookups, "a stated pin asked the resolver")
 
 	// A pin in a shape no version can be read out of is not a pin.
-	version, defaulted = pick("", []string{"apache-airflow>=2.9,<3"}, &v1Project{})
+	version, defaulted = pick("", []string{"apache-airflow>=2.9,<3"}, &project1x{})
 	assert.Equal(t, "3.50", version)
 	assert.True(t, defaulted)
 
 	// Nothing stated anything.
-	version, defaulted = pick("", nil, &v1Project{})
+	version, defaulted = pick("", nil, &project1x{})
 	assert.Equal(t, "3.50", version)
 	assert.True(t, defaulted)
 	assert.Equal(t, 2, lookups)
@@ -89,18 +89,18 @@ func TestPickAirflowVersion(t *testing.T) {
 // With no resolver, or one that names nothing, the default is the built-in
 // series, and its requires-python the built-in rule's.
 func TestPickAirflowVersionWithoutACatalog(t *testing.T) {
-	p := pickAirflowVersion("", nil, &v1Project{}, nil)
+	p := pickAirflowVersion("", nil, &project1x{}, nil)
 	assert.Equal(t, runtimeversions.FallbackAirflowSeries, p.version)
 	assert.Equal(t, runtimeversions.SourceBuiltIn, p.source)
-	assert.Equal(t, requiresPython(runtimeversions.FallbackAirflowSeries), p.pythonBound(&v1Project{}))
+	assert.Equal(t, requiresPython(runtimeversions.FallbackAirflowSeries), p.pythonBound(&project1x{}))
 
 	empty := func() (string, string, runtimeversions.Source) { return "", "", runtimeversions.SourceCatalog }
-	p = pickAirflowVersion("", nil, &v1Project{}, empty)
+	p = pickAirflowVersion("", nil, &project1x{}, empty)
 	assert.Equal(t, runtimeversions.FallbackAirflowSeries, p.version)
 	assert.Equal(t, runtimeversions.SourceBuiltIn, p.source)
 
 	// A stated pin reports no source, so a caller can tell it from a default.
-	p = pickAirflowVersion("3.1", nil, &v1Project{}, nil)
+	p = pickAirflowVersion("3.1", nil, &project1x{}, nil)
 	assert.Empty(t, p.source)
-	assert.Equal(t, ">=3.10", p.pythonBound(&v1Project{}))
+	assert.Equal(t, ">=3.10", p.pythonBound(&project1x{}))
 }

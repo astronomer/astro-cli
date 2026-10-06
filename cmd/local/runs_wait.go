@@ -82,7 +82,7 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 		},
 	}
 	opts.register(cmd)
-	// -t is --tags across this tree (TestShorthandsMeanOneThingEachAcrossTheV2Tree),
+	// -t is --tags across this tree (TestShorthandsMeanOneThingEachAcrossTheCoreTree),
 	// so --timeout has no shorthand here.
 	cmd.Flags().StringVar(&timeout, "timeout", defaultWaitTimeout, "How long to wait before giving up, in seconds or as a duration")
 	cmd.Flags().StringVarP(&poll, "poll-interval", "p", defaultPollInterval, "How often to check on the run, in seconds or as a duration")

@@ -325,12 +325,12 @@ func TestAirflowFromDockerfile(t *testing.T) {
 	}
 }
 
-// A directory with none of the v1 files is the greenfield case and must read
+// A directory with none of the 1.x files is the greenfield case and must read
 // cleanly rather than as an error.
-func TestReadV1ProjectWithNothingThere(t *testing.T) {
-	v1, err := readV1Project(t.TempDir())
+func TestRead1xProjectWithNothingThere(t *testing.T) {
+	from1x, err := read1xProject(t.TempDir())
 	require.NoError(t, err)
-	assert.Equal(t, &v1Project{}, v1)
+	assert.Equal(t, &project1x{}, from1x)
 }
 
 // A file that exists and cannot be read is an error, not an empty file.
@@ -339,7 +339,7 @@ func TestReadV1ProjectWithNothingThere(t *testing.T) {
 // as empty converts the project to a manifest that declares no dependencies,
 // which installs nothing and fails later at import time with a traceback that
 // says nothing about the conversion.
-func TestReadV1ProjectFailsOnAnUnreadableFile(t *testing.T) {
+func TestRead1xProjectFailsOnAnUnreadableFile(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("file modes do not deny reads on Windows")
 	}
@@ -352,14 +352,14 @@ func TestReadV1ProjectFailsOnAnUnreadableFile(t *testing.T) {
 	require.NoError(t, os.Chmod(path, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
 
-	_, err := readV1Project(dir)
+	_, err := read1xProject(dir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "requirements.txt")
 }
 
 // The greenfield conversion: a 1.x project with no pyproject.toml at all, which
 // is what a real 1.x project looks like.
-func TestPlanConvertsAV1ProjectWithNoManifest(t *testing.T) {
+func TestPlanConvertsA1xProjectWithNoManifest(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, body string) {
 		t.Helper()
@@ -387,7 +387,7 @@ func TestPlanConvertsAV1ProjectWithNoManifest(t *testing.T) {
 	// The include could not be followed, so it is reported rather than dropped.
 	assert.Contains(t, strings.Join(cs.Notes, "\n"), "includes another requirements file")
 
-	// The v1 files that were carried whole are gone, and the one that was not
+	// The 1.x files that were carried whole are gone, and the one that was not
 	// is still here. This fixture happens to cover both halves of the rule.
 	//
 	// The Dockerfile is a single FROM naming a runtime tag, so the manifest's
@@ -653,7 +653,7 @@ func TestConversionReadsAnAirflowCorePin(t *testing.T) {
 // Extras on a dropped apache-airflow requirement are real dependencies and are
 // reported rather than lost.
 //
-// Both arms replace a v1 apache-airflow entry with the requirement the pin
+// Both arms replace a 1.x apache-airflow entry with the requirement the pin
 // generates, on the grounds that they say the same thing. That holds only when
 // the entry carries no extras: apache-airflow[celery,statsd] also names two
 // installed distributions, and apache-airflow==2.9.* does not.
@@ -911,7 +911,7 @@ func TestConversionNeverDeclaresAPinOnlyDockerfile(t *testing.T) {
 // Declaring a Dockerfile keeps requirements.txt and packages.txt.
 //
 // The bug this pins was a completely ordinary conversion: a Dockerfile with an
-// ENV line (so not pin-only, so declared and kept) plus the two v1 files. Both
+// ENV line (so not pin-only, so declared and kept) plus the two 1.x files. Both
 // lists migrated into the manifest and both files were DELETED — and declaring
 // the file puts the build into imagebuild's Dockerfile mode, where those
 // manifest lists are ignored by design and the runtime base's own ONBUILD
@@ -922,7 +922,7 @@ func TestConversionNeverDeclaresAPinOnlyDockerfile(t *testing.T) {
 // The earlier pin-only fix separated "is this the build" from "may this be
 // deleted" but only taught the declaration side; this is the retirement side of
 // the same confusion.
-func TestConversionKeepsTheV1FilesADeclaredDockerfileNeeds(t *testing.T) {
+func TestConversionKeepsThe1xFilesADeclaredDockerfileNeeds(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
 		[]byte("FROM quay.io/astronomer/astro-runtime:7.4.0\nENV FOO=bar\n"), 0o600))

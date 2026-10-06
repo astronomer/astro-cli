@@ -64,8 +64,8 @@ func excludes(pm *patternmatcher.PatternMatcher, path string, isDir bool) bool {
 
 // planKeptDockerfileIgnore adds the .dockerignore change when init keeps the
 // Dockerfile as the build, whose context is the whole project.
-func planKeptDockerfileIgnore(dir string, v1 *v1Project, cs *Changeset) error {
-	if !declaresDockerfile(v1) {
+func planKeptDockerfileIgnore(dir string, from1x *project1x, cs *Changeset) error {
+	if !declaresDockerfile(from1x) {
 		return nil
 	}
 	ignore, err := planDockerignore(dir, fileDockerfile)

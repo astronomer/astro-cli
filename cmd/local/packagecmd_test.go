@@ -13,7 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// writeManifest drops a minimal valid v2 manifest in dir and points the deps'
+// writeManifest drops a minimal valid manifest in dir and points the deps'
 // WorkingDir at it, so `astro package` discovers a project.
 func writeManifest(t *testing.T, d *Deps, dir string) {
 	t.Helper()

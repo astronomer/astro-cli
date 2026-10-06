@@ -23,13 +23,13 @@ func convertWithConfig(t *testing.T, body string) (res *Result, about []string) 
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)), []byte(body), 0o600))
+		filepath.Join(dir, filepath.FromSlash(config1xRelPath)), []byte(body), 0o600))
 	writeAll(t, dir, map[string]string{"Dockerfile": pinOnlyDockerfile})
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 
-	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)))
+	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(config1xRelPath)))
 	require.NoError(t, statErr, "the config is never retired, whatever it names")
 
 	for _, n := range res.Notes {

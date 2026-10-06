@@ -31,7 +31,7 @@ func (w *comparingWriter) HasSecretValue(_ secrets.Kind, name, value string) (Se
 // An equal value already held is not a conflict: it is carried, and the file
 // retires as though nothing were held.
 func TestAnEqualHeldValueIsCarried(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := &comparingWriter{recordingWriter: newRecordingWriter(), where: ".env"}
 	writer.held["API_TOKEN"] = "tok-123"
 	writer.held["warehouse"] = `{"conn_type": "snowflake", "password": "hunter2"}`
@@ -55,7 +55,7 @@ func TestAnEqualHeldValueIsCarried(t *testing.T) {
 }
 
 func TestEveryValueEqualRetiresTheFile(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := &comparingWriter{recordingWriter: newRecordingWriter()}
 	writer.held["API_TOKEN"] = "tok-123"
 
@@ -71,7 +71,7 @@ func TestEveryValueEqualRetiresTheFile(t *testing.T) {
 // A writer with only HasSecret cannot compare, so the advisory does not claim
 // the values differ.
 func TestAWriterThatCannotCompareSaysOnlyThatOneIsHeld(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	writer.held["API_TOKEN"] = "tok-123"
 
@@ -87,7 +87,7 @@ func TestAWriterThatCannotCompareSaysOnlyThatOneIsHeld(t *testing.T) {
 // "Not compared" keeps the conservative behavior, even for a value that is
 // in fact equal: kept, the file stays, and the advisory claims no difference.
 func TestANotComparedHeldValueIsKept(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := &comparingWriter{recordingWriter: newRecordingWriter(), notCompared: map[string]bool{"API_TOKEN": true}}
 	writer.held["API_TOKEN"] = "tok-123"
 

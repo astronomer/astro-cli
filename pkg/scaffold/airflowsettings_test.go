@@ -48,8 +48,8 @@ func (w *recordingWriter) HasSecret(_ secrets.Kind, name string) (bool, error) {
 	return ok, w.hasErr
 }
 
-// v1WithSettings is a 1.x project carrying an airflow_settings.yaml.
-func v1WithSettings(t *testing.T, settings string) string {
+// project1xWithSettings is a 1.x project carrying an airflow_settings.yaml.
+func project1xWithSettings(t *testing.T, settings string) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("pendulum\n"), 0o600))
@@ -76,7 +76,7 @@ const settingsWithEverything = `airflow:
 // The whole of it: a connection and a Variable go to the vault, the manifest
 // declares both without their values and holds the pool, and the file goes.
 func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	writer := newRecordingWriter()
 
 	cs, err := Plan(dir, Options{SecretWriter: writer})
@@ -116,7 +116,7 @@ func TestConversionSplitsSettingsByWhatEachThingIs(t *testing.T) {
 // vault holds one shape, and a URI sitting in it is a record only one of the
 // two tools can read back.
 func TestAConnectionURIIsStoredInTheCanonicalShape(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: pg
       conn_uri: postgres://user:pw@db.example.com:5432/analytics
@@ -141,7 +141,7 @@ func TestAConnectionURIIsStoredInTheCanonicalShape(t *testing.T) {
 // Storing it would satisfy a required connection with a record that configures
 // nothing, which is worse than the project saying it is missing.
 func TestAnEmptyConnectionIsDeclaredAndNotStored(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_type: snowflake
@@ -163,7 +163,7 @@ func TestAnEmptyConnectionIsDeclaredAndNotStored(t *testing.T) {
 // Values before files. A manifest declaring connections whose values did not
 // land is a project that will not start, and nothing on screen would say why.
 func TestAFailedVaultWriteWritesNoManifest(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	writer := newRecordingWriter()
 	writer.err = os.ErrPermission
 
@@ -180,10 +180,10 @@ func TestAFailedVaultWriteWritesNoManifest(t *testing.T) {
 // the file, with a note saying where to move them. `astro init` over an
 // existing directory is the caller that needs this: making a directory a
 // project is not the reviewed, previewed operation that moving someone's
-// credentials into a keychain has to be. Failing would make a v1 directory
+// credentials into a keychain has to be. Failing would make a 1.x directory
 // unopenable; carrying silently would move credentials nobody was shown.
 func TestNoWriterLeavesTheValuesInTheFileAndSaysSo(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	cs, err := Plan(dir, Options{})
 	require.NoError(t, err)
 	require.Empty(t, cs.Secrets, "values were kept for a caller that supplied nowhere to put them")
@@ -209,7 +209,7 @@ func TestNoWriterLeavesTheValuesInTheFileAndSaysSo(t *testing.T) {
 // With no writer the file stays: the values in it went nowhere else, so it is
 // their only copy. The note names both commands.
 func TestNoWriterKeepsTheFile(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_type: snowflake
@@ -234,7 +234,7 @@ func TestNoWriterKeepsTheFile(t *testing.T) {
 // A project with no values needs no writer, so the common case does not have
 // to supply one.
 func TestNoWriterIsNeededWhenNothingIsCarried(t *testing.T) {
-	dir := v1WithSettings(t, "airflow:\n  pools:\n    - pool_name: p\n      pool_slot: 1\n")
+	dir := project1xWithSettings(t, "airflow:\n  pools:\n    - pool_name: p\n      pool_slot: 1\n")
 	cs, err := Plan(dir, Options{})
 	require.NoError(t, err)
 	_, err = cs.Apply()
@@ -246,7 +246,7 @@ func TestNoWriterIsNeededWhenNothingIsCarried(t *testing.T) {
 // carry creates [tool.astro.env], and whatever stayed behind has silently
 // stopped applying.
 func TestAFaultCarriesNothingAndKeepsTheFile(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_type: snowflake
@@ -271,7 +271,7 @@ func TestAFaultCarriesNothingAndKeepsTheFile(t *testing.T) {
 // A preview must be able to say a credential will be stored without being able
 // to say what it is.
 func TestAPreviewCarriesNoCredential(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
 	require.NoError(t, err)
 
@@ -290,7 +290,7 @@ func anyContains(hay []string, needle string) bool {
 	return false
 }
 
-// A credential already in the vault wins over the one committed to the v1 file.
+// A credential already in the vault wins over the one committed to the 1.x file.
 //
 // What is carried is whatever was committed, which may be months stale or a
 // placeholder. What is already there was put there deliberately, through
@@ -298,7 +298,7 @@ func anyContains(hay []string, needle string) bool {
 // credential and leaves the project running against exactly the value this
 // transform exists to get out of version control.
 func TestAValueAlreadyInTheVaultIsNotOverwritten(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	writer := newRecordingWriter()
 	writer.held["warehouse"] = "the-one-the-user-set"
 
@@ -315,7 +315,7 @@ func TestAValueAlreadyInTheVaultIsNotOverwritten(t *testing.T) {
 // The file's value for a name the vault already held was not carried, so the
 // file is its only copy and stays.
 func TestAFileWhoseValueTheVaultHeldIsKept(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	writer.held["API_TOKEN"] = "the-one-the-user-set"
 
@@ -338,7 +338,7 @@ func TestAFileWhoseValueTheVaultHeldIsKept(t *testing.T) {
 // arrives before Apply, the file would be the only copy of its value, so Apply
 // refuses before it stores or deletes anything.
 func TestAValueThatReachesTheVaultAfterPlanStopsTheRetirement(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestAValueThatReachesTheVaultAfterPlanStopsTheRetirement(t *testing.T) {
 // A vault that cannot be asked keeps the file. Plan does not fail over it:
 // Apply asks the same question and fails there.
 func TestAVaultThatCannotBeAskedKeepsTheFile(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	writer.hasErr = errors.New("keyring locked")
 
@@ -366,10 +366,10 @@ func TestAVaultThatCannotBeAskedKeepsTheFile(t *testing.T) {
 	require.FileExists(t, filepath.Join(dir, SettingsRelPath))
 }
 
-// v1 read this file through viper, which coerces. yaml.v3 into a typed struct
+// The 1.x CLI read this file through viper, which coerces. yaml.v3 into a typed struct
 // does not, and it fails the decode of the WHOLE document — so one quoted port
 // used to carry nothing from a file `astro dev start` read without complaint.
-func TestShapesV1AcceptedAreStillCarried(t *testing.T) {
+func TestShapes1xAcceptedAreStillCarried(t *testing.T) {
 	for _, tc := range []struct{ name, body, wantExtra string }{
 		{
 			name:      "extra as JSON text",
@@ -383,7 +383,7 @@ func TestShapesV1AcceptedAreStillCarried(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := v1WithSettings(t, tc.body)
+			dir := project1xWithSettings(t, tc.body)
 			writer := newRecordingWriter()
 			cs, err := Plan(dir, Options{SecretWriter: writer})
 			require.NoError(t, err)
@@ -399,7 +399,7 @@ func TestShapesV1AcceptedAreStillCarried(t *testing.T) {
 // differing only in case are one variable at start. Carrying both means the
 // project runs against whichever won by composition order.
 func TestTwoConnectionsThatDifferOnlyInCaseAreRefused(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: Warehouse
       conn_type: snowflake
@@ -432,10 +432,10 @@ const settingsValuesOnly = `airflow:
 `
 
 // With every value in the vault, nothing in the file stays behind, so it is
-// retired like any other carried v1 file. No note keeps it and no advisory
+// retired like any other carried 1.x file. No note keeps it and no advisory
 // says it still holds plaintext.
 func TestASettingsFileWhoseValuesReachTheVaultIsRetired(t *testing.T) {
-	dir := v1WithSettings(t, settingsValuesOnly)
+	dir := project1xWithSettings(t, settingsValuesOnly)
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -455,7 +455,7 @@ func TestASettingsFileWhoseValuesReachTheVaultIsRetired(t *testing.T) {
 // No value from the file reaches the manifest, whatever its kind: a Variable
 // is declared secret with nothing after it, a connection by its conn_type.
 func TestNoSettingsValueReachesTheManifest(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_type: postgres
@@ -489,12 +489,12 @@ func TestNoSettingsValueReachesTheManifest(t *testing.T) {
 	require.Contains(t, string(manifest), "SPLUNK_API_KEY = {secret = true}")
 }
 
-// An empty Variable has nothing to store, and v1 skipped it rather than create
+// An empty Variable has nothing to store, and the 1.x CLI skipped it rather than create
 // it, so a Dag reading it with a fallback ran. It is declared optional, not
 // required: the converted project starts with it unset, and the run says how to
 // set it.
 func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
-	dir := v1WithSettings(t, "airflow:\n  variables:\n    - variable_name: region\n      variable_value: \"\"\n")
+	dir := project1xWithSettings(t, "airflow:\n  variables:\n    - variable_name: region\n      variable_value: \"\"\n")
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -519,13 +519,13 @@ func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
 	require.True(t, s.AirflowVariables["region"].Optional)
 	require.True(t, s.AirflowVariables["region"].Secret)
 	require.Empty(t, envschema.Validate(s, envschema.Values{}),
-		"an empty v1 variable must not stop the converted project starting")
+		"an empty 1.x variable must not stop the converted project starting")
 }
 
 // A Variable with a value stays required: whoever converts has it in the vault,
 // and a teammate without it is told which one is missing.
 func TestAStoredVariableStaysRequired(t *testing.T) {
-	dir := v1WithSettings(t, "airflow:\n  variables:\n    - variable_name: region\n      variable_value: us-east-1\n")
+	dir := project1xWithSettings(t, "airflow:\n  variables:\n    - variable_name: region\n      variable_value: us-east-1\n")
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -551,7 +551,7 @@ func TestAStoredVariableStaysRequired(t *testing.T) {
 // with the empty string, and report success. This is the same refusal Apply
 // makes for a Change whose Content is nil.
 func TestAChangesetThatLostItsValuesIsRefused(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -576,7 +576,7 @@ func TestAChangesetThatLostItsValuesIsRefused(t *testing.T) {
 // read that field — so the disclosure a conversion is approved on was invisible
 // wherever it mattered.
 func TestThePreviewSaysCredentialsGoToTheVault(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
 	require.NoError(t, err)
 
@@ -614,7 +614,7 @@ func findAdvisory(t *testing.T, advisories []string, substr string) string {
 }
 
 func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	writer := newRecordingWriter()
 	writer.held["batch_size"] = "set-by-hand"
 	cs, err := Plan(dir, Options{SecretWriter: writer})
@@ -652,7 +652,7 @@ func TestThePreviewSaysThePlaintextIsStillInTheFile(t *testing.T) {
 // Two carried connections read as prose and stay in a stable order, because the
 // ids come from a map walk.
 func TestThePlaintextAdvisoryNamesEveryConnection(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_type: postgres
@@ -674,7 +674,7 @@ func TestThePlaintextAdvisoryNamesEveryConnection(t *testing.T) {
 // advisory would be noise on every project that only ever declared pools. The
 // neighboring case — a caller that supplies no writer at all — is below.
 func TestPoolsOnlySettingsGetNoPlaintextAdvisory(t *testing.T) {
-	dir := v1WithSettings(t, "airflow:\n  pools:\n    - pool_name: p\n      pool_slot: 1\n")
+	dir := project1xWithSettings(t, "airflow:\n  pools:\n    - pool_name: p\n      pool_slot: 1\n")
 	cs, err := Plan(dir, Options{SecretWriter: newRecordingWriter()})
 	require.NoError(t, err)
 
@@ -692,7 +692,7 @@ func TestPoolsOnlySettingsGetNoPlaintextAdvisory(t *testing.T) {
 // covers it (TestNoWriterLeavesTheValuesInTheFileAndSaysSo); what is pinned
 // here is that this advisory stays out of it.
 func TestNoWriterMeansNoPlaintextAdvisory(t *testing.T) {
-	dir := v1WithSettings(t, settingsWithEverything)
+	dir := project1xWithSettings(t, settingsWithEverything)
 	cs, err := Plan(dir, Options{})
 	require.NoError(t, err)
 	require.Empty(t, cs.Secrets, "nothing may be queued for a caller with nowhere to put it")
@@ -715,7 +715,7 @@ func TestNoWriterMeansNoPlaintextAdvisory(t *testing.T) {
 // through converts from the CLI and fails in the app after the preview was
 // approved. Refusing it where the connection is authored settles it for both.
 func TestAConnectionWithNoTypeIsRefused(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_host: acct.example.com
@@ -739,7 +739,7 @@ func TestAConnectionWithNoTypeIsRefused(t *testing.T) {
 // lives in the scheme there, so reading only the conn_type field would declare
 // an empty one beside a value that is a perfectly good postgres connection.
 func TestAURIConnectionIsDeclaredAsItsScheme(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: pg
       conn_uri: postgres://user:pw@db.example.com:5432/analytics
@@ -756,10 +756,10 @@ func TestAURIConnectionIsDeclaredAsItsScheme(t *testing.T) {
 	require.Contains(t, writer.stored, "pg")
 }
 
-// v1StockSettings is the airflow_settings.yaml v1's `astro dev init` wrote,
-// byte for byte. The 1.x project template kept it out of git, so most v1
+// stock1xSettings is the airflow_settings.yaml 1.x's `astro dev init` wrote,
+// byte for byte. The 1.x project template kept it out of git, so most 1.x
 // checkouts still hold it untouched.
-const v1StockSettings = `# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
+const stock1xSettings = `# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
 # NOTE: json dicts can be added to the conn_extra field as yaml key value pairs. See the example below.
 
 # For more information, refer to our docs: https://www.astronomer.io/docs/astro/cli/develop-project#configure-airflow_settingsyaml-local-development-only
@@ -788,8 +788,8 @@ airflow:
 
 // The untouched template carries nothing, so it is removed with no note, and
 // the report says there was nothing in it rather than that it was migrated.
-func TestTheStockV1SettingsFileIsRetired(t *testing.T) {
-	dir := v1WithSettings(t, v1StockSettings)
+func TestTheStock1xSettingsFileIsRetired(t *testing.T) {
+	dir := project1xWithSettings(t, stock1xSettings)
 	writer := newRecordingWriter()
 	cs, err := Plan(dir, Options{SecretWriter: writer})
 	require.NoError(t, err)
@@ -809,7 +809,7 @@ func TestTheStockV1SettingsFileIsRetired(t *testing.T) {
 // A real entry beside the template's blank ones carries as it would alone, and
 // the blank ones are skipped rather than blocking it.
 func TestTheStockTemplatesBlankEntriesDoNotBlockARealOne(t *testing.T) {
-	dir := v1WithSettings(t, v1StockSettings+`    - variable_name: API_TOKEN
+	dir := project1xWithSettings(t, stock1xSettings+`    - variable_name: API_TOKEN
       variable_value: tok-123
 `)
 	writer := newRecordingWriter()
@@ -828,7 +828,7 @@ func TestTheStockTemplatesBlankEntriesDoNotBlockARealOne(t *testing.T) {
 // An entry that has values but no id is a mistake, not a placeholder: the
 // file is kept and the note says which entry to fix, without its secrets.
 func TestAnEntryWithValuesButNoIDIsReported(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_type: snowflake
@@ -859,7 +859,7 @@ func TestAnEntryWithValuesButNoIDIsReported(t *testing.T) {
 // real extra, or a nameless pool with slots, holds something the user wrote,
 // so the file is kept and the entry named rather than removed with it.
 func TestAnEntryWithNoIDIsBlankOnlyWithTheTemplatesPlaceholders(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id:
       conn_extra:

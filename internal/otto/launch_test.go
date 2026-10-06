@@ -111,7 +111,7 @@ func pg(id, password string) *connmodel.Connection {
 // no file under the skill's config dir holds one.
 func (s *ConfigSuite) TestStartWritesTheWarehousesThatReachTheCheckout() {
 	warehouses, vault := s.prepareLaunch()
-	cwd := s.chdirV2Project("reach-project")
+	cwd := s.chdirManifestProject("reach-project")
 	canon, err := localrt.CanonicalPath(cwd)
 	s.Require().NoError(err)
 	elsewhere := filepath.Join(s.T().TempDir(), "elsewhere")
@@ -176,7 +176,7 @@ func (s *ConfigSuite) TestStartWritesTheWarehousesThatReachTheCheckout() {
 // secrets an earlier launch left in .env are stripped.
 func (s *ConfigSuite) TestStartPreservesUserWarehouseEntries() {
 	warehouses, vault := s.prepareLaunch()
-	s.chdirV2Project("preserve-project")
+	s.chdirManifestProject("preserve-project")
 	s.Require().NoError(os.MkdirAll(warehouses, 0o750))
 	s.Require().NoError(os.WriteFile(filepath.Join(warehouses, "warehouse.yml"),
 		[]byte("mine:\n  type: duckdb\nairflow_gone:\n  type: postgres\n"), 0o600))
@@ -204,7 +204,7 @@ func (s *ConfigSuite) TestStartPreservesUserWarehouseEntries() {
 // not either.
 func (s *ConfigSuite) TestStartKeepsAnInheritedWarehouseKey() {
 	_, vault := s.prepareLaunch()
-	s.chdirV2Project("inherit-project")
+	s.chdirManifestProject("inherit-project")
 	s.putConn(vault, secrets.GlobalScope, pg("mine", "vault-pw"))
 	s.T().Setenv("AIRFLOW_MINE_PASSWORD", "shell-pw")
 
@@ -225,7 +225,7 @@ func (s *ConfigSuite) TestStartKeepsAnInheritedWarehouseKey() {
 // keychain access for them.
 func (s *ConfigSuite) TestStartVersionWritesNoWarehouses() {
 	warehouses, vault := s.prepareLaunch()
-	s.chdirV2Project("version-project")
+	s.chdirManifestProject("version-project")
 	s.putConn(vault, secrets.GlobalScope, pg("any", "any-pw"))
 
 	s.start("--version")
@@ -319,12 +319,12 @@ func (s *ConfigSuite) TestPrependPathMatchesWindowsCase() {
 
 // A project's Airflow gets its URL and no default account; Otto resolves
 // that project's credentials itself.
-func (s *ConfigSuite) TestStartV2AirflowGetsNoAccount() {
+func (s *ConfigSuite) TestStartProjectAirflowGetsNoAccount() {
 	s.prepareLaunch()
 	srv := s.startFakeAirflow()
 	defer srv.Close()
-	cwd := s.chdirV2Project("v2-launch")
-	s.writeV2Record(cwd, serverPort(srv))
+	cwd := s.chdirManifestProject("project-launch")
+	s.writeProjectRecord(cwd, serverPort(srv))
 	s.T().Setenv("AIRFLOW_USERNAME", "") // restored after; unset for the run
 	s.T().Setenv("AIRFLOW_PASSWORD", "")
 	s.Require().NoError(os.Unsetenv("AIRFLOW_USERNAME"))
@@ -341,11 +341,11 @@ func (s *ConfigSuite) TestStartV2AirflowGetsNoAccount() {
 }
 
 // A v1 route keeps the default account.
-func (s *ConfigSuite) TestStartV1AirflowKeepsTheAccount() {
+func (s *ConfigSuite) TestStart1xAirflowKeepsTheAccount() {
 	s.prepareLaunch()
 	srv := s.startFakeAirflow()
 	defer srv.Close()
-	cwd := s.chdirTempProject("v1-launch")
+	cwd := s.chdirTempProject("1x-launch")
 	s.writeRoute(&pkgproxy.Route{Port: urlPort(s.T(), srv.URL), ProjectDir: cwd, PID: os.Getpid()})
 
 	l := s.start()

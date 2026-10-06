@@ -52,7 +52,7 @@ func TestRefusalTellsTheThreeConditionsApart(t *testing.T) {
 	}
 }
 
-// A conversion asks about a name as the v1 file spells it. A value stored under
+// A conversion asks about a name as the 1.x file spells it. A value stored under
 // another spelling of the same Airflow key is the one Airflow reads, so it
 // counts as held.
 func TestHasSecretMatchesOnTheEnvKey(t *testing.T) {

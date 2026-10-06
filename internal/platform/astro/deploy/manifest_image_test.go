@@ -91,11 +91,11 @@ func mockCreateImageDeploy(client *astrov1_mocks.ClientWithResponsesInterface, u
 	}, nil)
 }
 
-func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
+func TestDeployManifestImage_BuildAndImageAndDag(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false) // STANDARD, runtime 3.1-2, dag deploy on
+	mockManifestDeploymentAt(client, "3.1-2", true, false) // STANDARD, runtime 3.1-2, dag deploy on
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
@@ -103,9 +103,9 @@ func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
 
 	cmd, handler := withImageSeams(t, "3.1-2")
 
-	res, err := DeployImageV2(ImageDeployV2Input{
+	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.1",
 			Dependencies:   []string{"pandas"},
 		},
@@ -129,20 +129,20 @@ func TestDeployImageV2_BuildAndImageAndDag(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestDeployImageV2_ImageOnlySkipsDags(t *testing.T) {
+func TestDeployManifestImage_ImageOnlySkipsDags(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "") // image-only: no upload URL needed
 	mockFinalizeDeploy(client)
 
 	_, handler := withImageSeams(t, "3.1-2")
 
-	res, err := DeployImageV2(ImageDeployV2Input{
+	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.1",
 			Dependencies:   []string{"pandas"},
 		},
@@ -156,20 +156,20 @@ func TestDeployImageV2_ImageOnlySkipsDags(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestDeployImageV2_ImageNameSkipsBuild(t *testing.T) {
+func TestDeployManifestImage_ImageNameSkipsBuild(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "")
 	mockFinalizeDeploy(client)
 
 	cmd, _ := withImageSeams(t, "3.1-2")
 
-	res, err := DeployImageV2(ImageDeployV2Input{
+	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir: v2ProjectDir(t),
+			ProjectDir: manifestProjectDir(t),
 		},
 		DeploymentID: "test-deployment-id",
 		ImageName:    "astro-package/demo:7.0.0-abc",
@@ -216,19 +216,19 @@ func containerdStore(t *testing.T, runtimeVersion string) (cmd *fakeImageCmd, ha
 // read the runtime label and push a linux/amd64 image. Under the containerd
 // store a pulled base reads no labels, so this only succeeds when the deploy
 // builds a single-platform image at linux/amd64 and inspects and pushes that.
-func TestDeployImageV2_NothingToInstallBuildsASinglePlatformImage(t *testing.T) {
+func TestDeployManifestImage_NothingToInstallBuildsASinglePlatformImage(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "")
 	mockFinalizeDeploy(client)
 
 	cmd, handlers := containerdStore(t, "3.1-2")
 
-	dir := v2ProjectDir(t)
-	res, err := DeployImageV2(ImageDeployV2Input{
+	dir := manifestProjectDir(t)
+	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
 			ProjectDir:     dir,
 			AirflowVersion: "3.1",
@@ -249,19 +249,19 @@ func TestDeployImageV2_NothingToInstallBuildsASinglePlatformImage(t *testing.T) 
 	client.AssertExpectations(t)
 }
 
-func TestDeployImageV2_RuntimeVersionRejected(t *testing.T) {
+func TestDeployManifestImage_RuntimeVersionRejected(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false) // deployment at 3.1-2
+	mockManifestDeploymentAt(client, "3.1-2", true, false) // deployment at 3.1-2
 	mockDeploymentOptions(client, "3.1-2")
 
 	// The built image reports 3.1-1 — a downgrade the deployment must refuse.
 	withImageSeams(t, "3.1-1")
 
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.1",
 			Dependencies:   []string{"pandas"},
 		},
@@ -275,7 +275,7 @@ func TestDeployImageV2_RuntimeVersionRejected(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestDeployImageV2_NoDockerFailsEarly(t *testing.T) {
+func TestDeployManifestImage_NoDockerFailsEarly(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
@@ -283,9 +283,9 @@ func TestDeployImageV2_NoDockerFailsEarly(t *testing.T) {
 	resolveContainerEngine = func() (string, []string, error) { return "", nil, errors.New("no engine on PATH") }
 	t.Cleanup(func() { resolveContainerEngine = origResolve })
 
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.1",
 		},
 		DeploymentID: "test-deployment-id",
@@ -299,7 +299,7 @@ func TestDeployImageV2_NoDockerFailsEarly(t *testing.T) {
 
 // Podman with no machine up names the podman fix, not "Start Docker", and
 // still fails before the transport.
-func TestDeployImageV2_NoPodmanMachineNamesThePodmanFix(t *testing.T) {
+func TestDeployManifestImage_NoPodmanMachineNamesThePodmanFix(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
@@ -309,9 +309,9 @@ func TestDeployImageV2_NoPodmanMachineNamesThePodmanFix(t *testing.T) {
 	}
 	t.Cleanup(func() { resolveContainerEngine = origResolve })
 
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.1",
 		},
 		DeploymentID: "test-deployment-id",
@@ -372,11 +372,11 @@ func TestCheckPlannedRuntime(t *testing.T) {
 }
 
 func TestPlanRuntimeReadsTheGeneratedBase(t *testing.T) {
-	series := planRuntime(&ImageDeployV2Input{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3"})
+	series := planRuntime(&ManifestImageDeployInput{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3"})
 	assert.Equal(t, "3.3", series.version)
 	assert.True(t, series.series)
 
-	exact := planRuntime(&ImageDeployV2Input{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3-8-python-3.13"})
+	exact := planRuntime(&ManifestImageDeployInput{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3-8-python-3.13"})
 	assert.Equal(t, "3.3-8", exact.version)
 	assert.False(t, exact.series)
 	assert.Equal(t, "set [tool.astro] runtime to 3.3-9 or newer in pyproject.toml", exact.raise("3.3-9"))
@@ -384,43 +384,43 @@ func TestPlanRuntimeReadsTheGeneratedBase(t *testing.T) {
 
 // A deploy the deployment would refuse for its runtime is refused before the
 // build, which is minutes for a real project, and names what to change.
-func TestDeployImageV2_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
+func TestDeployManifestImage_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
 	tests := []struct {
 		name       string
-		in         ImageDeployV2Input
+		in         ManifestImageDeployInput
 		dockerfile string
 		wantErr    string
 	}{
 		{
 			name:    "an older Airflow pin",
-			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2"}},
+			in:      ManifestImageDeployInput{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2"}},
 			wantErr: "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, pin apache-airflow to 3.3 or newer in pyproject.toml",
 		},
 		{
 			name:    "an older runtime build in another series",
-			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Runtime: "3.2-10"}},
+			in:      ManifestImageDeployInput{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Runtime: "3.2-10"}},
 			wantErr: "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, pin apache-airflow to 3.3 and set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml",
 		},
 		{
 			name:    "an older runtime build",
-			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.3", Runtime: "3.3-7"}},
+			in:      ManifestImageDeployInput{Build: imagebuild.ManifestBuild{AirflowVersion: "3.3", Runtime: "3.3-7"}},
 			wantErr: "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml",
 		},
 		{
 			name:       "a Dockerfile FROM an older runtime",
-			in:         ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Dockerfile: "Dockerfile"}},
+			in:         ManifestImageDeployInput{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Dockerfile: "Dockerfile"}},
 			dockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.2-10-python-3.12\n",
 			wantErr:    "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, change the FROM line in Dockerfile to Astro Runtime 3.3-8 or newer, and pin apache-airflow to 3.3 in pyproject.toml",
 		},
 		{
 			name:       "a Dockerfile whose final stage is FROM an older series tag",
-			in:         ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Dockerfile: "Dockerfile"}},
+			in:         ManifestImageDeployInput{Build: imagebuild.ManifestBuild{AirflowVersion: "3.2", Dockerfile: "Dockerfile"}},
 			dockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.3 AS deps\nFROM astrocrpublic.azurecr.io/runtime:3.2\n",
 			wantErr:    "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, change the FROM line in Dockerfile to Astro Runtime 3.3-8 or newer, and pin apache-airflow to 3.3 in pyproject.toml",
 		},
 		{
 			name:    "a series the deployment does not offer",
-			in:      ImageDeployV2Input{Build: imagebuild.ManifestBuild{AirflowVersion: "3.5"}},
+			in:      ManifestImageDeployInput{Build: imagebuild.ManifestBuild{AirflowVersion: "3.5"}},
 			wantErr: "cannot deploy unsupported Astro Runtime 3.5; supported versions: 3.2-10, 3.3-8",
 		},
 	}
@@ -428,19 +428,19 @@ func TestDeployImageV2_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			client := new(astrov1_mocks.ClientWithResponsesInterface)
-			mockV2DeploymentAt(client, "3.3-8", true, false)
+			mockManifestDeploymentAt(client, "3.3-8", true, false)
 			mockDeploymentOptions(client, "3.2-10", "3.3-8")
 			cmd, _ := withImageSeams(t, "3.2-10")
 
 			in := tt.in
 			in.OnBuild = func() { t.Error("a refused deploy must not announce a build") }
-			in.Build.ProjectDir = v2ProjectDir(t)
+			in.Build.ProjectDir = manifestProjectDir(t)
 			in.DeploymentID = "test-deployment-id"
 			if tt.dockerfile != "" {
 				require.NoError(t, os.WriteFile(filepath.Join(in.Build.ProjectDir, "Dockerfile"), []byte(tt.dockerfile), 0o600))
 			}
 
-			_, err := DeployImageV2(in, client)
+			_, err := DeployManifestImage(in, client)
 			require.EqualError(t, err, tt.wantErr)
 			assert.False(t, hasImageCall(cmd.calls, "build --tag"), "nothing should be built, got %v", cmd.calls)
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -451,17 +451,17 @@ func TestDeployImageV2_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
 // The pin's series tag can serve an older build than the deployment runs. Only
 // the label shows that, and the pin is already right, so the fix is a runtime
 // build rather than a newer pin.
-func TestDeployImageV2_ASeriesTagBehindTheDeploymentNamesARuntimeBuild(t *testing.T) {
+func TestDeployManifestImage_ASeriesTagBehindTheDeploymentNamesARuntimeBuild(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockV2DeploymentAt(client, "3.3-8", true, false)
+	mockManifestDeploymentAt(client, "3.3-8", true, false)
 	mockDeploymentOptions(client, "3.3-7", "3.3-8")
 	cmd, _ := withImageSeams(t, "3.3-7")
 
 	built := false
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.3",
 		},
 		DeploymentID: "test-deployment-id",
@@ -475,16 +475,16 @@ func TestDeployImageV2_ASeriesTagBehindTheDeploymentNamesARuntimeBuild(t *testin
 
 // A prebuilt image is only known by its label, and the refusal names how to
 // rebuild it.
-func TestDeployImageV2_ImageNameDowngradeNamesTheFix(t *testing.T) {
+func TestDeployManifestImage_ImageNameDowngradeNamesTheFix(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockV2DeploymentAt(client, "3.3-8", true, false)
+	mockManifestDeploymentAt(client, "3.3-8", true, false)
 	mockDeploymentOptions(client, "3.2-10", "3.3-8")
 	withImageSeams(t, "3.2-10")
 
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir: v2ProjectDir(t),
+			ProjectDir: manifestProjectDir(t),
 		},
 		DeploymentID: "test-deployment-id",
 		ImageName:    "astro-package/demo:3.2-10-abc",
@@ -521,17 +521,17 @@ func hasImageCall(calls []string, substr string) bool {
 
 // Deploying a project that declared its own Dockerfile builds THAT file.
 //
-// Before this the v2 deploy resolved a runtime base from the manifest pin and
+// Before this the manifest deploy resolved a runtime base from the manifest pin and
 // built a generated image, so a tier-3 project shipped with every RUN and COPY
 // step silently dropped. The DAG then worked locally, where the declaration IS
 // read, and failed in the Deployment on whatever the Dockerfile installed —
 // which is the worst shape for a bug like this, because local success is what
 // convinces you the image is right.
-func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
+func TestDeployManifestImage_UsesADeclaredDockerfile(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateImageDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
@@ -539,12 +539,12 @@ func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
 
 	cmd, _ := withImageSeams(t, "3.1-2")
 
-	dir := v2ProjectDir(t)
+	dir := manifestProjectDir(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docker"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "docker", "Dockerfile"),
 		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN apt-get install -y unixodbc-dev\n"), 0o600))
 
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
 			ProjectDir:     dir,
 			AirflowVersion: "3.1",
@@ -574,18 +574,18 @@ func TestDeployImageV2_UsesADeclaredDockerfile(t *testing.T) {
 }
 
 // A declaration naming nothing fails before any build, naming the path.
-func TestDeployImageV2_RefusesAnUnreadableDeclaration(t *testing.T) {
+func TestDeployManifestImage_RefusesAnUnreadableDeclaration(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 
 	cmd, _ := withImageSeams(t, "3.1-2")
 
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.1",
 			Dockerfile:     "docker/Dockerfile", // never written
 		},

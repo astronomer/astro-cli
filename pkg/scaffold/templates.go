@@ -9,16 +9,16 @@ import _ "embed"
 // where a Go string literal is none of those.
 //
 // It imports only airflow.sdk and the standard library, and that is a
-// requirement rather than a coincidence. Under v1 a project's dependencies came
+// requirement rather than a coincidence. Under 1.x a project's dependencies came
 // from a fat runtime image, so the example could `import requests` and call an
 // API. A project installs exactly what [project.dependencies] names, which
 // this scaffold writes as apache-airflow alone — so an example carrying a
 // third-party import would fail to load on the first `astro local start`, which
 // is a worse first run than no example at all.
 //
-// It is Airflow 3 only, because airflow.sdk is. The v1 templates were a
+// It is Airflow 3 only, because airflow.sdk is. The 1.x templates were a
 // per-major pair, pkg/airflowrt/include/airflow2/exampledag.py beside
-// .../airflow3; nothing wrote them once v1 init was gone and they were deleted
+// .../airflow3; nothing wrote them once 1.x's init was gone and they were deleted
 // with it, so an Airflow 2 variant, if one is ever wanted, is modeled from that
 // file in git history. starterDagSuits is what keeps this file away from a
 // project that pins 2 in the meantime.

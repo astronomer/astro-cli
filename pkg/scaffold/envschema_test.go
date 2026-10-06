@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func v1ProjectDir(t *testing.T) string {
+func project1xDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
@@ -21,8 +21,8 @@ func v1ProjectDir(t *testing.T) string {
 // A project with nothing to declare gets no [tool.astro.env] at all, rather
 // than an empty table — an empty table is a claim, and it would make the app
 // treat the manifest as the source before anything declares there.
-func TestRunWritesNoEnvSectionWithoutAV1File(t *testing.T) {
-	dir := v1ProjectDir(t)
+func TestRunWritesNoEnvSectionWithoutA1xFile(t *testing.T) {
+	dir := project1xDir(t)
 
 	_, err := Run(dir, Options{})
 	require.NoError(t, err)
@@ -32,12 +32,12 @@ func TestRunWritesNoEnvSectionWithoutAV1File(t *testing.T) {
 	assert.NotContains(t, string(body), "[tool.astro.env")
 }
 
-// .astro/env.schema.yaml is not a v1 file the conversion reads. Only older
+// .astro/env.schema.yaml is not a 1.x file the conversion reads. Only older
 // Astro Desktop builds ever wrote it, so it is treated like any file the
 // conversion does not know: nothing is carried from it, nothing names it, and
 // it is left where it is.
 func TestRunIgnoresAnOldDesktopEnvSchema(t *testing.T) {
-	dir := v1ProjectDir(t)
+	dir := project1xDir(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o700))
 	file := filepath.Join(dir, ".astro", "env.schema.yaml")
 	body := []byte("env_vars:\n  - { key: API_URL, required: true }\n")

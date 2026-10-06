@@ -48,15 +48,15 @@ func workspaceConnections(projectDir string) ([]connmodel.Connection, error) {
 // warehouseConnections is every connection Otto's warehouses come from: the
 // vault's that reach the checkout, then, at the lowest precedence, the linked
 // workspace's, as a start layers them and as Astro Desktop feeds its
-// warehouses. A connection id the vault holds keeps the vault's. v2 is whether
+// warehouses. A connection id the vault holds keeps the vault's. isProject is whether
 // projectDir is a project, which is what can link a workspace.
 //
 // The workspace read is bounded by warehouseReadTimeout, and
 // a failure is logged and leaves those warehouses out: a launch never waits on
 // or fails over the platform.
-func warehouseConnections(projectDir string, v2 bool) []connmodel.Connection {
+func warehouseConnections(projectDir string, isProject bool) []connmodel.Connection {
 	out := reachingConnections(projectDir)
-	if !v2 {
+	if !isProject {
 		return out
 	}
 	cloud, err := workspaceConnections(projectDir)
@@ -96,10 +96,10 @@ var warehouseDir = connwarehouse.ConfigDir
 // that is no project matches only the globals with no link row.
 func writeWarehouses(cwd string) []connwarehouse.Materialized {
 	projectDir := cwd
-	v2 := false
+	isProject := false
 	if proj, err := project.Discover(cwd); err == nil {
 		projectDir = proj.Dir
-		v2 = true
+		isProject = true
 	} else {
 		var notFound *project.NotFoundError
 		if !errors.As(err, &notFound) {
@@ -111,7 +111,7 @@ func writeWarehouses(cwd string) []connwarehouse.Materialized {
 		logger.Warnf("otto: warehouse config dir: %v", err)
 		return nil
 	}
-	live, skipped := connwarehouse.MaterializeAll(warehouseConnections(projectDir, v2))
+	live, skipped := connwarehouse.MaterializeAll(warehouseConnections(projectDir, isProject))
 	if err := connwarehouse.Write(dir, live); err != nil {
 		logger.Warnf("otto: writing warehouse config: %v", err)
 		return live

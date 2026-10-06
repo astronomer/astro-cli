@@ -72,15 +72,15 @@ func TestExplainHibernatingLeavesANetworkErrorAlone(t *testing.T) {
 	assert.Same(t, offline, explainHibernating(offline, asleep))
 }
 
-func TestDeployDagsV2_HibernatingSaysHowToWakeIt(t *testing.T) {
+func TestDeployManifestDags_HibernatingSaysHowToWakeIt(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
+	mockManifestDeployment(client, true, false)
 	mockCreateDeployRefused(client, blockedByHibernation)
 
-	_, err := DeployDagsV2(DagDeployV2Input{
-		ProjectDir:   v2ProjectDir(t),
+	_, err := DeployManifestDags(ManifestDagDeployInput{
+		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
@@ -94,7 +94,7 @@ func TestDeployBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
 
 	bundlePath := filepath.Join(t.TempDir(), "dbt")
 	require.NoError(t, os.Mkdir(bundlePath, 0o755))
-	mockV2Deployment(client, true, false)
+	mockManifestDeployment(client, true, false)
 	mockCreateDeployRefused(client, blockedByHibernation)
 
 	err := DeployBundle(&DeployBundleInput{
@@ -109,18 +109,18 @@ func TestDeployBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestDeployImageV2_HibernatingSaysHowToWakeIt(t *testing.T) {
+func TestDeployManifestImage_HibernatingSaysHowToWakeIt(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateDeployRefused(client, blockedByHibernation)
 	_, handler := withImageSeams(t, "3.1-2")
 
-	_, err := DeployImageV2(ImageDeployV2Input{
+	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2ProjectDir(t),
+			ProjectDir:     manifestProjectDir(t),
 			AirflowVersion: "3.1",
 		},
 		DeploymentID: "test-deployment-id",

@@ -410,7 +410,7 @@ func refusal(err error) error {
 // pkg/scaffold's SecretWriter asks for.
 //
 // It takes the vault's own kind rather than localenv's, because the caller is a
-// conversion reading a v1 file and not a command parsing a flag — there is no
+// conversion reading a 1.x file and not a command parsing a flag — there is no
 // localenv.Kind anywhere in that path, and translating one into the other just
 // to translate it back is a round trip through a vocabulary neither side uses.
 //

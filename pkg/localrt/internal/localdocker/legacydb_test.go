@@ -19,7 +19,7 @@ import (
 // recomputed from the code under test: the md5 prefixes were taken with the
 // md5(1) tool, and the first two cases are real volumes observed on a machine
 // that had run both CLIs against those directories.
-func TestLegacyMetadataVolumeReproducesV1Names(t *testing.T) {
+func TestLegacyMetadataVolumeReproduces1xNames(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		projectPath string
@@ -80,7 +80,7 @@ func legacyProject(t *testing.T, body string) (projectPath, legacyVolume string)
 	require.NoError(t, os.Mkdir(filepath.Join(projectPath, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(projectPath, ".astro", "config.yaml"), []byte(body), 0o600))
 	// Derived rather than pinned because the path is a temp dir; the derivation
-	// itself is pinned against real v1 volumes above.
+	// itself is pinned against real 1.x volumes above.
 	return projectPath, legacyMetadataVolume(projectPath, "proj")
 }
 
@@ -124,7 +124,7 @@ func noteRun(t *testing.T, projectPath string, s *engineState) (calls, lines []s
 }
 
 // A first start of a project arriving from `astro dev` says where the old
-// database is and that Astro CLI v1 can still start it. Otherwise a fresh database
+// database is and that Astro CLI 1.x can still start it. Otherwise a fresh database
 // reads as the local Airflow having lost everything.
 func TestAFirstStartSaysWhereTheAstroDevDatabaseIs(t *testing.T) {
 	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
@@ -134,8 +134,8 @@ func TestAFirstStartSaysWhereTheAstroDevDatabaseIs(t *testing.T) {
 	assert.Contains(t, lines[0], "new local Airflow database")
 	assert.Contains(t, lines[0], legacy)
 	assert.Contains(t, lines[0], "docker volume")
-	assert.Contains(t, lines[0], "Astro CLI v1",
-		"the data is reachable from v1, and naming the tool is what stays true in both frontends")
+	assert.Contains(t, lines[0], "Astro CLI 1.x",
+		"the data is reachable from 1.x, and naming the tool is what stays true in both frontends")
 	assert.NotContains(t, lines[0], "astro dev start",
 		"v2 removed that command, so pointing at it sends the user into `was removed in Astro CLI v2`")
 }
@@ -152,7 +152,7 @@ func TestTheNoteOnlyLooks(t *testing.T) {
 	}
 }
 
-// v1 honored container.binary, so a podman user's volume is on the engine this
+// 1.x honored container.binary, so a podman user's volume is on the engine this
 // runtime does not prefer, and the note names the engine that has it.
 func TestTheNoteNamesTheEngineThatHasTheVolume(t *testing.T) {
 	projectPath, legacy := legacyProject(t, "project:\n  name: proj\n")
@@ -181,21 +181,21 @@ func TestNoNoteWhenTheEngineCannotSayIfThisRuntimeHasAVolume(t *testing.T) {
 	assert.Empty(t, lines)
 }
 
-func TestNoNoteForAProjectThatNeverRanUnderV1(t *testing.T) {
+func TestNoNoteForAProjectThatNeverRanUnder1x(t *testing.T) {
 	calls, lines := noteRun(t, t.TempDir(), &engineState{})
 
 	assert.Empty(t, lines)
-	require.Len(t, calls, 1, "without a v1 config there is nothing to look for, got %v", calls)
+	require.Len(t, calls, 1, "without a 1.x config there is nothing to look for, got %v", calls)
 }
 
-func TestNoNoteWhenTheV1ProjectHasNoVolume(t *testing.T) {
+func TestNoNoteWhenThe1xProjectHasNoVolume(t *testing.T) {
 	projectPath, _ := legacyProject(t, "project:\n  name: proj\n")
 	_, lines := noteRun(t, projectPath, &engineState{})
 
 	assert.Empty(t, lines)
 }
 
-// v1 read the project name per key from the home config when the project's own
+// The 1.x CLI read the project name per key from the home config when the project's own
 // file left it out, and the volume name follows whichever it used.
 func TestTheNoteReadsTheProjectNameFromTheHomeConfigToo(t *testing.T) {
 	home := t.TempDir()
@@ -250,8 +250,8 @@ func TestAStartTellsAProjectArrivingFromAstroDev(t *testing.T) {
 	assert.Less(t, probe, up, "the note must ask before the up creates the volume")
 }
 
-// composeProjectName resolves symlinks and v1's hash did not, so a project
-// reached through a symlink has its v1 volume under the other spelling. Missing
+// composeProjectName resolves symlinks and 1.x's hash did not, so a project
+// reached through a symlink has its 1.x volume under the other spelling. Missing
 // it is a silent no-op, the worst outcome this file has.
 func TestLegacyPathSpellingsCoversASymlinkedProject(t *testing.T) {
 	target := t.TempDir()
@@ -263,7 +263,7 @@ func TestLegacyPathSpellingsCoversASymlinkedProject(t *testing.T) {
 	resolved, err := filepath.EvalSymlinks(link)
 	require.NoError(t, err)
 	assert.Contains(t, spellings, link, "the spelling the caller handed us")
-	assert.Contains(t, spellings, resolved, "and the one v1 would have hashed if it ran from the real path")
+	assert.Contains(t, spellings, resolved, "and the one 1.x would have hashed if it ran from the real path")
 
 	// A plain directory yields exactly one, so the common case costs one lookup.
 	assert.Len(t, legacyPathSpellings(resolved), 1)

@@ -27,9 +27,9 @@ type Config struct {
 	Domain       string
 	Organization string
 	AirflowURL   string
-	// AirflowV2 is true when AirflowURL is a project's Airflow, which Otto
+	// ProjectAirflow is true when AirflowURL is a project's Airflow, which Otto
 	// authenticates to itself: no username and password are injected for it.
-	AirflowV2 bool
+	ProjectAirflow bool
 }
 
 // NewConfigFromContext builds a Config from the current astro login context.
@@ -74,24 +74,24 @@ func projectOrganization(fallback string) string {
 // directory, or "" if there is none, and whether it is a project's. The nearest enclosing project's
 // running Airflow wins — even over a v1 route registered on cwd itself;
 // otherwise the v1 proxy routes decide.
-func DetectAirflow() (url string, v2 bool) {
+func DetectAirflow() (url string, isProject bool) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", false
 	}
-	if url := detectV2Airflow(cwd); url != "" {
+	if url := detectProjectAirflow(cwd); url != "" {
 		return url, true
 	}
-	return detectV1Airflow(cwd), false
+	return detect1xAirflow(cwd), false
 }
 
-// detectV2Airflow reports the running local Airflow of the project cwd
+// detectProjectAirflow reports the running local Airflow of the project cwd
 // sits in, or "" when there is none. The health probe subsumes an engine
 // liveness check — a stale record fails it the same way a stopped Airflow
 // does. localhost:<port> rather than the record's hostname URL: the hostname
 // needs the proxy daemon up, and the record is rewritten on every start, so
 // the direct port is always current.
-func detectV2Airflow(cwd string) string {
+func detectProjectAirflow(cwd string) string {
 	proj, err := project.Discover(cwd)
 	if err != nil {
 		var notFound *project.NotFoundError
@@ -120,10 +120,10 @@ func detectV2Airflow(cwd string) string {
 	return url
 }
 
-// detectV1Airflow resolves through the v1 proxy routes. It prefers the proxy
+// detect1xAirflow resolves through the v1 proxy routes. It prefers the proxy
 // hostname URL because it's stable across `astro dev restart` — the container
 // port rotates, the hostname doesn't.
-func detectV1Airflow(cwd string) string {
+func detect1xAirflow(cwd string) string {
 	route, err := proxy.Routes().GetRouteByProject(cwd)
 	if err != nil || route == nil || route.Port == "" {
 		return ""
@@ -213,12 +213,12 @@ func (c *Config) BuildEnv() []string {
 	// Airflow connection
 	set("AIRFLOW_API_URL", c.AirflowURL)
 
-	if c.AirflowURL != "" && !c.AirflowV2 {
+	if c.AirflowURL != "" && !c.ProjectAirflow {
 		// A v1 route: the account the engines provision, from pkg/airflowrt
 		// rather than spelled again here. Right for docker mode either
 		// version, and for macOS standalone. NOT right for a non-macOS
 		// standalone Airflow 2, whose password `airflow standalone` generates:
-		// detectV1Airflow has no Airflow-major or mode information to refuse
+		// detect1xAirflow has no Airflow-major or mode information to refuse
 		// it with, so such a route still gets a pair that will 401. See the
 		// gap noted in pkg/airflowrt/account.go.
 		//

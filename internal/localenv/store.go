@@ -135,7 +135,7 @@ func InvalidName(kind Kind, name string) error {
 // in plaintext, which is the whole posture of this feature.
 //
 // The rule itself lives in pkg/airflowenv, beside the codec whose output it
-// names as canonical, because the conversion that carries a v1
+// names as canonical, because the conversion that carries a 1.x
 // airflow_settings.yaml into the vault has to write the same shape and cannot
 // reach an internal package.
 func NormalizeConn(connID, raw string) (string, error) {

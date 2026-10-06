@@ -21,7 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
-	v2deploy "github.com/astronomer/astro-cli/internal/deploy"
+	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
@@ -205,7 +205,7 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 // --build-secret has LEFT this list, which is the one entry that went the other
 // way. It was blocked on tier 3, then on imagebuild passing a
 // --secret; both have landed, so the flag is READ now. It still needs a project
-// Dockerfile to be mounted into, and deployV2 refuses it without one — a refusal
+// Dockerfile to be mounted into, and deployManifest refuses it without one — a refusal
 // about what the project declares rather than about which version it is, gated on
 // the flag being given rather than on a resolved value, since
 // util.ResolveBuildSecrets also reads BUILD_SECRET_INPUT from the environment.
@@ -239,7 +239,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// takes the manifest deploy path; everything else runs the 1.x path below,
 	// unchanged. project detection lives in internal/project.
 	if project.HasManifest(config.WorkingPath) {
-		return deployV2(cmd, args)
+		return deployManifest(cmd, args)
 	}
 
 	deploymentID = ""
@@ -386,11 +386,11 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 	return DeployBundle(deployBundleInput)
 }
 
-// deployV2 runs the manifest deploy path: load the manifest, gather flags and
+// deployManifest runs the manifest deploy path: load the manifest, gather flags and
 // context, resolve the deployment, and run the deploy — dags-only, image-only,
 // or both — then render the result. The manifest deploy's logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
-func deployV2(cmd *cobra.Command, args []string) error {
+func deployManifest(cmd *cobra.Command, args []string) error {
 	// The format is read before the flag refusals, so a bad --output is the
 	// usage error reported rather than whichever refusal came first. Every
 	// failure below, refusals included, reaches a json-mode caller as the one
@@ -403,14 +403,14 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	}
 	cmd.SilenceUsage = true
 	if rerr := refuseFlagsManifestDeployIgnores(cmd); rerr != nil {
-		return deployV2Err(cmd, rerr)
+		return manifestDeployErr(cmd, rerr)
 	}
 
 	out := cmd.OutOrStdout()
 
 	m, err := manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
 	if err != nil {
-		return deployV2Err(cmd, err)
+		return manifestDeployErr(cmd, err)
 	}
 
 	// --build-secret is refused HERE, not in internal/deploy, and gated on the
@@ -433,12 +433,12 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Changed("build-secret") {
 		switch {
 		case dags:
-			return deployV2Err(cmd, errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image"))
+			return manifestDeployErr(cmd, errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image"))
 		case imageName != "":
-			return deployV2Err(cmd, errors.New("--build-secret has no effect with --image-name: the image is already built"))
+			return manifestDeployErr(cmd, errors.New("--build-secret has no effect with --image-name: the image is already built"))
 		case m.Astro.Dockerfile == "":
 			if err := util.CheckGeneratedBuildSecrets(buildSecrets); err != nil {
-				return deployV2Err(cmd, err)
+				return manifestDeployErr(cmd, err)
 			}
 		}
 	}
@@ -450,7 +450,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 
 	login, err := loginForDeploy(cmd.Context(), m.Astro.LoginDomain())
 	if err != nil {
-		return deployV2Err(cmd, err)
+		return manifestDeployErr(cmd, err)
 	}
 
 	// --workspace wins over the legacy --workspace-id when both are set.
@@ -471,7 +471,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 	preselect, preselectFrom := deployPreselect(config.WorkingPath, willPrompt)
 
 	errOut := cmd.ErrOrStderr()
-	res, err := v2deploy.Run(v2deploy.Request{
+	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
@@ -511,7 +511,7 @@ func deployV2(cmd *cobra.Command, args []string) error {
 		// They go to stderr and stdout respectively — the announce line is
 		// context, the progress line is this command's own output — and json
 		// mode drops both, so the single result object is all it adds.
-		Announce: func(target v2deploy.Target) {
+		Announce: func(target manifestdeploy.Target) {
 			if format != formatText {
 				return
 			}
@@ -525,22 +525,22 @@ func deployV2(cmd *cobra.Command, args []string) error {
 				fmt.Fprintln(out, "Building your project image, this can take a few minutes...")
 			}
 		},
-	}, newV2Deployer(&login, cmd.InOrStdin(), errOut))
+	}, newManifestDeployer(&login, cmd.InOrStdin(), errOut))
 	if err != nil {
-		return deployV2Err(cmd, err)
+		return manifestDeployErr(cmd, err)
 	}
 
 	if res.Git.Uncommitted {
 		fmt.Fprintln(errOut, "note: the project has uncommitted changes, so this deploy records no git commit")
 	}
-	return renderV2Deploy(out, format, &res)
+	return renderManifestDeploy(out, format, &res)
 }
 
 // announceDeployTarget prints the one line every resolving command puts on
 // stderr before it acts, so a deploy's target is never invisible either. It
 // matches cmd/local's announceInstance: the name, then what the name does not
 // already say. A deployment named by id has nothing to add.
-func announceDeployTarget(w io.Writer, target v2deploy.Target) {
+func announceDeployTarget(w io.Writer, target manifestdeploy.Target) {
 	if target.LinkName == "" {
 		fmt.Fprintf(w, "→ %s\n", target.DeploymentID)
 		return
@@ -577,7 +577,7 @@ func deployPreselect(projectDir string, willPrompt bool) (name, from string) {
 	if state.Instance == "" {
 		return "", ""
 	}
-	return state.Instance, v2deploy.PinnedBy
+	return state.Instance, manifestdeploy.PinnedBy
 }
 
 // deployFormat selects how the manifest deploy path renders its result.
@@ -600,7 +600,7 @@ func parseDeployFormat(s string) (deployFormat, error) {
 	}
 }
 
-// deployJSON is the single object `astro deploy --output json` emits when a v2
+// deployJSON is the single object `astro deploy --output json` emits when a manifest
 // deploy finishes. Fields that do not apply to a deploy kind are omitted: a
 // dags-only deploy carries no image_tag, an image-only deploy no
 // dag_bundle_version.
@@ -625,10 +625,10 @@ type deployGitJSON struct {
 	CommitURL string `json:"commit_url,omitempty"`
 }
 
-// renderV2Deploy writes a finished manifest deploy: one JSON object in json mode, a
+// renderManifestDeploy writes a finished manifest deploy: one JSON object in json mode, a
 // plain summary in text mode. Both render the same Result, so the two modes
 // never drift.
-func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) error {
+func renderManifestDeploy(w io.Writer, format deployFormat, res *manifestdeploy.Result) error {
 	if format == formatJSON {
 		obj := deployJSON{
 			Deployment:       res.DeploymentID,
@@ -663,18 +663,18 @@ func renderV2Deploy(w io.Writer, format deployFormat, res *v2deploy.Result) erro
 // deployTargetName is what the summary line calls where the code went: the link
 // name the user chose, with the id in tow, because the id alone is the one thing
 // nobody recognizes at a glance.
-func deployTargetName(res *v2deploy.Result) string {
+func deployTargetName(res *manifestdeploy.Result) string {
 	if res.LinkName == "" {
 		return "deployment " + res.DeploymentID
 	}
 	return fmt.Sprintf("%s (deployment %s)", res.LinkName, res.DeploymentID)
 }
 
-// deployV2Err returns a manifest deploy failure for the root to report: the
+// manifestDeployErr returns a manifest deploy failure for the root to report: the
 // {"error","code","kind"} object on stdout in json mode, cobra's "Error:" in
 // text mode (cliout.Execute, as for every command).
-func deployV2Err(cmd *cobra.Command, err error) error {
-	if goerrors.Is(err, v2deploy.ErrAborted) {
+func manifestDeployErr(cmd *cobra.Command, err error) error {
+	if goerrors.Is(err, manifestdeploy.ErrAborted) {
 		// The user was asked and said no. Reading their own answer back at them
 		// as "Error: no deployment selected" adds nothing; the exit code carries
 		// the whole message. Only an interactive run can reach here, which is
@@ -689,7 +689,7 @@ func deployV2Err(cmd *cobra.Command, err error) error {
 type deployLogin struct {
 	context config.Context
 	client  astrov1.APIClient
-	// current reports the login is the current context's, which the v1
+	// current reports the login is the current context's, which the 1.x path's
 	// deployment picker assumes.
 	current bool
 }
@@ -727,16 +727,16 @@ func loginForDeploy(ctx context.Context, domain string) (deployLogin, error) {
 	}, nil
 }
 
-// newV2Deployer builds the transport the manifest deploy path drives. It is a var so a
+// newManifestDeployer builds the transport the manifest deploy path drives. It is a var so a
 // test can swap in a fake and exercise the whole cmd path — flag parsing,
 // selection, and rendering — with no real daemon, registry, or API.
-var newV2Deployer = func(login *deployLogin, in io.Reader, errOut io.Writer) v2deploy.Deployer {
-	return v2Deployer{login: login, in: in, errOut: errOut}
+var newManifestDeployer = func(login *deployLogin, in io.Reader, errOut io.Writer) manifestdeploy.Deployer {
+	return manifestDeployer{login: login, in: in, errOut: errOut}
 }
 
-// v2Deployer wires internal/deploy's transport seam to the v1 cloud/deploy
+// manifestDeployer wires internal/deploy's transport seam to the 1.x path's cloud/deploy
 // transport and the deployment selection flow.
-type v2Deployer struct {
+type manifestDeployer struct {
 	login *deployLogin
 	// in and errOut carry the deploy prompt. It asks on stderr and reads stdin,
 	// so stdout stays the deploy's own output.
@@ -762,7 +762,7 @@ const deployPromptAttempts = 3
 // It takes a name or a number, and Enter takes the highlighted entry when there
 // is one. With nothing highlighted there is no default on Enter: the safe answer
 // to "where should I ship this code" is never one the CLI picked by itself.
-func (d v2Deployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.Preselect) (string, error) {
+func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
 	fmt.Fprintln(d.errOut, "Deploy to which deployment?")
 	chosen := 0
 	for i, choice := range choices {
@@ -795,7 +795,7 @@ func (d v2Deployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.
 	// Asked three times, told three times that the answer was not one of the
 	// choices, and still no pick. The prompt has already said everything there
 	// is to say, so this ends quietly — that is what the sentinel is for.
-	return "", v2deploy.ErrAborted
+	return "", manifestdeploy.ErrAborted
 }
 
 // matchDeployChoice reads an answer as a name or a number, names first. A link
@@ -803,7 +803,7 @@ func (d v2Deployer) ConfirmTarget(choices []v2deploy.Choice, preselect v2deploy.
 // would otherwise read "2" as "the second entry" and ship somewhere else
 // entirely. What the user typed is what they meant; the numbers are only a
 // shorthand for names nobody wants to retype.
-func matchDeployChoice(choices []v2deploy.Choice, answer string) (string, bool) {
+func matchDeployChoice(choices []manifestdeploy.Choice, answer string) (string, bool) {
 	for _, choice := range choices {
 		if choice.Name == answer {
 			return choice.Name, true
@@ -815,9 +815,9 @@ func matchDeployChoice(choices []v2deploy.Choice, answer string) (string, bool) 
 	return "", false
 }
 
-// ResolveUnlinked runs v1's workspace-level pick/create flow and returns the
+// ResolveUnlinked runs the 1.x path's workspace-level pick/create flow and returns the
 // chosen deployment id.
-func (d v2Deployer) ResolveUnlinked(workspaceID string) (string, error) {
+func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
 	if !d.login.current {
 		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
 	}
@@ -829,8 +829,8 @@ func (d v2Deployer) ResolveUnlinked(workspaceID string) (string, error) {
 }
 
 // DeployDags reuses the 1.x dags-only transport for the project's dags/.
-func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, error) {
-	res, err := astrodeploy.DeployDagsV2(astrodeploy.DagDeployV2Input{
+func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
+	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
 		Login:         &d.login.context,
 		ProjectDir:    in.ProjectDir,
 		DeploymentID:  in.DeploymentID,
@@ -840,21 +840,21 @@ func (d v2Deployer) DeployDags(in *v2deploy.DagDeploy) (v2deploy.DagResult, erro
 		WaitTime:      in.WaitTime,
 	}, d.login.client)
 	if err != nil {
-		return v2deploy.DagResult{}, err
+		return manifestdeploy.DagResult{}, err
 	}
-	return v2deploy.DagResult{
+	return manifestdeploy.DagResult{
 		WorkspaceID:       res.WorkspaceID,
 		RuntimeVersion:    res.RuntimeVersion,
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
-		Git:               toV2DeployGit(res.Git),
+		Git:               toManifestDeployGit(res.Git),
 	}, nil
 }
 
-func toV2DeployGit(g astrodeploy.DeployGitV2) v2deploy.Git {
-	out := v2deploy.Git{Uncommitted: g.Uncommitted}
+func toManifestDeployGit(g astrodeploy.ManifestDeployGit) manifestdeploy.Git {
+	out := manifestdeploy.Git{Uncommitted: g.Uncommitted}
 	if c := g.Commit; c != nil {
-		out.Commit = &v2deploy.Commit{SHA: c.CommitSha}
+		out.Commit = &manifestdeploy.Commit{SHA: c.CommitSha}
 		if c.Branch != nil {
 			out.Commit.Branch = *c.Branch
 		}
@@ -867,8 +867,8 @@ func toV2DeployGit(g astrodeploy.DeployGitV2) v2deploy.Git {
 
 // DeployImage builds or adopts the project image and ships it through the
 // cloud/deploy transport.
-func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult, error) {
-	res, err := astrodeploy.DeployImageV2(astrodeploy.ImageDeployV2Input{
+func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestdeploy.ImageResult, error) {
+	res, err := astrodeploy.DeployManifestImage(astrodeploy.ManifestImageDeployInput{
 		Login:         &d.login.context,
 		Build:         in.Build,
 		Catalog:       func() *runtimeversions.Catalog { return runtimecatalog.Catalog(context.Background()) },
@@ -883,15 +883,15 @@ func (d v2Deployer) DeployImage(in *v2deploy.ImageDeploy) (v2deploy.ImageResult,
 		WaitTime:      in.WaitTime,
 	}, d.login.client)
 	if err != nil {
-		return v2deploy.ImageResult{}, err
+		return manifestdeploy.ImageResult{}, err
 	}
-	return v2deploy.ImageResult{
+	return manifestdeploy.ImageResult{
 		WorkspaceID:       res.WorkspaceID,
 		RuntimeVersion:    res.RuntimeVersion,
 		ImageTag:          res.ImageTag,
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
-		Git:               toV2DeployGit(res.Git),
+		Git:               toManifestDeployGit(res.Git),
 	}, nil
 }
 

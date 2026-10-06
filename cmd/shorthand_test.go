@@ -11,7 +11,7 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// v1DashDExceptions are the shell flags that spell -d as something other than a
+// shellDashDExceptions are the shell flags that spell -d as something other than a
 // deployment. They are grandfathered, not endorsed: an earlier fix settled -d for
 // --deployment across the core tree, harmonizing with the shell's own --deployment-id,
 // and every one of these predates that. Nothing may be added — a new flag
@@ -24,7 +24,7 @@ import (
 // listing every one of the dozen-odd places `--description` already appears,
 // and re-listing them whenever one moves. Named here so the next person to
 // widen the tree knows what this does not catch.
-var v1DashDExceptions = map[string]bool{
+var shellDashDExceptions = map[string]bool{
 	"dags":        true, // astro deploy (and software deploy, where houston allows)
 	"description": true, // deployment, workspace, team, and token create/update
 	"domain":      true, // astro auth token
@@ -45,26 +45,26 @@ var v1DashDExceptions = map[string]bool{
 func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 	testUtil.SetupOSArgsForGinkgo()
 
-	v2 := map[string]string{}
-	v2Names := map[string]bool{}
+	core := map[string]string{}
+	coreNames := map[string]bool{}
 	for _, top := range local.AddCmds(local.NewDeps()) {
-		v2Names[top.Name()] = true
+		coreNames[top.Name()] = true
 		walkCmd(top, func(cmd *cobra.Command) {
-			collect(cmd, func(f *pflag.Flag) { v2[f.Shorthand] = f.Name })
+			collect(cmd, func(f *pflag.Flag) { core[f.Shorthand] = f.Name })
 		})
 	}
-	if v2["d"] != "deployment" {
-		t.Fatalf("-d in the core tree is --%s, want --deployment", v2["d"])
+	if core["d"] != "deployment" {
+		t.Fatalf("-d in the core tree is --%s, want --deployment", core["d"])
 	}
 
 	for platform, root := range rootsUnderTest(t) {
 		for _, top := range root.Commands() {
-			if v2Names[top.Name()] {
+			if coreNames[top.Name()] {
 				continue
 			}
 			walkCmd(top, func(cmd *cobra.Command) {
 				collect(cmd, func(f *pflag.Flag) {
-					if f.Shorthand != "d" || f.Name == "deployment" || f.Name == "deployment-id" || v1DashDExceptions[f.Name] {
+					if f.Shorthand != "d" || f.Name == "deployment" || f.Name == "deployment-id" || shellDashDExceptions[f.Name] {
 						return
 					}
 					t.Errorf("[%s] %s: -d is --%s; an earlier fix settled -d for the deployment selector", platform, cmd.CommandPath(), f.Name)
@@ -74,10 +74,10 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 	}
 }
 
-// TestV1DashDExceptionsAreAllStillReal keeps the allowlist honest: an entry
+// TestShellDashDExceptionsAreAllStillReal keeps the allowlist honest: an entry
 // whose flag no longer takes -d is a line to delete, and leaving it behind
 // would quietly re-open the hole for a future flag of the same name.
-func TestV1DashDExceptionsAreAllStillReal(t *testing.T) {
+func TestShellDashDExceptionsAreAllStillReal(t *testing.T) {
 	testUtil.SetupOSArgsForGinkgo()
 	seen := map[string]bool{}
 	// The union across both branches: an entry reachable in only one of them
@@ -94,14 +94,14 @@ func TestV1DashDExceptionsAreAllStillReal(t *testing.T) {
 		}
 	}
 	var stale []string
-	for name := range v1DashDExceptions {
+	for name := range shellDashDExceptions {
 		if !seen[name] {
 			stale = append(stale, name)
 		}
 	}
 	sort.Strings(stale)
 	for _, name := range stale {
-		t.Errorf("--%s no longer takes -d; drop it from v1DashDExceptions", name)
+		t.Errorf("--%s no longer takes -d; drop it from shellDashDExceptions", name)
 	}
 }
 

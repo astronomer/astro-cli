@@ -19,13 +19,13 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-const v2GitCommitMessage = "ship the new dag"
+const manifestGitCommitMessage = "ship the new dag"
 
-// v2GitProjectDir is v2ProjectDir committed to a git repository whose origin
+// manifestGitProjectDir is manifestProjectDir committed to a git repository whose origin
 // is on GitHub. dirty leaves a change to a tracked DAG file uncommitted.
-func v2GitProjectDir(t *testing.T, dirty bool) string {
+func manifestGitProjectDir(t *testing.T, dirty bool) string {
 	t.Helper()
-	dir := v2ProjectDir(t)
+	dir := manifestProjectDir(t)
 	runGit := func(args ...string) {
 		t.Helper()
 		out, err := exec.Command("git", append([]string{"-C", dir, "-c", "commit.gpgsign=false"}, args...)...).CombinedOutput()
@@ -35,7 +35,7 @@ func v2GitProjectDir(t *testing.T, dirty bool) string {
 	runGit("config", "user.email", "test@test.com")
 	runGit("config", "user.name", "Test")
 	runGit("add", "-A")
-	runGit("commit", "-m", v2GitCommitMessage)
+	runGit("commit", "-m", manifestGitCommitMessage)
 	runGit("remote", "add", "origin", "https://github.com/account/repo.git")
 	if dirty {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "dags", "example.py"), []byte("# changed\n"), 0o600))
@@ -53,17 +53,17 @@ func captureCreateDeploy(client *astrov1_mocks.ClientWithResponsesInterface, dep
 	return got
 }
 
-func dagDeployWithCapture(t *testing.T, in DagDeployV2Input) (DagDeployV2Result, *astrov1.CreateDeployRequest) {
+func dagDeployWithCapture(t *testing.T, in ManifestDagDeployInput) (ManifestDagDeployResult, *astrov1.CreateDeployRequest) {
 	t.Helper()
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockV2Deployment(client, true, false)
+	mockManifestDeployment(client, true, false)
 	uploadURL := "https://upload-url"
 	req := captureCreateDeploy(client, &astrov1.Deploy{Id: "test-deploy-id", DagsUploadUrl: &uploadURL})
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
 	in.DeploymentID = "test-deployment-id"
-	res, err := DeployDagsV2(in, client)
+	res, err := DeployManifestDags(in, client)
 	require.NoError(t, err)
 	client.AssertExpectations(t)
 	return res, req
@@ -84,28 +84,28 @@ func assertGitHubCommit(t *testing.T, g *astrov1.CreateDeployGitRequest) {
 	assert.Equal(t, "https://github.com/account/repo/commit/"+g.CommitSha, *g.CommitUrl)
 }
 
-func TestDeployDagsV2_RecordsTheCommit(t *testing.T) {
+func TestDeployManifestDags_RecordsTheCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, DagDeployV2Input{ProjectDir: v2GitProjectDir(t, false)})
+	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
 
 	assertGitHubCommit(t, req.Git)
 	require.NotNil(t, req.Description)
-	assert.Equal(t, v2GitCommitMessage, *req.Description)
+	assert.Equal(t, manifestGitCommitMessage, *req.Description)
 	assert.Same(t, req.Git, res.Git.Commit)
 	assert.False(t, res.Git.Uncommitted)
 }
 
-func TestDeployDagsV2_KeepsAGivenDescription(t *testing.T) {
+func TestDeployManifestDags_KeepsAGivenDescription(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, req := dagDeployWithCapture(t, DagDeployV2Input{ProjectDir: v2GitProjectDir(t, false), Description: "hotfix"})
+	_, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false), Description: "hotfix"})
 
 	assertGitHubCommit(t, req.Git)
 	assert.Equal(t, "hotfix", *req.Description)
 }
 
-func TestDeployDagsV2_UncommittedChangesRecordNoCommit(t *testing.T) {
+func TestDeployManifestDags_UncommittedChangesRecordNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, DagDeployV2Input{ProjectDir: v2GitProjectDir(t, true)})
+	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, true)})
 
 	assert.Nil(t, req.Git)
 	assert.Empty(t, *req.Description)
@@ -113,30 +113,30 @@ func TestDeployDagsV2_UncommittedChangesRecordNoCommit(t *testing.T) {
 	assert.True(t, res.Git.Uncommitted)
 }
 
-func TestDeployDagsV2_GitMetadataSettingOff(t *testing.T) {
+func TestDeployManifestDags_GitMetadataSettingOff(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	require.NoError(t, config.CFG.DeployGitMetadata.SetHomeString("false"))
 	t.Cleanup(func() { _ = config.CFG.DeployGitMetadata.SetHomeString("true") })
 
-	res, req := dagDeployWithCapture(t, DagDeployV2Input{ProjectDir: v2GitProjectDir(t, false)})
+	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
 
 	assert.Nil(t, req.Git)
 	assert.Empty(t, *req.Description)
-	assert.Equal(t, DeployGitV2{}, res.Git)
+	assert.Equal(t, ManifestDeployGit{}, res.Git)
 }
 
-func TestDeployDagsV2_OutsideAGitCheckoutRecordsNoCommit(t *testing.T) {
+func TestDeployManifestDags_OutsideAGitCheckoutRecordsNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, DagDeployV2Input{ProjectDir: v2ProjectDir(t)})
+	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestProjectDir(t)})
 
 	assert.Nil(t, req.Git)
-	assert.Equal(t, DeployGitV2{}, res.Git)
+	assert.Equal(t, ManifestDeployGit{}, res.Git)
 }
 
-func imageDeployWithCapture(t *testing.T, in *ImageDeployV2Input) (ImageDeployV2Result, *astrov1.CreateDeployRequest) {
+func imageDeployWithCapture(t *testing.T, in *ManifestImageDeployInput) (ManifestImageDeployResult, *astrov1.CreateDeployRequest) {
 	t.Helper()
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockV2DeploymentAt(client, "3.1-2", true, false)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 	req := captureCreateDeploy(client, &astrov1.Deploy{
 		Id:              "test-deploy-id",
@@ -147,36 +147,36 @@ func imageDeployWithCapture(t *testing.T, in *ImageDeployV2Input) (ImageDeployV2
 	withImageSeams(t, "3.1-2")
 
 	in.DeploymentID = "test-deployment-id"
-	res, err := DeployImageV2(*in, client)
+	res, err := DeployManifestImage(*in, client)
 	require.NoError(t, err)
 	client.AssertExpectations(t)
 	return res, req
 }
 
-func TestDeployImageV2_RecordsTheCommit(t *testing.T) {
+func TestDeployManifestImage_RecordsTheCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := imageDeployWithCapture(t, &ImageDeployV2Input{
+	res, req := imageDeployWithCapture(t, &ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir:     v2GitProjectDir(t, false),
+			ProjectDir:     manifestGitProjectDir(t, false),
 			AirflowVersion: "3.1",
 		},
 	})
 
 	assertGitHubCommit(t, req.Git)
-	assert.Equal(t, v2GitCommitMessage, *req.Description)
+	assert.Equal(t, manifestGitCommitMessage, *req.Description)
 	assert.Same(t, req.Git, res.Git.Commit)
 }
 
-func TestDeployImageV2_PrebuiltImageRecordsNoCommit(t *testing.T) {
+func TestDeployManifestImage_PrebuiltImageRecordsNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := imageDeployWithCapture(t, &ImageDeployV2Input{
+	res, req := imageDeployWithCapture(t, &ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
-			ProjectDir: v2GitProjectDir(t, false),
+			ProjectDir: manifestGitProjectDir(t, false),
 		},
 		ImageName: "astro-package/demo:7.0.0-abc",
 	})
 
 	assert.Nil(t, req.Git)
 	assert.Empty(t, *req.Description)
-	assert.Equal(t, DeployGitV2{}, res.Git)
+	assert.Equal(t, ManifestDeployGit{}, res.Git)
 }

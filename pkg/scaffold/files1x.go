@@ -15,7 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
-// A v1 Astro project states its shape in the files v2 replaces:
+// A 1.x Astro project states its shape in the files v2 replaces:
 // requirements.txt (Python dependencies), packages.txt (OS packages), a
 // Dockerfile whose image tag names the runtime it runs on, and
 // airflow_settings.yaml (connections, variables and pools). Reading them is
@@ -28,7 +28,7 @@ import (
 // actually reached it.
 //
 // That decision was a separate one until O27 and 2c settled it, and the
-// reasoning it replaced is worth keeping: the v1 files used to stay put so that
+// reasoning it replaced is worth keeping: the 1.x files used to stay put so that
 // a conversion the user had not reviewed was reversible by ignoring it. What
 // replaces that guarantee is narrower and worth stating plainly — a file is
 // removed only when everything it said is in the manifest, so ignoring the
@@ -40,9 +40,9 @@ import (
 // preview a person approves, so "this line was not carried, and here is why" is
 // a useful answer and a wrong dependency is not.
 
-// v1Project is what the v1 files state. The zero value is a project that has
+// project1x is what the 1.x files state. The zero value is a project that has
 // none of them, which is the greenfield case and needs no special handling.
-type v1Project struct {
+type project1x struct {
 	// dependencies are the requirement lines carried from requirements.txt, in
 	// file order, minus anything that needed a note instead.
 	dependencies []string
@@ -65,7 +65,7 @@ type v1Project struct {
 	settings carriedSettings
 	// notes is what could not be carried, with the reason.
 	notes []string
-	// present names the v1 files this directory actually has, in read order.
+	// present names the 1.x files this directory actually has, in read order.
 	//
 	// Presence only. Whether a file can be RETIRED is decided by planRetirements
 	// once the manifest has been rendered, and it cannot be decided here,
@@ -104,17 +104,17 @@ type v1Project struct {
 	// instances are the entries of the same file's top-level `instances:`
 	// list, the deployment links an early v2 build kept there. Reported, not
 	// converted.
-	instances []v1Instance
+	instances []instance1x
 }
 
-// v1Instance is one entry of .astro/config.yaml's `instances:` list. source is
+// instance1x is one entry of .astro/config.yaml's `instances:` list. source is
 // empty or "astro" for an Astro Deployment.
-type v1Instance struct {
+type instance1x struct {
 	name, source, deploymentID string
 }
 
-// v1Config is the three fields of .astro/config.yaml this reads. The rest of
-// the file is v1 CLI configuration that a project does not carry.
+// config1x is the three fields of .astro/config.yaml this reads. The rest of
+// the file is 1.x CLI configuration that a project does not carry.
 //
 // Deployment is `project.deployment`, and reading it is what keeps the note
 // about it honest. The note used to fire on the file merely existing, which is
@@ -124,11 +124,11 @@ type v1Instance struct {
 //
 // Deployment and Workspace are `any` rather than `string` on purpose. A struct
 // field types the whole decode: `deployment:` holding a map or a sequence makes
-// yaml fail the file, and readV1Config's error path drops the name with it, so
+// yaml fail the file, and read1xConfig's error path drops the name with it, so
 // declaring these as strings would rename a project after its directory over a
 // key the conversion does not need. Decoding loose and taking the value only
 // when it is a scalar keeps a malformed deploy target from costing the name.
-type v1Config struct {
+type config1x struct {
 	Project struct {
 		Name       string `yaml:"name"`
 		Deployment any    `yaml:"deployment"`
@@ -137,10 +137,10 @@ type v1Config struct {
 	Instances any `yaml:"instances"`
 }
 
-// v1ConfigFacts is what readV1Config takes from the file.
-type v1ConfigFacts struct {
+// config1xFacts is what read1xConfig takes from the file.
+type config1xFacts struct {
 	name, deployment, workspace string
-	instances                   []v1Instance
+	instances                   []instance1x
 }
 
 // yamlString is the value of a loosely-decoded scalar string, and "" for every
@@ -153,79 +153,79 @@ func yamlString(v any) string {
 	return strings.TrimSpace(s)
 }
 
-// v1ConfigRelPath is where a 1.x project states its own name.
-const v1ConfigRelPath = ".astro/config.yaml"
+// config1xRelPath is where a 1.x project states its own name.
+const config1xRelPath = ".astro/config.yaml"
 
-// readV1Project reads whatever v1 files dir has. A missing file is not an
+// read1xProject reads whatever 1.x files dir has. A missing file is not an
 // error: most of these are optional even in a 1.x project.
 //
 // A file that exists and cannot be READ is an error, though. Silently treating
 // an unreadable requirements.txt as an empty one would convert the project to a
 // manifest declaring no dependencies, which installs nothing and fails at
 // import time with a traceback that says nothing about this.
-func readV1Project(dir string) (*v1Project, error) {
-	v1 := &v1Project{}
+func read1xProject(dir string) (*project1x, error) {
+	from1x := &project1x{}
 
 	if data, err := readIfPresent(filepath.Join(dir, "requirements.txt")); err != nil {
 		return nil, err
 	} else if data != nil {
 		deps, notes := parseRequirements(data)
-		v1.dependencies, v1.notes = deps, append(v1.notes, notes...)
+		from1x.dependencies, from1x.notes = deps, append(from1x.notes, notes...)
 		if pinsAirflow(deps) {
-			v1.statedVersion = true
+			from1x.statedVersion = true
 		}
-		v1.present = append(v1.present, "requirements.txt")
+		from1x.present = append(from1x.present, "requirements.txt")
 	}
 
 	if data, err := readIfPresent(filepath.Join(dir, "packages.txt")); err != nil {
 		return nil, err
 	} else if data != nil {
-		v1.packages = parsePackages(data)
-		v1.present = append(v1.present, "packages.txt")
+		from1x.packages = parsePackages(data)
+		from1x.present = append(from1x.present, "packages.txt")
 	}
 
 	// The project's own name, which is the one thing in .astro/config.yaml a
 	// project keeps, and the Deployment id that decides whether this file
-	// gets a note at all. Not added to present: the file holds v1 CLI
+	// gets a note at all. Not added to present: the file holds 1.x CLI
 	// configuration this conversion neither reads nor replaces, so it is not a
 	// candidate for retirement, and recording it there would offer it for
 	// deletion.
-	cfg, note, err := readV1Config(dir)
+	cfg, note, err := read1xConfig(dir)
 	if err != nil {
 		return nil, err
 	}
-	v1.projectName, v1.deployment, v1.workspace, v1.instances = cfg.name, cfg.deployment, cfg.workspace, cfg.instances
+	from1x.projectName, from1x.deployment, from1x.workspace, from1x.instances = cfg.name, cfg.deployment, cfg.workspace, cfg.instances
 	if note != "" {
-		v1.notes = append(v1.notes, note)
+		from1x.notes = append(from1x.notes, note)
 	}
 
 	if data, err := readIfPresent(filepath.Join(dir, SettingsRelPath)); err != nil {
 		return nil, err
 	} else if data != nil {
-		v1.settings = readAirflowSettings(data)
-		v1.notes = append(v1.notes, v1.settings.blockers...)
-		v1.notes = append(v1.notes, v1.settings.pools.notes...)
-		v1.present = append(v1.present, SettingsRelPath)
+		from1x.settings = readAirflowSettings(data)
+		from1x.notes = append(from1x.notes, from1x.settings.blockers...)
+		from1x.notes = append(from1x.notes, from1x.settings.pools.notes...)
+		from1x.present = append(from1x.present, SettingsRelPath)
 	}
 
 	if data, err := readIfPresent(filepath.Join(dir, "Dockerfile")); err != nil {
 		return nil, err
 	} else if data != nil {
 		version, stated, notes := airflowFromDockerfile(data)
-		v1.airflow = version
+		from1x.airflow = version
 		build := buildStepsNote(data)
-		v1.notes = append(v1.notes, notes...)
-		v1.notes = append(v1.notes, build...)
-		v1.notes = append(v1.notes, pipInstallNote(data)...)
-		v1.notes = append(v1.notes, buildSecretNotes(filepath.Join(dir, "Dockerfile"))...)
+		from1x.notes = append(from1x.notes, notes...)
+		from1x.notes = append(from1x.notes, build...)
+		from1x.notes = append(from1x.notes, pipInstallNote(data)...)
+		from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, "Dockerfile"))...)
 		if stated {
-			v1.statedVersion = true
+			from1x.statedVersion = true
 		}
-		v1.present = append(v1.present, "Dockerfile")
-		v1.dockerfilePinOnly = dockerfileIsPinOnly(data)
-		v1.dockerfileBody = data
+		from1x.present = append(from1x.present, "Dockerfile")
+		from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
+		from1x.dockerfileBody = data
 		if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); base.RuntimeVersion() != "" {
-			_, v1.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
+			_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
 		}
 		// Two sources for one list, so say it rather than let someone find out.
 		//
@@ -236,10 +236,10 @@ func readV1Project(dir string) (*v1Project, error) {
 		// the lists too, for the day the Dockerfile goes away. Both being live
 		// at once is deliberate and is exactly the kind of thing that reads as a
 		// conversion bug when nothing mentions it.
-		if !v1.dockerfilePinOnly {
+		if !from1x.dockerfilePinOnly {
 			for _, kept := range []string{"requirements.txt", "packages.txt"} {
-				if slices.Contains(v1.present, kept) {
-					v1.notes = append(v1.notes, kept+": kept, because your Dockerfile's base image reads it "+
+				if slices.Contains(from1x.present, kept) {
+					from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
 						"during the build. Its contents are in pyproject.toml as well, which is what a project "+
 						"without a Dockerfile installs from")
 				}
@@ -252,15 +252,15 @@ func readV1Project(dir string) (*v1Project, error) {
 		// shapes; this covers the rest — a second stage, an instruction no
 		// regex here knows — where the file survives precisely because nothing
 		// recognized it.
-		if !v1.dockerfilePinOnly && len(notes) == 0 && len(build) == 0 {
-			v1.notes = append(v1.notes,
+		if !from1x.dockerfilePinOnly && len(notes) == 0 && len(build) == 0 {
+			from1x.notes = append(from1x.notes,
 				"Dockerfile: it does more than name a base image, so it was kept and declared as this "+
 					"project's build. What it does is not described in pyproject.toml, which is the point of "+
 					"declaring it")
 		}
 	}
 
-	return v1, nil
+	return from1x, nil
 }
 
 // dockerfileIsPinOnly reports a Dockerfile that says nothing except which
@@ -301,10 +301,10 @@ func dockerfileIsPinOnly(data []byte) bool {
 	return seenFrom
 }
 
-// readV1Config reads the project's own name out of .astro/config.yaml, plus
+// read1xConfig reads the project's own name out of .astro/config.yaml, plus
 // the deploy target and workspace that decide whether the file earns a note.
 //
-// A malformed file is not an error. v1's own loader tolerated one, nothing
+// A malformed file is not an error. The 1.x CLI's own loader tolerated one, nothing
 // else in a conversion depends on this file, and failing `astro init` over
 // unparseable YAML in a file being left behind anyway would be the least
 // useful outcome available.
@@ -314,20 +314,20 @@ func dockerfileIsPinOnly(data []byte) bool {
 // back to the directory and the run says why, rather than renaming somebody's
 // project without comment.
 //
-// The PROJECT's config only, never the home one, though v1 resolved this key
+// The PROJECT's config only, never the home one, though the 1.x CLI resolved this key
 // with a fallback to it. A global project.name would otherwise rename every
 // project converted on that machine to the same thing.
-func readV1Config(dir string) (facts v1ConfigFacts, note string, err error) {
-	data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)))
+func read1xConfig(dir string) (facts config1xFacts, note string, err error) {
+	data, err := readIfPresent(filepath.Join(dir, filepath.FromSlash(config1xRelPath)))
 	if err != nil || data == nil {
-		return v1ConfigFacts{}, "", err
+		return config1xFacts{}, "", err
 	}
-	var cfg v1Config
+	var cfg config1x
 	if uerr := yaml.Unmarshal(data, &cfg); uerr != nil {
-		return v1ConfigFacts{}, v1ConfigRelPath +
+		return config1xFacts{}, config1xRelPath +
 			": could not be read, so the project is named after its directory. " + uerr.Error(), nil
 	}
-	return v1ConfigFacts{
+	return config1xFacts{
 		name:       strings.TrimSpace(cfg.Project.Name),
 		deployment: yamlString(cfg.Project.Deployment),
 		workspace:  yamlString(cfg.Project.Workspace),
@@ -335,20 +335,20 @@ func readV1Config(dir string) (facts v1ConfigFacts, note string, err error) {
 	}, "", nil
 }
 
-// yamlInstances reads the `instances:` list loosely, for the reason v1Config
+// yamlInstances reads the `instances:` list loosely, for the reason config1x
 // decodes its ids as any: a shape this does not expect costs the entry, not
 // the file. An entry whose source is not astro keeps its name only. The
 // deployment id is read from the entry or, failing that, from its `auth:`
 // table, which is where the early v2 build that wrote `instances:` keeps it.
-func yamlInstances(v any) []v1Instance {
+func yamlInstances(v any) []instance1x {
 	entries, _ := v.([]any)
-	var out []v1Instance
+	var out []instance1x
 	for _, e := range entries {
 		fields, ok := e.(map[string]any)
 		if !ok {
 			continue
 		}
-		inst := v1Instance{
+		inst := instance1x{
 			name:         yamlString(fields["name"]),
 			source:       yamlString(fields["source"]),
 			deploymentID: yamlString(fields["deployment_id"]),
@@ -585,7 +585,7 @@ var oldRuntimeTagRe = regexp.MustCompile(`^\d+(\.\d+){0,2}(?:[.-].+)?$`)
 // named "runtime" and missed the second.
 const runtimeImageHint = "runtime"
 
-// airflowFromDockerfile reads the Airflow version a v1 Dockerfile's runtime tag
+// airflowFromDockerfile reads the Airflow version a 1.x Dockerfile's runtime tag
 // names. The second return reports that the Dockerfile stated a version at all,
 // whether or not it could be used.
 //
@@ -661,7 +661,7 @@ var buildInstructionRe = regexp.MustCompile(`(?im)^[ \t]*(RUN|COPY|ADD|ENV|ARG|U
 
 // buildStepsNote reports that the Dockerfile does more than name a base image.
 //
-// Reading the tag is not reading the file. A v1 Dockerfile commonly carries
+// Reading the tag is not reading the file. A 1.x Dockerfile commonly carries
 // `RUN apt-get install -y unixodbc-dev`, a COPY of certificates, an ENV — real
 // build customization that v2 does not perform, because there is no Dockerfile
 // in the shape it produces. leftovers used to say so with an unconditional
@@ -689,7 +689,7 @@ func buildStepsNote(data []byte) []string {
 	// The old second half said "v2 builds no Dockerfile: move what they install
 	// or set into pyproject.toml", which the dockerfile key made false — the file
 	// IS the build now, so these instructions run, and moving them into the
-	// manifest would be work for nothing. Saying so kept a v1-era sentence
+	// manifest would be work for nothing. Saying so kept a 1.x-era sentence
 	// giving v2 users the opposite of the right advice.
 	return []string{"Dockerfile: its " + strings.Join(kinds, ", ") +
 		" instructions were not read here, so the manifest does not describe them. The Dockerfile stays your build and they still run"}

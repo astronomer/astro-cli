@@ -159,12 +159,12 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	// file before cobra has seen argv. The read creates nothing, so a core
 	// command on a machine that never logged in leaves no config/ state behind
 	// (config.initHome, and TestInitLeavesNoHomeConfigBehind in e2e).
-	v2Deps := local.NewDeps()
-	wireLinkPickers(&v2Deps, o.platform, astroV1Client, o.out)
+	coreDeps := local.NewDeps()
+	wireLinkPickers(&coreDeps, o.platform, astroV1Client, o.out)
 	// A single positional argument is Otto's first message in an interactive
 	// session.
-	v2Deps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
-	rootCmd.AddCommand(local.AddCmds(v2Deps)...)
+	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
+	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)
 	rootCmd.SetUsageTemplate(rootUsageTemplate(rootCmd))

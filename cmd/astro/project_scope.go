@@ -134,7 +134,7 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 	return pick, nil
 }
 
-// projectManifest loads the v2 manifest of the project holding dir, or nil
+// projectManifest loads the manifest of the project holding dir, or nil
 // outside one or in a project without [tool.astro].
 func projectManifest(dir string) (*manifest.Manifest, error) {
 	proj, err := project.Discover(dir)

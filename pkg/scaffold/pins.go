@@ -39,7 +39,7 @@ func pinFromDeps(deps []string) (version string, ok bool) {
 // airflowExtrasNote reports the extras lost when an apache-airflow requirement
 // is replaced by the one the pin generates.
 //
-// Both arms drop a v1 apache-airflow entry, on the grounds that it is where the
+// Both arms drop a 1.x apache-airflow entry, on the grounds that it is where the
 // pin came from and the generated requirement says the same thing. That is only
 // true when the entry carries no extras: "apache-airflow[celery,statsd]==2.9.1"
 // also names two installed distributions, and the replacement
@@ -74,7 +74,7 @@ func airflowExtrasNote(spec string) []string {
 //
 //	AttributeError: module 'ast' has no attribute 'Str'
 //
-// from inside werkzeug, which names neither Airflow nor Python. Every v1
+// from inside werkzeug, which names neither Airflow nor Python. Every 1.x
 // conversion lands on an Airflow 2 pin, so this is the path a migrating user
 // takes.
 //

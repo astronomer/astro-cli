@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// v1 conversion: `astro init` in a project that states its shape in v1 files.
+// 1.x conversion: `astro init` in a project that states its shape in 1.x files.
 //
 // The most review-sensitive thing in the release, because it rewrites
 // somebody's repository and deletes files out of it. Also the cheapest thing
@@ -30,7 +30,7 @@ import (
 // from the other: a consumer that mixes them up either tells somebody to do a
 // thing that has happened, or hides a change they did not ask for.
 //
-// One shape is missing on purpose. A v1 airflow_settings.yaml with a
+// One shape is missing on purpose. A 1.x airflow_settings.yaml with a
 // connection or a variable carries a VALUE, and values go to the vault, which
 // opens the OS keyring — the one thing no environment variable relocates, per
 // doc.go.
@@ -54,8 +54,8 @@ type initResult struct {
 	Advisory []string `json:"advisories"`
 }
 
-// v1Case is one 1.x project and what converting it has to produce.
-type v1Case struct {
+// case1x is one 1.x project and what converting it has to produce.
+type case1x struct {
 	name  string
 	files map[string]string
 
@@ -77,7 +77,7 @@ type v1Case struct {
 	manifestHas   []string
 	manifestLacks []string
 	// retired names files the run must report deleting AND that must be gone
-	// from disk. kept is the other half: a v1 file that must survive, must not
+	// from disk. kept is the other half: a 1.x file that must survive, must not
 	// be reported as removed, and whose content must be intact — keptHas names
 	// a fragment that has to still be in it.
 	retired []string
@@ -99,9 +99,9 @@ type v1Case struct {
 	noNotes    bool
 }
 
-// v1StockSettings is the airflow_settings.yaml v1's `astro dev init` wrote,
+// stock1xSettings is the airflow_settings.yaml 1.x's `astro dev init` wrote,
 // byte for byte.
-const v1StockSettings = `# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
+const stock1xSettings = `# This file allows you to configure Airflow Connections, Pools, and Variables in a single place for local development only.
 # NOTE: json dicts can be added to the conn_extra field as yaml key value pairs. See the example below.
 
 # For more information, refer to our docs: https://www.astronomer.io/docs/astro/cli/develop-project#configure-airflow_settingsyaml-local-development-only
@@ -128,7 +128,7 @@ airflow:
       variable_value:
 `
 
-func v1Cases() []v1Case {
+func cases1x() []case1x {
 	// A pre-3 runtime tag names a runtime and not an Airflow minor, so it
 	// always earns a note — which, because a file a note names is never
 	// retired, is also what spares the Dockerfile in every fixture using it.
@@ -137,12 +137,12 @@ func v1Cases() []v1Case {
 	// nothing to keep the Dockerfile for: this is the shape that deletes it.
 	const runtime3 = "FROM quay.io/astronomer/astro-runtime:3.1-12\n"
 
-	return []v1Case{
+	return []case1x{
 		{
-			// The ordinary Airflow 2 conversion. Both v1 lists reach the
+			// The ordinary Airflow 2 conversion. Both 1.x lists reach the
 			// manifest and go; the Dockerfile stays, because the note about
 			// its tag is also something still to be said about it.
-			name: "the whole v1 shape",
+			name: "the whole 1.x shape",
 			files: map[string]string{
 				"Dockerfile": runtime2,
 				// Deliberately NOT in alphabetical order, so the assertion
@@ -181,7 +181,7 @@ func v1Cases() []v1Case {
 		},
 		{
 			// A Dockerfile that does more than pin becomes the project's
-			// declared build, which makes BOTH v1 lists load-bearing again:
+			// declared build, which makes BOTH 1.x lists load-bearing again:
 			// the base image's ONBUILD reads them during the build, so deleting
 			// either would change what the image contains.
 			//
@@ -224,9 +224,9 @@ func v1Cases() []v1Case {
 		},
 		{
 			// A kept Dockerfile builds with the project as its context, so the
-			// .dockerignore v1 wrote keeps its lines and gains the per-machine
+			// .dockerignore the 1.x CLI wrote keeps its lines and gains the per-machine
 			// paths it lacks.
-			name: "a kept Dockerfile beside a v1 .dockerignore",
+			name: "a kept Dockerfile beside a 1.x .dockerignore",
 			files: map[string]string{
 				"Dockerfile":    runtime3 + "RUN echo hi\n",
 				".dockerignore": "astro\n.git\n.env\n.venv\n",
@@ -267,7 +267,7 @@ func v1Cases() []v1Case {
 			},
 		},
 		{
-			// An env schema left by an older desktop build is not a v1 file:
+			// An env schema left by an older desktop build is not a 1.x file:
 			// the conversion reads nothing from it, says nothing about it, and
 			// leaves it where it is.
 			name: "an old desktop env schema is ignored",
@@ -328,7 +328,7 @@ func v1Cases() []v1Case {
 			// Nothing names a version, so the pin is the default, and both
 			// places that carry it agree. Deliberately quiet: a project that
 			// never expressed an opinion is not owed a warning, which is what
-			// v1Project.statedVersion separates from "said something
+			// project1x.statedVersion separates from "said something
 			// unreadable".
 			name: "nothing names an Airflow version",
 			files: map[string]string{
@@ -341,9 +341,9 @@ func v1Cases() []v1Case {
 		},
 		{
 			// A settings file with nothing left in it is retired like any
-			// other carried v1 file. The variable is empty so the
+			// other carried 1.x file. The variable is empty so the
 			// case stores nothing and stays off the keyring. An empty variable
-			// is declared optional, since v1 skipped it rather than create it,
+			// is declared optional, since the 1.x CLI skipped it rather than create it,
 			// and the manifest carries no value for it.
 			name: "a settings file whose contents all carry",
 			files: map[string]string{
@@ -363,13 +363,13 @@ func v1Cases() []v1Case {
 			advisories:    []string{"region: declared as an optional Airflow variable"},
 		},
 		{
-			// The file v1's `astro dev init` wrote, untouched. Its entries
-			// have blank ids, which v1 skipped, so nothing carries and the
+			// The file 1.x's `astro dev init` wrote, untouched. Its entries
+			// have blank ids, which the 1.x CLI skipped, so nothing carries and the
 			// file goes without a note.
-			name: "the stock v1 settings file",
+			name: "the stock 1.x settings file",
 			files: map[string]string{
 				"requirements.txt":      "pandas==2.1.0\n",
-				"airflow_settings.yaml": v1StockSettings,
+				"airflow_settings.yaml": stock1xSettings,
 			},
 			manifestLacks: []string{"tool.astro.env"},
 			retired:       []string{"requirements.txt", "airflow_settings.yaml"},
@@ -424,7 +424,7 @@ func v1Cases() []v1Case {
 		{
 			// A 1.x repository that also keeps a pyproject.toml, holding only
 			// tool settings. Common in real 1.x repositories, and not a v2
-			// project: the conversion adopts the file, carries the v1 lists into
+			// project: the conversion adopts the file, carries the 1.x lists into
 			// it, and leaves the tool tables as they were.
 			name: "a 1.x repository whose pyproject.toml only configures tools",
 			files: map[string]string{
@@ -498,7 +498,7 @@ func v1Cases() []v1Case {
 			// A stated name that cannot be a [project] name as written is
 			// respelled, and the respelling is reported: the project said what
 			// it was called and this is not quite that.
-			name: "a v1 name that is not a legal project name",
+			name: "a 1.x name that is not a legal project name",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: Orders Pipeline\n",
 				"Dockerfile":         runtime3,
@@ -534,10 +534,10 @@ func v1Cases() []v1Case {
 	}
 }
 
-func TestInitConvertsAV1Project(t *testing.T) {
+func TestInitConvertsA1xProject(t *testing.T) {
 	tier(t, 0)
 
-	for _, tc := range v1Cases() {
+	for _, tc := range cases1x() {
 		t.Run(tc.name, func(t *testing.T) {
 			p := newProject(t)
 			for path, content := range tc.files {
@@ -571,7 +571,7 @@ func TestInitConvertsAV1Project(t *testing.T) {
 
 // checkManifest requires each expected line or fragment, and the absence of
 // anything a conversion must not have written.
-func checkManifest(t *testing.T, p *project, tc *v1Case) {
+func checkManifest(t *testing.T, p *project, tc *case1x) {
 	t.Helper()
 	manifest := read(t, filepath.Join(p.Dir, "pyproject.toml"))
 	for _, line := range tc.manifestLines {
@@ -602,7 +602,7 @@ func checkManifest(t *testing.T, p *project, tc *v1Case) {
 // Reporting without removing, or removing without reporting, are each their own
 // bug in a command that edits somebody's repository — and a file kept but
 // rewritten is a third, which is what keptHas is for.
-func checkFiles(t *testing.T, p *project, res *initResult, tc *v1Case) {
+func checkFiles(t *testing.T, p *project, res *initResult, tc *case1x) {
 	t.Helper()
 	for _, name := range tc.retired {
 		if !reports(res.Deleted, name) {
@@ -633,7 +633,7 @@ func checkFiles(t *testing.T, p *project, res *initResult, tc *v1Case) {
 // which of created, updated and skipped a file lands in is what a preview
 // renders. A consumer cannot tell them apart from the text, which is why they
 // are separate fields and why this checks them separately.
-func checkLists(t *testing.T, res *initResult, tc *v1Case) {
+func checkLists(t *testing.T, res *initResult, tc *case1x) {
 	t.Helper()
 	for _, want := range tc.notes {
 		if !reports(res.Notes, want) {
@@ -685,15 +685,15 @@ func checkVaultUntouched(t *testing.T, p *project) {
 
 // A config this run cannot parse does not reach stdout.
 //
-// The v1 config loader prints its read errors, and printed them to stdout —
+// The 1.x config loader prints its read errors, and printed them to stdout —
 // so `astro init --output json` in a project whose .astro/config.yaml will not
 // parse put a line of prose in front of the object and no consumer could read
-// the result. The command still succeeds: the file is v1 CLI configuration
+// the result. The command still succeeds: the file is 1.x CLI configuration
 // that a conversion only takes a name out of.
 //
 // requireJSON unmarshals the whole of stdout, so it is the assertion: one
 // stray line and it fails.
-func TestInitKeepsStdoutParseableWhenTheV1ConfigWillNot(t *testing.T) {
+func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
@@ -708,7 +708,7 @@ func TestInitKeepsStdoutParseableWhenTheV1ConfigWillNot(t *testing.T) {
 	// The name falls back to the directory, since the file that states one
 	// could not be read.
 	if res.Name == "" {
-		t.Error("a project still needs a name when its v1 config will not parse")
+		t.Error("a project still needs a name when its 1.x config will not parse")
 	}
 	// And the warning is not lost, it is on the stream prose belongs on — and
 	// names the file it is about, rather than the home directory, which is

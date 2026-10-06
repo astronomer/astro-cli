@@ -8,7 +8,7 @@ import (
 
 // The build itself — assembling the requirements.txt/packages.txt context over
 // the runtime base image and running the container build — lives in
-// internal/imagebuild, so the coming v2 deploy path builds the same image (see
+// internal/imagebuild, so the manifest deploy path builds the same image (see
 // Start, which calls it). This file keeps only what is docker-mode's own: the
 // tag the built layer carries and its clean-up.
 

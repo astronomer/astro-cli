@@ -17,7 +17,7 @@ func (s *CmdSuite) useWorkingPath(dir string) {
 	s.T().Cleanup(func() { config.WorkingPath = orig })
 }
 
-func (s *CmdSuite) useV2Project() {
+func (s *CmdSuite) useManifestProject() {
 	dir := s.T().TempDir()
 	s.Require().NoError(os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"p\"\nversion = \"0.1.0\"\n\n[tool.astro]\n"), 0o600))
 	s.useWorkingPath(dir)
@@ -59,9 +59,9 @@ func (s *CmdSuite) TestConfigSetOutsideProjectSuggestsTheValueToo() {
 	s.ErrorContains(err, "astro config set show_warnings false -g")
 }
 
-func (s *CmdSuite) TestConfigInV2ProjectPointsAtGlobalAndPyproject() {
+func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.useV2Project()
+	s.useManifestProject()
 
 	_, err := executeCommand("config", "set", "show_warnings", "false")
 	s.Error(err)
@@ -82,14 +82,14 @@ func (s *CmdSuite) TestConfigInV2ProjectPointsAtGlobalAndPyproject() {
 
 func (s *CmdSuite) TestConfigSuggestionQuotesAValueWithSpaces() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.useV2Project()
+	s.useManifestProject()
 	_, err := executeCommand("config", "set", "dev.build_secrets", "id=a,src=/my path")
 	s.ErrorContains(err, "astro config set dev.build_secrets 'id=a,src=/my path' -g")
 }
 
-func (s *CmdSuite) TestConfigInV1ProjectWithPyprojectKeepsProjectScope() {
+func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	s.useV2Project()
+	s.useManifestProject()
 	s.Require().NoError(os.Mkdir(filepath.Join(config.WorkingPath, config.ConfigDir), 0o755))
 	s.Require().NoError(os.WriteFile(filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt), nil, 0o600))
 	_, err := executeCommand("config", "get", "page_size")
@@ -125,7 +125,7 @@ func (s *CmdSuite) TestConfigListShowsValueAndScope() {
 	s.NotContains(out, config.CFG.PostgresPassword.Path)
 }
 
-func (s *CmdSuite) TestConfigListReadsAV1ProjectUnlessGlobal() {
+func (s *CmdSuite) TestConfigListReadsA1xProjectUnlessGlobal() {
 	s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 
 	buf := new(bytes.Buffer)

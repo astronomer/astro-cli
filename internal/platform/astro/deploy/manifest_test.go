@@ -19,9 +19,9 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// v2ProjectDir builds a throwaway project with a dags/ directory holding one
+// manifestProjectDir builds a throwaway project with a dags/ directory holding one
 // DAG file, and returns its root.
-func v2ProjectDir(t *testing.T) string {
+func manifestProjectDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "dags"), 0o755))
@@ -29,14 +29,14 @@ func v2ProjectDir(t *testing.T) string {
 	return dir
 }
 
-// mockV2Deployment stubs GetDeploymentWithResponse (the call behind
+// mockManifestDeployment stubs GetDeploymentWithResponse (the call behind
 // deployment.GetDeploymentByID) with a STANDARD deployment, so the dags
 // transport skips the monitoring-DAG injection.
-func mockV2Deployment(client *astrov1_mocks.ClientWithResponsesInterface, dagDeployEnabled, cicdEnforced bool) {
-	mockV2DeploymentAt(client, "7.0.0", dagDeployEnabled, cicdEnforced)
+func mockManifestDeployment(client *astrov1_mocks.ClientWithResponsesInterface, dagDeployEnabled, cicdEnforced bool) {
+	mockManifestDeploymentAt(client, "7.0.0", dagDeployEnabled, cicdEnforced)
 }
 
-func mockV2DeploymentAt(client *astrov1_mocks.ClientWithResponsesInterface, runtimeVersion string, dagDeployEnabled, cicdEnforced bool) {
+func mockManifestDeploymentAt(client *astrov1_mocks.ClientWithResponsesInterface, runtimeVersion string, dagDeployEnabled, cicdEnforced bool) {
 	standard := astrov1.DeploymentTypeSTANDARD
 	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
@@ -69,11 +69,11 @@ func mockFinalizeDeploy(client *astrov1_mocks.ClientWithResponsesInterface) {
 	}, nil)
 }
 
-func TestDeployDagsV2_Success(t *testing.T) {
+func TestDeployManifestDags_Success(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
+	mockManifestDeployment(client, true, false)
 	mockCreateDagDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
 
@@ -81,8 +81,8 @@ func TestDeployDagsV2_Success(t *testing.T) {
 		return "tarball-v1", nil
 	}
 
-	res, err := DeployDagsV2(DagDeployV2Input{
-		ProjectDir:   v2ProjectDir(t),
+	res, err := DeployManifestDags(ManifestDagDeployInput{
+		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 		Description:  "a manifest dags deploy",
 	}, client)
@@ -105,14 +105,14 @@ func TestDashboardURLHasAScheme(t *testing.T) {
 	}
 }
 
-func TestDeployDagsV2_DagDeployDisabled(t *testing.T) {
+func TestDeployManifestDags_DagDeployDisabled(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, false, false)
+	mockManifestDeployment(client, false, false)
 
-	_, err := DeployDagsV2(DagDeployV2Input{
-		ProjectDir:   v2ProjectDir(t),
+	_, err := DeployManifestDags(ManifestDagDeployInput{
+		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
@@ -120,30 +120,30 @@ func TestDeployDagsV2_DagDeployDisabled(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-func TestDeployDagsV2_CiCdEnforcedBlocks(t *testing.T) {
+func TestDeployManifestDags_CiCdEnforcedBlocks(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, true)
+	mockManifestDeployment(client, true, true)
 	canCiCdDeploy = func(token string) bool { return false }
 
-	_, err := DeployDagsV2(DagDeployV2Input{
-		ProjectDir:   v2ProjectDir(t),
+	_, err := DeployManifestDags(ManifestDagDeployInput{
+		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
 	client.AssertExpectations(t)
 }
 
-func TestDeployDagsV2_NoUploadURL(t *testing.T) {
+func TestDeployManifestDags_NoUploadURL(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-	mockV2Deployment(client, true, false)
+	mockManifestDeployment(client, true, false)
 	mockCreateDagDeploy(client, "") // server returned no upload URL
 
-	_, err := DeployDagsV2(DagDeployV2Input{
-		ProjectDir:   v2ProjectDir(t),
+	_, err := DeployManifestDags(ManifestDagDeployInput{
+		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
@@ -154,7 +154,7 @@ func TestDeployDagsV2_NoUploadURL(t *testing.T) {
 // A deploy handed a login for another host looks the Deployment up under that
 // login's organization and links to that host's cloud UI, whatever host the
 // current context names.
-func TestDeployDagsV2_UsesTheLoginItIsHanded(t *testing.T) {
+func TestDeployManifestDags_UsesTheLoginItIsHanded(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudStagePlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
@@ -174,9 +174,9 @@ func TestDeployDagsV2_UsesTheLoginItIsHanded(t *testing.T) {
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
-	res, err := DeployDagsV2(DagDeployV2Input{
+	res, err := DeployManifestDags(ManifestDagDeployInput{
 		Login:        &config.Context{Domain: "astronomer.io", Organization: "prod-org", Token: "Bearer prod-token"},
-		ProjectDir:   v2ProjectDir(t),
+		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.NoError(t, err)
@@ -186,7 +186,7 @@ func TestDeployDagsV2_UsesTheLoginItIsHanded(t *testing.T) {
 
 // --wait polls the Deployment in the login's org, and asks its Airflow with
 // the login's token, never the current context's.
-func TestDeployDagsV2_WaitUsesTheLoginItIsHanded(t *testing.T) {
+func TestDeployManifestDags_WaitUsesTheLoginItIsHanded(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudStagePlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 	origSleep, origTick := dagOnlyDeploySleepTime, tickNum
@@ -218,9 +218,9 @@ func TestDeployDagsV2_WaitUsesTheLoginItIsHanded(t *testing.T) {
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
-	_, err := DeployDagsV2(DagDeployV2Input{
+	_, err := DeployManifestDags(ManifestDagDeployInput{
 		Login:        &config.Context{Domain: "astronomer.io", Organization: "prod-org", Token: "Bearer prod-token"},
-		ProjectDir:   v2ProjectDir(t),
+		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 		Wait:         true,
 		WaitTime:     30 * time.Second,
@@ -232,7 +232,7 @@ func TestDeployDagsV2_WaitUsesTheLoginItIsHanded(t *testing.T) {
 
 // Whether the monitoring DAG ships follows the org of the login handed in, not
 // the current context's: a hybrid Deployment in a hosted org gets none.
-func TestDeployDagsV2_MonitoringDagFollowsTheLoginsOrg(t *testing.T) {
+func TestDeployManifestDags_MonitoringDagFollowsTheLoginsOrg(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudStagePlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 
@@ -249,14 +249,14 @@ func TestDeployDagsV2_MonitoringDagFollowsTheLoginsOrg(t *testing.T) {
 	}, nil)
 	mockCreateDagDeploy(client, "https://upload-url")
 	mockFinalizeDeploy(client)
-	dir := v2ProjectDir(t)
+	dir := manifestProjectDir(t)
 	azureUploader = func(string, io.Reader) (string, error) {
 		_, err := os.Stat(filepath.Join(dir, "dags", "astronomer_monitoring_dag.py"))
 		assert.True(t, os.IsNotExist(err), "a hosted org's deploy must not add the monitoring DAG")
 		return "tarball-v1", nil
 	}
 
-	_, err := DeployDagsV2(DagDeployV2Input{
+	_, err := DeployManifestDags(ManifestDagDeployInput{
 		Login:        &config.Context{Domain: "astronomer.io", Organization: "prod-org", OrganizationProduct: "HOSTED", Token: "Bearer prod-token"},
 		ProjectDir:   dir,
 		DeploymentID: "test-deployment-id",

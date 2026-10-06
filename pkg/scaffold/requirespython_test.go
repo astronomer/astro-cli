@@ -68,7 +68,7 @@ func TestInitPinsAnInterpreterTheAirflowCanRun(t *testing.T) {
 
 // A 1.x project converts through the same scaffold, and every 1.x project is an
 // Airflow 2 one — so this is the path a migrating user actually takes.
-func TestConvertingAV1ProjectBoundsTheInterpreter(t *testing.T) {
+func TestConvertingA1xProjectBoundsTheInterpreter(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
 		[]byte("FROM quay.io/astronomer/astro-runtime:11.8.0\n"), 0o600))

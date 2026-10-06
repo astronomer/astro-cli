@@ -167,33 +167,33 @@ func (s *ConfigSuite) TestBuildEnv_OverridesExisting() {
 	s.Equal("new-token", value)
 }
 
-func (s *ConfigSuite) TestDetectAirflow_V2ProjectHealthy() {
+func (s *ConfigSuite) TestDetectAirflow_ProjectProjectHealthy() {
 	srv := s.startFakeAirflow()
 	defer srv.Close()
 
-	cwd := s.chdirV2Project("v2-healthy")
-	s.writeV2Record(cwd, serverPort(srv))
+	cwd := s.chdirManifestProject("project-healthy")
+	s.writeProjectRecord(cwd, serverPort(srv))
 
 	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), detectedURL())
 }
 
-func (s *ConfigSuite) TestDetectAirflow_V2StaleRecord() {
+func (s *ConfigSuite) TestDetectAirflow_ProjectStaleRecord() {
 	// A record whose Airflow is gone fails the health probe and must yield
 	// nothing rather than a dead URL.
-	cwd := s.chdirV2Project("v2-stale")
-	s.writeV2Record(cwd, unusedPort(s.T()))
+	cwd := s.chdirManifestProject("project-stale")
+	s.writeProjectRecord(cwd, unusedPort(s.T()))
 
 	s.Empty(detectedURL())
 }
 
-func (s *ConfigSuite) TestDetectAirflow_V2Airflow2StandaloneRefused() {
+func (s *ConfigSuite) TestDetectAirflow_ProjectAirflow2StandaloneRefused() {
 	// A standalone Airflow 2 record means a generated admin password otto can't
 	// read — detection must yield nothing rather than a URL with wrong
 	// credentials.
 	srv := s.startFakeAirflow()
 	defer srv.Close()
 
-	cwd := s.chdirV2Project("v2-airflow2")
+	cwd := s.chdirManifestProject("project-airflow2")
 	s.Require().NoError(localrttest.Seed(localrttest.Record{
 		ProjectPath:  cwd,
 		Port:         serverPort(srv),
@@ -204,13 +204,13 @@ func (s *ConfigSuite) TestDetectAirflow_V2Airflow2StandaloneRefused() {
 	s.Empty(detectedURL())
 }
 
-func (s *ConfigSuite) TestDetectAirflow_V2Airflow2DockerDetected() {
+func (s *ConfigSuite) TestDetectAirflow_ProjectAirflow2DockerDetected() {
 	// Docker mode creates admin/admin itself, which is the pair BuildEnv sends,
 	// so an Airflow 2 project running in containers is reachable.
 	srv := s.startFakeAirflow()
 	defer srv.Close()
 
-	cwd := s.chdirV2Project("v2-airflow2-docker")
+	cwd := s.chdirManifestProject("project-airflow2-docker")
 	s.Require().NoError(localrttest.Seed(localrttest.Record{
 		ProjectPath:  cwd,
 		Port:         serverPort(srv),
@@ -221,30 +221,30 @@ func (s *ConfigSuite) TestDetectAirflow_V2Airflow2DockerDetected() {
 	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(srv)), detectedURL())
 }
 
-func (s *ConfigSuite) TestDetectAirflow_V2ProjectNoRecord() {
-	s.chdirV2Project("v2-not-started")
+func (s *ConfigSuite) TestDetectAirflow_ProjectProjectNoRecord() {
+	s.chdirManifestProject("project-not-started")
 
 	s.Empty(detectedURL())
 }
 
-func (s *ConfigSuite) TestDetectAirflow_V2WinsOverV1Route() {
-	// A directory can carry both a v2 state record and a stale v1 route (a
+func (s *ConfigSuite) TestDetectAirflow_ProjectWinsOver1xRoute() {
+	// A directory can carry both a project's state record and a stale 1.x route (a
 	// project migrated in place). The project's own Airflow wins.
-	v2srv := s.startFakeAirflow()
-	defer v2srv.Close()
-	v1srv := s.startFakeAirflow()
-	defer v1srv.Close()
+	projectSrv := s.startFakeAirflow()
+	defer projectSrv.Close()
+	routeSrv := s.startFakeAirflow()
+	defer routeSrv.Close()
 
-	cwd := s.chdirV2Project("v2-migrated")
-	s.writeV2Record(cwd, serverPort(v2srv))
+	cwd := s.chdirManifestProject("project-migrated")
+	s.writeProjectRecord(cwd, serverPort(projectSrv))
 	s.writeRoute(&pkgproxy.Route{
-		Hostname:   "v2-migrated.localhost",
-		Port:       urlPort(s.T(), v1srv.URL),
+		Hostname:   "project-migrated.localhost",
+		Port:       urlPort(s.T(), routeSrv.URL),
 		ProjectDir: cwd,
 		PID:        os.Getpid(),
 	})
 
-	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(v2srv)), detectedURL())
+	s.Equal(fmt.Sprintf("http://localhost:%d", serverPort(projectSrv)), detectedURL())
 }
 
 func (s *ConfigSuite) TestDetectAirflow_NoRouteForProject() {
@@ -327,18 +327,18 @@ func (s *ConfigSuite) chdirTempProject(name string) string {
 	return resolved
 }
 
-// chdirV2Project is chdirTempProject plus a project manifest. Discovery keys
+// chdirManifestProject is chdirTempProject plus a project manifest. Discovery keys
 // on the file's presence alone; the [tool.astro] body just makes the fixture
 // look like a real project.
-func (s *ConfigSuite) chdirV2Project(name string) string {
+func (s *ConfigSuite) chdirManifestProject(name string) string {
 	dir := s.chdirTempProject(name)
 	manifest := "[tool.astro]\n"
 	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(manifest), 0o600))
 	return dir
 }
 
-// writeV2Record writes the smallest record detection reads: path and port.
-func (s *ConfigSuite) writeV2Record(projectPath string, port int) {
+// writeProjectRecord writes the smallest record detection reads: path and port.
+func (s *ConfigSuite) writeProjectRecord(projectPath string, port int) {
 	s.T().Helper()
 	s.Require().NoError(localrttest.Seed(localrttest.Record{
 		ProjectPath: projectPath,

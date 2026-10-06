@@ -32,16 +32,16 @@ const initCommand = "astro init"
 // directory or any of its parents.
 type NotFoundError struct {
 	Start string
-	// V1Dir is the nearest directory on the walk up that holds a 1.x project
-	// (see IsV1), or empty when there is none. A 1.x project has no
+	// Project1xDir is the nearest directory on the walk up that holds a 1.x project
+	// (see Is1xProject), or empty when there is none. A 1.x project has no
 	// marker, so without this the error would only say what is missing, not
 	// that `astro init` upgrades what is there.
-	V1Dir string
+	Project1xDir string
 }
 
 func (e *NotFoundError) Error() string {
-	if e.V1Dir != "" {
-		return v1Message(e.Start, e.V1Dir)
+	if e.Project1xDir != "" {
+		return project1xMessage(e.Start, e.Project1xDir)
 	}
 	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun `%s` to make this directory one",
 		Marker, e.Start, initCommand)
@@ -55,13 +55,13 @@ type NoAstroSectionError struct {
 	// Start is the directory the command ran in, Dir or one below it.
 	Start string
 	Dir   string
-	// V1 is whether Dir also holds a 1.x project (see IsV1).
-	V1 bool
+	// Has1xProject is whether Dir also holds a 1.x project (see Is1xProject).
+	Has1xProject bool
 }
 
 func (e *NoAstroSectionError) Error() string {
-	if e.V1 {
-		return v1Message(e.Start, e.Dir)
+	if e.Has1xProject {
+		return project1xMessage(e.Start, e.Dir)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
 		"Run `%s` in %s to add one; the rest of the file is left alone",
@@ -70,12 +70,12 @@ func (e *NoAstroSectionError) Error() string {
 
 func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection }
 
-// v1Message says that v1Dir holds a 1.x project and how to upgrade it,
+// project1xMessage says that project1xDir holds a 1.x project and how to upgrade it,
 // naming the directory only when it is not the one the command ran in.
-func v1Message(start, v1Dir string) string {
+func project1xMessage(start, project1xDir string) string {
 	where, there := "this directory", "here"
-	if v1Dir != start {
-		where, there = v1Dir, "in "+v1Dir
+	if project1xDir != start {
+		where, there = project1xDir, "in "+project1xDir
 	}
 	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
 		"Run `%s` %s to upgrade it in place", where, initCommand, there)
@@ -91,7 +91,7 @@ func LoadError(start, dir string, err error) error {
 	if abs, absErr := filepath.Abs(start); absErr == nil {
 		start = abs
 	}
-	return &NoAstroSectionError{Start: start, Dir: dir, V1: IsV1(dir)}
+	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: Is1xProject(dir)}
 }
 
 // Project is a discovered astro project.
@@ -119,7 +119,7 @@ func Discover(startDir string) (*Project, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", startDir, err)
 	}
-	var v1Dir string
+	var project1xDir string
 	for dir := abs; ; {
 		info, err := os.Stat(filepath.Join(dir, Marker))
 		if err == nil && info.Mode().IsRegular() {
@@ -128,12 +128,12 @@ func Discover(startDir string) (*Project, error) {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
-		if v1Dir == "" && IsV1(dir) {
-			v1Dir = dir
+		if project1xDir == "" && Is1xProject(dir) {
+			project1xDir = dir
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return nil, &NotFoundError{Start: abs, V1Dir: v1Dir}
+			return nil, &NotFoundError{Start: abs, Project1xDir: project1xDir}
 		}
 		dir = parent
 	}
@@ -184,7 +184,7 @@ func HasManifest(dir string) bool {
 	}
 }
 
-// IsV1 reports whether dir holds a 1.x project: the old Dockerfile
+// Is1xProject reports whether dir holds a 1.x project: the old Dockerfile
 // layout with a .astro/ directory, and no manifest. A Dockerfile on its own
 // marks some container project, not necessarily a 1.x one, so it does not
 // qualify — `astro dev` must not claim such a directory is 1.x. A
@@ -193,7 +193,7 @@ func HasManifest(dir string) bool {
 // directory a project with a manifest. `astro init` does not consult this: it
 // converts a 1.x directory too, and reports the 1.x files it could not read
 // rather than refusing them.
-func IsV1(dir string) bool {
+func Is1xProject(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
 		return false
 	}

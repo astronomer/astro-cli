@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	v1DeploymentID = "cm1ordersdeployment000001"
-	v1WorkspaceID  = "cm1ordersworkspace0000001"
+	deploymentID1x = "cm1ordersdeployment000001"
+	workspaceID1x  = "cm1ordersworkspace0000001"
 )
 
 // convertedManifest converts dir and loads the manifest it wrote.
@@ -27,11 +27,11 @@ func convertedManifest(t *testing.T, dir string) (*Result, *manifest.Manifest) {
 	return res, m
 }
 
-func v1ProjectWithConfig(t *testing.T, config string, extra map[string]string) string {
+func project1xWithConfig(t *testing.T, config string, extra map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-	files := map[string]string{v1ConfigRelPath: config, "Dockerfile": pinOnlyDockerfile}
+	files := map[string]string{config1xRelPath: config, "Dockerfile": pinOnlyDockerfile}
 	for k, v := range extra {
 		files[k] = v
 	}
@@ -42,17 +42,17 @@ func v1ProjectWithConfig(t *testing.T, config string, extra map[string]string) s
 // A saved Astro Deployment with its workspace becomes a link, marked default,
 // in both arms, and is reported as done rather than as left to do.
 func TestASavedDeployTargetBecomesALink(t *testing.T) {
-	config := "project:\n  name: orders\n  deployment: " + v1DeploymentID + "\n  workspace: " + v1WorkspaceID + "\n"
+	config := "project:\n  name: orders\n  deployment: " + deploymentID1x + "\n  workspace: " + workspaceID1x + "\n"
 	for name, extra := range map[string]map[string]string{
 		"greenfield": nil,
 		"adopted":    {manifest.Marker: "[tool.ruff]\nline-length = 120\n"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			res, m := convertedManifest(t, v1ProjectWithConfig(t, config, extra))
+			res, m := convertedManifest(t, project1xWithConfig(t, config, extra))
 			link, ok := m.Astro.Deployments[V1LinkName]
 			require.True(t, ok, "links: %v", m.Astro.Deployments)
-			assert.Equal(t, v1DeploymentID, link.Deployment)
-			assert.Equal(t, v1WorkspaceID, link.Workspace)
+			assert.Equal(t, deploymentID1x, link.Deployment)
+			assert.Equal(t, workspaceID1x, link.Workspace)
 			assert.True(t, link.Default, "the one saved target is the default")
 			assert.Equal(t, manifest.KindAstro, link.Kind())
 			for _, n := range res.Notes {
@@ -66,17 +66,17 @@ func TestASavedDeployTargetBecomesALink(t *testing.T) {
 // The link is SaveLink's: the same bytes `astro link add` writes into the
 // same manifest.
 func TestTheConversionLinkIsWhatSaveLinkWrites(t *testing.T) {
-	config := "project:\n  name: orders\n  deployment: " + v1DeploymentID + "\n  workspace: " + v1WorkspaceID + "\n"
-	dir := v1ProjectWithConfig(t, config, nil)
+	config := "project:\n  name: orders\n  deployment: " + deploymentID1x + "\n  workspace: " + workspaceID1x + "\n"
+	dir := project1xWithConfig(t, config, nil)
 	_, err := Run(dir, Options{})
 	require.NoError(t, err)
 	converted, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 
-	plain := v1ProjectWithConfig(t, "project:\n  name: orders\n", nil)
+	plain := project1xWithConfig(t, "project:\n  name: orders\n", nil)
 	_, err = Run(plain, Options{})
 	require.NoError(t, err)
-	require.NoError(t, SaveLink(plain, nil, Link{Name: V1LinkName, Kind: manifest.KindAstro, Deployment: v1DeploymentID, Workspace: v1WorkspaceID}))
+	require.NoError(t, SaveLink(plain, nil, Link{Name: V1LinkName, Kind: manifest.KindAstro, Deployment: deploymentID1x, Workspace: workspaceID1x}))
 	require.NoError(t, SetDefaultLink(plain, nil, V1LinkName))
 	linked, err := os.ReadFile(filepath.Join(plain, manifest.Marker))
 	require.NoError(t, err)
@@ -88,13 +88,13 @@ func TestTheConversionLinkIsWhatSaveLinkWrites(t *testing.T) {
 func TestASavedDeployTargetThatCannotBeLinkedStaysANote(t *testing.T) {
 	for name, config := range map[string]string{
 		// cmd/apc/deploy.go saves a Software release name under the same key.
-		"a Software release name": "project:\n  name: orders\n  deployment: celestial-orbit-1234\n  workspace: " + v1WorkspaceID + "\n",
+		"a Software release name": "project:\n  name: orders\n  deployment: celestial-orbit-1234\n  workspace: " + workspaceID1x + "\n",
 		// A link must name a workspace, and the conversion cannot look one up.
-		"no workspace":       "project:\n  name: orders\n  deployment: " + v1DeploymentID + "\n",
-		"a workspace not id": "project:\n  name: orders\n  deployment: " + v1DeploymentID + "\n  workspace: my workspace\n",
+		"no workspace":       "project:\n  name: orders\n  deployment: " + deploymentID1x + "\n",
+		"a workspace not id": "project:\n  name: orders\n  deployment: " + deploymentID1x + "\n  workspace: my workspace\n",
 	} {
 		t.Run(name, func(t *testing.T) {
-			res, m := convertedManifest(t, v1ProjectWithConfig(t, config, nil))
+			res, m := convertedManifest(t, project1xWithConfig(t, config, nil))
 			assert.Empty(t, m.Astro.Deployments)
 			assert.Contains(t, strings.Join(res.Notes, "\n"), "saved deploy target")
 			assert.NotContains(t, strings.Join(res.Advisories, "\n"), "[tool.astro.deployments.")

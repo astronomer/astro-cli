@@ -24,7 +24,7 @@ const settingsPoolsOnly = `airflow:
 // Pools go into [tool.astro.pools] as the file wrote them, and a file that
 // held only pools has nothing left in it, so it goes.
 func TestPoolsAreCarriedIntoTheManifest(t *testing.T) {
-	dir := v1WithSettings(t, settingsPoolsOnly)
+	dir := project1xWithSettings(t, settingsPoolsOnly)
 
 	cs, err := Plan(dir, Options{})
 	require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestPoolsAreCarriedIntoTheManifest(t *testing.T) {
 
 // The adopt arm writes them too.
 func TestPoolsAreCarriedIntoAnAdoptedManifest(t *testing.T) {
-	dir := v1WithSettings(t, "airflow:\n  pools:\n    - pool_name: etl\n      pool_slot: 4\n")
+	dir := project1xWithSettings(t, "airflow:\n  pools:\n    - pool_name: etl\n      pool_slot: 4\n")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = 'adopted'\n"), 0o600))
 
 	cs, err := Plan(dir, Options{})
@@ -95,7 +95,7 @@ func TestAPoolThatCannotBeCarriedKeepsTheFile(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			dir := v1WithSettings(t, tc.settings)
+			dir := project1xWithSettings(t, tc.settings)
 			cs, err := Plan(dir, Options{})
 			require.NoError(t, err)
 			res, err := cs.Apply()
@@ -117,7 +117,7 @@ func TestAPoolThatCannotBeCarriedKeepsTheFile(t *testing.T) {
 // Airflow does not let a caller change default_pool's description, so its
 // slots are carried and the run says what it left out.
 func TestDefaultPoolIsCarriedWithoutItsDescription(t *testing.T) {
-	dir := v1WithSettings(t, "airflow:\n  pools:\n    - pool_name: default_pool\n      pool_slot: 64\n      pool_description: mine\n")
+	dir := project1xWithSettings(t, "airflow:\n  pools:\n    - pool_name: default_pool\n      pool_slot: 64\n      pool_description: mine\n")
 	cs, err := Plan(dir, Options{})
 	require.NoError(t, err)
 	res, err := cs.Apply()
@@ -134,7 +134,7 @@ func TestDefaultPoolIsCarriedWithoutItsDescription(t *testing.T) {
 // but its pools still reach the manifest: they declare nothing in
 // [tool.astro.env], which is what the all-or-nothing rule protects.
 func TestPoolsAreCarriedWhenTheRestOfTheFileIsNot(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
   pools:
@@ -156,7 +156,7 @@ func TestPoolsAreCarriedWhenTheRestOfTheFileIsNot(t *testing.T) {
 // A pool that cannot be carried keeps the file, and nothing else: the
 // connections and variables beside it still reach the vault.
 func TestAPoolThatCannotBeCarriedDoesNotStopTheValues(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   connections:
     - conn_id: warehouse
       conn_type: postgres

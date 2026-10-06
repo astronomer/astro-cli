@@ -102,7 +102,7 @@ func TestDevStubBareAndUnknown(t *testing.T) {
 	}
 }
 
-func TestDevStubV1Notice(t *testing.T) {
+func TestDevStub1xNotice(t *testing.T) {
 	writeDockerfile := func(t *testing.T, dir string) {
 		t.Helper()
 		if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600); err != nil {
@@ -111,7 +111,7 @@ func TestDevStubV1Notice(t *testing.T) {
 	}
 	const notice = "project made by Astro CLI 1.x (Dockerfile and .astro/)"
 
-	t.Run("Dockerfile and .astro gets the v1 notice", func(t *testing.T) {
+	t.Run("Dockerfile and .astro gets the 1.x notice", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		if err := os.Mkdir(filepath.Join(dir, ".astro"), 0o700); err != nil {
@@ -121,21 +121,21 @@ func TestDevStubV1Notice(t *testing.T) {
 		d.WorkingDir = func() (string, error) { return dir, nil }
 		err := execute(t, d, "dev")
 		if err == nil || !strings.Contains(err.Error(), notice) {
-			t.Errorf("v1 dir should get the v1 notice: %v", err)
+			t.Errorf("1.x dir should get the 1.x notice: %v", err)
 		}
 	})
-	t.Run("a pyproject that only configures tools keeps the v1 notice", func(t *testing.T) {
+	t.Run("a pyproject that only configures tools keeps the 1.x notice", func(t *testing.T) {
 		d, _ := testDeps(t)
-		d.WorkingDir = func() (string, error) { return v1ProjectWithToolsPyproject(t), nil }
+		d.WorkingDir = func() (string, error) { return project1xWithToolsPyproject(t), nil }
 		err := execute(t, d, "dev")
 		if err == nil || !strings.Contains(err.Error(), notice) {
-			t.Errorf("a v1 dir with a tools-only pyproject.toml should get the v1 notice: %v", err)
+			t.Errorf("a 1.x dir with a tools-only pyproject.toml should get the 1.x notice: %v", err)
 		}
 		if err != nil && !strings.Contains(err.Error(), "Run `astro init` here to convert it in place") {
-			t.Errorf("the v1 notice should point at astro init: %v", err)
+			t.Errorf("the 1.x notice should point at astro init: %v", err)
 		}
 	})
-	t.Run("Dockerfile alone gets no v1 notice", func(t *testing.T) {
+	t.Run("Dockerfile alone gets no 1.x notice", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		d, _ := testDeps(t)
@@ -145,14 +145,14 @@ func TestDevStubV1Notice(t *testing.T) {
 			t.Fatal("astro dev must still fail")
 		}
 		if strings.Contains(err.Error(), "Astro CLI 1.x") {
-			t.Errorf("a Dockerfile-only dir must not be called v1: %v", err)
+			t.Errorf("a Dockerfile-only dir must not be called 1.x: %v", err)
 		}
 	})
 }
 
-// v1ProjectWithToolsPyproject is a classic 1.x project that also keeps a
+// project1xWithToolsPyproject is a classic 1.x project that also keeps a
 // pyproject.toml for tool settings only, which many 1.x repositories do.
-func v1ProjectWithToolsPyproject(t *testing.T) string {
+func project1xWithToolsPyproject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	for name, content := range map[string]string{
@@ -170,9 +170,9 @@ func v1ProjectWithToolsPyproject(t *testing.T) string {
 	return dir
 }
 
-func TestDevStubLeadsWithTheConversionInAV1Project(t *testing.T) {
+func TestDevStubLeadsWithTheConversionInA1xProject(t *testing.T) {
 	d, _ := testDeps(t)
-	d.WorkingDir = func() (string, error) { return v1ProjectWithToolsPyproject(t), nil }
+	d.WorkingDir = func() (string, error) { return project1xWithToolsPyproject(t), nil }
 
 	err := execute(t, d, "dev", "pytest")
 	if err == nil || !strings.Contains(err.Error(), "Convert with `astro init`, then use `uv run pytest`") {
@@ -199,7 +199,7 @@ func TestDevStubJSONNamesTheConversion(t *testing.T) {
 		var payload struct {
 			Replacement string `json:"replacement"`
 			Convert     string `json:"convert"`
-			V1Project   bool   `json:"v1_project"`
+			Is1xProject bool   `json:"v1_project"`
 		}
 		if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
 			t.Fatalf("stdout is not one JSON object: %v\n%s", err, out.String())
@@ -207,14 +207,14 @@ func TestDevStubJSONNamesTheConversion(t *testing.T) {
 		if payload.Replacement != "uv run pytest" {
 			t.Errorf("replacement = %q, want uv run pytest", payload.Replacement)
 		}
-		return payload.Convert, payload.V1Project
+		return payload.Convert, payload.Is1xProject
 	}
 
-	if got, v1 := convert(t, v1ProjectWithToolsPyproject(t)); got != "astro init" || !v1 {
-		t.Errorf("1.x project: convert = %q, v1_project = %v; want astro init, true", got, v1)
+	if got, is1x := convert(t, project1xWithToolsPyproject(t)); got != "astro init" || !is1x {
+		t.Errorf("1.x project: convert = %q, v1_project = %v; want astro init, true", got, is1x)
 	}
-	if got, v1 := convert(t, t.TempDir()); got != "" || v1 {
-		t.Errorf("empty dir: convert = %q, v1_project = %v; want neither", got, v1)
+	if got, is1x := convert(t, t.TempDir()); got != "" || is1x {
+		t.Errorf("empty dir: convert = %q, v1_project = %v; want neither", got, is1x)
 	}
 }
 
@@ -311,7 +311,7 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 		{
 			name: "a 1.x project with a build secret converts to a Docker-mode build",
 			args: []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
-			dc:   devContext{v1: true, buildSecret: true},
+			dc:   devContext{is1x: true, buildSecret: true},
 			want: "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
 		},
 		{

@@ -74,7 +74,7 @@ func Start(args []string) error {
 
 	// Deferred from NewConfigFromContext: detection health-probes local
 	// ports, so it runs only once the launch is definitely spawning Otto.
-	cfg.AirflowURL, cfg.AirflowV2 = DetectAirflow()
+	cfg.AirflowURL, cfg.ProjectAirflow = DetectAirflow()
 
 	// Help and version exit before Otto reads anything, so they neither need
 	// the warehouses nor should open the keychain for them. The warehouses'

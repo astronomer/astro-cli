@@ -58,7 +58,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if err != nil {
 		return err
 	}
-	// A v1 airflow_settings.yaml's connection and variable values go to
+	// A 1.x airflow_settings.yaml's connection and variable values go to
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
@@ -221,7 +221,7 @@ func renderLeftToDo(w io.Writer, notes []string) error {
 // resolved until there is a directory to resolve. Opening eagerly turned every
 // init-into-a-new-directory into a failure about symlinks.
 //
-// A value is asked about only when a v1 airflow_settings.yaml holds one, so the
+// A value is asked about only when a 1.x airflow_settings.yaml holds one, so the
 // directory already exists. A project with nothing to carry never opens the
 // vault at all, which is most of them.
 type lazyVaultWriter struct {

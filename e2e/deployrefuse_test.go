@@ -20,10 +20,10 @@ import (
 // because refuseFlagsManifestDeployIgnores runs before the manifest is read and
 // mutates nothing — each subtest takes a view bound to its own T so a failure
 // stays in its own case.
-func TestDeployRefusesTheFlagsAV2ProjectIgnores(t *testing.T) {
+func TestDeployRefusesTheFlagsAManifestProjectIgnores(t *testing.T) {
 	tier(t, 0)
 
-	parent := v2ProjectForDeploy(t)
+	parent := manifestProjectForDeploy(t)
 
 	// The eight, written out rather than imported. Importing the table from
 	// cmd/astro would make this a test that the CLI agrees with itself; the
@@ -104,7 +104,7 @@ func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 	const whereToPutIt = "under [tool.astro] in pyproject.toml"
 
 	t.Run("refused without a declared dockerfile", func(t *testing.T) {
-		p := v2ProjectForDeploy(t).forT(t)
+		p := manifestProjectForDeploy(t).forT(t)
 		r := p.run("deploy", "--build-secret", "id=x,src=/dev/null").requireFailure()
 
 		if !strings.Contains(r.Stderr, needsOne) {
@@ -121,7 +121,7 @@ func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 	// unrelated reason, this asserts it got PAST the gate: the next thing it
 	// complains about is the workspace, which is checked further down.
 	t.Run("not refused when the project declares one", func(t *testing.T) {
-		p := v2ProjectForDeploy(t).forT(t)
+		p := manifestProjectForDeploy(t).forT(t)
 		write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM scratch\n")
 		declareDockerfile(t, p)
 
@@ -152,7 +152,7 @@ func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 				label += " and a declared dockerfile"
 			}
 			t.Run("refused "+label, func(t *testing.T) {
-				p := v2ProjectForDeploy(t).forT(t)
+				p := manifestProjectForDeploy(t).forT(t)
 				if declared {
 					write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM scratch\n")
 					declareDockerfile(t, p)
@@ -171,10 +171,10 @@ func TestDeployBuildSecretDependsOnADeclaredDockerfile(t *testing.T) {
 	}
 }
 
-// v2ProjectForDeploy is a scaffolded project, which is all `astro deploy`
+// manifestProjectForDeploy is a scaffolded project, which is all `astro deploy`
 // needs to take the manifest path: project.HasManifest looks for a pyproject.toml carrying
 // [tool.astro].
-func v2ProjectForDeploy(t *testing.T) *project {
+func manifestProjectForDeploy(t *testing.T) *project {
 	t.Helper()
 	p := newProject(t)
 	p.run("init", "--name", "deployable").requireSuccess()
@@ -211,7 +211,7 @@ func addAstroKey(t *testing.T, p *project, line string) {
 func TestDeployTakesANetrcBuildSecretWithoutADockerfile(t *testing.T) {
 	tier(t, 0)
 
-	p := v2ProjectForDeploy(t).forT(t)
+	p := manifestProjectForDeploy(t).forT(t)
 	r := p.run("deploy", "--build-secret", "id=netrc,src=/dev/null")
 	if strings.Contains(r.output(), "reads only the netrc build secret") {
 		t.Fatalf("the runtime image mounts netrc, so a generated build takes it\n%s", r.output())

@@ -97,18 +97,18 @@ func TestChooseNameTakesWhatTheProjectCallsItself(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), tc.dirName)
 			require.NoError(t, os.MkdirAll(dir, 0o755))
-			v1 := &v1Project{}
+			from1x := &project1x{}
 			if tc.configName != "" {
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 				require.NoError(t, os.WriteFile(
-					filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)),
+					filepath.Join(dir, filepath.FromSlash(config1xRelPath)),
 					[]byte("project:\n  name: "+tc.configName+"\n"), 0o600))
-				read, err := readV1Project(dir)
+				read, err := read1xProject(dir)
 				require.NoError(t, err)
-				v1 = read
+				from1x = read
 			}
 
-			got, advisory := chooseName(dir, Options{Name: tc.optsName}, v1)
+			got, advisory := chooseName(dir, Options{Name: tc.optsName}, from1x)
 			assert.Equal(t, tc.want, got)
 			if tc.wantAdvisory == "" {
 				assert.Empty(t, advisory, "a name carried as written needs no comment")
@@ -122,42 +122,42 @@ func TestChooseNameTakesWhatTheProjectCallsItself(t *testing.T) {
 
 // Reading the name does not put the file up for deletion.
 //
-// .astro/config.yaml holds v1 CLI configuration this conversion neither reads
-// nor replaces, so the file stays. Recording it as one of the v1 files present
+// .astro/config.yaml holds 1.x CLI configuration this conversion neither reads
+// nor replaces, so the file stays. Recording it as one of the 1.x files present
 // would offer it to planRetirements, which retires a file once everything it
 // said reached the manifest — and the name would be everything, as far as that
 // code could tell.
-func TestReadingTheV1NameDoesNotRetireTheConfig(t *testing.T) {
+func TestReadingThe1xNameDoesNotRetireTheConfig(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)),
+		filepath.Join(dir, filepath.FromSlash(config1xRelPath)),
 		[]byte("project:\n  name: orders-pipeline\n"), 0o600))
 	writeAll(t, dir, map[string]string{"Dockerfile": pinOnlyDockerfile})
 
-	v1, err := readV1Project(dir)
+	from1x, err := read1xProject(dir)
 	require.NoError(t, err)
-	require.Equal(t, "orders-pipeline", v1.projectName)
-	assert.NotContains(t, v1.present, v1ConfigRelPath,
+	require.Equal(t, "orders-pipeline", from1x.projectName)
+	assert.NotContains(t, from1x.present, config1xRelPath,
 		"the config is not a retirement candidate, so it must not be recorded as present")
 
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 	assert.Equal(t, "orders-pipeline", res.Name)
-	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)))
-	assert.NoError(t, statErr, "the config holds v1 CLI configuration this run does not replace, so it stays")
+	_, statErr := os.Stat(filepath.Join(dir, filepath.FromSlash(config1xRelPath)))
+	assert.NoError(t, statErr, "the config holds 1.x CLI configuration this run does not replace, so it stays")
 }
 
 // A malformed config costs the name, not the conversion.
 //
-// v1's own loader tolerated an unparseable config, the rest of a conversion
+// The 1.x CLI's own loader tolerated an unparseable config, the rest of a conversion
 // does not depend on it, and failing `astro init` over YAML in a file being
 // left behind anyway would be the least useful outcome available.
-func TestAMalformedV1ConfigDoesNotFailTheConversion(t *testing.T) {
+func TestAMalformed1xConfigDoesNotFailTheConversion(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "thedir")
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)),
+		filepath.Join(dir, filepath.FromSlash(config1xRelPath)),
 		[]byte("project:\n  name: [not a string\n"), 0o600))
 	writeAll(t, dir, map[string]string{"Dockerfile": pinOnlyDockerfile})
 
@@ -171,7 +171,7 @@ func TestAMalformedV1ConfigDoesNotFailTheConversion(t *testing.T) {
 	// error.
 	var found string
 	for _, n := range res.Notes {
-		if strings.Contains(n, v1ConfigRelPath) && strings.Contains(n, "could not be read") {
+		if strings.Contains(n, config1xRelPath) && strings.Contains(n, "could not be read") {
 			found = n
 		}
 	}
@@ -182,13 +182,13 @@ func TestAMalformedV1ConfigDoesNotFailTheConversion(t *testing.T) {
 // Two files naming the project differently is worth one line.
 //
 // The manifest wins — it has already said what the project is called — but
-// somebody who has only ever seen the v1 name should not have to work out
+// somebody who has only ever seen the 1.x name should not have to work out
 // where it went.
-func TestAdoptSaysWhenTheManifestNameDisagreesWithTheV1One(t *testing.T) {
+func TestAdoptSaysWhenTheManifestNameDisagreesWithThe1xOne(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "thedir")
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)),
+		filepath.Join(dir, filepath.FromSlash(config1xRelPath)),
 		[]byte("project:\n  name: orders-pipeline\n"), 0o600))
 	writeAll(t, dir, map[string]string{
 		"pyproject.toml": "[project]\nname = 'internal-dags'\nversion = '0.1.0'\n" +
@@ -205,11 +205,11 @@ func TestAdoptSaysWhenTheManifestNameDisagreesWithTheV1One(t *testing.T) {
 			found = a
 		}
 	}
-	require.NotEmpty(t, found, "the v1 name went somewhere and the run should say so: %v", res.Advisories)
+	require.NotEmpty(t, found, "the 1.x name went somewhere and the run should say so: %v", res.Advisories)
 	assert.Contains(t, found, "internal-dags", "and name what it kept instead")
 }
 
-// An adopted manifest's own name wins, and one without a name takes the v1
+// An adopted manifest's own name wins, and one without a name takes the 1.x
 // project's.
 //
 // Two halves of the same rule: a manifest that states a name has said what the
@@ -220,7 +220,7 @@ func TestAdoptKeepsAManifestNameAndFillsAMissingOne(t *testing.T) {
 		dir := filepath.Join(t.TempDir(), "thedir")
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 		require.NoError(t, os.WriteFile(
-			filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)),
+			filepath.Join(dir, filepath.FromSlash(config1xRelPath)),
 			[]byte("project:\n  name: orders-pipeline\n"), 0o600))
 		writeAll(t, dir, map[string]string{
 			"pyproject.toml": "[project]\nname = 'kept-by-manifest'\nversion = '0.1.0'\n" +
@@ -232,11 +232,11 @@ func TestAdoptKeepsAManifestNameAndFillsAMissingOne(t *testing.T) {
 		assert.Equal(t, "kept-by-manifest", res.Name)
 	})
 
-	t.Run("a manifest with no name takes the v1 one", func(t *testing.T) {
+	t.Run("a manifest with no name takes the 1.x one", func(t *testing.T) {
 		dir := filepath.Join(t.TempDir(), "thedir")
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 		require.NoError(t, os.WriteFile(
-			filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)),
+			filepath.Join(dir, filepath.FromSlash(config1xRelPath)),
 			[]byte("project:\n  name: orders-pipeline\n"), 0o600))
 		writeAll(t, dir, map[string]string{
 			"pyproject.toml": "[tool.ruff]\nline-length = 100\n",
@@ -263,7 +263,7 @@ func TestARewrittenNameIsAnAdvisory(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "thedir")
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, filepath.FromSlash(v1ConfigRelPath)),
+		filepath.Join(dir, filepath.FromSlash(config1xRelPath)),
 		[]byte("project:\n  name: Orders Pipeline\n"), 0o600))
 	writeAll(t, dir, map[string]string{"Dockerfile": pinOnlyDockerfile})
 

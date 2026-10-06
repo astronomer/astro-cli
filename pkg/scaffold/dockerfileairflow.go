@@ -70,8 +70,8 @@ func CheckDockerfileAirflow(dir string, m *manifest.Manifest) error {
 // requirement is the Airflow requirement the manifest would carry, and source
 // names where its version came from, for the message. The problem is the one
 // start would report, wrapped as a *manifest.ValidationError.
-func refuseKeptDockerfileOfAnotherAirflow(dir string, v1 *v1Project, requirement, source string) error {
-	if !declaresDockerfile(v1) {
+func refuseKeptDockerfileOfAnotherAirflow(dir string, from1x *project1x, requirement, source string) error {
+	if !declaresDockerfile(from1x) {
 		return nil
 	}
 	m := &manifest.Manifest{
@@ -91,14 +91,14 @@ func refuseKeptDockerfileOfAnotherAirflow(dir string, v1 *v1Project, requirement
 // for the adopt arm, where the version comes from --airflow-version when it is
 // given, which rewrites the requirement, and otherwise from the requirement
 // the existing manifest already carries, which is kept.
-func refuseAdoptedDockerfileOfAnotherAirflow(dir string, v1 *v1Project, flag string, deps []string) error {
+func refuseAdoptedDockerfileOfAnotherAirflow(dir string, from1x *project1x, flag string, deps []string) error {
 	if flag != "" {
-		return refuseKeptDockerfileOfAnotherAirflow(dir, v1, airflowRequirement(flag), "--airflow-version "+flag)
+		return refuseKeptDockerfileOfAnotherAirflow(dir, from1x, airflowRequirement(flag), "--airflow-version "+flag)
 	}
 	for _, spec := range deps {
 		if _, ok := manifest.AirflowPin(spec); ok {
 			spec = strings.TrimSpace(spec)
-			return refuseKeptDockerfileOfAnotherAirflow(dir, v1, spec,
+			return refuseKeptDockerfileOfAnotherAirflow(dir, from1x, spec,
 				"The Airflow requirement "+spec+" already in "+manifest.Marker)
 		}
 	}

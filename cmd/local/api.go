@@ -91,7 +91,7 @@ func newAPICmd(c *cli) *cobra.Command {
 	cmd.Flags().BoolVar(&opts.root, "root", false, "Address the server root, below the API version prefix (af spells it --raw)")
 	cmd.Flags().StringArrayVarP(&opts.fields, "field", "F", nil, "Add a typed field in key=value format: numbers, true, false, null, @file")
 	// No -f: across the core tree -f is --follow (`astro local logs -f`), and one
-	// shorthand means one thing there (TestShorthandsMeanOneThingEachAcrossTheV2Tree).
+	// shorthand means one thing there (TestShorthandsMeanOneThingEachAcrossTheCoreTree).
 	// af's `-f key=value` is spelled out as --raw-field here.
 	cmd.Flags().StringArrayVar(&opts.rawFields, "raw-field", nil, "Add a string field in key=value format")
 	cmd.Flags().StringArrayVarP(&opts.headers, "header", "H", nil, "Add a request header in key:value format")

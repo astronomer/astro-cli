@@ -57,7 +57,7 @@ type Options struct {
 	// GOOS overrides runtime.GOOS, so tests can check the Windows layout
 	// (no CLAUDE.md symlink) from any host.
 	GOOS string
-	// SecretWriter stores the connection and Airflow variable values a v1
+	// SecretWriter stores the connection and Airflow variable values a 1.x
 	// airflow_settings.yaml carries, at the project scope the writer itself
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
@@ -80,7 +80,7 @@ type Result struct {
 	Skipped []string `json:"skipped,omitempty"`
 	// Updated lists files this run changed rather than created.
 	Updated []string `json:"updated,omitempty"`
-	// Deleted lists the v1 files this run removed, once their contents were in
+	// Deleted lists the 1.x files this run removed, once their contents were in
 	// the manifest. Separate from Updated because a caller that renders the two
 	// the same way tells the user a destroyed file was edited.
 	Deleted []string `json:"deleted,omitempty"`
@@ -109,7 +109,7 @@ type Result struct {
 // directory is either scaffolded or adopted. Callers branch with errors.Is.
 var ErrAlreadyAstroProject = errors.New("is already an Astro project")
 
-// Project files are the user's own; world-readable is right (never the v1
+// Project files are the user's own; world-readable is right (never the 1.x
 // helpers' 0o777 — an earlier fix).
 const (
 	dirPerm  = 0o755
@@ -178,10 +178,10 @@ func isDagsPlaceholder(name string) bool {
 //
 // The example imports airflow.sdk, which is the Airflow 3 Task SDK and does not
 // exist before it: Airflow 2 spells the same two decorators airflow.decorators,
-// which is why this repo's v1 templates were a per-major pair
+// which is why this repo's 1.x templates were a per-major pair
 // (pkg/airflowrt/include/airflow2 beside .../airflow3). The pin is not always 3.
 // pickAirflowVersion reads it from --airflow-version, the manifest, a Dockerfile
-// runtime tag or requirements.txt, and any of those can say 2 — adopting a v1
+// runtime tag or requirements.txt, and any of those can say 2 — adopting a 1.x
 // project is the ordinary way it happens.
 //
 // So a project pinning Airflow 2 gets no example, deliberately. A DAG that
@@ -214,7 +214,7 @@ type templateFile struct{ name, content string }
 // projectDirs creates, and planFiles writes files after directories for that
 // reason.
 //
-// A new project had an empty dags/ until this landed: v1's scaffold wrote an
+// A new project had an empty dags/ until this landed: 1.x's scaffold wrote an
 // example and pkg/scaffold did not carry it over, so `astro init` followed by
 // `astro local start` gave you an Airflow with nothing in it. No decision was
 // recorded against having one, so this reads as an omission rather than a
@@ -229,9 +229,9 @@ const (
 	fileDockerignore = ".dockerignore"
 	fileAgents       = "AGENTS.md"
 	fileClaude       = "CLAUDE.md"
-	// fileDockerfile is the one place a v1 layout can put a Dockerfile, so it
+	// fileDockerfile is the one place a 1.x layout can put a Dockerfile, so it
 	// is both the file the retirement decision is about and the value the
-	// manifest declaration carries. The literals in v1files.go are left alone
+	// manifest declaration carries. The literals in files1x.go are left alone
 	// deliberately: several of them are note prefixes with the name inside
 	// prose ("Dockerfile: its RUN instructions..."), which a constant cannot
 	// cover, and half-converting them would read worse than neither.
@@ -272,7 +272,7 @@ type manifestFacts struct {
 	// surfaces, from inside a dependency that names neither.
 	loosePython bool
 	// migrationNotes is what building the manifest could not migrate, discovered
-	// while building it rather than while reading the v1 files: extras on an
+	// while building it rather than while reading the 1.x files: extras on an
 	// apache-airflow requirement that the generated pin does not reproduce.
 	migrationNotes []string
 	// migratedLabels describes what the manifest write absorbed, for the
@@ -325,11 +325,11 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		return nil, fmt.Errorf("%w: %q is not a version like 3, 3.1, or 3.1.2", ErrInvalidAirflowVersion, v)
 	}
 
-	// What the v1 files say, read before either arm, because both need it: a
+	// What the 1.x files say, read before either arm, because both need it: a
 	// greenfield manifest is BUILT from them and an adopted one is extended
 	// with them. This is the difference between init-in-an-existing-project
 	// converting it and init leaving a hand-off list beside files nobody read.
-	v1, err := readV1Project(abs)
+	from1x, err := read1xProject(abs)
 	if err != nil {
 		return nil, err
 	}
@@ -343,11 +343,11 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	data, readErr := os.ReadFile(marker)
 	switch {
 	case readErr == nil:
-		out, manifestLabels, pin, err = adopt(abs, data, opts, v1, &cs.Result)
+		out, manifestLabels, pin, err = adopt(abs, data, opts, from1x, &cs.Result)
 	case errors.Is(readErr, os.ErrNotExist):
 		// No labels from this arm: a scaffolded manifest is created rather than
 		// edited, so its one line is the filename, supplied below.
-		out, pin, err = scaffoldManifest(abs, opts, v1, &cs.Result)
+		out, pin, err = scaffoldManifest(abs, opts, from1x, &cs.Result)
 	default:
 		err = fmt.Errorf("reading %s: %w", marker, readErr)
 	}
@@ -358,7 +358,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	if err := planFiles(abs, goos != windowsOS, cs); err != nil {
 		return nil, err
 	}
-	if err := planKeptDockerfileIgnore(abs, v1, cs); err != nil {
+	if err := planKeptDockerfileIgnore(abs, from1x, cs); err != nil {
 		return nil, err
 	}
 
@@ -379,11 +379,11 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// retirements are decided from. Deciding earlier is what made the first
 	// version of this delete a requirements.txt that had been carried nowhere.
 	//
-	// The v1 notes lead: they are about the files this run just read, so they
+	// The 1.x notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
-	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, v1)
-	cs.Notes = slices.Concat(v1.notes, pin.migrationNotes, lefts)
+	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
+	cs.Notes = slices.Concat(from1x.notes, pin.migrationNotes, lefts)
 
 	// The values airflow_settings.yaml supplied. They ride the changeset rather
 	// than being written here because Plan writes nothing, and they are a
@@ -392,7 +392,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	//
 	// Settled before the retirements, because whether every value reaches the
 	// vault decides whether the file may go.
-	cs.Secrets = v1.settings.secrets
+	cs.Secrets = from1x.settings.secrets
 	cs.secrets = opts.SecretWriter
 	switch {
 	case len(cs.Secrets) == 0:
@@ -403,7 +403,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		//
 		// This used to be an error, on the reasoning that a changeset which
 		// cannot be applied must not first be approved. The reasoning assumed
-		// every caller intends the carry. Failing would make a v1 directory
+		// every caller intends the carry. Failing would make a 1.x directory
 		// unopenable; carrying silently would move credentials nobody was shown.
 		//
 		// So the writer IS the consent, and its absence is a decision the note
@@ -416,9 +416,9 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 			" stayed in the file. Convert this project in Astro Desktop, or run "+
 			setCommands(cs.Secrets)+", to move "+pronoun(n)+" into the encrypted vault")
 		cs.Secrets = nil
-		v1.settings.unstored = true
+		from1x.settings.unstored = true
 	default:
-		v1.settings.checkVault(cs.secrets)
+		from1x.settings.checkVault(cs.secrets)
 	}
 
 	// And the deletions go last of all. Apply walks this slice in order and
@@ -430,14 +430,14 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// That state does make a rerun refuse, since a manifest carrying
 	// [tool.astro] is what ErrAlreadyAstroProject tests. Refusing over a project
 	// whose dependencies are intact is the better half of the trade.
-	for _, name := range planRetirements(v1,
-		slices.Concat(v1.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
+	for _, name := range planRetirements(from1x,
+		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
 		label := name + " (migrated into " + manifest.Marker + ", removed)"
 		if name == SettingsRelPath {
 			switch {
 			case len(cs.Secrets) > 0:
 				label = name + " (migrated into the encrypted vault and " + manifest.Marker + ", removed)"
-			case !v1.settings.declares() && len(v1.settings.pools.byName) == 0:
+			case !from1x.settings.declares() && len(from1x.settings.pools.byName) == 0:
 				label = name + " (nothing to carry, removed)"
 			}
 		}
@@ -453,9 +453,9 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// would keep the project's Dockerfile alive if these went there. They are
 	// the opposite KIND of statement: Notes is work outstanding, an advisory is
 	// a change already made.
-	cs.Advisories = append(cs.Advisories, v1.settings.carriedAdvisories()...)
-	cs.Advisories = append(cs.Advisories, v1.settings.pools.advisories...)
-	if a := v1.deployLinkAdvisory(); a != "" {
+	cs.Advisories = append(cs.Advisories, from1x.settings.carriedAdvisories()...)
+	cs.Advisories = append(cs.Advisories, from1x.settings.pools.advisories...)
+	if a := from1x.deployLinkAdvisory(); a != "" {
 		cs.Advisories = append(cs.Advisories, a)
 	}
 
@@ -486,7 +486,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// is not a Change and never appears there. Nothing in the app read it.
 	if len(cs.Secrets) > 0 {
 		stored := slices.DeleteFunc(slices.Clone(cs.Secrets), func(w SecretWrite) bool {
-			return slices.Contains(v1.settings.held, w.Name)
+			return slices.Contains(from1x.settings.held, w.Name)
 		})
 		if len(stored) > 0 {
 			cs.Advisories = append(cs.Advisories,
@@ -506,7 +506,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		// The names are spelled out rather than pronouned: every consumer renders
 		// this list its own way, so a line whose "it" resolves against a
 		// neighboring advisory dangles wherever the two are shown apart.
-		if kept := v1.settings.keptFor(); kept != "" {
+		if kept := from1x.settings.keptFor(); kept != "" {
 			cs.Advisories = append(cs.Advisories,
 				SettingsRelPath+" still contains "+carriedNames(cs.Secrets)+" in plaintext, and is kept "+kept)
 		}
@@ -514,10 +514,10 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	return cs, nil
 }
 
-// planRetirements names the v1 files this run may delete.
+// planRetirements names the 1.x files this run may delete.
 //
 // The rule is "carried, so removable", and the whole difficulty is that only
-// this function is in a position to know. readV1Project sees what each file
+// this function is in a position to know. read1xProject sees what each file
 // SAID; what reached the manifest is settled later, by mergeDependencies,
 // renderPyproject and pickAirflowVersion, any of which can drop what it read.
 //
@@ -529,13 +529,13 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 // It is not a clever test and it does not need to be. It errs toward keeping,
 // which is the direction to err: a file wrongly kept is untidy, a file wrongly
 // deleted is gone.
-func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
+func planRetirements(from1x *project1x, notes []string, pinned string) []string {
 	var out []string
-	for _, name := range v1.present {
+	for _, name := range from1x.present {
 		if namedInAny(notes, name) {
 			continue
 		}
-		if name == "Dockerfile" && !dockerfileIsSpent(v1, pinned) {
+		if name == "Dockerfile" && !dockerfileIsSpent(from1x, pinned) {
 			continue
 		}
 		// airflow_settings.yaml is retired only when nothing in it stays
@@ -545,7 +545,7 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 		// Explicit, and not left to the notes that mention those cases: this
 		// deletes files, a note is prose, and "is that string still in the
 		// list" is not what should stand between a project's values and rm.
-		if name == SettingsRelPath && !v1.settings.retirable() {
+		if name == SettingsRelPath && !from1x.settings.retirable() {
 			continue
 		}
 		out = append(out, name)
@@ -558,7 +558,7 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 	// are ignored by design because the file decides what goes in — and if that
 	// file is FROM an Astro runtime, the base's own ONBUILD `COPY
 	// requirements.txt .` fires and reads the file from the build context. So an
-	// entirely ordinary conversion (a Dockerfile with an ENV, plus the two v1
+	// entirely ordinary conversion (a Dockerfile with an ENV, plus the two 1.x
 	// files) migrated both lists into the manifest, deleted both files, and left
 	// a build that either fails on the missing COPY or produces an image with
 	// none of the project's packages.
@@ -566,7 +566,7 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 	// Kept rather than un-migrated: the manifest lists stay, because a project
 	// that later drops its Dockerfile needs them, and they cost nothing while the
 	// declaration stands. The note below tells the user both exist.
-	if declaresDockerfile(v1) {
+	if declaresDockerfile(from1x) {
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return name == "requirements.txt" || name == "packages.txt"
 		})
@@ -576,8 +576,8 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 	// alone would be. `RUN pip install -r requirements.txt` is the common one,
 	// and packages.txt is consumed the same way by the runtime image's ONBUILD
 	// step, from the build context.
-	if !slices.Contains(out, "Dockerfile") && len(v1.dockerfileBody) > 0 {
-		body := string(v1.dockerfileBody)
+	if !slices.Contains(out, "Dockerfile") && len(from1x.dockerfileBody) > 0 {
+		body := string(from1x.dockerfileBody)
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return strings.Contains(body, name)
 		})
@@ -593,8 +593,8 @@ func planRetirements(v1 *v1Project, notes []string, pinned string) []string {
 // Dockerfile's tag. A run that took either of those and then deleted the
 // Dockerfile would destroy the only record of a version the project actually
 // built on, while the manifest claims a different one.
-func dockerfileIsSpent(v1 *v1Project, pinned string) bool {
-	return v1.dockerfilePinOnly && v1.airflow != "" && v1.airflow == pinned
+func dockerfileIsSpent(from1x *project1x, pinned string) bool {
+	return from1x.dockerfilePinOnly && from1x.airflow != "" && from1x.airflow == pinned
 }
 
 // declaresDockerfile reports that this project's Dockerfile IS the build: it is
@@ -605,32 +605,32 @@ func dockerfileIsSpent(v1 *v1Project, pinned string) bool {
 // dockerfileIsSpent was that they are different questions. Spelled out three
 // times, any refinement (a file with only comments and a FROM, an ARG-only one)
 // lands in some of them and the label and the declaration disagree.
-func declaresDockerfile(v1 *v1Project) bool {
-	return len(v1.dockerfileBody) > 0 && !v1.dockerfilePinOnly
+func declaresDockerfile(from1x *project1x) bool {
+	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly
 }
 
 // buildPython is the Python this project's image runs when its Dockerfile is
 // the build and the base's tag names one, or "". A Dockerfile that is only a
 // pin gives nothing here: the image is then generated from the runtime series
 // and runs that runtime's default Python.
-func (v1 *v1Project) buildPython() string {
-	if !declaresDockerfile(v1) {
+func (from1x *project1x) buildPython() string {
+	if !declaresDockerfile(from1x) {
 		return ""
 	}
-	return v1.basePython
+	return from1x.basePython
 }
 
-func setV1Declarations(ed tomledit.Editor, v1 *v1Project) error {
-	if err := setDockerfileDeclaration(ed, v1); err != nil {
+func set1xDeclarations(ed tomledit.Editor, from1x *project1x) error {
+	if err := setDockerfileDeclaration(ed, from1x); err != nil {
 		return err
 	}
-	if err := setEnvDeclarations(ed, &v1.settings); err != nil {
+	if err := setEnvDeclarations(ed, &from1x.settings); err != nil {
 		return err
 	}
-	if err := setDeployLink(ed, v1); err != nil {
+	if err := setDeployLink(ed, from1x); err != nil {
 		return err
 	}
-	return setPools(ed, v1.settings.pools.byName)
+	return setPools(ed, from1x.settings.pools.byName)
 }
 
 // setDockerfileDeclaration records the project's own Dockerfile in the manifest,
@@ -658,12 +658,12 @@ func setV1Declarations(ed tomledit.Editor, v1 *v1Project) error {
 // So the two decisions overlap and are not the same, and only this one is about
 // what builds the image.
 //
-// The value is the filename rather than a discovered path because the v1 layout
+// The value is the filename rather than a discovered path because the 1.x layout
 // this converts from has exactly one place a Dockerfile can be. A project that
 // wants its build somewhere else can say so by hand; the manifest accepts any
 // path inside the project.
-func setDockerfileDeclaration(ed tomledit.Editor, v1 *v1Project) error {
-	if !declaresDockerfile(v1) {
+func setDockerfileDeclaration(ed tomledit.Editor, from1x *project1x) error {
+	if !declaresDockerfile(from1x) {
 		return nil
 	}
 	return ed.Set([]string{"tool", "astro", manifestKeyDockerfile}, fileDockerfile)
@@ -682,16 +682,16 @@ func namedInAny(notes []string, name string) bool {
 // scaffoldManifest renders the manifest for a directory that has none, and
 // records on the Result what it chose. It returns the manifest rather than
 // writing it, so write puts every file on disk in one place.
-func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]byte, manifestFacts, error) {
-	name, nameAdvisory := chooseName(dir, opts, v1)
-	pick := pickAirflowVersion(opts.AirflowVersion, nil, v1, opts.Default)
+func scaffoldManifest(dir string, opts Options, from1x *project1x, res *Result) ([]byte, manifestFacts, error) {
+	name, nameAdvisory := chooseName(dir, opts, from1x)
+	pick := pickAirflowVersion(opts.AirflowVersion, nil, from1x, opts.Default)
 	if opts.AirflowVersion != "" {
-		if err := refuseKeptDockerfileOfAnotherAirflow(dir, v1, airflowRequirement(pick.version),
+		if err := refuseKeptDockerfileOfAnotherAirflow(dir, from1x, airflowRequirement(pick.version),
 			"--airflow-version "+opts.AirflowVersion); err != nil {
 			return nil, manifestFacts{}, err
 		}
 	}
-	pyproject, notes, err := renderPyproject(name, pick, v1)
+	pyproject, notes, err := renderPyproject(name, pick, from1x)
 	if err != nil {
 		return nil, manifestFacts{}, err
 	}
@@ -699,33 +699,33 @@ func scaffoldManifest(dir string, opts Options, v1 *v1Project, res *Result) ([]b
 	return pyproject, manifestFacts{
 		defaultedPin:   pick.defaulted(),
 		migrationNotes: notes,
-		migratedLabels: migratedLabels(v1),
+		migratedLabels: migratedLabels(from1x),
 		nameAdvisory:   nameAdvisory,
 	}, nil
 }
 
-// migratedLabels describes what a greenfield manifest absorbed from the v1 files.
+// migratedLabels describes what a greenfield manifest absorbed from the 1.x files.
 //
 // Without this the common case said nothing. A real 1.x project has no
 // pyproject.toml, so it takes the greenfield arm, where Plan hardcodes the
 // manifest's label to the filename — so `astro init` printed "pyproject.toml"
 // and never mentioned that thirty requirement lines and a list of apt packages
 // had just been moved into it. The rarer adopt arm did say so.
-func migratedLabels(v1 *v1Project) []string {
+func migratedLabels(from1x *project1x) []string {
 	var out []string
-	if n := len(v1.dependencies); n > 0 {
+	if n := len(from1x.dependencies); n > 0 {
 		out = append(out, manifest.Marker+" (migrated "+strconv.Itoa(n)+" from requirements.txt into dependencies)")
 	}
-	if len(v1.packages) > 0 {
+	if len(from1x.packages) > 0 {
 		out = append(out, manifest.Marker+" (migrated packages.txt into packages)")
 	}
-	if v1.settings.declares() {
+	if from1x.settings.declares() {
 		out = append(out, manifest.Marker+" (migrated "+SettingsRelPath+" into [tool.astro.env])")
 	}
-	out = appendLabel(out, poolsLabel(v1.settings.pools.byName))
+	out = appendLabel(out, poolsLabel(from1x.settings.pools.byName))
 
-	if v1.airflow != "" {
-		out = append(out, manifest.Marker+" (read Airflow "+v1.airflow+" from the Dockerfile)")
+	if from1x.airflow != "" {
+		out = append(out, manifest.Marker+" (read Airflow "+from1x.airflow+" from the Dockerfile)")
 	}
 	// The declaration is the one key here that changes what gets BUILT — with it
 	// the project's own Dockerfile is the image, and the dependencies and
@@ -733,7 +733,7 @@ func migratedLabels(v1 *v1Project) []string {
 	// this would show a preview whose most consequential line is missing, which
 	// is the rule Plan's own comment states: a change performed but unreported
 	// cannot be reviewed.
-	if declaresDockerfile(v1) {
+	if declaresDockerfile(from1x) {
 		out = append(out, manifest.Marker+" (declared "+fileDockerfile+" as this project's build)")
 	}
 	return out
@@ -761,8 +761,8 @@ func (p airflowPick) defaulted() bool { return p.source != "" }
 // locks for every Python requires-python allows and, with no other hint, runs
 // the newest it finds: a floor resolves for interpreters the image never runs,
 // can fail on one of them, and can start standalone on another.
-func (p airflowPick) pythonBound(v1 *v1Project) string {
-	if python := v1.buildPython(); python != "" {
+func (p airflowPick) pythonBound(from1x *project1x) string {
+	if python := from1x.buildPython(); python != "" {
 		return "==" + python + ".*"
 	}
 	if p.requiresPython != "" {
@@ -797,7 +797,7 @@ func (p airflowPick) pythonBound(v1 *v1Project) string {
 // flag.
 //
 // And requirements.txt is consulted on BOTH paths. The adopt arm passed the
-// manifest's dependencies and never looked at v1's, so the same project answered
+// manifest's dependencies and never looked at 1.x's, so the same project answered
 // differently depending on whether an unrelated pyproject.toml happened to
 // exist: greenfield read the requirements pin, adopt defaulted and then dropped
 // the pin during the merge.
@@ -809,17 +809,17 @@ func (p airflowPick) pythonBound(v1 *v1Project) string {
 // The Dockerfile sits above a requirements.txt pin because the image tag is what
 // the project runs today, while a pin in requirements.txt is what pip was asked
 // to install INTO that image.
-func pickAirflowVersion(flag string, manifestDeps []string, v1 *v1Project, def DefaultAirflow) airflowPick {
+func pickAirflowVersion(flag string, manifestDeps []string, from1x *project1x, def DefaultAirflow) airflowPick {
 	if flag != "" {
 		return airflowPick{version: flag}
 	}
 	if v, ok := pinFromDeps(manifestDeps); ok {
 		return airflowPick{version: v}
 	}
-	if v1.airflow != "" {
-		return airflowPick{version: v1.airflow}
+	if from1x.airflow != "" {
+		return airflowPick{version: from1x.airflow}
 	}
-	if v, ok := pinFromDeps(v1.dependencies); ok {
+	if v, ok := pinFromDeps(from1x.dependencies); ok {
 		return airflowPick{version: v}
 	}
 	return defaultAirflow(def)
@@ -849,7 +849,7 @@ func defaultAirflow(def DefaultAirflow) airflowPick {
 // refuses an invalid --airflow-version before this runs. [project.dependencies]
 // leads with the requirement that states the Airflow version, the only place
 // the manifest states it, so init → start needs no hand-edit.
-func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []byte, notes []string, err error) {
+func renderPyproject(name string, pick airflowPick, from1x *project1x) (pyproject []byte, notes []string, err error) {
 	version := pick.version
 	tmpl := "[project]\n" +
 		"name = 'astro-project'\n" +
@@ -864,7 +864,7 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 	if err := ed.Set([]string{"project", "name"}, name); err != nil {
 		return nil, nil, err
 	}
-	if err := ed.Set([]string{"project", "requires-python"}, pick.pythonBound(v1)); err != nil {
+	if err := ed.Set([]string{"project", "requires-python"}, pick.pythonBound(from1x)); err != nil {
 		return nil, nil, err
 	}
 	// The Airflow requirement leads, then whatever requirements.txt carried,
@@ -878,7 +878,7 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 	// guarded against it, and greenfield is the arm a real 1.x project takes.
 	deps := []any{airflowRequirement(version)}
 	seen := map[string]bool{}
-	for _, d := range v1.dependencies {
+	for _, d := range from1x.dependencies {
 		// An Airflow entry, apache-airflow or apache-airflow-core, is where
 		// `version` came from, so the generated requirement above already
 		// says it. Carrying a core entry beside it would state the version
@@ -905,12 +905,12 @@ func renderPyproject(name string, pick airflowPick, v1 *v1Project) (pyproject []
 	if err := ed.Set([]string{"project", "dependencies"}, deps); err != nil {
 		return nil, nil, err
 	}
-	if len(v1.packages) > 0 {
-		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(v1.packages)); err != nil {
+	if len(from1x.packages) > 0 {
+		if err := ed.Set([]string{"tool", "astro", "packages"}, asAny(from1x.packages)); err != nil {
 			return nil, nil, err
 		}
 	}
-	if err := setV1Declarations(ed, v1); err != nil {
+	if err := set1xDeclarations(ed, from1x); err != nil {
 		return nil, nil, err
 	}
 	data, err := ed.Bytes()
@@ -1019,19 +1019,19 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 // the reason is known: respelled, or discarded entirely, are different sizes
 // of surprise.
 //
-// Only the PROJECT's config is read, never the home one, though v1 resolved
+// Only the PROJECT's config is read, never the home one, though the 1.x CLI resolved
 // this key with a fallback to it. A global project.name would otherwise rename
 // every project converted on that machine to the same thing, which is a worse
 // answer than the directory in every case where the two differ.
-func chooseName(dir string, opts Options, v1 *v1Project) (name, advisory string) {
+func chooseName(dir string, opts Options, from1x *project1x) (name, advisory string) {
 	if opts.Name != "" {
 		return opts.Name, ""
 	}
-	if v1 == nil || v1.projectName == "" {
+	if from1x == nil || from1x.projectName == "" {
 		return deriveName(dir), ""
 	}
 
-	stated := v1.projectName
+	stated := from1x.projectName
 	legal := sanitizeName(stated)
 	switch {
 	case legal == stated:
@@ -1044,7 +1044,7 @@ func chooseName(dir string, opts Options, v1 *v1Project) (name, advisory string)
 		// maps every rune a [project] name cannot hold, which is most
 		// punctuation and everything non-ASCII. So the advisory shows the two
 		// names and lets them speak.
-		return legal, "named " + legal + ", from " + stated + " in " + v1ConfigRelPath +
+		return legal, "named " + legal + ", from " + stated + " in " + config1xRelPath +
 			": a [project] name holds lower-case letters, digits, and - _ . only"
 
 	default:
@@ -1053,7 +1053,7 @@ func chooseName(dir string, opts Options, v1 *v1Project) (name, advisory string)
 		// name was discarded rather than respelled.
 		fallback := deriveName(dir)
 		return fallback, "named " + fallback + " after the directory: " + stated +
-			" in " + v1ConfigRelPath + " has nothing a [project] name can hold, " +
+			" in " + config1xRelPath + " has nothing a [project] name can hold, " +
 			"which is lower-case letters, digits, and - _ ."
 	}
 }
@@ -1106,7 +1106,7 @@ func sanitizeName(s string) string {
 // alive after the manifest had already taken its pin. The comment further down
 // this file flags that hazard for environment variable names; this is the same
 // one, arriving through a different door.
-func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes, forRetirement []string) {
+func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (notes, forRetirement []string) {
 	// requirements.txt, packages.txt, the Dockerfile, airflow_settings.yaml and
 	// .astro/config.yaml are READ now, so none of them is matched on presence
 	// here: whatever they could not carry is a note from the reader that says
@@ -1120,7 +1120,7 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	// the same on every platform: filepath.Join once reported
 	// `.astro\config.yaml` on Windows while the other names in the same list
 	// were slash-form, one contract disagreeing with itself.
-	// v1ConfigRelPath, the only nested name emitted now, is that same kind of
+	// config1xRelPath, the only nested name emitted now, is that same kind of
 	// constant and is concatenated rather than joined.
 	var out []string
 	// Reported on the target being there, never on the file being there. The
@@ -1136,15 +1136,15 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	var deployNote string
 	// A target the conversion linked (setDeployLink) is carried, so it is an
 	// advisory rather than a note; only one it could not link is left to do.
-	if _, linked := v1.deployLink(); v1.deployment != "" && !linked {
-		deployNote = v1ConfigRelPath + ": " + deployTargetNote(v1.deployment, v1.workspace)
+	if _, linked := from1x.deployLink(); from1x.deployment != "" && !linked {
+		deployNote = config1xRelPath + ": " + deployTargetNote(from1x.deployment, from1x.workspace)
 		out = append(out, deployNote)
 	}
 	// Kept out of forRetirement for the reason deployNote is: planRetirements
 	// matches file names as substrings of notes, and link names are the user's.
 	var linksNote string
-	if len(v1.instances) > 0 {
-		linksNote = v1ConfigRelPath + ": " + instancesNote(v1.instances)
+	if len(from1x.instances) > 0 {
+		linksNote = config1xRelPath + ": " + instancesNote(from1x.instances)
 		out = append(out, linksNote)
 	}
 	checks := []struct{ file, note string }{
@@ -1163,13 +1163,13 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 	// in a Dockerfile image tag, and most of those are on 2.x, so the default
 	// is the likeliest way this ends up a project that cannot start.
 	//
-	// v1.statedVersion is now what gates this rather than the presence of a
+	// from1x.statedVersion is now what gates this rather than the presence of a
 	// Dockerfile or a requirements.txt. Presence used to stand in for "we did
 	// not read it", and that is no longer true: a Dockerfile whose tag we read
 	// leaves defaultedPin false, and one whose tag we could not read has
 	// already said so in its own note. What is left for this warning is the
 	// case where a file named a version and we still ended up defaulting.
-	if facts.defaultedPin && v1.statedVersion {
+	if facts.defaultedPin && from1x.statedVersion {
 		out = append([]string{"Airflow " + version + " is the default, not this project's version: " +
 			"set the " + airflowRequirement(version) + " requirement in " + manifest.Marker +
 			" to the Airflow this project already names"}, out...)
@@ -1188,7 +1188,7 @@ func leftovers(dir, version string, facts *manifestFacts, v1 *v1Project) (notes,
 // instancesNote names the deployment links .astro/config.yaml's `instances:`
 // list holds and the command that links each one. A name or id that is not
 // plain is not printed, for the reason deployTargetNote gives.
-func instancesNote(instances []v1Instance) string {
+func instancesNote(instances []instance1x) string {
 	cmds := make([]string, 0, len(instances))
 	for _, inst := range instances {
 		name, id := "<name>", "<id>"

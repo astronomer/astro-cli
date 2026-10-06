@@ -63,7 +63,7 @@ func cloudConn(id, password string) astrov1.EnvironmentObject {
 // holds keeps the vault's credentials.
 func (s *ConfigSuite) TestStartAddsWorkspaceConnectionsBelowTheVault() {
 	warehouses, vault := s.prepareLaunch()
-	cwd := s.chdirV2Project("workspace-project")
+	cwd := s.chdirManifestProject("workspace-project")
 	canon, err := localrt.CanonicalPath(cwd)
 	s.Require().NoError(err)
 	s.putConn(vault, canon, pg("own", "own-pw"))
@@ -92,7 +92,7 @@ func (s *ConfigSuite) TestStartAddsWorkspaceConnectionsBelowTheVault() {
 // with the vault's.
 func (s *ConfigSuite) TestStartWithoutTheWorkspaceWhenItCannotBeRead() {
 	warehouses, vault := s.prepareLaunch()
-	cwd := s.chdirV2Project("offline-project")
+	cwd := s.chdirManifestProject("offline-project")
 	s.putConn(vault, secrets.GlobalScope, pg("everywhere", "everywhere-pw"))
 	s.linkWorkspace(cwd, true)
 

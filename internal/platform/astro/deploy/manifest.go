@@ -11,10 +11,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
-// DagDeployV2Input is the resolved input for a project's dags-only deploy.
-// The deployment is already chosen; this reuses the v1 dags transport (create
+// ManifestDagDeployInput is the resolved input for a project's dags-only deploy.
+// The deployment is already chosen; this reuses the 1.x path's dags transport (create
 // deploy, upload the tarball, finalize) against the project's dags/ directory.
-type DagDeployV2Input struct {
+type ManifestDagDeployInput struct {
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment lives on; nil is the current context.
 	Login *config.Context
@@ -27,35 +27,35 @@ type DagDeployV2Input struct {
 	WaitTime      time.Duration
 }
 
-// DagDeployV2Result reports the outcome for cmd to render.
-type DagDeployV2Result struct {
+// ManifestDagDeployResult reports the outcome for cmd to render.
+type ManifestDagDeployResult struct {
 	WorkspaceID       string
 	RuntimeVersion    string
 	DagTarballVersion string
 	URL               string
-	Git               DeployGitV2
+	Git               ManifestDeployGit
 }
 
-// DeployGitV2 is what a manifest deploy recorded about the commit it shipped.
-type DeployGitV2 struct {
+// ManifestDeployGit is what a manifest deploy recorded about the commit it shipped.
+type ManifestDeployGit struct {
 	// Commit is the git metadata sent with the deploy, nil when none was.
 	Commit      *astrov1.CreateDeployGitRequest
 	Uncommitted bool
 }
 
-// readDeployGitV2 reads the git metadata a manifest deploy records, under v1's
+// readManifestDeployGit reads the git metadata a manifest deploy records, under the 1.x path's
 // rules: none when deploy.git_metadata is off, and none when the tree has
 // uncommitted changes, since HEAD would not describe the files deployed. The
 // commit message comes back as the description fallback.
-func readDeployGitV2(projectDir string) (info DeployGitV2, commitMessage string) {
+func readManifestDeployGit(projectDir string) (info ManifestDeployGit, commitMessage string) {
 	if !config.CFG.DeployGitMetadata.GetBool() {
-		return DeployGitV2{}, ""
+		return ManifestDeployGit{}, ""
 	}
 	if git.HasUncommittedChanges(projectDir) {
-		return DeployGitV2{Uncommitted: true}, ""
+		return ManifestDeployGit{Uncommitted: true}, ""
 	}
 	commit, message := readHeadGitMetadata(projectDir)
-	return DeployGitV2{Commit: commit}, message
+	return ManifestDeployGit{Commit: commit}, message
 }
 
 func descriptionOrCommitMessage(description, commitMessage string) string {
@@ -65,36 +65,36 @@ func descriptionOrCommitMessage(description, commitMessage string) string {
 	return commitMessage
 }
 
-// DeployDagsV2 deploys only the dags/ directory of a project to an already
+// DeployManifestDags deploys only the dags/ directory of a project to an already
 // resolved deployment. It reads the runtime version and type from the
 // server-side deployment — a project ships no image, so a dags-only deploy
-// must fit the image already running — then reuses the v1 dags transport.
+// must fit the image already running — then reuses the 1.x path's dags transport.
 //
-// Unlike the v1 Deploy(), it neither prints nor exits: it returns a result for
+// Unlike the 1.x path's Deploy(), it neither prints nor exits: it returns a result for
 // cmd to render, so the path stays cancellable and ready for --output json. It
 // reuses createDeploy and deployDags as they are, and finalizes through a
-// print-free helper rather than the v1 finalizeDeploy, which prints.
-func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDeployV2Result, error) {
+// print-free helper rather than the 1.x path's finalizeDeploy, which prints.
+func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClient) (ManifestDagDeployResult, error) {
 	c, err := loginOrCurrent(in.Login)
 	if err != nil {
-		return DagDeployV2Result{}, err
+		return ManifestDagDeployResult{}, err
 	}
 
 	// Read the deployment's server-side facts: runtime version and type drive
 	// the dags transport, and the flags gate the deploy.
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
-		return DagDeployV2Result{}, err
+		return ManifestDagDeployResult{}, err
 	}
 
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
-		return DagDeployV2Result{}, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
+		return ManifestDagDeployResult{}, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}
 	if !dep.IsDagDeployEnabled {
-		return DagDeployV2Result{}, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
+		return ManifestDagDeployResult{}, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
 	}
 
-	gitInfo, commitMessage := readDeployGitV2(in.ProjectDir)
+	gitInfo, commitMessage := readManifestDeployGit(in.ProjectDir)
 	description := descriptionOrCommitMessage(in.Description, commitMessage)
 	created, err := createDeploy(dep.OrganizationId, dep.Id, astrov1.CreateDeployRequest{
 		Description: &description,
@@ -102,25 +102,25 @@ func DeployDagsV2(in DagDeployV2Input, astroV1Client astrov1.APIClient) (DagDepl
 		Git:         gitInfo.Commit,
 	}, astroV1Client)
 	if err != nil {
-		return DagDeployV2Result{}, explainHibernating(err, &dep)
+		return ManifestDagDeployResult{}, explainHibernating(err, &dep)
 	}
 
 	tarballVersion, err := uploadDeployDags(&c, in.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 	if err != nil {
-		return DagDeployV2Result{}, err
+		return ManifestDagDeployResult{}, err
 	}
 
-	if err := finalizeDeployV2(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
-		return DagDeployV2Result{}, err
+	if err := finalizeManifestDeploy(dep.OrganizationId, dep.Id, created.Id, tarballVersion, astroV1Client); err != nil {
+		return ManifestDagDeployResult{}, err
 	}
 
 	if in.Wait {
 		if err := deployment.HealthPollIn(dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
-			return DagDeployV2Result{}, err
+			return ManifestDagDeployResult{}, err
 		}
 	}
 
-	return DagDeployV2Result{
+	return ManifestDagDeployResult{
 		WorkspaceID:       dep.WorkspaceId,
 		RuntimeVersion:    dep.AstroRuntimeVersion,
 		DagTarballVersion: tarballVersion,

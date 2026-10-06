@@ -23,11 +23,11 @@ var astroIDRe = regexp.MustCompile(`^c[a-z0-9]{24}$`)
 // cmd/apc/deploy.go saves there, and the id shape is what tells the two apart.
 // A link needs a workspace to parse, and the conversion has no login to look
 // one up with, so a saved target without one stays a note.
-func (v1 *v1Project) deployLink() (Link, bool) {
-	if !astroIDRe.MatchString(v1.deployment) || !astroIDRe.MatchString(v1.workspace) {
+func (from1x *project1x) deployLink() (Link, bool) {
+	if !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
 		return Link{}, false
 	}
-	return Link{Name: V1LinkName, Kind: manifest.KindAstro, Deployment: v1.deployment, Workspace: v1.workspace}, true
+	return Link{Name: V1LinkName, Kind: manifest.KindAstro, Deployment: from1x.deployment, Workspace: from1x.workspace}, true
 }
 
 // setDeployLink writes the saved deploy target as a link marked default, with
@@ -37,8 +37,8 @@ func (v1 *v1Project) deployLink() (Link, bool) {
 // exactly true: both arms only reach here for a file with no [tool.astro] of
 // its own, so there is no workspace, target or link for the new one to inherit
 // or keep.
-func setDeployLink(ed tomledit.Editor, v1 *v1Project) error {
-	l, ok := v1.deployLink()
+func setDeployLink(ed tomledit.Editor, from1x *project1x) error {
+	l, ok := from1x.deployLink()
 	if !ok {
 		return nil
 	}
@@ -52,11 +52,11 @@ func setDeployLink(ed tomledit.Editor, v1 *v1Project) error {
 }
 
 // deployLinkAdvisory says what setDeployLink wrote, or "" when it wrote nothing.
-func (v1 *v1Project) deployLinkAdvisory() string {
-	l, ok := v1.deployLink()
+func (from1x *project1x) deployLinkAdvisory() string {
+	l, ok := from1x.deployLink()
 	if !ok {
 		return ""
 	}
-	return v1ConfigRelPath + ": its saved deploy target is now the " + l.Name + " link in " + manifest.Marker +
+	return config1xRelPath + ": its saved deploy target is now the " + l.Name + " link in " + manifest.Marker +
 		" ([tool.astro.deployments." + l.Name + "], deployment " + l.Deployment + " in workspace " + l.Workspace + ")"
 }

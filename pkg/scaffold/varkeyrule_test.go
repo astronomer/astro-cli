@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A v1 variable whose key starts with a digit cannot be stored as an Airflow
+// A 1.x variable whose key starts with a digit cannot be stored as an Airflow
 // Variable, so the conversion refuses to carry the file and names the key.
 func TestAVariableKeyWithALeadingDigitIsNotCarried(t *testing.T) {
-	dir := v1WithSettings(t, `airflow:
+	dir := project1xWithSettings(t, `airflow:
   variables:
     - variable_name: 1st_run
       variable_value: "yes"

@@ -31,7 +31,7 @@ func TestDockerModeRefusesADockerfileNotOnARuntimeBase(t *testing.T) {
 
 	p := newNamedProject(t, "oddbase")
 	p.run("init", "--name", "oddbase").requireSuccess()
-	// The ordinary OSS Airflow image: not an Astro Runtime, and the shape a v1
+	// The ordinary OSS Airflow image: not an Astro Runtime, and the shape a 1.x
 	// repo brings.
 	write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM apache/airflow:2.9.3\n")
 	declareDockerfile(t, p)
