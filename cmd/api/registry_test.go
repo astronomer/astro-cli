@@ -269,6 +269,7 @@ func TestRegistryCmd_Execute_SilentMode(t *testing.T) {
 }
 
 func TestRegistryCmd_Execute_OperationID(t *testing.T) {
+	isolateSpecCache(t)
 	// Serve the OpenAPI spec for operation ID resolution
 	specJSON := `{
 		"openapi": "3.0.0",
@@ -370,6 +371,7 @@ func TestRegistryCmd_Execute_Template(t *testing.T) {
 }
 
 func TestRegistryCmd_Execute_NoArgs_ShowsHelp(t *testing.T) {
+	isolateSpecCache(t)
 	// When run with no args and the spec isn't reachable, it should fall back gracefully.
 	// We test that it attempts to show interactive guidance.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -967,6 +967,28 @@ func TestDeploymentCreate(t *testing.T) {
 		assert.NoError(t, err)
 		m.AssertExpectations(t)
 	})
+	t.Run("takes a scheduler size in any case", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectStandardCreate(m, func(r astrov1.CreateStandardDeploymentRequest) bool {
+			return r.SchedulerSize != nil && *r.SchedulerSize == astrov1.CreateStandardDeploymentRequestSchedulerSizeEXTRALARGE
+		})
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--region", "us-central1", "--scheduler-size", "EXTRA_Large")
+		assert.NoError(t, err)
+		m.AssertExpectations(t)
+	})
+	// A size create does not know was dropped from the request, and the
+	// create succeeded with whatever size the API chose.
+	t.Run("refuses an unknown scheduler size before any request", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t) // no expectations: any API call fails the test
+		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--type", "dedicated", "--scheduler-size", "extra-large")
+		require.Error(t, err)
+		assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(t.Context(), err), "%v", err)
+		assert.ErrorContains(t, err, `"extra-large"`)
+		assert.ErrorContains(t, err, "small, medium, large, extra_large")
+		m.AssertExpectations(t)
+	})
 	t.Run("creates a hosted deployment with workload identity", func(t *testing.T) {
 		setHostedOrg(t, ws)
 		m := newCreateUpdateMock(t)
@@ -1136,6 +1158,27 @@ func TestDeploymentUpdate(t *testing.T) {
 		}))
 		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra_large", "--yes")
 		assert.NoError(t, err)
+		m.AssertExpectations(t)
+	})
+	t.Run("takes a scheduler size in any case", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t)
+		expectUpdate(m, &hostedDeploymentResponse, standardUpdate(func(r astrov1.UpdateStandardDeploymentRequest) bool {
+			return r.SchedulerSize == astrov1.UpdateStandardDeploymentRequestSchedulerSizeMEDIUM
+		}))
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "Medium", "--yes")
+		assert.NoError(t, err)
+		m.AssertExpectations(t)
+	})
+	// Update sent an empty size for one it did not know.
+	t.Run("refuses an unknown scheduler size before any request", func(t *testing.T) {
+		setHostedOrg(t, ws)
+		m := newCreateUpdateMock(t) // no expectations: any API call fails the test
+		_, err := execDeploymentCmd("update", "test-id-1", "--name", "test-name", "--workspace-id", ws, "--scheduler-size", "extra-large", "--yes")
+		require.Error(t, err)
+		assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(t.Context(), err), "%v", err)
+		assert.ErrorContains(t, err, `"extra-large"`)
+		assert.ErrorContains(t, err, "small, medium, large, extra_large")
 		m.AssertExpectations(t)
 	})
 	t.Run("updates a hosted deployment with workload identity", func(t *testing.T) {

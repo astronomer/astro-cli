@@ -739,6 +739,9 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
+	if err := normalizeSchedulerSizeFlag(); err != nil {
+		return err
+	}
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -854,6 +857,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+	if err := normalizeSchedulerSizeFlag(); err != nil {
+		return err
+	}
 	// Find Workspace ID
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -908,6 +914,22 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client)
+}
+
+// normalizeSchedulerSizeFlag refuses a --scheduler-size that is not a size,
+// before anything is asked of the API, and lowercases one that is. Create
+// and Update match the lowercase spelling and send no size for anything
+// else, so --scheduler-size extra-large used to succeed having set nothing.
+func normalizeSchedulerSizeFlag() error {
+	if schedulerSize == "" {
+		return nil
+	}
+	size, ok := deployment.NormalizeSchedulerSize(schedulerSize)
+	if !ok {
+		return cliout.Usage(fmt.Errorf("invalid --scheduler-size %q: use one of %s", schedulerSize, strings.Join(deployment.SchedulerSizes, ", ")))
+	}
+	schedulerSize = size
+	return nil
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string) error {

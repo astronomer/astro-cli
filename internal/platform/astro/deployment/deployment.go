@@ -2193,6 +2193,25 @@ func ConvertWorkerQueues[T any](workerQueues []astrov1.WorkerQueue, convertFn fu
 	return result
 }
 
+// SchedulerSizes are the scheduler sizes a hosted Deployment takes, spelled as
+// --scheduler-size and a deployment file's scheduler_size accept them: the
+// API's enum, lowercased.
+var SchedulerSizes = []string{
+	strings.ToLower(string(astrov1.DeploymentSchedulerSizeSMALL)),
+	strings.ToLower(string(astrov1.DeploymentSchedulerSizeMEDIUM)),
+	strings.ToLower(string(astrov1.DeploymentSchedulerSizeLARGE)),
+	strings.ToLower(string(astrov1.DeploymentSchedulerSizeEXTRALARGE)),
+}
+
+// NormalizeSchedulerSize returns size as Create and Update match it, in
+// lowercase, and whether it is one of SchedulerSizes. The match ignores case,
+// as an executor's or a cloud provider's does. An unknown size is the
+// caller's to refuse: Create and Update would send no size for it.
+func NormalizeSchedulerSize(size string) (string, bool) {
+	lower := strings.ToLower(size)
+	return lower, slices.Contains(SchedulerSizes, lower)
+}
+
 func IsValidExecutor(executor, runtimeVersion, deploymentType string) bool {
 	validExecutors := []string{
 		KubeExecutor,

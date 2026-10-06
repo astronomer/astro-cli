@@ -770,6 +770,12 @@ func checkRequiredFields(deploymentFromFile *inspect.FormattedDeployment, action
 	if !deployment.IsValidExecutor(deploymentFromFile.Deployment.Configuration.Executor, deploymentFromFile.Deployment.Configuration.RunTimeVersion, deploymentFromFile.Deployment.Configuration.DeploymentType) {
 		return fmt.Errorf("executor %s %w. It can be CeleryExecutor, KubernetesExecutor, or AstroExecutor", deploymentFromFile.Deployment.Configuration.Executor, errInvalidValue)
 	}
+	// an unknown scheduler size would otherwise be dropped from the request
+	if size := deploymentFromFile.Deployment.Configuration.SchedulerSize; size != "" {
+		if _, ok := deployment.NormalizeSchedulerSize(size); !ok {
+			return fmt.Errorf("scheduler_size %s %w. It can be %s", size, errInvalidValue, strings.Join(deployment.SchedulerSizes, ", "))
+		}
+	}
 	// if alert emails are requested
 	if hasAlertEmails(deploymentFromFile) {
 		err := checkAlertEmails(deploymentFromFile)

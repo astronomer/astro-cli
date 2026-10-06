@@ -17,9 +17,28 @@ import (
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
-// initTestConfig initializes the config with an in-memory filesystem for tests.
+// isolateSpecCache points the OpenAPI spec cache, which lives in
+// config.HomeConfigPath and is read and written through the real filesystem,
+// at a directory of this test's own. Without it a test reads and writes the
+// developer's ~/.astro: a remote spec is cached under a name derived from its
+// URL, an httptest URL differs only by its port, and a cache entry that an
+// earlier run left for the same port is served for 24 hours without any
+// request being made.
+func isolateSpecCache(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("ASTRO_HOME", home) // what config.InitConfig derives HomeConfigPath from
+	origPath, origFile := config.HomeConfigPath, config.HomeConfigFile
+	config.HomeConfigPath = filepath.Join(home, config.ConfigDir)
+	config.HomeConfigFile = filepath.Join(config.HomeConfigPath, config.ConfigFileNameWithExt)
+	t.Cleanup(func() { config.HomeConfigPath, config.HomeConfigFile = origPath, origFile })
+}
+
+// initTestConfig initializes the config with an in-memory filesystem for tests,
+// and gives the test a spec cache of its own.
 func initTestConfig(t *testing.T) {
 	t.Helper()
+	isolateSpecCache(t)
 	fs := afero.NewMemMapFs()
 	configRaw := []byte(`context: astronomer_io
 contexts:

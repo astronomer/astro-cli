@@ -581,6 +581,7 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 // --deployment falls through to an Astro Deployment id for a name no link
 // declares.
 func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
+	isolateSpecCache(t)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	ctx, err := config.GetCurrentContext()
 	require.NoError(t, err)
@@ -843,6 +844,7 @@ func TestRunAirflow_ConnectionRefused(t *testing.T) {
 }
 
 func TestRunAirflow_ConnectionRefused_OperationID(t *testing.T) {
+	isolateSpecCache(t)
 	// Verify friendly error also works when using an operation ID
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	closedURL := ts.URL
