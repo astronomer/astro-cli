@@ -8,12 +8,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/mattn/go-isatty"
 	jsoncolor "github.com/neilotoole/jsoncolor"
-	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-// Format represents the output format type
+// Format is the rendering a Printer draws. It is not parsed here: the cmd
+// layer parses -o/--output with cliout.ParseFormat, the one parser, and
+// converts the result. A pkg/ package cannot import cmd/ to take its type.
 type Format string
 
 const (
@@ -196,32 +197,6 @@ func (p *Printer) printJSON(data any) error {
 	}
 
 	return enc.Encode(data)
-}
-
-// ParseFormat validates an --output flag value. The wording matches the
-// astro local tree's, so every command rejects a bad -o the same way.
-func ParseFormat(s string) (Format, error) {
-	switch Format(s) {
-	case FormatText, FormatJSON:
-		return Format(s), nil
-	default:
-		return "", fmt.Errorf("unknown output format %q (supported: text, json)", s)
-	}
-}
-
-// Flags holds the output flag value for a command.
-type Flags struct {
-	Format string
-}
-
-// AddFlags registers --output/-o on a cobra command.
-func (f *Flags) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&f.Format, "output", "o", string(FormatText), "Output format: text or json")
-}
-
-// Resolve returns the parsed Format from the flag value.
-func (f *Flags) Resolve() (Format, error) {
-	return ParseFormat(f.Format)
 }
 
 // PrintData fetches data via fetchFn and renders it using the given table config, format, and writer.

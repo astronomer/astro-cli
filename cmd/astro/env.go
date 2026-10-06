@@ -3,7 +3,6 @@ package astro
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -31,35 +30,13 @@ func autoLinkPtr(cmd *cobra.Command) *bool {
 	return &envAutoLink
 }
 
-// addOutputFlag wires -o/--output onto an `astro env` command that renders
-// what it read. It is the format, as everywhere else in the CLI. It used to be
-// a file path here, with the format on --format, which made `--output json`
+// formatDotenv is the -o value the environment-variable reads offer beyond
+// text and json, declared to cliout as an extra on those commands only: an
+// environment variable is the one kind with the KEY=VALUE shape a .env file
+// is made of. -o is the format here, as everywhere else in the CLI. It used
+// to be a file path, with the format on --format, which made `--output json`
 // quietly write a file named json.
-func addOutputFlag(cmd *cobra.Command, supported []env.Format) {
-	addOutputFlagTo(cmd, &envOutput, supported)
-}
-
-// addOutputFlagTo is addOutputFlag for a command that keeps its flag values
-// off the shared package variables, as the link groups do.
-func addOutputFlagTo(cmd *cobra.Command, target *string, supported []env.Format) {
-	names := make([]string, len(supported))
-	for i, f := range supported {
-		names[i] = string(f)
-	}
-	usage := "Output format: " + strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
-	cmd.Flags().StringVarP(target, "output", "o", string(env.FormatText), usage)
-}
-
-// parseOutput is env.ParseFormat with a bad value marked as a usage error, so
-// it exits 2 and publishes kind usage like a bad --output anywhere else. The
-// platform package cannot mark it itself: internal/ never imports cmd/.
-func parseOutput(s string, supported []env.Format) (env.Format, error) {
-	f, err := env.ParseFormat(s, supported)
-	if err != nil {
-		return "", cliout.Usage(err)
-	}
-	return f, nil
-}
+const formatDotenv = cliout.Format(env.FormatDotenv)
 
 // addScopePersistentFlags wires the workspace/deployment scope flags onto a
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
@@ -155,7 +132,7 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 			return runEnvList(cmd, out)
 		},
 	}
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	// The scope flags are persistent on each noun rather than on `env`, so a
 	// command sitting directly under the group has to register its own. They
 	// are worded exactly as addScopePersistentFlags words them, and the
@@ -183,7 +160,7 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 		cmd.SilenceUsage = true
 		return cliout.Usage(env.ErrInventoryHasNoValues)
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -193,7 +170,7 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteInventory(items, f, out)
+	return env.WriteInventory(items, env.Format(f), out)
 }
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 	"github.com/astronomer/astro-cli/pkg/connmodel"
@@ -62,7 +63,7 @@ func newEnvConnListCmd(out io.Writer) *cobra.Command {
 			return runEnvConnList(cmd, out)
 		},
 	}
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
@@ -75,7 +76,7 @@ func newEnvConnGetCmd(out io.Writer) *cobra.Command {
 			return runEnvConnGet(cmd, out, args[0])
 		},
 	}
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
@@ -144,7 +145,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -157,7 +158,7 @@ func runEnvConnList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteConnList(objs, f, out)
+	return env.WriteConnList(objs, env.Format(f), out)
 }
 
 func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -165,7 +166,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -175,7 +176,7 @@ func runEnvConnGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteConn(obj, f, out)
+	return env.WriteConn(obj, env.Format(f), out)
 }
 
 // runEnvConnSet upserts. Update is tried first and a not-found falls through

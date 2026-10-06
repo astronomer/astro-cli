@@ -14,21 +14,16 @@ import (
 )
 
 // Format selects how an `astro env` command renders what it read: the
-// value of -o/--output.
+// value of -o/--output. It is not parsed here: the cmd layer parses the flag
+// with cliout.ParseFormat, the one parser, declaring dotenv as an extra where
+// the command offers it, and converts the result. internal/ never imports
+// cmd/, so this package cannot take cliout's type.
 type Format string
 
 const (
 	FormatText   Format = "text"
 	FormatJSON   Format = "json"
 	FormatDotenv Format = "dotenv"
-)
-
-// The formats a command accepts. Every `astro env` read takes text and json;
-// the environment-variable reads take dotenv too, since only an environment
-// variable has the KEY=VALUE shape a .env file is made of.
-var (
-	TextOrJSON     = []Format{FormatText, FormatJSON}
-	TextJSONDotenv = []Format{FormatText, FormatJSON, FormatDotenv}
 )
 
 const (
@@ -56,28 +51,12 @@ func clampTableValue(s string) string {
 	return s
 }
 
-// ParseFormat validates an -o/--output value against the formats a command
-// supports.
-func ParseFormat(s string, supported []Format) (Format, error) {
-	if slices.Contains(supported, Format(s)) {
-		return Format(s), nil
-	}
-	return "", unsupportedFormat(s, supported)
-}
-
-// unsupportedFormat is the one wording for a format a command does not take,
-// whether the flag parser or a writer is the one refusing it.
-func unsupportedFormat(s string, supported []Format) error {
-	names := make([]string, len(supported))
-	for i, f := range supported {
-		names[i] = string(f)
-	}
-	return fmt.Errorf("unknown output format %q (supported: %s)", s, strings.Join(names, ", "))
-}
-
 // write renders v as f. JSON is v itself; text draws the human view of it;
 // dotenv draws the .env view, and is nil for a value that has none, which
 // refuses the format. Every Write* below is this with its own renderers.
+//
+// The refusal is a guard for a caller that skipped the parse, not the
+// message a user sees: the command has already rejected an unknown -o.
 func write(out io.Writer, f Format, v any, text, dotenv func(io.Writer) error) error {
 	switch {
 	case f == FormatText:
@@ -87,10 +66,7 @@ func write(out io.Writer, f Format, v any, text, dotenv func(io.Writer) error) e
 	case f == FormatDotenv && dotenv != nil:
 		return dotenv(out)
 	}
-	if dotenv != nil {
-		return unsupportedFormat(string(f), TextJSONDotenv)
-	}
-	return unsupportedFormat(string(f), TextOrJSON)
+	return fmt.Errorf("unsupported output format: %s", f)
 }
 
 var errNilObject = errors.New("nil environment object")

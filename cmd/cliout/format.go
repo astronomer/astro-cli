@@ -13,6 +13,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -25,21 +27,40 @@ const (
 	FormatJSON Format = "json"
 )
 
-// ParseFormat validates an --output flag value. A value it does not know is a
-// usage error: the command was invoked wrongly, and nothing ran.
-func ParseFormat(s string) (Format, error) {
-	switch Format(s) {
-	case FormatText, FormatJSON:
-		return Format(s), nil
-	default:
-		return "", Usage(fmt.Errorf("unknown output format %q (supported: text, json)", s))
+// ParseFormat validates an --output flag value against text, json and the
+// extras the command declared when it registered the flag. A value it does
+// not know is a usage error: the command was invoked wrongly, and nothing ran.
+//
+// This is the one place --output is parsed. A command that renders through a
+// package below cmd/ converts the result to that package's own format type at
+// the call site (env.Format(f), output.Format(f)): those packages may not
+// import cmd/, so they cannot take a Format, and their writers only render.
+func ParseFormat(s string, extras ...Format) (Format, error) {
+	f := Format(s)
+	if f == FormatText || f == FormatJSON || slices.Contains(extras, f) {
+		return f, nil
 	}
+	return "", Usage(fmt.Errorf("unknown output format %q (supported: %s)", s, strings.Join(formatNames(extras), ", ")))
 }
 
 // AddOutputFlag registers the shared --output flag on cmd's persistent flags,
-// so one registration covers a whole command family.
-func AddOutputFlag(cmd *cobra.Command, target *string) {
-	cmd.PersistentFlags().StringVarP(target, "output", "o", string(FormatText), "Output format: text or json")
+// so one registration covers a whole command family. A command that offers a
+// format beyond text and json for a special use (dotenv for `astro env
+// variable list`, yaml for `astro deployment inspect`) names it as an extra,
+// and passes the same extras to ParseFormat.
+func AddOutputFlag(cmd *cobra.Command, target *string, extras ...Format) {
+	names := formatNames(extras)
+	usage := "Output format: " + strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+	cmd.PersistentFlags().StringVarP(target, "output", "o", string(FormatText), usage)
+}
+
+// formatNames lists text, json and the extras, in that order.
+func formatNames(extras []Format) []string {
+	names := []string{string(FormatText), string(FormatJSON)}
+	for _, f := range extras {
+		names = append(names, string(f))
+	}
+	return names
 }
 
 // Renderer writes command results. Emit is the single output path: json mode

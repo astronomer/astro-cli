@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
@@ -57,7 +58,7 @@ func newEnvAirflowVarListCmd(out io.Writer) *cobra.Command {
 			return runEnvAirflowVarList(cmd, out)
 		},
 	}
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
@@ -70,7 +71,7 @@ func newEnvAirflowVarGetCmd(out io.Writer) *cobra.Command {
 			return runEnvAirflowVarGet(cmd, out, args[0])
 		},
 	}
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
@@ -122,7 +123,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteAirflowVarList(objs, f, envIncludeSecrets, out)
+	return env.WriteAirflowVarList(objs, env.Format(f), envIncludeSecrets, out)
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -143,7 +144,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -153,7 +154,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	return env.WriteAirflowVar(obj, f, envIncludeSecrets, out)
+	return env.WriteAirflowVar(obj, env.Format(f), envIncludeSecrets, out)
 }
 
 func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {

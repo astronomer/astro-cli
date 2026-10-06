@@ -6,18 +6,19 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/output"
 )
 
 var (
-	bundleName            string
-	bundleMountPath       string
-	bundleNonDagType      string
-	bundleDescription     string
-	bundleDagBundleIDs    []string
-	forceBundleDelete     bool
-	bundleListOutputFlags output.Flags
+	bundleName         string
+	bundleMountPath    string
+	bundleNonDagType   string
+	bundleDescription  string
+	bundleDagBundleIDs []string
+	forceBundleDelete  bool
+	bundleListOutput   string
 )
 
 func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
@@ -75,7 +76,7 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro deployment bundle list --deployment-id <id>
   astro deployment bundle list --deployment-id <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := resolveOutput(&bundleListOutputFlags)
+			format, err := cliout.ParseFormat(bundleListOutput)
 			if err != nil {
 				return err
 			}
@@ -84,10 +85,10 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.ListBundlesWithFormat(ws, deploymentID, format, out, astroV1Client, astroV1Alpha1Client)
+			return deployment.ListBundlesWithFormat(ws, deploymentID, output.Format(format), out, astroV1Client, astroV1Alpha1Client)
 		},
 	}
-	bundleListOutputFlags.AddFlags(cmd)
+	cliout.AddOutputFlag(cmd, &bundleListOutput)
 	return cmd
 }
 

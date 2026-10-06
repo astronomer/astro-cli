@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
@@ -144,7 +145,7 @@ func newEnvVarLinkListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addLinkVariableFlags(cmd)
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
@@ -215,7 +216,7 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -229,5 +230,5 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteVarLinks(report, f, envIncludeSecrets, out)
+	return env.WriteVarLinks(report, env.Format(f), envIncludeSecrets, out)
 }

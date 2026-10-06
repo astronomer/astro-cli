@@ -7,28 +7,6 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
-func (s *Suite) TestParseFormat() {
-	for _, in := range []Format{FormatText, FormatJSON, FormatDotenv} {
-		got, err := ParseFormat(string(in), TextJSONDotenv)
-		s.NoError(err, "input %q", in)
-		s.Equal(in, got, "input %q", in)
-	}
-
-	// dotenv only where the command offers it.
-	_, err := ParseFormat("dotenv", TextOrJSON)
-	s.EqualError(err, `unknown output format "dotenv" (supported: text, json)`)
-
-	// yaml went with v2; "" is not a silent text.
-	for _, in := range []string{"yaml", "xml", ""} {
-		_, err := ParseFormat(in, TextJSONDotenv)
-		s.EqualError(err, `unknown output format "`+in+`" (supported: text, json, dotenv)`, "input %q", in)
-	}
-
-	// table went too; text renders it.
-	_, err = ParseFormat("table", TextOrJSON)
-	s.EqualError(err, `unknown output format "table" (supported: text, json)`)
-}
-
 // An empty scope lists nothing, and nothing is [] in json, not null: a script
 // loops over -o json without a null check. The lists arrive nil from the pager.
 func (s *Suite) TestEmptyListsAreJSONArrays() {
@@ -83,13 +61,13 @@ func (s *Suite) TestWritersShareOneSwitch() {
 		s.Equal(c.jsonOpens, js.Bytes()[0], c.name)
 		s.Contains(js.String(), `"K"`, c.name)
 
-		s.ErrorContains(c.w("yaml", new(bytes.Buffer)), `unknown output format "yaml" (supported: text, json`, c.name)
+		s.EqualError(c.w("yaml", new(bytes.Buffer)), "unsupported output format: yaml", c.name)
 
 		err := c.w(FormatDotenv, new(bytes.Buffer))
 		if c.dotenv {
 			s.NoError(err, c.name)
 		} else {
-			s.EqualError(err, `unknown output format "dotenv" (supported: text, json)`, c.name)
+			s.EqualError(err, "unsupported output format: dotenv", c.name)
 		}
 	}
 }

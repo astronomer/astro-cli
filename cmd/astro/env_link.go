@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
 )
@@ -246,7 +247,7 @@ func newEnvLinkListCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command 
 		},
 	}
 	addLinkObjectFlags(cmd, n, f)
-	addOutputFlagTo(cmd, &f.output, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &f.output)
 	return cmd
 }
 
@@ -317,7 +318,7 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	format, err := parseOutput(f.output, env.TextOrJSON)
+	format, err := cliout.ParseFormat(f.output)
 	if err != nil {
 		return err
 	}
@@ -331,7 +332,7 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	return env.WriteLinks(report, format, out)
+	return env.WriteLinks(report, env.Format(format), out)
 }
 
 // article prefixes a noun with "a" or "an".

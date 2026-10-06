@@ -194,8 +194,10 @@ func TestEnvOutputFlagIsUniform(t *testing.T) {
 		for _, sub := range c.Commands() {
 			walk(sub)
 		}
-		assert.Nil(t, c.Flags().Lookup("format"), "%s still has --format", c.CommandPath())
-		o := c.Flags().Lookup("output")
+		// c.Flag, not c.Flags().Lookup: cliout registers --output as a
+		// persistent flag, which Flags() holds only once cobra has merged it.
+		assert.Nil(t, c.Flag("format"), "%s still has --format", c.CommandPath())
+		o := c.Flag("output")
 		if o == nil {
 			return
 		}

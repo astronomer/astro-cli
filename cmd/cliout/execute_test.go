@@ -83,6 +83,50 @@ func TestParseFormat(t *testing.T) {
 	assert.True(t, IsUsage(err), "an unknown --output value is a usage error")
 }
 
+// An extra is accepted only where the command declared it, and the error
+// lists what this command takes, extras included.
+func TestParseFormatExtras(t *testing.T) {
+	f, err := ParseFormat("dotenv", "dotenv")
+	require.NoError(t, err)
+	assert.Equal(t, Format("dotenv"), f)
+
+	for _, c := range []struct {
+		in     string
+		extras []Format
+		want   string
+	}{
+		{"dotenv", nil, `unknown output format "dotenv" (supported: text, json)`},
+		{"yaml", []Format{"dotenv"}, `unknown output format "yaml" (supported: text, json, dotenv)`},
+		{"table", []Format{"yaml"}, `unknown output format "table" (supported: text, json, yaml)`},
+		{"", nil, `unknown output format "" (supported: text, json)`},
+	} {
+		_, err := ParseFormat(c.in, c.extras...)
+		require.EqualError(t, err, c.want)
+		assert.True(t, IsUsage(err), "%q: an unknown --output value is a usage error", c.in)
+	}
+}
+
+// The help names the formats the command takes, extras included.
+func TestAddOutputFlagUsage(t *testing.T) {
+	for _, c := range []struct {
+		extras []Format
+		want   string
+	}{
+		{nil, "Output format: text or json"},
+		{[]Format{"dotenv"}, "Output format: text, json or dotenv"},
+		{[]Format{"yaml", "toml"}, "Output format: text, json, yaml or toml"},
+	} {
+		var v string
+		cmd := &cobra.Command{Use: "x"}
+		AddOutputFlag(cmd, &v, c.extras...)
+		f := cmd.PersistentFlags().Lookup("output")
+		require.NotNil(t, f)
+		assert.Equal(t, c.want, f.Usage)
+		assert.Equal(t, "o", f.Shorthand)
+		assert.Equal(t, "text", f.DefValue)
+	}
+}
+
 func TestExitCode(t *testing.T) {
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()

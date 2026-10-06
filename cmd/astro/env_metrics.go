@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -59,7 +60,7 @@ func newEnvMetricsListCmd(out io.Writer) *cobra.Command {
 			return runEnvMetricsList(cmd, out)
 		},
 	}
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
@@ -72,7 +73,7 @@ func newEnvMetricsGetCmd(out io.Writer) *cobra.Command {
 			return runEnvMetricsGet(cmd, out, args[0])
 		},
 	}
-	addOutputFlag(cmd, env.TextOrJSON)
+	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
 }
 
@@ -125,7 +126,7 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -138,7 +139,7 @@ func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteMetricsExportList(objs, f, out)
+	return env.WriteMetricsExportList(objs, env.Format(f), out)
 }
 
 func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
@@ -146,7 +147,7 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextOrJSON)
+	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -156,7 +157,7 @@ func runEnvMetricsGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteMetricsExport(obj, f, out)
+	return env.WriteMetricsExport(obj, env.Format(f), out)
 }
 
 // runEnvMetricsSet upserts, with one asymmetry the other nouns do not have:

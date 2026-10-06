@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/fromfile"
@@ -32,66 +33,66 @@ const (
 )
 
 var (
-	label                         string
-	runtimeVersion                string
-	deploymentID                  string
-	logsKeyword                   string
-	forceDelete                   bool
-	description                   string
-	clusterID                     string
-	dagDeploy                     string
-	schedulerAU                   int
-	schedulerReplicas             int
-	updateSchedulerReplicas       int
-	updateSchedulerAU             int
-	forceUpdate                   bool
-	allDeployments                bool
-	warnLogs                      bool
-	errorLogs                     bool
-	infoLogs                      bool
-	waitForStatus                 bool
-	waitTimeForDeployment         time.Duration
-	logCount                      = 500
-	variableKey                   string
-	variableValue                 string
-	useEnvFile                    bool
-	makeSecret                    bool
-	executor                      string
-	inputFile                     string
-	cloudProvider                 string
-	region                        string
-	schedulerSize                 string
-	highAvailability              string
-	developmentMode               string
-	cicdEnforcement               string
-	defaultTaskPodMemory          string
-	resourceQuotaCPU              string
-	resourceQuotaMemory           string
-	defaultTaskPodCPU             string
-	addDeploymentRole             string
-	updateDeploymentRole          string
-	workloadIdentity              string
-	until                         string
-	forDuration                   string
-	removeOverride                bool
-	forceOverride                 bool
-	logApiserver                  bool
-	logWebserver                  bool
-	logScheduler                  bool
-	logWorkers                    bool
-	logTriggerer                  bool
-	logDagProcessor               bool
-	logComponents                 []string
-	flagRemoteExecutionEnabled    bool
-	flagAllowedIPAddressRanges    string
-	flagTaskLogBucket             string
-	flagTaskLogURLPattern         string
-	allowedIPAddressRanges        *[]string
-	taskLogBucket                 *string
-	taskLogURLPattern             *string
-	deploymentListOutputFlags     output.Flags
-	deploymentUserListOutputFlags output.Flags
-	deploymentTeamListOutputFlags output.Flags
+	label                      string
+	runtimeVersion             string
+	deploymentID               string
+	logsKeyword                string
+	forceDelete                bool
+	description                string
+	clusterID                  string
+	dagDeploy                  string
+	schedulerAU                int
+	schedulerReplicas          int
+	updateSchedulerReplicas    int
+	updateSchedulerAU          int
+	forceUpdate                bool
+	allDeployments             bool
+	warnLogs                   bool
+	errorLogs                  bool
+	infoLogs                   bool
+	waitForStatus              bool
+	waitTimeForDeployment      time.Duration
+	logCount                   = 500
+	variableKey                string
+	variableValue              string
+	useEnvFile                 bool
+	makeSecret                 bool
+	executor                   string
+	inputFile                  string
+	cloudProvider              string
+	region                     string
+	schedulerSize              string
+	highAvailability           string
+	developmentMode            string
+	cicdEnforcement            string
+	defaultTaskPodMemory       string
+	resourceQuotaCPU           string
+	resourceQuotaMemory        string
+	defaultTaskPodCPU          string
+	addDeploymentRole          string
+	updateDeploymentRole       string
+	workloadIdentity           string
+	until                      string
+	forDuration                string
+	removeOverride             bool
+	forceOverride              bool
+	logApiserver               bool
+	logWebserver               bool
+	logScheduler               bool
+	logWorkers                 bool
+	logTriggerer               bool
+	logDagProcessor            bool
+	logComponents              []string
+	flagRemoteExecutionEnabled bool
+	flagAllowedIPAddressRanges string
+	flagTaskLogBucket          string
+	flagTaskLogURLPattern      string
+	allowedIPAddressRanges     *[]string
+	taskLogBucket              *string
+	taskLogURLPattern          *string
+	deploymentListOutput       string
+	deploymentUserListOutput   string
+	deploymentTeamListOutput   string
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -186,7 +187,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 			return listDeploymentTeam(cmd, out)
 		},
 	}
-	deploymentTeamListOutputFlags.AddFlags(cmd)
+	cliout.AddOutputFlag(cmd, &deploymentTeamListOutput)
 	return cmd
 }
 
@@ -211,13 +212,13 @@ func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment-id", "astro deployment list")
 	}
 
-	format, err := resolveOutput(&deploymentTeamListOutputFlags)
+	format, err := cliout.ParseFormat(deploymentTeamListOutput)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, format, out)
+	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, output.Format(format), out)
 }
 
 func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -354,7 +355,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 			return listDeploymentUser(cmd, out)
 		},
 	}
-	deploymentUserListOutputFlags.AddFlags(cmd)
+	cliout.AddOutputFlag(cmd, &deploymentUserListOutput)
 	return cmd
 }
 
@@ -406,7 +407,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
-	deploymentListOutputFlags.AddFlags(cmd)
+	cliout.AddOutputFlag(cmd, &deploymentListOutput)
 	return cmd
 }
 
@@ -685,7 +686,7 @@ func newDeploymentWakeUpCmd() *cobra.Command {
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Reject a bad -o before anything that needs a login.
-	format, err := resolveOutput(&deploymentListOutputFlags)
+	format, err := cliout.ParseFormat(deploymentListOutput)
 	if err != nil {
 		return err
 	}
@@ -703,7 +704,7 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, format, out)
+	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, output.Format(format), out)
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string) error {
@@ -1035,13 +1036,13 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment-id", "astro deployment list")
 	}
 
-	format, err := resolveOutput(&deploymentUserListOutputFlags)
+	format, err := cliout.ParseFormat(deploymentUserListOutput)
 	if err != nil {
 		return err
 	}
 
 	cmd.SilenceUsage = true
-	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, format, out)
+	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, output.Format(format), out)
 }
 
 func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {

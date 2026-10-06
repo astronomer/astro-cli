@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
@@ -67,7 +68,7 @@ func newEnvVarListCmd(out io.Writer) *cobra.Command {
 			return runEnvVarList(cmd, out, "")
 		},
 	}
-	addOutputFlag(cmd, env.TextJSONDotenv)
+	cliout.AddOutputFlag(cmd, &envOutput, formatDotenv)
 	return cmd
 }
 
@@ -93,7 +94,7 @@ func newEnvVarGetCmd(out io.Writer) *cobra.Command {
 			return runEnvVarGet(cmd, out, args[0])
 		},
 	}
-	addOutputFlag(cmd, env.TextJSONDotenv)
+	cliout.AddOutputFlag(cmd, &envOutput, formatDotenv)
 	return cmd
 }
 
@@ -147,10 +148,12 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride env.Format)
 	}
 	f := formatOverride
 	if f == "" {
-		f, err = parseOutput(envOutput, env.TextJSONDotenv)
+		var parsed cliout.Format
+		parsed, err = cliout.ParseFormat(envOutput, formatDotenv)
 		if err != nil {
 			return err
 		}
+		f = env.Format(parsed)
 	}
 	cmd.SilenceUsage = true
 
@@ -169,7 +172,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	f, err := parseOutput(envOutput, env.TextJSONDotenv)
+	f, err := cliout.ParseFormat(envOutput, formatDotenv)
 	if err != nil {
 		return err
 	}
@@ -179,7 +182,7 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteVar(obj, f, envIncludeSecrets, out)
+	return env.WriteVar(obj, env.Format(f), envIncludeSecrets, out)
 }
 
 func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {

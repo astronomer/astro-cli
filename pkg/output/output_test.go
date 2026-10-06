@@ -3,41 +3,11 @@ package output
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestParseFormat(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected Format
-		wantErr  bool
-	}{
-		{"text", FormatText, false},
-		{"json", FormatJSON, false},
-		// The removed v1 dialect: one spelling per format in v2.
-		{"table", "", true},
-		{"template", "", true},
-		{"", "", true},
-		{"invalid", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got, err := ParseFormat(tt.input)
-			if tt.wantErr {
-				assert.EqualError(t, err, fmt.Sprintf("unknown output format %q (supported: text, json)", tt.input))
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, got)
-			}
-		})
-	}
-}
 
 func TestPrinter_PrintJSON(t *testing.T) {
 	data := map[string]any{
@@ -265,59 +235,5 @@ func TestPrintData(t *testing.T) {
 			cfg, FormatJSON, &buf,
 		)
 		assert.ErrorIs(t, err, assert.AnError)
-	})
-}
-
-func TestFlags(t *testing.T) {
-	parse := func(t *testing.T, args ...string) (Format, error) {
-		t.Helper()
-		var f Flags
-		cmd := &cobra.Command{Use: "list", RunE: func(*cobra.Command, []string) error { return nil }}
-		f.AddFlags(cmd)
-		if err := cmd.ParseFlags(args); err != nil {
-			return "", err
-		}
-		return f.Resolve()
-	}
-
-	t.Run("defaults to text", func(t *testing.T) {
-		format, err := parse(t)
-		require.NoError(t, err)
-		assert.Equal(t, FormatText, format)
-	})
-
-	t.Run("-o json", func(t *testing.T) {
-		format, err := parse(t, "-o", "json")
-		require.NoError(t, err)
-		assert.Equal(t, FormatJSON, format)
-	})
-
-	t.Run("--output text", func(t *testing.T) {
-		format, err := parse(t, "--output", "text")
-		require.NoError(t, err)
-		assert.Equal(t, FormatText, format)
-	})
-
-	t.Run("-o template is rejected", func(t *testing.T) {
-		_, err := parse(t, "-o", "template")
-		assert.EqualError(t, err, `unknown output format "template" (supported: text, json)`)
-	})
-
-	t.Run("--json and --template are gone", func(t *testing.T) {
-		_, err := parse(t, "--json")
-		assert.ErrorContains(t, err, "unknown flag: --json")
-		_, err = parse(t, "--template", "{{.}}")
-		assert.ErrorContains(t, err, "unknown flag: --template")
-	})
-
-	t.Run("help text", func(t *testing.T) {
-		var f Flags
-		cmd := &cobra.Command{Use: "list"}
-		f.AddFlags(cmd)
-		flag := cmd.Flags().Lookup("output")
-		require.NotNil(t, flag)
-		assert.Equal(t, "o", flag.Shorthand)
-		assert.Equal(t, "text", flag.DefValue)
-		assert.Equal(t, "Output format: text or json", flag.Usage)
 	})
 }
