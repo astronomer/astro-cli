@@ -11,11 +11,15 @@ import (
 // would have put the API's spelling into the CLI's contract.
 //
 // It is a copy, not a view: no field is dropped, and pointer for pointer an
-// optional field the API left out stays absent. Secret values are whatever
-// the API returned, untouched: without --include-secrets the platform blanks
-// a secret variable's value and leaves a connection's password and masked
-// extra keys out, and with it the platform returns them, so the json says
-// exactly what the response said.
+// optional field the API left out stays absent. The one place it departs
+// from the response is a hidden secret. A hidden value is null; a hidden
+// credential is absent and listed in set_fields. Unless secrets were asked
+// for (--include-secrets), NewObjectInfo hides them itself, whatever the API
+// put there: a secret variable's or Airflow variable's value, and a link's
+// override of it, is null, and "" only when the value really is empty, so a
+// script can tell the two apart; a connection's password and the extra keys
+// its auth type marks secret, and a metrics export's password and basic
+// token, are absent, on the object and on its links' overrides (maskRead).
 type ObjectInfo struct {
 	ID                  *string `json:"id,omitempty"`
 	ObjectKey           string  `json:"object_key"`
@@ -47,10 +51,11 @@ type ObjectInfo struct {
 }
 
 // VariableInfo is the value of an environment variable or an Airflow
-// variable. A secret's value is "" unless the platform was asked for it.
+// variable. Value is null when it is hidden: the variable is secret and its
+// value was not asked for (see shownValue).
 type VariableInfo struct {
-	IsSecret bool   `json:"is_secret"`
-	Value    string `json:"value"`
+	IsSecret bool    `json:"is_secret"`
+	Value    *string `json:"value"`
 }
 
 // ConnectionInfo is a connection's fields. Extra's keys are the connection's
@@ -120,9 +125,10 @@ type DeploymentLinkInfo struct {
 	MetricsExportOverrides       *MetricsExportOverridesInfo `json:"metrics_export_overrides,omitempty"`
 }
 
-// ValueOverrideInfo is a link's override of a variable's value.
+// ValueOverrideInfo is a link's override of a variable's value, null when
+// the variable is secret and its value hidden, as the variable's own is.
 type ValueOverrideInfo struct {
-	Value string `json:"value"`
+	Value *string `json:"value"`
 }
 
 // ConnectionOverridesInfo is a link's override of a connection: only the
@@ -169,18 +175,46 @@ type SubjectInfo struct {
 	APITokenName *string `json:"api_token_name,omitempty"`
 }
 
+// Every -o json path of `astro env` decides a variable's value with these
+// two: ObjectInfo, both link reports, reads and writes alike.
+//
+// A hidden value is null; a hidden credential is absent and listed in
+// set_fields. A variable's or an Airflow variable's value, and a link's
+// override of it, is hidden when the variable is secret and secretsShown is
+// false: a read without --include-secrets, or any write, which publishes
+// through MaskSecrets. What the API sent for a hidden value is not looked
+// at: the platform blanks it today, but null must not depend on that. A
+// shown value is published as it is, "" included, so "" always means empty.
+
+// secretHidden says whether a variable's value is hidden.
+func secretHidden(isSecret, secretsShown bool) bool { return isSecret && !secretsShown }
+
+// shownValue is a value as -o json publishes it: null when hidden.
+func shownValue(v string, hidden bool) *string {
+	if hidden {
+		return nil
+	}
+	return &v
+}
+
 // newObjectInfos converts a list for -o json, [] when it is empty.
-func newObjectInfos(objs []astrov1.EnvironmentObject) []ObjectInfo {
+// secretsShown is whether the platform was asked for secret values.
+func newObjectInfos(objs []astrov1.EnvironmentObject, secretsShown bool) []ObjectInfo {
 	out := make([]ObjectInfo, len(objs))
 	for i := range objs {
-		out[i] = NewObjectInfo(&objs[i])
+		out[i] = NewObjectInfo(&objs[i], secretsShown)
 	}
 	return out
 }
 
 // NewObjectInfo converts one object for -o json: a `get`, and what a `set`
-// left or a `delete` removed.
-func NewObjectInfo(o *astrov1.EnvironmentObject) ObjectInfo {
+// left or a `delete` removed. secretsShown is whether the platform was asked
+// for secret values (--include-secrets). A write passes false: what it
+// publishes is masked (MaskSecrets), so a secret's value is null.
+func NewObjectInfo(o *astrov1.EnvironmentObject, secretsShown bool) ObjectInfo {
+	if !secretsShown {
+		o = maskRead(o)
+	}
 	info := ObjectInfo{
 		ID:                  o.Id,
 		ObjectKey:           o.ObjectKey,
@@ -197,11 +231,14 @@ func NewObjectInfo(o *astrov1.EnvironmentObject) ObjectInfo {
 		UpdatedAt:           o.UpdatedAt,
 		UpdatedBy:           newSubjectInfo(o.UpdatedBy),
 	}
+	var varHidden, afHidden bool
 	if v := o.EnvironmentVariable; v != nil {
-		info.EnvironmentVariable = &VariableInfo{IsSecret: v.IsSecret, Value: v.Value}
+		varHidden = secretHidden(v.IsSecret, secretsShown)
+		info.EnvironmentVariable = &VariableInfo{IsSecret: v.IsSecret, Value: shownValue(v.Value, varHidden)}
 	}
 	if v := o.AirflowVariable; v != nil {
-		info.AirflowVariable = &VariableInfo{IsSecret: v.IsSecret, Value: v.Value}
+		afHidden = secretHidden(v.IsSecret, secretsShown)
+		info.AirflowVariable = &VariableInfo{IsSecret: v.IsSecret, Value: shownValue(v.Value, afHidden)}
 	}
 	if c := o.Connection; c != nil {
 		info.Connection = &ConnectionInfo{
@@ -221,7 +258,7 @@ func NewObjectInfo(o *astrov1.EnvironmentObject) ObjectInfo {
 	if o.Links != nil {
 		links := make([]DeploymentLinkInfo, len(*o.Links))
 		for i := range *o.Links {
-			links[i] = newDeploymentLinkInfo(&(*o.Links)[i])
+			links[i] = newDeploymentLinkInfo(&(*o.Links)[i], varHidden, afHidden)
 		}
 		info.Links = &links
 	}
@@ -235,13 +272,16 @@ func NewObjectInfo(o *astrov1.EnvironmentObject) ObjectInfo {
 	return info
 }
 
-func newDeploymentLinkInfo(l *astrov1.EnvironmentObjectLink) DeploymentLinkInfo {
+// newDeploymentLinkInfo converts one link. varHidden and afHidden say the
+// object's variable or Airflow variable is a secret whose value is hidden,
+// and so its override is too.
+func newDeploymentLinkInfo(l *astrov1.EnvironmentObjectLink, varHidden, afHidden bool) DeploymentLinkInfo {
 	info := DeploymentLinkInfo{Scope: string(l.Scope), ScopeEntityID: l.ScopeEntityId, SetFields: l.SetFields}
 	if v := l.EnvironmentVariableOverrides; v != nil {
-		info.EnvironmentVariableOverrides = &ValueOverrideInfo{Value: v.Value}
+		info.EnvironmentVariableOverrides = &ValueOverrideInfo{Value: shownValue(v.Value, varHidden)}
 	}
 	if v := l.AirflowVariableOverrides; v != nil {
-		info.AirflowVariableOverrides = &ValueOverrideInfo{Value: v.Value}
+		info.AirflowVariableOverrides = &ValueOverrideInfo{Value: shownValue(v.Value, afHidden)}
 	}
 	if c := l.ConnectionOverrides; c != nil {
 		info.ConnectionOverrides = &ConnectionOverridesInfo{

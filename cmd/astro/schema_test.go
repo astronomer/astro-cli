@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/workerqueue"
@@ -118,6 +119,38 @@ var publishedPayloads = []cliouttest.Case{
 	// `variable export` the variable list. `set --from-file` is the one of
 	// its own: what it did with each key of the file.
 	{Name: "env-set-from-file", Value: env.SetFromFileResult{}},
+	// A variable's value, and a link's override of it, is null when hidden
+	// (secret, and --include-secrets not given, or any write) and the value
+	// itself otherwise, "" included. Filling shows only the shown branch, so
+	// both are also pinned as given; the objects go through NewObjectInfo, the
+	// conversion every env json path uses.
+	{Name: "env-object-secret", Value: env.NewObjectInfo(&astrov1.EnvironmentObject{
+		ObjectKey: "KEY", ObjectType: astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE, Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: "WS", SetFields: []string{"value"},
+		EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{IsSecret: true, Value: "never published"},
+		Links: &[]astrov1.EnvironmentObjectLink{{
+			Scope: astrov1.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: "DEP", SetFields: []string{"value"},
+			EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: "never published"},
+		}},
+	}, false), AsGiven: true},
+	{Name: "env-object-empty-value", Value: env.NewObjectInfo(&astrov1.EnvironmentObject{
+		ObjectKey: "KEY", ObjectType: astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE, Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: "WS", SetFields: []string{},
+		EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: ""},
+		Links: &[]astrov1.EnvironmentObjectLink{{
+			Scope: astrov1.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: "DEP", SetFields: []string{},
+			EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: ""},
+		}},
+	}, false), AsGiven: true},
+	// The variable link report says the same: workspace_value null when
+	// hidden, and override_value absent for a link with no override, null for
+	// one whose value is hidden, and the value otherwise.
+	{Name: "env-variable-link-list-secret", Value: env.VarLinksReport{
+		ObjectKey: "KEY", ObjectID: "ID", IsSecret: true, ExcludeLinks: []string{},
+		Links: []env.VarLink{{DeploymentID: "DEP", OverrideValue: schemaPtr[*string](nil)}, {DeploymentID: "DEP2"}},
+	}, AsGiven: true},
+	{Name: "env-variable-link-list-empty-value", Value: env.VarLinksReport{
+		ObjectKey: "KEY", ObjectID: "ID", WorkspaceValue: schemaPtr(""), ExcludeLinks: []string{},
+		Links: []env.VarLink{{DeploymentID: "DEP", OverrideValue: schemaPtr(schemaPtr(""))}},
+	}, AsGiven: true},
 
 	// astro deploy --output json, in a project with a manifest: the one
 	// object a finished deploy prints.
@@ -293,3 +326,6 @@ func TestEmitProblemsReportsWhatIsUnpinned(t *testing.T) {
 	pinned := map[reflect.Type]bool{reflect.TypeOf(apitoken.Token{}): true}
 	assert.Empty(t, emitProblems(pinned, nil, 1), "a pinned type, above the floor")
 }
+
+// schemaPtr is a pointer to v, for the cases pinned as given.
+func schemaPtr[T any](v T) *T { return &v }

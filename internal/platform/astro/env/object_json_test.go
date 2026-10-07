@@ -15,7 +15,10 @@ import (
 // The API object is marshaled, its keys snake_cased, and held against what
 // -o json publishes, once with every field set and once with none, so a
 // field the API model gains, or the copy drops, or an optional field that
-// starts appearing when unset, fails here.
+// starts appearing when unset, fails here. It is converted as a read with
+// --include-secrets: without it, a secret's value is null whatever the API
+// sent, the one departure, which TestEnvVarGetJSONPublishesSecretsOnlyWhenAsked
+// in cmd/astro pins.
 func (s *Suite) TestObjectInfoIsTheAPIObjectInSnakeCase() {
 	full := astrov1.EnvironmentObject{}
 	fillValue(reflect.ValueOf(&full).Elem())
@@ -30,7 +33,7 @@ func (s *Suite) TestObjectInfoIsTheAPIObjectInSnakeCase() {
 		want = snakeKeys(want)
 
 		var out bytes.Buffer
-		s.Require().NoError(WriteConn(o, jsonTo(&out)))
+		s.Require().NoError(WriteConn(o, true, jsonTo(&out)))
 		var got any
 		s.Require().NoError(json.Unmarshal(out.Bytes(), &got))
 

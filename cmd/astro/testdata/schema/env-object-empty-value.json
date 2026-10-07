@@ -1,0 +1,21 @@
+{
+  "object_key": "KEY",
+  "object_type": "ENVIRONMENT_VARIABLE",
+  "scope": "WORKSPACE",
+  "scope_entity_id": "WS",
+  "set_fields": [],
+  "environment_variable": {
+    "is_secret": false,
+    "value": ""
+  },
+  "links": [
+    {
+      "scope": "DEPLOYMENT",
+      "scope_entity_id": "DEP",
+      "set_fields": [],
+      "environment_variable_overrides": {
+        "value": ""
+      }
+    }
+  ]
+}

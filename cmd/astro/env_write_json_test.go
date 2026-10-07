@@ -2,6 +2,7 @@ package astro
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -364,8 +365,19 @@ func TestEnvSetJSONWhenTheReadBackFails(t *testing.T) {
 				require.NotNil(t, got.Connection)
 				assert.Nil(t, got.Connection.Password)
 				require.NotNil(t, got.Connection.Extra)
-				assert.Equal(t, map[string]any{"aws_secret_access_key": ""}, *got.Connection.Extra,
-					"no auth type says which extra keys are secret, so every value is blanked")
+				assert.Equal(t, map[string]any{"aws_secret_access_key": nil}, *got.Connection.Extra,
+					"no auth type says which extra keys are secret, so every value is hidden")
+				assert.Contains(t, r.stdout, `"aws_secret_access_key":null`, "a hidden value is null")
+			}
+			if key := map[astrov1.EnvironmentObjectObjectType]string{
+				astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE: "environment_variable",
+				astrov1.EnvironmentObjectObjectTypeAIRFLOWVARIABLE:     "airflow_variable",
+			}[n.typ]; key != "" {
+				var v struct {
+					Value json.RawMessage `json:"value"`
+				}
+				require.NoError(t, json.Unmarshal(fields[key], &v), r.stdout)
+				assert.Equal(t, "null", string(v.Value), "the secret the create was given, hidden")
 			}
 			require.NotNil(t, got.ID)
 			assert.Equal(t, wjCreatedID, *got.ID)
@@ -417,6 +429,33 @@ func TestEnvWritesMaskSecretsTheAPIReturned(t *testing.T) {
 		r := execEnvJSON(t, leaky(), append(args, "-o", "json")...)
 		require.NoError(t, r.err, args)
 		assert.NotContains(t, r.stdout, "s3cret", args)
+		// And what it hid is null, not "": the object's value and the link's
+		// override, or the link report's workspace value and override.
+		fields := decodeObject(t, r.stdout)
+		if args[1] == "link" {
+			assert.Equal(t, "null", string(fields["workspace_value"]), args)
+			if args[2] == "set" {
+				var links []map[string]json.RawMessage
+				require.NoError(t, json.Unmarshal(fields["links"], &links))
+				require.Len(t, links, 1, args)
+				assert.Equal(t, "null", string(links[0]["override_value"]), args)
+			}
+			continue
+		}
+		var got struct {
+			EnvironmentVariable struct {
+				Value json.RawMessage `json:"value"`
+			} `json:"environment_variable"`
+			Links []struct {
+				Overrides struct {
+					Value json.RawMessage `json:"value"`
+				} `json:"environment_variable_overrides"`
+			} `json:"links"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(r.stdout), &got))
+		assert.Equal(t, "null", string(got.EnvironmentVariable.Value), args)
+		require.Len(t, got.Links, 1, args)
+		assert.Equal(t, "null", string(got.Links[0].Overrides.Value), args)
 	}
 }
 
@@ -470,7 +509,8 @@ func TestEnvLinkChangesJSON(t *testing.T) {
 		require.Len(t, got.Links, 1)
 		assert.Equal(t, wjDeployment, got.Links[0].DeploymentID)
 		require.NotNil(t, got.Links[0].OverrideValue)
-		assert.Equal(t, "own", *got.Links[0].OverrideValue)
+		require.NotNil(t, *got.Links[0].OverrideValue)
+		assert.Equal(t, "own", **got.Links[0].OverrideValue)
 
 		got = env.VarLinksReport{}
 		r = execEnvJSON(t, wjClient(t), "variable", "link", "delete", "--variable-key", "LINKED", dep, ws, "-o", "json")

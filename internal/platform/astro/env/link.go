@@ -205,10 +205,12 @@ func (o *LinkOverride) request(kind LinkKind) (req *astrov1.UpdateEnvironmentObj
 
 // VarLinksReport is the consolidated view of how a workspace-scoped env var is
 // attached (or excluded) across deployments. Returned by ListVarLinks.
+// WorkspaceValue is null when the variable is secret and its value hidden
+// (see shownValue).
 type VarLinksReport struct {
 	ObjectKey           string    `json:"object_key"`
 	ObjectID            string    `json:"object_id"`
-	WorkspaceValue      string    `json:"workspace_value"`
+	WorkspaceValue      *string   `json:"workspace_value"`
 	IsSecret            bool      `json:"is_secret"`
 	AutoLinkDeployments bool      `json:"auto_link_deployments"`
 	Links               []VarLink `json:"links"`
@@ -216,9 +218,23 @@ type VarLinksReport struct {
 }
 
 // VarLink describes one explicit Link entry on a workspace env var.
+//
+// OverrideValue says three things, so it is a pointer to a pointer, which
+// encoding/json publishes as each needs: nil when the link has no override
+// (override_value absent), a nil *string when it has one whose value is
+// hidden (null), and the value otherwise ("" included).
 type VarLink struct {
-	DeploymentID  string  `json:"deployment_id"`
-	OverrideValue *string `json:"override_value,omitempty"`
+	DeploymentID  string   `json:"deployment_id"`
+	OverrideValue **string `json:"override_value,omitempty"`
+}
+
+// override is the link's override value when it has one that is shown, and
+// nil otherwise.
+func (l VarLink) override() *string {
+	if l.OverrideValue == nil {
+		return nil
+	}
+	return *l.OverrideValue
 }
 
 // LinksReport is the link state of a workspace connection or Airflow
@@ -283,7 +299,7 @@ func varLinksAfter(obj *astrov1.EnvironmentObject, err error) (*VarLinksReport, 
 	if err != nil {
 		return nil, err
 	}
-	return newVarLinksReport(MaskSecrets(obj)), nil
+	return newVarLinksReport(MaskSecrets(obj), false), nil
 }
 
 // linksAfter reports a connection's or an Airflow variable's links from the
@@ -292,7 +308,7 @@ func linksAfter(k linkKind, obj *astrov1.EnvironmentObject, err error) (*LinksRe
 	if err != nil {
 		return nil, err
 	}
-	return newLinksReport(k, MaskSecrets(obj))
+	return newLinksReport(k, MaskSecrets(obj), false)
 }
 
 // Link, Unlink, Exclude and Unexclude change a workspace connection's or
@@ -448,11 +464,13 @@ func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, astroV1Clien
 	if err != nil {
 		return nil, err
 	}
-	return newVarLinksReport(current), nil
+	return newVarLinksReport(current, includeSecrets), nil
 }
 
-// newVarLinksReport reports a workspace env var's links.
-func newVarLinksReport(current *astrov1.EnvironmentObject) *VarLinksReport {
+// newVarLinksReport reports a workspace env var's links. secretsShown is
+// whether the platform was asked for secret values; without them a secret's
+// value and its overrides are null (see shownValue).
+func newVarLinksReport(current *astrov1.EnvironmentObject, secretsShown bool) *VarLinksReport {
 	// Links/ExcludeLinks start non-nil so an empty list marshals as [] rather
 	// than null; scripted consumers iterate .links[] without null guards.
 	report := &VarLinksReport{
@@ -466,14 +484,18 @@ func newVarLinksReport(current *astrov1.EnvironmentObject) *VarLinksReport {
 	if current.AutoLinkDeployments != nil {
 		report.AutoLinkDeployments = *current.AutoLinkDeployments
 	}
-	if current.EnvironmentVariable != nil {
-		report.WorkspaceValue = current.EnvironmentVariable.Value
-		report.IsSecret = current.EnvironmentVariable.IsSecret
+	hidden := false
+	if v := current.EnvironmentVariable; v != nil {
+		hidden = secretHidden(v.IsSecret, secretsShown)
+		report.IsSecret = v.IsSecret
+		report.WorkspaceValue = shownValue(v.Value, hidden)
+	} else {
+		report.WorkspaceValue = shownValue("", false)
 	}
 	for _, l := range derefSlice(current.Links) {
 		vl := VarLink{DeploymentID: l.ScopeEntityId}
 		if l.EnvironmentVariableOverrides != nil {
-			v := l.EnvironmentVariableOverrides.Value
+			v := shownValue(l.EnvironmentVariableOverrides.Value, hidden)
 			vl.OverrideValue = &v
 		}
 		report.Links = append(report.Links, vl)
@@ -490,11 +512,18 @@ func ListLinks(kind LinkKind, idOrKey string, scope Scope, includeSecrets bool, 
 	if err != nil {
 		return nil, err
 	}
-	return newLinksReport(k, current)
+	return newLinksReport(k, current, includeSecrets)
 }
 
 // newLinksReport reports a workspace connection's or Airflow variable's links.
-func newLinksReport(k linkKind, current *astrov1.EnvironmentObject) (*LinksReport, error) {
+// secretsShown is whether the platform was asked for secret values; without
+// them a secret Airflow variable's override value is null (see shownValue),
+// and a connection's credentials are out of its overrides (maskRead).
+func newLinksReport(k linkKind, current *astrov1.EnvironmentObject, secretsShown bool) (*LinksReport, error) {
+	if !secretsShown {
+		current = maskRead(current)
+	}
+	afHidden := current.AirflowVariable != nil && secretHidden(current.AirflowVariable.IsSecret, secretsShown)
 	report := &LinksReport{
 		ObjectKey:    current.ObjectKey,
 		Links:        []ObjectLink{},
@@ -512,6 +541,9 @@ func newLinksReport(k linkKind, current *astrov1.EnvironmentObject) (*LinksRepor
 		overrides, err := overrideMap(k.overrides(&links[i]))
 		if err != nil {
 			return nil, err
+		}
+		if _, ok := overrides[overrideValueField]; ok && afHidden {
+			overrides[overrideValueField] = nil
 		}
 		ol.Overrides = overrides
 		report.Links = append(report.Links, ol)

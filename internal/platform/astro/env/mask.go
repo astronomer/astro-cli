@@ -8,22 +8,48 @@ import (
 )
 
 // MaskSecrets returns a copy of o with every secret value taken out, the way
-// the platform leaves them out of a read without --include-secrets: a secret
-// variable's or Airflow variable's value is "", and so is a link's override
-// of it; a connection's and a metrics export's password and basic token are
-// absent, on the object and on each link's override; and so are the keys of
-// a connection's extra that its auth type marks secret. A connection with no
-// auth type to say which extra keys are secret (the object a create builds
-// from its inputs, or one made field by field) has every extra value blanked
-// to "", its keys kept, on the object and on its links: an extra holds keys
-// such as aws_secret_access_key as readily as a region, and nothing else
-// tells them apart. set_fields still names what is set.
+// the platform leaves them out of a read without --include-secrets. A hidden
+// value is null; a hidden credential is absent and listed in set_fields:
+//
+//   - a secret variable's or Airflow variable's value is "", and so is a
+//     link's override of it, which -o json publishes as null (NewObjectInfo
+//     and the link reports, given secretsShown false, as every write is);
+//   - a connection's and a metrics export's password and basic token are
+//     absent, on the object and on each link's override, and so are the
+//     keys of a connection's extra that its auth type marks secret;
+//   - a connection with no auth type to say which extra keys are secret (the
+//     object a create builds from its inputs, or one made field by field)
+//     has every extra value hidden, nil and so null, its keys kept, on the
+//     object and on its links: an extra holds keys such as
+//     aws_secret_access_key as readily as a region, and nothing else tells
+//     them apart.
+//
+// set_fields still names what is set.
 //
 // What a write publishes goes through it, whatever the API answered with.
 // The platform masks its answers to a write today, but a write's output is
 // the one a script is most likely to log, and that is no place to depend on
 // another service for it.
 func MaskSecrets(o *astrov1.EnvironmentObject) *astrov1.EnvironmentObject {
+	return maskSecrets(o, true)
+}
+
+// maskRead is MaskSecrets for what a read without --include-secrets
+// publishes: the same, except that a connection with no auth type keeps its
+// extra as the platform returned it. On a read the platform has already
+// taken out what it holds secret, and an object it returns with no auth type
+// is one whose extra it does not; hiding every value there would hide a
+// region or a role ARN on every read, from the json and the link table both,
+// with nothing secret behind it. The values the create's echo carries are
+// the caller's own input, which the platform never saw masked, so a write
+// hides them all.
+func maskRead(o *astrov1.EnvironmentObject) *astrov1.EnvironmentObject {
+	return maskSecrets(o, false)
+}
+
+// maskSecrets is MaskSecrets, hiding every extra value of a connection with
+// no auth type only when unknownExtraSecret.
+func maskSecrets(o *astrov1.EnvironmentObject, unknownExtraSecret bool) *astrov1.EnvironmentObject {
 	if o == nil {
 		return nil
 	}
@@ -42,7 +68,7 @@ func MaskSecrets(o *astrov1.EnvironmentObject) *astrov1.EnvironmentObject {
 	}
 	var extra extraMask
 	if c := o.Connection; c != nil {
-		extra = newExtraMask(c.ConnectionAuthType)
+		extra = newExtraMask(c.ConnectionAuthType, unknownExtraSecret)
 		cc := *c
 		cc.Password = nil
 		cc.Extra = extra.apply(c.Extra)
@@ -86,15 +112,16 @@ func maskLink(l *astrov1.EnvironmentObjectLink, varSecret, afSecret bool, extra 
 }
 
 // extraMask is how a connection's extra is masked: by the keys its auth type
-// marks secret, or, when there is no auth type to say, every value.
+// marks secret, or, when there is no auth type to say and unknownSecret,
+// every value (with neither, none).
 type extraMask struct {
 	known  bool
 	secret []string
 }
 
-func newExtraMask(a *astrov1.ConnectionAuthType) extraMask {
+func newExtraMask(a *astrov1.ConnectionAuthType, unknownSecret bool) extraMask {
 	if a == nil || len(a.Parameters) == 0 {
-		return extraMask{}
+		return extraMask{known: !unknownSecret}
 	}
 	m := extraMask{known: true}
 	for _, p := range a.Parameters {
@@ -114,7 +141,7 @@ func (e extraMask) apply(m *map[string]any) *map[string]any { //nolint:gocritic 
 	if !e.known {
 		out := make(map[string]any, len(*m))
 		for k := range *m {
-			out[k] = ""
+			out[k] = nil
 		}
 		return &out
 	}

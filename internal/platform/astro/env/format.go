@@ -16,6 +16,10 @@ import (
 const (
 	maskedSecret = "****"
 
+	// hiddenOverride is how the link tables show an override value that is
+	// there but hidden.
+	hiddenOverride = "(hidden, use --include-secrets)"
+
 	// tableValueMax caps the width of value-style columns in the table view.
 	// JSON and dotenv output is never truncated; this is a display concession
 	// so a single 5000-char value doesn't shred the layout.
@@ -87,7 +91,7 @@ func nonNil[T any](s []T) []T {
 
 // WriteVarList renders a list of ENVIRONMENT_VARIABLE objects.
 func WriteVarList(envObjs []astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
-	return r.Emit(VariableList{Variables: newObjectInfos(envObjs)},
+	return r.Emit(VariableList{Variables: newObjectInfos(envObjs, includeSecrets)},
 		func(w io.Writer) error { return writeVarTable(envObjs, includeSecrets, w) })
 }
 
@@ -97,7 +101,7 @@ func WriteVar(envObj *astrov1.EnvironmentObject, includeSecrets bool, r output.E
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(NewObjectInfo(envObj),
+	return r.Emit(NewObjectInfo(envObj, includeSecrets),
 		func(w io.Writer) error { return writeVarTable(one, includeSecrets, w) })
 }
 
@@ -107,23 +111,23 @@ func WriteVarLinks(report *VarLinksReport, includeSecrets bool, r output.Emitter
 }
 
 // WriteConnList renders a list of CONNECTION objects.
-func WriteConnList(envObjs []astrov1.EnvironmentObject, r output.Emitter) error {
-	return r.Emit(ConnectionList{Connections: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeConnTable(envObjs, w) })
+func WriteConnList(envObjs []astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
+	return r.Emit(ConnectionList{Connections: newObjectInfos(envObjs, includeSecrets)}, func(w io.Writer) error { return writeConnTable(envObjs, w) })
 }
 
 // WriteConn renders a single CONNECTION object.
-func WriteConn(envObj *astrov1.EnvironmentObject, r output.Emitter) error {
+func WriteConn(envObj *astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
 	if envObj == nil {
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(NewObjectInfo(envObj), func(w io.Writer) error { return writeConnTable(one, w) })
+	return r.Emit(NewObjectInfo(envObj, includeSecrets), func(w io.Writer) error { return writeConnTable(one, w) })
 }
 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
 // Same shape as ENVIRONMENT_VARIABLE.
 func WriteAirflowVarList(envObjs []astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
-	return r.Emit(AirflowVariableList{AirflowVariables: newObjectInfos(envObjs)},
+	return r.Emit(AirflowVariableList{AirflowVariables: newObjectInfos(envObjs, includeSecrets)},
 		func(w io.Writer) error { return writeAirflowVarTable(envObjs, includeSecrets, w) })
 }
 
@@ -133,22 +137,22 @@ func WriteAirflowVar(envObj *astrov1.EnvironmentObject, includeSecrets bool, r o
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(NewObjectInfo(envObj),
+	return r.Emit(NewObjectInfo(envObj, includeSecrets),
 		func(w io.Writer) error { return writeAirflowVarTable(one, includeSecrets, w) })
 }
 
 // WriteMetricsExportList renders a list of METRICS_EXPORT objects.
-func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, r output.Emitter) error {
-	return r.Emit(MetricsExportList{MetricsExports: newObjectInfos(envObjs)}, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) })
+func WriteMetricsExportList(envObjs []astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
+	return r.Emit(MetricsExportList{MetricsExports: newObjectInfos(envObjs, includeSecrets)}, func(w io.Writer) error { return writeMetricsExportTable(envObjs, w) })
 }
 
 // WriteMetricsExport renders a single METRICS_EXPORT object.
-func WriteMetricsExport(envObj *astrov1.EnvironmentObject, r output.Emitter) error {
+func WriteMetricsExport(envObj *astrov1.EnvironmentObject, includeSecrets bool, r output.Emitter) error {
 	if envObj == nil {
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(NewObjectInfo(envObj), func(w io.Writer) error { return writeMetricsExportTable(one, w) })
+	return r.Emit(NewObjectInfo(envObj, includeSecrets), func(w io.Writer) error { return writeMetricsExportTable(one, w) })
 }
 
 func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {
@@ -255,7 +259,7 @@ func dotenvQuote(v string) string {
 // quietly showing "-").
 func overrideDisplay(override *string, isSecret, includeSecrets bool) string {
 	if isSecret && !includeSecrets {
-		return "(hidden, use --include-secrets)"
+		return hiddenOverride
 	}
 	if override == nil {
 		return "-"
@@ -308,7 +312,7 @@ func (t *linksTable) write(out io.Writer) error {
 }
 
 func varLinksTable(report *VarLinksReport, includeSecrets bool) *linksTable {
-	value := report.WorkspaceValue
+	value := ptrStr(report.WorkspaceValue)
 	if report.IsSecret && !includeSecrets {
 		value = maskedSecret + " (secret)"
 	}
@@ -323,7 +327,7 @@ func varLinksTable(report *VarLinksReport, includeSecrets bool) *linksTable {
 		excludes:       report.ExcludeLinks,
 	}
 	for _, l := range report.Links {
-		t.links = append(t.links, [2]string{l.DeploymentID, overrideDisplay(l.OverrideValue, report.IsSecret, includeSecrets)})
+		t.links = append(t.links, [2]string{l.DeploymentID, overrideDisplay(l.override(), report.IsSecret, includeSecrets)})
 	}
 	return t
 }
@@ -352,23 +356,25 @@ func connLinksTable(report *LinksReport) *linksTable {
 // overridesDisplay renders a link's overrides as name=value pairs. A field
 // set but absent from the overrides is a secret the platform masked, shown
 // as hidden rather than dropped, so a set password is not mistaken for none.
+// So is a hidden value, which json publishes as null (a secret Airflow
+// variable's override): marked, so it is not mistaken for a real "".
 func overridesDisplay(l ObjectLink) string {
 	var parts []string
 	shown := map[string]bool{}
 	for name, v := range l.Overrides {
 		if extra, ok := v.(map[string]any); ok {
 			for key, ev := range extra {
-				parts = append(parts, fmt.Sprintf("%s.%s=%v", name, key, ev))
+				parts = append(parts, overridePart(name+"."+key, ev))
 				shown[name+"."+key] = true
 			}
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("%s=%v", name, v))
+		parts = append(parts, overridePart(name, v))
 		shown[name] = true
 	}
 	for _, f := range l.SetFields {
 		if !shown[f] {
-			parts = append(parts, f+"=(hidden, use --include-secrets)")
+			parts = append(parts, overridePart(f, nil))
 		}
 	}
 	if len(parts) == 0 {
@@ -483,6 +489,15 @@ func anyHasID(envObjs []astrov1.EnvironmentObject) bool {
 		}
 	}
 	return false
+}
+
+// overridePart is one name=value of a link's overrides, a hidden (nil)
+// value marked the way `variable link list` marks one.
+func overridePart(name string, v any) string {
+	if v == nil {
+		return name + "=" + hiddenOverride
+	}
+	return fmt.Sprintf("%s=%v", name, v)
 }
 
 func ptrStr(s *string) string {

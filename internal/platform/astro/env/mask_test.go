@@ -72,7 +72,8 @@ func TestMaskSecrets(t *testing.T) {
 	})
 
 	// With no auth type, nothing says which extra keys are secret, so every
-	// value is blanked and the keys kept, on the object and its links.
+	// value is hidden (nil, which json publishes as null) and the keys kept,
+	// on the object and its links.
 	t.Run("a connection with no auth type", func(t *testing.T) {
 		extra := map[string]any{"aws_secret_access_key": "AKIAsecret", "region": "eu"}
 		for _, auth := range []*astrov1.ConnectionAuthType{nil, {}} {
@@ -83,7 +84,7 @@ func TestMaskSecrets(t *testing.T) {
 				}},
 			}
 			m := MaskSecrets(o)
-			want := map[string]any{"aws_secret_access_key": "", "region": ""}
+			want := map[string]any{"aws_secret_access_key": nil, "region": nil}
 			assert.Equal(t, want, *m.Connection.Extra)
 			assert.Equal(t, want, *(*m.Links)[0].ConnectionOverrides.Extra)
 			assert.Equal(t, "AKIAsecret", extra["aws_secret_access_key"], "the original keeps its extra")
@@ -130,4 +131,24 @@ func TestWithSetFields(t *testing.T) {
 
 	got = WithSetFields(&astrov1.EnvironmentObject{SetFields: []string{"value"}, EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{}})
 	assert.Equal(t, []string{"value"}, got.SetFields)
+}
+
+// A read's mask takes out what MaskSecrets does, except a connection with no
+// auth type keeps its extra: on a read the platform has already taken out
+// what it holds secret. Its password still goes.
+func TestMaskReadKeepsAnExtraWithNoAuthType(t *testing.T) {
+	pw := "pw"
+	extra := map[string]any{"region": "eu"}
+	o := &astrov1.EnvironmentObject{
+		Connection: &astrov1.EnvironmentObjectConnection{Type: "aws", Password: &pw, Extra: &extra},
+		Links: &[]astrov1.EnvironmentObjectLink{{
+			ConnectionOverrides: &astrov1.EnvironmentObjectConnectionOverrides{Password: &pw, Extra: &extra},
+		}},
+	}
+	m := maskRead(o)
+	assert.Nil(t, m.Connection.Password)
+	assert.Equal(t, extra, *m.Connection.Extra)
+	assert.Nil(t, (*m.Links)[0].ConnectionOverrides.Password)
+	assert.Equal(t, extra, *(*m.Links)[0].ConnectionOverrides.Extra)
+	assert.Equal(t, map[string]any{"region": nil}, *MaskSecrets(o).Connection.Extra, "a write hides it")
 }

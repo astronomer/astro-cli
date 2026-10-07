@@ -2,8 +2,10 @@ package astro
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -94,54 +96,75 @@ func decodeObject(t *testing.T, out string) map[string]json.RawMessage {
 	return got
 }
 
-// A secret variable's value is published as the platform returned it: blank
-// unless --include-secrets asked for it, and then the value. is_secret says
-// which it is either way, and set_fields that a blank secret is set.
+// A secret variable's value is null unless --include-secrets asked for it,
+// whatever the platform returned, and then the value; a value that is really
+// empty is "", so a script tells the two apart. is_secret says which it is
+// either way, and set_fields that a hidden secret is set. The same holds for
+// an Airflow variable, and for a link's override of either.
 func TestEnvVarGetJSONPublishesSecretsOnlyWhenAsked(t *testing.T) {
 	for _, c := range []struct {
-		name  string
-		flags []string
-		value string
+		name     string
+		flags    []string
+		secret   bool
+		apiValue string
+		want     string // the raw json of value
 	}{
-		{"without --include-secrets", nil, ""},
-		{"with --include-secrets", []string{"--include-secrets"}, "shh"},
+		{"a secret without --include-secrets", nil, true, "", `null`},
+		{"a secret the platform returned anyway", nil, true, "leaked", `null`},
+		{"a secret with --include-secrets", []string{"--include-secrets"}, true, "shh", `"shh"`},
+		{"an empty secret with --include-secrets", []string{"--include-secrets"}, true, "", `""`},
+		{"an empty plain value", nil, false, "", `""`},
 	} {
-		t.Run(c.name, func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.LocalPlatform)
-			defer resetEnvFlags()
-			mc := mockEnvList(t, c.value != "", astrov1.EnvironmentObject{
-				ObjectKey:           "TOKEN",
-				ObjectType:          astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE,
-				Scope:               astrov1.EnvironmentObjectScopeWORKSPACE,
-				ScopeEntityId:       "ws-test",
-				SetFields:           []string{"value"},
-				EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{IsSecret: true, Value: c.value},
-			})
-			astroV1Client = mc
+		for _, n := range envNouns[:2] { // variable and airflow-variable
+			t.Run(n.noun+"/"+c.name, func(t *testing.T) {
+				testUtil.InitTestConfig(testUtil.LocalPlatform)
+				defer resetEnvFlags()
+				obj := astrov1.EnvironmentObject{
+					ObjectKey:     "TOKEN",
+					ObjectType:    n.typ,
+					Scope:         astrov1.EnvironmentObjectScopeWORKSPACE,
+					ScopeEntityId: "ws-test",
+					SetFields:     []string{"value"},
+				}
+				link := astrov1.EnvironmentObjectLink{ScopeEntityId: "dep"}
+				if n.typ == astrov1.EnvironmentObjectObjectTypeENVIRONMENTVARIABLE {
+					obj.EnvironmentVariable = &astrov1.EnvironmentObjectEnvironmentVariable{IsSecret: c.secret, Value: c.apiValue}
+					link.EnvironmentVariableOverrides = &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: c.apiValue}
+				} else {
+					obj.AirflowVariable = &astrov1.EnvironmentObjectAirflowVariable{IsSecret: c.secret, Value: c.apiValue}
+					link.AirflowVariableOverrides = &astrov1.EnvironmentObjectAirflowVariableOverrides{Value: c.apiValue}
+				}
+				obj.Links = &[]astrov1.EnvironmentObjectLink{link}
+				mc := mockEnvList(t, len(c.flags) > 0, obj)
+				astroV1Client = mc
 
-			out, err := execEnvCmd(append([]string{"variable", "get", "TOKEN", "--workspace-id", "ws-test", "-o", "json"}, c.flags...)...)
-			require.NoError(t, err)
-			var got struct {
-				ObjectKey           string   `json:"object_key"`
-				ObjectType          string   `json:"object_type"`
-				Scope               string   `json:"scope"`
-				ScopeEntityID       string   `json:"scope_entity_id"`
-				SetFields           []string `json:"set_fields"`
-				EnvironmentVariable struct {
-					IsSecret bool   `json:"is_secret"`
-					Value    string `json:"value"`
-				} `json:"environment_variable"`
-			}
-			require.NoError(t, json.Unmarshal([]byte(out), &got), out)
-			assert.Equal(t, "TOKEN", got.ObjectKey)
-			assert.Equal(t, "ENVIRONMENT_VARIABLE", got.ObjectType)
-			assert.Equal(t, "WORKSPACE", got.Scope)
-			assert.Equal(t, "ws-test", got.ScopeEntityID)
-			assert.Equal(t, []string{"value"}, got.SetFields)
-			assert.True(t, got.EnvironmentVariable.IsSecret)
-			assert.Equal(t, c.value, got.EnvironmentVariable.Value)
-			mc.AssertExpectations(t)
-		})
+				out, err := execEnvCmd(append([]string{n.noun, "get", "TOKEN", "--workspace-id", "ws-test", "-o", "json"}, c.flags...)...)
+				require.NoError(t, err)
+				valueKey, overrideKey := "environment_variable", "environment_variable_overrides"
+				if n.typ == astrov1.EnvironmentObjectObjectTypeAIRFLOWVARIABLE {
+					valueKey, overrideKey = "airflow_variable", "airflow_variable_overrides"
+				}
+				var got struct {
+					ObjectKey string                       `json:"object_key"`
+					SetFields []string                     `json:"set_fields"`
+					Links     []map[string]json.RawMessage `json:"links"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(out), &got), out)
+				var value, override struct {
+					IsSecret bool            `json:"is_secret"`
+					Value    json.RawMessage `json:"value"`
+				}
+				require.NoError(t, json.Unmarshal(decodeObject(t, out)[valueKey], &value), out)
+				assert.Equal(t, "TOKEN", got.ObjectKey)
+				assert.Equal(t, []string{"value"}, got.SetFields)
+				assert.Equal(t, c.secret, value.IsSecret)
+				assert.Equal(t, c.want, string(value.Value))
+				require.Len(t, got.Links, 1)
+				require.NoError(t, json.Unmarshal(got.Links[0][overrideKey], &override), out)
+				assert.Equal(t, c.want, string(override.Value), "the link's override")
+				mc.AssertExpectations(t)
+			})
+		}
 	}
 }
 
@@ -248,4 +271,147 @@ func TestEnvVarLinkListJSON(t *testing.T) {
 	assert.Equal(t, "eu", *got.Links[0].OverrideValue)
 	assert.Equal(t, []string{other}, got.ExcludeLinks)
 	mc.AssertExpectations(t)
+}
+
+// The link reports hide a secret's value the way the object does: without
+// --include-secrets the workspace value and a link's override are null,
+// whatever the platform returned, while a link with no override has none;
+// with it they are the values.
+func TestEnvLinkListJSONHidesASecretsValue(t *testing.T) {
+	id, dep, bare := "clxyz0000000000000000000a", "clxyz0000000000000000000b", "clxyz0000000000000000000c"
+	for _, c := range []struct {
+		name      string
+		flags     []string
+		value     string // the raw json of each value
+		overrides string // what the platform returned
+	}{
+		{"without --include-secrets", nil, `null`, ""},
+		{"when the platform returned the value anyway", nil, `null`, "leaked"},
+		{"with --include-secrets", []string{"--include-secrets"}, `"eu"`, "eu"},
+	} {
+		t.Run("variable/"+c.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			defer resetEnvFlags()
+			links := []astrov1.EnvironmentObjectLink{
+				{ScopeEntityId: dep, EnvironmentVariableOverrides: &astrov1.EnvironmentObjectEnvironmentVariableOverrides{Value: c.overrides}},
+				{ScopeEntityId: bare},
+			}
+			mc := mockEnvList(t, len(c.flags) > 0, astrov1.EnvironmentObject{
+				Id: &id, ObjectKey: "REGION", Scope: astrov1.EnvironmentObjectScopeWORKSPACE, Links: &links,
+				EnvironmentVariable: &astrov1.EnvironmentObjectEnvironmentVariable{Value: c.overrides, IsSecret: true},
+			})
+			astroV1Client = mc
+
+			out, err := execEnvCmd(append([]string{envNouns[0].noun, "link", "list", "--variable-key", "REGION", "--workspace-id", "ws-test", "-o", "json"}, c.flags...)...)
+			require.NoError(t, err)
+			fields := decodeObject(t, out)
+			assert.Equal(t, c.value, string(fields["workspace_value"]))
+			var got []map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(fields["links"], &got), out)
+			require.Len(t, got, 2)
+			assert.Equal(t, c.value, string(got[0]["override_value"]))
+			assert.NotContains(t, got[1], "override_value", "a link with no override has none")
+			mc.AssertExpectations(t)
+		})
+		t.Run("airflow-variable/"+c.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			defer resetEnvFlags()
+			links := []astrov1.EnvironmentObjectLink{{
+				ScopeEntityId: dep, SetFields: []string{"value"},
+				AirflowVariableOverrides: &astrov1.EnvironmentObjectAirflowVariableOverrides{Value: c.overrides},
+			}}
+			mc := mockEnvList(t, len(c.flags) > 0, astrov1.EnvironmentObject{
+				Id: &id, ObjectKey: "region", Scope: astrov1.EnvironmentObjectScopeWORKSPACE, Links: &links,
+				AirflowVariable: &astrov1.EnvironmentObjectAirflowVariable{Value: c.overrides, IsSecret: true},
+			})
+			astroV1Client = mc
+
+			out, err := execEnvCmd(append([]string{"airflow-variable", "link", "list", "--airflow-variable-key", "region", "--workspace-id", "ws-test", "-o", "json"}, c.flags...)...)
+			require.NoError(t, err)
+			var got struct {
+				Links []struct {
+					Overrides map[string]json.RawMessage `json:"overrides"`
+				} `json:"links"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(out), &got), out)
+			require.Len(t, got.Links, 1)
+			assert.Equal(t, c.value, string(got.Links[0].Overrides["value"]))
+			mc.AssertExpectations(t)
+		})
+	}
+}
+
+// Without --include-secrets a connection's and a metrics export's credentials
+// are absent from the json even when the platform's answer carries them: the
+// password, the basic token, an extra key the connection's auth type marks
+// secret, and a link override's password. Every other field, and an extra
+// key that is not secret, is there. With the flag, everything is.
+func TestEnvReadsMaskCredentialsTheAPIReturned(t *testing.T) {
+	host, pw, tok, id := "db.prod", "s3cret-pw", "s3cret-tok", "clxyz0000000000000000000a"
+	conn := func() astrov1.EnvironmentObject {
+		extra := map[string]any{"region": "eu", "aws_secret_access_key": "s3cret-key"}
+		links := []astrov1.EnvironmentObjectLink{{
+			Scope: astrov1.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: "clxyz0000000000000000000b",
+			ConnectionOverrides: &astrov1.EnvironmentObjectConnectionOverrides{Host: &host, Password: &pw},
+			SetFields:           []string{"host", "password"},
+		}}
+		return astrov1.EnvironmentObject{
+			Id: &id, ObjectKey: "db", ObjectType: astrov1.EnvironmentObjectObjectTypeCONNECTION,
+			Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: "ws-test",
+			SetFields: []string{"extra.aws_secret_access_key", "extra.region", "host", "password"},
+			Links:     &links,
+			Connection: &astrov1.EnvironmentObjectConnection{
+				Type: "aws", Host: &host, Password: &pw, Extra: &extra,
+				ConnectionAuthType: &astrov1.ConnectionAuthType{Parameters: []astrov1.ConnectionAuthTypeParameter{
+					{AirflowParamName: "aws_secret_access_key", IsSecret: true, IsInExtra: true},
+					{AirflowParamName: "region", IsInExtra: true},
+				}},
+			},
+		}
+	}
+	metrics := astrov1.EnvironmentObject{
+		ObjectKey: "m", ObjectType: astrov1.EnvironmentObjectObjectTypeMETRICSEXPORT,
+		Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: "ws-test",
+		SetFields:     []string{"basicToken", "endpoint", "exporterType", "password"},
+		MetricsExport: &astrov1.EnvironmentObjectMetricsExport{Endpoint: "https://m", ExporterType: "PROMETHEUS", Password: &pw, BasicToken: &tok},
+	}
+	for _, c := range []struct {
+		name string
+		obj  astrov1.EnvironmentObject
+		args []string
+		// secrets are what the platform's answer carries for this view, and
+		// plain a field of it that is not secret.
+		secrets []string
+		plain   string
+	}{
+		{"connection get", conn(), []string{"connection", "get", "db"}, []string{"s3cret-pw", "s3cret-key"}, `"region":"eu"`},
+		{"connection list", conn(), []string{"connection", "list"}, []string{"s3cret-pw", "s3cret-key"}, `"region":"eu"`},
+		{"connection link list", conn(), []string{"connection", "link", "list", "--connection-key", "db"}, []string{"s3cret-pw"}, `"host":"db.prod"`},
+		{"metrics-export get", metrics, []string{"metrics-export", "get", "m"}, []string{"s3cret-pw", "s3cret-tok"}, `"endpoint":"https://m"`},
+		{"metrics-export list", metrics, []string{"metrics-export", "list"}, []string{"s3cret-pw", "s3cret-tok"}, `"endpoint":"https://m"`},
+	} {
+		for _, include := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/include-secrets=%v", c.name, include), func(t *testing.T) {
+				testUtil.InitTestConfig(testUtil.LocalPlatform)
+				defer resetEnvFlags()
+				mc := mockEnvList(t, include, c.obj)
+				astroV1Client = mc
+				args := append(slices.Clone(c.args), "--workspace-id", "ws-test", "-o", "json")
+				if include {
+					args = append(args, "--include-secrets")
+				}
+				out, err := execEnvCmd(args...)
+				require.NoError(t, err)
+				check := assert.NotContains
+				if include {
+					check = assert.Contains
+				}
+				for _, secret := range c.secrets {
+					check(t, out, secret, "published only when asked for, whatever the platform sent")
+				}
+				assert.Contains(t, out, c.plain, "what is not secret is there either way")
+				mc.AssertExpectations(t)
+			})
+		}
+	}
 }

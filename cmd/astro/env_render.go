@@ -56,9 +56,10 @@ func createdAsHeld(warn io.Writer, r cliout.Renderer, obj *astrov1.EnvironmentOb
 }
 
 // setInfo is the object a set or a delete publishes, its secrets masked
-// whatever the platform answered with (env.MaskSecrets).
+// whatever the platform answered with (env.MaskSecrets): a secret's value is
+// null, a password or token absent.
 func setInfo(obj *astrov1.EnvironmentObject) env.ObjectInfo {
-	return env.NewObjectInfo(env.MaskSecrets(obj))
+	return env.NewObjectInfo(env.MaskSecrets(obj), false)
 }
 
 // renderEnvSet renders the object a single set left: "Created KEY (id: ID)"

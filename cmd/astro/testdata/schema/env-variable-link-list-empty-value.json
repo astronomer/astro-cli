@@ -1,0 +1,14 @@
+{
+  "object_key": "KEY",
+  "object_id": "ID",
+  "workspace_value": "",
+  "is_secret": false,
+  "auto_link_deployments": false,
+  "links": [
+    {
+      "deployment_id": "DEP",
+      "override_value": ""
+    }
+  ],
+  "exclude_links": []
+}

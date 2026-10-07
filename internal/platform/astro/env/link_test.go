@@ -464,11 +464,11 @@ func (s *Suite) TestListVarLinksReportsAll() {
 	report, err := ListVarLinks("FOO", Scope{WorkspaceID: cuid.New()}, false, mc)
 	s.NoError(err)
 	s.Equal("FOO", report.ObjectKey)
-	s.Equal("ws-default", report.WorkspaceValue)
+	s.Equal(ptr("ws-default"), report.WorkspaceValue)
 	s.True(report.AutoLinkDeployments)
 	s.Len(report.Links, 2)
 	s.Nil(report.Links[0].OverrideValue) // dep1 has no override
-	s.Equal(overrideVal, *report.Links[1].OverrideValue)
+	s.Equal(ptr(ptr(overrideVal)), report.Links[1].OverrideValue)
 	s.Equal([]string{dep3}, report.ExcludeLinks)
 	mc.AssertExpectations(s.T())
 }

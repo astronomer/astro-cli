@@ -20,9 +20,9 @@ func (s *Suite) TestEmptyListsAreJSONArrays() {
 		w   writer
 	}{
 		"var list":         {"variables", func(b *bytes.Buffer) error { return WriteVarList(nil, false, jsonTo(b)) }},
-		"conn list":        {"connections", func(b *bytes.Buffer) error { return WriteConnList(nil, jsonTo(b)) }},
+		"conn list":        {"connections", func(b *bytes.Buffer) error { return WriteConnList(nil, false, jsonTo(b)) }},
 		"airflow var list": {"airflow_variables", func(b *bytes.Buffer) error { return WriteAirflowVarList(nil, false, jsonTo(b)) }},
-		"metrics list":     {"metrics_exports", func(b *bytes.Buffer) error { return WriteMetricsExportList(nil, jsonTo(b)) }},
+		"metrics list":     {"metrics_exports", func(b *bytes.Buffer) error { return WriteMetricsExportList(nil, false, jsonTo(b)) }},
 		"inventory":        {"objects", func(b *bytes.Buffer) error { return WriteInventory(nil, jsonTo(b)) }},
 	} {
 		var js bytes.Buffer
@@ -46,12 +46,12 @@ func (s *Suite) TestWritersPublishOneObject() {
 	}{
 		{"var", func(r output.Emitter) error { return WriteVar(obj, false, r) }, ""},
 		{"var list", func(r output.Emitter) error { return WriteVarList(list, false, r) }, "variables"},
-		{"conn", func(r output.Emitter) error { return WriteConn(obj, r) }, ""},
-		{"conn list", func(r output.Emitter) error { return WriteConnList(list, r) }, "connections"},
+		{"conn", func(r output.Emitter) error { return WriteConn(obj, false, r) }, ""},
+		{"conn list", func(r output.Emitter) error { return WriteConnList(list, false, r) }, "connections"},
 		{"airflow var", func(r output.Emitter) error { return WriteAirflowVar(obj, false, r) }, ""},
 		{"airflow var list", func(r output.Emitter) error { return WriteAirflowVarList(list, false, r) }, "airflow_variables"},
-		{"metrics", func(r output.Emitter) error { return WriteMetricsExport(obj, r) }, ""},
-		{"metrics list", func(r output.Emitter) error { return WriteMetricsExportList(list, r) }, "metrics_exports"},
+		{"metrics", func(r output.Emitter) error { return WriteMetricsExport(obj, false, r) }, ""},
+		{"metrics list", func(r output.Emitter) error { return WriteMetricsExportList(list, false, r) }, "metrics_exports"},
 		{"var links", func(r output.Emitter) error {
 			return WriteVarLinks(&VarLinksReport{ObjectKey: "K"}, false, r)
 		}, ""},
@@ -204,9 +204,9 @@ func (s *Suite) TestWriteVarLinksTableSecrets() {
 	override := "secret-override"
 	report := &VarLinksReport{
 		ObjectKey:      "FOO",
-		WorkspaceValue: "secret-value",
+		WorkspaceValue: ptr("secret-value"),
 		IsSecret:       true,
-		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &override}},
+		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: ptr(&override)}},
 	}
 
 	s.Run("masks workspace value and override without --include-secrets", func() {
@@ -235,8 +235,8 @@ func (s *Suite) TestWriteVarLinksTableClampsValues() {
 	long := strings.Repeat("x", 500)
 	report := &VarLinksReport{
 		ObjectKey:      "FOO",
-		WorkspaceValue: "line1\nline2",
-		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: &long}},
+		WorkspaceValue: ptr("line1\nline2"),
+		Links:          []VarLink{{DeploymentID: "dep1", OverrideValue: ptr(&long)}},
 	}
 	var buf bytes.Buffer
 	s.NoError(WriteVarLinks(report, false, textTo(&buf)))
@@ -245,5 +245,41 @@ func (s *Suite) TestWriteVarLinksTableClampsValues() {
 	s.Contains(out, "line1 ⏎ line2")
 	for _, line := range strings.Split(out, "\n") {
 		s.LessOrEqual(len([]rune(line)), 120, "rendered line exceeds bounded width: %q", line)
+	}
+}
+
+// An Airflow variable's link table marks a hidden override the way the
+// variable link table does, so it is not mistaken for a real empty one,
+// which still prints as empty.
+func (s *Suite) TestAirflowVarLinksTableMarksAHiddenOverride() {
+	for _, c := range []struct {
+		name         string
+		secret       bool
+		shown        bool
+		value, want  string
+		wantNotFound string
+	}{
+		{"a hidden secret", true, false, "", "value=" + hiddenOverride, ""},
+		{"a hidden secret the platform returned", true, false, "leaked", "value=" + hiddenOverride, "leaked"},
+		{"a secret asked for", true, true, "eu", "value=eu", hiddenOverride},
+		{"a real empty value", false, false, "", "value= ", hiddenOverride},
+	} {
+		id := "id1"
+		obj := &astrov1.EnvironmentObject{
+			Id: &id, ObjectKey: "A",
+			AirflowVariable: &astrov1.EnvironmentObjectAirflowVariable{Value: c.value, IsSecret: c.secret},
+			Links: &[]astrov1.EnvironmentObjectLink{{
+				ScopeEntityId:            "dep1",
+				AirflowVariableOverrides: &astrov1.EnvironmentObjectAirflowVariableOverrides{Value: c.value},
+			}},
+		}
+		report, err := newLinksReport(linkKinds[LinkAirflowVariable], obj, c.shown)
+		s.Require().NoError(err, c.name)
+		var buf bytes.Buffer
+		s.NoError(WriteLinks(report, textTo(&buf)), c.name)
+		s.Contains(buf.String(), "dep1           "+c.want, c.name)
+		if c.wantNotFound != "" {
+			s.NotContains(buf.String(), c.wantNotFound, c.name)
+		}
 	}
 }
