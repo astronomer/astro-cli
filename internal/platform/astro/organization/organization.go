@@ -231,18 +231,21 @@ func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer, 
 	return now, nil
 }
 
-// Write the audit logs to the provided io.Writer.
-func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, earliest int) error {
+// ExportAuditLogs writes the audit logs of the Organization orgName names, or
+// the current one, from earliest days back, gzipped, to filePath, or to a
+// file named for the Organization and the date when it is empty. It returns
+// what it wrote, and prints nothing.
+func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, earliest int) (*AuditLogExport, error) {
 	var orgID string
 	or, err := ListOrganizations(astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if orgName == "" {
 		// get current context
 		c, err := context.GetCurrentContext()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		orgID = c.Organization
 		for i := range or {
@@ -259,7 +262,7 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 			}
 		}
 		if orgID == "" {
-			return errInvalidOrganizationName
+			return nil, errInvalidOrganizationName
 		}
 	}
 	if filePath == "" {
@@ -276,11 +279,11 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 	}
 	resp, err := astroV1Client.GetOrganizationAuditLogsWithResponse(http_context.Background(), orgID, organizationAuditLogsParams)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// The v1 audit-logs endpoint responds with Content-Encoding: gzip, so Go's
@@ -290,17 +293,15 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 	// case the transport does not decompress it (e.g. a proxy strips the header).
 	body, err := ensureGzip(resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	filePerms := 0o644
 	err = os.WriteFile(filePath, body, os.FileMode(filePerms))
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	fmt.Println("Finished exporting logs to local GZIP file")
-	return nil
+	return &AuditLogExport{OutputFile: filePath, OrganizationID: orgID, Days: earliest, Bytes: len(body)}, nil
 }
 
 // ensureGzip returns a gzip-compressed copy of body, unless body is already

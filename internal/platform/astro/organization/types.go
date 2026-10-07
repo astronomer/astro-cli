@@ -44,3 +44,14 @@ type ClusterInfo struct {
 type ClusterList struct {
 	Clusters []ClusterInfo `json:"clusters"`
 }
+
+// AuditLogExport is what `astro organization audit-logs export` publishes:
+// the file it wrote, as the path it was given or the name it chose, the
+// Organization whose logs it holds, how many days back they reach, and the
+// file's size in bytes.
+type AuditLogExport struct {
+	OutputFile     string `json:"output_file"`
+	OrganizationID string `json:"organization_id"`
+	Days           int    `json:"days"`
+	Bytes          int    `json:"bytes"`
+}

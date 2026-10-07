@@ -27,6 +27,7 @@ var (
 	wsSwitch                           = workspace.SwitchTo
 	orgName                            string
 	auditLogsOutputFilePath            string
+	auditLogsOutput                    string
 	auditLogsEarliestParam             int
 	auditLogsEarliestParamDefaultValue = 1
 	shouldDisplayLoginLink             bool
@@ -138,7 +139,7 @@ func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
+func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "export",
 		Aliases: []string{"e"},
@@ -153,13 +154,18 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 
   # Export the last 7 days of another Organization
   astro organization audit-logs export --organization-name my-org --include 7
+
+  # Export to a file, and print where it went as JSON
+  astro organization audit-logs export --output-file audit-logs.gz -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return organizationExportAuditLogs(cmd)
+			return organizationExportAuditLogs(cmd, out)
 		},
 	}
+	cliout.AddOutputFlag(cmd, &auditLogsOutput)
 	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for")
-	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
+	// No shorthand: -o is --output, as on every other command.
+	cmd.Flags().StringVar(&auditLogsOutputFilePath, "output-file", "", "Path to a file for storing exported audit logs. Defaults to a file in the current directory named for the Organization, the days and the date")
 	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
 		"Number of days in the past to start exporting logs from, from 1 to 90")
 	return cmd
@@ -300,13 +306,23 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 	return emitOrganizationSwitch(r, res, switched.Changed, false)
 }
 
-func organizationExportAuditLogs(cmd *cobra.Command) error {
+func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(auditLogsOutput)
+	if err != nil {
+		// -o was --output-file's shorthand here until it became --output,
+		// so a script passing -o <path> lands here.
+		return fmt.Errorf("%w; -o is the output format, and --output-file takes the path", err)
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	fmt.Println("This may take some time depending on how many days are being exported.")
-	return orgExportAuditLogs(astroV1Client,
+	fmt.Fprintln(questionsTo(cmd, format, out), "This may take some time depending on how many days are being exported.")
+	export, err := orgExportAuditLogs(astroV1Client,
 		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
+	if err != nil {
+		return err
+	}
+	return emitAuditLogExport(cliout.Renderer{Format: format, Out: out}, export)
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {

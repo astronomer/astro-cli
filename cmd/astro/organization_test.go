@@ -7,12 +7,16 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
@@ -240,8 +244,10 @@ func TestOrganizationSwitch(t *testing.T) {
 func TestOrganizationExportAuditLogs(t *testing.T) {
 	// turn on audit logs
 	config.CFG.AuditLogs.SetHomeString("true")
-	orgExportAuditLogs = func(astroV1Client astrov1.APIClient, orgName, filePath string, earliest int) error {
-		return nil
+	orig := orgExportAuditLogs
+	t.Cleanup(func() { orgExportAuditLogs = orig })
+	orgExportAuditLogs = func(astroV1Client astrov1.APIClient, orgName, filePath string, earliest int) (*organization.AuditLogExport, error) {
+		return &organization.AuditLogExport{OutputFile: filePath, Days: earliest}, nil
 	}
 
 	t.Run("Without params", func(t *testing.T) {
@@ -265,4 +271,75 @@ func TestOrganizationExportAuditLogs(t *testing.T) {
 		}
 	}
 	os.Remove("test.json")
+}
+
+// auditLogsMock answers an audit-log export of the test config's
+// Organization with body.
+func auditLogsMock(t *testing.T, body []byte) *astrov1_mocks.ClientWithResponsesInterface {
+	t.Helper()
+	m := new(astrov1_mocks.ClientWithResponsesInterface)
+	orgs := []astrov1.Organization{{Id: "test-org-id", Name: "Test Org"}}
+	m.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&astrov1.ListOrganizationsResponse{
+		HTTPResponse: ok200(),
+		JSON200:      &astrov1.OrganizationsPaginated{Organizations: orgs, TotalCount: len(orgs), Limit: 100},
+	}, nil).Once()
+	m.On("GetOrganizationAuditLogsWithResponse", mock.Anything, "test-org-id", mock.Anything).Return(&astrov1.GetOrganizationAuditLogsResponse{HTTPResponse: ok200(), Body: body}, nil).Once()
+	return m
+}
+
+// What an audit-log export prints: in text the two lines it always printed;
+// under json the file it wrote, with the note on stderr. -o is the output
+// format here as everywhere, so it no longer names the file.
+func TestOrganizationAuditLogsExportOutput(t *testing.T) {
+	body := []byte(`{"action":"login"}` + "\n")
+	args := []string{"organization", "audit-logs", "export"}
+
+	t.Run("text", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "audit.gz")
+		m := auditLogsMock(t, body)
+		r := execAstroCmd(t, m, "", newOrganizationCmd, append(args, "--output-file", path)...)
+		require.NoError(t, r.err)
+		assert.Equal(t, "This may take some time depending on how many days are being exported.\nFinished exporting logs to local GZIP file\n", r.stdout)
+		assert.FileExists(t, path)
+		m.AssertExpectations(t)
+	})
+
+	t.Run("json with --output-file", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "audit.gz")
+		m := auditLogsMock(t, body)
+		r := execAstroCmd(t, m, "", newOrganizationCmd, append(args, "--output-file", path, "--include", "7", "-o", "json")...)
+		require.NoError(t, r.err)
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		jsonIs(map[string]any{"output_file": path, "organization_id": "test-org-id", "days": float64(7), "bytes": float64(info.Size())})(t, r.stdout)
+		assert.Equal(t, "This may take some time depending on how many days are being exported.\n", r.stderr)
+		m.AssertExpectations(t)
+	})
+
+	// With no --output-file the export names its own file, and the result is
+	// how a script learns which.
+	t.Run("json naming no file", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		m := auditLogsMock(t, body)
+		r := execAstroCmd(t, m, "", newOrganizationCmd, append(args, "-o", "json")...)
+		require.NoError(t, r.err)
+		var got organization.AuditLogExport
+		decodeOne(t, r.stdout, &got)
+		assert.Equal(t, "testorg-logs-1-day-"+time.Now().Format("20060102")+".ndjson.gz", got.OutputFile)
+		assert.FileExists(t, got.OutputFile)
+		m.AssertExpectations(t)
+	})
+
+	// A script still passing -o <path> gets a usage error that says where
+	// the path goes now, and nothing is exported or written.
+	t.Run("-o with a path", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		// A client that answers nothing: a usage error makes no request.
+		r := execAstroCmd(t, new(astrov1_mocks.ClientWithResponsesInterface), "", newOrganizationCmd, append(args, "-o", "audit.gz")...)
+		require.Error(t, r.err)
+		assert.Equal(t, cliout.ExitUsage, r.code)
+		assert.EqualError(t, r.err, `unknown output format "audit.gz" (supported: text, json); -o is the output format, and --output-file takes the path`)
+		assert.Empty(t, r.stdout)
+		assert.NoFileExists(t, "audit.gz")
+	})
 }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -493,11 +494,13 @@ func (s *Suite) TestIsOrgHosted() {
 func (s *Suite) TestExportAuditLogs() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// An export naming no file writes one into the working directory.
+	s.T().Chdir(s.T().TempDir())
 	s.Run("export audit logs success", func() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
-		err := ExportAuditLogs(mockV1Client, "", "", 1)
+		_, err := ExportAuditLogs(mockV1Client, "", "", 1)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -505,8 +508,15 @@ func (s *Suite) TestExportAuditLogs() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
-		err := ExportAuditLogs(mockV1Client, "org1", "", 1)
+		export, err := ExportAuditLogs(mockV1Client, "org1", "", 3)
 		s.NoError(err)
+		// The file it named for the Organization, the days and the date, and
+		// wrote.
+		s.Equal("org1-logs-3-days-"+time.Now().Format("20060102")+".ndjson.gz", export.OutputFile)
+		s.Equal(3, export.Days)
+		info, err := os.Stat(export.OutputFile)
+		s.NoError(err)
+		s.Equal(int(info.Size()), export.Bytes)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("exported file is valid gzip of the raw NDJSON body", func() {
@@ -515,11 +525,12 @@ func (s *Suite) TestExportAuditLogs() {
 		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
 
 		filePath := s.T().TempDir() + "/audit-logs.ndjson.gz"
-		err := ExportAuditLogs(mockV1Client, "org1", filePath, 1)
+		export, err := ExportAuditLogs(mockV1Client, "org1", filePath, 1)
 		s.NoError(err)
 
 		written, err := os.ReadFile(filePath)
 		s.NoError(err)
+		s.Equal(&AuditLogExport{OutputFile: filePath, OrganizationID: "org1", Days: 1, Bytes: len(written)}, export)
 		// File must be a real gzip stream, not raw JSON (the AI-978 regression).
 		s.Equal(byte(0x1f), written[0])
 		s.Equal(byte(0x8b), written[1])
@@ -547,14 +558,14 @@ func (s *Suite) TestExportAuditLogs() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
-		err := ExportAuditLogs(mockV1Client, "", "", 1)
+		_, err := ExportAuditLogs(mockV1Client, "", "", 1)
 		s.Contains(err.Error(), "network error")
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("list failure", func() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
-		err := ExportAuditLogs(mockV1Client, "org1", "", 1)
+		_, err := ExportAuditLogs(mockV1Client, "org1", "", 1)
 		s.Contains(err.Error(), "network error")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -562,7 +573,7 @@ func (s *Suite) TestExportAuditLogs() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponseError, nil).Once()
-		err := ExportAuditLogs(mockV1Client, "", "", 1)
+		_, err := ExportAuditLogs(mockV1Client, "", "", 1)
 		s.Contains(err.Error(), "failed to fetch organizations audit logs")
 		mockV1Client.AssertExpectations(s.T())
 	})

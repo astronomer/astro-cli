@@ -53,6 +53,12 @@ func emitWorkspaceRemoval(r cliout.Renderer, removal *workspace.Removal) error {
 	}))
 }
 
+// emitAuditLogExport publishes the file an audit-log export wrote; in text,
+// the line the command always printed.
+func emitAuditLogExport(r cliout.Renderer, export *organization.AuditLogExport) error {
+	return r.Emit(export, cliout.Text(func(b *bufio.Writer) { fmt.Fprintln(b, "Finished exporting logs to local GZIP file") }))
+}
+
 // emitWorkspaceSwitch publishes the Workspace a switch made current. In text
 // it is the context table the switch always printed, read from the config the
 // switch wrote.

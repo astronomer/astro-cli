@@ -184,6 +184,8 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "organization-switch", Value: organization.SwitchResult{}},
 	// astro organization role list.
 	{Name: "organization-role-list", Value: roleClient.RoleList{}},
+	// astro organization audit-logs export: the file it wrote.
+	{Name: "organization-audit-logs-export", Value: organization.AuditLogExport{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -216,7 +218,7 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Forty-one shapes reach Emit in this package's tests today:
+// would be silent. Forty-two shapes reach Emit in this package's tests today:
 // the deployment variable and token results, the deployment, workspace and
 // organization user and team results, the workspace and organization token
 // results, the pkg/output lists and the `astro env` payloads (reads and
@@ -224,10 +226,10 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // inspect's deployment (which create and update publish too), delete's
 // removal, hibernate's override, the worker-queue result, the log entry,
 // the Workspace a create, update or switch publishes and what a Workspace
-// delete did, what an Organization switch left current, the role list, and
-// the error object.
+// delete did, what an Organization switch left current, the role list, the
+// file an audit-log export wrote, and the error object.
 // Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 41
+const minWatchedPayloads = 42
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would
