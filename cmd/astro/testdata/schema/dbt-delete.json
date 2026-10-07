@@ -1,0 +1,9 @@
+{
+  "action": "x",
+  "deployment": "x",
+  "workspace": "x",
+  "deploy_id": "x",
+  "mount_path": "x",
+  "waited": true,
+  "wait_error": "x"
+}

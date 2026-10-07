@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestRemoteRootCmd(t *testing.T) {
-	cmd := newRemoteRootCmd()
+	cmd := newRemoteRootCmd(os.Stdout)
 	assert.Equal(t, "remote", cmd.Use)
 	assert.Equal(t, "Manage remote deploys and images", cmd.Short)
 	assert.True(t, cmd.HasSubCommands())
@@ -250,7 +251,7 @@ func TestRemoteDeployDeploymentValidation(t *testing.T) {
 
 // Test that ensures the remote command integrates properly with the root command
 func TestRemoteCommandIntegration(t *testing.T) {
-	rootCmd := newRemoteRootCmd()
+	rootCmd := newRemoteRootCmd(os.Stdout)
 
 	t.Run("remote root has deploy subcommand", func(t *testing.T) {
 		deployCmd, _, err := rootCmd.Find([]string{"deploy"})

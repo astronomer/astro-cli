@@ -266,7 +266,7 @@ type NonDagsDeploySuite struct {
 	suite.Suite
 	mockV1Client     *astrov1_mocks.ClientWithResponsesInterface
 	origV1Client     astrov1.APIClient
-	origDeployBundle func(deployInput *astrodeploy.DeployBundleInput) error
+	origDeployBundle func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error)
 	origWorkingPath  string
 	origWd           string
 	tmpWorkingDir    string
@@ -318,9 +318,9 @@ func (s *NonDagsDeploySuite) TestRequiresMountPath() {
 
 func (s *NonDagsDeploySuite) TestBundleTypeDefaultsToNone() {
 	var captured *astrodeploy.DeployBundleInput
-	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
 		captured = deployInput
-		return nil
+		return astrodeploy.BundleDeploy{}, nil
 	}
 
 	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x")
@@ -337,9 +337,9 @@ func (s *NonDagsDeploySuite) TestRejectsIncompatibleFlag() {
 
 func (s *NonDagsDeploySuite) TestProvidedDeploymentId() {
 	var captured *astrodeploy.DeployBundleInput
-	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
 		captured = deployInput
-		return nil
+		return astrodeploy.BundleDeploy{}, nil
 	}
 
 	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt")

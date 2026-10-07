@@ -24,35 +24,60 @@ type DeployBundleInput struct {
 	BundlePath   string
 	MountPath    string
 	DeploymentID string
-	BundleType   string
-	Description  string
-	Wait         bool
-	WaitTime     time.Duration
-	// Progress takes the --wait progress; nil is stderr.
-	Progress      io.Writer
+	// Deployment is the Deployment as the caller already read it (from the
+	// picker, or by name); nil reads it by DeploymentID.
+	Deployment    *astrov1.Deployment
+	BundleType    string
+	Description   string
 	AstroV1Client astrov1.APIClient
 }
 
-func DeployBundle(input *DeployBundleInput) error {
+// BundleGit is the commit a bundle deploy recorded, when the bundle sits in a
+// git checkout with no uncommitted changes.
+type BundleGit struct {
+	CommitSHA string
+	Branch    string
+	CommitURL string
+}
+
+// BundleDeploy is what a bundle deploy did: the deploy it created on the
+// Deployment and the version of the bundle it uploaded. Waiting for the
+// Deployment to take it is the caller's (WaitForBundle), so a caller can
+// report the upload before the wait begins.
+type BundleDeploy struct {
+	DeploymentID   string
+	DeploymentName string
+	WorkspaceID    string
+	DeployID       string
+	MountPath      string
+	BundleVersion  string
+	Git            *BundleGit
+}
+
+// DeployBundle uploads the bundle at input.BundlePath to the Deployment and
+// finalizes the deploy. It does not report the result: its caller renders the
+// BundleDeploy it returns.
+func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return BundleDeploy{}, err
 	}
 
-	// get the current deployment so we can check the deploy is valid
-	currentDeployment, err := deployment.GetDeploymentByID(c.Organization, input.DeploymentID, input.AstroV1Client)
+	// the deployment, to check the deploy is valid: as the caller read it, or
+	// read now when the caller knew only its id
+	currentDeployment, err := deploymentFor(c.Organization, input.DeploymentID, input.Deployment, input.AstroV1Client)
 	if err != nil {
-		return err
+		return BundleDeploy{}, err
 	}
 
 	// if CI/CD is enforced, check the subject can deploy
 	if currentDeployment.IsCicdEnforced && !canCiCdDeploy(c.Token) {
-		return fmt.Errorf(errCiCdEnforcementUpdate, currentDeployment.Name)
+		return BundleDeploy{}, fmt.Errorf(errCiCdEnforcementUpdate, currentDeployment.Name)
 	}
 
 	// check the deployment is enabled for DAG deploys
 	if !currentDeployment.IsDagDeployEnabled {
-		return fmt.Errorf(enableDagDeployMsg, input.DeploymentID)
+		return BundleDeploy{}, fmt.Errorf(enableDagDeployMsg, input.DeploymentID)
 	}
 
 	// Check if git metadata is enabled (default: true)
@@ -70,55 +95,93 @@ func DeployBundle(input *DeployBundleInput) error {
 	// initialize the deploy
 	deploy, err := createBundleDeploy(c.Organization, input, deployGit, input.AstroV1Client)
 	if err != nil {
-		return explainHibernating(err, &currentDeployment)
+		return BundleDeploy{}, explainHibernating(err, &currentDeployment)
 	}
 
 	// check we received an upload URL
 	if deploy.BundleUploadUrl == nil {
-		return errors.New("no bundle upload URL received from Astro")
+		return BundleDeploy{}, errors.New("no bundle upload URL received from Astro")
 	}
 
 	// upload the bundle
 	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.AstroRuntimeVersion)
 	if err != nil {
-		return err
+		return BundleDeploy{}, err
 	}
 
 	// finalize the deploy
 	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, tarballVersion, input.AstroV1Client)
 	if err != nil {
-		return err
+		return BundleDeploy{}, err
 	}
-	fmt.Println("Successfully uploaded bundle with version " + tarballVersion + " to Astro.")
 
-	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
-	if input.Wait {
-		err = deployment.HealthPoll(input.Progress, currentDeployment.Id, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
-		if err != nil {
-			return err
+	res := BundleDeploy{
+		DeploymentID:   currentDeployment.Id,
+		DeploymentName: currentDeployment.Name,
+		WorkspaceID:    currentDeployment.WorkspaceId,
+		DeployID:       deploy.Id,
+		MountPath:      input.MountPath,
+		BundleVersion:  tarballVersion,
+	}
+	if deployGit != nil {
+		res.Git = &BundleGit{CommitSHA: deployGit.CommitSha}
+		if deployGit.Branch != nil {
+			res.Git.Branch = *deployGit.Branch
+		}
+		if deployGit.CommitUrl != nil {
+			res.Git.CommitURL = *deployGit.CommitUrl
 		}
 	}
+	return res, nil
+}
 
-	return nil
+// deploymentFor is read when the caller has it, and the Deployment with id
+// read from Astro otherwise.
+func deploymentFor(orgID, id string, read *astrov1.Deployment, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+	if read != nil {
+		return *read, nil
+	}
+	return deployment.GetDeploymentByID(orgID, id, astroV1Client)
+}
+
+// WaitForBundle waits up to waitTime for the Deployment to become healthy
+// after a bundle deploy or delete, writing its progress to progress (nil is
+// stderr).
+func WaitForBundle(progress io.Writer, deploymentID string, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+	return deployment.HealthPoll(progress, deploymentID, dagOnlyDeploySleepTime, tickNum, int(waitTime.Seconds()), astroV1Client)
 }
 
 type DeleteBundleInput struct {
 	MountPath    string
 	DeploymentID string
-	WorkspaceID  string
-	BundleType   string
-	Description  string
-	Wait         bool
-	WaitTime     time.Duration
-	// Progress takes the --wait progress; nil is stderr.
-	Progress      io.Writer
+	// Deployment is the Deployment as the caller already read it (from the
+	// picker, or by name), nil when it knew only DeploymentID. A delete reads
+	// nothing to fill it in: it names the Workspace only from this, and
+	// explains a hibernating refusal with what it has.
+	Deployment    *astrov1.Deployment
+	BundleType    string
+	Description   string
 	AstroV1Client astrov1.APIClient
 }
 
-func DeleteBundle(input *DeleteBundleInput) error {
+// BundleDelete is what a bundle delete did: the deploy that removes the
+// bundle at MountPath from the Deployment. Astro removes it as the
+// Deployment takes that deploy, which WaitForBundle waits for. WorkspaceID
+// is empty when the caller did not know it.
+type BundleDelete struct {
+	DeploymentID string
+	WorkspaceID  string
+	DeployID     string
+	MountPath    string
+}
+
+// DeleteBundle requests the removal of the bundle mounted at input.MountPath.
+// It does not report the result: its caller renders the BundleDelete it
+// returns.
+func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return BundleDelete{}, err
 	}
 
 	// initialize the deploy
@@ -130,25 +193,27 @@ func DeleteBundle(input *DeleteBundleInput) error {
 	}
 	deploy, err := createBundleDeploy(c.Organization, createInput, nil, input.AstroV1Client)
 	if err != nil {
-		return err
+		known := input.Deployment
+		if known == nil {
+			known = &astrov1.Deployment{Id: input.DeploymentID}
+		}
+		return BundleDelete{}, explainHibernating(err, known)
 	}
 
 	// immediately finalize with no version, which will delete the bundle from the deployment
 	err = finalizeBundleDeploy(c.Organization, input.DeploymentID, deploy.Id, "", input.AstroV1Client)
 	if err != nil {
-		return err
+		return BundleDelete{}, err
 	}
-	fmt.Println("Successfully requested bundle delete for mount path " + input.MountPath + " from Astro.")
-
-	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
-	if input.Wait {
-		err = deployment.HealthPoll(input.Progress, input.DeploymentID, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
-		if err != nil {
-			return err
-		}
+	res := BundleDelete{
+		DeploymentID: input.DeploymentID,
+		DeployID:     deploy.Id,
+		MountPath:    input.MountPath,
 	}
-
-	return nil
+	if input.Deployment != nil {
+		res.WorkspaceID = input.Deployment.WorkspaceId
+	}
+	return res, nil
 }
 
 // ValidateBundleSymlinks checks if any symlinks within the bundlePath point outside of it

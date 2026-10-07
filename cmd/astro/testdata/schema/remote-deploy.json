@@ -1,0 +1,14 @@
+{
+  "image": "x",
+  "registry": "x",
+  "tag": "x",
+  "source_image": "x",
+  "platforms": [
+    "x"
+  ],
+  "runtime_check": {
+    "deployment": "x",
+    "client_runtime_version": "x",
+    "deployment_runtime_version": "x"
+  }
+}

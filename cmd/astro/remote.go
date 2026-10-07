@@ -1,10 +1,12 @@
 package astro
 
 import (
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
@@ -31,12 +33,14 @@ const (
 )
 
 // newRemoteRootCmd creates the root command for remote operations
-func newRemoteRootCmd() *cobra.Command {
+func newRemoteRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remote",
 		Short: "Manage remote deploys and images",
 		Long:  "Commands for interacting with remote registries and deploying client images",
 	}
+	// Bound for the same reason as dbt: see newDbtCmd.
+	cmd.SetOut(out)
 
 	cmd.AddCommand(newRemoteDeployCmd())
 	applyPreferredFlagsIn(cmd)
@@ -68,14 +72,29 @@ func newRemoteDeployCmd() *cobra.Command {
 	utils.AddBuildSecretFlag(cmd.Flags(), &remoteBuildSecrets)
 	cmd.Flags().StringVar(&remoteDeploymentID, "deployment-id", "", "Deployment ID to validate client image runtime version against deployment runtime version")
 	addDeploymentFlag(cmd.Flags(), "Deployment whose runtime version the client image is validated against")
+	cliout.AddOutputFlag(cmd, &remoteOutput)
 
 	return cmd
 }
 
+// remoteOutput is --output for `astro remote deploy`.
+var remoteOutput string
+
+// deployClientImage builds and pushes the client image. A var so a test can
+// stand in for Docker and the registry.
+var deployClientImage = astrodeploy.DeployClientImage
+
 // remoteDeploy handles the remote deploy functionality
 func remoteDeploy(cmd *cobra.Command, args []string) error {
+	format, err := cliout.ParseFormat(remoteOutput)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	// The build's and the push's own output, and the notes on the way, are
+	// what text mode has always shown; under json they go to stderr.
+	defer strayStdoutToStderr(format)()
 
 	deployInput := astrodeploy.InputClientDeploy{
 		Path:         config.WorkingPath,
@@ -85,5 +104,9 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 		DeploymentID: remoteDeploymentID,
 	}
 
-	return astrodeploy.DeployClientImage(deployInput, astroV1Client)
+	res, err := deployClientImage(deployInput, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(newRemoteDeployJSON(&res), renderRemoteDeploy(res.Image))
 }

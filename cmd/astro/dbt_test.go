@@ -22,8 +22,8 @@ type DbtSuite struct {
 	suite.Suite
 	mockV1Client     *astrov1_mocks.ClientWithResponsesInterface
 	origV1Client     astrov1.APIClient
-	origDeployBundle func(deployInput *astrodeploy.DeployBundleInput) error
-	origDeleteBundle func(deleteInput *astrodeploy.DeleteBundleInput) error
+	origDeployBundle func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error)
+	origDeleteBundle func(deleteInput *astrodeploy.DeleteBundleInput) (astrodeploy.BundleDelete, error)
 	origWorkingPath  string
 	origWd           string
 	tmpWorkingDir    string
@@ -78,8 +78,8 @@ func (s *DbtSuite) TestDbtDeploy_PickDeployment() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
-		return nil
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+		return astrodeploy.BundleDeploy{}, nil
 	}
 
 	s.mockListTestDeployments()
@@ -94,8 +94,8 @@ func (s *DbtSuite) TestDbtDeploy_ProvidedDeploymentId() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
-		return nil
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+		return astrodeploy.BundleDeploy{}, nil
 	}
 
 	err := testExecCmd(newDbtDeployCmd(), "test-deployment-id")
@@ -110,11 +110,11 @@ func (s *DbtSuite) TestDbtDeploy_CustomProjectPath() {
 	s.createDbtProjectFile(filepath.Join(projectPath, "dbt_project.yml"))
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
 		if deployInput.BundlePath != projectPath {
-			return assert.AnError
+			return astrodeploy.BundleDeploy{}, assert.AnError
 		}
-		return nil
+		return astrodeploy.BundleDeploy{}, nil
 	}
 
 	defer testUtil.MockUserInput(s.T(), "1")()
@@ -126,11 +126,11 @@ func (s *DbtSuite) TestDbtDeploy_CustomMountPath() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) error {
+	DeployBundle = func(deployInput *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
 		if deployInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
-			return assert.AnError
+			return astrodeploy.BundleDeploy{}, assert.AnError
 		}
-		return nil
+		return astrodeploy.BundleDeploy{}, nil
 	}
 
 	defer testUtil.MockUserInput(s.T(), "1")()
@@ -167,8 +167,8 @@ func (s *DbtSuite) TestDbtDelete_PickDeployment() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
-		return nil
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) (astrodeploy.BundleDelete, error) {
+		return astrodeploy.BundleDelete{}, nil
 	}
 
 	s.mockListTestDeployments()
@@ -183,8 +183,8 @@ func (s *DbtSuite) TestDbtDelete_ProvidedDeploymentId() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
-		return nil
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) (astrodeploy.BundleDelete, error) {
+		return astrodeploy.BundleDelete{}, nil
 	}
 
 	err := testExecCmd(newDbtDeleteCmd(), "test-deployment-id")
@@ -199,11 +199,11 @@ func (s *DbtSuite) TestDbtDelete_CustomProjectPath() {
 	s.createDbtProjectFile(filepath.Join(projectPath, "dbt_project.yml"))
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) (astrodeploy.BundleDelete, error) {
 		if deleteInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
-			return assert.AnError
+			return astrodeploy.BundleDelete{}, assert.AnError
 		}
-		return nil
+		return astrodeploy.BundleDelete{}, nil
 	}
 
 	defer testUtil.MockUserInput(s.T(), "1")()
@@ -215,11 +215,11 @@ func (s *DbtSuite) TestDbtDelete_NoMountPathOrProjectPath() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) (astrodeploy.BundleDelete, error) {
 		if deleteInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
-			return assert.AnError
+			return astrodeploy.BundleDelete{}, assert.AnError
 		}
-		return nil
+		return astrodeploy.BundleDelete{}, nil
 	}
 
 	defer testUtil.MockUserInput(s.T(), "1")()
@@ -238,11 +238,11 @@ func (s *DbtSuite) TestDbtDelete_CustomMountPath() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")
 
-	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) error {
+	DeleteBundle = func(deleteInput *astrodeploy.DeleteBundleInput) (astrodeploy.BundleDelete, error) {
 		if deleteInput.MountPath != dbtDefaultMountPathPrefix+"test_dbt_project" {
-			return assert.AnError
+			return astrodeploy.BundleDelete{}, assert.AnError
 		}
-		return nil
+		return astrodeploy.BundleDelete{}, nil
 	}
 
 	defer testUtil.MockUserInput(s.T(), "1")()

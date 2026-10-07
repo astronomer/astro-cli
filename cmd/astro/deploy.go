@@ -372,7 +372,7 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 		return errors.New("bundle path is within an Astro project. Non-DAG bundles must be a separate directory")
 	}
 
-	targetDeploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)
+	targetID, target, err := resolveBundleDeployment(args, workspaceID, deploymentName, "")
 	if err != nil {
 		return err
 	}
@@ -382,15 +382,21 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 	deployBundleInput := &astrodeploy.DeployBundleInput{
 		BundlePath:    nonDagsBundlePath,
 		MountPath:     nonDagsMountPath,
-		DeploymentID:  targetDeploymentID,
+		DeploymentID:  targetID,
+		Deployment:    target,
 		BundleType:    nonDagsBundleType,
 		Description:   deployDescription,
-		Wait:          waitForDeploy,
-		WaitTime:      waitTime,
-		Progress:      cmd.ErrOrStderr(),
 		AstroV1Client: astroV1Client,
 	}
-	return DeployBundle(deployBundleInput)
+	res, err := DeployBundle(deployBundleInput)
+	if err != nil {
+		return err
+	}
+	// A 1.x project's deploy has no --output, so this is text: the line it has
+	// always printed, then the wait.
+	return publishThenWait(cmd, cliout.FormatText, waitForDeploy, res.DeploymentID, waitTime, func(error) error {
+		return renderBundleUploaded(res.BundleVersion)(cmd.OutOrStdout())
+	})
 }
 
 // deployManifest runs the manifest deploy path: load the manifest, gather flags and

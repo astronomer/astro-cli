@@ -29,8 +29,8 @@ func AddCmds(v1Client astrov1.APIClient, v1Alpha1Client astrov1alpha1.APIClient,
 		newEnvRootCmd(out),
 		newWorkspaceCmd(out),
 		newOrganizationCmd(out),
-		newDbtCmd(),
+		newDbtCmd(out),
 		newIDECommand(out),
-		newRemoteRootCmd(),
+		newRemoteRootCmd(out),
 	}
 }

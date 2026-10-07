@@ -1512,7 +1512,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecrets: nil,
 		}
 
-		err = DeployClientImage(deployInput, nil)
+		_, err = DeployClientImage(deployInput, nil)
 		assert.NoError(t, err)
 		assert.True(t, dockerLoginCalled, "DockerLogin should have been called")
 		assert.Equal(t, "images.astronomer.cloud", capturedRegistry)
@@ -1542,7 +1542,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecrets: nil,
 		}
 
-		err = DeployClientImage(deployInput, nil)
+		_, err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
 	})
@@ -1570,7 +1570,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecrets: nil,
 		}
 
-		err = DeployClientImage(deployInput, nil)
+		_, err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
 		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
@@ -1626,7 +1626,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecrets: nil,
 		}
 
-		err = DeployClientImage(deployInput, nil)
+		_, err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to build client image")
 		mockImageHandler.AssertExpectations(t)
@@ -1683,7 +1683,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecrets: nil,
 		}
 
-		err = DeployClientImage(deployInput, nil)
+		_, err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to push client image")
 		mockImageHandler.AssertExpectations(t)
@@ -1730,7 +1730,7 @@ func TestDeployClientImage(t *testing.T) {
 			BuildSecrets: nil,
 		}
 
-		err = DeployClientImage(deployInput, nil)
+		_, err = DeployClientImage(deployInput, nil)
 		assert.NoError(t, err)
 		mockImageHandler.AssertExpectations(t)
 	})
@@ -2185,7 +2185,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 		}
 
 		// Should not error when deployment ID is empty
-		err := validateClientImageRuntimeVersion(deployInput, nil)
+		_, err := validateClientImageRuntimeVersion(deployInput, nil)
 		assert.NoError(t, err)
 	})
 
@@ -2201,7 +2201,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 
-		err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get current context")
 	})
@@ -2222,7 +2222,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				HTTPResponse: &http.Response{StatusCode: 500},
 			}, nil)
 
-		err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get deployment information")
 	})
@@ -2251,7 +2251,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Dockerfile.client is required for client image runtime version validation")
 	})
@@ -2287,7 +2287,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse Dockerfile.client")
 	})
@@ -2321,7 +2321,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to find base image in Dockerfile.client")
 	})
@@ -2357,7 +2357,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 			}, nil)
 
 		// Should error when version extraction fails
-		err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to extract runtime version from client image")
 	})
@@ -2392,7 +2392,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "client image runtime version validation failed")
 		assert.Contains(t, err.Error(), "4.0-1")
@@ -2429,8 +2429,9 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		check, err := validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.NoError(t, err)
+		assert.Equal(t, &ClientRuntimeCheck{DeploymentID: "test-deployment-id", ClientRuntimeVersion: "3.0-5", DeploymentRuntimeVersion: "3.0-7"}, check)
 	})
 
 	t.Run("success when client runtime version equals deployment version", func(t *testing.T) {
@@ -2463,7 +2464,7 @@ func TestValidateClientImageRuntimeVersion(t *testing.T) {
 				},
 			}, nil)
 
-		err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
+		_, err = validateClientImageRuntimeVersion(deployInput, mockV1Client)
 		assert.NoError(t, err)
 	})
 }

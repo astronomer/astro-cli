@@ -62,12 +62,6 @@ func cleanupRoots(roots []string) (precompute.CleanupSummary, error) {
 	return summary, nil
 }
 
-// removeArtifacts is cleanupRoots for callers that only need the error.
-func removeArtifacts(roots []string) error {
-	_, err := cleanupRoots(roots)
-	return err
-}
-
 // EnsureClean removes the Cosmos Boost artifacts earlier deploys left under
 // path, and fails when their absence cannot be guaranteed. Consumers cannot
 // tell fresh output from stale, so a deploy must not proceed while a stale

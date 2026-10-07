@@ -1572,11 +1572,11 @@ func updateResourceQuotaMemory(resourceQuotaMemory string, deployment *astrov1.D
 	return deployment.ResourceQuotaMemory
 }
 
-// errNothingTo is the failure of a command that acts on one Deployment when
+// ErrNothingTo is the failure of a command that acts on one Deployment when
 // the Workspace has none it could act on. A Deployment named by id or name is
 // one that was not found, the same failure as in a Workspace that has others;
 // with none named, there was nothing to pick from.
-func errNothingTo(ws, deploymentID, deploymentName, what string) error {
+func ErrNothingTo(ws, deploymentID, deploymentName, what string) error {
 	if deploymentID != "" || deploymentName != "" {
 		return errInvalidDeployment
 	}
@@ -1593,7 +1593,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 	}
 
 	if currentDeployment.Id == "" {
-		return nil, errNothingTo(ws, deploymentID, deploymentName, "to delete")
+		return nil, ErrNothingTo(ws, deploymentID, deploymentName, "to delete")
 	}
 
 	// prompt user
@@ -1642,7 +1642,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		return nil, err
 	}
 	if currentDeployment.Id == "" {
-		return nil, errNothingTo(ws, deploymentID, deploymentName, "to "+action)
+		return nil, ErrNothingTo(ws, deploymentID, deploymentName, "to "+action)
 	}
 
 	if currentDeployment.IsDevelopmentMode == nil || !*currentDeployment.IsDevelopmentMode {

@@ -168,7 +168,7 @@ func TestCleanupKeepsForeignSidecarWithoutError(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(foreign), 0o755))
 	require.NoError(t, os.WriteFile(foreign, []byte(`{"generated_by": {"application": "someone-else"}}`), 0o644))
 
-	require.NoError(t, Cleanup(dir))
+	require.NoError(t, cleanupErr(dir))
 	require.FileExists(t, foreign)
 }
 

@@ -97,7 +97,7 @@ func TestDeployBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
 	mockManifestDeployment(client, true, false)
 	mockCreateDeployRefused(client, blockedByHibernation)
 
-	err := DeployBundle(&DeployBundleInput{
+	_, err := DeployBundle(&DeployBundleInput{
 		BundlePath:    bundlePath,
 		MountPath:     "dbt/project",
 		DeploymentID:  "test-deployment-id",
@@ -107,6 +107,49 @@ func TestDeployBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), wakeUpHint)
 	client.AssertExpectations(t)
+}
+
+// A bundle delete reads nothing before it creates its deploy, so it explains
+// a refusal from the Deployment its caller knows: the one picked, with its
+// name and status, or one named by id, which has only the id to give.
+func TestDeleteBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
+	cases := []struct {
+		name string
+		dep  *astrov1.Deployment
+		body string
+		hint string
+	}{
+		{
+			name: "a picked Deployment read as hibernating",
+			dep:  &astrov1.Deployment{Id: "test-deployment-id", Name: "test-deployment", Status: astrov1.DeploymentStatusHIBERNATING},
+			body: `{"message":"deploy refused"}`,
+			hint: wakeUpHint,
+		},
+		{
+			name: "a Deployment named by id",
+			dep:  nil,
+			body: blockedByHibernation,
+			hint: "Astro Deployment test-deployment-id is hibernating, so it cannot take a deploy — wake it with `astro deployment wake-up test-deployment-id`",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			client := new(astrov1_mocks.ClientWithResponsesInterface)
+			mockCreateDeployRefused(client, tc.body)
+
+			_, err := DeleteBundle(&DeleteBundleInput{
+				MountPath:     "dbt/project",
+				DeploymentID:  "test-deployment-id",
+				Deployment:    tc.dep,
+				BundleType:    "dbt",
+				AstroV1Client: client,
+			})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.hint)
+			client.AssertExpectations(t)
+		})
+	}
 }
 
 func TestDeployManifestImage_HibernatingSaysHowToWakeIt(t *testing.T) {

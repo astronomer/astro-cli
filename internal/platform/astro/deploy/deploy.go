@@ -1093,16 +1093,44 @@ func setupClientDependencyFiles(buildDir string) error {
 	return nil
 }
 
-// DeployClientImage handles the client deploy functionality
-func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this shell code
+// ClientDeploy is what a client image deploy pushed, and where.
+type ClientDeploy struct {
+	// Image is the full reference pushed, Registry:Tag.
+	Image    string
+	Registry string
+	Tag      string
+	// SourceImage is the local image pushed in place of a build
+	// (InputClientDeploy.ImageName); empty when the deploy built one.
+	SourceImage string
+	// Platforms are the platforms the image was built for; empty for the
+	// host's, or when nothing was built.
+	Platforms []string
+	// RuntimeCheck is the runtime version check against a Deployment, nil
+	// when no Deployment was named.
+	RuntimeCheck *ClientRuntimeCheck
+}
+
+// ClientRuntimeCheck is the client image's runtime version checked against a
+// Deployment's: the client's is not newer.
+type ClientRuntimeCheck struct {
+	DeploymentID             string
+	ClientRuntimeVersion     string
+	DeploymentRuntimeVersion string
+}
+
+// DeployClientImage builds the client image (or tags the local one named)
+// and pushes it to the remote client registry. It does not report the result:
+// its caller renders the ClientDeploy it returns.
+func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) (ClientDeploy, error) { //nolint:gocritic // intentional in this shell code
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return errors.Wrap(err, "failed to get current context")
+		return ClientDeploy{}, errors.Wrap(err, "failed to get current context")
 	}
 
 	// Validate deployment runtime version if deployment ID is provided
-	if err := validateClientImageRuntimeVersion(deployInput, astroV1Client); err != nil {
-		return err
+	check, err := validateClientImageRuntimeVersion(deployInput, astroV1Client)
+	if err != nil {
+		return ClientDeploy{}, err
 	}
 
 	// Get the remote client registry endpoint from config
@@ -1111,7 +1139,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		fmt.Println("The Astro CLI is not configured to push client images to your private registry.")
 		fmt.Println("For remote Deployments, client images must be stored in your private registry, not in Astronomer managed registries.")
 		fmt.Println("Please provide your private registry information so the Astro CLI can push client images.")
-		return errors.New("remote client registry is not configured. To configure it, run: 'astro config set remote.client_registry <endpoint>' and try again.")
+		return ClientDeploy{}, errors.New("remote client registry is not configured. To configure it, run: 'astro config set remote.client_registry <endpoint>' and try again.")
 	}
 
 	// Use consistent deploy-<timestamp> tagging mechanism like regular deploys
@@ -1124,12 +1152,14 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	// Create an image handler for building and pushing
 	imageHandler := airflowImageHandler(remoteImage)
 
+	// Use empty slice to let Docker build for host platform by default
+	targetPlatforms := []string{}
 	if deployInput.ImageName != "" {
 		// Use the provided local image (tag will be ignored, remote tag is always timestamp-based)
 		fmt.Println("Using provided image:", deployInput.ImageName)
 		err := imageHandler.TagLocalImage(deployInput.ImageName)
 		if err != nil {
-			return fmt.Errorf("failed to tag local image: %w", err)
+			return ClientDeploy{}, fmt.Errorf("failed to tag local image: %w", err)
 		}
 	} else {
 		// Authenticate with the base image registry before building
@@ -1149,13 +1179,12 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file.")
 				fmt.Println("This could be because either your token has expired or you don't have permission to pull the base agent image.")
 				fmt.Println("Please re-login via `astro login` to refresh the credentials or validate that `ASTRO_API_TOKEN` environment variable is set with the correct token and try again")
-				return fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
+				return ClientDeploy{}, fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
 			}
 		}
 
 		// Build the client image from the current directory
 		// Determine target platforms for client deploy
-		var targetPlatforms []string
 		if deployInput.Platform != "" {
 			// Parse comma-separated platforms from --platform flag
 			targetPlatforms = strings.Split(deployInput.Platform, ",")
@@ -1165,8 +1194,6 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			}
 			fmt.Printf("Building client image for platforms: %s\n", strings.Join(targetPlatforms, ", "))
 		} else {
-			// Use empty slice to let Docker build for host platform by default
-			targetPlatforms = []string{}
 			fmt.Println("Building client image for host platform")
 		}
 
@@ -1176,7 +1203,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			defer buildContext.CleanupFunc()
 		}
 		if err != nil {
-			return fmt.Errorf("failed to prepare client build context: %w", err)
+			return ClientDeploy{}, fmt.Errorf("failed to prepare client build context: %w", err)
 		}
 
 		// Build the image from the prepared context
@@ -1187,7 +1214,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 
 		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecrets, buildConfig)
 		if err != nil {
-			return fmt.Errorf("failed to build client image: %w", err)
+			return ClientDeploy{}, fmt.Errorf("failed to build client image: %w", err)
 		}
 	}
 
@@ -1201,66 +1228,64 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")
 			fmt.Printf("Please ensure that you have logged in to `%s` via `docker login` and try again\n\n", registryEndpoint)
 		}
-		return fmt.Errorf("failed to push client image: %w", err)
+		return ClientDeploy{}, fmt.Errorf("failed to push client image: %w", err)
 	}
 
-	fmt.Printf("Successfully pushed client image to %s\n", ansi.Bold(remoteImage))
-
-	fmt.Printf("\n--------------------------------\n")
-	fmt.Println("The client image has been pushed to your private registry.")
-	fmt.Println("Your next step would be to update the agent component to use the new client image.")
-	fmt.Println("For that you would either need to update the helm chart values.yaml file or update your CI/CD pipeline to use the new client image.")
-	fmt.Printf("If you are using Astronomer provided Agent Helm chart, you would need to update the `image` field for each of the workers, dagProcessor, and triggerer component sections to the new image: %s\n", remoteImage)
-	fmt.Println("Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components")
-
-	return nil
+	return ClientDeploy{
+		Image:        remoteImage,
+		Registry:     registryEndpoint,
+		Tag:          imageTag,
+		SourceImage:  deployInput.ImageName,
+		Platforms:    targetPlatforms,
+		RuntimeCheck: check,
+	}, nil
 }
 
 // validateClientImageRuntimeVersion validates that the client image runtime version
 // is not newer than the deployment runtime version
-func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) error { //nolint:gocritic // intentional in this shell code
+func validateClientImageRuntimeVersion(deployInput InputClientDeploy, astroV1Client astrov1.APIClient) (*ClientRuntimeCheck, error) { //nolint:gocritic // intentional in this shell code
 	// Skip validation if no deployment ID provided
 	if deployInput.DeploymentID == "" {
-		return nil
+		return nil, nil
 	}
 
 	// Get current context for organization info
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return errors.Wrap(err, "failed to get current context")
+		return nil, errors.Wrap(err, "failed to get current context")
 	}
 
 	// Get deployment information
 	deployInfo, err := fetchDeploymentDetails(deployInput.DeploymentID, c.Organization, astroV1Client)
 	if err != nil {
-		return errors.Wrap(err, "failed to get deployment information")
+		return nil, errors.Wrap(err, "failed to get deployment information")
 	}
 
 	// Parse Dockerfile.client to get client image runtime version
 	dockerfileClientPath := filepath.Join(deployInput.Path, "Dockerfile.client")
 	if _, err := os.Stat(dockerfileClientPath); os.IsNotExist(err) {
-		return errors.New("Dockerfile.client is required for client image runtime version validation")
+		return nil, errors.New("Dockerfile.client is required for client image runtime version validation")
 	}
 
 	cmds, err := docker.ParseFile(dockerfileClientPath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to parse Dockerfile.client: %s", dockerfileClientPath)
+		return nil, errors.Wrapf(err, "failed to parse Dockerfile.client: %s", dockerfileClientPath)
 	}
 
 	baseImage := docker.GetImageFromParsedFile(cmds)
 	if baseImage == "" {
-		return errors.New("failed to find base image in Dockerfile.client")
+		return nil, errors.New("failed to find base image in Dockerfile.client")
 	}
 
 	// Extract runtime version from the base image tag
 	clientRuntimeVersion, err := extractRuntimeVersionFromImage(baseImage)
 	if err != nil {
-		return errors.Wrapf(err, "failed to extract runtime version from client image %s", baseImage)
+		return nil, errors.Wrapf(err, "failed to extract runtime version from client image %s", baseImage)
 	}
 
 	// Compare versions
 	if airflowversions.CompareRuntimeVersions(clientRuntimeVersion, deployInfo.currentVersion) > 0 {
-		return fmt.Errorf(`client image runtime version validation failed:
+		return nil, fmt.Errorf(`client image runtime version validation failed:
 
 The client image is based on Astro Runtime version %s, which is newer than the deployment's runtime version %s.
 
@@ -1275,7 +1300,11 @@ This validation ensures compatibility between your client image and the deployme
 	fmt.Printf("✓ Client image runtime version %s is compatible with deployment runtime version %s\n",
 		clientRuntimeVersion, deployInfo.currentVersion)
 
-	return nil
+	return &ClientRuntimeCheck{
+		DeploymentID:             deployInput.DeploymentID,
+		ClientRuntimeVersion:     clientRuntimeVersion,
+		DeploymentRuntimeVersion: deployInfo.currentVersion,
+	}, nil
 }
 
 // extractRuntimeVersionFromImage extracts the runtime version from an image tag

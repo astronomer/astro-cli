@@ -136,7 +136,7 @@ func TestDeployBundleDbtPathRunsPreDeployWhenEnabled(t *testing.T) {
 		return "version-id", nil
 	}
 
-	err := DeployBundle(&DeployBundleInput{
+	_, err := DeployBundle(&DeployBundleInput{
 		BundlePath:    bundleDir,
 		MountPath:     "dbt/shop",
 		DeploymentID:  "test-deployment-id",

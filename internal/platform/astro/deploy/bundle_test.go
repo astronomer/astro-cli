@@ -69,11 +69,35 @@ func (s *BundleSuite) TestBundleDeploy_Success() {
 		return "version-id", nil
 	}
 
-	err := DeployBundle(input)
+	res, err := DeployBundle(input)
 	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), BundleDeploy{DeploymentID: "test-deployment-id", WorkspaceID: "test-workspace-id", DeployID: "test-deploy-id", MountPath: "test-mount-path", BundleVersion: "version-id"}, res)
 
 	s.mockV1Client.AssertExpectations(s.T())
 	s.mockV1Client.AssertExpectations(s.T())
+}
+
+// A Deployment the caller already read is used as it is: the deploy reads
+// it again from no one (the mock has no GetDeployment, so a read panics).
+func (s *BundleSuite) TestBundleDeploy_UsesTheDeploymentItIsHanded() {
+	tmpDir := s.T().TempDir()
+	bundlePath := filepath.Join(tmpDir, "bundle")
+	require.NoError(s.T(), os.Mkdir(bundlePath, 0o755))
+	mockCreateDeploy(s.mockV1Client, "http://bundle-upload-url", nil)
+	mockUpdateDeploy(s.mockV1Client, "version-id")
+	azureUploader = func(string, io.Reader) (string, error) { return "version-id", nil }
+
+	res, err := DeployBundle(&DeployBundleInput{
+		BundlePath:    bundlePath,
+		MountPath:     "test-mount-path",
+		DeploymentID:  "test-deployment-id",
+		Deployment:    &astrov1.Deployment{Id: "test-deployment-id", Name: "picked", WorkspaceId: "test-workspace-id", IsDagDeployEnabled: true},
+		BundleType:    "dbt",
+		AstroV1Client: s.mockV1Client,
+	})
+	s.Require().NoError(err)
+	s.Equal("picked", res.DeploymentName)
+	s.mockV1Client.AssertNotCalled(s.T(), "GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
@@ -88,7 +112,7 @@ func (s *BundleSuite) TestBundleDeploy_CiCdIncompatible() {
 
 	mockGetDeployment(s.mockV1Client, true, true)
 
-	err := DeployBundle(input)
+	_, err := DeployBundle(input)
 	assert.Error(s.T(), err)
 
 	s.mockV1Client.AssertExpectations(s.T())
@@ -102,7 +126,7 @@ func (s *BundleSuite) TestBundleDeploy_DagDeployDisabled() {
 
 	mockGetDeployment(s.mockV1Client, false, false)
 
-	err := DeployBundle(input)
+	_, err := DeployBundle(input)
 	assert.Error(s.T(), err)
 
 	s.mockV1Client.AssertExpectations(s.T())
@@ -147,8 +171,11 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataRetrieved() {
 		return "version-id", nil
 	}
 
-	err := DeployBundle(input)
+	res, err := DeployBundle(input)
 	assert.NoError(s.T(), err)
+	s.Require().NotNil(res.Git, "the deploy recorded a commit, so its result names it")
+	assert.Equal(s.T(), "main", res.Git.Branch)
+	assert.True(s.T(), strings.HasPrefix(res.Git.CommitURL, "https://github.com/account/repo/commit/"+res.Git.CommitSHA))
 
 	s.mockV1Client.AssertExpectations(s.T())
 }
@@ -183,7 +210,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataGenericProvider() {
 		return "version-id", nil
 	}
 
-	err := DeployBundle(input)
+	_, err := DeployBundle(input)
 	assert.NoError(s.T(), err)
 
 	s.mockV1Client.AssertExpectations(s.T())
@@ -213,7 +240,7 @@ func (s *BundleSuite) TestBundleDeploy_GitHasUncommittedChanges() {
 		return "version-id", nil
 	}
 
-	err := DeployBundle(input)
+	_, err := DeployBundle(input)
 	assert.NoError(s.T(), err)
 
 	s.mockV1Client.AssertExpectations(s.T())
@@ -251,7 +278,7 @@ func (s *BundleSuite) TestBundleDeploy_GitMetadataDisabledViaConfig() {
 		return "version-id", nil
 	}
 
-	err = DeployBundle(input)
+	_, err = DeployBundle(input)
 	assert.NoError(s.T(), err)
 
 	s.mockV1Client.AssertExpectations(s.T())
@@ -271,7 +298,7 @@ func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 		return "version-id", nil
 	}
 
-	err := DeployBundle(input)
+	_, err := DeployBundle(input)
 	assert.Error(s.T(), err)
 
 	s.mockV1Client.AssertExpectations(s.T())
@@ -281,6 +308,7 @@ func (s *BundleSuite) TestBundleDeploy_BundleUploadUrlMissing() {
 func (s *BundleSuite) TestBundleDelete_Success() {
 	input := &DeleteBundleInput{
 		DeploymentID:  "test-deployment-id",
+		Deployment:    &astrov1.Deployment{Id: "test-deployment-id", WorkspaceId: "test-workspace-id"},
 		MountPath:     "test-mount-path",
 		AstroV1Client: s.mockV1Client,
 	}
@@ -288,8 +316,9 @@ func (s *BundleSuite) TestBundleDelete_Success() {
 	mockCreateDeploy(s.mockV1Client, "", nil)
 	mockUpdateDeploy(s.mockV1Client, "")
 
-	err := DeleteBundle(input)
+	res, err := DeleteBundle(input)
 	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), BundleDelete{DeploymentID: "test-deployment-id", WorkspaceID: "test-workspace-id", DeployID: "test-deploy-id", MountPath: "test-mount-path"}, res)
 
 	s.mockV1Client.AssertExpectations(s.T())
 	s.mockV1Client.AssertExpectations(s.T())
@@ -461,6 +490,7 @@ func mockGetDeployment(client *astrov1_mocks.ClientWithResponsesInterface, isDag
 		},
 		JSON200: &astrov1.Deployment{
 			Id:                 "test-deployment-id",
+			WorkspaceId:        "test-workspace-id",
 			IsDagDeployEnabled: isDagDeployEnabled,
 			IsCicdEnforced:     isCicdEnforced,
 		},

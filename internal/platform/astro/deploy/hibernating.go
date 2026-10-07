@@ -18,8 +18,14 @@ type hibernatingError struct {
 // Error keeps Astro's own text when it does not name hibernation, since then
 // only the earlier status read did, and the refusal may be for another reason.
 func (e *hibernatingError) Error() string {
-	hint := fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so it cannot take a deploy — wake it with `astro deployment wake-up %s`, which takes about a minute, then deploy again",
-		e.deploymentID, e.name, e.deploymentID)
+	named := e.deploymentID
+	// A caller that knew only the id (a bundle delete named by id) has no
+	// name to add.
+	if e.name != "" {
+		named = fmt.Sprintf("%s (%q)", e.deploymentID, e.name)
+	}
+	hint := fmt.Sprintf("Astro Deployment %s is hibernating, so it cannot take a deploy — wake it with `astro deployment wake-up %s`, which takes about a minute, then deploy again",
+		named, e.deploymentID)
 	if namesHibernation(e.refusal) {
 		return hint
 	}
