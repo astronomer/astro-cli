@@ -510,11 +510,14 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 		Long:    "Remove a team from an Astro Workspace",
 		Example: `
   $ astro workspace team remove clxxxxxxxxx
+  $ astro workspace team remove clxxxxxxxxx --workspace clyyyyyyyyy
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceTeam(cmd, args, out)
 		},
 	}
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), "w", "The Workspace's unique identifier")
 	return cmd
 }
 
@@ -545,7 +548,7 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	r, err := team.RemoveWorkspaceTeam(id, "", astroV1Client)
+	r, err := team.RemoveWorkspaceTeam(id, workspaceID, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -593,7 +596,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &t, fmt.Sprintf("The team %s was successfully added to the workspace with the role %s", t.ID, t.WorkspaceRole))
+	return renderLines(format, out, &t, fmt.Sprintf("The team %s was successfully added to the workspace with the role %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -604,12 +607,14 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 		Long:    "Update the role of a team in an Astro Workspace\n$astro workspace team update [id] --role [" + allowedWorkspaceRoleNames + "].",
 		Example: `
   $ astro workspace team update clxxxxxxxxx --role WORKSPACE_OPERATOR
-  $ astro workspace team update clxxxxxxxxx --role WORKSPACE_OWNER
+  $ astro workspace team update clxxxxxxxxx --role WORKSPACE_OWNER --workspace clyyyyyyyyy
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceTeam(cmd, args, out)
 		},
 	}
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), "w", "The Workspace's unique identifier")
 	cmd.Flags().StringVarP(&updateWorkspaceRole, "role", "r", "", "The new role for the "+
 		"team. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd
@@ -640,11 +645,11 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 			return err
 		}
 	}
-	t, err := team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, "", astroV1Client)
+	t, err := team.UpdateWorkspaceTeamRole(id, updateWorkspaceRole, workspaceID, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &t, fmt.Sprintf("The workspace team %s role was successfully updated to %s", t.ID, t.WorkspaceRole))
+	return renderLines(format, out, &t, fmt.Sprintf("The workspace team %s role was successfully updated to %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func workspaceList(cmd *cobra.Command, out io.Writer) error {

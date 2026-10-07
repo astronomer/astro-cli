@@ -25,6 +25,10 @@ var (
 	ErrUserNotFound            = errors.New("no user was found for the email you provided")
 )
 
+// roleEntityDeployment is the roleEntity that names a user's role on a
+// Deployment.
+const roleEntityDeployment = "deployment"
+
 // CreateInvite invites email to the current Organization with role, and
 // returns the invitation it sent.
 func CreateInvite(email, role string, client astrov1.APIClient) (Invite, error) {
@@ -106,7 +110,7 @@ func UpdateUserRole(email, role string, client astrov1.APIClient) (UserInfo, err
 	if err != nil {
 		return UserInfo{}, err
 	}
-	user, err := findUser(email, users, "organization")
+	user, err := findUser(email, users, "organization", "")
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -153,7 +157,7 @@ func userRoleForScope(user astrov1.User, roleEntity, scopeID string) string { //
 			}
 		}
 		return ""
-	case "deployment":
+	case roleEntityDeployment:
 		if user.DeploymentRoles == nil {
 			return ""
 		}
@@ -171,12 +175,15 @@ func userRoleForScope(user astrov1.User, roleEntity, scopeID string) string { //
 	}
 }
 
-func SelectUser(users []astrov1.User, roleEntity string) (astrov1.User, error) {
+// SelectUser asks which of users to act on, showing each one's role on the
+// object roleEntity names: the Organization, or the Workspace or Deployment
+// with scopeID.
+func SelectUser(users []astrov1.User, roleEntity, scopeID string) (astrov1.User, error) {
 	roleColumn := "ORGANIZATION ROLE"
 	switch roleEntity {
 	case "workspace":
 		roleColumn = "WORKSPACE ROLE"
-	case "deployment":
+	case roleEntityDeployment:
 		roleColumn = "DEPLOYMENT ROLE"
 	}
 
@@ -191,7 +198,7 @@ func SelectUser(users []astrov1.User, roleEntity string) (astrov1.User, error) {
 			users[i].FullName,
 			users[i].Username,
 			users[i].Id,
-			userRoleForScope(users[i], roleEntity, ""),
+			userRoleForScope(users[i], roleEntity, scopeID),
 			users[i].CreatedAt.Format(time.RFC3339),
 		)
 	}
@@ -328,7 +335,7 @@ func UpdateWorkspaceUserRole(email, role, workspaceID string, client astrov1.API
 // setWorkspaceRole finds the user among users, by email or through the
 // picker, and sets its role on workspaceID, keeping every other role it holds.
 func setWorkspaceRole(client astrov1.APIClient, orgID, workspaceID, email, role string, users []astrov1.User, roleEntity string) (UserInfo, error) {
-	found, err := findUser(email, users, roleEntity)
+	found, err := findUser(email, users, roleEntity, workspaceID)
 	if err != nil {
 		return UserInfo{}, err
 	}
@@ -409,7 +416,7 @@ func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (W
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
-	found, err := findUser(email, users, "workspace")
+	found, err := findUser(email, users, "workspace", workspaceID)
 	if err != nil {
 		return WorkspaceRemoval{}, err
 	}
@@ -433,10 +440,11 @@ func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (W
 }
 
 // findUser returns the user among users whose email is email, or the one
-// picked when email is "".
-func findUser(email string, users []astrov1.User, roleEntity string) (astrov1.User, error) {
+// picked when email is "", the picker showing each one's role on the object
+// roleEntity and scopeID name.
+func findUser(email string, users []astrov1.User, roleEntity, scopeID string) (astrov1.User, error) {
 	if email == "" {
-		return SelectUser(users, roleEntity)
+		return SelectUser(users, roleEntity, scopeID)
 	}
 	var found astrov1.User
 	for i := range users {
@@ -494,7 +502,7 @@ func UpdateDeploymentUserRole(email, role, deploymentID string, client astrov1.A
 	if err != nil {
 		return UserInfo{}, err
 	}
-	return setDeploymentRole(client, ctx.Organization, deploymentID, email, role, users, "deployment")
+	return setDeploymentRole(client, ctx.Organization, deploymentID, email, role, users, roleEntityDeployment)
 }
 
 // RemoveDeploymentUser removes the role on the Deployment of its user with
@@ -509,7 +517,7 @@ func RemoveDeploymentUser(email, deploymentID string, client astrov1.APIClient) 
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
-	found, err := putDeploymentRole(client, ctx.Organization, deploymentID, email, "", users, "deployment")
+	found, err := putDeploymentRole(client, ctx.Organization, deploymentID, email, "", users, roleEntityDeployment)
 	if err != nil {
 		return DeploymentRemoval{}, err
 	}
@@ -534,7 +542,13 @@ func setDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, rol
 // picker, and sets its role on deploymentID to role, or removes it when role
 // is "", keeping every other role it holds. It returns the user found.
 func putDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, role string, users []astrov1.User, roleEntity string) (astrov1.User, error) {
-	found, err := findUser(email, users, roleEntity)
+	// The picker shows each user's role on the Deployment when choosing among
+	// its users; adding one chooses among the Organization's, which have none.
+	scopeID := ""
+	if roleEntity == roleEntityDeployment {
+		scopeID = deploymentID
+	}
+	found, err := findUser(email, users, roleEntity, scopeID)
 	if err != nil {
 		return astrov1.User{}, err
 	}
@@ -564,8 +578,6 @@ func GetDeploymentUsers(client astrov1.APIClient, deploymentID string, _ int) ([
 }
 
 // ListDeploymentUsersData returns deployment user list data for structured output
-//
-//nolint:dupl // the duplication is acceptable here
 func ListDeploymentUsersData(client astrov1.APIClient, deploymentID string) (*UserList, error) {
 	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
 	if err != nil {
@@ -578,7 +590,7 @@ func ListDeploymentUsersData(client astrov1.APIClient, deploymentID string) (*Us
 			FullName:       users[i].FullName,
 			Email:          users[i].Username,
 			ID:             users[i].Id,
-			DeploymentRole: userRoleForScope(users[i], "deployment", deploymentID),
+			DeploymentRole: userRoleForScope(users[i], roleEntityDeployment, deploymentID),
 			CreatedAt:      users[i].CreatedAt,
 		})
 	}
@@ -613,8 +625,6 @@ func ListDeploymentUsersWithFormat(client astrov1.APIClient, deploymentID string
 }
 
 // ListWorkspaceUsersData returns workspace user list data for structured output
-//
-//nolint:dupl // the duplication is acceptable here
 func ListWorkspaceUsersData(client astrov1.APIClient, workspaceID string) (*UserList, error) {
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {

@@ -416,7 +416,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceAPITokenResponseError, nil)
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOKWorkspaceToken, nil)
 
-		_, err := UpdateToken("token3", "", "", "", "", "", pickIndex(1), mockClient)
+		_, err := UpdateToken("token3", "", "renamed", "", "", "", pickIndex(1), mockClient)
 		s.Equal("failed to update workspace token", err.Error())
 	})
 

@@ -83,11 +83,8 @@ type Membership struct {
 }
 
 // Update is what an organization team update did: the team as it left it,
-// the name it had before (the name the text reports), and whether it changed
-// the team's Organization role. An update whose role change failed after the
-// rename went through returns the rename with the error.
+// and whether it changed the team's Organization role.
 type Update struct {
-	Team         TeamInfo
-	PreviousName string
-	RoleChanged  bool
+	Team        TeamInfo
+	RoleChanged bool
 }

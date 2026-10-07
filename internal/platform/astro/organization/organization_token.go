@@ -276,7 +276,8 @@ func CreateToken(name, description, role string, expiration int, client astrov1.
 // A role that is not an Organization role is refused before anything is
 // asked or sent, and a role the token already holds before anything is sent.
 // The role is changed before the name and description, so a role the API
-// refuses leaves the token as it was.
+// refuses leaves the token as it was; the name and description are sent only
+// when one is given.
 func UpdateToken(id, name, newName, description, role string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
 	if role != "" {
 		if err := user.IsOrganizationRoleValid(role); err != nil {
@@ -307,38 +308,22 @@ func UpdateToken(id, name, newName, description, role string, pick apitoken.Pick
 		}
 	}
 
-	updateReq := astrov1.UpdateApiTokenJSONRequestBody{}
-	if newName == "" {
-		updateReq.Name = token.Name
-	} else {
-		updateReq.Name = newName
-	}
-	if description == "" {
-		d := token.Description
-		updateReq.Description = &d
-	} else {
-		d := description
-		updateReq.Description = &d
-	}
-	resp, err := client.UpdateApiTokenWithResponse(httpContext.Background(), ctx.Organization, token.Id, updateReq)
-	if err != nil {
-		return apitoken.Update{}, err
-	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return apitoken.Update{}, err
-	}
-	// The token as the update left it: the API's answer, or what was asked
-	// for when it gave none.
-	updated := token
-	if resp.JSON200 != nil {
-		updated = *resp.JSON200
-	} else {
-		updated.Name, updated.Description = updateReq.Name, *updateReq.Description
-	}
-
 	newRole := currentRole
 	if role != "" {
 		newRole = role
+	}
+	// The name and description are sent only when one was given, so a
+	// role-only update is one call. A failure after the role went through
+	// says that it did, with the token as it now is.
+	updated := token
+	if newName != "" || description != "" {
+		updated, err = updateNameAndDescription(&token, newName, description, ctx.Organization, client)
+		if err != nil {
+			if role != "" {
+				return apitoken.Update{Token: apitoken.FromAPI(&token, newRole), PreviousName: token.Name}, apitoken.RenameFailedAfterRole(role, err)
+			}
+			return apitoken.Update{}, err
+		}
 	}
 	return apitoken.Update{Token: apitoken.FromAPI(&updated, newRole), PreviousName: token.Name}, nil
 }
@@ -382,4 +367,32 @@ func DeleteToken(token astrov1.ApiToken, client astrov1.APIClient) (apitoken.Org
 		ID: token.Id, Name: token.Name, Scope: string(token.Scope),
 		OrganizationID: ctx.Organization, Action: apitoken.Deleted,
 	}, nil
+}
+
+// updateNameAndDescription sends token's new name and description, keeping
+// its own for whichever is "", and returns the token as the update left it:
+// the API's answer, or what was asked for when it gave none.
+func updateNameAndDescription(token *astrov1.ApiToken, newName, description, organizationID string, client astrov1.APIClient) (astrov1.ApiToken, error) {
+	updateReq := astrov1.UpdateApiTokenJSONRequestBody{Name: token.Name}
+	if newName != "" {
+		updateReq.Name = newName
+	}
+	d := token.Description
+	if description != "" {
+		d = description
+	}
+	updateReq.Description = &d
+	resp, err := client.UpdateApiTokenWithResponse(httpContext.Background(), organizationID, token.Id, updateReq)
+	if err != nil {
+		return astrov1.ApiToken{}, err
+	}
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return astrov1.ApiToken{}, err
+	}
+	if resp.JSON200 != nil {
+		return *resp.JSON200, nil
+	}
+	updated := *token
+	updated.Name, updated.Description = updateReq.Name, d
+	return updated, nil
 }

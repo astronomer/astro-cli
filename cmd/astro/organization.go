@@ -172,7 +172,7 @@ func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 		Use:     "invite [email]",
 		Aliases: []string{"inv"},
 		Short:   "Invite a user to your Astro Organization",
-		Long:    "Invite a user to your Astro Organization\n$astro user invite [email] --role [" + allowedOrganizationRoleNames + "].",
+		Long:    "Invite a user to your Astro Organization\n$astro organization user invite [email] --role [" + allowedOrganizationRoleNames + "].",
 		Example: `
   $ astro organization user invite user@company.com
   $ astro organization user invite user@company.com --role ORGANIZATION_BILLING_ADMIN
@@ -205,8 +205,8 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update [email]",
 		Aliases: []string{"up"},
-		Short:   "Update the role of a user your in Astro Organization",
-		Long:    "Update the role of a user in your Astro Organization\n$astro user update [email] --role [" + allowedOrganizationRoleNames + "].",
+		Short:   "Update the role of a user in your Astro Organization",
+		Long:    "Update the role of a user in your Astro Organization\n$astro organization user update [email] --role [" + allowedOrganizationRoleNames + "].",
 		Example: `
   $ astro organization user update user@company.com --role ORGANIZATION_OWNER
   $ astro organization user update user@company.com --role ORGANIZATION_MEMBER
@@ -438,7 +438,7 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&teamName, "name", "n", "", "The Team's name. If the name contains a space, specify the entire team within quotes \"\" ")
 	cmd.Flags().StringVarP(&teamDescription, "description", "d", "", "Description of the Team. If the description contains a space, specify the entire team in quotes \"\"")
-	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
+	cmd.Flags().StringVarP(&teamOrgRole, "role", "r", "", "The role for the new team. Possible values are "+allowedOrganizationRoleNamesProse)
 
 	return cmd
 }

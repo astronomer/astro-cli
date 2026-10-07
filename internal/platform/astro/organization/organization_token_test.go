@@ -472,7 +472,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetAPITokensResponseOK, nil)
 		mockClient.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateOrganizationAPITokenResponseError, nil)
-		_, err := UpdateToken("token3", "", "", "", "", s.noPicking(), mockClient)
+		_, err := UpdateToken("token3", "", "renamed", "", "", s.noPicking(), mockClient)
 		s.Equal("failed to update token", err.Error())
 	})
 

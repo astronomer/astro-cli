@@ -108,7 +108,8 @@ func CreateToken(name, description, role, deploymentID string, expiration int, c
 // A role the token already holds on the Deployment is refused before anything
 // is sent, as the workspace-token and organization-token adds and updates
 // refuse theirs. The role is changed before the name and description, so a
-// role the API refuses leaves the token as it was.
+// role the API refuses leaves the token as it was; the name and description
+// are sent only when one is given.
 func UpdateToken(id, name, newName, description, role, deploymentID string, pick apitoken.Picker, client astrov1.APIClient) (apitoken.Update, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -132,14 +133,22 @@ func UpdateToken(id, name, newName, description, role, deploymentID string, pick
 		}
 	}
 
-	updated, err := updateNameAndDescription(&token, newName, description, organizationID, client)
-	if err != nil {
-		return apitoken.Update{}, err
-	}
-
 	newRole := currentRole
 	if role != "" {
 		newRole = role
+	}
+	// The name and description are sent only when one was given, so a
+	// role-only update is one call. A failure after the role went through
+	// says that it did, with the token as it now is.
+	updated := token
+	if newName != "" || description != "" {
+		updated, err = updateNameAndDescription(&token, newName, description, organizationID, client)
+		if err != nil {
+			if role != "" {
+				return apitoken.Update{Token: apitoken.FromAPI(&token, newRole), PreviousName: token.Name}, apitoken.RenameFailedAfterRole(role, err)
+			}
+			return apitoken.Update{}, err
+		}
 	}
 	return apitoken.Update{Token: apitoken.FromAPI(&updated, newRole), PreviousName: token.Name}, nil
 }

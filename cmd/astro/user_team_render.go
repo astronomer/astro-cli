@@ -53,33 +53,23 @@ func renderLines(format cliout.Format, out io.Writer, v any, lines ...string) er
 	}))
 }
 
-// renderTeamUpdate renders what an organization team update did. upd is nil
-// when the person declined to change an IdP-managed team, which prints
-// nothing. With err, the rename went through and the role did not: text says
-// so the way it always has, with the first line and then the error, while
-// json publishes only the error.
+// renderTeamUpdate renders what an organization team update did, naming the
+// team as it now is. upd is nil when the person declined to change an
+// IdP-managed team, which prints nothing.
 func renderTeamUpdate(format cliout.Format, out io.Writer, upd *team.Update, err error) error {
-	if upd == nil {
+	if err != nil || upd == nil {
 		return err
 	}
-	lines := []string{fmt.Sprintf("Astro Team %s was successfully updated", upd.PreviousName)}
-	if err != nil {
-		if format == cliout.FormatText {
-			if werr := cliout.WriteText(out, func(b *bufio.Writer) { fmt.Fprintln(b, lines[0]) }); werr != nil {
-				return werr
-			}
-		}
-		return err
-	}
+	lines := []string{fmt.Sprintf("Astro Team %s was successfully updated", upd.Team.Name)}
 	if upd.RoleChanged {
-		lines = append(lines, fmt.Sprintf("Astro Team role %s was successfully updated to %s", upd.PreviousName, upd.Team.OrgRole))
+		lines = append(lines, fmt.Sprintf("Astro Team %s role was successfully updated to %s", upd.Team.Name, upd.Team.OrgRole))
 	}
 	return renderLines(format, out, &upd.Team, lines...)
 }
 
-// renderMembership renders a team user add or remove. m is nil when the
-// person declined to change an IdP-managed team, which prints nothing. The
-// text names the user by ID, and has always ended in a space.
+// renderMembership renders a team user add or remove, naming the user by
+// email, or by ID when it has none. m is nil when the person declined to
+// change an IdP-managed team, which prints nothing.
 func renderMembership(format cliout.Format, out io.Writer, m *team.Membership) error {
 	if m == nil {
 		return nil
@@ -88,7 +78,20 @@ func renderMembership(format cliout.Format, out io.Writer, m *team.Membership) e
 	if m.Action == team.Removed {
 		verb = "removed from"
 	}
-	return renderLines(format, out, m, fmt.Sprintf("Astro User %s was successfully %s team %s ", m.UserID, verb, m.TeamName))
+	who := m.Email
+	if who == "" {
+		who = m.UserID
+	}
+	return renderLines(format, out, m, fmt.Sprintf("Astro User %s was successfully %s team %s", who, verb, m.TeamName))
+}
+
+// teamLabel is how the text of a workspace team command names t: by name, or
+// by ID when it has none.
+func teamLabel(t *team.TeamInfo) string {
+	if t.Name == "" {
+		return t.ID
+	}
+	return t.Name
 }
 
 // renderTeamMembers renders a team's members.

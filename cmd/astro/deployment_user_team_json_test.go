@@ -61,11 +61,10 @@ func deploymentUserTeamTextCases() []tokenCase {
 	}
 	// The pickers' rows: the Organization's users by their Organization role
 	// for an add, and the Deployment's users by their role on it for an
-	// update or a remove. The Deployment picker's role column is empty
-	// whatever role the user holds: user.SelectUser looks the role up on
-	// Deployment "" (fixed separately for the Workspace picker).
+	// update or a remove: each user's role on this Deployment, empty for one
+	// that holds none there.
 	depPickRows := []map[string]string{
-		userPickRow("1", "Ada Lovelace", "ada@example.com", "user-ada", "DEPLOYMENT ROLE", ""),
+		userPickRow("1", "Ada Lovelace", "ada@example.com", "user-ada", "DEPLOYMENT ROLE", "DEPLOYMENT_ADMIN"),
 		userPickRow("2", "Bob Builder", "bob@example.com", "user-bob", "DEPLOYMENT ROLE", ""),
 	}
 	addAda := "The user ada@example.com was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n"

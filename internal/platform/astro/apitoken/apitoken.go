@@ -95,6 +95,14 @@ type Update struct {
 	PreviousName string
 }
 
+// RenameFailedAfterRole is the error of an update whose role change went
+// through and whose name and description update, sent after it, failed: the
+// token now holds role, and says so, rather than reporting only the failure.
+// It wraps err, so the failure's kind is kept.
+func RenameFailedAfterRole(role string, err error) error {
+	return fmt.Errorf("the token's role was updated to %s, but updating its name and description failed: %w", role, err)
+}
+
 // Role is one role a token holds, on one object.
 type Role struct {
 	EntityType string `json:"entity_type"`

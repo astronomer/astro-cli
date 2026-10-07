@@ -667,7 +667,7 @@ func (s *Suite) TestUpdate() {
 		got, err := UpdateTeam(team1.Id, "name", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
-		s.Equal(team1.Name, got.PreviousName)
+		s.Equal("name", got.Team.Name, "the team as the update left it")
 		s.False(got.RoleChanged)
 	})
 
@@ -680,38 +680,68 @@ func (s *Suite) TestUpdate() {
 		got, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
-		s.Equal(team1.Name, got.PreviousName)
+		s.Equal("name", got.Team.Name)
 		s.True(got.RoleChanged)
 		s.Equal(role, got.Team.OrgRole)
 	})
 
-	s.Run("unhappy path Update - with invalid role", func() {
+	s.Run("unhappy path Update - with invalid role is refused before any request", func() {
 		role := "WORKSPACE_VIEWER"
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
 		_, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
 		s.EqualError(err, "requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ")
+		s.Empty(mockClient.Calls, "neither the lookup nor the rename is sent")
 	})
 
-	s.Run("unhappy path Update - with role UpdateTeamRolesWithResponse error", func() {
+	s.Run("unhappy path Update - a role the API refuses leaves the name as it was", func() {
 		role := "ORGANIZATION_OWNER"
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Maybe()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseRoleError, nil).Once()
 		_, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
 		s.EqualError(err, "failed to update team role")
+		mockClient.AssertNotCalled(s.T(), "UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	s.Run("Update with only a role sends no rename", func() {
+		role := "ORGANIZATION_OWNER"
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Maybe()
+		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
+		got, err := UpdateTeam(team1.Id, "", "", role, false, mockClient)
+		s.NoError(err)
+		s.Require().NotNil(got)
+		s.True(got.RoleChanged)
+		s.Equal(role, got.Team.OrgRole)
+		s.Equal(team1.Name, got.Team.Name)
+		mockClient.AssertNotCalled(s.T(), "UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	s.Run("a rename that fails after the role went through says so", func() {
+		role := "ORGANIZATION_OWNER"
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
+		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseError, nil).Once()
+		got, err := UpdateTeam(team1.Id, "name", "", role, false, mockClient)
+		s.EqualError(err, "the team's role was updated to ORGANIZATION_OWNER, but updating its name and description failed: failed to update team")
+		s.Require().NotNil(got, "the team as it now is")
+		s.True(got.RoleChanged)
+		s.Equal(role, got.Team.OrgRole)
+		s.Equal(team1.Name, got.Team.Name, "not renamed")
 	})
 
 	s.Run("unhappy path Update - with role UpdateTeamRolesWithResponse network error", func() {
 		role := "ORGANIZATION_OWNER"
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
-		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Once()
+		mockClient.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamResponseOK, nil).Maybe()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		_, err := UpdateTeam(team1.Id, "name", "description", role, false, mockClient)
 		s.EqualError(err, "network error")
+		mockClient.AssertNotCalled(s.T(), "UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	s.Run("happy path Update with idp managed team", func() {
@@ -722,7 +752,7 @@ func (s *Suite) TestUpdate() {
 		got, err := UpdateTeam(team2.Id, "name", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
-		s.Equal(team2.Name, got.PreviousName)
+		s.Equal("name", got.Team.Name)
 		s.False(got.RoleChanged)
 	})
 
@@ -733,7 +763,7 @@ func (s *Suite) TestUpdate() {
 		got, err := UpdateTeam(team2.Id, "name", "description", "", true, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
-		s.Equal(team2.Name, got.PreviousName)
+		s.Equal("name", got.Team.Name)
 		s.False(got.RoleChanged)
 	})
 
@@ -754,7 +784,7 @@ func (s *Suite) TestUpdate() {
 		got, err := UpdateTeam(team1.Id, "name", "", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
-		s.Equal(team1.Name, got.PreviousName)
+		s.Equal("name", got.Team.Name)
 		s.False(got.RoleChanged)
 	})
 
@@ -765,7 +795,7 @@ func (s *Suite) TestUpdate() {
 		got, err := UpdateTeam(team1.Id, "", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
-		s.Equal(team1.Name, got.PreviousName)
+		s.Equal(team1.Name, got.Team.Name, "no --name keeps the name")
 		s.False(got.RoleChanged)
 	})
 
@@ -827,7 +857,7 @@ func (s *Suite) TestUpdate() {
 		got, err := UpdateTeam("", "name", "description", "", false, mockClient)
 		s.NoError(err)
 		s.Require().NotNil(got)
-		s.Equal(team1.Name, got.PreviousName)
+		s.Equal("name", got.Team.Name)
 		s.False(got.RoleChanged)
 	})
 }
@@ -1097,6 +1127,15 @@ func (s *Suite) TestRemoveUser() {
 		s.Equal(user1.Id, got.UserID)
 		s.Equal(team1.Name, got.TeamName)
 		s.Equal(Removed, got.Action)
+	})
+
+	s.Run("RemoveUser of a user who is not a member says so", func() {
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Once()
+		mockClient.On("ListTeamMembersWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamMembersResponseOK, nil).Once()
+		_, err := RemoveUser(team1.Id, "user-nobody", false, mockClient)
+		s.EqualError(err, "user user-nobody is not a member of team "+team1.Name)
+		mockClient.AssertNotCalled(s.T(), "RemoveTeamMemberWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	s.Run("happy path RemoveUser with idp managed team", func() {

@@ -2,6 +2,7 @@ package astro
 
 import (
 	"io"
+	"net/http"
 	"testing"
 	"time"
 
@@ -157,9 +158,8 @@ func removesMember(teamID, userID string) func(m *astrov1_mocks.ClientWithRespon
 	}
 }
 
-// The rows a user picker shows. In the Workspace picker the role column is
-// empty whatever role the user holds (pinned: SelectUser looks the role up on
-// the Workspace ""); the Organization picker shows the Organization role.
+// The rows a user picker shows, with each user's role on the object the
+// picker is about: the Workspace whose users are listed, or the Organization.
 func userPickRow(n, name, email, id, roleHeader, role string) map[string]string {
 	return map[string]string{"#": n, "FULLNAME": name, "EMAIL": email, "ID": id, roleHeader: role, "CREATE DATE": "2026-01-02T03:04:05Z"}
 }
@@ -167,6 +167,9 @@ func userPickRow(n, name, email, id, roleHeader, role string) map[string]string 
 var (
 	adaOrgPickRow = userPickRow("1", "Ada Lovelace", "ada@example.com", "user-ada", "ORGANIZATION ROLE", "ORGANIZATION_MEMBER")
 	bobOrgPickRow = userPickRow("2", "Bob Builder", "bob@example.com", "user-bob", "ORGANIZATION ROLE", "ORGANIZATION_OWNER")
+	// Bob holds no role on the current Workspace (the mock lists him anyway).
+	adaWsPickRow = userPickRow("1", "Ada Lovelace", "ada@example.com", "user-ada", "WORKSPACE ROLE", "WORKSPACE_MEMBER")
+	bobWsPickRow = userPickRow("2", "Bob Builder", "bob@example.com", "user-bob", "WORKSPACE ROLE", "")
 )
 
 var (
@@ -220,18 +223,18 @@ func TestWorkspaceOrganizationUserText(t *testing.T) {
 			args: []string{"workspace", "user", "update", "--role", "WORKSPACE_OWNER"},
 			check: func(t *testing.T, out string) {
 				requireInOrder(t, out, "Please select the user:", "> The workspace user ada@example.com role was successfully updated to WORKSPACE_OWNER")
-				assert.Equal(t, []map[string]string{
-					userPickRow("1", "Ada Lovelace", "ada@example.com", "user-ada", "WORKSPACE ROLE", ""),
-					userPickRow("2", "Bob Builder", "bob@example.com", "user-bob", "WORKSPACE ROLE", ""),
-				}, tableRows(t, out, "#"))
+				assert.Equal(t, []map[string]string{adaWsPickRow, bobWsPickRow}, tableRows(t, out, "#"))
 			},
 		},
 		{name: "workspace update with a role that is not one", root: newWorkspaceCmd, client: with(users), args: []string{"workspace", "user", "update", "ada@example.com", "--role", "NOPE"}, check: func(t *testing.T, out string) { assert.Empty(t, out) }, wantErr: "requested role is invalid. Possible values are WORKSPACE_MEMBER, WORKSPACE_AUTHOR, WORKSPACE_OPERATOR and WORKSPACE_OWNER "},
 		{name: "workspace remove", root: newWorkspaceCmd, client: with(users, setsUserRoles("user-ada")), args: []string{"workspace", "user", "remove", "ada@example.com"}, check: says("The user ada@example.com was successfully removed from the workspace")},
 		{
 			name: "workspace remove through the picker", root: newWorkspaceCmd, client: with(users, setsUserRoles("user-ada")), answers: "1\n",
-			args:  []string{"workspace", "user", "remove"},
-			check: says("Please select the user:", "> The user ada@example.com was successfully removed from the workspace"),
+			args: []string{"workspace", "user", "remove"},
+			check: func(t *testing.T, out string) {
+				requireInOrder(t, out, "Please select the user:", "> The user ada@example.com was successfully removed from the workspace")
+				assert.Equal(t, []map[string]string{adaWsPickRow, bobWsPickRow}, tableRows(t, out, "#"))
+			},
 		},
 		{name: "workspace remove of nobody", root: newWorkspaceCmd, client: with(users), args: []string{"workspace", "user", "remove", "nobody@example.com"}, check: func(t *testing.T, out string) { assert.Empty(t, out) }, wantErr: "no user was found for the email you provided"},
 	})
@@ -258,7 +261,10 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 			},
 		},
 		{name: "create with the name asked", root: newOrganizationCmd, client: with(teams, createsTeam(&eng)), answers: "Engineering\n", args: []string{"organization", "team", "create", "--role", "ORGANIZATION_MEMBER"}, check: says("Please specify a name for your Team", "Team name: ", "Astro Team Engineering was successfully created")},
-		{name: "update", root: newOrganizationCmd, client: with(teams, updatesTeam("team-eng", &renamed), setsTeamRoles("team-eng")), args: []string{"organization", "team", "update", "team-eng", "--name", "Platform", "--role", "ORGANIZATION_OWNER"}, check: says("Astro Team Engineering was successfully updated", "Astro Team role Engineering was successfully updated to ORGANIZATION_OWNER")},
+		{name: "update", root: newOrganizationCmd, client: with(teams, updatesTeam("team-eng", &renamed), setsTeamRoles("team-eng")), args: []string{"organization", "team", "update", "team-eng", "--name", "Platform", "--role", "ORGANIZATION_OWNER"}, check: func(t *testing.T, out string) {
+			// Named as it now is.
+			assert.Equal(t, "Astro Team Platform was successfully updated\nAstro Team Platform role was successfully updated to ORGANIZATION_OWNER\n", out)
+		}},
 		{name: "update without --role", root: newOrganizationCmd, client: with(teams, updatesTeam("team-eng", &eng)), args: []string{"organization", "team", "update", "team-eng", "--description", "d"}, check: func(t *testing.T, out string) {
 			assert.Equal(t, "Astro Team Engineering was successfully updated\n", out)
 		}},
@@ -276,11 +282,11 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 		}},
 		{name: "update an IdP team --yes", root: newOrganizationCmd, client: with(teams, updatesTeam("team-idp", &idp)), args: []string{"organization", "team", "update", "team-idp", "--description", "d", "--yes"}, check: says("Astro Team Okta Ops was successfully updated")},
 		{
-			// Pinned: the rename is sent before the role is checked, so a
-			// role that is not one fails after the team was renamed.
-			name: "update with a role that is not one", root: newOrganizationCmd, client: with(teams, updatesTeam("team-eng", &renamed)),
+			// Refused before anything is sent:
+			// TestOrganizationTeamUpdateRefusesBeforeChanging.
+			name: "update with a role that is not one", root: newOrganizationCmd, client: with(teams),
 			args:    []string{"organization", "team", "update", "team-eng", "--name", "Platform", "--role", "NOPE"},
-			check:   says("Astro Team Engineering was successfully updated"),
+			check:   empty,
 			wantErr: "requested role is invalid. Possible values are ORGANIZATION_MEMBER, ORGANIZATION_BILLING_ADMIN and ORGANIZATION_OWNER ",
 		},
 		{name: "delete", root: newOrganizationCmd, client: with(teams, deletesTeam("team-eng")), args: []string{"organization", "team", "delete", "team-eng"}, check: says("Astro Team Engineering was successfully deleted")},
@@ -288,30 +294,34 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 		{name: "delete an IdP team --yes", root: newOrganizationCmd, client: with(teams, deletesTeam("team-idp")), args: []string{"organization", "team", "delete", "team-idp", "--yes"}, check: says("Astro Team Okta Ops was successfully deleted")},
 		{name: "delete an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "delete", "team-idp"}, check: says("Are you sure you want to continue the operation? (y/n)")},
 		{name: "delete with no teams", root: newOrganizationCmd, client: with(noTeams), args: []string{"organization", "team", "delete"}, check: empty, wantErr: "no teams found in your organization"},
-		// Pinned: the user is named by ID, and the line ends in a space.
-		{name: "user add", root: newOrganizationCmd, client: with(teams, addsMember("team-eng")), args: []string{"organization", "team", "user", "add", "--team-id", "team-eng", "--user-id", "user-bob"}, check: says("Astro User user-bob was successfully added to team Engineering \n")},
+		// The user is named by email, and the line ends with the team's name.
+		{name: "user add", root: newOrganizationCmd, client: with(teams, addsMember("team-eng")), args: []string{"organization", "team", "user", "add", "--team-id", "team-eng", "--user-id", "user-bob"}, check: func(t *testing.T, out string) {
+			assert.Equal(t, "Astro User bob@example.com was successfully added to team Engineering\n", out)
+		}},
 		{
 			name: "user add through the user picker", root: newOrganizationCmd, client: with(teams, addsMember("team-eng")), answers: "2\n",
 			args:  []string{"organization", "team", "user", "add", "--team-id", "team-eng"},
-			check: says("Please select the user:", "> Astro User user-bob was successfully added to team Engineering"),
+			check: says("Please select the user:", "> Astro User bob@example.com was successfully added to team Engineering\n"),
 		},
 		{
 			name: "user add through the team picker", root: newOrganizationCmd, client: with(teams, addsMember("team-eng")), answers: "1\n",
 			args:  []string{"organization", "team", "user", "add", "--user-id", "user-bob"},
-			check: says("Please select a team:", "> Astro User user-bob was successfully added to team Engineering"),
+			check: says("Please select a team:", "> Astro User bob@example.com was successfully added to team Engineering\n"),
 		},
 		{name: "user add to an IdP team declined", root: newOrganizationCmd, client: with(teams), answers: "n\n", args: []string{"organization", "team", "user", "add", "--team-id", "team-idp", "--user-id", "user-bob"}, check: says("Are you sure you want to continue the operation? (y/n)")},
-		{name: "user remove", root: newOrganizationCmd, client: with(teams, removesMember("team-eng", "user-ada")), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: says("Astro User user-ada was successfully removed from team Engineering \n")},
+		{name: "user remove", root: newOrganizationCmd, client: with(teams, removesMember("team-eng", "user-ada")), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: func(t *testing.T, out string) {
+			assert.Equal(t, "Astro User ada@example.com was successfully removed from team Engineering\n", out)
+		}},
 		{
 			name: "user remove through the member picker", root: newOrganizationCmd, client: with(teams, removesMember("team-eng", "user-ada")), answers: "1\n",
 			args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "Please select the teamMember who's membership you'd like to modify:", "> Astro User user-ada was successfully removed from team Engineering")
+				requireInOrder(t, out, "Please select the team member you would like to remove from the team:", "> Astro User ada@example.com was successfully removed from team Engineering\n")
 				assert.Equal(t, []map[string]string{{"#": "1", "FULLNAME": "Ada Lovelace", "EMAIL": "ada@example.com", "ID": "user-ada"}}, tableRows(t, out, "#"))
 			},
 		},
-		// Pinned: a user who is not a member is reported as a team not found.
-		{name: "user remove of a non-member", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-bob"}, check: empty, wantErr: "no team was found for the ID you provided"},
+		// The client mocks no removal, so going on would panic.
+		{name: "user remove of a non-member", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-bob"}, check: empty, wantErr: "user user-bob is not a member of team Engineering"},
 		{name: "user remove from a team with no members", root: newOrganizationCmd, client: with(noMembers), args: []string{"organization", "team", "user", "remove", "--team-id", "team-eng", "--user-id", "user-ada"}, check: empty, wantErr: "no team members found in team"},
 		{name: "user list", root: newOrganizationCmd, client: with(teams), args: []string{"organization", "team", "user", "list", "--team-id", "team-eng"}, check: listsRows("ID", adaMemberRow)},
 		{name: "user list empty", root: newOrganizationCmd, client: with(noMembers), args: []string{"organization", "team", "user", "list", "--team-id", "team-eng"}, check: func(t *testing.T, out string) {
@@ -327,19 +337,19 @@ func TestWorkspaceOrganizationTeamText(t *testing.T) {
 				assert.Equal(t, teamPickRows, tableRows(t, out, "#"))
 			},
 		},
-		// Pinned: add and update name the team by ID, remove by name.
-		{name: "workspace add", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-idp")), args: []string{"workspace", "team", "add", "team-idp", "--role", "WORKSPACE_AUTHOR"}, check: says("The team team-idp was successfully added to the workspace with the role WORKSPACE_AUTHOR")},
-		{name: "workspace add with the default role", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-idp")), args: []string{"workspace", "team", "add", "team-idp"}, check: says("The team team-idp was successfully added to the workspace with the role WORKSPACE_MEMBER")},
-		{name: "workspace add through the picker", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-idp")), answers: "2\n", args: []string{"workspace", "team", "add"}, check: says("Please select a team:", "> The team team-idp was successfully added to the workspace with the role WORKSPACE_MEMBER")},
-		{name: "workspace update", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-eng")), args: []string{"workspace", "team", "update", "team-eng", "--role", "WORKSPACE_OWNER"}, check: says("The workspace team team-eng role was successfully updated to WORKSPACE_OWNER")},
+		// add, update and remove name the team by name.
+		{name: "workspace add", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-idp")), args: []string{"workspace", "team", "add", "team-idp", "--role", "WORKSPACE_AUTHOR"}, check: says("The team Okta Ops was successfully added to the workspace with the role WORKSPACE_AUTHOR")},
+		{name: "workspace add with the default role", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-idp")), args: []string{"workspace", "team", "add", "team-idp"}, check: says("The team Okta Ops was successfully added to the workspace with the role WORKSPACE_MEMBER")},
+		{name: "workspace add through the picker", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-idp")), answers: "2\n", args: []string{"workspace", "team", "add"}, check: says("Please select a team:", "> The team Okta Ops was successfully added to the workspace with the role WORKSPACE_MEMBER")},
+		{name: "workspace update", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-eng")), args: []string{"workspace", "team", "update", "team-eng", "--role", "WORKSPACE_OWNER"}, check: says("The workspace team Engineering role was successfully updated to WORKSPACE_OWNER")},
 		{
 			name: "workspace update with the role picked", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-eng")), answers: "4\n",
 			args: []string{"workspace", "team", "update", "team-eng"},
 			check: func(t *testing.T, out string) {
-				requireInOrder(t, out, "ROLE", "WORKSPACE_OWNER", "> The workspace team team-eng role was successfully updated to WORKSPACE_OWNER")
+				requireInOrder(t, out, "ROLE", "WORKSPACE_OWNER", "> The workspace team Engineering role was successfully updated to WORKSPACE_OWNER")
 			},
 		},
-		{name: "workspace update through the picker", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-eng")), answers: "1\n", args: []string{"workspace", "team", "update", "--role", "WORKSPACE_OWNER"}, check: says("Please select a team:", "> The workspace team team-eng role was successfully updated to WORKSPACE_OWNER")},
+		{name: "workspace update through the picker", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-eng")), answers: "1\n", args: []string{"workspace", "team", "update", "--role", "WORKSPACE_OWNER"}, check: says("Please select a team:", "> The workspace team Engineering role was successfully updated to WORKSPACE_OWNER")},
 		{name: "workspace update with no teams", root: newWorkspaceCmd, client: with(noTeams), args: []string{"workspace", "team", "update", "--role", "WORKSPACE_OWNER"}, check: empty, wantErr: "no teams found in your workspace"},
 		{name: "workspace remove", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-eng")), args: []string{"workspace", "team", "remove", "team-eng"}, check: says("Astro Team Engineering was successfully removed from workspace " + curWorkspaceID)},
 		{name: "workspace remove through the picker", root: newWorkspaceCmd, client: with(teams, setsTeamRoles("team-eng")), answers: "1\n", args: []string{"workspace", "team", "remove"}, check: says("Please select a team:", "> Astro Team Engineering was successfully removed from workspace "+curWorkspaceID)},
@@ -559,22 +569,108 @@ func TestWorkspaceOrganizationUserTeamJSONNeverAsks(t *testing.T) {
 	}
 }
 
-// A team update whose role is refused after the rename went through says so
-// in text, the rename's line and then the error, as it always has (pinned in
-// TestWorkspaceOrganizationTeamText). Under --output json stdout is the error
-// object alone: no line ahead of it.
-func TestOrganizationTeamUpdateRefusedRoleJSON(t *testing.T) {
+// An organization team update refuses a role that is not one before any
+// request, and sends the role before the name and description, so a role the
+// API refuses leaves the team as it was. Either way it prints nothing but the
+// error, in text and in json.
+func TestOrganizationTeamUpdateRefusesBeforeChanging(t *testing.T) {
 	ada, bob, eng, idp := userTeamFixtures()
 	renamed := eng
 	renamed.Name = "Platform"
-	client := with(userTeamMock([]astrov1.User{ada, bob}, []astrov1.Team{eng, idp}, nil), updatesTeam("team-eng", &renamed))
-	r := execAstroCmd(t, client(t), "", newOrganizationCmd, "organization", "team", "update", "team-eng", "--name", "Platform", "--role", "NOPE", "-o", "json")
-	require.Error(t, r.err)
-	assert.Equal(t, cliout.ExitFailure, r.code)
+	update := []string{"organization", "team", "update", "team-eng", "--name", "Platform", "--description", "d"}
+	for _, format := range []string{"text", "json"} {
+		t.Run("a role that is not one/"+format, func(t *testing.T) {
+			m := userTeamMock([]astrov1.User{ada, bob}, []astrov1.Team{eng, idp}, nil)(t)
+			r := execAstroCmd(t, m, "", newOrganizationCmd, append(update, "--role", "NOPE", "-o", format)...)
+			require.Error(t, r.err)
+			assert.Equal(t, cliout.ExitFailure, r.code)
+			assert.Contains(t, r.err.Error(), "requested role is invalid")
+			assert.Empty(t, m.Calls, "refused before any request, the lookup included")
+			assertOnlyTheError(t, format, r, "requested role is invalid")
+		})
+
+		t.Run("a role the API refuses/"+format, func(t *testing.T) {
+			m := userTeamMock([]astrov1.User{ada, bob}, []astrov1.Team{eng, idp}, nil)(t)
+			m.On("UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateTeamResponse{HTTPResponse: ok200(), JSON200: &renamed}, nil).Maybe()
+			m.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, "team-eng", mock.Anything).Return(&astrov1.UpdateTeamRolesResponse{
+				HTTPResponse: &http.Response{StatusCode: http.StatusForbidden},
+				Body:         []byte(`{"message":"you may not grant that role"}`),
+			}, nil)
+			r := execAstroCmd(t, m, "", newOrganizationCmd, append(update, "--role", "ORGANIZATION_OWNER", "-o", format)...)
+			require.Error(t, r.err)
+			assert.Equal(t, cliout.ExitFailure, r.code)
+			assert.Contains(t, r.err.Error(), "you may not grant that role")
+			m.AssertNotCalled(t, "UpdateTeamWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			assertOnlyTheError(t, format, r, "you may not grant that role")
+		})
+	}
+}
+
+// assertOnlyTheError checks that a failed run printed nothing but its error:
+// in text, nothing on stdout; in json, the error object alone.
+func assertOnlyTheError(t *testing.T, format string, r tokenRun, msg string) {
+	t.Helper()
+	if format == "text" {
+		assert.Empty(t, r.stdout)
+		return
+	}
 	var got errorJSON
 	decodeOne(t, r.stdout, &got)
-	assert.Contains(t, got.Error, "requested role is invalid")
+	assert.Contains(t, got.Error, msg)
 	assert.Empty(t, r.stderr)
+}
+
+// workspace team update and remove act on the Workspace --workspace (or
+// --workspace-id) names, as add and the workspace user commands do, and list
+// that Workspace's teams for the picker.
+func TestWorkspaceTeamUpdateRemoveTakeWorkspace(t *testing.T) {
+	ada, bob, eng, idp := userTeamFixtures()
+	other := "clws-other"
+	for _, tc := range []struct {
+		name string
+		args []string
+		want map[string]any
+	}{
+		{"update --workspace", []string{"workspace", "team", "update", "team-eng", "--role", "WORKSPACE_OWNER", "--workspace", other}, engJSON("workspace_role", "WORKSPACE_OWNER")},
+		{"update --workspace-id", []string{"workspace", "team", "update", "team-eng", "--role", "WORKSPACE_OWNER", "--workspace-id", other}, engJSON("workspace_role", "WORKSPACE_OWNER")},
+		{"remove --workspace", []string{"workspace", "team", "remove", "team-eng", "--workspace", other}, map[string]any{"id": "team-eng", "name": "Engineering", "workspace_id": other, "action": "removed"}},
+		{"remove -w", []string{"workspace", "team", "remove", "team-eng", "-w", other}, map[string]any{"id": "team-eng", "name": "Engineering", "workspace_id": other, "action": "removed"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := userTeamMock([]astrov1.User{ada, bob}, []astrov1.Team{eng, idp}, nil)(t)
+			var sent astrov1.UpdateTeamRolesRequest
+			m.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, "team-eng", mock.Anything).Run(func(args mock.Arguments) {
+				sent = args.Get(3).(astrov1.UpdateTeamRolesRequest)
+			}).Return(&astrov1.UpdateTeamRolesResponse{HTTPResponse: ok200(), JSON200: &astrov1.SubjectRoles{}}, nil)
+			r := execAstroCmd(t, m, "", newWorkspaceCmd, append(tc.args, "-o", "json")...)
+			require.NoError(t, r.err)
+			jsonIs(tc.want)(t, r.stdout)
+			// The role changes on the Workspace named and nowhere else: the
+			// current one keeps the role it had.
+			require.NotNil(t, sent.WorkspaceRoles)
+			roles := map[string]string{}
+			for _, wr := range *sent.WorkspaceRoles {
+				roles[wr.WorkspaceId] = string(wr.Role)
+			}
+			assert.Equal(t, "WORKSPACE_OPERATOR", roles[curWorkspaceID])
+			if tc.want["action"] == "removed" {
+				assert.NotContains(t, roles, other)
+			} else {
+				assert.Equal(t, "WORKSPACE_OWNER", roles[other])
+			}
+		})
+	}
+
+	t.Run("the picker lists the Workspace named", func(t *testing.T) {
+		m := userTeamMock([]astrov1.User{ada, bob}, []astrov1.Team{eng, idp}, nil)(t)
+		setsTeamRoles("team-eng")(m)
+		r := execAstroCmd(t, m, "1\n", newWorkspaceCmd, "workspace", "team", "remove", "--workspace", other)
+		require.NoError(t, r.err)
+		m.AssertCalled(t, "ListTeamsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(p *astrov1.ListTeamsParams) bool {
+			return p.WorkspaceId != nil && *p.WorkspaceId == other
+		}))
+		requireInOrder(t, r.stdout, "Please select a team:", "> Astro Team Engineering was successfully removed from workspace "+other)
+	})
 }
 
 // --output takes text or json on every user and team command: anything else
@@ -598,24 +694,22 @@ func TestWorkspaceOrganizationUserTeamOutputUsage(t *testing.T) {
 	}
 }
 
-// Help text this change leaves as it was, pinned so that fixing it is a
-// visible change: each is a follow-up, listed in the PR.
-func TestUserTeamHelpQuirksArePinned(t *testing.T) {
+// The help of the user and team commands names the right command and object.
+func TestUserTeamHelp(t *testing.T) {
 	find := func(root func(io.Writer) *cobra.Command, path ...string) *cobra.Command {
 		t.Helper()
 		c, _, err := root(io.Discard).Find(path)
 		require.NoError(t, err)
 		return c
 	}
-	// The team's role is called the token's.
-	assert.Contains(t, find(newOrganizationCmd, "team", "create").Flag("role").Usage, "The role for the token.")
-	// The usage lines name a top-level `astro user` that does not exist.
-	assert.Contains(t, find(newOrganizationCmd, "user", "invite").Long, "$astro user invite [email]")
-	assert.Contains(t, find(newOrganizationCmd, "user", "update").Long, "$astro user update [email]")
-	assert.Equal(t, "Update the role of a user your in Astro Organization", find(newOrganizationCmd, "user", "update").Short)
-	// update and remove act on the current Workspace only; add and the user
-	// commands take --workspace.
-	assert.Nil(t, find(newWorkspaceCmd, "team", "update").Flag("workspace"))
-	assert.Nil(t, find(newWorkspaceCmd, "team", "remove").Flag("workspace"))
-	assert.NotNil(t, find(newWorkspaceCmd, "team", "add").Flag("workspace"))
+	assert.Contains(t, find(newOrganizationCmd, "team", "create").Flag("role").Usage, "The role for the new team.")
+	assert.Contains(t, find(newOrganizationCmd, "user", "invite").Long, "$astro organization user invite [email]")
+	assert.Contains(t, find(newOrganizationCmd, "user", "update").Long, "$astro organization user update [email]")
+	assert.Equal(t, "Update the role of a user in your Astro Organization", find(newOrganizationCmd, "user", "update").Short)
+	// Every workspace team command that acts on a Workspace takes --workspace.
+	for _, sub := range []string{"add", "update", "remove"} {
+		c := find(newWorkspaceCmd, "team", sub)
+		assert.NotNil(t, c.Flag("workspace"), sub)
+		assert.NotNil(t, c.Flag("workspace-id"), sub)
+	}
 }
