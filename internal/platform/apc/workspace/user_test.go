@@ -14,7 +14,13 @@ var (
 	mockWsUserResponse = &houston.Workspace{
 		ID: "ckc0eir8e01gj07608ajmvia1",
 	}
-	mockRoles = houston.WorkspaceUserRoleBindings{
+	errMock = errors.New("api error")
+)
+
+// mockRoles is a function, not a shared value: a test that changes what it
+// returns must not change it for the next run of the suite (-count=N).
+func mockRoles() houston.WorkspaceUserRoleBindings {
+	return houston.WorkspaceUserRoleBindings{
 		RoleBindings: []houston.RoleBinding{
 			{
 				Role:      houston.WorkspaceViewerRole,
@@ -26,8 +32,7 @@ var (
 			},
 		},
 	}
-	errMock = errors.New("api error")
-)
+}
 
 func (s *Suite) TestAdd() {
 	testUtil.InitTestConfig("software")
@@ -379,7 +384,7 @@ func (s *Suite) TestUpdateRole() {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
 	api.On("UpdateWorkspaceUserRole", houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: id, Email: email, Role: role}).Return(role, nil)
 
 	buf := new(bytes.Buffer)
@@ -398,7 +403,7 @@ func (s *Suite) TestUpdateRoleNoAccessDeploymentOnly() {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)
@@ -430,7 +435,7 @@ func (s *Suite) TestUpdateRoleError() {
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
 	api.On("UpdateWorkspaceUserRole", houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: id, Email: email, Role: role}).Return("", errMock)
 
 	buf := new(bytes.Buffer)
@@ -442,14 +447,12 @@ func (s *Suite) TestUpdateRoleError() {
 func (s *Suite) TestUpdateRoleNoAccess() {
 	testUtil.InitTestConfig("software")
 
-	mockRoles.RoleBindings = []houston.RoleBinding{}
-
 	id := "ckoixo6o501496qemiwsja1tl"
 	role := "test-role"
 	email := "test@test.com"
 
 	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles, nil)
+	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(houston.WorkspaceUserRoleBindings{}, nil)
 
 	buf := new(bytes.Buffer)
 	err := UpdateRole(id, email, role, api, buf)

@@ -17,6 +17,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
@@ -258,7 +259,7 @@ var (
 // envCredentials reports whether the environment supplies the credentials
 // Setup uses before any saved login.
 func envCredentials() bool {
-	return os.Getenv("ASTRO_API_TOKEN") != "" || (os.Getenv("ASTRONOMER_KEY_ID") != "" && os.Getenv("ASTRONOMER_KEY_SECRET") != "")
+	return astrosession.HasAPIToken() || (os.Getenv("ASTRONOMER_KEY_ID") != "" && os.Getenv("ASTRONOMER_KEY_SECRET") != "")
 }
 
 func renewLogin(c *config.Context) error {
@@ -513,10 +514,14 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 
 func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
 	// check os variables
-	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
-	if astroAPIToken == "" {
+	// Read as every reader of the variable reads it: one holding only the
+	// scheme ("Bearer ") is no token, and one holding the scheme too is the
+	// token after it, so the login below does not carry it twice.
+	stored, ok := astrosession.APIToken()
+	if !ok {
 		return false, nil
 	}
+	astroAPIToken := astrosession.Credential(stored)
 	if !isDeploymentFile {
 		fmt.Println("Using an Astro API Token")
 	}

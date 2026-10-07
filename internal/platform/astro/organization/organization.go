@@ -32,6 +32,9 @@ var (
 	Login                      = auth.Login
 	CheckUserSession           = auth.CheckUserSession
 	FetchDomainAuthConfig      = auth.FetchDomainAuthConfig
+	// auditLogsClock is the time an audit-log export is as of: the date in
+	// the file it names and the day its logs start from.
+	auditLogsClock = time.Now
 )
 
 var organizationTableConfig = output.BuildTableConfig(
@@ -188,7 +191,7 @@ const NameOrIDAnswer = "the organization name or ID as an argument"
 // Switch makes the Organization named, by name or id, current, or, with no
 // name, the one picked from a menu drawn on out. The login check that follows
 // a switch picks the Organization's Workspace, and may ask for one on out too.
-func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) (*Switched, error) {
+func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer) (*Switched, error) {
 	// get current context
 	c, err := context.GetCurrentContext()
 	if err != nil {
@@ -265,15 +268,17 @@ func ExportAuditLogs(astroV1Client astrov1.APIClient, orgName, filePath string, 
 			return nil, errInvalidOrganizationName
 		}
 	}
+	// One reading of the clock, so the date in the file's name and the day
+	// its logs start from cannot straddle a midnight.
+	asOf := auditLogsClock()
 	if filePath == "" {
 		orgName = strings.ReplaceAll(strings.ToLower(orgName), " ", "")
 
-		currentTime := time.Now()
-		date := "-" + currentTime.Format("20060102")
+		date := "-" + asOf.Format("20060102")
 		filePath = fmt.Sprintf("%s-logs-%d-day%s%s.ndjson.gz", orgName, earliest, pluralize(earliest), date)
 	}
 
-	startDate := time.Now().AddDate(0, 0, -earliest)
+	startDate := asOf.AddDate(0, 0, -earliest)
 	organizationAuditLogsParams := &astrov1.GetOrganizationAuditLogsParams{
 		StartDate: &startDate,
 	}

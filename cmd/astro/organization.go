@@ -30,7 +30,6 @@ var (
 	auditLogsOutput                    string
 	auditLogsEarliestParam             int
 	auditLogsEarliestParamDefaultValue = 1
-	shouldDisplayLoginLink             bool
 	role                               string
 	updateRole                         string
 	teamDescription                    string
@@ -98,7 +97,7 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 		Use:     "switch [ORGANIZATION_NAME_OR_ID]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Organization",
-		Long:    "Switch your active Organization and reset your Workspace context. After switching, your active Workspace is cleared unless you specify one with --workspace. Use --login-link to generate a login URL for switching on a different device.",
+		Long:    "Switch your active Organization and reset your Workspace context. After switching, your active Workspace is cleared unless you specify one with --workspace.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
   # Choose an Organization from a list
@@ -106,9 +105,6 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 
   # Switch to an Organization by its name or ID
   astro organization switch my-organization
-
-  # Get a login link to switch on another device, and make a Workspace current
-  astro organization switch --login-link --workspace <WORKSPACE_ID>
 
   # Switch, make a Workspace current, and print the result as JSON
   astro organization switch my-organization --workspace <WORKSPACE_ID> -o json
@@ -119,9 +115,9 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	}
 	cliout.AddOutputFlag(cmd, &organizationSwitchOutput)
 
-	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for organization switch")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
 	addWorkspaceFlag(cmd.Flags(), "w", "Workspace to make current after the switch")
+	addRemovedFlag(cmd, "login-link", "l", true, errLoginLinkRemoved)
 
 	return cmd
 }
@@ -270,7 +266,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 	}
 
 	asks := questionsTo(cmd, format, out)
-	switched, err := orgSwitch(organizationNameOrID, astroV1Client, asks, shouldDisplayLoginLink)
+	switched, err := orgSwitch(organizationNameOrID, astroV1Client, asks)
 	if err != nil {
 		return err
 	}

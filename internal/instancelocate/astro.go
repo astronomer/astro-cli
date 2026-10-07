@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -142,10 +141,10 @@ func (e *UnavailableError) Error() string {
 // Add: the generated client appends, and two Authorization headers is a 401
 // with nothing to read.
 func bearer(token string) astrov1.RequestEditorFn {
-	value := token
-	if !strings.HasPrefix(value, "Bearer ") {
-		value = "Bearer " + value
-	}
+	// The token as BearerFor gave it, a stored one with its scheme or
+	// ASTRO_API_TOKEN as set, read by the one rule, so the scheme goes out
+	// once whichever it was.
+	value := "Bearer " + astrosession.Credential(token)
 	return func(_ context.Context, req *http.Request) error {
 		req.Header.Set("Authorization", value)
 		return nil

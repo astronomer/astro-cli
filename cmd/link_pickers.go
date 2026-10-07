@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 
 	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
@@ -134,7 +133,7 @@ func isUnauthorized(err error) bool {
 // what failed, and an unreachable host is the workspace link's offline cause.
 func loginCheckFailed(err error) error {
 	switch {
-	case os.Getenv(astrosession.EnvAPIToken) != "":
+	case astrosession.HasAPIToken():
 		return err
 	case isOffline(err):
 		return offline()

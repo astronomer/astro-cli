@@ -37,6 +37,7 @@ var (
 	errNotSupported              = errors.New("does not support")
 	errNoUseWorkerQueues         = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 	errNoWorkerQueues            = errors.New("no worker queues found for this deployment")
+	errNoWorkerTypes             = errors.New("no worker types are available for this deployment")
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
@@ -421,6 +422,7 @@ func selectWorkerMachine(workerType string, workerMachines []astrov1.WorkerMachi
 			InvalidAnswer: func(choice string) error {
 				return fmt.Errorf("%w: invalid worker type: %s selected", errInvalidAstroMachine, choice)
 			},
+			Empty: errNoWorkerTypes,
 		}
 		for i := range workerMachines {
 			list.AddRow(false, string(workerMachines[i].Name), workerMachines[i].Spec.Cpu+" vCPU", workerMachines[i].Spec.Memory)
@@ -466,6 +468,7 @@ func selectNodePool(workerType string, nodePools []astrov1.NodePool, out io.Writ
 			InvalidAnswer: func(choice string) error {
 				return fmt.Errorf("%w: invalid worker type: %s selected", errInvalidNodePool, choice)
 			},
+			Empty: errNoWorkerTypes,
 		}
 		for i := range nodePools {
 			list.AddRow(false, nodePools[i].NodeInstanceType, strconv.FormatBool(nodePools[i].IsDefault), nodePools[i].Id)

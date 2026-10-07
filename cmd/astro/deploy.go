@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -708,9 +707,10 @@ func loginForDeploy(ctx context.Context, domain string) (deployLogin, error) {
 	if err != nil {
 		return deployLogin{}, err
 	}
-	if !strings.HasPrefix(token, "Bearer ") {
-		token = "Bearer " + token
-	}
+	// The token as BearerFor gave it, a stored one with its scheme or
+	// ASTRO_API_TOKEN as set: read by the one rule, so the scheme goes out
+	// once whichever it was.
+	token = "Bearer " + astrosession.Credential(token)
 	login.Token, login.Organization = token, org
 	return deployLogin{
 		context: login,
@@ -734,11 +734,6 @@ type manifestDeployer struct {
 	in     io.Reader
 	errOut io.Writer
 }
-
-// deployPromptAttempts bounds the re-asking, so a stdin that answers but never
-// answers usefully ends rather than loops. It matches the query surface's
-// picker (cmd/local).
-const deployPromptAttempts = 3
 
 // ConfirmTarget asks which deployment to ship to. Every interactive deploy that
 // did not name its target comes through here — a pin, ASTRO_DEPLOYMENT, or a
@@ -764,14 +759,13 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 		Title:  "Deploy to which deployment?",
 		Header: header,
 		Ask:    []input.Option{input.About("the deployment to ship to"), input.AnsweredBy("--deployment")},
-		// Asked three times, and still no pick. The picker has said "Not one
+		// Asked picker.DefaultAttempts times, and still no pick. The picker has said "Not one
 		// of the choices." after every answer, the third included, so that
 		// line is the last word and this ends quietly: that is what the
 		// sentinel is for. Input that ends instead fails with Ended.
-		Invalid:  manifestdeploy.ErrAborted,
-		Attempts: deployPromptAttempts,
-		ByName:   true,
-		Ended:    input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")),
+		Invalid: manifestdeploy.ErrAborted,
+		ByName:  true,
+		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")),
 	}
 	for i, choice := range choices {
 		cells := []string{choice.Name, choice.Where}

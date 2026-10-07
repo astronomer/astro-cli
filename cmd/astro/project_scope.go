@@ -164,7 +164,7 @@ func projectManifest(dir string) (*manifest.Manifest, error) {
 // makes that domain current, so the command stays on the host the environment
 // names rather than move the user's current context.
 func credentialFromEnv() bool {
-	return os.Getenv(astrosession.EnvAPIToken) != "" || os.Getenv("ASTRONOMER_KEY_ID") != ""
+	return astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != ""
 }
 
 // projectDeployment reads ref as a Deployment link name, then as a Deployment

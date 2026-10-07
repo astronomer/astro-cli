@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
@@ -13,25 +14,11 @@ import (
 	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-type workspacePaginationOptions struct {
-	pageSize      int
-	pageNumber    int
-	quit          bool
-	userSelection int
-}
-
 type workspaceSelection struct {
 	id   string
 	quit bool
 	err  error
 }
-
-const (
-	defaultWorkspacePaginationOptions      = "f. first p. previous n. next q. quit\n> "
-	workspacePaginationWithoutNextOptions  = "f. first p. previous q. quit\n> "
-	workspacePaginationWithNextQuitOptions = "n. next q. quit\n> "
-	workspacePaginationWithQuitOptions     = "q. quit\n> "
-)
 
 var errInvalidWorkspaceKey = errors.New("invalid workspace selection")
 
@@ -125,82 +112,39 @@ func GetCurrentWorkspace() (string, error) {
 	return c.Workspace, nil
 }
 
-var GetWorkspaceSelectionID = func(client houston.ClientInterface, out io.Writer) (string, error) {
-	var c config.Context
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return "", err
+// switchList is the switch's question before its rows are fetched, paged or
+// not. The same List is checked before the fetch (List.MayAsk) and then asked,
+// so the refusal a run that may not ask gets before anything is fetched is
+// the one asking would give.
+func switchList(paged bool) picker.List {
+	about := "a workspace"
+	if paged {
+		about = "a workspace, or which page to show next"
 	}
-
-	ws, err := houston.Call(client.ListWorkspaces)(c.Organization)
-	if err != nil {
-		return "", err
-	}
-
-	list := picker.List{
+	return picker.List{
 		Header:  []string{"NAME", "ID"},
-		Ask:     []input.Option{input.About("a workspace")},
+		Ask:     []input.Option{input.About(about), input.AnsweredBy("the workspace ID as an argument")},
 		Invalid: errInvalidWorkspaceKey,
 	}
-	for i := range ws {
-		list.AddRow(c.Workspace == ws[i].ID, ws[i].Label, ws[i].ID)
-	}
-	i, err := list.Pick(out, os.Stdin)
-	if err != nil {
-		return "", err
-	}
-	return ws[i].ID, nil
 }
 
-// switchAsk and pagedSwitchAsk describe the switch's question to a run that
-// may not ask it.
-var (
-	switchAsk      = []input.Option{input.About("a workspace"), input.AnsweredBy("the workspace ID as an argument")}
-	pagedSwitchAsk = []input.Option{input.About("a workspace, or which page to show next"), input.AnsweredBy("the workspace ID as an argument")}
-)
-
-// workspacesPromptPaginatedOption asks for a row of the page shown, or the page
-// to show next, given the page size, the page number and the rows on this
-// page. Rows are numbered on from the pages before, so the second page of ten
-// starts at 11. Anything but a letter on offer or one of this page's row
-// numbers, written exactly, fails with errInvalidWorkspaceKey.
-var workspacesPromptPaginatedOption = func(pageSize, pageNumber, totalRecord int) (workspacePaginationOptions, error) {
-	gotoOptionMessage := defaultWorkspacePaginationOptions
-	gotoOptions := make(map[string]workspacePaginationOptions)
-	gotoOptions["f"] = workspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: 0, userSelection: 0}
-	gotoOptions["p"] = workspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber - 1, userSelection: 0}
-	gotoOptions["n"] = workspacePaginationOptions{pageSize: pageSize, quit: false, pageNumber: pageNumber + 1, userSelection: 0}
-	gotoOptions["q"] = workspacePaginationOptions{pageSize: pageSize, quit: true, pageNumber: pageNumber, userSelection: 0}
-
-	if totalRecord < pageSize {
-		delete(gotoOptions, "n")
-		gotoOptionMessage = workspacePaginationWithoutNextOptions
+// pageKeys are the letters that move between pages on offer on page
+// pageNumber, given the page size and the rows the page holds, and the hint
+// that names them: no "f" or "p" on the first page, no "n" on a page that is
+// not full.
+func pageKeys(pageSize, pageNumber, rows int) (keys []string, hint string) {
+	var names []string
+	if pageNumber > 0 {
+		keys = append(keys, "f", "p")
+		names = append(names, "f. first", "p. previous")
 	}
-
-	if pageNumber == 0 {
-		delete(gotoOptions, "p")
-		delete(gotoOptions, "f")
-		gotoOptionMessage = workspacePaginationWithNextQuitOptions
+	if rows >= pageSize {
+		keys = append(keys, "n")
+		names = append(names, "n. next")
 	}
-
-	if pageNumber == 0 && totalRecord < pageSize {
-		gotoOptionMessage = workspacePaginationWithQuitOptions
-	}
-
-	in, err := input.Text("\n\nPlease select one of the following options or enter index to select the row.\n"+gotoOptionMessage, pagedSwitchAsk...)
-	if err != nil {
-		return workspacePaginationOptions{}, err
-	}
-	if value, found := gotoOptions[in]; found {
-		return value, nil
-	}
-	offset := pageSize * pageNumber
-	if n, ok := picker.Number(in, offset+1, offset+totalRecord); ok {
-		userSelection := gotoOptions["q"]
-		userSelection.userSelection = n - offset
-		return userSelection, nil
-	}
-	return workspacePaginationOptions{}, errInvalidWorkspaceKey
+	keys = append(keys, "q")
+	names = append(names, "q. quit")
+	return keys, "Please select one of the following options or enter index to select the row.\n" + strings.Join(names, " ")
 }
 
 // getWorkspaceSelection asks which workspace to switch to: from a numbered
@@ -212,7 +156,8 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 		id, err := pickWorkspace(client, out)
 		return workspaceSelection{id: id, err: err}
 	}
-	if err := input.MayAsk("\n> ", pagedSwitchAsk...); err != nil {
+	list := switchList(true)
+	if err := list.MayAsk(); err != nil {
 		return workspaceSelection{err: err}
 	}
 
@@ -226,32 +171,37 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 		return workspaceSelection{err: err}
 	}
 
-	tab := newTableOut()
-	tab.GetUserInput = true
+	// Rows are numbered on from the pages before, so the second page of ten
+	// starts at 11, and answered by the numbers shown.
+	list.Keys, list.Hint = pageKeys(pageSize, pageNumber, len(ws))
+	list.First = pageNumber*pageSize + 1
 	for i := range ws {
-		tab.AddRow([]string{ws[i].Label, ws[i].ID}, c.Workspace == ws[i].ID)
+		list.AddRow(c.Workspace == ws[i].ID, ws[i].Label, ws[i].ID)
 	}
-	if err := tab.PrintWithPageNumber(pageNumber*pageSize, out); err != nil {
-		return workspaceSelection{err: fmt.Errorf("unable to print with page number: %w", err)}
-	}
-
-	selectedOption, err := workspacesPromptPaginatedOption(pageSize, pageNumber, len(ws))
+	choice, err := list.Choose(out, os.Stdin)
 	if err != nil {
 		return workspaceSelection{err: err}
 	}
-	if selectedOption.quit {
-		if selectedOption.userSelection == 0 {
-			return workspaceSelection{quit: true}
-		}
-		return workspaceSelection{id: ws[selectedOption.userSelection-1].ID}
+	switch choice.Key {
+	case "":
+		return workspaceSelection{id: ws[choice.Row].ID}
+	case "q":
+		return workspaceSelection{quit: true}
+	case "f":
+		pageNumber = 0
+	case "p":
+		pageNumber--
+	case "n":
+		pageNumber++
 	}
-	return getWorkspaceSelection(selectedOption.pageSize, selectedOption.pageNumber, client, out)
+	return getWorkspaceSelection(pageSize, pageNumber, client, out)
 }
 
 // pickWorkspace asks for one workspace from a numbered table of all of them.
 // It refuses, having fetched nothing, when this run may not ask.
 func pickWorkspace(client houston.ClientInterface, out io.Writer) (string, error) {
-	if err := input.MayAsk("\n> ", switchAsk...); err != nil {
+	list := switchList(false)
+	if err := list.MayAsk(); err != nil {
 		return "", err
 	}
 	ws, err := houston.Call(client.ListWorkspaces)(nil)
@@ -261,11 +211,6 @@ func pickWorkspace(client houston.ClientInterface, out io.Writer) (string, error
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return "", err
-	}
-	list := picker.List{
-		Header:  []string{"NAME", "ID"},
-		Ask:     switchAsk,
-		Invalid: errInvalidWorkspaceKey,
 	}
 	for i := range ws {
 		list.AddRow(c.Workspace == ws[i].ID, ws[i].Label, ws[i].ID)
@@ -280,16 +225,16 @@ func pickWorkspace(client houston.ClientInterface, out io.Writer) (string, error
 // Switch switches workspaces
 func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writer) error {
 	if id == "" {
-		workspaceSelection := getWorkspaceSelection(pageSize, 0, client, out)
+		sel := getWorkspaceSelection(pageSize, 0, client, out)
 
-		if workspaceSelection.quit {
+		if sel.quit {
 			return nil
 		}
-		if workspaceSelection.err != nil {
-			return workspaceSelection.err
+		if sel.err != nil {
+			return sel.err
 		}
 
-		id = workspaceSelection.id
+		id = sel.id
 	}
 	// validate workspace
 	_, err := houston.Call(client.ValidateWorkspaceID)(id)

@@ -22,6 +22,12 @@ const (
 		"To manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL
 )
 
+// Tombstone for the flag `astro organization switch` had for printing a login
+// link: a switch has not logged in again since 2023, so there is no login to
+// link to. Delete it in v3.
+const errLoginLinkRemoved = "--login-link was removed in Astro CLI v2: switching organizations no longer re-authenticates. " +
+	"To log in on another device, use `astro login --login-link`"
+
 // addRemovedFlag registers name, hidden, so that a run passing it fails with
 // msg instead of cobra's "unknown flag". isBool is the flag's old kind: a
 // string flag still consumes its value, so `--deployment-file f.yaml` does not

@@ -316,10 +316,11 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 		Header: []string{"NAME"},
 		Ask:    []input.Option{input.About("the deployment this project uses"), input.AnsweredBy("--deployment")},
 		// Out of tries: the message naming every way to decide.
-		Invalid:  ambiguous,
-		Attempts: promptAttempts,
-		ByName:   true,
-		Ended:    input.Required(ambiguous),
+		// It asks picker.DefaultAttempts times, so a stdin that answers
+		// but never usefully ends with the message naming the flags.
+		Invalid: ambiguous,
+		ByName:  true,
+		Ended:   input.Required(ambiguous),
 	}
 	for _, name := range choices {
 		l.AddRow(false, name)
@@ -330,10 +331,6 @@ func (c *cli) promptForDeployment(choices []string) (string, error) {
 	}
 	return choices[i], nil
 }
-
-// promptAttempts bounds the re-asking, so a stdin that answers but never
-// answers usefully ends with the message naming the flags rather than looping.
-const promptAttempts = 3
 
 // interactive reports whether this run can ask a question: someone has to be at
 // a terminal to answer it. A piped or redirected stdin is a script, and a

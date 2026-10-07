@@ -742,3 +742,35 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+// Every reader of ASTRO_API_TOKEN reads it by the one rule: a value holding
+// only the scheme is no token, so setup neither counts it as an environment
+// credential nor tries to parse it; a real token, with its scheme or
+// without, is parsed bare (and so logged in with the scheme once).
+func TestSetupReadsTheAPITokenByTheOneRule(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Setenv("ASTRONOMER_KEY_ID", "")
+	t.Setenv("ASTRONOMER_KEY_SECRET", "")
+	origParse := parseAPIToken
+	t.Cleanup(func() { parseAPIToken = origParse })
+	errStop := errors.New("stop after the parse")
+	for env, parsed := range map[string]string{"Bearer ": "", "Bearer Bearer": "", "token": "token", "Bearer token": "token", "Bearer Bearer token": "token"} {
+		t.Setenv("ASTRO_API_TOKEN", env)
+		assert.Equal(t, parsed != "", envCredentials(), "ASTRO_API_TOKEN=%q", env)
+		assert.Equal(t, parsed != "", credentialFromEnv(), "ASTRO_API_TOKEN=%q", env)
+
+		var got string
+		parseAPIToken = func(token string) (*util.CustomClaims, error) {
+			got = token
+			return nil, errStop
+		}
+		ok, err := checkAPIToken(true, new(astrov1_mocks.ClientWithResponsesInterface))
+		assert.False(t, ok, "ASTRO_API_TOKEN=%q", env)
+		if parsed == "" {
+			assert.NoError(t, err, "ASTRO_API_TOKEN=%q", env)
+		} else {
+			assert.ErrorIs(t, err, errStop, "ASTRO_API_TOKEN=%q", env)
+		}
+		assert.Equal(t, parsed, got, "ASTRO_API_TOKEN=%q: what was parsed", env)
+	}
+}

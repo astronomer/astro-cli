@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1715,6 +1716,7 @@ func (s *Suite) TestSelectCluster() {
 }
 
 func (s *Suite) TestCanCiCdDeploy() {
+	s.T().Cleanup(func() { parseToken = util.ParseAPIToken })
 	permissions := []string{}
 	mockClaims := util.CustomClaims{
 		Permissions: permissions,
@@ -1747,6 +1749,87 @@ func (s *Suite) TestCanCiCdDeploy() {
 
 	canDeploy = CanCiCdDeploy("bearer token")
 	s.Equal(canDeploy, true)
+}
+
+// TestCanCiCdDeployTokenForms runs the real parser over every form a stored
+// token can take. One that does not show it carries permissions is not one
+// that may deploy past CI/CD enforcement — and is never a panic.
+// SelectDeployment takes the only Deployment without asking when CI supplied
+// an ASTRO_API_TOKEN, read by the one rule: one holding only the scheme is no
+// token, so it asks (and, with nothing to read, fails).
+func (s *Suite) TestSelectDeploymentReadsTheAPITokenByTheOneRule() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	s.T().Setenv("ASTRONOMER_KEY_ID", "")
+	s.T().Setenv("ASTRONOMER_KEY_SECRET", "")
+	only := []astrov1.Deployment{{Id: "dep-1", Name: "only"}}
+	for env, asks := range map[string]bool{"Bearer ": true, "Bearer Bearer": true, "ci-token": false, "Bearer ci-token": false} {
+		s.Run(env, func() {
+			s.T().Setenv("ASTRO_API_TOKEN", env)
+			defer testUtil.MockUserInput(s.T(), "")()
+			got, err := SelectDeployment(only, "Which?")
+			if asks {
+				s.Error(err)
+				return
+			}
+			s.NoError(err)
+			s.Equal("dep-1", got.Id)
+		})
+	}
+}
+
+func (s *Suite) TestCanCiCdDeployTokenForms() {
+	orig := parseToken
+	s.T().Cleanup(func() { parseToken = orig })
+	parseToken = util.ParseAPIToken
+
+	jwtWith := func(claims string) string {
+		enc := base64.RawURLEncoding.EncodeToString
+		return enc([]byte(`{"alg":"HS256","typ":"JWT"}`)) + "." + enc([]byte(claims)) + ".c2ln"
+	}
+	apiToken := jwtWith(`{"permissions":["workspaceId:ws","organizationId:org"]}`)
+	userToken := jwtWith(`{"sub":"user"}`)
+
+	for _, tc := range []struct {
+		name, token string
+		want        bool
+	}{
+		{"API token with Bearer", "Bearer " + apiToken, true},
+		{"API token with lowercase scheme", "bearer " + apiToken, true},
+		{"API token without Bearer", apiToken, true},
+		{"API token with surrounding space", "  Bearer " + apiToken + " \n", true},
+		{"user token with Bearer", "Bearer " + userToken, false},
+		{"user token without Bearer", userToken, false},
+		{"empty", "", false},
+		{"logged out", "Bearer ", false},
+		{"Bearer alone", "Bearer", false},
+		{"not a JWT", "Bearer not-a-jwt", false},
+		{"malformed JWT", "Bearer a.b", false},
+		{"bad base64", "Bearer !!!.@@@.###", false},
+	} {
+		s.Run(tc.name, func() {
+			s.Equal(tc.want, CanCiCdDeploy(tc.token))
+		})
+	}
+
+	// A stored token that holds no credential at all is no API token, and
+	// not a token to warn about: nothing was there to parse.
+	for _, stored := range []string{"", "Bearer ", "Bearer", "Bearer Bearer", "bearer  BEARER "} {
+		s.Run("quietly no credential: "+stored, func() {
+			// A file, not a pipe: nothing has to drain it while the call
+			// runs, however much it writes.
+			f, err := os.CreateTemp(s.T().TempDir(), "stderr")
+			s.Require().NoError(err)
+			stderr := os.Stderr
+			os.Stderr = f
+			s.T().Cleanup(func() { os.Stderr = stderr; f.Close() })
+			got := CanCiCdDeploy(stored)
+			os.Stderr = stderr
+			warned, err := os.ReadFile(f.Name())
+			s.Require().NoError(err)
+			s.False(got)
+			s.Empty(string(warned))
+		})
+	}
 }
 
 func (s *Suite) TestUpdate() {

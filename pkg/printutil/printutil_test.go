@@ -47,7 +47,6 @@ func (s *Suite) TestTablePrint() {
 		RenderedHeader  string
 		Truncate        bool
 		Rows            []Row
-		GetUserInput    bool
 		SuccessMsg      string
 		NoResultsMsg    string
 		ColorRowCode    [2]string
@@ -82,7 +81,6 @@ func (s *Suite) TestTablePrint() {
 				RenderedHeader:  tt.fields.RenderedHeader,
 				Truncate:        tt.fields.Truncate,
 				Rows:            tt.fields.Rows,
-				GetUserInput:    tt.fields.GetUserInput,
 				SuccessMsg:      tt.fields.SuccessMsg,
 				NoResultsMsg:    tt.fields.NoResultsMsg,
 				ColorRowCode:    tt.fields.ColorRowCode,
@@ -98,65 +96,6 @@ func (s *Suite) TestTablePrint() {
 	}
 }
 
-func (s *Suite) TestTablePrintWithIndex() {
-	type fields struct {
-		Padding         []int
-		RenderedPadding string
-		Header          []string
-		RenderedHeader  string
-		Truncate        bool
-		Rows            []Row
-		GetUserInput    bool
-		SuccessMsg      string
-		NoResultsMsg    string
-		ColorRowCode    [2]string
-		altPadding      []int
-		DynamicPadding  bool
-	}
-	tests := []*struct {
-		name         string
-		fields       fields
-		wantOut      string
-		errAssertion assert.ErrorAssertionFunc
-	}{
-		{
-			name:         "empty table case",
-			fields:       fields{NoResultsMsg: "no rows present"},
-			wantOut:      "no rows present",
-			errAssertion: assert.NoError,
-		},
-		{
-			name:         "basic case",
-			fields:       fields{SuccessMsg: "printed all rows", Rows: []Row{{Raw: []string{"testing"}}}},
-			wantOut:      "printed all rows",
-			errAssertion: assert.NoError,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tr := &Table{
-				Padding:         tt.fields.Padding,
-				RenderedPadding: tt.fields.RenderedPadding,
-				Header:          tt.fields.Header,
-				RenderedHeader:  tt.fields.RenderedHeader,
-				Truncate:        tt.fields.Truncate,
-				Rows:            tt.fields.Rows,
-				GetUserInput:    tt.fields.GetUserInput,
-				SuccessMsg:      tt.fields.SuccessMsg,
-				NoResultsMsg:    tt.fields.NoResultsMsg,
-				ColorRowCode:    tt.fields.ColorRowCode,
-				altPadding:      tt.fields.altPadding,
-				DynamicPadding:  tt.fields.DynamicPadding,
-			}
-			out := &bytes.Buffer{}
-			if tt.errAssertion(s.T(), tr.PrintWithPageNumber(10, out)) {
-				return
-			}
-			s.Contains(out.String(), tt.wantOut)
-		})
-	}
-}
-
 func (s *Suite) TestTablePrintHeader() {
 	type fields struct {
 		Padding         []int
@@ -165,7 +104,6 @@ func (s *Suite) TestTablePrintHeader() {
 		RenderedHeader  string
 		Truncate        bool
 		Rows            []Row
-		GetUserInput    bool
 		SuccessMsg      string
 		NoResultsMsg    string
 		ColorRowCode    [2]string
@@ -179,7 +117,7 @@ func (s *Suite) TestTablePrintHeader() {
 	}{
 		{
 			name:    "basic case",
-			fields:  fields{Header: []string{"testing"}, GetUserInput: true},
+			fields:  fields{Header: []string{"testing"}},
 			wantOut: "testing",
 		},
 	}
@@ -192,7 +130,6 @@ func (s *Suite) TestTablePrintHeader() {
 				RenderedHeader:  tt.fields.RenderedHeader,
 				Truncate:        tt.fields.Truncate,
 				Rows:            tt.fields.Rows,
-				GetUserInput:    tt.fields.GetUserInput,
 				SuccessMsg:      tt.fields.SuccessMsg,
 				NoResultsMsg:    tt.fields.NoResultsMsg,
 				ColorRowCode:    tt.fields.ColorRowCode,
@@ -214,7 +151,6 @@ func (s *Suite) TestTablePrintRows() {
 		RenderedHeader  string
 		Truncate        bool
 		Rows            []Row
-		GetUserInput    bool
 		SuccessMsg      string
 		NoResultsMsg    string
 		ColorRowCode    [2]string
@@ -228,7 +164,7 @@ func (s *Suite) TestTablePrintRows() {
 	}{
 		{
 			name:    "basic case",
-			fields:  fields{Rows: []Row{{Raw: []string{"testing"}}}, GetUserInput: true},
+			fields:  fields{Rows: []Row{{Raw: []string{"testing"}}}},
 			wantOut: "testing",
 		},
 	}
@@ -241,7 +177,6 @@ func (s *Suite) TestTablePrintRows() {
 				RenderedHeader:  tt.fields.RenderedHeader,
 				Truncate:        tt.fields.Truncate,
 				Rows:            tt.fields.Rows,
-				GetUserInput:    tt.fields.GetUserInput,
 				SuccessMsg:      tt.fields.SuccessMsg,
 				NoResultsMsg:    tt.fields.NoResultsMsg,
 				ColorRowCode:    tt.fields.ColorRowCode,
@@ -249,7 +184,7 @@ func (s *Suite) TestTablePrintRows() {
 				DynamicPadding:  tt.fields.DynamicPadding,
 			}
 			out := &bytes.Buffer{}
-			tr.PrintRows(out, 0)
+			tr.PrintRows(out)
 			s.Contains(out.String(), tt.wantOut)
 		})
 	}

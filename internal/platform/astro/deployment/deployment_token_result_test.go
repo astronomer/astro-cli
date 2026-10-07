@@ -30,8 +30,8 @@ func resultToken(id, name string, scope astrov1.ApiTokenScope, role string) astr
 	}
 }
 
-func resultClient(tokens ...astrov1.ApiToken) *astrov1_mocks.ClientWithResponsesInterface {
-	m := new(astrov1_mocks.ClientWithResponsesInterface)
+func resultClient(t *testing.T, tokens ...astrov1.ApiToken) *astrov1_mocks.ClientWithResponsesInterface {
+	m := astrov1_mocks.NewClientWithResponsesInterface(t)
 	m.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListApiTokensResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		JSON200:      &astrov1.ApiTokensPaginated{Tokens: tokens, TotalCount: len(tokens)},
@@ -59,7 +59,7 @@ func TestListTokensResult(t *testing.T) {
 		org := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "DEPLOYMENT_MEMBER")
 		org.CreatedBy = &astrov1.BasicSubjectProfile{ApiTokenName: &fullName2}
 		org.Token = &token // a list must not pass a secret on
-		got, err := ListTokens(resultClient(dep, org), deploymentID, nil)
+		got, err := ListTokens(resultClient(t, dep, org), deploymentID, nil)
 		require.NoError(t, err)
 		assert.Equal(t, []apitoken.Token{
 			{ID: "t1", Name: "one", Description: "about one", Scope: "DEPLOYMENT", Role: "DEPLOYMENT_ADMIN", CreatedAt: resultCreated, CreatedBy: fullName1},
@@ -70,14 +70,14 @@ func TestListTokensResult(t *testing.T) {
 	t.Run("filtered by scope", func(t *testing.T) {
 		dep := resultToken("t1", "one", astrov1.ApiTokenScopeDEPLOYMENT, "DEPLOYMENT_ADMIN")
 		org := resultToken("t2", "two", astrov1.ApiTokenScopeORGANIZATION, "DEPLOYMENT_MEMBER")
-		got, err := ListTokens(resultClient(dep, org), deploymentID, []DeploymentTokenType{DeploymentTokenTypeORGANIZATION})
+		got, err := ListTokens(resultClient(t, dep, org), deploymentID, []DeploymentTokenType{DeploymentTokenTypeORGANIZATION})
 		require.NoError(t, err)
 		require.Len(t, got, 1)
 		assert.Equal(t, "t2", got[0].ID)
 	})
 
 	t.Run("none is empty, not nil", func(t *testing.T) {
-		got, err := ListTokens(resultClient(), deploymentID, nil)
+		got, err := ListTokens(resultClient(t), deploymentID, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, got)
 		assert.Empty(t, got)
@@ -90,7 +90,7 @@ func TestCreateTokenResult(t *testing.T) {
 	created.Token = &token
 	end := resultCreated.Add(24 * time.Hour)
 	created.EndAt = &end
-	m := resultClient()
+	m := resultClient(t)
 	m.On("CreateApiTokenWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.CreateApiTokenResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &created,
 	}, nil)
@@ -108,7 +108,7 @@ func TestUpdateTokenResult(t *testing.T) {
 	before := resultToken("t1", "one", astrov1.ApiTokenScopeDEPLOYMENT, "DEPLOYMENT_ADMIN")
 	after := before
 	after.Name = "uno"
-	m := resultClient(before)
+	m := resultClient(t, before)
 	m.On("UpdateApiTokenWithResponse", mock.Anything, mock.Anything, "t1", mock.Anything).Return(&astrov1.UpdateApiTokenResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &after,
 	}, nil)
@@ -127,7 +127,7 @@ func TestRotateTokenResult(t *testing.T) {
 	tok := resultToken("t1", "one", astrov1.ApiTokenScopeDEPLOYMENT, "DEPLOYMENT_ADMIN")
 	rotated := tok
 	rotated.Token = &token
-	m := resultClient(tok)
+	m := resultClient(t, tok)
 	m.On("RotateApiTokenWithResponse", mock.Anything, mock.Anything, "t1").Return(&astrov1.RotateApiTokenResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &rotated,
 	}, nil)
@@ -143,7 +143,7 @@ func TestDeleteTokenResult(t *testing.T) {
 
 	t.Run("a Deployment token is deleted", func(t *testing.T) {
 		tok := resultToken("t1", "one", astrov1.ApiTokenScopeDEPLOYMENT, "DEPLOYMENT_ADMIN")
-		m := resultClient(tok)
+		m := resultClient(t, tok)
 		m.On("DeleteApiTokenWithResponse", mock.Anything, mock.Anything, "t1").Return(&DeleteDeploymentAPITokenResponseOK, nil)
 		got, err := DeleteToken(tok, deploymentID, m)
 		require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestDeleteTokenResult(t *testing.T) {
 
 	t.Run("any other token loses its Deployment role", func(t *testing.T) {
 		tok := resultToken("t2", "two", astrov1.ApiTokenScopeWORKSPACE, "DEPLOYMENT_MEMBER")
-		m := resultClient(tok)
+		m := resultClient(t, tok)
 		m.On("UpdateApiTokenRolesWithResponse", mock.Anything, mock.Anything, "t2", mock.MatchedBy(func(r astrov1.UpdateApiTokenRolesRequest) bool {
 			return len(r.Roles) == 0
 		})).Return(&UpdateOrganizationAPITokenResponseOK, nil)
@@ -174,7 +174,7 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 			heading, offered = h, tokens
 			return 1, nil
 		}
-		got, err := FindToken("", "", deploymentID, nil, pick, resultClient(a, b))
+		got, err := FindToken("", "", deploymentID, nil, pick, resultClient(t, a, b))
 		require.NoError(t, err)
 		assert.Equal(t, "t2", got.Id)
 		assert.Empty(t, heading, "the picker asks the plain choice in its own words")
@@ -188,7 +188,7 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 			heading = h
 			return 0, nil
 		}
-		got, err := FindToken("", "same", deploymentID, nil, pick, resultClient(a, b))
+		got, err := FindToken("", "same", deploymentID, nil, pick, resultClient(t, a, b))
 		require.NoError(t, err)
 		assert.Equal(t, "t1", got.Id)
 		assert.Equal(t, "\nThere are more than one API tokens with name same. Please select an API token:", heading)
@@ -197,13 +197,13 @@ func TestFindTokenAsksThePicker(t *testing.T) {
 	t.Run("a picker's refusal is the error", func(t *testing.T) {
 		refused := errors.New("cannot ask")
 		pick := func(string, []apitoken.Token) (int, error) { return 0, refused }
-		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(a, b))
+		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(t, a, b))
 		assert.ErrorIs(t, err, refused)
 	})
 
 	t.Run("a pick out of range is an error, not a panic", func(t *testing.T) {
 		pick := func(string, []apitoken.Token) (int, error) { return 5, nil }
-		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(a, b))
+		_, err := FindToken("", "", deploymentID, nil, pick, resultClient(t, a, b))
 		assert.Error(t, err)
 	})
 }

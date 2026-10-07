@@ -115,6 +115,35 @@ func TestBearerForPrefersTheAPIToken(t *testing.T) {
 	}
 }
 
+// An ASTRO_API_TOKEN holding no credential ("Bearer " alone) is no API
+// token: the current context answers, as it does with the variable unset.
+func TestBearerIgnoresAnAPITokenWithNoCredential(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	for _, v := range []string{"Bearer ", " bearer", "Bearer Bearer"} {
+		t.Setenv(EnvAPIToken, v)
+		token, err := Bearer(context.Background())
+		if err != nil || token != "token" {
+			t.Errorf("%s=%q: token, err = %q, %v; want the current context's token", EnvAPIToken, v, token, err)
+		}
+		if err := Rejected("astronomer.io"); strings.Contains(err.Error(), EnvAPIToken+". Check it") {
+			t.Errorf("%s=%q: a 401 blamed the variable: %v", EnvAPIToken, v, err)
+		}
+		if HasAPIToken() {
+			t.Errorf("%s=%q: HasAPIToken() = true", EnvAPIToken, v)
+		}
+	}
+	// A real token, with its scheme or without, is one, and wins.
+	for _, v := range []string{"ci-token", "Bearer ci-token"} {
+		t.Setenv(EnvAPIToken, v)
+		if token, err := Bearer(context.Background()); err != nil || token != v {
+			t.Errorf("%s=%q: token, err = %q, %v; want the variable", EnvAPIToken, v, token, err)
+		}
+		if !HasAPIToken() {
+			t.Errorf("%s=%q: HasAPIToken() = false", EnvAPIToken, v)
+		}
+	}
+}
+
 func TestBearerForWithNoDomainReadsTheCurrentContext(t *testing.T) {
 	t.Setenv(EnvAPIToken, "")
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -269,5 +298,33 @@ func TestRejectedWithNoAPITokenIsAnExpiredLogin(t *testing.T) {
 	}
 	if !errors.Is(Rejected(""), errExpired) {
 		t.Fatalf("with no domain, got %q", Rejected(""))
+	}
+}
+
+// Credential reads every form a stored token takes: with its scheme in any
+// case or without one, with space around it, and the scheme alone, which is a
+// context logged out of.
+func TestCredentialReadsEveryStoredForm(t *testing.T) {
+	for stored, want := range map[string]string{
+		"Bearer abc.def.ghi":        "abc.def.ghi",
+		"bearer abc.def.ghi":        "abc.def.ghi",
+		"BEARER abc.def.ghi":        "abc.def.ghi",
+		"abc.def.ghi":               "abc.def.ghi",
+		"  Bearer abc.def.ghi \n":   "abc.def.ghi",
+		"Bearer   abc.def.ghi":      "abc.def.ghi",
+		"":                          "",
+		"Bearer ":                   "",
+		"Bearer":                    "",
+		" bearer\t":                 "",
+		"Bearer not-a-jwt":          "not-a-jwt",
+		"Bearerabc.def.ghi":         "Bearerabc.def.ghi",
+		"Bearer Bearer":             "",
+		"Bearer Bearer abc.def.ghi": "abc.def.ghi",
+		"Bearer\tabc.def.ghi":       "abc.def.ghi",
+		"bearer  BEARER ":           "",
+	} {
+		if got := Credential(stored); got != want {
+			t.Errorf("Credential(%q) = %q, want %q", stored, got, want)
+		}
 	}
 }

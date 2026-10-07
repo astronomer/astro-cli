@@ -190,11 +190,27 @@ func TestOrganizationClusterList(t *testing.T) {
 }
 
 func TestOrganizationSwitch(t *testing.T) {
+	// A switch has not re-authenticated since 2023, so --login-link had
+	// nothing to print a link for. It is a tombstone: a usage error (exit 2)
+	// that says why, refused before the API is asked anything, so the client
+	// mocks nothing.
+	t.Run("login-link was removed", func(t *testing.T) {
+		for _, flag := range []string{"--login-link", "-l"} {
+			r := execAstroCmd(t, new(astrov1_mocks.ClientWithResponsesInterface), "", newOrganizationCmd, "organization", "switch", "my-org", flag)
+			require.Error(t, r.err, flag)
+			assert.Equal(t, cliout.ExitUsage, r.code, flag)
+			assert.True(t, strings.HasPrefix(r.err.Error(), "--login-link was removed in Astro CLI v2: switching organizations no longer re-authenticates"), "%s: %s", flag, r.err)
+		}
+		r := execAstroCmd(t, new(astrov1_mocks.ClientWithResponsesInterface), "", newOrganizationCmd, "organization", "switch", "--help")
+		require.NoError(t, r.err)
+		assert.NotContains(t, r.stdout, "login-link")
+	})
+
 	t.Run("workspace flag triggers wsSwitch with provided id", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		origOrgSwitch := orgSwitch
-		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) (*organization.Switched, error) {
+		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer) (*organization.Switched, error) {
 			return &organization.Switched{Changed: true}, nil
 		}
 		defer func() { orgSwitch = origOrgSwitch }()
@@ -222,7 +238,7 @@ func TestOrganizationSwitch(t *testing.T) {
 		expectedErr := fmt.Errorf("org switch failed")
 
 		origOrgSwitch := orgSwitch
-		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) (*organization.Switched, error) {
+		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer) (*organization.Switched, error) {
 			return nil, expectedErr
 		}
 		defer func() { orgSwitch = origOrgSwitch }()
@@ -321,11 +337,16 @@ func TestOrganizationAuditLogsExportOutput(t *testing.T) {
 	t.Run("json naming no file", func(t *testing.T) {
 		t.Chdir(t.TempDir())
 		m := auditLogsMock(t, body)
+		// The date is read during the export: a run crossing midnight names
+		// the day before or the day after, and either is right.
+		named := func() string { return "testorg-logs-1-day-" + time.Now().Format("20060102") + ".ndjson.gz" }
+		before := named()
 		r := execAstroCmd(t, m, "", newOrganizationCmd, append(args, "-o", "json")...)
+		after := named()
 		require.NoError(t, r.err)
 		var got organization.AuditLogExport
 		decodeOne(t, r.stdout, &got)
-		assert.Equal(t, "testorg-logs-1-day-"+time.Now().Format("20060102")+".ndjson.gz", got.OutputFile)
+		assert.Contains(t, []string{before, after}, got.OutputFile)
 		assert.FileExists(t, got.OutputFile)
 		m.AssertExpectations(t)
 	})

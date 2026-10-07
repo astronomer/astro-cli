@@ -142,7 +142,6 @@ func TestPickDefaultOnEnter(t *testing.T) {
 // strictly on the last try as on the first.
 func TestPickAsksAgainThenFails(t *testing.T) {
 	l := things()
-	l.Attempts = 3
 	l.Default = 1
 	var out bytes.Buffer
 	i, err := l.Pick(&out, strings.NewReader("9\n 2\n2\n"))
@@ -151,7 +150,6 @@ func TestPickAsksAgainThenFails(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(out.String(), "Not one of the choices.\n> [1] "), "%q", out.String())
 
 	l = things()
-	l.Attempts = 3
 	l.InvalidAnswer = func(answer string) error { return fmt.Errorf("%w: %q", errInvalidThing, answer) }
 	out.Reset()
 	_, err = l.Pick(&out, strings.NewReader("0\n02\n+2\n1\n"))
@@ -160,7 +158,6 @@ func TestPickAsksAgainThenFails(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(out.String(), "Not one of the choices.\n> "), "%q", out.String())
 
 	l = things()
-	l.Attempts = 3
 	out.Reset()
 	_, err = l.Pick(&out, strings.NewReader("9\n"))
 	require.ErrorIs(t, err, errInvalidThing)
@@ -191,7 +188,6 @@ func TestPickByName(t *testing.T) {
 func TestPickEnded(t *testing.T) {
 	errEnded := errors.New("ended")
 	l := things()
-	l.Attempts = 3
 	l.Default = 2
 	l.Ended = errEnded
 	var out bytes.Buffer
@@ -213,22 +209,149 @@ func TestPickEnded(t *testing.T) {
 	}
 }
 
-// A picker that asks again says so after every wrong answer, the last
-// included, so one that runs out does not end without a word. One that asks
-// once says nothing.
+// A picker says so after every wrong answer, the last included, so one that
+// runs out does not end without a word. By default it reads DefaultAttempts
+// answers; Attempts 1 asks once, and still says so.
 func TestPickTellsEveryWrongAnswer(t *testing.T) {
-	l := things()
-	l.Attempts = 3
 	var out bytes.Buffer
-	_, err := l.Pick(&out, strings.NewReader("9\n8\n7\n"))
-	require.ErrorIs(t, err, errInvalidThing)
-	assert.Equal(t, 3, strings.Count(out.String(), "Not one of the choices.\n"), "%q", out.String())
+	_, err := things().Pick(&out, strings.NewReader("9\n8\n7\n1\n"))
+	require.ErrorIs(t, err, errInvalidThing, "a fourth answer is not read")
+	assert.Equal(t, DefaultAttempts, strings.Count(out.String(), "Not one of the choices.\n"), "%q", out.String())
 	assert.True(t, strings.HasSuffix(out.String(), "Not one of the choices.\n"), "%q", out.String())
 
 	out.Reset()
-	_, err = things().Pick(&out, strings.NewReader("9\n"))
+	l := things()
+	l.Attempts = 1
+	_, err = l.Pick(&out, strings.NewReader("9\n1\n"))
 	require.ErrorIs(t, err, errInvalidThing)
-	assert.NotContains(t, out.String(), "Not one of the choices.")
+	assert.Equal(t, 1, strings.Count(out.String(), "Not one of the choices."), "%q", out.String())
+	assert.True(t, strings.HasSuffix(out.String(), "Not one of the choices.\n"), "%q", out.String())
+}
+
+// pages is the second page of a paged list: rows numbered on from the page
+// before, and letters that turn the page.
+func pages() *List {
+	l := &List{
+		Header:  []string{"NAME"},
+		Invalid: errInvalidThing,
+		Keys:    []string{"p", "n"},
+		Hint:    "p. previous n. next",
+		First:   4,
+	}
+	l.AddRow(false, "four")
+	l.AddRow(false, "five")
+	return l
+}
+
+// Pick cannot return a key, so a List with Keys is a programming error there.
+func TestPickPanicsOnAListWithKeys(t *testing.T) {
+	assert.PanicsWithValue(t, "picker: a List with Keys is asked with Choose, not Pick", func() {
+		_, _ = pages().Pick(&bytes.Buffer{}, strings.NewReader("n\n"))
+	})
+}
+
+// A List with no rows and no Keys has no answer to give: it fails at once,
+// printing and reading nothing, with Empty, or ErrNoChoices naming what is
+// asked about, and never with the bad-selection error, since no selection
+// was made. A run that may not ask is still refused as such, so a script
+// learns which flag answers it.
+func TestChooseFailsAtOnceWithNothingToChoose(t *testing.T) {
+	l := &List{Header: []string{"NAME"}, Invalid: errInvalidThing, Ask: []input.Option{input.About("a thing"), input.AnsweredBy("--thing")}}
+	restore := input.SetGuard(func() string { return "with --output json it cannot" })
+	_, err := l.Pick(&bytes.Buffer{}, strings.NewReader("1\n"))
+	restore()
+	require.True(t, input.IsRequired(err), "%v", err)
+
+	var out bytes.Buffer
+	in := strings.NewReader("1\n")
+	_, err = l.Pick(&out, in)
+	require.ErrorIs(t, err, ErrNoChoices)
+	assert.EqualError(t, err, "there is nothing to choose from: no choice of a thing")
+	assert.Empty(t, out.String())
+	assert.Equal(t, 2, in.Len(), "nothing read")
+
+	l.InvalidAnswer = func(answer string) error { return fmt.Errorf("%w: %q", errInvalidThing, answer) }
+	_, err = l.Pick(&out, in)
+	require.ErrorIs(t, err, ErrNoChoices, "not a bad selection")
+
+	l.Ask = nil
+	_, err = l.Pick(&out, in)
+	require.EqualError(t, err, ErrNoChoices.Error())
+
+	errNoThings := errors.New("no things in this project")
+	l.Empty = errNoThings
+	_, err = l.Pick(&out, in)
+	require.ErrorIs(t, err, errNoThings)
+
+	// Keys alone are something to choose.
+	l = &List{Invalid: errInvalidThing, Keys: []string{"q"}}
+	c, err := l.Choose(&bytes.Buffer{}, strings.NewReader("q\n"))
+	require.NoError(t, err)
+	assert.Equal(t, Choice{Key: "q"}, c)
+}
+
+// With First, the row Enter picks is shown by the number it is shown with.
+func TestChooseDefaultWithFirst(t *testing.T) {
+	l := pages()
+	l.Default = 2
+	var out bytes.Buffer
+	c, err := l.Choose(&out, strings.NewReader("\n"))
+	require.NoError(t, err)
+	assert.Equal(t, Choice{Row: 1}, c)
+	assert.True(t, strings.HasSuffix(out.String(), "\n> [5] "), "%q", out.String())
+}
+
+// With ByName a row named like a key would make one answer mean both, so
+// such a List is a programming error; without ByName the key answers, and a
+// ByName row named otherwise is picked by its name beside the keys.
+func TestChooseRefusesARowNamedLikeAKey(t *testing.T) {
+	l := &List{Header: []string{"NAME"}, Invalid: errInvalidThing, Keys: []string{"n"}, ByName: true}
+	l.AddRow(false, "first")
+	l.AddRow(false, "n")
+	assert.PanicsWithValue(t, `picker: a ByName row is named "n", one of its Keys`, func() {
+		_, _ = l.Choose(&bytes.Buffer{}, strings.NewReader("n\n"))
+	})
+
+	l.ByName = false
+	c, err := l.Choose(&bytes.Buffer{}, strings.NewReader("n\n"))
+	require.NoError(t, err)
+	assert.Equal(t, Choice{Key: "n"}, c)
+
+	l = &List{Header: []string{"NAME"}, Invalid: errInvalidThing, Keys: []string{"n"}, ByName: true}
+	l.AddRow(false, "first")
+	for answer, want := range map[string]Choice{"first\n": {Row: 0}, "n\n": {Key: "n"}} {
+		c, err := l.Choose(&bytes.Buffer{}, strings.NewReader(answer))
+		require.NoError(t, err)
+		assert.Equal(t, want, c, "answer %q", answer)
+	}
+}
+
+// First numbers the rows from where the page starts, and they are answered by
+// the numbers shown; Keys answer as themselves; Hint is shown above the
+// prompt each time it is asked.
+func TestChooseKeysAndFirst(t *testing.T) {
+	var out bytes.Buffer
+	c, err := pages().Choose(&out, strings.NewReader("5\n"))
+	require.NoError(t, err)
+	assert.Equal(t, Choice{Row: 1}, c)
+	lines := strings.Split(out.String(), "\n")
+	assert.Equal(t, []string{"4", "four"}, strings.Fields(lines[1]))
+	assert.True(t, strings.HasSuffix(out.String(), "\n\np. previous n. next\n> "), "%q", out.String())
+
+	c, err = pages().Choose(&bytes.Buffer{}, strings.NewReader("n\n"))
+	require.NoError(t, err)
+	assert.Equal(t, Choice{Key: "n"}, c)
+
+	for _, answer := range []string{"1\n", "3\n", "6\n", "N\n", "q\n", " n\n"} {
+		_, err := pages().Choose(&bytes.Buffer{}, strings.NewReader(answer))
+		assert.ErrorIs(t, err, errInvalidThing, "answer %q", answer)
+	}
+
+	out.Reset()
+	c, err = pages().Choose(&out, strings.NewReader("x\np\n"))
+	require.NoError(t, err)
+	assert.Equal(t, Choice{Key: "p"}, c, "a key after a wrong answer")
+	assert.Equal(t, 1, strings.Count(out.String(), "Not one of the choices.\np. previous n. next\n> "), "%q", out.String())
 }
 
 // InvalidAnswer names the last answer given, not the nothing that ended
@@ -236,7 +359,6 @@ func TestPickTellsEveryWrongAnswer(t *testing.T) {
 func TestPickInvalidAnswerNamesTheLastAnswerGiven(t *testing.T) {
 	for in, want := range map[string]string{"9\n": "9", "9\nprd": "prd", "9\n\n": ""} {
 		l := things()
-		l.Attempts = 3
 		l.InvalidAnswer = func(answer string) error { return fmt.Errorf("%w: %q", errInvalidThing, answer) }
 		_, err := l.Pick(&bytes.Buffer{}, strings.NewReader(in))
 		require.ErrorIs(t, err, errInvalidThing)

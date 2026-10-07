@@ -108,6 +108,42 @@ func TestAstroMethodPrefersTheAPITokenThenTheSession(t *testing.T) {
 	}
 }
 
+// An ASTRO_API_TOKEN holding only the scheme is no token: the session
+// answers, as it does with the variable unset, rather than "Bearer Bearer"
+// going out and its 401 reading as an expired login. A real token, with or
+// without its scheme, still wins.
+func TestAstroMethodReadsTheAPITokenAsTheSessionReaderDoes(t *testing.T) {
+	i := link(t, "\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n")
+	session := func(context.Context) (string, error) { return "Bearer session-token", nil }
+	for env, want := range map[string]string{
+		"Bearer ":          "Bearer session-token",
+		"Bearer Bearer":    "Bearer session-token",
+		"ci-token":         "Bearer ci-token",
+		"Bearer ci-token":  "Bearer ci-token",
+		"bearer\tci-token": "Bearer ci-token",
+	} {
+		src, _, err := credentials(context.Background(), i, "", Deps{LookupEnv: instancestest.Env(map[string]string{EnvAPIToken: env}), Session: session})
+		if err != nil {
+			t.Fatalf("%s=%q: credentials: %v", EnvAPIToken, env, err)
+		}
+		if got := instancestest.Header(t, src); got != want {
+			t.Errorf("%s=%q: header = %q, want %q", EnvAPIToken, env, got, want)
+		}
+	}
+
+	// A session holding only the scheme is logged out.
+	src, _, err := credentials(context.Background(), i, "", Deps{
+		LookupEnv: instancestest.Env(map[string]string{EnvAPIToken: "Bearer "}),
+		Session:   func(context.Context) (string, error) { return "Bearer ", nil },
+	})
+	if err != nil {
+		t.Fatalf("credentials: %v", err)
+	}
+	if _, _, err := src(context.Background()); err == nil || !strings.Contains(err.Error(), "astro login") {
+		t.Fatalf("err = %v, want the logged-out message", err)
+	}
+}
+
 func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 	i := link(t, "\n[tool.astro.deployments.prod]\ndeployment = 'clm2xk9dq000108l7a2b3c4d5'\n")
 

@@ -316,3 +316,18 @@ func TestWhyUnavailableHasNothingToAddForAnUnknownStatusOrAFailedLookup(t *testi
 		t.Errorf("offline: err = %v, want nil", err)
 	}
 }
+
+// bearer sends the scheme once, whatever form BearerFor handed the token in:
+// bare, as ASTRO_API_TOKEN may hold it, or stored with its scheme, doubled,
+// or set off by a tab.
+func TestBearerSendsTheSchemeOnce(t *testing.T) {
+	for _, token := range []string{"ci-token", "Bearer ci-token", "bearer\tci-token", "Bearer Bearer ci-token"} {
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://example.invalid", http.NoBody)
+		if err := bearer(token)(context.Background(), req); err != nil {
+			t.Fatal(err)
+		}
+		if got := req.Header.Get("Authorization"); got != "Bearer ci-token" {
+			t.Errorf("bearer(%q): Authorization = %q, want %q", token, got, "Bearer ci-token")
+		}
+	}
+}

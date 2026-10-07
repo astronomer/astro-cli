@@ -192,42 +192,6 @@ func (s *Suite) TestDeleteError() {
 	api.AssertExpectations(s.T())
 }
 
-func (s *Suite) TestGetWorkspaceSelectionId() {
-	// Create a mock client
-	testUtil.InitTestConfig("software")
-	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaces", "test-org-id").Return([]houston.Workspace{
-		{ID: "123", Label: "Workspace 1"},
-		{ID: "456", Label: "Workspace 2"},
-	}, nil)
-
-	// Set up a mock output buffer
-	buf := new(bytes.Buffer)
-
-	// Set up mock input
-	testUtil.MockUserInput(s.T(), "1\n")
-	// Call the function
-	workspaceID, err := GetWorkspaceSelectionID(api, buf)
-	if err != nil {
-		s.Fail("Unexpected error: %s", err)
-	}
-
-	// Check the output buffer: the numbered rows, then the prompt.
-	lines := strings.Split(buf.String(), "\n")
-	s.Equal([]string{"#", "NAME", "ID"}, strings.Fields(lines[0]))
-	s.Equal([]string{"1", "Workspace", "1", "123"}, strings.Fields(lines[1]))
-	s.Equal([]string{"2", "Workspace", "2", "456"}, strings.Fields(lines[2]))
-	s.True(strings.HasSuffix(buf.String(), "\n\n> "), buf.String())
-
-	// Check the selected workspace ID
-	s.Equal("123", workspaceID)
-
-	testUtil.MockUserInput(s.T(), "7\n")
-	// Call the function
-	_, err = GetWorkspaceSelectionID(api, buf)
-	s.ErrorIs(err, errInvalidWorkspaceKey)
-}
-
 func (s *Suite) TestGetCurrentWorkspace() {
 	// we init default workspace to: ck05r3bor07h40d02y2hw4n4v
 	testUtil.InitTestConfig("software")
@@ -273,8 +237,8 @@ func (s *Suite) TestGetWorkspaceSelectionError() {
 	api.On("ListWorkspaces", nil).Return(nil, errMock)
 
 	buf := new(bytes.Buffer)
-	workspaceSelection := getWorkspaceSelection(0, 0, api, buf)
-	s.EqualError(workspaceSelection.err, errMock.Error())
+	sel := getWorkspaceSelection(0, 0, api, buf)
+	s.EqualError(sel.err, errMock.Error())
 	api.AssertExpectations(s.T())
 }
 
@@ -443,10 +407,10 @@ func (s *Suite) TestGetWorkspaceSelection() {
 		err := config.ResetCurrentContext()
 		s.NoError(err)
 		out := new(bytes.Buffer)
-		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
+		sel := getWorkspaceSelection(0, 0, api, out)
 
-		s.Contains(workspaceSelection.err.Error(), "no context set, have you authenticated to Astro or APC? Run astro login and try again")
-		s.Equal("", workspaceSelection.id)
+		s.Contains(sel.err.Error(), "no context set, have you authenticated to Astro or APC? Run astro login and try again")
+		s.Equal("", sel.id)
 	})
 
 	testUtil.InitTestConfig("software")
@@ -454,49 +418,126 @@ func (s *Suite) TestGetWorkspaceSelection() {
 	s.Run("success", func() {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(s.T(), "1")()
-		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
+		sel := getWorkspaceSelection(0, 0, api, out)
 
-		s.NoError(workspaceSelection.err)
-		s.Equal("ckbv7zvb100pe0760xp98qnh9", workspaceSelection.id)
+		s.NoError(sel.err)
+		s.Equal("ckbv7zvb100pe0760xp98qnh9", sel.id)
 	})
 
 	s.Run("success with pagination", func() {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(s.T(), "1")()
-		workspaceSelection := getWorkspaceSelection(10, 0, api, out)
+		sel := getWorkspaceSelection(10, 0, api, out)
 
-		s.NoError(workspaceSelection.err)
-		s.Equal("ckbv7zvb100pe0760xp98qnh9", workspaceSelection.id)
+		s.NoError(sel.err)
+		s.Equal("ckbv7zvb100pe0760xp98qnh9", sel.id)
 	})
 
 	s.Run("invalid selection", func() {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(s.T(), "y")()
-		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
+		sel := getWorkspaceSelection(0, 0, api, out)
 
-		s.ErrorIs(workspaceSelection.err, errInvalidWorkspaceKey)
-		s.Equal("", workspaceSelection.id)
+		s.ErrorIs(sel.err, errInvalidWorkspaceKey)
+		s.Equal("", sel.id)
 	})
 
 	s.Run("quit selection when paginated", func() {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(s.T(), "q")()
-		workspaceSelection := getWorkspaceSelection(10, 0, api, out)
-		s.Nil(workspaceSelection.err)
-		s.Equal("", workspaceSelection.id)
-		s.Equal(true, workspaceSelection.quit)
+		sel := getWorkspaceSelection(10, 0, api, out)
+		s.Nil(sel.err)
+		s.Equal("", sel.id)
+		s.Equal(true, sel.quit)
 	})
 }
 
-func (s *Suite) TestWorkspacesPromptPaginatedOption() {
-	s.Run("quit selection when total record less then page size and page first", func() {
-		defer testUtil.MockUserInput(s.T(), "q")()
-		resp, err := workspacesPromptPaginatedOption(3, 0, 3)
-		s.NoError(err)
-		expected := workspacePaginationOptions{pageSize: 3, pageNumber: 0, quit: true, userSelection: 0}
+// The paged switch shows a page of the list, numbered on from the pages
+// before, and the letters on offer for it; a wrong answer is told so and
+// asked again, with the letters, up to picker.DefaultAttempts answers, and a
+// letter or a row number among them still answers. Input that ends is not
+// asked again.
+func (s *Suite) TestGetWorkspaceSelectionPaged() {
+	testUtil.InitTestConfig("software")
+	const told = "Not one of the choices."
+	// Pages of three: a full first page offers "n"; the second page offers
+	// "f" and "p" and, full too, "n".
+	api := new(mocks.ClientInterface)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 3, PageNumber: 0}).Return(mockWorkspaceList, nil)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 3, PageNumber: 1}).Return(mockWorkspaceList, nil)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(mockWorkspaceList, nil)
+	ask := func(pageSize int, in string) (workspaceSelection, string) {
+		defer testUtil.MockUserInput(s.T(), in)()
+		out := new(bytes.Buffer)
+		return getWorkspaceSelection(pageSize, 0, api, out), out.String()
+	}
 
-		s.Equal(expected, resp)
+	s.Run("a row after two typos", func() {
+		got, out := ask(3, "x\n0\n2\n")
+		s.NoError(got.err)
+		s.Equal(mockWorkspaceList[1].ID, got.id)
+		s.Equal(2, strings.Count(out, told+"\nPlease select one of the following options or enter index to select the row.\nn. next q. quit\n> "), out)
 	})
+
+	s.Run("a page letter after a typo, then a row of the next page", func() {
+		got, out := ask(3, "nn\nn\n6\n")
+		s.NoError(got.err)
+		s.Equal(mockWorkspaceList[2].ID, got.id, "row 6 is the third of the second page")
+		s.Equal(1, strings.Count(out, told), out)
+		s.Contains(out, "f. first p. previous n. next q. quit\n> ")
+	})
+
+	s.Run("quit", func() {
+		got, _ := ask(3, "q\n")
+		s.NoError(got.err)
+		s.True(got.quit)
+	})
+
+	s.Run("a page not full offers no next", func() {
+		got, out := ask(10, "n\n")
+		s.ErrorIs(got.err, errInvalidWorkspaceKey)
+		s.Contains(out, "\nq. quit\n> ")
+		s.NotContains(out, "n. next")
+	})
+
+	s.Run("three wrong answers", func() {
+		got, out := ask(3, "x\ny\nz\n1\n")
+		s.ErrorIs(got.err, errInvalidWorkspaceKey)
+		s.Equal(3, strings.Count(out, told), out)
+		s.True(strings.HasSuffix(out, told+"\n"), out)
+	})
+
+	s.Run("closed stdin ends at once", func() {
+		got, out := ask(3, "")
+		s.ErrorIs(got.err, errInvalidWorkspaceKey)
+		s.NotContains(out, told)
+	})
+
+	s.Run("an answer cut short by the end of input", func() {
+		got, out := ask(3, "x")
+		s.ErrorIs(got.err, errInvalidWorkspaceKey)
+		s.Equal(1, strings.Count(out, told), out)
+	})
+}
+
+// The switch asks again after a typo, paged or not, so a slip does not
+// abandon it (nor the `astro login` that asks it).
+func (s *Suite) TestGetWorkspaceSelectionAsksAgain() {
+	testUtil.InitTestConfig("software")
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(mockWorkspaceList, nil)
+
+	for _, pageSize := range []int{0, 10} {
+		s.Run(map[int]string{0: "not paged", 10: "paged"}[pageSize], func() {
+			defer testUtil.MockUserInput(s.T(), "w1\n2\n")()
+			out := new(bytes.Buffer)
+			got := getWorkspaceSelection(pageSize, 0, api, out)
+			s.NoError(got.err)
+			s.Equal(mockWorkspaceList[1].ID, got.id)
+			s.Contains(out.String(), "Not one of the choices.")
+		})
+	}
 }
 
 // A row number that names no row, or names one in any spelling but plain
@@ -553,5 +594,9 @@ func (s *Suite) TestGetWorkspaceSelectionRefusesWithoutPrintingWhenItMayNotAsk()
 		s.True(input.IsRequired(got.err), "page size %d: %v", pageSize, got.err)
 		s.Empty(out.String(), "page size %d", pageSize)
 		api.AssertExpectations(s.T())
+		// The early refusal is the question's own: the one asking it gives.
+		list := switchList(pageSize > 0)
+		s.Equal(list.MayAsk().Error(), got.err.Error(), "page size %d", pageSize)
+		s.Equal(pageSize > 0, strings.Contains(got.err.Error(), "which page to show next"), "page size %d: %v", pageSize, got.err)
 	}
 }

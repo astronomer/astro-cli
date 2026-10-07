@@ -3,7 +3,6 @@ package printutil
 import (
 	"fmt"
 	"io"
-	"strconv"
 )
 
 // Table represents a table to be printed.
@@ -27,9 +26,6 @@ type Table struct {
 
 	// An array of row structs
 	Rows []Row
-
-	// RowSelectionPrompt puts a number in front of each row and prompts user for selection
-	GetUserInput bool
 
 	// A message to print after table has been printed
 	SuccessMsg string
@@ -79,23 +75,7 @@ func (t *Table) Print(out io.Writer) error {
 	}
 
 	t.PrintHeader(out)
-	t.PrintRows(out, 0)
-
-	if t.SuccessMsg != "" {
-		fmt.Fprintln(out, t.SuccessMsg)
-	}
-	return nil
-}
-
-// Print header __as well as__ rows
-func (t *Table) PrintWithPageNumber(pageNumber int, out io.Writer) error {
-	if len(t.Rows) == 0 && t.NoResultsMsg != "" {
-		fmt.Fprintln(out, t.NoResultsMsg)
-		return nil
-	}
-
-	t.PrintHeader(out)
-	t.PrintRows(out, pageNumber)
+	t.PrintRows(out)
 
 	if t.SuccessMsg != "" {
 		fmt.Fprintln(out, t.SuccessMsg)
@@ -113,37 +93,26 @@ func (t *Table) PrintHeader(out io.Writer) {
 
 	p := getPadding(t.altPadding)
 
-	headerSelectPrefix := ""
-	if t.GetUserInput {
-		headerSelectPrefix = fmt.Sprintf("%-5s", "#")
-	}
-
 	header := strSliceToInterSlice(t.Header)
 	t.RenderedHeader = fmt.Sprintf(p, header...)
 
-	fmt.Fprintln(out, headerSelectPrefix+t.RenderedHeader)
+	fmt.Fprintln(out, t.RenderedHeader)
 }
 
-// PrintRows prints rows with an "S"
-func (t *Table) PrintRows(out io.Writer, pageNumber int) {
+// PrintRows prints rows, a colored one in ColorRowCode.
+func (t *Table) PrintRows(out io.Writer) {
 	if t.RenderedPadding == "" {
 		p := getPadding(t.altPadding)
 		t.RenderedPadding = p
 	}
 
-	for i, r := range t.Rows {
+	for _, r := range t.Rows {
 		ri := strSliceToInterSlice(r.Raw)
 		rr := fmt.Sprintf(t.RenderedPadding, ri...)
-
-		// Responsible for adding the int in front of a row for selection by user
-		rowSelectPrefix := ""
-		if t.GetUserInput {
-			rowSelectPrefix = fmt.Sprintf("%-5s", strconv.Itoa(pageNumber+i+1))
-		}
 		if r.Colored && len(t.ColorRowCode) == 2 {
-			fmt.Fprintln(out, rowSelectPrefix+t.ColorRowCode[0]+rr+t.ColorRowCode[1])
+			fmt.Fprintln(out, t.ColorRowCode[0]+rr+t.ColorRowCode[1])
 		} else {
-			fmt.Fprintln(out, rowSelectPrefix+rr)
+			fmt.Fprintln(out, rr)
 		}
 	}
 }

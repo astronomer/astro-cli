@@ -82,7 +82,10 @@ var errLoggedOut = errors.New("you are not logged in — log in with `astro logi
 // a stale one is refreshed, is the caller's choice behind Deps.Session.
 func astroCredentials(d Deps) airflowapi.CredentialSource {
 	return func(ctx context.Context) (string, string, error) {
-		if token, ok := d.credentialEnv(EnvAPIToken); ok {
+		// Read as airflowapi.BearerCredential reads it, the rule the CLI's
+		// own session reader uses: a variable holding only the scheme
+		// ("Bearer ") is no token, and the session answers instead.
+		if token, ok := d.credentialEnv(EnvAPIToken); ok && airflowapi.BearerCredential(token) != "" {
 			return airflowapi.BearerToken(token)(ctx)
 		}
 		if d.Session == nil {
@@ -92,7 +95,7 @@ func astroCredentials(d Deps) airflowapi.CredentialSource {
 		if err != nil {
 			return "", "", err
 		}
-		if token == "" {
+		if airflowapi.BearerCredential(token) == "" {
 			return "", "", errLoggedOut
 		}
 		return airflowapi.BearerToken(token)(ctx)

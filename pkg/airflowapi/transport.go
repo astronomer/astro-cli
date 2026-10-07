@@ -205,11 +205,29 @@ const (
 	basicScheme  = "Basic"
 )
 
-// BearerToken is a CredentialSource for a token that is already in hand. A
-// leading "Bearer " is trimmed: the CLI's stored session tokens carry the
-// scheme in the value, and sending it twice is a 401 nobody can read.
+// BearerCredential is the credential in a bearer token as the CLI holds one:
+// a stored session token, which carries its scheme ("Bearer <token>"), or one
+// supplied bare, as ASTRO_API_TOKEN is. It is the one rule every reader of
+// such a token uses, so one run cannot read a credential where another reads
+// none.
+//
+// The scheme is read as HTTP reads it: in any case, set off from the token by
+// any run of spaces or tabs, with space around both ignored. It is stripped
+// however often it repeats ("Bearer Bearer <token>"), and the scheme with
+// nothing after it ("Bearer ", "Bearer Bearer") is no credential: "" .
+func BearerCredential(token string) string {
+	fields := strings.Fields(token)
+	for len(fields) > 0 && strings.EqualFold(fields[0], bearerScheme) {
+		fields = fields[1:]
+	}
+	return strings.Join(fields, " ")
+}
+
+// BearerToken is a CredentialSource for a token that is already in hand, read
+// through BearerCredential: the CLI's stored session tokens carry the scheme
+// in the value, and sending it twice is a 401 nobody can read.
 func BearerToken(token string) CredentialSource {
-	value := strings.TrimSpace(strings.TrimPrefix(token, bearerScheme+" "))
+	value := BearerCredential(token)
 	return func(context.Context) (string, string, error) {
 		return bearerScheme, value, nil
 	}

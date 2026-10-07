@@ -43,6 +43,7 @@ DEADCODE_GOOS=${DEADCODE_GOOS:-linux windows}
 # packages import them.
 TEST_SUPPORT=(
   cmd/cliout/cliouttest/
+  internal/platform/astro/apitoken/apitokentest/
   pkg/testing/
   config/config_test_utils.go
 )

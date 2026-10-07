@@ -384,6 +384,33 @@ func TestBearerTokenTrimsAStoredScheme(t *testing.T) {
 	}
 }
 
+// BearerCredential reads every form a bearer token comes in: its scheme in
+// any case, repeated, set off by any whitespace, or absent; and the scheme
+// with nothing after it is no credential.
+func TestBearerCredentialReadsEveryForm(t *testing.T) {
+	for token, want := range map[string]string{
+		"abc.def.ghi":                "abc.def.ghi",
+		"Bearer abc.def.ghi":         "abc.def.ghi",
+		"bearer abc.def.ghi":         "abc.def.ghi",
+		"BEARER abc.def.ghi":         "abc.def.ghi",
+		"Bearer\tabc.def.ghi":        "abc.def.ghi",
+		"Bearer   abc.def.ghi":       "abc.def.ghi",
+		"  Bearer abc.def.ghi \n":    "abc.def.ghi",
+		"Bearer Bearer abc.def.ghi":  "abc.def.ghi",
+		"bearer\tBEARER abc.def.ghi": "abc.def.ghi",
+		"":                           "",
+		"Bearer":                     "",
+		"Bearer ":                    "",
+		" bearer\t":                  "",
+		"Bearer Bearer":              "",
+		"Bearerabc.def.ghi":          "Bearerabc.def.ghi",
+	} {
+		if got := BearerCredential(token); got != want {
+			t.Errorf("BearerCredential(%q) = %q, want %q", token, got, want)
+		}
+	}
+}
+
 func TestCallerAuthorizationHeaderWins(t *testing.T) {
 	stub := newAF3Stub(t)
 	stub.route(http.MethodGet, "/api/v2/dags", `{"total_entries":0}`)

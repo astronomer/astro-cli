@@ -247,3 +247,20 @@ func TestLinkPickersUseTheWorkspacePicker(t *testing.T) {
 	assert.Equal(t, 1, calls.ensures)
 	assert.Contains(t, out.String(), "Select a Workspace\n")
 }
+
+// An ASTRO_API_TOKEN holding only the scheme is no token, so a failed login
+// check is the login's, not the token's; a real token keeps the failure as
+// the token's own.
+func TestLoginCheckFailedReadsTheAPITokenByTheOneRule(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	boom := errors.New("boom")
+	for env, own := range map[string]bool{"Bearer ": false, "Bearer Bearer": false, "ci-token": true, "Bearer ci-token": true} {
+		t.Setenv("ASTRO_API_TOKEN", env)
+		err := loginCheckFailed(boom)
+		if own {
+			assert.Same(t, boom, err, "ASTRO_API_TOKEN=%q", env)
+		} else {
+			assert.Contains(t, err.Error(), "checking your", "ASTRO_API_TOKEN=%q", env)
+		}
+	}
+}

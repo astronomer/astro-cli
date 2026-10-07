@@ -1244,6 +1244,17 @@ func (s *Suite) TestSelectNodePool() {
 		nodePoolID, err = selectNodePool(workerType, poolList, out)
 		s.ErrorIs(err, errInvalidNodePool)
 	})
+	// With nothing to choose from, the pickers say so at once, rather than
+	// asking for an answer that cannot exist and calling it a bad selection.
+	s.Run("no node pools and no worker machines to choose from", func() {
+		defer testUtil.MockUserInput(s.T(), "1\n")()
+		var empty bytes.Buffer
+		_, err := selectNodePool("", nil, &empty)
+		s.ErrorIs(err, errNoWorkerTypes)
+		_, err = selectWorkerMachine("", nil, &empty)
+		s.ErrorIs(err, errNoWorkerTypes)
+		s.Empty(empty.String())
+	})
 }
 
 func (s *Suite) TestSelectQueue() {

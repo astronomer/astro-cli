@@ -16,10 +16,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/airflowapi"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 	"github.com/astronomer/astro-cli/pkg/emfetch"
 )
@@ -61,7 +61,7 @@ func ExpiredOn(domain string) error {
 // Rejected is the outage for a 401 from domain. With EnvAPIToken set, that
 // token is the one sent, so the fix is the variable, not a login.
 func Rejected(domain string) error {
-	if strings.TrimSpace(os.Getenv(EnvAPIToken)) != "" {
+	if _, ok := APIToken(); ok {
 		host := cmp.Or(domain, "Astro")
 		return fmt.Errorf("%s rejected the token in %s. Check it, or unset it to use your `astro login` session", host, EnvAPIToken)
 	}
@@ -80,8 +80,12 @@ func Rejected(domain string) error {
 // It is exported so every core reader of the session answers that question the
 // same way: `astro local start` deciding whether to consult Environment Manager
 // and a query command deciding whether it has a bearer must not disagree.
+//
+// It reads the token by airflowapi.BearerCredential, the one rule pkg/instances
+// reads the same token by: the scheme in any case, repeated, set off by any
+// whitespace; and the scheme with nothing after it is no credential.
 func Credential(stored string) string {
-	return strings.TrimSpace(strings.TrimPrefix(stored, "Bearer "))
+	return airflowapi.BearerCredential(stored)
 }
 
 // Bearer returns the current identity's token exactly as it is stored, scheme
@@ -96,7 +100,7 @@ func Credential(stored string) string {
 // bearer is wanted is what lets a CI run reach an Astro Deployment it has to
 // look up first, not just one whose URL it already holds.
 func Bearer(context.Context) (string, error) {
-	if token, ok := apiToken(); ok {
+	if token, ok := APIToken(); ok {
 		return token, nil
 	}
 	ctx, err := config.GetCurrentContext()
@@ -123,7 +127,7 @@ func BearerFor(ctx context.Context, domain string) (string, error) {
 	if domain == "" {
 		return Bearer(ctx)
 	}
-	if token, ok := apiToken(); ok {
+	if token, ok := APIToken(); ok {
 		return token, nil
 	}
 	login, err := Login(domain)
@@ -140,9 +144,20 @@ func BearerFor(ctx context.Context, domain string) (string, error) {
 	return login.Token, nil
 }
 
-func apiToken() (string, bool) {
+// APIToken is ASTRO_API_TOKEN, and whether it holds a credential, read as
+// Credential reads one: "Bearer " alone is not one, here as anywhere. Every
+// reader of the variable asks this, so a run that uses it for one thing does
+// not ignore it for another.
+func APIToken() (string, bool) {
 	token := os.Getenv(EnvAPIToken)
-	return token, strings.TrimSpace(token) != ""
+	return token, Credential(token) != ""
+}
+
+// HasAPIToken reports whether ASTRO_API_TOKEN holds a credential (see
+// APIToken), for a reader that only asks whether CI supplied one.
+func HasAPIToken() bool {
+	_, ok := APIToken()
+	return ok
 }
 
 // expired reads the expiry the config records at login. A login with none

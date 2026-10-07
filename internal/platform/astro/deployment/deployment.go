@@ -16,6 +16,7 @@ import (
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/pagination"
@@ -131,8 +132,16 @@ func deploymentTableConfig(fromAllWorkspaces bool, ws string) *output.TableConfi
 	)
 }
 
+// CanCiCdDeploy reports whether the stored token is one that may act past
+// CI/CD enforcement: an API token, which carries permissions. It takes the
+// token with or without its "Bearer " scheme. A token it cannot read — empty,
+// logged out, not a JWT — is not one that can, so a caller refuses or warns
+// exactly as it does for a user's token.
 func CanCiCdDeploy(bearerToken string) bool {
-	token := strings.Split(bearerToken, " ")[1] // Stripping Bearer
+	token := astrosession.Credential(bearerToken)
+	if token == "" {
+		return false
+	}
 	// Parse the token to peek at the custom claims
 	claims, err := parseToken(token)
 	if err != nil {
@@ -2013,7 +2022,7 @@ var SelectDeployment = func(deployments []astrov1.Deployment, message string) (a
 		return astrov1.Deployment{}, nil
 	}
 
-	if len(deployments) == 1 && (os.Getenv("ASTRO_API_TOKEN") != "" || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()) {
+	if len(deployments) == 1 && (astrosession.HasAPIToken() || os.Getenv("ASTRONOMER_KEY_ID") != "" || os.Getenv("ASTRONOMER_KEY_SECRET") != "" || config.CFG.AutoSelect.GetBool()) {
 		if !CleanOutput {
 			fmt.Println("Only one Deployment was found. Using the following Deployment by default: \n" +
 				fmt.Sprintf("\n Deployment Name: %s", ansi.Bold(deployments[0].Name)) +

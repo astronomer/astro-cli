@@ -252,7 +252,7 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		sw, err := Switch("org1", mockV1Client, buf, false)
+		sw, err := Switch("org1", mockV1Client, buf)
 		s.NoError(err)
 		s.Equal(&Switched{Organization: OrganizationInfo{Name: "org1", ID: "org1", IsCurrent: true}, Changed: true}, sw)
 		s.Empty(buf.String(), "the command says it switched")
@@ -265,7 +265,7 @@ func (s *Suite) TestSwitch() {
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		sw, err := Switch("org1", mockV1Client, buf, false)
+		sw, err := Switch("org1", mockV1Client, buf)
 		s.NoError(err)
 		s.Equal(&Switched{Organization: OrganizationInfo{Name: "org1", ID: "org1", IsCurrent: true}}, sw, "no switch")
 		s.Empty(buf.String())
@@ -291,7 +291,7 @@ func (s *Suite) TestSwitch() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		buf := new(bytes.Buffer)
-		_, err = Switch("", mockV1Client, buf, false)
+		_, err = Switch("", mockV1Client, buf)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
@@ -304,7 +304,7 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		_, err := Switch("name-wrong", mockV1Client, buf, false)
+		_, err := Switch("name-wrong", mockV1Client, buf)
 		s.ErrorIs(err, errInvalidOrganizationName)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
@@ -328,7 +328,7 @@ func (s *Suite) TestSwitch() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		buf := new(bytes.Buffer)
-		_, err = Switch("", mockV1Client, buf, false)
+		_, err = Switch("", mockV1Client, buf)
 		s.ErrorIs(err, errInvalidOrganizationKey)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
@@ -354,7 +354,7 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		sw, err := Switch("org1", mockV1Client, buf, false)
+		sw, err := Switch("org1", mockV1Client, buf)
 		s.NoError(err)
 		s.True(sw.Changed)
 		mockV1Client.AssertExpectations(s.T())
@@ -373,7 +373,7 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		sw, err := Switch(testCUID, mockV1Client, buf, false)
+		sw, err := Switch(testCUID, mockV1Client, buf)
 		s.NoError(err)
 		s.Equal(OrganizationInfo{Name: "org3", ID: testCUID, IsCurrent: true}, sw.Organization)
 		mockV1Client.AssertExpectations(s.T())
@@ -389,7 +389,7 @@ func (s *Suite) TestSwitch() {
 			Body:         errorBody,
 		}, nil).Once()
 		buf := new(bytes.Buffer)
-		_, err := Switch(testCUID, mockV1Client, buf, false)
+		_, err := Switch(testCUID, mockV1Client, buf)
 		s.Error(err)
 		s.Contains(err.Error(), "organization not found")
 		mockV1Client.AssertExpectations(s.T())
@@ -427,7 +427,7 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		sw, err := Switch("target-org", mockV1Client, buf, false)
+		sw, err := Switch("target-org", mockV1Client, buf)
 		s.NoError(err)
 		s.Equal("org-target", sw.Organization.ID)
 		mockV1Client.AssertExpectations(s.T())
@@ -507,12 +507,20 @@ func (s *Suite) TestExportAuditLogs() {
 	s.Run("export audit logs and select org success", func() {
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
-		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockOKAuditLogResponse, nil).Once()
+		// A second before midnight: the date is the clock's, whenever the
+		// export finishes.
+		asOf := time.Date(2025, 12, 31, 23, 59, 59, 0, time.Local)
+		defer func(orig func() time.Time) { auditLogsClock = orig }(auditLogsClock)
+		auditLogsClock = func() time.Time { return asOf }
+		startsThreeDaysBefore := mock.MatchedBy(func(p *astrov1.GetOrganizationAuditLogsParams) bool {
+			return p.StartDate != nil && p.StartDate.Equal(asOf.AddDate(0, 0, -3))
+		})
+		mockV1Client.On("GetOrganizationAuditLogsWithResponse", mock.Anything, mock.Anything, startsThreeDaysBefore).Return(&mockOKAuditLogResponse, nil).Once()
 		export, err := ExportAuditLogs(mockV1Client, "org1", "", 3)
 		s.NoError(err)
 		// The file it named for the Organization, the days and the date, and
 		// wrote.
-		s.Equal("org1-logs-3-days-"+time.Now().Format("20060102")+".ndjson.gz", export.OutputFile)
+		s.Equal("org1-logs-3-days-20251231.ndjson.gz", export.OutputFile)
 		s.Equal(3, export.Days)
 		info, err := os.Stat(export.OutputFile)
 		s.NoError(err)
