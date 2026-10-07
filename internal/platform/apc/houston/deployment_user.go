@@ -59,6 +59,7 @@ var (
 		){
 			id
 			user {
+				id
 				username
 			}
 			role
@@ -82,6 +83,10 @@ var (
 			deploymentId: $deploymentId
 		){
 			id
+			user {
+				id
+				username
+			}
 			role
 		}
 	}`
@@ -102,6 +107,7 @@ var (
 		){
 			id
 			user {
+				id
 				username
 			}
 			role

@@ -37,34 +37,7 @@ var outputExempt = map[string]string{
 // an --output json today. Delete an entry when its command gains one.
 var lacksOutputFlag = map[string][]string{
 	cloudPlatform: {},
-	apcPlatform: {
-		"astro deployment service-account create",
-		"astro deployment service-account delete",
-		"astro deployment service-account list",
-		"astro deployment team add",
-		"astro deployment team list",
-		"astro deployment team remove",
-		"astro deployment team update",
-		"astro deployment user add",
-		"astro deployment user list",
-		"astro deployment user remove",
-		"astro deployment user update",
-		"astro team get",
-		"astro team list",
-		"astro team update",
-		"astro user create",
-		"astro workspace service-account create",
-		"astro workspace service-account delete",
-		"astro workspace service-account list",
-		"astro workspace team add",
-		"astro workspace team list",
-		"astro workspace team remove",
-		"astro workspace team update",
-		"astro workspace user add",
-		"astro workspace user list",
-		"astro workspace user remove",
-		"astro workspace user update",
-	},
+	apcPlatform:   {},
 }
 
 // reachesJSONOutput reports whether cmd can reach an --output flag that offers

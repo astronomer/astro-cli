@@ -59,6 +59,7 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the service account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	_ = cmd.MarkFlagRequired("label")         //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -75,6 +76,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -92,28 +94,52 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	if err := validateDeploymentRole(deploymentSACreateRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return sa.CreateUsingDeploymentUUID(deploymentID, deploymentSACreateLabel, deploymentSACreateCategory, deploymentSACreateRole, houstonClient, out)
+	created, err := sa.CreateUsingDeploymentUUID(deploymentID, deploymentSACreateLabel, deploymentSACreateCategory, deploymentSACreateRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderServiceAccountCreated(r, &created)
 }
 
 func deploymentSaList(cmd *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return sa.GetDeploymentServiceAccounts(deploymentID, houstonClient, out)
+	sas, err := sa.GetDeploymentServiceAccounts(deploymentID, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderServiceAccountList(r, sas)
 }
 
 func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient, out)
+	deleted, err := sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient)
+	if err != nil {
+		return err
+	}
+	removal := deploymentServiceAccountRemovalJSON{ID: deleted.ID, Label: orNull(deleted.Label), DeploymentID: deploymentID, Action: accessActionDeleted}
+	return r.Emit(removal, serviceAccountDeletedText(&deleted))
 }

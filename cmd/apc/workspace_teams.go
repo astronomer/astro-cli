@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
 )
@@ -45,7 +46,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
+func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the Deployment twin differs in its flags and its role
 	cmd := &cobra.Command{
 		Use:     "add",
 		Short:   "Add a Team to a Workspace",
@@ -58,6 +59,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to workspace")
 	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -73,6 +75,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -88,6 +91,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 			return workspaceTeamRm(cmd, out, args)
 		},
 	}
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -102,10 +106,15 @@ func newWorkspaceTeamsListCmd(out io.Writer) *cobra.Command {
 			return workspaceTeamsList(cmd, out, args)
 		},
 	}
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -117,10 +126,18 @@ func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.AddTeam(ws, teamID, workspaceTeamRole, houstonClient, out)
+	w, err := workspace.AddTeam(ws, teamID, workspaceTeamRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceTeamAdded(r, w, teamID, workspaceTeamRole)
 }
 
 func workspaceTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -132,10 +149,18 @@ func workspaceTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.UpdateTeamRole(ws, args[0], workspaceTeamRole, houstonClient, out)
+	change, err := workspace.UpdateTeamRole(ws, args[0], workspaceTeamRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceTeamUpdated(r, &change)
 }
 
 func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -143,11 +168,18 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return workspace.RemoveTeam(ws, args[0], houstonClient, out)
+	removal, err := workspace.RemoveTeam(ws, args[0], houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceTeamRemoved(r, cliout.NotesTo(cmd, r.Format, out), &removal, args[0])
 }
 
 func workspaceTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -155,5 +187,9 @@ func workspaceTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.ListTeamRoles(ws, houstonClient, out)
+	ts, err := workspace.ListTeamRoles(ws, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceTeamList(r, ws, ts)
 }

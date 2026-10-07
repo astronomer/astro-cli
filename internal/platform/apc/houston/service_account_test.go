@@ -14,17 +14,20 @@ func (s *Suite) TestCreateDeploymentServiceAccount() {
 
 	mockResponse := &Response{
 		Data: ResponseData{
+			// A create answers with the bare row: no bindings loaded, so
+			// entityType reads SYSTEM and deploymentUuid is null
+			//.
 			CreateDeploymentServiceAccount: &DeploymentServiceAccount{
-				ID:             "id",
-				APIKey:         "apikey",
-				Label:          "test label",
-				Category:       "test category",
-				EntityType:     "DEPLOYMENT",
-				DeploymentUUID: "deployment-id",
-				LastUsedAt:     "2020-06-25T22:10:42.385Z",
-				CreatedAt:      "2020-06-25T22:10:42.385Z",
-				UpdatedAt:      "2020-06-25T22:10:42.385Z",
-				Active:         true,
+				ServiceAccount: ServiceAccount{
+					ID:        "id",
+					APIKey:    "apikey",
+					Label:     "test label",
+					Category:  "test category",
+					CreatedAt: "2020-06-25T22:10:42.385Z",
+					UpdatedAt: "2020-06-25T22:10:42.385Z",
+					Active:    true,
+				},
+				EntityType: "SYSTEM",
 			},
 		},
 	}
@@ -66,17 +69,18 @@ func (s *Suite) TestCreateWorkspaceServiceAccount() {
 
 	mockResponse := &Response{
 		Data: ResponseData{
+			// As for a Deployment: workspaceUuid is null on a create.
 			CreateWorkspaceServiceAccount: &WorkspaceServiceAccount{
-				ID:            "id",
-				APIKey:        "apikey",
-				Label:         "test label",
-				Category:      "test category",
-				EntityType:    "DEPLOYMENT",
-				WorkspaceUUID: "workspace-id",
-				LastUsedAt:    "2020-06-25T22:10:42.385Z",
-				CreatedAt:     "2020-06-25T22:10:42.385Z",
-				UpdatedAt:     "2020-06-25T22:10:42.385Z",
-				Active:        true,
+				ServiceAccount: ServiceAccount{
+					ID:        "id",
+					APIKey:    "apikey",
+					Label:     "test label",
+					Category:  "test category",
+					CreatedAt: "2020-06-25T22:10:42.385Z",
+					UpdatedAt: "2020-06-25T22:10:42.385Z",
+					Active:    true,
+				},
+				EntityType: "SYSTEM",
 			},
 		},
 	}

@@ -3,142 +3,87 @@ package teams
 import (
 	"errors"
 	"fmt"
-	"io"
 
-	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/utils"
-	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
 	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 const ListTeamLimit = 20
 
 var (
 	errMissingTeamID = errors.New("missing team ID")
+	errTeamNotFound  = errors.New("no team was found with this ID")
 
 	// monkey patched to write tests
 	promptPaginatedOption = utils.PromptPaginatedOption
 )
 
-// retrieves a team and all of its users if passed optional param
-func Get(teamID string, getUserInfo, getRoleInfo, allFilters bool, client houston.ClientInterface, out io.Writer) error {
+// Detail is a team as `astro team get` shows it: the team, with its role
+// bindings, and its users when they were asked for (nil otherwise).
+type Detail struct {
+	Team  *houston.Team
+	Users []houston.User
+}
+
+// Get returns a team, and its users when withUsers is set.
+func Get(teamID string, withUsers bool, client houston.ClientInterface) (Detail, error) {
 	if teamID == "" {
-		return errMissingTeamID
+		return Detail{}, errMissingTeamID
 	}
 	team, err := houston.Call(client.GetTeam)(teamID)
 	if err != nil {
-		return err
+		return Detail{}, err
 	}
-	role := getSystemLevelRole(team.RoleBindings)
-
-	fmt.Fprintf(out, "\nTeam Name: %s\nTeam ID: %s \nSystem Role: %s\n", team.Name, team.ID, role)
-
-	if getRoleInfo || allFilters {
-		workspaceRolesTable := printutil.Table{
-			Padding:        []int{44, 50},
-			DynamicPadding: true,
-			Header:         []string{"WORKSPACE ID", "WORKSPACE NAME", "ROLE"},
-			ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-		}
-
-		deploymentRolesTable := printutil.Table{
-			Padding:        []int{44, 50},
-			DynamicPadding: true,
-			Header:         []string{"DEPLOYMENT ID", "DEPLOYMENT NAME", "ROLE"},
-			ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-		}
-
-		for i := range team.RoleBindings {
-			if workspace.IsValidWorkspaceLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneRole {
-				workspaceRolesTable.AddRow([]string{team.RoleBindings[i].Workspace.ID, team.RoleBindings[i].Workspace.Label, team.RoleBindings[i].Role}, false)
-			}
-			if deployment.IsValidDeploymentLevelRole(team.RoleBindings[i].Role) && team.RoleBindings[i].Role != houston.NoneRole {
-				deploymentRolesTable.AddRow([]string{team.RoleBindings[i].Deployment.ID, team.RoleBindings[i].Deployment.Label, team.RoleBindings[i].Role}, false)
-			}
-		}
-		if len(workspaceRolesTable.Rows) > 0 {
-			fmt.Fprintln(out, "\nWorkspace Level Roles:")
-			workspaceRolesTable.Print(out) //nolint:errcheck // best-effort render to the terminal
-		}
-
-		if len(deploymentRolesTable.Rows) > 0 {
-			fmt.Fprintln(out, "\nDeployment Level Roles:")
-			deploymentRolesTable.Print(out) //nolint:errcheck // best-effort render to the terminal
-		}
+	if team == nil {
+		return Detail{}, fmt.Errorf("%w: %s", errTeamNotFound, teamID)
 	}
-
-	if getUserInfo || allFilters {
+	d := Detail{Team: team}
+	if withUsers {
 		logger.Debug("retrieving users part of team")
-		fmt.Fprintln(out, "\nUsers part of Team:")
 		users, err := houston.Call(client.GetTeamUsers)(teamID)
 		if err != nil {
-			return err
+			return Detail{}, err
 		}
-		teamUsersTable := printutil.Table{
-			Padding:        []int{44, 50},
-			DynamicPadding: true,
-			Header:         []string{"USERNAME", "ID"},
-			ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
+		d.Users = users
+		if d.Users == nil {
+			d.Users = []houston.User{}
 		}
-		for i := range users {
-			user := users[i]
-			teamUsersTable.AddRow([]string{user.Username, user.ID}, false)
-		}
-		return teamUsersTable.Print(out)
 	}
-
-	return nil
+	return d, nil
 }
 
-// retrieves all teams present with the platform
-func List(client houston.ClientInterface, out io.Writer) error {
-	var teams []houston.Team
+// List returns every team on the platform, reading them a page at a time.
+func List(client houston.ClientInterface) ([]houston.Team, error) {
+	teams := []houston.Team{}
 	var cursor string
 	count := -1
 
 	for len(teams) < count || count == -1 {
 		resp, err := houston.Call(client.ListTeams)(houston.ListTeamsRequest{Take: ListTeamLimit, Cursor: cursor})
 		if err != nil {
-			return err
+			return nil, err
 		}
 		count = resp.Count
-		teams = append(teams, resp.Teams...)
-		if count > 0 {
-			cursor = teams[len(teams)-1].ID
+		// A page with nothing on it ends the list, whatever the count says:
+		// asking again from the same cursor would get the same empty page.
+		if len(resp.Teams) == 0 {
+			break
 		}
+		teams = append(teams, resp.Teams...)
+		cursor = teams[len(teams)-1].ID
 	}
-
-	teamsTable := printutil.Table{
-		Padding:        []int{50, 50},
-		DynamicPadding: true,
-		Header:         []string{"TEAM ID", "TEAM NAME", "ROLE"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-	for i := range teams {
-		role := getSystemLevelRole(teams[i].RoleBindings)
-		teamsTable.AddRow([]string{teams[i].ID, teams[i].Name, role}, false)
-	}
-	return teamsTable.Print(out)
+	return teams, nil
 }
 
-func PaginatedList(client houston.ClientInterface, out io.Writer, pageSize, pageNumber int, cursorID string) error {
+// PaginatedList shows the platform's teams a page at a time, asking which
+// page to show next, until the person quits. render draws each page.
+func PaginatedList(client houston.ClientInterface, pageSize, pageNumber int, cursorID string, render func([]houston.Team) error) error {
 	resp, err := houston.Call(client.ListTeams)(houston.ListTeamsRequest{Cursor: cursorID, Take: pageSize})
 	if err != nil {
 		return err
 	}
-	teamsTable := printutil.Table{
-		Padding:        []int{50, 50},
-		DynamicPadding: true,
-		Header:         []string{"TEAM ID", "TEAM NAME", "ROLE"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-	for i := range resp.Teams {
-		role := getSystemLevelRole(resp.Teams[i].RoleBindings)
-		teamsTable.AddRow([]string{resp.Teams[i].ID, resp.Teams[i].Name, role}, false)
-	}
-	if err := teamsTable.Print(out); err != nil {
+	if err := render(resp.Teams); err != nil {
 		return err
 	}
 
@@ -168,49 +113,65 @@ func PaginatedList(client houston.ClientInterface, out io.Writer, pageSize, page
 	if selectedOption.Quit {
 		return nil
 	}
-	return PaginatedList(client, out, selectedOption.PageSize, selectedOption.PageNumber, selectedOption.CursorID)
+	return PaginatedList(client, selectedOption.PageSize, selectedOption.PageNumber, selectedOption.CursorID, render)
 }
 
-// Update will update the system role associated with the team
-func Update(teamID, role string, client houston.ClientInterface, out io.Writer) error {
+// RoleChange is what a team update did to the team's system role: the role
+// it held before (NONE when it held none, and "" when the update did not
+// look), and the role it holds now. Changed is false when the update asked
+// for NONE and the team already held no system role, so nothing was sent.
+type RoleChange struct {
+	TeamID   string
+	Previous string
+	Role     string
+	Changed  bool
+}
+
+// Update sets the system role of a team. NONE removes the role it holds.
+func Update(teamID, role string, client houston.ClientInterface) (RoleChange, error) {
 	if !isValidSystemLevelRole(role) {
-		return fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole)
+		return RoleChange{}, fmt.Errorf("invalid role: %s, should be one of: %s, %s, %s or %s", role, houston.SystemAdminRole, houston.SystemEditorRole, houston.SystemViewerRole, houston.NoneRole)
 	}
 
 	if role == houston.NoneRole {
 		// Get current role for the team
 		team, err := houston.Call(client.GetTeam)(teamID)
 		if err != nil {
-			return err
+			return RoleChange{}, err
+		}
+		if team == nil {
+			return RoleChange{}, fmt.Errorf("%w: %s", errTeamNotFound, teamID)
 		}
 
+		current := houston.NoneRole
 		for idx := range team.RoleBindings {
 			if isValidSystemLevelRole(team.RoleBindings[idx].Role) {
-				role = team.RoleBindings[idx].Role
+				current = team.RoleBindings[idx].Role
 				break
 			}
 		}
 
-		if role == houston.NoneRole { // No system level role set for the team
-			fmt.Fprintf(out, "Role for the team %s already set to None, nothing to update\n", teamID)
-			return nil
+		if current == houston.NoneRole { // No system level role set for the team
+			return RoleChange{TeamID: teamID, Previous: houston.NoneRole, Role: houston.NoneRole}, nil
 		}
 
-		_, err = houston.Call(client.DeleteTeamSystemRoleBinding)(houston.SystemRoleBindingRequest{TeamID: teamID, Role: role})
+		_, err = houston.Call(client.DeleteTeamSystemRoleBinding)(houston.SystemRoleBindingRequest{TeamID: teamID, Role: current})
 		if err != nil {
-			return err
+			return RoleChange{}, err
 		}
-		fmt.Fprintf(out, "Role has been changed from %s to %s for team %s\n\n", role, houston.NoneRole, teamID)
-		return nil
+		return RoleChange{TeamID: teamID, Previous: current, Role: houston.NoneRole, Changed: true}, nil
 	}
 
 	newRole, err := houston.Call(client.CreateTeamSystemRoleBinding)(houston.SystemRoleBindingRequest{TeamID: teamID, Role: role})
 	if err != nil {
-		return err
+		return RoleChange{}, err
 	}
+	return RoleChange{TeamID: teamID, Role: newRole, Changed: true}, nil
+}
 
-	fmt.Fprintf(out, "Role has been changed to %s for team %s\n\n", newRole, teamID)
-	return nil
+// SystemRole is the system role a team's role bindings give it, or NONE.
+func SystemRole(roles []houston.RoleBinding) string {
+	return getSystemLevelRole(roles)
 }
 
 // isValidSystemLevelRole checks if the role is amongst valid system adming role

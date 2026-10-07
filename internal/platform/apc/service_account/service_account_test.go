@@ -1,10 +1,10 @@
 package serviceaccount
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
@@ -22,40 +22,42 @@ func TestServiceAccount(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
+// created is what Houston returns for a create: the new row with no role
+// bindings loaded, so entityType reads SYSTEM and the deploymentUuid or
+// workspaceUuid is null, both being derived from the bindings
+//. The API
+// key is whole.
+var created = ServiceAccount{
+	ID:        "ckbvcbqs1014t0760u4bszmcs",
+	APIKey:    "60f2f4f3fa006e3e135dbe99b1391d84",
+	Label:     "test",
+	Category:  "test",
+	CreatedAt: "2020-06-25T22:10:42.385Z",
+	Active:    true,
+}
+
+var createdRow = houston.ServiceAccount{
+	ID: created.ID, APIKey: created.APIKey, Label: created.Label, Category: created.Category,
+	CreatedAt: created.CreatedAt, UpdatedAt: created.CreatedAt, Active: true,
+}
+
 func (s *Suite) TestCreateUsingDeploymentUUID() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	mockSA := &houston.DeploymentServiceAccount{
-		ID:             "ckbvcbqs1014t0760u4bszmcs",
-		APIKey:         "60f2f4f3fa006e3e135dbe99b1391d84",
-		Label:          "test",
-		Category:       "test",
-		EntityType:     "DEPLOYMENT",
-		DeploymentUUID: "ck1qg6whg001r08691y117hub",
-		LastUsedAt:     "",
-		CreatedAt:      "2020-06-25T22:10:42.385Z",
-		UpdatedAt:      "2020-06-25T22:10:42.385Z",
-		Active:         true,
-	}
+	mockSA := &houston.DeploymentServiceAccount{ServiceAccount: createdRow, EntityType: "SYSTEM"}
 	expectedRequest := &houston.CreateServiceAccountRequest{
-		DeploymentID: mockSA.DeploymentUUID,
-		Label:        mockSA.Label,
-		Category:     mockSA.Category,
-		Role:         "test",
+		DeploymentID: "ck1qg6whg001r08691y117hub",
+		Label:        "test",
+		Category:     "test",
+		Role:         houston.DeploymentViewerRole,
 	}
 
-	s.Run("success", func() {
+	s.Run("returns the account with its key", func() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateDeploymentServiceAccount", expectedRequest).Return(mockSA, nil)
 
-		buf := new(bytes.Buffer)
-		err := CreateUsingDeploymentUUID(mockSA.DeploymentUUID, mockSA.Label, mockSA.Category, "test", api, buf)
+		got, err := CreateUsingDeploymentUUID(expectedRequest.DeploymentID, "test", "test", houston.DeploymentViewerRole, api)
 		s.NoError(err)
-		expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
- test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
-
- Service account successfully created.
-`
-		s.Equal(buf.String(), expectedOut)
+		s.Equal(created, got)
 		api.AssertExpectations(s.T())
 	})
 
@@ -63,198 +65,130 @@ func (s *Suite) TestCreateUsingDeploymentUUID() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateDeploymentServiceAccount", expectedRequest).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		err := CreateUsingDeploymentUUID(mockSA.DeploymentUUID, mockSA.Label, mockSA.Category, "test", api, buf)
-		s.EqualError(err, errMock.Error())
-		api.AssertExpectations(s.T())
+		_, err := CreateUsingDeploymentUUID(expectedRequest.DeploymentID, "test", "test", houston.DeploymentViewerRole, api)
+		s.ErrorIs(err, errMock)
 	})
 }
 
 func (s *Suite) TestCreateUsingWorkspaceUUID() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	mockSA := &houston.WorkspaceServiceAccount{
-		ID:            "ckbvcbqs1014t0760u4bszmcs",
-		APIKey:        "60f2f4f3fa006e3e135dbe99b1391d84",
-		Label:         "test",
-		Category:      "test",
-		EntityType:    "WORKSPACE",
-		WorkspaceUUID: "ck1qg6whg001r08691y117hub",
-		LastUsedAt:    "",
-		CreatedAt:     "2020-06-25T22:10:42.385Z",
-		UpdatedAt:     "2020-06-25T22:10:42.385Z",
-		Active:        true,
-	}
+	mockSA := &houston.WorkspaceServiceAccount{ServiceAccount: createdRow, EntityType: "SYSTEM"}
 	expectedRequest := &houston.CreateServiceAccountRequest{
-		WorkspaceID: mockSA.WorkspaceUUID,
-		Label:       mockSA.Label,
-		Category:    mockSA.Category,
-		Role:        "test",
+		WorkspaceID: "ck1qg6whg001r08691y117hub",
+		Label:       "test",
+		Category:    "test",
+		Role:        houston.WorkspaceViewerRole,
 	}
 
-	label, category, role := "test", "test", "test"
-
-	s.Run("success", func() {
+	s.Run("returns the account with its key", func() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateWorkspaceServiceAccount", expectedRequest).Return(mockSA, nil)
 
-		buf := new(bytes.Buffer)
-		err := CreateUsingWorkspaceUUID(mockSA.WorkspaceUUID, label, category, role, api, buf)
+		got, err := CreateUsingWorkspaceUUID(expectedRequest.WorkspaceID, "test", "test", houston.WorkspaceViewerRole, api)
 		s.NoError(err)
-		expectedOut := ` NAME     CATEGORY     ID                            APIKEY                               
- test     test         ckbvcbqs1014t0760u4bszmcs     60f2f4f3fa006e3e135dbe99b1391d84     
-
- Service account successfully created.
-`
-		s.Equal(buf.String(), expectedOut)
+		s.Equal(created, got)
 		api.AssertExpectations(s.T())
 	})
 
-	s.Run("api error", func() {
+	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("CreateWorkspaceServiceAccount", expectedRequest).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		err := CreateUsingWorkspaceUUID(mockSA.WorkspaceUUID, label, category, role, api, buf)
-		s.EqualError(err, errMock.Error())
+		_, err := CreateUsingWorkspaceUUID(expectedRequest.WorkspaceID, "test", "test", houston.WorkspaceViewerRole, api)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func (s *Suite) TestDeleteUsingWorkspaceUUID() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+// A list returns each key whole for ten minutes after its create and masked
+// after that: its first six characters, then * to the full length
+//. lastUsedAt is null until the account is used.
+var listed = []houston.ServiceAccount{
+	{ID: "sa-1", APIKey: "60f2f4**************************", Label: "ci", Category: "default", CreatedAt: "2020-06-25T22:10:42.385Z", LastUsedAt: "2020-06-26T10:00:00.000Z", Active: true},
+	{ID: "sa-2", APIKey: "8d1e0a3b5c7f9e2d4a6b8c0d1e2f3a4b", Label: "new", CreatedAt: "2020-06-27T22:10:42.385Z", Active: true},
+}
 
-	mockSA := &houston.ServiceAccount{
-		ID: "ckbvcbqs1014t0760u4bszmcs",
+func (s *Suite) TestGetServiceAccounts() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	want := []ServiceAccount{
+		{ID: "sa-1", APIKey: "60f2f4**************************", Label: "ci", Category: "default", CreatedAt: "2020-06-25T22:10:42.385Z", LastUsedAt: "2020-06-26T10:00:00.000Z", Active: true},
+		{ID: "sa-2", APIKey: "8d1e0a3b5c7f9e2d4a6b8c0d1e2f3a4b", Label: "new", CreatedAt: "2020-06-27T22:10:42.385Z", Active: true},
 	}
 
-	workspaceUUID := "ck1qg6whg001r08691y117hub"
-
-	s.Run("success", func() {
+	s.Run("deployment", func() {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: workspaceUUID, ServiceAccountID: mockSA.ID}).Return(mockSA, nil)
-
-		buf := new(bytes.Buffer)
-		err := DeleteUsingWorkspaceUUID(mockSA.ID, workspaceUUID, api, buf)
+		api.On("ListDeploymentServiceAccounts", "dep-1").Return(listed, nil)
+		got, err := GetDeploymentServiceAccounts("dep-1", api)
 		s.NoError(err)
-		expectedOut := `Service Account  (ckbvcbqs1014t0760u4bszmcs) successfully deleted
-`
-		s.Equal(buf.String(), expectedOut)
-		api.AssertExpectations(s.T())
+		s.Equal(want, got)
 	})
-
+	s.Run("workspace", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspaceServiceAccounts", "ws-1").Return(listed, nil)
+		got, err := GetWorkspaceServiceAccounts("ws-1", api)
+		s.NoError(err)
+		s.Equal(want, got)
+	})
+	s.Run("none is empty, not nil", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspaceServiceAccounts", "ws-1").Return([]houston.ServiceAccount{}, nil)
+		got, err := GetWorkspaceServiceAccounts("ws-1", api)
+		s.NoError(err)
+		s.NotNil(got)
+		s.Empty(got)
+	})
 	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: workspaceUUID, ServiceAccountID: mockSA.ID}).Return(nil, errMock)
-
-		buf := new(bytes.Buffer)
-		err := DeleteUsingWorkspaceUUID(mockSA.ID, workspaceUUID, api, buf)
-		s.EqualError(err, errMock.Error())
-		api.AssertExpectations(s.T())
+		api.On("ListDeploymentServiceAccounts", "dep-1").Return(nil, errMock)
+		_, err := GetDeploymentServiceAccounts("dep-1", api)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func (s *Suite) TestDeleteUsingDeploymentUUID() {
+func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	deleted := &houston.ServiceAccount{ID: "sa-1", Label: "ci", Category: "default", Active: true}
 
-	mockSA := &houston.ServiceAccount{
-		ID: "ckbvcbqs1014t0760u4bszmcs",
-	}
-	deploymentUUID := "ck1qg6whg001r08691y117hub"
-
-	s.Run("success", func() {
+	s.Run("deployment", func() {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: deploymentUUID, ServiceAccountID: mockSA.ID}).Return(mockSA, nil)
-
-		buf := new(bytes.Buffer)
-		err := DeleteUsingDeploymentUUID(mockSA.ID, deploymentUUID, api, buf)
+		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: "dep-1", ServiceAccountID: "sa-1"}).Return(deleted, nil)
+		got, err := DeleteUsingDeploymentUUID("sa-1", "dep-1", api)
 		s.NoError(err)
-		expectedOut := `Service Account  (ckbvcbqs1014t0760u4bszmcs) successfully deleted
-`
-		s.Equal(buf.String(), expectedOut)
+		s.Equal(ServiceAccount{ID: "sa-1", Label: "ci", Category: "default", Active: true}, got)
 	})
-
+	s.Run("workspace", func() {
+		api := new(mocks.ClientInterface)
+		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: "ws-1", ServiceAccountID: "sa-1"}).Return(deleted, nil)
+		got, err := DeleteUsingWorkspaceUUID("sa-1", "ws-1", api)
+		s.NoError(err)
+		s.Equal("sa-1", got.ID)
+	})
+	// An unknown account is an error, never a null answer
+	//.
 	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
-		api.On("DeleteDeploymentServiceAccount", houston.DeleteServiceAccountRequest{DeploymentID: deploymentUUID, ServiceAccountID: mockSA.ID}).Return(nil, errMock)
-
-		buf := new(bytes.Buffer)
-		err := DeleteUsingDeploymentUUID(mockSA.ID, deploymentUUID, api, buf)
-		s.EqualError(err, errMock.Error())
-		api.AssertExpectations(s.T())
+		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: "ws-1", ServiceAccountID: "sa-1"}).Return(nil, errMock)
+		_, err := DeleteUsingWorkspaceUUID("sa-1", "ws-1", api)
+		s.ErrorIs(err, errMock)
 	})
 }
 
-func (s *Suite) TestGetDeploymentServiceAccount() {
+// Every create and delete mutation returns a nullable ServiceAccount
+//. A null answer with no error is refused,
+// not read.
+func (s *Suite) TestNullAnswers() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	mockSAs := []houston.ServiceAccount{
-		{
-			ID:        "ckqvfa2cu1468rn9hnr0bqqfk",
-			APIKey:    "658b304f36eaaf19860a6d9eb73f7d8a",
-			Label:     "yooo can u see me test",
-			Active:    true,
-			CreatedAt: "2021-07-08T21:28:57.966Z",
-			UpdatedAt: "2021-07-08T21:28:57.966Z",
-		},
-	}
-	deploymentUUID := "ckqvf9spa1189rn9hbh5h439u"
+	api := new(mocks.ClientInterface)
+	api.On("CreateDeploymentServiceAccount", mock.Anything).Return(nil, nil)
+	api.On("CreateWorkspaceServiceAccount", mock.Anything).Return(nil, nil)
+	api.On("DeleteDeploymentServiceAccount", mock.Anything).Return(nil, nil)
+	api.On("DeleteWorkspaceServiceAccount", mock.Anything).Return(nil, nil)
 
-	s.Run("success", func() {
-		api := new(mocks.ClientInterface)
-		api.On("ListDeploymentServiceAccounts", deploymentUUID).Return(mockSAs, nil)
-
-		buf := new(bytes.Buffer)
-		err := GetDeploymentServiceAccounts(deploymentUUID, api, buf)
-		s.NoError(err)
-		expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
-		s.Contains(buf.String(), expectedOut)
-		api.AssertExpectations(s.T())
-	})
-
-	s.Run("error", func() {
-		api := new(mocks.ClientInterface)
-		api.On("ListDeploymentServiceAccounts", deploymentUUID).Return([]houston.ServiceAccount{}, errMock)
-
-		buf := new(bytes.Buffer)
-		err := GetDeploymentServiceAccounts(deploymentUUID, api, buf)
-		s.EqualError(err, errMock.Error())
-		api.AssertExpectations(s.T())
-	})
-}
-
-func (s *Suite) TestGetWorkspaceServiceAccount() {
-	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-
-	mockSAs := []houston.ServiceAccount{
-		{
-			ID:        "ckqvfa2cu1468rn9hnr0bqqfk",
-			APIKey:    "658b304f36eaaf19860a6d9eb73f7d8a",
-			Label:     "yooo can u see me test",
-			Active:    true,
-			CreatedAt: "2021-07-08T21:28:57.966Z",
-			UpdatedAt: "2021-07-08T21:28:57.966Z",
-		},
-	}
-	workspaceUUID := "ckqvf9spa1189rn9hbh5h439u"
-
-	s.Run("success", func() {
-		api := new(mocks.ClientInterface)
-		api.On("ListWorkspaceServiceAccounts", workspaceUUID).Return(mockSAs, nil)
-
-		buf := new(bytes.Buffer)
-		err := GetWorkspaceServiceAccounts(workspaceUUID, api, buf)
-		s.NoError(err)
-		expectedOut := ` yooo can u see me test                  ckqvfa2cu1468rn9hnr0bqqfk     658b304f36eaaf19860a6d9eb73f7d8a`
-		s.Contains(buf.String(), expectedOut)
-		api.AssertExpectations(s.T())
-	})
-
-	s.Run("error", func() {
-		api := new(mocks.ClientInterface)
-		api.On("ListWorkspaceServiceAccounts", workspaceUUID).Return([]houston.ServiceAccount{}, errMock)
-
-		buf := new(bytes.Buffer)
-		err := GetWorkspaceServiceAccounts(workspaceUUID, api, buf)
-		s.EqualError(err, errMock.Error())
-		api.AssertExpectations(s.T())
-	})
+	_, err := CreateUsingDeploymentUUID("dep-1", "ci", "default", houston.DeploymentViewerRole, api)
+	s.ErrorIs(err, errNoServiceAccount)
+	_, err = CreateUsingWorkspaceUUID("ws-1", "ci", "default", houston.WorkspaceViewerRole, api)
+	s.ErrorIs(err, errNoServiceAccount)
+	_, err = DeleteUsingDeploymentUUID("sa-1", "dep-1", api)
+	s.ErrorIs(err, errNoServiceAccount)
+	_, err = DeleteUsingWorkspaceUUID("sa-1", "ws-1", api)
+	s.ErrorIs(err, errNoServiceAccount)
 }

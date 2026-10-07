@@ -1,7 +1,6 @@
 package teams
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
@@ -22,99 +21,161 @@ func TestTeams(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
+func (s *Suite) TearDownSubTest() {
+	promptPaginatedOption = utils.PromptPaginatedOption
+}
+
 func (s *Suite) TestGet() {
-	s.Run("success", func() {
-		mockTeamResp := &houston.Team{
-			ID:   "test-id",
-			Name: "test-name",
-			RoleBindings: []houston.RoleBinding{
-				{
-					Role:      houston.WorkspaceAdminRole,
-					Workspace: houston.Workspace{ID: "test-ws-id"},
-				},
-				{
-					Role:       houston.DeploymentAdminRole,
-					Deployment: houston.Deployment{ID: "test-deployment-id"},
-				},
-			},
-		}
-		buf := new(bytes.Buffer)
+	// team returns all of the team's bindings, on every Workspace and
+	// Deployment and on the platform.
+	mockTeamResp := &houston.Team{
+		ID:   "test-id",
+		Name: "test-name",
+		RoleBindings: []houston.RoleBinding{
+			{Role: houston.SystemViewerRole},
+			{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: "test-ws-id"}},
+			{Role: houston.DeploymentAdminRole, Deployment: houston.Deployment{ID: "test-deployment-id"}},
+		},
+	}
+
+	s.Run("the team with its users", func() {
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(mockTeamResp, nil).Once()
 		mockClient.On("GetTeamUsers", "test-id").Return([]houston.User{{ID: "user-id", Username: "username"}}, nil).Once()
 
-		err := Get("test-id", true, true, false, mockClient, buf)
+		got, err := Get("test-id", true, mockClient)
 		s.NoError(err)
-		s.Contains(buf.String(), "test-id")
-		s.Contains(buf.String(), "test-name")
-		s.Contains(buf.String(), "user-id")
-		s.Contains(buf.String(), "username")
+		s.Equal(Detail{Team: mockTeamResp, Users: []houston.User{{ID: "user-id", Username: "username"}}}, got)
 		mockClient.AssertExpectations(s.T())
 	})
 
+	s.Run("without its users, nothing more is asked", func() {
+		mockClient := new(houston_mocks.ClientInterface)
+		mockClient.On("GetTeam", "test-id").Return(mockTeamResp, nil).Once()
+
+		got, err := Get("test-id", false, mockClient)
+		s.NoError(err)
+		s.Nil(got.Users)
+		mockClient.AssertNotCalled(s.T(), "GetTeamUsers", "test-id")
+	})
+
+	// teamUsers answers [] for a team with no users, and for an unknown one
+	//.
+	s.Run("no users is empty, not nil", func() {
+		mockClient := new(houston_mocks.ClientInterface)
+		mockClient.On("GetTeam", "test-id").Return(mockTeamResp, nil).Once()
+		mockClient.On("GetTeamUsers", "test-id").Return(nil, nil).Once()
+
+		got, err := Get("test-id", true, mockClient)
+		s.NoError(err)
+		s.NotNil(got.Users)
+	})
+
+	// An unknown team is an error, "The requested resource was not found",
+	// never a null answer.
 	s.Run("getTeam error", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(nil, errMockHouston).Once()
 
-		err := Get("test-id", false, false, true, mockClient, buf)
+		_, err := Get("test-id", true, mockClient)
 		s.ErrorIs(err, errMockHouston)
-		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("a null answer is refused rather than read", func() {
+		mockClient := new(houston_mocks.ClientInterface)
+		mockClient.On("GetTeam", "test-id").Return(nil, nil).Once()
+
+		_, err := Get("test-id", false, mockClient)
+		s.ErrorIs(err, errTeamNotFound)
 	})
 
 	s.Run("getTeamUsers error", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", Name: "test-name"}, nil).Once()
 		mockClient.On("GetTeamUsers", "test-id").Return([]houston.User{}, errMockHouston).Once()
 
-		err := Get("test-id", false, false, true, mockClient, buf)
+		_, err := Get("test-id", true, mockClient)
 		s.ErrorIs(err, errMockHouston)
-		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("no ID", func() {
+		_, err := Get("", false, nil)
+		s.ErrorIs(err, errMissingTeamID)
 	})
 }
 
 func (s *Suite) TestList() {
-	s.Run("success", func() {
-		buf := new(bytes.Buffer)
+	// paginatedTeams skips the cursor row and counts every team on the
+	// platform, not the page.
+	s.Run("reads every page", func() {
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil)
+		first := make([]houston.Team, ListTeamLimit)
+		for i := range first {
+			first[i] = houston.Team{ID: "t-" + string(rune('a'+i))}
+		}
+		last := first[len(first)-1].ID
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: ListTeamLimit + 1, Teams: first}, nil).Once()
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: last, Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: ListTeamLimit + 1, Teams: []houston.Team{{ID: "z"}}}, nil).Once()
 
-		err := List(mockClient, buf)
+		got, err := List(mockClient)
 		s.NoError(err)
-		s.Contains(buf.String(), "test-id")
-		s.Contains(buf.String(), "test-name")
+		s.Len(got, ListTeamLimit+1)
+		s.Equal("z", got[ListTeamLimit].ID)
 		mockClient.AssertExpectations(s.T())
 	})
 
-	s.Run("listTeams error", func() {
-		buf := new(bytes.Buffer)
+	s.Run("an empty page ends the list, whatever the count says", func() {
 		mockClient := new(houston_mocks.ClientInterface)
-		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{}, errMockHouston)
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 5, Teams: []houston.Team{{ID: "a"}}}, nil).Once()
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "a", Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 5}, nil).Once()
 
-		err := List(mockClient, buf)
+		got, err := List(mockClient)
+		s.NoError(err)
+		s.Equal([]houston.Team{{ID: "a"}}, got)
+	})
+
+	s.Run("none is empty, not nil", func() {
+		mockClient := new(houston_mocks.ClientInterface)
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Take: ListTeamLimit}).Return(houston.ListTeamsResp{}, nil).Once()
+
+		got, err := List(mockClient)
+		s.NoError(err)
+		s.NotNil(got)
+		s.Empty(got)
+	})
+
+	s.Run("listTeams error", func() {
+		mockClient := new(houston_mocks.ClientInterface)
+		mockClient.On("ListTeams", houston.ListTeamsRequest{Take: ListTeamLimit}).Return(houston.ListTeamsResp{}, errMockHouston)
+
+		_, err := List(mockClient)
 		s.ErrorIs(err, errMockHouston)
-		mockClient.AssertExpectations(s.T())
 	})
 }
 
 func (s *Suite) TestPaginatedList() {
+	collect := func(pages *[][]houston.Team) func([]houston.Team) error {
+		return func(ts []houston.Team) error {
+			*pages = append(*pages, ts)
+			return nil
+		}
+	}
+
 	s.Run("success", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{Count: 1, Teams: []houston.Team{{ID: "test-id", Name: "test-name"}}}, nil).Once()
 		promptPaginatedOption = func(previousCursorID, nextCursorID string, take, totalRecord, pageNumber int, lastPage bool) (utils.PaginationOptions, error) {
 			return utils.PaginationOptions{Quit: true}, nil
 		}
 
-		err := PaginatedList(mockClient, buf, ListTeamLimit, 0, "")
+		var pages [][]houston.Team
+		err := PaginatedList(mockClient, ListTeamLimit, 0, "", collect(&pages))
 		s.NoError(err)
-		s.Contains(buf.String(), "test-id")
+		s.Equal([][]houston.Team{{{ID: "test-id", Name: "test-name"}}}, pages)
 		mockClient.AssertExpectations(s.T())
 	})
 
 	s.Run("with one recursion", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: 1}).Return(houston.ListTeamsResp{Count: 2, Teams: []houston.Team{{ID: "test-id-1", Name: "test-name-1"}}}, nil).Once()
 		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "test-id-1", Take: 1}).Return(houston.ListTeamsResp{Count: 2, Teams: []houston.Team{{ID: "test-id-2", Name: "test-name-2"}}}, nil).Once()
@@ -128,97 +189,85 @@ func (s *Suite) TestPaginatedList() {
 			return utils.PaginationOptions{Quit: true}, nil
 		}
 
-		err := PaginatedList(mockClient, buf, 1, 0, "")
+		var pages [][]houston.Team
+		err := PaginatedList(mockClient, 1, 0, "", collect(&pages))
 		s.NoError(err)
-		s.Contains(buf.String(), "test-id-1")
-		s.Contains(buf.String(), "test-id-2")
+		s.Len(pages, 2)
+		s.Equal("test-id-2", pages[1][0].ID)
 		mockClient.AssertExpectations(s.T())
 	})
 
 	s.Run("list team error", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("ListTeams", houston.ListTeamsRequest{Cursor: "", Take: ListTeamLimit}).Return(houston.ListTeamsResp{}, errMockHouston).Once()
 
-		err := PaginatedList(mockClient, buf, ListTeamLimit, 0, "")
+		err := PaginatedList(mockClient, ListTeamLimit, 0, "", func([]houston.Team) error { return nil })
 		s.ErrorIs(err, errMockHouston)
-		mockClient.AssertExpectations(s.T())
 	})
 }
 
 func (s *Suite) TestUpdate() {
 	s.Run("success", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
+		// createTeamSystemRoleBinding answers with the binding, created or
+		// changed.
 		mockClient.On("CreateTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil).Once()
 
-		err := Update("test-id", houston.SystemAdminRole, mockClient, buf)
+		got, err := Update("test-id", houston.SystemAdminRole, mockClient)
 		s.NoError(err)
-		s.Contains(buf.String(), "test-id")
-		s.Contains(buf.String(), houston.SystemAdminRole)
+		s.Equal(RoleChange{TeamID: "test-id", Role: houston.SystemAdminRole, Changed: true}, got)
 		mockClient.AssertExpectations(s.T())
 	})
 
 	s.Run("success to set None", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
 		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return(houston.SystemAdminRole, nil).Once()
 
-		err := Update("test-id", houston.NoneRole, mockClient, buf)
+		got, err := Update("test-id", houston.NoneRole, mockClient)
 		s.NoError(err)
-		s.Contains(buf.String(), "test-id")
-		s.Contains(buf.String(), houston.SystemAdminRole)
+		s.Equal(RoleChange{TeamID: "test-id", Previous: houston.SystemAdminRole, Role: houston.NoneRole, Changed: true}, got)
 		mockClient.AssertExpectations(s.T())
 	})
 
 	s.Run("invalid role", func() {
-		buf := new(bytes.Buffer)
-
-		err := Update("test-id", "invalid-role-string", nil, buf)
-		s.Contains(err.Error(), "invalid role: invalid-role-string")
+		_, err := Update("test-id", "invalid-role-string", nil)
+		s.ErrorContains(err, "invalid role: invalid-role-string")
 	})
 
 	s.Run("CreateTeamSystemRoleBinding error", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("CreateTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return("", errMockHouston).Once()
 
-		err := Update("test-id", houston.SystemAdminRole, mockClient, buf)
+		_, err := Update("test-id", houston.SystemAdminRole, mockClient)
 		s.ErrorIs(err, errMockHouston)
-		mockClient.AssertExpectations(s.T())
 	})
 
 	s.Run("GetTeam error", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(nil, errMockHouston).Once()
 
-		err := Update("test-id", houston.NoneRole, mockClient, buf)
+		_, err := Update("test-id", houston.NoneRole, mockClient)
 		s.ErrorIs(err, errMockHouston)
-		mockClient.AssertExpectations(s.T())
 	})
 
 	s.Run("No role set already", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{}}, nil).Once()
 
-		err := Update("test-id", houston.NoneRole, mockClient, buf)
+		got, err := Update("test-id", houston.NoneRole, mockClient)
 		s.NoError(err)
-		s.Contains(buf.String(), "Role for the team test-id already set to None, nothing to update")
-		mockClient.AssertExpectations(s.T())
+		s.Equal(RoleChange{TeamID: "test-id", Previous: houston.NoneRole, Role: houston.NoneRole}, got)
+		mockClient.AssertNotCalled(s.T(), "DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.NoneRole})
 	})
 
 	s.Run("DeleteTeamSystemRoleBinding error", func() {
-		buf := new(bytes.Buffer)
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Role: houston.SystemAdminRole}}}, nil).Once()
 		mockClient.On("DeleteTeamSystemRoleBinding", houston.SystemRoleBindingRequest{TeamID: "test-id", Role: houston.SystemAdminRole}).Return("", errMockHouston).Once()
 
-		err := Update("test-id", houston.NoneRole, mockClient, buf)
+		_, err := Update("test-id", houston.NoneRole, mockClient)
 		s.ErrorIs(err, errMockHouston)
-		mockClient.AssertExpectations(s.T())
 	})
 }
 

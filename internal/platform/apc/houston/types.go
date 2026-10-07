@@ -183,18 +183,12 @@ type ServiceAccount struct {
 	Active     bool   `json:"active"`
 }
 
-// WorkspaceServiceAccount defines a structure of a WorkspaceServiceAccountResponse object
+// WorkspaceServiceAccount defines a structure of a WorkspaceServiceAccountResponse object:
+// a ServiceAccount with the Workspace it belongs to.
 type WorkspaceServiceAccount struct {
-	ID            string `json:"id"`
-	APIKey        string `json:"apiKey"`
-	Label         string `json:"label"`
-	Category      string `json:"category"`
+	ServiceAccount
 	EntityType    string `json:"entityType"`
 	WorkspaceUUID string `json:"workspaceUuid"`
-	LastUsedAt    string `json:"lastUsedAt"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt     string `json:"updatedAt"`
-	Active        bool   `json:"active"`
 }
 
 // DeploymentUser defines a structure of RBAC deployment users
@@ -206,18 +200,12 @@ type DeploymentUser struct {
 	RoleBindings []RoleBinding `json:"roleBindings"`
 }
 
-// DeploymentServiceAccount defines a structure of a DeploymentServiceAccountResponse object
+// DeploymentServiceAccount defines a structure of a DeploymentServiceAccountResponse object:
+// a ServiceAccount with the Deployment it belongs to.
 type DeploymentServiceAccount struct {
-	ID             string `json:"id"`
-	APIKey         string `json:"apiKey"`
-	Label          string `json:"label"`
-	Category       string `json:"category"`
+	ServiceAccount
 	EntityType     string `json:"entityType"`
 	DeploymentUUID string `json:"deploymentUuid"`
-	LastUsedAt     string `json:"lastUsedAt"`
-	CreatedAt      string `json:"createdAt"`
-	UpdatedAt      string `json:"updatedAt"`
-	Active         bool   `json:"active"`
 }
 
 // Token contains a houston auth token as well as it's payload of components

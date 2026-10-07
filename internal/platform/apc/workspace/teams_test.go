@@ -1,153 +1,179 @@
 package workspace
 
 import (
-	"bytes"
+	"errors"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houston_mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 )
 
 func (s *Suite) TestAddTeam() {
-	s.Run("success", func() {
+	req := houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: houston.WorkspaceEditorRole}
+	s.Run("returns the Workspace", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role"}).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
+		// workspaceAddTeam returns the whole Workspace row
+		//.
+		mock.On("AddWorkspaceTeam", req).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
 
-		buf := new(bytes.Buffer)
-		err := AddTeam("workspace-id", "team-id", "role", mock, buf)
-
+		w, err := AddTeam("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)
 		s.NoError(err)
-		s.Contains(buf.String(), "workspace-id")
-		s.Contains(buf.String(), "team-id")
-		mock.AssertExpectations(s.T())
+		s.Equal("label", w.Label)
 	})
 
 	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("AddWorkspaceTeam", houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role"}).Return(nil, errMock)
+		mock.On("AddWorkspaceTeam", req).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		err := AddTeam("workspace-id", "team-id", "role", mock, buf)
-
+		_, err := AddTeam("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)
 		s.ErrorIs(err, errMock)
-		mock.AssertExpectations(s.T())
 	})
 }
 
 func (s *Suite) TestRemoveTeam() {
-	s.Run("success", func() {
+	get := houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}
+	req := houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}
+	// The team query returns all of the team's bindings
+	//.
+	member := &houston.Team{ID: "team-id", RoleBindings: []houston.RoleBinding{
+		{Role: houston.SystemViewerRole},
+		{Role: houston.WorkspaceViewerRole, Workspace: houston.Workspace{ID: "workspace-id"}},
+	}}
+
+	s.Run("a member is removed, verified", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
+		mock.On("GetWorkspaceTeamRole", get).Return(member, nil)
+		mock.On("DeleteWorkspaceTeam", req).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
 
-		buf := new(bytes.Buffer)
-		err := RemoveTeam("workspace-id", "team-id", mock, buf)
-
+		got, err := RemoveTeam("workspace-id", "team-id", mock)
 		s.NoError(err)
-		s.Contains(buf.String(), "workspace-id")
-		s.Contains(buf.String(), "team-id")
+		s.Equal(TeamRemoval{Workspace: &houston.Workspace{ID: "workspace-id", Label: "label"}, Verified: true}, got)
 		mock.AssertExpectations(s.T())
+	})
+
+	// workspaceRemoveTeam deletes role bindings only, and removes nothing,
+	// with no error, for a team that has none there
+	//.
+	// The lookup passes Houston's shield for a team with any binding in the
+	// Workspace, a Deployment's included ();
+	// one with no Workspace role is refused before anything is sent.
+	s.Run("a team with no Workspace role is refused", func() {
+		mock := new(houston_mocks.ClientInterface)
+		mock.On("GetWorkspaceTeamRole", get).Return(&houston.Team{ID: "team-id", RoleBindings: []houston.RoleBinding{
+			{Role: houston.DeploymentAdminRole, Workspace: houston.Workspace{ID: "workspace-id"}, Deployment: houston.Deployment{ID: "dep-1"}},
+			{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: "other"}},
+		}}, nil)
+
+		_, err := RemoveTeam("workspace-id", "team-id", mock)
+		s.ErrorIs(err, errTeamNotInWorkspace)
+		mock.AssertNotCalled(s.T(), "DeleteWorkspaceTeam", req)
+	})
+
+	// The lookup needs workspace.teams.get and the removal only
+	// workspace.iam.update ( against 893-896), and the
+	// shield's refusal reads the same for a non-member: so it is sent anyway.
+	s.Run("a refused lookup still sends the removal, unverified", func() {
+		mock := new(houston_mocks.ClientInterface)
+		mock.On("GetWorkspaceTeamRole", get).Return(nil, errors.New("Insufficient permissions."))
+		mock.On("DeleteWorkspaceTeam", req).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
+
+		got, err := RemoveTeam("workspace-id", "team-id", mock)
+		s.NoError(err)
+		s.False(got.Verified)
+		mock.AssertExpectations(s.T())
+	})
+
+	s.Run("another lookup failure sends nothing", func() {
+		mock := new(houston_mocks.ClientInterface)
+		mock.On("GetWorkspaceTeamRole", get).Return(nil, errMock)
+
+		_, err := RemoveTeam("workspace-id", "team-id", mock)
+		s.ErrorIs(err, errMock)
+		mock.AssertNotCalled(s.T(), "DeleteWorkspaceTeam", req)
 	})
 
 	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, errMock)
+		mock.On("GetWorkspaceTeamRole", get).Return(member, nil)
+		mock.On("DeleteWorkspaceTeam", req).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		err := RemoveTeam("workspace-id", "team-id", mock, buf)
-
+		_, err := RemoveTeam("workspace-id", "team-id", mock)
 		s.ErrorIs(err, errMock)
-		mock.AssertExpectations(s.T())
 	})
 }
 
 func (s *Suite) TestListTeamRoles() {
-	s.Run("success", func() {
+	s.Run("the teams with a role on the Workspace, and that role", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("ListWorkspaceTeamsAndRoles", "workspace-id").Return(
 			[]houston.Team{
 				{ID: "test-id-1", Name: "test-name-1", RoleBindings: []houston.RoleBinding{{Role: houston.WorkspaceViewerRole, Workspace: houston.Workspace{ID: "workspace-id"}}}},
-				{ID: "test-id-2", Name: "test-name-2", RoleBindings: []houston.RoleBinding{{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: "workspace-id"}}}},
+				{ID: "test-id-2", Name: "test-name-2", RoleBindings: []houston.RoleBinding{
+					{Role: houston.DeploymentAdminRole, Deployment: houston.Deployment{ID: "dep-1"}},
+					{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: "workspace-id"}},
+				}},
 			}, nil)
 
-		buf := new(bytes.Buffer)
-		err := ListTeamRoles("workspace-id", mock, buf)
-
+		got, err := ListTeamRoles("workspace-id", mock)
 		s.NoError(err)
-		s.Contains(buf.String(), "workspace-id")
-		s.Contains(buf.String(), "test-id-1")
-		s.Contains(buf.String(), "test-id-2")
-		mock.AssertExpectations(s.T())
+		s.Equal([]TeamRole{
+			{ID: "test-id-1", Name: "test-name-1", Role: houston.WorkspaceViewerRole},
+			{ID: "test-id-2", Name: "test-name-2", Role: houston.WorkspaceAdminRole},
+		}, got)
 	})
 
 	s.Run("houston failure", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("ListWorkspaceTeamsAndRoles", "workspace-id").Return([]houston.Team{}, errMock)
 
-		buf := new(bytes.Buffer)
-		err := ListTeamRoles("workspace-id", mock, buf)
-
+		_, err := ListTeamRoles("workspace-id", mock)
 		s.ErrorIs(err, errMock)
-		mock.AssertExpectations(s.T())
 	})
 }
 
 func (s *Suite) TestUpdateTeamRole() {
-	s.Run("success", func() {
+	get := houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}
+	update := houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: houston.WorkspaceEditorRole}
+	team := &houston.Team{ID: "team-id", Name: "Data", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}
+
+	s.Run("returns the team, its role before and after", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
-		mock.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role-id"}).Return("role-id", nil)
+		mock.On("GetWorkspaceTeamRole", get).Return(team, nil)
+		// workspaceUpdateTeamRole answers with the new role
+		//.
+		mock.On("UpdateWorkspaceTeamRole", update).Return(houston.WorkspaceEditorRole, nil)
 
-		buf := new(bytes.Buffer)
-		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
-
+		got, err := UpdateTeamRole("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)
 		s.NoError(err)
-		s.Contains(buf.String(), "team-id")
-		s.Contains(buf.String(), "role-id")
-		mock.AssertExpectations(s.T())
+		s.Equal(TeamRoleChange{Team: TeamRole{ID: "team-id", Name: "Data", Role: houston.WorkspaceEditorRole}, Previous: houston.WorkspaceAdminRole}, got)
 	})
 
-	s.Run("teams not in workspace", func() {
+	// The team query with a workspaceUuid refuses a team with no binding in
+	// that Workspace as "Insufficient permissions." rather than answering
+	// null.
+	s.Run("a team not in the Workspace", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, nil)
+		mock.On("GetWorkspaceTeamRole", get).Return(nil, errors.New("Insufficient permissions."))
 
-		buf := new(bytes.Buffer)
-		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
-
+		_, err := UpdateTeamRole("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)
 		s.ErrorIs(err, errTeamNotInWorkspace)
-		mock.AssertExpectations(s.T())
-	})
-
-	s.Run("GetWorkspaceTeamRole failure", func() {
-		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(nil, errMock)
-
-		buf := new(bytes.Buffer)
-		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
-
-		s.ErrorIs(err, errTeamNotInWorkspace)
-		mock.AssertExpectations(s.T())
+		mock.AssertNotCalled(s.T(), "UpdateWorkspaceTeamRole", update)
 	})
 
 	s.Run("rolebinding not present", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{}}, nil)
+		mock.On("GetWorkspaceTeamRole", get).Return(&houston.Team{ID: "team-id", RoleBindings: []houston.RoleBinding{}}, nil)
 
-		buf := new(bytes.Buffer)
-		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
-
+		_, err := UpdateTeamRole("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)
 		s.ErrorIs(err, errTeamNotInWorkspace)
-		mock.AssertExpectations(s.T())
 	})
 
 	s.Run("UpdateWorkspaceTeamRole failure", func() {
 		mock := new(houston_mocks.ClientInterface)
-		mock.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}).Return(&houston.Team{ID: "test-id", RoleBindings: []houston.RoleBinding{{Workspace: houston.Workspace{ID: "workspace-id"}, Role: houston.WorkspaceAdminRole}}}, nil)
-		mock.On("UpdateWorkspaceTeamRole", houston.UpdateWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: "role-id"}).Return("", errMock)
+		mock.On("GetWorkspaceTeamRole", get).Return(team, nil)
+		mock.On("UpdateWorkspaceTeamRole", update).Return("", errMock)
 
-		buf := new(bytes.Buffer)
-		err := UpdateTeamRole("workspace-id", "team-id", "role-id", mock, buf)
-
+		_, err := UpdateTeamRole("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)
 		s.ErrorIs(err, errMock)
-		mock.AssertExpectations(s.T())
 	})
 }
 

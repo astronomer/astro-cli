@@ -1,11 +1,13 @@
 package apc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
@@ -57,6 +59,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&workspaceUserWsRole, "role", "r", houston.WorkspaceViewerRole, "Role assigned to user")
 	cmd.Flags().StringVarP(&workspaceUserCreateEmail, "email", "e", "", "Email of the user you wish to add to this workspace")
 	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -73,6 +76,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -89,6 +93,7 @@ func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 			return workspaceUserRemove(cmd, out, args)
 		},
 	}
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -111,10 +116,15 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().BoolVarP(&paginated, "paginated", "p", false, "Paginated workspace user list")
 		cmd.Flags().IntVarP(&pageSize, "page-size", "s", 0, "Page size of the workspace user list if paginated is set to true")
 	}
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func workspaceUserAdd(cmd *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -126,10 +136,18 @@ func workspaceUserAdd(cmd *cobra.Command, out io.Writer) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.Add(ws, workspaceUserCreateEmail, workspaceUserWsRole, houstonClient, out)
+	w, added, err := workspace.Add(ws, workspaceUserCreateEmail, workspaceUserWsRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceUserAdded(r, w, workspaceUserCreateEmail, &added)
 }
 
 func workspaceUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -141,10 +159,18 @@ func workspaceUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.UpdateRole(ws, args[0], workspaceUserWsRole, houstonClient, out)
+	change, err := workspace.UpdateRole(ws, args[0], workspaceUserWsRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceUserUpdated(r, args[0], &change)
 }
 
 func workspaceUserRemove(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -153,23 +179,42 @@ func workspaceUserRemove(cmd *cobra.Command, out io.Writer, args []string) error
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	user, err := houston.Call(houstonClient.GetWorkspaceUserRole)(houston.GetWorkspaceUserRoleRequest{WorkspaceID: ws, Email: args[0]})
+	// A user with no Workspace role there is refused before anything is
+	// sent: workspaceUser answers for any active user with the email,
+	// whatever the Workspace.
+	user, err := workspace.UserRoleIn(ws, args[0], houstonClient)
 	if err != nil {
 		return err
 	}
 
-	return workspace.Remove(ws, user.ID, houstonClient, out)
+	w, err := workspace.Remove(ws, user.ID, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceUserRemoved(r, w, &user)
 }
 
+// errListPaginatedUnderJSON refuses --paginated under --output json: it pages
+// through a list by asking which page to show next, and json asks nothing.
+var errListPaginatedUnderJSON = errors.New("--paginated pages through the list by asking which page to show next, so it cannot be used with --output json; leave it out to publish the whole list")
+
 func workspaceUserList(_ *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
+	if paginated && r.Format == cliout.FormatJSON {
+		return cliout.Usage(errListPaginatedUnderJSON)
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 	configPageSize := config.CFG.PageSize.GetInt()
 
-	// not calling paginated workspace roles if houston version is before 0.30.0, since that doesn't support pagination
-	if (config.CFG.Interactive.GetBool() || paginated) && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
+	// not calling paginated workspace roles if houston version is before 0.30.0, since that doesn't support pagination.
+	// Under json the interactive setting does not apply: the whole list is the result.
+	if r.Format != cliout.FormatJSON && (config.CFG.Interactive.GetBool() || paginated) && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.30.0"}) {
 		if pageSize <= 0 && configPageSize > 0 {
 			pageSize = configPageSize
 		}
@@ -179,7 +224,13 @@ func workspaceUserList(_ *cobra.Command, out io.Writer) error {
 			pageSize = defaultWorkspaceUserPageSize
 		}
 
-		return workspace.PaginatedListRoles(ws, "", pageSize, 0, houstonClient, out)
+		return workspace.PaginatedListRoles(ws, "", pageSize, 0, houstonClient, func(users []workspace.UserRole) error {
+			return workspaceUserListTable(users).Print(out)
+		})
 	}
-	return workspace.ListRoles(ws, houstonClient, out)
+	users, err := workspace.ListRoles(ws, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderWorkspaceUserList(r, users)
 }

@@ -59,6 +59,55 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "workspace-list", Value: workspaceListJSON{}},
 	// astro workspace delete: what it removed.
 	{Name: "workspace-removal", Value: workspaceRemovalJSON{}},
+	// astro deployment|workspace service-account create. api_key is the
+	// account's credential, the result a script creates it for, and only a
+	// create publishes it.
+	{Name: "service-account", Value: serviceAccountJSON{}},
+	// The same account where Houston gave none of the optional values (a
+	// category never given, an account never used): they are null, never "".
+	{Name: "service-account-without-values", Value: serviceAccountJSON{ID: "x", Label: sp("x")}, AsGiven: true},
+	// astro deployment|workspace service-account list: api_key is always
+	// null. Houston returns the key whole for ten minutes after the create
+	//, and a
+	// list is not where a script should come by it. Pinned as given, since
+	// populating every field would show a key.
+	{Name: "service-account-list", Value: serviceAccountListJSON{ServiceAccounts: []serviceAccountJSON{
+		{ID: "x", Label: sp("x"), Category: sp("x"), Active: true, CreatedAt: sp("x"), LastUsedAt: sp("x")},
+	}}, AsGiven: true},
+	// astro deployment|workspace service-account delete: what each deleted.
+	{Name: "deployment-service-account-removal", Value: deploymentServiceAccountRemovalJSON{}},
+	{Name: "workspace-service-account-removal", Value: workspaceServiceAccountRemovalJSON{}},
+
+	// A user and the role they hold on the Workspace or the Deployment the
+	// command is about: each item of `deployment user list` and `workspace
+	// user list`, and what an add or an update of either publishes.
+	{Name: "user", Value: userJSON{}},
+	// A Deployment user as an add or an update publishes them: no
+	// workspace role, and no full name, which the mutation does not return.
+	{Name: "user-without-values", Value: userJSON{ID: sp("x"), Username: sp("x"), DeploymentRole: sp("x")}, AsGiven: true},
+	{Name: "user-list", Value: userListJSON{}},
+	// astro workspace|deployment user remove.
+	{Name: "workspace-user-removal", Value: workspaceUserRemovalJSON{}},
+	{Name: "deployment-user-removal", Value: deploymentUserRemovalJSON{}},
+	// astro user create. Houston's session token for the new user is not
+	// published.
+	{Name: "user-created", Value: createdUserJSON{}},
+
+	// A team and the role it holds on the platform, a Workspace or a
+	// Deployment: each item of `team list`, `workspace team list` and
+	// `deployment team list`, and what an add or an update of any of them
+	// publishes.
+	{Name: "team", Value: teamJSON{}},
+	// A team as `workspace team add` publishes it: Houston's answer names
+	// the Workspace, not the team.
+	{Name: "team-without-values", Value: teamJSON{ID: "x", WorkspaceRole: sp("x")}, AsGiven: true},
+	{Name: "team-list", Value: teamListJSON{}},
+	// astro team get. users is null unless --users or --all asked for them.
+	{Name: "team-detail", Value: teamDetailJSON{}},
+	{Name: "team-detail-without-users", Value: teamDetailJSON{ID: "x", Name: sp("x"), SystemRole: "NONE", WorkspaceRoles: []teamWorkspaceRoleJSON{}, DeploymentRoles: []teamDeploymentRoleJSON{}}, AsGiven: true},
+	// astro workspace|deployment team remove.
+	{Name: "workspace-team-removal", Value: workspaceTeamRemovalJSON{}},
+	{Name: "deployment-team-removal", Value: deploymentTeamRemovalJSON{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -83,12 +132,13 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Ten shapes reach Emit in this package's tests today:
+// would be silent. Twenty-four shapes reach Emit in this package's tests today:
 // the deployment family's Deployment, list, removal, version change and log
 // entry, deploy's result, the workspace family's Workspace, list and
-// removal, and the error object.
+// removal, the user, team and service-account results, and the error
+// object.
 // Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 10
+const minWatchedPayloads = 24
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

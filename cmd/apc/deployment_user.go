@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -64,6 +65,7 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentUserFullname, "name", "n", "", "Full name of the user to search for")
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -84,6 +86,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("email")         //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -100,6 +103,7 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment where you want to remove the user")
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -117,37 +121,73 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment where you want to update the user")
 	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func deploymentUserList(cmd *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UserList(deploymentID, deploymentUserEmail, deploymentUserID, deploymentUserFullname, houstonClient, out)
+	users, err := deployment.UserList(deploymentID, deploymentUserEmail, deploymentUserID, deploymentUserFullname, houstonClient)
+	if errors.Is(err, deployment.ErrNoDeploymentUsers) {
+		return renderNoDeploymentUsers(r)
+	}
+	if err != nil {
+		return err
+	}
+	return renderDeploymentUserList(r, users)
 }
 
 func deploymentUserAdd(cmd *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.Add(deploymentID, deploymentUserEmail, deploymentUserRole, houstonClient, out)
+	u, err := deployment.Add(deploymentID, deploymentUserEmail, deploymentUserRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderDeploymentUserChange(r, deploymentID, deploymentUserEmail, &u, true)
 }
 
 func deploymentUserRemove(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.RemoveUser(deploymentID, args[0], houstonClient, out)
+	u, err := deployment.RemoveUser(deploymentID, args[0], houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderDeploymentUserRemoval(r, deploymentID, args[0], &u)
 }
 
 func deploymentUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UpdateUser(deploymentID, args[0], deploymentUserRole, houstonClient, out)
+	u, err := deployment.UpdateUser(deploymentID, args[0], deploymentUserRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderDeploymentUserChange(r, deploymentID, args[0], &u, false)
 }

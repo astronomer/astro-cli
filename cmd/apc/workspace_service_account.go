@@ -59,6 +59,7 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&workspaceSALabel, "label", "l", "", "Label of the new service account")
 	cmd.Flags().StringVarP(&workspaceSARole, "role", "r", houston.WorkspaceViewerRole, "Role (permissions) attached to the created service account")
 	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -74,6 +75,7 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -90,10 +92,15 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -104,10 +111,18 @@ func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return sa.CreateUsingWorkspaceUUID(ws, workspaceSALabel, workspaceSACategory, workspaceSARole, houstonClient, out)
+	created, err := sa.CreateUsingWorkspaceUUID(ws, workspaceSALabel, workspaceSACategory, workspaceSARole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderServiceAccountCreated(r, &created)
 }
 
 func workspaceSaList(cmd *cobra.Command, out io.Writer) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -115,11 +130,18 @@ func workspaceSaList(cmd *cobra.Command, out io.Writer) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return sa.GetWorkspaceServiceAccounts(ws, houstonClient, out)
+	sas, err := sa.GetWorkspaceServiceAccounts(ws, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderServiceAccountList(r, sas)
 }
 
 func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -127,6 +149,10 @@ func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-
-	return sa.DeleteUsingWorkspaceUUID(args[0], ws, houstonClient, out)
+	deleted, err := sa.DeleteUsingWorkspaceUUID(args[0], ws, houstonClient)
+	if err != nil {
+		return err
+	}
+	removal := workspaceServiceAccountRemovalJSON{ID: deleted.ID, Label: orNull(deleted.Label), WorkspaceID: ws, Action: accessActionDeleted}
+	return r.Emit(removal, serviceAccountDeletedText(&deleted))
 }

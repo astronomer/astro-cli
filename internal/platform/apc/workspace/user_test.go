@@ -1,34 +1,32 @@
 package workspace
 
 import (
-	"bytes"
 	"errors"
 	"os"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/apc/utils"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-var (
-	mockWsUserResponse = &houston.Workspace{
-		ID: "ckc0eir8e01gj07608ajmvia1",
-	}
-	errMock = errors.New("api error")
-)
+var errMock = errors.New("api error")
 
 // mockRoles is a function, not a shared value: a test that changes what it
 // returns must not change it for the next run of the suite (-count=N).
+//
+// workspaceUser returns the first active user with the email, whatever the
+// Workspace, and narrows their bindings to the Workspace asked about
+//: a user with no role there comes
+// back with no bindings, not as an error.
 func mockRoles() houston.WorkspaceUserRoleBindings {
 	return houston.WorkspaceUserRoleBindings{
+		ID:       "u-1",
+		Username: "test@test.com",
 		RoleBindings: []houston.RoleBinding{
 			{
 				Role:      houston.WorkspaceViewerRole,
 				Workspace: houston.Workspace{ID: "ckoixo6o501496qemiwsja1tl"},
-			},
-			{
-				Role:      "DEPLOYMENT_VIEWER",
-				Workspace: houston.Workspace{ID: "ckg6sfddu30911pc0n1o0e97e"},
 			},
 		},
 	}
@@ -36,321 +34,154 @@ func mockRoles() houston.WorkspaceUserRoleBindings {
 
 func (s *Suite) TestAdd() {
 	testUtil.InitTestConfig("software")
-
 	id := "ck1qg6whg001r08691y117hub"
-	role := "test-role"
-	email := "test@test.com"
+	req := houston.AddWorkspaceUserRequest{WorkspaceID: id, Email: "Test@test.com", Role: houston.WorkspaceEditorRole}
 
-	api := new(mocks.ClientInterface)
-	api.On("AddWorkspaceUser", houston.AddWorkspaceUserRequest{WorkspaceID: id, Email: email, Role: role}).Return(mockWsUserResponse, nil)
+	s.Run("names the user Houston added", func() {
+		// workspaceAddUser returns the Workspace as {id, label} and its
+		// members, the new one among them under its username, the email in
+		// lower case.
+		ws := &houston.Workspace{ID: id, Label: "airflow", Users: []houston.User{
+			{ID: "u-0", Username: "someone@test.com"},
+			{ID: "u-1", Username: "test@test.com"},
+		}}
+		api := new(mocks.ClientInterface)
+		api.On("AddWorkspaceUser", req).Return(ws, nil)
 
-	buf := new(bytes.Buffer)
-	err := Add(id, email, role, api, buf)
-	s.NoError(err)
-	expected := ` NAME     WORKSPACE ID                  EMAIL             ROLE          
-          ckc0eir8e01gj07608ajmvia1     test@test.com     test-role     
-Successfully added test@test.com to 
-`
-	s.Equal(expected, buf.String())
-	api.AssertExpectations(s.T())
-}
+		w, added, err := Add(id, "Test@test.com", houston.WorkspaceEditorRole, api)
+		s.NoError(err)
+		s.Equal(ws, w)
+		s.Equal(UserRole{ID: "u-1", Username: "test@test.com", Role: houston.WorkspaceEditorRole}, added)
+	})
 
-func (s *Suite) TestAddError() {
-	testUtil.InitTestConfig("software")
+	s.Run("houston failure", func() {
+		api := new(mocks.ClientInterface)
+		api.On("AddWorkspaceUser", req).Return(nil, errMock)
 
-	id := "ck1qg6whg001r08691y117hub"
-	role := "test-role"
-	email := "test@test.com"
-
-	api := new(mocks.ClientInterface)
-	api.On("AddWorkspaceUser", houston.AddWorkspaceUserRequest{WorkspaceID: id, Email: email, Role: role}).Return(nil, errMock)
-
-	buf := new(bytes.Buffer)
-	err := Add(id, email, role, api, buf)
-	s.EqualError(err, errMock.Error())
-	api.AssertExpectations(s.T())
+		_, _, err := Add(id, "Test@test.com", houston.WorkspaceEditorRole, api)
+		s.ErrorIs(err, errMock)
+	})
 }
 
 func (s *Suite) TestRemove() {
 	testUtil.InitTestConfig("software")
-
 	id := "ck1qg6whg001r08691y117hub"
-	userID := "ckc0eir8e01gj07608ajmvia1"
+	req := houston.DeleteWorkspaceUserRequest{WorkspaceID: id, UserID: "u-1"}
 
-	api := new(mocks.ClientInterface)
-	api.On("DeleteWorkspaceUser", houston.DeleteWorkspaceUserRequest{WorkspaceID: id, UserID: mockWsUserResponse.ID}).Return(mockWsUserResponse, nil)
+	s.Run("success", func() {
+		api := new(mocks.ClientInterface)
+		api.On("DeleteWorkspaceUser", req).Return(&houston.Workspace{ID: id, Label: "airflow"}, nil)
 
-	buf := new(bytes.Buffer)
-	err := Remove(id, userID, api, buf)
-	s.NoError(err)
-	expected := ` NAME                          WORKSPACE ID                                      USER_ID                                           
-                               ckc0eir8e01gj07608ajmvia1                         ckc0eir8e01gj07608ajmvia1                         
-Successfully removed user from workspace
-`
-	s.Equal(expected, buf.String())
-	api.AssertExpectations(s.T())
-}
+		w, err := Remove(id, "u-1", api)
+		s.NoError(err)
+		s.Equal("airflow", w.Label)
+	})
 
-func (s *Suite) TestRemoveError() {
-	testUtil.InitTestConfig("software")
+	// A user who is not a member is an error
+	//.
+	s.Run("houston failure", func() {
+		api := new(mocks.ClientInterface)
+		api.On("DeleteWorkspaceUser", req).Return(nil, errMock)
 
-	id := "ck1qg6whg001r08691y117hub"
-	email := "test@test.com"
-
-	api := new(mocks.ClientInterface)
-	api.On("DeleteWorkspaceUser", houston.DeleteWorkspaceUserRequest{WorkspaceID: id, UserID: email}).Return(nil, errMock)
-
-	buf := new(bytes.Buffer)
-	err := Remove(id, email, api, buf)
-	s.EqualError(err, errMock.Error())
-	api.AssertExpectations(s.T())
+		_, err := Remove(id, "u-1", api)
+		s.ErrorIs(err, errMock)
+	})
 }
 
 func (s *Suite) TestListRoles() {
 	wsID := "ck1qg6whg001r08691y117hub"
-
+	// workspaceUsers narrows each user's bindings to the Workspace
+	//.
 	mockResponse := []houston.WorkspaceUserRoleBindings{
 		{
-			ID:       "ckbv7zpkh00og0760ki4mhl6r",
-			Username: "test@test.com",
-			FullName: "test",
-			Emails:   []houston.Email{{Address: "test@test.com"}},
-			RoleBindings: []houston.RoleBinding{
-				{
-					Role: houston.WorkspaceAdminRole,
-					Workspace: houston.Workspace{
-						ID: wsID,
-					},
-				},
-			},
+			ID:           "ckbv7zpkh00og0760ki4mhl6r",
+			Username:     "test@test.com",
+			FullName:     "test",
+			Emails:       []houston.Email{{Address: "test@test.com"}},
+			RoleBindings: []houston.RoleBinding{{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: wsID}}},
 		},
 	}
 
-	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaceUserAndRoles", wsID).Return(mockResponse, nil)
+	s.Run("the users and their role", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspaceUserAndRoles", wsID).Return(mockResponse, nil)
 
-	buf := new(bytes.Buffer)
-	err := ListRoles(wsID, api, buf)
-	s.NoError(err)
-	expected := ` USERNAME          ID                            ROLE                
- test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
-`
-	s.Equal(expected, buf.String())
-	api.AssertExpectations(s.T())
-}
+		got, err := ListRoles(wsID, api)
+		s.NoError(err)
+		s.Equal([]UserRole{{ID: "ckbv7zpkh00og0760ki4mhl6r", Username: "test@test.com", FullName: "test", Role: houston.WorkspaceAdminRole}}, got)
+	})
 
-func (s *Suite) TestListRolesWithServiceAccounts() {
-	testUtil.InitTestConfig("software")
+	s.Run("none is empty, not nil", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspaceUserAndRoles", wsID).Return([]houston.WorkspaceUserRoleBindings{}, nil)
 
-	wsID := "ck1qg6whg001r08691y117hub"
-	mockResponse := []houston.WorkspaceUserRoleBindings{
-		{
-			ID:       "ckbv7zpkh00og0760ki4mhl6r",
-			Username: "test@test.com",
-			FullName: "test",
-			Emails:   []houston.Email{{Address: "test@test.com"}},
-			RoleBindings: []houston.RoleBinding{
-				{
-					Role: houston.WorkspaceAdminRole,
-					Workspace: houston.Workspace{
-						ID: wsID,
-					},
-				},
-			},
-		},
-	}
+		got, err := ListRoles(wsID, api)
+		s.NoError(err)
+		s.NotNil(got)
+		s.Empty(got)
+	})
 
-	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaceUserAndRoles", wsID).Return(mockResponse, nil)
+	s.Run("houston failure", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspaceUserAndRoles", wsID).Return(nil, errMock)
 
-	buf := new(bytes.Buffer)
-	err := ListRoles(wsID, api, buf)
-	s.NoError(err)
-	expected := ` USERNAME          ID                            ROLE                
- test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
-`
-	s.Equal(expected, buf.String())
-	api.AssertExpectations(s.T())
-}
-
-func (s *Suite) TestListRolesError() {
-	testUtil.InitTestConfig("software")
-
-	wsID := "ck1qg6whg001r08691y117hub"
-
-	api := new(mocks.ClientInterface)
-	api.On("ListWorkspaceUserAndRoles", wsID).Return(nil, errMock)
-
-	buf := new(bytes.Buffer)
-	err := ListRoles(wsID, api, buf)
-	s.EqualError(err, errMock.Error())
-	api.AssertExpectations(s.T())
+		_, err := ListRoles(wsID, api)
+		s.ErrorIs(err, errMock)
+	})
 }
 
 func (s *Suite) TestPaginatedListRoles() {
-	s.Run("user should not be prompted for pagination options if api returns less then page size", func() {
-		wsID := "ck1qg6whg001r08691y117hub"
-		paginationPageSize := 100
-
-		mockResponse := []houston.WorkspaceUserRoleBindings{
-			{
-				ID:       "ckbv7zpkh00og0760ki4mhl6r",
-				Username: "test@test.com",
-				FullName: "test",
-				Emails:   []houston.Email{{Address: "test@test.com"}},
-				RoleBindings: []houston.RoleBinding{
-					{
-						Role: houston.WorkspaceAdminRole,
-						Workspace: houston.Workspace{
-							ID: wsID,
-						},
-					},
-				},
-			},
-		}
-
-		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: float64(paginationPageSize)}).Return(mockResponse, nil)
-
-		// mock os.Stdin for when prompted by PromptPaginatedOption
-		input := []byte("q")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		buf := new(bytes.Buffer)
-		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-		s.NoError(err)
-		expected := ` USERNAME          ID                            ROLE                
- test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
-`
-		s.Equal(expected, buf.String())
-		api.AssertExpectations(s.T())
-	})
-	s.Run("user should be prompted for pagination options if return record is same as page size", func() {
-		wsID := "ck1qg6whg001r08691y117hub"
-		paginationPageSize := 1
-
-		mockResponse := []houston.WorkspaceUserRoleBindings{
-			{
-				ID:       "ckbv7zpkh00og0760ki4mhl6r",
-				Username: "test@test.com",
-				FullName: "test",
-				Emails:   []houston.Email{{Address: "test@test.com"}},
-				RoleBindings: []houston.RoleBinding{
-					{
-						Role: houston.WorkspaceAdminRole,
-						Workspace: houston.Workspace{
-							ID: wsID,
-						},
-					},
-				},
-			},
-		}
-
-		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: float64(paginationPageSize)}).Return(mockResponse, nil)
-
-		// mock os.Stdin for when prompted by PromptPaginatedOption
-		input := []byte("q")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		buf := new(bytes.Buffer)
-		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-		s.NoError(err)
-		expected := ` USERNAME          ID                            ROLE                
- test@test.com     ckbv7zpkh00og0760ki4mhl6r     WORKSPACE_ADMIN     
-`
-		s.Equal(expected, buf.String())
-		api.AssertExpectations(s.T())
-	})
-	s.Run("user should not see previous option if no record return if last action was next", func() {
-		wsID := "ck1qg6whg001r08691y117hub"
-		paginationPageSize := 10
-
-		mockResponse := []houston.WorkspaceUserRoleBindings{}
-
-		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: float64(paginationPageSize)}).Return(mockResponse, nil)
-
-		// mock os.Stdin for when prompted by PromptPaginatedOption
-		input := []byte("q")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		buf := new(bytes.Buffer)
-		err = PaginatedListRoles(wsID, "", paginationPageSize, 10, api, buf)
-		s.NoError(err)
-		expected := ` USERNAME     ID     ROLE     
-`
-		s.Equal(expected, buf.String())
-		api.AssertExpectations(s.T())
-	})
-	s.Run("user should not see next option if no record return if last action was previous", func() {
-		wsID := "ck1qg6whg001r08691y117hub"
-		paginationPageSize := -10
-
-		mockResponse := []houston.WorkspaceUserRoleBindings{}
-
-		api := new(mocks.ClientInterface)
-		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: float64(paginationPageSize)}).Return(mockResponse, nil)
-
-		// mock os.Stdin for when prompted by PromptPaginatedOption
-		input := []byte("q")
-		r, w, err := os.Pipe()
-		s.Require().NoError(err)
-		_, err = w.Write(input)
-		s.NoError(err)
-		w.Close()
-		stdin := os.Stdin
-		// Restore stdin right after the test.
-		defer func() { os.Stdin = stdin }()
-		os.Stdin = r
-
-		buf := new(bytes.Buffer)
-		err = PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-		s.NoError(err)
-		expected := ` USERNAME     ID     ROLE     
-`
-		s.Equal(expected, buf.String())
-		api.AssertExpectations(s.T())
-	})
-}
-
-func (s *Suite) TestPaginatedListRolesError() {
-	testUtil.InitTestConfig("software")
-
 	wsID := "ck1qg6whg001r08691y117hub"
-	paginationPageSize := 100
+	user := houston.WorkspaceUserRoleBindings{
+		ID:           "ckbv7zpkh00og0760ki4mhl6r",
+		Username:     "test@test.com",
+		RoleBindings: []houston.RoleBinding{{Role: houston.WorkspaceAdminRole, Workspace: houston.Workspace{ID: wsID}}},
+	}
+	page := []UserRole{{ID: user.ID, Username: user.Username, Role: houston.WorkspaceAdminRole}}
 
-	api := new(mocks.ClientInterface)
-	api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: "", Take: float64(paginationPageSize)}).Return(nil, errMock)
+	s.Run("a page shorter than the page size is the only one, so nothing is asked", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, Take: 100}).Return([]houston.WorkspaceUserRoleBindings{user}, nil)
+		asked := false
+		promptPaginatedOption = func(string, string, int, int, int, bool) (utils.PaginationOptions, error) {
+			asked = true
+			return utils.PaginationOptions{Quit: true}, nil
+		}
+		defer func() { promptPaginatedOption = utils.PromptPaginatedOption }()
 
-	buf := new(bytes.Buffer)
-	err := PaginatedListRoles(wsID, "", paginationPageSize, 0, api, buf)
-	s.EqualError(err, errMock.Error())
-	api.AssertExpectations(s.T())
+		var pages [][]UserRole
+		err := PaginatedListRoles(wsID, "", 100, 0, api, func(u []UserRole) error { pages = append(pages, u); return nil })
+		s.NoError(err)
+		s.Equal([][]UserRole{page}, pages)
+		s.False(asked)
+	})
+
+	s.Run("a full page asks, and the answer picks the next", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, Take: 1}).Return([]houston.WorkspaceUserRoleBindings{user}, nil).Once()
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, CursorID: user.ID, Take: 1}).Return([]houston.WorkspaceUserRoleBindings{}, nil).Once()
+		answers := []utils.PaginationOptions{{CursorID: user.ID, PageSize: 1, PageNumber: 1}, {Quit: true}}
+		promptPaginatedOption = func(string, string, int, int, int, bool) (utils.PaginationOptions, error) {
+			a := answers[0]
+			answers = answers[1:]
+			return a, nil
+		}
+		defer func() { promptPaginatedOption = utils.PromptPaginatedOption }()
+
+		var pages [][]UserRole
+		err := PaginatedListRoles(wsID, "", 1, 0, api, func(u []UserRole) error { pages = append(pages, u); return nil })
+		s.NoError(err)
+		s.Equal([][]UserRole{page, {}}, pages)
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("houston failure", func() {
+		api := new(mocks.ClientInterface)
+		api.On("ListWorkspacePaginatedUserAndRoles", houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: wsID, Take: 100}).Return(nil, errMock)
+
+		err := PaginatedListRoles(wsID, "", 100, 0, api, func([]UserRole) error { return nil })
+		s.ErrorIs(err, errMock)
+	})
 }
 
 func (s *Suite) TestShowListRolesPaginatedOption() {
@@ -378,84 +209,58 @@ func (s *Suite) TestShowListRolesPaginatedOption() {
 
 func (s *Suite) TestUpdateRole() {
 	testUtil.InitTestConfig("software")
-
 	id := "ckoixo6o501496qemiwsja1tl"
-	role := "test-role"
 	email := "test@test.com"
+	update := houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: id, Email: email, Role: houston.WorkspaceAdminRole}
 
-	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
-	api.On("UpdateWorkspaceUserRole", houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: id, Email: email, Role: role}).Return(role, nil)
+	s.Run("returns the role before and after", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
+		// workspaceUpsertUserRole answers with the role it set
+		//.
+		api.On("UpdateWorkspaceUserRole", update).Return(houston.WorkspaceAdminRole, nil)
 
-	buf := new(bytes.Buffer)
-	err := UpdateRole(id, email, role, api, buf)
-	s.NoError(err)
-	expected := `Role has been changed from WORKSPACE_VIEWER to test-role for user test@test.com`
-	s.Equal(expected, buf.String())
-	api.AssertExpectations(s.T())
-}
+		got, err := UpdateRole(id, email, houston.WorkspaceAdminRole, api)
+		s.NoError(err)
+		s.Equal(UserRoleChange{User: UserRole{ID: "u-1", Username: email, Role: houston.WorkspaceAdminRole}, Previous: houston.WorkspaceViewerRole}, got)
+		api.AssertExpectations(s.T())
+	})
 
-func (s *Suite) TestUpdateRoleNoAccessDeploymentOnly() {
-	testUtil.InitTestConfig("software")
+	// It answers null when the user holds more than one binding, having set
+	// the role all the same (workspace-upsert-user-role/index.js).
+	s.Run("a null answer is the role asked for", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
+		api.On("UpdateWorkspaceUserRole", update).Return("", nil)
 
-	id := "ckg6sfddu30911pc0n1o0e97e"
-	role := "test-role"
-	email := "test@test.com"
+		got, err := UpdateRole(id, email, houston.WorkspaceAdminRole, api)
+		s.NoError(err)
+		s.Equal(houston.WorkspaceAdminRole, got.User.Role)
+	})
 
-	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
+	s.Run("a user with no role on the Workspace is refused before any change", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(houston.WorkspaceUserRoleBindings{ID: "u-1", Username: email}, nil)
 
-	buf := new(bytes.Buffer)
-	err := UpdateRole(id, email, role, api, buf)
-	s.Equal("the user you are trying to change is not part of this workspace", err.Error())
-	api.AssertExpectations(s.T())
-}
+		_, err := UpdateRole(id, email, houston.WorkspaceAdminRole, api)
+		s.ErrorIs(err, errUserNotInWorkspace)
+		api.AssertNotCalled(s.T(), "UpdateWorkspaceUserRole", update)
+	})
 
-func (s *Suite) TestUpdateRoleErrorGetRoles() {
-	testUtil.InitTestConfig("software")
+	s.Run("a lookup failure", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(houston.WorkspaceUserRoleBindings{}, errMock)
 
-	id := "ck1qg6whg001r08691y117hub"
-	role := "test-role"
-	email := "test@test.com"
+		_, err := UpdateRole(id, email, houston.WorkspaceAdminRole, api)
+		s.ErrorIs(err, errMock)
+	})
 
-	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(houston.WorkspaceUserRoleBindings{}, errMock)
+	s.Run("an update failure", func() {
+		api := new(mocks.ClientInterface)
+		api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
+		api.On("UpdateWorkspaceUserRole", update).Return("", errMock)
 
-	buf := new(bytes.Buffer)
-	err := UpdateRole(id, email, role, api, buf)
-	s.EqualError(err, errMock.Error())
-	api.AssertExpectations(s.T())
-}
-
-func (s *Suite) TestUpdateRoleError() {
-	testUtil.InitTestConfig("software")
-
-	id := "ckoixo6o501496qemiwsja1tl"
-	role := "test-role"
-	email := "test@test.com"
-
-	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
-	api.On("UpdateWorkspaceUserRole", houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: id, Email: email, Role: role}).Return("", errMock)
-
-	buf := new(bytes.Buffer)
-	err := UpdateRole(id, email, role, api, buf)
-	s.EqualError(err, errMock.Error())
-	api.AssertExpectations(s.T())
-}
-
-func (s *Suite) TestUpdateRoleNoAccess() {
-	testUtil.InitTestConfig("software")
-
-	id := "ckoixo6o501496qemiwsja1tl"
-	role := "test-role"
-	email := "test@test.com"
-
-	api := new(mocks.ClientInterface)
-	api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(houston.WorkspaceUserRoleBindings{}, nil)
-
-	buf := new(bytes.Buffer)
-	err := UpdateRole(id, email, role, api, buf)
-	s.Equal("the user you are trying to change is not part of this workspace", err.Error())
-	api.AssertExpectations(s.T())
+		_, err := UpdateRole(id, email, houston.WorkspaceAdminRole, api)
+		s.ErrorIs(err, errMock)
+	})
 }

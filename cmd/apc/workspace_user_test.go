@@ -27,7 +27,8 @@ func (s *Suite) TestWorkspaceUserRemove() {
 		FullName: "test",
 		RoleBindings: []houston.RoleBinding{
 			{
-				Role: houston.WorkspaceAdminRole,
+				Role:      houston.WorkspaceAdminRole,
+				Workspace: houston.Workspace{ID: mockWorkspace.ID},
 			},
 		},
 	}

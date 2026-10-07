@@ -1,11 +1,13 @@
 package apc
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
@@ -45,7 +47,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
+func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the Workspace twin differs in its flags and its role
 	cmd := &cobra.Command{
 		Use:     "add",
 		Short:   "Add a team to a deployment",
@@ -58,6 +60,7 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team to add to the Deployment")
 	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -72,6 +75,7 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamRemove(cmd, out, args)
 		},
 	}
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -87,6 +91,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
@@ -101,37 +106,76 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamsList(cmd, out, args)
 		},
 	}
+	addAccessOutputFlag(cmd)
 	return cmd
 }
 
 func deploymentTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.ListTeamRoles(deploymentID, houstonClient, out)
+	ts, err := deployment.ListTeamRoles(deploymentID, houstonClient)
+	// The text has always refused a Deployment Houston lists no team for.
+	// A list is [] when it is empty, so json publishes that: Houston
+	// answers [] for a Deployment that does not exist too, so the refusal
+	// never told the two apart.
+	if errors.Is(err, deployment.ErrNoDeploymentTeams) && r.Format == cliout.FormatJSON {
+		ts, err = []deployment.TeamRole{}, nil
+	}
+	if err != nil {
+		return err
+	}
+	return renderDeploymentTeamList(r, deploymentID, ts)
 }
 
 func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.AddTeam(deploymentID, teamID, deploymentRole, houstonClient, out)
+	role, err := deployment.AddTeam(deploymentID, teamID, deploymentRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderDeploymentTeamChange(r, deploymentID, teamID, role, true)
 }
 
 func deploymentTeamRemove(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.RemoveTeam(deploymentID, args[0], houstonClient, out)
+	if err := deployment.RemoveTeam(deploymentID, args[0], houstonClient); err != nil {
+		return err
+	}
+	return renderDeploymentTeamRemoval(r, deploymentID, args[0])
 }
 
 func deploymentTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	r, err := accessRenderer(out)
+	if err != nil {
+		return err
+	}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.UpdateTeamRole(deploymentID, args[0], deploymentRole, houstonClient, out)
+	role, err := deployment.UpdateTeamRole(deploymentID, args[0], deploymentRole, houstonClient)
+	if err != nil {
+		return err
+	}
+	return renderDeploymentTeamChange(r, deploymentID, args[0], role, false)
 }

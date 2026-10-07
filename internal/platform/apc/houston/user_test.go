@@ -23,9 +23,6 @@ func (s *Suite) TestCreateUser() {
 					Username: "username",
 					Status:   "active",
 				},
-				Token: Token{
-					Value: "test-token",
-				},
 			},
 		},
 	}
@@ -33,7 +30,10 @@ func (s *Suite) TestCreateUser() {
 	s.NoError(err)
 
 	s.Run("success", func() {
+		var sent string
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			body, _ := io.ReadAll(req.Body)
+			sent = string(body)
 			return &http.Response{
 				StatusCode: 200,
 				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
@@ -45,6 +45,10 @@ func (s *Suite) TestCreateUser() {
 		response, err := api.CreateUser(CreateUserRequest{"email", "password"})
 		s.NoError(err)
 		s.Equal(response, mockResponse.Data.CreateUser)
+		// The new user's session token is not asked for: token { value }
+		// is the only selection with a value field.
+		s.Contains(sent, "createUser")
+		s.NotContains(sent, "value")
 	})
 
 	s.Run("error", func() {

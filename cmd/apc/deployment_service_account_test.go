@@ -75,16 +75,19 @@ func (s *Suite) TestDeploymentSaCreateCommand() {
  Service account successfully created.
 `
 
+	// A create answers with no bindings loaded: entityType SYSTEM, no
+	// deploymentUuid.
 	mockSA := &houston.DeploymentServiceAccount{
-		ID:             mockDeploymentSA.ID,
-		APIKey:         mockDeploymentSA.APIKey,
-		Label:          mockDeploymentSA.Label,
-		Category:       mockDeploymentSA.Category,
-		EntityType:     "DEPLOYMENT",
-		DeploymentUUID: mockDeployment.ID,
-		CreatedAt:      mockDeploymentSA.CreatedAt,
-		UpdatedAt:      mockDeploymentSA.UpdatedAt,
-		Active:         true,
+		ServiceAccount: houston.ServiceAccount{
+			ID:        mockDeploymentSA.ID,
+			APIKey:    mockDeploymentSA.APIKey,
+			Label:     mockDeploymentSA.Label,
+			Category:  mockDeploymentSA.Category,
+			CreatedAt: mockDeploymentSA.CreatedAt,
+			UpdatedAt: mockDeploymentSA.UpdatedAt,
+			Active:    true,
+		},
+		EntityType: "SYSTEM",
 	}
 
 	expectedSARequest := &houston.CreateServiceAccountRequest{

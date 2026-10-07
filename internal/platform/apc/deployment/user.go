@@ -1,28 +1,28 @@
 package deployment
 
 import (
-	"fmt"
-	"io"
+	"errors"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-const (
-	houstonInvalidDeploymentUsersMsg = "No users were found for this deployment.  Check the deploymentId and try again.\n"
-)
+// ErrNoDeploymentUsers is UserList's answer when Houston lists no user for
+// the Deployment at all.
+var ErrNoDeploymentUsers = errors.New("no users were found for this deployment")
 
-var (
-	header = []string{"DEPLOYMENT ID", "USER", "ROLE"}
-	tab    = printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         header,
-	}
-)
+// UserRole is a user and the role they hold on a Deployment. ID is empty
+// when Houston's answer did not name them.
+type UserRole struct {
+	ID       string
+	FullName string
+	Username string
+	Role     string
+}
 
-// UserList returns a list of user with deployment access
-func UserList(deploymentID, email, userID, fullName string, client houston.ClientInterface, out io.Writer) error {
+// UserList returns the users with a role on the Deployment who match the
+// filters, and the role each holds there. It is ErrNoDeploymentUsers when
+// Houston lists none.
+func UserList(deploymentID, email, userID, fullName string, client houston.ClientInterface) ([]UserRole, error) {
 	filters := houston.ListDeploymentUsersRequest{
 		UserID:       userID,
 		Email:        email,
@@ -31,90 +31,65 @@ func UserList(deploymentID, email, userID, fullName string, client houston.Clien
 	}
 	deploymentUsers, err := houston.Call(client.ListDeploymentUsers)(filters)
 	if err != nil {
-		fmt.Println(err)
-		return err
+		return nil, err
 	}
-
 	if len(deploymentUsers) < 1 {
-		_, err = out.Write([]byte(houstonInvalidDeploymentUsersMsg))
-		return err
+		return nil, ErrNoDeploymentUsers
 	}
-
-	header = []string{"USER ID", "NAME", "EMAIL", "ROLE"}
-	tab = printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         header,
-	}
-
-	// Build rows
+	users := make([]UserRole, 0, len(deploymentUsers))
 	for _, d := range deploymentUsers {
 		role := getDeploymentLevelRole(d.RoleBindings, deploymentID)
 		if role != houston.NoneRole {
-			tab.AddRow([]string{d.ID, d.FullName, d.Username, role}, false)
+			users = append(users, UserRole{ID: d.ID, FullName: d.FullName, Username: d.Username, Role: role})
 		}
 	}
-
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return users, nil
 }
 
-// Add a user to a deployment with specified role
-func Add(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
-	addUserRequest := houston.UpdateDeploymentUserRequest{
+// Add gives the user with email role on a Deployment, and returns them with
+// the role Houston recorded.
+func Add(deploymentID, email, role string, client houston.ClientInterface) (UserRole, error) {
+	rb, err := houston.Call(client.AddDeploymentUser)(houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,
 		DeploymentID: deploymentID,
-	}
-	d, err := houston.Call(client.AddDeploymentUser)(addUserRequest)
+	})
 	if err != nil {
-		return err
+		return UserRole{}, err
 	}
-
-	tab.AddRow([]string{deploymentID, email, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully added %s as a %s", email, role)
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return boundUser(rb, role), nil
 }
 
-// UpdateUser updates a user's deployment role
-func UpdateUser(deploymentID, email, role string, client houston.ClientInterface, out io.Writer) error {
-	updateUserRequest := houston.UpdateDeploymentUserRequest{
+// UpdateUser changes the role of the user with email on a Deployment, and
+// returns them with the role Houston recorded.
+func UpdateUser(deploymentID, email, role string, client houston.ClientInterface) (UserRole, error) {
+	rb, err := houston.Call(client.UpdateDeploymentUser)(houston.UpdateDeploymentUserRequest{
 		Email:        email,
 		Role:         role,
 		DeploymentID: deploymentID,
-	}
-	d, err := houston.Call(client.UpdateDeploymentUser)(updateUserRequest)
+	})
 	if err != nil {
-		return err
+		return UserRole{}, err
 	}
-
-	tab.AddRow([]string{d.Deployment.ID, d.User.Username, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated %s to a %s", email, role)
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return boundUser(rb, role), nil
 }
 
-// RemoveUser removes user access for a deployment
-func RemoveUser(deploymentID, email string, client houston.ClientInterface, out io.Writer) error {
-	d, err := houston.Call(client.DeleteDeploymentUser)(houston.DeleteDeploymentUserRequest{DeploymentID: deploymentID, Email: email})
+// RemoveUser removes the role of the user with email on a Deployment, and
+// returns them, as Houston names them, with the role they held.
+func RemoveUser(deploymentID, email string, client houston.ClientInterface) (UserRole, error) {
+	rb, err := houston.Call(client.DeleteDeploymentUser)(houston.DeleteDeploymentUserRequest{DeploymentID: deploymentID, Email: email})
 	if err != nil {
-		return err
+		return UserRole{}, err
 	}
-	header := []string{"DEPLOYMENT ID", "USER", "ROLE"}
+	return boundUser(rb, ""), nil
+}
 
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         header,
+// boundUser is the user a role binding Houston returned names, as Houston
+// names them: ID and Username are empty when its answer does not.
+func boundUser(rb *houston.RoleBinding, role string) UserRole {
+	u := UserRole{Role: boundRole(rb, role)}
+	if rb != nil {
+		u.ID, u.Username = rb.User.ID, rb.User.Username
 	}
-
-	tab.AddRow([]string{deploymentID, email, d.Role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed the %s role for %s from deployment %s", d.Role, email, deploymentID)
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return u
 }

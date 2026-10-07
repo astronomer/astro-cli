@@ -1,0 +1,26 @@
+{
+  "id": "x",
+  "name": "x",
+  "system_role": "x",
+  "created_at": "x",
+  "workspace_roles": [
+    {
+      "workspace_id": "x",
+      "label": "x",
+      "role": "x"
+    }
+  ],
+  "deployment_roles": [
+    {
+      "deployment_id": "x",
+      "label": "x",
+      "role": "x"
+    }
+  ],
+  "users": [
+    {
+      "id": "x",
+      "username": "x"
+    }
+  ]
+}

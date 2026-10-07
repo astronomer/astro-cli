@@ -44,7 +44,7 @@ var (
 	mutation deploymentAddTeamRole(
 		$teamUuid: Uuid!
 		$deploymentUuid: Uuid!
-		$role: Role! = WORKSPACE_VIEWER
+		$role: Role! = DEPLOYMENT_VIEWER
 	){
 		deploymentAddTeamRole(
 			teamUuid: $teamUuid

@@ -1,0 +1,11 @@
+{
+  "users": [
+    {
+      "id": "x",
+      "username": "x",
+      "full_name": "x",
+      "workspace_role": "x",
+      "deployment_role": "x"
+    }
+  ]
+}

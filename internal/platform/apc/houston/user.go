@@ -6,6 +6,10 @@ type CreateUserRequest struct {
 	Password string `json:"password"`
 }
 
+// UserCreateRequest asks for the user only. createUser also mints a session
+// token for the new user when it is active (houston-api
+// ); the CLI has no use for a
+// credential of someone else's, so it does not ask for one.
 var UserCreateRequest = `
 	mutation CreateUser(
 		$email: String!
@@ -25,9 +29,6 @@ var UserCreateRequest = `
 				status
 				createdAt
 				updatedAt
-			}
-			token {
-				value
 			}
 		}
 	}`

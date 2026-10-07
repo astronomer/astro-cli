@@ -61,6 +61,7 @@ func (s *Suite) TestWorkspaceTeamRm() {
 
 	api := new(mocks.ClientInterface)
 	api.On("GetAppConfig", mock.Anything).Return(mockAppConfig, nil)
+	api.On("GetWorkspaceTeamRole", houston.GetWorkspaceTeamRoleRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockTeamID}).Return(&houston.Team{ID: mockTeamID, RoleBindings: []houston.RoleBinding{{Role: houston.WorkspaceViewerRole, Workspace: houston.Workspace{ID: mockWorkspace.ID}}}}, nil)
 	api.On("DeleteWorkspaceTeam", houston.DeleteWorkspaceTeamRequest{WorkspaceID: mockWorkspace.ID, TeamID: mockTeamID}).Return(mockWorkspace, nil)
 	houstonClient = api
 

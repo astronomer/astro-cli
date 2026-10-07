@@ -2,13 +2,10 @@ package workspace
 
 import (
 	"errors"
-	"fmt"
-	"io"
 	"strings"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/utils"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
@@ -18,87 +15,84 @@ var (
 	promptPaginatedOption = utils.PromptPaginatedOption
 )
 
-// Add a user to a workspace with specified role
-func Add(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error { //nolint:dupl // the duplication is acceptable here
+// UserRole is a user and the role they hold on a Workspace. ID is empty
+// when Houston's answer did not name them, FullName when it did not give it.
+type UserRole struct {
+	ID       string
+	Username string
+	FullName string
+	Role     string
+}
+
+// UserRoleChange is what a Workspace user update did: the user, the role
+// they held before, and the role they hold now.
+type UserRoleChange struct {
+	User     UserRole
+	Previous string
+}
+
+// Add gives the user with email role on a Workspace, and returns the
+// Workspace as Houston returned it and the user it added: named as Houston
+// names them, and unnamed when its answer does not list them.
+func Add(workspaceID, email, role string, client houston.ClientInterface) (*houston.Workspace, UserRole, error) {
 	w, err := houston.Call(client.AddWorkspaceUser)(houston.AddWorkspaceUserRequest{WorkspaceID: workspaceID, Email: email, Role: role})
 	if err != nil {
-		return err
+		return nil, UserRole{}, err
 	}
-
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "WORKSPACE ID", "EMAIL", "ROLE"},
-	}
-
-	tab.AddRow([]string{w.Label, w.ID, email, role}, false)
-	tab.SuccessMsg = fmt.Sprintf("Successfully added %s to %s", email, w.Label)
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
-}
-
-// Remove a user from a workspace
-func Remove(workspaceID, userID string, client houston.ClientInterface, out io.Writer) error {
-	w, err := houston.Call(client.DeleteWorkspaceUser)(houston.DeleteWorkspaceUserRequest{WorkspaceID: workspaceID, UserID: userID})
-	if err != nil {
-		return err
-	}
-
-	utab := printutil.Table{
-		Padding: []int{30, 50, 50},
-		Header:  []string{"NAME", "WORKSPACE ID", "USER_ID"},
-	}
-
-	utab.AddRow([]string{w.Label, w.ID, userID}, false)
-	utab.SuccessMsg = "Successfully removed user from workspace"
-	utab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	return nil
-}
-
-// ListRoles print users and roles from a workspace
-func ListRoles(workspaceID string, client houston.ClientInterface, out io.Writer) error {
-	users, err := houston.Call(client.ListWorkspaceUserAndRoles)(workspaceID)
-	if err != nil {
-		return err
-	}
-
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"USERNAME", "ID", "ROLE"},
-	}
-	for i := range users {
-		var color bool
-		role := getWorkspaceLevelRole(users[i].RoleBindings, workspaceID)
-		if role != houston.NoneRole {
-			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
+	w = orWorkspace(w, workspaceID)
+	added := UserRole{Role: role}
+	// Houston returns the Workspace with its users, the one added among them:
+	// its ID is there, under its username.
+	for i := range w.Users {
+		if strings.EqualFold(w.Users[i].Username, email) {
+			added.ID, added.Username = w.Users[i].ID, w.Users[i].Username
+			break
 		}
 	}
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	return nil
+	return w, added, nil
 }
 
-// PaginatedListRoles print users and roles from a workspace
-func PaginatedListRoles(workspaceID, cursorID string, take, pageNumber int, client houston.ClientInterface, out io.Writer) error {
+// Remove takes the user with userID off a Workspace, and returns the
+// Workspace as Houston returned it.
+func Remove(workspaceID, userID string, client houston.ClientInterface) (*houston.Workspace, error) {
+	w, err := houston.Call(client.DeleteWorkspaceUser)(houston.DeleteWorkspaceUserRequest{WorkspaceID: workspaceID, UserID: userID})
+	if err != nil {
+		return nil, err
+	}
+	return orWorkspace(w, workspaceID), nil
+}
+
+// ListRoles returns the users with a role on a Workspace, and the role each
+// holds there.
+func ListRoles(workspaceID string, client houston.ClientInterface) ([]UserRole, error) {
+	users, err := houston.Call(client.ListWorkspaceUserAndRoles)(workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	return withWorkspaceRole(users, workspaceID), nil
+}
+
+func withWorkspaceRole(users []houston.WorkspaceUserRoleBindings, workspaceID string) []UserRole {
+	out := make([]UserRole, 0, len(users))
+	for i := range users {
+		role := getWorkspaceLevelRole(users[i].RoleBindings, workspaceID)
+		if role != houston.NoneRole {
+			out = append(out, UserRole{ID: users[i].ID, Username: users[i].Username, FullName: users[i].FullName, Role: role})
+		}
+	}
+	return out
+}
+
+// PaginatedListRoles shows a Workspace's users a page at a time, asking which
+// page to show next, until the person quits. render draws each page.
+func PaginatedListRoles(workspaceID, cursorID string, take, pageNumber int, client houston.ClientInterface, render func([]UserRole) error) error {
 	users, err := houston.Call(client.ListWorkspacePaginatedUserAndRoles)(houston.PaginatedWorkspaceUserRolesRequest{WorkspaceID: workspaceID, CursorID: cursorID, Take: float64(take)})
 	if err != nil {
 		return err
 	}
-
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"USERNAME", "ID", "ROLE"},
+	if err := render(withWorkspaceRole(users, workspaceID)); err != nil {
+		return err
 	}
-	for i := range users {
-		var color bool
-		role := getWorkspaceLevelRole(users[i].RoleBindings, workspaceID)
-		if role != houston.NoneRole {
-			tab.AddRow([]string{users[i].Username, users[i].ID, role}, color)
-		}
-	}
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
 
 	totalUsers := len(users)
 	if pageNumber == 0 && totalUsers < take {
@@ -129,36 +123,41 @@ func PaginatedListRoles(workspaceID, cursorID string, take, pageNumber int, clie
 		return nil
 	}
 
-	return PaginatedListRoles(workspaceID, selectedOption.CursorID, selectedOption.PageSize, selectedOption.PageNumber, client, out)
+	return PaginatedListRoles(workspaceID, selectedOption.CursorID, selectedOption.PageSize, selectedOption.PageNumber, client, render)
 }
 
-// Update workspace user role
-func UpdateRole(workspaceID, email, role string, client houston.ClientInterface, out io.Writer) error {
-	// get user you are updating to show role from before change
-	roles, err := houston.Call(client.GetWorkspaceUserRole)(houston.GetWorkspaceUserRoleRequest{WorkspaceID: workspaceID, Email: email})
+// UserRoleIn returns the user with email and the role they hold on a
+// Workspace. It refuses one who has no role there.
+func UserRoleIn(workspaceID, email string, client houston.ClientInterface) (UserRole, error) {
+	u, err := houston.Call(client.GetWorkspaceUserRole)(houston.GetWorkspaceUserRoleRequest{WorkspaceID: workspaceID, Email: email})
 	if err != nil {
-		return err
+		return UserRole{}, err
 	}
-
-	var rb houston.RoleBinding
-	var found bool
-	for idx := range roles.RoleBindings {
-		if roles.RoleBindings[idx].Workspace.ID == workspaceID && strings.Contains(roles.RoleBindings[idx].Role, "WORKSPACE") {
-			rb = roles.RoleBindings[idx]
-			found = true
-			break
+	for i := range u.RoleBindings {
+		if u.RoleBindings[i].Workspace.ID == workspaceID && strings.Contains(u.RoleBindings[i].Role, "WORKSPACE") {
+			return UserRole{ID: u.ID, Username: u.Username, FullName: u.FullName, Role: u.RoleBindings[i].Role}, nil
 		}
 	}
-	// check if rolebinding is an empty structure
-	if !found {
-		return errUserNotInWorkspace
-	}
+	return UserRole{}, errUserNotInWorkspace
+}
 
+// UpdateRole changes the role of the user with email on a Workspace. It
+// looks the user up first, and refuses one who has no role there.
+func UpdateRole(workspaceID, email, role string, client houston.ClientInterface) (UserRoleChange, error) {
+	user, err := UserRoleIn(workspaceID, email, client)
+	if err != nil {
+		return UserRoleChange{}, err
+	}
 	newRole, err := houston.Call(client.UpdateWorkspaceUserRole)(houston.UpdateWorkspaceUserRoleRequest{WorkspaceID: workspaceID, Email: email, Role: role})
 	if err != nil {
-		return err
+		return UserRoleChange{}, err
 	}
-
-	fmt.Fprintf(out, "Role has been changed from %s to %s for user %s", rb.Role, newRole, email)
-	return nil
+	previous := user.Role
+	// Houston answers null when the user holds more than one binding there,
+	// having set the role all the same.
+	if newRole == "" {
+		newRole = role
+	}
+	user.Role = newRole
+	return UserRoleChange{User: user, Previous: previous}, nil
 }

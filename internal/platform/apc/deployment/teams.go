@@ -2,105 +2,77 @@ package deployment
 
 import (
 	"errors"
-	"fmt"
-	"io"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
-var errHoustonInvalidDeploymentTeams = errors.New("no teams were found for this deployment. Check the deploymentId and try again")
+// ErrNoDeploymentTeams is ListTeamRoles' answer when Houston lists no team
+// for the Deployment at all.
+var ErrNoDeploymentTeams = errors.New("no teams were found for this deployment. Check the deploymentId and try again")
 
-// TeamsList returns a list of teams with deployment access
-func ListTeamRoles(deploymentID string, client houston.ClientInterface, out io.Writer) error {
+// TeamRole is a team and the role it holds on a Deployment.
+type TeamRole struct {
+	ID   string
+	Name string
+	Role string
+}
+
+// ListTeamRoles returns the teams with a role on the Deployment, and the role
+// each holds there. It is ErrNoDeploymentTeams when Houston lists none.
+func ListTeamRoles(deploymentID string, client houston.ClientInterface) ([]TeamRole, error) {
 	deploymentTeams, err := houston.Call(client.ListDeploymentTeamsAndRoles)(deploymentID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	if len(deploymentTeams) < 1 {
-		return errHoustonInvalidDeploymentTeams
+		return nil, ErrNoDeploymentTeams
 	}
-
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"DEPLOYMENT ID", "TEAM ID", "TEAM NAME", "ROLE"},
-	}
-
-	// Build rows
+	teams := make([]TeamRole, 0, len(deploymentTeams))
 	for i := range deploymentTeams {
 		role := getDeploymentLevelRole(deploymentTeams[i].RoleBindings, deploymentID)
 		if role != houston.NoneRole {
-			tab.AddRow([]string{deploymentID, deploymentTeams[i].ID, deploymentTeams[i].Name, role}, false)
+			teams = append(teams, TeamRole{ID: deploymentTeams[i].ID, Name: deploymentTeams[i].Name, Role: role})
 		}
 	}
-
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return teams, nil
 }
 
-// AddTeam adds a team to a deployment with specified role
-func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	_, err := houston.Call(client.AddDeploymentTeam)(houston.AddDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
+// AddTeam gives a team role on a Deployment, and returns the role Houston
+// recorded.
+func AddTeam(deploymentID, teamID, role string, client houston.ClientInterface) (string, error) {
+	rb, err := houston.Call(client.AddDeploymentTeam)(houston.AddDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
-		return err
+		return "", err
 	}
-
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"DEPLOYMENT ID", "TEAM ID", "ROLE"},
-	}
-	tab.AddRow([]string{deploymentID, teamID, role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\nSuccessfully added team %s to deployment %s as a %s", teamID, deploymentID, role)
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return boundRole(rb, role), nil
 }
 
-// UpdateTeam updates a team's deployment role
-func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface, out io.Writer) error {
-	_, err := houston.Call(client.UpdateDeploymentTeamRole)(houston.UpdateDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
+// UpdateTeamRole changes a team's role on a Deployment, and returns the role
+// Houston recorded.
+func UpdateTeamRole(deploymentID, teamID, role string, client houston.ClientInterface) (string, error) {
+	rb, err := houston.Call(client.UpdateDeploymentTeamRole)(houston.UpdateDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID, Role: role})
 	if err != nil {
-		return err
+		return "", err
 	}
-
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"DEPLOYMENT ID", "TEAM ID", "ROLE"},
-	}
-
-	tab.AddRow([]string{deploymentID, teamID, role}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully updated team %s to a %s", teamID, role)
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return boundRole(rb, role), nil
 }
 
-// RemoveTeam removes team access for a deployment
-func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface, out io.Writer) error {
+// RemoveTeam removes a team's role on a Deployment.
+func RemoveTeam(deploymentID, teamID string, client houston.ClientInterface) error {
 	_, err := houston.Call(client.RemoveDeploymentTeam)(houston.RemoveDeploymentTeamRequest{DeploymentID: deploymentID, TeamID: teamID})
-	if err != nil {
-		return err
-	}
-
-	tab := printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"DEPLOYMENT ID", "TEAM ID"},
-	}
-
-	tab.AddRow([]string{deploymentID, teamID}, false)
-	tab.SuccessMsg = fmt.Sprintf("\n Successfully removed team %s from deployment %s", teamID, deploymentID)
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return err
 }
 
-// isValidDeploymentLevelRole checks if the role is amongst valid workspace roles
+// boundRole is the role a role binding Houston returned holds, or asked when
+// it returned none.
+func boundRole(rb *houston.RoleBinding, asked string) string {
+	if rb == nil || rb.Role == "" {
+		return asked
+	}
+	return rb.Role
+}
+
+// IsValidDeploymentLevelRole checks if the role is amongst valid deployment roles
 func IsValidDeploymentLevelRole(role string) bool {
 	switch role {
 	case houston.DeploymentAdminRole, houston.DeploymentEditorRole, houston.DeploymentViewerRole, houston.NoneRole:
@@ -109,7 +81,7 @@ func IsValidDeploymentLevelRole(role string) bool {
 	return false
 }
 
-// getDeploymentLevelRole returns the first system level role from a slice of roles
+// getDeploymentLevelRole returns the first deployment level role from a slice of roles
 func getDeploymentLevelRole(roles []houston.RoleBinding, deploymentID string) string {
 	for i := range roles {
 		if IsValidDeploymentLevelRole(roles[i].Role) && roles[i].Deployment.ID == deploymentID {
