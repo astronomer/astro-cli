@@ -703,8 +703,8 @@ func TestUserTeamHelp(t *testing.T) {
 		return c
 	}
 	assert.Contains(t, find(newOrganizationCmd, "team", "create").Flag("role").Usage, "The role for the new team.")
-	assert.Contains(t, find(newOrganizationCmd, "user", "invite").Long, "$astro organization user invite [email]")
-	assert.Contains(t, find(newOrganizationCmd, "user", "update").Long, "$astro organization user update [email]")
+	assert.NotContains(t, find(newOrganizationCmd, "user", "invite").Long, "$astro", "the Long describes the command; the example shows its usage")
+	assert.NotContains(t, find(newOrganizationCmd, "user", "update").Long, "$astro", "the Long describes the command; the example shows its usage")
 	assert.Equal(t, "Update the role of a user in your Astro Organization", find(newOrganizationCmd, "user", "update").Short)
 	// Every workspace team command that acts on a Workspace takes --workspace.
 	for _, sub := range []string{"add", "update", "remove"} {

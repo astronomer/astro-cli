@@ -17,11 +17,11 @@ var (
 	workspaceSARole     string
 
 	workspaceSaCreateExample = `
-  # Create service-account
-  $ astro workspace service-account create --workspace-id=<workspace-id> --label=my_label --role=ROLE
+  # Create a service account in a Workspace
+  astro workspace service-account create --workspace-id <WORKSPACE_ID> --label my_label --role WORKSPACE_EDITOR
 `
 	workspaceSaListExample = `
-$ astro workspace service-account list --workspace-id=<workspace-id>
+  astro workspace service-account list --workspace-id <WORKSPACE_ID>
 `
 )
 
@@ -78,12 +78,12 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [service-account ID]",
+		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete a service account in the APC platform",
 		Long:    "Delete a service account in the APC platform",
 		Args:    cobra.ExactArgs(1),
-		Example: "astro workspace sa delete cl0wh207g0496759fx0qof80q",
+		Example: `  astro workspace service-account delete <SERVICE_ACCOUNT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSaDelete(cmd, out, args)
 		},

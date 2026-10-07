@@ -94,16 +94,23 @@ func newOrganizationListCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "switch [organization name/id]",
+		Use:     "switch [ORGANIZATION_NAME_OR_ID]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different Organization",
 		Long:    "Switch your active Organization and reset your Workspace context. After switching, your active Workspace is cleared unless you specify one with --workspace. Use --login-link to generate a login URL for switching on a different device.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
-  $ astro organization switch
-  $ astro organization switch my-organization
-  $ astro organization switch --login-link --workspace ws123456
-  $ astro organization switch my-organization --workspace ws123456 -o json
+  # Choose an Organization from a list
+  astro organization switch
+
+  # Switch to an Organization by its name or ID
+  astro organization switch my-organization
+
+  # Get a login link to switch on another device, and make a Workspace current
+  astro organization switch --login-link --workspace <WORKSPACE_ID>
+
+  # Switch, make a Workspace current, and print the result as JSON
+  astro organization switch my-organization --workspace <WORKSPACE_ID> -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationSwitch(cmd, out, args)
@@ -122,7 +129,7 @@ func newOrganizationAuditLogs(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "audit-logs",
 		Aliases: []string{"al"},
-		Short:   "Manage your Organization audit logs.",
+		Short:   "Manage your Organization audit logs",
 		Long:    "Manage your Organization audit logs.",
 	}
 	cmd.AddCommand(
@@ -135,21 +142,26 @@ func newOrganizationExportAuditLogs(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "export",
 		Aliases: []string{"e"},
-		Short:   "Export your Organization audit logs in GZIP. Requires Organization Owner permissions.",
+		Short:   "Export your Organization audit logs in GZIP",
 		Long:    "Export Organization audit logs as a GZIP file. Includes all API and UI actions by Organization members for up to 90 days. Use --include to control how many days back to export (default: 1 day). Requires Organization Owner permissions.",
 		Example: `
-  $ astro organization audit-logs export
-  $ astro organization audit-logs export --output-file audit-logs.gz --include 30
-  $ astro organization audit-logs export --organization-name my-org --include 7
+  # Export the last day of audit logs
+  astro organization audit-logs export
+
+  # Export the last 30 days to a file
+  astro organization audit-logs export --output-file audit-logs.gz --include 30
+
+  # Export the last 7 days of another Organization
+  astro organization audit-logs export --organization-name my-org --include 7
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationExportAuditLogs(cmd)
 		},
 	}
-	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for.")
+	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for")
 	cmd.Flags().StringVarP(&auditLogsOutputFilePath, "output-file", "o", "", "Path to a file for storing exported audit logs")
 	cmd.Flags().IntVarP(&auditLogsEarliestParam, "include", "i", auditLogsEarliestParamDefaultValue,
-		"Number of days in the past to start exporting logs from. Minimum: 1. Maximum: 90.")
+		"Number of days in the past to start exporting logs from, from 1 to 90")
 	return cmd
 }
 
@@ -172,20 +184,23 @@ func newOrganizationUserRootCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationUserInviteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "invite [email]",
+		Use:     "invite [EMAIL]",
 		Aliases: []string{"inv"},
 		Short:   "Invite a user to your Astro Organization",
-		Long:    "Invite a user to your Astro Organization\n$astro organization user invite [email] --role [" + allowedOrganizationRoleNames + "].",
+		Long:    "Invite a user to your Astro Organization. Without an email argument, you are prompted for one.",
 		Example: `
-  $ astro organization user invite user@company.com
-  $ astro organization user invite user@company.com --role ORGANIZATION_BILLING_ADMIN
+  # Invite a user as an Organization member
+  astro organization user invite user@company.com
+
+  # Invite a user as a billing admin
+  astro organization user invite user@company.com --role ORGANIZATION_BILLING_ADMIN
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return userInvite(cmd, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&role, "role", "r", "ORGANIZATION_MEMBER", "The role for the "+
-		"user. Possible values are"+allowedOrganizationRoleNamesProse)
+		"user. Possible values are "+allowedOrganizationRoleNamesProse)
 	return cmd
 }
 
@@ -206,13 +221,13 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 
 func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update [email]",
+		Use:     "update [EMAIL]",
 		Aliases: []string{"up"},
 		Short:   "Update the role of a user in your Astro Organization",
-		Long:    "Update the role of a user in your Astro Organization\n$astro organization user update [email] --role [" + allowedOrganizationRoleNames + "].",
+		Long:    "Update the role of a user in your Astro Organization. Without an email argument you choose the user from a list, and without --role you are prompted for the role.",
 		Example: `
-  $ astro organization user update user@company.com --role ORGANIZATION_OWNER
-  $ astro organization user update user@company.com --role ORGANIZATION_MEMBER
+  # Make a user an Organization owner
+  astro organization user update user@company.com --role ORGANIZATION_OWNER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return userUpdate(cmd, args, out)
@@ -413,15 +428,17 @@ func listTeams(cmd *cobra.Command, out io.Writer) error {
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update [team-id]",
+		Use:     "update [TEAM_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro team",
 		Long:    "Update a team's name, description, or Organization role. For IDP-managed teams, a confirmation prompt is shown unless --yes is used. Team names are case-insensitively unique within an Organization.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
-  $ astro organization team update team123
-  $ astro organization team update team123 --name "New Team Name" --role ORGANIZATION_MEMBER
-  $ astro organization team update team123 --description "Updated description"
+  # Rename a team and change its Organization role
+  astro organization team update <TEAM_ID> --name "New Team Name" --role ORGANIZATION_MEMBER
+
+  # Change a team's description
+  astro organization team update <TEAM_ID> --description "Updated description"
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return teamUpdate(cmd, out, args)
@@ -462,9 +479,11 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 		Short:   "Create an Astro Team",
 		Long:    "Create a team in your Organization. Teams let you assign Workspace and Deployment roles to groups of users at once. If your Organization uses an external identity provider (SCIM) for team sync, team creation through the CLI is blocked — manage teams in the IDP instead.",
 		Example: `
-  $ astro organization team create
-  $ astro organization team create --name "My Team" --role ORGANIZATION_MEMBER
-  $ astro organization team create --name "My Team" --description "Data engineering team" --role ORGANIZATION_OWNER
+  # Create a team, choosing its name and role when prompted
+  astro organization team create
+
+  # Create a team with a name, a description and a role
+  astro organization team create --name "My Team" --description "Data engineering team" --role ORGANIZATION_MEMBER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return teamCreate(cmd, out)
@@ -505,14 +524,17 @@ func teamCreate(cmd *cobra.Command, out io.Writer) error {
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [team-id]",
+		Use:     "delete [TEAM_ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete an Astro Team",
 		Long:    "Permanently delete a team. All Workspace and Deployment role bindings for the team are removed, and members lose any access they had through the team (but keep directly assigned roles). This action cannot be undone.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
-  $ astro organization team delete
-  $ astro organization team delete team123
+  # Delete a team by its ID
+  astro organization team delete <TEAM_ID>
+
+  # Choose the team to delete from a list
+  astro organization team delete
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return teamDelete(cmd, out, args)
@@ -567,7 +589,7 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 		Short: "Remove a user from an Astro Team",
 		Long:  "Remove a user from a team. The user loses all Workspace and Deployment roles inherited through the team but keeps any directly assigned roles.",
 		Example: `
-  $ astro organization team user remove --team-id team123 --user-id user456
+  astro organization team user remove --team-id <TEAM_ID> --user-id <USER_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeTeamUser(cmd, out)
@@ -618,7 +640,7 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 		Short: "Add a user to an Astro Team",
 		Long:  "Add a user to a team. The user immediately inherits all Workspace and Deployment roles assigned to the team.",
 		Example: `
-  $ astro organization team user add --team-id team123 --user-id user456
+  astro organization team user add --team-id <TEAM_ID> --user-id <USER_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addTeamUser(cmd, out)
@@ -652,8 +674,11 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 		Short: "Lists users in an Astro Team",
 		Long:  "List all members of a team.",
 		Example: `
-  $ astro organization team user list
-  $ astro organization team user list --team-id team123
+  # List the members of a team
+  astro organization team user list --team-id <TEAM_ID>
+
+  # Choose the team from a list
+  astro organization team user list
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listUsersCmd(cmd, out)
@@ -699,7 +724,7 @@ func newOrganizationTokenRootCmd(out io.Writer) *cobra.Command {
 		newOrganizationTokenRotateCmd(out),
 		newOrganizationTokenDeleteCmd(out),
 	)
-	cmd.PersistentFlags().StringVar(&organizationID, "organization-id", "", "organization where you would like to manage tokens")
+	cmd.PersistentFlags().StringVar(&organizationID, "organization-id", "", "Organization where you would like to manage tokens")
 	cliout.AddOutputFlag(cmd, &organizationTokenOutput)
 	return cmd
 }
@@ -711,8 +736,11 @@ func newOrganizationTokenListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the API tokens in an Astro Organization",
 		Long:    "List all Organization-scoped API tokens. Organization tokens can hold roles at multiple levels (Organization, Workspace, Deployment) simultaneously.",
 		Example: `
-  $ astro organization token list
-  $ astro organization token list --organization-id org123
+  # List the tokens in the current Organization
+  astro organization token list
+
+  # List the tokens in another Organization
+  astro organization token list --organization-id <ORGANIZATION_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listOrganizationToken(cmd, out)
@@ -725,9 +753,9 @@ func newOrganizationTokenListRolesCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "roles [TOKEN_ID]",
 		Short: "List roles for an organization API token",
-		Long:  "List roles for an organization API token\n$astro organization token roles [TOKEN_ID] ",
+		Long:  "List roles for an organization API token",
 		Example: `
-  $ astro organization token roles token123
+  astro organization token roles <TOKEN_ID>
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listOrganizationTokenRoles(cmd, args, out)
@@ -743,9 +771,14 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 		Short:   "Create an API token in an Astro Organization",
 		Long:    "Create an Organization-scoped API token. The token value is displayed only once at creation and cannot be retrieved later — store it securely. Use --clean-output to print only the raw token value for scripts. Use --expiration to set a TTL in days (default: no expiration).",
 		Example: `
-  $ astro organization token create
-  $ astro organization token create --name "CI/CD Token" --role ORGANIZATION_MEMBER
-  $ astro organization token create --name "Deploy Token" --role ORGANIZATION_OWNER --expiration 365 --clean-output
+  # Create a token, choosing its name and role when prompted
+  astro organization token create
+
+  # Create a member token
+  astro organization token create --name "CI/CD Token" --role ORGANIZATION_MEMBER
+
+  # Create an owner token that expires in a year, printing only the token
+  astro organization token create --name "Deploy Token" --role ORGANIZATION_OWNER --expiration 365 --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createOrganizationToken(cmd, out)
@@ -755,7 +788,7 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&cleanTokenOutput, "clean-output", "c", false, "Print only the token as output. For use of the command in scripts")
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Description of the token. If the description contains a space, specify the entire description within quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the token. Possible values are "+allowedOrganizationRoleNamesProse)
-	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days. If the flag isn't used the token won't have an expiration. Must be between 1 and 3650 days. ")
+	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Expiration of the token in days, from 1 to 3650. Without it, the token does not expire")
 	return cmd
 }
 
@@ -766,9 +799,11 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 		Short:   "Update an Organization API token",
 		Long:    "Update an Organization API token's name, description, or Organization-level role. Identify the token by its ID (positional argument) or current name (--name). This does not affect the token's Workspace or Deployment roles.",
 		Example: `
-  $ astro organization token update token123
-  $ astro organization token update token123 --new-name "Updated Token" --role ORGANIZATION_OWNER
-  $ astro organization token update --name "My Token" --new-name "Renamed Token" --description "Updated desc"
+  # Rename a token and change its Organization role
+  astro organization token update <TOKEN_ID> --new-name "Updated Token" --role ORGANIZATION_OWNER
+
+  # Find a token by its name and change its description
+  astro organization token update --name "My Token" --description "Updated description"
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrganizationToken(cmd, args, out)
@@ -776,7 +811,7 @@ func newOrganizationTokenUpdateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The current name of the token. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenName, "new-name", "n", "", "The token's new name. If the name contains a space, specify the entire name within quotes \"\" ")
-	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
+	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The new role for the token. Possible values are "+allowedOrganizationRoleNamesProse+". Without it, the token keeps its role")
 	return cmd
 }
@@ -789,9 +824,11 @@ func newOrganizationTokenRotateCmd(out io.Writer) *cobra.Command {
 		Short:   "Rotate a Organization API token",
 		Long:    "Rotate a Organization API token. You can only rotate Organization API tokens. You cannot rotate Workspace API tokens with this command",
 		Example: `
-  $ astro organization token rotate token123
-  $ astro organization token rotate --name "My Token" --yes
-  $ astro organization token rotate token123 --clean-output
+  # Rotate a token by its ID
+  astro organization token rotate <TOKEN_ID>
+
+  # Rotate a token by its name without confirming, printing only the new token
+  astro organization token rotate --name "My Token" --yes --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return rotateOrganizationToken(cmd, args, out)
@@ -811,8 +848,11 @@ func newOrganizationTokenDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete a Organization API token or remove an Organization API token from a Organization",
 		Long:    "Permanently revoke an Organization API token. All access the token grants — including any Workspace and Deployment roles — is immediately revoked.",
 		Example: `
-  $ astro organization token delete token123
-  $ astro organization token delete --name "My Token" --yes
+  # Delete a token by its ID
+  astro organization token delete <TOKEN_ID>
+
+  # Delete a token by its name without confirming
+  astro organization token delete --name "My Token" --yes
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deleteOrganizationToken(cmd, args, out)
@@ -862,9 +902,14 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the roles in your Astro Organization",
 		Long:    "List all custom roles in your Organization. Custom roles define fine-grained permissions that can be assigned to users, teams, and tokens. Use --include-default-roles to also show the built-in system roles (Organization Member, Owner, etc.).",
 		Example: `
-  $ astro organization role list
-  $ astro organization role list --include-default-roles
-  $ astro organization role list -o json
+  # List the custom roles
+  astro organization role list
+
+  # Include the built-in roles
+  astro organization role list --include-default-roles
+
+  # List the roles as JSON
+  astro organization role list -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listRoles(cmd, out)

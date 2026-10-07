@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	createUserExample = `astro user create --email=<user-email-address>`
+	createUserExample = `  # Create a user, prompting for the password
+  astro user create --email user@company.com`
 )
 
 func newUserCmd(out io.Writer) *cobra.Command {

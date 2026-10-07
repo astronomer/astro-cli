@@ -27,11 +27,16 @@ func newTeamCmd(out io.Writer) *cobra.Command {
 func newTeamGetCmd(out io.Writer) *cobra.Command {
 	var usersEnabled, rolesEnabled, all bool
 	cmd := &cobra.Command{
-		Use:     "get [TEAM ID]",
+		Use:     "get <TEAM_ID>",
 		Aliases: []string{"g"},
 		Short:   "Get a team in the APC platform",
 		Long:    "Get a team in the APC platform",
-		Args:    cobra.ExactArgs(1),
+		Example: `  # Show a team
+  astro team get <TEAM_ID>
+
+  # Show a team with its users and roles
+  astro team get <TEAM_ID> --all`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return teams.Get(args[0], usersEnabled, rolesEnabled, all, houstonClient, out)
@@ -51,6 +56,11 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"l"},
 		Short:   "List all teams in the APC platform",
 		Long:    "List all teams in the APC platform",
+		Example: `  # List every team
+  astro team list
+
+  # List teams a page at a time
+  astro team list --paginated --page-size 20`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return listTeam(cmd, out, paginated, pageSize)
@@ -64,11 +74,13 @@ func newTeamListCmd(out io.Writer) *cobra.Command {
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 	var teamRole string
 	cmd := &cobra.Command{
-		Use:     "update [TEAM ID]",
+		Use:     "update <TEAM_ID>",
 		Aliases: []string{"u"},
 		Short:   "Update a team in the APC platform",
 		Long:    "Update a team in the APC platform",
-		Args:    cobra.ExactArgs(1),
+		Example: `  # Give a team the system editor role
+  astro team update <TEAM_ID> --role SYSTEM_EDITOR`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return teams.Update(args[0], teamRole, houstonClient, out)

@@ -44,22 +44,29 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 		Use:   "add",
 		Short: "Add a User to a Workspace",
 		Long:  "Add a User to a Workspace",
+		Example: `  # Add a user to the current Workspace as a viewer
+  astro workspace user add --email user@company.com
+
+  # Add a user to another Workspace as an editor
+  astro workspace user add --email user@company.com --role WORKSPACE_EDITOR --workspace-id <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserAdd(cmd, out)
 		},
 	}
 	cmd.Flags().StringVarP(&workspaceUserWsRole, "role", "r", houston.WorkspaceViewerRole, "Role assigned to user")
-	cmd.Flags().StringVarP(&workspaceUserCreateEmail, "email", "e", "", "Email of the user you wish to add to this workspace.")
+	cmd.Flags().StringVarP(&workspaceUserCreateEmail, "email", "e", "", "Email of the user you wish to add to this workspace")
 	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
 }
 
 func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update [user-email]",
+		Use:   "update <EMAIL>",
 		Short: "Update a User's Role for a Workspace",
 		Long:  "Update a User's Role for a Workspace",
-		Args:  cobra.ExactArgs(1),
+		Example: `  # Make a user an admin of the current Workspace
+  astro workspace user update user@company.com --role WORKSPACE_ADMIN`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserUpdate(cmd, out, args)
 		},
@@ -70,12 +77,13 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 
 func newWorkspaceUserRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove [user-email]",
+		Use:     "remove <EMAIL>",
 		Aliases: []string{"rm"},
 		Short:   "Remove a User from a Workspace",
 		Long:    "Remove a User from a Workspace",
-		Example: "astro workspace user remove test@astronomer.com",
-		Args:    cobra.ExactArgs(1),
+		Example: `  # Remove a user from the current Workspace
+  astro workspace user remove user@company.com`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserRemove(cmd, out, args)
 		},
@@ -89,6 +97,11 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List users inside an APC Workspace",
 		Long:    "List users inside an APC Workspace",
+		Example: `  # List the users in the current Workspace
+  astro workspace user list
+
+  # List the users in another Workspace
+  astro workspace user list --workspace-id <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserList(cmd, out)
 		},

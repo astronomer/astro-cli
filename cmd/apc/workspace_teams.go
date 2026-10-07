@@ -14,16 +14,18 @@ var (
 	workspaceTeamRole string
 
 	workspaceTeamAddExample = `
-$ astro workspace team add --workspace-id=<workspace-id> --team-id=<team-id> --role=ROLE
+  # Add a team to a Workspace as an editor
+  astro workspace team add --workspace-id <WORKSPACE_ID> --team-id <TEAM_ID> --role WORKSPACE_EDITOR
 `
 	workspaceTeamRemoveExample = `
-$ astro workspace team remove <team-id> --workspace-id=<workspace-id>
+  astro workspace team remove <TEAM_ID> --workspace-id <WORKSPACE_ID>
 `
 	workspaceTeamUpdateExample = `
-$ astro workspace team update <team-id> --workspace-id <workspace-id> --role WORKSPACE_EDITOR
+  # Change a team's role in a Workspace
+  astro workspace team update <TEAM_ID> --workspace-id <WORKSPACE_ID> --role WORKSPACE_EDITOR
 `
 	workspaceTeamsListExample = `
-$ astro workspace team list --workspace-id <workspace-id>`
+  astro workspace team list --workspace-id <WORKSPACE_ID>`
 )
 
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
@@ -33,7 +35,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Workspace Team resources",
 		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace to associate team to")
+	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "Workspace to associate team to")
 	cmd.AddCommand(
 		newWorkspaceTeamAddCmd(out),
 		newWorkspaceTeamUpdateCmd(out),
@@ -53,15 +55,15 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 			return workspaceTeamAdd(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "team id to be assigned to workspace")
+	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to workspace")
 	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "workspace role assigned to team")
+	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
 	return cmd
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update",
+		Use:     "update <TEAM_ID>",
 		Short:   "Update a Team inside a workspace",
 		Long:    "Update a Team inside a workspace",
 		Example: workspaceTeamUpdateExample,
@@ -70,13 +72,13 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return workspaceTeamUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "workspace role assigned to team")
+	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
 	return cmd
 }
 
 func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove TEAM",
+		Use:     "remove <TEAM_ID>",
 		Aliases: []string{"rm"},
 		Short:   "Remove a Team from a Workspace",
 		Long:    "Remove a Team from a Workspace",
