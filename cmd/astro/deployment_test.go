@@ -1157,7 +1157,7 @@ func TestDeploymentUpdate(t *testing.T) {
 	})
 	// The deployment an update from a file echoes, in the format of that
 	// file: its YAML, or a json result from the CLI's one encoder.
-	echoFromFile := func(t *testing.T, name string, data []byte) string {
+	echoFromFile := func(t *testing.T, name string, data []byte, extra ...string) string {
 		t.Helper()
 		m := newCreateUpdateMock(t)
 		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
@@ -1169,7 +1169,7 @@ func TestDeploymentUpdate(t *testing.T) {
 		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		path := filepath.Join(t.TempDir(), name)
 		require.NoError(t, os.WriteFile(path, data, 0o600))
-		out, err := execDeploymentCmd("update", "--deployment-file", path)
+		out, err := execDeploymentCmd(append([]string{"update", "--deployment-file", path}, extra...)...)
 		require.NoError(t, err)
 		m.AssertExpectations(t)
 		return out
@@ -1191,6 +1191,18 @@ func TestDeploymentUpdate(t *testing.T) {
 		var echoed inspect.FormattedDeployment
 		require.NoError(t, yaml.Unmarshal([]byte(out), &echoed))
 		assert.Equal(t, deploymentResponse.JSON200.Name, echoed.Deployment.Configuration.Name)
+	})
+	// -o json makes the echo json whatever the file was, so stdout holds one
+	// object; -o text keeps the file's own format.
+	t.Run("echoes a deployment updated from a YAML file as json under -o json", func(t *testing.T) {
+		out := echoFromFile(t, "test-deployment.yaml", []byte(deploymentFileYAML), "-o", "json")
+		var echoed inspect.FormattedDeployment
+		decodeOne(t, out, &echoed)
+		assert.Equal(t, deploymentResponse.JSON200.Name, echoed.Deployment.Configuration.Name)
+	})
+	t.Run("echoes a deployment updated from a YAML file as YAML under -o text", func(t *testing.T) {
+		out := echoFromFile(t, "test-deployment.yaml", []byte(deploymentFileYAML), "-o", "text")
+		assert.True(t, strings.HasPrefix(out, "deployment:\n"), out)
 	})
 	t.Run("returns an error if updating a deployment from file fails", func(t *testing.T) {
 		newCreateUpdateMock(t)

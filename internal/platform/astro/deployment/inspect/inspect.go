@@ -124,13 +124,8 @@ const notApplicable = "N/A"
 // echoes after reading a YAML file. A --key prints the bare value to out in
 // every mode, which is how deploy-action reads it.
 func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIClient, out io.Writer, r output.Emitter, requestedField string, template, showWorkloadIdentity bool) error {
-	var (
-		requestedDeployment                                                        astrov1.Deployment
-		err                                                                        error
-		deploymentInfoMap, deploymentConfigMap, additionalMap, printableDeployment map[string]interface{}
-	)
 	// get or select the deployment
-	requestedDeployment, err = deployment.GetDeployment(wsID, deploymentID, deploymentName, true, nil, astroV1Client)
+	requestedDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, true, nil, astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -139,30 +134,10 @@ func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIC
 		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(wsID))
 		return nil
 	}
-	// create a map for deployment.information
-	deploymentInfoMap, err = getDeploymentInfo(requestedDeployment)
+	printableDeployment, err := getPrintable(&requestedDeployment, astroV1Client, showWorkloadIdentity)
 	if err != nil {
 		return err
 	}
-	// create a map for deployment.configuration
-	deploymentConfigMap, err = getDeploymentConfig(&requestedDeployment, astroV1Client, showWorkloadIdentity)
-	if err != nil {
-		return err
-	}
-	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
-	nodePools := []astrov1.NodePool{}
-	if requestedDeployment.ClusterId != nil {
-		cluster, err := deployment.GetClusterByID("", *requestedDeployment.ClusterId, astroV1Client)
-		if err != nil {
-			return err
-		}
-		if cluster.NodePools != nil {
-			nodePools = *cluster.NodePools
-		}
-	}
-	additionalMap = getAdditionalNullableFields(&requestedDeployment, nodePools)
-	// create a map for the entire deployment
-	printableDeployment = getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap)
 	// get specific field if requested
 	if requestedField != "" {
 		value, err := getSpecificField(printableDeployment, requestedField)
@@ -178,6 +153,47 @@ func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIC
 		return err
 	}
 	return r.Emit(formatted, writeYAML(&formatted))
+}
+
+// Formatted is d as `deployment inspect --show-workload-identity` publishes
+// it, for a command that already has the Deployment in hand: `deployment
+// create` and `update` publish the Deployment they leave in the same shape,
+// as the --deployment-file echo of either does.
+func Formatted(d *astrov1.Deployment, astroV1Client astrov1.APIClient) (FormattedDeployment, error) {
+	printable, err := getPrintable(d, astroV1Client, true)
+	if err != nil {
+		return FormattedDeployment{}, err
+	}
+	return formatDeployment(false, printable)
+}
+
+// getPrintable is d as one map, in the sections inspect prints: its metadata,
+// its configuration, and the lists that may be empty.
+func getPrintable(d *astrov1.Deployment, astroV1Client astrov1.APIClient, showWorkloadIdentity bool) (map[string]interface{}, error) {
+	// create a map for deployment.information
+	deploymentInfoMap, err := getDeploymentInfo(*d)
+	if err != nil {
+		return nil, err
+	}
+	// create a map for deployment.configuration
+	deploymentConfigMap, err := getDeploymentConfig(d, astroV1Client, showWorkloadIdentity)
+	if err != nil {
+		return nil, err
+	}
+	// create a map for deployment.alert_emails, deployment.worker_queues and deployment.astronomer_variables
+	nodePools := []astrov1.NodePool{}
+	if d.ClusterId != nil {
+		cluster, err := deployment.GetClusterByID("", *d.ClusterId, astroV1Client)
+		if err != nil {
+			return nil, err
+		}
+		if cluster.NodePools != nil {
+			nodePools = *cluster.NodePools
+		}
+	}
+	additionalMap := getAdditionalNullableFields(d, nodePools)
+	// create a map for the entire deployment
+	return getPrintableDeployment(deploymentInfoMap, deploymentConfigMap, additionalMap), nil
 }
 
 func getDeploymentInfo(deploymentObj astrov1.Deployment) (map[string]interface{}, error) { //nolint:gocritic // signature kept as-is for this shell code

@@ -115,7 +115,15 @@ var publishedPayloads = []cliouttest.Case{
 	// and are snake_case already; the --deployment-file round trip and
 	// astronomer/deploy-action read them, so they do not move. The bytes of
 	// every inspect output are pinned too, in testdata/deployment_inspect.
+	// `deployment create` and `update` -o json publish the Deployment they
+	// leave in this shape too, as their --deployment-file echo does.
 	{Name: "deployment-inspect", Value: inspect.FormattedDeployment{}},
+
+	// astro deployment delete: what it deleted.
+	{Name: "deployment-removal", Value: deployment.Removal{}},
+	// astro deployment hibernate and wake-up: the override the Deployment now
+	// has, which is null after --remove-override.
+	{Name: "deployment-hibernation", Value: deployment.HibernationResult{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -148,13 +156,14 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Thirty shapes reach Emit in this package's tests today:
+// would be silent. Thirty-two shapes reach Emit in this package's tests today:
 // the deployment variable and token results, the workspace and organization
 // token, user and team results, the pkg/output lists and the `astro env`
 // payloads their tests reach, the manifest deploy's result, deployment
-// inspect's deployment, and the error object. Raise it as conversions land;
-// lower it only saying why.
-const minWatchedPayloads = 30
+// inspect's deployment (which create and update publish too), delete's
+// removal, hibernate's override, and the error object. Raise it as
+// conversions land; lower it only saying why.
+const minWatchedPayloads = 32
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

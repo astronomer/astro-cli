@@ -1,5 +1,11 @@
 package deployment
 
+import (
+	"time"
+
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+)
+
 // DeploymentInfo represents simplified deployment information for output
 // formatting. Its keys are snake_case like every other -o json shape, and
 // where `deployment inspect` publishes the same fact they use its name
@@ -24,4 +30,46 @@ type DeploymentInfo struct {
 // DeploymentList represents a list of deployments for output formatting
 type DeploymentList struct {
 	Deployments []DeploymentInfo `json:"deployments"`
+}
+
+// UpdateResult is what Update did. Deployment is the Deployment as the update
+// left it when Updated, and as it was otherwise: when it already had the DAG
+// deploy setting asked for, or the question before the update was declined.
+type UpdateResult struct {
+	Deployment astrov1.Deployment
+	Updated    bool
+}
+
+// ActionDeleted is a Removal's action: the Deployment is gone.
+const ActionDeleted = "deleted"
+
+// Removal is what `astro deployment delete` did, as it publishes it under
+// --output json. Its keys are the ones the Deployment's other shapes use for
+// the same facts (deployment_id, workspace_id), and action is the one
+// `astro deployment token delete` publishes for a token it deleted.
+type Removal struct {
+	DeploymentID string `json:"deployment_id"`
+	Name         string `json:"name"`
+	WorkspaceID  string `json:"workspace_id"`
+	Action       string `json:"action"`
+}
+
+// HibernationResult is the hibernation override a development Deployment has
+// after `astro deployment hibernate` or `wake-up`, as they publish it under
+// --output json. Override is null after --remove-override, when the
+// Deployment's hibernation schedule, if it has one, applies again.
+type HibernationResult struct {
+	DeploymentID string               `json:"deployment_id"`
+	Name         string               `json:"name"`
+	Override     *HibernationOverride `json:"hibernation_override"`
+}
+
+// HibernationOverride is an override of a Deployment's hibernation schedule,
+// under the key and with the fields `deployment inspect` gives it in the
+// Deployment's metadata: whether it holds the Deployment hibernating or
+// awake, and until when. override_until is null for an override that lasts
+// until it is removed.
+type HibernationOverride struct {
+	IsHibernating bool       `json:"is_hibernating"`
+	OverrideUntil *time.Time `json:"override_until"`
 }

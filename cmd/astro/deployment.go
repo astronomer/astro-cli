@@ -132,7 +132,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	addWorkspaceFlag(cmd.PersistentFlags(), "", "Workspace the Deployment is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
 	cmd.AddCommand(
 		newDeploymentListCmd(out),
-		newDeploymentDeleteCmd(),
+		newDeploymentDeleteCmd(out),
 		newDeploymentCreateCmd(out),
 		newDeploymentLogsCmd(),
 		newDeploymentUpdateCmd(out),
@@ -143,8 +143,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentTeamRootCmd(out),
 		newDeploymentTokenRootCmd(out),
 		newDeploymentBundleRootCmd(out),
-		newDeploymentHibernateCmd(),
-		newDeploymentWakeUpCmd(),
+		newDeploymentHibernateCmd(out),
+		newDeploymentWakeUpCmd(out),
 	)
 	cmd.AddCommand(newRemovedDeploymentObjectCmds()...)
 	for _, c := range cmd.Commands() {
@@ -492,6 +492,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in. Run \"astro organization cluster list\" to see your Organization's cluster IDs")
 	cmd.Flags().BoolVarP(&forceUpdate, "yes", "y", false, "Don't ask for confirmation, including after a warning about the Deployment's CI/CD enforcement")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -533,10 +534,11 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().IntVarP(&updateSchedulerAU, "scheduler-au", "s", 0, "The Deployment's Scheduler resources in AUs.")
 		cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment.")
 	}
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
-func newDeploymentDeleteCmd() *cobra.Command {
+func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete DEPLOYMENT-ID",
 		Aliases: []string{"de"},
@@ -546,11 +548,12 @@ func newDeploymentDeleteCmd() *cobra.Command {
   $ astro deployment delete <deployment-id>
   $ astro deployment delete --deployment my-deployment --yes
 `,
-		RunE: deploymentDelete,
+		RunE: func(cmd *cobra.Command, args []string) error { return deploymentDelete(cmd, args, out) },
 	}
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the Deployment")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to delete")
 	addDeploymentFlag(cmd.Flags(), "Deployment to delete: a link name from pyproject.toml, a Deployment id, or a Deployment name")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -645,7 +648,7 @@ func newDeploymentVariableUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 //nolint:dupl // the duplication is acceptable here
-func newDeploymentHibernateCmd() *cobra.Command {
+func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "hibernate [DEPLOYMENT-ID]",
 		Aliases: []string{"hb"},
@@ -658,7 +661,9 @@ func newDeploymentHibernateCmd() *cobra.Command {
   $ astro deployment hibernate <deployment-id> --remove-override
   $ astro deployment hibernate <deployment-id> --wait
 `,
-		RunE: func(cmd *cobra.Command, args []string) error { return deploymentOverrideHibernation(cmd, args, true) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentOverrideHibernation(cmd, args, out, true)
+		},
 	}
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to hibernate")
 	addDeploymentFlag(cmd.Flags(), "Deployment to hibernate: a link name from pyproject.toml, a Deployment id, or a Deployment name")
@@ -670,11 +675,12 @@ func newDeploymentHibernateCmd() *cobra.Command {
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to hibernate before ending the command. Can only be used with --wait=true")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 	cmd.MarkFlagsMutuallyExclusive("wait", "remove-override")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
 //nolint:dupl // the duplication is acceptable here
-func newDeploymentWakeUpCmd() *cobra.Command {
+func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "wake-up [DEPLOYMENT-ID]",
 		Aliases: []string{"wu"},
@@ -687,7 +693,9 @@ func newDeploymentWakeUpCmd() *cobra.Command {
   $ astro deployment wake-up <deployment-id> --remove-override
   $ astro deployment wake-up <deployment-id> --wait
 `,
-		RunE: func(cmd *cobra.Command, args []string) error { return deploymentOverrideHibernation(cmd, args, false) },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentOverrideHibernation(cmd, args, out, false)
+		},
 	}
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the Deployment to wake up.")
 	addDeploymentFlag(cmd.Flags(), "Deployment to wake up: a link name from pyproject.toml, a Deployment id, or a Deployment name")
@@ -699,6 +707,7 @@ func newDeploymentWakeUpCmd() *cobra.Command {
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 	cmd.MarkFlagsMutuallyExclusive("wait", "remove-override")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -741,6 +750,14 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deploymentOutput)
+	if err != nil {
+		return err
+	}
+	// The create prints its progress (the Workspace, a picker, the wait) to
+	// bare stdout; under json that is a note, not the result.
+	defer strayStdoutToStderr(format)()
 	if err := normalizeSchedulerSizeFlag(); err != nil {
 		return err
 	}
@@ -830,8 +847,8 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if inputFile != "" {
 		// --yes answers the file path's own confirmation, so it is allowed
 		// beside the file like --wait.
-		if onlyFlagsSet(cmd, "wait", "wait-time", "deployment-file", "yes", "verbosity") {
-			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out), waitForStatus, waitTimeForDeployment, forceUpdate)
+		if onlyFlagsSet(cmd, "wait", "wait-time", "deployment-file", "yes", "verbosity", "output") {
+			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out, format), waitForStatus, waitTimeForDeployment, forceUpdate)
 		}
 		return errFlag
 	}
@@ -855,7 +872,20 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment)
+	d, err := deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment)
+	if d.Id == "" {
+		return err
+	}
+	// The Deployment exists even when the --wait for it failed, so it is
+	// published either way.
+	r := cliout.Renderer{Format: format, Out: out}
+	if emitErr := emitDeployment(r, &d, func(w io.Writer) error { return deployment.WriteCreated(w, workspaceID, &d) }); emitErr != nil {
+		if err != nil {
+			return err
+		}
+		return emitErr
+	}
+	return failedAfterResult(cmd, format, err)
 }
 
 // deploymentFileEcho is the Renderer `deployment create|update
@@ -863,9 +893,11 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 // format of the file it read: a JSON file's echo is a json result, from the
 // CLI's one encoder, so it is pretty on a terminal and one line when piped;
 // a YAML file's is the deployment's YAML, as `deployment inspect` prints it.
-func deploymentFileEcho(out io.Writer) fromfile.Echo {
+// Under -o json the echo is json whatever the file was: stdout then holds
+// the one object, the same FormattedDeployment the flag path publishes.
+func deploymentFileEcho(out io.Writer, format cliout.Format) fromfile.Echo {
 	return func(fromJSON bool) output.Emitter {
-		if fromJSON {
+		if fromJSON || format == cliout.FormatJSON {
 			return cliout.Renderer{Format: cliout.FormatJSON, Out: out}
 		}
 		return cliout.Renderer{Format: cliout.FormatText, Out: out}
@@ -873,6 +905,14 @@ func deploymentFileEcho(out io.Writer) fromfile.Echo {
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deploymentOutput)
+	if err != nil {
+		return err
+	}
+	// The update prints its warnings and notes to bare stdout; under json
+	// they are notes, not the result.
+	defer strayStdoutToStderr(format)()
 	if err := normalizeSchedulerSizeFlag(); err != nil {
 		return err
 	}
@@ -896,8 +936,8 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if inputFile != "" {
 		// --yes answers the file path's own confirmation. Counting every set
 		// flag also refused it, and the global --verbosity with it.
-		if onlyFlagsSet(cmd, "deployment-file", "yes", "verbosity") {
-			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out), false, 0*time.Second, forceUpdate)
+		if onlyFlagsSet(cmd, "deployment-file", "yes", "verbosity", "output") {
+			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out, format), false, 0*time.Second, forceUpdate)
 		}
 		return errFlag
 	}
@@ -929,7 +969,11 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client)
+	res, err := deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return emitUpdated(cliout.Renderer{Format: format, Out: out}, &res)
 }
 
 // normalizeSchedulerSizeFlag refuses a --scheduler-size that is not a size,
@@ -948,7 +992,13 @@ func normalizeSchedulerSizeFlag() error {
 	return nil
 }
 
-func deploymentDelete(cmd *cobra.Command, args []string) error {
+func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deploymentOutput)
+	if err != nil {
+		return err
+	}
+	defer strayStdoutToStderr(format)()
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid Workspace")
@@ -962,7 +1012,12 @@ func deploymentDelete(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
-	return deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroV1Client)
+	removal, err := deployment.Delete(deploymentID, ws, deploymentName, forceDelete, astroV1Client)
+	if err != nil || removal == nil {
+		// nil, nil is a declined question, which has said so.
+		return err
+	}
+	return emitRemoval(cliout.Renderer{Format: format, Out: out}, removal)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
@@ -1021,7 +1076,15 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 	return emitVariableModify(cliout.Renderer{Format: format, Out: out}, res)
 }
 
-func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernating bool) error {
+func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deploymentOutput)
+	if err != nil {
+		return err
+	}
+	// The --wait prints its progress to bare stdout; under json that is a
+	// note, not the result.
+	defer strayStdoutToStderr(format)()
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -1039,8 +1102,19 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	r := cliout.Renderer{Format: format, Out: out}
+	action := "wake up"
+	if isHibernating {
+		action = "hibernate"
+	}
+
 	if removeOverride {
-		return deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, astroV1Client)
+		res, err := deployment.DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName, forceOverride, astroV1Client)
+		if err != nil || res == nil {
+			// nil, nil is a declined question, which has said so.
+			return err
+		}
+		return emitHibernation(r, res, action)
 	}
 
 	overrideUntil, err := getOverrideUntil(until, forDuration)
@@ -1048,7 +1122,18 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, isHibernat
 		return err
 	}
 
-	return deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, waitForStatus, waitTimeForDeployment, astroV1Client)
+	res, err := deployment.UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName, isHibernating, overrideUntil, forceOverride, astroV1Client)
+	if err != nil || res == nil {
+		return err
+	}
+	// The override is set, and said so, before the wait for it starts.
+	if err := emitHibernation(r, res, action); err != nil {
+		return err
+	}
+	if !waitForStatus {
+		return nil
+	}
+	return failedAfterResult(cmd, format, deployment.WaitForHibernationOverride(res.DeploymentID, isHibernating, waitTimeForDeployment, astroV1Client))
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.

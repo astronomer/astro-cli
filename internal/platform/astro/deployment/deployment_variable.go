@@ -125,11 +125,20 @@ func VariableModify(
 			newEnvironmentVariables, updateVars, makeSecret, result)
 	}
 
-	err = Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+	res, err := Update(currentDeployment.Id, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
 		0, 0, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, newEnvironmentVariables,
 		nil, nil, nil, false, astroV1Client)
 	if err != nil {
 		return nil, err
+	}
+	// With no variables to send, Update is a plain update of the Deployment,
+	// and the table `astro deployment update` prints is what this has always
+	// printed after one. A note, not the result: under --output json the
+	// command points stdout at stderr while it runs.
+	if len(newEnvironmentVariables) == 0 && res.Updated {
+		if err := WriteUpdated(os.Stdout, &res.Deployment); err != nil {
+			return nil, err
+		}
 	}
 	updated, err := GetDeploymentByID("", currentDeployment.Id, astroV1Client)
 	if err != nil {
