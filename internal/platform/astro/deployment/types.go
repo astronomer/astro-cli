@@ -40,8 +40,8 @@ type UpdateResult struct {
 	Updated    bool
 }
 
-// ActionDeleted is a Removal's action: the Deployment is gone.
-const ActionDeleted = "deleted"
+// actionDeleted is a Removal's action: the Deployment is gone.
+const actionDeleted = "deleted"
 
 // Removal is what `astro deployment delete` did, as it publishes it under
 // --output json. Its keys are the ones the Deployment's other shapes use for

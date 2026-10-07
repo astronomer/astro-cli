@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,13 +21,15 @@ import (
 )
 
 type DeployBundleInput struct {
-	BundlePath    string
-	MountPath     string
-	DeploymentID  string
-	BundleType    string
-	Description   string
-	Wait          bool
-	WaitTime      time.Duration
+	BundlePath   string
+	MountPath    string
+	DeploymentID string
+	BundleType   string
+	Description  string
+	Wait         bool
+	WaitTime     time.Duration
+	// Progress takes the --wait progress; nil is stderr.
+	Progress      io.Writer
 	AstroV1Client astrov1.APIClient
 }
 
@@ -90,7 +93,7 @@ func DeployBundle(input *DeployBundleInput) error {
 
 	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
 	if input.Wait {
-		err = deployment.HealthPoll(currentDeployment.Id, currentDeployment.WorkspaceId, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
+		err = deployment.HealthPoll(input.Progress, currentDeployment.Id, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
 		if err != nil {
 			return err
 		}
@@ -100,13 +103,15 @@ func DeployBundle(input *DeployBundleInput) error {
 }
 
 type DeleteBundleInput struct {
-	MountPath     string
-	DeploymentID  string
-	WorkspaceID   string
-	BundleType    string
-	Description   string
-	Wait          bool
-	WaitTime      time.Duration
+	MountPath    string
+	DeploymentID string
+	WorkspaceID  string
+	BundleType   string
+	Description  string
+	Wait         bool
+	WaitTime     time.Duration
+	// Progress takes the --wait progress; nil is stderr.
+	Progress      io.Writer
 	AstroV1Client astrov1.APIClient
 }
 
@@ -137,7 +142,7 @@ func DeleteBundle(input *DeleteBundleInput) error {
 
 	// if requested, wait for the deploy to finish by polling the deployment until it is healthy
 	if input.Wait {
-		err = deployment.HealthPoll(input.DeploymentID, input.WorkspaceID, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
+		err = deployment.HealthPoll(input.Progress, input.DeploymentID, dagOnlyDeploySleepTime, tickNum, int(input.WaitTime.Seconds()), input.AstroV1Client)
 		if err != nil {
 			return err
 		}

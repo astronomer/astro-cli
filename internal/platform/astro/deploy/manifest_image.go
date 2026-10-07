@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -56,6 +57,8 @@ type ManifestImageDeployInput struct {
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
+	// Progress takes the Wait progress; nil is stderr.
+	Progress io.Writer
 }
 
 // ManifestImageDeployResult reports the outcome for cmd to render.
@@ -89,7 +92,8 @@ var (
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
 // tarball. It reuses the 1.x transport (createDeploy, the registry push in
 // airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
-// neither prints nor exits — it returns a result for cmd to render.
+// neither prints nor exits — it returns a result for cmd to render, and writes
+// only a --wait's progress, to in.Progress.
 //
 // Docker is required and checked before any transport work (docs/deploy.md, section 5).
 //
@@ -185,7 +189,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	}
 
 	if in.Wait {
-		if err := deployment.HealthPollIn(dep.OrganizationId, c.Token, dep.Id, sleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
+		if err := deployment.HealthPollIn(in.Progress, dep.OrganizationId, c.Token, dep.Id, sleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
 			return ManifestImageDeployResult{}, err
 		}
 	}

@@ -919,7 +919,7 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	d, err := deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment)
+	d, err := deployment.Create(label, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, coreDeploymentType, schedulerAU, schedulerReplicas, flagRemoteExecutionEnabled, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, cmd.ErrOrStderr())
 	if d.Id == "" {
 		return err
 	}
@@ -991,7 +991,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	res, err := deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client)
+	res, err := deployment.Update(deploymentID, label, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCPU, defaultTaskPodMemory, resourceQuotaCPU, resourceQuotaMemory, workloadIdentity, updateSchedulerAU, updateSchedulerReplicas, []astrov1.WorkerQueueRequest{}, []astrov1.HybridWorkerQueueRequest{}, []astrov1.DeploymentEnvironmentVariableRequest{}, allowedIPAddressRanges, taskLogBucket, taskLogURLPattern, forceUpdate, astroV1Client, cmd.ErrOrStderr())
 	if err != nil {
 		return err
 	}
@@ -1155,7 +1155,7 @@ func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Wri
 	if !waitForStatus {
 		return nil
 	}
-	return failedAfterResult(cmd, format, deployment.WaitForHibernationOverride(res.DeploymentID, isHibernating, waitTimeForDeployment, astroV1Client))
+	return failedAfterResult(cmd, format, deployment.WaitForHibernationOverride(cmd.ErrOrStderr(), res.DeploymentID, isHibernating, waitTimeForDeployment, astroV1Client))
 }
 
 // isValidCloudProvider returns true for valid CloudProvider values and false if not.

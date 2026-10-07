@@ -160,6 +160,7 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		Description:   deployDescription,
 		Wait:          waitForDeploy,
 		WaitTime:      waitTime,
+		Progress:      cmd.ErrOrStderr(),
 		AstroV1Client: astroV1Client,
 	}
 	return DeployBundle(deployBundleInput)
@@ -249,6 +250,7 @@ func deleteDbt(cmd *cobra.Command, args []string) error {
 		Description:   deployDescription,
 		Wait:          waitForDeploy,
 		WaitTime:      waitTime,
+		Progress:      cmd.ErrOrStderr(),
 		AstroV1Client: astroV1Client,
 	}
 	return DeleteBundle(deleteBundleInput)

@@ -33,14 +33,14 @@ import (
 var (
 	errInvalidDeployment         = errors.New("the Deployment specified was not found in this workspace. Your account or API Key may not have access to the deployment specified")
 	ErrInvalidDeploymentKey      = errors.New("invalid Deployment selected")
-	ErrInvalidClusterKey         = errors.New("invalid Cluster selected")
-	ErrInvalidRegionKey          = errors.New("invalid Region selected")
+	errInvalidClusterKey         = errors.New("invalid Cluster selected")
+	errInvalidRegionKey          = errors.New("invalid Region selected")
 	ErrTimedOut                  = errors.New("timed out waiting for the Deployment to enter a Healthy state")
 	ErrTimedOutHibernating       = errors.New("timed out waiting for the Deployment to hibernate")
-	ErrAirflowNotAnswering       = errors.New("timed out waiting for the Deployment's Airflow API to answer, though Astro reports the Deployment healthy")
-	ErrInvalidResourceRequest    = errors.New("invalid resource request")
-	ErrNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
-	ErrInvalidTokenName          = errors.New("no name provided for the deployment token. Retry with a valid name")
+	errAirflowNotAnswering       = errors.New("timed out waiting for the Deployment's Airflow API to answer, though Astro reports the Deployment healthy")
+	errInvalidResourceRequest    = errors.New("invalid resource request")
+	errNotADevelopmentDeployment = errors.New("the Deployment specified is not a development Deployment")
+	errInvalidTokenName          = errors.New("no name provided for the deployment token. Retry with a valid name")
 
 	// Monkey patched to write unit tests
 	createDeployment = createAndPrint
@@ -136,7 +136,8 @@ func CanCiCdDeploy(bearerToken string) bool {
 	// Parse the token to peek at the custom claims
 	claims, err := parseToken(token)
 	if err != nil {
-		fmt.Println("Unable to Parse Token")
+		// A warning, so stderr: stdout is the command's result.
+		fmt.Fprintln(os.Stderr, "Unable to Parse Token")
 		return false
 	}
 
@@ -187,8 +188,8 @@ func deploymentToInfo(d *astrov1.Deployment, includeWorkspaceName bool) Deployme
 	}
 }
 
-// ListData returns deployment list data for structured output
-func ListData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
+// listData returns deployment list data for structured output
+func listData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient) (*DeploymentList, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -218,7 +219,7 @@ func ListData(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient
 // ListWithFormat lists deployments with the specified output format
 func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.APIClient, r output.Emitter) error {
 	return output.PrintData(
-		func() (*DeploymentList, error) { return ListData(ws, fromAllWorkspaces, astroV1Client) },
+		func() (*DeploymentList, error) { return listData(ws, fromAllWorkspaces, astroV1Client) },
 		deploymentTableConfig(fromAllWorkspaces, ws), r,
 	)
 }
@@ -308,7 +309,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 
 	var allResults []astrov1.DeploymentLogEntry
 	for {
-		deploymentLogs, err := GetDeploymentLogs("", deploymentID, getDeploymentLogsParams, astroV1Client)
+		deploymentLogs, err := getDeploymentLogs("", deploymentID, getDeploymentLogsParams, astroV1Client)
 		if err != nil {
 			return nil, err
 		}
@@ -345,7 +346,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration) (astrov1.Deployment, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
+func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration, progress io.Writer) (astrov1.Deployment, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
 	var organizationID string
 	var currentWorkspace astrov1.Workspace
 
@@ -354,13 +355,13 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		return astrov1.Deployment{}, err
 	}
 	coreDeploymentType := astrov1.GetDeploymentOptionsParamsDeploymentType(deploymentType)
-	coreCloudProvider := GetCoreCloudProvider(cloudProvider)
+	coreCloudProvider := getCoreCloudProvider(cloudProvider)
 	deploymentOptionsParams := astrov1.GetDeploymentOptionsParams{
 		DeploymentType: &coreDeploymentType,
 		CloudProvider:  &coreCloudProvider,
 	}
 
-	configOption, err := GetDeploymentOptions("", deploymentOptionsParams, astroV1Client)
+	configOption, err := getDeploymentOptions("", deploymentOptionsParams, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, err
 	}
@@ -386,15 +387,18 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 	if organizationID == "" {
 		return astrov1.Deployment{}, fmt.Errorf(noWorkspaceMsg, workspaceID)
 	}
-	fmt.Printf("Current Workspace: %s\n\n", currentWorkspace.Name)
-
-	// name input
+	// Refused before the lines that lead up to the question, so a run that
+	// cannot ask prints nothing about it.
 	if name == "" {
-		// Refused before the line that introduces the question, so a run that
-		// cannot ask prints nothing about it.
 		if err := input.MayAsk("Deployment name", input.AnsweredBy("--name")); err != nil {
 			return astrov1.Deployment{}, err
 		}
+	}
+	// A note, so progress: stdout is the Deployment the create made.
+	fmt.Fprintf(progressTo(progress), "Current Workspace: %s\n\n", currentWorkspace.Name)
+
+	// name input
+	if name == "" {
 		fmt.Println("Please specify a name for your Deployment")
 		name, err = input.Text(ansi.Bold("\nDeployment name: "), input.AnsweredBy("--name"))
 		if err != nil {
@@ -440,10 +444,10 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		} else {
 			developmentModeValue = false
 		}
-		defaultTaskPodCPUPtr := CreateDefaultTaskPodCPU(defaultTaskPodCpu, remoteExecutionEnabled, &configOption)
-		defaultTaskPodMemoryPtr := CreateDefaultTaskPodMemory(defaultTaskPodMemory, remoteExecutionEnabled, &configOption)
-		resourceQuotaCPUPtr := CreateResourceQuotaCPU(resourceQuotaCpu, remoteExecutionEnabled, &configOption)
-		resourceQuotaMemoryPtr := CreateResourceQuotaMemory(resourceQuotaMemory, remoteExecutionEnabled, &configOption)
+		defaultTaskPodCPUPtr := createDefaultTaskPodCPU(defaultTaskPodCpu, remoteExecutionEnabled, &configOption)
+		defaultTaskPodMemoryPtr := createDefaultTaskPodMemory(defaultTaskPodMemory, remoteExecutionEnabled, &configOption)
+		resourceQuotaCPUPtr := createResourceQuotaCPU(resourceQuotaCpu, remoteExecutionEnabled, &configOption)
+		resourceQuotaMemoryPtr := createResourceQuotaMemory(resourceQuotaMemory, remoteExecutionEnabled, &configOption)
 		var remoteExecution *astrov1.DeploymentRemoteExecutionRequest
 		if remoteExecutionEnabled {
 			remoteExecution = &astrov1.DeploymentRemoteExecutionRequest{
@@ -565,11 +569,11 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 	// build hybrid input
-	if IsDeploymentHybrid(deploymentType) {
+	if isDeploymentHybrid(deploymentType) {
 		// Validate only the scheduler values the user actually supplied; the server fills in the rest.
 		if schedulerAU != 0 && schedulerReplicas != 0 {
 			if !validateHybridResources(schedulerAU, schedulerReplicas, configOption) {
-				return astrov1.Deployment{}, ErrInvalidResourceRequest
+				return astrov1.Deployment{}, errInvalidResourceRequest
 			}
 		}
 		var requestedExecutor astrov1.CreateHybridDeploymentRequestExecutor
@@ -606,7 +610,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		}
 	}
 
-	d, err := CoreCreateDeployment(organizationID, createDeploymentRequest, astroV1Client)
+	d, err := coreCreateDeployment(organizationID, createDeploymentRequest, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, err
 	}
@@ -614,7 +618,7 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 		// The Deployment exists whether or not it becomes healthy in time, so
 		// it is returned with the error: the caller still reports what was
 		// made.
-		if err := HealthPoll(d.Id, workspaceID, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), astroV1Client); err != nil {
+		if err := HealthPoll(progress, d.Id, SleepTime, TickNum, int(waitTimeForDeployment.Seconds()), astroV1Client); err != nil {
 			return d, err
 		}
 	}
@@ -632,7 +636,9 @@ func getDefaultNodePoolID(nodePools *[]astrov1.NodePool) string {
 // which has no command of its own to render what it made: it prints what
 // `astro deployment create` prints in text.
 func createAndPrint(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string, astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration) error { //nolint:gocritic,staticcheck // Create's parameters, passed through
-	d, err := Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity, deploymentType, schedulerAU, schedulerReplicas, remoteExecutionEnabled, allowedIpAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment)
+	// The picker runs inside another command, whose stdout is its own; the
+	// create's progress goes to stderr.
+	d, err := Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy, executor, cloudProvider, region, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity, deploymentType, schedulerAU, schedulerReplicas, remoteExecutionEnabled, allowedIpAddressRanges, taskLogBucket, taskLogURLPattern, astroV1Client, waitForStatus, waitTimeForDeployment, os.Stderr)
 	if d.Id == "" {
 		return err
 	}
@@ -725,7 +731,7 @@ func validateHybridResources(schedulerAU, schedulerReplicas int, _ astrov1.Deplo
 	return true
 }
 
-func ListClusterOptions(cloudProvider string, astroV1Client astrov1.APIClient) ([]astrov1.ClusterOptions, error) {
+func listClusterOptions(cloudProvider string, astroV1Client astrov1.APIClient) ([]astrov1.ClusterOptions, error) {
 	ctx, err := config.GetCurrentContext()
 	if err != nil {
 		return nil, err
@@ -759,7 +765,7 @@ func ListClusterOptions(cloudProvider string, astroV1Client astrov1.APIClient) (
 
 func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient) (newRegion string, err error) {
 	// get all regions for the cloud provider
-	options, err := ListClusterOptions(cloudProvider, astroV1Client)
+	options, err := listClusterOptions(cloudProvider, astroV1Client)
 	if err != nil {
 		return "", err
 	}
@@ -770,7 +776,7 @@ func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient)
 			Title:   "\nPlease select a Region for your Deployment:",
 			Header:  []string{"REGION"},
 			Ask:     []input.Option{input.About("a Region"), input.AnsweredBy("--region")},
-			Invalid: ErrInvalidRegionKey,
+			Invalid: errInvalidRegionKey,
 		}
 		for i := range regions {
 			list.AddRow(false, regions[i].Name)
@@ -806,7 +812,7 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 			Title:   "\nPlease select a Cluster for your Deployment:",
 			Header:  []string{"CLUSTER NAME", "CLOUD PROVIDER", "CLUSTER ID"},
 			Ask:     []input.Option{input.About("a Cluster"), input.AnsweredBy("--cluster-id")},
-			Invalid: ErrInvalidClusterKey,
+			Invalid: errInvalidClusterKey,
 		}
 		for i := range cs {
 			list.AddRow(false, cs[i].Name, string(cs[i].CloudProvider), cs[i].Id)
@@ -831,15 +837,28 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 	return clusterID, nil
 }
 
-func HealthPoll(deploymentID, ws string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
-	return HealthPollIn("", "", deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client)
+// progressTo is where a wait, a warning or a note goes: w, or stderr when w
+// is nil. It is never stdout, which carries a command's result and nothing
+// else, in text as under --output json.
+func progressTo(w io.Writer) io.Writer {
+	if w == nil {
+		return os.Stderr
+	}
+	return w
+}
+
+// HealthPoll waits for the Deployment to become healthy, writing its progress
+// to progress (stderr when nil).
+func HealthPoll(progress io.Writer, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
+	return HealthPollIn(progress, "", "", deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client)
 }
 
 // HealthPollIn is HealthPoll for a Deployment in orgID, which need not be the
 // current context's, with token authorizing the check that its Airflow
 // answers. An empty orgID or token is the current context's.
-func HealthPollIn(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
-	fmt.Printf("\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
+func HealthPollIn(progress io.Writer, orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient) error {
+	progress = progressTo(progress)
+	fmt.Fprintf(progress, "\nWaiting for the deployment to become healthy…\n\nThis may take a few minutes\n")
 	// considering hibernating as healthy state, since hibernation can only happen when the deployment is healthy.
 	// This covers for the case when the deployment is created and straight away goes into hibernation.
 	d, err := pollStatus(orgID, token, deploymentID, sleepTime, tickNum, timeoutNum, astroV1Client, ErrTimedOut,
@@ -847,14 +866,14 @@ func HealthPollIn(orgID, token, deploymentID string, sleepTime, tickNum, timeout
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Deployment %s is now healthy\n", d.Name)
+	fmt.Fprintf(progress, "Deployment %s is now healthy\n", d.Name)
 	return nil
 }
 
 // pollStatus waits sleepTime seconds, then checks the Deployment every
 // tickNum seconds until it reports one of statuses, and returns timedOut when
 // timeoutNum seconds pass first. A Deployment reporting HEALTHY also has to
-// have an Airflow that answers, and ErrAirflowNotAnswering is the timeout when
+// have an Airflow that answers, and errAirflowNotAnswering is the timeout when
 // that was all that was missing.
 func pollStatus(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNum int, astroV1Client astrov1.APIClient, timedOut error, statuses ...astrov1.DeploymentStatus) (astrov1.Deployment, error) {
 	time.Sleep(time.Duration(sleepTime) * time.Second)
@@ -878,7 +897,7 @@ func pollStatus(orgID, token, deploymentID string, sleepTime, tickNum, timeoutNu
 			if currentDeployment.Status != astrov1.DeploymentStatusHEALTHY || airflowAnswering(currentDeployment, token) {
 				return currentDeployment, nil
 			}
-			missing = ErrAirflowNotAnswering
+			missing = errAirflowNotAnswering
 		}
 	}
 }
@@ -930,7 +949,7 @@ var airflowAnswering = func(d astrov1.Deployment, token string) bool {
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astrov1.WorkerQueueRequest, hybridQueueList []astrov1.HybridWorkerQueueRequest, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogUrlPattern *string, force bool, astroV1Client astrov1.APIClient) (UpdateResult, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
+func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, executor, schedulerSize, highAvailability, developmentMode, cicdEnforcement, defaultTaskPodCpu, defaultTaskPodMemory, resourceQuotaCpu, resourceQuotaMemory, workloadIdentity string, schedulerAU, schedulerReplicas int, wQueueList []astrov1.WorkerQueueRequest, hybridQueueList []astrov1.HybridWorkerQueueRequest, newEnvironmentVariables []astrov1.DeploymentEnvironmentVariableRequest, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogUrlPattern *string, force bool, astroV1Client astrov1.APIClient, notes io.Writer) (UpdateResult, error) { //nolint:gocognit,gocyclo,gocritic,staticcheck // v1 complexity, refactor tracked separately
 	var confirmWithUser bool
 	// get deployment
 	currentDeployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
@@ -959,7 +978,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			if err := input.MayAsk("Are you sure you want to continue?", input.AnsweredBy("--yes")); err != nil {
 				return UpdateResult{}, err
 			}
-			fmt.Printf("\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start." +
+			fmt.Fprintf(progressTo(notes), "\nWarning: You are trying to update the dag deploy setting with ci-cd enforcement enabled. Once the setting is updated, you will not be able to deploy your dags using the CLI. Until you deploy your dags, dags will not be visible in the UI nor will new tasks start."+
 				"\nAfter the setting is updated, either disable cicd enforcement and then deploy your dags OR deploy your dags via CICD or using API Tokens.")
 			y, err := input.Confirm("\n\nAre you sure you want to continue?", input.AnsweredBy("--yes"))
 			if err != nil {
@@ -980,7 +999,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 
-		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled." +
+		fmt.Fprintf(progressTo(notes), "\nYou enabled DAG-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled."+
 			"\nRun `astro deploy --dags` to complete enabling this feature and resume your DAGs. It may take a few minutes for the Airflow UI to update..\n\n")
 		dagDeployEnabled = true
 	case disable:
@@ -989,7 +1008,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
-			fmt.Printf("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
+			fmt.Fprintf(progressTo(notes), "\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled"+
 				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update.")
 			confirmWithUser = true
 		}
@@ -997,7 +1016,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	case "":
 		dagDeployEnabled = currentDeployment.IsDagDeployEnabled
 	}
-	configOption, err := GetDeploymentOptions("", astrov1.GetDeploymentOptionsParams{}, astroV1Client)
+	configOption, err := getDeploymentOptions("", astrov1.GetDeploymentOptionsParams{}, astroV1Client)
 	if err != nil {
 		return UpdateResult{}, err
 	}
@@ -1037,7 +1056,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		var workerQueuesRequest []astrov1.UpdateWorkerQueueRequest
 		if currentDeployment.WorkerQueues != nil {
 			workerQueues := *currentDeployment.WorkerQueues
-			workerQueuesRequest = ConvertWorkerQueues(workerQueues, func(q astrov1.WorkerQueue) astrov1.UpdateWorkerQueueRequest {
+			workerQueuesRequest = convertWorkerQueues(workerQueues, func(q astrov1.WorkerQueue) astrov1.UpdateWorkerQueueRequest {
 				machine := astrov1.UpdateWorkerQueueRequestAstroMachine(*q.AstroMachine)
 				return astrov1.UpdateWorkerQueueRequest{
 					AstroMachine:      &machine,
@@ -1068,7 +1087,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}}
 
 		if len(wQueueList) > 0 {
-			workerQueuesRequest = ConvertCreateQueuesToUpdate(wQueueList)
+			workerQueuesRequest = convertCreateQueuesToUpdate(wQueueList)
 		}
 		var highAvailabilityValue bool
 		switch highAvailability {
@@ -1092,10 +1111,10 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		default:
 			return UpdateResult{}, errors.New("Invalid --development-mode value")
 		}
-		defaultTaskPodCPUPtr := UpdateDefaultTaskPodCPU(defaultTaskPodCpu, &currentDeployment, &configOption)
-		defaultTaskPodMemoryPtr := UpdateDefaultTaskPodMemory(defaultTaskPodMemory, &currentDeployment, &configOption)
-		resourceQuotaCPUPtr := UpdateResourceQuotaCPU(resourceQuotaCpu, &currentDeployment)
-		resourceQuotaMemoryPtr := UpdateResourceQuotaMemory(resourceQuotaMemory, &currentDeployment)
+		defaultTaskPodCPUPtr := updateDefaultTaskPodCPU(defaultTaskPodCpu, &currentDeployment, &configOption)
+		defaultTaskPodMemoryPtr := updateDefaultTaskPodMemory(defaultTaskPodMemory, &currentDeployment, &configOption)
+		resourceQuotaCPUPtr := updateResourceQuotaCPU(resourceQuotaCpu, &currentDeployment)
+		resourceQuotaMemoryPtr := updateResourceQuotaMemory(resourceQuotaMemory, &currentDeployment)
 		var remoteExecution *astrov1.DeploymentRemoteExecutionRequest
 		if IsRemoteExecutionEnabled(&currentDeployment) {
 			remoteExecution = &astrov1.DeploymentRemoteExecutionRequest{
@@ -1260,7 +1279,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		var workerQueuesRequest []astrov1.UpdateWorkerQueueRequest
 		if currentDeployment.WorkerQueues != nil {
 			workerQueues := *currentDeployment.WorkerQueues
-			workerQueuesRequest = ConvertWorkerQueues(workerQueues, func(q astrov1.WorkerQueue) astrov1.UpdateWorkerQueueRequest {
+			workerQueuesRequest = convertWorkerQueues(workerQueues, func(q astrov1.WorkerQueue) astrov1.UpdateWorkerQueueRequest {
 				nodePoolID := ""
 				if q.NodePoolId != nil {
 					nodePoolID = *q.NodePoolId
@@ -1278,7 +1297,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 
 		if len(hybridQueueList) > 0 {
-			workerQueuesRequest = ConvertHybridQueuesToUpdate(hybridQueueList)
+			workerQueuesRequest = convertHybridQueuesToUpdate(hybridQueueList)
 		}
 		if schedulerAU == 0 {
 			schedulerAU = *currentDeployment.SchedulerAu
@@ -1299,7 +1318,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		// validate au resources requests
 		resourcesValid := validateHybridResources(schedulerAU, schedulerReplicas, configOption)
 		if !resourcesValid {
-			return UpdateResult{}, ErrInvalidResourceRequest
+			return UpdateResult{}, errInvalidResourceRequest
 		}
 		var requestedExecutor astrov1.UpdateHybridDeploymentRequestExecutor
 		switch strings.ToUpper(executor) {
@@ -1387,7 +1406,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 		}
 	}
 	// update deployment
-	d, err := CoreUpdateDeployment(c.Organization, currentDeployment.Id, updateDeploymentRequest, astroV1Client)
+	d, err := coreUpdateDeployment(c.Organization, currentDeployment.Id, updateDeploymentRequest, astroV1Client)
 	if err != nil {
 		return UpdateResult{}, err
 	}
@@ -1399,7 +1418,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	return UpdateResult{Deployment: d, Updated: true}, nil
 }
 
-func ConvertHybridQueuesToUpdate(in []astrov1.HybridWorkerQueueRequest) []astrov1.UpdateWorkerQueueRequest {
+func convertHybridQueuesToUpdate(in []astrov1.HybridWorkerQueueRequest) []astrov1.UpdateWorkerQueueRequest {
 	out := make([]astrov1.UpdateWorkerQueueRequest, len(in))
 	for i := range in {
 		nodePoolID := in[i].NodePoolId
@@ -1416,7 +1435,7 @@ func ConvertHybridQueuesToUpdate(in []astrov1.HybridWorkerQueueRequest) []astrov
 	return out
 }
 
-func ConvertCreateQueuesToUpdate(in []astrov1.WorkerQueueRequest) []astrov1.UpdateWorkerQueueRequest {
+func convertCreateQueuesToUpdate(in []astrov1.WorkerQueueRequest) []astrov1.UpdateWorkerQueueRequest {
 	out := make([]astrov1.UpdateWorkerQueueRequest, len(in))
 	for i := range in {
 		machine := astrov1.UpdateWorkerQueueRequestAstroMachine(in[i].AstroMachine)
@@ -1458,7 +1477,7 @@ func updateWorkerQueuesForExecutor(newExecutor astrov1.DeploymentExecutor, worke
 	}
 }
 
-func CreateDefaultTaskPodCPU(defaultTaskPodCPU string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
+func createDefaultTaskPodCPU(defaultTaskPodCPU string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
 	if defaultTaskPodCPU != "" {
 		return &defaultTaskPodCPU
 	}
@@ -1468,7 +1487,7 @@ func CreateDefaultTaskPodCPU(defaultTaskPodCPU string, isRemoteExecutionEnabled 
 	return &configOption.ResourceQuotas.DefaultPodSize.Cpu.Default
 }
 
-func CreateDefaultTaskPodMemory(defaultTaskPodMemory string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
+func createDefaultTaskPodMemory(defaultTaskPodMemory string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
 	if defaultTaskPodMemory != "" {
 		return &defaultTaskPodMemory
 	}
@@ -1478,7 +1497,7 @@ func CreateDefaultTaskPodMemory(defaultTaskPodMemory string, isRemoteExecutionEn
 	return &configOption.ResourceQuotas.DefaultPodSize.Memory.Default
 }
 
-func CreateResourceQuotaCPU(resourceQuotaCPU string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
+func createResourceQuotaCPU(resourceQuotaCPU string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
 	if resourceQuotaCPU != "" {
 		return &resourceQuotaCPU
 	}
@@ -1488,7 +1507,7 @@ func CreateResourceQuotaCPU(resourceQuotaCPU string, isRemoteExecutionEnabled bo
 	return &configOption.ResourceQuotas.ResourceQuota.Cpu.Default
 }
 
-func CreateResourceQuotaMemory(resourceQuotaMemory string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
+func createResourceQuotaMemory(resourceQuotaMemory string, isRemoteExecutionEnabled bool, configOption *astrov1.DeploymentOptions) *string {
 	if resourceQuotaMemory != "" {
 		return &resourceQuotaMemory
 	}
@@ -1498,7 +1517,7 @@ func CreateResourceQuotaMemory(resourceQuotaMemory string, isRemoteExecutionEnab
 	return &configOption.ResourceQuotas.ResourceQuota.Memory.Default
 }
 
-func UpdateDefaultTaskPodCPU(defaultTaskPodCPU string, deployment *astrov1.Deployment, configOption *astrov1.DeploymentOptions) *string {
+func updateDefaultTaskPodCPU(defaultTaskPodCPU string, deployment *astrov1.Deployment, configOption *astrov1.DeploymentOptions) *string {
 	if defaultTaskPodCPU != "" {
 		return &defaultTaskPodCPU
 	}
@@ -1514,7 +1533,7 @@ func UpdateDefaultTaskPodCPU(defaultTaskPodCPU string, deployment *astrov1.Deplo
 	return nil
 }
 
-func UpdateDefaultTaskPodMemory(defaultTaskPodMemory string, deployment *astrov1.Deployment, configOption *astrov1.DeploymentOptions) *string {
+func updateDefaultTaskPodMemory(defaultTaskPodMemory string, deployment *astrov1.Deployment, configOption *astrov1.DeploymentOptions) *string {
 	if defaultTaskPodMemory != "" {
 		return &defaultTaskPodMemory
 	}
@@ -1530,14 +1549,14 @@ func UpdateDefaultTaskPodMemory(defaultTaskPodMemory string, deployment *astrov1
 	return nil
 }
 
-func UpdateResourceQuotaCPU(resourceQuotaCPU string, deployment *astrov1.Deployment) *string {
+func updateResourceQuotaCPU(resourceQuotaCPU string, deployment *astrov1.Deployment) *string {
 	if resourceQuotaCPU != "" {
 		return &resourceQuotaCPU
 	}
 	return deployment.ResourceQuotaCpu
 }
 
-func UpdateResourceQuotaMemory(resourceQuotaMemory string, deployment *astrov1.Deployment) *string {
+func updateResourceQuotaMemory(resourceQuotaMemory string, deployment *astrov1.Deployment) *string {
 	if resourceQuotaMemory != "" {
 		return &resourceQuotaMemory
 	}
@@ -1582,7 +1601,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 		}
 	}
 
-	err = CoreDeleteDeployment(currentDeployment.OrganizationId, currentDeployment.Id, astroV1Client)
+	err = coreDeleteDeployment(currentDeployment.OrganizationId, currentDeployment.Id, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -1590,7 +1609,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 		DeploymentID: currentDeployment.Id,
 		Name:         currentDeployment.Name,
 		WorkspaceID:  currentDeployment.WorkspaceId,
-		Action:       ActionDeleted,
+		Action:       actionDeleted,
 	}, nil
 }
 
@@ -1618,7 +1637,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	}
 
 	if currentDeployment.IsDevelopmentMode == nil || !*currentDeployment.IsDevelopmentMode {
-		return nil, ErrNotADevelopmentDeployment
+		return nil, errNotADevelopmentDeployment
 	}
 
 	// prompt user
@@ -1640,7 +1659,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		OverrideUntil: overrideUntil,
 	}
 
-	deploymentHibernationOverride, err := CoreUpdateDeploymentHibernationOverride(currentDeployment.OrganizationId, currentDeployment.Id, overrideDeploymentHibernationBody, astroV1Client)
+	deploymentHibernationOverride, err := coreUpdateDeploymentHibernationOverride(currentDeployment.OrganizationId, currentDeployment.Id, overrideDeploymentHibernationBody, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -1661,17 +1680,19 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 // WaitForHibernationOverride waits until the Deployment reports the state an
 // override asked for: hibernating, or healthy again. Unlike HealthPoll it
 // has no initial sleep, which would be longer than a whole wake-up.
-func WaitForHibernationOverride(deploymentID string, isHibernating bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+// Its progress goes to progress (stderr when nil).
+func WaitForHibernationOverride(progress io.Writer, deploymentID string, isHibernating bool, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+	progress = progressTo(progress)
 	status, timedOut, waiting, done := astrov1.DeploymentStatusHEALTHY, ErrTimedOut, "wake up", "awake"
 	if isHibernating {
 		status, timedOut, waiting, done = astrov1.DeploymentStatusHIBERNATING, ErrTimedOutHibernating, "hibernate", "hibernating"
 	}
-	fmt.Printf("\nWaiting for the Deployment to %s…\n", waiting)
+	fmt.Fprintf(progress, "\nWaiting for the Deployment to %s…\n", waiting)
 	d, err := pollStatus("", "", deploymentID, 0, TickNum, int(waitTime.Seconds()), astroV1Client, timedOut, status)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Deployment %s is now %s\n", d.Name, done)
+	fmt.Fprintf(progress, "Deployment %s is now %s\n", d.Name, done)
 	return nil
 }
 
@@ -1693,7 +1714,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	}
 
 	if currentDeployment.IsDevelopmentMode == nil || !*currentDeployment.IsDevelopmentMode {
-		return nil, ErrNotADevelopmentDeployment
+		return nil, errNotADevelopmentDeployment
 	}
 
 	// prompt user
@@ -1710,7 +1731,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 		}
 	}
 
-	err = CoreDeleteDeploymentHibernationOverride(currentDeployment.OrganizationId, currentDeployment.Id, astroV1Client)
+	err = coreDeleteDeploymentHibernationOverride(currentDeployment.OrganizationId, currentDeployment.Id, astroV1Client)
 	if err != nil {
 		return nil, err
 	}
@@ -1725,7 +1746,7 @@ func IsDeploymentDedicated(deploymentType astrov1.DeploymentType) bool {
 	return deploymentType == astrov1.DeploymentTypeDEDICATED
 }
 
-func IsDeploymentHybrid(deploymentType astrov1.DeploymentType) bool {
+func isDeploymentHybrid(deploymentType astrov1.DeploymentType) bool {
 	return deploymentType == astrov1.DeploymentTypeHYBRID
 }
 
@@ -1733,10 +1754,10 @@ func IsRemoteExecutionEnabled(deployment *astrov1.Deployment) bool {
 	return deployment.RemoteExecution != nil && deployment.RemoteExecution.Enabled
 }
 
-// CoreUpdateDeploymentHibernationOverride updates a deployment hibernation override with the core API
+// coreUpdateDeploymentHibernationOverride updates a deployment hibernation override with the core API
 //
 //nolint:dupl // the duplication is acceptable here
-var CoreUpdateDeploymentHibernationOverride = func(orgID, deploymentID string, overrideDeploymentHibernationRequest astrov1.OverrideDeploymentHibernationBody, astroV1Client astrov1.APIClient) (astrov1.DeploymentHibernationOverride, error) {
+var coreUpdateDeploymentHibernationOverride = func(orgID, deploymentID string, overrideDeploymentHibernationRequest astrov1.OverrideDeploymentHibernationBody, astroV1Client astrov1.APIClient) (astrov1.DeploymentHibernationOverride, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1756,8 +1777,8 @@ var CoreUpdateDeploymentHibernationOverride = func(orgID, deploymentID string, o
 	return deploymentHibernationOverride, nil
 }
 
-// CoreDeleteDeploymentHibernationOverride deletes a deployment hibernation override with the core API
-var CoreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, astroV1Client astrov1.APIClient) error {
+// coreDeleteDeploymentHibernationOverride deletes a deployment hibernation override with the core API
+var coreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, astroV1Client astrov1.APIClient) error {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1850,8 +1871,8 @@ var GetDeploymentByID = func(orgID, deploymentID string, astroV1Client astrov1.A
 	return deployment, nil
 }
 
-// CoreCreateDeployment creates a deployment with the core API
-var CoreCreateDeployment = func(orgID string, createDeploymentRequest astrov1.CreateDeploymentJSONRequestBody, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+// coreCreateDeployment creates a deployment with the core API
+var coreCreateDeployment = func(orgID string, createDeploymentRequest astrov1.CreateDeploymentJSONRequestBody, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1874,10 +1895,10 @@ var CoreCreateDeployment = func(orgID string, createDeploymentRequest astrov1.Cr
 	return deployment, nil
 }
 
-// CoreUpdateDeployment updates a deployment with the core API
+// coreUpdateDeployment updates a deployment with the core API
 //
 //nolint:dupl // the duplication is acceptable here
-var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astrov1.UpdateDeploymentJSONRequestBody, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
+var coreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequest astrov1.UpdateDeploymentJSONRequestBody, astroV1Client astrov1.APIClient) (astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1898,8 +1919,8 @@ var CoreUpdateDeployment = func(orgID, deploymentID string, updateDeploymentRequ
 	return deployment, nil
 }
 
-// CoreDeleteDeployment deletes a deployment with the core API
-var CoreDeleteDeployment = func(orgID, deploymentID string, astroV1Client astrov1.APIClient) error {
+// coreDeleteDeployment deletes a deployment with the core API
+var coreDeleteDeployment = func(orgID, deploymentID string, astroV1Client astrov1.APIClient) error {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1921,7 +1942,7 @@ var CoreDeleteDeployment = func(orgID, deploymentID string, astroV1Client astrov
 	return nil
 }
 
-var GetDeploymentOptions = func(orgID string, deploymentOptionsParams astrov1.GetDeploymentOptionsParams, astroV1Client astrov1.APIClient) (astrov1.DeploymentOptions, error) {
+var getDeploymentOptions = func(orgID string, deploymentOptionsParams astrov1.GetDeploymentOptionsParams, astroV1Client astrov1.APIClient) (astrov1.DeploymentOptions, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -1964,7 +1985,7 @@ func GetPlatformDeploymentOptions(orgID string, deploymentOptionsParams astrov1.
 	return DeploymentOptions, nil
 }
 
-var GetDeploymentLogs = func(orgID string, deploymentID string, getDeploymentLogsParams astrov1.GetDeploymentLogsParams, astroV1Client astrov1.APIClient) (astrov1.DeploymentLog, error) {
+var getDeploymentLogs = func(orgID string, deploymentID string, getDeploymentLogsParams astrov1.GetDeploymentLogsParams, astroV1Client astrov1.APIClient) (astrov1.DeploymentLog, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
 		if err != nil {
@@ -2151,7 +2172,7 @@ func DeploymentURLOn(domain, deploymentID, workspaceID string) string {
 	return "cloud." + domain + "/" + workspaceID + "/deployments/" + deploymentID
 }
 
-func GetCoreCloudProvider(cloudProvider string) astrov1.GetDeploymentOptionsParamsCloudProvider {
+func getCoreCloudProvider(cloudProvider string) astrov1.GetDeploymentOptionsParamsCloudProvider {
 	var coreCloudProvider astrov1.GetDeploymentOptionsParamsCloudProvider
 	switch strings.ToUpper(cloudProvider) {
 	case strings.ToUpper(awsCloud):
@@ -2168,8 +2189,8 @@ func isDevelopmentDeployment(deployment astrov1.Deployment) bool { //nolint:gocr
 	return deployment.IsDevelopmentMode != nil && *deployment.IsDevelopmentMode
 }
 
-// ConvertWorkerQueues is a generic function to convert a slice of WorkerQueue to a slice of T (WorkerQueueRequest or HybridWorkerQueueRequest)
-func ConvertWorkerQueues[T any](workerQueues []astrov1.WorkerQueue, convertFn func(astrov1.WorkerQueue) T) []T {
+// convertWorkerQueues is a generic function to convert a slice of WorkerQueue to a slice of T (WorkerQueueRequest or HybridWorkerQueueRequest)
+func convertWorkerQueues[T any](workerQueues []astrov1.WorkerQueue, convertFn func(astrov1.WorkerQueue) T) []T {
 	result := make([]T, 0, len(workerQueues))
 	for i := range workerQueues {
 		result = append(result, convertFn(workerQueues[i]))

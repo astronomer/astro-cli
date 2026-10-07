@@ -5,6 +5,7 @@ import (
 	"bytes"
 	httpContext "context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,11 +118,13 @@ type InputDeploy struct {
 	Image          bool
 	WaitForStatus  bool
 	WaitTime       time.Duration
-	DagsPath       string
-	Description    string
-	BuildSecrets   []string
-	Force          bool
-	DagBundleName  string
+	// Progress takes the --wait progress; nil is stderr.
+	Progress      io.Writer
+	DagsPath      string
+	Description   string
+	BuildSecrets  []string
+	Force         bool
+	DagBundleName string
 }
 
 // InputClientDeploy contains inputs for client image deployments
@@ -396,7 +399,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 		if deployInput.WaitForStatus {
 			// Keeping wait timeout low since dag only deploy is faster
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, dagOnlyDeploySleepTime, tickNum, int(deployInput.WaitTime.Seconds()), astroV1Client)
+			err = deployment.HealthPoll(deployInput.Progress, deployInfo.deploymentID, dagOnlyDeploySleepTime, tickNum, int(deployInput.WaitTime.Seconds()), astroV1Client)
 			if err != nil {
 				return err
 			}
@@ -488,7 +491,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		if deployInput.WaitForStatus {
-			err = deployment.HealthPoll(deployInfo.deploymentID, deployInfo.workspaceID, sleepTime, tickNum, int(deployInput.WaitTime.Seconds()), astroV1Client)
+			err = deployment.HealthPoll(deployInput.Progress, deployInfo.deploymentID, sleepTime, tickNum, int(deployInput.WaitTime.Seconds()), astroV1Client)
 			if err != nil {
 				return err
 			}

@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -218,15 +219,21 @@ func TestDeployManifestDags_WaitUsesTheLoginItIsHanded(t *testing.T) {
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
+	var progress bytes.Buffer
 	_, err := DeployManifestDags(ManifestDagDeployInput{
 		Login:        &config.Context{Domain: "astronomer.io", Organization: "prod-org", Token: "Bearer prod-token"},
 		ProjectDir:   manifestProjectDir(t),
 		DeploymentID: "test-deployment-id",
 		Wait:         true,
 		WaitTime:     30 * time.Second,
+		Progress:     &progress,
 	}, client)
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer prod-token", auth)
+	// The wait's progress goes where the caller says (stderr, from cmd), so
+	// stdout stays the deploy's result.
+	assert.Contains(t, progress.String(), "Waiting for the deployment to become healthy")
+	assert.Contains(t, progress.String(), "Deployment test-deployment is now healthy")
 	client.AssertExpectations(t)
 }
 

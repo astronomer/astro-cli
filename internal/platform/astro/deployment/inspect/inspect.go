@@ -248,7 +248,7 @@ func getDeploymentConfig(deploymentPointer *astrov1.Deployment, astroV1Client as
 	if !deployment.IsDeploymentStandard(*deploymentObj.Type) {
 		clusterName = *deploymentObj.ClusterName
 		if deploymentObj.TaskPodNodePoolId != nil {
-			defaultWorkerType, err = GetDefaultWorkerType(*deploymentObj.TaskPodNodePoolId, *deploymentObj.ClusterId, astroV1Client)
+			defaultWorkerType, err = getDefaultWorkerType(*deploymentObj.TaskPodNodePoolId, *deploymentObj.ClusterId, astroV1Client)
 			if err != nil {
 				return nil, err
 			}
@@ -482,7 +482,7 @@ func getWorkerTypeFromNodePoolID(poolID string, nodePools []astrov1.NodePool) st
 	return ""
 }
 
-func GetDefaultWorkerType(taskPodNodePoolID, clusterID string, astroV1Client astrov1.APIClient) (string, error) {
+func getDefaultWorkerType(taskPodNodePoolID, clusterID string, astroV1Client astrov1.APIClient) (string, error) {
 	var defaultWorkerType string
 	cluster, err := deployment.GetClusterByID("", clusterID, astroV1Client)
 	if err != nil {

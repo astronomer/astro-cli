@@ -7,9 +7,9 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 )
 
-// ActionDeleted is a delete's Result action. A create's is "created" and an
+// actionDeleted is a delete's Result action. A create's is "created" and an
 // update's "updated", the past tense of the command.
-const ActionDeleted = "deleted"
+const actionDeleted = "deleted"
 
 // Result is what `astro deployment worker-queue create`, `update` or
 // `delete` did, as they publish it under --output json: the Deployment it

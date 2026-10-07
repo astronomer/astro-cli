@@ -34,7 +34,7 @@ var (
 	errQueueDoesNotExist         = errors.New("worker queue does not exist")
 	errInvalidQueue              = errors.New("worker queue selection failed")
 	errCannotDeleteDefaultQueue  = errors.New("default queue can not be deleted")
-	ErrNotSupported              = errors.New("does not support")
+	errNotSupported              = errors.New("does not support")
 	errNoUseWorkerQueues         = errors.New("don't use 'worker_queues' to update default queue with KubernetesExecutor, use 'default_task_pod_cpu' and 'default_task_pod_memory' instead")
 	errNoWorkerQueues            = errors.New("no worker queues found for this deployment")
 )
@@ -123,7 +123,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			MaxWorkerCount:    wQueueMax,         // use the value from the user input
 			WorkerConcurrency: wQueueConcurrency, // use the value from the user input
 		}
-		queueToCreateOrUpdate = SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions, &workerMachine)
+		queueToCreateOrUpdate = setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdate, defaultOptions, &workerMachine)
 	} else {
 		// get the node poolID to use
 		cluster, err := deployment.GetClusterByID("", *requestedDeployment.ClusterId, astroV1Client)
@@ -164,17 +164,17 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			}
 			name = queueToCreateOrUpdateHybrid.Name
 		}
-		queueToCreateOrUpdateHybrid = SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdateHybrid, defaultOptions)
+		queueToCreateOrUpdateHybrid = setWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency, queueToCreateOrUpdateHybrid, defaultOptions)
 	}
 	switch *requestedDeployment.Executor {
 	case astrov1.DeploymentExecutorCELERY, astrov1.DeploymentExecutorASTRO:
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			err = IsHostedWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
+			err = isHostedWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			err = IsWorkerQueueInputValid(queueToCreateOrUpdateHybrid, defaultOptions)
+			err = isWorkerQueueInputValid(queueToCreateOrUpdateHybrid, defaultOptions)
 			if err != nil {
 				return nil, err
 			}
@@ -186,7 +186,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 		// -1 is the CLI default to allow users to request wQueueMin=0. Here we set it to default because MinWorkerCount is not used in Kubernetes Deployments
 		queueToCreateOrUpdateHybrid.MinWorkerCount = -1
-		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
+		err = isKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +197,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	// create listToCreate
 	switch action {
 	case createAction:
-		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
+		if queueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			// create does not allow updating existing queues
 			errHelp = fmt.Sprintf("use worker queue update %s instead", name)
 			return nil, fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
@@ -206,7 +206,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		listToCreate = append(listToCreate, queueToCreateOrUpdate)
 		hybridListToCreate = append(hybridListToCreate, queueToCreateOrUpdateHybrid)
 	case updateAction:
-		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
+		if queueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			if !force {
 				i, err := input.Confirm(
 					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(name)), input.AnsweredBy("--yes"))
@@ -234,7 +234,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		}
 	}
 	// update the deployment with the new list of worker queues
-	_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client)
+	_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -268,8 +268,8 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	return res, nil
 }
 
-// SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
-func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate astrov1.WorkerQueueRequest, workerQueueDefaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) astrov1.WorkerQueueRequest { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
+// setWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
+func setWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate astrov1.WorkerQueueRequest, workerQueueDefaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) astrov1.WorkerQueueRequest { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
 	// -1 is the CLI default to allow users to request wQueueMin=0
 	if wQueueMin == -1 {
 		// set default value as user input did not have it
@@ -287,8 +287,8 @@ func SetWorkerQueueValues(wQueueMin, wQueueMax, wQueueConcurrency int, workerQue
 	return workerQueueToCreate
 }
 
-// SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
-func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate astrov1.HybridWorkerQueueRequest, workerQueueDefaultOptions astrov1.WorkerQueueOptions) astrov1.HybridWorkerQueueRequest {
+// setWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
+func setWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, workerQueueToCreate astrov1.HybridWorkerQueueRequest, workerQueueDefaultOptions astrov1.WorkerQueueOptions) astrov1.HybridWorkerQueueRequest {
 	// -1 is the CLI default to allow users to request wQueueMin=default
 	if wQueueMin == -1 {
 		// set default value as user input did not have it
@@ -305,11 +305,11 @@ func SetWorkerQueueValuesHybrid(wQueueMin, wQueueMax, wQueueConcurrency int, wor
 	return workerQueueToCreate
 }
 
-// IsWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions.
+// isWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions.
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
-// ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsWorkerQueueInputValid(requestedHybridWorkerQueue astrov1.HybridWorkerQueueRequest, defaultOptions astrov1.WorkerQueueOptions) error {
+// errNotSupported is returned if PodCPU or PodRAM are requested.
+func isWorkerQueueInputValid(requestedHybridWorkerQueue astrov1.HybridWorkerQueueRequest, defaultOptions astrov1.WorkerQueueOptions) error {
 	var errorMessage string
 	if !(requestedHybridWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedHybridWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
@@ -329,11 +329,11 @@ func IsWorkerQueueInputValid(requestedHybridWorkerQueue astrov1.HybridWorkerQueu
 	return nil
 }
 
-// IsHostedWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
+// isHostedWorkerQueueInputValid checks if the requestedWorkerQueue adheres to the floor and ceiling set in the defaultOptions and machineOptions.
 // if it adheres to them, it returns nil.
 // errInvalidWorkerQueueOption is returned if min, max or concurrency are out of range.
-// ErrNotSupported is returned if PodCPU or PodRAM are requested.
-func IsHostedWorkerQueueInputValid(requestedWorkerQueue astrov1.WorkerQueueRequest, defaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) error { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
+// errNotSupported is returned if PodCPU or PodRAM are requested.
+func isHostedWorkerQueueInputValid(requestedWorkerQueue astrov1.WorkerQueueRequest, defaultOptions astrov1.WorkerQueueOptions, machineOptions *astrov1.WorkerMachine) error { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
 	var errorMessage string
 	if !(requestedWorkerQueue.MinWorkerCount >= int(defaultOptions.MinWorkers.Floor)) ||
 		!(requestedWorkerQueue.MinWorkerCount <= int(defaultOptions.MinWorkers.Ceiling)) {
@@ -355,32 +355,32 @@ func IsHostedWorkerQueueInputValid(requestedWorkerQueue astrov1.WorkerQueueReque
 	return nil
 }
 
-// IsKubernetesWorkerQueueInputValid checks if the requestedQueue has all the necessary properties
+// isKubernetesWorkerQueueInputValid checks if the requestedQueue has all the necessary properties
 // required to create a worker queue for the KubernetesExecutor.
 // errNotSupported is returned for any invalid properties.
-func IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid astrov1.HybridWorkerQueueRequest) error {
+func isKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid astrov1.HybridWorkerQueueRequest) error {
 	var errorMessage string
 
 	if queueToCreateOrUpdateHybrid.Name != defaultQueueName {
 		errorMessage = "a non default worker queue in the request. Rename the queue to default"
-		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
+		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, errNotSupported, errorMessage)
 	}
 	if queueToCreateOrUpdateHybrid.MaxWorkerCount != 0 {
 		errorMessage = "maximum worker count in the request. It can only be used with CeleryExecutor"
-		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
+		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, errNotSupported, errorMessage)
 	}
 	if queueToCreateOrUpdateHybrid.WorkerConcurrency != 0 {
 		errorMessage = "worker concurrency in the request. It can only be used with CeleryExecutor"
-		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, ErrNotSupported, errorMessage)
+		return fmt.Errorf("%s %w %s", deployment.KubeExecutor, errNotSupported, errorMessage)
 	}
 
 	return nil
 }
 
-// QueueExists takes a []existingQueues and a queueToCreateOrUpdate as arguments
+// queueExists takes a []existingQueues and a queueToCreateOrUpdate as arguments
 // It returns true if queueToCreateOrUpdate exists in []existingQueues
 // It returns false if queueToCreateOrUpdate does not exist in []existingQueues
-func QueueExists(existingQueues []astrov1.WorkerQueue, queueToCreateOrUpdate astrov1.WorkerQueueRequest, queueToCreateOrUpdateHybrid astrov1.HybridWorkerQueueRequest) bool { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
+func queueExists(existingQueues []astrov1.WorkerQueue, queueToCreateOrUpdate astrov1.WorkerQueueRequest, queueToCreateOrUpdateHybrid astrov1.HybridWorkerQueueRequest) bool { //nolint:gocritic // WorkerQueueRequest is a large generated API type; passed by value intentionally
 	for _, queue := range existingQueues {
 		if queue.Name == queueToCreateOrUpdateHybrid.Name {
 			// queueToCreateOrUpdate exists
@@ -537,7 +537,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 	// sanitize all the existing queues based on executor
 	existingQueues = sanitizeExistingQueues(*requestedDeployment.WorkerQueues, *requestedDeployment.Executor)
 
-	if QueueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
+	if queueExists(existingQueues, queueToDelete, queueToDeleteHybrid) {
 		if !force {
 			i, err := input.Confirm(
 				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)), input.AnsweredBy("--yes"))
@@ -567,7 +567,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 				}
 			}
 			// update the deployment with the new list
-			_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client)
+			_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -588,7 +588,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 				}
 			}
 			// update the deployment with the new list
-			_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client)
+			_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -597,7 +597,7 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 			DeploymentID:   requestedDeployment.Id,
 			DeploymentName: requestedDeployment.Name,
 			WorkspaceID:    requestedDeployment.WorkspaceId,
-			Action:         ActionDeleted,
+			Action:         actionDeleted,
 		}
 		for i := range existingQueues {
 			if q := existingQueues[i]; q.Name == name {

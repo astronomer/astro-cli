@@ -53,7 +53,7 @@ func captureCreateDeploy(client *astrov1_mocks.ClientWithResponsesInterface, dep
 	return got
 }
 
-func dagDeployWithCapture(t *testing.T, in ManifestDagDeployInput) (ManifestDagDeployResult, *astrov1.CreateDeployRequest) {
+func dagDeployWithCapture(t *testing.T, in *ManifestDagDeployInput) (ManifestDagDeployResult, *astrov1.CreateDeployRequest) {
 	t.Helper()
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 	mockManifestDeployment(client, true, false)
@@ -63,7 +63,7 @@ func dagDeployWithCapture(t *testing.T, in ManifestDagDeployInput) (ManifestDagD
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
 	in.DeploymentID = "test-deployment-id"
-	res, err := DeployManifestDags(in, client)
+	res, err := DeployManifestDags(*in, client)
 	require.NoError(t, err)
 	client.AssertExpectations(t)
 	return res, req
@@ -86,7 +86,7 @@ func assertGitHubCommit(t *testing.T, g *astrov1.CreateDeployGitRequest) {
 
 func TestDeployManifestDags_RecordsTheCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
 
 	assertGitHubCommit(t, req.Git)
 	require.NotNil(t, req.Description)
@@ -97,7 +97,7 @@ func TestDeployManifestDags_RecordsTheCommit(t *testing.T) {
 
 func TestDeployManifestDags_KeepsAGivenDescription(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false), Description: "hotfix"})
+	_, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false), Description: "hotfix"})
 
 	assertGitHubCommit(t, req.Git)
 	assert.Equal(t, "hotfix", *req.Description)
@@ -105,7 +105,7 @@ func TestDeployManifestDags_KeepsAGivenDescription(t *testing.T) {
 
 func TestDeployManifestDags_UncommittedChangesRecordNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, true)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, true)})
 
 	assert.Nil(t, req.Git)
 	assert.Empty(t, *req.Description)
@@ -118,7 +118,7 @@ func TestDeployManifestDags_GitMetadataSettingOff(t *testing.T) {
 	require.NoError(t, config.CFG.DeployGitMetadata.SetHomeString("false"))
 	t.Cleanup(func() { _ = config.CFG.DeployGitMetadata.SetHomeString("true") })
 
-	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestGitProjectDir(t, false)})
 
 	assert.Nil(t, req.Git)
 	assert.Empty(t, *req.Description)
@@ -127,7 +127,7 @@ func TestDeployManifestDags_GitMetadataSettingOff(t *testing.T) {
 
 func TestDeployManifestDags_OutsideAGitCheckoutRecordsNoCommit(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	res, req := dagDeployWithCapture(t, ManifestDagDeployInput{ProjectDir: manifestProjectDir(t)})
+	res, req := dagDeployWithCapture(t, &ManifestDagDeployInput{ProjectDir: manifestProjectDir(t)})
 
 	assert.Nil(t, req.Git)
 	assert.Equal(t, ManifestDeployGit{}, res.Git)

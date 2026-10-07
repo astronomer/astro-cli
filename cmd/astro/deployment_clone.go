@@ -77,7 +77,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 	if cmd.Flags().Changed("description") {
 		desc = &description
 	}
-	d, notes, err := deployment.Clone(&src, label, target, desc, waitForStatus, waitTimeForDeployment, astroV1Client)
+	d, notes, err := deployment.Clone(&src, label, target, desc, waitForStatus, waitTimeForDeployment, astroV1Client, cmd.ErrOrStderr())
 	if d.Id == "" {
 		return err
 	}

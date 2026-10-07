@@ -404,7 +404,7 @@ func (s *Suite) TestCreate() {
 
 		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
 
-		s.ErrorIs(err, ErrNotSupported)
+		s.ErrorIs(err, errNotSupported)
 		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -416,7 +416,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil)
 
 		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
-		s.ErrorIs(err, ErrNotSupported)
+		s.ErrorIs(err, errNotSupported)
 		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -700,7 +700,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
 		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", updateAction, "test-instance-type-1", -1, 0, 0, false, mockV1Client, out)
-		s.ErrorIs(err, ErrNotSupported)
+		s.ErrorIs(err, errNotSupported)
 		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -903,27 +903,27 @@ func (s *Suite) TestSetWorkerQueueValues() {
 		},
 	}
 	s.Run("sets user provided min worker count for queue", func() {
-		actualQueue := SetWorkerQueueValues(0, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		actualQueue := setWorkerQueueValues(0, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.Equal(mockWorkerQueue.MinWorkerCount, actualQueue.MinWorkerCount)
 	})
 	s.Run("sets user provided max worker count for queue", func() {
-		actualQueue := SetWorkerQueueValues(10, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		actualQueue := setWorkerQueueValues(10, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.Equal(mockWorkerQueue.MaxWorkerCount, actualQueue.MaxWorkerCount)
 	})
 	s.Run("sets user provided worker concurrency for queue", func() {
-		actualQueue := SetWorkerQueueValues(10, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		actualQueue := setWorkerQueueValues(10, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.Equal(mockWorkerQueue.WorkerConcurrency, actualQueue.WorkerConcurrency)
 	})
 	s.Run("sets default min worker count for queue if user did not provide it", func() {
-		actualQueue := SetWorkerQueueValues(-1, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		actualQueue := setWorkerQueueValues(-1, 150, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.Equal(int(mockWorkerQueueDefaultOptions.MinWorkers.Default), actualQueue.MinWorkerCount)
 	})
 	s.Run("sets default max worker count for queue if user did not provide it", func() {
-		actualQueue := SetWorkerQueueValues(10, 0, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		actualQueue := setWorkerQueueValues(10, 0, 225, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.Equal(int(mockWorkerQueueDefaultOptions.MaxWorkers.Default), actualQueue.MaxWorkerCount)
 	})
 	s.Run("sets default worker concurrency for queue if user did not provide it", func() {
-		actualQueue := SetWorkerQueueValues(10, 150, 0, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		actualQueue := setWorkerQueueValues(10, 150, 0, mockWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.Equal(int(mockWorkerQueueDefaultOptions.WorkerConcurrency.Default), actualQueue.WorkerConcurrency)
 	})
 }
@@ -960,19 +960,19 @@ func (s *Suite) TestIsCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 0
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 275
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := isWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.NoError(err)
 	})
 	s.Run("returns an error when min worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 35
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := isWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
 	})
 	s.Run("returns an error when max worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := isWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
@@ -980,7 +980,7 @@ func (s *Suite) TestIsCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 350
-		err := IsWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
+		err := isWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: worker concurrency must be between 175 and 275")
 	})
@@ -1025,19 +1025,19 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 0
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 10
-		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := isHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.NoError(err)
 	})
 	s.Run("returns an error when min worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 35
-		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := isHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: min worker count must be between 0 and 20")
 	})
 	s.Run("returns an error when max worker count is not between default floor and ceiling values", func() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 19
-		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := isHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: max worker count must be between 20 and 200")
 	})
@@ -1045,7 +1045,7 @@ func (s *Suite) TestIsHostedCeleryWorkerQueueInputValid() {
 		requestedWorkerQueue.MinWorkerCount = 8
 		requestedWorkerQueue.MaxWorkerCount = 25
 		requestedWorkerQueue.WorkerConcurrency = 20
-		err := IsHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
+		err := isHostedWorkerQueueInputValid(requestedWorkerQueue, mockWorkerQueueDefaultOptions, mockMachineOptions)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		s.Contains(err.Error(), "worker queue option is invalid: worker concurrency must be between 1 and 15")
 	})
@@ -1062,7 +1062,7 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 	}
 
 	s.Run("returns nil when queue input is valid", func() {
-		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		err := isKubernetesWorkerQueueInputValid(requestedWorkerQueue)
 		s.NoError(err)
 	})
 	s.Run("returns an error when queue name is not default", func() {
@@ -1076,8 +1076,8 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 				WorkerConcurrency: 0,
 			}
 		}()
-		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
-		s.ErrorIs(err, ErrNotSupported)
+		err := isKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		s.ErrorIs(err, errNotSupported)
 		s.Contains(err.Error(), "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 	})
 	s.Run("returns an error when max_worker_count is in input", func() {
@@ -1091,8 +1091,8 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 				WorkerConcurrency: 0,
 			}
 		}()
-		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
-		s.ErrorIs(err, ErrNotSupported)
+		err := isKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		s.ErrorIs(err, errNotSupported)
 		s.Contains(err.Error(), "KubernetesExecutor does not support maximum worker count in the request. It can only be used with CeleryExecutor")
 	})
 	s.Run("returns an error when worker_concurrency is in input", func() {
@@ -1106,8 +1106,8 @@ func (s *Suite) TestIsKubernetesWorkerQueueInputValid() {
 				WorkerConcurrency: 0,
 			}
 		}()
-		err := IsKubernetesWorkerQueueInputValid(requestedWorkerQueue)
-		s.ErrorIs(err, ErrNotSupported)
+		err := isKubernetesWorkerQueueInputValid(requestedWorkerQueue)
+		s.ErrorIs(err, errNotSupported)
 		s.Contains(err.Error(), "KubernetesExecutor does not support worker concurrency in the request. It can only be used with CeleryExecutor")
 	})
 }
@@ -1139,20 +1139,20 @@ func (s *Suite) TestQueueExists() {
 		},
 	}
 	s.Run("returns true if queue with same name exists in list of queues", func() {
-		actual := QueueExists(existingQueues, astrov1.WorkerQueueRequest{Name: "test-default-queue"}, astrov1.HybridWorkerQueueRequest{Name: "test-default-queue"})
+		actual := queueExists(existingQueues, astrov1.WorkerQueueRequest{Name: "test-default-queue"}, astrov1.HybridWorkerQueueRequest{Name: "test-default-queue"})
 		s.True(actual)
 	})
 	s.Run("returns true if queue with same id exists in list of queues", func() {
-		actual := QueueExists(existingQueues, astrov1.WorkerQueueRequest{Id: &testWQID}, astrov1.HybridWorkerQueueRequest{Id: &testWQID})
+		actual := queueExists(existingQueues, astrov1.WorkerQueueRequest{Id: &testWQID}, astrov1.HybridWorkerQueueRequest{Id: &testWQID})
 		fmt.Println(actual)
 		s.True(actual)
 	})
 	s.Run("returns false if queue with same name does not exist in list of queues", func() {
-		actual := QueueExists(existingQueues, astrov1.WorkerQueueRequest{Name: "test-default-queues"}, astrov1.HybridWorkerQueueRequest{Name: "test-default-queues"})
+		actual := queueExists(existingQueues, astrov1.WorkerQueueRequest{Name: "test-default-queues"}, astrov1.HybridWorkerQueueRequest{Name: "test-default-queues"})
 		s.False(actual)
 	})
 	s.Run("returns false if queue with same id exists in list of queues", func() {
-		actual := QueueExists(existingQueues, astrov1.WorkerQueueRequest{Id: &testWQID10}, astrov1.HybridWorkerQueueRequest{Id: &testWQID10})
+		actual := queueExists(existingQueues, astrov1.WorkerQueueRequest{Id: &testWQID10}, astrov1.HybridWorkerQueueRequest{Id: &testWQID10})
 		s.False(actual)
 	})
 }

@@ -179,7 +179,6 @@ func TestDeploymentCoreText(t *testing.T) {
 			},
 			args: createArgs,
 			check: tableThen("etl-prod",
-				"Current Workspace: test-workspace",
 				"Successfully created Deployment: ", "etl-prod",
 				"Deployment can be accessed at the following URLs",
 				"Deployment Dashboard: ", coreDeploymentID,
@@ -378,7 +377,7 @@ func TestDeploymentCoreJSON(t *testing.T) {
 		assert.Equal(t, "workspace-id", got.Deployment.Metadata.WorkspaceID)
 		assert.Equal(t, "etl-prod", got.Deployment.Configuration.Name)
 		assert.Equal(t, "test-workspace", got.Deployment.Configuration.WorkspaceName)
-		assert.Empty(t, r.stderr)
+		assert.Equal(t, "Current Workspace: test-workspace\n\n", r.stderr, "the note, on stderr")
 		m.AssertExpectations(t)
 	})
 
@@ -501,7 +500,8 @@ func TestDeploymentCoreWaitThatRunsOut(t *testing.T) {
 			assert.Equal(t, cliout.ExitFailure, r.code)
 			assert.ErrorIs(t, r.err, deployment.ErrTimedOutHibernating)
 			if format == "text" {
-				requireInOrder(t, r.stdout, "Successfully overrode to ", "Waiting for the Deployment to hibernate")
+				requireInOrder(t, r.stdout, "Successfully overrode to ")
+				requireInOrder(t, r.stderr, "Waiting for the Deployment to hibernate")
 				return
 			}
 			var got hibernationJSON

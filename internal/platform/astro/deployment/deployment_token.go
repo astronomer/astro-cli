@@ -31,7 +31,7 @@ const (
 )
 
 var (
-	ErrDeploymentTokenNotFound    = errors.New("no Deployment API token was found for the API token name you provided")
+	errDeploymentTokenNotFound    = errors.New("no Deployment API token was found for the API token name you provided")
 	errWorkspaceTokenInDeployment = errors.New("this Workspace API token has already been added to the Deployment with that role")
 	errOrgTokenInDeployment       = errors.New("this Organization API token has already been added to the Deployment with that role")
 	errDeploymentTokenRoleSet     = errors.New("this Deployment API token already has that role on the Deployment")
@@ -71,7 +71,7 @@ func ListTokens(client astrov1.APIClient, deploymentID string, tokenTypes []Depl
 // secret.
 func CreateToken(name, description, role, deploymentID string, expiration int, client astrov1.APIClient) (apitoken.Token, error) {
 	if name == "" {
-		return apitoken.Token{}, ErrInvalidTokenName
+		return apitoken.Token{}, errInvalidTokenName
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -297,7 +297,7 @@ func getDeploymentToken(id, name, deploymentID string, tokens []astrov1.ApiToken
 			}
 		}
 		if token.Id == "" {
-			return astrov1.ApiToken{}, ErrDeploymentTokenNotFound
+			return astrov1.ApiToken{}, errDeploymentTokenNotFound
 		}
 	case name != "" && id == "":
 		var matchedTokens []astrov1.ApiToken
@@ -316,7 +316,7 @@ func getDeploymentToken(id, name, deploymentID string, tokens []astrov1.ApiToken
 		}
 	}
 	if token.Id == "" {
-		return astrov1.ApiToken{}, ErrDeploymentTokenNotFound
+		return astrov1.ApiToken{}, errDeploymentTokenNotFound
 	}
 	return token, nil
 }

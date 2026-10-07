@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/astronomer/astro-cli/config"
@@ -25,6 +26,8 @@ type ManifestDagDeployInput struct {
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
+	// Progress takes the Wait progress; nil is stderr.
+	Progress io.Writer
 }
 
 // ManifestDagDeployResult reports the outcome for cmd to render.
@@ -73,7 +76,10 @@ func descriptionOrCommitMessage(description, commitMessage string) string {
 // Unlike the 1.x path's Deploy(), it neither prints nor exits: it returns a result for
 // cmd to render, so the path stays cancellable and ready for --output json. It
 // reuses createDeploy and deployDags as they are, and finalizes through a
-// print-free helper rather than the 1.x path's finalizeDeploy, which prints.
+// print-free helper rather than the 1.x path's finalizeDeploy, which prints. A
+// --wait's progress is the one thing it writes, and only to in.Progress.
+//
+//nolint:gocritic // value input keeps this seam symmetric with DeployManifestImage
 func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClient) (ManifestDagDeployResult, error) {
 	c, err := loginOrCurrent(in.Login)
 	if err != nil {
@@ -115,7 +121,7 @@ func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClie
 	}
 
 	if in.Wait {
-		if err := deployment.HealthPollIn(dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
+		if err := deployment.HealthPollIn(in.Progress, dep.OrganizationId, c.Token, dep.Id, dagOnlyDeploySleepTime, tickNum, int(in.WaitTime.Seconds()), astroV1Client); err != nil {
 			return ManifestDagDeployResult{}, err
 		}
 	}

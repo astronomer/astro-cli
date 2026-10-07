@@ -321,7 +321,7 @@ func (s *Suite) TestCreateToken() {
 
 		_, err := CreateToken("", "Description 1", "DEPLOYMENT_MEMBER", "", 0, mockClient)
 
-		s.Equal(ErrInvalidTokenName, err)
+		s.Equal(errInvalidTokenName, err)
 	})
 }
 
@@ -381,7 +381,7 @@ func (s *Suite) TestUpdateToken() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
 		_, err := UpdateToken("", "invalid name", "", "", "", "", pickSecond, mockClient)
-		s.Equal(ErrDeploymentTokenNotFound, err)
+		s.Equal(errDeploymentTokenNotFound, err)
 	})
 
 	s.Run("error path when getDeploymentToken returns an error", func() {
@@ -475,7 +475,7 @@ func (s *Suite) TestRotateToken() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
 		_, err := findAndRotate("", "invalid name", mockClient)
-		s.Equal(ErrDeploymentTokenNotFound, err)
+		s.Equal(errDeploymentTokenNotFound, err)
 	})
 
 	s.Run("error path when getApiToken returns an error", func() {
@@ -549,7 +549,7 @@ func (s *Suite) TestDeleteToken() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil)
 		_, err := findAndDelete("", "invalid name", mockClient)
-		s.Equal(ErrDeploymentTokenNotFound, err)
+		s.Equal(errDeploymentTokenNotFound, err)
 	})
 
 	s.Run("error path when DeleteDeploymentApiTokenWithResponse returns an error", func() {
@@ -585,7 +585,7 @@ func (s *Suite) TestGetDeploymentToken() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Twice()
 		token, err := getDeploymentToken("nonexistent", "", "testDeployment", apiTokens, pickSecond)
-		s.Equal(ErrDeploymentTokenNotFound, err)
+		s.Equal(errDeploymentTokenNotFound, err)
 		s.Equal(astrov1.ApiToken{}, token)
 	})
 
@@ -593,7 +593,7 @@ func (s *Suite) TestGetDeploymentToken() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&ListDeploymentAPITokensResponseOK, nil).Twice()
 		token, err := getDeploymentToken("", "Nonexistent Token", "testDeployment", apiTokens, pickSecond)
-		s.Equal(ErrDeploymentTokenNotFound, err)
+		s.Equal(errDeploymentTokenNotFound, err)
 		s.Equal(astrov1.ApiToken{}, token)
 	})
 }

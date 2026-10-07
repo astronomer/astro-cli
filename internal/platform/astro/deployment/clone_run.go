@@ -2,6 +2,7 @@ package deployment
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -43,22 +44,23 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 
 // Clone creates a copy of src named name, in workspaceID or else src's own
 // Workspace, with one create request (see clone.Request), and with wait,
-// waits up to waitTime for it to become healthy. It returns what src has that
+// waits up to waitTime for it to become healthy, writing that wait's progress
+// to progress (stderr when nil). It returns what src has that
 // the copy does not.
 //
 // The Deployment exists whether or not it becomes healthy in time, so a wait
 // that runs out returns it with the error, as Create does.
-func Clone(src *astrov1.Deployment, name, workspaceID string, description *string, wait bool, waitTime time.Duration, astroV1Client astrov1.APIClient) (astrov1.Deployment, []clone.Note, error) {
+func Clone(src *astrov1.Deployment, name, workspaceID string, description *string, wait bool, waitTime time.Duration, astroV1Client astrov1.APIClient, progress io.Writer) (astrov1.Deployment, []clone.Note, error) {
 	req, notes, err := clone.Request(src, name, workspaceID, description)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
-	d, err := CoreCreateDeployment(src.OrganizationId, req, astroV1Client)
+	d, err := coreCreateDeployment(src.OrganizationId, req, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, notes, err
 	}
 	if wait {
-		if err := HealthPoll(d.Id, d.WorkspaceId, SleepTime, TickNum, int(waitTime.Seconds()), astroV1Client); err != nil {
+		if err := HealthPoll(progress, d.Id, SleepTime, TickNum, int(waitTime.Seconds()), astroV1Client); err != nil {
 			return d, notes, err
 		}
 	}

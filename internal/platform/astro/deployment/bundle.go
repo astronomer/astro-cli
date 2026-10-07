@@ -198,9 +198,9 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 	return nil
 }
 
-// ListBundlesData fetches every bundle configured on a deployment, paging through
+// listBundlesData fetches every bundle configured on a deployment, paging through
 // all results.
-func ListBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleList, error) {
+func listBundlesData(wsID, deploymentID string, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) (*BundleList, error) {
 	dep, err := GetDeployment(wsID, deploymentID, "", false, nil, astroV1Client)
 	if err != nil {
 		return nil, err
@@ -293,7 +293,7 @@ func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath 
 func ListBundlesWithFormat(wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	return output.PrintData(
 		func() (*BundleList, error) {
-			return ListBundlesData(wsID, deploymentID, astroV1Client, astroV1Alpha1Client)
+			return listBundlesData(wsID, deploymentID, astroV1Client, astroV1Alpha1Client)
 		},
 		bundleTableConfig(), r,
 	)

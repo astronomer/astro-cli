@@ -326,6 +326,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		Image:          image,
 		WaitForStatus:  waitForDeploy,
 		WaitTime:       waitTime,
+		Progress:       cmd.ErrOrStderr(),
 		DagsPath:       dagsPath,
 		Description:    deployDescription,
 		BuildSecrets:   util.ResolveBuildSecrets(buildSecrets, os.Getenv(util.BuildSecretInputEnv)),
@@ -388,6 +389,7 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 		Description:   deployDescription,
 		Wait:          waitForDeploy,
 		WaitTime:      waitTime,
+		Progress:      cmd.ErrOrStderr(),
 		AstroV1Client: astroV1Client,
 	}
 	return DeployBundle(deployBundleInput)
@@ -828,6 +830,7 @@ func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdepl
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
 		WaitTime:      in.WaitTime,
+		Progress:      d.errOut,
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.DagResult{}, err
@@ -871,6 +874,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
 		WaitTime:      in.WaitTime,
+		Progress:      d.errOut,
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err
