@@ -361,7 +361,7 @@ func TestForcedRenewalHelper(t *testing.T) {
 	if os.Getenv(renewHelperEnv) == "" {
 		t.Skip("run by TestConcurrentForcedRenewalsRefreshOnce")
 	}
-	idpURL, start := os.Getenv("ASTRO_TEST_IDP_URL"), os.Getenv("ASTRO_TEST_START_FILE")
+	idpURL, start, renewed := os.Getenv("ASTRO_TEST_IDP_URL"), os.Getenv("ASTRO_TEST_START_FILE"), os.Getenv("ASTRO_TEST_RENEWED_TOKEN")
 	fetchDomainAuthConfig = func(string) (auth.Config, error) {
 		return auth.Config{ClientID: "client-id", DomainURL: idpURL + "/"}, nil
 	}
@@ -380,7 +380,7 @@ func TestForcedRenewalHelper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Token != "Bearer renewed" {
+	if c.Token != "Bearer "+renewed {
 		t.Errorf("token is not the renewal (len %d)", len(c.Token))
 	}
 }
@@ -403,11 +403,19 @@ func TestConcurrentForcedRenewalsRefreshOnce(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// A JWT issued now, like the IdP's. A process that starts after the other
+	// saved its renewal reads that renewal as its starting token, and only the
+	// issued-at claim tells it the token is new rather than the one refused
+	// (see renewedMeanwhile): an opaque token there is refreshed a second time.
+	renewed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{IssuedAt: jwt.NewNumericDate(time.Now())}).SignedString([]byte("test-key"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	var calls atomic.Int32
 	idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		time.Sleep(300 * time.Millisecond) // long enough for the other process to be waiting
-		w.Write([]byte(`{"access_token":"renewed","expires_in":3600}`))
+		w.Write([]byte(`{"access_token":"` + renewed + `","expires_in":3600}`))
 	}))
 	t.Cleanup(idp.Close)
 	start := filepath.Join(t.TempDir(), "start")
@@ -422,7 +430,8 @@ func TestConcurrentForcedRenewalsRefreshOnce(t *testing.T) {
 	for i := range cmds {
 		cmd := exec.Command(self, "-test.run=^TestForcedRenewalHelper$", "-test.count=1")
 		cmd.Env = append(os.Environ(), renewHelperEnv+"=1", "ASTRO_HOME="+home, "ASTRO_DOMAIN=", "ASTRO_API_TOKEN=",
-			"ASTRONOMER_KEY_ID=", "ASTRONOMER_KEY_SECRET=", "ASTRO_TEST_IDP_URL="+idp.URL, "ASTRO_TEST_START_FILE="+start)
+			"ASTRONOMER_KEY_ID=", "ASTRONOMER_KEY_SECRET=", "ASTRO_TEST_IDP_URL="+idp.URL, "ASTRO_TEST_START_FILE="+start,
+			"ASTRO_TEST_RENEWED_TOKEN="+renewed)
 		outs[i] = &strings.Builder{}
 		cmd.Stdout, cmd.Stderr = outs[i], outs[i]
 		if err := cmd.Start(); err != nil {
