@@ -1,0 +1,14 @@
+{
+  "deployment_id": "x",
+  "label": "x",
+  "release_name": "x",
+  "workspace_id": null,
+  "cluster_id": null,
+  "namespace": null,
+  "chart_version": null,
+  "airflow_version": null,
+  "runtime_version": null,
+  "image_tag": null,
+  "dag_deployment_type": null,
+  "urls": []
+}

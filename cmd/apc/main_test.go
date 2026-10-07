@@ -4,12 +4,7 @@ import (
 	"flag"
 	"os"
 	"testing"
-
-	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 )
-
-// watching is the emit watch TestMain armed, for TestTheEmitObserverIsArmed.
-var watching *cliouttest.Watching
 
 // TestMain pins os.Args to a single non-test argument for the whole package run.
 // Several tests execute cobra commands, which fall back to os.Args when no args
@@ -31,7 +26,7 @@ func TestMain(m *testing.M) {
 	// in a real one: without this, they would pass or fail with the developer's
 	// working tree. A test of the refusal sets its own.
 	hasUncommittedChanges = func(string) bool { return false }
-	watching = emitWatch().Arm()
+	watching := emitWatch().Arm()
 	code := m.Run()
 	os.Args = origArgs
 	os.Exit(watching.Finish(code))

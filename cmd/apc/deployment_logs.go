@@ -1,12 +1,15 @@
 package apc
 
 import (
+	"fmt"
 	"io"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
 
 const (
@@ -14,13 +17,21 @@ const (
 	logScheduler = "scheduler"
 	logWorker    = "worker"
 	logTriggerer = "triggerer"
+
+	// maxLogsSince is the longest window Houston searches (2 days).
+	maxLogsSince = 48 * time.Hour
 )
 
 var (
-	search      string
-	follow      bool
-	since       time.Duration
-	logsExample = `
+	search     string
+	follow     bool
+	since      time.Duration
+	logsOutput string
+
+	// subscribeLogs is a variable so a test can follow a stream without a
+	// websocket server.
+	subscribeLogs = deployment.SubscribeDeploymentLog
+	logsExample   = `
   # Return logs for last 5 minutes of webserver logs and output them.
   astro deployment logs webserver example-deployment-uuid
 
@@ -69,13 +80,14 @@ func newWebserverLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
   astro deployment logs webserver <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logWebserver, args, out)
+			return fetchRemoteLogs(cmd, logWebserver, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
-	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
+	cliout.AddOutputFlag(cmd, &logsOutput)
 	return cmd
 }
 
@@ -92,13 +104,14 @@ func newSchedulerLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
   astro deployment logs scheduler <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logScheduler, args, out)
+			return fetchRemoteLogs(cmd, logScheduler, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
-	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
+	cliout.AddOutputFlag(cmd, &logsOutput)
 	return cmd
 }
 
@@ -115,13 +128,14 @@ func newWorkersLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the dupl
   astro deployment logs workers <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logWorker, args, out)
+			return fetchRemoteLogs(cmd, logWorker, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
-	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
+	cliout.AddOutputFlag(cmd, &logsOutput)
 	// get airflow workers logs
 	return cmd
 }
@@ -139,20 +153,45 @@ func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
   astro deployment logs triggerer <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return fetchRemoteLogs(logTriggerer, args, out)
+			return fetchRemoteLogs(cmd, logTriggerer, args, out)
 		},
 	}
 	cmd.Flags().StringVarP(&search, "search", "s", "", "Search term inside logs")
 	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Subscribe to watch more logs")
-	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h")
+	cmd.Flags().DurationVarP(&since, "since", "t", 0, "Only return logs newer than a relative duration like 5m, 1h, or 24h, up to 48h. With --follow, Houston streams only logs from the moment it starts")
 	cmd.Flags().BoolP("help", "h", false, "Help for "+cmd.Name())
+	cliout.AddOutputFlag(cmd, &logsOutput)
 	// get airflow workers logs
 	return cmd
 }
 
-func fetchRemoteLogs(component string, args []string, out io.Writer) error {
-	if follow {
-		return deployment.SubscribeDeploymentLog(args[0], component, search, since)
+// fetchRemoteLogs prints a component's log records, one per line, or under
+// json one object per line: a stream, which --follow keeps open.
+func fetchRemoteLogs(cmd *cobra.Command, component string, args []string, out io.Writer) error {
+	format, err := cliout.ParseFormat(logsOutput)
+	if err != nil {
+		return err
 	}
-	return deployment.Log(args[0], component, search, since, houstonClient, out)
+	// Houston searches at most 2 days of logs and refuses a longer window
+	//. A follow
+	// ignores --since, so only a search is held to it.
+	if !follow && since > maxLogsSince {
+		return cliout.Usage(fmt.Errorf("--since %s is longer than the %s of logs APC searches at most", since, maxLogsSince))
+	}
+	cmd.SilenceUsage = true
+	r := cliout.Renderer{Format: format, Out: out}
+	if follow {
+		return subscribeLogs(args[0], component, search, since, cliout.NotesTo(cmd, format, out),
+			func(l houston.DeploymentLog) error { return emitLogEntry(r, component, l, true) })
+	}
+	logs, err := deployment.Log(args[0], component, search, since, houstonClient)
+	if err != nil {
+		return err
+	}
+	for _, l := range logs {
+		if err := emitLogEntry(r, component, l, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }

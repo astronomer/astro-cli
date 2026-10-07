@@ -3,6 +3,7 @@ package deploy
 import (
 	"errors"
 	"fmt"
+	"io"
 	neturl "net/url"
 	"os"
 	"path/filepath"
@@ -46,10 +47,13 @@ var (
 	// ErrDagOnlyDeployDisabledInConfigLegacy is returned for Houston before 2.0.0 (flat feature-flag paths).
 	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your APC cluster")
 	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
-	ErrDagOnlyDeployDisabledInConfig         = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster")
-	ErrDagOnlyDeployNotEnabledForDeployment  = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
-	ErrEmptyDagFolderUserCancelledOperation  = errors.New("no DAGs found in the dags folder. User canceled the operation")
-	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.deployments.registry.protectedCustomRegistry.updateRegistry.host")
+	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster")
+	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
+	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
+	// Houston reads the host from its registry.protectedCustomRegistry.updateRegistry.host
+	//, under
+	// astronomer.houston.config in the platform's values.
+	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
 	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
 	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label io.astronomer.docker.runtime.version")
@@ -73,10 +77,48 @@ const (
 	composeSkipImageBuildingPromptMsg = "Skipping building image since --image-name flag is used..."
 )
 
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+// Deployed is what an image deploy pushed.
+type Deployed struct {
+	// DeploymentID is the Deployment deployed to: the one named, the
+	// project's saved one, or the one picked.
+	DeploymentID string
+	// Image is the image reference pushed to the registry.
+	Image string
+	// URL is the Deployment's Airflow UI, "" when Houston gives none.
+	URL string
+}
+
+// Options is what a deploy's caller decides about its output and its
+// questions.
+type Options struct {
+	// Progress is where the deploy's progress goes: its notes, the image
+	// push and the DAG upload. nil is os.Stdout, where it has always gone; a
+	// command whose stdout carries a result (--output json) sends it to
+	// stderr.
+	Progress io.Writer
+	// Yes answers the deploy's confirmations yes: an image tag that is not
+	// recommended, and a DAGs folder with no DAGs in it.
+	Yes bool
+}
+
+func (o Options) progress() io.Writer {
+	if o.Progress != nil {
+		return o.Progress
+	}
+	return os.Stdout
+}
+
+// progressSetter is an image handler that can draw its progress somewhere
+// other than stdout (airflow.DockerImage).
+type progressSetter interface{ ProgressTo(io.Writer) }
+
+// Airflow builds the project's image, or tags the one named, pushes it to
+// the Deployment's registry and returns what it pushed. Its DeploymentID is
+// set on a failure too, once the Deployment is known.
+func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, opts Options) (Deployed, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
-		return deploymentID, err
+		return Deployed{DeploymentID: deploymentID}, err
 	}
 
 	c, _ := config.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
@@ -93,13 +135,13 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
-		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
+		return Deployed{DeploymentID: deploymentID}, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 
 	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
 	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
 	if err != nil {
-		return deploymentID, fmt.Errorf("failed to get app config: %w", err)
+		return Deployed{DeploymentID: deploymentID}, fmt.Errorf("failed to get app config: %w", err)
 	}
 
 	byoRegistryDomain := ""
@@ -109,7 +151,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 		nextTag = "deploy-" + time.Now().UTC().Format("2006-01-02T15-04")
 		byoRegistryDomain = appConfig.BYORegistryDomain
 		if byoRegistryDomain == "" {
-			return deploymentID, ErrBYORegistryDomainNotSet
+			return Deployed{DeploymentID: deploymentID}, ErrBYORegistryDomainNotSet
 		}
 	}
 
@@ -117,22 +159,22 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	// If we deploy only the image, the deployment will not have any dags for image-based deployments.
 	// Even on astro, image-based deployments are not allowed to be deployed with --image flag.
 	if isImageOnlyDeploy && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType {
-		return "", ErrDeploymentTypeIncorrectForImageOnly
+		return Deployed{DeploymentID: deploymentID}, ErrDeploymentTypeIncorrectForImageOnly
 	}
 	// We don't need to exclude the dags from the image because the dags present in the image are not respected anyways for non-image based deployments
 
-	fmt.Printf(houstonDeploymentPrompt, releaseName)
+	fmt.Fprintf(opts.progress(), houstonDeploymentPrompt, releaseName)
 
 	// Build the image to deploy
-	err = buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description, imageName)
+	pushed, err := buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description, imageName, opts)
 	if err != nil {
-		return deploymentID, err
+		return Deployed{DeploymentID: deploymentID}, err
 	}
 
 	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
-	fmt.Printf("Successfully pushed Docker image to the APC registry, it can take a few minutes to update the deployment with the new image. Navigate to the APC UI to confirm the state of your deployment (%s).\n", deploymentLink)
+	fmt.Fprintf(opts.progress(), "Successfully pushed Docker image to the APC registry, it can take a few minutes to update the deployment with the new image. Navigate to the APC UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
-	return deploymentID, nil
+	return Deployed{DeploymentID: deploymentID, Image: pushed, URL: deploymentLink}, nil
 }
 
 // Find deployment ID in deployments slice
@@ -161,7 +203,7 @@ func resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID string, deployments []
 	return wsID
 }
 
-func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, deploymentInfo *houston.Deployment) error {
+func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, deploymentInfo *houston.Deployment, opts Options) error {
 	// Get valid image tags for platform using Deployment Info request
 	deploymentConfig, err := houston.Call(houstonClient.GetDeploymentConfig)(nil)
 	if err != nil {
@@ -178,7 +220,7 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 	if config.CFG.ShowWarnings.GetBool() && deploymentInfo.DesiredRuntimeVersion != "" && !runtimeReleases.IsValidVersion(tag) {
 		validTags = strings.Join(runtimeReleases.GreaterVersions(tag), ", ")
 	}
-	if validTags != "" {
+	if validTags != "" && !opts.Yes {
 		validTags := strings.Join(deploymentConfig.GetValidTags(tag), ", ")
 
 		msg := fmt.Sprintf(warningInvalidNameTag, tag, validTags)
@@ -186,19 +228,19 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 			msg = fmt.Sprintf(warningInvalidNameTagEmptyRecommendations, tag)
 		}
 
-		i, err := input.Confirm(msg)
+		i, err := input.Confirm(msg, input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
 		if !i {
-			fmt.Println("Canceling deploy...")
+			fmt.Fprintln(opts.progress(), "Canceling deploy...")
 			os.Exit(1)
 		}
 	}
 	return nil
 }
 
-func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string) (string, error) {
+func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, opts Options) (string, error) {
 	if runtimeVersion == "" {
 		return "", ErrRuntimeVersionNotPassedForRemoteImage
 	}
@@ -213,14 +255,17 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 	if err != nil {
 		return "", fmt.Errorf("failed to get deployment info: %w", err)
 	}
-	fmt.Println("Skipping building the image since --image-name flag is used...")
+	fmt.Fprintln(opts.progress(), "Skipping building the image since --image-name flag is used...")
 	req := houston.UpdateDeploymentImageRequest{ReleaseName: deploymentInfo.ReleaseName, Image: imageName, AirflowVersion: "", RuntimeVersion: runtimeVersion}
-	_, err = houston.Call(houstonClient.UpdateDeploymentImage)(req)
-	fmt.Println("Image successfully updated")
-	return deploymentID, err
+	// It used to say the image was updated whether or not it was.
+	if _, err = houston.Call(houstonClient.UpdateDeploymentImage)(req); err != nil {
+		return deploymentID, err
+	}
+	fmt.Fprintln(opts.progress(), "Image successfully updated")
+	return deploymentID, nil
 }
 
-func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string) error {
+func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string, opts Options) (string, error) {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
@@ -232,17 +277,17 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			var err error
 			registry, err = getDeploymentRegistryURL(deploymentInfo.Urls)
 			if err != nil {
-				return err
+				return "", err
 			}
 			// Switch to per deployment registry login
-			err = auth.RegistryAuth(houstonClient, os.Stdout, registry, houston.GetAppConfigRequest{
+			err = auth.RegistryAuth(houstonClient, opts.progress(), registry, houston.GetAppConfigRequest{
 				ClusterID:      deploymentInfo.ClusterID,
 				WorkspaceUUID:  deploymentInfo.Workspace.ID,
 				DeploymentUUID: deploymentInfo.ID,
 			})
 			if err != nil {
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
-				return err
+				return "", err
 			}
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
 		} else {
@@ -251,16 +296,25 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			token = c.Token
 		}
 	}
-	if customImageName != "" {
+	// A custom image's own tag names only the source. To the APC registry it
+	// is pushed as <release>/airflow:<nextTag>, as a build is: Houston deploys
+	// only a push to that repository (houston-api
+	//  ),
+	// skips a push tagged "latest" (),
+	// and does not roll out a tag it has deployed before (), so
+	// the user's tag would deploy nothing for "latest" or a reused tag. It used
+	// to be pushed as <registry>:<tag>, which Houston never deployed at all. A
+	// BYO registry takes the image by the mutation instead, under its tag.
+	if customImageName != "" && byoRegistryEnabled {
 		if tagFromImageName := getGetTagFromImageName(customImageName); tagFromImageName != "" {
 			remoteImage = fmt.Sprintf("%s:%s", registry, tagFromImageName)
 		}
 	}
 	useShaAsTag := config.CFG.ShaAsTag.GetBool()
-	fmt.Println("Pushing image to configured registry")
+	fmt.Fprintln(opts.progress(), "Pushing image to configured registry")
 	sha, err := imageHandler.Push(remoteImage, "", token, useShaAsTag)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if byoRegistryEnabled {
 		if useShaAsTag {
@@ -269,31 +323,32 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel) //nolint:errcheck // error deliberately ignored in this shell code
 		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel) //nolint:errcheck // error deliberately ignored in this shell code
 		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
-		_, err = houston.Call(houstonClient.UpdateDeploymentImage)(req)
-		return err
+		if _, err = houston.Call(houstonClient.UpdateDeploymentImage)(req); err != nil {
+			return "", err
+		}
 	}
-	return nil
+	return remoteImage, nil
 }
 
-func buildDockerImageForCustomImage(imageHandler airflow.ImageHandler, customImageName string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface) error {
-	fmt.Println(composeSkipImageBuildingPromptMsg)
+func buildDockerImageForCustomImage(imageHandler airflow.ImageHandler, customImageName string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface, opts Options) error {
+	fmt.Fprintln(opts.progress(), composeSkipImageBuildingPromptMsg)
 	err := imageHandler.TagLocalImage(customImageName)
 	if err != nil {
 		return err
 	}
 	runtimeLabel, err := imageHandler.GetLabel("", airflow.RuntimeImageLabel)
 	if err != nil {
-		fmt.Println("unable get runtime version from image")
+		fmt.Fprintln(opts.progress(), "unable get runtime version from image")
 		return err
 	}
 	if runtimeLabel == "" {
 		return ErrNoRuntimeLabelOnCustomImage
 	}
-	err = validateRuntimeVersion(houstonClient, runtimeLabel, deploymentInfo)
+	err = validateRuntimeVersion(houstonClient, runtimeLabel, deploymentInfo, opts)
 	return err
 }
 
-func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, deploymentInfo *houston.Deployment, ignoreCacheDeploy bool, description string) error {
+func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, deploymentInfo *houston.Deployment, ignoreCacheDeploy bool, description string, opts Options) error {
 	// all these checks inside Dockerfile should happen only when no image-name is provided
 	// parse dockerfile
 	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
@@ -304,12 +359,12 @@ func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandl
 	_, tag := docker.GetImageTagFromParsedFile(cmds)
 
 	// Get valid image tags for platform using Deployment Info request
-	err = validateRuntimeVersion(houstonClient, tag, deploymentInfo)
+	err = validateRuntimeVersion(houstonClient, tag, deploymentInfo, opts)
 	if err != nil {
 		return err
 	}
 	// Build our image
-	fmt.Println(imageBuildingPrompt)
+	fmt.Fprintln(opts.progress(), imageBuildingPrompt)
 	deployLabels := []string{"io.astronomer.skip.revision=true"}
 	if description != "" {
 		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
@@ -325,11 +380,11 @@ func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandl
 	return err
 }
 
-func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment, customImageName, path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, description string) error {
+func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment, customImageName, path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, description string, opts Options) error {
 	if customImageName == "" {
-		return buildDockerImageFromWorkingDir(path, imageHandler, houstonClient, deploymentInfo, ignoreCacheDeploy, description)
+		return buildDockerImageFromWorkingDir(path, imageHandler, houstonClient, deploymentInfo, ignoreCacheDeploy, description, opts)
 	}
-	return buildDockerImageForCustomImage(imageHandler, customImageName, deploymentInfo, houstonClient)
+	return buildDockerImageForCustomImage(imageHandler, customImageName, deploymentInfo, houstonClient, opts)
 }
 
 func getGetTagFromImageName(imageName string) string {
@@ -340,14 +395,17 @@ func getGetTagFromImageName(imageName string) string {
 	return ""
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string) error {
+func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string, opts Options) (string, error) {
 	imageName := airflow.ImageName(name, "latest")
 	imageHandler := imageHandlerInit(imageName)
-	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient, description)
-	if err != nil {
-		return err
+	if p, ok := imageHandler.(progressSetter); ok {
+		p.ProgressTo(opts.progress())
 	}
-	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName)
+	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient, description, opts)
+	if err != nil {
+		return "", err
+	}
+	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName, opts)
 }
 
 func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
@@ -513,32 +571,35 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	return ""
 }
 
-func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+// DagsOnlyDeploy uploads the project's DAGs to a Deployment and returns the
+// Deployment it deployed to: the one named, or the one picked when none was.
+// It returns that Deployment on a failure too, once it is known.
+func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, opts Options) (string, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 
 	if deploymentID == "" {
-		return errInvalidDeploymentID
+		return deploymentID, errInvalidDeploymentID
 	}
 
 	// Throw error if the feature is disabled at Deployment level
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
-		return fmt.Errorf("failed to get deployment info: %w", err)
+		return deploymentID, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
 	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
 	if err != nil {
-		return fmt.Errorf("failed to get app config: %w", err)
+		return deploymentID, fmt.Errorf("failed to get app config: %w", err)
 	}
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
-		return errDagOnlyDeployDisabledAtCluster(appConfig)
+		return deploymentID, errDagOnlyDeployDisabledAtCluster(appConfig)
 	}
 	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
-		return ErrDagOnlyDeployNotEnabledForDeployment
+		return deploymentID, ErrDagOnlyDeployNotEnabledForDeployment
 	}
 
 	uploadURL := ""
@@ -546,7 +607,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		// Throw error if the upload URL can't be constructed
 		err = validateIfDagDeployURLCanBeConstructed(deploymentInfo)
 		if err != nil {
-			return err
+			return deploymentID, err
 		}
 		uploadURL = getDagDeployURL(deploymentInfo)
 	} else {
@@ -559,20 +620,20 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
 	// Alert the user if dags folder is empty
-	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() {
-		i, err := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !opts.Yes {
+		i, err := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?", input.AnsweredBy("--yes"))
 		if err != nil {
-			return err
+			return deploymentID, err
 		}
 		if !i {
-			return ErrEmptyDagFolderUserCancelledOperation
+			return deploymentID, ErrEmptyDagFolderUserCancelledOperation
 		}
 	}
 
 	// Generate the dags tar
 	err = fileutil.Tar(dagsPath, dagsTarPath, true, nil)
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 	if cleanUpFiles {
 		defer os.Remove(dagsTarPath) //nolint:errcheck // best-effort cleanup
@@ -581,7 +642,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	// Gzip the tar
 	err = gzipFile(dagsTarPath, dagsTarGzPath)
 	if err != nil {
-		return err
+		return deploymentID, err
 	}
 	if cleanUpFiles {
 		defer os.Remove(dagsTarGzPath) //nolint:errcheck // best-effort cleanup
@@ -603,6 +664,7 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		InitialDelayInMS:    1 * 1000,
 		BackoffFactor:       2,
 		RetryDisplayMessage: "please wait, attempting to upload the dags",
+		Out:                 opts.progress(),
 	}
-	return fileutil.UploadFile(&uploadFileArgs)
+	return deploymentID, fileutil.UploadFile(&uploadFileArgs)
 }

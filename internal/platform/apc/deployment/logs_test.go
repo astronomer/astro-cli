@@ -1,7 +1,8 @@
 package deployment
 
 import (
-	"bytes"
+	"io"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 
@@ -15,42 +16,69 @@ func (s *Suite) TestLog() {
 
 	s.Run("success", func() {
 		api := new(mocks.ClientInterface)
-		api.On("ListDeploymentLogs", mock.AnythingOfType("houston.ListDeploymentLogsRequest")).Return([]houston.DeploymentLog{{ID: "test-id", Log: "test log"}}, nil)
-		out := new(bytes.Buffer)
+		api.On("ListDeploymentLogs", mock.MatchedBy(func(r houston.ListDeploymentLogsRequest) bool {
+			return r.DeploymentID == "test-id" && r.Component == "test-component" && r.Search == "test"
+		})).Return([]houston.DeploymentLog{{ID: "test-id", Log: "test log"}}, nil)
 
-		err := Log("test-id", "test-component", "test", 0, api, out)
+		logs, err := Log("test-id", "test-component", "test", 0, api)
 		s.NoError(err)
-		s.Contains(out.String(), "test log")
+		s.Equal([]houston.DeploymentLog{{ID: "test-id", Log: "test log"}}, logs)
+	})
+
+	// --since is a window: startTime and endTime, which Houston searches
+	// exactly; timestamp alone is a whole UTC day there (houston-api
+	// ).
+	s.Run("since is sent as a window", func() {
+		api := new(mocks.ClientInterface)
+		var got houston.ListDeploymentLogsRequest
+		api.On("ListDeploymentLogs", mock.AnythingOfType("houston.ListDeploymentLogsRequest")).Run(func(args mock.Arguments) {
+			got = args.Get(0).(houston.ListDeploymentLogsRequest)
+		}).Return([]houston.DeploymentLog{}, nil)
+
+		_, err := Log("test-id", "scheduler", "", 5*time.Minute, api)
+		s.NoError(err)
+		s.Require().NotNil(got.LogWindow)
+		s.InDelta(5*time.Minute, got.EndTime.Sub(got.StartTime), float64(time.Second))
+
+		_, err = Log("test-id", "scheduler", "", 0, api)
+		s.NoError(err)
+		s.Nil(got.LogWindow, "no --since: today's logs, as before")
 	})
 
 	s.Run("houston error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeploymentLogs", mock.AnythingOfType("houston.ListDeploymentLogsRequest")).Return([]houston.DeploymentLog{}, errMock)
-		out := new(bytes.Buffer)
 
-		err := Log("test-id", "test-component", "test", 0, api, out)
+		_, err := Log("test-id", "test-component", "test", 0, api)
 		s.ErrorIs(err, errMock)
 	})
 }
 
 func (s *Suite) TestSubscribeDeploymentLog() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	prev := subscribe
+	s.T().Cleanup(func() { subscribe = prev })
 
-	s.Run("success", func() {
-		subscribe = func(jwtToken, url, queryMessage string) error {
-			return nil
+	s.Run("success hands each record on", func() {
+		subscribe = func(_, _, _ string, _ io.Writer, onLog func(houston.DeploymentLog) error) error {
+			return onLog(houston.DeploymentLog{Log: "a record"})
 		}
 
-		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0)
+		var got []string
+		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0, io.Discard, func(l houston.DeploymentLog) error {
+			got = append(got, l.Log)
+			return nil
+		})
 		s.NoError(err)
+		s.Equal([]string{"a record"}, got)
 	})
 
 	s.Run("houston failure", func() {
-		subscribe = func(jwtToken, url, queryMessage string) error {
+		subscribe = func(_, _, _ string, _ io.Writer, _ func(houston.DeploymentLog) error) error {
 			return errMock
 		}
 
-		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0)
+		err := SubscribeDeploymentLog("test-id", "test-component", "test", 0, io.Discard, func(houston.DeploymentLog) error { return nil })
 		s.ErrorIs(err, errMock)
 	})
 }

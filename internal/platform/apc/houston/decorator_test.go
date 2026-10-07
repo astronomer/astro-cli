@@ -176,6 +176,29 @@ func (s *Suite) TestCall() {
 	})
 }
 
+// The upgrade mutations exist only where Houston still serves them:
+// updateDeploymentAirflow is a no-op stub from 0.37.0,
+// and updateDeploymentRuntime and cancelRuntimeUpdate are gone from 1.0.43
+//.
+func (s *Suite) TestUpgradeMutationsAreGatedToTheHoustonsThatServeThem() {
+	for _, c := range []struct {
+		api, version string
+		served       bool
+	}{
+		{"UpdateDeploymentAirflow", "0.36.19", true},
+		{"UpdateDeploymentAirflow", "0.37.0", false},
+		{"UpdateDeploymentAirflow", "1.0.0", false},
+		{"UpdateDeploymentRuntime", "0.29.0", true},
+		{"UpdateDeploymentRuntime", "1.0.42", true},
+		{"UpdateDeploymentRuntime", "1.0.43", false},
+		{"UpdateDeploymentRuntime", "2.1.0", false},
+		{"CancelUpdateDeploymentRuntime", "1.0.42", true},
+		{"CancelUpdateDeploymentRuntime", "1.0.43", false},
+	} {
+		s.Equal(c.served, VerifyVersionMatch(c.version, houstonAPIAvailabilityByVersion[c.api]), "%s on %s", c.api, c.version)
+	}
+}
+
 func (s *Suite) TestGetVersion() {
 	s.Run("when version is already present", func() {
 		version = "0.30.0"

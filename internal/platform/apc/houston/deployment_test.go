@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -905,4 +906,60 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		s.Contains(capturedBody, "updateDeploymentImage")
 		s.NotContains(capturedBody, "upsertDeployment")
 	})
+}
+
+// The window goes only to a Houston that takes it: startTime and endTime came
+// in 0.25.6. Before it the query declares neither and
+// the variables carry neither.
+func (s *Suite) TestListDeploymentLogsWindowByVersion() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	prevVersion := version
+	defer func() { version = prevVersion }()
+	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+
+	for _, c := range []struct {
+		houston    string
+		withWindow bool
+	}{
+		{"0.25.0", false},
+		{"0.25.5", false},
+		{"0.25.6", true},
+		{"2.1.0", true},
+	} {
+		version = c.houston
+		var sent string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			b, _ := io.ReadAll(req.Body)
+			sent = string(b)
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewBufferString(`{"data":{"logs":[]}}`)), Header: make(http.Header)}
+		})
+		_, err := NewClient(client).ListDeploymentLogs(ListDeploymentLogsRequest{
+			DeploymentID: "d", Timestamp: &at, LogWindow: &LogWindow{StartTime: at, EndTime: at.Add(time.Minute)},
+		})
+		s.NoError(err, c.houston)
+		s.Equal(c.withWindow, strings.Contains(sent, `$startTime`), "query on %s", c.houston)
+		s.Equal(c.withWindow, strings.Contains(sent, `"startTime":`), "variables on %s", c.houston)
+	}
+}
+
+// GetDeployment asks for desiredRuntimeVersion only where Houston serves it:
+// 0.29.0 up to 1.0.43, which removed it. Asked for
+// after that, the whole query would fail validation.
+func (s *Suite) TestGetDeploymentSelectsTheDesiredRuntimeVersionWhereServed() {
+	for _, c := range []struct {
+		houston string
+		selects bool
+	}{
+		{"0.29.0", true},
+		{"1.0.0", true},
+		{"1.0.42", true},
+		{"1.0.43", false},
+		{"2.1.0", false},
+	} {
+		q := DeploymentGetRequest.GreatestLowerBound(c.houston)
+		s.Equal(c.selects, strings.Contains(q, "desiredRuntimeVersion"), c.houston)
+		if c.houston >= "1" {
+			s.Contains(q, "workspace {", c.houston)
+		}
+	}
 }

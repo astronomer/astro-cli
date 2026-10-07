@@ -1,0 +1,14 @@
+{
+  "deployment_id": "x",
+  "label": "x",
+  "release_name": "x",
+  "action": "x",
+  "current": {
+    "image": "x",
+    "version": "x"
+  },
+  "desired": {
+    "image": "x",
+    "version": "x"
+  }
+}

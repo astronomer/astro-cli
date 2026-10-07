@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	semver "github.com/Masterminds/semver/v3"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
@@ -189,7 +188,7 @@ func (s *Suite) TestCreate() {
 	nfsLocation := ""
 	triggerReplicas := 0
 	clusterID := "testClusterID"
-	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID, ""}
+	req := &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID, "", ""}
 
 	s.Run("create success. Cluster is not passed in the payload", func() {
 		req.ClusterID = ""
@@ -198,9 +197,9 @@ func (s *Suite) TestCreate() {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
 		req.ClusterID = clusterID
 	})
@@ -211,9 +210,9 @@ func (s *Suite) TestCreate() {
 		api.On("CreateDeployment", mock.Anything).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
 	})
 
@@ -225,7 +224,7 @@ func (s *Suite) TestCreate() {
 		})).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, mockAppConfig)
+		_, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		api.AssertExpectations(s.T())
 		req.Mode = ""
@@ -240,7 +239,7 @@ func (s *Suite) TestCreate() {
 		})).Return(mockDeployment, nil)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, mockAppConfig)
+		_, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
 		api.AssertExpectations(s.T())
 	})
@@ -253,9 +252,9 @@ func (s *Suite) TestCreate() {
 
 		triggerReplicas = 1
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
 	})
 
@@ -267,10 +266,10 @@ func (s *Suite) TestCreate() {
 
 		triggerReplicas = -1
 		buf := new(bytes.Buffer)
-		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID, ""}
-		err := Create(req, api, buf, mockAppConfig)
+		req = &CreateDeploymentRequest{label, ws, releaseName, role, executor, airflowVersion, "", dagDeploymentType, nfsLocation, "", "", "", "", "", "", 1, triggerReplicas, clusterID, "", ""}
+		created, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
 	})
 
@@ -284,9 +283,9 @@ func (s *Suite) TestCreate() {
 		triggerReplicas = 0
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
 	})
 
@@ -318,14 +317,13 @@ func (s *Suite) TestCreate() {
 
 		for _, tt := range myTests {
 			buf := new(bytes.Buffer)
-			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, clusterID, ""}
-			err := Create(createReq, api, buf, mockAppConfig)
+			createReq := &CreateDeploymentRequest{label, ws, releaseName, role, executor, "", runtimeVersion, dagDeploymentType, "", tt.repoURL, tt.revision, tt.branchName, tt.dagDirectoryLocation, tt.sshKey, tt.knownHosts, tt.syncInterval, triggerReplicas, clusterID, "", ""}
+			_, err := Create(createReq, api, buf, mockAppConfig)
 			if tt.expectedError != "" {
 				s.EqualError(err, tt.expectedError)
 			} else {
 				s.NoError(err)
 			}
-			s.Contains(buf.String(), tt.expectedOutput)
 		}
 	})
 
@@ -351,9 +349,9 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
 	})
 
@@ -384,7 +382,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf, &appConfig)
+		_, err = Create(req, api, buf, &appConfig)
 		s.EqualError(err, "number is out of available range")
 		api.AssertExpectations(s.T())
 	})
@@ -399,7 +397,7 @@ func (s *Suite) TestCreate() {
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, errMock)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, &appConfig)
+		_, err := Create(req, api, buf, &appConfig)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -409,7 +407,7 @@ func (s *Suite) TestCreate() {
 		api.On("CreateDeployment", mock.Anything).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
-		err := Create(req, api, buf, mockAppConfig)
+		_, err := Create(req, api, buf, mockAppConfig)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -422,7 +420,7 @@ func (s *Suite) TestCreate() {
 
 		buf := new(bytes.Buffer)
 		// mock os.Stdin
-		input := []byte("Test1")
+		input := []byte("test1")
 		r, w, err := os.Pipe()
 		s.Require().NoError(err)
 		_, err = w.Write(input)
@@ -433,9 +431,9 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf, mockAppConfig)
+		created, err := Create(req, api, buf, mockAppConfig)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully created deployment with Celery executor. Deployment can be accessed at the following URLs")
+		s.Equal(mockDeployment, created)
 		api.AssertExpectations(s.T())
 	})
 	s.Run("create free form namespace error", func() {
@@ -455,7 +453,7 @@ func (s *Suite) TestCreate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		err = Create(req, api, buf, mockAppConfig)
+		_, err = Create(req, api, buf, mockAppConfig)
 		s.EqualError(err, "no kubernetes namespaces specified")
 	})
 }
@@ -475,10 +473,9 @@ func (s *Suite) TestDelete() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		err := Delete(mockDeployment.ID, false, api, buf)
+		deleted, err := Delete(mockDeployment.ID, false, api)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully deleted deployment")
+		s.Equal(mockDeployment, deleted)
 		api.AssertExpectations(s.T())
 	})
 
@@ -486,8 +483,7 @@ func (s *Suite) TestDelete() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: false}).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		err := Delete(mockDeployment.ID, false, api, buf)
+		_, err := Delete(mockDeployment.ID, false, api)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -496,10 +492,9 @@ func (s *Suite) TestDelete() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteDeployment", houston.DeleteDeploymentRequest{DeploymentID: mockDeployment.ID, HardDelete: true}).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		err := Delete(mockDeployment.ID, true, api, buf)
+		deleted, err := Delete(mockDeployment.ID, true, api)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully deleted deployment")
+		s.Equal(mockDeployment, deleted)
 	})
 }
 
@@ -524,11 +519,9 @@ func (s *Suite) TestAdopt() {
 		api := new(mocks.ClientInterface)
 		api.On("AdoptDeployment", req).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		err := Adopt(req, api, buf)
+		adopted, err := Adopt(req, api)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully adopted deployment")
-		s.Contains(buf.String(), mockDeployment.ReleaseName)
+		s.Equal(mockDeployment, adopted)
 		api.AssertExpectations(s.T())
 	})
 
@@ -536,8 +529,7 @@ func (s *Suite) TestAdopt() {
 		api := new(mocks.ClientInterface)
 		api.On("AdoptDeployment", req).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		err := Adopt(req, api, buf)
+		_, err := Adopt(req, api)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -555,10 +547,9 @@ func (s *Suite) TestUnadopt() {
 		api := new(mocks.ClientInterface)
 		api.On("UnadoptDeployment", houston.UnadoptDeploymentRequest{DeploymentID: mockDeployment.ID}).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		err := Unadopt(mockDeployment.ID, api, buf)
+		unadopted, err := Unadopt(mockDeployment.ID, api)
 		s.NoError(err)
-		s.Contains(buf.String(), "Successfully unadopted deployment")
+		s.Equal(mockDeployment, unadopted)
 		api.AssertExpectations(s.T())
 	})
 
@@ -566,8 +557,7 @@ func (s *Suite) TestUnadopt() {
 		api := new(mocks.ClientInterface)
 		api.On("UnadoptDeployment", houston.UnadoptDeploymentRequest{DeploymentID: mockDeployment.ID}).Return(nil, errMock)
 
-		buf := new(bytes.Buffer)
-		err := Unadopt(mockDeployment.ID, api, buf)
+		_, err := Unadopt(mockDeployment.ID, api)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -600,22 +590,28 @@ func (s *Suite) TestList() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeployments", expectedRequest).Return(mockDeployments, nil)
 
-		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, false, api, buf, clusterID)
+		got, err := List(mockDeployments[0].Workspace.ID, false, api, clusterID)
 		s.NoError(err)
-		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
- test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     
-`
-		s.Equal(expected, buf.String())
+		s.Equal(mockDeployments, got)
 		api.AssertExpectations(s.T())
+	})
+
+	s.Run("ordered by label, last first", func() {
+		a, b := mockDeployments[0], mockDeployments[0]
+		a.Label, b.Label = "alpha", "beta"
+		api := new(mocks.ClientInterface)
+		api.On("ListDeployments", expectedRequest).Return([]houston.Deployment{a, b}, nil)
+
+		got, err := List(mockDeployments[0].Workspace.ID, false, api, clusterID)
+		s.NoError(err)
+		s.Equal([]houston.Deployment{b, a}, got)
 	})
 
 	s.Run("list namespace api error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeployments", expectedRequest).Return([]houston.Deployment{}, errMock)
 
-		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, false, api, buf, clusterID)
+		_, err := List(mockDeployments[0].Workspace.ID, false, api, clusterID)
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -629,13 +625,9 @@ func (s *Suite) TestList() {
 		api := new(mocks.ClientInterface)
 		api.On("ListPaginatedDeployments", expectedRequest).Return(mockDeployments, nil)
 
-		buf := new(bytes.Buffer)
-		err := List(mockDeployments[0].Workspace.ID, true, api, buf, clusterID)
+		got, err := List(mockDeployments[0].Workspace.ID, true, api, clusterID)
 		s.NoError(err)
-		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 TAG     IMAGE VERSION                  
- test     burning-terrestrial-5940     v1.1.0     ckbv801t300qh0760pck7ea0c     ?       Astronomer-Certified-1.1.0     
-`
-		s.Equal(expected, buf.String())
+		s.Equal(mockDeployments, got)
 		api.AssertExpectations(s.T())
 	})
 }
@@ -685,24 +677,10 @@ func (s *Suite) TestUpdate() {
 		api := new(mocks.ClientInterface)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         IMAGE VERSION                  
- test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     2.2.2-1     Astronomer-Certified-2.2.2     
-
- Successfully updated deployment
-`
-		myTests := []*struct {
-			deploymentConfig  map[string]string
-			dagDeploymentType string
-			expectedOutput    string
-		}{
-			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: "", expectedOutput: expected},
-			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: houston.ImageDeploymentType, expectedOutput: expected},
-		}
-		for _, tt := range myTests {
-			buf := new(bytes.Buffer)
-			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, buf, mockAppConfig)
+		for _, dagDeploymentType := range []string{"", houston.ImageDeploymentType} {
+			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType, "", "", "", "", "", "", "", "", 1, 0, api, mockAppConfig)
 			s.NoError(err)
-			s.Equal(expected, buf.String())
+			s.Equal(mockDeployment, got)
 			api.AssertExpectations(s.T())
 		}
 	})
@@ -713,24 +691,10 @@ func (s *Suite) TestUpdate() {
 		api := new(mocks.ClientInterface)
 		api.On("UpdateDeployment", mock.Anything).Return(mockDeployment, nil)
 
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO     DEPLOYMENT ID                 TAG         IMAGE VERSION                  
- test123     burning-terrestrial-5940     0.0.0     ckbv801t300qh0760pck7ea0c     2.2.2-1     Astronomer-Certified-2.2.2     
-
- Successfully updated deployment
-`
-		myTests := []struct {
-			deploymentConfig  map[string]string
-			dagDeploymentType string
-			expectedOutput    string
-		}{
-			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: "", expectedOutput: expected},
-			{deploymentConfig: map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType: houston.ImageDeploymentType, expectedOutput: expected},
-		}
-		for _, tt := range myTests {
-			buf := new(bytes.Buffer)
-			err := Update(mockDeployment.ID, role, tt.deploymentConfig, tt.dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, buf, mockAppConfig)
+		for _, dagDeploymentType := range []string{"", houston.ImageDeploymentType} {
+			got, err := Update(mockDeployment.ID, role, map[string]string{"executor": houston.CeleryExecutorType}, dagDeploymentType, "", "", "", "", "", "", "", "", 1, 1, api, mockAppConfig)
 			s.NoError(err)
-			s.Equal(expected, buf.String())
+			s.Equal(mockDeployment, got)
 			api.AssertExpectations(s.T())
 		}
 	})
@@ -742,8 +706,7 @@ func (s *Suite) TestUpdate() {
 		deploymentConfig := make(map[string]string)
 		deploymentConfig["executor"] = houston.CeleryExecutorType
 
-		buf := new(bytes.Buffer)
-		err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, buf, mockAppConfig)
+		_, err := Update(mockDeployment.ID, role, deploymentConfig, "", "", "", "", "", "", "", "", "", 1, 0, api, mockAppConfig)
 
 		s.EqualError(err, errMock.Error())
 		api.AssertExpectations(s.T())
@@ -770,18 +733,11 @@ func (s *Suite) TestAirflowUpgrade() {
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(mockDeployment, nil)
 		buf := new(bytes.Buffer)
-		err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
+		got, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
 		s.NoError(err)
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION                    
- test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Astronomer-Certified-1.10.10     
-
-The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.
-To cancel, run: 
- $ astro deployment airflow upgrade --cancel
-
-`
-
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeStarted, got.Action)
+		s.Equal(ImageVersion{Image: ImageCertified, Version: "1.10.5"}, got.Current)
+		s.Equal(&ImageVersion{Image: ImageCertified, Version: "1.10.10"}, got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -790,7 +746,7 @@ To cancel, run:
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, errGetDeploymentMock)
 
 		buf := new(bytes.Buffer)
-		err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
+		_, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
 		s.Error(err, errGetDeploymentMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -802,7 +758,7 @@ To cancel, run:
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(nil, errUpdateDeploymentMock)
 
 		buf := new(bytes.Buffer)
-		err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
+		_, err := AirflowUpgrade(mockDeployment.ID, mockDeployment.DesiredAirflowVersion, api, buf)
 		s.Error(err, errUpdateDeploymentMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -829,13 +785,11 @@ func (s *Suite) TestAirflowUpgradeCancel() {
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		err := AirflowUpgradeCancel(deploymentID, api, buf)
+		got, err := AirflowUpgradeCancel(deploymentID, api)
 		s.NoError(err)
-		expected := `
-Airflow upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 1.10.5.
-`
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeCanceled, got.Action)
+		s.Equal(ImageVersion{Image: ImageCertified, Version: "1.10.5"}, got.Current)
+		s.Equal((*ImageVersion)(nil), got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -845,12 +799,11 @@ Airflow upgrade process has been successfully canceled. Your Deployment was not 
 		mockResp.AirflowVersion = mockResp.DesiredAirflowVersion
 		api.On("GetDeployment", mockDeployment.ID).Return(&mockResp, nil)
 
-		buf := new(bytes.Buffer)
-		err := AirflowUpgradeCancel(deploymentID, api, buf)
+		got, err := AirflowUpgradeCancel(deploymentID, api)
 		s.NoError(err)
-		expected := `
-Nothing to cancel. You are currently running Airflow 1.10.10 and you have not indicated that you want to upgrade.`
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeNothingToCancel, got.Action)
+		s.Equal(ImageVersion{Image: ImageCertified, Version: "1.10.10"}, got.Current)
+		s.Equal((*ImageVersion)(nil), got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -858,8 +811,7 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, errGetDeploymentMock)
 
-		buf := new(bytes.Buffer)
-		err := AirflowUpgradeCancel(deploymentID, api, buf)
+		_, err := AirflowUpgradeCancel(deploymentID, api)
 		s.EqualError(err, errGetDeploymentMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -870,8 +822,7 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
 		expectedVars["desiredAirflowVersion"] = mockDeployment.AirflowVersion
 		api.On("UpdateDeploymentAirflow", expectedVars).Return(nil, errUpdateDeploymentMock)
 
-		buf := new(bytes.Buffer)
-		err := AirflowUpgradeCancel(deploymentID, api, buf)
+		_, err := AirflowUpgradeCancel(deploymentID, api)
 		s.EqualError(err, errUpdateDeploymentMock.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -903,26 +854,21 @@ Nothing to cancel. You are currently running Airflow 1.10.10 and you have not in
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		err = AirflowUpgrade(deploymentID, "", api, buf)
+		got, err := AirflowUpgrade(deploymentID, "", api, buf)
 		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
 		s.NoError(err)
 		rows, rest := s.picked(buf.String())
+		s.Empty(rest, "the picker is all it draws; the result is the caller's")
 		s.Equal([][]string{
 			{"#", "AIRFLOW", "VERSION"},
 			{"1", "Astronomer-Certified-1.10.7"},
 			{"2", "Astronomer-Certified-1.10.10"},
 			{"3", "Astronomer-Certified-1.10.12"},
 		}, rows)
-		expected := ` NAME     DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION                    
- test     burning-terrestrial-5940     v0.0.0     ckggzqj5f4157qtc9lescmehm     Astronomer-Certified-1.10.10     
-
-The upgrade from Airflow 1.10.5 to 1.10.10 has been started. To complete this process, add an Airflow 1.10.10 image to your Dockerfile and deploy to APC.
-To cancel, run: 
- $ astro deployment airflow upgrade --cancel
-
-`
-		s.Equal(expected, rest)
+		s.Equal(VersionChangeStarted, got.Action)
+		s.Equal(ImageVersion{Image: ImageCertified, Version: "1.10.5"}, got.Current)
+		s.Equal(&ImageVersion{Image: ImageCertified, Version: "1.10.10"}, got.Desired)
 		api.AssertExpectations(s.T())
 	})
 }
@@ -1037,7 +983,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
 		s.NoError(err)
 		rows, rest := s.picked(buf.String())
 		s.Equal([][]string{{"#", "AVAILABLE", "KUBERNETES", "NAMESPACES"}, {"1", "test1"}, {"2", "test2"}}, rows)
@@ -1058,7 +1004,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 			api := new(mocks.ClientInterface)
 			api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(mockAvailableNamespaces, nil)
 			testUtil.MockUserInput(s.T(), answer)
-			_, err := getDeploymentSelectionNamespaces(api, new(bytes.Buffer), "testClusterID")
+			_, err := getDeploymentSelectionNamespaces(api, new(bytes.Buffer), "testClusterID", "")
 			s.Equal(want, err, "answer %q", answer)
 		}
 	})
@@ -1068,7 +1014,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return([]houston.Namespace{}, nil)
 
 		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
 		expected := ``
 		s.Equal(expected, name)
 		s.EqualError(err, "no kubernetes namespaces are available")
@@ -1093,7 +1039,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
 		s.Equal("", name)
 		s.EqualError(err, "cannot parse test to int")
 		api.AssertExpectations(s.T())
@@ -1104,7 +1050,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 		api.On("GetAvailableNamespaces", map[string]interface{}{"clusterID": "testClusterID"}).Return(nil, errMock)
 
 		buf := new(bytes.Buffer)
-		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID")
+		name, err := getDeploymentSelectionNamespaces(api, buf, "testClusterID", "")
 		s.Equal("", name)
 		s.EqualError(err, errMock.Error())
 	})
@@ -1112,7 +1058,7 @@ func (s *Suite) TestGetDeploymentSelectionNamespaces() {
 
 func (s *Suite) TestGetDeploymentNamespaceName() {
 	// mock os.Stdin
-	input := []byte("Test1")
+	input := []byte("test1")
 	r, w, err := os.Pipe()
 	s.Require().NoError(err)
 	_, err = w.Write(input)
@@ -1123,8 +1069,8 @@ func (s *Suite) TestGetDeploymentNamespaceName() {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	name, _ := getDeploymentNamespaceName()
-	s.Equal("Test1", name)
+	name, _ := getDeploymentNamespaceName("")
+	s.Equal("test1", name)
 }
 
 func (s *Suite) TestGetDeploymentNamespaceNameError() {
@@ -1140,7 +1086,7 @@ func (s *Suite) TestGetDeploymentNamespaceNameError() {
 	defer func() { os.Stdin = stdin }()
 	os.Stdin = r
 
-	name, err := getDeploymentNamespaceName()
+	name, err := getDeploymentNamespaceName("")
 	s.Equal("", name)
 	s.EqualError(err, "no kubernetes namespaces specified")
 }
@@ -1219,18 +1165,11 @@ func (s *Suite) TestRuntimeUpgrade() {
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 		buf := new(bytes.Buffer)
-		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		got, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
 		s.NoError(err)
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
- test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
-
-The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.
-To cancel, run: 
- $ astro deployment runtime upgrade --cancel
-
-`
-
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeStarted, got.Action)
+		s.Equal(ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Current)
+		s.Equal(&ImageVersion{Image: ImageRuntime, Version: "4.2.5"}, got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -1243,18 +1182,11 @@ To cancel, run:
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 		buf := new(bytes.Buffer)
-		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		got, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
 		s.NoError(err)
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
- test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
-
-The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.
-To cancel, run: 
- $ astro deployment runtime upgrade --cancel
-
-`
-
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeStarted, got.Action)
+		s.Equal(ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Current)
+		s.Equal(&ImageVersion{Image: ImageRuntime, Version: "4.2.5"}, got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -1267,7 +1199,7 @@ To cancel, run:
 		api.On("GetDeployment", mockDeployment.ID).Return(&mockResp, nil)
 
 		buf := new(bytes.Buffer)
-		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
 		s.ErrorIs(err, errDeploymentNotOnRuntime)
 	})
 
@@ -1277,7 +1209,7 @@ To cancel, run:
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
-		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
 		s.Error(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1290,7 +1222,7 @@ To cancel, run:
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
 
 		buf := new(bytes.Buffer)
-		err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
+		_, err := RuntimeUpgrade(mockDeployment.ID, mockDeployment.DesiredRuntimeVersion, api, buf)
 		s.Error(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1321,21 +1253,16 @@ To cancel, run:
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		err = RuntimeUpgrade(mockDeployment.ID, "", api, buf)
+		got, err := RuntimeUpgrade(mockDeployment.ID, "", api, buf)
 		s.T().Log(buf.String()) // Log the buffer so that this test is recognized by go test
 
 		s.NoError(err)
 		rows, rest := s.picked(buf.String())
+		s.Empty(rest, "the picker is all it draws; the result is the caller's")
 		s.Equal([][]string{{"#", "RUNTIME", "VERSION"}, {"1", "Runtime-4.2.5"}}, rows)
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
- test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.5     
-
-The upgrade from Runtime 4.2.4 to 4.2.5 has been started. To complete this process, add an Runtime 4.2.5 image to your Dockerfile and deploy to APC.
-To cancel, run: 
- $ astro deployment runtime upgrade --cancel
-
-`
-		s.Equal(expected, rest)
+		s.Equal(VersionChangeStarted, got.Action)
+		s.Equal(ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Current)
+		s.Equal(&ImageVersion{Image: ImageRuntime, Version: "4.2.5"}, got.Desired)
 		api.AssertExpectations(s.T())
 	})
 }
@@ -1361,13 +1288,11 @@ func (s *Suite) TestRuntimeUpgradeCancel() {
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeUpgradeCancel(deploymentID, api, buf)
+		got, err := RuntimeUpgradeCancel(deploymentID, api)
 		s.NoError(err)
-		expected := `
-Runtime upgrade process has been successfully canceled. Your Deployment was not interrupted and you are still running Runtime 4.2.4.
-`
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeCanceled, got.Action)
+		s.Equal(ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Current)
+		s.Equal((*ImageVersion)(nil), got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -1376,8 +1301,7 @@ Runtime upgrade process has been successfully canceled. Your Deployment was not 
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeUpgradeCancel(deploymentID, api, buf)
+		_, err := RuntimeUpgradeCancel(deploymentID, api)
 		s.EqualError(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1388,8 +1312,7 @@ Runtime upgrade process has been successfully canceled. Your Deployment was not 
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeUpgradeCancel(deploymentID, api, buf)
+		_, err := RuntimeUpgradeCancel(deploymentID, api)
 		s.EqualError(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1420,19 +1343,11 @@ func (s *Suite) TestRuntimeMigrate() {
 		mockMigrateRuntimeResp := *mockDeployment
 		mockMigrateRuntimeResp.RuntimeVersion = "4.2.4"
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeResp, nil)
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		got, err := RuntimeMigrate(mockDeployment.ID, api)
 		s.NoError(err)
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
- test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.4     
-
-The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.
-To cancel, run: 
- $ astro deployment runtime migrate --cancel
-
-`
-
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeStarted, got.Action)
+		s.Equal(ImageVersion{Image: ImageCertified, Version: "2.2.4"}, got.Current)
+		s.Equal(&ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -1450,19 +1365,11 @@ To cancel, run:
 		mockMigrateRuntimeUpdateResp := *mockDeployment
 		mockMigrateRuntimeUpdateResp.RuntimeVersion = "4.2.4"
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(&mockMigrateRuntimeUpdateResp, nil)
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		got, err := RuntimeMigrate(mockDeployment.ID, api)
 		s.NoError(err)
-		expected := ` NAME        DEPLOYMENT NAME              ASTRO      DEPLOYMENT ID                 IMAGE VERSION     
- test123     burning-terrestrial-5940     v0.0.0     ckbv818oa00r107606ywhoqtw     Runtime-4.2.4     
-
-The migration from Airflow 2.2.4 image to Runtime 4.2.4 has been started. To complete this process, add an Runtime 4.2.4 image to your Dockerfile and deploy to APC.
-To cancel, run: 
- $ astro deployment runtime migrate --cancel
-
-`
-
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeStarted, got.Action)
+		s.Equal(ImageVersion{Image: ImageCertified, Version: "2.2.4"}, got.Current)
+		s.Equal(&ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -1471,8 +1378,7 @@ To cancel, run:
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		_, err := RuntimeMigrate(mockDeployment.ID, api)
 		s.Error(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1484,8 +1390,7 @@ To cancel, run:
 		mockDeploymentResp.AirflowVersion = ""
 		api.On("GetDeployment", mockDeployment.ID).Return(&mockDeploymentResp, nil)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		_, err := RuntimeMigrate(mockDeployment.ID, api)
 		s.Error(err, errDeploymentAlreadyOnRuntime)
 		api.AssertExpectations(s.T())
 	})
@@ -1499,8 +1404,7 @@ To cancel, run:
 		vars["clusterId"] = ""
 		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, mockError)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		_, err := RuntimeMigrate(mockDeployment.ID, api)
 		s.Error(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1513,8 +1417,7 @@ To cancel, run:
 		vars["clusterId"] = ""
 		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{}, nil)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		_, err := RuntimeMigrate(mockDeployment.ID, api)
 		s.Error(err, errInvalidAirflowVersion)
 		api.AssertExpectations(s.T())
 	})
@@ -1530,8 +1433,7 @@ To cancel, run:
 		api.On("GetRuntimeReleases", vars).Return(houston.RuntimeReleases{houston.RuntimeRelease{Version: "4.2.4", AirflowVersion: "2.2.4"}}, nil)
 		api.On("UpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrate(mockDeployment.ID, api, buf)
+		_, err := RuntimeMigrate(mockDeployment.ID, api)
 		s.Error(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1559,13 +1461,11 @@ func (s *Suite) TestRuntimeMigrateCancel() {
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(mockDeployment, nil)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrateCancel(deploymentID, api, buf)
+		got, err := RuntimeMigrateCancel(deploymentID, api)
 		s.NoError(err)
-		expected := `
-Runtime migrate process has been successfully canceled. Your Deployment was not interrupted and you are still running Airflow 2.2.4.
-`
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeCanceled, got.Action)
+		s.Equal(ImageVersion{Image: ImageCertified, Version: "2.2.4"}, got.Current)
+		s.Equal((*ImageVersion)(nil), got.Desired)
 		api.AssertExpectations(s.T())
 	})
 
@@ -1574,8 +1474,7 @@ Runtime migrate process has been successfully canceled. Your Deployment was not 
 		api := new(mocks.ClientInterface)
 		api.On("GetDeployment", mockDeployment.ID).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrateCancel(deploymentID, api, buf)
+		_, err := RuntimeMigrateCancel(deploymentID, api)
 		s.EqualError(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1586,8 +1485,7 @@ Runtime migrate process has been successfully canceled. Your Deployment was not 
 		api.On("GetDeployment", mockDeployment.ID).Return(mockDeployment, nil)
 		api.On("CancelUpdateDeploymentRuntime", expectedVars).Return(nil, mockError)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrateCancel(deploymentID, api, buf)
+		_, err := RuntimeMigrateCancel(deploymentID, api)
 		s.EqualError(err, mockError.Error())
 		api.AssertExpectations(s.T())
 	})
@@ -1599,12 +1497,11 @@ Runtime migrate process has been successfully canceled. Your Deployment was not 
 		mockDeploymentResp.RuntimeVersion = mockDeployment.DesiredRuntimeVersion
 		api.On("GetDeployment", mockDeployment.ID).Return(&mockDeploymentResp, nil)
 
-		buf := new(bytes.Buffer)
-		err := RuntimeMigrateCancel(deploymentID, api, buf)
+		got, err := RuntimeMigrateCancel(deploymentID, api)
 		s.NoError(err)
-		expected := `
-Nothing to cancel. You are already running Runtime 4.2.4 and you have either not indicated that you want to migrate or migration has been completed.`
-		s.Equal(expected, buf.String())
+		s.Equal(VersionChangeNothingToCancel, got.Action)
+		s.Equal(ImageVersion{Image: ImageRuntime, Version: "4.2.4"}, got.Current)
+		s.Equal((*ImageVersion)(nil), got.Desired)
 		api.AssertExpectations(s.T())
 	})
 }
@@ -1627,7 +1524,7 @@ func (s *Suite) TestMeetsRuntimeUpgradeReqs() {
 		{
 			name:        "invalid case",
 			args:        args{runtimeVersion: "4.2.4", desiredRuntimeVersion: "4.2.4"},
-			expectedErr: ErrInvalidRuntimeVersion{currentVersion: semver.MustParse("4.2.4"), desiredVersion: "4.2.4"},
+			expectedErr: ErrInvalidRuntimeVersion{currentVersion: "4.2.4", desiredVersion: "4.2.4"},
 		},
 		{
 			name:        "error parsing runtime version",

@@ -42,7 +42,7 @@ func AddCmds(client houston.ClientInterface, out io.Writer) []*cobra.Command {
 	return []*cobra.Command{
 		newDeploymentRootCmd(out),
 		newWorkspaceCmd(out),
-		NewDeployCmd(),
+		NewDeployCmd(out),
 		newUserCmd(out),
 		newTeamCmd(out),
 	}

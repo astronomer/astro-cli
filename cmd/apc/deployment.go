@@ -1,11 +1,14 @@
 package apc
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -30,6 +33,7 @@ const (
 
 var (
 	skipPrompt                  bool
+	deploymentOutput            string
 	allDeployments              bool
 	cancel                      bool
 	executor                    string
@@ -58,6 +62,11 @@ var (
 	desiredRuntimeVersion   string
 	clusterID               string
 	deploymentMode          string
+	createNamespace         string
+
+	// errNoAppConfig is a create with no platform settings to read: the
+	// lookup when the tree was built failed, and none was asked for since.
+	errNoAppConfig = errors.New("could not read this platform's settings for a new Deployment; check your login and try again")
 
 	adoptName                    string
 	adoptNamespace               string
@@ -224,6 +233,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&airflowVersion, "airflow-version", "a", "", "Add desired Airflow version parameter: e.g: 1.10.5 or 1.10.7")
 	cmd.Flags().StringVarP(&releaseName, "release-name", "r", "", "Set custom release-name if possible")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
+	cmd.Flags().StringVar(&createNamespace, "namespace", "", "Kubernetes namespace for the Deployment, where the platform asks for one: one of the namespaces it offers, or a name of your own (lower-case letters, digits and '-', at most 63) where it takes one")
 
 	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
@@ -235,6 +245,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		cmd.Example += createExampleOperatorMode
 	}
 	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -245,12 +256,17 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete an Airflow Deployment",
 		Long:    "Delete an Airflow Deployment",
 		Example: `  # Delete a Deployment and all of its data, after you confirm
-  astro deployment delete <DEPLOYMENT_ID>`,
+  astro deployment delete <DEPLOYMENT_ID>
+
+  # Delete it without the confirmation, from a script
+  astro deployment delete <DEPLOYMENT_ID> --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentDelete(cmd, args, out)
 		},
 	}
+	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Delete without asking for confirmation")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -275,6 +291,7 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	_ = cmd.MarkFlagRequired("cluster-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("name")       //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	_ = cmd.MarkFlagRequired("namespace")  //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -290,6 +307,8 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the adopted Deployment to release")
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Release the Deployment without asking for confirmation")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -319,6 +338,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Show Deployments from the specified cluster")
 	}
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -378,6 +398,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentUpdateDescription, "description", "d", "", "Set description to update in deployment")
 	cmd.Flags().StringVarP(&deploymentUpdateLabel, "label", "l", "", "Set label to update in deployment")
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -425,6 +446,7 @@ func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 	if err != nil {
 		fmt.Println("error adding deployment-id flag: ", err.Error())
 	}
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -460,6 +482,7 @@ func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dup
 	if err != nil {
 		fmt.Println("error adding deployment-id flag: ", err.Error())
 	}
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
@@ -480,17 +503,44 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 	if err != nil {
 		fmt.Println("error adding deployment-id flag: ", err.Error())
 	}
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
 
+// deploymentRenderer parses -o, before anything else so a bad value is a
+// usage error, and returns the Renderer the command publishes through.
+func deploymentRenderer(out io.Writer) (cliout.Renderer, error) {
+	format, err := cliout.ParseFormat(deploymentOutput)
+	if err != nil {
+		return cliout.Renderer{}, err
+	}
+	return cliout.Renderer{Format: format, Out: out}, nil
+}
+
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
-	if clusterID != "" {
-		appConfig, _ = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws}) //nolint:errcheck // error deliberately ignored in this shell code
+	// The settings that decide create's questions (namespace management, DAG
+	// deploy mechanisms) are resolved per cluster and workspace (houston-api
+	// ), so a --namespace is
+	// judged against those, not the defaults the tree was built with. A
+	// failed lookup used to be dropped, leaving no settings to read.
+	if clusterID != "" || createNamespace != "" {
+		appConfig, err = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws})
+		if err != nil {
+			return fmt.Errorf("failed to get app config: %w", err)
+		}
+	}
+	if appConfig == nil {
+		return errNoAppConfig
 	}
 
 	// Silence Usage as we have now validated command input
@@ -555,28 +605,50 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		TriggererReplicas: createTriggererReplicas,
 		ClusterID:         clusterID,
 		Mode:              deploymentMode,
+		Namespace:         createNamespace,
 	}
-	return deployment.Create(req, houstonClient, out, appConfig)
+	d, err := deployment.Create(req, houstonClient, cliout.NotesTo(cmd, r.Format, out), appConfig)
+	if err != nil {
+		return err
+	}
+	return emitCreated(r, d, executorType)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	// Deletions are always hard deletes now (PLX-575): all data associated with
 	// the Deployment, including the database, is permanently removed. Confirm
-	// before proceeding.
-	i, err := input.Confirm(cliDeploymentHardDeletePrompt)
+	// before proceeding, unless --yes already did.
+	if !skipPrompt {
+		i, err := input.Confirm(cliDeploymentHardDeletePrompt, input.AnsweredBy("--yes"))
+		if err != nil {
+			return err
+		}
+		if !i {
+			fmt.Println("Exit: This command was not executed and your Deployment was not deleted.")
+			return nil
+		}
+	}
+	d, err := deployment.Delete(args[0], true, houstonClient)
 	if err != nil {
 		return err
 	}
-	if !i {
-		fmt.Println("Exit: This command was not executed and your Deployment was not deleted.")
-		return nil
-	}
-	return deployment.Delete(args[0], true, houstonClient, out)
+	return r.Emit(newRemovalJSON(args[0], d, "deleted"), cliout.Text(func(b *bufio.Writer) {
+		fmt.Fprintln(b, "\n Successfully deleted deployment")
+	}))
 }
 
 func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -596,25 +668,52 @@ func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
 		UseApcRegistry:          adoptUseApcRegistry,
 		AcceptIncompatibilities: adoptAcceptIncompatibilities,
 	}
-	return deployment.Adopt(req, houstonClient, out)
-}
-
-func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	i, err := input.Confirm(cliDeploymentUnadoptPrompt)
+	d, err := deployment.Adopt(req, houstonClient)
 	if err != nil {
 		return err
 	}
-	if !i {
-		fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
-		return nil
+	return emitAdopted(r, d)
+}
+
+func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
 	}
-	return deployment.Unadopt(deploymentID, houstonClient, out)
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	if !skipPrompt {
+		i, err := input.Confirm(cliDeploymentUnadoptPrompt, input.AnsweredBy("--yes"))
+		if err != nil {
+			return err
+		}
+		if !i {
+			fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not unadopted.")
+			return nil
+		}
+	}
+	d, err := deployment.Unadopt(deploymentID, houstonClient)
+	if err != nil {
+		return err
+	}
+	return r.Emit(newRemovalJSON(deploymentID, d, "unadopted"), cliout.Text(func(b *bufio.Writer) {
+		// Houston returns the record it removed; without one, the id given
+		// is what is known.
+		if d == nil {
+			fmt.Fprintf(b, "\n Successfully unadopted deployment %s\n", deploymentID)
+			return
+		}
+		fmt.Fprintf(b, "\n Successfully unadopted deployment %s (%s)\n", d.ReleaseName, d.ID)
+	}))
 }
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -628,7 +727,11 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.List(ws, allDeployments, houstonClient, out, clusterID)
+	ds, err := deployment.List(ws, allDeployments, houstonClient, clusterID)
+	if err != nil {
+		return err
+	}
+	return emitDeploymentList(r, ds)
 }
 
 // confirmDagDeploymentTypeChange asks before an update moves a deployment onto
@@ -648,6 +751,11 @@ func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
+
 	argsMap := map[string]string{}
 	if deploymentUpdateDescription != "" {
 		argsMap["description"] = deploymentUpdateDescription
@@ -706,32 +814,66 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	return deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, out, appConfig)
+	d, err := deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, appConfig)
+	if err != nil {
+		return err
+	}
+	return emitUpdated(r, d)
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	var change *deployment.VersionChange
 	if cancel {
-		return deployment.AirflowUpgradeCancel(deploymentID, houstonClient, out)
+		change, err = deployment.AirflowUpgradeCancel(deploymentID, houstonClient)
+	} else {
+		change, err = deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient, cliout.NotesTo(cmd, r.Format, out))
 	}
-	return deployment.AirflowUpgrade(deploymentID, desiredAirflowVersion, houstonClient, out)
+	if err != nil {
+		return err
+	}
+	return emitVersionChange(r, airflowUpgrade, change)
 }
 
 func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	var change *deployment.VersionChange
 	if cancel {
-		return deployment.RuntimeUpgradeCancel(deploymentID, houstonClient, out)
+		change, err = deployment.RuntimeUpgradeCancel(deploymentID, houstonClient)
+	} else {
+		change, err = deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient, cliout.NotesTo(cmd, r.Format, out))
 	}
-	return deployment.RuntimeUpgrade(deploymentID, desiredRuntimeVersion, houstonClient, out)
+	if err != nil {
+		return err
+	}
+	return emitVersionChange(r, runtimeUpgrade, change)
 }
 
 func deploymentRuntimeMigrate(cmd *cobra.Command, out io.Writer) error {
+	r, err := deploymentRenderer(out)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
+	var change *deployment.VersionChange
 	if cancel {
-		return deployment.RuntimeMigrateCancel(deploymentID, houstonClient, out)
+		change, err = deployment.RuntimeMigrateCancel(deploymentID, houstonClient)
+	} else {
+		change, err = deployment.RuntimeMigrate(deploymentID, houstonClient)
 	}
-	return deployment.RuntimeMigrate(deploymentID, houstonClient, out)
+	if err != nil {
+		return err
+	}
+	return emitVersionChange(r, runtimeMigrate, change)
 }

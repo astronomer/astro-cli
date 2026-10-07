@@ -41,6 +41,15 @@ type UploadFileArguments struct {
 	InitialDelayInMS    int
 	BackoffFactor       int
 	RetryDisplayMessage string
+	// Out is where the upload's progress lines go; nil is os.Stdout.
+	Out io.Writer
+}
+
+func (a *UploadFileArguments) out() io.Writer {
+	if a.Out != nil {
+		return a.Out
+	}
+	return os.Stdout
 }
 
 // Exists returns a boolean indicating if the given path already exists
@@ -258,7 +267,7 @@ func UploadFile(args *UploadFileArguments) error {
 
 		headers := args.Headers
 		headers["Content-Type"] = writer.FormDataContentType()
-		fmt.Println(args.RetryDisplayMessage)
+		fmt.Fprintln(args.out(), args.RetryDisplayMessage)
 		req, err := newRequestWithContext(http_context.Background(), "POST", args.TargetURL, body)
 		if err != nil {
 			currentUploadError = err
@@ -288,7 +297,7 @@ func UploadFile(args *UploadFileArguments) error {
 		// Return success for 2xx status code
 		if response.StatusCode == http.StatusOK {
 			currentUploadError = nil
-			fmt.Println("upload successful")
+			fmt.Fprintln(args.out(), "upload successful")
 			break
 		}
 

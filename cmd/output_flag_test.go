@@ -38,21 +38,6 @@ var outputExempt = map[string]string{
 var lacksOutputFlag = map[string][]string{
 	cloudPlatform: {},
 	apcPlatform: {
-		"astro deploy",
-		// adopt and unadopt exist only on APC 2.1.0 and later, so this test
-		// first saw them when it began building that tree; they predate it,
-		// like the rest of the APC deployment family listed here.
-		"astro deployment adopt",
-		"astro deployment airflow upgrade",
-		"astro deployment create",
-		"astro deployment delete",
-		"astro deployment list",
-		"astro deployment logs scheduler",
-		"astro deployment logs triggerer",
-		"astro deployment logs webserver",
-		"astro deployment logs workers",
-		"astro deployment runtime migrate",
-		"astro deployment runtime upgrade",
 		"astro deployment service-account create",
 		"astro deployment service-account delete",
 		"astro deployment service-account list",
@@ -60,8 +45,6 @@ var lacksOutputFlag = map[string][]string{
 		"astro deployment team list",
 		"astro deployment team remove",
 		"astro deployment team update",
-		"astro deployment unadopt",
-		"astro deployment update",
 		"astro deployment user add",
 		"astro deployment user list",
 		"astro deployment user remove",

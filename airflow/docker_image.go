@@ -61,10 +61,28 @@ var getDockerClient = func() (client.APIClient, error) {
 
 type DockerImage struct {
 	imageName string
+	// progress is where a build (at debug level) and a push draw their
+	// progress: os.Stdout unless ProgressTo says otherwise.
+	progress io.Writer
 }
 
 func DockerImageInit(imageName string) *DockerImage {
 	return &DockerImage{imageName: imageName}
+}
+
+// ProgressTo sends the build and push progress to w instead of stdout: a
+// command whose stdout carries a result (--output json) sends it to stderr.
+func (d *DockerImage) ProgressTo(w io.Writer) {
+	d.progress = w
+}
+
+// progressOut is where progress goes: ProgressTo's writer, or os.Stdout as
+// it is when asked.
+func (d *DockerImage) progressOut() io.Writer {
+	if d.progress != nil {
+		return d.progress
+	}
+	return os.Stdout
 }
 
 func shouldAddPullFlag(dockerfilePath string) (bool, error) {
@@ -144,7 +162,7 @@ func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildC
 	var stdout, stderr io.Writer
 	var outBuff bytes.Buffer
 	if logger.IsLevelEnabled(logrus.DebugLevel) {
-		stdout = os.Stdout
+		stdout = d.progressOut()
 		stderr = os.Stderr
 	} else {
 		stdout = &outBuff
@@ -315,7 +333,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		}
 		// if it does not work with the go library use the container runtime's CLI. Support for (old?) versions of Colima
 		logger.Debugf("Retrying the push with the %s CLI", containerRuntime)
-		err = pushWithCLI(&authConfig, remoteImage)
+		err = pushWithCLI(&authConfig, remoteImage, d.progressOut())
 		if err != nil {
 			// Check for 403 errors only after both methods fail
 			if is403Error(err) {
@@ -391,7 +409,7 @@ func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImag
 		return err
 	}
 	defer responseBody.Close()
-	return displayJSONMessagesToStream(responseBody, nil)
+	return displayJSONMessagesToStream(responseBody, d.progressOut(), nil)
 }
 
 // Get the registry name to authenticate against
@@ -419,8 +437,8 @@ func (d *DockerImage) getRegistryToAuth(imageName string) (string, error) {
 	return parts[0], nil
 }
 
-var displayJSONMessagesToStream = func(responseBody io.ReadCloser, auxCallback func(jsonmessage.JSONMessage)) error {
-	out := streams.NewOut(os.Stdout)
+var displayJSONMessagesToStream = func(responseBody io.ReadCloser, w io.Writer, auxCallback func(jsonmessage.JSONMessage)) error {
+	out := streams.NewOut(w)
 	err := jsonmessage.DisplayJSONMessagesToStream(responseBody, out, nil)
 	if err != nil {
 		return err
@@ -516,7 +534,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 }
 
 // pushWithCLI is the fallback for runtimes, such as older Colima, that reject the Go client's push.
-func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string) error {
+func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string, out io.Writer) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
@@ -524,7 +542,7 @@ func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string) error {
 
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
 		var stderr bytes.Buffer
-		err = registryLogin(containerRuntime, authConfig.ServerAddress, authConfig.Username, authConfig.Password, os.Stdout, &stderr)
+		err = registryLogin(containerRuntime, authConfig.ServerAddress, authConfig.Username, authConfig.Password, out, &stderr)
 		if err != nil {
 			stderrOutput := stderr.String()
 			if stderrOutput != "" {
@@ -536,7 +554,7 @@ func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string) error {
 
 	// docker push <imageName> - capture stderr to preserve error details
 	var stderr bytes.Buffer
-	err = cmdExec(containerRuntime, os.Stdout, &stderr, "push", imageName)
+	err = cmdExec(containerRuntime, out, &stderr, "push", imageName)
 	if err != nil {
 		// Include stderr output in the error so we can detect 403 errors
 		stderrOutput := stderr.String()

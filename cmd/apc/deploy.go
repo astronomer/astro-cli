@@ -3,9 +3,11 @@ package apc
 import (
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
@@ -18,6 +20,8 @@ var (
 	forceDeploy      bool
 	forcePrompt      bool
 	saveDeployConfig bool
+	deployOutput     string
+	deployYes        bool
 
 	ignoreCacheDeploy = false
 
@@ -50,7 +54,7 @@ var deployExample = `  # Deploy this project, picking the Deployment from a list
 
 var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy <deployment-id> --force` to deploy anyway")
 
-func NewDeployCmd() *cobra.Command {
+func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy [DEPLOYMENT_ID]",
 		Short: "Deploy an Airflow project",
@@ -62,7 +66,9 @@ func NewDeployCmd() *cobra.Command {
 			}
 			return EnsureProjectDir(cmd, args)
 		},
-		RunE:    deployAirflow,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deployAirflow(cmd, args, out)
+		},
 		Example: deployExample,
 	}
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
@@ -75,6 +81,8 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of the custom image(should be present locally unless --remote is specified) to deploy")
 	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Runtime version of the image to deploy. Example - 12.1.1. Mandatory if --image-name --remote is provided")
 	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Custom image which is present on the remote registry. Can only be used with --image-name flag")
+	cmd.Flags().BoolVarP(&deployYes, "yes", "y", false, "Answer the deploy's confirmations yes: an image tag that is not recommended, and a DAGs folder with no DAGs")
+	cliout.AddOutputFlag(cmd, &deployOutput)
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
@@ -82,7 +90,38 @@ func NewDeployCmd() *cobra.Command {
 	return cmd
 }
 
-func deployAirflow(cmd *cobra.Command, args []string) error {
+// The kinds of deploy deployJSON.Type names.
+const (
+	deployTypeImageAndDags = "image_and_dags"
+	deployTypeImage        = "image"
+	deployTypeDags         = "dags"
+)
+
+// deployJSON is the one object `astro deploy --output json` publishes on APC,
+// named as the Astro platform's deploy names the same things. Fields that do
+// not apply to a deploy are omitted: a dags-only deploy pushes no image.
+type deployJSON struct {
+	Deployment string `json:"deployment"`
+	Workspace  string `json:"workspace"`
+	// Type is image_and_dags, image (--image, or a Deployment that takes no
+	// DAG-only deploy), or dags (--dags).
+	Type string `json:"type"`
+	// Image is the image the Deployment now runs: the one pushed, or the one
+	// --image-name --remote named.
+	Image string `json:"image,omitempty"`
+	// RuntimeVersion is --runtime-version, given with --image-name --remote.
+	RuntimeVersion string `json:"runtime_version,omitempty"`
+	// URL is the Deployment's Airflow UI, when Houston gives it.
+	URL string `json:"url,omitempty"`
+}
+
+func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deployOutput)
+	if err != nil {
+		return err
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -122,36 +161,65 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		return ErrBothDagsOnlyAndImageOnlySet
 	}
 
+	// The deploy's progress (its notes, the image push, the DAG upload) goes
+	// where it always has in text, and to stderr under json, where stdout
+	// carries the result.
+	opts := deploy.Options{Progress: cliout.NotesTo(cmd, format, out), Yes: deployYes}
+	r := cliout.Renderer{Format: format, Out: out}
+	result := deployJSON{Workspace: ws}
+
 	if isDagOnlyDeploy {
-		return DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description)
+		deployedTo, err := DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description, opts)
+		if err != nil {
+			return err
+		}
+		result.Deployment, result.Type = deployedTo, deployTypeDags
+		return emitDeploy(r, &result)
 	}
 
 	if imagePresentOnRemote {
 		if imageName == "" {
 			return ErrImageNameNotPassedForRemoteFlag
 		}
-		deploymentID, err = UpdateDeploymentImage(houstonClient, deploymentID, ws, runtimeVersionForImageName, imageName)
+		deploymentID, err = UpdateDeploymentImage(houstonClient, deploymentID, ws, runtimeVersionForImageName, imageName, opts)
 		if err != nil {
 			return err
 		}
+		result.Image, result.RuntimeVersion = imageName, runtimeVersionForImageName
 	} else {
 		// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-		deploymentID, err = DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, ignoreCacheDeploy, forcePrompt, description, isImageOnlyDeploy, imageName)
+		deployed, err := DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, ignoreCacheDeploy, forcePrompt, description, isImageOnlyDeploy, imageName, opts)
 		if err != nil {
 			return err
 		}
+		deploymentID = deployed.DeploymentID
+		result.Image, result.URL = deployed.Image, deployed.URL
 	}
+	result.Deployment, result.Type = deploymentID, deployTypeImage
 
 	// Don't deploy dags even for dags-only deployments --image is passed
 	if isImageOnlyDeploy {
-		fmt.Println("Dags in the project will not be deployed since --image is passed.")
-		return nil
+		fmt.Fprintln(opts.Progress, "Dags in the project will not be deployed since --image is passed.")
+		return emitDeploy(r, &result)
 	}
 
-	err = DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description)
+	_, err = DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description, opts)
 	// Don't throw the error if dag-deploy itself is disabled
 	if deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
+		return emitDeploy(r, &result)
+	}
+	if err != nil {
+		return err
+	}
+	result.Type = deployTypeImageAndDags
+	return emitDeploy(r, &result)
+}
+
+// emitDeploy publishes a finished deploy under json. In text the deploy has
+// already said what it did, as it always has, and this prints nothing.
+func emitDeploy(r cliout.Renderer, result *deployJSON) error {
+	if r.Format != cliout.FormatJSON {
 		return nil
 	}
-	return err
+	return r.Emit(result, nil)
 }

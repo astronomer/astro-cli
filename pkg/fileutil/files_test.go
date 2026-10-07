@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -556,6 +557,7 @@ func (s *Suite) TestUploadFile() {
 			InitialDelayInMS:    1,
 			BackoffFactor:       2,
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
+			Out:                 new(bytes.Buffer),
 		}
 		err = UploadFile(&uploadFileArgs)
 
@@ -563,6 +565,8 @@ func (s *Suite) TestUploadFile() {
 		s.EqualError(err, "file upload failed. Status code: 500 and Message: Internal Server Error")
 		// Assert that the server is hit required number of times
 		s.Equal(2, mockServer.hitCount)
+		// Each try's line goes to Out, not stdout.
+		s.Equal(strings.Repeat("please wait, attempting to upload the dags\n", 2), uploadFileArgs.Out.(*bytes.Buffer).String())
 	})
 
 	s.Run("uploaded the file but got 400 response code. Uploading should not be retried", func() {

@@ -1,6 +1,7 @@
 package houston
 
 import (
+	"strings"
 	"time"
 )
 
@@ -17,10 +18,22 @@ type PaginatedDeploymentsRequest struct {
 
 // ListDeploymentLogsRequest - filters to list logs from a deployment
 type ListDeploymentLogsRequest struct {
-	DeploymentID string    `json:"deploymentId"`
-	Component    string    `json:"component"`
-	Search       string    `json:"search"`
-	Timestamp    time.Time `json:"timestamp"`
+	DeploymentID string     `json:"deploymentId"`
+	Component    string     `json:"component"`
+	Search       string     `json:"search"`
+	Timestamp    *time.Time `json:"timestamp,omitempty"`
+	// LogWindow, when set, bounds the search. With timestamp alone Houston
+	// searches that whole UTC calendar day (houston-api
+	// ); with a window it searches
+	// exactly the window, of at most 2 days (:66-75).
+	*LogWindow
+}
+
+// LogWindow is a logs search's startTime and endTime, both since Houston
+// 0.25.6.
+type LogWindow struct {
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
 }
 
 // UpdateDeploymentImageRequest - properties to update a deployment image
@@ -697,6 +710,12 @@ var (
 		},
 	}
 
+	// DeploymentGetRequest is one Deployment by id. The 1.x entries select
+	// workspace { id }: update reads it for the app config it asks for, and
+	// deploy for its registry login.
+	// 1.0.0 and 1.0.1 select desiredRuntimeVersion, so a runtime cancel can see
+	// whether anything is pending; Houston 1.0.43 removed it (houston-api
+	// 69595020), and the 1.0.43 entry leaves it out.
 	DeploymentGetRequest = queryList{
 		{
 			version: "0.25.0",
@@ -754,6 +773,7 @@ var (
 				){
 					id
 					runtimeVersion
+					desiredRuntimeVersion
 					runtimeAirflowVersion
 					releaseName
 					urls {
@@ -764,11 +784,42 @@ var (
 						type
 					}
 					clusterId
+					workspace {
+						id
+					}
 				}
 			}`,
 		},
 		{
 			version: "1.0.1",
+			query: `
+			query GetDeployment(
+				$id: String!
+			){
+				deployment(
+					where: {id: $id}
+				){
+					id
+					runtimeVersion
+					desiredRuntimeVersion
+					runtimeAirflowVersion
+					releaseName
+					urls {
+						type
+						url
+					}
+					dagDeployment {
+						type
+					}
+					clusterId
+					workspace {
+						id
+					}
+				}
+			}`,
+		},
+		{
+			version: "1.0.43",
 			query: `
 			query GetDeployment(
 				$id: String!
@@ -788,6 +839,9 @@ var (
 						type
 					}
 					clusterId
+					workspace {
+						id
+					}
 				}
 			}`,
 		},
@@ -908,24 +962,57 @@ var (
 		},
 	}
 
-	DeploymentLogsGetRequest = `
-	query GetLogs(
-		$deploymentId: Uuid!
-		$component: String
-		$timestamp: DateTime
-		$search: String
-	){
-		logs(
-			deploymentUuid: $deploymentId
-			component: $component
-			timestamp: $timestamp
-			search: $search
-		){
-			id
-			createdAt: timestamp
-			log: message
-		}
-	}`
+	// DeploymentLogsGetRequest is a Deployment's log records. Houston 0.25.6
+	// added startTime and endTime; before it, the
+	// window is left out and timestamp alone bounds the search.
+	DeploymentLogsGetRequest = queryList{
+		{
+			version: "0.25.0",
+			query: `
+			query GetLogs(
+				$deploymentId: Uuid!
+				$component: String
+				$timestamp: DateTime
+				$search: String
+			){
+				logs(
+					deploymentUuid: $deploymentId
+					component: $component
+					timestamp: $timestamp
+					search: $search
+				){
+					id
+					createdAt: timestamp
+					log: message
+				}
+			}`,
+		},
+		{
+			version: "0.25.6",
+			query: `
+			query GetLogs(
+				$deploymentId: Uuid!
+				$component: String
+				$timestamp: DateTime
+				$startTime: DateTime
+				$endTime: DateTime
+				$search: String
+			){
+				logs(
+					deploymentUuid: $deploymentId
+					component: $component
+					timestamp: $timestamp
+					startTime: $startTime
+					endTime: $endTime
+					search: $search
+				){
+					id
+					createdAt: timestamp
+					log: message
+				}
+			}`,
+		},
+	}
 
 	DeploymentImageUpdateRequest = queryList{
 		{
@@ -1200,8 +1287,14 @@ func (h ClientImplementation) GetDeploymentConfig(_ interface{}) (*DeploymentCon
 
 // ListDeploymentLogs - list logs from a deployment
 func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error) {
+	reqQuery := DeploymentLogsGetRequest.GreatestLowerBound(version)
+	if !strings.Contains(reqQuery, "$startTime") {
+		// A Houston before 0.25.6 takes no window; timestamp alone bounds
+		// the search there.
+		filters.LogWindow = nil
+	}
 	req := Request{
-		Query:     DeploymentLogsGetRequest,
+		Query:     reqQuery,
 		Variables: filters,
 	}
 

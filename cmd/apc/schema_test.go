@@ -28,7 +28,28 @@ var schemaDir = filepath.Join("testdata", "schema")
 // `--output json`, named for the surface rather than the Go type. The APC
 // commands gain `-o json` a family at a time (cmd/output_flag_test.go's
 // lacksOutputFlag lists the rest); each conversion adds its shapes here.
-var publishedPayloads = []cliouttest.Case{}
+var publishedPayloads = []cliouttest.Case{
+	// astro deployment create, update and adopt: the Deployment as it now is.
+	{Name: "deployment", Value: deploymentJSON{}},
+	// The same Deployment where Houston gave none of the optional values:
+	// they are null, never "" (see deploymentJSON). Pinned as given, since
+	// populating every field can show only the other branch.
+	{Name: "deployment-without-values", Value: deploymentJSON{DeploymentID: "x", Label: "x", ReleaseName: "x", URLs: []deploymentURLJSON{}}, AsGiven: true},
+	// astro deployment list.
+	{Name: "deployment-list", Value: deploymentListJSON{}},
+	// astro deployment delete and unadopt: what they removed.
+	{Name: "deployment-removal", Value: deploymentRemovalJSON{}},
+	// What unadopt removed when Houston answered with no record: only the id
+	// given and the action are known.
+	{Name: "deployment-removal-without-values", Value: deploymentRemovalJSON{DeploymentID: "x", Action: "unadopted"}, AsGiven: true},
+	// astro deployment airflow upgrade, runtime upgrade and runtime migrate,
+	// and their --cancel: what changed.
+	{Name: "deployment-version-change", Value: versionChangeJSON{}},
+	// astro deployment logs -o json: one of these per line, a stream.
+	{Name: "deployment-log-entry", Value: logEntryJSON{}},
+	// astro deploy: what it deployed.
+	{Name: "deploy", Value: deployJSON{}},
+}
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
 	for _, c := range publishedPayloads {
@@ -52,19 +73,18 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. No command here publishes through Emit yet, so the floor
-// is 0 and TestTheEmitObserverIsArmed stands in for it until one does; the
-// watch fails a run that pins a shape while the floor is still 0.
+// would be silent. Seven shapes reach Emit in this package's tests today:
+// the deployment family's Deployment, list, removal, version change and log
+// entry, deploy's result, and the error object.
 // Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 0
+const minWatchedPayloads = 7
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would
 // give two goldens to keep in step for one contract.
 var pinnedElsewhere = map[reflect.Type]string{
 	// The failure object cliout.Execute publishes for every command under
-	// --output json, whichever tree it is in. No test here reaches it yet;
-	// the first that runs an APC command under json will.
+	// --output json, whichever tree it is in.
 	reflect.TypeOf(cliout.ErrorObject{}): "cmd/local/testdata/schema/error.json",
 }
 
@@ -82,12 +102,4 @@ func emitWatch() cliouttest.Watch {
 // field name that reached the wire because a tag was forgotten.
 func TestPublishedKeysAreSnakeCase(t *testing.T) {
 	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0, nil))
-}
-
-// While the floor is 0 it cannot notice the observer never being armed, so
-// this does: the observer installed now must report into the tally TestMain
-// armed. That it still does when the run ends, the watch checks.
-func TestTheEmitObserverIsArmed(t *testing.T) {
-	assert.True(t, watching != nil && watching.Armed(),
-		"TestMain no longer arms the emit watch, so nothing checks what this package's commands publish")
 }

@@ -309,7 +309,7 @@ func (s *Suite) TestDockerImagePush() {
 	s.Run("success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error { return nil }
 
-		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ io.Writer, _ func(jsonmessage.JSONMessage)) error {
 			return nil
 		}
 
@@ -318,7 +318,7 @@ func (s *Suite) TestDockerImagePush() {
 	})
 
 	s.Run("success with docker cred store", func() {
-		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ io.Writer, _ func(jsonmessage.JSONMessage)) error {
 			return nil
 		}
 
@@ -592,7 +592,7 @@ func (s *Suite) TestPushWithCLI() {
 			s.Contains([]string{"push", "rmi"}, args[0])
 			return nil
 		}
-		err := pushWithCLI(&types.AuthConfig{Username: "testing", Password: "pass", ServerAddress: "registry.test"}, "test")
+		err := pushWithCLI(&types.AuthConfig{Username: "testing", Password: "pass", ServerAddress: "registry.test"}, "test", io.Discard)
 		s.NoError(err)
 		s.True(loginSeen)
 	})
@@ -602,13 +602,13 @@ func (s *Suite) TestPushWithCLI() {
 			s.Contains(args[0], "push")
 			return errMockDocker
 		}
-		err := pushWithCLI(&types.AuthConfig{}, "test")
+		err := pushWithCLI(&types.AuthConfig{}, "test", io.Discard)
 		s.ErrorIs(err, errMockDocker)
 	})
 
 	s.Run("login exec failure", func() {
 		registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return errMockDocker }
-		err := pushWithCLI(&types.AuthConfig{Username: "testing"}, "test")
+		err := pushWithCLI(&types.AuthConfig{Username: "testing"}, "test", io.Discard)
 		s.ErrorIs(err, errMockDocker)
 	})
 }
@@ -657,7 +657,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
 		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
-		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ io.Writer, _ func(jsonmessage.JSONMessage)) error {
 			return fmt.Errorf("unauthorized: authentication required for %s", fakeToken)
 		}
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -699,7 +699,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 			}
 			return nil
 		}
-		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ io.Writer, _ func(jsonmessage.JSONMessage)) error {
 			return fmt.Errorf("unauthorized: authentication required")
 		}
 
@@ -719,7 +719,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 			return nil
 		}
 
-		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ io.Writer, _ func(jsonmessage.JSONMessage)) error {
 			return fmt.Errorf("Error response from daemon: authentication required")
 		}
 
@@ -743,7 +743,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 			return nil
 		}
 
-		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ io.Writer, _ func(jsonmessage.JSONMessage)) error {
 			return fmt.Errorf("client error")
 		}
 
@@ -763,7 +763,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 			return nil
 		}
 
-		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
+		displayJSONMessagesToStream = func(_ io.ReadCloser, _ io.Writer, _ func(jsonmessage.JSONMessage)) error {
 			return fmt.Errorf("network error")
 		}
 
