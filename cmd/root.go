@@ -125,7 +125,7 @@ func newRootCmd(o rootOptions) *cobra.Command {
 
 	if isCloudCtx { // Include all the commands to be exposed for cloud users
 		rootCmd.AddCommand(
-			astroCmd.AddCmds(astroV1Client, v1Alpha1Client, o.out)...,
+			astroCmd.AddCmds(astroV1Client, v1Alpha1Client, v1Alpha1Client, o.out)...,
 		)
 	} else { // Include all the commands to be exposed for APC users
 		rootCmd.AddCommand(

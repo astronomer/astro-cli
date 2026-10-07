@@ -6,14 +6,17 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/ide"
 )
 
 var (
-	ideProjectID string
-	ideSessionID string
+	ideProjectID     string
+	ideSessionID     string
+	ideImportYes     bool
+	ideProjectOutput string
 )
 
 func newIDECommand(out io.Writer) *cobra.Command {
@@ -37,6 +40,7 @@ func newIDEProjectCmd(out io.Writer) *cobra.Command {
 		newIDEImportProjectCmd(out),
 		newIDEExportProjectCmd(out),
 	)
+	cliout.AddOutputFlag(cmd, &ideProjectOutput)
 	return cmd
 }
 
@@ -76,6 +80,7 @@ func newIDEImportProjectCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to import")
 	cmd.Flags().StringVarP(&ideSessionID, "session-id", "s", "", "Session ID to import")
+	cmd.Flags().BoolVarP(&ideImportYes, "yes", "y", false, "Import into the current directory without asking when it is not empty")
 	return cmd
 }
 
@@ -103,11 +108,23 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 }
 
 func listIDEProjects(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(ideProjectOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return ide.List(astroV1Alpha1Client, out)
+	list, err := ide.List(astroV1Alpha1Client)
+	if err != nil {
+		return err
+	}
+	return emitIDEProjects(cliout.Renderer{Format: format, Out: out}, list)
 }
 
 func importIDEProject(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(ideProjectOutput)
+	if err != nil {
+		return err
+	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -119,10 +136,18 @@ func importIDEProject(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return ide.ImportProject(astroV1Alpha1Client, ideProjectID, ideSessionID, orgID, wsID, out)
+	res, err := ide.ImportProject(cmd.Context(), astroV1Alpha1Client, astroIDEExporter, ideProjectID, ideSessionID, orgID, wsID, ideImportYes, questionsTo(cmd, format, out))
+	if err != nil {
+		return err
+	}
+	return emitIDEImport(cliout.Renderer{Format: format, Out: out}, res)
 }
 
 func exportProject(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(ideProjectOutput)
+	if err != nil {
+		return err
+	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -134,7 +159,19 @@ func exportProject(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return ide.ExportProject(astroV1Alpha1Client, astroV1Client, ideProjectID, orgID, wsID, ctx.Domain, force, out)
+	res, err := ide.ExportProject(astroV1Alpha1Client, astroV1Client, ideProjectID, orgID, wsID, force, questionsTo(cmd, format, out))
+	if err != nil {
+		return err
+	}
+	if err := emitIDEExport(cliout.Renderer{Format: format, Out: out}, res); err != nil {
+		return err
+	}
+	// A person is shown the project in a browser; a run under json reads its
+	// url from the result instead.
+	if format == cliout.FormatText {
+		ide.OpenInBrowser(res.URL, out)
+	}
+	return nil
 }
 
 func validateWorkspaceAndOrgID(ctx *config.Context) (orgID, wsID string, err error) {

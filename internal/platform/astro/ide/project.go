@@ -16,14 +16,12 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/pkg/browser"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/picker"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
@@ -35,34 +33,22 @@ var (
 	gitignoreParseWarningMsg             = "Warning: failed to parse .gitignore: %v. Continuing without gitignore filtering."
 )
 
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-}
+// The functions here that ask or note something along the way take notes,
+// the writer those go to: stdout in text, as they always have, and stderr
+// under --output json, where stdout carries only the result. Nothing is asked
+// under json (the question is refused instead), so there it holds notes only.
 
-// List all IDE projects
-func List(client astrov1alpha1.APIClient, out io.Writer) error {
+// List returns the current Workspace's Astro IDE projects, by name.
+func List(client astrov1alpha1.APIClient) (*ProjectList, error) {
 	projects, err := ListProjects(client)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	tab := newTableOut()
+	list := &ProjectList{Projects: make([]Project, 0, len(projects))}
 	for i := range projects {
-		name := projects[i].Name
-		projectID := projects[i].Id
-
-		var color bool
-		tab.AddRow([]string{name, projectID}, color)
+		list.Projects = append(list.Projects, projectOf(&projects[i]))
 	}
-
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	return list, nil
 }
 
 func ListProjects(client astrov1alpha1.APIClient) ([]astrov1alpha1.AstroIdeProject, error) {
@@ -86,20 +72,21 @@ func ListProjects(client astrov1alpha1.APIClient) ([]astrov1alpha1.AstroIdeProje
 	if err != nil {
 		return []astrov1alpha1.AstroIdeProject{}, err
 	}
+	if resp.JSON200 == nil {
+		return []astrov1alpha1.AstroIdeProject{}, errors.New("the API did not return the Astro IDE projects")
+	}
 
-	projects := resp.JSON200.Projects
-
-	return projects, nil
+	return resp.JSON200.Projects, nil
 }
 
-func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.AstroIdeProject, error) {
+func selectIDEProject(projects []astrov1alpha1.AstroIdeProject, notes io.Writer) (astrov1alpha1.AstroIdeProject, error) {
 	if len(projects) == 0 {
 		return astrov1alpha1.AstroIdeProject{}, ErrNoProjectsFound
 	}
 
 	if len(projects) == 1 {
-		fmt.Println("Only one Project was found. Using the following Project by default: \n" +
-			fmt.Sprintf("\n Project Name: %s", ansi.Bold(projects[0].Name)) +
+		fmt.Fprintln(notes, "Only one Project was found. Using the following Project by default: \n"+
+			fmt.Sprintf("\n Project Name: %s", ansi.Bold(projects[0].Name))+
 			fmt.Sprintf("\n Project ID: %s\n", ansi.Bold(projects[0].Id)))
 
 		return projects[0], nil
@@ -114,20 +101,20 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject) (astrov1alpha1.A
 	for i := range projects {
 		list.AddRow(false, projects[i].Name, projects[i].Id)
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(notes, os.Stdin)
 	if err != nil {
 		return astrov1alpha1.AstroIdeProject{}, err
 	}
 	return projects[i], nil
 }
 
-// createNewProject creates a new project and returns its ID
-func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, organizationID, workspaceID string, out io.Writer) (string, error) {
+// createNewProject asks for a name, creates a project by it and returns its ID
+func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, organizationID, workspaceID string, notes io.Writer) (string, error) {
 	about := input.About("a name for the new project")
 	if err := input.MayAsk("\n> ", about); err != nil {
 		return "", err
 	}
-	fmt.Println("Enter project name:")
+	fmt.Fprintln(notes, "Enter project name:")
 	name, err := input.Text("\n> ", about)
 	if err != nil {
 		return "", err
@@ -145,12 +132,15 @@ func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 	if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return "", err
 	}
+	if resp.JSON200 == nil {
+		return "", errors.New("failed to create project: the API did not return the project")
+	}
 
 	workspaceName, err := getWorkspaceName(v1Client, organizationID, workspaceID)
 	if err != nil {
 		workspaceName = workspaceID
 	}
-	fmt.Fprintf(out, "Successfully created project '%s' in workspace '%s'\n", name, workspaceName)
+	fmt.Fprintf(notes, "Successfully created project '%s' in workspace '%s'\n", name, workspaceName)
 	return resp.JSON200.Id, nil
 }
 
@@ -173,10 +163,7 @@ func createSession(client astrov1alpha1.APIClient, organizationID, workspaceID, 
 	if err != nil {
 		return nil, err
 	}
-	if err := astrov1alpha1.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
-		return nil, err
-	}
-	return sessionResp, nil
+	return sessionResp, checkSession(sessionResp)
 }
 
 func createSessionWithPermission(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID string, permission astrov1alpha1.CreateAstroIdeSessionRequestPermission) (*astrov1alpha1.CreateAstroIdeSessionResponse, error) {
@@ -186,10 +173,19 @@ func createSessionWithPermission(client astrov1alpha1.APIClient, organizationID,
 	if err != nil {
 		return nil, err
 	}
-	if err := astrov1alpha1.NormalizeAPIError(sessionResp.HTTPResponse, sessionResp.Body); err != nil {
-		return nil, err
+	return sessionResp, checkSession(sessionResp)
+}
+
+// checkSession fails a session create the API refused, or answered with no
+// session.
+func checkSession(resp *astrov1alpha1.CreateAstroIdeSessionResponse) error {
+	if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return err
 	}
-	return sessionResp, nil
+	if resp.JSON200 == nil {
+		return errors.New("the API did not return the Astro IDE session")
+	}
+	return nil
 }
 
 // getProject retrieves project details by ID
@@ -200,6 +196,9 @@ func getProject(client astrov1alpha1.APIClient, organizationID, workspaceID, pro
 	}
 	if err := astrov1alpha1.NormalizeAPIError(projectResp.HTTPResponse, projectResp.Body); err != nil {
 		return nil, err
+	}
+	if projectResp.JSON200 == nil {
+		return nil, errors.New("the API did not return the Astro IDE project")
 	}
 	return projectResp, nil
 }
@@ -252,37 +251,34 @@ func saveSessionAndCleanup(client astrov1alpha1.APIClient, organizationID, works
 	return updateSessionPermission(client, organizationID, workspaceID, projectID, sessionID, astrov1alpha1.UpdateAstroIdeSessionRequestPermissionREADONLY)
 }
 
-// openProjectInBrowser opens the project URL in the default browser
-func openProjectInBrowser(client astrov1alpha1.APIClient, organizationID, workspaceID, projectID string, out io.Writer) {
-	projectResp, err := getProject(client, organizationID, workspaceID, projectID)
-	var url string
-	if err == nil && projectResp != nil && projectResp.JSON200 != nil && projectResp.JSON200.Url != nil && *projectResp.JSON200.Url != "" {
-		url = *projectResp.JSON200.Url
-	} else {
+// OpenInBrowser opens an exported project's URL in the default browser, and
+// says where to go when it cannot. It does nothing for a project with no URL.
+func OpenInBrowser(url string, out io.Writer) {
+	if url == "" {
 		return
 	}
-
-	// Open the URL in browser
 	if err := openURL(url); err != nil {
 		fmt.Fprintf(out, "Unable to open the Astro IDE project URL, please visit the following link: %s\n", url)
 	}
 }
 
-// resolveProjectID handles project creation or selection when projectID is not provided
-func resolveProjectID(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID string, force bool, out io.Writer) (string, error) {
+// resolveProjectID handles project creation or selection when projectID is
+// not provided. It reports whether it created the project.
+func resolveProjectID(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID string, force bool, notes io.Writer) (id string, created bool, err error) {
 	// Handle project creation or selection
 	if projectID == "" && !force {
 		ask := []input.Option{input.About("whether to create a new project"), input.AnsweredBy("--project-id")}
 		if err := input.MayAsk("\n> ", ask...); err != nil {
-			return "", err
+			return "", false, err
 		}
-		fmt.Println("Do you want to create a new project? (y/n)")
+		fmt.Fprintln(notes, "Do you want to create a new project? (y/n)")
 		choice, err := input.Text("\n> ", ask...)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		if choice == "y" || choice == "Y" {
-			return createNewProject(client, v1Client, organizationID, workspaceID, out)
+			id, err := createNewProject(client, v1Client, organizationID, workspaceID, notes)
+			return id, err == nil, err
 		}
 	}
 
@@ -290,16 +286,16 @@ func resolveProjectID(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 	if projectID == "" {
 		projects, err := ListProjects(client)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
-		selectedProject, err := selectIDEProject(projects)
+		selectedProject, err := selectIDEProject(projects, notes)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
-		return selectedProject.Id, nil
+		return selectedProject.Id, false, nil
 	}
 
-	return projectID, nil
+	return projectID, false, nil
 }
 
 // handleProjectLock checks for project locks and handles permission upgrades
@@ -330,84 +326,102 @@ func handleProjectLock(client astrov1alpha1.APIClient, sessionResp *astrov1alpha
 	return createSessionWithPermission(client, organizationID, workspaceID, projectID, astrov1alpha1.CreateAstroIdeSessionRequestPermissionREADWRITE)
 }
 
-// ExportProject exports a project from CLI to Astro IDE
-func ExportProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID, domain string, force bool, out io.Writer) error {
-	var err error
-
-	// Resolve project ID (create or select)
-	projectID, err = resolveProjectID(client, v1Client, projectID, organizationID, workspaceID, force, out)
+// ExportProject exports the project in the current directory to Astro IDE,
+// and returns what it exported. It neither prints its result nor opens the
+// project: the caller does (see OpenInBrowser).
+func ExportProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient, projectID, organizationID, workspaceID string, force bool, notes io.Writer) (res *Export, err error) {
+	dir, err := os.Getwd()
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to read current directory: %w", err)
 	}
 
-	// Create temporary directory and archive
+	// Archive the directory first: a local failure then leaves nothing
+	// behind in the Astro IDE, a project this run would create included.
 	tempDir, err := os.MkdirTemp("", "astro-import-*")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer os.RemoveAll(tempDir) //nolint:errcheck // best-effort cleanup
 
 	archivePath := filepath.Join(tempDir, "project.tar.gz")
-	if err := createTarGzArchive(".", archivePath); err != nil {
-		return err
+	stats, err := createTarGzArchive(".", archivePath, notes)
+	if err != nil {
+		return nil, err
 	}
+
+	// Resolve project ID (create or select)
+	projectID, created, err := resolveProjectID(client, v1Client, projectID, organizationID, workspaceID, force, notes)
+	if err != nil {
+		return nil, err
+	}
+	// A project this run created outlives a failure after it, so the
+	// failure names it: the caller would otherwise never learn it exists.
+	defer func() {
+		if err != nil && created {
+			err = fmt.Errorf("created the Astro IDE project %s, but the export to it failed: %w", projectID, err)
+		}
+	}()
 
 	// Create session and handle permissions
 	sessionResp, err := createSession(client, organizationID, workspaceID, projectID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Handle project lock and permission upgrades
 	sessionResp, err = handleProjectLock(client, sessionResp, organizationID, workspaceID, projectID, force)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Upload and import archive
 	if err := importArchiveToIde(client, organizationID, workspaceID, projectID, sessionResp.JSON200.Id, archivePath); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Save session and cleanup
 	if err := saveSessionAndCleanup(client, organizationID, workspaceID, projectID, sessionResp.JSON200.Id); err != nil {
-		return err
+		return nil, err
 	}
 
-	// Get project name for display
-	projectName := projectID
+	res = &Export{
+		ProjectID:      projectID,
+		ProjectCreated: created,
+		Directory:      dir,
+		Files:          stats.files,
+		Bytes:          stats.bytes,
+		Action:         ActionExported,
+	}
+	// The project's name and URL, read back; the export has happened either way.
 	if projectResp, err := getProject(client, organizationID, workspaceID, projectID); err == nil {
-		projectName = projectResp.JSON200.Name
+		res.ProjectName = projectResp.JSON200.Name
+		if projectResp.JSON200.Url != nil {
+			res.URL = *projectResp.JSON200.Url
+		}
 	}
-	fmt.Fprintf(out, "Successfully exported project to %s\n", projectName)
-
-	// Open project in browser
-	openProjectInBrowser(client, organizationID, workspaceID, projectID, out)
-
-	return nil
+	return res, nil
 }
 
-// createTarGzArchive creates a tar.gz archive of the given directory
-func createTarGzArchive(sourceDir, targetFile string) error {
-	matcher := gitignoreMatcher(sourceDir)
+// createTarGzArchive creates a tar.gz archive of the given directory, and
+// counts the regular files it holds.
+func createTarGzArchive(sourceDir, targetFile string, notes io.Writer) (stats archiveStats, err error) {
+	matcher := gitignoreMatcher(sourceDir, notes)
 
 	// Create the target file
 	target, err := os.Create(targetFile)
 	if err != nil {
-		return err
+		return stats, err
 	}
-	defer target.Close()
-
-	// Create a gzip writer
+	// The archive is only whole once the tar, the gzip and the file have
+	// each flushed and closed, so a failure to do so fails the archive.
 	gzipWriter := gzip.NewWriter(target)
-	defer gzipWriter.Close() //nolint:errcheck // best-effort close
-
-	// Create a tar writer
 	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close() //nolint:errcheck // best-effort close
+	defer func() {
+		err = errors.Join(err, tarWriter.Close(), gzipWriter.Close(), target.Close())
+	}()
 
 	// Walk through the source directory
-	return filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -460,22 +474,25 @@ func createTarGzArchive(sourceDir, targetFile string) error {
 			}
 			defer file.Close()
 
-			_, err = io.Copy(tarWriter, file)
+			n, err := io.Copy(tarWriter, file)
 			if err != nil {
 				return err
 			}
+			stats.files++
+			stats.bytes += n
 		}
 
 		return nil
 	})
+	return stats, err
 }
 
 // gitignoreMatcher creates a matcher from .gitignore patterns in the given root.
-func gitignoreMatcher(root string) gitignore.Matcher {
+func gitignoreMatcher(root string, notes io.Writer) gitignore.Matcher {
 	fs := osfs.New(root)
 	patterns, err := gitignore.ReadPatterns(fs, []string{})
 	if err != nil {
-		fmt.Println(fmt.Sprintf(gitignoreParseWarningMsg, err))
+		fmt.Fprintln(notes, fmt.Sprintf(gitignoreParseWarningMsg, err))
 		return gitignore.NewMatcher(nil)
 	}
 	return gitignore.NewMatcher(patterns)
@@ -488,8 +505,13 @@ func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.
 		return true
 	}
 
-	// Include .astro directory, gitignore and dockerignore files
+	// Never a temporary file an interrupted import left behind
 	base := filepath.Base(relPath)
+	if info.Mode().IsRegular() && isImportTemp(base) {
+		return true
+	}
+
+	// Include .astro directory, gitignore and dockerignore files
 	includeAllowed := relPath == ".astro" || strings.HasPrefix(relPath, ".astro"+string(filepath.Separator)) || relPath == ".gitignore" || relPath == ".dockerignore" || base == ".airflowignore"
 	if includeAllowed {
 		return false
@@ -500,21 +522,27 @@ func shouldSkipArchiveEntry(relPath string, info os.FileInfo, matcher gitignore.
 	return matcher.Match(pathParts, info.IsDir())
 }
 
-// ImportProject imports a project from Astro IDE to the local directory
-func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organizationID, workspaceID string, out io.Writer) error {
+// ImportProject imports a project from Astro IDE into the current directory,
+// and returns what it imported. A directory that is not empty is confirmed
+// first, unless yes.
+func ImportProject(ctx httpContext.Context, client astrov1alpha1.APIClient, exporter SessionExporter, projectID, sessionID, organizationID, workspaceID string, yes bool, notes io.Writer) (*Import, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read current directory: %w", err)
+	}
 	// Validate current directory is empty
 	entries, err := os.ReadDir(".")
 	if err != nil {
-		return fmt.Errorf("failed to read current directory: %w", err)
+		return nil, fmt.Errorf("failed to read current directory: %w", err)
 	}
-	if len(entries) > 0 {
-		proceed, err := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", config.WorkingPath))
+	if len(entries) > 0 && !yes {
+		proceed, err := input.Confirm(fmt.Sprintf("Current directory is not empty. Do you want to import the project here? %s", dir), input.AnsweredBy("--yes"))
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if !proceed {
-			return fmt.Errorf("import canceled by user")
+			return nil, fmt.Errorf("import canceled by user")
 		}
 	}
 
@@ -522,11 +550,11 @@ func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organiz
 	if projectID == "" {
 		projects, err := ListProjects(client)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		selectedProject, err := selectIDEProject(projects)
+		selectedProject, err := selectIDEProject(projects, notes)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		projectID = selectedProject.Id
 	}
@@ -535,7 +563,7 @@ func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organiz
 		// Create a new session with READ_ONLY permission.
 		sessionResp, err := createSessionWithPermission(client, organizationID, workspaceID, projectID, astrov1alpha1.CreateAstroIdeSessionRequestPermissionREADONLY)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		sessionID = sessionResp.JSON200.Id
 	}
@@ -543,102 +571,34 @@ func ImportProject(client astrov1alpha1.APIClient, projectID, sessionID, organiz
 	// Create a temporary file for the archive
 	tempFile, err := os.CreateTemp("", "astro-export-*.tar.gz")
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
+		return nil, fmt.Errorf("failed to create temporary file: %w", err)
 	}
 	defer os.Remove(tempFile.Name()) //nolint:errcheck // best-effort cleanup
 	defer tempFile.Close()
 
-	// Export the project
-	exportParams := &astrov1alpha1.ExportAstroIdeSessionTarParams{}
-	exportResp, err := client.ExportAstroIdeSessionTarWithResponse(httpContext.Background(), organizationID, workspaceID, projectID, sessionID, exportParams)
+	// Export the project, streamed into the temporary file
+	if err := downloadSession(ctx, exporter, organizationID, workspaceID, projectID, sessionID, tempFile); err != nil {
+		return nil, err
+	}
+
+	// Extract the archive from the same open file, so what is checked and
+	// what is written are read from the one file this run wrote.
+	stats, err := extractTarGzArchive(ctx, tempFile, ".")
 	if err != nil {
-		return err
-	}
-	if err := astrov1alpha1.NormalizeAPIError(exportResp.HTTPResponse, exportResp.Body); err != nil {
-		return err
+		return nil, fmt.Errorf("failed to extract archive: %w", err)
 	}
 
-	// Write the response body to the temporary file
-	if _, err := tempFile.Write(exportResp.Body); err != nil {
-		return fmt.Errorf("failed to write archive to temporary file: %w", err)
+	res := &Import{
+		ProjectID: projectID,
+		SessionID: sessionID,
+		Directory: dir,
+		Files:     stats.files,
+		Bytes:     stats.bytes,
+		Action:    ActionImported,
 	}
-
-	// Close the file before extracting
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("failed to close temporary file: %w", err)
-	}
-
-	// Extract the archive
-	if err := extractTarGzArchive(tempFile.Name(), "."); err != nil {
-		return fmt.Errorf("failed to extract archive: %w", err)
-	}
-
-	// Get project name for display
-	projectName := projectID
+	// The project's name, read back; the import has happened either way.
 	if projectResp, err := getProject(client, organizationID, workspaceID, projectID); err == nil {
-		projectName = projectResp.JSON200.Name
+		res.ProjectName = projectResp.JSON200.Name
 	}
-	fmt.Fprintf(out, "Successfully exported project from %s\n", projectName)
-	return nil
-}
-
-// extractTarGzArchive extracts a tar.gz archive to the target directory
-func extractTarGzArchive(archivePath, targetDir string) error {
-	// Open the archive file
-	archiveFile, err := os.Open(archivePath)
-	if err != nil {
-		return err
-	}
-	defer archiveFile.Close()
-
-	// Create a gzip reader
-	gzipReader, err := gzip.NewReader(archiveFile)
-	if err != nil {
-		return err
-	}
-	defer gzipReader.Close() //nolint:errcheck // best-effort close
-
-	// Create a tar reader
-	tarReader := tar.NewReader(gzipReader)
-
-	// Extract each file
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-
-		// Create the target path
-		targetPath := filepath.Join(targetDir, header.Name) //nolint:gosec // the tar is produced by the Astro IDE export; entries stay under targetDir
-
-		// Create parent directories if needed
-		if err := os.MkdirAll(filepath.Dir(targetPath), DefaultDirPerm); err != nil {
-			return err
-		}
-
-		// Handle different types of files
-		switch header.Typeflag {
-		case tar.TypeDir:
-			// Create directory
-			if err := os.MkdirAll(targetPath, DefaultDirPerm); err != nil {
-				return err
-			}
-		case tar.TypeReg:
-			// Create file
-			file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(file, tarReader); err != nil { //nolint:gosec // the tar is produced by the Astro IDE export, not untrusted input
-				file.Close()
-				return err
-			}
-			file.Close()
-		}
-	}
-
-	return nil
+	return res, nil
 }

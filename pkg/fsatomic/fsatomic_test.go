@@ -157,6 +157,31 @@ func TestReplaceReturnsANonBusyErrorAtOnce(t *testing.T) {
 	}
 }
 
+// Replace runs the caller's rename (here an os.Root's) and hands back what
+// it returned: the published file on success, the rename's own error on a
+// failure that is not contention.
+func TestReplaceRunsTheCallersRename(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if err := os.WriteFile(filepath.Join(dir, "tmp"), []byte("new"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Replace(func() error { return root.Rename("tmp", "file") }); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := os.ReadFile(filepath.Join(dir, "file")); err != nil || string(got) != "new" {
+		t.Errorf("file holds %q (%v)", got, err)
+	}
+	want := errors.New("read-only file system")
+	if err := Replace(func() error { return want }); !errors.Is(err, want) {
+		t.Errorf("err = %v, want %v", err, want)
+	}
+}
+
 // A destination held open for good is reported, not spun on forever, and the
 // message says how hard we tried so the reader can tell a lock from a race.
 func TestReplaceGivesUpWithinItsBudget(t *testing.T) {

@@ -127,10 +127,16 @@ const (
 // the retry, one of them simply fails, and pkg/secrets' own concurrency test
 // proved it the first time it ran on Windows.
 func replace(tmp, path string) error {
+	return Replace(func() error { return os.Rename(tmp, path) })
+}
+
+// Replace runs rename, a rename of a finished temporary file onto a path
+// another process may hold open, with the retry WriteFile's own rename gets:
+// see replace. It is for a writer that streams its file or renames through
+// something other than os.Rename (an os.Root), and so cannot use WriteFile.
+func Replace(rename func() error) error {
 	start := time.Now()
-	attempts, err := retryWhileBusy(replaceBudget, isBusy, func() error {
-		return os.Rename(tmp, path)
-	})
+	attempts, err := retryWhileBusy(replaceBudget, isBusy, rename)
 	if err != nil && isBusy(err) {
 		// Elapsed rather than the budget: the budget is a constant a reader can
 		// look up, and the loop always overshoots it by up to one wait. What

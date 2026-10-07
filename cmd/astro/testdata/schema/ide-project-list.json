@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "id": "x",
+      "name": "x",
+      "description": "x",
+      "workspace_id": "x",
+      "organization_id": "x",
+      "url": "x",
+      "created_at": "2026-07-21T10:30:00Z",
+      "updated_at": "2026-07-21T10:30:00Z"
+    }
+  ]
+}

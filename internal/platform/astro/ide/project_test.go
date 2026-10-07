@@ -1,8 +1,11 @@
 package ide
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -50,14 +53,22 @@ func TestCreateAndExtractArchive_RespectsGitignoreAndAllowlist(t *testing.T) {
 	// Create archive
 	archiveDir := t.TempDir()
 	archivePath := filepath.Join(archiveDir, "project.tar.gz")
-	if err := createTarGzArchive(root, archivePath); err != nil {
+	created, err := createTarGzArchive(root, archivePath, io.Discard)
+	if err != nil {
 		t.Fatalf("createTarGzArchive error: %v", err)
 	}
 
 	// Extract archive
 	outDir := t.TempDir()
-	if err := extractTarGzArchive(archivePath, outDir); err != nil {
+	extracted, err := extractAt(t.Context(), archivePath, outDir)
+	if err != nil {
 		t.Fatalf("extractTarGzArchive error: %v", err)
+	}
+	// The nine files kept, below: what was archived is what was written.
+	want := archiveStats{files: 9, bytes: int64(len("select 1\n") + len("name: test\n") + len("*.tmp\n") + len("*.log\n") +
+		len("print('hello')\n") + len("FROM astrocrpublic.azurecr.io/runtime:3.0-7\n") + len("pytest-html\n") + len("curl\n") + len("*.log\n.venv/\n.*\n"))}
+	if created != want || extracted != want {
+		t.Errorf("archived %+v and extracted %+v, want %+v", created, extracted, want)
 	}
 
 	// Expect included
@@ -101,5 +112,53 @@ func TestCreateAndExtractArchive_RespectsGitignoreAndAllowlist(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(outDir, ".test")); !os.IsNotExist(err) {
 		t.Errorf("expected .test to be excluded, got err=%v", err)
+	}
+}
+
+// An import over a file that is longer than the one imported leaves the
+// imported file, not the imported bytes followed by the old file's tail.
+func TestExtractReplacesALongerFile(t *testing.T) {
+	src := t.TempDir()
+	writeFile(t, src, "dags/a.py", "new\n")
+	archivePath := filepath.Join(t.TempDir(), "project.tar.gz")
+	if _, err := createTarGzArchive(src, archivePath, io.Discard); err != nil {
+		t.Fatalf("createTarGzArchive error: %v", err)
+	}
+
+	dst := t.TempDir()
+	writeFile(t, dst, "dags/a.py", "a much longer old file\n")
+	if _, err := extractAt(t.Context(), archivePath, dst); err != nil {
+		t.Fatalf("extractTarGzArchive error: %v", err)
+	}
+	got, err := os.ReadFile(filepath.Join(dst, "dags", "a.py"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new\n" {
+		t.Errorf("dags/a.py holds %q, want %q", got, "new\n")
+	}
+}
+
+func TestOpenInBrowser(t *testing.T) {
+	prev := openURL
+	t.Cleanup(func() { openURL = prev })
+	var opened []string
+	openURL = func(url string) error {
+		opened = append(opened, url)
+		return errors.New("no browser")
+	}
+
+	var out strings.Builder
+	OpenInBrowser("", &out)
+	if len(opened) != 0 || out.Len() != 0 {
+		t.Errorf("a project with no URL opened %v and said %q", opened, out.String())
+	}
+
+	OpenInBrowser("https://ide.example/p", &out)
+	if len(opened) != 1 || opened[0] != "https://ide.example/p" {
+		t.Errorf("opened %v", opened)
+	}
+	if want := "Unable to open the Astro IDE project URL, please visit the following link: https://ide.example/p\n"; out.String() != want {
+		t.Errorf("said %q, want %q", out.String(), want)
 	}
 }
