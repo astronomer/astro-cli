@@ -27,22 +27,24 @@ var (
 	ErrUserNotFound            = errors.New("no user was found for the email you provided")
 )
 
-func CreateInvite(email, role string, out io.Writer, client astrov1.APIClient) error {
+// CreateInvite invites email to the current Organization with role, and
+// returns the invitation it sent.
+func CreateInvite(email, role string, client astrov1.APIClient) (Invite, error) {
 	var (
 		userInviteInput astrov1.CreateUserInviteRequest
 		err             error
 		ctx             config.Context
 	)
 	if email == "" {
-		return ErrInvalidEmail
+		return Invite{}, ErrInvalidEmail
 	}
 	err = IsRoleValid(role)
 	if err != nil {
-		return err
+		return Invite{}, err
 	}
 	ctx, err = context.GetCurrentContext()
 	if err != nil {
-		return err
+		return Invite{}, err
 	}
 	userInviteInput = astrov1.CreateUserInviteRequest{
 		InviteeEmail: email,
@@ -50,14 +52,33 @@ func CreateInvite(email, role string, out io.Writer, client astrov1.APIClient) e
 	}
 	resp, err := client.CreateUserInviteWithResponse(httpContext.Background(), ctx.Organization, userInviteInput)
 	if err != nil {
-		return err
+		return Invite{}, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return Invite{}, err
 	}
-	fmt.Fprintf(out, "invite for %s with role %s created\n", email, role)
-	return nil
+	inv := Invite{Email: email, Role: role, OrganizationID: ctx.Organization}
+	if got := resp.JSON200; got != nil {
+		inv.InviteID = got.InviteId
+		if got.OrganizationId != "" {
+			inv.OrganizationID = got.OrganizationId
+		}
+		if got.UserId != nil {
+			inv.UserID = *got.UserId
+		}
+		if !got.ExpiresAt.IsZero() {
+			expires := got.ExpiresAt
+			inv.ExpiresAt = &expires
+		}
+	}
+	return inv, nil
+}
+
+// Info is u as a user command reports it, with no role: the caller sets the
+// one on the object the command is about.
+func Info(u *astrov1.User) UserInfo {
+	return UserInfo{FullName: u.FullName, Email: u.Username, ID: u.Id, CreatedAt: u.CreatedAt}
 }
 
 // orgRolePtr returns a pointer to the user's current organization role (as a plain string),
@@ -71,51 +92,40 @@ func orgRolePtr(user astrov1.User) *string { //nolint:gocritic // User is large;
 	return &s
 }
 
-func UpdateUserRole(email, role string, out io.Writer, client astrov1.APIClient) error {
-	var userID string
+// UpdateUserRole sets the Organization role of the user with email, or of
+// the one picked when email is "", and returns the user with that role.
+func UpdateUserRole(email, role string, client astrov1.APIClient) (UserInfo, error) {
 	err := IsRoleValid(role)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	// Get all org users
 	users, err := GetOrgUsers(client)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	if email != "" {
-		for i := range users {
-			if users[i].Username == email {
-				userID = users[i].Id
-			}
-		}
-		if userID == "" {
-			return ErrUserNotFound
-		}
-	} else {
-		user, err := SelectUser(users, "organization")
-		if err != nil {
-			return err
-		}
-		userID = user.Id
-		email = user.Username
+	user, err := findUser(email, users, "organization")
+	if err != nil {
+		return UserInfo{}, err
 	}
 	mutateUserInput := astrov1.UpdateUserRolesRequest{
 		OrganizationRole: &role,
 	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, userID, mutateUserInput)
+	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, user.Id, mutateUserInput)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	fmt.Fprintf(out, "The user %s role was successfully updated to %s\n", email, role)
-	return nil
+	info := Info(&user)
+	info.OrgRole = role
+	return info, nil
 }
 
 // IsRoleValid checks if the requested role is valid
@@ -273,84 +283,78 @@ func upsertDeploymentRole(existing *[]astrov1.DeploymentRole, deploymentID, role
 	return &out
 }
 
-func AddWorkspaceUser(email, role, workspaceID string, out io.Writer, client astrov1.APIClient) error {
+// AddWorkspaceUser gives the Organization user with email, or the one picked
+// when email is "", role on the Workspace (the current one when workspaceID
+// is ""), and returns the user with that role.
+func AddWorkspaceUser(email, role, workspaceID string, client astrov1.APIClient) (UserInfo, error) {
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
 	users, err := GetOrgUsers(client)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	userID, email, err := getUserID(email, users, "organization")
-	if err != nil {
-		return err
-	}
-	current, err := GetUser(client, userID)
-	if err != nil {
-		return err
-	}
-	req := astrov1.UpdateUserRolesRequest{
-		OrganizationRole: orgRolePtr(current),
-		WorkspaceRoles:   upsertWorkspaceRole(current.WorkspaceRoles, workspaceID, role),
-		DeploymentRoles:  current.DeploymentRoles,
-	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, userID, req)
-	if err != nil {
-		return err
-	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "The user %s was successfully added to the workspace with the role %s\n", email, role)
-	return nil
+	return setWorkspaceRole(client, ctx.Organization, workspaceID, email, role, users, "organization")
 }
 
-func UpdateWorkspaceUserRole(email, role, workspaceID string, out io.Writer, client astrov1.APIClient) error {
+// UpdateWorkspaceUserRole sets the role on the Workspace of its user with
+// email, or of the one picked when email is "", and returns the user with
+// that role.
+func UpdateWorkspaceUserRole(email, role, workspaceID string, client astrov1.APIClient) (UserInfo, error) {
 	err := IsWorkspaceRoleValid(role)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	userID, email, err := getUserID(email, users, "workspace")
+	return setWorkspaceRole(client, ctx.Organization, workspaceID, email, role, users, "workspace")
+}
+
+// setWorkspaceRole finds the user among users, by email or through the
+// picker, and sets its role on workspaceID, keeping every other role it holds.
+func setWorkspaceRole(client astrov1.APIClient, orgID, workspaceID, email, role string, users []astrov1.User, roleEntity string) (UserInfo, error) {
+	found, err := findUser(email, users, roleEntity)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	current, err := GetUser(client, userID)
+	current, err := GetUser(client, found.Id)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	req := astrov1.UpdateUserRolesRequest{
 		OrganizationRole: orgRolePtr(current),
 		WorkspaceRoles:   upsertWorkspaceRole(current.WorkspaceRoles, workspaceID, role),
 		DeploymentRoles:  current.DeploymentRoles,
 	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, userID, req)
+	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), orgID, found.Id, req)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	fmt.Fprintf(out, "The workspace user %s role was successfully updated to %s\n", email, role)
-	return nil
+	// The user as listed, which is where the email the command was given
+	// matched.
+	info := Info(&found)
+	info.WorkspaceRole = role
+	return info, nil
 }
 
 // IsWorkspaceRoleValid checks if the requested role is valid
@@ -392,59 +396,68 @@ func GetWorkspaceUsers(client astrov1.APIClient, workspaceID string, _ int) ([]a
 	return listUsers(client, &wsID, nil)
 }
 
-func RemoveWorkspaceUser(email, workspaceID string, out io.Writer, client astrov1.APIClient) error {
+// RemoveWorkspaceUser removes the role on the Workspace of its user with
+// email, or of the one picked when email is "", and returns which user it
+// removed from which Workspace.
+func RemoveWorkspaceUser(email, workspaceID string, client astrov1.APIClient) (WorkspaceRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
 	}
 	users, err := GetWorkspaceUsers(client, workspaceID, userPaginationLimit)
 	if err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
-	userID, email, err := getUserID(email, users, "workspace")
+	found, err := findUser(email, users, "workspace")
 	if err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
-	current, err := GetUser(client, userID)
+	current, err := GetUser(client, found.Id)
 	if err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
 	req := astrov1.UpdateUserRolesRequest{
 		OrganizationRole: orgRolePtr(current),
 		WorkspaceRoles:   upsertWorkspaceRole(current.WorkspaceRoles, workspaceID, ""),
 		DeploymentRoles:  current.DeploymentRoles,
 	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, userID, req)
+	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, found.Id, req)
 	if err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
-	fmt.Fprintf(out, "The user %s was successfully removed from the workspace\n", email)
-	return nil
+	return WorkspaceRemoval{ID: found.Id, Email: found.Username, WorkspaceID: workspaceID, Action: Removed}, nil
+}
+
+// findUser returns the user among users whose email is email, or the one
+// picked when email is "".
+func findUser(email string, users []astrov1.User, roleEntity string) (astrov1.User, error) {
+	if email == "" {
+		return SelectUser(users, roleEntity)
+	}
+	var found astrov1.User
+	for i := range users {
+		if users[i].Username == email {
+			found = users[i]
+		}
+	}
+	if found.Id == "" {
+		return astrov1.User{}, ErrUserNotFound
+	}
+	return found, nil
 }
 
 func getUserID(email string, users []astrov1.User, roleEntity string) (userID, newEmail string, err error) {
-	if email == "" {
-		user, err := SelectUser(users, roleEntity)
-		if err != nil {
-			return "", user.Username, err
-		}
-		return user.Id, user.Username, nil
+	found, err := findUser(email, users, roleEntity)
+	if err != nil {
+		return "", email, err
 	}
-	for i := range users {
-		if users[i].Username == email {
-			userID = users[i].Id
-		}
-	}
-	if userID == "" {
-		return userID, email, ErrUserNotFound
-	}
-	return userID, email, nil
+	return found.Id, found.Username, nil
 }
 
 func GetUser(client astrov1.APIClient, userID string) (user astrov1.User, err error) {

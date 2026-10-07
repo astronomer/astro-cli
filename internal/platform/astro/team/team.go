@@ -16,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/output"
 	"github.com/astronomer/astro-cli/pkg/picker"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
@@ -43,28 +42,40 @@ func confirmOperation(force bool) (bool, error) {
 	return input.Confirm("This is an IDP-managed team. Are you sure you want to continue the operation?", input.AnsweredBy("--yes"))
 }
 
-func CreateTeam(name, description, role string, out io.Writer, client astrov1.APIClient) error {
+// Info is t as a team command reports it, with no role: the caller sets the
+// one on the object the command is about.
+func Info(t *astrov1.Team) TeamInfo {
+	info := TeamInfo{ID: t.Id, Name: t.Name, CreatedAt: t.CreatedAt, IsIdpManaged: t.IsIdpManaged}
+	if t.Description != nil {
+		info.Description = *t.Description
+	}
+	return info
+}
+
+// CreateTeam creates a team in the current Organization, asking for its name
+// when name is "", and returns the team it created.
+func CreateTeam(name, description, role string, client astrov1.APIClient) (TeamInfo, error) {
 	err := user.IsOrganizationRoleValid(role)
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 	if name == "" {
 		prompt := ansi.Bold("\nTeam name: ")
 		if err := input.MayAsk(prompt, input.About("a Team name"), input.AnsweredBy("--name")); err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		fmt.Println("Please specify a name for your Team")
 		name, err = input.Text(prompt, input.About("a Team name"), input.AnsweredBy("--name"))
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		if name == "" {
-			return ErrNoTeamNameProvided
+			return TeamInfo{}, ErrNoTeamNameProvided
 		}
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 	typedRole := astrov1.CreateTeamRequestOrganizationRole(role)
 	teamCreateRequest := astrov1.CreateTeamJSONRequestBody{
@@ -74,14 +85,26 @@ func CreateTeam(name, description, role string, out io.Writer, client astrov1.AP
 	}
 	resp, err := client.CreateTeamWithResponse(httpContext.Background(), ctx.Organization, teamCreateRequest)
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
-	fmt.Fprintf(out, "Astro Team %s was successfully created\n", name)
-	return nil
+	if resp.JSON200 == nil {
+		return TeamInfo{Name: name, Description: description, OrgRole: role}, nil
+	}
+	info := Info(resp.JSON200)
+	info.OrgRole = orDefault(string(resp.JSON200.OrganizationRole), role)
+	return info, nil
+}
+
+// orDefault is s, or def when s is "".
+func orDefault(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }
 
 func GetTeam(client astrov1.APIClient, teamID string) (team astrov1.Team, err error) {
@@ -158,14 +181,17 @@ func updateTeamRoles(client astrov1.APIClient, orgID, teamID string, req astrov1
 	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 }
 
-func UpdateWorkspaceTeamRole(id, role, workspaceID string, out io.Writer, client astrov1.APIClient) error {
+// UpdateWorkspaceTeamRole sets the role on the Workspace of the team with
+// id, or of the Workspace's team picked when id is "", and returns the team
+// with that role.
+func UpdateWorkspaceTeamRole(id, role, workspaceID string, client astrov1.APIClient) (TeamInfo, error) {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
@@ -175,22 +201,22 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, out io.Writer, client
 	if id == "" {
 		teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInWorkspace
+			return TeamInfo{}, ErrNoTeamsFoundInWorkspace
 		}
 		team, err = selectTeam(teams)
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 	} else {
 		team, err = GetTeam(client, id)
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return TeamInfo{}, ErrTeamNotFound
 		}
 	}
 
@@ -200,47 +226,56 @@ func UpdateWorkspaceTeamRole(id, role, workspaceID string, out io.Writer, client
 		DeploymentRoles:  team.DeploymentRoles,
 	}
 	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
-		return err
+		return TeamInfo{}, err
 	}
-	fmt.Fprintf(out, "The workspace team %s role was successfully updated to %s\n", team.Id, role)
-	return nil
+	info := Info(&team)
+	info.WorkspaceRole = role
+	return info, nil
 }
 
-func UpdateTeam(id, name, description, role string, force bool, out io.Writer, client astrov1.APIClient) error {
+// UpdateTeam changes the name, description and Organization role of the team
+// with id, or of the one picked when id is "": only what is given, so "" keeps
+// each as it is. It returns nil, and changes nothing, when the team is
+// IdP-managed and the person declines to go on.
+//
+// The name and description are sent before the role is checked, so a role
+// that is not one, or that the API refuses, fails after they changed; the
+// Update returned with that error says so.
+func UpdateTeam(id, name, description, role string, force bool, client astrov1.APIClient) (*Update, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var team astrov1.Team
 	if id == "" {
 		teams, err := GetOrgTeams(client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
+			return nil, ErrNoTeamsFoundInOrg
 		}
 		team, err = selectTeam(teams)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		team, err = GetTeam(client, id)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return nil, ErrTeamNotFound
 		}
 	}
 	if team.IsIdpManaged {
 		y, err := confirmOperation(force)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !y {
-			return nil
+			return nil, nil
 		}
 	}
 	teamID := team.Id
@@ -260,17 +295,24 @@ func UpdateTeam(id, name, description, role string, force bool, out io.Writer, c
 
 	resp, err := client.UpdateTeamWithResponse(httpContext.Background(), ctx.Organization, teamID, teamUpdateRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Fprintf(out, "Astro Team %s was successfully updated\n", team.Name)
+	after := team
+	if resp.JSON200 != nil {
+		after = *resp.JSON200
+	} else {
+		after.Name, after.Description = teamUpdateRequest.Name, teamUpdateRequest.Description
+	}
+	upd := &Update{Team: Info(&after), PreviousName: team.Name}
+	upd.Team.OrgRole = orDefault(string(after.OrganizationRole), string(team.OrganizationRole))
 
 	if role != "" {
 		if err := user.IsOrganizationRoleValid(role); err != nil {
-			return err
+			return upd, err
 		}
 		req := astrov1.UpdateTeamRolesRequest{
 			OrganizationRole: role,
@@ -278,17 +320,21 @@ func UpdateTeam(id, name, description, role string, force bool, out io.Writer, c
 			DeploymentRoles:  team.DeploymentRoles,
 		}
 		if err := updateTeamRoles(client, ctx.Organization, teamID, req); err != nil {
-			return err
+			return upd, err
 		}
-		fmt.Fprintf(out, "Astro Team role %s was successfully updated to %s\n", team.Name, role)
+		upd.RoleChanged = true
+		upd.Team.OrgRole = role
 	}
-	return nil
+	return upd, nil
 }
 
-func RemoveWorkspaceTeam(id, workspaceID string, out io.Writer, client astrov1.APIClient) error {
+// RemoveWorkspaceTeam removes the role on the Workspace of the team with id,
+// or of the Workspace's team picked when id is "", and returns which team it
+// removed from which Workspace.
+func RemoveWorkspaceTeam(id, workspaceID string, client astrov1.APIClient) (WorkspaceRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
@@ -298,22 +344,22 @@ func RemoveWorkspaceTeam(id, workspaceID string, out io.Writer, client astrov1.A
 	if id == "" {
 		teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
 		if err != nil {
-			return err
+			return WorkspaceRemoval{}, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInWorkspace
+			return WorkspaceRemoval{}, ErrNoTeamsFoundInWorkspace
 		}
 		team, err = selectTeam(teams)
 		if err != nil {
-			return err
+			return WorkspaceRemoval{}, err
 		}
 	} else {
 		team, err = GetTeam(client, id)
 		if err != nil {
-			return err
+			return WorkspaceRemoval{}, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return WorkspaceRemoval{}, ErrTeamNotFound
 		}
 	}
 	req := astrov1.UpdateTeamRolesRequest{
@@ -322,10 +368,9 @@ func RemoveWorkspaceTeam(id, workspaceID string, out io.Writer, client astrov1.A
 		DeploymentRoles:  team.DeploymentRoles,
 	}
 	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
-		return err
+		return WorkspaceRemoval{}, err
 	}
-	fmt.Fprintf(out, "Astro Team %s was successfully removed from workspace %s\n", team.Name, workspaceID)
-	return nil
+	return WorkspaceRemoval{ID: team.Id, Name: team.Name, WorkspaceID: workspaceID, Action: Removed}, nil
 }
 
 func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
@@ -389,14 +434,17 @@ func GetWorkspaceTeams(client astrov1.APIClient, workspaceID string, _ int) ([]a
 	return listTeams(client, &wsID, nil)
 }
 
-func AddWorkspaceTeam(id, role, workspaceID string, out io.Writer, client astrov1.APIClient) error {
+// AddWorkspaceTeam gives the Organization's team with id, or the one picked
+// when id is "", role on the Workspace (the current one when workspaceID is
+// ""), and returns the team with that role.
+func AddWorkspaceTeam(id, role, workspaceID string, client astrov1.APIClient) (TeamInfo, error) {
 	err := user.IsWorkspaceRoleValid(role)
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 	if workspaceID == "" {
 		workspaceID = ctx.Workspace
@@ -405,22 +453,22 @@ func AddWorkspaceTeam(id, role, workspaceID string, out io.Writer, client astrov
 	if id == "" {
 		teams, err := GetOrgTeams(client)
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
+			return TeamInfo{}, ErrNoTeamsFoundInOrg
 		}
 		team, err = selectTeam(teams)
 		if err != nil || team.Id == "" {
-			return ErrInvalidTeamKey
+			return TeamInfo{}, pickFailed(err)
 		}
 	} else {
 		team, err = GetTeam(client, id)
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return TeamInfo{}, ErrTeamNotFound
 		}
 	}
 
@@ -430,10 +478,21 @@ func AddWorkspaceTeam(id, role, workspaceID string, out io.Writer, client astrov
 		DeploymentRoles:  team.DeploymentRoles,
 	}
 	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
+		return TeamInfo{}, err
+	}
+	info := Info(&team)
+	info.WorkspaceRole = role
+	return info, nil
+}
+
+// pickFailed is the error of a team picker that returned err, or no team:
+// ErrInvalidTeamKey, as it has always been, unless the picker refused to ask
+// (under --output json), whose refusal names what answers it.
+func pickFailed(err error) error {
+	if input.IsRequired(err) {
 		return err
 	}
-	fmt.Fprintf(out, "The team %s was successfully added to the workspace with the role %s\n", team.Id, role)
-	return nil
+	return ErrInvalidTeamKey
 }
 
 // GetOrgTeams returns a list of all organization teams.
@@ -441,54 +500,56 @@ func GetOrgTeams(client astrov1.APIClient) ([]astrov1.Team, error) {
 	return listTeams(client, nil, nil)
 }
 
-func Delete(id string, force bool, out io.Writer, client astrov1.APIClient) error {
+// Delete deletes the team with id, or the one picked when id is "", and
+// returns which team it deleted. It returns nil, and deletes nothing, when
+// the team is IdP-managed and the person declines to go on.
+func Delete(id string, force bool, client astrov1.APIClient) (*OrganizationRemoval, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var team astrov1.Team
 	if id == "" {
 		teams, err := GetOrgTeams(client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
+			return nil, ErrNoTeamsFoundInOrg
 		}
 		team, err = selectTeam(teams)
 		if err != nil || team.Id == "" {
-			return ErrInvalidTeamKey
+			return nil, pickFailed(err)
 		}
 	} else {
 		team, err = GetTeam(client, id)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return nil, ErrTeamNotFound
 		}
 	}
 	if team.IsIdpManaged {
 		y, err := confirmOperation(force)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !y {
-			return nil
+			return nil, nil
 		}
 	}
 	teamID := team.Id
 	resp, err := client.DeleteTeamWithResponse(httpContext.Background(), ctx.Organization, teamID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Fprintf(out, "Astro Team %s was successfully deleted\n", team.Name)
-	return nil
+	return &OrganizationRemoval{ID: team.Id, Name: team.Name, OrganizationID: ctx.Organization, Action: Deleted}, nil
 }
 
 // listTeamMembers fetches all members for a team using the paginated v1 endpoint.
@@ -516,57 +577,61 @@ func listTeamMembers(client astrov1.APIClient, orgID, teamID string) ([]astrov1.
 	return members, nil
 }
 
-func RemoveUser(teamID, teamMemberID string, force bool, out io.Writer, client astrov1.APIClient) error {
+// RemoveUser removes the member with teamMemberID, or the one picked when it
+// is "", from the team with teamID, or the one picked when it is "", and
+// returns which user it removed from which team. It returns nil, and removes
+// no one, when the team is IdP-managed and the person declines to go on.
+func RemoveUser(teamID, teamMemberID string, force bool, client astrov1.APIClient) (*Membership, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var team astrov1.Team
 	if teamID == "" {
 		teams, err := GetOrgTeams(client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
+			return nil, ErrNoTeamsFoundInOrg
 		}
 		team, err = selectTeam(teams)
 		if err != nil || team.Id == "" {
-			return ErrInvalidTeamKey
+			return nil, pickFailed(err)
 		}
 	} else {
 		team, err = GetTeam(client, teamID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return nil, ErrTeamNotFound
 		}
 	}
 	if team.IsIdpManaged {
 		y, err := confirmOperation(force)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !y {
-			return nil
+			return nil, nil
 		}
 	}
 	teamID = team.Id
 	teamMembers, err := listTeamMembers(client, ctx.Organization, teamID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(teamMembers) == 0 {
-		return ErrNoTeamMembersFoundInTeam
+		return nil, ErrNoTeamMembersFoundInTeam
 	}
 
 	var teamMemberSelection astrov1.TeamMember
 	if teamMemberID == "" {
 		teamMemberSelection, err = selectTeamMember(teamMembers)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		for i := range teamMembers {
@@ -575,58 +640,66 @@ func RemoveUser(teamID, teamMemberID string, force bool, out io.Writer, client a
 			}
 		}
 		if teamMemberSelection.UserId == "" {
-			return ErrTeamNotFound
+			return nil, ErrTeamNotFound
 		}
 	}
 	userID := teamMemberSelection.UserId
 
 	resp, err := client.RemoveTeamMemberWithResponse(httpContext.Background(), ctx.Organization, teamID, userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Fprintf(out, "Astro User %s was successfully removed from team %s \n", teamMemberSelection.UserId, team.Name)
-	return nil
+	return &Membership{TeamID: team.Id, TeamName: team.Name, UserID: userID, Email: teamMemberSelection.Username, Action: Removed}, nil
 }
 
-func AddUser(teamID, userID string, force bool, out io.Writer, client astrov1.APIClient) error {
+// AddUser adds the Organization user with userID, or the one picked when it
+// is "", to the team with teamID, or the one picked when it is "", and
+// returns which user it added to which team. It returns nil, and adds no one,
+// when the team is IdP-managed and the person declines to go on.
+func AddUser(teamID, userID string, force bool, client astrov1.APIClient) (*Membership, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var team astrov1.Team
 	if teamID == "" {
 		teams, err := GetOrgTeams(client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
+			return nil, ErrNoTeamsFoundInOrg
 		}
 		team, err = selectTeam(teams)
-		if err != nil || team.Id == "" {
-			return err
+		if err != nil {
+			return nil, err
+		}
+		// A picked team with no ID used to end the command here with exit
+		// 0, having added no one.
+		if team.Id == "" {
+			return nil, ErrInvalidTeamKey
 		}
 	} else {
 		team, err = GetTeam(client, teamID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return nil, ErrTeamNotFound
 		}
 	}
 	if team.IsIdpManaged {
 		y, err := confirmOperation(force)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !y {
-			return nil
+			return nil, nil
 		}
 	}
 	teamID = team.Id
@@ -635,22 +708,22 @@ func AddUser(teamID, userID string, force bool, out io.Writer, client astrov1.AP
 	if userID == "" {
 		users, err := user.GetOrgUsers(client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(users) == 0 {
-			return ErrNoUsersFoundInOrg
+			return nil, ErrNoUsersFoundInOrg
 		}
 		userSelection, err = user.SelectUser(users, "organization")
 		if err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		userSelection, err = user.GetUser(client, userID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if userSelection.Id == "" {
-			return user.ErrUserNotFound
+			return nil, user.ErrUserNotFound
 		}
 	}
 
@@ -661,14 +734,13 @@ func AddUser(teamID, userID string, force bool, out io.Writer, client astrov1.AP
 
 	resp, err := client.AddTeamMembersWithResponse(httpContext.Background(), ctx.Organization, teamID, addTeamMembersRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Fprintf(out, "Astro User %s was successfully added to team %s \n", userSelection.Id, team.Name)
-	return nil
+	return &Membership{TeamID: team.Id, TeamName: team.Name, UserID: userID, Email: userSelection.Username, Action: Added}, nil
 }
 
 func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, error) {
@@ -692,58 +764,48 @@ func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, err
 	return teamMembers[i], nil
 }
 
-func ListTeamUsers(teamID string, out io.Writer, client astrov1.APIClient) (err error) {
+// ListTeamUsers returns the members of the team with teamID, or of the one
+// picked when it is "".
+func ListTeamUsers(teamID string, client astrov1.APIClient) (MemberList, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return MemberList{}, err
 	}
 	var team astrov1.Team
 	if teamID == "" {
 		teams, err := GetOrgTeams(client)
 		if err != nil {
-			return err
+			return MemberList{}, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
+			return MemberList{}, ErrNoTeamsFoundInOrg
 		}
 		team, err = selectTeam(teams)
 		if err != nil || team.Id == "" {
-			return ErrInvalidTeamKey
+			return MemberList{}, pickFailed(err)
 		}
 	} else {
 		team, err = GetTeam(client, teamID)
 		if err != nil {
-			return err
+			return MemberList{}, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return MemberList{}, ErrTeamNotFound
 		}
 	}
 	members, err := listTeamMembers(client, ctx.Organization, team.Id)
 	if err != nil {
-		return err
+		return MemberList{}, err
 	}
-	table := printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"ID", "FullName", "Email"},
-	}
-	if len(members) == 0 {
-		fmt.Println("The selected team has no members")
-		return nil
-	}
+	list := MemberList{Members: make([]Member, 0, len(members))}
 	for i := range members {
 		var fullName string
 		if members[i].FullName != nil {
 			fullName = *members[i].FullName
 		}
-		table.AddRow([]string{
-			members[i].UserId,
-			fullName,
-			members[i].Username,
-		}, false)
+		list.Members = append(list.Members, Member{ID: members[i].UserId, FullName: fullName, Email: members[i].Username})
 	}
-	table.Print(out) //nolint:errcheck // best-effort render to the terminal
-	return nil
+	return list, nil
 }
 
 func GetDeploymentTeams(client astrov1.APIClient, deploymentID string, _ int) ([]astrov1.Team, error) {

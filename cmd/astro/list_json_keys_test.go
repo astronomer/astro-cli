@@ -28,6 +28,7 @@ func TestCloudListJSONKeysAreSnakeCase(t *testing.T) {
 		deployment.BundleList{},     // deployment bundle list
 		team.TeamList{},             // deployment, workspace, organization team list
 		user.UserList{},             // deployment, workspace, organization user list
+		team.MemberList{},           // organization team user list
 		organization.OrganizationList{},
 		organization.ClusterList{},
 		workspace.WorkspaceList{},

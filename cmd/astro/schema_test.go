@@ -74,6 +74,22 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "user-list", Value: user.UserList{}},
 	{Name: "team-list", Value: team.TeamList{}},
 
+	// The user and team commands of `workspace` and `organization`. An add or
+	// an update publishes the one user or team its list holds, with the role
+	// it now has on the object the command is about; a create or an update of
+	// a team, the team as it now is. A remove or a delete names what it acted
+	// on and what it did, as the token families' removals do.
+	{Name: "user", Value: user.UserInfo{}},
+	{Name: "team", Value: team.TeamInfo{}},
+	{Name: "workspace-user-removal", Value: user.WorkspaceRemoval{}},
+	{Name: "workspace-team-removal", Value: team.WorkspaceRemoval{}},
+	{Name: "organization-team-removal", Value: team.OrganizationRemoval{}},
+	// astro organization user invite.
+	{Name: "user-invite", Value: user.Invite{}},
+	// astro organization team user add|remove, and list.
+	{Name: "team-membership", Value: team.Membership{}},
+	{Name: "team-member-list", Value: team.MemberList{}},
+
 	// astro env: internal/platform/astro/env renders the text and hands the
 	// result to the command's cliout.Renderer, as pkg/output does. The four
 	// per-kind lists carry the same object under different keys, and the key
@@ -132,12 +148,13 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Nineteen shapes reach Emit in this package's tests today:
-// the deployment variable and token results, the pkg/output lists and the
-// `astro env` payloads their tests reach, the manifest deploy's result,
-// deployment inspect's deployment, and the error object. Raise it as
-// conversions land; lower it only saying why.
-const minWatchedPayloads = 19
+// would be silent. Thirty shapes reach Emit in this package's tests today:
+// the deployment variable and token results, the workspace and organization
+// token, user and team results, the pkg/output lists and the `astro env`
+// payloads their tests reach, the manifest deploy's result, deployment
+// inspect's deployment, and the error object. Raise it as conversions land;
+// lower it only saying why.
+const minWatchedPayloads = 30
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

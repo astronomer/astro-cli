@@ -1,0 +1,10 @@
+{
+  "id": "x",
+  "name": "x",
+  "description": "x",
+  "created_at": "2026-07-21T10:30:00Z",
+  "workspace_role": "x",
+  "deployment_role": "x",
+  "org_role": "x",
+  "is_idp_managed": true
+}

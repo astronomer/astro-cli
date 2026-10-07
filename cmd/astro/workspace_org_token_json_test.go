@@ -120,11 +120,11 @@ type tokenCase struct {
 	wantErr string
 }
 
-func runTokenCases(t *testing.T, cases []tokenCase, extra ...string) {
+func runTokenCases(t *testing.T, cases []tokenCase) {
 	t.Helper()
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := execAstroCmd(t, tc.client(t), tc.answers, tc.root, append(tc.args, extra...)...)
+			r := execAstroCmd(t, tc.client(t), tc.answers, tc.root, tc.args...)
 			if tc.wantErr != "" {
 				require.Error(t, r.err)
 				assert.Equal(t, tc.wantErr, r.err.Error())

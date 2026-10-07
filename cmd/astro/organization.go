@@ -41,8 +41,6 @@ var (
 	validOrganizationRoles             []string
 	shouldIncludeDefaultRoles          bool
 	organizationListOutput             string
-	organizationUserListOutput         string
-	organizationTeamListOutput         string
 	organizationClusterListOutput      string
 	forceTeam                          bool
 )
@@ -165,6 +163,7 @@ func newOrganizationUserRootCmd(out io.Writer) *cobra.Command {
 		newOrganizationUserListCmd(out),
 		newOrganizationUserUpdateCmd(out),
 	)
+	cliout.AddOutputFlag(cmd, &organizationUserOutput)
 	return cmd
 }
 
@@ -199,7 +198,6 @@ func newOrganizationUserListCmd(out io.Writer) *cobra.Command {
 			return listUsers(cmd, out)
 		},
 	}
-	cliout.AddOutputFlag(cmd, &organizationUserListOutput)
 	return cmd
 }
 
@@ -263,6 +261,10 @@ func organizationExportAuditLogs(cmd *cobra.Command) error {
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
+	format, err := cliout.ParseFormat(organizationUserOutput)
+	if err != nil {
+		return err
+	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -279,11 +281,15 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.CreateInvite(email, role, out, astroV1Client)
+	inv, err := user.CreateInvite(email, role, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &inv, fmt.Sprintf("invite for %s with role %s created", inv.Email, inv.Role))
 }
 
 func listUsers(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationUserListOutput)
+	format, err := cliout.ParseFormat(organizationUserOutput)
 	if err != nil {
 		return err
 	}
@@ -293,6 +299,10 @@ func listUsers(cmd *cobra.Command, out io.Writer) error {
 }
 
 func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
+	format, err := cliout.ParseFormat(organizationUserOutput)
+	if err != nil {
+		return err
+	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -311,7 +321,16 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateUserRole(email, updateRole, out, astroV1Client)
+	if email == "" {
+		if err := mayPick("a user", userEmailAnswer); err != nil {
+			return err
+		}
+	}
+	u, err := user.UpdateUserRole(email, updateRole, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &u, fmt.Sprintf("The user %s role was successfully updated to %s", u.Email, u.OrgRole))
 }
 
 func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
@@ -329,6 +348,7 @@ func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
 		newTeamDeleteCmd(out),
 		newOrganizationTeamUserRootCmd(out),
 	)
+	cliout.AddOutputFlag(cmd, &organizationTeamOutput)
 	return cmd
 }
 
@@ -344,12 +364,11 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 			return listTeams(cmd, out)
 		},
 	}
-	cliout.AddOutputFlag(cmd, &organizationTeamListOutput)
 	return cmd
 }
 
 func listTeams(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationTeamListOutput)
+	format, err := cliout.ParseFormat(organizationTeamOutput)
 	if err != nil {
 		return err
 	}
@@ -384,15 +403,22 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	format, err := cliout.ParseFormat(organizationTeamOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
 
 	id := ""
 
 	if len(args) == 1 {
 		id = args[0]
+	} else if err := mayPick("a team", teamIDAnswer); err != nil {
+		return err
 	}
 
-	return team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, forceTeam, out, astroV1Client)
+	upd, err := team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, forceTeam, astroV1Client)
+	return renderTeamUpdate(format, out, upd, err)
 }
 
 func newTeamCreateCmd(out io.Writer) *cobra.Command {
@@ -418,17 +444,29 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func teamCreate(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(organizationTeamOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
 	if teamOrgRole == "" {
+		// Refused before the line introducing the choice, so a run that
+		// cannot ask prints nothing.
+		if err := mayPickRole(); err != nil {
+			return err
+		}
 		fmt.Println("select a Organization Role for the new team:")
 		// no role was provided so ask the user for it
-		var err error
 		teamOrgRole, err = selectOrganizationRole()
 		if err != nil {
 			return err
 		}
 	}
-	return team.CreateTeam(teamName, teamDescription, teamOrgRole, out, astroV1Client)
+	t, err := team.CreateTeam(teamName, teamDescription, teamOrgRole, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &t, fmt.Sprintf("Astro Team %s was successfully created", t.Name))
 }
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
@@ -451,15 +489,25 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+	format, err := cliout.ParseFormat(organizationTeamOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
 
 	id := ""
 
 	if len(args) == 1 {
 		id = args[0]
+	} else if err := mayPick("a team", teamIDAnswer); err != nil {
+		return err
 	}
 
-	return team.Delete(id, forceTeam, out, astroV1Client)
+	r, err := team.Delete(id, forceTeam, astroV1Client)
+	if err != nil || r == nil {
+		return err
+	}
+	return renderLines(format, out, r, fmt.Sprintf("Astro Team %s was successfully deleted", r.Name))
 }
 
 func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
@@ -498,8 +546,35 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 }
 
 func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(organizationTeamOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return team.RemoveUser(teamID, userID, forceTeam, out, astroV1Client)
+	if err := mayPickTeamAndUser("a team member"); err != nil {
+		return err
+	}
+	m, err := team.RemoveUser(teamID, userID, forceTeam, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderMembership(format, out, m)
+}
+
+// mayPickTeamAndUser refuses, under --output json, a team user command given
+// no --team-id or no --user-id, before it fetches anything. userWhat is the
+// user picker's question: a user of the Organization to add, or a member of
+// the team to remove.
+func mayPickTeamAndUser(userWhat string) error {
+	if teamID == "" {
+		if err := mayPick("a team", teamIDFlag); err != nil {
+			return err
+		}
+	}
+	if userID == "" {
+		return mayPick(userWhat, userIDFlag)
+	}
+	return nil
 }
 
 //nolint:dupl // the duplication is acceptable here
@@ -522,8 +597,19 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 }
 
 func addTeamUser(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(organizationTeamOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return team.AddUser(teamID, userID, forceTeam, out, astroV1Client)
+	if err := mayPickTeamAndUser("a user"); err != nil {
+		return err
+	}
+	m, err := team.AddUser(teamID, userID, forceTeam, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderMembership(format, out, m)
 }
 
 func newTeamListUsersCmd(out io.Writer) *cobra.Command {
@@ -544,8 +630,21 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 }
 
 func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(organizationTeamOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return team.ListTeamUsers(teamID, out, astroV1Client)
+	if teamID == "" {
+		if err := mayPick("a team", teamIDFlag); err != nil {
+			return err
+		}
+	}
+	list, err := team.ListTeamUsers(teamID, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderTeamMembers(format, out, &list)
 }
 
 // org tokens
