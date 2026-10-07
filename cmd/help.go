@@ -116,7 +116,7 @@ func helpPage(c *cobra.Command, platform, platformVersion string, width int) str
 	if !c.HasParent() {
 		b.WriteString(rootBanner + "\n")
 	}
-	if text := strings.TrimSpace(firstNonEmpty(c.Long, c.Short)); text != "" {
+	if text := strings.TrimSpace(firstNonEmpty(commandLong(c), c.Short)); text != "" {
 		b.WriteString(wrapText(text, width) + "\n\n")
 	}
 	if c.Runnable() || c.HasSubCommands() {
