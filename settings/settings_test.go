@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -502,9 +504,23 @@ func (s *Suite) TestEnvExport() {
 	})
 }
 
+// exportToTempSettings points the settings file at a copy of the checked-in
+// export fixture in a temporary directory, so an export writes there rather
+// than into testfiles/, and puts back WorkingPath and the stubbed Airflow
+// command when the test ends.
+func exportToTempSettings(s *Suite) {
+	dir := s.T().TempDir()
+	fixture, err := os.ReadFile(filepath.Join("testfiles", "airflow_settings_export.yaml"))
+	s.Require().NoError(err)
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, "airflow_settings_export.yaml"), fixture, 0o600))
+	previousPath, previousCommand := WorkingPath, execAirflowCommand
+	s.T().Cleanup(func() { WorkingPath, execAirflowCommand = previousPath, previousCommand })
+	WorkingPath = dir
+}
+
 func (s *Suite) TestExport() {
+	exportToTempSettings(s)
 	s.Run("success", func() {
-		WorkingPath = "./testfiles/"
 		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			switch airflowCommand {
 			case airflowConnectionList:
@@ -546,7 +562,6 @@ func (s *Suite) TestExport() {
 	})
 
 	s.Run("variable failure", func() {
-		WorkingPath = "./testfiles/"
 		execAirflowCommand = func(id, airflowCommand string) (string, error) {
 			return "", nil
 		}
@@ -559,6 +574,70 @@ func (s *Suite) TestExport() {
 		err := Export("", "", 2, true, true, true)
 		s.ErrorIs(err, errNoID)
 	})
+}
+
+// Airflow renders an empty listing in YAML as "[]", after whatever
+// warnings it printed first. An empty listing exports nothing and succeeds,
+// as an empty variables export does; output that is neither a listing nor
+// "[]" is an error rather than a panic.
+func (s *Suite) TestExportEmptyListings() {
+	exportToTempSettings(s)
+	s.Require().NoError(InitSettings("airflow_settings_export.yaml"))
+	for _, out := range []string{"[]", "[]\n", "WARNING: something deprecated\n\n[]\n", "\x1b[33m[]\x1b[0m\n"} {
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
+			return out, nil
+		}
+		before := len(settings.Airflow.Connections)
+		s.NoError(ExportConnections("id"), "connections %q", out)
+		s.Len(settings.Airflow.Connections, before, "connections %q", out)
+
+		before = len(settings.Airflow.Pools)
+		s.NoError(ExportPools("id"), "pools %q", out)
+		s.Len(settings.Airflow.Pools, before, "pools %q", out)
+	}
+
+	for _, out := range []string{"", "something went wrong", "Error: expected a list, got []", "[] is not a listing"} {
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
+			return out, nil
+		}
+		err := ExportConnections("id")
+		s.ErrorContains(err, "unexpected output listing connections", "connections %q", out)
+		err = ExportPools("id")
+		s.ErrorContains(err, "unexpected output listing pools", "pools %q", out)
+	}
+}
+
+// Every pool Airflow lists is exported, default_pool included: import
+// updates default_pool's slots in place, so its size round-trips too.
+func (s *Suite) TestExportPoolsExportsEveryPool() {
+	exportToTempSettings(s)
+	s.Require().NoError(InitSettings("airflow_settings_export.yaml"))
+	settings.Airflow.Pools = nil
+	execAirflowCommand = func(id, airflowCommand string) (string, error) {
+		return `
+- description: Default pool
+  include_deferred: 'False'
+  pool: default_pool
+  slots: '64'
+- description: ETL jobs
+  include_deferred: 'False'
+  pool: etl
+  slots: '8'
+- description: ''
+  include_deferred: 'False'
+  pool: ml
+  slots: '2'`, nil
+	}
+	s.Require().NoError(ExportPools("id"))
+
+	s.Equal(Pools{
+		{PoolName: "default_pool", PoolSlot: 64, PoolDescription: "Default pool"},
+		{PoolName: "etl", PoolSlot: 8, PoolDescription: "ETL jobs"},
+		{PoolName: "ml", PoolSlot: 2, PoolDescription: ""},
+	}, settings.Airflow.Pools)
+
+	s.Require().NoError(InitSettings("airflow_settings_export.yaml"))
+	s.Len(settings.Airflow.Pools, 3, "the settings file holds every pool")
 }
 
 func (s *Suite) TestJsonString() {

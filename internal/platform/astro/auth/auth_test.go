@@ -245,6 +245,7 @@ func TestRequestUserInfo(t *testing.T) {
 	assert.NoError(t, err)
 	emptyResponse, err := json.Marshal(emptyUserInfo)
 	assert.NoError(t, err)
+	restoreHTTPClient(t)
 
 	t.Run("success", func(t *testing.T) {
 		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -295,6 +296,7 @@ func TestRequestToken(t *testing.T) {
 	}
 	jsonResponse, err := json.Marshal(mockResponse)
 	assert.NoError(t, err)
+	restoreHTTPClient(t)
 
 	t.Run("success", func(t *testing.T) {
 		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
@@ -369,7 +371,12 @@ func TestAuthorizeError(t *testing.T) {
 }
 
 func TestAuthorizeCallbackHandler(t *testing.T) {
+	// The callback answers the browser with a redirect to auth.astronomer.io.
+	// The test checks where it points without following it there.
 	client := httputil.NewHTTPClient()
+	client.HTTPClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	previous := httpClient
+	t.Cleanup(func() { httpClient = previous })
 	httpClient = client
 	t.Run("success", func(t *testing.T) {
 		callbackServer = "localhost:12345"
@@ -383,8 +390,12 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 				Method: http.MethodGet,
 				Path:   "http://localhost:12345/callback?code=test",
 			}
-			_, cbErr := client.Do(opts)
-			assert.NoError(t, cbErr)
+			res, cbErr := client.Do(opts)
+			if assert.NoError(t, cbErr) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusFound, res.StatusCode)
+				assert.Equal(t, "https://auth.astronomer.io/device/success", res.Header.Get("Location"))
+			}
 		}()
 		code, err := authorizeCallbackHandler()
 		assert.Equal(t, "test", code)
@@ -418,8 +429,12 @@ func TestAuthorizeCallbackHandler(t *testing.T) {
 				Method: http.MethodGet,
 				Path:   "http://localhost:12346/callback?error=error&error_description=fatal_error",
 			}
-			_, cbErr := client.Do(opts)
-			assert.NoError(t, cbErr)
+			res, cbErr := client.Do(opts)
+			if assert.NoError(t, cbErr) {
+				defer res.Body.Close()
+				assert.Equal(t, http.StatusFound, res.StatusCode)
+				assert.Equal(t, "https://auth.astronomer.io/device/denied", res.Header.Get("Location"))
+			}
 		}()
 		_, err := authorizeCallbackHandler()
 		assert.Contains(t, err.Error(), "fatal_error")
@@ -1271,6 +1286,7 @@ func TestCheckUserSessionNoOrganization(t *testing.T) {
 // nothing, as unauthenticated rather than a question a flag could answer.
 func TestLoginRefusedWhenTheRunMayNotAsk(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	stubAuthConfig(t, testAuthConfig)
 	stubRefresh(t, astroauth.TokenResponse{}, errMock)
 	t.Cleanup(input.SetGuard(func() string { return "with --output json it cannot" }))
 	previous := authenticator
@@ -1303,7 +1319,9 @@ func TestLogin(t *testing.T) {
 	// These cases log in through the browser, so the logins they save must not
 	// be reused by the cases after them.
 	stubRefresh(t, astroauth.TokenResponse{}, errMock)
+	restoreHTTPClient(t)
 	t.Run("success", func(t *testing.T) {
+		stubAuthConfig(t, testAuthConfig)
 		mockResponse := Result{RefreshToken: "test-token", AccessToken: "test-token", ExpiresIn: 300}
 		mockUserInfo := UserInfo{Email: "test@astronomer.test"}
 		callbackHandler := func() (string, error) {
@@ -1508,12 +1526,24 @@ func TestLogin(t *testing.T) {
 	})
 }
 
+// testAuthConfig is what a stubbed auth-config request answers with.
+var testAuthConfig = Config{ClientID: "client-id", Audience: "audience", DomainURL: "https://auth.astronomer.test/"}
+
+// restoreHTTPClient puts the package's client back when the test ends, for a
+// test whose cases replace it without doing so themselves. A client left
+// behind would answer the next test's requests, or, if it is the real one,
+// send them to the network.
+func restoreHTTPClient(t *testing.T) {
+	t.Helper()
+	previous := httpClient
+	t.Cleanup(func() { httpClient = previous })
+}
+
 // stubAuthConfig answers every auth-config request with authConfig, and puts
 // the real client back when the test ends.
 func stubAuthConfig(t *testing.T, authConfig Config) {
 	t.Helper()
-	previous := httpClient
-	t.Cleanup(func() { httpClient = previous })
+	restoreHTTPClient(t)
 	body, err := json.Marshal(authConfig)
 	assert.NoError(t, err)
 	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {

@@ -303,6 +303,54 @@ func imports(t *testing.T, path string) []string {
 	return out
 }
 
+// TestOnlyTestsImportTheTestHelpers keeps pkg/testing out of the shipped
+// binary. Its init makes http.DefaultTransport refuse every host but this
+// machine (pkg/testing/nonetwork.go), which is the point in a test and would
+// break every request the CLI makes if any non-test file imported it.
+// The pkg/testing tree itself is exempt; every other Go file in the
+// repository, in any module, must be a _test.go file to import pkg/testing or
+// anything under it. A file that does not parse (a fixture, a template) is
+// not Go the build compiles, and is skipped.
+func TestOnlyTestsImportTheTestHelpers(t *testing.T) {
+	root := repoRoot(t)
+	const helpers = modulePrefix + "pkg/testing"
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if path != root && (strings.HasPrefix(d.Name(), ".") || slices.Contains([]string{"testdata", "node_modules", "vendor"}, d.Name())) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if dir := filepath.ToSlash(filepath.Dir(rel)); dir == "pkg/testing" || strings.HasPrefix(dir, "pkg/testing/") {
+			return nil
+		}
+		f, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return nil //nolint:nilerr // not Go the build compiles; see above
+		}
+		for _, imp := range f.Imports {
+			p, err := strconv.Unquote(imp.Path.Value)
+			if err == nil && (p == helpers || strings.HasPrefix(p, helpers+"/")) {
+				t.Errorf("%s imports %s: only a _test.go file may, because pkg/testing's init cuts the network off", rel, p)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestInternalNeverImportsCmd(t *testing.T) {
 	root := repoRoot(t)
 	goFiles(t, root, "internal", func(rel string) {

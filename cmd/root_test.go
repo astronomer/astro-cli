@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
-	"github.com/astronomer/astro-cli/version"
 )
 
 type CmdSuite struct {
@@ -50,7 +49,7 @@ func (s *CmdSuite) TestRootCommandLocal() {
 
 func (s *CmdSuite) TestRootCommandCloudContext() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	version.CurrVersion = "1.0.0"
+	s.withVersion("1.0.0")
 	output, err := executeCommand("help")
 	s.NoError(err)
 	s.Contains(output, "astro [command]")
@@ -83,7 +82,7 @@ func (s *CmdSuite) TestRootCompletionCommand() {
 
 func (s *CmdSuite) TestRootCommandSoftwareContext() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	version.CurrVersion = "1.0.0"
+	s.withVersion("1.0.0")
 	output, err := executeCommand("help")
 	s.NoError(err)
 	s.Contains(output, "astro [command]")

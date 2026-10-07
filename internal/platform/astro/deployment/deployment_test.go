@@ -266,9 +266,18 @@ const (
 
 var mockV1Client *astrov1_mocks.ClientWithResponsesInterface
 
+// stubRuntimeVersion is the runtime the create flow is told is newest. The
+// real answer is fetched from updates.astronomer.io, which no unit test may
+// reach.
+const stubRuntimeVersion = "13.0.0"
+
 func (s *Suite) SetupTest() {
 	// init mocks
 	mockV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
+
+	previous := latestRuntimeVersion
+	latestRuntimeVersion = func() (string, error) { return stubRuntimeVersion, nil }
+	s.T().Cleanup(func() { latestRuntimeVersion = previous })
 
 	// init responses object
 	MockResponseInit()
@@ -557,6 +566,7 @@ func (s *Suite) TestGetDeployment() {
 			deploymentType astrov1.DeploymentType, schedulerAU, schedulerReplicas int, remoteExecutionEnabled bool, allowedIpAddressRanges *[]string, taskLogBucket *string, taskLogURLPattern *string,
 			astroV1Client astrov1.APIClient, waitForStatus bool, waitTimeForDeployment time.Duration,
 		) error {
+			s.Equal(stubRuntimeVersion, runtimeVersion)
 			return errMock
 		}
 

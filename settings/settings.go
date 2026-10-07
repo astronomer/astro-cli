@@ -559,6 +559,28 @@ func Export(id, settingsFile string, version uint64, connections, variables, poo
 	return nil
 }
 
+// listedYAML returns the YAML list in the output of an `airflow ... list -o
+// yaml` command, from the first item on, dropping whatever warnings Airflow
+// printed before it. Each item starts with marker. Airflow renders an empty
+// listing as a last line of exactly "[]", which is returned as is (it
+// unmarshals to an empty list); output holding neither is an error, naming
+// what was being listed.
+func listedYAML(out, marker, what string) (string, error) {
+	if _, items, ok := strings.Cut(out, marker); ok {
+		return marker + items, nil
+	}
+	if lastLine(out) == "[]" {
+		return "[]", nil
+	}
+	return "", fmt.Errorf("unexpected output listing %s: %q", what, out)
+}
+
+// lastLine is the last line of out that is not blank, trimmed.
+func lastLine(out string) string {
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
 func ExportConnections(id string) error {
 	// Setup airflow command to export connections
 	out, err := execAirflowCommand(id, airflowConnectionList)
@@ -568,7 +590,10 @@ func ExportConnections(id string) error {
 	// remove all color from output of the airflow command
 	plainOut := re.ReplaceAllString(out, "")
 	// remove extra warning text
-	yamlCons := "- conn_id:" + strings.SplitN(plainOut, "- conn_id:", 2)[1]
+	yamlCons, err := listedYAML(plainOut, "- conn_id:", "connections")
+	if err != nil {
+		return err
+	}
 
 	var connections AirflowConnections
 
@@ -683,7 +708,10 @@ func ExportPools(id string) error {
 
 	var pools AirflowPools
 	// remove warnings and extra text from the the output
-	yamlpools := "- description:" + strings.SplitN(plainOut, "- description:", 2)[1]
+	yamlpools, err := listedYAML(plainOut, "- description:", "pools")
+	if err != nil {
+		return err
+	}
 
 	err = yaml.Unmarshal([]byte(yamlpools), &pools)
 	if err != nil {
@@ -691,9 +719,6 @@ func ExportPools(id string) error {
 	}
 	// add pools to the settings object
 	for i := range pools {
-		if pools[i].PoolName != "default_pool" {
-			continue
-		}
 		slot, err := strconv.Atoi(pools[i].PoolSlot)
 		if err != nil {
 			fmt.Println("Issue with parsing pool slot number: ")

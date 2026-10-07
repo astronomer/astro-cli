@@ -32,42 +32,6 @@ func (_m *ImageHandler) Build(dockerfile string, buildSecrets []string, config t
 	return r0
 }
 
-// CreatePipFreeze provides a mock function with given fields: altImageName, pipFreezeFile
-func (_m *ImageHandler) CreatePipFreeze(altImageName string, pipFreezeFile string) error {
-	ret := _m.Called(altImageName, pipFreezeFile)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CreatePipFreeze")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(altImageName, pipFreezeFile)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// DoesImageExist provides a mock function with given fields: image
-func (_m *ImageHandler) DoesImageExist(image string) error {
-	ret := _m.Called(image)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DoesImageExist")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(image)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // GetImageRepoSHA provides a mock function with given fields: registry
 func (_m *ImageHandler) GetImageRepoSHA(registry string) (string, error) {
 	ret := _m.Called(registry)

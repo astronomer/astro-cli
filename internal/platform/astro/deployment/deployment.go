@@ -48,6 +48,14 @@ var (
 	canCiCdDeploy    = CanCiCdDeploy
 	parseToken       = util.ParseAPIToken
 	CleanOutput      = false
+
+	// latestRuntimeVersion is the runtime a Deployment created from the
+	// selection flow gets: the newest stable one, read from Astronomer's
+	// runtime catalog over the network. Replaced in tests.
+	latestRuntimeVersion = func() (string, error) {
+		client := airflowversions.NewClient(httputil.NewHTTPClient(), false, false)
+		return airflowversions.GetDefaultImageTag(client, "", "", false)
+	}
 )
 
 const (
@@ -2127,8 +2135,7 @@ func deploymentSelectionProcess(ws string, deployments []astrov1.Deployment, dep
 	}
 	if currentDeployment.Id == "" {
 		// get latest runtime version
-		airflowVersionClient := airflowversions.NewClient(httputil.NewHTTPClient(), false, false)
-		runtimeVersion, err := airflowversions.GetDefaultImageTag(airflowVersionClient, "", "", false)
+		runtimeVersion, err := latestRuntimeVersion()
 		if err != nil {
 			return astrov1.Deployment{}, err
 		}

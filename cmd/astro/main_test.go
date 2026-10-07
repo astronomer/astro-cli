@@ -4,6 +4,9 @@ import (
 	"flag"
 	"os"
 	"testing"
+
+	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/platform/astro/auth"
 )
 
 // TestMain pins os.Args to a single non-test argument for the whole package run.
@@ -28,6 +31,17 @@ func TestMain(m *testing.M) {
 	// in a real one: without this, they would pass or fail with the developer's
 	// working tree. A test of the refusal sets its own.
 	hasUncommittedChanges = func(string) bool { return false }
+	// A login reads its auth config from api.<domain>, which no unit test may
+	// reach. The identity provider it names is under .test, which never
+	// resolves, so a refresh against it fails without leaving the machine, as
+	// the cases that fall back to a browser login expect. A test of the fetch,
+	// or of what it answers, sets its own.
+	fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
+		if !context.IsCloudDomain(domain) {
+			return auth.FetchDomainAuthConfig(domain) // refuses it before any request
+		}
+		return auth.Config{ClientID: "client-id", Audience: "audience", DomainURL: "https://auth.astronomer.test/"}, nil
+	}
 	watching := emitWatch().Arm()
 	code := m.Run()
 	os.Args = origArgs

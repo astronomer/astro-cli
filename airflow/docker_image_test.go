@@ -284,37 +284,6 @@ func (s *Suite) TestDockerImagePytest() {
 	})
 }
 
-func (s *Suite) TestDockerCreatePipFreeze() {
-	handler := DockerImage{
-		imageName: "testing",
-	}
-
-	cwd, err := os.Getwd()
-	s.NoError(err)
-
-	pipFreeze := cwd + "/pip-freeze-test.txt"
-	defer afero.NewOsFs().Remove(pipFreeze)
-
-	s.Run("create pip freeze success", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return nil
-		}
-		err := handler.CreatePipFreeze("", pipFreeze)
-		s.NoError(err)
-	})
-	s.Run("create pip freeze error", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return errMock
-		}
-		err := handler.CreatePipFreeze("", pipFreeze)
-		s.Error(err)
-	})
-	s.Run("unable to read file error", func() {
-		err := handler.CreatePipFreeze("", "")
-		s.Error(err)
-	})
-}
-
 func (s *Suite) TestDockerPull() {
 	handler := DockerImage{
 		imageName: "testing",
@@ -675,33 +644,6 @@ func (s *Suite) TestDockerImageListLabel() {
 
 		_, err := handler.ListLabels()
 		s.ErrorIs(err, errGetImageLabel)
-	})
-}
-
-func (s *Suite) TestDoesImageExist() {
-	handler := DockerImage{
-		imageName: "testing",
-	}
-	testImage := "image"
-
-	s.Run("success", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains(args, "inspect")
-			return nil
-		}
-
-		err := handler.DoesImageExist(testImage)
-		s.NoError(err)
-	})
-
-	s.Run("cmdExec error", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains(args, "inspect")
-			return errMockDocker
-		}
-
-		err := handler.DoesImageExist(testImage)
-		s.ErrorIs(err, errMockDocker)
 	})
 }
 

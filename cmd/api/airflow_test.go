@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -845,6 +846,10 @@ func TestRunAirflow_ConnectionRefused(t *testing.T) {
 
 func TestRunAirflow_ConnectionRefused_OperationID(t *testing.T) {
 	isolateSpecCache(t)
+	// The operation ID resolves against Airflow's spec, which is otherwise
+	// fetched from GitHub; a fresh cached copy answers instead.
+	seedAirflowSpecCache(t, "3.0.3", `{"openapi":"3.0.0","info":{"title":"Airflow","version":"2"},`+
+		`"paths":{"/api/v2/dags":{"get":{"operationId":"get_dags","responses":{"200":{"description":"OK"}}}}}}`)
 	// Verify friendly error also works when using an operation ID
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	closedURL := ts.URL
@@ -965,4 +970,15 @@ func TestAirflowCmdHasSpec(t *testing.T) {
 	found, _, err := cmd.Find([]string{"spec"})
 	require.NoError(t, err)
 	assert.Equal(t, "spec", found.Name())
+}
+
+// seedAirflowSpecCache writes spec as a freshly fetched copy of the given
+// Airflow version's OpenAPI spec, in the cache isolateSpecCache made, so an
+// operation ID resolves without the spec being fetched from GitHub.
+func seedAirflowSpecCache(t *testing.T, version, spec string) {
+	t.Helper()
+	data, err := json.Marshal(openapi.CachedSpec{RawSpec: []byte(spec), FetchedAt: time.Now()})
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(config.HomeConfigPath, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(config.HomeConfigPath, openapi.AirflowCacheFileNameForVersion(version)), data, 0o600))
 }

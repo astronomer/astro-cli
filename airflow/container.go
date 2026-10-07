@@ -16,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -41,7 +40,6 @@ type ContainerHandler interface {
 	ComposeExport(settingsFile, composeFile string) error
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string, buildSecrets []string) (string, error)
 	Parse(customImageName, deployImageName string, buildSecrets []string) error
-	UpgradeTest(runtimeVersion, deploymentID, customImageName string, buildSecrets []string, versionTest, dagTest, lintTest, includeLintDeprecations, lintFix bool, lintConfigFile string, astroV1Client astrov1.ClientWithResponsesInterface) error
 }
 
 // RegistryHandler defines methods require to handle all operations with registry
@@ -55,12 +53,10 @@ type ImageHandler interface {
 	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
 	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
-	DoesImageExist(image string) error
 	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
 	RunDAG(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
-	CreatePipFreeze(altImageName, pipFreezeFile string) error
 	GetImageRepoSHA(registry string) (string, error)
 	RunCommand(args []string, mountDirs map[string]string, stdout, stderr io.Writer) error
 }

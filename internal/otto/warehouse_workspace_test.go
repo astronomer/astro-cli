@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
@@ -23,7 +24,12 @@ import (
 // list per object type, connections under CONNECTION.
 func (s *ConfigSuite) linkWorkspace(dir string, fail bool, conns ...astrov1.EnvironmentObject) {
 	s.T().Helper()
+	// InitTestConfig resets HomeConfigPath to the real ~/.astro, as SetupTest
+	// notes. Left there, BinDir would no longer hold the Otto prepareLaunch
+	// installed, and the launch would download one (or run the developer's).
+	home := config.HomeConfigPath
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	config.HomeConfigPath = home
 	body := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'cmws'\ndomain = 'localhost'\n"
 	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(body), 0o600))
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)

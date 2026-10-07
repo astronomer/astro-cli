@@ -263,34 +263,6 @@ func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory
 	return strings.TrimSpace(outb.String()), err
 }
 
-func (d *DockerImage) CreatePipFreeze(altImageName, pipFreezeFile string) error {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
-	if err != nil {
-		return err
-	}
-	// Define the Docker command and arguments
-	imageName := d.imageName
-	if altImageName != "" {
-		imageName = altImageName
-	}
-	dockerArgs := []string{"run", "--rm", imageName, "pip", "freeze"}
-
-	// Create a file to store the command output
-	file, err := os.Create(pipFreezeFile)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Run the Docker command
-	err = cmdExec(containerRuntime, file, os.Stderr, dockerArgs...)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha bool) (string, error) {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
@@ -512,21 +484,6 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	label = stdout.String()
 	label = strings.Trim(label, "\n")
 	return label, nil
-}
-
-func (d *DockerImage) DoesImageExist(imageName string) error {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
-	if err != nil {
-		return err
-	}
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-
-	err = cmdExec(containerRuntime, stdout, stderr, "manifest", "inspect", imageName)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (d *DockerImage) ListLabels() (map[string]string, error) {
