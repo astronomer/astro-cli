@@ -220,11 +220,9 @@ func TestHashManifestIgnoresVolatileMetadata(t *testing.T) {
 	}
 }
 
-// TestHashManifestSkipsNonDBT verifies that a manifest.json lacking the dbt
-// shape (e.g. a web-app/PWA manifest), invalid JSON, or another dbt artifact
-// entirely (run_results.json, catalog.json - both carry the same
-// metadata.dbt_schema_version field dbt manifests do) is not treated as a dbt
-// manifest, so it won't be stamped.
+// TestHashManifestSkipsNonDBT: a non-dbt manifest.json, invalid JSON, or
+// another dbt artifact (same metadata.dbt_schema_version field) isn't
+// treated as a dbt manifest.
 func TestHashManifestSkipsNonDBT(t *testing.T) {
 	dir := t.TempDir()
 	cases := map[string]string{

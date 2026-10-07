@@ -45,7 +45,7 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 		} `json:"generated_by"`
 	}
 	require.NoError(t, json.Unmarshal(data, &meta))
-	require.Equal(t, 1, meta.Schema, "schema is the plugin's compatibility gate and must stay 1")
+	require.Equal(t, 2, meta.Schema, "schema is the plugin's compatibility gate - bump deliberately, not by accident")
 	require.NotEmpty(t, meta.Version.Hash, "version.hash is what the plugin consumes")
 	require.NotEmpty(t, meta.Version.Algo)
 	require.Equal(t, "astro", meta.GeneratedBy.Application)
