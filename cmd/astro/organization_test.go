@@ -17,6 +17,7 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -189,18 +190,18 @@ func TestOrganizationSwitch(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 
 		origOrgSwitch := orgSwitch
-		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return nil
+		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) (*organization.Switched, error) {
+			return &organization.Switched{Changed: true}, nil
 		}
 		defer func() { orgSwitch = origOrgSwitch }()
 
 		called := false
 		gotID := ""
 		origWsSwitch := wsSwitch
-		wsSwitch = func(id string, client astrov1.APIClient, out io.Writer) error {
+		wsSwitch = func(id string, client astrov1.APIClient, out io.Writer) (*workspace.WorkspaceInfo, error) {
 			called = true
 			gotID = id
-			return nil
+			return &workspace.WorkspaceInfo{ID: id, IsCurrent: true}, nil
 		}
 		defer func() { wsSwitch = origWsSwitch }()
 
@@ -217,16 +218,16 @@ func TestOrganizationSwitch(t *testing.T) {
 		expectedErr := fmt.Errorf("org switch failed")
 
 		origOrgSwitch := orgSwitch
-		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
-			return expectedErr
+		orgSwitch = func(orgName string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) (*organization.Switched, error) {
+			return nil, expectedErr
 		}
 		defer func() { orgSwitch = origOrgSwitch }()
 
 		calledWs := false
 		origWsSwitch := wsSwitch
-		wsSwitch = func(id string, client astrov1.APIClient, out io.Writer) error {
+		wsSwitch = func(id string, client astrov1.APIClient, out io.Writer) (*workspace.WorkspaceInfo, error) {
 			calledWs = true
-			return nil
+			return &workspace.WorkspaceInfo{}, nil
 		}
 		defer func() { wsSwitch = origWsSwitch }()
 

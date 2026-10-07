@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -23,7 +24,7 @@ var (
 	errInvalidOrganizationRoleKey      = errors.New("invalid organization role selection")
 	orgSwitch                          = organization.Switch
 	orgExportAuditLogs                 = organization.ExportAuditLogs
-	wsSwitch                           = workspace.Switch
+	wsSwitch                           = workspace.SwitchTo
 	orgName                            string
 	auditLogsOutputFilePath            string
 	auditLogsEarliestParam             int
@@ -102,11 +103,13 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
   $ astro organization switch
   $ astro organization switch my-organization
   $ astro organization switch --login-link --workspace ws123456
+  $ astro organization switch my-organization --workspace ws123456 -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return organizationSwitch(cmd, out, args)
 		},
 	}
+	cliout.AddOutputFlag(cmd, &organizationSwitchOutput)
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for organization switch")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
@@ -232,6 +235,10 @@ func organizationList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
+	format, err := cliout.ParseFormat(organizationSwitchOutput)
+	if err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -241,14 +248,41 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	if err := orgSwitch(organizationNameOrID, astroV1Client, out, shouldDisplayLoginLink); err != nil {
+	asks := questionsTo(cmd, format, out)
+	switched, err := orgSwitch(organizationNameOrID, astroV1Client, asks, shouldDisplayLoginLink)
+	if err != nil {
 		return err
 	}
+	res := &organization.SwitchResult{Organization: switched.Organization}
+	r := cliout.Renderer{Format: format, Out: out}
 
 	if workspaceID != "" {
-		return wsSwitch(workspaceID, astroV1Client, out)
+		ws, err := wsSwitch(workspaceID, astroV1Client, asks)
+		if err != nil {
+			// The Organization did switch, and text has always said so
+			// before the error. Under json the error object is all of it.
+			if format == cliout.FormatText {
+				if werr := cliout.WriteText(out, func(b *bufio.Writer) { fmt.Fprintln(b, switchedLine(switched.Changed)) }); werr != nil {
+					return werr
+				}
+			}
+			return err
+		}
+		res.Workspace = ws
+		return emitOrganizationSwitch(r, res, switched.Changed, true)
 	}
-	return nil
+	// Which Workspace the switch left current is read back only for json:
+	// text does not show it, and finding it costs a list. The switch is
+	// already written by then, so a failed read does not fail the run: the
+	// result says no Workspace is known to be current, and stderr says why.
+	if format == cliout.FormatJSON {
+		ws, err := workspace.Current(astroV1Client)
+		if err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "The Organization was switched, but the current Workspace could not be read: %s\n", err)
+		}
+		res.Workspace = ws
+	}
+	return emitOrganizationSwitch(r, res, switched.Changed, false)
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command) error {
@@ -817,6 +851,7 @@ func newOrganizationRoleRootCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newOrganizationRoleListCmd(out),
 	)
+	cliout.AddOutputFlag(cmd, &organizationRoleOutput)
 	return cmd
 }
 
@@ -829,6 +864,7 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 		Example: `
   $ astro organization role list
   $ astro organization role list --include-default-roles
+  $ astro organization role list -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listRoles(cmd, out)
@@ -840,8 +876,16 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 }
 
 func listRoles(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(organizationRoleOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return roleClient.ListOrgRoles(out, astroV1Client, shouldIncludeDefaultRoles)
+	roles, err := roleClient.ListData(astroV1Client, shouldIncludeDefaultRoles)
+	if err != nil {
+		return err
+	}
+	return emitRoles(cliout.Renderer{Format: format, Out: out}, roles)
 }
 
 func newOrganizationClusterRootCmd(out io.Writer) *cobra.Command {

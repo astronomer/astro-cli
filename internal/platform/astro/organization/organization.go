@@ -27,12 +27,11 @@ const (
 )
 
 var (
-	errInvalidOrganizationKey   = errors.New("invalid organization selection")
-	errInvalidOrganizationName  = errors.New("invalid organization name")
-	Login                       = auth.Login
-	CheckUserSession            = auth.CheckUserSession
-	FetchDomainAuthConfig       = auth.FetchDomainAuthConfig
-	switchedOrganizationMessage = "\nSuccessfully switched organization"
+	errInvalidOrganizationKey  = errors.New("invalid organization selection")
+	errInvalidOrganizationName = errors.New("invalid organization name")
+	Login                      = auth.Login
+	CheckUserSession           = auth.CheckUserSession
+	FetchDomainAuthConfig      = auth.FetchDomainAuthConfig
 )
 
 var organizationTableConfig = output.BuildTableConfig(
@@ -124,6 +123,17 @@ func ListWithFormat(astroV1Client astrov1.APIClient, r output.Emitter) error {
 }
 
 func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*astrov1.Organization, error) {
+	// Refused before anything is listed: a run that cannot ask has no use
+	// for the list.
+	list := picker.List{
+		Header:  []string{"NAME", "ID"},
+		Ask:     []input.Option{input.About("an organization"), input.AnsweredBy(NameOrIDAnswer)},
+		Invalid: errInvalidOrganizationKey,
+	}
+	if err := input.MayAsk("\n> ", list.Ask...); err != nil {
+		return nil, err
+	}
+
 	var c config.Context
 	c, err := config.GetCurrentContext()
 	if err != nil {
@@ -135,11 +145,6 @@ func getOrganizationSelection(out io.Writer, astroV1Client astrov1.APIClient) (*
 		return nil, err
 	}
 
-	list := picker.List{
-		Header:  []string{"NAME", "ID"},
-		Ask:     []input.Option{input.About("an organization")},
-		Invalid: errInvalidOrganizationKey,
-	}
 	for i := range or {
 		list.AddRow(c.Organization == or[i].Id, or[i].Name, or[i].Id)
 	}
@@ -173,20 +178,21 @@ func SwitchWithContext(domain string, targetOrg *astrov1.Organization, astroV1Cl
 	}
 	c, _ = context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
 	// call check user session which will trigger workspace switcher flow
-	err := CheckUserSession(&c, astroV1Client, out)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(out, switchedOrganizationMessage)
-	return nil
+	return CheckUserSession(&c, astroV1Client, out)
 }
 
-// Switch switches organizations
-func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+// NameOrIDAnswer is what answers the question a switch naming no
+// Organization asks.
+const NameOrIDAnswer = "the organization name or ID as an argument"
+
+// Switch makes the Organization named, by name or id, current, or, with no
+// name, the one picked from a menu drawn on out. The login check that follows
+// a switch picks the Organization's Workspace, and may ask for one on out too.
+func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) (*Switched, error) {
 	// get current context
 	c, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// get target org
@@ -195,30 +201,34 @@ func Switch(orgNameOrID string, astroV1Client astrov1.APIClient, out io.Writer, 
 	case orgNameOrID == "":
 		targetOrg, err = getOrganizationSelection(out, astroV1Client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	case util.IsCUID(orgNameOrID):
 		// Input looks like a CUID — fetch directly by ID
 		targetOrg, err = GetOrganization(orgNameOrID, astroV1Client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	default:
 		// Input is a name — paginate through all orgs to find it
 		targetOrg, err = findOrganizationByName(orgNameOrID, astroV1Client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if targetOrg == nil {
-		return errInvalidOrganizationName
+		return nil, errInvalidOrganizationName
 	}
 
+	now := &Switched{Organization: OrganizationInfo{Name: targetOrg.Name, ID: targetOrg.Id, IsCurrent: true}}
 	if targetOrg.Id == c.Organization {
-		fmt.Fprintln(out, "You selected the same organization as the current one. No switch was made")
-		return nil
+		return now, nil
 	}
-	return SwitchWithContext(c.Domain, targetOrg, astroV1Client, out)
+	if err := SwitchWithContext(c.Domain, targetOrg, astroV1Client, out); err != nil {
+		return nil, err
+	}
+	now.Changed = true
+	return now, nil
 }
 
 // Write the audit logs to the provided io.Writer.

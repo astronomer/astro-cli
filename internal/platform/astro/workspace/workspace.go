@@ -90,26 +90,36 @@ func ListWithFormat(client astrov1.APIClient, r output.Emitter) error {
 }
 
 var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (string, error) {
+	w, err := pickWorkspace(client, out)
+	if err != nil {
+		return "", err
+	}
+	return w.Id, nil
+}
+
+// pickWorkspace asks which of the Organization's Workspaces is meant, drawing
+// the menu on out. opts say more about the question, for a refusal to name.
+func pickWorkspace(client astrov1.APIClient, out io.Writer, opts ...input.Option) (*astrov1.Workspace, error) {
 	// Refused before anything is listed or drawn: a run that cannot ask
 	// prints nothing it would then have to explain.
 	list := picker.List{
 		Header:  []string{"NAME", "ID"},
-		Ask:     []input.Option{input.About("a workspace")},
+		Ask:     append([]input.Option{input.About("a workspace")}, opts...),
 		Invalid: errInvalidWorkspaceKey,
 	}
 	if err := input.MayAsk("\n> ", list.Ask...); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	var c config.Context
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	ws, err := GetWorkspaces(client)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	for i := range ws {
@@ -117,62 +127,103 @@ var GetWorkspaceSelection = func(client astrov1.APIClient, out io.Writer) (strin
 	}
 	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return ws[i].Id, nil
+	return &ws[i], nil
 }
 
-func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) error {
-	var wsID string
-	if workspaceNameOrID == "" {
-		id, err := GetWorkspaceSelection(client, out)
-		if err != nil {
-			return err
-		}
+// NameOrIDAnswer is what answers the question a switch naming no Workspace
+// asks.
+const NameOrIDAnswer = "the workspace name or ID as an argument"
 
-		wsID = id
+// Switch makes the Workspace named current, and prints the context table on
+// out, which is what logging in shows after it picks a Workspace.
+func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) error {
+	if _, err := SwitchTo(workspaceNameOrID, client, out); err != nil {
+		return err
+	}
+	return config.PrintCurrentCloudContext(out)
+}
+
+// SwitchTo makes the Workspace named, by name or id, current, and returns it.
+// With no name it asks which, drawing the menu on out.
+func SwitchTo(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) (*WorkspaceInfo, error) {
+	var picked *astrov1.Workspace
+	if workspaceNameOrID == "" {
+		w, err := pickWorkspace(client, out, input.AnsweredBy(NameOrIDAnswer))
+		if err != nil {
+			return nil, err
+		}
+		picked = w
 	} else {
 		ws, err := GetWorkspaces(client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for i := range ws {
 			if ws[i].Name == workspaceNameOrID || ws[i].Id == workspaceNameOrID {
-				wsID = ws[i].Id
+				picked = &ws[i]
 			}
 		}
 
-		if wsID == "" {
-			return errors.New("workspace id/name could not be found")
+		if picked == nil {
+			return nil, errors.New("workspace id/name could not be found")
 		}
 	}
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = c.SetContextKey("workspace", wsID)
+	err = c.SetContextKey("workspace", picked.Id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = c.SetContextKey("last_used_workspace", wsID)
+	err = c.SetContextKey("last_used_workspace", picked.Id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = c.SetOrganizationContext(c.Organization, c.OrganizationProduct)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = config.PrintCurrentCloudContext(out)
+	return &WorkspaceInfo{Name: picked.Name, ID: picked.Id, IsCurrent: true}, nil
+}
+
+// Current returns the current Workspace, as `workspace list` shows it, or nil
+// when the context names none of the current Organization's Workspaces: none
+// at all, or one an Organization switch left behind.
+func Current(client astrov1.APIClient) (*WorkspaceInfo, error) {
+	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
+	if c.Workspace == "" {
+		return nil, nil
+	}
+	ws, err := GetWorkspaces(client)
+	if err != nil {
+		return nil, err
+	}
+	for i := range ws {
+		if ws[i].Id == c.Workspace {
+			return &WorkspaceInfo{Name: ws[i].Name, ID: ws[i].Id, IsCurrent: true}, nil
+		}
+	}
+	return nil, nil
+}
 
-	return nil
+// info is w as `workspace list` shows it.
+func info(w *astrov1.Workspace) (WorkspaceInfo, error) {
+	c, err := config.GetCurrentContext()
+	if err != nil {
+		return WorkspaceInfo{}, err
+	}
+	return WorkspaceInfo{Name: w.Name, ID: w.Id, IsCurrent: c.Workspace == w.Id}, nil
 }
 
 func validateEnforceCD(enforceCD string) (bool, error) {
@@ -188,17 +239,19 @@ func validateEnforceCD(enforceCD string) (bool, error) {
 	return enforce, nil
 }
 
-func Create(name, description, enforceCD string, out io.Writer, client astrov1.APIClient) error {
+// Create creates a Workspace in the current Organization, and returns it as
+// `workspace list` shows it.
+func Create(name, description, enforceCD string, client astrov1.APIClient) (*WorkspaceInfo, error) {
 	if name == "" {
-		return ErrInvalidName
+		return nil, ErrInvalidName
 	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	enforce, err := validateEnforceCD(enforceCD)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	workspaceCreateRequest := astrov1.CreateWorkspaceJSONRequestBody{
 		CicdEnforcedDefault: &enforce,
@@ -207,43 +260,32 @@ func Create(name, description, enforceCD string, out io.Writer, client astrov1.A
 	}
 	resp, err := client.CreateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceCreateRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Fprintf(out, "Astro Workspace %s was successfully created\n", name)
-	return nil
+	if resp.JSON200 == nil {
+		return nil, fmt.Errorf("something went wrong: the API did not return the Workspace %s it created", name)
+	}
+	created, err := info(resp.JSON200)
+	if err != nil {
+		return nil, err
+	}
+	return &created, nil
 }
 
-func Update(id, name, description, enforceCD string, out io.Writer, client astrov1.APIClient) error {
+// Update updates the Workspace id names, or, with no id, the one picked from
+// a menu drawn on out, and returns what it did.
+func Update(id, name, description, enforceCD string, out io.Writer, client astrov1.APIClient) (*Updated, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	workspaces, err := GetWorkspaces(client)
+	workspace, err := findWorkspace(id, "the workspace to update", out, client)
 	if err != nil {
-		return err
-	}
-	var workspace astrov1.Workspace
-	if id == "" {
-		workspace, err = selectWorkspace(workspaces)
-		if workspace.Id == "" {
-			return ErrNoWorkspaceExists
-		}
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range workspaces {
-			if workspaces[i].Id == id {
-				workspace = workspaces[i]
-			}
-		}
-		if workspace.Id == "" {
-			return ErrWorkspaceNotFound
-		}
+		return nil, err
 	}
 	workspaceID := workspace.Id
 
@@ -267,86 +309,105 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	} else {
 		enforce, err := validateEnforceCD(enforceCD)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		workspaceUpdateRequest.CicdEnforcedDefault = enforce
 	}
 	resp, err := client.UpdateWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID, workspaceUpdateRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Fprintf(out, "Astro Workspace %s was successfully updated\n", workspace.Name)
-	return nil
+	if resp.JSON200 == nil {
+		return nil, fmt.Errorf("something went wrong: the API did not return the Workspace %s it updated", workspace.Name)
+	}
+	updated, err := info(resp.JSON200)
+	if err != nil {
+		return nil, err
+	}
+	return &Updated{Workspace: updated, PreviousName: workspace.Name}, nil
 }
 
-func Delete(id string, out io.Writer, client astrov1.APIClient) error {
+// Delete deletes the Workspace id names, or, with no id, the one picked from
+// a menu drawn on out, and returns what it deleted.
+func Delete(id string, out io.Writer, client astrov1.APIClient) (*Removal, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	workspaces, err := GetWorkspaces(client)
+	workspace, err := findWorkspace(id, "the workspace to delete", out, client)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	var workspace astrov1.Workspace
-	if id == "" {
-		workspace, err = selectWorkspace(workspaces)
-		if workspace.Id == "" {
-			return ErrNoWorkspaceExists
-		}
-		if err != nil {
-			return err
-		}
-	} else {
-		for i := range workspaces {
-			if workspaces[i].Id == id {
-				workspace = workspaces[i]
-			}
-		}
-		if workspace.Id == "" {
-			return ErrWorkspaceNotFound
-		}
-	}
-	workspaceID := workspace.Id
-	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspaceID)
+	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspace.Id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Fprintf(out, "Astro Workspace %s was successfully deleted\n", workspace.Name)
-	return nil
+	return &Removal{WorkspaceID: workspace.Id, Name: workspace.Name, Action: ActionDeleted}, nil
 }
 
-func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) {
+// IDAnswer is what answers the question an update or a delete naming no
+// Workspace asks.
+const IDAnswer = "the workspace ID as an argument"
+
+// findWorkspace returns the Workspace id names, or, with no id, the one picked
+// from a menu drawn on out; about says what the menu asks for.
+func findWorkspace(id, about string, out io.Writer, client astrov1.APIClient) (astrov1.Workspace, error) {
+	workspaces, err := GetWorkspaces(client)
+	if err != nil {
+		return astrov1.Workspace{}, err
+	}
+	if id == "" {
+		// The question's refusal first: with more than one Workspace and no
+		// way to ask, that is the answer, not that there are none.
+		workspace, err := selectWorkspace(workspaces, about, out)
+		if err != nil {
+			return astrov1.Workspace{}, err
+		}
+		if workspace.Id == "" {
+			return astrov1.Workspace{}, ErrNoWorkspaceExists
+		}
+		return workspace, nil
+	}
+	for i := range workspaces {
+		if workspaces[i].Id == id {
+			return workspaces[i], nil
+		}
+	}
+	return astrov1.Workspace{}, ErrWorkspaceNotFound
+}
+
+func selectWorkspace(workspaces []astrov1.Workspace, about string, out io.Writer) (astrov1.Workspace, error) {
 	if len(workspaces) == 0 {
 		return astrov1.Workspace{}, nil
 	}
 
 	if len(workspaces) == 1 {
-		fmt.Println("Only one Workspace was found. Using the following Workspace by default: \n" +
-			fmt.Sprintf("\n Workspace Name: %s", ansi.Bold(workspaces[0].Name)) +
+		fmt.Fprintln(out, "Only one Workspace was found. Using the following Workspace by default: \n"+
+			fmt.Sprintf("\n Workspace Name: %s", ansi.Bold(workspaces[0].Name))+
 			fmt.Sprintf("\n Workspace ID: %s\n", ansi.Bold(workspaces[0].Id)))
 
 		return workspaces[0], nil
 	}
 
+	// The title says "update" for a delete too, as it always has.
 	list := picker.List{
 		Title:   "\nPlease select the workspace you would like to update:",
 		Header:  []string{"WORKSPACENAME", "ID", "CICD ENFORCEMENT"},
-		Ask:     []input.Option{input.About("the workspace to update")},
+		Ask:     []input.Option{input.About(about), input.AnsweredBy(IDAnswer)},
 		Invalid: errInvalidWorkspaceKey,
 	}
 	for i := range workspaces {
 		list.AddRow(false, workspaces[i].Name, workspaces[i].Id, strconv.FormatBool(workspaces[i].CicdEnforcedDefault))
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(out, os.Stdin)
 	if err != nil {
 		return astrov1.Workspace{}, err
 	}

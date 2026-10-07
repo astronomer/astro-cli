@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	pkginput "github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -388,47 +389,44 @@ var (
 
 func (s *Suite) TestCreate() {
 	s.Run("happy path Create", func() {
-		expectedOutMessage := "Astro Workspace workspace-test was successfully created\n"
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseOK, nil).Once()
-		err := Create("workspace-test", "a test workspace", "ON", out, mockClient)
+		created, err := Create("workspace-test", "a test workspace", "ON", mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(&WorkspaceInfo{Name: "workspace-test"}, created)
+	})
+
+	s.Run("a create the API answers with no Workspace fails", func() {
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.CreateWorkspaceResponse{HTTPResponse: &http.Response{StatusCode: 200}}, nil).Once()
+		_, err := Create("workspace-test", "a test workspace", "ON", mockClient)
+		s.EqualError(err, "something went wrong: the API did not return the Workspace workspace-test it created")
 	})
 
 	s.Run("error path when CreateWorkspaceWithResponse return network error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := Create("workspace-test", "a test workspace", "ON", out, mockClient)
+		_, err := Create("workspace-test", "a test workspace", "ON", mockClient)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when CreateWorkspaceWithResponse returns an error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("CreateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&CreateWorkspaceResponseError, nil).Once()
-		err := Create("workspace-test", "a test workspace", "ON", out, mockClient)
+		_, err := Create("workspace-test", "a test workspace", "ON", mockClient)
 		s.EqualError(err, "failed to create workspace")
 	})
 	s.Run("error path when validateEnforceCD returns an error", func() {
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := Create("workspace-test", "a test workspace", "on", out, mockClient)
+		_, err := Create("workspace-test", "a test workspace", "on", mockClient)
 		s.ErrorIs(err, ErrWrongEnforceInput)
-		s.Equal(expectedOutMessage, out.String())
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := Create("workspace-test", "a test workspace", "on", out, mockClient)
+		_, err := Create("workspace-test", "a test workspace", "on", mockClient)
 		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
 	})
 }
 
@@ -453,14 +451,14 @@ var (
 
 func (s *Suite) TestDelete() {
 	s.Run("happy path Delete", func() {
-		expectedOutMessage := "Astro Workspace test-workspace was successfully deleted\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseOK, nil).Once()
-		err := Delete("workspace-id", out, mockClient)
+		removal, err := Delete("workspace-id", out, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(&Removal{WorkspaceID: "workspace-id", Name: "test-workspace", Action: "deleted"}, removal)
+		s.Empty(out.String())
 	})
 
 	s.Run("print message if no workpaces found", func() {
@@ -480,7 +478,7 @@ func (s *Suite) TestDelete() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listWorkspacesResponseOK, nil).Once()
-		err := Delete("", out, mockClient)
+		_, err := Delete("", out, mockClient)
 		s.ErrorIs(err, ErrNoWorkspaceExists)
 	})
 
@@ -489,7 +487,7 @@ func (s *Suite) TestDelete() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := Delete("workspace-id", out, mockClient)
+		_, err := Delete("workspace-id", out, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -498,7 +496,7 @@ func (s *Suite) TestDelete() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseError, nil).Once()
-		err := Delete("workspace-id", out, mockClient)
+		_, err := Delete("workspace-id", out, mockClient)
 		s.EqualError(err, "failed to delete workspace")
 	})
 
@@ -507,7 +505,7 @@ func (s *Suite) TestDelete() {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := Delete("workspace-id", out, mockClient)
+		_, err := Delete("workspace-id", out, mockClient)
 		s.Error(err)
 		s.Equal(expectedOutMessage, out.String())
 	})
@@ -530,12 +528,11 @@ func (s *Suite) TestDelete() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "Astro Workspace test-workspace was successfully deleted\n"
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseOK, nil).Once()
 
-		err = Delete("", out, mockClient)
+		removal, err := Delete("", out, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOut, out.String())
+		s.Equal("test-workspace", removal.Name)
 	})
 }
 
@@ -564,14 +561,23 @@ var (
 
 func (s *Suite) TestUpdate() {
 	s.Run("happy path Update", func() {
-		expectedOutMessage := "Astro Workspace test-workspace was successfully updated\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
+		res, err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		// The Workspace as the API answered the update, and the name it had.
+		s.Equal(&Updated{Workspace: WorkspaceInfo{Name: "workspace-test"}, PreviousName: "test-workspace"}, res)
+		s.Empty(out.String())
+	})
+
+	s.Run("an update the API answers with no Workspace fails", func() {
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.UpdateWorkspaceResponse{HTTPResponse: &http.Response{StatusCode: 200}}, nil).Once()
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		_, err := Update("workspace-id", "", "", "", new(bytes.Buffer), mockClient)
+		s.EqualError(err, "something went wrong: the API did not return the Workspace test-workspace it updated")
 	})
 
 	s.Run("print message if no workpaces found", func() {
@@ -592,7 +598,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listWorkspacesResponseOK, nil).Once()
-		err := Update("", "update-workspace-test", "updated workspace", "ON", out, mockClient)
+		_, err := Update("", "update-workspace-test", "updated workspace", "ON", out, mockClient)
 		s.ErrorIs(err, ErrNoWorkspaceExists)
 	})
 
@@ -619,14 +625,24 @@ func (s *Suite) TestUpdate() {
 				Workspaces: workspaces,
 			},
 		}
-		expectedOutMessage := "Astro Workspace test-workspace was successfully updated\n"
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
+		res, err := Update("workspace-id", "update-workspace-test", "updated workspace", "ON", out, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal("test-workspace", res.PreviousName)
+	})
+
+	s.Run("a picker that cannot ask says so, naming what answers it", func() {
+		defer pkginput.SetGuard(func() string { return "with --output json it cannot" })()
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		out := new(bytes.Buffer)
+		_, err := Update("", "", "", "", out, mockClient)
+		s.True(pkginput.IsRequired(err), "refused, not %v", err)
+		s.ErrorContains(err, "pass the workspace ID as an argument")
+		s.Empty(out.String())
 	})
 
 	s.Run("error path when UpdateWorkspaceWithResponse return network error", func() {
@@ -634,7 +650,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		err := Update("workspace-id", "", "", "", out, mockClient)
+		_, err := Update("workspace-id", "", "", "", out, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -643,7 +659,7 @@ func (s *Suite) TestUpdate() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseError, nil).Once()
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		err := Update("workspace-id", "", "", "", out, mockClient)
+		_, err := Update("workspace-id", "", "", "", out, mockClient)
 		s.EqualError(err, "failed to update workspace")
 	})
 
@@ -652,7 +668,7 @@ func (s *Suite) TestUpdate() {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := Update("workspace-id", "", "", "", out, mockClient)
+		_, err := Update("workspace-id", "", "", "", out, mockClient)
 		s.Error(err)
 		s.Equal(expectedOutMessage, out.String())
 	})
@@ -675,11 +691,10 @@ func (s *Suite) TestUpdate() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "Astro Workspace test-workspace was successfully updated\n"
 		mockClient.On("UpdateWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateWorkspaceResponseOK, nil).Once()
 
-		err = Update("", "", "", "", out, mockClient)
+		res, err := Update("", "", "", "", out, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOut, out.String())
+		s.Equal("test-workspace", res.PreviousName)
 	})
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/workerqueue"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
+	roleClient "github.com/astronomer/astro-cli/internal/platform/astro/role"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
@@ -133,6 +134,17 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "deployment-worker-queue", Value: workerqueue.Result{}},
 	// astro deployment logs -o json: one of these per line, a stream.
 	{Name: "deployment-log-entry", Value: deployment.LogEntry{}},
+
+	// astro workspace create, update and switch: the one Workspace, as
+	// `workspace list` shows it. delete: what it deleted.
+	{Name: "workspace", Value: workspace.WorkspaceInfo{}},
+	{Name: "workspace-removal", Value: workspace.Removal{}},
+	// astro organization switch: the Organization and the Workspace the run
+	// left current, each as its list shows one; the Workspace is null when
+	// none of the Organization's is current.
+	{Name: "organization-switch", Value: organization.SwitchResult{}},
+	// astro organization role list.
+	{Name: "organization-role-list", Value: roleClient.RoleList{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -165,15 +177,17 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Thirty-six shapes reach Emit in this package's tests today:
+// would be silent. Forty shapes reach Emit in this package's tests today:
 // the deployment variable and token results, the deployment, workspace and
 // organization user and team results, the workspace and organization token
 // results, the pkg/output lists and the `astro env` payloads their tests
 // reach, the manifest deploy's result, deployment inspect's deployment
 // (which create and update publish too), delete's removal, hibernate's
-// override, the worker-queue result, the log entry, and the error object. Raise it as conversions land; lower it only
-// saying why.
-const minWatchedPayloads = 36
+// override, the worker-queue result, the log entry, the Workspace a create,
+// update or switch publishes and what a Workspace delete did, what an
+// Organization switch left current, the role list, and the error object.
+// Raise it as conversions land; lower it only saying why.
+const minWatchedPayloads = 40
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

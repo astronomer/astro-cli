@@ -73,17 +73,15 @@ var lacksOutputFlag = map[string][]string{
 		"astro ide project export",
 		"astro ide project import",
 		"astro ide project list",
+		// Its -o is --output-file, the path the export is written to, so
+		// `-o json` writes the logs to a file named json. Giving it --output
+		// means moving that shorthand first, which breaks every script
+		// passing -o today: a decision of its own, not part of a conversion.
 		"astro organization audit-logs export",
-		"astro organization role list",
-		"astro organization switch",
 		"astro remote deploy",
 		"astro telemetry",
 		"astro telemetry disable",
 		"astro telemetry enable",
-		"astro workspace create",
-		"astro workspace delete",
-		"astro workspace switch",
-		"astro workspace update",
 	},
 	apcPlatform: {
 		"astro auth token",

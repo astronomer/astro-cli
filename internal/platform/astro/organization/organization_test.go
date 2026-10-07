@@ -251,9 +251,10 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("org1", mockV1Client, buf, false)
+		sw, err := Switch("org1", mockV1Client, buf, false)
 		s.NoError(err)
-		s.Equal("\nSuccessfully switched organization\n", buf.String())
+		s.Equal(&Switched{Organization: OrganizationInfo{Name: "org1", ID: "org1", IsCurrent: true}, Changed: true}, sw)
+		s.Empty(buf.String(), "the command says it switched")
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -263,9 +264,10 @@ func (s *Suite) TestSwitch() {
 		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOKResponse, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("org1", mockV1Client, buf, false)
+		sw, err := Switch("org1", mockV1Client, buf, false)
 		s.NoError(err)
-		s.Equal("You selected the same organization as the current one. No switch was made\n", buf.String())
+		s.Equal(&Switched{Organization: OrganizationInfo{Name: "org1", ID: "org1", IsCurrent: true}}, sw, "no switch")
+		s.Empty(buf.String())
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -288,7 +290,7 @@ func (s *Suite) TestSwitch() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		buf := new(bytes.Buffer)
-		err = Switch("", mockV1Client, buf, false)
+		_, err = Switch("", mockV1Client, buf, false)
 		s.NoError(err)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
@@ -301,7 +303,7 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("name-wrong", mockV1Client, buf, false)
+		_, err := Switch("name-wrong", mockV1Client, buf, false)
 		s.ErrorIs(err, errInvalidOrganizationName)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
@@ -325,7 +327,7 @@ func (s *Suite) TestSwitch() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 		buf := new(bytes.Buffer)
-		err = Switch("", mockV1Client, buf, false)
+		_, err = Switch("", mockV1Client, buf, false)
 		s.ErrorIs(err, errInvalidOrganizationKey)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
@@ -351,9 +353,9 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("org1", mockV1Client, buf, false)
+		sw, err := Switch("org1", mockV1Client, buf, false)
 		s.NoError(err)
-		s.Equal("\nSuccessfully switched organization\n", buf.String())
+		s.True(sw.Changed)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -370,9 +372,9 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch(testCUID, mockV1Client, buf, false)
+		sw, err := Switch(testCUID, mockV1Client, buf, false)
 		s.NoError(err)
-		s.Equal("\nSuccessfully switched organization\n", buf.String())
+		s.Equal(OrganizationInfo{Name: "org3", ID: testCUID, IsCurrent: true}, sw.Organization)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -386,7 +388,7 @@ func (s *Suite) TestSwitch() {
 			Body:         errorBody,
 		}, nil).Once()
 		buf := new(bytes.Buffer)
-		err := Switch(testCUID, mockV1Client, buf, false)
+		_, err := Switch(testCUID, mockV1Client, buf, false)
 		s.Error(err)
 		s.Contains(err.Error(), "organization not found")
 		mockV1Client.AssertExpectations(s.T())
@@ -424,9 +426,9 @@ func (s *Suite) TestSwitch() {
 			return nil
 		}
 		buf := new(bytes.Buffer)
-		err := Switch("target-org", mockV1Client, buf, false)
+		sw, err := Switch("target-org", mockV1Client, buf, false)
 		s.NoError(err)
-		s.Equal("\nSuccessfully switched organization\n", buf.String())
+		s.Equal("org-target", sw.Organization.ID)
 		mockV1Client.AssertExpectations(s.T())
 		mockV1Client.AssertExpectations(s.T())
 	})

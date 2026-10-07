@@ -1,5 +1,23 @@
 package organization
 
+import "github.com/astronomer/astro-cli/internal/platform/astro/workspace"
+
+// Switched is what Switch did: the Organization now current, and whether it
+// is another one than before.
+type Switched struct {
+	Organization OrganizationInfo
+	Changed      bool
+}
+
+// SwitchResult is what `astro organization switch` publishes: what the run
+// left current. The Organization as `organization list` shows one, and the
+// Workspace as `workspace list` (and `workspace switch`) shows one, or null
+// when no Workspace of the Organization is current.
+type SwitchResult struct {
+	Organization OrganizationInfo         `json:"organization"`
+	Workspace    *workspace.WorkspaceInfo `json:"workspace"`
+}
+
 // OrganizationInfo represents simplified organization information for output formatting
 type OrganizationInfo struct {
 	Name      string `json:"name"`

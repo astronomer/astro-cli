@@ -2,14 +2,29 @@ package role
 
 import (
 	httpContext "context"
-	"io"
 
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var rolePaginationLimit = 100
+
+// RoleInfo is one role `astro organization role list` publishes. A default
+// role is built in, and has no id.
+type RoleInfo struct {
+	Name        string `json:"name"`
+	ID          string `json:"id,omitempty"`
+	Description string `json:"description,omitempty"`
+	ScopeType   string `json:"scope_type"`
+	IsDefault   bool   `json:"is_default"`
+}
+
+// RoleList is what `astro organization role list` publishes: the default
+// roles first, when they were asked for, then the Organization's own, in the
+// order the table lists them.
+type RoleList struct {
+	Roles []RoleInfo `json:"roles"`
+}
 
 // Returns a list of all of an organizations roles
 func GetOrgRoles(client astrov1.APIClient, shouldIncludeDefaultRoles bool) ([]astrov1.Role, []astrov1.DefaultRole, error) {
@@ -41,7 +56,7 @@ func GetOrgRoles(client astrov1.APIClient, shouldIncludeDefaultRoles bool) ([]as
 		if err != nil {
 			return nil, nil, err
 		}
-		if len(defaultRoles) == 0 && shouldIncludeDefaultRoles {
+		if len(defaultRoles) == 0 && shouldIncludeDefaultRoles && resp.JSON200.DefaultRoles != nil {
 			defaultRoles = *resp.JSON200.DefaultRoles
 		}
 
@@ -57,37 +72,36 @@ func GetOrgRoles(client astrov1.APIClient, shouldIncludeDefaultRoles bool) ([]as
 	return roles, defaultRoles, nil
 }
 
-// Prints a list of all of an organizations roles
-func ListOrgRoles(out io.Writer, client astrov1.APIClient, shouldIncludeDefaultRoles bool) error {
-	table := printutil.Table{
-		Padding:        []int{30, 50, 10, 50, 10, 10, 10},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "ID", "DESCRIPTION"},
-	}
+// ListData returns the Organization's roles, with the default ones first
+// when shouldIncludeDefaultRoles.
+func ListData(client astrov1.APIClient, shouldIncludeDefaultRoles bool) (*RoleList, error) {
 	roles, defaultRoles, err := GetOrgRoles(client, shouldIncludeDefaultRoles)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	list := &RoleList{Roles: make([]RoleInfo, 0, len(defaultRoles)+len(roles))}
 	for i := range defaultRoles {
-		table.AddRow([]string{
-			defaultRoles[i].Name,
-			"",
-			*defaultRoles[i].Description,
-		}, false)
+		list.Roles = append(list.Roles, RoleInfo{
+			Name:        defaultRoles[i].Name,
+			Description: deref(defaultRoles[i].Description),
+			ScopeType:   string(defaultRoles[i].ScopeType),
+			IsDefault:   true,
+		})
 	}
-
 	for i := range roles {
-		var description string
-		if roles[i].Description != nil {
-			description = *roles[i].Description
-		}
-		table.AddRow([]string{
-			roles[i].Name,
-			roles[i].Id,
-			description,
-		}, false)
+		list.Roles = append(list.Roles, RoleInfo{
+			Name:        roles[i].Name,
+			ID:          roles[i].Id,
+			Description: deref(roles[i].Description),
+			ScopeType:   string(roles[i].ScopeType),
+		})
 	}
+	return list, nil
+}
 
-	table.Print(out) //nolint:errcheck // best-effort render to the terminal
-	return nil
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

@@ -95,11 +95,13 @@ func newWorkspaceSwitchCmd(out io.Writer) *cobra.Command {
 		Example: `
   $ astro workspace switch
   $ astro workspace switch my-workspace
+  $ astro workspace switch my-workspace -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceSwitch(cmd, out, args)
 		},
 	}
+	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
 	return cmd
 }
 
@@ -112,11 +114,13 @@ func newWorkspaceCreateCmd(out io.Writer) *cobra.Command {
 		Example: `
   $ astro workspace create --name "My Workspace" --description "Production pipelines"
   $ astro workspace create --name "My Workspace" --enforce-cicd ON
+  $ astro workspace create --name "My Workspace" -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceCreate(cmd, out)
 		},
 	}
+	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
 	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&enforceCD, "enforce-cicd", "e", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
@@ -133,11 +137,13 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		Example: `
   $ astro workspace update clxxxxxxxxx --name "New Name"
   $ astro workspace update clxxxxxxxxx --description "Updated description" --enforce-cicd ON
+  $ astro workspace update clxxxxxxxxx --name "New Name" -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUpdate(cmd, out, args)
 		},
 	}
+	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
 	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&enforceCD, "enforce-cicd", "e", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
@@ -154,11 +160,13 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Example: `
   $ astro workspace delete
   $ astro workspace delete clxxxxxxxxx
+  $ astro workspace delete clxxxxxxxxx -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceDelete(cmd, out, args)
 		},
 	}
+	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
 	return cmd
 }
 
@@ -664,40 +672,73 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
-	// Silence Usage as we have now validated command input
+	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
+	if err != nil {
+		return err
+	}
 
 	workspaceNameOrID := ""
 
 	if len(args) == 1 {
 		workspaceNameOrID = args[0]
 	}
+	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.Switch(workspaceNameOrID, astroV1Client, out)
+	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, questionsTo(cmd, format, out))
+	if err != nil {
+		return err
+	}
+	return emitWorkspaceSwitch(cliout.Renderer{Format: format, Out: out}, ws)
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
+	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return workspace.Create(workspaceName, workspaceDescription, enforceCD, out, astroV1Client)
+	ws, err := workspace.Create(workspaceName, workspaceDescription, enforceCD, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return emitWorkspace(cliout.Renderer{Format: format, Out: out}, ws, fmt.Sprintf("Astro Workspace %s was successfully created", ws.Name))
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
+	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
+	if err != nil {
+		return err
+	}
 	id := ""
 
 	if len(args) == 1 {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Update(id, workspaceName, workspaceDescription, enforceCD, out, astroV1Client)
+	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforceCD, questionsTo(cmd, format, out), astroV1Client)
+	if err != nil {
+		return err
+	}
+	// The line names the Workspace as it was called before the update.
+	return emitWorkspace(cliout.Renderer{Format: format, Out: out}, &res.Workspace, fmt.Sprintf("Astro Workspace %s was successfully updated", res.PreviousName))
 }
 
 func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
+	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
+	if err != nil {
+		return err
+	}
 	id := ""
 
 	if len(args) == 1 {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return workspace.Delete(id, out, astroV1Client)
+	removal, err := workspace.Delete(id, questionsTo(cmd, format, out), astroV1Client)
+	if err != nil {
+		return err
+	}
+	return emitWorkspaceRemoval(cliout.Renderer{Format: format, Out: out}, removal)
 }
 
 func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {

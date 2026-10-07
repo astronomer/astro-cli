@@ -1,7 +1,6 @@
 package role
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -76,50 +75,66 @@ var (
 	}
 )
 
-func (s *Suite) TestListOrgRole() {
-	s.Run("happy path TestListOrgRole", func() {
+func (s *Suite) TestListData() {
+	s.Run("the default roles first, then the Organization's own", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()
-		err := ListOrgRoles(out, mockClient, true)
+		list, err := ListData(mockClient, true)
 		s.NoError(err)
+		s.Equal([]RoleInfo{
+			{Name: "default role 1", Description: description, IsDefault: true},
+			{Name: "default role 2", Description: description, IsDefault: true},
+			{Name: "role 1", ID: "role1-id", Description: description},
+			{Name: "role 2", ID: "role2-id", Description: description},
+			{Name: "role 1", ID: "role1-id", Description: description},
+			{Name: "role 2", ID: "role2-id", Description: description},
+		}, list.Roles, "the mock answers every page alike, so the second page repeats the first")
 	})
 
-	s.Run("happy path TestListOrgRole - should include default roles false", func() {
+	s.Run("no default roles unless asked for", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseOK, nil).Twice()
-		err := ListOrgRoles(out, mockClient, false)
+		list, err := ListData(mockClient, false)
 		s.NoError(err)
+		for _, r := range list.Roles {
+			s.False(r.IsDefault, r.Name)
+		}
+	})
+
+	s.Run("a role with no description, and an answer with no default roles", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.ListRolesResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200:      &astrov1.RolesPaginated{Roles: []astrov1.Role{{Name: "bare", Id: "bare-id", ScopeType: astrov1.RoleScopeTypeWORKSPACE}}},
+		}, nil).Once()
+		list, err := ListData(mockClient, true)
+		s.NoError(err)
+		s.Equal([]RoleInfo{{Name: "bare", ID: "bare-id", ScopeType: "WORKSPACE"}}, list.Roles)
 	})
 
 	s.Run("error path when ListRolesWithResponse return network error", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := ListOrgRoles(out, mockClient, true)
+		_, err := ListData(mockClient, true)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when ListRolesWithResponse returns an error", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListRolesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListRolesResponseError, nil).Twice()
-		err := ListOrgRoles(out, mockClient, true)
+		_, err := ListData(mockClient, true)
 		s.EqualError(err, "failed to list roles")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := ListOrgRoles(out, mockClient, true)
+		_, err := ListData(mockClient, true)
 		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
 	})
 }

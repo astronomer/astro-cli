@@ -1,0 +1,11 @@
+{
+  "roles": [
+    {
+      "name": "x",
+      "id": "x",
+      "description": "x",
+      "scope_type": "x",
+      "is_default": true
+    }
+  ]
+}
