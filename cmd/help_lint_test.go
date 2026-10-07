@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
@@ -83,6 +85,13 @@ var helpRules = []helpRule{
 			"and any explanation as a `  # comment` line above the command it explains.",
 		check: checkExampleStyle,
 	},
+	{
+		name: "example-runs",
+		why: "Every astro command line in an example names a command that exists and flags that command accepts: " +
+			"an example is copied as it is, and one that fails teaches the wrong thing. Placeholders are fine as " +
+			"argument and flag values.",
+		check: checkExampleRuns,
+	},
 }
 
 func checkShort(cmd *cobra.Command) string {
@@ -136,6 +145,176 @@ func checkUse(cmd *cobra.Command) string {
 	}
 	return fmt.Sprintf("Use %q spells %s outside <ARG> / [ARG]", cmd.Use, strings.Join(bad, ", "))
 }
+
+// checkExampleRuns resolves each astro command line in cmd's examples against
+// the tree cmd belongs to, as cobra would on that platform, and parses its
+// flags there. Nothing runs. A line continued with a trailing backslash is
+// joined with the next first.
+func checkExampleRuns(cmd *cobra.Command) string {
+	if strings.TrimSpace(cmd.Example) == "" {
+		return ""
+	}
+	joined := strings.ReplaceAll(cmd.Example, "\\\n", " ")
+	for _, line := range strings.Split(joined, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
+		args, ok := astroArgs(line)
+		if !ok {
+			continue
+		}
+		if problem := resolveExample(cmd.Root(), args); problem != "" {
+			return fmt.Sprintf("%q: %s", line, problem)
+		}
+	}
+	return ""
+}
+
+// astroArgs returns the arguments an example line hands astro: the words
+// after `astro` in the pipeline stage that runs it, up to whatever ends that
+// command (a pipe, a redirect, a separator).
+func astroArgs(line string) ([]string, bool) {
+	words := shellWords(line)
+	start := -1
+	for i, w := range words {
+		if w == "astro" && (i == 0 || words[i-1] == "|") {
+			start = i + 1
+			break
+		}
+	}
+	if start < 0 {
+		return nil, false
+	}
+	var args []string
+	for _, w := range words[start:] {
+		if w == "|" || w == "&&" || w == "||" || w == ";" || strings.HasPrefix(w, ">") || strings.HasPrefix(w, "2>") || w == "<" {
+			break
+		}
+		args = append(args, w)
+	}
+	return args, true
+}
+
+// shellWords splits a line the way a POSIX shell would for the cases examples
+// use: whitespace, single and double quotes, a trailing # comment, and the
+// operators astroArgs stops at. It does not expand anything.
+func shellWords(line string) []string {
+	var words []string
+	var cur strings.Builder
+	inWord := false
+	var quote rune
+	flush := func() {
+		if inWord {
+			words = append(words, cur.String())
+			cur.Reset()
+			inWord = false
+		}
+	}
+	for _, r := range line {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == '#' && !inWord:
+			flush()
+			return words
+		case r == '\'' || r == '"':
+			quote = r
+			inWord = true
+		case r == ' ' || r == '\t':
+			flush()
+		case r == '|' || r == ';':
+			flush()
+			if n := len(words); r == '|' && n > 0 && words[n-1] == "|" {
+				words[n-1] = "||"
+			} else {
+				words = append(words, string(r))
+			}
+		default:
+			cur.WriteRune(r)
+			inWord = true
+		}
+	}
+	flush()
+	return words
+}
+
+// resolveExample finds the command args name under root and parses args'
+// flags with it, reporting what cobra would refuse.
+func resolveExample(root *cobra.Command, args []string) string {
+	target, rest, err := root.Find(args)
+	if err != nil {
+		return err.Error()
+	}
+	if target == root {
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+			return fmt.Sprintf("no command %q", args[0])
+		}
+		return ""
+	}
+	if target.HasAvailableSubCommands() && !target.Runnable() {
+		return fmt.Sprintf("%q is a group, not a command", target.CommandPath())
+	}
+	// Parse a copy of the flags, so linting one example leaves no values set
+	// on the tree for the next. Help is not run, so -h needs no special case.
+	flags := pflag.NewFlagSet(target.Name(), pflag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	target.Flags().VisitAll(func(f *pflag.Flag) { flags.AddFlag(copyFlag(f)) })
+	target.InheritedFlags().VisitAll(func(f *pflag.Flag) {
+		if flags.Lookup(f.Name) == nil {
+			flags.AddFlag(copyFlag(f))
+		}
+	})
+	if err := flags.Parse(rest); err != nil {
+		return err.Error()
+	}
+	// Find stops at the deepest command it can match, so a mistyped
+	// subcommand under a runnable group comes back as that group's argument.
+	// A group that declares an Args validator takes positionals of its own
+	// (`astro api airflow /dags`), and the validator below judges those.
+	if positional := flags.Args(); len(positional) > 0 && target.HasAvailableSubCommands() && target.Args == nil {
+		return fmt.Sprintf("%q has no subcommand %q", target.CommandPath(), positional[0])
+	}
+	if err := target.ValidateArgs(flags.Args()); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+// copyFlag is f with a value of its own of the same type, so parsing sets
+// nothing on the command f came from. A value that cannot be told apart
+// (a custom type) is reused as a string, which accepts anything — the flag's
+// existence is what is checked, not its value.
+func copyFlag(f *pflag.Flag) *pflag.Flag {
+	c := *f
+	if f.Value.Type() == "bool" {
+		c.Value = new(boolFlag)
+	} else {
+		c.Value = new(stringFlag)
+	}
+	return &c
+}
+
+type stringFlag string
+
+func (s *stringFlag) String() string     { return string(*s) }
+func (s *stringFlag) Set(v string) error { *s = stringFlag(v); return nil }
+func (s *stringFlag) Type() string       { return "string" }
+
+type boolFlag bool
+
+func (b *boolFlag) String() string { return fmt.Sprint(bool(*b)) }
+func (b *boolFlag) Set(v string) error {
+	parsed, err := strconv.ParseBool(v)
+	*b = boolFlag(parsed)
+	return err
+}
+func (b *boolFlag) Type() string     { return "bool" }
+func (b *boolFlag) IsBoolFlag() bool { return true }
 
 func checkExampleStyle(cmd *cobra.Command) string {
 	if strings.TrimSpace(cmd.Example) == "" {

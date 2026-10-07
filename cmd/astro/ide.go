@@ -52,7 +52,7 @@ func newIDEListProjectCmd(out io.Writer) *cobra.Command {
 		},
 		Example: `
 # List all IDE projects in your workspace
-astro IDE project list
+astro ide project list
 `,
 	}
 	return cmd
@@ -94,7 +94,7 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 		},
 		Example: `
 # Export a project to Astro IDE
-astro ide export
+astro ide project export
 
 # Export a project to a specific Astro IDE project
 astro ide project export --project-id <project-id>

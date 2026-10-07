@@ -164,3 +164,39 @@ func TestFlagUsagesWrapsPastAWordWiderThanTheRoom(t *testing.T) {
 	assert.Contains(t, words, `Output format (default "text")`, "pflag's default is kept")
 	assert.Contains(t, got, "--build-secret stringArray")
 }
+
+// TestExampleRunsCatchesWhatCobraWouldRefuse proves the example-runs rule is
+// not vacuous: each failing line here is one cobra would refuse, and the rule
+// names why.
+func TestExampleRunsCatchesWhatCobraWouldRefuse(t *testing.T) {
+	root := &cobra.Command{Use: "astro"}
+	af := &cobra.Command{Use: "af", Run: func(*cobra.Command, []string) {}}
+	dags := &cobra.Command{Use: "dags"}
+	get := &cobra.Command{Use: "get <DAG_ID>", Args: cobra.ExactArgs(1), Run: func(*cobra.Command, []string) {}}
+	get.Flags().BoolP("details", "d", false, "Show details")
+	dags.AddCommand(get)
+	af.AddCommand(dags)
+	root.AddCommand(af)
+
+	for _, tc := range []struct {
+		line, want string
+	}{
+		{"astro af dags get <DAG_ID> --details", ""},
+		{"astro af dags get <DAG_ID> -d   # with a trailing comment", ""},
+		{`echo "x" | astro af dags get "my dag" | jq .`, ""},
+		{"astro af dags get <DAG_ID> --bogus", "unknown flag: --bogus"},
+		{"astro af dags get", "accepts 1 arg(s), received 0"},
+		{"astro af dagz get <DAG_ID>", `"astro af" has no subcommand "dagz"`},
+		{"astro af dags", `"astro af dags" is a group, not a command`},
+		{"astro AF dags get x", `unknown command "AF"`},
+	} {
+		get.Example = "  " + tc.line
+		got := checkExampleRuns(get)
+		if tc.want == "" {
+			assert.Empty(t, got, tc.line)
+		} else {
+			assert.Contains(t, got, tc.want, tc.line)
+		}
+	}
+	assert.False(t, get.Flags().Changed("details"), "linting an example sets nothing on the command")
+}
