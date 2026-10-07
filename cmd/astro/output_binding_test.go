@@ -29,7 +29,9 @@ func execUnboundRoot(t *testing.T, client astrov1.APIClient, args ...string) (st
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	testUtil.SetupOSArgsForGinkgo()
 	prevClient, prevAlpha := astroV1Client, astroV1Alpha1Client
-	t.Cleanup(func() { astroV1Client, astroV1Alpha1Client = prevClient, prevAlpha })
+	// dbt deploy resolves a Workspace into the package's workspaceID, which
+	// coalesceWorkspace reads before the context; see execDeployCmd.
+	t.Cleanup(func() { astroV1Client, astroV1Alpha1Client, workspaceID = prevClient, prevAlpha, "" })
 
 	outR, outW, perr := os.Pipe()
 	require.NoError(t, perr)

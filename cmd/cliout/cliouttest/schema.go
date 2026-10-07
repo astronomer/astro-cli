@@ -38,9 +38,11 @@ import (
 // UpdateEnv rewrites the goldens instead of comparing against them, when it
 // is set to anything. `make update-schemas` sets it.
 //
-// An environment variable rather than a test flag: cmd/astro's TestMain
-// replaces os.Args before m.Run parses the test flags, so a flag never
-// arrives there, and one switch for every tree beats one per tree.
+// An environment variable rather than a test flag, so one switch reaches
+// every tree: `make update-schemas` runs one `go test` over several packages,
+// and a custom flag given to that run is handed to every package's test
+// binary, failing any that does not define it. An environment variable needs
+// no package to declare anything.
 const UpdateEnv = "ASTRO_UPDATE_SCHEMAS"
 
 // Updating reports whether this run rewrites the goldens.
@@ -137,6 +139,20 @@ func checkColorSafe(t *testing.T, name string, v any) {
 
 var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
+// goldenEntries is what dir holds. A tree that pins nothing yet has no
+// directory of goldens, since an empty one cannot be committed, so a missing
+// directory is an empty tree. Only then: a tree with cases has goldens, and a
+// missing directory there is a wrong path, which fails t.
+func goldenEntries(t testing.TB, dir string, hasCases bool) []os.DirEntry {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) && !hasCases {
+		return nil
+	}
+	require.NoError(t, err)
+	return entries
+}
+
 // Orphans lists the goldens under dir that no case names.
 //
 // A golden nobody generates is a snapshot of a shape that may no longer
@@ -144,16 +160,16 @@ var ansiEscape = regexp.MustCompile("\x1b\\[[0-9;]*m")
 // left behind by a renamed case would keep that test green against a dead
 // file. Renaming a case writes the new golden and leaves the old one; this is
 // what says so.
-func Orphans(t *testing.T, dir string, cases []Case) []string {
+//
+// A missing directory is read as goldenEntries reads it.
+func Orphans(t testing.TB, dir string, cases []Case) []string {
 	t.Helper()
 	expected := map[string]bool{}
 	for _, c := range cases {
 		expected[c.Name+".json"] = true
 	}
 
-	entries, err := os.ReadDir(dir)
-	require.NoError(t, err)
-
+	entries := goldenEntries(t, dir, len(cases) > 0)
 	var orphans []string
 	for _, e := range entries {
 		if !e.IsDir() && !expected[e.Name()] {

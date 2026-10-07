@@ -1,11 +1,9 @@
 package astro
 
 import (
-	"fmt"
+	"flag"
 	"os"
 	"testing"
-
-	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 )
 
 // TestMain pins os.Args to a single non-test argument for the whole package run.
@@ -14,35 +12,29 @@ import (
 // empty) leak between tests and make cobra execution order-dependent under
 // -shuffle. Restoring afterward leaves the real args for anything that runs later.
 //
+// The test flags are parsed first, while os.Args still holds them: m.Run parses
+// only if nobody has, and from os.Args. Pinning before parsing made it read
+// none, so this package used to ignore -run, -skip, -shuffle and the coverage
+// flags `make test` passes. A helper process (TestForcedRenewalHelper) gets
+// its -test.run the same way.
+//
 // It also watches what the commands publish through cliout.Renderer.Emit, and
 // fails a passing run that published a shape no golden pins (schema_test.go).
 func TestMain(m *testing.M) {
+	flag.Parse()
 	origArgs := os.Args
-	// A helper process (TestForcedRenewalHelper) needs its -test.run, and so
-	// does `make update-schemas`, which runs only the golden tests: the rest
-	// of the package has nothing to rewrite.
-	if os.Getenv(renewHelperEnv) == "" && !cliouttest.Updating() {
-		os.Args = []string{"astro"}
-	}
+	os.Args = []string{"astro"}
 	// Deploy refuses a checkout with uncommitted changes, and these tests run
 	// in a real one: without this, they would pass or fail with the developer's
 	// working tree. A test of the refusal sets its own.
 	hasUncommittedChanges = func(string) bool { return false }
-	problems := watchEmit()
+	watching := emitWatch().Arm()
 	code := m.Run()
 	os.Args = origArgs
 
-	// Only for a whole, passing run. A failing run emits a partial set, and
-	// gaps reported from it would bury the failure that caused them; a helper
-	// process or an update run is filtered, so its tally is partial too.
-	if code == 0 && os.Getenv(renewHelperEnv) == "" && !cliouttest.Updating() {
-		if found := problems(); len(found) > 0 {
-			fmt.Fprintln(os.Stderr, "FAIL: what commands emit does not match what is pinned")
-			for _, p := range found {
-				fmt.Fprintln(os.Stderr, "  "+p)
-			}
-			code = 1
-		}
+	// A helper process runs one test for its parent, which judges the run.
+	if os.Getenv(renewHelperEnv) != "" {
+		os.Exit(code)
 	}
-	os.Exit(code)
+	os.Exit(watching.Finish(code))
 }

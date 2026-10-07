@@ -140,16 +140,18 @@ test:
 	GORACE=atexit_sleep_ms=0 go test -count=1 -race -shuffle=on -timeout=15m -cover -coverprofile=coverage.txt -covermode=atomic ./... -test.v
 
 # The `--output json` payloads are pinned against goldens in
-# cmd/local/testdata/schema and cmd/astro/testdata/schema, and `astro
-# deployment inspect`'s bytes against cmd/astro/testdata/deployment_inspect.
+# cmd/local/testdata/schema, cmd/astro/testdata/schema, cmd/testdata/schema and
+# cmd/apc/testdata/schema, and `astro deployment inspect`'s bytes against
+# cmd/astro/testdata/deployment_inspect.
 # A deliberate change to one — a new field, a rename — regenerates them; the
 # diff then lands in the PR, which is the point. Read what it writes before
 # committing it: these shapes are what scripts, agents and Astro Desktop parse.
-# ASTRO_UPDATE_SCHEMAS is the switch (cmd/cliout/cliouttest), an environment
-# variable because cmd/astro's TestMain hides test flags from m.Run.
+# ASTRO_UPDATE_SCHEMAS is the switch (cmd/cliout/cliouttest): an environment
+# variable, so one switch reaches every package this one `go test` runs, where
+# a custom test flag would fail any package that does not define it.
 .PHONY: update-schemas
 update-schemas:
-	ASTRO_UPDATE_SCHEMAS=1 go test -count=1 ./cmd/ ./cmd/local/ ./cmd/astro/ -run 'TestPublishedJSONPayloadsKeepTheirShape|TestDeploymentInspectPrintsPinnedBytes'
+	ASTRO_UPDATE_SCHEMAS=1 go test -count=1 ./cmd/ ./cmd/local/ ./cmd/astro/ ./cmd/apc/ -run 'TestPublishedJSONPayloadsKeepTheirShape|TestDeploymentInspectPrintsPinnedBytes'
 
 # Each pkg/* sub-module has its own go.mod, which the root `go test ./...`
 # never descends into, so their tests need a run of their own.

@@ -21,6 +21,10 @@ import (
 )
 
 func execDeployCmd(args ...string) error {
+	// --workspace-id, and deploy itself when it resolves one, set the
+	// package's workspaceID, which coalesceWorkspace reads before the context.
+	// Left set, it would choose the Workspace of whatever runs next.
+	defer func() { workspaceID = "" }()
 	testUtil.SetupOSArgsForGinkgo()
 	cmd := NewDeployCmd()
 	cmd.SetArgs(args)

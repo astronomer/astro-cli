@@ -143,6 +143,7 @@ func setupManifestDeployWith(t *testing.T, d manifestdeploy.Deployer, toml strin
 // execDeployCapture runs the deploy command with stdout and stderr captured, so
 // a test can read the rendered output instead of the process's real streams.
 func execDeployCapture(args ...string) (string, error) {
+	defer func() { workspaceID = "" }() // see execDeployCmd
 	testUtil.SetupOSArgsForGinkgo()
 	root := deployUnderRoot()
 	var buf bytes.Buffer
@@ -169,6 +170,7 @@ func deployUnderRoot() *cobra.Command {
 // back apart, because the ordering this command has to get right is a prompt on
 // one and a progress line on the other.
 func execDeployIO(answers string, args ...string) (out, errOut string, err error) {
+	defer func() { workspaceID = "" }() // see execDeployCmd
 	testUtil.SetupOSArgsForGinkgo()
 	root := deployUnderRoot()
 	var outBuf, errBuf bytes.Buffer

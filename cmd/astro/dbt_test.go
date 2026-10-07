@@ -254,6 +254,10 @@ func testExecCmd(cmd *cobra.Command, args ...string) error {
 	if args == nil {
 		args = []string{}
 	}
+	// deploy and dbt set the package's workspaceID from --workspace-id or the
+	// one they resolve, and coalesceWorkspace reads it before the context.
+	// Left set, it would choose the Workspace of whatever runs next.
+	defer func() { workspaceID = "" }()
 	testUtil.SetupOSArgsForGinkgo()
 	cmd.SetArgs(args)
 	_, err := cmd.ExecuteC()

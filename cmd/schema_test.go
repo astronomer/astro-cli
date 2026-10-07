@@ -3,13 +3,9 @@ package cmd
 import (
 	"bytes"
 	stdcontext "context"
-	"flag"
-	"fmt"
 	"io"
 	"path/filepath"
 	"reflect"
-	"sort"
-	"sync"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -89,99 +85,20 @@ var pinnedElsewhere = map[reflect.Type]string{
 	reflect.TypeOf(cliout.ErrorObject{}): "cmd/local/testdata/schema/error.json",
 }
 
-var emitted = struct {
-	sync.Mutex
-	named     map[reflect.Type]bool
-	anonymous map[string]bool
-}{
-	named:     map[reflect.Type]bool{},
-	anonymous: map[string]bool{},
-}
-
-func recordEmitted(v any) {
-	if v == nil {
-		return
-	}
-	t := cliouttest.PayloadType(reflect.TypeOf(v))
-	if t == nil {
-		return
-	}
-	emitted.Lock()
-	defer emitted.Unlock()
-	if t.Name() == "" {
-		emitted.anonymous[t.String()] = true
-		return
-	}
-	emitted.named[t] = true
-}
-
-// watchEmit arms the observer and returns what reports on it after the run.
-// This package's TestMain honors -run, and a run it narrowed has a partial
-// tally by definition, so the floor applies only to a whole run; whatever did
-// run and emitted something unpinned is still reported.
-func watchEmit() (problems func() []string) {
-	cliout.EmitObserver = recordEmitted
-	return func() []string {
-		emitted.Lock()
-		defer emitted.Unlock()
-		floor := minWatchedPayloads
-		if f := flag.Lookup("test.run"); f != nil && f.Value.String() != "" {
-			floor = 0
-		}
-		return emitProblems(emitted.named, emitted.anonymous, floor)
+// emitWatch is this package's configuration of the observer TestMain arms.
+func emitWatch() cliouttest.Watch {
+	return cliouttest.Watch{
+		Cases:           publishedPayloads,
+		PinnedElsewhere: pinnedElsewhere,
+		Floor:           minWatchedPayloads,
+		File:            "cmd/schema_test.go",
 	}
 }
 
-// emitProblems is the report over a tally handed in, so it can be tested
-// directly.
-func emitProblems(named map[reflect.Type]bool, anonymous map[string]bool, floor int) []string {
-	pinned := map[reflect.Type]bool{}
-	for _, c := range publishedPayloads {
-		if t := cliouttest.PayloadType(reflect.TypeOf(c.Value)); t != nil {
-			pinned[t] = true
-		}
-	}
-
-	var out []string
-	if len(named) < floor {
-		out = append(out, fmt.Sprintf(
-			"only %d payload shapes were seen reaching cliout.Renderer.Emit, below the floor of %d.\n"+
-				"    Either the observer is no longer wired up, in which case the check\n"+
-				"    below is passing on an empty tally, or command tests stopped running.\n"+
-				"    If the drop is real and intended, lower minWatchedPayloads and say why.",
-			len(named), floor))
-	}
-	for t := range named {
-		if !pinned[t] && pinnedElsewhere[t] == "" {
-			out = append(out, fmt.Sprintf(
-				"a command passed %s through cliout.Renderer.Emit and no golden pins it.\n"+
-					"    Add it to publishedPayloads in cmd/schema_test.go and run\n"+
-					"    `make update-schemas`; a shape that reaches stdout is a contract.", t))
-		}
-	}
-	for name := range anonymous {
-		out = append(out, fmt.Sprintf(
-			"a command passed the anonymous struct %s through cliout.Renderer.Emit.\n"+
-				"    An anonymous shape cannot be pinned. Give it a name and add it to\n"+
-				"    publishedPayloads.", name))
-	}
-	sort.Strings(out)
-	return out
-}
-
-func TestEmitProblemsReportsWhatIsUnpinned(t *testing.T) {
-	type notPinned struct {
-		A string `json:"a"`
-	}
-	got := emitProblems(
-		map[reflect.Type]bool{reflect.TypeOf(notPinned{}): true},
-		map[string]bool{"struct { A int }": true},
-		99,
-	)
-	assert.Len(t, got, 3, "the floor, the named type and the anonymous one")
-
-	pinned := map[reflect.Type]bool{reflect.TypeOf(authToken{}): true}
-	assert.Empty(t, emitProblems(pinned, nil, 1), "a pinned type, above the floor")
+// Every key a golden here publishes is snake_case: a capital in one is a Go
+// field name that reached the wire because a tag was forgotten.
+func TestPublishedKeysAreSnakeCase(t *testing.T) {
+	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0, nil))
 }
 
 // textTo is a text renderer onto w, for a test calling a command's function

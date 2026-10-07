@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -96,6 +97,10 @@ func goldenInspectDeployment() astrov1.Deployment {
 // encoder, compact unless stdout is a terminal, and a test never is; on a
 // terminal the same keys and values come out indented and colored.
 func TestDeploymentInspectPrintsPinnedBytes(t *testing.T) {
+	// --clean-output sets deployment.CleanOutput for the process, which is one
+	// run in production; here it would silence the notes of whatever command
+	// the shuffle runs next.
+	t.Cleanup(func() { deployment.CleanOutput = false })
 	const id = "clgoldendeploy0001"
 	for _, tc := range []struct {
 		name   string

@@ -18,6 +18,11 @@ import (
 )
 
 func execEnvCmd(args ...string) (string, error) {
+	// The env tree falls back to coalesceWorkspace, which reads the package's
+	// workspaceID before the context. Another tree's --workspace-id sets it
+	// and nothing here registers that flag to reset it, so under -shuffle a
+	// run would inherit the Workspace of whichever test ran before it.
+	workspaceID = ""
 	buf := new(bytes.Buffer)
 	cmd := newEnvRootCmd(buf)
 	cmd.SetOut(buf)
