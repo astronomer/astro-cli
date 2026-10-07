@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"maps"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -67,14 +69,44 @@ var (
   astro config set postgres.user postgres`
 )
 
+// configOutput is the -o of `astro config get`, `set` and `list`, registered
+// once on the group as -g is.
+var configOutput string
+
+// configSetting is one setting as `astro config get`, `set` and `list`
+// publish it: its key, its value, the scope the value was read from or
+// written to, and whether a config file sets it there. The scopes are project
+// (a 1.x project's .astro/config.yaml), global, and, in a list, default for a
+// value no config file sets.
+type configSetting struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	Scope string `json:"scope"`
+	Set   bool   `json:"set"`
+}
+
+// globalScope is the scope of the home config.
+const globalScope = "global"
+
+// configSettings is `astro config list`.
+type configSettings struct {
+	Settings []configSetting `json:"settings"`
+}
+
+// projectScope is the scope a setting read from, or written to, a 1.x
+// project's .astro/config.yaml has.
+const projectScope = "project"
+
 func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
 		Short:             "Manage CLI settings for this machine",
 		Long:              "Manage CLI settings, stored globally with -g or in a 1.x project's .astro/config.yaml. Run `astro config list` to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
 		PersistentPreRunE: ensureGlobalFlag,
+		Annotations:       map[string]string{astroCmd.NoLoginAnnotation: "true"},
 	}
 	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "View or modify global config")
+	cliout.AddOutputFlag(cmd, &configOutput)
 	cmd.AddCommand(
 		newConfigGetCmd(out),
 		newConfigSetCmd(out),
@@ -113,7 +145,11 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 		Long:  "List every CLI setting with its value and where the value comes from: project (a 1.x project's .astro/config.yaml), global, or default. With -g, list the global values only",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return configList(out)
+			format, err := cliout.ParseFormat(configOutput)
+			if err != nil {
+				return err
+			}
+			return configList(cliout.Renderer{Format: format, Out: out})
 		},
 		Example: `  # List every setting, with where its value comes from
   astro config list
@@ -170,7 +206,17 @@ func isShellSafe(r rune) bool {
 	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("-_.,:/=@+%", r)
 }
 
+// configGet publishes one setting from the scope asked for, as its text has
+// always shown it: with -g the global value (the built-in default when the
+// home config does not set it), and otherwise the 1.x project's own, which is
+// "" when the project does not set it. It never falls back from one to the
+// other; set says whether that scope sets the key. `config list` is where the
+// value in effect, and the scope it comes from, are published.
 func configGet(cmd *cobra.Command, args []string) error {
+	format, err := cliout.ParseFormat(configOutput)
+	if err != nil {
+		return err
+	}
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
@@ -180,16 +226,20 @@ func configGet(cmd *cobra.Command, args []string) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
+	setting := configSetting{Key: cfg.Path, Value: cfg.GetProjectString(), Scope: projectScope, Set: cfg.Scope() == projectScope}
 	if globalFlag {
-		fmt.Printf("%s: %s\n", cfg.Path, cfg.GetHomeString())
-	} else {
-		fmt.Printf("%s: %s\n", cfg.Path, cfg.GetProjectString())
+		setting = configSetting{Key: cfg.Path, Value: cfg.GetHomeString(), Scope: globalScope, Set: cfg.HomeScope() == globalScope}
 	}
-
-	return nil
+	return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
+		fmt.Fprintf(b, "%s: %s\n", setting.Key, setting.Value)
+	}))
 }
 
 func configSet(cmd *cobra.Command, args []string) error {
+	format, err := cliout.ParseFormat(configOutput)
+	if err != nil {
+		return err
+	}
 	if len(args) != 2 {
 		return errInvalidSetArgs
 	}
@@ -214,8 +264,9 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid value for %s: %w", cfg.Path, err)
 	}
 
-	var err error
+	setting := configSetting{Key: cfg.Path, Value: args[1], Scope: projectScope, Set: true}
 	if globalFlag {
+		setting.Scope = globalScope
 		err = cfg.SetHomeString(args[1])
 	} else {
 		err = cfg.SetProjectString(args[1])
@@ -224,25 +275,37 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf(configSetSuccessMsg+"\n", cfg.Path, args[1])
-	return nil
+	return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
+		fmt.Fprintf(b, configSetSuccessMsg+"\n", setting.Key, setting.Value)
+	}))
 }
 
-func configList(out io.Writer) error {
-	tab := printutil.Table{
-		DynamicPadding: true,
-		Header:         []string{"KEY", "VALUE", "SCOPE"},
-	}
+// configList publishes every setting but the unlisted ones, by key: with -g
+// the global values, and otherwise each value from where commands run here
+// read it, with the scope it comes from; set is false for a default. In
+// text, the table it always printed.
+func configList(r cliout.Renderer) error {
+	list := configSettings{Settings: []configSetting{}}
 	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
 		if unlistedConfigs[key] {
 			continue
 		}
 		cfg := config.CFGStrMap[key]
+		setting := configSetting{Key: key, Value: cfg.GetString(), Scope: cfg.Scope()}
 		if globalFlag {
-			tab.AddRow([]string{key, cfg.GetHomeString(), cfg.HomeScope()}, false)
-		} else {
-			tab.AddRow([]string{key, cfg.GetString(), cfg.Scope()}, false)
+			setting = configSetting{Key: key, Value: cfg.GetHomeString(), Scope: cfg.HomeScope()}
 		}
+		setting.Set = setting.Scope != "default"
+		list.Settings = append(list.Settings, setting)
 	}
-	return tab.Print(out)
+	return r.Emit(&list, func(w io.Writer) error {
+		tab := printutil.Table{
+			DynamicPadding: true,
+			Header:         []string{"KEY", "VALUE", "SCOPE"},
+		}
+		for _, s := range list.Settings {
+			tab.AddRow([]string{s.Key, s.Value, s.Scope}, false)
+		}
+		return tab.Print(w)
+	})
 }

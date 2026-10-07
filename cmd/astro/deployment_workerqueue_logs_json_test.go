@@ -177,7 +177,7 @@ func TestDeploymentWorkerQueueAndLogsText(t *testing.T) {
 			run := execAstroCmd(t, client, tc.answers, newDeploymentRootCmd, append([]string{"deployment"}, tc.args...)...)
 			require.NoError(t, run.err, "stdout:\n%s", run.stdout)
 			assert.Equal(t, 0, run.code)
-			requireInOrder(t, run.stdout, tc.says...)
+			requireInOrder(t, run.terminal(), tc.says...)
 			client.(*astrov1_mocks.ClientWithResponsesInterface).AssertExpectations(t)
 		})
 	}

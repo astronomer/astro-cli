@@ -265,7 +265,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 		organizationNameOrID = args[0]
 	}
 
-	asks := questionsTo(cmd, format, out)
+	asks := cliout.NotesTo(cmd, format, out)
 	switched, err := orgSwitch(organizationNameOrID, astroV1Client, asks)
 	if err != nil {
 		return err
@@ -312,7 +312,7 @@ func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	fmt.Fprintln(questionsTo(cmd, format, out), "This may take some time depending on how many days are being exported.")
+	fmt.Fprintln(cliout.NotesTo(cmd, format, out), "This may take some time depending on how many days are being exported.")
 	export, err := orgExportAuditLogs(astroV1Client,
 		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
 	if err != nil {
@@ -521,7 +521,7 @@ func teamCreate(cmd *cobra.Command, out io.Writer) error {
 		if err := mayPickRole(); err != nil {
 			return err
 		}
-		fmt.Println("select a Organization Role for the new team:")
+		fmt.Fprintln(os.Stderr, "select a Organization Role for the new team:")
 		// no role was provided so ask the user for it
 		teamOrgRole, err = selectOrganizationRole()
 		if err != nil {
@@ -887,7 +887,7 @@ func selectOrganizationRole() (string, error) {
 	for _, role := range validOrganizationRoles {
 		list.AddRow(false, role)
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return "", err
 	}

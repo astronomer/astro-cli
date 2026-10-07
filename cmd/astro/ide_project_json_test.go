@@ -208,7 +208,7 @@ func TestIDEProjectText(t *testing.T) {
 				require.NoError(t, r.err)
 				assert.Equal(t, 0, r.code)
 			}
-			tc.check(t, r.stdout)
+			tc.check(t, r.terminal())
 			assert.Empty(t, r.stderr)
 			if tc.after != nil {
 				tc.after(t, dir)
@@ -430,7 +430,8 @@ func TestIDEProjectImportConfirmationNamesTheDirectory(t *testing.T) {
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
 	sameDir(t, dir, cwd)
-	assert.Contains(t, r.stdout, "Do you want to import the project here? "+cwd+" (y/n) ")
+	assert.Contains(t, r.asked, "Do you want to import the project here? "+cwd+" (y/n) ")
+	assert.NotContains(t, r.stdout, "Do you want to import", "the question is on stderr")
 }
 
 // -o takes text or json, and anything else is a usage error before any

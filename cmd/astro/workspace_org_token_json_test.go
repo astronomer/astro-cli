@@ -133,7 +133,8 @@ func runTokenCases(t *testing.T, cases []tokenCase) {
 				require.NoError(t, r.err)
 				assert.Equal(t, 0, r.code)
 			}
-			tc.check(t, r.stdout)
+			noTokenQuestionOnStdout(t, r.stdout)
+			tc.check(t, r.terminal())
 		})
 	}
 }

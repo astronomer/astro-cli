@@ -4,16 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
-
-	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
@@ -21,23 +19,7 @@ var (
 	CloudDomainRegex     = regexp.MustCompile(`(?:https:\/\/|^)(?:(pr\d{4,6})\.|)(?:cloud\.|)astronomer(?:-(dev|stage|perf))?\.io(?:\/|)$`)
 	contextDeleteWarnMsg = "Are you sure you want to delete currently used context: %s"
 	cancelCtxDeleteMsg   = "Canceling context delete..."
-	failCtxDeleteMsg     = "Error deleting context %s: "
-	successCtxDeleteMsg  = "Successfully deleted context: %s"
 )
-
-var tab = printutil.Table{
-	Padding:      []int{44},
-	Header:       []string{"NAME"},
-	ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
-}
-
-// newTableOut construct new printutil.Table
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding: []int{36, 36},
-		Header:  []string{"CONTEXT DOMAIN", "WORKSPACE"},
-	}
-}
 
 // ContextExists checks to see if context exist in config
 func Exists(domain string) bool {
@@ -81,16 +63,119 @@ func Switch(domain string) error {
 	return c.SwitchContext()
 }
 
-func Delete(domain string, noPrompt bool) error {
+// Info is one saved context, as `astro context list` and `astro context
+// switch` publish it. The login itself is never part of it.
+type Info struct {
+	Domain         string `json:"domain"`
+	UserEmail      string `json:"user_email"`
+	OrganizationID string `json:"organization_id"`
+	WorkspaceID    string `json:"workspace_id"`
+	// IsCurrent is whether commands run here use this context now, which
+	// ASTRO_DOMAIN decides when it is set.
+	IsCurrent bool `json:"is_current"`
+}
+
+// InfoList is `astro context list`: every saved context, sorted by domain.
+type InfoList struct {
+	Contexts []Info `json:"contexts"`
+}
+
+// Removal is what `astro context delete` did.
+type Removal struct {
+	Domain string `json:"domain"`
+	Action string `json:"action"`
+}
+
+// List returns the contexts saved on this machine, in order. Like the
+// table it always printed, it fails when no context is current.
+func List() (InfoList, error) {
+	// No current context is read: reading one reads its login, which can
+	// mean waiting on the keyring. saved marks the current domain's.
+	list, _, err := saved()
+	if err != nil {
+		return InfoList{}, err
+	}
+	if !slices.ContainsFunc(list.Contexts, func(i Info) bool { return i.IsCurrent }) {
+		// None is current: no current domain at all, or one with no saved
+		// context.
+		if _, err := config.GetCurrentDomain(); err != nil {
+			return InfoList{}, err
+		}
+		return InfoList{}, config.ErrNotConnected
+	}
+	return list, nil
+}
+
+// saved reads the contexts without their logins: nothing here needs one, and
+// reading one can mean waiting on the keyring. Alongside them, the key the
+// config files each under, which is how a domain finds its own.
+func saved() (InfoList, []string, error) {
+	contexts, err := config.ListContexts()
+	if err != nil {
+		return InfoList{}, nil, err
+	}
+	current, _ := config.GetCurrentDomain() //nolint:errcheck // with no current context none is marked
+	keys := slices.Sorted(maps.Keys(contexts.Contexts))
+	list := InfoList{Contexts: make([]Info, 0, len(keys))}
+	for _, key := range keys {
+		ctx := contexts.Contexts[key]
+		domain := ctx.Domain
+		if domain == "" {
+			domain = strings.ReplaceAll(key, "_", ".")
+		}
+		list.Contexts = append(list.Contexts, Info{
+			Domain:         domain,
+			UserEmail:      ctx.UserEmail,
+			OrganizationID: ctx.Organization,
+			WorkspaceID:    ctx.Workspace,
+			IsCurrent:      current != "" && key == contextKey(current),
+		})
+	}
+	return list, keys, nil
+}
+
+// contextKey is the key the config files domain's context under. Viper
+// lowercases every key it reads.
+func contextKey(domain string) string {
+	return strings.ToLower(strings.ReplaceAll(domain, ".", "_"))
+}
+
+// Saved returns the context saved as current, the one a switch just wrote,
+// whether or not ASTRO_DOMAIN outranks it in this shell.
+func Saved() (Info, error) {
+	domain := config.CFG.Context.GetHomeString()
+	list, keys, err := saved()
+	if err != nil {
+		return Info{}, err
+	}
+	if i := slices.Index(keys, contextKey(domain)); domain != "" && i >= 0 {
+		return list.Contexts[i], nil
+	}
+	return Info{}, fmt.Errorf("%w: %s", config.ErrContextNotExist, domain)
+}
+
+// SwitchTo makes the APC context for domain current, creating it if needed,
+// and returns it as it now is.
+func SwitchTo(domain string) (Info, error) {
+	if err := Switch(domain); err != nil {
+		return Info{}, err
+	}
+	return Saved()
+}
+
+// Delete removes the saved context for domain. Deleting the current one asks
+// first, unless noPrompt; a declined delete returns no removal. What it says
+// along the way goes to out.
+func Delete(domain string, noPrompt bool, out io.Writer) (*Removal, error) {
 	currentCtx, _ := GetCurrentContext() //nolint:errcheck // error deliberately ignored in this shell code
 	if currentCtx.Domain != "" && currentCtx.Domain == domain && !noPrompt {
 		i, err := input.Confirm(fmt.Sprintf(contextDeleteWarnMsg, domain), input.AnsweredBy("--yes"))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !i {
-			fmt.Println(cancelCtxDeleteMsg)
-			return nil
+			fmt.Fprintln(out, cancelCtxDeleteMsg)
+			return nil, nil
 		}
 	}
 
@@ -98,87 +183,19 @@ func Delete(domain string, noPrompt bool) error {
 	err := c.DeleteContext()
 	if errors.Is(err, config.ErrContextNotExist) {
 		// The error names the context already; the prefix below would print
-		// it twice, half on stdout and half on stderr.
-		return err
+		// it twice.
+		return nil, err
 	}
 	if err != nil {
-		fmt.Printf(failCtxDeleteMsg, domain)
-		return err
+		return nil, fmt.Errorf("deleting context %s: %w", domain, err)
 	}
 
 	if currentCtx.Domain == domain {
 		if err := config.ResetCurrentContext(); err != nil {
-			return err
+			return nil, err
 		}
 	}
-
-	fmt.Println(fmt.Sprintf(successCtxDeleteMsg, domain))
-	return nil
-}
-
-func SwitchContext(cmd *cobra.Command, args []string) error {
-	cmd.SilenceUsage = true
-
-	domain := ""
-	if len(args) == 1 {
-		domain = args[0]
-	}
-
-	err := Switch(domain)
-	if err != nil {
-		return err
-	}
-
-	c := config.Context{Domain: domain}
-	ctx, err := c.GetContext()
-	if err != nil {
-		return err
-	}
-
-	tab := newTableOut()
-	tab.AddRow([]string{ctx.Domain, ctx.Workspace}, false)
-	tab.SuccessMsg = "\n Switched context"
-	tab.Print(os.Stdout) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
-}
-
-func ListContext(cmd *cobra.Command, args []string, out io.Writer) error {
-	cmd.SilenceUsage = true
-
-	var domain string
-	contexts, err := config.ListContexts()
-	if err != nil {
-		return err
-	}
-
-	currentCtx, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-	//nolint:gocritic // intentional in this shell code
-	for ctxKey, ctx := range contexts.Contexts {
-		if ctx.Domain != "" {
-			domain = ctx.Domain
-		} else {
-			domain = strings.Replace(ctxKey, "_", ".", -1)
-		}
-
-		if domain == currentCtx.Domain {
-			tab.AddRow([]string{domain}, true)
-		} else {
-			tab.AddRow([]string{domain}, false)
-		}
-	}
-
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-	return nil
-}
-
-func DeleteContext(cmd *cobra.Command, args []string, noPrompt bool) error {
-	cmd.SilenceUsage = true
-	domain := args[0]
-	return Delete(domain, noPrompt)
+	return &Removal{Domain: domain, Action: "deleted"}, nil
 }
 
 // IsCloudContext returns whether current context domain is related to cloud platform or not

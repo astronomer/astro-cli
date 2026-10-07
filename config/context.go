@@ -18,7 +18,7 @@ var (
 	ErrContextNotExist = errors.New("context does not exist")
 
 	ErrGetHomeString = errors.New("no context set, have you authenticated to Astro or APC? Run astro login and try again")
-	errNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
+	ErrNotConnected  = errors.New("not connected, have you authenticated to Astro? Run astro login and try again")
 	errNotLoginField = errors.New("only a login field is shared across a tenant")
 )
 
@@ -105,7 +105,7 @@ func (c *Context) GetContext() (Context, error) {
 	}
 
 	if !c.ContextExists() {
-		return *c, errNotConnected
+		return *c, ErrNotConnected
 	}
 	err = viperHome.UnmarshalKey(contextsKey+"."+key, &c)
 	if err != nil {

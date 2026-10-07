@@ -316,7 +316,7 @@ func TestDeploymentCoreText(t *testing.T) {
 			}
 			require.NoError(t, run.err, "stdout:\n%s", run.stdout)
 			assert.Equal(t, 0, run.code)
-			tc.check(t, run.stdout)
+			tc.check(t, run.terminal())
 			if m, ok := client.(*astrov1_mocks.ClientWithResponsesInterface); ok {
 				m.AssertExpectations(t)
 			}

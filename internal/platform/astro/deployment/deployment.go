@@ -408,8 +408,8 @@ func Create(name, workspaceID, description, clusterID, runtimeVersion, dagDeploy
 
 	// name input
 	if name == "" {
-		fmt.Println("Please specify a name for your Deployment")
-		name, err = input.Text(ansi.Bold("\nDeployment name: "), input.AnsweredBy("--name"))
+		fmt.Fprintln(os.Stderr, "Please specify a name for your Deployment")
+		name, err = input.Text(ansi.ForStderr().Bold("\nDeployment name: "), input.AnsweredBy("--name"))
 		if err != nil {
 			return astrov1.Deployment{}, err
 		}
@@ -790,7 +790,7 @@ func selectRegion(cloudProvider, region string, astroV1Client astrov1.APIClient)
 		for i := range regions {
 			list.AddRow(false, regions[i].Name)
 		}
-		i, err := list.Pick(os.Stdout, os.Stdin)
+		i, err := list.Pick(os.Stderr, os.Stdin)
 		if err != nil {
 			return "", err
 		}
@@ -826,7 +826,7 @@ func selectCluster(clusterID, organizationID string, astroV1Client astrov1.APICl
 		for i := range cs {
 			list.AddRow(false, cs[i].Name, string(cs[i].CloudProvider), cs[i].Id)
 		}
-		i, err := list.Pick(os.Stdout, os.Stdin)
+		i, err := list.Pick(os.Stderr, os.Stdin)
 		if err != nil {
 			return "", err
 		}
@@ -1403,7 +1403,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	if !force {
 		if confirmWithUser {
 			y, err := input.Confirm(
-				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
+				fmt.Sprintf("\nAre you sure you want to update the %s Deployment?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 			if err != nil {
 				return UpdateResult{}, err
 			}
@@ -1599,7 +1599,7 @@ func Delete(deploymentID, ws, deploymentName string, forceDelete bool, astroV1Cl
 	// prompt user
 	if !forceDelete {
 		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to delete the %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
+			fmt.Sprintf("\nAre you sure you want to delete the %s Deployment?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
 		}
@@ -1652,7 +1652,7 @@ func UpdateDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.Bold(action), ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
+			fmt.Sprintf("\nAre you sure you want to override to %s for %s Deployment?", ansi.ForStderr().Bold(action), ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
 		}
@@ -1729,7 +1729,7 @@ func DeleteDeploymentHibernationOverride(deploymentID, ws, deploymentName string
 	// prompt user
 	if !force {
 		i, err := input.Confirm(
-			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
+			fmt.Sprintf("\nAre you sure you want to remove the hibernation override and resume schedule for %s Deployment?", ansi.ForStderr().Bold(currentDeployment.Name)), input.AnsweredBy("--yes"))
 		if err != nil {
 			return nil, err
 		}
@@ -2045,7 +2045,7 @@ var SelectDeployment = func(deployments []astrov1.Deployment, message string) (a
 	for i := range deployments {
 		list.AddRow(false, deployments[i].Name, deployments[i].Namespace, deployments[i].Id, strconv.FormatBool(deployments[i].IsDagDeployEnabled))
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return astrov1.Deployment{}, err
 	}

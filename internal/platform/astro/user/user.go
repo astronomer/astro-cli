@@ -202,7 +202,7 @@ func SelectUser(users []astrov1.User, roleEntity, scopeID string) (astrov1.User,
 			users[i].CreatedAt.Format(time.RFC3339),
 		)
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return astrov1.User{}, err
 	}

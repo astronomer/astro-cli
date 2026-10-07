@@ -36,26 +36,8 @@ var outputExempt = map[string]string{
 // lacksOutputFlag lists, per platform, the runnable commands that cannot reach
 // an --output json today. Delete an entry when its command gains one.
 var lacksOutputFlag = map[string][]string{
-	cloudPlatform: {
-		"astro auth token",
-		"astro config get",
-		"astro config list",
-		"astro config set",
-		"astro context delete",
-		"astro context list",
-		"astro context switch",
-		"astro telemetry",
-		"astro telemetry disable",
-		"astro telemetry enable",
-	},
+	cloudPlatform: {},
 	apcPlatform: {
-		"astro auth token",
-		"astro config get",
-		"astro config list",
-		"astro config set",
-		"astro context delete",
-		"astro context list",
-		"astro context switch",
 		"astro deploy",
 		// adopt and unadopt exist only on APC 2.1.0 and later, so this test
 		// first saw them when it began building that tree; they predate it,
@@ -87,9 +69,6 @@ var lacksOutputFlag = map[string][]string{
 		"astro team get",
 		"astro team list",
 		"astro team update",
-		"astro telemetry",
-		"astro telemetry disable",
-		"astro telemetry enable",
 		"astro user create",
 		"astro workspace create",
 		"astro workspace delete",

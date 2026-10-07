@@ -44,6 +44,12 @@ func Cyan(text string) string {
 }
 
 func shouldUseColors() bool {
+	return shouldColor(IsOutputTerminal)
+}
+
+// shouldColor decides colors for a stream, by the environment's override and
+// otherwise by whether the stream is a terminal.
+func shouldColor(isTerminal func() bool) bool {
 	if EnvironmentOverrideColors {
 		force, ok := os.LookupEnv(cliColorForce)
 
@@ -58,5 +64,29 @@ func shouldUseColors() bool {
 		}
 	}
 
-	return ForceColors || IsOutputTerminal()
+	return ForceColors || isTerminal()
 }
+
+// Palette colors text for one stream.
+type Palette struct{ a aurora.Aurora }
+
+// ForStderr colors text written to stderr, where every question and its
+// notes go: by whether stderr is a terminal, not stdout. A prompt seen at the
+// terminal stays colored with stdout redirected, and one written to a
+// redirected stderr carries no escapes. It is decided at each call, since a
+// prompt is built just before it is asked.
+func ForStderr() Palette {
+	return Palette{aurora.NewAurora(shouldColor(isMessagesTerminal))}
+}
+
+// Bold returns text bolded for the palette's stream.
+func (p Palette) Bold(text string) string { return p.a.Sprintf(p.a.Bold(text)) }
+
+// Red returns text colored red for the palette's stream.
+func (p Palette) Red(text string) string { return p.a.Sprintf(p.a.Red(text)) }
+
+// Green returns text colored green for the palette's stream.
+func (p Palette) Green(text string) string { return p.a.Sprintf(p.a.Green(text)) }
+
+// Cyan returns text colored cyan for the palette's stream.
+func (p Palette) Cyan(text string) string { return p.a.Sprintf(p.a.Cyan(text)) }

@@ -83,6 +83,18 @@ type Renderer struct {
 	Style Style
 }
 
+// NotesTo is where a command hands the code below it to draw what it asks and
+// the notes it prints along the way: out, the command's own writer, in text,
+// as always; and the command's stderr under json, where stdout carries the one
+// result. Nothing is asked under json (the run refuses instead), so what lands
+// on stderr there is notes only.
+func NotesTo(cmd *cobra.Command, format Format, out io.Writer) io.Writer {
+	if format == FormatJSON {
+		return cmd.ErrOrStderr()
+	}
+	return out
+}
+
 // Style is how a json result is laid out. Only whitespace and color differ:
 // the keys, values and their order are the same in every style.
 type Style int

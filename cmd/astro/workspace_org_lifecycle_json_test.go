@@ -235,8 +235,9 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 		// answers them: the confirmation gets the "y" the picker read ahead.
 		{
 			name: "workspace delete through the picker, confirmed", root: ws, client: workspacesMock(both, deletesWorkspace(curWorkspaceID)), answers: "2\ny\n",
-			args:  []string{"workspace", "delete"},
-			check: then(pickRows, plain(says("Please select the workspace you would like to delete:", "> ", "\nAre you sure you want to delete the Development Workspace ("+curWorkspaceID+")? This cannot be undone. (y/n) ", "Astro Workspace Development was successfully deleted\n"))),
+			args: []string{"workspace", "delete"},
+			// The question is on stderr, which the terminal view reads first.
+			check: then(pickRows, plain(says("\nAre you sure you want to delete the Development Workspace ("+curWorkspaceID+")? This cannot be undone. (y/n) ", "Please select the workspace you would like to delete:", "> ", "Astro Workspace Development was successfully deleted\n"))),
 		},
 		{
 			name: "workspace delete through the picker, declined", root: ws, client: workspacesMock(both), answers: "2\nn\n",
@@ -247,13 +248,13 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 		{
 			name: "workspace delete of the only Workspace", root: ws, client: workspacesMock([]astrov1.Workspace{prod}, deletesWorkspace("ws-prod")), answers: "y\n",
 			args: []string{"workspace", "delete"},
-			check: plain(says("Only one Workspace was found. Using the following Workspace by default: \n",
-				deleteProdQuestion, "Astro Workspace Production was successfully deleted\n")),
+			check: plain(says(deleteProdQuestion, "Only one Workspace was found. Using the following Workspace by default: \n",
+				"Astro Workspace Production was successfully deleted\n")),
 		},
 		{
 			name: "workspace delete of the only Workspace, declined", root: ws, client: workspacesMock([]astrov1.Workspace{prod}), answers: "n\n",
 			args:  []string{"workspace", "delete"},
-			check: plain(says("Only one Workspace was found.", deleteProdQuestion, "Canceling Workspace deletion\n")),
+			check: plain(says(deleteProdQuestion, "Only one Workspace was found.", "Canceling Workspace deletion\n")),
 		},
 		{name: "workspace delete of an unknown id", root: ws, client: workspacesMock(both), args: []string{"workspace", "delete", "ws-nope"}, check: says(""), wantErr: "no workspace was found for the ID you provided"},
 		{name: "workspace switch by name", root: ws, client: workspacesMock(both), args: []string{"workspace", "switch", "Production"}, check: listsContext("ws-prod")},

@@ -2,10 +2,14 @@ package input
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"golang.org/x/term"
 )
+
+// Every prompt here is written to stderr: stdout carries a command's results
+// only, and a question is not one.
 
 // Text requests a user for input text and returns it. It returns a
 // *RequiredError, and reads nothing, when this run may not ask (see SetGuard).
@@ -15,7 +19,7 @@ func Text(promptText string, opts ...Option) (string, error) {
 	}
 	reader := stdin()
 	if promptText != "" {
-		fmt.Print(promptText)
+		fmt.Fprint(os.Stderr, promptText)
 	}
 	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this shell code
 	return strings.Trim(text, "\r\n"), nil
@@ -30,7 +34,7 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 		return false, err
 	}
 	reader := stdin()
-	fmt.Printf("%s (y/n) ", promptText)
+	fmt.Fprintf(os.Stderr, "%s (y/n) ", promptText)
 
 	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this shell code
 	return strings.Trim(text, "\r\n") == "y", nil
@@ -43,11 +47,11 @@ func Password(promptText string, opts ...Option) (string, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return "", err
 	}
-	fmt.Print(promptText)
+	fmt.Fprint(os.Stderr, promptText)
 	bytePassword, err := term.ReadPassword(stdinFD())
 	if err != nil {
 		return "", err
 	}
-	fmt.Print("\n")
+	fmt.Fprint(os.Stderr, "\n")
 	return string(bytePassword), nil
 }

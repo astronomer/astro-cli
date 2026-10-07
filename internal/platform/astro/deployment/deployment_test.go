@@ -1310,6 +1310,32 @@ func (s *Suite) TestCreate() {
 		mockV1Client.AssertExpectations(s.T())
 	})
 
+	s.Run("asks for the name on stderr, and stdout stays empty", func() {
+		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
+		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
+		// No name given: the create stops right after the question.
+		defer testUtil.MockUserInput(s.T(), "\n")()
+
+		outR, outW, err := os.Pipe()
+		s.Require().NoError(err)
+		errR, errW, err := os.Pipe()
+		s.Require().NoError(err)
+		previousOut, previousErr := os.Stdout, os.Stderr
+		os.Stdout, os.Stderr = outW, errW
+		_, createErr := Create("", ws, "test-desc", csID, "4.2.5", dagDeploy, CeleryExecutor, "", "", "", "", "", "", "", "", "", "", "", astrov1.DeploymentTypeHYBRID, 0, 0, false, nil, nil, nil, mockV1Client, false, 0*time.Second, nil)
+		os.Stdout, os.Stderr = previousOut, previousErr
+		outW.Close()
+		errW.Close()
+		stdout, _ := io.ReadAll(outR)
+		stderr, _ := io.ReadAll(errR)
+
+		s.EqualError(createErr, "you must give your Deployment a name")
+		s.Empty(string(stdout))
+		s.Contains(string(stderr), "Please specify a name for your Deployment")
+		s.Contains(string(stderr), "Deployment name: ")
+		mockV1Client.AssertExpectations(s.T())
+	})
+
 	s.Run("success with enabling development mode", func() {
 		// Set up mock responses and expectations
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()

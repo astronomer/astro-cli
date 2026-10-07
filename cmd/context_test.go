@@ -33,7 +33,7 @@ func (s *CmdSuite) TestContextSwitch() {
 		}
 		for name, want := range tests {
 			got = ""
-			s.NoError(switchContext(&cobra.Command{}, []string{name}, nil, new(bytes.Buffer)))
+			s.NoError(switchContext(&cobra.Command{}, []string{name}, nil, textTo(new(bytes.Buffer))))
 			s.Equal(want, got, name)
 		}
 	})
@@ -41,7 +41,7 @@ func (s *CmdSuite) TestContextSwitch() {
 	s.Run("an APC domain switches as before", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		got = ""
-		s.NoError(switchContext(&cobra.Command{}, []string{"software.example.com"}, nil, new(bytes.Buffer)))
+		s.NoError(switchContext(&cobra.Command{}, []string{"software.example.com"}, nil, textTo(new(bytes.Buffer))))
 		s.Empty(got)
 		domain, err := config.GetCurrentDomain()
 		s.NoError(err)
@@ -80,7 +80,7 @@ func (s *CmdSuite) TestContextSwitchPicker() {
 		errOut := new(bytes.Buffer)
 		cmd.SetErr(errOut)
 		out := new(bytes.Buffer)
-		err = switchContext(cmd, nil, nil, out)
+		err = switchContext(cmd, nil, nil, textTo(out))
 		return out.String(), errOut.String(), err
 	}
 	// rowOf is the line of the picker's table that holds domain.
@@ -130,11 +130,11 @@ func (s *CmdSuite) TestContextSwitchPicker() {
 		for _, env := range []string{"astronomer.io", "https://cloud.astronomer.io/", "Astronomer.io"} {
 			errOut.Reset()
 			s.T().Setenv("ASTRO_DOMAIN", env)
-			s.NoError(switchContext(cmd, []string{"cloud.astronomer.io"}, nil, new(bytes.Buffer)), env)
+			s.NoError(switchContext(cmd, []string{"cloud.astronomer.io"}, nil, textTo(new(bytes.Buffer))), env)
 			s.NotContains(errOut.String(), "outranks", env)
 		}
 		s.T().Setenv("ASTRO_DOMAIN", "cloud.astronomer-dev.io")
-		s.NoError(switchContext(cmd, []string{"astronomer.io"}, nil, new(bytes.Buffer)))
+		s.NoError(switchContext(cmd, []string{"astronomer.io"}, nil, textTo(new(bytes.Buffer))))
 		s.Contains(errOut.String(), "outranks", "a different host still warns")
 	})
 

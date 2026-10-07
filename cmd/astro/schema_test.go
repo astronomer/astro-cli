@@ -231,18 +231,20 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Fifty shapes reach Emit in this package's tests today:
-// the deployment variable and token results, the deployment, workspace and
-// organization user and team results, the workspace and organization token
-// results, the pkg/output lists and the `astro env` payloads (reads and
-// writes) their tests reach, the manifest deploy's result, the dbt deploy,
-// delete and cleanup results and the remote deploy's pushed image, deployment
-// inspect's deployment (which create and update publish too), delete's
-// removal, hibernate's override, the worker-queue result, the log entry,
-// the Workspace a create, update or switch publishes and what a Workspace
-// delete did, what an Organization switch left current, the role list, the
-// file an audit-log export wrote, the Astro IDE project list and what an
-// import or an export moved, and the error object.
+// would be silent. Fifty shapes reach Emit in this package's tests
+// today: the deployment variable results (2) and the six API token results;
+// the deployment, workspace and organization user and team results, with the
+// organization's invite and team membership (10); the pkg/output lists their
+// tests reach (deployment, bundle, workspace, organization, cluster: 5); the
+// `astro env` payloads, reads and writes (8); the manifest deploy's result,
+// deployment inspect's deployment (which create and update publish too),
+// delete's removal, hibernate's override, the worker-queue result and the
+// log entry (6); the dbt deploy, delete and cleanup results and the remote
+// deploy's pushed image (4); the Workspace a create, update or switch
+// publishes and what a Workspace delete did, what an Organization switch left
+// current, the role list and the file an audit-log export wrote (5); the
+// Astro IDE project list and what an import or an export moved (3); and the
+// error object.
 // Raise it as conversions land; lower it only saying why.
 const minWatchedPayloads = 50
 

@@ -141,7 +141,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		minWorkerCount = -1
 	}
 
-	res, err := workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, workerQueueAsks(cmd, format, out))
+	res, err := workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, cliout.NotesTo(cmd, format, out))
 	if err != nil || res == nil {
 		// nil, nil is a declined update, which has said so.
 		return err
@@ -163,7 +163,7 @@ func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) 
 		return err
 	}
 
-	res, err := workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, workerQueueAsks(cmd, format, out))
+	res, err := workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, cliout.NotesTo(cmd, format, out))
 	if err != nil || res == nil {
 		// nil, nil is a declined deletion, which has said so.
 		return err

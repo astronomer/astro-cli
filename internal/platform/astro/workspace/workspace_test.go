@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -244,7 +245,7 @@ func (s *Suite) TestSwitch() {
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("workspace-id-2", mockV1Client, buf)
+		err := switchAndPrint("workspace-id-2", mockV1Client, buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "workspace-id-2")
 		mockV1Client.AssertExpectations(s.T())
@@ -275,7 +276,7 @@ func (s *Suite) TestSwitch() {
 		freshClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&page2, nil).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("workspace-id-2", freshClient, buf)
+		err := switchAndPrint("workspace-id-2", freshClient, buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "workspace-id-2")
 		freshClient.AssertExpectations(s.T())
@@ -285,7 +286,7 @@ func (s *Suite) TestSwitch() {
 		mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errMock).Once()
 
 		buf := new(bytes.Buffer)
-		err := Switch("workspace-id-2", mockV1Client, buf)
+		err := switchAndPrint("workspace-id-2", mockV1Client, buf)
 		s.ErrorIs(err, errMock)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -306,7 +307,7 @@ func (s *Suite) TestSwitch() {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		err = Switch("", mockV1Client, buf)
+		err = switchAndPrint("", mockV1Client, buf)
 		s.NoError(err)
 		s.Contains(buf.String(), "workspace-id")
 		mockV1Client.AssertExpectations(s.T())
@@ -328,7 +329,7 @@ func (s *Suite) TestSwitch() {
 		os.Stdin = r
 
 		buf := new(bytes.Buffer)
-		err = Switch("", mockV1Client, buf)
+		err = switchAndPrint("", mockV1Client, buf)
 		s.ErrorIs(err, errInvalidWorkspaceKey)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -338,7 +339,7 @@ func (s *Suite) TestSwitch() {
 		s.NoError(err)
 
 		buf := new(bytes.Buffer)
-		err = Switch("test-id-1", mockV1Client, buf)
+		err = switchAndPrint("test-id-1", mockV1Client, buf)
 		s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -697,4 +698,13 @@ func (s *Suite) TestUpdate() {
 		s.NoError(err)
 		s.Equal("test-workspace", res.PreviousName)
 	})
+}
+
+// switchAndPrint is SwitchTo followed by the context table it leaves, what a
+// login shows after it asks which Workspace to use.
+func switchAndPrint(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) error {
+	if _, err := SwitchTo(workspaceNameOrID, client, out); err != nil {
+		return err
+	}
+	return config.PrintCurrentCloudContext(out)
 }

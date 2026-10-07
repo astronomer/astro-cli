@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/spf13/cobra"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
@@ -18,12 +18,6 @@ type Suite struct {
 
 func TestContext(t *testing.T) {
 	suite.Run(t, new(Suite))
-}
-
-func (s *Suite) TestNewTableOut() {
-	tab := newTableOut()
-	s.NotNil(tab)
-	s.Equal([]int{36, 36}, tab.Padding)
 }
 
 func (s *Suite) TestExists() {
@@ -101,29 +95,45 @@ func (s *Suite) TestIsCloudContext() {
 
 func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	err := Delete("astronomer.io", true)
+	out := new(bytes.Buffer)
+	removal, err := Delete("astronomer.io", true, out)
 	s.NoError(err)
+	s.Equal(&Removal{Domain: "astronomer.io", Action: "deleted"}, removal)
+	s.False(Exists("astronomer.io"))
+	_, err = config.GetCurrentDomain()
+	s.ErrorIs(err, config.ErrGetHomeString, "deleting the current context leaves none current")
+	s.Empty(out.String(), "the success line is the command's to print")
 
-	err = Delete("astronomer.io", true)
+	removal, err = Delete("astronomer.io", true, out)
 	s.ErrorIs(err, config.ErrContextNotExist)
+	s.Nil(removal)
 
-	err = Delete("", false)
+	_, err = Delete("", false, out)
 	s.ErrorIs(err, config.ErrCtxConfigErr)
 }
 
-func (s *Suite) TestDeleteContext() {
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-	err := DeleteContext(&cobra.Command{}, []string{"astronomer.io"}, true)
-	s.NoError(err)
+// A delete the config refuses to save says which context in the error it
+// returns, and prints nothing beside it: under --output json the error is the
+// one object on stdout.
+func (s *Suite) TestDeleteThatCannotSave() {
+	fs := afero.NewMemMapFs()
+	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig(testUtil.LocalPlatform), 0o600))
+	config.InitConfig(afero.NewReadOnlyFs(fs))
+	s.T().Cleanup(func() { testUtil.InitTestConfig(testUtil.LocalPlatform) })
+
+	out := new(bytes.Buffer)
+	removal, err := Delete("localhost", true, out)
+	s.Nil(removal)
+	s.ErrorContains(err, "deleting context localhost: ")
+	s.Empty(out.String())
 }
 
-func (s *Suite) TestDeleteContextWithoutConfig() {
+func (s *Suite) TestDeleteWithoutConfig() {
 	testUtil.InitTestConfig(testUtil.Initial)
-	cmd := &cobra.Command{}
-	err := DeleteContext(cmd, []string{"nope.example.com"}, true)
+	removal, err := Delete("nope.example.com", true, new(bytes.Buffer))
 	s.ErrorIs(err, config.ErrContextNotExist)
 	s.ErrorContains(err, "nope.example.com")
-	s.True(cmd.SilenceUsage, "a missing context is not a usage error")
+	s.Nil(removal)
 }
 
 func (s *Suite) TestGetContext() {
@@ -133,19 +143,67 @@ func (s *Suite) TestGetContext() {
 	s.Equal(ctx.Domain, "localhost")
 }
 
-func (s *Suite) TestSwitchContext() {
+func (s *Suite) TestSwitchTo() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	err := SwitchContext(&cobra.Command{}, []string{"localhost"})
+	s.Require().NoError(SetContext("software.example.com"))
+
+	switched, err := SwitchTo("software.example.com")
 	s.NoError(err)
+	s.Equal("software.example.com", switched.Domain)
+	s.True(switched.IsCurrent)
+	domain, err := config.GetCurrentDomain()
+	s.NoError(err)
+	s.Equal("software.example.com", domain)
+
+	s.Run("a new domain is saved and made current", func() {
+		switched, err := SwitchTo("new.example.com")
+		s.NoError(err)
+		s.Equal(Info{Domain: "new.example.com", IsCurrent: true}, switched)
+	})
 }
 
-func (s *Suite) TestListContext() {
+func (s *Suite) TestSavedIgnoresASTRODOMAIN() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	SetContext("astronomer.io")
-	buf := new(bytes.Buffer)
-	err := ListContext(&cobra.Command{}, []string{}, buf)
+	s.Require().NoError(SetContext("astronomer.io"))
+	s.T().Setenv("ASTRO_DOMAIN", "astronomer.io")
+	saved, err := Saved()
 	s.NoError(err)
-	s.Contains(buf.String(), "localhost")
+	s.Equal("localhost", saved.Domain, "the saved current context, not the variable's")
+	s.False(saved.IsCurrent, "the variable makes another one current here")
+}
+
+func (s *Suite) TestList() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	s.Require().NoError(SetContext("astronomer.io"))
+	list, err := List()
+	s.NoError(err)
+	domains := []string{}
+	for _, c := range list.Contexts {
+		domains = append(domains, c.Domain)
+		s.Equal(c.Domain == "localhost", c.IsCurrent, c.Domain)
+	}
+	s.Equal([]string{"astronomer.io", "localhost"}, domains, "sorted, with nothing else")
+	s.Equal("ck05r3bor07h40d02y2hw4n4v", list.Contexts[1].WorkspaceID)
+
+	s.Run("ASTRO_DOMAIN decides which is current, however it is spelled", func() {
+		s.T().Setenv("ASTRO_DOMAIN", "Astronomer.io")
+		list, err := List()
+		s.NoError(err)
+		s.True(list.Contexts[0].IsCurrent)
+		s.False(list.Contexts[1].IsCurrent)
+	})
+
+	s.Run("fails when the current domain has no saved context", func() {
+		s.T().Setenv("ASTRO_DOMAIN", "unsaved.example.com")
+		_, err := List()
+		s.ErrorIs(err, config.ErrNotConnected)
+	})
+
+	s.Run("fails with no current context, as the table did", func() {
+		s.Require().NoError(config.ResetCurrentContext())
+		_, err := List()
+		s.ErrorIs(err, config.ErrGetHomeString)
+	})
 }
 
 func (s *Suite) TestIsCloudDomain() {

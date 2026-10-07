@@ -149,7 +149,7 @@ test:
 # variable because cmd/astro's TestMain hides test flags from m.Run.
 .PHONY: update-schemas
 update-schemas:
-	ASTRO_UPDATE_SCHEMAS=1 go test -count=1 ./cmd/local/ ./cmd/astro/ -run 'TestPublishedJSONPayloadsKeepTheirShape|TestDeploymentInspectPrintsPinnedBytes'
+	ASTRO_UPDATE_SCHEMAS=1 go test -count=1 ./cmd/ ./cmd/local/ ./cmd/astro/ -run 'TestPublishedJSONPayloadsKeepTheirShape|TestDeploymentInspectPrintsPinnedBytes'
 
 # Each pkg/* sub-module has its own go.mod, which the root `go test ./...`
 # never descends into, so their tests need a run of their own.

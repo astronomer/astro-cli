@@ -1,20 +1,25 @@
 package cmd
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	apcAuth "github.com/astronomer/astro-cli/internal/platform/apc/auth"
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 var (
@@ -219,6 +224,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 	var (
 		tokenDomain string
 		forceRenew  bool
+		output      string
 	)
 	cmd := &cobra.Command{
 		Use:   "token",
@@ -226,20 +232,42 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 		Long:  "Print the current authentication token to standard output. This is useful for using the token in scripts or CI/CD pipelines.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return printAuthToken(cmd, tokenDomain, forceRenew, out)
+			format, err := cliout.ParseFormat(output)
+			if err != nil {
+				return err
+			}
+			return printAuthToken(cmd, tokenDomain, forceRenew, cliout.Renderer{Format: format, Out: out})
 		},
 		Example: `  # Print the current context's token
   astro auth token
 
   # Print the token for another context
-  astro auth token --domain <DOMAIN>`,
+  astro auth token --domain <DOMAIN>
+
+  # The token with its domain and expiry, for a script
+  astro auth token -o json`,
 	}
 	cmd.Flags().StringVarP(&tokenDomain, "domain", "d", "", "Print the token for a specific context domain instead of the current context")
 	cmd.Flags().BoolVar(&forceRenew, "force", false, "Renew the token from the saved login even if it has not expired yet")
+	cliout.AddOutputFlag(cmd, &output)
 	return cmd
 }
 
-func printAuthToken(cmd *cobra.Command, contextDomain string, force bool, out io.Writer) error {
+// errNoAuthToken is `astro auth token` finding a context with no login in it.
+var errNoAuthToken = errors.New("no token found. Please run 'astro login' to authenticate")
+
+// authToken is what `astro auth token -o json` publishes: the token, without
+// its "Bearer " prefix, the domain it is for, and when it expires, which is
+// absent when that is not known (tokenExpiry).
+type authToken struct {
+	Token     string     `json:"token"`
+	Domain    string     `json:"domain"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+// printAuthToken publishes the login's token. In text it is the token and
+// nothing else, so `$(astro auth token)` is the token.
+func printAuthToken(cmd *cobra.Command, contextDomain string, force bool, r cliout.Renderer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -249,10 +277,32 @@ func printAuthToken(cmd *cobra.Command, contextDomain string, force bool, out io
 	}
 
 	if c.Token == "" {
-		return fmt.Errorf("no token found. Please run 'astro login' to authenticate")
+		return errNoAuthToken
 	}
 
-	rawToken := strings.TrimPrefix(c.Token, "Bearer ")
-	fmt.Fprintln(out, rawToken)
+	tok := authToken{Token: strings.TrimPrefix(c.Token, "Bearer "), Domain: c.Domain}
+	tok.ExpiresAt = tokenExpiry(&c, tok.Token)
+	return r.Emit(&tok, cliout.Text(func(b *bufio.Writer) { fmt.Fprintln(b, tok.Token) }))
+}
+
+// tokenExpiry is when token expires: its own exp claim when it states one,
+// and otherwise the expiry its login recorded, which is the identity
+// provider's word for a browser login whose token is no JWT this reads. An
+// ASTRO_API_TOKEN with no exp claim has none: the expiry recorded for it is a
+// year from now, made up so the login reads as live, and is not published.
+func tokenExpiry(c *config.Context, token string) *time.Time {
+	if claims, err := util.ParseAPIToken(token); err == nil && claims.ExpiresAt != nil {
+		expiry := claims.ExpiresAt.UTC()
+		return &expiry
+	}
+	// The environment's token, read by the one rule every reader of the
+	// variable uses (any-case scheme, repeated, any whitespace).
+	if env, ok := astrosession.APIToken(); ok && astrosession.Credential(env) == astrosession.Credential(token) {
+		return nil
+	}
+	if expiry, err := c.GetExpiresIn(); err == nil && !expiry.IsZero() {
+		expiry = expiry.UTC()
+		return &expiry
+	}
 	return nil
 }

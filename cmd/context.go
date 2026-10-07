@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
@@ -19,6 +22,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
+	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 var (
@@ -39,7 +43,9 @@ func newContextCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comman
 		Use:     "context",
 		Aliases: []string{"c"},
 		Short:   "Manage Astro & APC contexts",
-		Long:    "Context represent a connection to Astro or APC in the form of a Domain URL. If your context is set to astronomer.io, for example, you are connected to Astro",
+		// Saved contexts are this machine's own; switch never opens a browser.
+		Annotations: map[string]string{astroCmd.NoLoginAnnotation: "true"},
+		Long:        "Context represent a connection to Astro or APC in the form of a Domain URL. If your context is set to astronomer.io, for example, you are connected to Astro",
 	}
 	cmd.AddCommand(
 		newContextListCmd(out),
@@ -50,28 +56,60 @@ func newContextCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comman
 }
 
 func newContextListCmd(out io.Writer) *cobra.Command {
+	var output string
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all contexts",
 		Long:    "List all Astro and APC contexts or domains that you've authenticated to on this machine",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return context.ListContext(cmd, args, out)
+			format, err := cliout.ParseFormat(output)
+			if err != nil {
+				return err
+			}
+			cmd.SilenceUsage = true
+			list, err := context.List()
+			if err != nil {
+				return err
+			}
+			return emitContextList(cliout.Renderer{Format: format, Out: out}, &list)
 		},
 		Example: `  # List the contexts saved on this machine
   astro context list`,
 	}
+	cliout.AddOutputFlag(cmd, &output)
 	return cmd
 }
 
+// emitContextList publishes the saved contexts; in text, the table it always
+// printed, the current context's row in green.
+func emitContextList(r cliout.Renderer, list *context.InfoList) error {
+	return r.Emit(list, func(w io.Writer) error {
+		table := printutil.Table{
+			Padding:      []int{44},
+			Header:       []string{"NAME"},
+			ColorRowCode: [2]string{"\033[1;32m", "\033[0m"},
+		}
+		for _, c := range list.Contexts {
+			table.AddRow([]string{c.Domain}, c.IsCurrent)
+		}
+		return table.Print(w)
+	})
+}
+
 func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
+	var output string
 	cmd := &cobra.Command{
 		Use:     "switch [DOMAIN]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different context",
 		Long:    "Switch to a different context. With no domain, pick one from the contexts saved on this machine. For Astro, the saved login for the domain is refreshed if it can be; the command never opens a browser.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return switchContext(cmd, args, astroV1Client, out)
+			format, err := cliout.ParseFormat(output)
+			if err != nil {
+				return err
+			}
+			return switchContext(cmd, args, astroV1Client, cliout.Renderer{Format: format, Out: out})
 		},
 		Args: cobra.MaximumNArgs(1),
 		Example: `  # Pick a context from the ones saved on this machine
@@ -80,30 +118,56 @@ func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
   # Switch to Astro
   astro context switch astronomer.io`,
 	}
+	cliout.AddOutputFlag(cmd, &output)
 	return cmd
 }
 
-func switchContext(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
+// switchContext makes a context current and publishes it as it now is. In
+// text, an Astro switch says what its login check found, as it always has,
+// and an APC switch prints the context table.
+func switchContext(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, r cliout.Renderer) error {
+	cmd.SilenceUsage = true
 	if len(args) == 0 {
-		cmd.SilenceUsage = true
-		domain, err := pickContext(cmd.InOrStdin(), out)
+		domain, err := pickContext(cmd.InOrStdin(), r.Out)
 		if err != nil {
 			return err
 		}
 		args = []string{domain}
 	}
 	domain := domainutil.ExpandShortName(args[0])
-	var err error
+	var (
+		switched context.Info
+		err      error
+	)
+	text := func(io.Writer) error { return nil }
 	if context.IsCloudDomain(domain) {
-		cmd.SilenceUsage = true
-		err = cloudSwitch(domain, astroV1Client, out)
+		if switchErr := cloudSwitch(domain, astroV1Client, cliout.NotesTo(cmd, r.Format, r.Out)); switchErr != nil {
+			return switchErr
+		}
+		switched, err = context.Saved()
 	} else {
-		err = context.SwitchContext(cmd, args)
+		switched, err = context.SwitchTo(args[0])
+		text = func(w io.Writer) error { return printSwitchedContext(w, &switched) }
 	}
-	if err == nil {
-		noteDomainOverride(cmd.ErrOrStderr(), domain)
+	if err != nil {
+		return err
 	}
-	return err
+	if err := r.Emit(&switched, text); err != nil {
+		return err
+	}
+	noteDomainOverride(cmd.ErrOrStderr(), domain)
+	return nil
+}
+
+// printSwitchedContext is the table an APC switch has always printed.
+func printSwitchedContext(w io.Writer, c *context.Info) error {
+	table := printutil.Table{
+		Padding:    []int{36, 36},
+		Header:     []string{"CONTEXT DOMAIN", "WORKSPACE"},
+		SuccessMsg: "\n Switched context",
+	}
+	table.AddRow([]string{c.Domain, c.WorkspaceID}, false)
+	return table.Print(w)
 }
 
 // errInvalidContextSelection is the context picker's answer to a choice that is
@@ -118,7 +182,7 @@ var errInvalidContextSelection = errors.New("invalid context selected")
 // CLI look as though it flips between hosts.
 func pickContext(in io.Reader, out io.Writer) (string, error) {
 	if !contextPickerMayPrompt() {
-		return "", errors.New("name the context to switch to: `astro context switch <domain>`")
+		return "", input.Required(errors.New("name the context to switch to: `astro context switch <domain>`"))
 	}
 	contexts, err := config.ListContexts()
 	if err != nil {
@@ -181,13 +245,26 @@ func noteDomainOverride(errOut io.Writer, domain string) {
 }
 
 func newContextDeleteCmd() *cobra.Command {
+	var output string
 	cmd := &cobra.Command{
 		Use:     "delete <DOMAIN>",
 		Aliases: []string{"de"},
 		Short:   "Delete a context",
 		Long:    "Delete a locally stored context to Astro or APC",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return context.DeleteContext(cmd, []string{domainutil.ExpandShortName(args[0])}, noPrompt)
+			format, err := cliout.ParseFormat(output)
+			if err != nil {
+				return err
+			}
+			cmd.SilenceUsage = true
+			out := cmd.OutOrStdout()
+			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt, cliout.NotesTo(cmd, format, out))
+			if err != nil || removal == nil {
+				return err
+			}
+			return cliout.Renderer{Format: format, Out: out}.Emit(removal, cliout.Text(func(b *bufio.Writer) {
+				fmt.Fprintf(b, "Successfully deleted context: %s\n", removal.Domain)
+			}))
 		},
 		Args: cobra.ExactArgs(1),
 		Example: `  # Delete a saved context
@@ -198,5 +275,6 @@ func newContextDeleteCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&noPrompt, "yes", "y", false, "Don't ask for confirmation before deleting the current context")
+	cliout.AddOutputFlag(cmd, &output)
 	return cmd
 }

@@ -39,3 +39,29 @@ func (s *Suite) TestShouldUseColors() {
 		})
 	}
 }
+
+// A question goes to stderr, so its colors follow stderr: colored at a
+// terminal with stdout redirected, and plain on a redirected stderr.
+func (s *Suite) TestForStderrFollowsStderrNotStdout() {
+	for _, v := range []string{cliColorForce, "CLICOLOR"} {
+		s.T().Setenv(v, "")
+		s.Require().NoError(os.Unsetenv(v))
+	}
+	redirected, err := os.CreateTemp(s.T().TempDir(), "stdout")
+	s.Require().NoError(err)
+	defer redirected.Close()
+	previousOut, previousCheck := Output, isMessagesTerminal
+	s.T().Cleanup(func() { Output, isMessagesTerminal = previousOut, previousCheck })
+	Output = redirected
+	s.Require().False(IsOutputTerminal(), "stdout is redirected")
+
+	isMessagesTerminal = func() bool { return true }
+	for _, colored := range []string{ForStderr().Bold("x"), ForStderr().Green("x"), ForStderr().Red("x"), ForStderr().Cyan("x")} {
+		s.Contains(colored, "\x1b[", "stderr is a terminal: %q", colored)
+	}
+
+	isMessagesTerminal = func() bool { return false }
+	for _, plain := range []string{ForStderr().Bold("x"), ForStderr().Green("x"), ForStderr().Red("x"), ForStderr().Cyan("x")} {
+		s.Equal("x", plain, "stderr is redirected")
+	}
+}

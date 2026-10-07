@@ -33,10 +33,11 @@ var (
 	gitignoreParseWarningMsg             = "Warning: failed to parse .gitignore: %v. Continuing without gitignore filtering."
 )
 
-// The functions here that ask or note something along the way take notes,
-// the writer those go to: stdout in text, as they always have, and stderr
-// under --output json, where stdout carries only the result. Nothing is asked
-// under json (the question is refused instead), so there it holds notes only.
+// The functions here that note something along the way take notes, the
+// writer those go to: stdout in text, as they always have, and stderr under
+// --output json, where stdout carries only the result. A question (its
+// intro, its picker and its prompt) is always on stderr, in text too, and
+// under json it is refused instead.
 
 // List returns the current Workspace's Astro IDE projects, by name.
 func List(client astrov1alpha1.APIClient) (*ProjectList, error) {
@@ -101,7 +102,7 @@ func selectIDEProject(projects []astrov1alpha1.AstroIdeProject, notes io.Writer)
 	for i := range projects {
 		list.AddRow(false, projects[i].Name, projects[i].Id)
 	}
-	i, err := list.Pick(notes, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return astrov1alpha1.AstroIdeProject{}, err
 	}
@@ -114,7 +115,7 @@ func createNewProject(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 	if err := input.MayAsk("\n> ", about); err != nil {
 		return "", err
 	}
-	fmt.Fprintln(notes, "Enter project name:")
+	fmt.Fprintln(os.Stderr, "Enter project name:")
 	name, err := input.Text("\n> ", about)
 	if err != nil {
 		return "", err
@@ -271,7 +272,7 @@ func resolveProjectID(client astrov1alpha1.APIClient, v1Client astrov1.APIClient
 		if err := input.MayAsk("\n> ", ask...); err != nil {
 			return "", false, err
 		}
-		fmt.Fprintln(notes, "Do you want to create a new project? (y/n)")
+		fmt.Fprintln(os.Stderr, "Do you want to create a new project? (y/n)")
 		choice, err := input.Text("\n> ", ask...)
 		if err != nil {
 			return "", false, err

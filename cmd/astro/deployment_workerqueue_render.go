@@ -6,7 +6,6 @@ package astro
 import (
 	"bufio"
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
@@ -22,17 +21,6 @@ var (
 	// deploymentLogsOutput is `deployment logs`'s --output.
 	deploymentLogsOutput string
 )
-
-// workerQueueAsks is where the worker-queue commands print the tables they
-// pick a worker type or a queue from: the command's writer in text, as
-// always, and stderr under json, where they are not the result. Under json a
-// pick is refused anyway, unless the flag answering it was passed.
-func workerQueueAsks(cmd *cobra.Command, format cliout.Format, out io.Writer) io.Writer {
-	if format == cliout.FormatJSON {
-		return cmd.ErrOrStderr()
-	}
-	return out
-}
 
 // emitWorkerQueue publishes a queue change: in text, the line it always
 // printed, which names the Workspace the command was run against.

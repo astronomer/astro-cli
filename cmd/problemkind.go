@@ -42,8 +42,9 @@ const (
 // returns a *httputil.StatusError carrying the response status, so the status
 // is the reliable handle and the API's message is left as prose. Before any
 // request, the "no login" errors are sentinels: config's, from the shell tree's
-// context lookup; astrosession's, from the core's; and auth's ErrLoginNeeded, for a
-// login a run under --output json may not start.
+// context lookup; astrosession's, from the core's; auth's ErrLoginNeeded, for a
+// login a run under --output json may not start; and `astro auth token`'s,
+// for a context holding no token.
 //
 // APC (Houston) failures are not classified: its GraphQL client reports
 // errors as text, with nothing typed to assert.
@@ -52,6 +53,7 @@ var cloudKinds = cliout.Kinds{
 		return errors.Is(err, config.ErrGetHomeString) ||
 			errors.Is(err, astrosession.ErrLoggedOut) ||
 			errors.Is(err, astroAuth.ErrLoginNeeded) ||
+			errors.Is(err, errNoAuthToken) ||
 			httputil.HasStatus(err, http.StatusUnauthorized)
 	}},
 	{Kind: KindForbidden, Match: status(http.StatusForbidden)},

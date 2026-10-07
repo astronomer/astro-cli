@@ -868,7 +868,7 @@ var SelectDeployment = func(deployments []houston.Deployment, message string) (h
 	for i := range deployments {
 		list.AddRow(false, deployments[i].Label, deployments[i].ReleaseName, deployments[i].ID)
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return houston.Deployment{}, err
 	}

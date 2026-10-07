@@ -743,6 +743,27 @@ func TestCheckAPIToken(t *testing.T) {
 	})
 }
 
+// A group annotated NoLoginAnnotation works on this machine's own state, so
+// the root's login check leaves it and everything under it alone: with no
+// login they still run instead of starting a browser login (or, under
+// --output json, refusing).
+func TestSetupLeavesANoLoginGroupAlone(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.ErrorReturningContext)
+	t.Setenv("ASTRO_API_TOKEN", "")
+	t.Setenv("ASTRONOMER_KEY_ID", "")
+	run := func(*cobra.Command, []string) {}
+	root := &cobra.Command{Use: topLvlCmd}
+	group := &cobra.Command{Use: "telemetry", Run: run, Annotations: map[string]string{NoLoginAnnotation: "true"}}
+	leaf := &cobra.Command{Use: "enable", Run: run}
+	other := &cobra.Command{Use: "other", Run: run}
+	group.AddCommand(leaf)
+	root.AddCommand(group, other)
+
+	assert.NoError(t, Setup(group, nil))
+	assert.NoError(t, Setup(leaf, nil), "the group's annotation covers its commands")
+	assert.Error(t, Setup(other, nil), "a command that is not annotated needs the login this config lacks")
+}
+
 // Every reader of ASTRO_API_TOKEN reads it by the one rule: a value holding
 // only the scheme is no token, so setup neither counts it as an environment
 // credential nor tries to parse it; a real token, with its scheme or

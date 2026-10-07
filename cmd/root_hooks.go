@@ -18,9 +18,10 @@ import (
 )
 
 // SetupLogging is a pre-run hook shared between APC & cloud
-// setting up log verbosity.
+// setting up log verbosity. Logs go to stderr: stdout is the command's output,
+// which under --output json is one object a script parses.
 func SetupLogging(_ *cobra.Command, _ []string) error {
-	return apcCmd.SetUpLogs(os.Stdout, verboseLevel)
+	return apcCmd.SetUpLogs(os.Stderr, verboseLevel)
 }
 
 // CreateRootPersistentPreRunE takes clients as arguments and returns a cobra

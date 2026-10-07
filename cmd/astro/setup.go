@@ -97,8 +97,9 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 		return nil
 	}
 
-	// context command does not need auth setup
-	if cmd.Parent().Use == "context" {
+	// Commands that work on this machine's own state (context, config,
+	// telemetry) say so, on themselves or on their group.
+	if needsNoLogin(cmd) {
 		return nil
 	}
 
@@ -121,6 +122,22 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	return ensureLogin(isDeploymentFile, astroV1Client)
 }
 
+// NoLoginAnnotation, set to "true" on a command or on a group, says that it
+// and everything under it work on this machine's own state and need no login:
+// Setup leaves them alone, so they never start the login flow.
+const NoLoginAnnotation = "noLogin"
+
+// needsNoLogin reports whether cmd, or a group it is in, carries
+// NoLoginAnnotation.
+func needsNoLogin(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if c.Annotations[NoLoginAnnotation] == "true" {
+			return true
+		}
+	}
+	return false
+}
+
 func isAuthTokenCmd(cmd *cobra.Command) bool {
 	return cmd.CalledAs() == "token" && cmd.Parent() != nil && cmd.Parent().Name() == "auth"
 }
@@ -140,7 +157,7 @@ func ensureLogin(deploymentFile bool, astroV1Client astrov1.APIClient) error {
 	if err != nil || used {
 		return err
 	}
-	return checkToken(astroV1Client, os.Stdout)
+	return checkToken(astroV1Client, os.Stderr)
 }
 
 // ensureEnvCredentials sets up an API token or API keys from the environment,
@@ -441,8 +458,8 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 		return false, nil
 	}
 	if !isDeploymentFile {
-		fmt.Println("Using an Astro API key")
-		fmt.Println("\nWarning: Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://www.astronomer.io/docs/astro/deployment-api-tokens")
+		fmt.Fprintln(os.Stderr, "Using an Astro API key")
+		fmt.Fprintln(os.Stderr, "\nWarning: Starting June 1st, 2024, Deployment API Keys will stop working. To ensure uninterrupted access to our services, we strongly recommend transitioning to Deployment API tokens. See https://www.astronomer.io/docs/astro/deployment-api-tokens")
 	}
 
 	domain, current := environmentDomain()
@@ -523,7 +540,7 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 	}
 	astroAPIToken := astrosession.Credential(stored)
 	if !isDeploymentFile {
-		fmt.Println("Using an Astro API Token")
+		fmt.Fprintln(os.Stderr, "Using an Astro API Token")
 	}
 
 	// Parse the token to peek at the custom claims
@@ -538,7 +555,7 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 	expiresAt := time.Now().AddDate(1, 0, 0)
 	if claims.ExpiresAt != nil {
 		if claims.ExpiresAt.Before(time.Now()) {
-			fmt.Printf("The given API Token %s has expired \n", claims.APITokenID)
+			fmt.Fprintf(os.Stderr, "The given API Token %s has expired \n", claims.APITokenID)
 			return false, errExpiredAPIToken
 		}
 		expiresAt = claims.ExpiresAt.Time
@@ -615,14 +632,14 @@ func useEnvironmentLogin(domain string, current bool, token string, expiresAt ti
 // itself is.
 func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) {
 	if err := c.SetEnvironmentContextKey("workspace", wsID); err != nil {
-		fmt.Println("no workspace set")
+		fmt.Fprintln(os.Stderr, "no workspace set")
 	}
 	if err := c.SetEnvironmentContextKey("organization", orgID); err != nil {
-		fmt.Println("no organization context set")
+		fmt.Fprintln(os.Stderr, "no organization context set")
 		return
 	}
 	if err := c.SetEnvironmentContextKey("organization_product", orgProduct); err != nil {
-		fmt.Println("no organization context set")
+		fmt.Fprintln(os.Stderr, "no organization context set")
 	}
 }
 

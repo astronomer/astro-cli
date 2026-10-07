@@ -136,15 +136,6 @@ func pickWorkspace(client astrov1.APIClient, out io.Writer, opts ...input.Option
 // asks.
 const NameOrIDAnswer = "the workspace name or ID as an argument"
 
-// Switch makes the Workspace named current, and prints the context table on
-// out, which is what logging in shows after it picks a Workspace.
-func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) error {
-	if _, err := SwitchTo(workspaceNameOrID, client, out); err != nil {
-		return err
-	}
-	return config.PrintCurrentCloudContext(out)
-}
-
 // SwitchTo makes the Workspace named, by name or id, current, and returns it.
 // With no name it asks which, drawing the menu on out.
 func SwitchTo(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) (*WorkspaceInfo, error) {

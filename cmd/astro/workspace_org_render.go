@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/spf13/cobra"
-
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
@@ -28,17 +26,6 @@ var (
 	organizationSwitchOutput string
 	organizationRoleOutput   string
 )
-
-// questionsTo is where the platform draws what it asks and the notes it
-// prints along the way: the command's own writer in text, as always, and
-// stderr under json, where stdout carries the one result. Nothing is asked
-// under json (the run refuses instead), so on stderr there are notes only.
-func questionsTo(cmd *cobra.Command, format cliout.Format, out io.Writer) io.Writer {
-	if format == cliout.FormatJSON {
-		return cmd.ErrOrStderr()
-	}
-	return out
-}
 
 // emitWorkspace publishes the Workspace a create or an update left, as
 // `workspace list` shows one; in text, the line the command always printed.

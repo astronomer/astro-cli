@@ -592,14 +592,14 @@ func TestAuthDeviceLogin(t *testing.T) {
 		}
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
 
-		out := captureStdout(t, func() {
+		out := captureStderr(t, func() {
 			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, true, false)
 			assert.NoError(t, err)
 		})
 		assert.Contains(t, out, "to open the browser to create your Astro account")
 		assert.Contains(t, out, "astro login --signin")
 
-		out = captureStdout(t, func() {
+		out = captureStderr(t, func() {
 			_, err := mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 			assert.NoError(t, err)
 		})
@@ -684,7 +684,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 		mockAuthenticator := Authenticator{tokenRequester: tokenRequester, callbackHandler: callbackHandler}
 
 		var err error
-		out := captureStdout(t, func() {
+		out := captureStderr(t, func() {
 			_, err = mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		})
 		assert.NoError(t, err)
@@ -709,7 +709,7 @@ func TestAuthDeviceLogin(t *testing.T) {
 
 		var resp Result
 		var err error
-		out := captureStdout(t, func() {
+		out := captureStderr(t, func() {
 			resp, err = mockAuthenticator.authDeviceLogin(Config{}, false, false, false)
 		})
 		assert.NoError(t, err)
@@ -882,6 +882,48 @@ func TestSwitchToLastUsedWorkspace(t *testing.T) {
 		assert.False(t, found)
 		assert.Equal(t, astrov1.Workspace{}, resp)
 	})
+}
+
+// A login that has to ask which Workspace to use asks on stderr, picker and
+// all, and stdout stays empty; the context the switch leaves is the result,
+// on the command's writer.
+func TestCheckUserSessionAsksForTheWorkspaceOnStderr(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	two := ListWorkspacesResponseOK
+	two.JSON200 = &astrov1.WorkspacesPaginated{TotalCount: 2, Workspaces: []astrov1.Workspace{
+		{Name: "first-workspace", Id: "ws-first"},
+		{Name: "second-workspace", Id: "ws-second"},
+	}}
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&two, nil)
+	mockV1Client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).Return(&mockGetSelfResponse, nil).Maybe()
+	mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrganizationsResponse, nil).Maybe()
+	mockV1Client.On("GetOrganizationWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetOrganizationResponse, nil).Maybe()
+	ctx, err := config.GetCurrentContext()
+	assert.NoError(t, err)
+
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	_, _ = w.WriteString("2\n")
+	w.Close()
+	previous := os.Stdin
+	os.Stdin = r
+	t.Cleanup(func() { os.Stdin = previous })
+
+	out := new(bytes.Buffer)
+	var stdout string
+	errOut := captureStderr(t, func() {
+		stdout = captureStdout(t, func() {
+			assert.NoError(t, checkUserSession(&ctx, mockV1Client, out, false))
+		})
+	})
+
+	assert.Empty(t, stdout)
+	assert.Contains(t, errOut, cliChooseWorkspace)
+	assert.Contains(t, errOut, "first-workspace", "the picker's table")
+	assert.Contains(t, errOut, "\n> ", "the picker's prompt")
+	assert.Contains(t, out.String(), "ws-second", "the context the switch left")
+	assert.NotContains(t, out.String(), "first-workspace", "the question is not on the command's writer")
 }
 
 func TestCheckUserSession(t *testing.T) {
@@ -1613,6 +1655,47 @@ func TestLoginReusesSavedLogin(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "Bearer browser-token", c.Token)
 		assert.Equal(t, "browser-refresh", c.RefreshToken)
+	})
+
+	// A login runs inside other commands' login checks too, where stdout is
+	// the command's own output, and with stdout redirected the person still
+	// has to see the question. So the whole flow (the welcome, the Enter
+	// prompt or the link, the progress) is on stderr, and stdout stays empty.
+	t.Run("a browser login asks on stderr and leaves stdout empty", func(t *testing.T) {
+		for _, terminal := range []bool{false, true} {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			saveLogin(t, domain, "", "", 0)
+			browserLogins := browserAuthenticator(t)
+			stubStdinIsTerminal(t, terminal)
+			mockV1Client := checkUserSessionMocks()
+			if terminal {
+				// The Enter the prompt waits for.
+				r, w, err := os.Pipe()
+				assert.NoError(t, err)
+				_, _ = w.WriteString("\n")
+				w.Close()
+				previous := os.Stdin
+				os.Stdin = r
+				t.Cleanup(func() { os.Stdin = previous })
+			}
+
+			var out string
+			errOut := captureStderr(t, func() {
+				out = captureStdout(t, func() {
+					assert.NoError(t, Login(domain, "", mockV1Client, io.Discard, false, false, false))
+				})
+			})
+
+			assert.Equal(t, 1, *browserLogins, "terminal=%v", terminal)
+			assert.Empty(t, out, "terminal=%v", terminal)
+			assert.Contains(t, errOut, "Welcome to the Astro CLI")
+			if terminal {
+				assert.Contains(t, errOut, "Press Enter")
+			} else {
+				assert.Contains(t, errOut, "Please visit the following link")
+			}
+			assert.Contains(t, errOut, "Logging in as")
+		}
 	})
 
 	t.Run("a token userinfo rejects falls back to the browser", func(t *testing.T) {

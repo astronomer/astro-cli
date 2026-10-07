@@ -8,6 +8,7 @@ package astro
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -43,7 +44,7 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
 	// roles takes no --name: only the token ID answers its picker.
-	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker(out, "", "Please select the Organization API token whose roles you would like to list:"), astroV1Client)
+	roles, err := organization.ListTokenRoles(tokenID, organizationTokenPicker("", "Please select the Organization API token whose roles you would like to list:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -71,7 +72,7 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 		if err := mayPickRole(); err != nil {
 			return err
 		}
-		fmt.Println("select a Organization Role for the new API token:")
+		fmt.Fprintln(os.Stderr, "select a Organization Role for the new API token:")
 		// no role was provided so ask the user for it
 		tokenRole, err = selectOrganizationRole()
 		if err != nil {
@@ -95,7 +96,7 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
 	res, err := organization.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole,
-		organizationTokenPicker(out, "--name", "Please select the Organization API token you would like to update:"), astroV1Client)
+		organizationTokenPicker("--name", "Please select the Organization API token you would like to update:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -109,13 +110,13 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	pick := organizationTokenPicker(out, "--name", "Please select the Organization API token you would like to rotate:")
+	pick := organizationTokenPicker("--name", "Please select the Organization API token you would like to rotate:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if !forceRotate {
-		ok, err := confirmTokenChange(out,
+		ok, err := confirmTokenChange(
 			"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 		if err != nil {
@@ -141,13 +142,13 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	}
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
-	pick := organizationTokenPicker(out, "--name", "Please select the Organization API token you would like to delete:")
+	pick := organizationTokenPicker("--name", "Please select the Organization API token you would like to delete:")
 	token, err := organization.FindCurrentToken(tokenID, name, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if !forceDelete {
-		ok, err := confirmTokenChange(out, "WARNING: API token deletion cannot be undone.",
+		ok, err := confirmTokenChange("WARNING: API token deletion cannot be undone.",
 			fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name)))
 		if err != nil {
 			return err

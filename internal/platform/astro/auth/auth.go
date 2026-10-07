@@ -220,14 +220,14 @@ func authorizeCallbackHandler() (string, error) {
 		case <-time.After(callbackTimeout):
 			err := s.Shutdown(http_context.Background())
 			if err != nil {
-				fmt.Printf("error: %s", err)
+				fmt.Fprintf(os.Stderr, "error: %s", err)
 			}
 			return "", errors.New("the operation has timed out")
 		}
 	}
 	err = s.Shutdown(http_context.Background())
 	if err != nil {
-		fmt.Printf("error: %s", err)
+		fmt.Fprintf(os.Stderr, "error: %s", err)
 	}
 
 	// return code
@@ -245,7 +245,7 @@ func quitOnInterrupt() (stop func()) {
 	go func() {
 		select {
 		case <-signals:
-			fmt.Println()
+			fmt.Fprintln(os.Stderr)
 			exitOnInterrupt(130) //nolint:mnd // the shell's exit status for a process ended by SIGINT
 		case <-done:
 		}
@@ -298,17 +298,17 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 		action := "log in"
 		if signup {
 			action = "create your Astro account"
-			fmt.Printf("Already have an Astro account? Log in from the same page, or run %s.\n", ansi.Cyan("astro login --signin"))
+			fmt.Fprintf(os.Stderr, "Already have an Astro account? Log in from the same page, or run %s.\n", ansi.ForStderr().Cyan("astro login --signin"))
 		}
-		fmt.Printf("%s to open the browser to %s or %s to quit…", ansi.Green("Press Enter"), action, ansi.Red("^C"))
+		fmt.Fprintf(os.Stderr, "%s to open the browser to %s or %s to quit…", ansi.ForStderr().Green("Press Enter"), action, ansi.ForStderr().Red("^C"))
 		_, err := fmt.Scanln()
 		if err != nil {
 			return Result{}, err
 		}
 		err = openURL(authorizeURL)
 		if err != nil {
-			fmt.Println("\nUnable to open the URL, please visit the following link: " + authorizeURL)
-			fmt.Printf("\n")
+			fmt.Fprintln(os.Stderr, "\nUnable to open the URL, please visit the following link: "+authorizeURL)
+			fmt.Fprintln(os.Stderr)
 		}
 		err = ansi.Spinner(spinnerMessage, func() error {
 			authorizationCode, err := a.callbackHandler()
@@ -322,7 +322,7 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 			return Result{}, err
 		}
 	} else {
-		fmt.Println("Please visit the following link on a device with a browser: " + authorizeURL)
+		fmt.Fprintln(os.Stderr, "Please visit the following link on a device with a browser: "+authorizeURL)
 		authorizationCode, err := a.callbackHandler()
 		if err != nil {
 			return Result{}, err
@@ -549,8 +549,7 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		if !isSwitched {
 			// show switch menu with available workspace IDs
 			fmt.Fprintln(os.Stderr, "\n"+cliChooseWorkspace)
-			err := workspace.Switch("", astroV1Client, out)
-			if err != nil {
+			if err := pickWorkspace(astroV1Client, out); err != nil {
 				fmt.Fprint(os.Stderr, cliSetWorkspaceExample)
 			}
 		} else {
@@ -558,6 +557,16 @@ func checkUserSession(c *config.Context, astroV1Client astrov1.APIClient, out io
 		}
 	}
 	return nil
+}
+
+// pickWorkspace asks which Workspace a login uses. The picker is the
+// question, so it is drawn on stderr with its intro; the context the switch
+// leaves is the result, on out.
+func pickWorkspace(astroV1Client astrov1.APIClient, out io.Writer) error {
+	if _, err := workspace.SwitchTo("", astroV1Client, os.Stderr); err != nil {
+		return err
+	}
+	return config.PrintCurrentCloudContext(out)
 }
 
 // ShouldSignup reports whether a login to domain should open the sign-up screen
@@ -602,7 +611,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 		}
 	}
 
-	// A browser login prints to stdout and then waits: on Enter at a terminal,
+	// A browser login asks on stderr and then waits: on Enter at a terminal,
 	// on the browser's callback otherwise. A run that may not ask can do
 	// neither, so it is refused before anything is printed.
 	if token == "" {
@@ -613,8 +622,8 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	}
 
 	// Welcome User
-	fmt.Print("Welcome to the Astro CLI 🚀\n")
-	fmt.Print("To learn more about Astro, go to https://www.astronomer.io/docs\n")
+	fmt.Fprint(os.Stderr, "Welcome to the Astro CLI 🚀\n")
+	fmt.Fprint(os.Stderr, "To learn more about Astro, go to https://www.astronomer.io/docs\n")
 
 	var res Result
 	if token == "" {
@@ -623,7 +632,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 			return err
 		}
 	} else {
-		fmt.Print("You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n")
+		fmt.Fprint(os.Stderr, "You are logging into Astro via an OAuth token\nThis token will expire in 1 hour and will not refresh\n")
 		res = Result{
 			AccessToken: token,
 			ExpiresIn:   3600,
@@ -738,7 +747,7 @@ func completeLogin(domain string, authConfig Config, res Result, astroV1Client a
 
 	// Progress, so stderr: this also runs inside any command's login check,
 	// where stdout is the command's own output (one object under -o json).
-	fmt.Fprintf(os.Stderr, "Logging in as %s\n", ansi.Green(res.UserEmail))
+	fmt.Fprintf(os.Stderr, "Logging in as %s\n", ansi.ForStderr().Green(res.UserEmail))
 
 	err = checkUserSession(&c, astroV1Client, out, signup)
 	if err != nil {

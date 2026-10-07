@@ -669,7 +669,7 @@ func TestWorkspaceTeamUpdateRemoveTakeWorkspace(t *testing.T) {
 		m.AssertCalled(t, "ListTeamsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(p *astrov1.ListTeamsParams) bool {
 			return p.WorkspaceId != nil && *p.WorkspaceId == other
 		}))
-		requireInOrder(t, r.stdout, "Please select a team:", "> Astro Team Engineering was successfully removed from workspace "+other)
+		requireInOrder(t, r.terminal(), "Please select a team:", "> Astro Team Engineering was successfully removed from workspace "+other)
 	})
 }
 

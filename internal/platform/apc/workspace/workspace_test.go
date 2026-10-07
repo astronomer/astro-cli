@@ -2,6 +2,8 @@ package workspace
 
 import (
 	"bytes"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -299,8 +301,13 @@ contexts:
 	defer testUtil.MockUserInput(s.T(), "q")()
 
 	buf := new(bytes.Buffer)
-	err := Switch("", 10, api, buf)
+	var err error
+	asked := captureStderr(s.T(), func() { err = Switch("", 10, api, buf) })
 	s.NoError(err)
+	// The paged table and its prompt are the question, both on stderr.
+	s.Contains(asked, mockWorkspace.ID)
+	s.Contains(asked, "Please select one of the following options")
+	s.Empty(buf.String())
 	api.AssertExpectations(s.T())
 }
 
@@ -329,10 +336,35 @@ contexts:
 	defer testUtil.MockUserInput(s.T(), "y")()
 
 	buf := new(bytes.Buffer)
-	err := Switch("", 0, api, buf)
+	var err error
+	asked := captureStderr(s.T(), func() { err = Switch("", 0, api, buf) })
 	s.ErrorIs(err, errInvalidWorkspaceKey)
-	s.Contains(buf.String(), mockWorkspace.ID)
+	// The picker is the question: on stderr, and nothing on the writer the
+	// switch's result goes to.
+	s.Contains(asked, mockWorkspace.ID)
+	s.Empty(buf.String())
 	api.AssertExpectations(s.T())
+}
+
+// captureStderr returns what f writes to the process's stderr, which it swaps
+// for a pipe while f runs.
+func captureStderr(t *testing.T, f func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := os.Stderr
+	os.Stderr = w
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
+	f()
+	os.Stderr = previous
+	w.Close()
+	return <-done
 }
 
 func (s *Suite) TestSwitchHoustonError() {

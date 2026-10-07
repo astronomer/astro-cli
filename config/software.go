@@ -13,7 +13,7 @@ var noApply = "N/A"
 // PrintSoftwareContext prints current context to stdOut
 func (c *Context) PrintSoftwareContext(out io.Writer) error {
 	context, err := c.GetContext()
-	if err != nil && !errors.Is(err, errNotConnected) {
+	if err != nil && !errors.Is(err, ErrNotConnected) {
 		return err
 	}
 

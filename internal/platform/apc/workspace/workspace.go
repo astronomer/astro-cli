@@ -225,7 +225,9 @@ func pickWorkspace(client houston.ClientInterface, out io.Writer) (string, error
 // Switch switches workspaces
 func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writer) error {
 	if id == "" {
-		sel := getWorkspaceSelection(pageSize, 0, client, out)
+		// The picker, paged or not, is the question: its table and prompt
+		// are drawn on stderr. The context it leaves is the result, on out.
+		sel := getWorkspaceSelection(pageSize, 0, client, os.Stderr)
 
 		if sel.quit {
 			return nil

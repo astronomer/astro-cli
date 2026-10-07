@@ -120,8 +120,30 @@ func rolesOK() *astrov1.UpdateApiTokenRolesResponse {
 type tokenRun struct {
 	stdout string
 	stderr string
-	err    error
-	code   int
+	// asked is what reached the process's stderr directly: every question
+	// (a y/n, a picker drawn on os.Stderr, a prompt for a value) and the
+	// notes written beside them. Questions never go to stdout, which carries
+	// only the command's result.
+	asked string
+	err   error
+	code  int
+}
+
+// noTokenQuestionOnStdout fails when an API token picker's question reached
+// stdout: a question's table goes with its question, on stderr.
+func noTokenQuestionOnStdout(t *testing.T, stdout string) {
+	t.Helper()
+	for _, line := range strings.Split(stdout, "\n") {
+		if strings.Contains(line, "Please select the") && strings.Contains(line, "API token") {
+			t.Errorf("a token picker's question went to stdout: %q", line)
+		}
+	}
+}
+
+// terminal is what a person running the command sees, questions first: the
+// order the text tests read prompts and results in.
+func (r tokenRun) terminal() string {
+	return r.asked + r.stdout
 }
 
 // execTokenCmd runs `astro deployment <args>` the way execAstroCmd does.
@@ -153,12 +175,19 @@ func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoo
 	require.NoError(t, err)
 	require.NoError(t, inW.Close())
 
-	prevOut, prevIn := os.Stdout, os.Stdin
-	os.Stdout, os.Stdin = outW, inR
-	captured := make(chan string)
+	askedR, askedW, err := os.Pipe()
+	require.NoError(t, err)
+
+	prevOut, prevErr, prevIn := os.Stdout, os.Stderr, os.Stdin
+	os.Stdout, os.Stderr, os.Stdin = outW, askedW, inR
+	captured, capturedAsked := make(chan string), make(chan string)
 	go func() {
 		b, _ := io.ReadAll(outR)
 		captured <- string(b)
+	}()
+	go func() {
+		b, _ := io.ReadAll(askedR)
+		capturedAsked <- string(b)
 	}()
 
 	var errBuf bytes.Buffer
@@ -169,12 +198,15 @@ func execAstroCmd(t *testing.T, client astrov1.APIClient, answers string, newRoo
 	ctx := context.Background()
 	runErr := cliout.Execute(ctx, root, args, outW, nil)
 
-	os.Stdout, os.Stdin = prevOut, prevIn
+	os.Stdout, os.Stderr, os.Stdin = prevOut, prevErr, prevIn
 	require.NoError(t, outW.Close())
-	stdout := <-captured
+	require.NoError(t, askedW.Close())
+	stdout, asked := <-captured, <-capturedAsked
 	_ = inR.Close()
 	_ = outR.Close()
-	return tokenRun{stdout: stdout, stderr: errBuf.String(), err: runErr, code: cliout.ExitCode(ctx, runErr)}
+	_ = askedR.Close()
+	assert.NotContains(t, stdout, "(y/n)", "a question went to stdout, which carries only the result")
+	return tokenRun{stdout: stdout, stderr: errBuf.String(), asked: asked, err: runErr, code: cliout.ExitCode(ctx, runErr)}
 }
 
 // headerCell is one column title in a table header: words joined by single
@@ -584,7 +616,8 @@ func TestDeploymentTokenText(t *testing.T) {
 				require.NoError(t, r.err)
 				assert.Equal(t, 0, r.code)
 			}
-			tc.check(t, r.stdout)
+			noTokenQuestionOnStdout(t, r.stdout)
+			tc.check(t, r.terminal())
 		})
 	}
 }

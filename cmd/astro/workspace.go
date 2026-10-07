@@ -757,7 +757,7 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, questionsTo(cmd, format, out))
+	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, cliout.NotesTo(cmd, format, out))
 	if err != nil {
 		return err
 	}
@@ -797,7 +797,7 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 			return workspace.ErrWrongEnforceInput
 		}
 	}
-	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforce, questionsTo(cmd, format, out), astroV1Client)
+	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforce, cliout.NotesTo(cmd, format, out), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -816,7 +816,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	removal, err := workspace.Delete(id, workspaceDeleteYes, questionsTo(cmd, format, out), astroV1Client)
+	removal, err := workspace.Delete(id, workspaceDeleteYes, cliout.NotesTo(cmd, format, out), astroV1Client)
 	if err != nil || removal == nil {
 		// nil, nil is a declined question, which has said so.
 		return err
@@ -954,7 +954,7 @@ func selectWorkspaceRole() (string, error) {
 	for _, role := range validWorkspaceRoles {
 		list.AddRow(false, role)
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return "", err
 	}

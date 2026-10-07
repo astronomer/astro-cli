@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/docker/docker/api/types/versions"
@@ -87,8 +88,8 @@ func oAuth(oAuthURL string) (string, error) {
 	if err := input.MayAsk(inputOAuthToken, input.About("the OAuth token from "+oAuthURL)); err != nil {
 		return "", err
 	}
-	fmt.Printf("\n" + houstonOAuthRedirect + "\n")
-	fmt.Println(oAuthURL + "\n")
+	fmt.Fprint(os.Stderr, "\n"+houstonOAuthRedirect+"\n")
+	fmt.Fprintln(os.Stderr, oAuthURL+"\n")
 	return input.Text(inputOAuthToken)
 }
 
@@ -240,7 +241,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		if err != nil {
 			return err
 		}
-		fmt.Printf(configSetDefaultWorkspace, w.Label)
+		fmt.Fprintf(os.Stderr, configSetDefaultWorkspace, w.Label)
 	}
 
 	if len(workspaces) > 1 {
@@ -249,14 +250,14 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 
 		if !isSwitched {
 			// show switch menu with available workspace IDs
-			fmt.Println("\n" + cliChooseWorkspace)
+			fmt.Fprintln(os.Stderr, "\n"+cliChooseWorkspace)
 
 			if !interactive {
 				pageSize = 0
 			}
 			err := workspace.Switch("", pageSize, client, out)
 			if err != nil {
-				fmt.Fprint(out, cliSetWorkspaceExample) //nolint:errcheck // best-effort render to the terminal
+				fmt.Fprint(os.Stderr, cliSetWorkspaceExample)
 			}
 		}
 	}
@@ -329,7 +330,7 @@ func getAuthToken(username, password string, authConfig *houston.AuthConfig, ctx
 				return "", fmt.Errorf("local auth login failed: %w", err)
 			}
 		} else {
-			fmt.Println(houstonBasicAuthDisabled)
+			fmt.Fprintln(os.Stderr, houstonBasicAuthDisabled)
 		}
 	}
 	return token, nil

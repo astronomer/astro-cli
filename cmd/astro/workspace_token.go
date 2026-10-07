@@ -7,6 +7,7 @@ package astro
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -69,7 +70,7 @@ func createWorkspaceToken(cmd *cobra.Command, out io.Writer) error {
 		if err := mayPickRole(); err != nil {
 			return err
 		}
-		fmt.Println("select a Workspace Role for the new API token:")
+		fmt.Fprintln(os.Stderr, "select a Workspace Role for the new API token:")
 		// no role was provided so ask the user for it
 		tokenRole, err = selectWorkspaceRole()
 		if err != nil {
@@ -93,7 +94,7 @@ func updateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	tokenArg(args, &tokenID)
 	cmd.SilenceUsage = true
 	res, err := workspacetoken.UpdateToken(tokenID, name, tokenName, tokenDescription, tokenRole, workspaceID,
-		workspaceTokenPicker(out, "--name", "Please select the Workspace API token you would like to update:"), astroV1Client)
+		workspaceTokenPicker("--name", "Please select the Workspace API token you would like to update:"), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -112,13 +113,13 @@ func rotateWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 		return err
 	}
 	tokenTypes := []workspacetoken.TokenType{workspacetoken.TokenTypeWORKSPACE}
-	pick := workspaceTokenPicker(out, "--name", "Please select the Workspace API token you would like to rotate:")
+	pick := workspaceTokenPicker("--name", "Please select the Workspace API token you would like to rotate:")
 	token, err := workspacetoken.FindToken(tokenID, name, ws, org, tokenTypes, pick, astroV1Client)
 	if err != nil {
 		return err
 	}
 	if !forceRotate {
-		ok, err := confirmTokenChange(out,
+		ok, err := confirmTokenChange(
 			"WARNING: API Token rotation will invalidate the current token and cannot be undone.",
 			fmt.Sprintf("\nAre you sure you want to rotate the %s API token?", ansi.Bold(token.Name)))
 		if err != nil {
@@ -148,7 +149,7 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	pick := workspaceTokenPicker(out, "--name", "Please select the API token you would like to delete from the Workspace:")
+	pick := workspaceTokenPicker("--name", "Please select the API token you would like to delete from the Workspace:")
 	token, err := workspacetoken.FindToken(tokenID, name, ws, org, nil, pick, astroV1Client)
 	if err != nil {
 		return err
@@ -161,7 +162,7 @@ func deleteWorkspaceToken(cmd *cobra.Command, args []string, out io.Writer) erro
 			question = fmt.Sprintf("\nAre you sure you want to delete the %s API token?", ansi.Bold(token.Name))
 			canceled = "Canceling API Token deletion"
 		}
-		ok, err := confirmTokenChange(out, warning, question)
+		ok, err := confirmTokenChange(warning, question)
 		if err != nil {
 			return err
 		}
@@ -194,7 +195,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 		if err := mayPickRole(); err != nil {
 			return err
 		}
-		fmt.Println("select a Workspace Role for the Organization Token:")
+		fmt.Fprintln(os.Stderr, "select a Workspace Role for the Organization Token:")
 		// no role was provided so ask the user for it
 		tokenRole, err = selectWorkspaceRole()
 		if err != nil {
@@ -202,7 +203,7 @@ func addOrgTokenToWorkspace(cmd *cobra.Command, args []string, out io.Writer) er
 		}
 	}
 	cmd.SilenceUsage = true
-	pick := organizationTokenPicker(out, "--org-token-name", "Please select the Organization API token you would like to add to the Workspace:")
+	pick := organizationTokenPicker("--org-token-name", "Please select the Organization API token you would like to add to the Workspace:")
 	token, err := organization.AddOrgTokenToWorkspace(orgTokenID, orgTokenName, tokenRole, workspaceID, pick, astroV1Client)
 	if err != nil {
 		return err
@@ -240,9 +241,9 @@ func upsertOrgTokenWorkspaceRole(cmd *cobra.Command, args []string, out io.Write
 	}
 	cmd.SilenceUsage = true
 
-	pick := workspaceTokenPicker(out, "--org-token-name", "Please select the Organization API token whose Workspace role you would like to update:")
+	pick := workspaceTokenPicker("--org-token-name", "Please select the Organization API token whose Workspace role you would like to update:")
 	if operation == tokenRoleAdd {
-		pick = organizationTokenPicker(out, "--org-token-name", "Please select the Organization API token you would like to add to the Workspace:")
+		pick = organizationTokenPicker("--org-token-name", "Please select the Organization API token you would like to add to the Workspace:")
 	}
 	token, err := workspacetoken.UpsertOrgTokenWorkspaceRole(orgTokenID, orgTokenName, tokenRole, workspaceID, operation, pick, astroV1Client)
 	if err != nil {
@@ -258,7 +259,7 @@ func removeOrganizationTokenWorkspaceRole(cmd *cobra.Command, args []string, out
 	}
 	tokenArg(args, &orgTokenID)
 	cmd.SilenceUsage = true
-	pick := workspaceTokenPicker(out, "--org-token-name", "Please select the Organization API token you would like to remove from the Workspace:")
+	pick := workspaceTokenPicker("--org-token-name", "Please select the Organization API token you would like to remove from the Workspace:")
 	removal, err := workspacetoken.RemoveOrgTokenWorkspaceRole(orgTokenID, orgTokenName, workspaceID, pick, astroV1Client)
 	if err != nil {
 		return err

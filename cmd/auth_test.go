@@ -2,14 +2,18 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
@@ -293,7 +297,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "Bearer "+expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", false, buf)
+	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -302,7 +306,7 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", expectedToken)
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", false, buf)
+	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
@@ -311,14 +315,115 @@ func (s *CmdSuite) TestAuthToken() {
 	err = c.SetContextKey("token", "")
 	s.NoError(err)
 
-	err = printAuthToken(&cobra.Command{}, "", false, buf)
+	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
 	s.EqualError(err, "no token found. Please run 'astro login' to authenticate")
 
 	// Test with no current context set
 	buf.Reset()
 	config.ResetCurrentContext()
-	err = printAuthToken(&cobra.Command{}, "", false, buf)
+	err = printAuthToken(&cobra.Command{}, "", false, textTo(buf))
 	s.Error(err)
+}
+
+// runAuthToken runs `astro auth token` with args the way main runs it.
+func runAuthToken(args ...string) (stdout, stderr string, err error) {
+	return runCommands(func(out io.Writer) []*cobra.Command {
+		auth := &cobra.Command{Use: "auth"}
+		auth.AddCommand(newAuthTokenCommand(out))
+		return []*cobra.Command{auth}
+	}, append([]string{"auth", "token"}, args...)...)
+}
+
+func (s *CmdSuite) TestAuthTokenOutput() {
+	login := func(token string) config.Context {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		c, err := config.GetCurrentContext()
+		s.Require().NoError(err)
+		s.Require().NoError(c.SetContextKey("token", token))
+		return c
+	}
+
+	s.Run("text is the bare token, for $(astro auth token)", func() {
+		login("Bearer the-token")
+		stdout, stderr, err := runAuthToken()
+		s.NoError(err)
+		s.Empty(stderr)
+		s.Equal("the-token\n", stdout)
+	})
+
+	// signed is a token whose own claims say when it expires, or say nothing.
+	signed := func(exp *time.Time) string {
+		claims := jwt.RegisteredClaims{Subject: "someone"}
+		if exp != nil {
+			claims.ExpiresAt = jwt.NewNumericDate(*exp)
+		}
+		tok, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("k"))
+		s.Require().NoError(err)
+		return tok
+	}
+
+	s.Run("json publishes the token, its domain and the expiry it states", func() {
+		exp := time.Now().Add(time.Hour).Truncate(time.Second).UTC()
+		token := signed(&exp)
+		c := login("Bearer " + token)
+		s.Require().NoError(c.SetExpiresIn(7200), "what the config records is not the token's word")
+		stdout, stderr, err := runAuthToken("-o", "json")
+		s.NoError(err)
+		s.Empty(stderr)
+		got := decodeOne[authToken](s, stdout)
+		s.Equal(token, got.Token)
+		s.Equal("astronomer.io", got.Domain)
+		s.Require().NotNil(got.ExpiresAt)
+		s.True(exp.Equal(*got.ExpiresAt), "%v, want %v", got.ExpiresAt, exp)
+	})
+
+	s.Run("json falls back to the expiry a saved login recorded", func() {
+		c := login("Bearer the-token")
+		s.Require().NoError(c.SetExpiresIn(3600))
+		stdout, _, err := runAuthToken("-o", "json")
+		s.NoError(err)
+		got := decodeOne[authToken](s, stdout)
+		s.Equal("the-token", got.Token)
+		s.Require().NotNil(got.ExpiresAt, "a browser login's token need not be a JWT this reads")
+		s.WithinDuration(time.Now().Add(time.Hour), *got.ExpiresAt, time.Minute)
+		var raw struct {
+			ExpiresAt string `json:"expires_at"`
+		}
+		s.Require().NoError(json.Unmarshal([]byte(stdout), &raw))
+		s.True(strings.HasSuffix(raw.ExpiresAt, "Z"), "published in UTC: %s", raw.ExpiresAt)
+	})
+
+	s.Run("json leaves expires_at out for an ASTRO_API_TOKEN that states none, however it is written", func() {
+		token := signed(nil)
+		for _, env := range []string{token, "bearer " + token, token + " ", "Bearer\t Bearer " + token + "\n"} {
+			c := login("")
+			s.T().Setenv("ASTRO_API_TOKEN", env)
+			// What the login check does with such a token: the variable as
+			// given, and a year, made up.
+			s.Require().NoError(c.UseEnvironmentLogin("Bearer "+env, time.Now().AddDate(1, 0, 0)))
+			stdout, _, err := runAuthToken("-o", "json")
+			s.NoError(err)
+			s.NotContains(stdout, "expires_at", "ASTRO_API_TOKEN=%q", env)
+		}
+	})
+
+	s.Run("json leaves expires_at out when nothing says", func() {
+		login("the-token")
+		stdout, _, err := runAuthToken("-o", "json")
+		s.NoError(err)
+		s.Equal(authToken{Token: "the-token", Domain: "astronomer.io"}, decodeOne[authToken](s, stdout))
+		s.NotContains(stdout, "expires_at")
+	})
+
+	s.Run("json with no login fails as unauthenticated", func() {
+		login("")
+		stdout, stderr, err := runAuthToken("-o", "json")
+		s.ErrorIs(err, errNoAuthToken)
+		s.Empty(stderr)
+		failure := decodeOne[cliout.ErrorObject](s, stdout)
+		s.Equal(KindUnauthenticated, failure.Kind)
+		s.Equal(1, failure.Code)
+	})
 }
 
 func (s *CmdSuite) TestAuthTokenWithContext() {
@@ -333,13 +438,13 @@ func (s *CmdSuite) TestAuthTokenWithContext() {
 	s.NoError(err)
 
 	// Retrieve token using explicit context domain
-	err = printAuthToken(&cobra.Command{}, c.Domain, false, buf)
+	err = printAuthToken(&cobra.Command{}, c.Domain, false, textTo(buf))
 	s.NoError(err)
 	s.Equal(expectedToken+"\n", buf.String())
 
 	// Test with non-existent context
 	buf.Reset()
-	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", false, buf)
+	err = printAuthToken(&cobra.Command{}, "nonexistent.domain.com", false, textTo(buf))
 	s.Error(err)
 }
 

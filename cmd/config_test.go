@@ -117,7 +117,7 @@ func (s *CmdSuite) TestConfigListShowsValueAndScope() {
 	s.initConfigFiles("page_size: 50\ncontexts:\n  a:\n    token: t0ken-value\ncloud:\n  api:\n    token: t0ken-value\n", "")
 
 	buf := new(bytes.Buffer)
-	s.NoError(configList(buf))
+	s.NoError(configList(textTo(buf)))
 	out := buf.String()
 	s.Regexp(`(?m)^\s*page_size\s+50\s+global\s*$`, out)
 	s.Regexp(`(?m)^\s*show_warnings\s+true\s+default\s*$`, out)
@@ -130,12 +130,12 @@ func (s *CmdSuite) TestConfigListReadsA1xProjectUnlessGlobal() {
 	s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 
 	buf := new(bytes.Buffer)
-	s.NoError(configList(buf))
+	s.NoError(configList(textTo(buf)))
 	s.Regexp(`(?m)^\s*page_size\s+70\s+project\s*$`, buf.String())
 
 	globalFlag = true
 	buf.Reset()
-	s.NoError(configList(buf))
+	s.NoError(configList(textTo(buf)))
 	s.Regexp(`(?m)^\s*page_size\s+50\s+global\s*$`, buf.String())
 }
 

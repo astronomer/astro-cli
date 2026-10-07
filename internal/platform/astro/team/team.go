@@ -59,11 +59,11 @@ func CreateTeam(name, description, role string, client astrov1.APIClient) (TeamI
 		return TeamInfo{}, err
 	}
 	if name == "" {
-		prompt := ansi.Bold("\nTeam name: ")
+		prompt := ansi.ForStderr().Bold("\nTeam name: ")
 		if err := input.MayAsk(prompt, input.About("a Team name"), input.AnsweredBy("--name")); err != nil {
 			return TeamInfo{}, err
 		}
-		fmt.Println("Please specify a name for your Team")
+		fmt.Fprintln(os.Stderr, "Please specify a name for your Team")
 		name, err = input.Text(prompt, input.About("a Team name"), input.AnsweredBy("--name"))
 		if err != nil {
 			return TeamInfo{}, err
@@ -408,7 +408,7 @@ func selectTeam(teams []astrov1.Team) (astrov1.Team, error) {
 	for i := range teams {
 		list.AddRow(false, teams[i].Name, teams[i].Id)
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return astrov1.Team{}, err
 	}
@@ -782,7 +782,7 @@ func selectTeamMember(teamMembers []astrov1.TeamMember) (astrov1.TeamMember, err
 		}
 		list.AddRow(false, fullName, teamMembers[i].Username, teamMembers[i].UserId)
 	}
-	i, err := list.Pick(os.Stdout, os.Stdin)
+	i, err := list.Pick(os.Stderr, os.Stdin)
 	if err != nil {
 		return astrov1.TeamMember{}, err
 	}
