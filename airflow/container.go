@@ -1,43 +1,22 @@
 package airflow
 
 import (
-	"bytes"
 	"crypto/md5" //nolint:gosec // reviewed; not a new risk in this shell code
 	"fmt"
-	"html/template"
-	"io"
 	"regexp"
 	"strings"
 
-	"github.com/docker/compose/v2/pkg/api"
 	"github.com/docker/docker/client"
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/airflow/types"
-	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-// StartOptions is re-exported from airflow/types for use by callers.
-type StartOptions = types.StartOptions
-
-type ContainerHandler interface {
-	Start(opts *types.StartOptions) error
-	Stop(waitForExit bool) error
-	PS() (*types.PSStatus, error)
-	Kill() error
-	Logs(follow bool, containerNames ...string) error
-	Run(args []string, user string) error
-	Bash(container string) error
-	Build(customImageName string, buildSecrets []string, noCache bool) error
-	RunDAG(dagID, settingsFile, dagFile, executionDate string, noCache, taskLogs bool) error
-	ImportSettings(settingsFile, envFile string, connections, variables, pools bool) error
-	ExportSettings(settingsFile, envFile string, connections, variables, pools, envExport bool) error
-	ComposeExport(settingsFile, composeFile string) error
+// DAGCheck checks a project's DAGs in its image, the parse and
+// pytest steps of `astro deploy`.
+type DAGCheck interface {
 	Pytest(pytestFile, customImageName, deployImageName, pytestArgsString string, buildSecrets []string) (string, error)
 	Parse(customImageName, deployImageName string, buildSecrets []string) error
 }
@@ -51,30 +30,17 @@ type RegistryHandler interface {
 type ImageHandler interface {
 	Build(dockerfile string, buildSecrets []string, config types.ImageBuildConfig) error
 	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
-	Pull(remoteImage, username, token string) error
 	GetLabel(altImageName, labelName string) (string, error)
-	ListLabels() (map[string]string, error)
 	TagLocalImage(localImage string) error
-	RunDAG(dagID, envFile, settingsFile, containerName, dagFile, executionDate string, taskLogs bool) error
 	Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error)
-	GetImageRepoSHA(registry string) (string, error)
-	RunCommand(args []string, mountDirs map[string]string, stdout, stderr io.Writer) error
-}
-
-type DockerComposeAPI interface {
-	api.Compose
-}
-
-type DockerCLIClient interface {
-	client.APIClient
 }
 
 type DockerRegistryAPI interface {
 	client.APIClient
 }
 
-func ContainerHandlerInit(airflowHome, envFile, dockerfile, projectName string) (ContainerHandler, error) {
-	return DockerComposeInit(airflowHome, envFile, dockerfile, projectName)
+func DAGCheckInit(airflowHome, envFile, dockerfile, projectName string) (DAGCheck, error) {
+	return NewDAGChecker(airflowHome, envFile, dockerfile, projectName)
 }
 
 func RegistryHandlerInit(registry string) (RegistryHandler, error) {
@@ -136,121 +102,4 @@ func sanitizeImageName(s string) string {
 		out = "project"
 	}
 	return out
-}
-
-func normalizeName(s string) string {
-	r := regexp.MustCompile("[a-z0-9_-]")
-	s = strings.ToLower(s)
-	s = strings.Join(r.FindAllString(s, -1), "")
-	return strings.TrimLeft(s, "_-")
-}
-
-// PortOverrides allows callers to override the default ports used in the
-// generated compose config. When nil, ports are read from config as usual.
-type PortOverrides struct {
-	PostgresPort  string
-	WebserverPort string
-	APIServerPort string
-}
-
-// generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, portOverrides ...*PortOverrides) (string, error) {
-	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
-	if !ok {
-		return "", errors.New("runtime version label not found")
-	}
-	var composeYml string
-	switch airflowversions.AirflowMajorVersionForRuntimeVersion(runtimeVersion) {
-	case "2":
-		composeYml = Af2Composeyml
-	case "3":
-		composeYml = Af3Composeyml
-	default:
-		return "", errors.New("unsupported Airflow major version for runtime version " + runtimeVersion)
-	}
-
-	var tmpl *template.Template
-	var err error
-	tmpl, err = template.New("yml").Parse(composeYml)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to generate config")
-	}
-
-	envExists, err := fileutil.Exists(envFile, nil)
-	if err != nil {
-		return "", errors.Wrapf(err, envPathMsg, envFile)
-	}
-
-	if envFile != "" {
-		if !envExists {
-			logger.Debugf(envNotFoundMsg, envFile)
-			envFile = ""
-		} else {
-			logger.Debugf(envFoundMsg, envFile)
-			envFile = fmt.Sprintf("env_file: %s", envFile)
-		}
-	}
-
-	triggererEnabled, err := CheckTriggererEnabled(imageLabels)
-	if err != nil {
-		fmt.Println("unable to check runtime version Triggerer is disabled")
-	}
-
-	airflowImage := ImageName(projectName, "latest")
-	if buildImage != "" {
-		airflowImage = buildImage
-	}
-
-	settingsFileExist, err := util.Exists("./" + settingsFile)
-	if err != nil {
-		logger.Debug(err)
-	}
-
-	// Determine ports: use overrides if provided, otherwise read from config
-	pgPort := config.CFG.PostgresPort.GetString()
-	wsPort := config.CFG.WebserverPort.GetString()
-	apiPort := config.CFG.APIServerPort.GetString()
-	if len(portOverrides) > 0 && portOverrides[0] != nil {
-		po := portOverrides[0]
-		if po.PostgresPort != "" {
-			pgPort = po.PostgresPort
-		}
-		if po.WebserverPort != "" {
-			wsPort = po.WebserverPort
-		}
-		if po.APIServerPort != "" {
-			apiPort = po.APIServerPort
-		}
-	}
-
-	cfg := ComposeConfig{
-		PostgresUser:          config.CFG.PostgresUser.GetString(),
-		PostgresPassword:      config.CFG.PostgresPassword.GetString(),
-		PostgresHost:          config.CFG.PostgresHost.GetString(),
-		PostgresPort:          pgPort,
-		PostgresRepository:    config.CFG.PostgresRepository.GetString(),
-		PostgresTag:           config.CFG.PostgresTag.GetString(),
-		AirflowImage:          airflowImage,
-		AirflowHome:           airflowHome,
-		AirflowUser:           "astro",
-		AirflowWebserverPort:  wsPort,
-		AirflowAPIServerPort:  apiPort,
-		AirflowEnvFile:        envFile,
-		AirflowExposePort:     config.CFG.AirflowExposePort.GetBool(),
-		MountLabel:            "z",
-		SettingsFile:          settingsFile,
-		SettingsFileExist:     settingsFileExist,
-		TriggererEnabled:      triggererEnabled,
-		DuplicateImageVolumes: config.CFG.DuplicateImageVolumes.GetBool(),
-		ProjectName:           projectName,
-		AdminUser:             airflowrt.Airflow2AdminUser,
-		AdminPassword:         airflowrt.Airflow2AdminPassword,
-	}
-
-	buff := new(bytes.Buffer)
-	err = tmpl.Execute(buff, cfg)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to generate config")
-	}
-	return buff.String(), nil
 }

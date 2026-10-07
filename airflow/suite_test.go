@@ -4,24 +4,19 @@ import (
 	"io"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/docker/docker/client"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 type Suite struct {
 	suite.Suite
-	origCmdExec              func(cmd string, stdout, stderr io.Writer, args ...string) error
-	origRegistryLogin        func(containerRuntime, server, username, password string, stdout, stderr io.Writer) error
-	origGetDockerClient      func() (client.APIClient, error)
-	origInitSettings         func(airflowURL, authHeader, settingsFile string, envConns map[string]astrov1.EnvironmentObjectConnection, connections, variables, pools bool) error
-	origCheckWebserverHealth func(url string, timeout time.Duration, component string) error
-	origOpenURL              func(url string) error
-	origStdout               *os.File
+	origCmdExec         func(cmd string, stdout, stderr io.Writer, args ...string) error
+	origRegistryLogin   func(containerRuntime, server, username, password string, stdout, stderr io.Writer) error
+	origGetDockerClient func() (client.APIClient, error)
+	origStdout          *os.File
 }
 
 var (
@@ -40,14 +35,10 @@ func (s *Suite) SetupSuite() {
 	s.origRegistryLogin = registryLogin
 	s.origGetDockerClient = getDockerClient
 	s.origStdout = os.Stdout
-	s.origInitSettings = initSettings
-	s.origCheckWebserverHealth = checkWebserverHealth
-	s.origOpenURL = openURL
 }
 
 func (s *Suite) SetupTest() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	openURL = func(url string) error { return nil }
 	registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return nil }
 }
 
@@ -55,11 +46,8 @@ func (s *Suite) TearDownTest() {
 	cmdExec = s.origCmdExec
 	registryLogin = s.origRegistryLogin
 	getDockerClient = s.origGetDockerClient
-	initSettings = s.origInitSettings
 }
 
 func (s *Suite) TearDownSubTest() {
 	os.Stdout = s.origStdout
-	checkWebserverHealth = s.origCheckWebserverHealth
-	openURL = s.origOpenURL
 }

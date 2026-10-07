@@ -7,11 +7,10 @@ package airflowrt
 // against a local Airflow 2 has to send what created it, because a mismatch is a
 // 401 on every request rather than a build error.
 //
-// Three writers create this account:
+// Two writers create this account (v1 docker mode's compose template was a
+// third, until `astro dev` was removed):
 //
 //   - v2 docker mode, from the database service's `airflow users create`
-//   - v1 docker mode, from the compose template's `airflow users create`
-//     (airflow/include/airflow2/composeyml.go.tmpl)
 //   - standalone on macOS, from AF2DarwinShim's embedded Python (see
 //     standalone_scripts/af2_darwin_shim.py)
 //
@@ -20,10 +19,11 @@ package airflowrt
 // this pair when that file is missing or blank (pkg/instances), which is a
 // fallback and not a guarantee — code that sends this pair unconditionally to a
 // non-macOS standalone Airflow 2 will 401. An earlier version of this comment
-// called that third case a writer, which is exactly the mistake that produces
-// such a caller
+// called that case a writer, which is exactly the mistake that produces such a
+// caller
 //
-// It lives in this package because this is the only leaf that reaches all three.
+// It lives in this package because this is the only leaf that reaches every
+// writer.
 // The pair started out in pkg/localrt/rt, which the docker engine and the CLI can
 // both import — but not the shim, since pkg/localrt imports pkg/airflowrt and the
 // reverse would be a cycle. Placing it where the shim cannot see it would have

@@ -20,7 +20,6 @@ import (
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/printutil"
-	"github.com/astronomer/astro-cli/settings"
 )
 
 var (
@@ -674,7 +673,7 @@ func getRuntimeVersionSelection(runtimeVersion, airflowVersion, clusterID string
 }
 
 func meetsAirflowUpgradeReqs(airflowVersion, desiredAirflowVersion string) error {
-	upgradeVersion := strconv.FormatUint(settings.AirflowVersionTwo, 10)
+	upgradeVersion := "2" // an upgrade to Airflow 2 is the one with requirements
 	minRequiredVersion := minAirflowVersion
 	airflowUpgradeVersion, err := semver.NewVersion(upgradeVersion)
 	if err != nil {

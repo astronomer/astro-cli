@@ -7,7 +7,6 @@ import (
 	http_context "context"
 	"fmt"
 	"io"
-	f "io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -30,16 +29,6 @@ func TestFileUtil(t *testing.T) {
 }
 
 var errMock = errors.New("mock error")
-
-type FileMode = f.FileMode
-
-func openFileError(name string, flag int, perm FileMode) (*os.File, error) {
-	return nil, errMock
-}
-
-func readFileError(name string) ([]byte, error) {
-	return nil, errMock
-}
 
 func (s *Suite) TestExists() {
 	filePath := "test.yaml"
@@ -337,110 +326,6 @@ func (s *Suite) TestGetFilesWithSpecificExtension() {
 		s.Run(tt.name, func() {
 			files := GetFilesWithSpecificExtension(tt.args.folderPath, tt.args.ext)
 			s.Equal(expectedFiles, files)
-		})
-	}
-}
-
-func (s *Suite) TestAddLineToFile() {
-	filePath := "./test.py"
-	content := "testing"
-
-	WriteStringToFile(filePath, content)
-	defer afero.NewOsFs().Remove(filePath)
-
-	type args struct {
-		filePath    string
-		lineText    string
-		commentText string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "basic case",
-			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
-		},
-		{
-			name: "fail open file",
-			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
-		},
-		{
-			name: "fail read file",
-			args: args{filePath: filePath, lineText: "test line!", commentText: ""},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			openFile = os.OpenFile
-			readFile = os.ReadFile
-			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			s.NoError(err)
-		})
-
-		s.Run(tt.name, func() {
-			openFile = openFileError
-			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			s.Contains(err.Error(), errMock.Error())
-		})
-
-		s.Run(tt.name, func() {
-			openFile = os.OpenFile
-			readFile = readFileError
-			err := AddLineToFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			s.Contains(err.Error(), errMock.Error())
-		})
-	}
-}
-
-func (s *Suite) TestRemoveLineFromFile() {
-	filePath := "./test.py"
-	content := "testing\nremove this"
-
-	WriteStringToFile(filePath, content)
-	defer afero.NewOsFs().Remove(filePath)
-
-	type args struct {
-		filePath    string
-		lineText    string
-		commentText string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "basic case",
-			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
-		},
-		{
-			name: "fail open file",
-			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
-		},
-		{
-			name: "fail read file",
-			args: args{filePath: filePath, lineText: "remove this", commentText: ""},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			openFile = os.OpenFile
-			readFile = os.ReadFile
-			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			s.NoError(err)
-		})
-
-		s.Run(tt.name, func() {
-			openFile = openFileError
-			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			s.ErrorIs(err, errMock)
-		})
-
-		s.Run(tt.name, func() {
-			openFile = os.OpenFile
-			readFile = readFileError
-			err := RemoveLineFromFile(tt.args.filePath, tt.args.lineText, tt.args.commentText)
-			s.ErrorIs(err, errMock)
 		})
 	}
 }

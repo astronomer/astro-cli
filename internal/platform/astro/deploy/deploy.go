@@ -67,13 +67,13 @@ var (
 	deployImagePlatformSupport = []string{"linux/amd64"}
 
 	// Monkey patched to write unit tests
-	airflowImageHandler  = airflow.ImageHandlerInit
-	containerHandlerInit = airflow.ContainerHandlerInit
-	azureUploader        = azure.Upload
-	canCiCdDeploy        = deployment.CanCiCdDeploy
-	dagTarballVersion    = ""
-	dagsUploadURL        = ""
-	nextTag              = ""
+	airflowImageHandler = airflow.ImageHandlerInit
+	dagCheckInit        = airflow.DAGCheckInit
+	azureUploader       = azure.Upload
+	canCiCdDeploy       = deployment.CanCiCdDeploy
+	dagTarballVersion   = ""
+	dagsUploadURL       = ""
+	nextTag             = ""
 )
 
 var (
@@ -572,7 +572,7 @@ func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace st
 		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
 	}
 
-	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace)
+	dagCheck, err := dagCheckInit(config.WorkingPath, envFile, "Dockerfile", namespace)
 	if err != nil {
 		return err
 	}
@@ -581,26 +581,26 @@ func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace st
 	case pytest == parse && validDAGParseVersion:
 		// parse dags
 		fmt.Println("Testing image...")
-		err := parseDAGs(deployImage, buildSecrets, containerHandler)
+		err := parseDAGs(deployImage, buildSecrets, dagCheck)
 		if err != nil {
 			return err
 		}
 	case pytest != "" && pytest != parse && pytest != parseAndPytest:
 		// check pytests
 		fmt.Println("Testing image...")
-		err := checkPytest(pytest, deployImage, buildSecrets, containerHandler)
+		err := checkPytest(pytest, deployImage, buildSecrets, dagCheck)
 		if err != nil {
 			return err
 		}
 	case pytest == parseAndPytest:
 		// parse dags and check pytests
 		fmt.Println("Testing image...")
-		err := parseDAGs(deployImage, buildSecrets, containerHandler)
+		err := parseDAGs(deployImage, buildSecrets, dagCheck)
 		if err != nil {
 			return err
 		}
 
-		err = checkPytest(pytest, deployImage, buildSecrets, containerHandler)
+		err = checkPytest(pytest, deployImage, buildSecrets, dagCheck)
 		if err != nil {
 			return err
 		}
@@ -608,9 +608,9 @@ func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace st
 	return nil
 }
 
-func parseDAGs(deployImage string, buildSecrets []string, containerHandler airflow.ContainerHandler) error {
+func parseDAGs(deployImage string, buildSecrets []string, dagCheck airflow.DAGCheck) error {
 	if !config.CFG.SkipParse.GetBool() && !util.CheckEnvBool(os.Getenv("ASTRONOMER_SKIP_PARSE")) {
-		err := containerHandler.Parse("", deployImage, buildSecrets)
+		err := dagCheck.Parse("", deployImage, buildSecrets)
 		if err != nil {
 			fmt.Println(err)
 			return errDagsParseFailed
@@ -623,12 +623,12 @@ func parseDAGs(deployImage string, buildSecrets []string, containerHandler airfl
 }
 
 // Validate code with pytest
-func checkPytest(pytest, deployImage string, buildSecrets []string, containerHandler airflow.ContainerHandler) error {
+func checkPytest(pytest, deployImage string, buildSecrets []string, dagCheck airflow.DAGCheck) error {
 	if pytest != allTests && pytest != parseAndPytest {
 		pytestFile = pytest
 	}
 
-	exitCode, err := containerHandler.Pytest(pytestFile, "", deployImage, "", buildSecrets)
+	exitCode, err := dagCheck.Pytest(pytestFile, "", deployImage, "", buildSecrets)
 	if err != nil {
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")

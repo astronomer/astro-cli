@@ -3,8 +3,6 @@
 package mocks
 
 import (
-	io "io"
-
 	types "github.com/astronomer/astro-cli/airflow/types"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -30,34 +28,6 @@ func (_m *ImageHandler) Build(dockerfile string, buildSecrets []string, config t
 	}
 
 	return r0
-}
-
-// GetImageRepoSHA provides a mock function with given fields: registry
-func (_m *ImageHandler) GetImageRepoSHA(registry string) (string, error) {
-	ret := _m.Called(registry)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetImageRepoSHA")
-	}
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (string, error)); ok {
-		return rf(registry)
-	}
-	if rf, ok := ret.Get(0).(func(string) string); ok {
-		r0 = rf(registry)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(registry)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
 }
 
 // GetLabel provides a mock function with given fields: altImageName, labelName
@@ -86,54 +56,6 @@ func (_m *ImageHandler) GetLabel(altImageName string, labelName string) (string,
 	}
 
 	return r0, r1
-}
-
-// ListLabels provides a mock function with no fields
-func (_m *ImageHandler) ListLabels() (map[string]string, error) {
-	ret := _m.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListLabels")
-	}
-
-	var r0 map[string]string
-	var r1 error
-	if rf, ok := ret.Get(0).(func() (map[string]string, error)); ok {
-		return rf()
-	}
-	if rf, ok := ret.Get(0).(func() map[string]string); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]string)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Pull provides a mock function with given fields: remoteImage, username, token
-func (_m *ImageHandler) Pull(remoteImage string, username string, token string) error {
-	ret := _m.Called(remoteImage, username, token)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Pull")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
-		r0 = rf(remoteImage, username, token)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // Push provides a mock function with given fields: remoteImage, username, token, getImageRepoSha
@@ -190,42 +112,6 @@ func (_m *ImageHandler) Pytest(pytestFile string, airflowHome string, envFile st
 	}
 
 	return r0, r1
-}
-
-// RunCommand provides a mock function with given fields: args, mountDirs, stdout, stderr
-func (_m *ImageHandler) RunCommand(args []string, mountDirs map[string]string, stdout io.Writer, stderr io.Writer) error {
-	ret := _m.Called(args, mountDirs, stdout, stderr)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RunCommand")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func([]string, map[string]string, io.Writer, io.Writer) error); ok {
-		r0 = rf(args, mountDirs, stdout, stderr)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// RunDAG provides a mock function with given fields: dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs
-func (_m *ImageHandler) RunDAG(dagID string, envFile string, settingsFile string, containerName string, dagFile string, executionDate string, taskLogs bool) error {
-	ret := _m.Called(dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs)
-
-	if len(ret) == 0 {
-		panic("no return value specified for RunDAG")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, string, string, bool) error); ok {
-		r0 = rf(dagID, envFile, settingsFile, containerName, dagFile, executionDate, taskLogs)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
 }
 
 // TagLocalImage provides a mock function with given fields: localImage

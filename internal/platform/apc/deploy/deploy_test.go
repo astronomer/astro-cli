@@ -534,7 +534,7 @@ func (s *Suite) TestAirflowSuccessForBYORegistry() {
 		s.mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		s.mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool { return strings.Contains(remoteImage, "my.registry.domain") }), mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
 		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("4.2.5", nil)
-		s.mockImageHandler.On("GetLabel", "", airflow.AirflowImageLabel).Return("2.2.5", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("2.2.5", nil)
 		return s.mockImageHandler
 	}
 

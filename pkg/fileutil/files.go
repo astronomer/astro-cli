@@ -27,8 +27,6 @@ const openPermissions = 0o755
 
 var (
 	perm                  os.FileMode = 0o755
-	openFile                          = os.OpenFile
-	readFile                          = os.ReadFile
 	ioCopy                            = io.Copy
 	newRequestWithContext             = http.NewRequestWithContext
 )
@@ -215,48 +213,6 @@ func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 	})
 
 	return files
-}
-
-func AddLineToFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
-	if err != nil {
-		return err
-	}
-	content, err := readFile(filePath)
-	if err != nil {
-		return err
-	}
-	if !strings.Contains(string(content), lineText) {
-		_, err = f.WriteString("\n" + lineText + " " + commentText)
-		if err != nil {
-			return err
-		}
-	}
-	f.Close()
-	return err
-}
-
-// This function removes airflow db init from the Dockerfile. Needed by astro run command
-func RemoveLineFromFile(filePath, lineText, commentText string) error {
-	f, err := openFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:mnd // the value is clear from context
-	if err != nil {
-		return err
-	}
-	content, err := readFile(filePath)
-	if err != nil {
-		return err
-	}
-	if strings.Contains(string(content), lineText) {
-		lastInd := strings.LastIndex(string(content), "\n"+lineText+commentText)
-		if lastInd != -1 {
-			err = WriteStringToFile(filePath, string(content)[:lastInd])
-			if err != nil {
-				return err
-			}
-		}
-	}
-	f.Close()
-	return err
 }
 
 func backOff(retryDelayInMS, backoffFactor int) int {

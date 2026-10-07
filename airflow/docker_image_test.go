@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/docker/cli/cli/config/types"
@@ -16,12 +17,10 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/astronomer/astro-cli/airflow/mocks"
 	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -37,17 +36,26 @@ func countOccurrences(haystack []string, needle string) (count int) {
 	return count
 }
 
+// buildContext is a project directory of the test's own, holding the
+// Dockerfile and .dockerignore a build reads, so nothing depends on what
+// other tests left in the package directory. Build and Pytest chdir into the
+// build context, so the test starts there too and t.Chdir puts the package
+// directory back when it ends.
+func buildContext(s *Suite) string {
+	dir := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM quay.io/astronomer/astro-runtime:12.0.0\n"), 0o600))
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, ".dockerignore"), nil, 0o600))
+	s.T().Chdir(dir)
+	return dir
+}
+
 func (s *Suite) TestDockerImageBuild() {
 	handler := DockerImage{
 		imageName: "testing",
 	}
 
-	cwd, err := os.Getwd()
-	s.NoError(err)
-
-	dockerIgnoreFile := cwd + "/.dockerignore"
-	fileutil.WriteStringToFile(dockerIgnoreFile, "")
-	defer afero.NewOsFs().Remove(dockerIgnoreFile)
+	cwd := buildContext(s)
+	var err error
 
 	options := airflowTypes.ImageBuildConfig{
 		Path:            cwd,
@@ -173,12 +181,8 @@ func (s *Suite) TestDockerImagePytest() {
 		imageName: "testing",
 	}
 
-	cwd, err := os.Getwd()
-	s.NoError(err)
-
-	dockerIgnoreFile := cwd + "/.dockerignore"
-	fileutil.WriteStringToFile(dockerIgnoreFile, "")
-	defer afero.NewOsFs().Remove(dockerIgnoreFile)
+	cwd := buildContext(s)
+	var err error
 
 	options := airflowTypes.ImageBuildConfig{
 		Path:            cwd,
@@ -284,78 +288,6 @@ func (s *Suite) TestDockerImagePytest() {
 	})
 }
 
-func (s *Suite) TestDockerPull() {
-	handler := DockerImage{
-		imageName: "testing",
-	}
-
-	s.Run("pull image without username", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return nil
-		}
-		err := handler.Pull("", "", "")
-		s.NoError(err)
-	})
-
-	s.Run("pull image with username", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return nil
-		}
-		err := handler.Pull("", "username", "")
-		s.NoError(err)
-	})
-	s.Run("pull error", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return errMock
-		}
-		err := handler.Pull("", "", "")
-		s.Error(err)
-	})
-
-	s.Run("login error", func() {
-		registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return errMock }
-		defer func() { registryLogin = func(_, _, _, _ string, _, _ io.Writer) error { return nil } }()
-		err := handler.Pull("", "username", "")
-		s.ErrorIs(err, errMock)
-	})
-
-	for _, tc := range []struct {
-		input         string
-		username      string
-		platform      string
-		expected      string
-		expectedLogin string
-	}{
-		{"images.astronomer.io/foo/bar:123", "username", testUtil.CloudPlatform, "images.astronomer.io/foo/bar:123", "images.astronomer.io"},
-		{"images.astronomer.io/foo/bar:123", "username", testUtil.LocalPlatform, "images.astronomer.io/foo/bar:123", "localhost"},
-		// Software doesn't pass a username to Push
-		{"images.software/foo/bar:123", "", testUtil.SoftwarePlatform, "images.software/foo/bar:123", ""},
-	} {
-		s.Run(tc.input, func() {
-			testUtil.InitTestConfig(tc.platform)
-			pullSeen := false
-			loginSeen := false
-			registryLogin = func(_, server, _, _ string, _, _ io.Writer) error {
-				s.Contains(server, tc.expectedLogin)
-				loginSeen = true
-				return nil
-			}
-			cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-				if cmd == "docker" && args[0] == "pull" {
-					s.Contains(args, tc.expected)
-					pullSeen = true
-					return nil
-				}
-				return fmt.Errorf("unexpected command %q %q", cmd, args)
-			}
-			err := handler.Pull(tc.input, tc.username, "")
-			s.NoError(err)
-			s.True(pullSeen)
-			s.Equal(loginSeen, tc.expectedLogin != "", "docker login expected to be seen %v", tc.expectedLogin != "")
-		})
-	}
-}
-
 func (s *Suite) TestDockerImagePush() {
 	handler := DockerImage{
 		imageName: "testing",
@@ -410,7 +342,7 @@ func (s *Suite) TestDockerImagePush() {
 		s.Run(tc.input, func() {
 			testUtil.InitTestConfig(tc.platform)
 
-			mockClient := new(mocks.DockerCLIClient)
+			mockClient := new(mocks.DockerRegistryAPI)
 			mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 			mockClient.On("ImagePush", context.Background(), tc.expected, mock.MatchedBy(func(opts image.PushOptions) bool {
 				decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -445,7 +377,7 @@ func (s *Suite) TestDockerImagePush() {
 
 	s.Run("the Docker API gets the token without its Bearer prefix", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		mockClient := new(mocks.DockerCLIClient)
+		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), "images.astronomer.io/foo/bar:123", mock.MatchedBy(func(opts image.PushOptions) bool {
 			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -484,7 +416,7 @@ func (s *Suite) TestDockerImagePushWithGetRepoImageSha() {
 
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-		mockClient := new(mocks.DockerCLIClient)
+		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), expectedImage, mock.MatchedBy(func(opts image.PushOptions) bool {
 			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -526,7 +458,7 @@ func (s *Suite) TestDockerImagePushWithGetRepoImageSha() {
 
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-		mockClient := new(mocks.DockerCLIClient)
+		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), expectedImage, mock.MatchedBy(func(opts image.PushOptions) bool {
 			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -602,47 +534,6 @@ func (s *Suite) TestDockerImageGetLabel() {
 		}
 
 		_, err := handler.GetLabel("", mockLabel)
-		s.ErrorIs(err, errGetImageLabel)
-	})
-}
-
-func (s *Suite) TestDockerImageListLabel() {
-	handler := DockerImage{
-		imageName: "testing",
-	}
-
-	s.Run("success", func() {
-		mockResp := `{"test-label": "test-val"}`
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains(args, "inspect")
-			io.WriteString(stdout, mockResp)
-			return nil
-		}
-
-		resp, err := handler.ListLabels()
-		s.NoError(err)
-		s.Equal(map[string]string{"test-label": "test-val"}, resp)
-	})
-
-	s.Run("cmdExec error", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains(args, "inspect")
-			return errMockDocker
-		}
-
-		_, err := handler.ListLabels()
-		s.ErrorIs(err, errMockDocker)
-	})
-
-	s.Run("cmdExec failure", func() {
-		mockErrResp := "test-err-response"
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains(args, "inspect")
-			io.WriteString(stderr, mockErrResp)
-			return nil
-		}
-
-		_, err := handler.ListLabels()
 		s.ErrorIs(err, errGetImageLabel)
 	})
 }
@@ -755,61 +646,6 @@ func (s *Suite) TestDockerImagePushDebugLogHidesCredentials() {
 	s.NotContains(out.String(), fakeToken)
 }
 
-func (s *Suite) TestDockerImageRun() {
-	handler := DockerImage{
-		imageName: "testing",
-	}
-
-	cwd, err := os.Getwd()
-	s.NoError(err)
-
-	dockerIgnoreFile := cwd + "/.dockerignore"
-	fileutil.WriteStringToFile(dockerIgnoreFile, "")
-	defer afero.NewOsFs().Remove(dockerIgnoreFile)
-
-	s.Run("run success without container", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			if args[0] == "run" {
-				expectedArgs := []string{
-					"run_dag",
-					"./dags/", "",
-					"./", "--verbose",
-				}
-				for i := 0; i < 5; i++ {
-					if expectedArgs[i] != args[i+15] {
-						fmt.Println(args[i+15])
-						fmt.Println(expectedArgs[i])
-						return errMock // Elements from index 0 to 4 in slice1 are not equal to elements from index 5 to 9 in slice2
-					}
-				}
-			}
-
-			return nil
-		}
-
-		err = handler.RunDAG("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
-		s.NoError(err)
-	})
-
-	s.Run("run success with container", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return nil
-		}
-
-		err = handler.RunDAG("", "./testfiles/airflow_settings_invalid.yaml", "", "test-container", "", "", true)
-		s.NoError(err)
-	})
-
-	s.Run("run error without container", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return errExecMock
-		}
-
-		err = handler.RunDAG("", "./testfiles/airflow_settings.yaml", "", "", "", "", true)
-		s.Contains(err.Error(), errExecMock.Error())
-	})
-}
-
 func (s *Suite) TestDockerImagePush403Error() {
 	handler := DockerImage{
 		imageName: "testing",
@@ -817,7 +653,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 
 	s.Run("an auth error from the Docker API with a username set skips the CLI retry", func() {
 		const fakeToken = "fake-secret-token-2b8e41"
-		mockClient := new(mocks.DockerCLIClient)
+		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
 		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
@@ -851,7 +687,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 	})
 
 	s.Run("an auth error from the Docker API without a username still tries the CLI", func() {
-		mockClient := new(mocks.DockerCLIClient)
+		mockClient := new(mocks.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
 		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
