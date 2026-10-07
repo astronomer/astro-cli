@@ -262,6 +262,44 @@ func TestRunSlimsEveryManifestInProjectRoot(t *testing.T) {
 	mustExist(t, filepath.Join(root, "proj", sidecarDir, "manifest_full.slim.json"))
 }
 
+// TestRunProjectRootSlimFailureIsolatedToOneManifest: one candidate's slim
+// write failing (its target path is pre-occupied by a directory, so this
+// works even run as root) must not cost the project its tree-hash sidecar,
+// or an earlier sibling its already-written slim file.
+func TestRunProjectRootSlimFailureIsolatedToOneManifest(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml": "name: shop\n",
+		"proj/models/a.sql":    "select 1",
+		// Alphabetically first, so it's slimmed before the failing one.
+		"proj/manifest_a.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/manifest_b.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	// manifest_b's slim write will fail: its target path is already a directory.
+	if err := os.MkdirAll(filepath.Join(root, "proj", sidecarDir, "manifest_b.slim.json"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Err != nil || summary.Results[0].Warning == "" {
+		t.Fatalf("want 1 successful project result with a warning, got %+v", summary.Results)
+	}
+	mustExist(t, filepath.Join(root, "proj", sidecarDir, sidecarName))
+	mustExist(t, filepath.Join(root, "proj", sidecarDir, "manifest_a.slim.json"))
+
+	var meta Metadata
+	readJSON(t, filepath.Join(root, "proj", sidecarDir, sidecarName), &meta)
+	if _, ok := meta.Manifests["manifest_a.json"]; !ok {
+		t.Fatalf("manifest_a.json missing from sidecar despite slimming successfully: %+v", meta.Manifests)
+	}
+	if _, ok := meta.Manifests["manifest_b.json"]; ok {
+		t.Fatalf("manifest_b.json should not be listed - its slim write failed: %+v", meta.Manifests)
+	}
+}
+
 // TestRunWarnsOnUnreadableProjectRootManifest: a candidate in the project
 // root that can't even be read (unlike one that reads fine but isn't a dbt
 // manifest) must surface a warning, not vanish silently - the project still
