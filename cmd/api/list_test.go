@@ -92,15 +92,14 @@ func TestRunList(t *testing.T) {
 
 		require.NoError(t, runList(opts))
 
-		var items []map[string]any
-		require.NoError(t, json.Unmarshal(buf.Bytes(), &items), "output must be a JSON array")
+		items := decodeEndpoints(t, buf.Bytes())
 		require.Len(t, items, 2)
 
 		byPath := map[string]map[string]any{}
 		for _, it := range items {
 			byPath[it["path"].(string)] = it
 		}
-		assert.Equal(t, "get_dags", byPath["/dags"]["operationId"])
+		assert.Equal(t, "get_dags", byPath["/dags"]["operation_id"])
 		assert.Equal(t, "GET", byPath["/dags"]["method"])
 		assert.Equal(t, []any{"DAGs"}, byPath["/dags"]["tags"])
 		// No human-readable trailer leaked into JSON output.
@@ -114,8 +113,8 @@ func TestRunList(t *testing.T) {
 
 		require.NoError(t, runList(opts))
 
-		var items []map[string]any
-		require.NoError(t, json.Unmarshal(buf.Bytes(), &items))
+		items := decodeEndpoints(t, buf.Bytes())
+		assert.NotNil(t, items, `no match is "endpoints": [], not null`)
 		assert.Empty(t, items)
 	})
 }
@@ -137,4 +136,18 @@ func TestRunList_EmptySpec(t *testing.T) {
 	err := runList(opts)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no endpoints found")
+}
+
+// decodeEndpoints reads what ls --json and describe --json print: the
+// endpoints under "endpoints", with a count that agrees with them.
+func decodeEndpoints(t *testing.T, out []byte) []map[string]any {
+	t.Helper()
+	var doc struct {
+		Endpoints []map[string]any `json:"endpoints"`
+		Count     *int             `json:"count"`
+	}
+	require.NoError(t, json.Unmarshal(out, &doc), "output must be a JSON object: %s", out)
+	require.NotNil(t, doc.Count, "output has no count: %s", out)
+	require.Len(t, doc.Endpoints, *doc.Count)
+	return doc.Endpoints
 }

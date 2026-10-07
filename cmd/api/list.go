@@ -40,7 +40,7 @@ func runList(opts *ListOptions) error {
 	}
 	endpoints = openapi.FilterEndpoints(endpoints, opts.Filter)
 
-	// JSON output: emit the (possibly empty) list as an array and stop.
+	// JSON output: emit the (possibly empty) list under "endpoints" and stop.
 	if opts.JSON {
 		return apirequest.WriteEndpointsJSON(opts.Out, endpoints)
 	}

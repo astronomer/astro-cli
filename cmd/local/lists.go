@@ -205,16 +205,10 @@ func newConfigSectionList(rows []configSectionRow, total int) configSectionList 
 	return configSectionList{total, rows}
 }
 
-// endpointList is `astro local api ls`. The key and the count are af's `api
-// ls`; af's endpoints are bare path strings, these are objects with the path
-// under "path".
-type endpointList struct {
-	Endpoints []apirequest.EndpointRow `json:"endpoints"`
-	Count     int                      `json:"count"`
-}
-
-func newEndpointList(rows []apirequest.EndpointRow, _ int) endpointList {
-	return endpointList{rows, len(rows)}
+// newEndpointList is `astro local api ls`: apirequest.EndpointList, the
+// shape `astro api … ls --json` publishes too.
+func newEndpointList(rows []apirequest.EndpointRow, _ int) apirequest.EndpointList {
+	return apirequest.NewEndpointList(rows)
 }
 
 // localList is `astro local list`: the local Airflows, one per project. No af

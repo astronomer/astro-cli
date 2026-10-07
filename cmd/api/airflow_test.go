@@ -930,8 +930,7 @@ func TestAirflowListFilterFlag(t *testing.T) {
 			cmd.SetArgs(args)
 			require.NoError(t, cmd.Execute())
 
-			var rows []map[string]any
-			require.NoError(t, json.Unmarshal(out.Bytes(), &rows))
+			rows := decodeEndpoints(t, out.Bytes())
 			require.Len(t, rows, 1)
 			assert.Equal(t, "/variables", rows[0]["path"])
 		})

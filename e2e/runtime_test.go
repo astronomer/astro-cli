@@ -78,13 +78,13 @@ func startAndStop(t *testing.T, p *project) rtStatus {
 // the contract, and asking the implementation what it promises cannot catch a
 // promise being broken.
 type rtStatus struct {
-	ProjectPath string `json:"projectPath"`
+	ProjectPath string `json:"project_path"`
 	Mode        string `json:"mode"`
 	State       string `json:"state"`
 	PID         int    `json:"pid"`
 	Port        int    `json:"port"`
 	Hostname    string `json:"hostname"`
-	Airflow     string `json:"airflowMajor"`
+	Airflow     string `json:"airflow_major"`
 }
 
 func (p *project) status() rtStatus {

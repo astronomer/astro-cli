@@ -1,0 +1,84 @@
+{
+  "endpoints": [
+    {
+      "method": "x",
+      "path": "x",
+      "operation_id": "x",
+      "summary": "x",
+      "description": "x",
+      "deprecated": true,
+      "tags": [
+        "x"
+      ],
+      "parameters": [
+        {
+          "name": "x",
+          "in": "x",
+          "description": "x",
+          "required": true,
+          "schema": {
+            "ref": "x",
+            "circular": true,
+            "truncated": true,
+            "type": "x",
+            "format": "x",
+            "description": "x",
+            "required": [
+              "x"
+            ],
+            "read_only": true,
+            "deprecated": true,
+            "properties": [
+              {
+                "name": "x",
+                "schema": {
+                  "type": "x"
+                }
+              }
+            ],
+            "items": {
+              "type": "x"
+            },
+            "one_of": [
+              {
+                "type": "x"
+              }
+            ],
+            "any_of": [
+              {
+                "type": "x"
+              }
+            ],
+            "all_of": [
+              {
+                "type": "x"
+              }
+            ],
+            "enum": [
+              "x"
+            ],
+            "default": "x",
+            "example": "x"
+          }
+        }
+      ],
+      "request_body": {
+        "description": "x",
+        "required": true,
+        "schema": {
+          "type": "x"
+        }
+      },
+      "responses": [
+        {
+          "code": "x",
+          "description": "x",
+          "schema": {
+            "type": "x"
+          }
+        }
+      ]
+    }
+  ],
+  "count": 1
+}

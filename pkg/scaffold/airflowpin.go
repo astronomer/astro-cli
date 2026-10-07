@@ -30,15 +30,15 @@ type AirflowPinChange struct {
 	// CoreReplaced reports that an apache-airflow-core entry became
 	// apache-airflow, because the version is an Airflow 2 and core is
 	// published only for Airflow 3. Its extras and marker are kept.
-	CoreReplaced bool `json:"coreReplaced,omitempty"`
+	CoreReplaced bool `json:"core_replaced,omitempty"`
 	// RemovedAirflowKey reports that a leftover [tool.astro] airflow line was
 	// deleted. It decided nothing any more, and the manifest does not load
 	// while it is there.
-	RemovedAirflowKey bool `json:"removedAirflowKey,omitempty"`
+	RemovedAirflowKey bool `json:"removed_airflow_key,omitempty"`
 	// RequiresPython is the [project] requires-python now written, when it was
 	// the bound this package derives from the previous pin and the new pin
 	// derives a different one. Empty when it was left alone.
-	RequiresPython string `json:"requiresPython,omitempty"`
+	RequiresPython string `json:"requires_python,omitempty"`
 	// Runtime is the [tool.astro] runtime now written, when the pin moved
 	// to a series the old build is not of and the caller's catalog named the
 	// newest build carrying the new pin. Empty when the line was left alone or
@@ -48,7 +48,7 @@ type AirflowPinChange struct {
 	// moved to a series the old build is not of and no catalog was given to
 	// pick a build of the new one, or it named none, or a dockerfile is
 	// declared beside it, where it picks nothing.
-	RuntimeRemoved bool `json:"runtimeRemoved,omitempty"`
+	RuntimeRemoved bool `json:"runtime_removed,omitempty"`
 	// Dockerfile is [tool.astro] dockerfile when the project declares one.
 	// Docker mode then builds from that file, so its FROM line, not the pin,
 	// decides the image, and changing it is the user's.
@@ -204,7 +204,7 @@ type AirflowKeyMigration struct {
 	Requirements []string `json:"requirements,omitempty"`
 	// CoreReplaced reports that an apache-airflow-core entry became
 	// apache-airflow, as AirflowPinChange.CoreReplaced does.
-	CoreReplaced bool `json:"coreReplaced,omitempty"`
+	CoreReplaced bool `json:"core_replaced,omitempty"`
 }
 
 // MigrateAirflowKey repairs a manifest carrying the leftover [tool.astro]

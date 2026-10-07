@@ -138,7 +138,7 @@ func TestInitJSONNamesTheDefaultSource(t *testing.T) {
 	}
 	var payload struct {
 		Airflow string `json:"airflow"`
-		Source  string `json:"airflowDefaultSource"`
+		Source  string `json:"airflow_default_source"`
 	}
 	if err := json.Unmarshal([]byte(stdout.String()), &payload); err != nil {
 		t.Fatalf("not JSON: %v\n%s", err, stdout.String())

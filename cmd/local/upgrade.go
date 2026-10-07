@@ -46,7 +46,7 @@ type airflowUpgrade struct {
 	Available string `json:"available,omitempty"`
 	// RestartNeeded reports that this project's Airflow is running on the old
 	// pin. Nothing here restarts it.
-	RestartNeeded bool `json:"restartNeeded,omitempty"`
+	RestartNeeded bool `json:"restart_needed,omitempty"`
 }
 
 func newUpgradeCmd(c *cli) *cobra.Command {

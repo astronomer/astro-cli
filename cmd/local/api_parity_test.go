@@ -275,7 +275,7 @@ func TestLocalAPIListReadsAirflow2sSpec(t *testing.T) {
 		t.Fatalf("local api ls: %v", err)
 	}
 	rows := decodeRows(t, out, "endpoints")
-	if len(rows) != 1 || rows[0]["path"] != "/dags" || rows[0]["operationId"] != "get_dags" {
+	if len(rows) != 1 || rows[0]["path"] != "/dags" || rows[0]["operation_id"] != "get_dags" {
 		t.Errorf("rows = %v", rows)
 	}
 }

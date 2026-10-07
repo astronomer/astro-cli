@@ -683,15 +683,14 @@ func TestRunDescribe_JSONOutput(t *testing.T) {
 	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "CreateDeployment", JSON: true}
 	require.NoError(t, runDescribe(opts))
 
-	var endpoints []map[string]any
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &endpoints), "output must be a JSON array")
+	endpoints := decodeEndpoints(t, buf.Bytes())
 	require.Len(t, endpoints, 1)
 	ep := endpoints[0]
 
 	assert.Equal(t, "POST", ep["method"])
-	assert.Equal(t, "CreateDeployment", ep["operationId"])
+	assert.Equal(t, "CreateDeployment", ep["operation_id"])
 
-	schema := ep["requestBody"].(map[string]any)["schema"].(map[string]any)
+	schema := ep["request_body"].(map[string]any)["schema"].(map[string]any)
 	assert.Equal(t, "CreateDeploymentRequest", schema["ref"])
 	assert.Equal(t, []any{"name"}, schema["required"])
 
@@ -717,8 +716,7 @@ func TestRunDescribe_JSONOutputMultipleMatches(t *testing.T) {
 	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags", JSON: true}
 	require.NoError(t, runDescribe(opts))
 
-	var endpoints []map[string]any
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &endpoints), "output must be a JSON array")
+	endpoints := decodeEndpoints(t, buf.Bytes())
 	require.Len(t, endpoints, 2)
 	assert.Equal(t, "GET", endpoints[0]["method"])
 	assert.Equal(t, "POST", endpoints[1]["method"])

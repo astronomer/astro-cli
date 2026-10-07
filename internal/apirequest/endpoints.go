@@ -42,11 +42,11 @@ func ListFilter(args []string, flag string) (string, error) {
 type EndpointRow struct {
 	Method         string   `json:"method"`
 	Path           string   `json:"path"`
-	OperationID    string   `json:"operationId,omitempty"`
+	OperationID    string   `json:"operation_id,omitempty"`
 	Summary        string   `json:"summary,omitempty"`
 	Tags           []string `json:"tags,omitempty"`
 	Deprecated     bool     `json:"deprecated,omitempty"`
-	PathParameters []string `json:"pathParameters,omitempty"`
+	PathParameters []string `json:"path_parameters,omitempty"`
 }
 
 // Rows turns endpoints into their machine-readable rows, always a non-nil
@@ -68,12 +68,25 @@ func Rows(endpoints []openapi.Endpoint) []EndpointRow {
 	return rows
 }
 
-// WriteEndpointsJSON writes the rows as one indented JSON array: `astro api
-// ls --json`'s shape, an array even for zero or one match.
+// EndpointList is the `ls` listing, for `astro api … ls --json` and `astro
+// local api ls -o json` alike: the rows under "endpoints", [] when nothing
+// matched, and their count. The key and the count are af's `api ls`.
+type EndpointList struct {
+	Endpoints []EndpointRow `json:"endpoints"`
+	Count     int           `json:"count"`
+}
+
+// NewEndpointList wraps rows as the listing.
+func NewEndpointList(rows []EndpointRow) EndpointList {
+	return EndpointList{Endpoints: rows, Count: len(rows)}
+}
+
+// WriteEndpointsJSON writes the listing as one indented JSON object: `astro
+// api ls --json`'s shape.
 func WriteEndpointsJSON(out io.Writer, endpoints []openapi.Endpoint) error {
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(Rows(endpoints)); err != nil {
+	if err := enc.Encode(NewEndpointList(Rows(endpoints))); err != nil {
 		return fmt.Errorf("encoding list output as JSON: %w", err)
 	}
 	return nil

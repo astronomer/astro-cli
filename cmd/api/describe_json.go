@@ -13,8 +13,9 @@ import (
 // actual fields without needing the spec; genuine cycles are cut and marked
 // with "circular": true rather than recursing forever.
 //
-// Matched endpoints are always emitted as an array so callers can rely on a
-// stable top-level shape.
+// Matched endpoints are always a list under "endpoints", with their count, as
+// `ls --json` publishes its rows, so callers can rely on one shape for zero,
+// one or many matches.
 
 // maxJSONSchemaDepth bounds resolveSchemaJSON's recursion. Cycles are already
 // cut via the ancestry set; this is a backstop against pathologically deep or
@@ -25,13 +26,13 @@ const maxJSONSchemaDepth = 40
 type endpointJSON struct {
 	Method      string           `json:"method"`
 	Path        string           `json:"path"`
-	OperationID string           `json:"operationId,omitempty"`
+	OperationID string           `json:"operation_id,omitempty"`
 	Summary     string           `json:"summary,omitempty"`
 	Description string           `json:"description,omitempty"`
 	Deprecated  bool             `json:"deprecated,omitempty"`
 	Tags        []string         `json:"tags,omitempty"`
 	Parameters  []parameterJSON  `json:"parameters,omitempty"`
-	RequestBody *requestBodyJSON `json:"requestBody,omitempty"`
+	RequestBody *requestBodyJSON `json:"request_body,omitempty"`
 	Responses   []responseJSON   `json:"responses,omitempty"`
 }
 
@@ -63,13 +64,13 @@ type schemaJSON struct {
 	Format      string         `json:"format,omitempty"`
 	Description string         `json:"description,omitempty"`
 	Required    []string       `json:"required,omitempty"`
-	ReadOnly    bool           `json:"readOnly,omitempty"`
+	ReadOnly    bool           `json:"read_only,omitempty"`
 	Deprecated  bool           `json:"deprecated,omitempty"`
 	Properties  []propertyJSON `json:"properties,omitempty"`
 	Items       *schemaJSON    `json:"items,omitempty"`
-	OneOf       []*schemaJSON  `json:"oneOf,omitempty"`
-	AnyOf       []*schemaJSON  `json:"anyOf,omitempty"`
-	AllOf       []*schemaJSON  `json:"allOf,omitempty"`
+	OneOf       []*schemaJSON  `json:"one_of,omitempty"`
+	AnyOf       []*schemaJSON  `json:"any_of,omitempty"`
+	AllOf       []*schemaJSON  `json:"all_of,omitempty"`
 	Enum        []any          `json:"enum,omitempty"`
 	Default     any            `json:"default,omitempty"`
 	Example     any            `json:"example,omitempty"`
@@ -80,7 +81,13 @@ type propertyJSON struct {
 	Schema *schemaJSON `json:"schema"`
 }
 
-// writeEndpointsJSON marshals the matched endpoints as a JSON array.
+// describeOutput is `describe --json`: the matched endpoints, resolved.
+type describeOutput struct {
+	Endpoints []endpointJSON `json:"endpoints"`
+	Count     int            `json:"count"`
+}
+
+// writeEndpointsJSON marshals the matched endpoints as one describeOutput.
 func writeEndpointsJSON(out io.Writer, matches []openapi.Endpoint, resolver *openapi.SchemaResolver) error {
 	eps := make([]endpointJSON, 0, len(matches))
 	for i := range matches {
@@ -89,7 +96,7 @@ func writeEndpointsJSON(out io.Writer, matches []openapi.Endpoint, resolver *ope
 
 	enc := json.NewEncoder(out)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(eps); err != nil {
+	if err := enc.Encode(describeOutput{Endpoints: eps, Count: len(eps)}); err != nil {
 		return fmt.Errorf("encoding describe output as JSON: %w", err)
 	}
 	return nil

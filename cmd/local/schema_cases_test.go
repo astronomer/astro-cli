@@ -126,7 +126,7 @@ var publishedPayloads = []schemaCase{
 	{"provider-list", providerList{}},
 	{"plugin-list", pluginList{}},
 	{"config-section-list", configSectionList{}},
-	{"api-endpoint-list", endpointList{}},
+	{"api-endpoint-list", apirequest.EndpointList{}},
 	{"local-list", localList{}},
 	{"local-removed", localRemoved{}},
 	{"env-list", envList{}},

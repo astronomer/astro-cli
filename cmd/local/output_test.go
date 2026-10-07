@@ -231,12 +231,12 @@ func TestStatusJSONIsLowercaseAndOmitsZeroFields(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &keys); err != nil {
 		t.Fatalf("not valid JSON: %v", err)
 	}
-	for _, gone := range []string{"StartedAt", "startedAt", "PID", "pid", "Port", "port", "Mode", "mode"} {
+	for _, gone := range []string{"StartedAt", "started_at", "startedAt", "PID", "pid", "Port", "port", "Mode", "mode"} {
 		if _, ok := keys[gone]; ok {
 			t.Errorf("stopped status should omit %q: %v", gone, keys)
 		}
 	}
-	for _, want := range []string{"projectPath", "state"} {
+	for _, want := range []string{"project_path", "state"} {
 		if _, ok := keys[want]; !ok {
 			t.Errorf("status json missing %q: %v", want, keys)
 		}

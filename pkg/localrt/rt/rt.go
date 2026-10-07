@@ -182,12 +182,12 @@ const (
 // Proxy routes are derived from it (Route.ProjectDir = ProjectPath,
 // Route.Port = itoa(Port)); routes.json itself stays a compatibility view.
 // The json tags keep this in step with the rest of the core surface: lowercase
-// keys, and the fields a stopped Airflow zeroes (pid, port, startedAt) drop out
+// keys, and the fields a stopped Airflow zeroes (pid, port, started_at) drop out
 // rather than reporting a false 0 or a zero-value timestamp.
 type Status struct {
-	ProjectPath     string `json:"projectPath"`
+	ProjectPath     string `json:"project_path"`
 	Mode            Mode   `json:"mode,omitempty"`
-	StopWithSession bool   `json:"stopWithSession,omitempty"`
+	StopWithSession bool   `json:"stop_with_session,omitempty"`
 	State           State  `json:"state"`
 	PID             int    `json:"pid,omitempty"`
 	Port            int    `json:"port,omitempty"`
@@ -196,8 +196,8 @@ type Status struct {
 	// ("2" or "3"), carried from the record. It describes the running
 	// process, not the manifest, which may have been edited since. Empty on
 	// a record written before the field existed.
-	AirflowMajor string    `json:"airflowMajor,omitempty"`
-	StartedAt    time.Time `json:"startedAt,omitzero"`
+	AirflowMajor string    `json:"airflow_major,omitempty"`
+	StartedAt    time.Time `json:"started_at,omitzero"`
 }
 
 // LogLine is one parsed line of component output.

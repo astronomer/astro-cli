@@ -74,7 +74,7 @@ type Result struct {
 	// "catalog-empty" or "built-in" (see runtimeversions.Source). Empty when a
 	// flag or a pin decided it. Consumers should treat an unknown value as a
 	// built-in default: the set may grow.
-	AirflowDefaultSource runtimeversions.Source `json:"airflowDefaultSource,omitempty"`
+	AirflowDefaultSource runtimeversions.Source `json:"airflow_default_source,omitempty"`
 	Created              []string               `json:"created"`
 	// Skipped lists entries that already existed and were left untouched.
 	Skipped []string `json:"skipped,omitempty"`

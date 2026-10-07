@@ -5,14 +5,14 @@
   "requirements": [
     "x"
   ],
-  "coreReplaced": true,
-  "removedAirflowKey": true,
-  "requiresPython": "x",
+  "core_replaced": true,
+  "removed_airflow_key": true,
+  "requires_python": "x",
   "runtime": "x",
-  "runtimeRemoved": true,
+  "runtime_removed": true,
   "dockerfile": "x",
   "manifest": "x",
   "target": "x",
   "available": "x",
-  "restartNeeded": true
+  "restart_needed": true
 }

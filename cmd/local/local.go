@@ -816,7 +816,7 @@ type listRow struct {
 	State     string `json:"state"`
 	Port      int    `json:"port,omitempty"`
 	URL       string `json:"url,omitempty"`
-	StartedAt string `json:"startedAt,omitempty"`
+	StartedAt string `json:"started_at,omitempty"`
 	Uptime    string `json:"uptime,omitempty"`
 }
 

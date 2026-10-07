@@ -1,13 +1,13 @@
 {
   "method": "x",
   "path": "x",
-  "operationId": "x",
+  "operation_id": "x",
   "summary": "x",
   "tags": [
     "x"
   ],
   "deprecated": true,
-  "pathParameters": [
+  "path_parameters": [
     "x"
   ]
 }
