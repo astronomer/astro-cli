@@ -123,6 +123,9 @@ func hashProject(dir string, cfg dbtConfig) (hash string, files int, totalBytes 
 
 		digest, n, err := hashFile(path)
 		if err != nil {
+			if !strings.Contains(rel, "/") && isManifestCandidateName(d.Name()) {
+				return nil // processProject re-reads and warns on this one itself
+			}
 			return err
 		}
 		entries = append(entries, entry{rel, digest})
