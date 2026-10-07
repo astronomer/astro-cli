@@ -1349,7 +1349,8 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
   astro deployment token create --name my-token --role DEPLOYMENT_ADMIN --deployment <DEPLOYMENT_ID>
 
   # Create one that expires in 30 days, and print only the token
-  astro deployment token create --name my-token --role DEPLOYMENT_ADMIN --deployment <DEPLOYMENT_ID> --expiration 30 --clean-output`,
+  astro deployment token create --name my-token --role DEPLOYMENT_ADMIN \
+    --deployment <DEPLOYMENT_ID> --expiration 30 --clean-output`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createDeploymentToken(cmd, out)
 		},
@@ -1468,10 +1469,12 @@ func newAddOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		Short: "Add an Organization API token to a Deployment",
 		Long:  "Add an Organization API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --org-token-name.",
 		Example: `  # Give an Organization token admin access to a Deployment
-  astro deployment token organization-token add <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN
+  astro deployment token organization-token add <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
+    --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token organization-token add --org-token-name my-org-token --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
+  astro deployment token organization-token add --org-token-name my-org-token \
+    --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenToDeploymentRole(cmd, args, out)
 		},
@@ -1488,10 +1491,12 @@ func newUpdateOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
 		Short: "Update an Organization API token's Deployment Role",
 		Long:  "Update an Organization API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --org-token-name.",
 		Example: `  # Change an Organization token's role in a Deployment
-  astro deployment token organization-token update <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN
+  astro deployment token organization-token update <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
+    --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token organization-token update --org-token-name my-org-token --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
+  astro deployment token organization-token update --org-token-name my-org-token \
+    --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateOrgTokenToDeploymentRole(cmd, args, out)
 		},
@@ -1508,10 +1513,12 @@ func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 		Short: "Add a Workspace API token's Deployment Role",
 		Long:  "Add a Workspace API token to a Deployment with a role: DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --workspace-token-name.",
 		Example: `  # Give a Workspace token admin access to a Deployment
-  astro deployment token workspace-token add <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN
+  astro deployment token workspace-token add <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
+    --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token workspace-token add --workspace-token-name my-ws-token --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
+  astro deployment token workspace-token add --workspace-token-name my-ws-token \
+    --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
@@ -1528,10 +1535,12 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 		Short: "Update a Workspace API token's Deployment Role",
 		Long:  "Update a Workspace API token's Deployment Role to DEPLOYMENT_ADMIN or a custom role name. Name the token by its ID or with --workspace-token-name.",
 		Example: `  # Change a Workspace token's role in a Deployment
-  astro deployment token workspace-token update <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN
+  astro deployment token workspace-token update <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID> \
+    --role DEPLOYMENT_ADMIN
 
   # Name the token instead of giving its ID
-  astro deployment token workspace-token update --workspace-token-name my-ws-token --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
+  astro deployment token workspace-token update --workspace-token-name my-ws-token \
+    --deployment <DEPLOYMENT_ID> --role DEPLOYMENT_ADMIN`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return updateWorkspaceTokenDeploymentRole(cmd, args, out)
 		},
@@ -1567,7 +1576,8 @@ func newRemoveOrganizationTokenDeploymentRole(out io.Writer) *cobra.Command {
   astro deployment token organization-token remove <ORG_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
   # Name the token instead of giving its ID
-  astro deployment token organization-token remove --org-token-name my-org-token --deployment <DEPLOYMENT_ID>`,
+  astro deployment token organization-token remove --org-token-name my-org-token \
+    --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeOrgTokenFromDeploymentRole(cmd, args, out)
 		},
@@ -1585,7 +1595,8 @@ func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
   astro deployment token workspace-token remove <WORKSPACE_TOKEN_ID> --deployment <DEPLOYMENT_ID>
 
   # Name the token instead of giving its ID
-  astro deployment token workspace-token remove --workspace-token-name my-ws-token --deployment <DEPLOYMENT_ID>`,
+  astro deployment token workspace-token remove --workspace-token-name my-ws-token \
+    --deployment <DEPLOYMENT_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return removeWorkspaceTokenDeploymentRole(cmd, args, out)
 		},

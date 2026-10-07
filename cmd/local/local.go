@@ -190,7 +190,9 @@ func newStartCmd(c *cli) *cobra.Command {
 			"  # In Docker rather than the default standalone mode\n" +
 			"  astro local start --docker\n\n" +
 			"  # On a port of your choosing\n" +
-			"  astro local start --port 8081",
+			"  astro local start --port 8081\n\n" +
+			"  # Wait up to ten minutes for Airflow, over a slow link or a cold image pull\n" +
+			"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			mode := localrt.Mode("")

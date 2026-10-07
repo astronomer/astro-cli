@@ -107,8 +107,9 @@ func executeRoot(root *cobra.Command, args ...string) (stdout, stderr string, er
 // The contract is applied at the root, so it reaches every command in both
 // trees, not only the core one.
 func TestACloudCommandFailsAsOneJSONObject(t *testing.T) {
-	for platform, root := range rootsUnderTest(t) {
-		t.Run(platform, func(t *testing.T) {
+	for _, tree := range treesToExecute(t) {
+		label, root := tree.name, tree.root
+		t.Run(label, func(t *testing.T) {
 			// A cloud leaf that has --output json, failing the way an API call
 			// does. The pre-run is skipped because it reads the machine's login.
 			list, _, err := root.Find([]string{"deployment", "list"})
@@ -150,9 +151,10 @@ func TestUsageErrorsAcrossTheTree(t *testing.T) {
 		{"local", "status", "--bogus"},
 		{"bogus"},
 	}
-	for platform, root := range rootsUnderTest(t) {
+	for _, tree := range treesToExecute(t) {
+		label, root := tree.name, tree.root
 		for _, args := range cases {
-			t.Run(platform+" "+strings.Join(args, " "), func(t *testing.T) {
+			t.Run(label+" "+strings.Join(args, " "), func(t *testing.T) {
 				_, stderr, err := executeRoot(root, args...)
 				if code := cliout.ExitCode(context.Background(), err); code != cliout.ExitUsage {
 					t.Errorf("exit %d, want %d (err %v)", code, cliout.ExitUsage, err)
@@ -166,8 +168,9 @@ func TestUsageErrorsAcrossTheTree(t *testing.T) {
 }
 
 func TestAJSONUsageErrorAtTheRoot(t *testing.T) {
-	for platform, root := range rootsUnderTest(t) {
-		t.Run(platform, func(t *testing.T) {
+	for _, tree := range treesToExecute(t) {
+		label, root := tree.name, tree.root
+		t.Run(label, func(t *testing.T) {
 			stdout, _, err := executeRoot(root, "local", "status", "--bogus", "-o", "json")
 			if cliout.ExitCode(context.Background(), err) != cliout.ExitUsage {
 				t.Fatalf("want a usage error, got %v", err)

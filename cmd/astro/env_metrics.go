@@ -92,7 +92,8 @@ func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 			return runEnvMetricsSet(cmd, out, args[0])
 		},
 		Example: `  # Create a Prometheus export
-  astro env metrics-export set prom_main --endpoint https://prom.example.com/api/v1/write --exporter-type PROMETHEUS
+  astro env metrics-export set prom_main --endpoint https://prom.example.com/api/v1/write \
+    --exporter-type PROMETHEUS
 
   # Replace the labels on one that must already exist
   astro env metrics-export set prom_main --label env=prod --label team=data --no-create`,

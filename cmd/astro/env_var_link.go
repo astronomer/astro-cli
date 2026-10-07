@@ -105,7 +105,8 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 			return runEnvVarLinkSet(cmd, out)
 		},
 		Example: `  # Link a workspace variable to a Deployment, with a value only it sees
-  astro env variable link set --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID> --value postgres://prod
+  astro env variable link set --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID> \
+    --value postgres://prod
 
   # Opt a Deployment out of an auto-linked variable
   astro env variable link set --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,

@@ -24,7 +24,7 @@ var (
   # Return logs for last 5 minutes of webserver logs and output them.
   astro deployment logs webserver example-deployment-uuid
 
-  # Subscribe logs from airflow workers for last 5 min and specify search term, and subscribe to more.
+  # Follow worker logs from the last 5 minutes that match a search term
   astro deployment logs workers example-deployment-uuid --follow --search "some search terms"
 
   # Return logs from airflow webserver for last 25 min.

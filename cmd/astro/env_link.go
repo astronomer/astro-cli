@@ -87,14 +87,17 @@ var airflowVarLinkNoun = linkNoun{
     --deployment <dep> --value eu-west-1
 
   # drop that value, keeping the link
-  astro env airflow-variable link set --airflow-variable-key region --workspace <ws> --deployment <dep>
+  astro env airflow-variable link set --airflow-variable-key region --workspace <ws> \
+    --deployment <dep>
 
   # opt one deployment out of an auto-linked Airflow variable
-  astro env airflow-variable link set --airflow-variable-key region --workspace <ws> --deployment <dep> --exclude
+  astro env airflow-variable link set --airflow-variable-key region --workspace <ws> \
+    --deployment <dep> --exclude
 
   # list links, and remove one
   astro env airflow-variable link list --airflow-variable-key region --workspace <ws>
-  astro env airflow-variable link delete --airflow-variable-key region --workspace <ws> --deployment <dep>`,
+  astro env airflow-variable link delete --airflow-variable-key region --workspace <ws> \
+    --deployment <dep>`,
 	addOverrideFlags: func(cmd *cobra.Command, f *linkFlags) {
 		cmd.Flags().StringVar(&f.value, "value", "", "The deployment's own value; omit it to clear any it had")
 		cmd.MarkFlagsMutuallyExclusive("value", "exclude")
@@ -211,7 +214,8 @@ func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
   astro env %[2]s link set --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID>
 
   # Opt a Deployment out of an auto-linked %[1]s
-  astro env %[2]s link set --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
+  astro env %[2]s link set --%[2]s-key <KEY> \
+    --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
 	cmd.Flags().StringVar(&f.deploymentID, "deployment-id", "", "ID of the deployment to link (required)")
@@ -239,7 +243,8 @@ func newEnvLinkDeleteCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Comman
   astro env %[2]s link delete --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID>
 
   # Remove an exclude, so an auto-linked %[1]s reaches the Deployment again
-  astro env %[2]s link delete --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
+  astro env %[2]s link delete --%[2]s-key <KEY> \
+    --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
 	cmd.Flags().StringVar(&f.deploymentID, "deployment-id", "", "ID of the deployment to unlink (required)")

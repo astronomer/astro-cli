@@ -49,7 +49,8 @@ func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
   astro deployment bundle create --deployment <id> --name my-dags
 
   # Create a non-DAG bundle mounted at a path
-  astro deployment bundle create --deployment <id> --mount-path /usr/local/airflow/dbt --bundle-type dbt`,
+  astro deployment bundle create --deployment <id> --mount-path /usr/local/airflow/dbt \
+    --bundle-type dbt`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := coalesceWorkspace()
 			if err != nil {
@@ -104,7 +105,8 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
   astro deployment bundle update --deployment <id> --name my-dags --description "my bundle"
 
   # Re-associate a non-DAG bundle (identified by mount path) with a different set of DAG bundles
-  astro deployment bundle update --deployment <id> --mount-path /usr/local/airflow/dbt --dag-bundle-ids <dag-bundle-id>`,
+  astro deployment bundle update --deployment <id> --mount-path /usr/local/airflow/dbt \
+    --dag-bundle-ids <dag-bundle-id>`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ws, err := coalesceWorkspace()

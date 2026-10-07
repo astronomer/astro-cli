@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -416,7 +417,7 @@ func splitFlagUsage(rendered string) (left, usage string) {
 func wrapText(text string, width int) string {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
-		if len(line) <= width || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+		if utf8.RuneCountInString(line) <= width || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 			continue
 		}
 		hang := 0
@@ -443,7 +444,7 @@ func wrapHanging(text string, width, hang int) string {
 	for i, word := range words {
 		switch {
 		case i == 0:
-		case lineLen+1+len(word) > room:
+		case lineLen+1+utf8.RuneCountInString(word) > room:
 			b.WriteString("\n" + strings.Repeat(" ", hang))
 			lineLen = 0
 		default:
@@ -451,7 +452,7 @@ func wrapHanging(text string, width, hang int) string {
 			lineLen++
 		}
 		b.WriteString(word)
-		lineLen += len(word)
+		lineLen += utf8.RuneCountInString(word)
 	}
 	return b.String()
 }

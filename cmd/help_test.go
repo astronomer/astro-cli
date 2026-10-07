@@ -184,11 +184,23 @@ func TestExampleRunsCatchesWhatCobraWouldRefuse(t *testing.T) {
 		{"astro af dags get <DAG_ID> --details", ""},
 		{"astro af dags get <DAG_ID> -d   # with a trailing comment", ""},
 		{`echo "x" | astro af dags get "my dag" | jq .`, ""},
+		// A command after ||, && or ; is a command of its own, and checked.
+		{"true || astro af dags get <DAG_ID>", ""},
+		{"true && astro af dags get <DAG_ID> --bogus", "unknown flag: --bogus"},
+		{"true; astro af dags get", "accepts 1 arg(s), received 0"},
+		// Every astro command on a line is checked, not only the first.
+		{"astro af dags get <DAG_ID> || astro af dags get <DAG_ID> --bogus", "unknown flag: --bogus"},
 		{"astro af dags get <DAG_ID> --bogus", "unknown flag: --bogus"},
 		{"astro af dags get", "accepts 1 arg(s), received 0"},
 		{"astro af dagz get <DAG_ID>", `"astro af" has no subcommand "dagz"`},
 		{"astro af dags", `"astro af dags" is a group, not a command`},
 		{"astro AF dags get x", `unknown command "AF"`},
+		{"ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro af dags get <DAG_ID>", ""},
+		{`A=1 B="two words" astro af dags get <DAG_ID> -d`, ""},
+		{"ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro af dags get <DAG_ID> --bogus", "unknown flag: --bogus"},
+		{"ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro af dagz get <DAG_ID>", `"astro af" has no subcommand "dagz"`},
+		{"echo x | TOKEN=y astro af dags get", "accepts 1 arg(s), received 0"},
+		{"astro af dags get <DAG_ID> \\\n    --bogus", "unknown flag: --bogus"},
 	} {
 		get.Example = "  " + tc.line
 		got := checkExampleRuns(get)
@@ -199,6 +211,122 @@ func TestExampleRunsCatchesWhatCobraWouldRefuse(t *testing.T) {
 		}
 	}
 	assert.False(t, get.Flags().Changed("details"), "linting an example sets nothing on the command")
+}
+
+func TestExampleStyleAcceptsAnEnvironmentPrefix(t *testing.T) {
+	for _, tc := range []struct {
+		example string
+		ok      bool
+	}{
+		{"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start", true},
+		{"  A=1 B=2 astro local start", true},
+		{"  echo x | TOKEN=y astro local env variable set API_TOKEN --stdin", true},
+		{"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m", false},
+		{"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m airflow standalone", false},
+		{"  export ASTRO_LOCAL_HEALTH_TIMEOUT=10m", false},
+		{"  astro deploy \\\n    --dags", true},
+		{"  astro local stop || astro local reset --yes", true},
+		{"  true || astro local reset --yes", true},
+	} {
+		got := checkExampleStyle(&cobra.Command{Use: "x", Example: tc.example})
+		if tc.ok {
+			assert.Empty(t, got, tc.example)
+		} else {
+			assert.Contains(t, got, "neither an astro command nor a # comment", tc.example)
+		}
+	}
+}
+
+// TestExampleStyleRefusesSpaceAfterAContinuation: in a shell a backslash
+// continues a line only as its last character, so ` \ ` would run the next
+// line on its own, and example-runs would check neither half.
+func TestExampleStyleRefusesSpaceAfterAContinuation(t *testing.T) {
+	got := checkExampleStyle(&cobra.Command{Use: "x", Example: "  astro deploy \\ \n    --dags"})
+	assert.Contains(t, got, "whitespace after its continuation backslash")
+}
+
+// TestExampleStylePairsContinuationsWithBackslashes: a continuation line
+// without the backslash before it pastes as a second command made only of
+// flags, and a backslash without a continuation after it runs on into the
+// next example.
+func TestExampleStylePairsContinuationsWithBackslashes(t *testing.T) {
+	assert.Empty(t, checkExampleStyle(&cobra.Command{Use: "x", Example: "  astro deploy \\\n    --dags \\\n    --wait"}))
+	assert.Contains(t, checkExampleStyle(&cobra.Command{Use: "x", Example: "  astro deploy\n    --dags"}),
+		"the line before does not end in ` \\`")
+	assert.Contains(t, checkExampleStyle(&cobra.Command{Use: "x", Example: "  astro deploy \\\n  astro deploy --dags"}),
+		"follows a continuation backslash but is not indented four spaces")
+}
+
+// TestWrapCountsCharactersNotBytes: an em dash is three bytes and one column,
+// so measuring bytes wrapped prose with one early.
+func TestWrapCountsCharactersNotBytes(t *testing.T) {
+	line := strings.Repeat("—", 30) + " end"
+	assert.Equal(t, line, wrapText(line, 34), "34 characters fit in 34 columns")
+	assert.Equal(t, line, wrapHanging(line, 34, 0))
+}
+
+func TestExampleWidthMeasuresEachLineAsPrinted(t *testing.T) {
+	fits := "  astro " + strings.Repeat("x", helpMaxWidth-len("  astro "))
+	assert.Empty(t, checkExampleWidth(&cobra.Command{Example: fits}))
+	assert.Contains(t, checkExampleWidth(&cobra.Command{Example: fits + "x"}), "101 columns")
+	// The continuation backslash is part of the line it ends.
+	assert.Contains(t, checkExampleWidth(&cobra.Command{Example: fits + " \\\n    --flag"}), "102 columns")
+	assert.Empty(t, checkExampleWidth(&cobra.Command{Example: fits[:helpMaxWidth-2] + " \\\n    --flag"}))
+	assert.Contains(t, checkExampleWidth(&cobra.Command{Example: "  # " + strings.Repeat("x", helpMaxWidth)}), "104 columns")
+}
+
+func TestUseSpellsAPassthroughOneWay(t *testing.T) {
+	for _, tc := range []struct {
+		use string
+		ok  bool
+	}{
+		{"add [NAME] [-- COMMAND...]", true},
+		{"run [-- ARGS...]", true},
+		{"add [-- COMMAND...] [NAME]", false},
+		{"add [-- command...]", false},
+		{"add [-- COMMAND]", false},
+		{"add -- COMMAND...", false},
+		{"add [--COMMAND...]", false},
+	} {
+		got := checkUse(&cobra.Command{Use: tc.use})
+		if tc.ok {
+			assert.Empty(t, got, tc.use)
+		} else {
+			assert.NotEmpty(t, got, tc.use)
+		}
+	}
+}
+
+func TestRootRowCatchesAShortThatWraps(t *testing.T) {
+	run := func(*cobra.Command, []string) {}
+	root := &cobra.Command{Use: "astro"}
+	// The column is sized to "deployment, de" (14), so a description starts
+	// at column 2+14+2 and has 100-18 = 82 before it wraps.
+	deployment := &cobra.Command{Use: "deployment", Aliases: []string{"de"}, Short: "Manage Deployments", Run: run}
+	fits := &cobra.Command{Use: "fits", Short: strings.Repeat("x", 82), Run: run}
+	wraps := &cobra.Command{Use: "wraps", Short: "Two words " + strings.Repeat("x", 73), Run: run}
+	child := &cobra.Command{Use: "child", Short: "Not on the root page " + strings.Repeat("x", 100), Run: run}
+	fits.AddCommand(child)
+	root.AddCommand(deployment, fits, wraps)
+	assert.Empty(t, checkRootRow(deployment))
+	assert.Empty(t, checkRootRow(fits))
+	assert.Contains(t, checkRootRow(wraps), "Short is 83 columns and the root page has 82 before it wraps at 100")
+	assert.Empty(t, checkRootRow(child))
+
+	// Wider than helpNameColumnMax: the column is capped there, these
+	// spellings take a line of their own, and the description on the next
+	// has 100-(2+30+2) = 66.
+	wide := &cobra.Command{Use: strings.Repeat("w", helpNameColumnMax+1), Short: strings.Repeat("x", 66), Run: run}
+	wideWraps := &cobra.Command{Use: strings.Repeat("v", helpNameColumnMax+1), Short: "Two words " + strings.Repeat("x", 57), Run: run}
+	root.AddCommand(wide, wideWraps)
+	assert.Empty(t, checkRootRow(wide))
+	assert.Contains(t, checkRootRow(wideWraps), "Short is 67 columns and the root page has 66 before it wraps at 100")
+
+	// One word the renderer cannot break overruns the width without
+	// wrapping, which counting wrapped lines alone would miss.
+	overruns := &cobra.Command{Use: "overruns", Short: strings.Repeat("x", 90), Run: run}
+	root.AddCommand(overruns)
+	assert.Contains(t, checkRootRow(overruns), "past the 100 the root page wraps at")
 }
 
 // TestLongUnwrappedFindsHandWrappedProse proves the long-unwrapped rule is not

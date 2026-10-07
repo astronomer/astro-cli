@@ -388,7 +388,8 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
   ` + cmdLine + ` ` + name + ` --value 'postgres://admin@db.example.com:5432/warehouse'
 
   # Field by field, with the password piped
-  echo "$PASSWORD" | ` + cmdLine + ` ` + name + ` --stdin --type postgres --host db.example.com --login admin`
+  echo "$PASSWORD" | ` + cmdLine + ` ` + name + ` --stdin \
+    --type postgres --host db.example.com --login admin`
 	}
 	cmd := &cobra.Command{
 		Use:     "set " + k.arg,

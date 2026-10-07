@@ -499,7 +499,8 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
   astro organization team create
 
   # Create a team with a name, a description and a role
-  astro organization team create --name "My Team" --description "Data engineering team" --role ORGANIZATION_MEMBER
+  astro organization team create --name "My Team" --description "Data engineering team" \
+    --role ORGANIZATION_MEMBER
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return teamCreate(cmd, out)
@@ -794,7 +795,8 @@ func newOrganizationTokenCreateCmd(out io.Writer) *cobra.Command {
   astro organization token create --name "CI/CD Token" --role ORGANIZATION_MEMBER
 
   # Create an owner token that expires in a year, printing only the token
-  astro organization token create --name "Deploy Token" --role ORGANIZATION_OWNER --expiration 365 --clean-output
+  astro organization token create --name "Deploy Token" --role ORGANIZATION_OWNER \
+    --expiration 365 --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createOrganizationToken(cmd, out)

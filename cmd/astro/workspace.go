@@ -374,7 +374,8 @@ func newWorkspaceTokenCreateCmd(out io.Writer) *cobra.Command {
   astro workspace token create --name "My Token" --role WORKSPACE_MEMBER
 
   # Create an operator token that expires in 30 days, printing only the token
-  astro workspace token create --name "CI Token" --role WORKSPACE_OPERATOR --expiration 30 --clean-output
+  astro workspace token create --name "CI Token" --role WORKSPACE_OPERATOR \
+    --expiration 30 --clean-output
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return createWorkspaceToken(cmd, out)
@@ -509,7 +510,8 @@ func newAddOrganizationTokenWorkspaceRole(out io.Writer) *cobra.Command {
   astro workspace token organization-token add <ORG_TOKEN_ID> --role WORKSPACE_MEMBER
 
   # Find the Organization token by its name
-  astro workspace token organization-token add --org-token-name "My Org Token" --role WORKSPACE_OPERATOR`,
+  astro workspace token organization-token add --org-token-name "My Org Token" \
+    --role WORKSPACE_OPERATOR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addOrgTokenWorkspaceRole(cmd, args, out)
 		},

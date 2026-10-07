@@ -57,8 +57,8 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 		t.Fatalf("-d in the core tree is --%s, want --deployment", core["d"])
 	}
 
-	for platform, root := range rootsUnderTest(t) {
-		for _, top := range root.Commands() {
+	for _, tree := range rootsUnderTest(t) {
+		for _, top := range tree.root.Commands() {
 			if coreNames[top.Name()] {
 				continue
 			}
@@ -67,7 +67,7 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 					if f.Shorthand != "d" || f.Name == "deployment" || f.Name == "deployment-id" || shellDashDExceptions[f.Name] {
 						return
 					}
-					t.Errorf("[%s] %s: -d is --%s; an earlier fix settled -d for the deployment selector", platform, cmd.CommandPath(), f.Name)
+					t.Errorf("[%s] %s: -d is --%s; an earlier fix settled -d for the deployment selector", tree.name, cmd.CommandPath(), f.Name)
 				})
 			})
 		}
@@ -80,10 +80,10 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 func TestShellDashDExceptionsAreAllStillReal(t *testing.T) {
 	testUtil.SetupOSArgsForGinkgo()
 	seen := map[string]bool{}
-	// The union across both branches: an entry reachable in only one of them
-	// is still real, and building one root would call it stale.
-	for _, root := range rootsUnderTest(t) {
-		for _, top := range root.Commands() {
+	// The union across every tree: an entry reachable in only one of them is
+	// still real, and building one root would call it stale.
+	for _, tree := range rootsUnderTest(t) {
+		for _, top := range tree.root.Commands() {
 			walkCmd(top, func(cmd *cobra.Command) {
 				collect(cmd, func(f *pflag.Flag) {
 					if f.Shorthand == "d" {

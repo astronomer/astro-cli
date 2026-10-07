@@ -99,7 +99,8 @@ func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 			return runEnvConnSet(cmd, out, args[0])
 		},
 		Example: `  # Set a connection from a URI, with the password piped in
-  echo "$PW" | astro env connection set db_main --value 'postgres://admin@db.example.com:5432/warehouse'
+  echo "$PW" | astro env connection set db_main \
+    --value 'postgres://admin@db.example.com:5432/warehouse'
 
   # Set it field by field
   astro env connection set db_main --type postgres --host db.example.com --login admin --port 5432`,

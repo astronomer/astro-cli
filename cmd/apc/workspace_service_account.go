@@ -18,7 +18,8 @@ var (
 
 	workspaceSaCreateExample = `
   # Create a service account in a Workspace
-  astro workspace service-account create --workspace-id <WORKSPACE_ID> --label my_label --role WORKSPACE_EDITOR
+  astro workspace service-account create --workspace-id <WORKSPACE_ID> --label my_label \
+    --role WORKSPACE_EDITOR
 `
 	workspaceSaListExample = `
   astro workspace service-account list --workspace-id <WORKSPACE_ID>

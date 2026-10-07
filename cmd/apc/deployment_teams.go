@@ -17,7 +17,8 @@ const (
   astro deployment team add --deployment-id=<DEPLOYMENT_ID> --team-id=<TEAM_ID>
 
   # Give it another role
-  astro deployment team add --deployment-id=<DEPLOYMENT_ID> --team-id=<TEAM_ID> --role=DEPLOYMENT_EDITOR`
+  astro deployment team add --deployment-id=<DEPLOYMENT_ID> --team-id=<TEAM_ID> \
+    --role=DEPLOYMENT_EDITOR`
 	deploymentTeamRemoveExample = `  # Remove a team's access to a Deployment
   astro deployment team remove <TEAM_ID> --deployment-id=<DEPLOYMENT_ID>`
 	deploymentTeamUpdateExample = `  # Change a team's role in a Deployment

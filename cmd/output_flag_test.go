@@ -64,6 +64,10 @@ var lacksOutputFlag = map[string][]string{
 		"astro context list",
 		"astro context switch",
 		"astro deploy",
+		// adopt and unadopt exist only on APC 2.1.0 and later, so this test
+		// first saw them when it began building that tree; they predate it,
+		// like the rest of the APC deployment family listed here.
+		"astro deployment adopt",
 		"astro deployment airflow upgrade",
 		"astro deployment create",
 		"astro deployment delete",
@@ -81,6 +85,7 @@ var lacksOutputFlag = map[string][]string{
 		"astro deployment team list",
 		"astro deployment team remove",
 		"astro deployment team update",
+		"astro deployment unadopt",
 		"astro deployment update",
 		"astro deployment user add",
 		"astro deployment user list",
@@ -146,13 +151,13 @@ func exemptByDesign(path string) bool {
 }
 
 func TestEveryCommandCanReachOutputJSON(t *testing.T) {
-	for platform, root := range rootsUnderTest(t) {
+	for _, tree := range rootsUnderTest(t) {
 		allowed := map[string]bool{}
-		for _, p := range lacksOutputFlag[platform] {
+		for _, p := range lacksOutputFlag[tree.platform] {
 			allowed[p] = true
 		}
 		var missing []string
-		walkCmd(root, func(cmd *cobra.Command) {
+		walkCmd(tree.root, func(cmd *cobra.Command) {
 			path := cmd.CommandPath()
 			if !visibleRunnable(cmd) || exemptByDesign(path) || allowed[path] || reachesJSONOutput(cmd) {
 				return
@@ -162,34 +167,58 @@ func TestEveryCommandCanReachOutputJSON(t *testing.T) {
 		sort.Strings(missing)
 		for _, p := range missing {
 			t.Errorf("[%s] %s has no --output json. Every command offers one (`cliout.AddOutputFlag`, "+
-				"rendering through cliout.Renderer); do not add it to lacksOutputFlag", platform, p)
+				"rendering through cliout.Renderer); do not add it to lacksOutputFlag", tree.name, p)
 		}
 	}
 }
 
 // The allowlist only shrinks: each entry must still name a visible, runnable
-// command in its platform that still lacks the flag.
+// command that still lacks the flag in some tree of its platform. A command
+// one configuration builds and another does not (APC's version-gated
+// deployment adopt) is excused by one entry for the platform, and stays real
+// while any tree that builds it still lacks the flag.
 func TestOutputFlagAllowlistOnlyShrinks(t *testing.T) {
-	for platform, root := range rootsUnderTest(t) {
+	byPlatform := map[string][]map[string]*cobra.Command{}
+	for _, tree := range rootsUnderTest(t) {
 		byPath := map[string]*cobra.Command{}
-		walkCmd(root, func(cmd *cobra.Command) { byPath[cmd.CommandPath()] = cmd })
-
+		walkCmd(tree.root, func(cmd *cobra.Command) { byPath[cmd.CommandPath()] = cmd })
+		byPlatform[tree.platform] = append(byPlatform[tree.platform], byPath)
+	}
+	for platform, trees := range byPlatform {
 		seen := map[string]bool{}
 		for _, p := range lacksOutputFlag[platform] {
 			if seen[p] {
 				t.Errorf("[%s] %q is listed twice in lacksOutputFlag", platform, p)
 			}
 			seen[p] = true
-			cmd, ok := byPath[p]
+			// Why the entry is stale, in the first tree that has the
+			// command; none if any tree still needs it.
+			stale, exists := "", false
+			for _, byPath := range trees {
+				cmd, ok := byPath[p]
+				if !ok {
+					continue
+				}
+				exists = true
+				switch {
+				case !visibleRunnable(cmd):
+					stale = firstNonEmpty(stale, "is no longer a visible runnable command; delete the entry")
+				case exemptByDesign(p):
+					stale = firstNonEmpty(stale, "is exempt by design (outputExempt); delete the entry")
+				case reachesJSONOutput(cmd):
+					stale = firstNonEmpty(stale, "has --output json now; delete it from lacksOutputFlag")
+				default:
+					stale = ""
+				}
+				if stale == "" {
+					break
+				}
+			}
 			switch {
-			case !ok:
-				t.Errorf("[%s] lacksOutputFlag lists %q, which no longer exists; delete the entry", platform, p)
-			case !visibleRunnable(cmd):
-				t.Errorf("[%s] lacksOutputFlag lists %q, which is no longer a visible runnable command; delete the entry", platform, p)
-			case exemptByDesign(p):
-				t.Errorf("[%s] lacksOutputFlag lists %q, which is exempt by design (outputExempt); delete the entry", platform, p)
-			case reachesJSONOutput(cmd):
-				t.Errorf("[%s] %q has --output json now; delete it from lacksOutputFlag", platform, p)
+			case !exists:
+				t.Errorf("[%s] lacksOutputFlag lists %q, which no longer exists in any %s tree; delete the entry", platform, p, platform)
+			case stale != "":
+				t.Errorf("[%s] lacksOutputFlag lists %q, which %s", platform, p, stale)
 			}
 		}
 	}
@@ -204,8 +233,8 @@ func TestOutputFlagAllowlistOnlyShrinks(t *testing.T) {
 // reasons cannot outlive what it excuses.
 func TestOutputExemptionsExist(t *testing.T) {
 	exists := map[string]bool{}
-	for _, root := range rootsUnderTest(t) {
-		walkCmd(root, func(cmd *cobra.Command) { exists[cmd.CommandPath()] = true })
+	for _, tree := range rootsUnderTest(t) {
+		walkCmd(tree.root, func(cmd *cobra.Command) { exists[cmd.CommandPath()] = true })
 	}
 	for p := range outputExempt {
 		if !exists[p] {

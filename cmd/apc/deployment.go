@@ -71,7 +71,8 @@ var (
   astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE>
 
   # Adopt it into another Workspace
-  astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE> --workspace-id=<WORKSPACE_ID>`
+  astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE> \
+    --workspace-id=<WORKSPACE_ID>`
 	deploymentUnadoptExample = `  # Release an adopted Deployment
   astro deployment unadopt --deployment-id=<DEPLOYMENT_ID>`
 	deploymentCreateExample = `  # Create a Deployment with the Celery executor
@@ -86,31 +87,38 @@ var (
   astro deployment create --label=my-deployment --cluster-id=<CLUSTER_ID>
 
   # Create one with the Kubernetes executor and an Airflow version
-  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 --cluster-id=<CLUSTER_ID>
+  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
+    --cluster-id=<CLUSTER_ID>
 
   # Create one on Astronomer Runtime
-  astro deployment create --label=my-deployment --executor=kubernetes --runtime-version=6.0.1 --cluster-id=<CLUSTER_ID>`
+  astro deployment create --label=my-deployment --executor=kubernetes --runtime-version=6.0.1 \
+    --cluster-id=<CLUSTER_ID>`
 	createExampleOperatorMode = `
 
   # Create an operator-managed Deployment
-  astro deployment create --label=my-deployment --executor=kubernetes --cluster-id=<CLUSTER_ID> --mode=operator`
+  astro deployment create --label=my-deployment --executor=kubernetes --cluster-id=<CLUSTER_ID> \
+    --mode=operator`
 
 	createExampleDagDeployment = `
 
   # Create one that reads its DAGs from an NFS volume
-  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
+  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
+    --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
 	createExampleDagDeploymentAPCV1 = `
 
   # Create one that reads its DAGs from an NFS volume
-  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=<IP>:/<PATH> --cluster-id=<CLUSTER_ID>`
+  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
+    --dag-deployment-type=volume --nfs-location=<IP>:/<PATH> --cluster-id=<CLUSTER_ID>`
 
 	deploymentAirflowUpgradeExample = `  # Start upgrading a Deployment's Airflow
-  astro deployment airflow upgrade --deployment-id=<DEPLOYMENT_ID> --desired-airflow-version=<AIRFLOW_VERSION>
+  astro deployment airflow upgrade --deployment-id=<DEPLOYMENT_ID> \
+    --desired-airflow-version=<AIRFLOW_VERSION>
 
   # Cancel an upgrade that has not finished
   astro deployment airflow upgrade --deployment-id=<DEPLOYMENT_ID> --cancel`
 	deploymentRuntimeUpgradeExample = `  # Start upgrading a Deployment's Runtime
-  astro deployment runtime upgrade --deployment-id=<DEPLOYMENT_ID> --desired-runtime-version=<RUNTIME_VERSION>
+  astro deployment runtime upgrade --deployment-id=<DEPLOYMENT_ID> \
+    --desired-runtime-version=<RUNTIME_VERSION>
 
   # Cancel an upgrade that has not finished
   astro deployment runtime upgrade --deployment-id=<DEPLOYMENT_ID> --cancel`
@@ -257,7 +265,7 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "ID of the cluster the Airflow custom resource is running on")
-	cmd.Flags().StringVarP(&adoptName, "name", "", "", "metadata.name of the existing Airflow custom resource (CR)")
+	cmd.Flags().StringVarP(&adoptName, "name", "", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
 	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
 	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --name value")
 	cmd.Flags().StringVarP(&adoptDescription, "description", "", "", "Description for the adopted Deployment")

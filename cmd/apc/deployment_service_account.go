@@ -19,7 +19,8 @@ var (
   astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label
 
   # Create one that can edit it
-  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label --role=DEPLOYMENT_EDITOR`
+  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label \
+    --role=DEPLOYMENT_EDITOR`
 	deploymentSaListExample = `  # List a Deployment's service accounts
   astro deployment service-account list --deployment-id=<DEPLOYMENT_ID>`
 	deploymentSaDeleteExample = `  # Delete a service account from a Deployment

@@ -43,10 +43,12 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 		Short:   "Create a Deployment's worker queue",
 		Long:    "Create a worker queue for a Deployment. Worker queues let you assign tasks to different machine types with independent autoscaling. Each queue has its own min/max worker count and concurrency settings. KubernetesExecutor Deployments support only a single default queue. Queue names must be lowercase alphanumeric or hyphens, start with a letter, and not exceed 63 characters.",
 		Example: `  # Create a worker queue
-  astro deployment worker-queue create --deployment <DEPLOYMENT_ID> --name my-queue --worker-type <WORKER_TYPE>
+  astro deployment worker-queue create --deployment <DEPLOYMENT_ID> --name my-queue \
+    --worker-type <WORKER_TYPE>
 
   # Create one that scales between 2 and 10 workers
-  astro deployment worker-queue create --deployment <DEPLOYMENT_ID> --name my-queue --min-count 2 --max-count 10 --concurrency 16`,
+  astro deployment worker-queue create --deployment <DEPLOYMENT_ID> --name my-queue \
+    --min-count 2 --max-count 10 --concurrency 16`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
@@ -73,7 +75,8 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
   astro deployment worker-queue update --deployment <DEPLOYMENT_ID> --name my-queue --max-count 20
 
   # Change its concurrency without asking for confirmation
-  astro deployment worker-queue update --deployment <DEPLOYMENT_ID> --name my-queue --concurrency 32 --yes`,
+  astro deployment worker-queue update --deployment <DEPLOYMENT_ID> --name my-queue \
+    --concurrency 32 --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},

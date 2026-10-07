@@ -115,9 +115,11 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 		Example: "  astro link add\n" +
 			"  astro link add prod --deployment clx123abc\n" +
 			"  astro link add orders --target mwaa --environment orders-prod --region eu-west-1\n" +
-			"  astro link add gcp --target composer --environment orders --project acme-data --location us-central1\n" +
+			"  astro link add gcp --target composer --environment orders --project acme-data \\\n" +
+			"    --location us-central1\n" +
 			"  astro link add staging --url https://airflow.example.com --auth token --token-env AIRFLOW_TOKEN\n" +
-			"  astro link add custom --url https://airflow.example.com --auth exec -- my-token-tool --profile prod",
+			"  astro link add custom --url https://airflow.example.com \\\n" +
+			"    --auth exec -- my-token-tool --profile prod",
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name, command := "", []string(nil)
