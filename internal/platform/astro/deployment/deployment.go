@@ -224,7 +224,7 @@ func ListWithFormat(ws string, fromAllWorkspaces bool, astroV1Client astrov1.API
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint
-func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor bool, extraComponents []string, warnLogs, errorLogs, infoLogs bool, logCount int, astroV1Client astrov1.APIClient) error {
+func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor bool, extraComponents []string, warnLogs, errorLogs, infoLogs bool, logCount int, astroV1Client astrov1.APIClient) (*LogsResult, error) {
 	var logLevel string
 	var i int
 	// log level
@@ -245,13 +245,13 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		i++
 	}
 	if i > 1 {
-		return errors.New("cannot query for more than one log level and/or keyword at a time")
+		return nil, errors.New("cannot query for more than one log level and/or keyword at a time")
 	}
 
 	// get deployment
 	deployment, err := GetDeployment(ws, deploymentID, deploymentName, false, nil, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	deploymentID = deployment.Id
@@ -310,7 +310,7 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 	for {
 		deploymentLogs, err := GetDeploymentLogs("", deploymentID, getDeploymentLogsParams, astroV1Client)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		allResults = append(allResults, deploymentLogs.Results...)
@@ -337,15 +337,11 @@ func Logs(deploymentID, ws, deploymentName, keyword string, logServer, logSchedu
 		allResults = allResults[:logCount]
 	}
 
-	if len(allResults) == 0 {
-		hours := timeRange / 3600
-		fmt.Printf("No matching logs have been recorded in the past %d hours for Deployment %s\n", hours, deployment.Name)
-		return nil
-	}
+	res := &LogsResult{DeploymentName: deployment.Name, Hours: timeRange / 3600, Entries: make([]LogEntry, 0, len(allResults))}
 	for i := range allResults {
-		fmt.Printf("%s %s\n", allResults[i].Raw, allResults[i].Source)
+		res.Entries = append(res.Entries, LogEntry{Source: string(allResults[i].Source), Message: allResults[i].Raw})
 	}
-	return nil
+	return res, nil
 }
 
 // TODO (https://github.com/astronomer/astro-cli/issues/1709): move these input arguments to a struct, and drop the nolint

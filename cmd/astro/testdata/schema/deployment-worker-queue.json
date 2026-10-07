@@ -1,0 +1,14 @@
+{
+  "deployment_id": "x",
+  "deployment_name": "x",
+  "workspace_id": "x",
+  "action": "x",
+  "worker_queue": {
+    "name": "x",
+    "is_default": true,
+    "worker_type": "x",
+    "min_worker_count": -1,
+    "max_worker_count": -1,
+    "worker_concurrency": -1
+  }
+}

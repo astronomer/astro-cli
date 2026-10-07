@@ -248,16 +248,16 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "test-instance-type-1", -1, 20, 175, true, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "test-instance-type-1", -1, 20, 175, true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error when listing deployments fails", func() {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 0, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, errGetDeployment)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -265,7 +265,7 @@ func (s *Suite) TestCreate() {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(s.T(), "test-invalid-deployment-id")()
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, deployment.ErrInvalidDeploymentKey)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -281,8 +281,9 @@ func (s *Suite) TestCreate() {
 			},
 		}
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockDeploymentListResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, false, mockV1Client, out)
-		s.NoError(err)
+		res, err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, false, mockV1Client, out)
+		s.EqualError(err, "no Deployments found in workspace test-ws-id", "nothing to change is a failure, not a note and exit 0")
+		s.Nil(res)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error when selecting a node pool fails", func() {
@@ -291,7 +292,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "non-existent", 0, 200, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "non-existent", 0, 200, 0, false, mockV1Client, out)
 		s.ErrorIs(err, errInvalidNodePool)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -302,7 +303,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: "test-queue-1", NodePoolId: &testPoolID}}
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue-1", createAction, "test-instance-type-1", 0, 20, 175, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue-1", createAction, "test-instance-type-1", 0, 20, 175, false, mockV1Client, out)
 		s.ErrorIs(err, errCannotUpdateExistingQueue)
 		s.ErrorContains(err, "worker queue already exists: use worker queue update test-queue-1 instead")
 		mockV1Client.AssertExpectations(s.T())
@@ -316,7 +317,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 0, 20, 175, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 0, 20, 175, false, mockV1Client, out)
 		s.ErrorIs(err, errUpdateDeployment)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -332,9 +333,9 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "test-instance-type-1", 0, 20, 175, false, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "test-instance-type-1", 0, 20, 175, false, mockV1Client, out)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(expectedOutMessage, out.String()+reported(res))
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("happy path creates a new worker queue for a deployment when worker queues exist", func() {
@@ -348,9 +349,9 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", -1, 20, 175, false, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", -1, 20, 175, false, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("happy path creates a new worker queue for a hosted deployment when worker queues exist", func() {
@@ -365,9 +366,9 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", -1, 20, 10, false, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-worker-queue", createAction, "", -1, 20, 10, false, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 		deploymentResponse.JSON200.Type = &hybridType
 	})
@@ -376,7 +377,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, errWorkerQueueDefaultOptions)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type-1", 0, 200, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type-1", 0, 200, 0, false, mockV1Client, out)
 		s.ErrorIs(err, errWorkerQueueDefaultOptions)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -387,7 +388,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil)
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 25, 0, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 25, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -401,7 +402,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
 
 		s.ErrorIs(err, ErrNotSupported)
 		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
@@ -414,7 +415,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", createAction, "test-instance-type-1", 0, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, ErrNotSupported)
 		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
@@ -426,7 +427,7 @@ func (s *Suite) TestCreate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "default", createAction, "test-instance-type-1", -1, 0, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "default", createAction, "test-instance-type-1", -1, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, errCannotUpdateExistingQueue)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -449,9 +450,9 @@ func (s *Suite) TestCreateHostedShared() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "a5", -1, 20, 5, true, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "a5", -1, 20, 5, true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("select machine for hosted shared deployments", func() {
@@ -462,9 +463,9 @@ func (s *Suite) TestCreateHostedShared() {
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-worker-queue", createAction, "", -1, 20, 5, true, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-worker-queue", createAction, "", -1, 20, 5, true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("failed to select astro machines for hosted shared deployments", func() {
@@ -473,7 +474,7 @@ func (s *Suite) TestCreateHostedShared() {
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-worker-queue", createAction, "", -1, 20, 5, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-worker-queue", createAction, "", -1, 20, 5, true, mockV1Client, out)
 		s.ErrorIs(err, errInvalidAstroMachine)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -482,7 +483,7 @@ func (s *Suite) TestCreateHostedShared() {
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, errDeploymentConfigOptions)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "a5", -1, 20, 5, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", createAction, "a5", -1, 20, 5, true, mockV1Client, out)
 		s.ErrorIs(err, errDeploymentConfigOptions)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -506,12 +507,12 @@ func (s *Suite) TestUpdate() {
 
 		deploymentResponse.JSON200.Type = &hybridType
 
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", -1, 20, 175, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", -1, 20, 175, false, mockV1Client, out)
 		s.ErrorContains(err, "use worker queue create test-queue-1 instead")
 
 		deploymentResponse.JSON200.Type = &standardType
 
-		err = CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "a5", -1, 20, 5, false, mockV1Client, out)
+		_, err = CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "a5", -1, 20, 5, false, mockV1Client, out)
 		s.ErrorContains(err, "use worker queue create test-queue-1 instead")
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -524,9 +525,9 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type-1", 0, 20, 175, false, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type-1", 0, 20, 175, false, mockV1Client, out)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(expectedOutMessage, out.String()+reported(res))
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("prompts user for queue name if one was not provided", func() {
@@ -540,16 +541,16 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: expectedWorkerQueue.Name, NodePoolId: &testPoolID}}
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", -1, 20, 175, true, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", -1, 20, 175, true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error when selecting a deployment fails", func() {
 		out := new(bytes.Buffer)
 		defer testUtil.MockUserInput(s.T(), "test-invalid-deployment-id")()
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, deployment.ErrInvalidDeploymentKey)
-		err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "", "", "", "", "", 0, 0, 0, true, mockV1Client, out)
 		s.ErrorIs(err, deployment.ErrInvalidDeploymentKey)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -560,7 +561,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "non-existent", 0, 200, 0, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "non-existent", 0, 200, 0, true, mockV1Client, out)
 		s.ErrorIs(err, errInvalidNodePool)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -574,7 +575,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: expectedWorkerQueue.Name, NodePoolId: &testPoolID}}
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", 0, 20, 175, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "", updateAction, "test-instance-type-1", 0, 20, 175, true, mockV1Client, out)
 		s.ErrorIs(err, errInvalidQueue)
 		s.Contains(err.Error(), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
@@ -583,7 +584,7 @@ func (s *Suite) TestUpdate() {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 0, 0, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "", 0, 0, 0, true, mockV1Client, out)
 		s.ErrorIs(err, errGetDeployment)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -594,7 +595,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsPlatformResponseOK, nil)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue-2", updateAction, "test-instance-type-1", 0, 20, 175, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-queue-2", updateAction, "test-instance-type-1", 0, 20, 175, true, mockV1Client, out)
 		s.ErrorIs(err, errCannotCreateNewQueue)
 		s.ErrorContains(err, "worker queue does not exist: use worker queue create test-queue-2 instead")
 		mockV1Client.AssertExpectations(s.T())
@@ -608,7 +609,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: expectedWorkerQueue.Name, NodePoolId: &testPoolID}}
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 0, 20, 175, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 0, 20, 175, true, mockV1Client, out)
 		s.ErrorIs(err, errUpdateDeployment)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -624,9 +625,9 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: expectedWorkerQueue.Name, NodePoolId: &testPoolID}}
 
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", -1, 20, 175, true, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "test-queue-1", updateAction, "test-instance-type-1", -1, 20, 175, true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error when getting worker queue default options fails", func() {
@@ -635,7 +636,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type-1", 0, 200, 0, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type-1", 0, 200, 0, true, mockV1Client, out)
 		s.ErrorIs(err, errWorkerQueueDefaultOptions)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -647,12 +648,12 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 25, 0, 0, true, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "test-instance-type", 25, 0, 0, true, mockV1Client, out)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 
 		deploymentResponse.JSON200.Type = &dedicatedType
 
-		err = CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "a5", 25, 0, 0, true, mockV1Client, out)
+		_, err = CreateOrUpdate("test-ws-id", "test-deployment-id", "", "", "", "a5", 25, 0, 0, true, mockV1Client, out)
 		s.ErrorIs(err, errInvalidWorkerQueueOption)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -670,9 +671,9 @@ func (s *Suite) TestUpdate() {
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
 
 		deploymentResponse.JSON200.Type = &hybridType
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type", -1, 0, 0, true, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type", -1, 0, 0, true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("update existing worker queue with a new worker type", func() {
@@ -686,9 +687,9 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 		deploymentResponse.JSON200.WorkerQueues = &[]astrov1.WorkerQueue{{Name: "default", NodePoolId: &testPoolID}}
 
-		err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type-1", -1, 0, 0, true, mockV1Client, out)
+		res, err := CreateOrUpdate("test-ws-id", "", "test-deployment-label", "default", updateAction, "test-instance-type-1", -1, 0, 0, true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error when requested input is not valid", func() {
@@ -698,7 +699,7 @@ func (s *Suite) TestUpdate() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
-		err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", updateAction, "test-instance-type-1", -1, 0, 0, false, mockV1Client, out)
+		_, err := CreateOrUpdate("test-ws-id", "test-deployment-id", "", "test-KE-q", updateAction, "test-instance-type-1", -1, 0, 0, false, mockV1Client, out)
 		s.ErrorIs(err, ErrNotSupported)
 		s.ErrorContains(err, "KubernetesExecutor does not support a non default worker queue in the request. Rename the queue to default")
 		mockV1Client.AssertExpectations(s.T())
@@ -745,23 +746,23 @@ func (s *Suite) TestDelete() {
 		out := new(bytes.Buffer)
 		// standard type
 		deploymentResponse.JSON200.Type = &standardType
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
+		res, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(expectedOutMessage, out.String()+reported(res))
 
 		out = new(bytes.Buffer)
 		// dedicated type
 		deploymentResponse.JSON200.Type = &dedicatedType
-		err = Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
+		res, err = Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(expectedOutMessage, out.String()+reported(res))
 
 		out = new(bytes.Buffer)
 		// hybrid type
 		deploymentResponse.JSON200.Type = &hybridType
-		err = Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
+		res, err = Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(expectedOutMessage, out.String()+reported(res))
 
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -775,9 +776,9 @@ func (s *Suite) TestDelete() {
 
 		defer testUtil.MockUserInput(s.T(), "2")()
 
-		err := Delete("test-ws-id", "test-deployment-id", "", "", true, mockV1Client, out)
+		res, err := Delete("test-ws-id", "test-deployment-id", "", "", true, mockV1Client, out)
 		s.NoError(err)
-		s.Contains(out.String(), expectedOutMessage)
+		s.Contains(out.String()+reported(res), expectedOutMessage)
 
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -791,7 +792,7 @@ func (s *Suite) TestDelete() {
 			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 			mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
-			err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockV1Client, out)
+			_, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockV1Client, out)
 			s.NoError(err)
 			mockV1Client.AssertExpectations(s.T())
 		})
@@ -802,9 +803,9 @@ func (s *Suite) TestDelete() {
 			mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 			mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 
-			err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockV1Client, out)
+			res, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", false, mockV1Client, out)
 			s.NoError(err)
-			s.Equal(expectedOutMessage, out.String())
+			s.Equal(expectedOutMessage, out.String()+reported(res))
 			mockV1Client.AssertExpectations(s.T())
 		})
 	})
@@ -812,7 +813,7 @@ func (s *Suite) TestDelete() {
 		out := new(bytes.Buffer)
 
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment)
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue", true, mockV1Client, out)
+		_, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue", true, mockV1Client, out)
 		s.ErrorIs(err, errGetDeployment)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -823,9 +824,9 @@ func (s *Suite) TestDelete() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 
-		err := Delete("test-ws-id", "test-deployment-id", "", "", true, mockV1Client, out)
+		res, err := Delete("test-ws-id", "test-deployment-id", "", "", true, mockV1Client, out)
 		s.ErrorIs(err, errInvalidQueue)
-		s.NotContains(out.String(), expectedOutMessage)
+		s.NotContains(out.String()+reported(res), expectedOutMessage)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("returns an error if user chooses to delete default queue", func() {
@@ -833,7 +834,7 @@ func (s *Suite) TestDelete() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 
-		err := Delete("test-ws-id", "test-deployment-id", "", "default", true, mockV1Client, out)
+		_, err := Delete("test-ws-id", "test-deployment-id", "", "default", true, mockV1Client, out)
 		s.ErrorIs(err, errCannotDeleteDefaultQueue)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -842,7 +843,7 @@ func (s *Suite) TestDelete() {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-non-existent-queue", true, mockV1Client, out)
+		_, err := Delete("test-ws-id", "test-deployment-id", "", "test-non-existent-queue", true, mockV1Client, out)
 		s.ErrorIs(err, errQueueDoesNotExist)
 		mockV1Client.AssertExpectations(s.T())
 	})
@@ -854,15 +855,15 @@ func (s *Suite) TestDelete() {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil)
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil)
 
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
+		_, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
 		s.ErrorIs(err, errUpdateDeployment)
 		mockV1Client.AssertExpectations(s.T())
 	})
 	s.Run("when no deployments exists in the workspace", func() {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil)
-		err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
-		s.NoError(err)
+		_, err := Delete("test-ws-id", "test-deployment-id", "", "test-worker-queue-1", true, mockV1Client, out)
+		s.EqualError(err, "no Deployments found in workspace test-ws-id", "nothing to delete is a failure, not a note and exit 0")
 		mockV1Client.AssertExpectations(s.T())
 	})
 }
@@ -1489,4 +1490,14 @@ func (s *Suite) TestSanitizeExistingQueues() {
 		actualQs = sanitizeExistingQueues(existingQs, deployment.KubeExecutor)
 		s.Equal(expectedQs, actualQs)
 	})
+}
+
+// reported is the line a command prints for res, the result of a queue
+// change in the Workspace these tests use: what CreateOrUpdate and Delete
+// used to print themselves.
+func reported(res *Result) string {
+	if res == nil {
+		return ""
+	}
+	return fmt.Sprintf("worker queue %s for %s in test-ws-id workspace %s\n", res.WorkerQueue.Name, res.DeploymentName, res.Action)
 }

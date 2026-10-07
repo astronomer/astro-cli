@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/apitoken"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/workerqueue"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
@@ -124,6 +125,11 @@ var publishedPayloads = []cliouttest.Case{
 	// astro deployment hibernate and wake-up: the override the Deployment now
 	// has, which is null after --remove-override.
 	{Name: "deployment-hibernation", Value: deployment.HibernationResult{}},
+	// astro deployment worker-queue create, update and delete: the queue
+	// as the change left it, or as it was before a delete.
+	{Name: "deployment-worker-queue", Value: workerqueue.Result{}},
+	// astro deployment logs -o json: one of these per line, a stream.
+	{Name: "deployment-log-entry", Value: deployment.LogEntry{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -156,14 +162,15 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Thirty-two shapes reach Emit in this package's tests today:
+// would be silent. Thirty-four shapes reach Emit in this package's tests today:
 // the deployment variable and token results, the workspace and organization
 // token, user and team results, the pkg/output lists and the `astro env`
 // payloads their tests reach, the manifest deploy's result, deployment
 // inspect's deployment (which create and update publish too), delete's
-// removal, hibernate's override, and the error object. Raise it as
-// conversions land; lower it only saying why.
-const minWatchedPayloads = 32
+// removal, hibernate's override, the worker-queue result, the log entry,
+// and the error object. Raise it as conversions land; lower it only
+// saying why.
+const minWatchedPayloads = 34
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

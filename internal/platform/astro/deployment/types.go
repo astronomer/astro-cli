@@ -73,3 +73,23 @@ type HibernationOverride struct {
 	IsHibernating bool       `json:"is_hibernating"`
 	OverrideUntil *time.Time `json:"override_until"`
 }
+
+// LogsResult is what Logs found: the entries, oldest first as the API
+// returns them, and, for the line that says there were none, the Deployment
+// and how many hours back it looked.
+type LogsResult struct {
+	DeploymentName string
+	Hours          int
+	Entries        []LogEntry
+}
+
+// LogEntry is one line of a Deployment's logs, as `astro deployment logs -o
+// json` streams it, one object per line: the component it came from
+// (scheduler, worker, ...) and the line as the component wrote it, which
+// begins with its own timestamp. The API's separate timestamp is not
+// published: its client decodes it to a float32, which cannot hold a time in
+// seconds to better than about two minutes.
+type LogEntry struct {
+	Source  string `json:"source"`
+	Message string `json:"message"`
+}

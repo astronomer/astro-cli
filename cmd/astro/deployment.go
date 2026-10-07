@@ -134,7 +134,7 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentListCmd(out),
 		newDeploymentDeleteCmd(out),
 		newDeploymentCreateCmd(out),
-		newDeploymentLogsCmd(),
+		newDeploymentLogsCmd(out),
 		newDeploymentUpdateCmd(out),
 		newDeploymentVariableRootCmd(out),
 		newDeploymentWorkerQueueRootCmd(out),
@@ -418,7 +418,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func newDeploymentLogsCmd() *cobra.Command {
+func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "logs [Deployment-ID]",
 		Aliases: []string{"l"},
@@ -429,7 +429,7 @@ func newDeploymentLogsCmd() *cobra.Command {
   $ astro deployment logs <deployment-id> --error --info --log-count 50
   $ astro deployment logs --deployment my-deployment --keyword "task failed"
 `,
-		RunE: deploymentLogs,
+		RunE: func(cmd *cobra.Command, args []string) error { return deploymentLogs(cmd, args, out) },
 	}
 	cmd.Flags().BoolVarP(&warnLogs, "warn", "w", false, "Show logs with a log level of 'warning'")
 	cmd.Flags().BoolVarP(&errorLogs, "error", "e", false, "Show logs with a log level of 'error'")
@@ -445,6 +445,7 @@ func newDeploymentLogsCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&logTriggerer, "triggerer", false, "Show logs from the triggerer")
 	cmd.Flags().BoolVar(&logDagProcessor, "dag-processor", false, "Show logs from the DAG processor")
 	cmd.Flags().StringSliceVar(&logComponents, "component", nil, "Show logs from a component by name (repeatable or comma-separated). Alternative to passing individual flags like --scheduler or --triggerer.")
+	cliout.AddOutputFlag(cmd, &deploymentLogsOutput)
 	return cmd
 }
 
@@ -734,7 +735,16 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: format, Out: out})
 }
 
-func deploymentLogs(cmd *cobra.Command, args []string) error {
+func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deploymentLogsOutput)
+	if err != nil {
+		return err
+	}
+	// The Deployment lookup prints its notes to bare stdout; under json they
+	// are notes, not log records.
+	defer strayStdoutToStderr(format)()
+
 	// Get release name from args, if passed
 	if len(args) > 0 {
 		deploymentID = args[0]
@@ -746,7 +756,11 @@ func deploymentLogs(cmd *cobra.Command, args []string) error {
 	}
 	logServer := logWebserver || logApiserver
 
-	return deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, astroV1Client)
+	res, err := deployment.Logs(deploymentID, ws, deploymentName, logsKeyword, logServer, logScheduler, logTriggerer, logWorkers, logDagProcessor, logComponents, warnLogs, errorLogs, infoLogs, logCount, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return emitLogs(cmd, cliout.Renderer{Format: format, Out: out}, res)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately

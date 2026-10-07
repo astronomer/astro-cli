@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/workerqueue"
 )
 
@@ -31,6 +32,7 @@ func newDeploymentWorkerQueueRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentWorkerQueueUpdateCmd(out),
 		newDeploymentWorkerQueueDeleteCmd(out),
 	)
+	cliout.AddOutputFlag(cmd, &deploymentWorkerQueueOutput)
 	return cmd
 }
 
@@ -110,7 +112,15 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.Writer) error {
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deploymentWorkerQueueOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
+	// The Deployment picker and the update the change is sent as print to
+	// bare stdout; under json that is a note, not the result.
+	defer strayStdoutToStderr(format)()
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -125,16 +135,32 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 		minWorkerCount = -1
 	}
 
-	return workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, out)
+	res, err := workerqueue.CreateOrUpdate(ws, deploymentID, deploymentName, name, cmd.Name(), workerType, minWorkerCount, maxWorkerCount, concurrency, force, astroV1Client, workerQueueAsks(cmd, format, out))
+	if err != nil || res == nil {
+		// nil, nil is a declined update, which has said so.
+		return err
+	}
+	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out}, res, ws)
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
+	// Reject a bad -o before anything else, so it is a usage error.
+	format, err := cliout.ParseFormat(deploymentWorkerQueueOutput)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
+	defer strayStdoutToStderr(format)()
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
 	}
 
-	return workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, out)
+	res, err := workerqueue.Delete(ws, deploymentID, deploymentName, name, force, astroV1Client, workerQueueAsks(cmd, format, out))
+	if err != nil || res == nil {
+		// nil, nil is a declined deletion, which has said so.
+		return err
+	}
+	return emitWorkerQueue(cliout.Renderer{Format: format, Out: out}, res, ws)
 }

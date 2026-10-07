@@ -40,7 +40,7 @@ var (
 )
 
 // CreateOrUpdate creates a new worker queue or updates an existing worker queue for a deployment.
-func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, astroV1Client astrov1.APIClient, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
+func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType string, wQueueMin, wQueueMax, wQueueConcurrency int, force bool, astroV1Client astrov1.APIClient, out io.Writer) (*Result, error) { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
 	var (
 		requestedDeployment                  astrov1.Deployment
 		err                                  error
@@ -52,16 +52,16 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		existingQueues                       []astrov1.WorkerQueue
 		hybridListToCreate                   []astrov1.HybridWorkerQueueRequest
 		defaultOptions                       astrov1.WorkerQueueOptions
+		nodePools                            []astrov1.NodePool
 	)
 	// get or select the deployment
 	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if requestedDeployment.Id == "" {
-		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
-		return nil
+		return nil, errNoDeployment(ws)
 	}
 
 	getDeploymentOptions := astrov1.GetDeploymentOptionsParams{
@@ -69,7 +69,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 	}
 	deploymentOptions, err := deployment.GetPlatformDeploymentOptions("", getDeploymentOptions, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defaultOptions = deploymentOptions.WorkerQueues
 
@@ -93,7 +93,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if name == "" {
 			name, err = getQueueName(name, action, &requestedDeployment, out)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 		if action == updateAction && workerType == "" {
@@ -109,7 +109,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// get the machine to use
 		workerMachine, err = selectWorkerMachine(workerType, WorkerMachines, out)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if wQueueConcurrency == 0 && action == createAction {
@@ -128,11 +128,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		// get the node poolID to use
 		cluster, err := deployment.GetClusterByID("", *requestedDeployment.ClusterId, astroV1Client)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		nodePools = *cluster.NodePools
 		nodePoolID, err = selectNodePool(workerType, *cluster.NodePools, out)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		queueToCreateOrUpdateHybrid = astrov1.HybridWorkerQueueRequest{
 			Name:              name,
@@ -159,7 +160,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if name == "" {
 			queueToCreateOrUpdateHybrid.Name, err = getQueueName(name, action, &requestedDeployment, out)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			name = queueToCreateOrUpdateHybrid.Name
 		}
@@ -170,24 +171,24 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
 			err = IsHostedWorkerQueueInputValid(queueToCreateOrUpdate, defaultOptions, &workerMachine)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		} else {
 			err = IsWorkerQueueInputValid(queueToCreateOrUpdateHybrid, defaultOptions)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	case astrov1.DeploymentExecutorKUBERNETES:
 		// worker queues are only used with the kubernetes execuor for hybrid deployments
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
-			return errNoUseWorkerQueues
+			return nil, errNoUseWorkerQueues
 		}
 		// -1 is the CLI default to allow users to request wQueueMin=0. Here we set it to default because MinWorkerCount is not used in Kubernetes Deployments
 		queueToCreateOrUpdateHybrid.MinWorkerCount = -1
 		err = IsKubernetesWorkerQueueInputValid(queueToCreateOrUpdateHybrid)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -199,7 +200,7 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 		if QueueExists(existingQueues, queueToCreateOrUpdate, queueToCreateOrUpdateHybrid) {
 			// create does not allow updating existing queues
 			errHelp = fmt.Sprintf("use worker queue update %s instead", name)
-			return fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
+			return nil, fmt.Errorf("%w: %s", errCannotUpdateExistingQueue, errHelp)
 		}
 		// add the new queue to the list of worker queues
 		listToCreate = append(listToCreate, queueToCreateOrUpdate)
@@ -210,12 +211,12 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 				i, err := input.Confirm(
 					fmt.Sprintf("\nAre you sure you want to %s the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", action, ansi.Bold(name)), input.AnsweredBy("--yes"))
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				if !i {
 					fmt.Fprintf(out, "Canceling worker queue %s\n", action)
-					return nil
+					return nil, nil
 				}
 			}
 			// user requested an update and queueToCreateOrUpdate exists
@@ -229,19 +230,42 @@ func CreateOrUpdate(ws, deploymentID, deploymentName, name, action, workerType s
 			if !reflect.DeepEqual(queueToCreateOrUpdateHybrid, astrov1.HybridWorkerQueueRequest{}) {
 				errHelp = fmt.Sprintf("use worker queue create %s instead", queueToCreateOrUpdateHybrid.Name)
 			}
-			return fmt.Errorf("%w: %s", errCannotCreateNewQueue, errHelp)
+			return nil, fmt.Errorf("%w: %s", errCannotCreateNewQueue, errHelp)
 		}
 	}
 	// update the deployment with the new list of worker queues
 	_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, listToCreate, hybridListToCreate, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// change action to past tense
 	succeededAction = fmt.Sprintf("%sd", action)
 
-	fmt.Fprintf(out, "worker queue %s for %s in %s workspace %s\n", name, requestedDeployment.Name, ws, succeededAction)
-	return nil
+	res := &Result{
+		DeploymentID:   requestedDeployment.Id,
+		DeploymentName: requestedDeployment.Name,
+		WorkspaceID:    requestedDeployment.WorkspaceId,
+		Action:         succeededAction,
+	}
+	for i := range listToCreate {
+		if q := listToCreate[i]; q.Name == name && (deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type)) {
+			res.WorkerQueue = Queue{Name: q.Name, IsDefault: q.IsDefault, WorkerType: string(q.AstroMachine), MinWorkerCount: q.MinWorkerCount, MaxWorkerCount: q.MaxWorkerCount, WorkerConcurrency: q.WorkerConcurrency}
+		}
+	}
+	for i := range hybridListToCreate {
+		if q := hybridListToCreate[i]; q.Name == name && !(deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type)) {
+			res.WorkerQueue = Queue{Name: q.Name, IsDefault: q.IsDefault, WorkerType: nodePoolInstanceType(q.NodePoolId, nodePools), MinWorkerCount: q.MinWorkerCount, MaxWorkerCount: q.MaxWorkerCount, WorkerConcurrency: q.WorkerConcurrency}
+			if *requestedDeployment.Executor == astrov1.DeploymentExecutorKUBERNETES {
+				// A KubernetesExecutor queue has no counts of its own: its
+				// pods are sized by the worker type. The request carries the
+				// CLI's -1 "unset" for the minimum, which is not a count, so
+				// the result reports what an update does (updateHybridQueueList):
+				// 0 for all three.
+				res.WorkerQueue.MinWorkerCount, res.WorkerQueue.MaxWorkerCount, res.WorkerQueue.WorkerConcurrency = 0, 0, 0
+			}
+		}
+	}
+	return res, nil
 }
 
 // SetWorkerQueueValues sets default values for MinWorkerCount, MaxWorkerCount and WorkerConcurrency if none were requested.
@@ -470,7 +494,7 @@ func selectNodePool(workerType string, nodePools []astrov1.NodePool, out io.Writ
 // user gets prompted if no name for the queue to delete was specified
 // An errQueueDoesNotExist is returned if queue to delete does not exist
 // An errCannotDeleteDefaultQueue is returned if a user chooses the default queue
-func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Client astrov1.APIClient, out io.Writer) error { //nolint:gocognit // v1 complexity, refactor tracked separately
+func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Client astrov1.APIClient, out io.Writer) (*Result, error) { //nolint:gocognit // v1 complexity, refactor tracked separately
 	var (
 		requestedDeployment      astrov1.Deployment
 		err                      error
@@ -483,24 +507,23 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 	// get or select the deployment
 	requestedDeployment, err = deployment.GetDeployment(ws, deploymentID, deploymentName, true, nil, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if requestedDeployment.Id == "" {
-		fmt.Printf("%s %s\n", deployment.NoDeploymentInWSMsg, ansi.Bold(ws))
-		return nil
+		return nil, errNoDeployment(ws)
 	}
 
 	// prompt for queue name if one was not provided
 	if name == "" {
 		name, err = selectQueue(requestedDeployment.WorkerQueues, out)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	// check if default queue is being deleted
 	if name == defaultQueueName {
-		return errCannotDeleteDefaultQueue
+		return nil, errCannotDeleteDefaultQueue
 	}
 	queueToDelete = astrov1.WorkerQueueRequest{
 		Name:      name,
@@ -519,12 +542,12 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 			i, err := input.Confirm(
 				fmt.Sprintf("\nAre you sure you want to delete the %s worker queue? If there are any tasks in your DAGs assigned to this worker queue, the tasks might get stuck in a queued state and fail to execute", ansi.Bold(queueToDelete.Name)), input.AnsweredBy("--yes"))
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			if !i {
 				fmt.Fprintf(out, "Canceling worker queue deletion\n")
-				return nil
+				return nil, nil
 			}
 		}
 		if deployment.IsDeploymentStandard(*requestedDeployment.Type) || deployment.IsDeploymentDedicated(*requestedDeployment.Type) {
@@ -546,9 +569,8 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 			// update the deployment with the new list
 			_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Name, ws)
 		} else {
 			// create a new listToDeleteHybrid without queueToDeleteHybrid in it
 			for i := range existingQueues {
@@ -568,14 +590,27 @@ func Delete(ws, deploymentID, deploymentName, name string, force bool, astroV1Cl
 			// update the deployment with the new list
 			_, err = deployment.Update(requestedDeployment.Id, "", ws, "", "", "", "", "", "", "", "", "", "", "", "", "", 0, 0, workerQueuesToKeep, hybridWorkerQueuesToKeep, []astrov1.DeploymentEnvironmentVariableRequest{}, nil, nil, nil, true, astroV1Client)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			fmt.Fprintf(out, "worker queue %s for %s in %s workspace deleted\n", queueToDelete.Name, requestedDeployment.Name, ws)
 		}
-		return nil
+		res := &Result{
+			DeploymentID:   requestedDeployment.Id,
+			DeploymentName: requestedDeployment.Name,
+			WorkspaceID:    requestedDeployment.WorkspaceId,
+			Action:         ActionDeleted,
+		}
+		for i := range existingQueues {
+			if q := existingQueues[i]; q.Name == name {
+				res.WorkerQueue = Queue{Name: q.Name, IsDefault: q.IsDefault, MinWorkerCount: q.MinWorkerCount, MaxWorkerCount: q.MaxWorkerCount, WorkerConcurrency: q.WorkerConcurrency}
+				if q.AstroMachine != nil {
+					res.WorkerQueue.WorkerType = *q.AstroMachine
+				}
+			}
+		}
+		return res, nil
 	}
 	// can not delete a queue that does not exist
-	return fmt.Errorf("%w: %s", errQueueDoesNotExist, queueToDelete.Name)
+	return nil, fmt.Errorf("%w: %s", errQueueDoesNotExist, queueToDelete.Name)
 }
 
 // selectQueue takes []WorkerQueue and io.Writer as arguments
