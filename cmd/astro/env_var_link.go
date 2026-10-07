@@ -104,6 +104,11 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarLinkSet(cmd, out)
 		},
+		Example: `  # Link a workspace variable to a Deployment, with a value only it sees
+  astro env variable link set --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID> --value postgres://prod
+
+  # Opt a Deployment out of an auto-linked variable
+  astro env variable link set --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
 	}
 	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to link (required)")
@@ -128,6 +133,11 @@ func newEnvVarLinkDeleteCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarLinkDelete(cmd, out)
 		},
+		Example: `  # Unlink a workspace variable from a Deployment
+  astro env variable link delete --variable-key DATABASE_URL --deployment <DEPLOYMENT_ID>
+
+  # Remove an exclude, so an auto-linked variable reaches the Deployment again
+  astro env variable link delete --variable-key LOG_LEVEL --deployment <DEPLOYMENT_ID> --exclude`,
 	}
 	addLinkVariableFlags(cmd)
 	cmd.Flags().StringVar(&envLinkDeploymentID, "deployment-id", "", "ID of the deployment to unlink (required)")
@@ -145,6 +155,8 @@ func newEnvVarLinkListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarLinkList(cmd, out)
 		},
+		Example: `  # List the Deployments a workspace variable is linked to or excluded from
+  astro env variable link list --variable-key DATABASE_URL`,
 	}
 	addLinkVariableFlags(cmd)
 	cliout.AddOutputFlag(cmd, &envOutput)

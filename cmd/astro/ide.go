@@ -50,10 +50,8 @@ func newIDEListProjectCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listIDEProjects(cmd, out)
 		},
-		Example: `
-# List all IDE projects in your workspace
-astro ide project list
-`,
+		Example: `  # List all IDE projects in your workspace
+  astro ide project list`,
 	}
 	return cmd
 }
@@ -67,16 +65,14 @@ func newIDEImportProjectCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return importIDEProject(cmd, out)
 		},
-		Example: `
-# Import a project from Astro IDE
-astro ide project import
+		Example: `  # Import a project from Astro IDE
+  astro ide project import
 
-# Import a project from a specific Astro IDE project
-astro ide project import --project-id <project-id>
+  # Import a specific Astro IDE project
+  astro ide project import --project-id <PROJECT_ID>
 
-# Import a project from a specific Astro IDE session
-astro ide project import --project-id <project-id> --session-id <session-id>
-`,
+  # Import a project from a specific Astro IDE session
+  astro ide project import --project-id <PROJECT_ID> --session-id <SESSION_ID>`,
 	}
 	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to import")
 	cmd.Flags().StringVarP(&ideSessionID, "session-id", "s", "", "Session ID to import")
@@ -92,16 +88,14 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return exportProject(cmd, out)
 		},
-		Example: `
-# Export a project to Astro IDE
-astro ide project export
+		Example: `  # Export a project to Astro IDE
+  astro ide project export
 
-# Export a project to a specific Astro IDE project
-astro ide project export --project-id <project-id>
+  # Export it to a specific Astro IDE project
+  astro ide project export --project-id <PROJECT_ID>
 
-# Force export to an Astro IDE project
-astro ide project export --project-id <project-id> --force
-`,
+  # Export it even though the Astro IDE project is locked
+  astro ide project export --project-id <PROJECT_ID> --force`,
 	}
 	cmd.Flags().StringVarP(&ideProjectID, "project-id", "p", "", "Project ID to export")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force export to overwrite project lock")

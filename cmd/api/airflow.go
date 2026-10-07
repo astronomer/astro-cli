@@ -53,7 +53,7 @@ func NewAirflowCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "airflow <endpoint | operation-id>",
+		Use:   "airflow <ENDPOINT_OR_OPERATION_ID>",
 		Short: "Make requests to the Airflow REST API",
 		Long: `Make HTTP requests to the Airflow REST API.
 
@@ -469,7 +469,7 @@ func NewAirflowListCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command
 	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:     "ls [filter]",
+		Use:     "ls [FILTER]",
 		Aliases: []string{"list"},
 		Short:   "List available Airflow API endpoints",
 		Long: `List all available endpoints from the Airflow API.
@@ -577,7 +577,7 @@ func NewAirflowDescribeCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Com
 	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:   "describe <endpoint>",
+		Use:   "describe <ENDPOINT>",
 		Short: "Describe an Airflow API endpoint's request and response schema",
 		Long: `Show detailed information about an Airflow API endpoint, including:
 - Path and query parameters

@@ -59,6 +59,8 @@ func newEnvMetricsListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvMetricsList(cmd, out)
 		},
+		Example: `  # List the metrics exports in the workspace
+  astro env metrics-export list`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
@@ -66,12 +68,14 @@ func newEnvMetricsListCmd(out io.Writer) *cobra.Command {
 
 func newEnvMetricsGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get <id-or-key>",
+		Use:   "get <ID_OR_KEY>",
 		Short: "Show a metrics export",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvMetricsGet(cmd, out, args[0])
 		},
+		Example: `  # Show a metrics export by its key
+  astro env metrics-export get prom_main`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
@@ -79,7 +83,7 @@ func newEnvMetricsGetCmd(out io.Writer) *cobra.Command {
 
 func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <id-or-key>",
+		Use:   "set <ID_OR_KEY>",
 		Short: "Set a metrics export",
 		Long: "Set a metrics export, creating it if it does not exist. Pass --no-create to fail\n" +
 			"instead. Creating one needs --endpoint and --exporter-type.",
@@ -87,6 +91,11 @@ func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvMetricsSet(cmd, out, args[0])
 		},
+		Example: `  # Create a Prometheus export
+  astro env metrics-export set prom_main --endpoint https://prom.example.com/api/v1/write --exporter-type PROMETHEUS
+
+  # Replace the labels on one that must already exist
+  astro env metrics-export set prom_main --label env=prod --label team=data --no-create`,
 	}
 	metricsCommonFlags(cmd)
 	cmd.Flags().BoolVar(&envMetricsNoCreate, "no-create", false, "Fail if the metrics export does not exist, instead of creating it")
@@ -96,13 +105,15 @@ func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 
 func newEnvMetricsDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete <id-or-key>",
+		Use:     "delete <ID_OR_KEY>",
 		Aliases: []string{"rm"},
 		Short:   "Delete a metrics export",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(cmd, out, "metrics export", args[0], env.DeleteMetricsExport)
 		},
+		Example: `  # Delete a metrics export without the confirmation prompt
+  astro env metrics-export delete prom_main --yes`,
 	}
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd
@@ -117,8 +128,8 @@ func metricsCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&envMetricsPassword, "password", "", "Password for BASIC auth; prefer piping it, since a flag lands in shell history. Empty keeps the stored one: the platform cannot clear a password")
 	cmd.Flags().StringVar(&envMetricsSigV4AssumeArn, "sigv4-assume-arn", "", "AWS IAM role to assume (for SIGV4 auth)")
 	cmd.Flags().StringVar(&envMetricsSigV4StsRegion, "sigv4-sts-region", "", "AWS STS region (for SIGV4 auth)")
-	cmd.Flags().StringToStringVar(&envMetricsHeaders, "header", nil, "Request header in KEY=VALUE form. Repeatable.")
-	cmd.Flags().StringToStringVar(&envMetricsLabels, "label", nil, "Metric label in KEY=VALUE form. Repeatable.")
+	cmd.Flags().StringToStringVar(&envMetricsHeaders, "header", nil, "Request header in KEY=VALUE form; repeatable")
+	cmd.Flags().StringToStringVar(&envMetricsLabels, "label", nil, "Metric label in KEY=VALUE form; repeatable")
 }
 
 func runEnvMetricsList(cmd *cobra.Command, out io.Writer) error {

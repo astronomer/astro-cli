@@ -34,7 +34,7 @@ const (
 func newDbtCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "dbt",
-		Short: "Manage your dbt projects deployed to Deployments running on Astronomer",
+		Short: "Manage dbt projects deployed to your Deployments",
 	}
 	cmd.AddCommand(
 		newDbtDeployCmd(),
@@ -47,11 +47,16 @@ func newDbtCmd() *cobra.Command {
 
 func newDbtCleanupCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "cleanup [path ...]",
+		Use:   "cleanup [PATH]...",
 		Args:  cobra.ArbitraryArgs,
 		Short: "Remove the Cosmos Boost artifacts under each path",
 		Long:  "Remove the artifacts the Cosmos Boost pre-deploy step wrote under each path (default: the current directory). Run it after disabling cosmos_boost.pre_deploy, because a disabled deploy leaves earlier deploys' artifacts in place.",
 		RunE:  cleanupDbt,
+		Example: `  # Remove the artifacts under the current directory
+  astro dbt cleanup
+
+  # Remove them under two dbt projects
+  astro dbt cleanup <PATH> <PATH>`,
 	}
 	return cmd
 }
@@ -64,20 +69,16 @@ func cleanupDbt(cmd *cobra.Command, args []string) error {
 //nolint:dupl // the duplication is acceptable here
 func newDbtDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "deploy DEPLOYMENT-ID",
+		Use:   "deploy [DEPLOYMENT_ID]",
 		Short: "Deploy your dbt project to a Deployment on Astro",
 		Long:  "Deploy your dbt project to a Deployment on Astro. This command bundles your dbt project files and uploads it to your Deployment.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  deployDbt,
-		Example: `
-Specify the ID of the Deployment on Astronomer you would like to deploy this dbt project to:
+		Example: `  # Deploy the dbt project in the current directory, picking the Deployment from a list
+  astro dbt deploy
 
-  $ astro dbt deploy <deployment ID>
-
-Menu will be presented if you do not specify a deployment ID:
-
-  $ astro dbt deploy
-`,
+  # Deploy a dbt project elsewhere to a given Deployment
+  astro dbt deploy <DEPLOYMENT_ID> --project-path <PATH>`,
 	}
 
 	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Path to mount dbt project in Airflow, for reference by DAGs. Default %s{dbt project name}", dbtDefaultMountPathPrefix))
@@ -169,20 +170,16 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 //nolint:dupl // the duplication is acceptable here
 func newDbtDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "delete DEPLOYMENT-ID",
+		Use:   "delete [DEPLOYMENT_ID]",
 		Short: "Delete a dbt project from a Deployment on Astro",
 		Long:  "Delete a dbt project bundle from a Deployment. This removes the uploaded dbt project files but does not affect DAGs that were generated from the project.",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  deleteDbt,
-		Example: `
-Specify the ID of the Deployment on Astronomer you would like to delete this dbt project from:
+		Example: `  # Delete the dbt project in the current directory, picking the Deployment from a list
+  astro dbt delete
 
-  $ astro dbt delete <deployment ID>
-
-Menu will be presented if you do not specify a deployment ID:
-
-  $ astro dbt delete
-`,
+  # Delete it from a given Deployment, by its mount path
+  astro dbt delete <DEPLOYMENT_ID> --mount-path <MOUNT_PATH>`,
 	}
 
 	cmd.Flags().StringVarP(&mountPath, "mount-path", "m", "", fmt.Sprintf("Mount path of the dbt project to be deleted from the Deployment. Default %s{dbt project name}", dbtDefaultMountPathPrefix))

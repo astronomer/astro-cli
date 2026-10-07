@@ -207,6 +207,11 @@ func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvLinkSet(cmd, out, n, f)
 		},
+		Example: fmt.Sprintf(`  # Link a workspace %[1]s to a Deployment
+  astro env %[2]s link set --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID>
+
+  # Opt a Deployment out of an auto-linked %[1]s
+  astro env %[2]s link set --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
 	cmd.Flags().StringVar(&f.deploymentID, "deployment-id", "", "ID of the deployment to link (required)")
@@ -230,6 +235,11 @@ func newEnvLinkDeleteCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Comman
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvLinkDelete(cmd, out, n, f)
 		},
+		Example: fmt.Sprintf(`  # Unlink a workspace %[1]s from a Deployment
+  astro env %[2]s link delete --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID>
+
+  # Remove an exclude, so an auto-linked %[1]s reaches the Deployment again
+  astro env %[2]s link delete --%[2]s-key <KEY> --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
 	cmd.Flags().StringVar(&f.deploymentID, "deployment-id", "", "ID of the deployment to unlink (required)")
@@ -247,6 +257,8 @@ func newEnvLinkListCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command 
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvLinkList(cmd, out, n, f)
 		},
+		Example: fmt.Sprintf(`  # List the Deployments a workspace %[1]s is linked to or excluded from
+  astro env %[2]s link list --%[2]s-key <KEY>`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
 	cliout.AddOutputFlag(cmd, &f.output)

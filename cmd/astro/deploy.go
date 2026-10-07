@@ -62,15 +62,14 @@ var (
 	manifestDeployment string
 	manifestWorkspace  string
 	deployOutput       string
-	deployExample      = `
-Specify the ID of the Deployment on Astronomer you would like to deploy this project to:
+	deployExample      = `  # Deploy this project, picking the Deployment from a list
+  astro deploy
 
-  $ astro deploy <deployment ID>
+  # Deploy to a given Deployment
+  astro deploy <DEPLOYMENT_ID>
 
-Menu will be presented if you do not specify a deployment ID:
-
-  $ astro deploy
-`
+  # Deploy only the DAGs
+  astro deploy <DEPLOYMENT_ID> --dags`
 
 	DeployImage      = astrodeploy.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
@@ -92,7 +91,7 @@ const (
 
 func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "deploy DEPLOYMENT-ID",
+		Use:   "deploy [DEPLOYMENT_ID]",
 		Short: "Ship this project's code to a Deployment",
 		Long:  "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
 		Args:  cobra.MaximumNArgs(1),
@@ -131,7 +130,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
 	cmd.Flags().StringVar(&dagBundleName, "dag-bundle-name", "", "Deploy DAGs to a named DAG bundle on the Deployment instead of the default bundle. Requires Airflow 3, and the bundle must already exist on the Deployment")
 	cmd.Flags().MarkHidden("dag-bundle-name") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
+	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment; with DAG Deploy enabled, its DAGs are not affected")
 	cmd.Flags().StringVar(&dagsPath, dagsPathFlag, "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
 	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")

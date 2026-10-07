@@ -39,7 +39,7 @@ func NewCloudCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "cloud <endpoint | operation-id>",
+		Use:   "cloud <ENDPOINT_OR_OPERATION_ID>",
 		Short: "Make authenticated requests to the Astro Cloud API",
 		Long: `Make authenticated HTTP requests to the Astro Cloud API (api.astronomer.io).
 
@@ -441,7 +441,7 @@ func NewCloudListCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command {
 	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:     "ls [filter]",
+		Use:     "ls [FILTER]",
 		Aliases: []string{"list"},
 		Short:   "List available Astro Cloud API endpoints",
 		Long: `List all available endpoints from the Astro Cloud API.
@@ -507,7 +507,7 @@ func NewCloudDescribeCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command
 	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:   "describe <endpoint>",
+		Use:   "describe <ENDPOINT>",
 		Short: "Describe an Astro Cloud API endpoint's request and response schema",
 		Long: `Show detailed information about an Astro Cloud API endpoint, including:
 - Path and query parameters

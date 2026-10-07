@@ -133,6 +133,11 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvList(cmd, out)
 		},
+		Example: `  # List every environment object in the workspace
+  astro env list
+
+  # List one Deployment's, as JSON
+  astro env list --deployment <DEPLOYMENT_ID> -o json`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput)
 	// The scope flags are persistent on each noun rather than on `env`, so a

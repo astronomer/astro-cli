@@ -36,6 +36,8 @@ var (
 func newLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	cmd := newAuthLoginCommand(astroV1Client, out)
 	cmd.Long += " This is an alias for 'astro auth login'."
+	cmd.Example = `  # Log in to Astro
+  astro login`
 	return cmd
 }
 
@@ -43,6 +45,8 @@ func newLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comm
 func newLogoutCommand(out io.Writer) *cobra.Command {
 	cmd := newAuthLogoutCommand(out)
 	cmd.Long = "Log out of Astronomer. This is an alias for 'astro auth logout'."
+	cmd.Example = `  # Log out of the current context
+  astro logout`
 	return cmd
 }
 
@@ -172,6 +176,14 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return login(cmd, args, astroV1Client, out)
 		},
+		Example: `  # Log in to Astro in the browser
+  astro auth login
+
+  # Log in to an APC installation
+  astro auth login <BASEDOMAIN>
+
+  # Log in without a browser, with an API token
+  astro auth login --token-login <TOKEN>`,
 	}
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
@@ -194,6 +206,11 @@ func newAuthLogoutCommand(out io.Writer) *cobra.Command {
 			return logout(cmd, args, out)
 		},
 		Args: cobra.MaximumNArgs(1),
+		Example: `  # Log out of the current context
+  astro auth logout
+
+  # Log out of another context
+  astro auth logout <DOMAIN>`,
 	}
 	return cmd
 }
@@ -211,6 +228,11 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return printAuthToken(cmd, tokenDomain, forceRenew, out)
 		},
+		Example: `  # Print the current context's token
+  astro auth token
+
+  # Print the token for another context
+  astro auth token --domain <DOMAIN>`,
 	}
 	cmd.Flags().StringVarP(&tokenDomain, "domain", "d", "", "Print the token for a specific context domain instead of the current context")
 	cmd.Flags().BoolVar(&forceRenew, "force", false, "Renew the token from the saved login even if it has not expired yet")

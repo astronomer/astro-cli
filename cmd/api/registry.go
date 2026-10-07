@@ -40,7 +40,7 @@ func NewRegistryCmd(out io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "registry <endpoint | operation-id>",
+		Use:   "registry <ENDPOINT_OR_OPERATION_ID>",
 		Short: "Make requests to the Airflow Provider Registry API",
 		Long: `Make HTTP requests to the Airflow Provider Registry API.
 
@@ -212,7 +212,7 @@ func NewRegistryListCmd(out io.Writer, parentOpts *RegistryOptions) *cobra.Comma
 	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:     "ls [filter]",
+		Use:     "ls [FILTER]",
 		Aliases: []string{"list"},
 		Short:   "List available registry API endpoints",
 		Long: `List all available endpoints from the Airflow Provider Registry API.
@@ -263,7 +263,7 @@ func NewRegistryDescribeCmd(out io.Writer, parentOpts *RegistryOptions) *cobra.C
 	var jsonOut bool
 
 	cmd := &cobra.Command{
-		Use:   "describe <endpoint>",
+		Use:   "describe <ENDPOINT>",
 		Short: "Describe a registry API endpoint's request and response schema",
 		Long: `Show detailed information about a registry API endpoint, including:
 - Path parameters

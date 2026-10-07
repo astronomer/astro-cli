@@ -58,13 +58,15 @@ func newContextListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return context.ListContext(cmd, args, out)
 		},
+		Example: `  # List the contexts saved on this machine
+  astro context list`,
 	}
 	return cmd
 }
 
 func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "switch [domain]",
+		Use:     "switch [DOMAIN]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different context",
 		Long:    "Switch to a different context. With no domain, pick one from the contexts saved on this machine. For Astro, the saved login for the domain is refreshed if it can be; the command never opens a browser.",
@@ -72,6 +74,11 @@ func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 			return switchContext(cmd, args, astroV1Client, out)
 		},
 		Args: cobra.MaximumNArgs(1),
+		Example: `  # Pick a context from the ones saved on this machine
+  astro context switch
+
+  # Switch to Astro
+  astro context switch astronomer.io`,
 	}
 	return cmd
 }
@@ -175,7 +182,7 @@ func noteDomainOverride(errOut io.Writer, domain string) {
 
 func newContextDeleteCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [domain]",
+		Use:     "delete <DOMAIN>",
 		Aliases: []string{"de"},
 		Short:   "Delete a context",
 		Long:    "Delete a locally stored context to Astro or APC",
@@ -183,6 +190,11 @@ func newContextDeleteCmd() *cobra.Command {
 			return context.DeleteContext(cmd, []string{domainutil.ExpandShortName(args[0])}, noPrompt)
 		},
 		Args: cobra.ExactArgs(1),
+		Example: `  # Delete a saved context
+  astro context delete <DOMAIN>
+
+  # Delete the current context without the confirmation prompt
+  astro context delete <DOMAIN> --yes`,
 	}
 
 	cmd.Flags().BoolVarP(&noPrompt, "yes", "y", false, "Don't ask for confirmation before deleting the current context")

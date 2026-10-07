@@ -67,6 +67,11 @@ func newEnvVarListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarList(cmd, out, false)
 		},
+		Example: `  # List the environment variables in the workspace
+  astro env variable list
+
+  # List one Deployment's, as JSON
+  astro env variable list --deployment <DEPLOYMENT_ID> -o json`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput, formatDotenv)
 	return cmd
@@ -82,6 +87,11 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarList(cmd, out, true)
 		},
+		Example: `  # Write the workspace's environment variables to a .env file
+  astro env variable export > .env
+
+  # Include secret values, which are otherwise left blank
+  astro env variable export --include-secrets > .env`,
 	}
 	// dotenv is export's text, and is accepted by name as list and get
 	// accept it.
@@ -91,12 +101,17 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 
 func newEnvVarGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get <id-or-key>",
+		Use:   "get <ID_OR_KEY>",
 		Short: "Show an environment variable",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvVarGet(cmd, out, args[0])
 		},
+		Example: `  # Show an environment variable by its key
+  astro env variable get API_TOKEN
+
+  # Show one on a Deployment, as a KEY=VALUE line
+  astro env variable get API_TOKEN --deployment <DEPLOYMENT_ID> -o dotenv`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput, formatDotenv)
 	return cmd
@@ -104,7 +119,7 @@ func newEnvVarGetCmd(out io.Writer) *cobra.Command {
 
 func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set [<id-or-key>]",
+		Use:   "set [ID_OR_KEY]",
 		Short: "Set an environment variable",
 		Long: "Set an environment variable, creating it if it does not exist. Pass --no-create\n" +
 			"to fail instead, or --from-file to set many from a dotenv file.",
@@ -121,6 +136,11 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 			}
 			return runEnvVarSet(cmd, out, args[0])
 		},
+		Example: `  # Set a secret variable, creating it if it does not exist
+  astro env variable set API_TOKEN --value "$TOKEN" --secret
+
+  # Set many from a dotenv file
+  astro env variable set --from-file .env`,
 	}
 	cmd.Flags().StringVarP(&envVarValue, "value", "v", "", "The value; omit it to read from stdin or be prompted with echo off")
 	cmd.Flags().BoolVarP(&envVarSecret, "secret", "s", false, "Mark the variable secret when it is created; to change it later, delete and re-create it")
@@ -133,13 +153,18 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 
 func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete <id-or-key>",
+		Use:     "delete <ID_OR_KEY>",
 		Aliases: []string{"rm"},
 		Short:   "Delete an environment variable",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(cmd, out, "environment variable", args[0], env.DeleteVar)
 		},
+		Example: `  # Delete an environment variable
+  astro env variable delete API_TOKEN
+
+  # Delete it without the confirmation prompt
+  astro env variable delete API_TOKEN --yes`,
 	}
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd

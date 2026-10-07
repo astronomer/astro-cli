@@ -62,6 +62,11 @@ func newEnvConnListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvConnList(cmd, out)
 		},
+		Example: `  # List the connections in the workspace
+  astro env connection list
+
+  # List one Deployment's, as JSON
+  astro env connection list --deployment <DEPLOYMENT_ID> -o json`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
@@ -69,12 +74,14 @@ func newEnvConnListCmd(out io.Writer) *cobra.Command {
 
 func newEnvConnGetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get <id-or-key>",
+		Use:   "get <ID_OR_KEY>",
 		Short: "Show a connection",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvConnGet(cmd, out, args[0])
 		},
+		Example: `  # Show a connection by its key
+  astro env connection get db_main`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput)
 	return cmd
@@ -82,7 +89,7 @@ func newEnvConnGetCmd(out io.Writer) *cobra.Command {
 
 func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "set <id-or-key>",
+		Use:   "set <ID_OR_KEY>",
 		Short: "Set a connection",
 		Long: "Set a connection, creating it if it does not exist. Pass --no-create to fail\n" +
 			"instead. Give it whole with --value, as a URI or JSON, or field by field with\n" +
@@ -91,6 +98,11 @@ func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvConnSet(cmd, out, args[0])
 		},
+		Example: `  # Set a connection from a URI, with the password piped in
+  echo "$PW" | astro env connection set db_main --value 'postgres://admin@db.example.com:5432/warehouse'
+
+  # Set it field by field
+  astro env connection set db_main --type postgres --host db.example.com --login admin --port 5432`,
 	}
 	connFlags(cmd)
 	cmd.Flags().BoolVar(&envConnNoCreate, "no-create", false, "Fail if the connection does not exist, instead of creating it")
@@ -117,13 +129,15 @@ var connFieldFlagNames = []string{"type", "host", "login", "password", "schema",
 
 func newEnvConnDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete <id-or-key>",
+		Use:     "delete <ID_OR_KEY>",
 		Aliases: []string{"rm"},
 		Short:   "Delete a connection",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(cmd, out, "connection", args[0], env.DeleteConn)
 		},
+		Example: `  # Delete a connection without the confirmation prompt
+  astro env connection delete db_main --yes`,
 	}
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd

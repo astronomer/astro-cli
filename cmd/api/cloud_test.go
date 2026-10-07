@@ -59,7 +59,7 @@ func TestNewCloudCmd(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd := NewCloudCmd(out)
 
-	assert.Equal(t, "cloud <endpoint | operation-id>", cmd.Use)
+	assert.Equal(t, "cloud <ENDPOINT_OR_OPERATION_ID>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 	assert.NotEmpty(t, cmd.Example)

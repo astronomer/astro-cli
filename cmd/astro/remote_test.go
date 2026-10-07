@@ -267,6 +267,6 @@ func TestRemoteCommandIntegration(t *testing.T) {
 		deployCmd, _, err := rootCmd.Find([]string{"deploy"})
 		assert.NoError(t, err)
 		assert.Contains(t, deployCmd.Example, "--deployment ")
-		assert.Contains(t, deployCmd.Example, "deployment validation")
+		assert.Contains(t, deployCmd.Example, "checking its runtime against a Deployment")
 	})
 }

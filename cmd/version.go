@@ -30,6 +30,8 @@ func newVersionCommand() *cobra.Command {
 				version.PrintVersion,
 			)
 		},
+		Example: `  # Print the CLI's version
+  astro version`,
 	}
 	cliout.AddOutputFlag(cmd, &output)
 	return cmd

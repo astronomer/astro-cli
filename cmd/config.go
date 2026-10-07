@@ -55,14 +55,16 @@ func refuseRemovedConfigKey(key string) error {
 
 var (
 	globalFlag       bool
-	configGetExample = `
-		# Get your current project's name
-		$ astro config get project.name
-		`
-	configSetExample = `
-		# Set your current project's postgres user
-		$ astro config set postgres.user postgres
-		`
+	configGetExample = `  # Get a global setting
+  astro config get show_warnings -g
+
+  # Get a setting from a 1.x project's .astro/config.yaml
+  astro config get project.name`
+	configSetExample = `  # Turn off warnings for every project on this machine
+  astro config set show_warnings false -g
+
+  # Set a setting in a 1.x project's .astro/config.yaml
+  astro config set postgres.user postgres`
 )
 
 func newConfigRootCmd(out io.Writer) *cobra.Command {
@@ -72,7 +74,7 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 		Long:              "Manage CLI settings, stored globally with -g or in a 1.x project's .astro/config.yaml. Run `astro config list` to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
 		PersistentPreRunE: ensureGlobalFlag,
 	}
-	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "view or modify global config")
+	cmd.PersistentFlags().BoolVarP(&globalFlag, "global", "g", false, "View or modify global config")
 	cmd.AddCommand(
 		newConfigGetCmd(out),
 		newConfigSetCmd(out),
@@ -83,7 +85,7 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 
 func newConfigGetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "get [setting-name]",
+		Use:     "get <SETTING_NAME>",
 		Short:   "Get a CLI setting",
 		Long:    "List the value for a particular setting in your config.yaml file",
 		Args:    cobra.ExactArgs(1),
@@ -95,7 +97,7 @@ func newConfigGetCmd(_ io.Writer) *cobra.Command {
 
 func newConfigSetCmd(_ io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "set [setting-name]",
+		Use:     "set <SETTING_NAME> <VALUE>",
 		Short:   "Set a CLI setting",
 		Long:    "Update or override a particular setting in your config.yaml file",
 		Example: configSetExample,
@@ -113,6 +115,11 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return configList(out)
 		},
+		Example: `  # List every setting, with where its value comes from
+  astro config list
+
+  # List the global values only
+  astro config list -g`,
 	}
 }
 

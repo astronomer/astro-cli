@@ -31,7 +31,7 @@ func TestNewAirflowCmd(t *testing.T) {
 	out := new(bytes.Buffer)
 	cmd := NewAirflowCmd(out)
 
-	assert.Equal(t, "airflow <endpoint | operation-id>", cmd.Use)
+	assert.Equal(t, "airflow <ENDPOINT_OR_OPERATION_ID>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 	assert.NotEmpty(t, cmd.Long)
 	assert.NotEmpty(t, cmd.Example)
@@ -101,7 +101,7 @@ func TestNewAirflowListCmd(t *testing.T) {
 	parentOpts := &AirflowOptions{}
 	cmd := NewAirflowListCmd(out, parentOpts)
 
-	assert.Equal(t, "ls [filter]", cmd.Use)
+	assert.Equal(t, "ls [FILTER]", cmd.Use)
 	assert.Contains(t, cmd.Aliases, "list")
 	assert.NotEmpty(t, cmd.Short)
 	assert.Contains(t, cmd.Short, "Airflow")
@@ -119,7 +119,7 @@ func TestNewAirflowDescribeCmd(t *testing.T) {
 	parentOpts := &AirflowOptions{}
 	cmd := NewAirflowDescribeCmd(out, parentOpts)
 
-	assert.Equal(t, "describe <endpoint>", cmd.Use)
+	assert.Equal(t, "describe <ENDPOINT>", cmd.Use)
 	assert.NotEmpty(t, cmd.Short)
 
 	// Check flags exist

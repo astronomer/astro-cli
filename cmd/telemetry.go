@@ -45,6 +45,8 @@ func newTelemetryEnableCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return telemetryEnable(out)
 		},
+		Example: `  # Turn telemetry back on
+  astro telemetry enable`,
 	}
 	return cmd
 }
@@ -57,6 +59,8 @@ func newTelemetryDisableCmd(out io.Writer) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return telemetryDisable(out)
 		},
+		Example: `  # Stop sending anonymous telemetry
+  astro telemetry disable`,
 	}
 	return cmd
 }

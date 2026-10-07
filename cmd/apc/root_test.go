@@ -88,7 +88,7 @@ func (s *AddCmdSuite) TestAddCmds() {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+		s.Contains([]string{"deployment", "deploy [DEPLOYMENT_ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(s.T())
 }
@@ -100,7 +100,7 @@ func (s *AddCmdSuite) TestAppConfigFailure() {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+		s.Contains([]string{"deployment", "deploy [DEPLOYMENT_ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(s.T())
 	s.Contains(InitDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
@@ -119,7 +119,7 @@ func (s *AddCmdSuite) TestPlatformVersionFailure() {
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
-		s.Contains([]string{"deployment", "deploy [DEPLOYMENT ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
+		s.Contains([]string{"deployment", "deploy [DEPLOYMENT_ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(s.T())
 	s.Contains(InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", errMock))

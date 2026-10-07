@@ -39,21 +39,20 @@ var (
 	ErrImageNameNotPassedForRemoteFlag = errors.New("--image-name is mandatory when --remote flag is passed")
 )
 
-var deployExample = `
-Deployment you would like to deploy to Airflow cluster:
+var deployExample = `  # Deploy this project, picking the Deployment from a list
+  astro deploy
 
-$ astro deploy <deployment-id>
+  # Deploy to a given Deployment
+  astro deploy <DEPLOYMENT_ID>
 
-Menu will be presented if you do not specify a deployment name:
-
-$ astro deploy
-`
+  # Deploy a custom image built on this machine
+  astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>`
 
 var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy <deployment-id> --force` to deploy anyway")
 
 func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "deploy [DEPLOYMENT ID]",
+		Use:   "deploy [DEPLOYMENT_ID]",
 		Short: "Deploy an Airflow project",
 		Long:  "Deploy an Airflow project to an APC Deployment",
 		Args:  cobra.MaximumNArgs(1),
@@ -70,9 +69,9 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
 	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
 	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "workspace assigned to deployment")
-	cmd.Flags().StringVar(&description, "description", "", "Improve traceability by attaching a description to a code deploy. If you don't provide a description, the system automatically assigns a default description based on the deploy type.")
-	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Astro Deployment. This only works for Dag-only, Git-sync-based and NFS-based deployments.")
+	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace assigned to the Deployment")
+	cmd.Flags().StringVar(&description, "description", "", "Description to attach to the deploy, for traceability (default: one based on the deploy type)")
+	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of the custom image(should be present locally unless --remote is specified) to deploy")
 	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Runtime version of the image to deploy. Example - 12.1.1. Mandatory if --image-name --remote is provided")
 	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Custom image which is present on the remote registry. Can only be used with --image-name flag")
