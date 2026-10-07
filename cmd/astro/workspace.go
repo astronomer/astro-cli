@@ -25,6 +25,8 @@ var (
 	workspaceName              string
 	workspaceDescription       string
 	enforceCD                  string
+	workspaceUpdateEnforceCD   string
+	workspaceDeleteYes         bool
 	tokenName                  string
 	tokenDescription           string
 	tokenRole                  string
@@ -141,7 +143,7 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 		Use:     "update [WORKSPACE_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update an Astro Workspace",
-		Long:    "Update a Workspace's name, description, or CI/CD enforcement policy. Changing --enforce-cicd affects all Deployments in the Workspace: when enabled, only API token-authenticated deploys are allowed. If no Workspace ID is provided, you will be prompted to select one.",
+		Long:    "Update a Workspace's name, description, or CI/CD enforcement policy. Changing --enforce-cicd affects all Deployments in the Workspace: when enabled, only API token-authenticated deploys are allowed. A setting whose flag is left out keeps its current value. If no Workspace ID is provided, you will be prompted to select one.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
   # Rename a Workspace
@@ -160,7 +162,8 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
 	cmd.Flags().StringVarP(&workspaceName, "name", "n", "", "The Workspace's name. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&workspaceDescription, "description", "d", "", "Description of the Workspace. If the description contains a space, specify the entire description in quotes \"\"")
-	cmd.Flags().StringVarP(&enforceCD, "enforce-cicd", "e", "OFF", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD")
+	// No default: an update that does not name the setting keeps it.
+	cmd.Flags().StringVarP(&workspaceUpdateEnforceCD, "enforce-cicd", "e", "", "Provide this flag either ON/OFF. ON means deploys to deployments must use an API Key or Token. This essentially forces Deploys to happen through CI/CD (default: unchanged)")
 	return cmd
 }
 
@@ -169,23 +172,24 @@ func newWorkspaceDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [WORKSPACE_ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete an Astro Workspace",
-		Long:    "Permanently delete a Workspace. The Workspace must have zero Deployments — delete or transfer all Deployments first. Deletion also removes all Workspace-scoped API tokens and revokes Workspace-level roles from Organization tokens that had access. This action cannot be undone.",
+		Long:    "Permanently delete a Workspace. The Workspace must have zero Deployments — delete or transfer all Deployments first. Deletion also removes all Workspace-scoped API tokens and revokes Workspace-level roles from Organization tokens that had access. This action cannot be undone, so the command asks for confirmation first unless --yes is given.",
 		Args:    cobra.MaximumNArgs(1),
 		Example: `
-  # Delete a Workspace by its ID
+  # Delete a Workspace by its ID, after confirming
   astro workspace delete <WORKSPACE_ID>
 
   # Choose the Workspace to delete from a list
   astro workspace delete
 
-  # Delete a Workspace, and print the result as JSON
-  astro workspace delete <WORKSPACE_ID> -o json
+  # Delete a Workspace without being asked, and print the result as JSON
+  astro workspace delete <WORKSPACE_ID> --yes -o json
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceDelete(cmd, out, args)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &workspaceLifecycleOutput)
+	cmd.Flags().BoolVarP(&workspaceDeleteYes, "yes", "y", false, "Don't ask for confirmation before deleting the Workspace")
 	return cmd
 }
 
@@ -782,7 +786,16 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforceCD, questionsTo(cmd, format, out), astroV1Client)
+	// Left out, the setting stays as it is: Update keeps the Workspace's own
+	// for an empty value.
+	enforce := ""
+	if cmd.Flags().Changed("enforce-cicd") {
+		enforce = workspaceUpdateEnforceCD
+		if enforce == "" {
+			return workspace.ErrWrongEnforceInput
+		}
+	}
+	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforce, questionsTo(cmd, format, out), astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -801,8 +814,9 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	removal, err := workspace.Delete(id, questionsTo(cmd, format, out), astroV1Client)
-	if err != nil {
+	removal, err := workspace.Delete(id, workspaceDeleteYes, questionsTo(cmd, format, out), astroV1Client)
+	if err != nil || removal == nil {
+		// nil, nil is a declined question, which has said so.
 		return err
 	}
 	return emitWorkspaceRemoval(cliout.Renderer{Format: format, Out: out}, removal)

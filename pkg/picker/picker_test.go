@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -241,4 +242,26 @@ func TestPickInvalidAnswerNamesTheLastAnswerGiven(t *testing.T) {
 		require.ErrorIs(t, err, errInvalidThing)
 		assert.EqualError(t, err, fmt.Sprintf("invalid thing selection: %q", want), "input %q", in)
 	}
+}
+
+// A pick and the confirmation after it, answered from one pipe as a script
+// answers them: the picker reads stdin through the reader the confirmation
+// reads, so the "y" it read ahead with its own answer is still there.
+func TestPickThenConfirmFromOnePipe(t *testing.T) {
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	_, err = w.WriteString("2\ny\n")
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+	stdin := os.Stdin
+	os.Stdin = r
+	t.Cleanup(func() { os.Stdin = stdin; r.Close() })
+
+	var out bytes.Buffer
+	i, err := things().Pick(&out, os.Stdin)
+	require.NoError(t, err)
+	assert.Equal(t, 1, i)
+	ok, err := input.Confirm("Delete it?")
+	require.NoError(t, err)
+	assert.True(t, ok, "the confirmation lost the answer the picker read ahead")
 }

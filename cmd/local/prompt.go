@@ -1,7 +1,6 @@
 package local
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -30,7 +29,7 @@ func (c *cli) confirm(question string) error {
 		return err
 	}
 	fmt.Fprintf(c.d.Stderr, "%s [y/N] ", question)
-	line, err := bufio.NewReader(c.d.Stdin).ReadString('\n')
+	line, err := input.Reader(c.d.Stdin).ReadString('\n')
 	line = strings.TrimSpace(line)
 	if err != nil && line == "" {
 		if errors.Is(err, io.EOF) {

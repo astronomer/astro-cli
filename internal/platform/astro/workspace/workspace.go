@@ -283,7 +283,7 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 	if err != nil {
 		return nil, err
 	}
-	workspace, err := findWorkspace(id, "the workspace to update", out, client)
+	workspace, err := findWorkspace(id, "the workspace you would like to update", out, client)
 	if err != nil {
 		return nil, err
 	}
@@ -332,15 +332,35 @@ func Update(id, name, description, enforceCD string, out io.Writer, client astro
 }
 
 // Delete deletes the Workspace id names, or, with no id, the one picked from
-// a menu drawn on out, and returns what it deleted.
-func Delete(id string, out io.Writer, client astrov1.APIClient) (*Removal, error) {
+// a menu drawn on out, after asking unless yes. It returns what it deleted,
+// or nil when the question was declined, which it says on out.
+func Delete(id string, yes bool, out io.Writer, client astrov1.APIClient) (*Removal, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return nil, err
 	}
-	workspace, err := findWorkspace(id, "the workspace to delete", out, client)
+	// A run that cannot ask is refused before anything is listed or picked:
+	// the question it would end on is one only --yes answers.
+	if !yes {
+		if err := input.MayAsk("", input.About("confirmation to delete the Workspace"), input.AnsweredBy("--yes")); err != nil {
+			return nil, err
+		}
+	}
+	workspace, err := findWorkspace(id, "the workspace you would like to delete", out, client)
 	if err != nil {
 		return nil, err
+	}
+	if !yes {
+		ok, err := input.Confirm(
+			fmt.Sprintf("\nAre you sure you want to delete the %s Workspace (%s)? This cannot be undone.", ansi.Bold(workspace.Name), workspace.Id),
+			input.AnsweredBy("--yes"))
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			fmt.Fprintln(out, "Canceling Workspace deletion")
+			return nil, nil
+		}
 	}
 	resp, err := client.DeleteWorkspaceWithResponse(httpContext.Background(), ctx.Organization, workspace.Id)
 	if err != nil {
@@ -397,9 +417,8 @@ func selectWorkspace(workspaces []astrov1.Workspace, about string, out io.Writer
 		return workspaces[0], nil
 	}
 
-	// The title says "update" for a delete too, as it always has.
 	list := picker.List{
-		Title:   "\nPlease select the workspace you would like to update:",
+		Title:   "\nPlease select " + about + ":",
 		Header:  []string{"WORKSPACENAME", "ID", "CICD ENFORCEMENT"},
 		Ask:     []input.Option{input.About(about), input.AnsweredBy(IDAnswer)},
 		Invalid: errInvalidWorkspaceKey,

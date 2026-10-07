@@ -1,9 +1,7 @@
 package input
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"strings"
 
 	"golang.org/x/term"
@@ -15,7 +13,7 @@ func Text(promptText string, opts ...Option) (string, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return "", err
 	}
-	reader := bufio.NewReader(os.Stdin)
+	reader := stdin()
 	if promptText != "" {
 		fmt.Print(promptText)
 	}
@@ -31,7 +29,7 @@ func Confirm(promptText string, opts ...Option) (bool, error) {
 	if err := MayAsk(promptText, opts...); err != nil {
 		return false, err
 	}
-	reader := bufio.NewReader(os.Stdin)
+	reader := stdin()
 	fmt.Printf("%s (y/n) ", promptText)
 
 	text, _ := reader.ReadString('\n') //nolint:errcheck // error deliberately ignored in this shell code

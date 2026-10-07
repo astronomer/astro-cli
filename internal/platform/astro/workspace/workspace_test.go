@@ -455,7 +455,7 @@ func (s *Suite) TestDelete() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseOK, nil).Once()
-		removal, err := Delete("workspace-id", out, mockClient)
+		removal, err := Delete("workspace-id", true, out, mockClient)
 		s.NoError(err)
 		s.Equal(&Removal{WorkspaceID: "workspace-id", Name: "test-workspace", Action: "deleted"}, removal)
 		s.Empty(out.String())
@@ -478,7 +478,7 @@ func (s *Suite) TestDelete() {
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&listWorkspacesResponseOK, nil).Once()
-		_, err := Delete("", out, mockClient)
+		_, err := Delete("", true, out, mockClient)
 		s.ErrorIs(err, ErrNoWorkspaceExists)
 	})
 
@@ -487,7 +487,7 @@ func (s *Suite) TestDelete() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		_, err := Delete("workspace-id", out, mockClient)
+		_, err := Delete("workspace-id", true, out, mockClient)
 		s.EqualError(err, "network error")
 	})
 
@@ -496,7 +496,7 @@ func (s *Suite) TestDelete() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseError, nil).Once()
-		_, err := Delete("workspace-id", out, mockClient)
+		_, err := Delete("workspace-id", true, out, mockClient)
 		s.EqualError(err, "failed to delete workspace")
 	})
 
@@ -505,7 +505,7 @@ func (s *Suite) TestDelete() {
 		expectedOutMessage := ""
 		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		_, err := Delete("workspace-id", out, mockClient)
+		_, err := Delete("workspace-id", true, out, mockClient)
 		s.Error(err)
 		s.Equal(expectedOutMessage, out.String())
 	})
@@ -530,7 +530,7 @@ func (s *Suite) TestDelete() {
 
 		mockClient.On("DeleteWorkspaceWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&DeleteWorkspaceResponseOK, nil).Once()
 
-		removal, err := Delete("", out, mockClient)
+		removal, err := Delete("", true, out, mockClient)
 		s.NoError(err)
 		s.Equal("test-workspace", removal.Name)
 	})

@@ -1,8 +1,10 @@
 package input
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -131,4 +133,60 @@ func (s *Suite) TestRequiredWrapsAnAskersOwnRefusal() {
 	s.EqualError(err, "deploying: pass --deployment")
 	s.NoError(Required(nil))
 	s.False(IsRequired(base))
+}
+
+// Two questions answered from one pipe each get their own line: the first
+// read takes the whole pipe into the reader, and the second finds its answer
+// there instead of an empty stdin.
+func (s *Suite) TestQuestionsAnsweredFromOnePipe() {
+	defer SetGuard(nil)()
+	s.stdinWith("staging\ny\n")
+	got, err := Text("Which one? ")
+	s.Require().NoError(err)
+	s.Equal("staging", got)
+	ok, err := Confirm("Sure?")
+	s.Require().NoError(err)
+	s.True(ok)
+}
+
+// sliceReader is a reader whose type cannot be compared, and wrapper one that
+// passes as comparable until its field holds one: comparing two wrappers
+// then panics.
+type (
+	sliceReader []byte
+	wrapper     struct{ io.Reader }
+)
+
+func (r sliceReader) Read(p []byte) (int, error) { return copy(p, r), io.EOF }
+
+// Only a file is shared. Any other source, a wrapper around one that cannot
+// be compared included, is read through a reader of its own, and asking for
+// one never compares it with the last.
+func (s *Suite) TestReaderSharesOnlyFiles() {
+	first := Reader(wrapper{sliceReader("a\n")})
+	var second *bufio.Reader
+	s.NotPanics(func() { second = Reader(wrapper{sliceReader("b\n")}) })
+	s.NotSame(first, second)
+	line, _ := second.ReadString('\n')
+	s.Equal("b\n", line)
+
+	r, w, err := os.Pipe()
+	s.Require().NoError(err)
+	defer r.Close()
+	defer w.Close()
+	s.Same(Reader(r), Reader(r))
+}
+
+// A replaced os.Stdin is read from the start, with nothing the reader on the
+// old one read ahead carried over.
+func (s *Suite) TestReaderFollowsAReplacedStdin() {
+	defer SetGuard(nil)()
+	s.stdinWith("old\nstale\n")
+	got, err := Text("")
+	s.Require().NoError(err)
+	s.Equal("old", got)
+	s.stdinWith("new\n")
+	got, err = Text("")
+	s.Require().NoError(err)
+	s.Equal("new", got)
 }

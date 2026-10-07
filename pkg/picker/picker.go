@@ -99,7 +99,7 @@ func (l *List) Pick(out io.Writer, in io.Reader) (int, error) {
 		return 0, err
 	}
 	l.render(out)
-	r := bufio.NewReader(in)
+	r := input.Reader(in)
 	var last string // the last answer given, for InvalidAnswer to name
 	for attempt := 1; ; attempt++ {
 		// A failed read ends the input: whatever it returned is the last
