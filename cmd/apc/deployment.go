@@ -67,67 +67,58 @@ var (
 	adoptUseApcRegistry          bool
 	adoptAcceptIncompatibilities bool
 
-	deploymentAdoptExample = `
-$ astro deployment adopt --cluster-id=<cluster-id> --name=<cr-name> --namespace=<cr-namespace> --workspace-id=<workspace-id>
-`
-	deploymentUnadoptExample = `
-$ astro deployment unadopt --deployment-id=<deployment-id>
-`
-	deploymentCreateExample = `
-# Create new deployment with Celery executor (default: celery without params).
-$ astro deployment create --label=new-deployment-name --executor=celery
+	deploymentAdoptExample = `  # Adopt an Airflow custom resource into the current Workspace
+  astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE>
 
-# Create new deployment with Local executor.
-$ astro deployment create --label=new-deployment-name-local --executor=local
+  # Adopt it into another Workspace
+  astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE> --workspace-id=<WORKSPACE_ID>`
+	deploymentUnadoptExample = `  # Release an adopted Deployment
+  astro deployment unadopt --deployment-id=<DEPLOYMENT_ID>`
+	deploymentCreateExample = `  # Create a Deployment with the Celery executor
+  astro deployment create --label=my-deployment
 
-# Create new deployment with Kubernetes executor.
-$ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airflow-version=2.4.1
+  # Create one with the Kubernetes executor and an Airflow version
+  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1
 
-# Create new deployment with Astronomer Runtime.
-$ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1
-`
-	deploymentCreateExampleAPCV1 = `
-# Create new deployment with Celery executor (default: celery without params).
-$ astro deployment create --label=new-deployment-name --executor=celery --cluster-id=123
+  # Create one on Astronomer Runtime
+  astro deployment create --label=my-deployment --executor=kubernetes --runtime-version=6.0.1`
+	deploymentCreateExampleAPCV1 = `  # Create a Deployment with the Celery executor
+  astro deployment create --label=my-deployment --cluster-id=<CLUSTER_ID>
 
-# Create new deployment with Local executor.
-$ astro deployment create --label=new-deployment-name-local --executor=local --cluster-id=123
+  # Create one with the Kubernetes executor and an Airflow version
+  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 --cluster-id=<CLUSTER_ID>
 
-# Create new deployment with Kubernetes executor.
-$ astro deployment create --label=new-deployment-name-k8s --executor=k8s --airflow-version=2.4.1 --cluster-id=123
+  # Create one on Astronomer Runtime
+  astro deployment create --label=my-deployment --executor=kubernetes --runtime-version=6.0.1 --cluster-id=<CLUSTER_ID>`
+	createExampleOperatorMode = `
 
-# Create new deployment with Astronomer Runtime.
-$ astro deployment create --label=my-new-deployment --executor=k8s --runtime-version=6.0.1 --cluster-id=123
-
-# Create Operator deployment (APC 2.1.0+).
-$ astro deployment create --label=my-operator-deployment --executor=k8s --cluster-id=123 --mode=operator
-`
+  # Create an operator-managed Deployment
+  astro deployment create --label=my-deployment --executor=kubernetes --cluster-id=<CLUSTER_ID> --mode=operator`
 
 	createExampleDagDeployment = `
-# Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
-$ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test
-`
+
+  # Create one that reads its DAGs from an NFS volume
+  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
 	createExampleDagDeploymentAPCV1 = `
-# Create new deployment with Kubernetes executor and dag deployment type volume and nfs location.
-$ astro deployment create --label=my-new-deployment --executor=k8s --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=test:/test --cluster-id=123
-`
 
-	deploymentAirflowUpgradeExample = `
-  $ astro deployment airflow upgrade --deployment-id=<deployment-id> --desired-airflow-version=<desired-airflow-version>
+  # Create one that reads its DAGs from an NFS volume
+  astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 --dag-deployment-type=volume --nfs-location=<IP>:/<PATH> --cluster-id=<CLUSTER_ID>`
 
-# Abort the initial airflow upgrade step:
-  $ astro deployment airflow upgrade --cancel --deployment-id=<deployment-id>
-`
-	deploymentRuntimeUpgradeExample = `
-$ astro deployment runtime upgrade --deployment-id=<deployment-id> --desired-runtime-version=<desired-runtime-version>
-# Abort the initial runtime upgrade step:
-$ astro deployment runtime upgrade --deployment-id=<deployment-id> --cancel
-`
-	deploymentRuntimeMigrateExample = `
-$ astro deployment runtime migrate --deployment-id=<deployment-id>
-# Abort the initial runtime migrate step:
-$ astro deployment runtime migrate --deployment-id=<deployment-id> --cancel
-`
+	deploymentAirflowUpgradeExample = `  # Start upgrading a Deployment's Airflow
+  astro deployment airflow upgrade --deployment-id=<DEPLOYMENT_ID> --desired-airflow-version=<AIRFLOW_VERSION>
+
+  # Cancel an upgrade that has not finished
+  astro deployment airflow upgrade --deployment-id=<DEPLOYMENT_ID> --cancel`
+	deploymentRuntimeUpgradeExample = `  # Start upgrading a Deployment's Runtime
+  astro deployment runtime upgrade --deployment-id=<DEPLOYMENT_ID> --desired-runtime-version=<RUNTIME_VERSION>
+
+  # Cancel an upgrade that has not finished
+  astro deployment runtime upgrade --deployment-id=<DEPLOYMENT_ID> --cancel`
+	deploymentRuntimeMigrateExample = `  # Start migrating a Deployment to Astronomer Runtime
+  astro deployment runtime migrate --deployment-id=<DEPLOYMENT_ID>
+
+  # Cancel a migration that has not finished
+  astro deployment runtime migrate --deployment-id=<DEPLOYMENT_ID> --cancel`
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -205,7 +196,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		} else {
 			cmd.Example += createExampleDagDeployment
 		}
-		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS volume to mount, as <IP>:/<path>, without the nfs:// prefix the CLI adds")
 	}
 
 	if gitSyncDAGDeploymentEnabled {
@@ -233,6 +224,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "2.1.0"}) {
 		cmd.Flags().StringVarP(&deploymentMode, "mode", "", "", "Deployment mode, one of: helm (default), operator")
+		cmd.Example += createExampleOperatorMode
 	}
 	_ = cmd.MarkFlagRequired("label") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd
@@ -240,11 +232,13 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [deployment ID]",
+		Use:     "delete <DEPLOYMENT_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete an Airflow Deployment",
 		Long:    "Delete an Airflow Deployment",
-		Args:    cobra.ExactArgs(1),
+		Example: `  # Delete a Deployment and all of its data, after you confirm
+  astro deployment delete <DEPLOYMENT_ID>`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentDelete(cmd, args, out)
 		},
@@ -304,6 +298,11 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List Airflow Deployment",
 		Long:    "List Airflow Deployment",
+		Example: `  # List the Deployments in the current Workspace
+  astro deployment list
+
+  # List Deployments across all Workspaces
+  astro deployment list --all`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentList(cmd, out)
 		},
@@ -316,15 +315,17 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
-	example := `
-# update executor for given deployment
-$ astro deployment update [deployment ID] --executor=celery`
+	example := `  # Change a Deployment's executor
+  astro deployment update <DEPLOYMENT_ID> --executor=celery
+
+  # Change its label
+  astro deployment update <DEPLOYMENT_ID> --label=my-deployment`
 	updateExampleDagDeployment := `
 
-# update dag deployment strategy
-$ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-location=test:/test`
+  # Read its DAGs from an NFS volume
+  astro deployment update <DEPLOYMENT_ID> --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
 	cmd := &cobra.Command{
-		Use:     "update",
+		Use:     "update <DEPLOYMENT_ID>",
 		Aliases: []string{"up"},
 		Short:   "Update Airflow Deployments",
 		Long:    "Update Airflow Deployments",
@@ -354,7 +355,7 @@ $ astro deployment update [deployment ID] --dag-deployment-type=volume --nfs-loc
 
 	if nfsMountDAGDeploymentEnabled {
 		cmd.Example += updateExampleDagDeployment
-		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS Volume Mount, specified as: <IP>:/<path>. Input is automatically prepended with 'nfs://' - do not include.")
+		cmd.Flags().StringVarP(&nfsLocation, "nfs-location", "n", "", "NFS volume to mount, as <IP>:/<path>, without the nfs:// prefix the CLI adds")
 	}
 
 	if triggererEnabled {

@@ -16,22 +16,20 @@ var (
 	deploymentUserRole     string
 	deploymentUserFullname string
 	// examples
-	deploymentUserListExample = `
-# Search for deployment users
-  $ astro deployment user list --deployment-id=<deployment-id> --email=EMAIL_ADDRESS --user-id=ID --name=NAME
-`
-	deploymentUserCreateExample = `
-# Add a workspace user to a deployment with a particular role
-  $ astro deployment user add --deployment-id=xxxxx --role=DEPLOYMENT_ROLE --email=<user-email-address>
-`
-	deploymentUserRemoveExample = `
-# Remove user access to a deployment
-	$ astro deployment user remove --deployment-id=xxxxx <user-email-address>
-`
-	deploymentUserUpdateExample = `
-# Update a workspace user's deployment role
-  $ astro deployment user update --deployment-id=xxxxx --role=DEPLOYMENT_ROLE <user-email-address>
-`
+	deploymentUserListExample = `  # List a Deployment's users
+  astro deployment user list --deployment-id=<DEPLOYMENT_ID>
+
+  # Search them by email
+  astro deployment user list --deployment-id=<DEPLOYMENT_ID> --email=<EMAIL>`
+	deploymentUserCreateExample = `  # Give a Workspace user viewer access to a Deployment
+  astro deployment user add --deployment-id=<DEPLOYMENT_ID> --email=<EMAIL>
+
+  # Give them another role
+  astro deployment user add --deployment-id=<DEPLOYMENT_ID> --email=<EMAIL> --role=DEPLOYMENT_EDITOR`
+	deploymentUserRemoveExample = `  # Remove a user's access to a Deployment
+  astro deployment user remove <EMAIL> --deployment-id=<DEPLOYMENT_ID>`
+	deploymentUserUpdateExample = `  # Change a user's role in a Deployment
+  astro deployment user update <EMAIL> --deployment-id=<DEPLOYMENT_ID> --role=DEPLOYMENT_ADMIN`
 )
 
 func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
@@ -91,7 +89,7 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove [email]",
+		Use:     "remove <EMAIL>",
 		Short:   "Remove a user from a Deployment",
 		Long:    "Remove a user from a Deployment",
 		Args:    cobra.ExactArgs(1),
@@ -107,7 +105,7 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update [email]",
+		Use:     "update <EMAIL>",
 		Short:   "Update a user's role for a deployment",
 		Long:    "Update a user's role for a deployment",
 		Args:    cobra.ExactArgs(1),

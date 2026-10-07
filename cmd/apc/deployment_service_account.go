@@ -15,17 +15,15 @@ var (
 	deploymentSACreateCategory string
 	deploymentSACreateRole     string
 
-	deploymentSaCreateExample = `
-# Create service-account
-  $ astro deployment service-account create --deployment-id=xxxxx --label=my_label --role=ROLE
-`
-	deploymentSaListExample = `
-  # Get deployment service-accounts
-  $ astro deployment service-account list --deployment-id=<deployment-id>
-`
-	deploymentSaDeleteExample = `
-  $ astro deployment service-account delete <service-account-id> --deployment-id=<deployment-id>
-`
+	deploymentSaCreateExample = `  # Create a service account that can view a Deployment
+  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label
+
+  # Create one that can edit it
+  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label --role=DEPLOYMENT_EDITOR`
+	deploymentSaListExample = `  # List a Deployment's service accounts
+  astro deployment service-account list --deployment-id=<DEPLOYMENT_ID>`
+	deploymentSaDeleteExample = `  # Delete a service account from a Deployment
+  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment-id=<DEPLOYMENT_ID>`
 )
 
 func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
@@ -81,7 +79,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [service-account ID]",
+		Use:     "delete <SERVICE_ACCOUNT_ID>",
 		Aliases: []string{"de"},
 		Short:   "Delete a service account in the APC platform",
 		Long:    "Delete a service account in the APC platform",

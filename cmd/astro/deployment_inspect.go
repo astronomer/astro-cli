@@ -23,26 +23,29 @@ const formatYAML cliout.Format = "yaml"
 
 func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "inspect",
+		Use:     "inspect [DEPLOYMENT_ID]",
 		Aliases: []string{"in"},
 		Short:   "Inspect a deployment configuration",
 		Long:    "Inspect an Astro Deployment configuration. This command returns the Deployment's configuration as YAML (the default) or JSON, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations.",
-		Example: `
-  $ astro deployment inspect <deployment-id>
-  $ astro deployment inspect <deployment-id> --output json
-  $ astro deployment inspect --deployment my-deployment --key configuration.cluster_id
-`,
+		Example: `  # Show a Deployment's configuration as YAML
+  astro deployment inspect <DEPLOYMENT_ID>
+
+  # Show it as JSON
+  astro deployment inspect <DEPLOYMENT_ID> --output json
+
+  # Print one value from it
+  astro deployment inspect --deployment my-deployment --key configuration.cluster_id`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentInspect(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to inspect.")
+	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to inspect")
 	addDeploymentFlag(cmd.Flags(), "Deployment to inspect: a link name from pyproject.toml, a Deployment id, or a Deployment name")
 	cliout.AddOutputFlag(cmd, &outputFormat, formatYAML)
-	cmd.PersistentFlags().Lookup("output").Usage += ". text prints the deployment as YAML, the same as yaml."
-	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "A specific key for the deployment. Use --key configuration.cluster_id to get a deployment's cluster id.")
-	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
-	cmd.Flags().BoolVarP(&showWorkloadIdentity, "show-workload-identity", "", false, "Include the workload identity configured for the deployment in the output.")
+	cmd.PersistentFlags().Lookup("output").Usage += " (text prints the deployment as YAML, the same as yaml)"
+	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "Print only this key of the configuration, such as configuration.cluster_id")
+	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "Print only the Deployment's YAML or JSON, with no other output")
+	cmd.Flags().BoolVarP(&showWorkloadIdentity, "show-workload-identity", "", false, "Include the workload identity configured for the deployment in the output")
 	addRemovedFlag(cmd, "template", "t", true, errTemplateRemoved)
 	return cmd
 }

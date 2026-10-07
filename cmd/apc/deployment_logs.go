@@ -58,13 +58,15 @@ func newLogsCmd(out io.Writer) *cobra.Command {
 
 func newWebserverLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
 	cmd := &cobra.Command{
-		Use:     "webserver",
+		Use:     "webserver <DEPLOYMENT_ID>",
 		Aliases: []string{"web", "w"},
 		Short:   "Stream logs from an Airflow webserver",
-		Long: `Stream logs from an Airflow webserver. For example:
+		Long:    "Stream logs from an Airflow webserver",
+		Example: `  # Show a Deployment's webserver logs from the last 25 minutes
+  astro deployment logs webserver <DEPLOYMENT_ID> --since 25m
 
-astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
-`,
+  # Follow new ones that contain a search term
+  astro deployment logs webserver <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fetchRemoteLogs(logWebserver, args, out)
@@ -79,13 +81,15 @@ astro deployment logs webserver YOU_DEPLOYMENT_ID -s string-to-find
 
 func newSchedulerLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
 	cmd := &cobra.Command{
-		Use:     "scheduler",
+		Use:     "scheduler <DEPLOYMENT_ID>",
 		Aliases: []string{"sch", "s"},
 		Short:   "Stream logs from an Airflow scheduler",
-		Long: `Stream logs from an Airflow scheduler. For example:
+		Long:    "Stream logs from an Airflow scheduler",
+		Example: `  # Show a Deployment's scheduler logs from the last 25 minutes
+  astro deployment logs scheduler <DEPLOYMENT_ID> --since 25m
 
-astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
-`,
+  # Follow new ones that contain a search term
+  astro deployment logs scheduler <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fetchRemoteLogs(logScheduler, args, out)
@@ -100,13 +104,15 @@ astro deployment logs scheduler YOU_DEPLOYMENT_ID -s string-to-find
 
 func newWorkersLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
 	cmd := &cobra.Command{
-		Use:     "workers",
+		Use:     "workers <DEPLOYMENT_ID>",
 		Aliases: []string{"worker", "wrk"},
 		Short:   "Stream logs from Airflow workers",
-		Long: `Stream logs from Airflow workers. For example:
+		Long:    "Stream logs from Airflow workers",
+		Example: `  # Show a Deployment's worker logs from the last 25 minutes
+  astro deployment logs workers <DEPLOYMENT_ID> --since 25m
 
-astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
-`,
+  # Follow new ones that contain a search term
+  astro deployment logs workers <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fetchRemoteLogs(logWorker, args, out)
@@ -122,13 +128,15 @@ astro deployment logs workers YOU_DEPLOYMENT_ID -s string-to-find
 
 func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the duplication is acceptable here
 	cmd := &cobra.Command{
-		Use:     "triggerer",
+		Use:     "triggerer <DEPLOYMENT_ID>",
 		Aliases: []string{"triggerers", "trg"},
 		Short:   "Stream logs from Airflow triggerer",
-		Long: `Stream logs from Airflow triggerer. For example:
+		Long:    "Stream logs from Airflow triggerer",
+		Example: `  # Show a Deployment's triggerer logs from the last 25 minutes
+  astro deployment logs triggerer <DEPLOYMENT_ID> --since 25m
 
-astro deployment logs triggerer YOU_DEPLOYMENT_ID -s string-to-find
-`,
+  # Follow new ones that contain a search term
+  astro deployment logs triggerer <DEPLOYMENT_ID> --follow --search "some search terms"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return fetchRemoteLogs(logTriggerer, args, out)

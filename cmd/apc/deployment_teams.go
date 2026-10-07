@@ -13,21 +13,17 @@ import (
 var deploymentRole string
 
 const (
-	deploymentTeamAddExample = `
-	# Add a workspace team to a deployment with a particular role
-	$ astro deployment team add --deployment-id=xxxxx --team-id=<team-id> --role=DEPLOYMENT_ROLE
-	`
-	deploymentTeamRemoveExample = `
-	# Remove team access to a deployment
-	$ astro deployment team remove <team-id> --deployment-id=xxxxx
-	`
-	deploymentTeamUpdateExample = `
-	# Update a workspace team's deployment role
-	$ astro deployment team update <team-id> --deployment-id=xxxxx --role=DEPLOYMENT_ROLE
-	`
-	deploymentTeamsListExample = `
-	# List all teams added to a deployment
-	$ astro deployment teams list <deployment-id>`
+	deploymentTeamAddExample = `  # Give a Workspace team viewer access to a Deployment
+  astro deployment team add --deployment-id=<DEPLOYMENT_ID> --team-id=<TEAM_ID>
+
+  # Give it another role
+  astro deployment team add --deployment-id=<DEPLOYMENT_ID> --team-id=<TEAM_ID> --role=DEPLOYMENT_EDITOR`
+	deploymentTeamRemoveExample = `  # Remove a team's access to a Deployment
+  astro deployment team remove <TEAM_ID> --deployment-id=<DEPLOYMENT_ID>`
+	deploymentTeamUpdateExample = `  # Change a team's role in a Deployment
+  astro deployment team update <TEAM_ID> --deployment-id=<DEPLOYMENT_ID> --role=DEPLOYMENT_ADMIN`
+	deploymentTeamsListExample = `  # List the teams in a Deployment
+  astro deployment team list --deployment-id=<DEPLOYMENT_ID>`
 )
 
 func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
@@ -38,7 +34,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
 	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment to associate team to")
+	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "Deployment whose teams to manage")
 	cmd.AddCommand(
 		newDeploymentTeamListCmd(out),
 		newDeploymentTeamAddCmd(out),
@@ -58,15 +54,15 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamAdd(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "team to be added to deployment")
+	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team to add to the Deployment")
 	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "deployment role assigned to team")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
 	return cmd
 }
 
 func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "remove TEAM",
+		Use:     "remove <TEAM_ID>",
 		Short:   "Remove a team from a deployment",
 		Long:    "Remove a team from a deployment",
 		Args:    cobra.ExactArgs(1),
@@ -80,7 +76,7 @@ func newDeploymentTeamRemoveCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "update TEAM",
+		Use:     "update <TEAM_ID>",
 		Short:   "Update a team's role for a deployment",
 		Long:    "Update a team's role for a deployment",
 		Args:    cobra.ExactArgs(1),
@@ -89,7 +85,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "role assigned to team")
+	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
 	return cmd
 }
 

@@ -42,10 +42,11 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"cr"},
 		Short:   "Create a Deployment's worker queue",
 		Long:    "Create a worker queue for a Deployment. Worker queues let you assign tasks to different machine types with independent autoscaling. Each queue has its own min/max worker count and concurrency settings. KubernetesExecutor Deployments support only a single default queue. Queue names must be lowercase alphanumeric or hyphens, start with a letter, and not exceed 63 characters.",
-		Example: `
-  $ astro deployment worker-queue create --deployment <deployment-id> --name my-queue --worker-type default
-  $ astro deployment worker-queue create --deployment <deployment-id> --name my-queue --min-count 2 --max-count 10 --concurrency 16
-`,
+		Example: `  # Create a worker queue
+  astro deployment worker-queue create --deployment <DEPLOYMENT_ID> --name my-queue --worker-type <WORKER_TYPE>
+
+  # Create one that scales between 2 and 10 workers
+  astro deployment worker-queue create --deployment <DEPLOYMENT_ID> --name my-queue --min-count 2 --max-count 10 --concurrency 16`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
@@ -53,11 +54,11 @@ func newDeploymentWorkerQueueCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be deleted. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be deleted.")
 	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name")
-	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
-	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue.")
-	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue.")
-	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency(number of slots) of the worker queue.")
-	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue.")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue: up to 63 lowercase letters, digits or '-', starting with a letter")
+	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue")
+	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue")
+	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency (number of slots) of the worker queue")
+	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue")
 
 	return cmd
 }
@@ -68,10 +69,11 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"up"},
 		Short:   "Update a Deployment's worker queue",
 		Long:    "Update a worker queue's machine type, scaling limits, or concurrency. Running tasks are not interrupted, but may be affected if the queue is scaled down below the current worker count. The default queue cannot be renamed.",
-		Example: `
-  $ astro deployment worker-queue update --deployment <deployment-id> --name my-queue --max-count 20
-  $ astro deployment worker-queue update --deployment <deployment-id> --name my-queue --concurrency 32 --yes
-`,
+		Example: `  # Let a worker queue scale up to 20 workers
+  astro deployment worker-queue update --deployment <DEPLOYMENT_ID> --name my-queue --max-count 20
+
+  # Change its concurrency without asking for confirmation
+  astro deployment worker-queue update --deployment <DEPLOYMENT_ID> --name my-queue --concurrency 32 --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueCreateOrUpdate(cmd, args, out)
 		},
@@ -79,12 +81,12 @@ func newDeploymentWorkerQueueUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be created.")
 	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name")
-	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue. Queue names must not exceed 63 characters and contain only lowercase alphanumeric characters or '-' and start with an alphabetical character.")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue: up to 63 lowercase letters, digits or '-', starting with a letter")
 	cmd.Flags().BoolVarP(&force, "yes", "y", false, "Don't ask for confirmation, including after the warning about tasks assigned to the queue")
-	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue.")
-	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue.")
-	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency(number of slots) of the worker queue.")
-	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue.")
+	cmd.Flags().IntVarP(&minWorkerCount, "min-count", "", 0, "The min worker count of the worker queue")
+	cmd.Flags().IntVarP(&maxWorkerCount, "max-count", "", 0, "The max worker count of the worker queue")
+	cmd.Flags().IntVarP(&concurrency, "concurrency", "", 0, "The concurrency (number of slots) of the worker queue")
+	cmd.Flags().StringVarP(&workerType, "worker-type", "t", "", "The worker type of the worker queue")
 
 	return cmd
 }
@@ -95,10 +97,11 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"de"},
 		Short:   "Delete a Deployment's worker queue",
 		Long:    "Delete a worker queue from a Deployment. Tasks currently running on the queue may be interrupted. The default queue cannot be deleted.",
-		Example: `
-  $ astro deployment worker-queue delete --deployment <deployment-id> --name my-queue
-  $ astro deployment worker-queue delete --deployment <deployment-id> --name my-queue --yes
-`,
+		Example: `  # Delete a worker queue
+  astro deployment worker-queue delete --deployment <DEPLOYMENT_ID> --name my-queue
+
+  # Delete it without asking for confirmation
+  astro deployment worker-queue delete --deployment <DEPLOYMENT_ID> --name my-queue --yes`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentWorkerQueueDelete(cmd, args, out)
 		},
@@ -106,7 +109,7 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "The deployment where the worker queue should be created. Run 'astro deployment list' to find valid IDs")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment where the worker queue should be created.")
 	addDeploymentFlag(cmd.Flags(), "Deployment that has the worker queue: a link name from pyproject.toml, a Deployment id, or a Deployment name")
-	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue to delete.")
+	cmd.Flags().StringVarP(&name, "name", "n", "", "The name of the worker queue to delete")
 	cmd.Flags().BoolVarP(&force, "yes", "y", false, "Don't ask for confirmation, including after the warning about tasks assigned to the queue")
 	return cmd
 }

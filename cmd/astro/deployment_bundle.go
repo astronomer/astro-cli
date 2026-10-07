@@ -94,7 +94,7 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update [BUNDLE-ID]",
+		Use:   "update [BUNDLE_ID]",
 		Short: "Update a bundle on an Astro Deployment",
 		Long:  "Update a bundle's description or, for a non-DAG bundle, the DAG bundles it is served alongside. Identify the bundle by its ID argument, its DAG bundle --name, or its non-DAG --mount-path.",
 		Example: `  # Update a bundle's description, identified by ID
@@ -128,7 +128,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete [BUNDLE-ID]",
+		Use:     "delete [BUNDLE_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Delete a bundle from an Astro Deployment",
 		Long:    "Delete a DAG or non-DAG bundle from an Astro Deployment. Identify the bundle by its ID argument, its DAG bundle --name, or its non-DAG --mount-path.",
