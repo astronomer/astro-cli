@@ -284,11 +284,19 @@ type RoleBindingUser struct {
 
 // Workspace contains all components of an APC Workspace
 type Workspace struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-	Users       []User `json:"users"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	// Description is nil when Houston has none, and "" when it holds an
+	// empty one: the column is nullable (houston-api ,
+	// model Workspace) and so is the GraphQL field (src/generated/schema.graphql,
+	// type Workspace), and an update may store "".
+	Description *string `json:"description"`
+	Users       []User  `json:"users"`
 	// groups
+	// CreatedAt and UpdatedAt are "" only where the query does not ask for
+	// them: the columns are not nullable (@default(now()), @updatedAt), so
+	// Houston has a value for every workspace, and an ISO 8601 one is never
+	// empty.
 	CreatedAt    string        `json:"createdAt"`
 	UpdatedAt    string        `json:"updatedAt"`
 	RoleBindings []RoleBinding `json:"roleBindings"`

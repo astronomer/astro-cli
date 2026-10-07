@@ -12,10 +12,34 @@ type UpdateWorkspaceRequest struct {
 	Args        map[string]string `json:"payload"`
 }
 
-// UpdateWorkspaceRequest - inputs to list in workspaces
+// PaginatedListWorkspaceRequest is a page of the workspaces to list.
+// PageNumber goes to Houston as it is, in Houston's numbering: build it with
+// WorkspacesPageNumber.
 type PaginatedListWorkspaceRequest struct {
 	PageSize   int `json:"pageSize"`
 	PageNumber int `json:"pageNumber"`
+}
+
+// oneBasedPagesSince is the first Houston whose paginatedWorkspaces counts
+// pages from 1. It skips (pageNumber - 1) * take rows, and reads a
+// pageNumber of 0 as 1. Before it, the resolver skipped pageNumber * take
+// ( at 84611262, v0.30.3).
+// Sent unchanged to a newer Houston, the second page (1) came back as the
+// first, and every later one a page behind.
+const oneBasedPagesSince = "0.31.6"
+
+// WorkspacesPageNumber is the pageNumber that Houston at houstonVersion reads
+// as page, counted from 0. The first page is 0 on every Houston: a newer one
+// reads 0 as 1, an older one skips nothing. Only the pages after it differ,
+// so only they depend on the version, and a version not known (read as a
+// current one, as VerifyVersionMatch reads it) cannot lose the first page.
+// houstonVersion is the version of the Houston the request goes to, which
+// during a login to another domain is not the current context's.
+func WorkspacesPageNumber(page int, houstonVersion string) int {
+	if page == 0 || VerifyVersionMatch(houstonVersion, VersionRestrictions{LT: oneBasedPagesSince}) {
+		return page
+	}
+	return page + 1
 }
 
 var (

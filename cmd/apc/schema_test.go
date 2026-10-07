@@ -49,6 +49,16 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "deployment-log-entry", Value: logEntryJSON{}},
 	// astro deploy: what it deployed.
 	{Name: "deploy", Value: deployJSON{}},
+	// astro workspace create, update and switch: the Workspace as it now is.
+	{Name: "workspace", Value: workspaceJSON{}},
+	// The same Workspace where Houston gave none of the optional values:
+	// they are null, never "" (see workspaceJSON). Pinned as given, since
+	// populating every field can show only the other branch.
+	{Name: "workspace-without-values", Value: workspaceJSON{ID: "x", Label: "x"}, AsGiven: true},
+	// astro workspace list.
+	{Name: "workspace-list", Value: workspaceListJSON{}},
+	// astro workspace delete: what it removed.
+	{Name: "workspace-removal", Value: workspaceRemovalJSON{}},
 }
 
 func TestPublishedJSONPayloadsKeepTheirShape(t *testing.T) {
@@ -73,11 +83,12 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Seven shapes reach Emit in this package's tests today:
+// would be silent. Ten shapes reach Emit in this package's tests today:
 // the deployment family's Deployment, list, removal, version change and log
-// entry, deploy's result, and the error object.
+// entry, deploy's result, the workspace family's Workspace, list and
+// removal, and the error object.
 // Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 7
+const minWatchedPayloads = 10
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

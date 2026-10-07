@@ -255,8 +255,7 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 			if !interactive {
 				pageSize = 0
 			}
-			err := workspace.Switch("", pageSize, client, out)
-			if err != nil {
+			if err := switchWorkspace(pageSize, houstonVersion, client, out); err != nil {
 				fmt.Fprint(os.Stderr, cliSetWorkspaceExample)
 			}
 		}
@@ -268,6 +267,18 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 	}
 
 	return nil
+}
+
+// switchWorkspace asks which workspace to switch to and shows the context
+// the switch left; a person who quits the picker is shown nothing. Pages are
+// numbered for houstonVersion, the Houston being logged in to, which need not
+// be the current context's.
+func switchWorkspace(pageSize int, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+	_, quit, err := workspace.Switch("", pageSize, houstonVersion, client)
+	if err != nil || quit {
+		return err
+	}
+	return config.PrintCurrentSoftwareContext(out)
 }
 
 // Logout removes the locally stored token and reset current context

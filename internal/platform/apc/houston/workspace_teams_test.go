@@ -17,7 +17,7 @@ func (s *Suite) TestAddWorkspaceTeam() {
 			AddWorkspaceTeam: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "description",
+				Description: new("description"),
 				CreatedAt:   "2020-06-25T22:10:42.385Z",
 				UpdatedAt:   "2020-06-25T22:10:42.385Z",
 			},
@@ -64,7 +64,7 @@ func (s *Suite) TestDeleteWorkspaceTeam() {
 			RemoveWorkspaceTeam: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "description",
+				Description: new("description"),
 				CreatedAt:   "2020-06-25T22:10:42.385Z",
 				UpdatedAt:   "2020-06-25T22:10:42.385Z",
 			},

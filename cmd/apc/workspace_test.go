@@ -14,7 +14,7 @@ import (
 var mockWorkspace = &houston.Workspace{
 	ID:           "ck05r3bor07h40d02y2hw4n4v",
 	Label:        "airflow",
-	Description:  "test description",
+	Description:  new("test description"),
 	Users:        nil,
 	CreatedAt:    "2019-10-16T21:14:22.105Z",
 	UpdatedAt:    "2019-10-16T21:14:22.105Z",
@@ -42,7 +42,7 @@ func (s *Suite) TestWorkspaceList() {
 		{
 			ID:          "XXXXXXXXXXXXXXX",
 			Label:       "airflow123",
-			Description: "test description 123",
+			Description: new("test description 123"),
 		},
 	}
 
@@ -88,7 +88,9 @@ func (s *Suite) TestWorkspaceDelete() {
 	houstonClient = houstonMock
 	defer func() { houstonClient = currentClient }()
 
-	houstonMock.On("DeleteWorkspace", wsID).Return(nil, nil).Once()
+	// Houston answers with the record it removed, or fails; never null on
+	// success.
+	houstonMock.On("DeleteWorkspace", wsID).Return(&houston.Workspace{ID: wsID, Label: "test", Description: new("N/A")}, nil).Once()
 	err := workspaceDelete(&cobra.Command{}, buf, []string{wsID})
 	s.NoError(err)
 	s.Contains(buf.String(), "Successfully deleted workspace")

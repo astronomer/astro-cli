@@ -17,7 +17,7 @@ func (s *Suite) TestAddWorkspaceUser() {
 			AddWorkspaceUser: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "description",
+				Description: new("description"),
 				Users: []User{
 					{
 						ID: "id",
@@ -73,7 +73,7 @@ func (s *Suite) TestDeleteWorkspaceUser() {
 			RemoveWorkspaceUser: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "description",
+				Description: new("description"),
 				Users: []User{
 					{
 						ID: "id",

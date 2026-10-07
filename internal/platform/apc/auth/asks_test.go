@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -86,4 +87,64 @@ func (s *Suite) TestLoginAsksForTheWorkspaceOnStderr() {
 	s.Contains(stderr, "ws-first", "the picker's table")
 	s.Contains(out.String(), "ws-second", "the context the switch left")
 	s.NotContains(out.String(), "ws-first", "the question is not on the command's writer")
+}
+
+// loginPaged logs in with the paged picker on, pages of pageSize, against a
+// Houston at houstonVersion, answering with answers.
+func (s *Suite) loginPaged(pageSize, houstonVersion, answers string, houstonMock *houstonMocks.ClientInterface) (out, stderr string, err error) {
+	fs := afero.NewMemMapFs()
+	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig("localhost"), 0o600))
+	config.InitConfig(fs)
+	s.Require().NoError(config.CFG.Interactive.SetHomeString("true"))
+	s.Require().NoError(config.CFG.PageSize.SetHomeString(pageSize))
+	defer testUtil.MockUserInput(s.T(), answers)()
+	houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: true}, nil)
+	houstonMock.On("AuthenticateWithBasicAuth", mock.Anything).Return(mockToken, nil)
+	previous := switchToLastUsedWorkspace
+	s.T().Cleanup(func() { switchToLastUsedWorkspace = previous })
+	switchToLastUsedWorkspace = func(houston.ClientInterface, *config.Context) bool { return false }
+
+	buf := &bytes.Buffer{}
+	_, stderr = captureProcessOutput(s.T(), func() {
+		err = Login("localhost", false, "test", "test", houstonVersion, houstonMock, buf)
+	})
+	return buf.String(), stderr, err
+}
+
+// Quitting the login's paged picker switches nothing: the login succeeds,
+// shows only the context it started from, and gives no set-a-workspace hint,
+// which is for a switch that failed.
+func (s *Suite) TestLoginQuitAtThePagedPicker() {
+	houstonMock := new(houstonMocks.ClientInterface)
+	two := []houston.Workspace{{ID: "ws-first", Label: "first"}, {ID: "ws-second", Label: "second"}}
+	houstonMock.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 2, PageNumber: 0}).Return(two, nil).Once()
+	houstonMock.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(two, nil).Once()
+
+	out, stderr, err := s.loginPaged("10", "1.0.0", "q\n", houstonMock)
+	s.NoError(err)
+	s.Equal(1, strings.Count(out, "CLUSTER"), "only the context login started from:\n%s", out)
+	s.NotContains(out, "ws-first")
+	s.NotContains(stderr, cliSetWorkspaceExample)
+	houstonMock.AssertExpectations(s.T())
+	houstonMock.AssertNotCalled(s.T(), "ValidateWorkspaceID", mock.Anything)
+}
+
+// The login's picker numbers its pages for the Houston being logged in to,
+// the version Login is given, not the one the current context last saw: on a
+// Houston before v0.31.6 the second page is pageNumber 1, and "f" goes back
+// to 0.
+func (s *Suite) TestLoginPagesForTheHoustonLoggedInTo() {
+	houstonMock := new(houstonMocks.ClientInterface)
+	two := []houston.Workspace{{ID: "ws-first", Label: "first"}, {ID: "ws-second", Label: "second"}}
+	// The probe for more than one workspace, then the picker's first page,
+	// twice: before "n" and after "f".
+	houstonMock.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 2, PageNumber: 0}).Return(two, nil).Times(3)
+	houstonMock.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 2, PageNumber: 1}).Return([]houston.Workspace{{ID: "ws-third", Label: "third"}}, nil).Once()
+	houstonMock.On("ValidateWorkspaceID", "ws-first").Return(&houston.Workspace{ID: "ws-first", Label: "first"}, nil).Once()
+
+	out, _, err := s.loginPaged("2", "0.31.0", "n\nf\n1\n", houstonMock)
+	s.NoError(err)
+	s.Contains(out, "ws-first", "the context the switch left")
+	houstonMock.AssertExpectations(s.T())
+	houstonMock.AssertNotCalled(s.T(), "PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 2, PageNumber: 2})
 }

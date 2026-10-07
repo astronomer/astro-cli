@@ -11,7 +11,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/picker"
-	"github.com/astronomer/astro-cli/pkg/printutil"
 )
 
 type workspaceSelection struct {
@@ -24,77 +23,37 @@ var errInvalidWorkspaceKey = errors.New("invalid workspace selection")
 
 var errWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 
-func newTableOut() *printutil.Table {
-	return &printutil.Table{
-		Padding:        []int{44, 50},
-		DynamicPadding: true,
-		Header:         []string{"NAME", "ID"},
-		ColorRowCode:   [2]string{"\033[1;32m", "\033[0m"},
-	}
-}
+// errNoWorkspace is a mutation answered with no workspace and no error. Houston
+// answers createWorkspace and updateWorkspace with the record Prisma wrote,
+// and an update of a workspace that does not exist throws rather than
+// answering null. So this is what is left if that ever
+// changes: an error, where it used to panic printing a nil workspace.
+var errNoWorkspace = errors.New("the platform answered with no workspace")
 
-// Create a workspace
-func Create(label, desc string, client houston.ClientInterface, out io.Writer) error {
+// Create creates a workspace, and returns it as Houston stored it.
+func Create(label, desc string, client houston.ClientInterface) (*houston.Workspace, error) {
 	w, err := houston.Call(client.CreateWorkspace)(houston.CreateWorkspaceRequest{Label: label, Description: desc})
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	tab := newTableOut()
-	tab.AddRow([]string{w.Label, w.ID}, false)
-	tab.SuccessMsg = "\n Successfully created workspace"
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	if w == nil {
+		return nil, errNoWorkspace
+	}
+	return w, nil
 }
 
-// List all workspaces
-func List(client houston.ClientInterface, out io.Writer) error {
-	ws, err := houston.Call(client.ListWorkspaces)(nil)
-	if err != nil {
-		return err
-	}
-
-	c, err := config.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	tab := newTableOut()
-	for i := range ws {
-		w := ws[i]
-		name := w.Label
-		workspace := w.ID
-
-		var color bool
-
-		if c.Workspace == w.ID {
-			color = true
-		} else {
-			color = false
-		}
-		tab.AddRow([]string{name, workspace}, color)
-	}
-
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+// List returns every workspace the login can see, in Houston's order.
+func List(client houston.ClientInterface) ([]houston.Workspace, error) {
+	return houston.Call(client.ListWorkspaces)(nil)
 }
 
-// Delete a workspace by id
-func Delete(id string, client houston.ClientInterface, out io.Writer) error {
-	_, err := houston.Call(client.DeleteWorkspace)(id)
-	if err != nil {
-		return err
-	}
-
-	// TODO remove tab print until houston properly returns attrs on delete
-	// tab.AddRow([]string{w.Label, w.Id}, false)
-	// tab.SuccessMsg = "\n Successfully deleted workspace"
-	// tab.Print()
-	fmt.Fprintln(out, "\n Successfully deleted workspace")
-
-	return nil
+// Delete deletes a workspace, and returns the record Houston removed: its
+// id, label and description. Houston fails, rather than answering null, on
+// a workspace that does not exist or still has Deployments
+// ( and :66-68), so
+// nil comes back only if that ever changes.
+func Delete(id string, client houston.ClientInterface) (*houston.Workspace, error) {
+	return houston.Call(client.DeleteWorkspace)(id)
 }
 
 // GetCurrentWorkspace gets the current workspace set in context config
@@ -149,9 +108,10 @@ func pageKeys(pageSize, pageNumber, rows int) (keys []string, hint string) {
 
 // getWorkspaceSelection asks which workspace to switch to: from a numbered
 // table of every one when pageSize is 0, and otherwise a page at a time, with
-// letters to move between pages. A run that may not ask refuses before it
-// fetches or prints anything.
-func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterface, out io.Writer) workspaceSelection {
+// letters to move between pages. pageNumber counts from 0, and goes to the
+// Houston at houstonVersion in its own numbering. A run that may not ask
+// refuses before it fetches or prints anything.
+func getWorkspaceSelection(pageSize, pageNumber int, houstonVersion string, client houston.ClientInterface, out io.Writer) workspaceSelection {
 	if pageSize <= 0 {
 		id, err := pickWorkspace(client, out)
 		return workspaceSelection{id: id, err: err}
@@ -161,7 +121,10 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 		return workspaceSelection{err: err}
 	}
 
-	ws, err := houston.Call(client.PaginatedListWorkspaces)(houston.PaginatedListWorkspaceRequest{PageSize: pageSize, PageNumber: pageNumber})
+	ws, err := houston.Call(client.PaginatedListWorkspaces)(houston.PaginatedListWorkspaceRequest{
+		PageSize:   pageSize,
+		PageNumber: houston.WorkspacesPageNumber(pageNumber, houstonVersion),
+	})
 	if err != nil {
 		return workspaceSelection{err: err}
 	}
@@ -194,7 +157,7 @@ func getWorkspaceSelection(pageSize, pageNumber int, client houston.ClientInterf
 	case "n":
 		pageNumber++
 	}
-	return getWorkspaceSelection(pageSize, pageNumber, client, out)
+	return getWorkspaceSelection(pageSize, pageNumber, houstonVersion, client, out)
 }
 
 // pickWorkspace asks for one workspace from a numbered table of all of them.
@@ -222,55 +185,65 @@ func pickWorkspace(client houston.ClientInterface, out io.Writer) (string, error
 	return ws[i].ID, nil
 }
 
-// Switch switches workspaces
-func Switch(id string, pageSize int, client houston.ClientInterface, out io.Writer) error {
+// MayPick is the refusal the switch's picker would give, paged or not, in a
+// run that may not ask, and nil in one that may. A caller with notes of its
+// own to print first checks it, so a refused run prints nothing.
+func MayPick(paged bool) error {
+	list := switchList(paged)
+	return list.MayAsk()
+}
+
+// Switch makes a workspace the current context's, and returns it as Houston
+// has it. With no id, it asks which: from a numbered table of every one when
+// pageSize is 0, and otherwise a page at a time, numbering pages for the
+// Houston at houstonVersion. A person who quits the picker switches nothing:
+// Switch returns quit and no workspace.
+func Switch(id string, pageSize int, houstonVersion string, client houston.ClientInterface) (w *houston.Workspace, quit bool, err error) {
 	if id == "" {
 		// The picker, paged or not, is the question: its table and prompt
-		// are drawn on stderr. The context it leaves is the result, on out.
-		sel := getWorkspaceSelection(pageSize, 0, client, os.Stderr)
+		// are drawn on stderr.
+		sel := getWorkspaceSelection(pageSize, 0, houstonVersion, client, os.Stderr)
 
 		if sel.quit {
-			return nil
+			return nil, true, nil
 		}
 		if sel.err != nil {
-			return sel.err
+			return nil, false, sel.err
 		}
 
 		id = sel.id
 	}
 	// validate workspace
-	_, err := houston.Call(client.ValidateWorkspaceID)(id)
+	w, err = houston.Call(client.ValidateWorkspaceID)(id)
 	if err != nil {
-		return fmt.Errorf("workspace id is not valid: %w", err)
+		return nil, false, fmt.Errorf("workspace id is not valid: %w", err)
+	}
+	// The client turns Houston's null into ErrWorkspaceNotFound; a nil with
+	// no error is no workspace to switch to, so the context stays as it was.
+	if w == nil {
+		return nil, false, errNoWorkspace
 	}
 
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, false, err
 	}
 
 	c.Workspace = id
-	err = c.SetContext()
-	if err != nil {
-		return err
+	if err := c.SetContext(); err != nil {
+		return nil, false, err
 	}
-
-	err = config.PrintCurrentSoftwareContext(out)
-	return err
+	return w, false, nil
 }
 
-// Update an APC workspace
-func Update(id string, client houston.ClientInterface, out io.Writer, args map[string]string) error {
-	// validate workspace
+// Update updates a workspace, and returns it as it now is.
+func Update(id string, client houston.ClientInterface, args map[string]string) (*houston.Workspace, error) {
 	w, err := houston.Call(client.UpdateWorkspace)(houston.UpdateWorkspaceRequest{WorkspaceID: id, Args: args})
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	tab := newTableOut()
-	tab.AddRow([]string{w.Label, w.ID}, false)
-	tab.SuccessMsg = "\n Successfully updated workspace"
-	tab.Print(out) //nolint:errcheck // best-effort render to the terminal
-
-	return nil
+	if w == nil {
+		return nil, errNoWorkspace
+	}
+	return w, nil
 }

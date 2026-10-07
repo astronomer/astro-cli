@@ -435,15 +435,12 @@ func (s *Suite) TestLoginSuccess() {
 		}
 
 		houstonMock.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 100, PageNumber: 0}).Return([]houston.Workspace{{ID: "test-workspace-1"}, {ID: "test-workspace-2"}}, nil).Once()
-		houstonMock.On("ValidateWorkspaceID", "test-workspace-1").Return(&houston.Workspace{}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", "test-workspace-1").Return(&houston.Workspace{ID: "test-workspace-1"}, nil).Once()
 
 		out := &bytes.Buffer{}
-		if s.NoError(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)) {
-			return
-		}
-		if gotOut := out.String(); !testUtil.StringContains([]string{"localhost", "test-workspace-1"}, gotOut) {
-			s.Fail("Login() = %v, want %v", gotOut, []string{"localhost", "ck05r3bor07h40d02y2hw4n4v"})
-		}
+		s.Require().NoError(Login("localhost", false, "test", "test", "0.30.0", houstonMock, out))
+		// The context the switch left, after the one login started from.
+		s.Contains(out.String(), "test-workspace-1", "login shows the context the switch left")
 
 		houstonMock.AssertExpectations(s.T())
 	})

@@ -17,7 +17,7 @@ func (s *Suite) TestCreateWorkspace() {
 			CreateWorkspace: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "test description",
+				Description: new("test description"),
 				Users: []User{
 					{
 						ID:       "id",
@@ -75,7 +75,7 @@ func (s *Suite) TestListWorkspaces() {
 				{
 					ID:          "workspace-id",
 					Label:       "label",
-					Description: "test description",
+					Description: new("test description"),
 					Users: []User{
 						{
 							ID:       "id",
@@ -92,7 +92,7 @@ func (s *Suite) TestListWorkspaces() {
 				{
 					ID:          "workspace-id2",
 					Label:       "label2",
-					Description: "test description2",
+					Description: new("test description2"),
 					Users: []User{
 						{
 							ID:       "id",
@@ -151,7 +151,7 @@ func (s *Suite) TestPaginatedListWorkspaces() {
 				{
 					ID:          "workspace-id",
 					Label:       "label",
-					Description: "test description",
+					Description: new("test description"),
 					Users: []User{
 						{
 							ID:       "id",
@@ -168,7 +168,7 @@ func (s *Suite) TestPaginatedListWorkspaces() {
 				{
 					ID:          "workspace-id2",
 					Label:       "label2",
-					Description: "test description2",
+					Description: new("test description2"),
 					Users: []User{
 						{
 							ID:       "id",
@@ -226,7 +226,7 @@ func (s *Suite) TestDeleteWorkspace() {
 			DeleteWorkspace: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "test description",
+				Description: new("test description"),
 				Users: []User{
 					{
 						ID:       "id",
@@ -283,7 +283,7 @@ func (s *Suite) TestGetWorkspace() {
 			GetWorkspace: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "test description",
+				Description: new("test description"),
 				Users: []User{
 					{
 						ID:       "id",
@@ -340,7 +340,7 @@ func (s *Suite) TestValidateWorkspaceID() {
 			GetWorkspace: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "test description",
+				Description: new("test description"),
 				CreatedAt:   "2020-06-25T22:10:42.385Z",
 				UpdatedAt:   "2020-06-25T22:10:42.385Z",
 			},
@@ -387,7 +387,7 @@ func (s *Suite) TestUpdateWorkspace() {
 			UpdateWorkspace: &Workspace{
 				ID:          "workspace-id",
 				Label:       "label",
-				Description: "test description",
+				Description: new("test description"),
 				Users: []User{
 					{
 						ID:       "id",
@@ -434,4 +434,23 @@ func (s *Suite) TestUpdateWorkspace() {
 		_, err := api.UpdateWorkspace(UpdateWorkspaceRequest{"workspace-id", map[string]string{}})
 		s.Contains(err.Error(), "Internal Server Error")
 	})
+}
+
+// The CLI counts pages from 0 and Houston, since v0.31.6, from 1: it skips
+// (pageNumber - 1) * take rows and reads 0 as 1 (houston-api
+// ). Sent as 1, the second page came back
+// as the first. Before v0.31.6 the resolver skipped pageNumber * take, so a
+// page goes out as it is. The first page is 0 on both, whatever the version,
+// so a version read wrong cannot lose it.
+func (s *Suite) TestWorkspacesPageNumber() {
+	for _, v := range []string{"1.0.0", "0.31.6", "0.35.2", "", "invalid"} {
+		s.Equal(0, WorkspacesPageNumber(0, v), "Houston %q, first page", v)
+		s.Equal(2, WorkspacesPageNumber(1, v), "Houston %q, second page", v)
+		s.Equal(3, WorkspacesPageNumber(2, v), "Houston %q, third page", v)
+	}
+	for _, v := range []string{"0.30.3", "0.31.5"} {
+		s.Equal(0, WorkspacesPageNumber(0, v), "Houston %q, first page", v)
+		s.Equal(1, WorkspacesPageNumber(1, v), "Houston %q, second page", v)
+		s.Equal(2, WorkspacesPageNumber(2, v), "Houston %q, third page", v)
+	}
 }
