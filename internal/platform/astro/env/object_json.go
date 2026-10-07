@@ -173,12 +173,14 @@ type SubjectInfo struct {
 func newObjectInfos(objs []astrov1.EnvironmentObject) []ObjectInfo {
 	out := make([]ObjectInfo, len(objs))
 	for i := range objs {
-		out[i] = newObjectInfo(&objs[i])
+		out[i] = NewObjectInfo(&objs[i])
 	}
 	return out
 }
 
-func newObjectInfo(o *astrov1.EnvironmentObject) ObjectInfo {
+// NewObjectInfo converts one object for -o json: a `get`, and what a `set`
+// left or a `delete` removed.
+func NewObjectInfo(o *astrov1.EnvironmentObject) ObjectInfo {
 	info := ObjectInfo{
 		ID:                  o.Id,
 		ObjectKey:           o.ObjectKey,

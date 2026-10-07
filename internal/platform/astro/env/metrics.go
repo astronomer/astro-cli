@@ -172,7 +172,7 @@ func UpdateMetricsExport(idOrKey string, scope Scope, in *MetricsInput, astroV1C
 	return resp.JSON200, nil
 }
 
-// DeleteMetricsExport deletes a metrics export by ID or key.
-func DeleteMetricsExport(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
+// DeleteMetricsExport deletes a metrics export by ID or key, and returns it as it was.
+func DeleteMetricsExport(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	return deleteObject(idOrKey, scope, objectTypeMetrics, astroV1Client)
 }

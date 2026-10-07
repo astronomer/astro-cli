@@ -27,6 +27,7 @@ var envPublished = []any{
 	env.ObjectInfo{},          // get, every kind
 	env.VarLinksReport{},      // variable link list
 	env.LinksReport{},         // connection and airflow-variable link list
+	env.SetFromFileResult{},   // variable and airflow-variable set --from-file
 }
 
 // TestEnvJSONKeysAreSnakeCase walks the json tags of every type `astro env`

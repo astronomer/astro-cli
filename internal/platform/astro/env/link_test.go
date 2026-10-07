@@ -2,8 +2,10 @@ package env
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/lucsky/cuid"
 	"github.com/stretchr/testify/mock"
@@ -13,6 +15,9 @@ import (
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
+
+// errOf is the error of a call whose result the test does not look at.
+func errOf[T any](_ T, err error) error { return err }
 
 // envVarObj returns a workspace-scoped env-var EnvironmentObject with the given
 // links / excludes / autoLink, sufficient for resolveWorkspaceVar to succeed.
@@ -68,7 +73,7 @@ func (s *Suite) TestLinkVarPreservesAutoLink() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc))
+	s.NoError(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc)))
 	mc.AssertExpectations(s.T())
 }
 
@@ -103,7 +108,7 @@ func (s *Suite) TestLinkVarWithOverride() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, &override, false, mc))
+	s.NoError(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, &override, false, mc)))
 	mc.AssertExpectations(s.T())
 }
 
@@ -146,7 +151,7 @@ func (s *Suite) TestLinkVarUpsertsExistingLink() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, &newOverride, false, mc))
+	s.NoError(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, &newOverride, false, mc)))
 	mc.AssertExpectations(s.T())
 }
 
@@ -197,7 +202,7 @@ func (s *Suite) TestLinkVarClearsTheOverrideWhenNoValueIsGiven() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc))
+	s.NoError(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc)))
 	mc.AssertExpectations(s.T())
 }
 
@@ -251,7 +256,7 @@ func (s *Suite) TestLinkVarUpsertPreservesOtherLinks() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, upsertDep, &newOverride, false, mc))
+	s.NoError(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, upsertDep, &newOverride, false, mc)))
 	mc.AssertExpectations(s.T())
 }
 
@@ -273,20 +278,20 @@ func (s *Suite) TestExcludeVarIdempotent() {
 	}, nil).Once()
 	// Note: no ExcludeLinkingEnvironmentObjectWithResponse expectation - idempotent path skips the call entirely.
 
-	s.NoError(ExcludeVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, mc))
+	s.NoError(errOf(ExcludeVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, io.Discard, mc)))
 	mc.AssertExpectations(s.T())
 }
 
 func (s *Suite) TestLinkVarRejectsDeploymentScope() {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	err := LinkVar("FOO", Scope{DeploymentID: cuid.New()}, cuid.New(), nil, false, mc)
+	_, err := LinkVar("FOO", Scope{DeploymentID: cuid.New()}, cuid.New(), nil, false, mc)
 	s.ErrorContains(err, "require --workspace;")
 }
 
 func (s *Suite) TestLinkVarRejectsBadDeploymentID() {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
-	s.ErrorContains(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "", nil, false, mc), "cannot be empty")
-	s.ErrorContains(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "not-a-cuid", nil, false, mc), "valid deployment ID")
+	s.ErrorContains(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "", nil, false, mc)), "cannot be empty")
+	s.ErrorContains(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, "not-a-cuid", nil, false, mc)), "valid deployment ID")
 }
 
 func (s *Suite) TestUnlinkVar() {
@@ -318,22 +323,20 @@ func (s *Suite) TestUnlinkVar() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(UnlinkVar("FOO", Scope{WorkspaceID: cuid.New()}, dropDep, mc))
+	s.NoError(errOf(UnlinkVar("FOO", Scope{WorkspaceID: cuid.New()}, dropDep, mc)))
 	mc.AssertExpectations(s.T())
 }
 
-func (s *Suite) TestExcludeVarUsesDedicatedEndpoint() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+// excludeVarMock answers an exclude of FOO from depID: the key lookup, the
+// exclude-linking call, and the read back by id, which answers with readBack.
+func excludeVarMock(id, wsID, depID string, readBack *astrov1.GetEnvironmentObjectResponse) *astrov1_mocks.ClientWithResponsesInterface {
 	ctx, _ := config.GetCurrentContext()
-	id := cuid.New()
-	depID := cuid.New()
-
+	before := envVarObj(id, "v", nil, nil, nil)
+	before.ScopeEntityId = wsID
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, ctx.Organization, mock.Anything).Return(&astrov1.ListEnvironmentObjectsResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
-		JSON200: &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{
-			envVarObj(id, "v", nil, nil, nil),
-		}},
+		JSON200:      &astrov1.EnvironmentObjectsPaginated{EnvironmentObjects: []astrov1.EnvironmentObject{before}},
 	}, nil).Once()
 	mc.On("ExcludeLinkingEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id,
 		astrov1.ExcludeLinkingEnvironmentObjectJSONRequestBody{
@@ -343,8 +346,45 @@ func (s *Suite) TestExcludeVarUsesDedicatedEndpoint() {
 	).Return(&astrov1.ExcludeLinkingEnvironmentObjectResponse{
 		HTTPResponse: &http.Response{StatusCode: 200},
 	}, nil).Once()
+	mc.On("GetEnvironmentObjectWithResponse", mock.Anything, ctx.Organization, id).Return(readBack, nil).Once()
+	return mc
+}
 
-	s.NoError(ExcludeVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, mc))
+// The exclude-linking endpoint answers with no body, so the links an exclude
+// reports are read back after it.
+func (s *Suite) TestExcludeVarUsesDedicatedEndpointAndReadsBack() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	id, wsID, depID := cuid.New(), cuid.New(), cuid.New()
+	after := envVarObj(id, "v", nil, nil, []astrov1.EnvironmentObjectExcludeLink{
+		{Scope: astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT, ScopeEntityId: depID},
+	})
+	after.ScopeEntityId = wsID
+	after.AutoLinkDeployments = ptr(true) // only the read back says so
+	mc := excludeVarMock(id, wsID, depID, &astrov1.GetEnvironmentObjectResponse{HTTPResponse: &http.Response{StatusCode: 200}, JSON200: &after})
+
+	var warn strings.Builder
+	report, err := ExcludeVar("FOO", Scope{WorkspaceID: wsID}, depID, &warn, mc)
+	s.Require().NoError(err)
+	s.Equal([]string{depID}, report.ExcludeLinks)
+	s.True(report.AutoLinkDeployments, "the report is the read back")
+	s.Empty(warn.String())
+	mc.AssertExpectations(s.T())
+}
+
+// A read back that fails does not fail the exclude, which has happened: it
+// says so, and reports the object read before with the exclude added.
+func (s *Suite) TestExcludeVarFallsBackWhenTheReadBackFails() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	id, wsID, depID := cuid.New(), cuid.New(), cuid.New()
+	mc := excludeVarMock(id, wsID, depID, &astrov1.GetEnvironmentObjectResponse{
+		HTTPResponse: &http.Response{StatusCode: 500}, Body: []byte(`{"message":"boom"}`),
+	})
+
+	var warn strings.Builder
+	report, err := ExcludeVar("FOO", Scope{WorkspaceID: wsID}, depID, &warn, mc)
+	s.Require().NoError(err)
+	s.Equal([]string{depID}, report.ExcludeLinks)
+	s.Contains(warn.String(), "reading environment variable \"FOO\" back failed")
 	mc.AssertExpectations(s.T())
 }
 
@@ -381,7 +421,7 @@ func (s *Suite) TestUnexcludeVarPreservesAutoLink() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(UnexcludeVar("FOO", Scope{WorkspaceID: cuid.New()}, dropDep, mc))
+	s.NoError(errOf(UnexcludeVar("FOO", Scope{WorkspaceID: cuid.New()}, dropDep, mc)))
 	mc.AssertExpectations(s.T())
 }
 
@@ -485,7 +525,7 @@ func (s *Suite) TestLinkVarOmitsUnsetFieldsWhenCreatingTheLink() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc))
+	s.NoError(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc)))
 	mc.AssertExpectations(s.T())
 }
 
@@ -506,7 +546,7 @@ func (s *Suite) TestLinkVarNoCreateRefusesToLink() {
 		}},
 	}, nil).Once()
 
-	err := LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, true, mc)
+	_, err := LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, true, mc)
 	s.ErrorContains(err, "--no-create")
 	mc.AssertExpectations(s.T())
 }
@@ -546,6 +586,6 @@ func (s *Suite) TestLinkVarOmitsUnsetFieldsWhenTheLinkHasNoOverride() {
 		JSON200:      &astrov1.EnvironmentObject{Id: &id, ObjectKey: "FOO"},
 	}, nil).Once()
 
-	s.NoError(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc))
+	s.NoError(errOf(LinkVar("FOO", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc)))
 	mc.AssertExpectations(s.T())
 }

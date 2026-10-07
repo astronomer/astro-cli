@@ -180,22 +180,24 @@ func TestEnvRemovedFlagsFail(t *testing.T) {
 }
 
 // Every `astro env` command with an --output has it as the format: -o, text
-// by default, and no --format beside it. dotenv is offered by exactly the two
-// variable reads.
+// by default, and no --format beside it. dotenv is offered by exactly the three
+// variable reads: list, get and export.
 func TestEnvOutputFlagIsUniform(t *testing.T) {
 	dotenv := map[string]bool{
-		"astro env variable list": true,
-		"astro env variable get":  true,
+		"astro env variable list":   true,
+		"astro env variable get":    true,
+		"astro env variable export": true,
 	}
 	root := &cobra.Command{Use: "astro"}
 	root.AddCommand(newEnvRootCmd(io.Discard))
 
-	var seen int
+	var walked, seen int
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
 		for _, sub := range c.Commands() {
 			walk(sub)
 		}
+		walked++
 		// c.Flag, not c.Flags().Lookup: cliout registers --output as a
 		// persistent flag, which Flags() holds only once cobra has merged it.
 		assert.Nil(t, c.Flag("format"), "%s still has --format", c.CommandPath())
@@ -212,9 +214,9 @@ func TestEnvOutputFlagIsUniform(t *testing.T) {
 			assert.Equal(t, "Output format: text or json", o.Usage, c.CommandPath())
 		}
 	}
-	walk(root)
-	// list and get for four kinds, three link lists, and the cross-kind list;
-	// then the nine tombstones, create and update for four kinds and link
-	// create, which declare --output so their failure honors it.
-	assert.Equal(t, 21, seen)
+	walk(root.Commands()[0])
+	// The group declares it for every command under it, the groups and the
+	// tombstones included, so a failure anywhere honors it.
+	assert.Equal(t, walked, seen, "every astro env command reaches -o")
+	assert.Greater(t, seen, 40)
 }

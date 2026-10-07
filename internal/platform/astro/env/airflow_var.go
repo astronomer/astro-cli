@@ -109,7 +109,7 @@ func UpdateAirflowVar(idOrKey string, scope Scope, value string, autoLink *bool,
 	return resp.JSON200, nil
 }
 
-// DeleteAirflowVar deletes an Airflow variable by ID or key.
-func DeleteAirflowVar(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
+// DeleteAirflowVar deletes an Airflow variable by ID or key, and returns it as it was.
+func DeleteAirflowVar(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	return deleteObject(idOrKey, scope, objectTypeAirflowVar, astroV1Client)
 }

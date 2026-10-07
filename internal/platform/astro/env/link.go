@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"sort"
 
@@ -239,7 +240,8 @@ type ObjectLink struct {
 	SetFields    []string       `json:"set_fields,omitempty"`
 }
 
-// LinkVar sets a workspace-scoped env var's link to a deployment.
+// LinkVar sets a workspace-scoped env var's link to a deployment, and
+// returns the variable's links as the change left them.
 //
 // Set semantics, matching `set` on the object nouns: the link is created when
 // absent and updated when present, and overrideValue describes the whole
@@ -253,91 +255,146 @@ type ObjectLink struct {
 //
 // Note the platform does NOT preserve the Links/ExcludeLinks arrays
 // themselves when a PATCH omits them -- see echoPreservedFields.
-func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, noCreate bool, astroV1Client astrov1.APIClient) error {
-	return Link(LinkVariable, idOrKey, scope, depID, &LinkOverride{Value: overrideValue}, noCreate, astroV1Client)
+func LinkVar(idOrKey string, scope Scope, depID string, overrideValue *string, noCreate bool, astroV1Client astrov1.APIClient) (*VarLinksReport, error) {
+	return varLinksAfter(link(LinkVariable, idOrKey, scope, depID, &LinkOverride{Value: overrideValue}, noCreate, astroV1Client))
 }
 
-// UnlinkVar removes an explicit deployment link from a workspace env var.
-func UnlinkVar(idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) error {
-	return Unlink(LinkVariable, idOrKey, scope, depID, astroV1Client)
+// UnlinkVar removes an explicit deployment link from a workspace env var, and
+// returns its links as the change left them.
+func UnlinkVar(idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) (*VarLinksReport, error) {
+	return varLinksAfter(unlink(LinkVariable, idOrKey, scope, depID, astroV1Client))
 }
 
-// ExcludeVar adds a deployment to the workspace env var's excludeLinks list.
-// See Exclude.
-func ExcludeVar(idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) error {
-	return Exclude(LinkVariable, idOrKey, scope, depID, astroV1Client)
+// ExcludeVar adds a deployment to the workspace env var's excludeLinks list,
+// and returns its links as the change left them. See exclude.
+func ExcludeVar(idOrKey string, scope Scope, depID string, warn io.Writer, astroV1Client astrov1.APIClient) (*VarLinksReport, error) {
+	return varLinksAfter(exclude(LinkVariable, idOrKey, scope, depID, warn, astroV1Client))
 }
 
-// UnexcludeVar removes a deployment from a workspace env var's excludeLinks.
-func UnexcludeVar(idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) error {
-	return Unexclude(LinkVariable, idOrKey, scope, depID, astroV1Client)
+// UnexcludeVar removes a deployment from a workspace env var's excludeLinks,
+// and returns its links as the change left them.
+func UnexcludeVar(idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) (*VarLinksReport, error) {
+	return varLinksAfter(unexclude(LinkVariable, idOrKey, scope, depID, astroV1Client))
 }
 
+// varLinksAfter reports a variable's links from the object a change left,
+// secrets masked whatever the platform answered with (MaskSecrets).
+func varLinksAfter(obj *astrov1.EnvironmentObject, err error) (*VarLinksReport, error) {
+	if err != nil {
+		return nil, err
+	}
+	return newVarLinksReport(MaskSecrets(obj)), nil
+}
+
+// linksAfter reports a connection's or an Airflow variable's links from the
+// object a change left, secrets masked.
+func linksAfter(k linkKind, obj *astrov1.EnvironmentObject, err error) (*LinksReport, error) {
+	if err != nil {
+		return nil, err
+	}
+	return newLinksReport(k, MaskSecrets(obj))
+}
+
+// Link, Unlink, Exclude and Unexclude change a workspace connection's or
+// Airflow variable's links, and return them as the change left them: the
+// report `link list` prints, built from the object the platform answered the
+// change with, or for an exclude, read back after it.
+//
 // Link sets a workspace object's link to a deployment: created when absent,
 // updated when present, with override describing the whole override. A
 // field the link had that override does not give is cleared through
 // `unsetFields`, so a nil override leaves the link with none.
-func Link(kind LinkKind, idOrKey string, scope Scope, depID string, override *LinkOverride, noCreate bool, astroV1Client astrov1.APIClient) error {
+func Link(kind LinkKind, idOrKey string, scope Scope, depID string, override *LinkOverride, noCreate bool, astroV1Client astrov1.APIClient) (*LinksReport, error) {
+	obj, err := link(kind, idOrKey, scope, depID, override, noCreate, astroV1Client)
+	return linksAfter(linkKinds[kind], obj, err)
+}
+
+// Unlink removes an explicit deployment link from a workspace object.
+func Unlink(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) (*LinksReport, error) {
+	obj, err := unlink(kind, idOrKey, scope, depID, astroV1Client)
+	return linksAfter(linkKinds[kind], obj, err)
+}
+
+// Exclude adds a deployment to a workspace object's excludeLinks list. See
+// exclude.
+func Exclude(kind LinkKind, idOrKey string, scope Scope, depID string, warn io.Writer, astroV1Client astrov1.APIClient) (*LinksReport, error) {
+	obj, err := exclude(kind, idOrKey, scope, depID, warn, astroV1Client)
+	return linksAfter(linkKinds[kind], obj, err)
+}
+
+// Unexclude removes a deployment from a workspace object's excludeLinks.
+func Unexclude(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) (*LinksReport, error) {
+	obj, err := unexclude(kind, idOrKey, scope, depID, astroV1Client)
+	return linksAfter(linkKinds[kind], obj, err)
+}
+
+// link sets the link, and returns the object the platform answered with.
+func link(kind LinkKind, idOrKey string, scope Scope, depID string, override *LinkOverride, noCreate bool, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	k := linkKinds[kind]
 	if err := validateDeploymentID(depID); err != nil {
-		return err
+		return nil, err
 	}
 	current, err := resolveWorkspaceObject(k, idOrKey, scope, false, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if excludeExists(current.ExcludeLinks, depID) {
-		return fmt.Errorf("%s %q has deployment %s in its exclude list; remove the exclude first", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q has deployment %s in its exclude list; remove the exclude first", k.noun, current.ObjectKey, depID)
 	}
 
 	links, found := upsertLinkInUpdateList(kind, current.Links, depID, override)
 	if !found && noCreate {
-		return fmt.Errorf("%s %q is not linked to deployment %s and --no-create was passed",
+		return nil, fmt.Errorf("%s %q is not linked to deployment %s and --no-create was passed",
 			k.noun, current.ObjectKey, depID)
 	}
 	return patchLinks(k, *current.Id, current, &links, nil, astroV1Client)
 }
 
-// Unlink removes an explicit deployment link from a workspace object.
-func Unlink(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) error {
+// unlink removes the link, and returns the object the platform answered with.
+func unlink(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	k := linkKinds[kind]
 	if err := validateDeploymentID(depID); err != nil {
-		return err
+		return nil, err
 	}
 	current, err := resolveWorkspaceObject(k, idOrKey, scope, false, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !linkExists(current.Links, depID) {
-		return fmt.Errorf("%s %q is not linked to deployment %s", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q is not linked to deployment %s", k.noun, current.ObjectKey, depID)
 	}
 	links := buildUpdateLinksExcluding(k, current.Links, depID)
 	return patchLinks(k, *current.Id, current, &links, nil, astroV1Client)
 }
 
-// Exclude adds a deployment to a workspace object's excludeLinks list, using
+// exclude adds a deployment to a workspace object's excludeLinks list, using
 // the platform's dedicated POST .../exclude-linking endpoint. Useful for
 // auto-linked objects to opt out specific deployments. Idempotent: re-running
 // against an already-excluded deployment is a no-op success.
-func Exclude(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) error {
+//
+// That endpoint answers with no body, so the object returned is read back
+// after it. If that read fails, the exclude has still happened: it says so on
+// warn and returns the object read before the change with the exclude added,
+// what the endpoint did and the rest as it was.
+func exclude(kind LinkKind, idOrKey string, scope Scope, depID string, warn io.Writer, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	k := linkKinds[kind]
 	if err := validateDeploymentID(depID); err != nil {
-		return err
+		return nil, err
 	}
 	current, err := resolveWorkspaceObject(k, idOrKey, scope, false, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if linkExists(current.Links, depID) {
-		return fmt.Errorf("%s %q is explicitly linked to deployment %s; delete the link first to exclude", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q is explicitly linked to deployment %s; delete the link first to exclude", k.noun, current.ObjectKey, depID)
 	}
 	if excludeExists(current.ExcludeLinks, depID) {
 		// Already excluded; desired state matches actual, no-op success.
-		return nil
+		return current, nil
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	body := astrov1.ExcludeLinkingEnvironmentObjectJSONRequestBody{
 		Scope:         astrov1.ExcludeLinkEnvironmentObjectRequestScopeDEPLOYMENT,
@@ -345,24 +402,38 @@ func Exclude(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Cl
 	}
 	resp, err := astroV1Client.ExcludeLinkingEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, *current.Id, body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return nil, err
+	}
+	after, err := resolveWorkspaceObject(k, *current.Id, scope, false, astroV1Client)
+	if err == nil {
+		return after, nil
+	}
+	fmt.Fprintf(warn, "Excluded deployment %s, but reading %s %q back failed (%s); showing it as it was read before, with the exclude added.\n",
+		depID, k.noun, current.ObjectKey, err)
+	excludes := append(derefSlice(current.ExcludeLinks), astrov1.EnvironmentObjectExcludeLink{
+		Scope:         astrov1.EnvironmentObjectExcludeLinkScopeDEPLOYMENT,
+		ScopeEntityId: depID,
+	})
+	current.ExcludeLinks = &excludes
+	return current, nil
 }
 
-// Unexclude removes a deployment from a workspace object's excludeLinks.
+// unexclude removes a deployment from a workspace object's excludeLinks.
 // There's no dedicated endpoint for this, so it goes through PATCH.
-func Unexclude(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) error {
+func unexclude(kind LinkKind, idOrKey string, scope Scope, depID string, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	k := linkKinds[kind]
 	if err := validateDeploymentID(depID); err != nil {
-		return err
+		return nil, err
 	}
 	current, err := resolveWorkspaceObject(k, idOrKey, scope, false, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if !excludeExists(current.ExcludeLinks, depID) {
-		return fmt.Errorf("%s %q does not have deployment %s in its exclude list", k.noun, current.ObjectKey, depID)
+		return nil, fmt.Errorf("%s %q does not have deployment %s in its exclude list", k.noun, current.ObjectKey, depID)
 	}
 	excludes := buildUpdateExcludesExcluding(current.ExcludeLinks, depID)
 	return patchLinks(k, *current.Id, current, nil, &excludes, astroV1Client)
@@ -377,6 +448,11 @@ func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, astroV1Clien
 	if err != nil {
 		return nil, err
 	}
+	return newVarLinksReport(current), nil
+}
+
+// newVarLinksReport reports a workspace env var's links.
+func newVarLinksReport(current *astrov1.EnvironmentObject) *VarLinksReport {
 	// Links/ExcludeLinks start non-nil so an empty list marshals as [] rather
 	// than null; scripted consumers iterate .links[] without null guards.
 	report := &VarLinksReport{
@@ -402,7 +478,7 @@ func ListVarLinks(idOrKey string, scope Scope, includeSecrets bool, astroV1Clien
 		}
 		report.Links = append(report.Links, vl)
 	}
-	return report, nil
+	return report
 }
 
 // ListLinks returns the link state of a workspace connection or Airflow
@@ -414,6 +490,11 @@ func ListLinks(kind LinkKind, idOrKey string, scope Scope, includeSecrets bool, 
 	if err != nil {
 		return nil, err
 	}
+	return newLinksReport(k, current)
+}
+
+// newLinksReport reports a workspace connection's or Airflow variable's links.
+func newLinksReport(k linkKind, current *astrov1.EnvironmentObject) (*LinksReport, error) {
 	report := &LinksReport{
 		ObjectKey:    current.ObjectKey,
 		Links:        []ObjectLink{},
@@ -756,7 +837,7 @@ var metricsExportLinks = linkKind{
 
 // patchLinks PATCHes the env-object with new Links and/or ExcludeLinks,
 // echoing its value through the kind and the rest of its state via
-// echoPreservedFields.
+// echoPreservedFields, and returns the object the platform answered with.
 func patchLinks(
 	k linkKind,
 	id string,
@@ -764,10 +845,10 @@ func patchLinks(
 	links *[]astrov1.UpdateEnvironmentObjectLinkRequest,
 	excludes *[]astrov1.ExcludeLinkEnvironmentObjectRequest,
 	astroV1Client astrov1.APIClient,
-) error {
+) (*astrov1.EnvironmentObject, error) {
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var body astrov1.UpdateEnvironmentObjectJSONRequestBody
 	k.echoValue(&body, current)
@@ -776,7 +857,13 @@ func patchLinks(
 	echoPreservedFields(&body, current)
 	resp, err := astroV1Client.UpdateEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id, body)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return nil, err
+	}
+	if resp.JSON200 == nil {
+		return nil, errors.New("update returned empty response body")
+	}
+	return resp.JSON200, nil
 }

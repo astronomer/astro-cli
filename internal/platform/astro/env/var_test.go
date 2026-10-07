@@ -333,6 +333,6 @@ func (s *Suite) TestDeleteVar() {
 		HTTPResponse: &http.Response{StatusCode: 204},
 	}, nil).Once()
 
-	s.NoError(DeleteVar("FOO", Scope{WorkspaceID: workspaceID}, mc))
+	s.NoError(errOf(DeleteVar("FOO", Scope{WorkspaceID: workspaceID}, mc)))
 	mc.AssertExpectations(s.T())
 }

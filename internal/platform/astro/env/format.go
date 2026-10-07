@@ -97,7 +97,7 @@ func WriteVar(envObj *astrov1.EnvironmentObject, includeSecrets bool, r output.E
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(newObjectInfo(envObj),
+	return r.Emit(NewObjectInfo(envObj),
 		func(w io.Writer) error { return writeVarTable(one, includeSecrets, w) })
 }
 
@@ -117,7 +117,7 @@ func WriteConn(envObj *astrov1.EnvironmentObject, r output.Emitter) error {
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(newObjectInfo(envObj), func(w io.Writer) error { return writeConnTable(one, w) })
+	return r.Emit(NewObjectInfo(envObj), func(w io.Writer) error { return writeConnTable(one, w) })
 }
 
 // WriteAirflowVarList renders a list of AIRFLOW_VARIABLE objects.
@@ -133,7 +133,7 @@ func WriteAirflowVar(envObj *astrov1.EnvironmentObject, includeSecrets bool, r o
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(newObjectInfo(envObj),
+	return r.Emit(NewObjectInfo(envObj),
 		func(w io.Writer) error { return writeAirflowVarTable(one, includeSecrets, w) })
 }
 
@@ -148,7 +148,7 @@ func WriteMetricsExport(envObj *astrov1.EnvironmentObject, r output.Emitter) err
 		return errNilObject
 	}
 	one := []astrov1.EnvironmentObject{*envObj}
-	return r.Emit(newObjectInfo(envObj), func(w io.Writer) error { return writeMetricsExportTable(one, w) })
+	return r.Emit(NewObjectInfo(envObj), func(w io.Writer) error { return writeMetricsExportTable(one, w) })
 }
 
 func writeVarTable(envObjs []astrov1.EnvironmentObject, includeSecrets bool, out io.Writer) error {

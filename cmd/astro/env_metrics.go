@@ -101,7 +101,7 @@ func newEnvMetricsDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete a metrics export",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEnvMetricsDelete(cmd, out, args[0])
+			return runEnvDelete(cmd, out, "metrics export", args[0], env.DeleteMetricsExport)
 		},
 	}
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
@@ -174,6 +174,10 @@ func runEnvMetricsSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
+	r, err := envRenderer(out)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
 
 	in, err := buildMetricsInput(cmd)
@@ -201,39 +205,15 @@ func runEnvMetricsSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 				// reading, which setNotFound handles below.
 				return fmt.Errorf("metrics export %q does not exist and could not be created: %w", idOrKey, err)
 			}
-			printCreated(out, obj)
-			return nil
+			held := createdAsHeld(cmd.ErrOrStderr(), r, obj, scope, env.GetMetricsExport)
+			return renderEnvSet(r, held, true)
 		}
 		if errors.Is(err, env.ErrNotFound) && envMetricsNoCreate {
 			return setNotFound("metrics export", idOrKey, err)
 		}
 		return err
 	}
-	fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
-	return nil
-}
-
-func runEnvMetricsDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
-	if err != nil {
-		return err
-	}
-	cmd.SilenceUsage = true
-
-	if !envYes {
-		ok, err := confirmTTY(fmt.Sprintf("Delete metrics export %q?", idOrKey))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errAbortedDelete
-		}
-	}
-	if err := env.DeleteMetricsExport(idOrKey, scope, astroV1Client); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
-	return nil
+	return renderEnvSet(r, obj, false)
 }
 
 func buildMetricsInput(cmd *cobra.Command) (*env.MetricsInput, error) {

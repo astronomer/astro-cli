@@ -118,7 +118,7 @@ func UpdateVar(idOrKey string, scope Scope, value string, autoLink *bool, astroV
 	return resp.JSON200, nil
 }
 
-// DeleteVar deletes an env var by ID or key.
-func DeleteVar(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
+// DeleteVar deletes an env var by ID or key, and returns it as it was.
+func DeleteVar(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	return deleteObject(idOrKey, scope, objectTypeVar, astroV1Client)
 }

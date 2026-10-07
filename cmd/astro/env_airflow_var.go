@@ -111,7 +111,7 @@ func newEnvAirflowVarDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete an Airflow variable",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEnvAirflowVarDelete(cmd, out, args[0])
+			return runEnvDelete(cmd, out, "Airflow variable", args[0], env.DeleteAirflowVar)
 		},
 	}
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
@@ -162,12 +162,20 @@ func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	r, err := envRenderer(out)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return runFromFileSet(out, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, env.CreateAirflowVar, env.UpdateAirflowVar)
+	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateAirflowVar, env.UpdateAirflowVar, env.GetAirflowVar})
 }
 
 func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	r, err := envRenderer(out)
 	if err != nil {
 		return err
 	}
@@ -188,37 +196,13 @@ func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 			if err != nil {
 				return err
 			}
-			printCreated(out, obj)
-			return nil
+			held := createdAsHeld(cmd.ErrOrStderr(), r, obj, scope, env.GetAirflowVar)
+			return renderEnvSet(r, held, true)
 		}
 		if errors.Is(err, env.ErrNotFound) && envVarNoCreate {
 			return setNotFound("Airflow variable", idOrKey, err)
 		}
 		return err
 	}
-	fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
-	return nil
-}
-
-func runEnvAirflowVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
-	if err != nil {
-		return err
-	}
-	cmd.SilenceUsage = true
-
-	if !envYes {
-		ok, err := confirmTTY(fmt.Sprintf("Delete Airflow variable %q?", idOrKey))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errAbortedDelete
-		}
-	}
-	if err := env.DeleteAirflowVar(idOrKey, scope, astroV1Client); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
-	return nil
+	return renderEnvSet(r, obj, false)
 }

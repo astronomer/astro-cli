@@ -1,0 +1,147 @@
+{
+  "outcomes": [
+    {
+      "key": "x",
+      "kind": "x",
+      "object": {
+        "id": "x",
+        "object_key": "x",
+        "object_type": "x",
+        "scope": "x",
+        "scope_entity_id": "x",
+        "source_scope": "x",
+        "source_scope_entity_id": "x",
+        "description": "x",
+        "auto_link_deployments": true,
+        "set_fields": [
+          "x"
+        ],
+        "environment_variable": {
+          "is_secret": true,
+          "value": "x"
+        },
+        "airflow_variable": {
+          "is_secret": true,
+          "value": "x"
+        },
+        "connection": {
+          "type": "x",
+          "host": "x",
+          "port": -1,
+          "login": "x",
+          "password": "x",
+          "schema": "x",
+          "extra": {
+            "x": null
+          },
+          "connection_auth_type": {
+            "id": "x",
+            "name": "x",
+            "description": "x",
+            "airflow_type": "x",
+            "auth_method_name": "x",
+            "provider_package_name": "x",
+            "provider_logo": "x",
+            "guide_path": "x",
+            "parameters": [
+              {
+                "airflow_param_name": "x",
+                "friendly_name": "x",
+                "description": "x",
+                "data_type": "x",
+                "example": "x",
+                "pattern": "x",
+                "is_in_extra": true,
+                "is_required": true,
+                "is_secret": true
+              }
+            ]
+          }
+        },
+        "metrics_export": {
+          "exporter_type": "x",
+          "endpoint": "x",
+          "auth_type": "x",
+          "username": "x",
+          "password": "x",
+          "basic_token": "x",
+          "sig_v4_assume_arn": "x",
+          "sig_v4_sts_region": "x",
+          "headers": {
+            "x": "x"
+          },
+          "labels": {
+            "x": "x"
+          }
+        },
+        "links": [
+          {
+            "scope": "x",
+            "scope_entity_id": "x",
+            "set_fields": [
+              "x"
+            ],
+            "environment_variable_overrides": {
+              "value": "x"
+            },
+            "airflow_variable_overrides": {
+              "value": "x"
+            },
+            "connection_overrides": {
+              "type": "x",
+              "host": "x",
+              "port": -1,
+              "login": "x",
+              "password": "x",
+              "schema": "x",
+              "extra": {
+                "x": null
+              }
+            },
+            "metrics_export_overrides": {
+              "exporter_type": "x",
+              "endpoint": "x",
+              "auth_type": "x",
+              "username": "x",
+              "password": "x",
+              "basic_token": "x",
+              "sig_v4_assume_arn": "x",
+              "sig_v4_sts_region": "x",
+              "headers": {
+                "x": "x"
+              },
+              "labels": {
+                "x": "x"
+              }
+            }
+          }
+        ],
+        "exclude_links": [
+          {
+            "scope": "x",
+            "scope_entity_id": "x"
+          }
+        ],
+        "created_at": "x",
+        "created_by": {
+          "id": "x",
+          "subject_type": "x",
+          "username": "x",
+          "full_name": "x",
+          "avatar_url": "x",
+          "api_token_name": "x"
+        },
+        "updated_at": "x",
+        "updated_by": {
+          "id": "x",
+          "subject_type": "x",
+          "username": "x",
+          "full_name": "x",
+          "avatar_url": "x",
+          "api_token_name": "x"
+        }
+      },
+      "error": "x"
+    }
+  ]
+}

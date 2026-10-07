@@ -172,7 +172,7 @@ var fixedTime = time.Date(2026, 7, 21, 10, 30, 0, 0, time.UTC)
 // way the filler cannot honestly claim to have populated it, so it fails
 // rather than writing a truncated shape into a golden that then reads as
 // coverage.
-const maxFillDepth = 12
+const maxFillDepth = 14
 
 // fill populates every field reachable from v, which must be addressable, so
 // that the marshaled shape shows fields an `omitempty` zero value would hide.

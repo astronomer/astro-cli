@@ -153,32 +153,30 @@ func getObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentOb
 	return nil, fmt.Errorf("%w: %s", ErrNotFound, idOrKey)
 }
 
-// deleteObject deletes an env-object by ID or key.
-func deleteObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) error {
-	id, err := resolveID(idOrKey, scope, objectType, astroV1Client)
+// deleteObject deletes an env-object by ID or key, and returns it as it was
+// before the delete, secrets masked. An ID is fetched too, not passed
+// through, so that it is held to the same scope a key is looked up in.
+func deleteObject(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
+	existing, err := getObject(idOrKey, scope, objectType, false, astroV1Client)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	id, err := objectID(existing, idOrKey)
+	if err != nil {
+		return nil, err
 	}
 	c, err := config.GetCurrentContext()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := astroV1Client.DeleteEnvironmentObjectWithResponse(httpcontext.Background(), c.Organization, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-}
-
-// resolveID returns the ID of the object idOrKey names within the scope. An ID
-// is fetched too, not passed through, so that it is held to the same scope a
-// key is looked up in.
-func resolveID(idOrKey string, scope Scope, objectType astrov1.ListEnvironmentObjectsParamsObjectType, astroV1Client astrov1.APIClient) (string, error) {
-	existing, err := getObject(idOrKey, scope, objectType, false, astroV1Client)
-	if err != nil {
-		return "", err
+	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return nil, err
 	}
-	return objectID(existing, idOrKey)
+	return existing, nil
 }
 
 // outOfScopeError is checkInScope's refusal. obj is set when the object is of

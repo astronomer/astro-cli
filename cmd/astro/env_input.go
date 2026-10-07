@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -102,18 +103,6 @@ type createFn func(scope env.Scope, key, value string, isSecret bool, autoLink *
 // updateFn matches the per-type UpdateVar / UpdateAirflowVar signature.
 type updateFn func(idOrKey string, scope env.Scope, value string, autoLink *bool, client astrov1.APIClient) (*astrov1.EnvironmentObject, error)
 
-// printCreated reports a newly created object, with the id scripts read out
-// of this line. One definition because five paths print it — the four nouns
-// and the bulk import — and a create/update split that drifted per noun is
-// what this change exists to undo.
-func printCreated(out io.Writer, obj *astrov1.EnvironmentObject) {
-	id := ""
-	if obj.Id != nil {
-		id = *obj.Id
-	}
-	fmt.Fprintf(out, "Created %s (id: %s)\n", obj.ObjectKey, id)
-}
-
 // refuseCreateByID rejects creating an object addressed by an id.
 //
 // Mapping the id branch's 404 to ErrNotFound was needed so --no-create and
@@ -138,18 +127,29 @@ func setNotFound(noun, idOrKey string, err error) error {
 	return fmt.Errorf("%s %q does not exist and --no-create was passed: %w", noun, idOrKey, err)
 }
 
+// fromFileFns are one kind's calls, for `set --from-file`.
+type fromFileFns struct {
+	create createFn
+	update updateFn
+	get    getFn
+}
+
 // runFromFileSet parses a dotenv file and sets each entry. Honors the same
 // --no-create semantic as the single-key path: when noCreate is true and a key
 // does not exist, this aborts rather than creating.
-func runFromFileSet(out io.Writer, scope env.Scope, autoLink *bool, isSecret, noCreate bool, path string, create createFn, update updateFn) error {
+//
+// It renders once, at the end, what it did with every key. A failure part way
+// through stops it there. Text prints a line for each key set before it and
+// then the error, as it always has. Json publishes the outcomes so far,
+// ending in the failed key and its error, and exits 1 with the error on
+// stderr (failedAfterResult): the keys before it were set, and a script
+// needs to know which.
+func runFromFileSet(cmd *cobra.Command, r cliout.Renderer, scope env.Scope, autoLink *bool, isSecret, noCreate bool, path string, fns fromFileFns) error {
 	parsed, err := env.ParseDotenvFile(path)
 	if err != nil {
 		return err
 	}
-	if len(parsed) == 0 {
-		fmt.Fprintf(out, "no variables found in %s\n", displayPath(path))
-		return nil
-	}
+	res := &env.SetFromFileResult{Outcomes: []env.SetOutcome{}}
 	var skipped []string
 	for _, k := range sortedKeys(parsed) {
 		// An empty value in a dotenv file is very often not a value at all.
@@ -162,24 +162,26 @@ func runFromFileSet(out io.Writer, scope env.Scope, autoLink *bool, isSecret, no
 		// credentials.
 		if parsed[k] == "" {
 			skipped = append(skipped, k)
+			res.Outcomes = append(res.Outcomes, env.SetOutcome{Key: k, Kind: env.SetSkippedEmpty})
 			continue
 		}
-		obj, err := update(k, scope, parsed[k], autoLink, astroV1Client)
+		kind, obj, err := setFromFileEntry(cmd.ErrOrStderr(), r, scope, k, parsed[k], autoLink, isSecret, noCreate, fns)
 		if err != nil {
-			if errors.Is(err, env.ErrNotFound) && !noCreate {
-				obj, err = create(scope, k, parsed[k], isSecret, autoLink, astroV1Client)
-				if err != nil {
-					return fmt.Errorf("set %s: creating it failed: %w", k, err)
-				}
-				printCreated(out, obj)
-				continue
+			if r.Format != cliout.FormatJSON {
+				writeSetLines(r.Out, res)
+				return err
 			}
-			if errors.Is(err, env.ErrNotFound) {
-				return fmt.Errorf("set %s: it does not exist and --no-create was passed: %w", k, err)
+			res.Outcomes = append(res.Outcomes, env.SetOutcome{Key: k, Kind: env.SetFailed, Error: err.Error()})
+			if eerr := renderEnvSetFromFile(r, res, path); eerr != nil {
+				return eerr
 			}
-			return fmt.Errorf("set %s: %w", k, err)
+			return failedAfterResult(cmd, r.Format, err)
 		}
-		fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
+		info := setInfo(obj)
+		res.Outcomes = append(res.Outcomes, env.SetOutcome{Key: k, Kind: kind, Object: &info})
+	}
+	if err := renderEnvSetFromFile(r, res, path); err != nil {
+		return err
 	}
 	if len(skipped) > 0 {
 		fmt.Fprintf(os.Stderr,
@@ -190,6 +192,56 @@ func runFromFileSet(out io.Writer, scope env.Scope, autoLink *bool, isSecret, no
 			len(skipped), plural(len(skipped)), strings.Join(skipped, ", "))
 	}
 	return nil
+}
+
+// setFromFileEntry sets one key of the file: an update, or a create when the
+// key is absent and creating is allowed. It returns which it was and the
+// object it left.
+func setFromFileEntry(warn io.Writer, r cliout.Renderer, scope env.Scope, k, value string, autoLink *bool, isSecret, noCreate bool, fns fromFileFns) (env.SetOutcomeKind, *astrov1.EnvironmentObject, error) {
+	obj, err := fns.update(k, scope, value, autoLink, astroV1Client)
+	switch {
+	case err == nil:
+		return env.SetUpdated, obj, nil
+	case !errors.Is(err, env.ErrNotFound):
+		return "", nil, fmt.Errorf("set %s: %w", k, err)
+	case noCreate:
+		return "", nil, fmt.Errorf("set %s: it does not exist and --no-create was passed: %w", k, err)
+	}
+	obj, err = fns.create(scope, k, value, isSecret, autoLink, astroV1Client)
+	if err != nil {
+		return "", nil, fmt.Errorf("set %s: creating it failed: %w", k, err)
+	}
+	return env.SetCreated, createdAsHeld(warn, r, obj, scope, fns.get), nil
+}
+
+// runEnvDelete deletes the noun idOrKey names, once confirmed: --yes, or a
+// yes at a terminal. Under --output json it asks nothing, failing as
+// input_required naming --yes.
+func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del func(string, env.Scope, astrov1.APIClient) (*astrov1.EnvironmentObject, error)) error {
+	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	r, err := envRenderer(out)
+	if err != nil {
+		return err
+	}
+	cmd.SilenceUsage = true
+
+	if !envYes {
+		ok, err := confirmTTY(fmt.Sprintf("Delete %s %q?", noun, idOrKey))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errAbortedDelete
+		}
+	}
+	deleted, err := del(idOrKey, scope, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderEnvDeleted(r, deleted, idOrKey)
 }
 
 // plural is the suffix for "entry"/"entries" in the skip notice.

@@ -193,6 +193,10 @@ one deployment with --deployment.`,
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
 	cmd.SetOut(out)
+	// One -o for the whole group, text or json: a set publishes the object
+	// as it now is, a delete the object as it was, a link change the links
+	// as it left them. The reads that offer dotenv register their own.
+	cliout.AddOutputFlag(cmd, &envOutput)
 	cmd.AddCommand(
 		newEnvVarRootCmd(out),
 		newEnvConnRootCmd(out),

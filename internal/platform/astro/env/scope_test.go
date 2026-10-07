@@ -16,7 +16,7 @@ import (
 type scopedKind struct {
 	name       string
 	objectType astrov1.EnvironmentObjectObjectType
-	del        func(idOrKey string, scope Scope, c astrov1.APIClient) error
+	del        func(idOrKey string, scope Scope, c astrov1.APIClient) (*astrov1.EnvironmentObject, error)
 	update     func(idOrKey string, scope Scope, c astrov1.APIClient) error
 	get        func(idOrKey string, scope Scope, c astrov1.APIClient) error
 }
@@ -89,7 +89,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				HTTPResponse: &http.Response{StatusCode: 204},
 			}, nil).Once()
 
-			s.NoError(k.del(id, Scope{DeploymentID: depID}, mc))
+			s.NoError(errOf(k.del(id, Scope{DeploymentID: depID}, mc)))
 			mc.AssertExpectations(s.T())
 		})
 
@@ -106,7 +106,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				HTTPResponse: &http.Response{StatusCode: 204},
 			}, nil).Once()
 
-			s.NoError(k.del(id, Scope{WorkspaceID: wsID}, mc))
+			s.NoError(errOf(k.del(id, Scope{WorkspaceID: wsID}, mc)))
 			mc.AssertExpectations(s.T())
 		})
 
@@ -122,7 +122,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				Links: &[]astrov1.EnvironmentObjectLink{{Scope: astrov1.EnvironmentObjectLinkScopeDEPLOYMENT, ScopeEntityId: depID}},
 			})
 
-			err := k.del(id, Scope{DeploymentID: depID}, mc)
+			_, err := k.del(id, Scope{DeploymentID: depID}, mc)
 			s.ErrorIs(err, ErrOutOfScope)
 			s.Contains(err.Error(), "belongs to workspace "+wsID+", not deployment "+depID)
 			s.Contains(err.Error(), "--workspace "+wsID)
@@ -146,7 +146,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				Scope: astrov1.EnvironmentObjectScopeDEPLOYMENT, ScopeEntityId: otherDep,
 			})
 
-			err := k.del(id, Scope{DeploymentID: depID}, mc)
+			_, err := k.del(id, Scope{DeploymentID: depID}, mc)
 			s.ErrorIs(err, ErrOutOfScope)
 			s.Contains(err.Error(), "--deployment "+otherDep)
 			mc.AssertNotCalled(s.T(), "DeleteEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything)
@@ -162,7 +162,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				Scope: astrov1.EnvironmentObjectScopeDEPLOYMENT, ScopeEntityId: depID,
 			})
 
-			s.ErrorIs(k.del(id, Scope{WorkspaceID: wsID}, mc), ErrOutOfScope)
+			s.ErrorIs(errOf(k.del(id, Scope{WorkspaceID: wsID}, mc)), ErrOutOfScope)
 			mc.AssertNotCalled(s.T(), "DeleteEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything)
 		})
 
@@ -180,7 +180,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: wsID,
 			})
 
-			err := k.del(id, Scope{WorkspaceID: wsID}, mc)
+			_, err := k.del(id, Scope{WorkspaceID: wsID}, mc)
 			s.ErrorIs(err, ErrOutOfScope)
 			s.Contains(err.Error(), id+" is a "+nounForObjectType(other)+", not a "+k.name)
 			mc.AssertNotCalled(s.T(), "DeleteEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything)
@@ -193,7 +193,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 			mc := new(astrov1_mocks.ClientWithResponsesInterface)
 			mockGetByID(mc, ctx.Organization, &astrov1.EnvironmentObject{Id: &id, ObjectKey: "K", ObjectType: k.objectType})
 
-			err := k.del(id, Scope{WorkspaceID: cuid.New()}, mc)
+			_, err := k.del(id, Scope{WorkspaceID: cuid.New()}, mc)
 			s.ErrorIs(err, ErrOutOfScope)
 			s.Contains(err.Error(), "did not say what kind of object "+id)
 			mc.AssertNotCalled(s.T(), "DeleteEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything)
@@ -251,7 +251,7 @@ func (s *Suite) TestLinkByIDOfADeploymentObjectExplainsLinkingIsWorkspaceOnly() 
 		Scope: astrov1.EnvironmentObjectScopeDEPLOYMENT, ScopeEntityId: ownerDep,
 	})
 
-	err := Link(LinkVariable, id, Scope{WorkspaceID: wsID}, target, nil, false, mc)
+	_, err := Link(LinkVariable, id, Scope{WorkspaceID: wsID}, target, nil, false, mc)
 	s.Error(err)
 	s.Contains(err.Error(), "only workspace-scoped objects can be linked")
 	s.NotContains(err.Error(), "pass --deployment")
@@ -269,7 +269,7 @@ func (s *Suite) TestLinkByIDOfAnotherWorkspacesObjectIsRefused() {
 		Scope: astrov1.EnvironmentObjectScopeWORKSPACE, ScopeEntityId: otherWS,
 	})
 
-	err := Link(LinkVariable, id, Scope{WorkspaceID: wsID}, target, nil, false, mc)
+	_, err := Link(LinkVariable, id, Scope{WorkspaceID: wsID}, target, nil, false, mc)
 	s.ErrorIs(err, ErrOutOfScope)
 	s.Contains(err.Error(), "--workspace "+otherWS)
 	mc.AssertNotCalled(s.T(), "UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)

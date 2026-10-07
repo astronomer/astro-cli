@@ -122,7 +122,7 @@ func newEnvConnDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete a connection",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEnvConnDelete(cmd, out, args[0])
+			return runEnvDelete(cmd, out, "connection", args[0], env.DeleteConn)
 		},
 	}
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
@@ -213,6 +213,10 @@ func runEnvConnSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
+	r, err := envRenderer(out)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
 
 	in, err := buildConnInput(cmd, idOrKey)
@@ -229,39 +233,15 @@ func runEnvConnSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 			if err != nil {
 				return err
 			}
-			printCreated(out, obj)
-			return nil
+			held := createdAsHeld(cmd.ErrOrStderr(), r, obj, scope, env.GetConn)
+			return renderEnvSet(r, held, true)
 		}
 		if errors.Is(err, env.ErrNotFound) && envConnNoCreate {
 			return setNotFound("connection", idOrKey, err)
 		}
 		return err
 	}
-	fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
-	return nil
-}
-
-func runEnvConnDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
-	if err != nil {
-		return err
-	}
-	cmd.SilenceUsage = true
-
-	if !envYes {
-		ok, err := confirmTTY(fmt.Sprintf("Delete connection %q?", idOrKey))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errAbortedDelete
-		}
-	}
-	if err := env.DeleteConn(idOrKey, scope, astroV1Client); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
-	return nil
+	return renderEnvSet(r, obj, false)
 }
 
 // connInputFromValue turns a whole connection — a URI or connection JSON —

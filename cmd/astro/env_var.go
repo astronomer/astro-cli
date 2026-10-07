@@ -65,7 +65,7 @@ func newEnvVarListCmd(out io.Writer) *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List environment variables",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvVarList(cmd, out, "")
+			return runEnvVarList(cmd, out, false)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &envOutput, formatDotenv)
@@ -77,11 +77,15 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 		Use:   "export",
 		Short: "Export environment variables as a .env file",
 		Long: "Write the scope's environment variables as KEY=VALUE lines. Secret values are\n" +
-			"left blank unless --include-secrets is set.",
+			"left blank unless --include-secrets is set. With -o json, the variables as\n" +
+			"`list -o json` prints them.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runEnvVarList(cmd, out, formatDotenv)
+			return runEnvVarList(cmd, out, true)
 		},
 	}
+	// dotenv is export's text, and is accepted by name as list and get
+	// accept it.
+	cliout.AddOutputFlag(cmd, &envOutput, formatDotenv)
 	return cmd
 }
 
@@ -134,24 +138,26 @@ func newEnvVarDeleteCmd(out io.Writer) *cobra.Command {
 		Short:   "Delete an environment variable",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runEnvVarDelete(cmd, out, args[0])
+			return runEnvDelete(cmd, out, "environment variable", args[0], env.DeleteVar)
 		},
 	}
 	cmd.Flags().BoolVarP(&envYes, "yes", "y", false, "Skip confirmation prompt")
 	return cmd
 }
 
-func runEnvVarList(cmd *cobra.Command, out io.Writer, formatOverride cliout.Format) error {
+// runEnvVarList is `variable list`, and `variable export`, whose text is the
+// dotenv file and whose json is the list's: the same variables, as data.
+func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 	scope, err := envScope()
 	if err != nil {
 		return err
 	}
-	f := formatOverride
-	if f == "" {
-		f, err = cliout.ParseFormat(envOutput, formatDotenv)
-		if err != nil {
-			return err
-		}
+	f, err := cliout.ParseFormat(envOutput, formatDotenv)
+	if err != nil {
+		return err
+	}
+	if export && f == cliout.FormatText {
+		f = formatDotenv
 	}
 	cmd.SilenceUsage = true
 
@@ -194,12 +200,20 @@ func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	r, err := envRenderer(out)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
-	return runFromFileSet(out, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, env.CreateVar, env.UpdateVar)
+	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateVar, env.UpdateVar, env.GetVar})
 }
 
 func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	scope, err := envScope()
+	if err != nil {
+		return err
+	}
+	r, err := envRenderer(out)
 	if err != nil {
 		return err
 	}
@@ -221,7 +235,10 @@ func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 			if err != nil {
 				return err
 			}
-			printCreated(out, obj)
+			held := createdAsHeld(cmd.ErrOrStderr(), r, obj, scope, env.GetVar)
+			if err := renderEnvSet(r, held, true); err != nil {
+				return err
+			}
 			printPickupNoteIfItReachesDeployments(cmd.ErrOrStderr(), scope, obj)
 			return nil
 		}
@@ -230,7 +247,9 @@ func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 		}
 		return err
 	}
-	fmt.Fprintf(out, "Updated %s\n", obj.ObjectKey)
+	if err := renderEnvSet(r, obj, false); err != nil {
+		return err
+	}
 	printPickupNoteIfItReachesDeployments(cmd.ErrOrStderr(), scope, obj)
 	return nil
 }
@@ -243,27 +262,4 @@ func printPickupNoteIfItReachesDeployments(w io.Writer, scope env.Scope, obj *as
 	if scope.DeploymentID != "" || autoLinked || linked {
 		fmt.Fprintln(w, deploymentPickupNote)
 	}
-}
-
-func runEnvVarDelete(cmd *cobra.Command, out io.Writer, idOrKey string) error {
-	scope, err := envScope()
-	if err != nil {
-		return err
-	}
-	cmd.SilenceUsage = true
-
-	if !envYes {
-		ok, err := confirmTTY(fmt.Sprintf("Delete environment variable %q?", idOrKey))
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errAbortedDelete
-		}
-	}
-	if err := env.DeleteVar(idOrKey, scope, astroV1Client); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Deleted %s\n", idOrKey)
-	return nil
 }

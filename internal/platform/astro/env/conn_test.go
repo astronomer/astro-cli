@@ -63,6 +63,6 @@ func (s *Suite) TestDeleteConn() {
 		HTTPResponse: &http.Response{StatusCode: 204},
 	}, nil).Once()
 
-	s.NoError(DeleteConn(id, Scope{WorkspaceID: workspaceID}, mc))
+	s.NoError(errOf(DeleteConn(id, Scope{WorkspaceID: workspaceID}, mc)))
 	mc.AssertExpectations(s.T())
 }

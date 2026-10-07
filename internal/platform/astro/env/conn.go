@@ -182,7 +182,7 @@ func patchConn(in ConnInput, current *astrov1.EnvironmentObjectConnection) *astr
 	return req
 }
 
-// DeleteConn deletes a connection by ID or key.
-func DeleteConn(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) error {
+// DeleteConn deletes a connection by ID or key, and returns it as it was.
+func DeleteConn(idOrKey string, scope Scope, astroV1Client astrov1.APIClient) (*astrov1.EnvironmentObject, error) {
 	return deleteObject(idOrKey, scope, objectTypeConn, astroV1Client)
 }

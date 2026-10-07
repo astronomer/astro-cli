@@ -112,6 +112,12 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "env-object", Value: env.ObjectInfo{}},
 	{Name: "env-variable-link-list", Value: env.VarLinksReport{}},
 	{Name: "env-link-list", Value: env.LinksReport{}},
+	// The writes publish those same shapes: a `set` the object as it now
+	// is and a `delete` the object as it was (env-object), a `link set` or
+	// `link delete` the links as it left them (the two link reports), and
+	// `variable export` the variable list. `set --from-file` is the one of
+	// its own: what it did with each key of the file.
+	{Name: "env-set-from-file", Value: env.SetFromFileResult{}},
 
 	// astro deploy --output json, in a project with a manifest: the one
 	// object a finished deploy prints.
@@ -177,17 +183,18 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Forty shapes reach Emit in this package's tests today:
+// would be silent. Forty-one shapes reach Emit in this package's tests today:
 // the deployment variable and token results, the deployment, workspace and
 // organization user and team results, the workspace and organization token
-// results, the pkg/output lists and the `astro env` payloads their tests
-// reach, the manifest deploy's result, deployment inspect's deployment
-// (which create and update publish too), delete's removal, hibernate's
-// override, the worker-queue result, the log entry, the Workspace a create,
-// update or switch publishes and what a Workspace delete did, what an
-// Organization switch left current, the role list, and the error object.
+// results, the pkg/output lists and the `astro env` payloads (reads and
+// writes) their tests reach, the manifest deploy's result, deployment
+// inspect's deployment (which create and update publish too), delete's
+// removal, hibernate's override, the worker-queue result, the log entry,
+// the Workspace a create, update or switch publishes and what a Workspace
+// delete did, what an Organization switch left current, the role list, and
+// the error object.
 // Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 40
+const minWatchedPayloads = 41
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

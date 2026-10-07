@@ -156,6 +156,10 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	r, err := envRenderer(out)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
@@ -163,27 +167,25 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	if envLinkExclude {
-		if err := env.ExcludeVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
+		report, err := env.ExcludeVar(idOrKey, scope, envLinkDeploymentID, cmd.ErrOrStderr(), astroV1Client)
+		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "Excluded %s from deployment %s\n", idOrKey, envLinkDeploymentID)
-		fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
-		return nil
+		return linkChanged(cmd, r, report, fmt.Sprintf("Excluded %s from deployment %s", idOrKey, envLinkDeploymentID))
 	}
 	var override *string
 	if cmd.Flags().Changed("value") {
 		override = &envLinkValue
 	}
-	if err := env.LinkVar(idOrKey, scope, envLinkDeploymentID, override, envLinkNoCreate, astroV1Client); err != nil {
+	report, err := env.LinkVar(idOrKey, scope, envLinkDeploymentID, override, envLinkNoCreate, astroV1Client)
+	if err != nil {
 		return err
 	}
+	line := fmt.Sprintf("Linked %s to deployment %s (no override)", idOrKey, envLinkDeploymentID)
 	if override != nil {
-		fmt.Fprintf(out, "Linked %s to deployment %s (override value applied)\n", idOrKey, envLinkDeploymentID)
-	} else {
-		fmt.Fprintf(out, "Linked %s to deployment %s (no override)\n", idOrKey, envLinkDeploymentID)
+		line = fmt.Sprintf("Linked %s to deployment %s (override value applied)", idOrKey, envLinkDeploymentID)
 	}
-	fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
-	return nil
+	return linkChanged(cmd, r, report, line)
 }
 
 func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
@@ -191,6 +193,10 @@ func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	r, err := envRenderer(out)
+	if err != nil {
+		return err
+	}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
@@ -198,19 +204,17 @@ func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	if envLinkExclude {
-		if err := env.UnexcludeVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
+		report, err := env.UnexcludeVar(idOrKey, scope, envLinkDeploymentID, astroV1Client)
+		if err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "Removed exclude on %s for deployment %s\n", idOrKey, envLinkDeploymentID)
-		fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
-		return nil
+		return linkChanged(cmd, r, report, fmt.Sprintf("Removed exclude on %s for deployment %s", idOrKey, envLinkDeploymentID))
 	}
-	if err := env.UnlinkVar(idOrKey, scope, envLinkDeploymentID, astroV1Client); err != nil {
+	report, err := env.UnlinkVar(idOrKey, scope, envLinkDeploymentID, astroV1Client)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Unlinked %s from deployment %s\n", idOrKey, envLinkDeploymentID)
-	fmt.Fprintln(cmd.ErrOrStderr(), deploymentPickupNote)
-	return nil
+	return linkChanged(cmd, r, report, fmt.Sprintf("Unlinked %s from deployment %s", idOrKey, envLinkDeploymentID))
 }
 
 func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {

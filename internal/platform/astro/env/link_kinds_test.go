@@ -86,8 +86,8 @@ func (s *Suite) TestLinkConnEchoesTheWholeConnection() {
 	s.mockGet(mc, connObj(id, nil))
 	got := s.mockUpdate(mc, id)
 
-	s.NoError(Link(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, depID,
-		&LinkOverride{Connection: &ConnOverride{Host: ptr("db.prod"), Port: ptr(6432)}}, false, mc))
+	s.NoError(errOf(Link(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, depID,
+		&LinkOverride{Connection: &ConnOverride{Host: ptr("db.prod"), Port: ptr(6432)}}, false, mc)))
 	mc.AssertExpectations(s.T())
 
 	c := got.Connection
@@ -125,8 +125,8 @@ func (s *Suite) TestLinkConnUnsetsWhatTheNewOverrideOmits() {
 	s.mockGet(mc, connObj(id, []astrov1.EnvironmentObjectLink{existing}))
 	got := s.mockUpdate(mc, id)
 
-	s.NoError(Link(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, depID,
-		&LinkOverride{Connection: &ConnOverride{Host: ptr("db.new")}}, true, mc))
+	s.NoError(errOf(Link(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, depID,
+		&LinkOverride{Connection: &ConnOverride{Host: ptr("db.new")}}, true, mc)))
 	mc.AssertExpectations(s.T())
 
 	o := (*got.Links)[0].Overrides
@@ -148,7 +148,7 @@ func (s *Suite) TestLinkConnRoundTripsOtherLinksOverrides() {
 	}}))
 	got := s.mockUpdate(mc, id)
 
-	s.NoError(Link(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc))
+	s.NoError(errOf(Link(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc)))
 	mc.AssertExpectations(s.T())
 
 	s.Require().Len(*got.Links, 2)
@@ -206,7 +206,7 @@ func (s *Suite) TestLinkAirflowVar() {
 		s.mockGet(mc, airflowVarObj(id, "us-east-1", nil))
 		got := s.mockUpdate(mc, id)
 
-		s.NoError(Link(LinkAirflowVariable, "region", Scope{WorkspaceID: cuid.New()}, depID, &LinkOverride{Value: ptr("eu-west-1")}, false, mc))
+		s.NoError(errOf(Link(LinkAirflowVariable, "region", Scope{WorkspaceID: cuid.New()}, depID, &LinkOverride{Value: ptr("eu-west-1")}, false, mc)))
 		mc.AssertExpectations(s.T())
 		s.Equal("us-east-1", *got.AirflowVariable.Value)
 		s.Equal("eu-west-1", *(*got.Links)[0].Overrides.AirflowVariable.Value)
@@ -221,7 +221,7 @@ func (s *Suite) TestLinkAirflowVar() {
 		}}))
 		got := s.mockUpdate(mc, id)
 
-		s.NoError(Link(LinkAirflowVariable, "region", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc))
+		s.NoError(errOf(Link(LinkAirflowVariable, "region", Scope{WorkspaceID: cuid.New()}, depID, nil, false, mc)))
 		mc.AssertExpectations(s.T())
 		o := (*got.Links)[0].Overrides
 		s.Nil(o.AirflowVariable)
@@ -235,7 +235,7 @@ func (s *Suite) TestUnlinkNamesTheKind() {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	s.mockGet(mc, connObj(cuid.New(), nil))
 
-	err := Unlink(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, cuid.New(), mc)
+	_, err := Unlink(LinkConnection, "db", Scope{WorkspaceID: cuid.New()}, cuid.New(), mc)
 	s.ErrorContains(err, `connection "db" is not linked`)
 	mc.AssertExpectations(s.T())
 }
