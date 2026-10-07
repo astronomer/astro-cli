@@ -281,7 +281,7 @@ func envKinds() []envKind {
 		{
 			aliases: []string{"conn", "connections"},
 			kind:    localenv.KindConn,
-			arg:     "<id>",
+			arg:     "<CONN_ID>",
 			article: "a",
 			label:   "connection",
 			example: `
@@ -303,7 +303,7 @@ func envKinds() []envKind {
 		{
 			aliases: []string{"airflow-var", "airflow-vars", "airflow-variables"},
 			kind:    localenv.KindVar,
-			arg:     "<key>",
+			arg:     "<KEY>",
 			article: "an",
 			label:   "Airflow variable",
 			example: `
@@ -373,15 +373,30 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		"auto-linked to every project instead. Updating an existing global keeps its links.\n" +
 		"A global goes to the Airflow of every project it reaches, whether or not the\n" +
 		"project declares it."
+	cmdLine, name := "astro local env "+localenv.Noun(k.kind)+" set", exampleName(k.kind)
+	example := `  # Set it, typing the value at a prompt with echo off
+  ` + cmdLine + ` ` + name + `
+
+  # Read the value from a pipe instead
+  echo "$VALUE" | ` + cmdLine + ` ` + name + ` --stdin
+
+  # Create a global that reaches every project
+  ` + cmdLine + ` ` + name + ` --global --auto-link`
 	if k.kind == localenv.KindConn {
 		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type,\n" +
 			"--host and the rest."
+		example = `  # Set it from a URI
+  ` + cmdLine + ` ` + name + ` --value 'postgres://admin@db.example.com:5432/warehouse'
+
+  # Field by field, with the password piped
+  echo "$PASSWORD" | ` + cmdLine + ` ` + name + ` --stdin --type postgres --host db.example.com --login admin`
 	}
 	cmd := &cobra.Command{
-		Use:   "set " + k.arg,
-		Short: "Set " + k.article + " " + k.label,
-		Long:  long,
-		Args:  cobra.ExactArgs(1),
+		Use:     "set " + k.arg,
+		Short:   "Set " + k.article + " " + k.label,
+		Long:    long,
+		Example: example,
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := readStoreFlags(cmd, scope); err != nil {
 				return err
@@ -503,7 +518,11 @@ func newEnvGetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get " + k.arg,
 		Short: "Show " + k.article + " " + k.label + " and where it resolves from",
-		Args:  cobra.ExactArgs(1),
+		Example: "  # Show its value and where it resolves from\n" +
+			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + "\n\n" +
+			"  # The global value, rather than the project's\n" +
+			"  astro local env " + localenv.Noun(k.kind) + " get " + exampleName(k.kind) + " --global",
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := readStoreFlags(cmd, scope); err != nil {
 				return err
@@ -528,6 +547,10 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 			"will accept. --undeclare also removes the declaration, as undeclare does.\n" +
 			"With --global it removes it only from the current project's pyproject.toml,\n" +
 			"and refuses outside a project.",
+		Example: "  # Delete its value\n" +
+			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + "\n\n" +
+			"  # Also remove its declaration from pyproject.toml\n" +
+			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + " --undeclare",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := readStoreFlags(cmd, scope); err != nil {
@@ -551,6 +574,10 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 	// Only the cross-kind list gets a Long, matching `astro env list`; a
 	// noun's own list says all it needs in its Short.
 	long := ""
+	cmdLine := "astro local env list"
+	if only != "" {
+		cmdLine = "astro local env " + localenv.Noun(only) + " list"
+	}
 	if only == "" {
 		long = "List every declared value and where it resolves from, and every undeclared\n" +
 			"value a start passes to this project anyway. Whatever reaches a project goes\n" +
@@ -563,7 +590,11 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		Aliases: []string{"ls"},
 		Short:   short,
 		Long:    long,
-		Args:    cobra.NoArgs,
+		Example: "  # " + short + "\n" +
+			"  " + cmdLine + "\n\n" +
+			"  # Also every known project's .env, and globals not linked to this project\n" +
+			"  " + cmdLine + " --all",
+		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runEnvList(scope, all, only)
 		},

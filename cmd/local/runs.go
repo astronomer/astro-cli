@@ -87,6 +87,11 @@ func newRunsListCmd(q *query) *cobra.Command {
 		Short: "List runs, most recent first",
 		Long:  "List runs, most recent first: those of one DAG when it is named, every DAG's otherwise.",
 		Args:  cobra.MaximumNArgs(1),
+		Example: afExample(q.t,
+			"The latest runs of every DAG", "runs list",
+			"The failed runs of one DAG", "runs list <DAG_ID> -s failed",
+			"Runs that started on or after a time", "runs list --start-date-gte 2026-01-01T00:00:00Z",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dagID, err := dagIDArg(args, opts.dagID)
 			if err != nil {
@@ -169,6 +174,9 @@ func newRunsGetCmd(q *query) *cobra.Command {
 		Use:   "get <DAG_ID> <RUN_ID>",
 		Short: "Show one run's state, timing, and configuration",
 		Args:  cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"Show one run", "runs get <DAG_ID> <RUN_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsGet(cmd.Context(), args[0], args[1])
 		},
@@ -187,6 +195,9 @@ func newRunsTasksCmd(q *query) *cobra.Command {
 		Use:   "tasks <DAG_ID> <RUN_ID>",
 		Short: "List what each task in a run did, and how it ended",
 		Args:  cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"List what each task in a run did", "runs tasks <DAG_ID> <RUN_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsTasks(cmd.Context(), args[0], args[1], f)
 		},
@@ -313,6 +324,11 @@ func newRunsTriggerCmd(q *query) *cobra.Command {
 			"scheduled and the command would look like it worked. The unpause is announced on stderr; pass " +
 			"--no-auto-unpause to fail instead.",
 		Args: cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Start a run, unpausing the DAG if it is paused", "runs trigger <DAG_ID>",
+			"With a run configuration", "runs trigger <DAG_ID> --conf '{\"date\": \"2026-01-01\"}'",
+			"Fail instead of unpausing a paused DAG", "runs trigger <DAG_ID> --no-auto-unpause",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			trigger, err := opts.options()
 			if err != nil {
@@ -398,6 +414,10 @@ func newRunsDeleteCmd(q *query) *cobra.Command {
 		Short: "Delete a run and its task instances",
 		Long:  "Delete a run and everything Airflow recorded about it. This cannot be undone.",
 		Args:  cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"Delete a run, after a confirmation prompt", "runs delete <DAG_ID> <RUN_ID>",
+			"Without the prompt", "runs delete <DAG_ID> <RUN_ID> --yes",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsDelete(cmd.Context(), args[0], args[1], yes)
 		},
@@ -443,6 +463,10 @@ func newRunsClearCmd(q *query) *cobra.Command {
 		Long: "Reset a run's task instances so the scheduler runs them again. Pass --dry-run to see what would " +
 			"be cleared without clearing it.",
 		Args: cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"See what clearing a run would reset, and change nothing", "runs clear <DAG_ID> <RUN_ID> --dry-run",
+			"Clear it without the prompt", "runs clear <DAG_ID> <RUN_ID> --yes",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsClear(cmd.Context(), args[0], args[1], opts.dryRun, opts.yes)
 		},

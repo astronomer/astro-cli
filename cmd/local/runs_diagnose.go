@@ -20,6 +20,9 @@ func newRunsDiagnoseCmd(q *query) *cobra.Command {
 			"did not succeed.\n\nThe run is the part the command cannot do without, so a run Airflow does not " +
 			"know fails the command. A task listing that fails is reported in its place, beside the run.",
 		Args: cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"Find out why a run did not succeed", "runs diagnose <DAG_ID> <RUN_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runRunsDiagnose(cmd.Context(), args[0], args[1])
 		},

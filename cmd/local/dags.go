@@ -96,6 +96,11 @@ func newDagsListCmd(q *query) *cobra.Command {
 		Use:   "list",
 		Short: "List the DAGs on this Airflow",
 		Args:  cobra.NoArgs,
+		Example: afExample(q.t,
+			"List the DAGs", "dags list",
+			"Only the paused ones, as JSON", "dags list --paused -o json",
+			"Only the DAGs tagged etl", "dags list -t etl",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			o := airflowapi.ListDAGsOptions{
 				ListOptions:  list.options(),
@@ -173,6 +178,9 @@ func newDagsGetCmd(q *query) *cobra.Command {
 		Use:   "get <DAG_ID>",
 		Short: "Show one DAG's schedule, owners, tags, and file",
 		Args:  cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Show one DAG", "dags get <DAG_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsGet(cmd.Context(), args[0])
 		},
@@ -216,6 +224,9 @@ func newDagsSourceCmd(q *query) *cobra.Command {
 		Long: "Print the Python source Airflow parsed for this DAG. It comes from that Airflow, not from your " +
 			"checkout, so it is what is actually running there.",
 		Args: cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Print the source Airflow parsed for a DAG", "dags source <DAG_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsSource(cmd.Context(), args[0])
 		},
@@ -253,6 +264,10 @@ func newDagsStatsCmd(q *query) *cobra.Command {
 			"named it covers every DAG, which on Airflow 2 means listing the DAGs first because that generation " +
 			"refuses the endpoint without ids.",
 		Args: cobra.ArbitraryArgs,
+		Example: afExample(q.t,
+			"Count every DAG's runs by state", "dags stats",
+			"Only these two DAGs", "dags stats <DAG_ID> <OTHER_DAG_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsStats(cmd.Context(), slices.Compact(slices.Sorted(slices.Values(append(dagIDs, args...)))))
 		},
@@ -354,6 +369,9 @@ func newDagsPauseCmd(q *query) *cobra.Command {
 		Use:   "pause <DAG_ID>",
 		Short: "Stop the scheduler from creating new runs of a DAG",
 		Args:  cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Stop the scheduler from creating runs of a DAG", "dags pause <DAG_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runSetPaused(cmd.Context(), args[0], (*airflowapi.Client).PauseDAG)
 		},
@@ -365,6 +383,9 @@ func newDagsUnpauseCmd(q *query) *cobra.Command {
 		Use:   "unpause <DAG_ID>",
 		Short: "Let the scheduler create runs of a DAG again",
 		Args:  cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Let the scheduler create runs of a DAG again", "dags unpause <DAG_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runSetPaused(cmd.Context(), args[0], (*airflowapi.Client).UnpauseDAG)
 		},

@@ -44,7 +44,7 @@ import (
 func newAPICmd(c *cli) *cobra.Command {
 	var opts apiOptions
 	cmd := &cobra.Command{
-		Use:   "api <endpoint>",
+		Use:   "api <ENDPOINT>",
 		Short: "Make one request to this machine's Airflow API",
 		Long: "Send a request to the Airflow running on this machine and print what it sent back, unchanged.\n\n" +
 			"The endpoint is a path relative to the API base, so `/dags` (or `dags`) reaches /api/v2/dags on " +
@@ -251,7 +251,7 @@ func newAPIListCmd(c *cli) *cobra.Command {
 	var filterFlag string
 	var verbose bool
 	cmd := &cobra.Command{
-		Use:     "ls [filter]",
+		Use:     "ls [FILTER]",
 		Aliases: []string{"list"},
 		Short:   "List the endpoints this machine's Airflow serves",
 		Long: "List the API endpoints the Airflow running on this machine serves, read from its own OpenAPI " +

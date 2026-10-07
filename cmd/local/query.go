@@ -50,6 +50,20 @@ type target interface {
 	open(ctx context.Context, c *cli) (*airflowapi.Client, error)
 }
 
+// afExample spells a leaf's Example for the surface t is registered on, so
+// `astro af` and `astro local af` each show their own command line. Its
+// arguments alternate: a comment, then the command as it follows `af`.
+func afExample(t target, pairs ...string) string {
+	var b strings.Builder
+	for i := 0; i+1 < len(pairs); i += 2 {
+		if i > 0 {
+			b.WriteString("\n\n")
+		}
+		b.WriteString("  # " + pairs[i] + "\n  " + t.suggest(pairs[i+1]))
+	}
+	return b.String()
+}
+
 // deploymentTarget is the top-level registration: whichever deployment the
 // resolution rule picks.
 type deploymentTarget struct {

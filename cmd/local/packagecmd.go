@@ -24,7 +24,7 @@ import (
 // default: a deployable image runs on Astro's linux/amd64 nodes, not the host.
 const defaultPackagePlatform = "linux/amd64"
 
-// NewPackageCmd builds `astro package [target]` for a root to mount. It reads
+// NewPackageCmd builds `astro package [TARGET]` for a root to mount. It reads
 // the manifest and the project files, needs no account and no deployment link,
 // and touches the network only to pull a base image — the CI build stage
 // (docs/deploy.md, section 4). The astro, mwaa and composer targets build;
@@ -46,12 +46,16 @@ func newPackageCmd(c *cli) *cobra.Command {
 		buildSecrets []string
 	}
 	cmd := &cobra.Command{
-		Use:   "package [target]",
-		Short: "Build the deployable artifact for an Airflow platform without shipping it",
+		Use:   "package [TARGET]",
+		Short: "Build a platform's deployable artifact without shipping it",
 		Long: "Build the artifact a given Airflow platform consumes — for CI, or to hand a\n" +
 			"prebuilt image to `astro deploy --image-name`. TARGET is astro (the default),\n" +
 			"mwaa, composer, or oss. astro builds an image; mwaa and composer build a\n" +
 			"bucket-shaped directory; only oss is not built yet.",
+		Example: "  # Build the image Astro runs\n" +
+			"  astro package\n\n" +
+			"  # Build the bucket layout MWAA reads, and also write it to a zip\n" +
+			"  astro package mwaa --save dist/mwaa.zip",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := pack.TargetAstro

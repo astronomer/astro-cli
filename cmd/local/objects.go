@@ -109,6 +109,9 @@ func newConnectionsListCmd(q *query) *cobra.Command {
 		Use:   "list",
 		Short: "List the connections on this Airflow",
 		Args:  cobra.NoArgs,
+		Example: afExample(q.t,
+			"List the connections", "connections list",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runConnectionsList(cmd.Context(), list.options())
 		},
@@ -146,6 +149,9 @@ func newConnectionsGetCmd(q *query) *cobra.Command {
 		Use:   "get <CONN_ID>",
 		Short: "Show one connection, without its password",
 		Args:  cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Show one connection, without its password", "connections get <CONN_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runConnectionsGet(cmd.Context(), args[0])
 		},
@@ -213,6 +219,9 @@ func newVariablesListCmd(q *query) *cobra.Command {
 		Use:   "list",
 		Short: "List the Variable keys on this Airflow, without their values",
 		Args:  cobra.NoArgs,
+		Example: afExample(q.t,
+			"List the Variable keys", "variables list",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runVariablesList(cmd.Context(), list.options())
 		},
@@ -252,6 +261,9 @@ func newVariablesGetCmd(q *query) *cobra.Command {
 		Long: "Print one Variable's value. Airflow masks the values of Variables whose keys look sensitive, and " +
 			"what comes back is whatever it sent.",
 		Args: cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Print one Variable's value", "variables get <KEY>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runVariablesGet(cmd.Context(), args[0])
 		},
@@ -332,6 +344,9 @@ func newPoolsListCmd(q *query) *cobra.Command {
 		Use:   "list",
 		Short: "List the pools on this Airflow",
 		Args:  cobra.NoArgs,
+		Example: afExample(q.t,
+			"List the pools and their slots", "pools list",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runPoolsList(cmd.Context(), list.options())
 		},
@@ -371,6 +386,9 @@ func newPoolsGetCmd(q *query) *cobra.Command {
 		Use:   "get <NAME>",
 		Short: "Show one pool's slots and how they are used",
 		Args:  cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Show one pool", "pools get <NAME>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runPoolsGet(cmd.Context(), args[0])
 		},

@@ -29,11 +29,15 @@ func NewInitCmd(d Deps) *cobra.Command {
 func newInitCmd(c *cli) *cobra.Command {
 	var opts scaffold.Options
 	cmd := &cobra.Command{
-		Use:   "init [directory]",
+		Use:   "init [DIRECTORY]",
 		Short: "Make a directory an Astro project",
 		Long: "Create a pyproject.toml-based Astro project in the given directory (default: the current one).\n\n" +
 			"Run it in the Airflow repo you already have: a directory with no pyproject.toml is scaffolded, and one that has a pyproject.toml gains a [tool.astro] section, leaving the rest of the file alone.\n\n" +
 			"Files already there are kept. What init found but could not carry over — a requirements.txt, a Dockerfile — is listed at the end, to move across by hand.",
+		Example: "  # Make the current directory an Astro project\n" +
+			"  astro init\n\n" +
+			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
+			"  astro init my-project --airflow-version 3.1",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."

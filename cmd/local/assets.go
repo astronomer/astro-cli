@@ -65,6 +65,10 @@ func newAssetsListCmd(q *query) *cobra.Command {
 		Use:   "list",
 		Short: "List the assets this Airflow tracks",
 		Args:  cobra.NoArgs,
+		Example: afExample(q.t,
+			"List the assets", "assets list",
+			"Only those whose URI contains s3://", "assets list --uri-pattern s3://",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runAssetsList(cmd.Context(), airflowapi.ListAssetsOptions{
 				ListOptions: list.options(),
@@ -116,6 +120,10 @@ func newAssetsEventsCmd(q *query) *cobra.Command {
 		Long: "List the events that updated an asset. An event is what a task wrote, and it is what starts the " +
 			"DAGs scheduled on that asset — so this is the answer to why a data-aware DAG ran.",
 		Args: cobra.NoArgs,
+		Example: afExample(q.t,
+			"List the latest asset updates", "assets events",
+			"Only the updates one DAG produced", "assets events --dag-id <DAG_ID>",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runAssetsEvents(cmd.Context(), airflowapi.ListAssetEventsOptions{
 				ListOptions:  list.options(),
@@ -187,6 +195,9 @@ func newAssetsTriggersCmd(q *query) *cobra.Command {
 		Long: "List the asset events a run was waiting on: the updates that made the scheduler start this run of " +
 			"a data-aware DAG. A run the schedule or a person started lists none.",
 		Args: cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"List the asset updates that started a run", "assets triggers <DAG_ID> <RUN_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runAssetsTriggers(cmd.Context(), args[0], args[1])
 		},

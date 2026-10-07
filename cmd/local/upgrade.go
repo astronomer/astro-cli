@@ -64,7 +64,7 @@ func newUpgradeCmd(c *cli) *cobra.Command {
 func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 	var withOtto bool
 	cmd := &cobra.Command{
-		Use:   "airflow [version]",
+		Use:   "airflow [VERSION]",
 		Short: "Move this project to a new Airflow version",
 		Long: "Set this project's Airflow version in pyproject.toml: the apache-airflow requirement,\n" +
 			"plus requires-python and the runtime pin when they have to move. With no version, use the\n" +
@@ -72,8 +72,13 @@ func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 			"moves an Airflow 2 project to Airflow 3. It says when Airflow 3 is available.\n\n" +
 			"Dag code, providers and a declared Dockerfile are not changed. If Airflow is running,\n" +
 			"restart it afterwards.",
-		Example: "  astro local upgrade airflow\n  astro local upgrade airflow 3.1\n  astro local upgrade airflow --with-otto",
-		Args:    cobra.MaximumNArgs(1),
+		Example: "  # Move to the newest Airflow in the project's generation\n" +
+			"  astro local upgrade airflow\n\n" +
+			"  # Move to a given version\n" +
+			"  astro local upgrade airflow 3.1\n\n" +
+			"  # Upgrade, then start Otto to update the DAGs and providers for it\n" +
+			"  astro local upgrade airflow --with-otto",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := ""
 			if len(args) == 1 {

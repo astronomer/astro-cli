@@ -117,6 +117,9 @@ func newTasksListCmd(q *query) *cobra.Command {
 		Use:   "list <DAG_ID>",
 		Short: "List the tasks a DAG defines",
 		Args:  cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"List the tasks a DAG defines", "tasks list <DAG_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksList(cmd.Context(), args[0])
 		},
@@ -149,6 +152,9 @@ func newTasksGetCmd(q *query) *cobra.Command {
 		Use:   "get <DAG_ID> <TASK_ID>",
 		Short: "Show one task's definition",
 		Args:  cobra.ExactArgs(2),
+		Example: afExample(q.t,
+			"Show one task's definition", "tasks get <DAG_ID> <TASK_ID>",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksGet(cmd.Context(), args[0], args[1])
 		},
@@ -193,6 +199,10 @@ func newTasksInstanceCmd(q *query) *cobra.Command {
 		Use:   "instance <DAG_ID> <RUN_ID> <TASK_ID>",
 		Short: "Show what one run of a task did",
 		Args:  cobra.ExactArgs(taskInstanceArgs),
+		Example: afExample(q.t,
+			"Show what a task did in one run", "tasks instance <DAG_ID> <RUN_ID> <TASK_ID>",
+			"One expansion of a mapped task", "tasks instance <DAG_ID> <RUN_ID> <TASK_ID> --map-index 2",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksInstance(cmd.Context(), args[0], args[1], args[2], mapIndex)
 		},
@@ -287,6 +297,10 @@ func newTasksLogsCmd(q *query) *cobra.Command {
 			"Airflow sent it: Airflow 3 serves structured entries and Airflow 2 serves one string, and neither " +
 			"is reshaped here.",
 		Args: cobra.ExactArgs(taskInstanceArgs),
+		Example: afExample(q.t,
+			"Print the log of a task's first try", "tasks logs <DAG_ID> <RUN_ID> <TASK_ID>",
+			"The log of its second try", "tasks logs <DAG_ID> <RUN_ID> <TASK_ID> --try 2",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.try < 1 {
 				return fmt.Errorf("--try counts attempts from 1, so %d is not one", opts.try)
@@ -359,6 +373,10 @@ func newTasksClearCmd(q *query) *cobra.Command {
 			"which is what makes the scheduler pick the cleared tasks up; without it a run in a terminal state " +
 			"keeps it and the tasks never start. --no-reset-dagruns leaves the run's state alone.",
 		Args: cobra.MinimumNArgs(taskInstanceArgs),
+		Example: afExample(q.t,
+			"See what clearing a task would reset, and change nothing", "tasks clear <DAG_ID> <RUN_ID> <TASK_ID> --dry-run",
+			"Clear a task and everything downstream of it, without the prompt", "tasks clear <DAG_ID> <RUN_ID> <TASK_ID> --downstream --yes",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksClear(cmd.Context(), args[0], airflowapi.ClearTaskInstancesOptions{
 				DAGRunID:          args[1],

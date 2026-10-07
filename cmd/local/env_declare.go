@@ -104,11 +104,24 @@ func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	long += "\n\n--source workspace resolves the name from the workspace's Environment Manager\n" +
 		"when no local file sets it. A name with a default cannot resolve from the\n" +
 		"workspace."
+	cmdLine := "astro local env " + localenv.Noun(k.kind) + " declare " + exampleName(k.kind)
+	example := "  # Require it at start, with a note for whoever supplies it\n" +
+		"  " + cmdLine + " --description 'Ask the data team for it'\n\n"
+	if k.kind == localenv.KindConn {
+		example += "  # Expect a Postgres connection\n" +
+			"  " + cmdLine + " --type postgres\n\n"
+	} else {
+		example += "  # Keep its value only in the vault\n" +
+			"  " + cmdLine + " --secret\n\n"
+	}
+	example += "  # Resolve it from the workspace when no local file sets it\n" +
+		"  " + cmdLine + " --source workspace"
 	cmd := &cobra.Command{
-		Use:   "declare " + k.arg,
-		Short: "Declare " + k.article + " " + k.label + " in pyproject.toml",
-		Long:  long,
-		Args:  cobra.ExactArgs(1),
+		Use:     "declare " + k.arg,
+		Short:   "Declare " + k.article + " " + k.label + " in pyproject.toml",
+		Long:    long,
+		Example: example,
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return c.runEnvDeclare(cmd, scope, in, k.kind, args[0])
 		},
@@ -136,6 +149,8 @@ func newEnvUndeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Short: "Remove " + k.article + " " + k.label + "'s declaration from pyproject.toml",
 		Long: "Remove " + k.article + " " + k.label + "'s declaration from the project's pyproject.toml.\n\n" +
 			"Values already set for it stay where they are: use delete to remove one.",
+		Example: "  # Remove the declaration, keeping any value already set\n" +
+			"  astro local env " + localenv.Noun(k.kind) + " undeclare " + exampleName(k.kind),
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			return c.runEnvUndeclare(scope, k.kind, args[0])

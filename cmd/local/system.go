@@ -36,6 +36,9 @@ func newVersionCmd(d Deps, t target) *cobra.Command {
 			Short: "Show an Airflow's version and API generation",
 			Long:  "Show the version " + t.which() + " reports, and which generation of its REST API this CLI talks to.",
 			Args:  cobra.NoArgs,
+			Example: afExample(t,
+				"Show the Airflow version", "version",
+			),
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				return q.runVersion(cmd.Context())
 			},
@@ -70,6 +73,9 @@ func newProvidersCmd(d Deps, t target) *cobra.Command {
 				"that Airflow actually has, which is the thing to check when a DAG imports a provider that the " +
 				"project pins one version of and the Airflow runs another.",
 			Args: cobra.NoArgs,
+			Example: afExample(t,
+				"List the installed providers and their versions", "providers",
+			),
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				return q.runProviders(cmd.Context())
 			},
@@ -123,6 +129,9 @@ func newPluginsCmd(d Deps, t target) *cobra.Command {
 			Long: "List the plugins " + t.which() + " loaded: where each came from, and what it adds — macros, " +
 				"listeners, timetables, UI views and apps. A plugin missing here did not load.",
 			Args: cobra.NoArgs,
+			Example: afExample(t,
+				"List the plugins Airflow loaded", "plugins",
+			),
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				return q.runPlugins(cmd.Context(), list.options())
 			},
@@ -182,6 +191,10 @@ func newConfigCmd(d Deps, t target) *cobra.Command {
 				"expose_config on Airflow 3, [webserver] expose_config on Airflow 2. Both default to off, and " +
 				"then this command is refused.",
 			Args: cobra.NoArgs,
+			Example: afExample(t,
+				"Show the whole configuration", "config",
+				"Only the scheduler section", "config --section scheduler",
+			),
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				return q.runConfig(cmd.Context(), section)
 			},

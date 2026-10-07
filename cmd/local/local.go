@@ -185,6 +185,12 @@ func newStartCmd(c *cli) *cobra.Command {
 		Long: "Start local Airflow for this project.\n\n" +
 			"A start waits up to five minutes for Airflow to answer. Set " +
 			"ASTRO_LOCAL_HEALTH_TIMEOUT to a Go duration (10m, 90s) to change that.",
+		Example: "  # Start Airflow for this project\n" +
+			"  astro local start\n\n" +
+			"  # In Docker rather than the default standalone mode\n" +
+			"  astro local start --docker\n\n" +
+			"  # On a port of your choosing\n" +
+			"  astro local start --port 8081",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			mode := localrt.Mode("")
@@ -521,7 +527,11 @@ func newStopCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   nameStop,
 		Short: "Stop local Airflow for this project",
-		Args:  cobra.NoArgs,
+		Example: "  # Stop Airflow for this project\n" +
+			"  astro local stop\n\n" +
+			"  # Also remove its derived runtime state\n" +
+			"  astro local stop --clean",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runStop(cmd.Context(), localrt.StopOptions{Force: opts.force, Clean: opts.clean})
 		},
@@ -568,7 +578,9 @@ func newRestartCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   nameRestart,
 		Short: "Restart local Airflow for this project",
-		Args:  cobra.NoArgs,
+		Example: "  # Stop and start Airflow for this project\n" +
+			"  astro local restart",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runRestart(cmd.Context(), force, allowMissing, buildSecrets)
 		},
@@ -665,7 +677,11 @@ func newStatusCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show the state of this project's local Airflow",
-		Args:  cobra.NoArgs,
+		Example: "  # Show whether Airflow is running\n" +
+			"  astro local status\n\n" +
+			"  # As JSON, for a script\n" +
+			"  astro local status -o json",
+		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runStatus()
 		},
@@ -737,7 +753,13 @@ func newListCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List every local Airflow known on this machine",
-		Args:  cobra.NoArgs,
+		Example: "  # List the local Airflows running on this machine\n" +
+			"  astro local list\n\n" +
+			"  # Include the stale records too\n" +
+			"  astro local list --all\n\n" +
+			"  # Remove the stale records\n" +
+			"  astro local list --clean",
+		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runList(opts.all, opts.clean)
 		},
@@ -902,7 +924,11 @@ func newLogsCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   nameLogs,
 		Short: "Show logs from this project's local Airflow",
-		Args:  cobra.NoArgs,
+		Example: "  # Show every log line so far\n" +
+			"  astro local logs\n\n" +
+			"  # Follow the scheduler's log, starting from its last 100 lines\n" +
+			"  astro local logs --component scheduler --tail 100 -f",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runLogs(cmd.Context(), opts.follow, opts.tail, opts.components)
 		},
@@ -944,9 +970,13 @@ func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []s
 func newRunCmd(c *cli) *cobra.Command {
 	var withWorkspace bool
 	cmd := &cobra.Command{
-		Use:   nameRun + " [command] [args...]",
+		Use:   nameRun + " <COMMAND> [ARGS...]",
 		Short: "Run a command inside this project's Airflow environment",
-		Args:  cobra.MinimumNArgs(1),
+		Example: "  # Run the tests in the project's environment\n" +
+			"  astro local run pytest\n\n" +
+			"  # Run an Airflow CLI command\n" +
+			"  astro local run airflow dags list",
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return c.runExec(cmd.Context(), args, withWorkspace)
 		},
@@ -1075,7 +1105,9 @@ func newShellCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "shell",
 		Short: "Open a shell inside this project's Airflow environment",
-		Args:  cobra.NoArgs,
+		Example: "  # Open a shell with the project's environment\n" +
+			"  astro local shell",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runShell(cmd.Context(), withWorkspace)
 		},
@@ -1102,7 +1134,11 @@ func newOpenCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "open",
 		Short: "Open this project's Airflow UI in the browser",
-		Args:  cobra.NoArgs,
+		Example: "  # Open the Airflow UI\n" +
+			"  astro local open\n\n" +
+			"  # Print its URL instead\n" +
+			"  astro local open --print",
+		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			return c.runOpen(printURL)
 		},
@@ -1150,7 +1186,11 @@ func newResetCmd(c *cli) *cobra.Command {
 		Use:   "reset",
 		Short: "Stop local Airflow and wipe its derived state",
 		Long:  "Stop this project's local Airflow and remove derived runtime state (database, logs, environment). The project itself is untouched.",
-		Args:  cobra.NoArgs,
+		Example: "  # Wipe the local database, logs, and environment, after a confirmation prompt\n" +
+			"  astro local reset\n\n" +
+			"  # Without the prompt\n" +
+			"  astro local reset --yes",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return c.runReset(cmd.Context(), yes)
 		},

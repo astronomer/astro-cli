@@ -28,6 +28,10 @@ func newDagsErrorsCmd(q *query) *cobra.Command {
 			"traceback it raised. A DAG missing from `dags list` is nearly always here.\n\nThe command succeeds " +
 			"whether or not there are errors; an empty listing is the good news.",
 		Args: cobra.NoArgs,
+		Example: afExample(q.t,
+			"List the DAG files that failed to parse", "dags errors",
+			"As JSON, tracebacks included", "dags errors -o json",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runDagsErrors(cmd.Context(), list.options())
 		},
@@ -92,6 +96,9 @@ func newDagsWarningsCmd(q *query) *cobra.Command {
 		Long: "List the DAG warnings on this Airflow: problems the scheduler noticed in DAGs that parsed, such as " +
 			"a pool that does not exist or a deprecated argument. Unlike import errors, these DAGs still run.",
 		Args: cobra.NoArgs,
+		Example: afExample(q.t,
+			"List what the scheduler warns about", "dags warnings",
+		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runDagsWarnings(cmd.Context(), list.options())
 		},
@@ -128,6 +135,10 @@ func newDagsExploreCmd(q *query) *cobra.Command {
 			"and one that fails is reported in its place rather than ending the command. It fails only when none " +
 			"of the three could be read, which is what a DAG id Airflow does not know looks like.",
 		Args: cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Read a DAG's definition, tasks, and source in one go", "dags explore <DAG_ID>",
+			"As JSON, for a script or an agent", "dags explore <DAG_ID> -o json",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsExplore(cmd.Context(), args[0])
 		},

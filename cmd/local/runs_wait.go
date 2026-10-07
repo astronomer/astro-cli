@@ -66,6 +66,10 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 			"A paused DAG is unpaused first, as `runs trigger` does, or the wait would last until the timeout " +
 			"for a run that is never scheduled.",
 		Args: cobra.ExactArgs(1),
+		Example: afExample(q.t,
+			"Start a run and wait for it to finish", "runs trigger-wait <DAG_ID>",
+			"Give up waiting after ten minutes", "runs trigger-wait <DAG_ID> --timeout 10m",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			trigger, err := opts.options()
 			if err != nil {
