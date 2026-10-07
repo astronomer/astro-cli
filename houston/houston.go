@@ -61,6 +61,7 @@ type ClientInterface interface {
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
+	HibernateOverrideDeployment(variables map[string]interface{}) (*Deployment, error)
 	GetDeploymentConfig(interface{}) (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
 	UpdateDeploymentImage(req UpdateDeploymentImageRequest) (interface{}, error)

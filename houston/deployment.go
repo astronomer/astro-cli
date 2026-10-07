@@ -1013,6 +1013,19 @@ var (
 			runtimeAirflowVersion
 		}
 	}`
+
+	HibernateOverrideDeploymentRequest = `
+	mutation upsertDeployment($deploymentId: Uuid!, $hibernationOverride: HibernationOverrideInput) {
+		upsertDeployment(deploymentUuid: $deploymentId, hibernationOverride: $hibernationOverride) {
+			id
+			label
+			releaseName
+			hibernationOverride {
+				hibernate
+				overrideUntil
+			}
+		}
+	}`
 )
 
 // CreateDeployment - create a deployment
@@ -1254,4 +1267,22 @@ func (h ClientImplementation) CancelUpdateDeploymentRuntime(variables map[string
 	}
 
 	return res.Data.CancelUpdateDeploymentRuntime, nil
+}
+
+func (h ClientImplementation) HibernateOverrideDeployment(variables map[string]interface{}) (*Deployment, error) {
+	if !VerifyVersionMatch(version, VersionRestrictions{GTE: "2.2.0"}) {
+		return nil, ErrFieldsNotAvailable{}
+	}
+
+	req := Request{
+		Query:     HibernateOverrideDeploymentRequest,
+		Variables: variables,
+	}
+
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	return res.Data.UpsertDeployment, nil
 }

@@ -994,6 +994,35 @@ func (_m *ClientInterface) GetWorkspaceUserRole(req houston.GetWorkspaceUserRole
 	return r0, r1
 }
 
+func (_m *ClientInterface) HibernateOverrideDeployment(variables map[string]interface{}) (*houston.Deployment, error) {
+	ret := _m.Called(variables)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HibernateOverrideDeployment")
+	}
+
+	var r0 *houston.Deployment
+	var r1 error
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) (*houston.Deployment, error)); ok {
+		return rf(variables)
+	}
+	if rf, ok := ret.Get(0).(func(map[string]interface{}) *houston.Deployment); ok {
+		r0 = rf(variables)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*houston.Deployment)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(map[string]interface{}) error); ok {
+		r1 = rf(variables)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListDeploymentLogs provides a mock function with given fields: filters
 func (_m *ClientInterface) ListDeploymentLogs(filters houston.ListDeploymentLogsRequest) ([]houston.DeploymentLog, error) {
 	ret := _m.Called(filters)
