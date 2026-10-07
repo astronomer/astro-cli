@@ -25,6 +25,7 @@ func TestSlimNameFor(t *testing.T) {
 		"manifest.json":             "manifest.slim.json",
 		"manifest_full.json":        "manifest_full.slim.json",
 		"manifest_by_schedule.json": "manifest_by_schedule.slim.json",
+		"MANIFEST.JSON":             "MANIFEST.slim.json", // matches isManifestCandidateName's case-insensitivity
 	}
 	for in, want := range cases {
 		if got := slimNameFor(in); got != want {

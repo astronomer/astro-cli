@@ -14,11 +14,13 @@ const slimManifestName = "manifest" + slimManifestSuffix
 const slimSchemaVersion = 1
 
 // slimNameFor returns manifestFilename's slim companion name, e.g.
-// "manifest_full.json" -> "manifest_full.slim.json" - so multiple manifests
-// in one directory each get their own, discoverable by the same convention
-// a consumer already knows its own manifest_path by.
+// "manifest_full.json" -> "manifest_full.slim.json". The trim is
+// case-insensitive, matching isManifestCandidateName.
 func slimNameFor(manifestFilename string) string {
-	return strings.TrimSuffix(manifestFilename, ".json") + slimManifestSuffix
+	if len(manifestFilename) >= 5 && strings.EqualFold(manifestFilename[len(manifestFilename)-5:], ".json") {
+		manifestFilename = manifestFilename[:len(manifestFilename)-5]
+	}
+	return manifestFilename + slimManifestSuffix
 }
 
 // slimSections are the only top-level collections Cosmos loads nodes from

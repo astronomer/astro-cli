@@ -51,12 +51,9 @@ var manifestSkipDirs = map[string]bool{
 	gitDir:         true, // VCS internals can't hold a project's manifest
 }
 
-// isManifestCandidateName reports whether name could be a dbt manifest, by
-// name alone: a *.json file whose name contains "manifest" (case-insensitive)
-// - covers manifest.json, manifest_full.json, manifest_by_schedule.json, etc.
-// without needing a customer to configure anything. Content is validated
-// separately (isDbtManifest) before anything gets stamped, which is what
-// keeps this from also matching e.g. semantic_manifest.json.
+// isManifestCandidateName reports whether a *.json file could be a dbt
+// manifest by name alone (case-insensitive "manifest" anywhere); content is
+// validated separately (isDbtManifest).
 func isManifestCandidateName(name string) bool {
 	lower := strings.ToLower(name)
 	return strings.HasSuffix(lower, ".json") && strings.Contains(lower, "manifest")
