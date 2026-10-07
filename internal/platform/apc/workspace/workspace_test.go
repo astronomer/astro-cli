@@ -11,6 +11,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -365,7 +366,7 @@ contexts:
 
 	buf := new(bytes.Buffer)
 	err := Switch("", 0, api, buf)
-	s.Contains(err.Error(), "cannot parse y to int")
+	s.ErrorIs(err, errInvalidWorkspaceKey)
 	s.Contains(buf.String(), mockWorkspace.ID)
 	api.AssertExpectations(s.T())
 }
@@ -473,7 +474,7 @@ func (s *Suite) TestGetWorkspaceSelection() {
 		defer testUtil.MockUserInput(s.T(), "y")()
 		workspaceSelection := getWorkspaceSelection(0, 0, api, out)
 
-		s.Contains(workspaceSelection.err.Error(), "cannot parse y to int")
+		s.ErrorIs(workspaceSelection.err, errInvalidWorkspaceKey)
 		s.Equal("", workspaceSelection.id)
 	})
 
@@ -496,4 +497,61 @@ func (s *Suite) TestWorkspacesPromptPaginatedOption() {
 
 		s.Equal(expected, resp)
 	})
+}
+
+// A row number that names no row, or names one in any spelling but plain
+// decimal, picks nothing and fails with the invalid-selection error, whether
+// the list is paged or not. Before, 0 or a number past the end indexed the
+// fetched rows out of range and panicked, "01" and "+1" picked row 1, and the
+// paged prompt asked again on a closed stdin forever.
+func (s *Suite) TestGetWorkspaceSelectionRefusesAnythingButARowNumber() {
+	testUtil.InitTestConfig("software")
+	api := new(mocks.ClientInterface)
+	api.On("ListWorkspaces", nil).Return(mockWorkspaceList, nil)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 10, PageNumber: 0}).Return(mockWorkspaceList, nil)
+	api.On("PaginatedListWorkspaces", houston.PaginatedListWorkspaceRequest{PageSize: 3, PageNumber: 1}).Return(mockWorkspaceList, nil)
+
+	for _, tc := range []struct {
+		name                 string
+		pageSize, pageNumber int
+		answers              []string
+	}{
+		{"not paged", 0, 0, []string{"0", "4", "-1", "01", "+1", " 1", "1.0", "y", ""}},
+		{"paged, first page", 10, 0, []string{"0", "4", "-1", "01", "+1", " 1", "1.0", "y", ""}},
+		// The second page of three shows rows 4 to 6; 1 to 3 are the page before.
+		{"paged, second page", 3, 1, []string{"1", "3", "7", "04", "+4"}},
+	} {
+		for _, answer := range tc.answers {
+			s.Run(tc.name+" "+answer, func() {
+				defer testUtil.MockUserInput(s.T(), answer+"\n")()
+				got := getWorkspaceSelection(tc.pageSize, tc.pageNumber, api, new(bytes.Buffer))
+				s.ErrorIs(got.err, errInvalidWorkspaceKey)
+				s.Empty(got.id)
+				s.False(got.quit)
+			})
+		}
+	}
+
+	s.Run("paged, second page picks by the number shown", func() {
+		defer testUtil.MockUserInput(s.T(), "6\n")()
+		got := getWorkspaceSelection(3, 1, api, new(bytes.Buffer))
+		s.NoError(got.err)
+		s.Equal(mockWorkspaceList[2].ID, got.id)
+	})
+}
+
+// A run that may not ask refuses before it fetches or prints the table.
+func (s *Suite) TestGetWorkspaceSelectionRefusesWithoutPrintingWhenItMayNotAsk() {
+	testUtil.InitTestConfig("software")
+	restore := input.SetGuard(func() string { return "with --output json it cannot" })
+	defer restore()
+
+	for _, pageSize := range []int{0, 10} {
+		api := new(mocks.ClientInterface)
+		out := new(bytes.Buffer)
+		got := getWorkspaceSelection(pageSize, 0, api, out)
+		s.True(input.IsRequired(got.err), "page size %d: %v", pageSize, got.err)
+		s.Empty(out.String(), "page size %d", pageSize)
+		api.AssertExpectations(s.T())
+	}
 }

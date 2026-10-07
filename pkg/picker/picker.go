@@ -74,14 +74,26 @@ func (l *List) Pick(out io.Writer, in io.Reader) (int, error) {
 	l.render(out)
 	line, _ := bufio.NewReader(in).ReadString('\n') //nolint:errcheck // a failed read is an answer that picks nothing
 	answer := strings.Trim(line, "\r\n")
-	n, err := strconv.Atoi(answer)
-	if err != nil || n < 1 || n > len(l.rows) || strconv.Itoa(n) != answer {
+	n, ok := Number(answer, 1, len(l.rows))
+	if !ok {
 		if l.InvalidAnswer != nil {
 			return 0, l.InvalidAnswer(answer)
 		}
 		return 0, l.Invalid
 	}
 	return n - 1, nil
+}
+
+// Number reads answer the way Pick does, for a prompt that numbers its rows
+// itself: it returns the number answer spells, and true, only when that is
+// one of first to last written exactly. "2" is 2, but "02", "+2", " 2" and
+// "2.0" are no number at all.
+func Number(answer string, first, last int) (int, bool) {
+	n, err := strconv.Atoi(answer)
+	if err != nil || n < first || n > last || strconv.Itoa(n) != answer {
+		return 0, false
+	}
+	return n, true
 }
 
 // render writes the question: the title, the table with its current row
