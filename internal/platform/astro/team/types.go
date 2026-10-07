@@ -41,6 +41,15 @@ type WorkspaceRemoval struct {
 	Action      Action `json:"action"`
 }
 
+// DeploymentRemoval names the team a deployment team remove acted on, and
+// what it did, which is always Removed: the team stays in the Organization.
+type DeploymentRemoval struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	DeploymentID string `json:"deployment_id"`
+	Action       Action `json:"action"`
+}
+
 // OrganizationRemoval names the team an organization team delete acted on,
 // and what it did, which is always Deleted.
 type OrganizationRemoval struct {

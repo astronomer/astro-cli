@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"os"
 	"testing"
@@ -1369,64 +1368,54 @@ func (s *Suite) TestGetWorkspaceTeams() {
 func (s *Suite) TestUpdateDeploymentTeamRole() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.Run("happy path UpdateDeploymentTeamRole", func() {
-		expectedOutMessage := "The deployment team team1-id role was successfully updated to DEPLOYMENT_ADMIN\n"
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		got, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal("team1-id", got.ID)
+		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
 	})
 
 	s.Run("error path no deployment teams found", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseEmpty, nil).Twice()
-		err := UpdateDeploymentTeamRole("", "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := UpdateDeploymentTeamRole("", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "no teams found in your deployment")
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
-		err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when UpdateTeamRolesWithResponse return network error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when UpdateTeamRolesWithResponse returns an error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := UpdateDeploymentTeamRole(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
 	})
 
 	s.Run("UpdateDeploymentTeamRole no id passed", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsWorkspaceResponseOK, nil).Twice()
 		// mock os.Stdin
@@ -1441,68 +1430,59 @@ func (s *Suite) TestUpdateDeploymentTeamRole() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "The deployment team team1-id role was successfully updated to DEPLOYMENT_ADMIN\n"
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		err = UpdateDeploymentTeamRole("", "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		got, err := UpdateDeploymentTeamRole("", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOut, out.String())
+		s.Equal("team1-id", got.ID)
+		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
 	})
 }
 
 func (s *Suite) TestAddDeploymentTeam() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.Run("happy path AddDeploymentTeam", func() {
-		expectedOutMessage := "The team team1-id was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n"
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		got, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal("team1-id", got.ID)
+		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
-		err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when UpdateTeamRolesWithResponse return network error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when UpdateTeamRolesWithResponse returns an error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		_, err := AddDeploymentTeam(team1.Id, "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
 	})
 
 	s.Run("AddDeploymentTeam no id passed", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsResponseOK, nil).Twice()
 		// mock os.Stdin
@@ -1517,68 +1497,58 @@ func (s *Suite) TestAddDeploymentTeam() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOut := "The team team1-id was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n"
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		err = AddDeploymentTeam("", "DEPLOYMENT_ADMIN", deploymentID, out, mockClient)
+		got, err := AddDeploymentTeam("", "DEPLOYMENT_ADMIN", deploymentID, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOut, out.String())
+		s.Equal("team1-id", got.ID)
+		s.Equal("DEPLOYMENT_ADMIN", got.DeploymentRole)
 	})
 }
 
 func (s *Suite) TestRemoveDeploymentTeam() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.Run("happy path DeleteDeploymentTeam", func() {
-		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully removed from deployment %s\n", team1.Name, deploymentID)
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
-		err := RemoveDeploymentTeam(team1.Id, deploymentID, out, mockClient)
+		got, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(DeploymentRemoval{ID: team1.Id, Name: team1.Name, DeploymentID: deploymentID, Action: Removed}, got)
 	})
 
 	s.Run("error path when GetTeamWithResponse return network error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Twice()
-		err := RemoveDeploymentTeam(team1.Id, deploymentID, out, mockClient)
+		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when UpdateTeamRolesWithResponse return network error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, errorNetwork).Once()
-		err := RemoveDeploymentTeam(team1.Id, deploymentID, out, mockClient)
+		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
 		s.EqualError(err, "network error")
 	})
 
 	s.Run("error path when UpdateTeamRolesWithResponse returns an error", func() {
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("GetTeamWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetTeamWithResponseOK, nil).Twice()
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseError, nil).Once()
-		err := RemoveDeploymentTeam(team1.Id, deploymentID, out, mockClient)
+		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
 		s.EqualError(err, "failed to update team")
 	})
 
 	s.Run("error path when getting current context returns an error", func() {
 		testUtil.InitTestConfig(testUtil.Initial)
-		expectedOutMessage := ""
-		out := new(bytes.Buffer)
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
-		err := RemoveDeploymentTeam(team1.Id, deploymentID, out, mockClient)
+		_, err := RemoveDeploymentTeam(team1.Id, deploymentID, mockClient)
 		s.Error(err)
-		s.Equal(expectedOutMessage, out.String())
 	})
 
 	s.Run("RemoveDeploymentTeam no id passed", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		out := new(bytes.Buffer)
-
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListTeamsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListTeamsWorkspaceResponseOK, nil).Twice()
 		// mock os.Stdin
@@ -1593,12 +1563,11 @@ func (s *Suite) TestRemoveDeploymentTeam() {
 		defer func() { os.Stdin = stdin }()
 		os.Stdin = r
 
-		expectedOutMessage := fmt.Sprintf("Astro Team %s was successfully removed from deployment %s\n", team1.Name, deploymentID)
 		mockClient.On("UpdateTeamRolesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&UpdateTeamRolesResponseOK, nil).Once()
 
-		err = RemoveDeploymentTeam("", deploymentID, out, mockClient)
+		got, err := RemoveDeploymentTeam("", deploymentID, mockClient)
 		s.NoError(err)
-		s.Equal(expectedOutMessage, out.String())
+		s.Equal(DeploymentRemoval{ID: team1.Id, Name: team1.Name, DeploymentID: deploymentID, Action: Removed}, got)
 	})
 }
 

@@ -85,6 +85,11 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "workspace-user-removal", Value: user.WorkspaceRemoval{}},
 	{Name: "workspace-team-removal", Value: team.WorkspaceRemoval{}},
 	{Name: "organization-team-removal", Value: team.OrganizationRemoval{}},
+	// astro deployment user|team remove: the same removal, naming the
+	// Deployment. Its add and update publish the user and team above, with
+	// their deployment_role set.
+	{Name: "deployment-user-removal", Value: user.DeploymentRemoval{}},
+	{Name: "deployment-team-removal", Value: team.DeploymentRemoval{}},
 	// astro organization user invite.
 	{Name: "user-invite", Value: user.Invite{}},
 	// astro organization team user add|remove, and list.
@@ -160,15 +165,15 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Thirty-four shapes reach Emit in this package's tests today:
-// the deployment variable and token results, the workspace and organization
-// token, user and team results, the pkg/output lists and the `astro env`
-// payloads their tests reach, the manifest deploy's result, deployment
-// inspect's deployment (which create and update publish too), delete's
-// removal, hibernate's override, the worker-queue result, the log entry,
-// and the error object. Raise it as conversions land; lower it only
+// would be silent. Thirty-six shapes reach Emit in this package's tests today:
+// the deployment variable and token results, the deployment, workspace and
+// organization user and team results, the workspace and organization token
+// results, the pkg/output lists and the `astro env` payloads their tests
+// reach, the manifest deploy's result, deployment inspect's deployment
+// (which create and update publish too), delete's removal, hibernate's
+// override, the worker-queue result, the log entry, and the error object. Raise it as conversions land; lower it only
 // saying why.
-const minWatchedPayloads = 34
+const minWatchedPayloads = 36
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

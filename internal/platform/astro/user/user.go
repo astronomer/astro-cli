@@ -2,8 +2,6 @@ package user
 
 import (
 	httpContext "context"
-	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -452,14 +450,6 @@ func findUser(email string, users []astrov1.User, roleEntity string) (astrov1.Us
 	return found, nil
 }
 
-func getUserID(email string, users []astrov1.User, roleEntity string) (userID, newEmail string, err error) {
-	found, err := findUser(email, users, roleEntity)
-	if err != nil {
-		return "", email, err
-	}
-	return found.Id, found.Username, nil
-}
-
 func GetUser(client astrov1.APIClient, userID string) (user astrov1.User, err error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -477,106 +467,94 @@ func GetUser(client astrov1.APIClient, userID string) (user astrov1.User, err er
 	return *resp.JSON200, nil
 }
 
-func AddDeploymentUser(email, role, deploymentID string, out io.Writer, client astrov1.APIClient) error {
+// AddDeploymentUser gives the Organization user with email, or the one
+// picked when email is "", role on the Deployment with deploymentID, and
+// returns the user with that role.
+func AddDeploymentUser(email, role, deploymentID string, client astrov1.APIClient) (UserInfo, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-
 	users, err := GetOrgUsers(client)
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	userID, email, err := getUserID(email, users, "organization")
+	return setDeploymentRole(client, ctx.Organization, deploymentID, email, role, users, "organization")
+}
+
+// UpdateDeploymentUserRole sets the role on the Deployment of its user with
+// email, or of the one picked when email is "", and returns the user with
+// that role.
+func UpdateDeploymentUserRole(email, role, deploymentID string, client astrov1.APIClient) (UserInfo, error) {
+	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return UserInfo{}, err
 	}
-	current, err := GetUser(client, userID)
+	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
 	if err != nil {
-		return err
+		return UserInfo{}, err
+	}
+	return setDeploymentRole(client, ctx.Organization, deploymentID, email, role, users, "deployment")
+}
+
+// RemoveDeploymentUser removes the role on the Deployment of its user with
+// email, or of the one picked when email is "", and returns which user it
+// removed from which Deployment.
+func RemoveDeploymentUser(email, deploymentID string, client astrov1.APIClient) (DeploymentRemoval, error) {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return DeploymentRemoval{}, err
+	}
+	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
+	if err != nil {
+		return DeploymentRemoval{}, err
+	}
+	found, err := putDeploymentRole(client, ctx.Organization, deploymentID, email, "", users, "deployment")
+	if err != nil {
+		return DeploymentRemoval{}, err
+	}
+	return DeploymentRemoval{ID: found.Id, Email: found.Username, DeploymentID: deploymentID, Action: Removed}, nil
+}
+
+// setDeploymentRole finds the user among users, by email or through the
+// picker, sets its role on deploymentID, and returns it with that role.
+func setDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, role string, users []astrov1.User, roleEntity string) (UserInfo, error) {
+	found, err := putDeploymentRole(client, orgID, deploymentID, email, role, users, roleEntity)
+	if err != nil {
+		return UserInfo{}, err
+	}
+	// The user as listed, which is where the email the command was given
+	// matched.
+	info := Info(&found)
+	info.DeploymentRole = role
+	return info, nil
+}
+
+// putDeploymentRole finds the user among users, by email or through the
+// picker, and sets its role on deploymentID to role, or removes it when role
+// is "", keeping every other role it holds. It returns the user found.
+func putDeploymentRole(client astrov1.APIClient, orgID, deploymentID, email, role string, users []astrov1.User, roleEntity string) (astrov1.User, error) {
+	found, err := findUser(email, users, roleEntity)
+	if err != nil {
+		return astrov1.User{}, err
+	}
+	current, err := GetUser(client, found.Id)
+	if err != nil {
+		return astrov1.User{}, err
 	}
 	req := astrov1.UpdateUserRolesRequest{
 		OrganizationRole: orgRolePtr(current),
 		WorkspaceRoles:   current.WorkspaceRoles,
 		DeploymentRoles:  upsertDeploymentRole(current.DeploymentRoles, deploymentID, role),
 	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, userID, req)
+	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), orgID, found.Id, req)
 	if err != nil {
-		return err
+		return astrov1.User{}, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
+		return astrov1.User{}, err
 	}
-	fmt.Fprintf(out, "The user %s was successfully added to the deployment with the role %s\n", email, role)
-	return nil
-}
-
-func UpdateDeploymentUserRole(email, role, deploymentID string, out io.Writer, client astrov1.APIClient) error {
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
-	if err != nil {
-		return err
-	}
-	userID, email, err := getUserID(email, users, "deployment")
-	if err != nil {
-		return err
-	}
-	current, err := GetUser(client, userID)
-	if err != nil {
-		return err
-	}
-	req := astrov1.UpdateUserRolesRequest{
-		OrganizationRole: orgRolePtr(current),
-		WorkspaceRoles:   current.WorkspaceRoles,
-		DeploymentRoles:  upsertDeploymentRole(current.DeploymentRoles, deploymentID, role),
-	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, userID, req)
-	if err != nil {
-		return err
-	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "The deployment user %s role was successfully updated to %s\n", email, role)
-	return nil
-}
-
-func RemoveDeploymentUser(email, deploymentID string, out io.Writer, client astrov1.APIClient) error {
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	users, err := GetDeploymentUsers(client, deploymentID, userPaginationLimit)
-	if err != nil {
-		return err
-	}
-	userID, email, err := getUserID(email, users, "deployment")
-	if err != nil {
-		return err
-	}
-	current, err := GetUser(client, userID)
-	if err != nil {
-		return err
-	}
-	req := astrov1.UpdateUserRolesRequest{
-		OrganizationRole: orgRolePtr(current),
-		WorkspaceRoles:   current.WorkspaceRoles,
-		DeploymentRoles:  upsertDeploymentRole(current.DeploymentRoles, deploymentID, ""),
-	}
-	resp, err := client.UpdateUserRolesWithResponse(httpContext.Background(), ctx.Organization, userID, req)
-	if err != nil {
-		return err
-	}
-	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "The user %s was successfully removed from the deployment\n", email)
-	return nil
+	return found, nil
 }
 
 // GetDeploymentUsers returns users with a role in the given deployment.

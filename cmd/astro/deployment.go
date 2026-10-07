@@ -93,8 +93,8 @@ var (
 	taskLogBucket              *string
 	taskLogURLPattern          *string
 	deploymentListOutput       string
-	deploymentUserListOutput   string
-	deploymentTeamListOutput   string
+	deploymentUserOutput       string
+	deploymentTeamOutput       string
 
 	deploymentType                = standard
 	deploymentVariableListExample = `
@@ -176,6 +176,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment where you'd like to manage teams. Run 'astro deployment list' to find valid IDs")
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose teams you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs")
+	cliout.AddOutputFlag(cmd, &deploymentTeamOutput)
 	return cmd
 }
 
@@ -191,7 +192,6 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 			return listDeploymentTeam(cmd, out)
 		},
 	}
-	cliout.AddOutputFlag(cmd, &deploymentTeamListOutput)
 	return cmd
 }
 
@@ -216,7 +216,7 @@ func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	format, err := cliout.ParseFormat(deploymentTeamListOutput)
+	format, err := cliout.ParseFormat(deploymentTeamOutput)
 	if err != nil {
 		return err
 	}
@@ -229,6 +229,10 @@ func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
+	format, err := cliout.ParseFormat(deploymentTeamOutput)
+	if err != nil {
+		return err
+	}
 	var id string
 
 	// if an id was provided in the args we use it
@@ -236,7 +240,16 @@ func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.RemoveDeploymentTeam(id, deploymentID, out, astroV1Client)
+	if id == "" {
+		if err := mayPick("a team", teamIDAnswer); err != nil {
+			return err
+		}
+	}
+	r, err := team.RemoveDeploymentTeam(id, deploymentID, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &r, fmt.Sprintf("Astro Team %s was successfully removed from deployment %s", r.Name, r.DeploymentID))
 }
 
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
@@ -262,13 +275,26 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
+	format, err := cliout.ParseFormat(deploymentTeamOutput)
+	if err != nil {
+		return err
+	}
 	var id string
 
 	if len(args) > 0 {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	return team.AddDeploymentTeam(id, addDeploymentRole, deploymentID, out, astroV1Client)
+	if id == "" {
+		if err := mayPick("a team", teamIDAnswer); err != nil {
+			return err
+		}
+	}
+	t, err := team.AddDeploymentTeam(id, addDeploymentRole, deploymentID, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &t, fmt.Sprintf("The team %s was successfully added to the deployment with the role %s", t.ID, t.DeploymentRole))
 }
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -293,6 +319,10 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
+	format, err := cliout.ParseFormat(deploymentTeamOutput)
+	if err != nil {
+		return err
+	}
 	var id string
 
 	// if an id was provided in the args we use it
@@ -309,7 +339,16 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return team.UpdateDeploymentTeamRole(id, updateDeploymentRole, deploymentID, out, astroV1Client)
+	if id == "" {
+		if err := mayPick("a team", teamIDAnswer); err != nil {
+			return err
+		}
+	}
+	t, err := team.UpdateDeploymentTeamRole(id, updateDeploymentRole, deploymentID, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &t, fmt.Sprintf("The deployment team %s role was successfully updated to %s", t.ID, t.DeploymentRole))
 }
 
 func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
@@ -328,7 +367,7 @@ func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 	)
 	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "deployment where you'd like to manage users. Run 'astro deployment list' to find valid IDs")
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs")
-
+	cliout.AddOutputFlag(cmd, &deploymentUserOutput)
 	return cmd
 }
 
@@ -361,7 +400,6 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 			return listDeploymentUser(cmd, out)
 		},
 	}
-	cliout.AddOutputFlag(cmd, &deploymentUserListOutput)
 	return cmd
 }
 
@@ -1129,6 +1167,10 @@ func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
+	format, err := cliout.ParseFormat(deploymentUserOutput)
+	if err != nil {
+		return err
+	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -1138,7 +1180,16 @@ func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return user.AddDeploymentUser(email, addDeploymentRole, deploymentID, out, astroV1Client)
+	if email == "" {
+		if err := mayPick("a user", userEmailAnswer); err != nil {
+			return err
+		}
+	}
+	u, err := user.AddDeploymentUser(email, addDeploymentRole, deploymentID, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &u, fmt.Sprintf("The user %s was successfully added to the deployment with the role %s", u.Email, u.DeploymentRole))
 }
 
 func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
@@ -1146,7 +1197,7 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	format, err := cliout.ParseFormat(deploymentUserListOutput)
+	format, err := cliout.ParseFormat(deploymentUserOutput)
 	if err != nil {
 		return err
 	}
@@ -1158,6 +1209,10 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
+	}
+	format, err := cliout.ParseFormat(deploymentUserOutput)
+	if err != nil {
+		return err
 	}
 	var email string
 
@@ -1177,12 +1232,25 @@ func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return user.UpdateDeploymentUserRole(email, updateDeploymentRole, deploymentID, out, astroV1Client)
+	if email == "" {
+		if err := mayPick("a user", userEmailAnswer); err != nil {
+			return err
+		}
+	}
+	u, err := user.UpdateDeploymentUserRole(email, updateDeploymentRole, deploymentID, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &u, fmt.Sprintf("The deployment user %s role was successfully updated to %s", u.Email, u.DeploymentRole))
 }
 
 func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
+	}
+	format, err := cliout.ParseFormat(deploymentUserOutput)
+	if err != nil {
+		return err
 	}
 	var email string
 
@@ -1193,7 +1261,16 @@ func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	}
 
 	cmd.SilenceUsage = true
-	return user.RemoveDeploymentUser(email, deploymentID, out, astroV1Client)
+	if email == "" {
+		if err := mayPick("a user", userEmailAnswer); err != nil {
+			return err
+		}
+	}
+	r, err := user.RemoveDeploymentUser(email, deploymentID, astroV1Client)
+	if err != nil {
+		return err
+	}
+	return renderLines(format, out, &r, fmt.Sprintf("The user %s was successfully removed from the deployment", r.Email))
 }
 
 func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {

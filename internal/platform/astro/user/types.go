@@ -34,6 +34,15 @@ type WorkspaceRemoval struct {
 	Action      Action `json:"action"`
 }
 
+// DeploymentRemoval names the user a deployment user remove acted on, and
+// what it did, which is always Removed: the user stays in the Organization.
+type DeploymentRemoval struct {
+	ID           string `json:"id"`
+	Email        string `json:"email"`
+	DeploymentID string `json:"deployment_id"`
+	Action       Action `json:"action"`
+}
+
 // Invite is the invitation `astro organization user invite` sent. UserID is
 // set when the API already knows the person invited; ExpiresAt when the API
 // says when the invitation lapses.

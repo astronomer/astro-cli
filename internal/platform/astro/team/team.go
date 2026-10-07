@@ -4,7 +4,6 @@ import (
 	httpContext "context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"time"
@@ -813,126 +812,111 @@ func GetDeploymentTeams(client astrov1.APIClient, deploymentID string, _ int) ([
 	return listTeams(client, nil, &dID)
 }
 
-func AddDeploymentTeam(id, role, deploymentID string, out io.Writer, client astrov1.APIClient) error {
+// AddDeploymentTeam gives the Organization's team with id, or the one picked
+// when id is "", role on the Deployment with deploymentID, and returns the
+// team with that role.
+func AddDeploymentTeam(id, role, deploymentID string, client astrov1.APIClient) (TeamInfo, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
 
 	var team astrov1.Team
 	if id == "" {
 		teams, err := GetOrgTeams(client)
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInOrg
+			return TeamInfo{}, ErrNoTeamsFoundInOrg
 		}
 		team, err = selectTeam(teams)
 		if err != nil || team.Id == "" {
-			return ErrInvalidTeamKey
+			return TeamInfo{}, pickFailed(err)
 		}
 	} else {
 		team, err = GetTeam(client, id)
 		if err != nil {
-			return err
+			return TeamInfo{}, err
 		}
 		if team.Id == "" {
-			return ErrTeamNotFound
+			return TeamInfo{}, ErrTeamNotFound
 		}
 	}
-
-	req := astrov1.UpdateTeamRolesRequest{
-		OrganizationRole: teamOrgRole(team),
-		WorkspaceRoles:   team.WorkspaceRoles,
-		DeploymentRoles:  upsertTeamDeploymentRole(team.DeploymentRoles, deploymentID, role),
-	}
-	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "The team %s was successfully added to the deployment with the role %s\n", team.Id, role)
-	return nil
+	return setDeploymentTeamRole(client, ctx.Organization, deploymentID, role, &team)
 }
 
-func UpdateDeploymentTeamRole(id, role, deploymentID string, out io.Writer, client astrov1.APIClient) error {
+// UpdateDeploymentTeamRole sets the role on the Deployment of the team with
+// id, or of the Deployment's team picked when id is "", and returns the team
+// with that role.
+func UpdateDeploymentTeamRole(id, role, deploymentID string, client astrov1.APIClient) (TeamInfo, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
-		return err
+		return TeamInfo{}, err
 	}
+	team, err := deploymentTeam(id, deploymentID, client)
+	if err != nil {
+		return TeamInfo{}, err
+	}
+	return setDeploymentTeamRole(client, ctx.Organization, deploymentID, role, &team)
+}
 
-	var team astrov1.Team
+// RemoveDeploymentTeam removes the role on the Deployment of the team with
+// id, or of the Deployment's team picked when id is "", and returns which
+// team it removed from which Deployment.
+func RemoveDeploymentTeam(id, deploymentID string, client astrov1.APIClient) (DeploymentRemoval, error) {
+	ctx, err := context.GetCurrentContext()
+	if err != nil {
+		return DeploymentRemoval{}, err
+	}
+	team, err := deploymentTeam(id, deploymentID, client)
+	if err != nil {
+		return DeploymentRemoval{}, err
+	}
+	if _, err := setDeploymentTeamRole(client, ctx.Organization, deploymentID, "", &team); err != nil {
+		return DeploymentRemoval{}, err
+	}
+	return DeploymentRemoval{ID: team.Id, Name: team.Name, DeploymentID: deploymentID, Action: Removed}, nil
+}
+
+// deploymentTeam returns the team with id, or the Deployment's team picked
+// when id is "".
+func deploymentTeam(id, deploymentID string, client astrov1.APIClient) (astrov1.Team, error) {
 	if id == "" {
 		teams, err := GetDeploymentTeams(client, deploymentID, teamPaginationLimit)
 		if err != nil {
-			return err
+			return astrov1.Team{}, err
 		}
 		if len(teams) == 0 {
-			return ErrNoTeamsFoundInDeployment
+			return astrov1.Team{}, ErrNoTeamsFoundInDeployment
 		}
-		team, err = selectTeam(teams)
-		if err != nil {
-			return err
-		}
-	} else {
-		team, err = GetTeam(client, id)
-		if err != nil {
-			return err
-		}
-		if team.Id == "" {
-			return ErrTeamNotFound
-		}
+		return selectTeam(teams)
 	}
+	team, err := GetTeam(client, id)
+	if err != nil {
+		return astrov1.Team{}, err
+	}
+	if team.Id == "" {
+		return astrov1.Team{}, ErrTeamNotFound
+	}
+	return team, nil
+}
 
+// setDeploymentTeamRole sets team's role on deploymentID to role, or removes
+// it when role is "", keeping every other role it holds, and returns the team
+// with that role.
+func setDeploymentTeamRole(client astrov1.APIClient, orgID, deploymentID, role string, team *astrov1.Team) (TeamInfo, error) {
 	req := astrov1.UpdateTeamRolesRequest{
-		OrganizationRole: teamOrgRole(team),
+		OrganizationRole: teamOrgRole(*team),
 		WorkspaceRoles:   team.WorkspaceRoles,
 		DeploymentRoles:  upsertTeamDeploymentRole(team.DeploymentRoles, deploymentID, role),
 	}
-	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
-		return err
+	if err := updateTeamRoles(client, orgID, team.Id, req); err != nil {
+		return TeamInfo{}, err
 	}
-	fmt.Fprintf(out, "The deployment team %s role was successfully updated to %s\n", team.Id, role)
-	return nil
-}
-
-func RemoveDeploymentTeam(id, deploymentID string, out io.Writer, client astrov1.APIClient) error {
-	ctx, err := context.GetCurrentContext()
-	if err != nil {
-		return err
-	}
-
-	var team astrov1.Team
-	if id == "" {
-		teams, err := GetDeploymentTeams(client, deploymentID, teamPaginationLimit)
-		if err != nil {
-			return err
-		}
-		if len(teams) == 0 {
-			return ErrNoTeamsFoundInDeployment
-		}
-		team, err = selectTeam(teams)
-		if err != nil {
-			return err
-		}
-	} else {
-		team, err = GetTeam(client, id)
-		if err != nil {
-			return err
-		}
-		if team.Id == "" {
-			return ErrTeamNotFound
-		}
-	}
-	req := astrov1.UpdateTeamRolesRequest{
-		OrganizationRole: teamOrgRole(team),
-		WorkspaceRoles:   team.WorkspaceRoles,
-		DeploymentRoles:  upsertTeamDeploymentRole(team.DeploymentRoles, deploymentID, ""),
-	}
-	if err := updateTeamRoles(client, ctx.Organization, team.Id, req); err != nil {
-		return err
-	}
-	fmt.Fprintf(out, "Astro Team %s was successfully removed from deployment %s\n", team.Name, deploymentID)
-	return nil
+	info := Info(team)
+	info.DeploymentRole = role
+	return info, nil
 }
 
 // roleInDeployment returns the team's deployment role for the given deployment, or "" if absent.
