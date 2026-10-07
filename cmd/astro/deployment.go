@@ -454,7 +454,8 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astro Deployment",
-		Long:    "Create a new Deployment — an Airflow environment running on Astro. Configurable options include the executor type (Celery, Kubernetes, Astro), runtime version, worker queues, cloud provider, and region. On hosted Astro, a Deployment can be standard (shared infrastructure) or dedicated (isolated cluster). Use --wait to block until the Deployment is healthy.",
+		Long:    "Create a new Deployment — an Airflow environment running on Astro. Configurable options include the executor type (Celery, Kubernetes, Astro), runtime version, worker queues, cloud provider, and region. On hosted Astro, a Deployment can be standard (shared infrastructure) or dedicated (isolated cluster). Use --clone to copy an existing Deployment. Use --wait to block until the Deployment is healthy.",
+		Example: deploymentCreateExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentCreate(cmd, args, out)
 		},
@@ -467,6 +468,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the Deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor, KubernetesExecutor, or AstroExecutor.")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
+	cmd.Flags().StringVar(&cloneSource, "clone", "", cloneFlagUsage)
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
@@ -770,6 +772,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	// The create prints its progress (the Workspace, a picker, the wait) to
 	// bare stdout; under json that is a note, not the result.
 	defer strayStdoutToStderr(format)()
+	if cmd.Flags().Changed("clone") {
+		return deploymentClone(cmd, out, format)
+	}
 	if err := normalizeSchedulerSizeFlag(); err != nil {
 		return err
 	}

@@ -44,6 +44,7 @@ var coreBelowCmd = []string{
 	"internal/pack",
 	"internal/plan",
 	"internal/platform/astro/apitoken",
+	"internal/platform/astro/deployment/clone",
 	"internal/project",
 	"internal/runtimecatalog",
 	"internal/userstate",
