@@ -55,21 +55,6 @@ func (s *Suite) TestText() {
 	}
 }
 
-func (s *Suite) TestChoicePrompt() {
-	tests := []struct {
-		count, preselected int
-		want               string
-	}{
-		{1, 0, "Choose 1: "},
-		{1, 1, "Choose 1 [1]: "},
-		{3, 0, "Choose 1-3: "},
-		{3, 2, "Choose 1-3 [2]: "},
-	}
-	for _, tt := range tests {
-		s.Equal(tt.want, ChoicePrompt(tt.count, tt.preselected))
-	}
-}
-
 func (s *Suite) TestConfirm() {
 	type args struct {
 		promptText string

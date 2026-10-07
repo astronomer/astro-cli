@@ -1,14 +1,11 @@
 package local
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 // This file is the composition root for every command that acts on an Airflow:
@@ -306,52 +304,36 @@ func (c *cli) announceInstance(i instances.Instance) {
 }
 
 // promptForDeployment asks which deployment to use and returns the answer. It
-// takes a number or a name and nothing else: there is no default on Enter,
-// because the safe answer to "which Airflow should I act on" is never one this
-// picked for you. It is only ever reached on an interactive run.
+// takes a name or a number, names first: a deployment may legally be called
+// "2", and reading the number first would pin whichever entry happened to sit
+// in that position instead. There is no default on Enter, because the safe
+// answer to "which Airflow should I act on" is never one this picked for you.
+// It asks on stderr, and is only ever reached on an interactive run.
 func (c *cli) promptForDeployment(choices []string) (string, error) {
-	fmt.Fprintln(c.d.Stderr, "Which deployment should this project use?")
-	for i, name := range choices {
-		fmt.Fprintf(c.d.Stderr, "  %d) %s\n", i+1, name)
+	ambiguous := &instances.AmbiguousError{Choices: choices}
+	l := picker.List{
+		Title:  "Which deployment should this project use?",
+		Header: []string{"NAME"},
+		Ask:    []input.Option{input.About("the deployment this project uses"), input.AnsweredBy("--deployment")},
+		// Out of tries: the message naming every way to decide.
+		Invalid:  ambiguous,
+		Attempts: promptAttempts,
+		ByName:   true,
+		Ended:    input.Required(ambiguous),
 	}
-	in := bufio.NewReader(c.d.Stdin)
-	for attempt := 0; attempt < promptAttempts; attempt++ {
-		fmt.Fprintf(c.d.Stderr, "%s", input.ChoicePrompt(len(choices), 0))
-		line, err := in.ReadString('\n')
-		answer := strings.TrimSpace(line)
-		if err != nil && answer == "" {
-			if errors.Is(err, io.EOF) {
-				return "", input.Required(&instances.AmbiguousError{Choices: choices})
-			}
-			return "", err
-		}
-		if name, ok := matchChoice(choices, answer); ok {
-			return name, nil
-		}
-		fmt.Fprintf(c.d.Stderr, "Not one of the choices. ")
+	for _, name := range choices {
+		l.AddRow(false, name)
 	}
-	return "", &instances.AmbiguousError{Choices: choices}
+	i, err := l.Pick(c.d.Stderr, c.d.Stdin)
+	if err != nil {
+		return "", err
+	}
+	return choices[i], nil
 }
 
 // promptAttempts bounds the re-asking, so a stdin that answers but never
 // answers usefully ends with the message naming the flags rather than looping.
 const promptAttempts = 3
-
-// matchChoice reads an answer as a name or a number, names first. A deployment
-// may legally be called "2", and reading the number first would pin whichever
-// entry happened to sit in that position instead. What the user typed is what
-// they meant; the numbers are only a shorthand for names nobody wants to retype.
-func matchChoice(choices []string, answer string) (string, bool) {
-	for _, name := range choices {
-		if name == answer {
-			return name, true
-		}
-	}
-	if n, err := strconv.Atoi(answer); err == nil && n >= 1 && n <= len(choices) {
-		return choices[n-1], true
-	}
-	return "", false
-}
 
 // interactive reports whether this run can ask a question: someone has to be at
 // a terminal to answer it. A piped or redirected stdin is a script, and a

@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -751,60 +751,46 @@ const deployPromptAttempts = 3
 // shell is a different fact from one sitting there because the committed
 // manifest says so, and only the reader can tell which they meant.
 //
-// It takes a name or a number, and Enter takes the highlighted entry when there
-// is one. With nothing highlighted there is no default on Enter: the safe answer
-// to "where should I ship this code" is never one the CLI picked by itself.
+// It takes a name or a number, names first: a link may legally be called "2",
+// and what the user typed is what they meant. Enter takes the highlighted entry
+// when there is one. With nothing highlighted there is no default on Enter: the
+// safe answer to "where should I ship this code" is never one the CLI picked by
+// itself. It asks on stderr, so stdout stays the deploy's own output.
 func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
-	fmt.Fprintln(d.errOut, "Deploy to which deployment?")
-	chosen := 0
+	header := []string{"NAME", "WHERE"}
+	if preselect.Name != "" {
+		header = append(header, "PRESELECTED BY")
+	}
+	l := picker.List{
+		Title:  "Deploy to which deployment?",
+		Header: header,
+		Ask:    []input.Option{input.About("the deployment to ship to"), input.AnsweredBy("--deployment")},
+		// Asked three times, and still no pick. The picker has said "Not one
+		// of the choices." after every answer, the third included, so that
+		// line is the last word and this ends quietly: that is what the
+		// sentinel is for. Input that ends instead fails with Ended.
+		Invalid:  manifestdeploy.ErrAborted,
+		Attempts: deployPromptAttempts,
+		ByName:   true,
+		Ended:    input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")),
+	}
 	for i, choice := range choices {
-		marker := ""
-		if preselect.Name != "" && choice.Name == preselect.Name {
-			marker, chosen = "  ← "+preselect.From, i+1
+		cells := []string{choice.Name, choice.Where}
+		chosen := preselect.Name != "" && choice.Name == preselect.Name
+		switch {
+		case chosen:
+			l.Default = i + 1
+			cells = append(cells, preselect.From)
+		case preselect.Name != "":
+			cells = append(cells, "")
 		}
-		fmt.Fprintf(d.errOut, "  %d) %s (%s)%s\n", i+1, choice.Name, choice.Where, marker)
+		l.AddRow(chosen, cells...)
 	}
-	prompt := input.ChoicePrompt(len(choices), chosen)
-	in := bufio.NewReader(d.in)
-	for attempt := 0; attempt < deployPromptAttempts; attempt++ {
-		fmt.Fprintf(d.errOut, "%s", prompt)
-		line, err := in.ReadString('\n')
-		answer := strings.TrimSpace(line)
-		if answer == "" && chosen > 0 && err == nil {
-			return preselect.Name, nil
-		}
-		if err != nil && answer == "" {
-			if goerrors.Is(err, io.EOF) {
-				return "", input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>"))
-			}
-			return "", err
-		}
-		if name, ok := matchDeployChoice(choices, answer); ok {
-			return name, nil
-		}
-		fmt.Fprintf(d.errOut, "Not one of the choices. ")
+	i, err := l.Pick(d.errOut, d.in)
+	if err != nil {
+		return "", err
 	}
-	// Asked three times, told three times that the answer was not one of the
-	// choices, and still no pick. The prompt has already said everything there
-	// is to say, so this ends quietly — that is what the sentinel is for.
-	return "", manifestdeploy.ErrAborted
-}
-
-// matchDeployChoice reads an answer as a name or a number, names first. A link
-// may legally be called "2", and a project with one offered second in the list
-// would otherwise read "2" as "the second entry" and ship somewhere else
-// entirely. What the user typed is what they meant; the numbers are only a
-// shorthand for names nobody wants to retype.
-func matchDeployChoice(choices []manifestdeploy.Choice, answer string) (string, bool) {
-	for _, choice := range choices {
-		if choice.Name == answer {
-			return choice.Name, true
-		}
-	}
-	if n, err := strconv.Atoi(answer); err == nil && n >= 1 && n <= len(choices) {
-		return choices[n-1].Name, true
-	}
-	return "", false
+	return choices[i].Name, nil
 }
 
 // ResolveUnlinked runs the 1.x path's workspace-level pick/create flow and returns the

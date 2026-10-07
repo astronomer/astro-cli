@@ -22,6 +22,10 @@ import (
 // prompt is what a picker prints to ask for its answer, after the table.
 const prompt = "\n> "
 
+// retry is what a picker that asks again prints, before the prompt, after an
+// answer that picked nothing.
+const retry = "Not one of the choices."
+
 // The highlight a current row is drawn in: bold green.
 const (
 	highlightOn  = "\033[1;32m"
@@ -46,6 +50,25 @@ type List struct {
 	// error names the answer it refused.
 	InvalidAnswer func(answer string) error
 
+	// Default, when above 0, is the number of the row an empty answer (Enter)
+	// picks, and the prompt shows it: "> [2] ". At 0 an empty answer picks
+	// nothing, like any other answer that is not a row number.
+	Default int
+	// Attempts is how many answers Pick reads before it fails. Above 0, it
+	// says so after every answer that picks nothing, the last included, and
+	// asks again while answers remain. At 0 it asks once and says nothing.
+	Attempts int
+	// ByName lets an answer that is exactly a row's first cell pick that row,
+	// ahead of the numbers: a row may be called "2", and what someone typed is
+	// what they meant.
+	ByName bool
+	// Ended, when set, is the error for input that ends (Ctrl-D, a closed
+	// stdin) before an answer picks a row: with nothing typed, or with a
+	// last answer cut short that picks nothing. Input that has ended cannot
+	// be asked again, so it is returned at once. When nil, ended input fails
+	// like any answer that picks nothing.
+	Ended error
+
 	rows    [][]string
 	current int // the highlighted row, 1-based; 0 for none
 }
@@ -65,23 +88,87 @@ func (l *List) AddRow(current bool, cells ...string) {
 // nothing, when it may not. Otherwise it writes the title, the table and the
 // prompt to out, and reads one line from in. It returns the 0-based index of
 // the row whose number that line is, exactly: "2" picks the second row, but
-// "02", "+2" and " 2" pick nothing. Anything but a row number fails with
-// Invalid (or InvalidAnswer's error).
+// "02", "+2" and " 2" pick nothing. With ByName a row's first cell, exactly,
+// picks it too, and with Default an empty line picks that row. Anything else
+// is asked again, up to Attempts answers, each wrong one told so, and then
+// fails with Invalid (or InvalidAnswer's error, naming the last answer given).
+// Input that ends is not asked again: an answer cut short by it is read like
+// any other, and if it picks nothing Pick fails with Ended when that is set.
 func (l *List) Pick(out io.Writer, in io.Reader) (int, error) {
 	if err := input.MayAsk(prompt, l.Ask...); err != nil {
 		return 0, err
 	}
 	l.render(out)
-	line, _ := bufio.NewReader(in).ReadString('\n') //nolint:errcheck // a failed read is an answer that picks nothing
-	answer := strings.Trim(line, "\r\n")
+	r := bufio.NewReader(in)
+	var last string // the last answer given, for InvalidAnswer to name
+	for attempt := 1; ; attempt++ {
+		// A failed read ends the input: whatever it returned is the last
+		// answer there will be.
+		line, readErr := r.ReadString('\n')
+		ended := readErr != nil
+		answer := strings.Trim(line, "\r\n")
+		if i, ok := l.match(answer, !ended); ok {
+			return i, nil
+		}
+		// Input that ended with nothing on its line is no answer at all.
+		answered := answer != "" || !ended
+		if answered {
+			last = answer
+		}
+		// A picker that asks again tells every wrong answer so, the last
+		// included: one that ends quietly would otherwise end with no word.
+		tell := answered && l.Attempts > 0
+		if tell {
+			io.WriteString(out, retry) //nolint:errcheck // a failed write to the terminal still reads the answer
+		}
+		if ended || attempt >= l.Attempts {
+			if tell {
+				io.WriteString(out, "\n") //nolint:errcheck // as above
+			}
+			if ended && l.Ended != nil {
+				return 0, l.Ended
+			}
+			break
+		}
+		io.WriteString(out, l.prompt()) //nolint:errcheck // as above
+	}
+	if l.InvalidAnswer != nil {
+		return 0, l.InvalidAnswer(last)
+	}
+	return 0, l.Invalid
+}
+
+// match reads one answer: the 0-based row it picks, and whether it picks one.
+// An empty answer is Enter, and picks Default, only when its line ended
+// (entered); input that ended is not Enter.
+func (l *List) match(answer string, entered bool) (int, bool) {
+	if answer == "" {
+		if entered && l.Default > 0 && l.Default <= len(l.rows) {
+			return l.Default - 1, true
+		}
+		return 0, false
+	}
+	if l.ByName {
+		for i, row := range l.rows {
+			if len(row) > 0 && row[0] == answer {
+				return i, true
+			}
+		}
+	}
 	n, ok := Number(answer, 1, len(l.rows))
 	if !ok {
-		if l.InvalidAnswer != nil {
-			return 0, l.InvalidAnswer(answer)
-		}
-		return 0, l.Invalid
+		return 0, false
 	}
-	return n - 1, nil
+	return n - 1, true
+}
+
+// prompt is the line that asks for the answer, with the row Enter picks in
+// brackets when there is one.
+func (l *List) prompt() string {
+	if l.Default > 0 && l.Default <= len(l.rows) {
+		return fmt.Sprintf("%s[%d] ", prompt, l.Default)
+	}
+	return prompt
 }
 
 // Number reads answer the way Pick does, for a prompt that numbers its rows
@@ -122,6 +209,6 @@ func (l *List) render(out io.Writer) {
 		}
 		b.WriteString(line) //nolint:errcheck // sticky: reported, and ignored, at the Flush
 	}
-	b.WriteString(prompt) //nolint:errcheck // sticky: reported, and ignored, at the Flush
-	b.Flush()             //nolint:errcheck // a failed write to the terminal still reads the answer
+	b.WriteString(l.prompt()) //nolint:errcheck // sticky: reported, and ignored, at the Flush
+	b.Flush()                 //nolint:errcheck // a failed write to the terminal still reads the answer
 }

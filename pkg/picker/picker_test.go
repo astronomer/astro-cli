@@ -109,3 +109,136 @@ func TestPickRefusesWithoutWritingWhenItMayNotAsk(t *testing.T) {
 	assert.Empty(t, out.String(), "nothing written")
 	assert.Equal(t, 2, in.Len(), "nothing read")
 }
+
+// Default makes Enter an answer, and the prompt shows which row it picks.
+// Input that ends is not Enter, and picks nothing.
+func TestPickDefaultOnEnter(t *testing.T) {
+	l := things()
+	l.Default = 2
+	var out bytes.Buffer
+	i, err := l.Pick(&out, strings.NewReader("\n"))
+	require.NoError(t, err)
+	assert.Equal(t, 1, i)
+	assert.True(t, strings.HasSuffix(out.String(), "\n\n> [2] "), "%q", out.String())
+
+	l = things()
+	l.Default = 2
+	i, err = l.Pick(&bytes.Buffer{}, strings.NewReader("3\n"))
+	require.NoError(t, err)
+	assert.Equal(t, 2, i, "a row number still picks its row")
+
+	l = things()
+	l.Default = 2
+	_, err = l.Pick(&bytes.Buffer{}, strings.NewReader(""))
+	require.ErrorIs(t, err, errInvalidThing, "ended input is not Enter")
+
+	_, err = things().Pick(&bytes.Buffer{}, strings.NewReader("\n"))
+	assert.ErrorIs(t, err, errInvalidThing, "with no Default, Enter picks nothing")
+}
+
+// Attempts asks again after each answer that picks nothing, saying so, and
+// fails with the last answer once they run out. The answers are read as
+// strictly on the last try as on the first.
+func TestPickAsksAgainThenFails(t *testing.T) {
+	l := things()
+	l.Attempts = 3
+	l.Default = 1
+	var out bytes.Buffer
+	i, err := l.Pick(&out, strings.NewReader("9\n 2\n2\n"))
+	require.NoError(t, err)
+	assert.Equal(t, 1, i)
+	assert.Equal(t, 2, strings.Count(out.String(), "Not one of the choices.\n> [1] "), "%q", out.String())
+
+	l = things()
+	l.Attempts = 3
+	l.InvalidAnswer = func(answer string) error { return fmt.Errorf("%w: %q", errInvalidThing, answer) }
+	out.Reset()
+	_, err = l.Pick(&out, strings.NewReader("0\n02\n+2\n1\n"))
+	require.ErrorIs(t, err, errInvalidThing)
+	require.EqualError(t, err, `invalid thing selection: "+2"`, "the last answer is the one named, and a fourth is not read")
+	assert.Equal(t, 2, strings.Count(out.String(), "Not one of the choices.\n> "), "%q", out.String())
+
+	l = things()
+	l.Attempts = 3
+	out.Reset()
+	_, err = l.Pick(&out, strings.NewReader("9\n"))
+	require.ErrorIs(t, err, errInvalidThing)
+	assert.Equal(t, 1, strings.Count(out.String(), "Not one of the choices."), "ended input is not asked again")
+}
+
+// ByName lets a row's first cell, exactly, pick it, ahead of the numbers.
+func TestPickByName(t *testing.T) {
+	l := &List{Header: []string{"NAME"}, Invalid: errInvalidThing, ByName: true}
+	l.AddRow(false, "2")
+	l.AddRow(false, "prod")
+	for answer, want := range map[string]int{"2\n": 0, "prod\n": 1, "1\n": 0} {
+		i, err := l.Pick(&bytes.Buffer{}, strings.NewReader(answer))
+		require.NoError(t, err, answer)
+		assert.Equal(t, want, i, "answer %q", answer)
+	}
+	for _, answer := range []string{" prod\n", "prod \n", "Prod\n", "\n"} {
+		_, err := l.Pick(&bytes.Buffer{}, strings.NewReader(answer))
+		require.ErrorIs(t, err, errInvalidThing, "answer %q", answer)
+	}
+
+	_, err := things().Pick(&bytes.Buffer{}, strings.NewReader("dev\n"))
+	assert.ErrorIs(t, err, errInvalidThing, "without ByName a name picks nothing")
+}
+
+// Ended is returned at once for input that ends with no answer, without
+// asking again; an answer on a last, unterminated line is still read.
+func TestPickEnded(t *testing.T) {
+	errEnded := errors.New("ended")
+	l := things()
+	l.Attempts = 3
+	l.Default = 2
+	l.Ended = errEnded
+	var out bytes.Buffer
+	_, err := l.Pick(&out, strings.NewReader("9\n"))
+	require.ErrorIs(t, err, errEnded)
+	assert.Equal(t, 1, strings.Count(out.String(), "Not one of the choices."))
+
+	i, err := l.Pick(&bytes.Buffer{}, strings.NewReader("3"))
+	require.NoError(t, err)
+	assert.Equal(t, 2, i)
+
+	// An answer cut short by the end of input that picks nothing cannot be
+	// asked again: Ended, after it is told so.
+	for _, in := range []string{"prd", "9\nprd"} {
+		out.Reset()
+		_, err = l.Pick(&out, strings.NewReader(in))
+		require.ErrorIs(t, err, errEnded, "input %q", in)
+		assert.Equal(t, strings.Count(in, "\n")+1, strings.Count(out.String(), "Not one of the choices.\n"), "input %q: %q", in, out.String())
+	}
+}
+
+// A picker that asks again says so after every wrong answer, the last
+// included, so one that runs out does not end without a word. One that asks
+// once says nothing.
+func TestPickTellsEveryWrongAnswer(t *testing.T) {
+	l := things()
+	l.Attempts = 3
+	var out bytes.Buffer
+	_, err := l.Pick(&out, strings.NewReader("9\n8\n7\n"))
+	require.ErrorIs(t, err, errInvalidThing)
+	assert.Equal(t, 3, strings.Count(out.String(), "Not one of the choices.\n"), "%q", out.String())
+	assert.True(t, strings.HasSuffix(out.String(), "Not one of the choices.\n"), "%q", out.String())
+
+	out.Reset()
+	_, err = things().Pick(&out, strings.NewReader("9\n"))
+	require.ErrorIs(t, err, errInvalidThing)
+	assert.NotContains(t, out.String(), "Not one of the choices.")
+}
+
+// InvalidAnswer names the last answer given, not the nothing that ended
+// the input after it.
+func TestPickInvalidAnswerNamesTheLastAnswerGiven(t *testing.T) {
+	for in, want := range map[string]string{"9\n": "9", "9\nprd": "prd", "9\n\n": ""} {
+		l := things()
+		l.Attempts = 3
+		l.InvalidAnswer = func(answer string) error { return fmt.Errorf("%w: %q", errInvalidThing, answer) }
+		_, err := l.Pick(&bytes.Buffer{}, strings.NewReader(in))
+		require.ErrorIs(t, err, errInvalidThing)
+		assert.EqualError(t, err, fmt.Sprintf("invalid thing selection: %q", want), "input %q", in)
+	}
+}

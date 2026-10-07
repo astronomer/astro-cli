@@ -23,19 +23,6 @@ func Text(promptText string, opts ...Option) (string, error) {
 	return strings.Trim(text, "\r\n"), nil
 }
 
-// ChoicePrompt is the line that asks for a pick from a numbered list of count
-// entries, with the one Enter takes in brackets when preselected is above 0.
-func ChoicePrompt(count, preselected int) string {
-	numbers := "1"
-	if count > 1 {
-		numbers = fmt.Sprintf("1-%d", count)
-	}
-	if preselected > 0 {
-		return fmt.Sprintf("Choose %s [%d]: ", numbers, preselected)
-	}
-	return fmt.Sprintf("Choose %s: ", numbers)
-}
-
 // Confirm requests a user to confirm their input. It returns a *RequiredError,
 // and reads nothing, when this run may not ask (see SetGuard): a refused
 // confirmation is neither a yes nor a no, so a caller must not read the bool

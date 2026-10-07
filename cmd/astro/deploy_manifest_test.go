@@ -22,6 +22,7 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -462,8 +463,9 @@ func TestDeployManifestPromptNamesWhatMovedTheCursor(t *testing.T) {
 
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
-	assert.Contains(t, errOut, "dev (astro deployment clx-dev)  ← ASTRO_DEPLOYMENT")
-	assert.NotContains(t, errOut, "← default")
+	assert.Equal(t, []string{"1", "dev", "astro", "deployment", "clx-dev", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
+	assert.NotContains(t, errOut, "default = true")
+	assert.Contains(t, errOut, "\n> [1] ")
 	// And Enter took the highlighted entry, which is the one it named.
 	assert.Contains(t, out, "to dev (deployment clx-dev).")
 }
@@ -550,10 +552,99 @@ func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, errOut, "Deploy to which deployment?")
-	assert.Contains(t, errOut, "prod (astro deployment clx-dep)  ← default = true")
-	assert.Contains(t, errOut, "dev (astro deployment clx-dev)")
-	assert.Contains(t, errOut, "Choose 1-2 [2]: ")
+	assert.Equal(t, []string{"#", "NAME", "WHERE", "PRESELECTED", "BY"}, strings.Fields(strings.Split(errOut, "\n")[1]))
+	assert.Equal(t, []string{"2", "prod", "astro", "deployment", "clx-dep", "default", "=", "true"}, pickerRow(t, errOut, "prod"))
+	assert.Equal(t, []string{"1", "dev", "astro", "deployment", "clx-dev"}, pickerRow(t, errOut, "dev"))
+	assert.Contains(t, errOut, "\n> [2] ")
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
+}
+
+// pickerRow returns the fields of the deploy picker's row for name, its
+// highlight stripped, failing when the table has no such row.
+func pickerRow(t *testing.T, errOut, name string) []string {
+	t.Helper()
+	for _, line := range strings.Split(errOut, "\n") {
+		line = strings.NewReplacer("\033[1;32m", "", "\033[0m", "").Replace(line)
+		if f := strings.Fields(line); len(f) > 1 && f[1] == name {
+			return f
+		}
+	}
+	t.Fatalf("no row for %q in %q", name, errOut)
+	return nil
+}
+
+// With nothing preselected there is no default on Enter and no column saying
+// what preselected it: Enter is asked again, like any answer that is not a
+// choice, and three of them end the deploy quietly.
+func TestDeployManifestPromptWithNoPreselectNeedsAnAnswer(t *testing.T) {
+	var errOut bytes.Buffer
+	prompt := manifestDeployer{in: strings.NewReader("\n prod\nstaging\n"), errOut: &errOut}
+
+	_, err := prompt.ConfirmTarget([]manifestdeploy.Choice{
+		{Name: "dev", Where: "astro deployment clx-dev"},
+		{Name: "prod", Where: "astro deployment clx-dep"},
+	}, manifestdeploy.Preselect{})
+	require.ErrorIs(t, err, manifestdeploy.ErrAborted)
+
+	assert.NotContains(t, errOut.String(), "PRESELECTED BY")
+	assert.NotContains(t, errOut.String(), "[", "no default shown in the prompt")
+	assert.NotContains(t, errOut.String(), "\033[", "nothing highlighted")
+	assert.Equal(t, 2, strings.Count(errOut.String(), "Not one of the choices.\n> "),
+		"an empty answer and a padded name are each asked again: %q", errOut.String())
+	assert.Equal(t, 3, strings.Count(errOut.String(), "Not one of the choices."),
+		"the third wrong answer is told so too, before the deploy ends quietly: %q", errOut.String())
+}
+
+// Input that ends partway through an answer is read like any answer: a
+// number still picks, and anything else ends the deploy with the message
+// naming how to answer, not quietly.
+func TestDeployManifestPromptReadsAnAnswerCutShort(t *testing.T) {
+	choices := []manifestdeploy.Choice{
+		{Name: "dev", Where: "astro deployment clx-dev"},
+		{Name: "prod", Where: "astro deployment clx-dep"},
+	}
+	name, err := manifestDeployer{in: strings.NewReader("1"), errOut: &bytes.Buffer{}}.ConfirmTarget(choices, manifestdeploy.Preselect{})
+	require.NoError(t, err)
+	assert.Equal(t, "dev", name)
+
+	_, err = manifestDeployer{in: strings.NewReader("prd"), errOut: &bytes.Buffer{}}.ConfirmTarget(choices, manifestdeploy.Preselect{})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, manifestdeploy.ErrAborted)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
+}
+
+// A run that may not ask refuses before it prints the table, naming the flag
+// that answers instead. resolveTarget refuses first on a non-interactive run;
+// this is the picker's own check behind it.
+func TestDeployManifestPromptRefusesWithoutPrintingWhenItMayNotAsk(t *testing.T) {
+	restore := input.SetGuard(func() string { return "with --output json it cannot" })
+	defer restore()
+	var errOut bytes.Buffer
+	prompt := manifestDeployer{in: strings.NewReader("1\n"), errOut: &errOut}
+
+	_, err := prompt.ConfirmTarget(
+		[]manifestdeploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
+		manifestdeploy.Preselect{Name: "test", From: "default = true"},
+	)
+	require.Error(t, err)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.Contains(t, err.Error(), "--deployment")
+	assert.Empty(t, errOut.String())
+}
+
+// Ctrl-D at the prompt is no answer, so it does not take the preselected
+// entry: it ends the deploy with the message naming how to answer instead.
+func TestDeployManifestPromptEndedInputTakesNoDefault(t *testing.T) {
+	prompt := manifestDeployer{in: strings.NewReader(""), errOut: &bytes.Buffer{}}
+
+	_, err := prompt.ConfirmTarget(
+		[]manifestdeploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
+		manifestdeploy.Preselect{Name: "test", From: "default = true"},
+	)
+	require.Error(t, err)
+	assert.True(t, input.IsRequired(err), "%v", err)
+	assert.Contains(t, err.Error(), "a deploy must name the deployment it ships to")
 }
 
 func TestDeployManifestPromptWithOneLinkOffersOneNumber(t *testing.T) {
@@ -567,8 +658,7 @@ func TestDeployManifestPromptWithOneLinkOffersOneNumber(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "test", name)
-	assert.Contains(t, errOut.String(), "Choose 1 [1]: ")
-	assert.NotContains(t, errOut.String(), "1-1")
+	assert.True(t, strings.HasSuffix(errOut.String(), "\n> [1] "), "%q", errOut.String())
 }
 
 func TestDeployManifestPromptTakesTheOtherLink(t *testing.T) {

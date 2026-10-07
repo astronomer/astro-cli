@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/instances/instancestest"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -328,7 +329,7 @@ func TestPromptNeedsAnExplicitChoice(t *testing.T) {
 	if name != "prod" {
 		t.Fatalf("answer = %q, want the explicit choice", name)
 	}
-	if strings.Count(errOut.String(), "Choose 1-2") < 3 {
+	if strings.Count(errOut.String(), "\n> ") < 3 {
 		t.Errorf("empty answers were not re-asked: %q", errOut)
 	}
 }
@@ -373,6 +374,81 @@ func TestPromptEndsOnAClosedStdin(t *testing.T) {
 	var ambiguous *instances.AmbiguousError
 	if !errors.As(err, &ambiguous) {
 		t.Fatalf("err = %v, want the message naming every way to decide", err)
+	}
+	if !input.IsRequired(err) {
+		t.Errorf("err = %v, want a question this run could not get answered", err)
+	}
+}
+
+// Input that ends partway through an answer is read like any answer: a number
+// still picks, and anything else is the question this run could not get
+// answered, with the message naming every way to decide.
+func TestPromptReadsAnAnswerCutShort(t *testing.T) {
+	d, _, _ := instanceDeps(t, t.TempDir())
+	d.Stdin = strings.NewReader("1")
+	name, err := (&cli{d: d}).promptForDeployment([]string{"dev", "prod"})
+	if err != nil || name != "dev" {
+		t.Fatalf("prompt = %q, %v; want dev", name, err)
+	}
+
+	d.Stdin = strings.NewReader("prd")
+	_, err = (&cli{d: d}).promptForDeployment([]string{"dev", "prod"})
+	var ambiguous *instances.AmbiguousError
+	if !errors.As(err, &ambiguous) || !input.IsRequired(err) {
+		t.Fatalf("err = %v, want the AmbiguousError as a question this run could not get answered", err)
+	}
+}
+
+// The question is the shared picker's: a numbered table on stderr, a bare
+// prompt with no default, and an answer read exactly — a padded name is not
+// the name, so three of them run out of tries with the message naming every
+// way to decide.
+func TestPromptIsTheSharedPickerAndReadsExactly(t *testing.T) {
+	d, out, errOut := instanceDeps(t, t.TempDir())
+	d.Stdin = strings.NewReader(" dev\ndev \n02\n")
+	c := &cli{d: d}
+
+	_, err := c.promptForDeployment([]string{"dev", "prod"})
+	var ambiguous *instances.AmbiguousError
+	if !errors.As(err, &ambiguous) || input.IsRequired(err) {
+		t.Fatalf("err = %v, want the AmbiguousError after three tries", err)
+	}
+	lines := strings.Split(errOut.String(), "\n")
+	if len(lines) < 4 || lines[0] != "Which deployment should this project use?" ||
+		strings.Join(strings.Fields(lines[1]), " ") != "# NAME" ||
+		strings.Join(strings.Fields(lines[2]), " ") != "1 dev" ||
+		strings.Join(strings.Fields(lines[3]), " ") != "2 prod" {
+		t.Errorf("table = %q", errOut)
+	}
+	if strings.Contains(errOut.String(), "[") {
+		t.Errorf("a default was offered: %q", errOut)
+	}
+	if got := strings.Count(errOut.String(), "Not one of the choices.\n> "); got != 2 {
+		t.Errorf("re-asked %d times, want 2: %q", got, errOut)
+	}
+	if got := strings.Count(errOut.String(), "Not one of the choices."); got != 3 {
+		t.Errorf("told %d wrong answers, want all 3: %q", got, errOut)
+	}
+	if out.Len() != 0 {
+		t.Errorf("the question went to stdout: %q", out)
+	}
+}
+
+// A run that may not ask refuses before it prints the table, naming the flag
+// that answers instead.
+func TestPromptRefusesWithoutPrintingWhenItMayNotAsk(t *testing.T) {
+	restore := input.SetGuard(func() string { return "with --output json it cannot" })
+	defer restore()
+	d, _, errOut := instanceDeps(t, t.TempDir())
+	d.Stdin = strings.NewReader("1\n")
+	c := &cli{d: d}
+
+	_, err := c.promptForDeployment([]string{"dev", "prod"})
+	if !input.IsRequired(err) || !strings.Contains(err.Error(), "--deployment") {
+		t.Fatalf("err = %v, want a refusal naming --deployment", err)
+	}
+	if errOut.Len() != 0 {
+		t.Errorf("printed before refusing: %q", errOut)
 	}
 }
 
