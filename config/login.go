@@ -137,7 +137,7 @@ func readHomeFromDisk() (v *viper.Viper, ok bool) {
 	v = viper.New()
 	v.SetFs(configFs)
 	v.SetConfigFile(HomeConfigFile)
-	if err := v.ReadInConfig(); err != nil {
+	if err := readConfigFile(v, configFs); err != nil {
 		return nil, false
 	}
 	return v, true
@@ -325,8 +325,8 @@ const renewalLockAttempts = 6
 
 // ReloadHome rereads the home config from disk, for a caller that must see
 // what another process has saved since this one loaded it. It reads under the
-// config's lock, as saveConfig writes, so it never sees a file another astro
-// process is halfway through writing; without the lock it reads anyway.
+// config's lock, as saveConfig writes, so a save another astro process has
+// begun is finished before it reads; without the lock it reads anyway.
 func ReloadHome() {
 	lock := flock.New(HomeConfigFile + ".lock")
 	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)

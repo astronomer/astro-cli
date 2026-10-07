@@ -13,6 +13,7 @@ import (
 	"github.com/gofrs/flock"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
@@ -197,9 +198,9 @@ func initHome(fs afero.Fs) {
 	// Nothing needs the file to exist. Its absence reads as those same
 	// defaults, the setters guard on ConfigFileUsed() which SetConfigFile
 	// above has already set, and saveConfig creates the parent directory
-	// before viper's WriteConfigAs creates the file — so the first `astro
-	// login` or `astro config set -g` still writes it.
-	switch err := viperHome.ReadInConfig(); {
+	// before it writes the file — so the first `astro login` or `astro
+	// config set -g` still writes it.
+	switch err := readConfigFile(viperHome, fs); {
 	case err == nil, errors.Is(err, iofs.ErrNotExist):
 		// A file that is not there cannot be destroyed by writing one, so a
 		// missing config is not an unreadable config.
@@ -241,7 +242,7 @@ func initProject(fs afero.Fs) {
 
 	// Read in project config. As with the home config, a file that vanished
 	// between the check above and this read is absent rather than corrupt.
-	switch readErr := viperProject.ReadInConfig(); {
+	switch readErr := readConfigFile(viperProject, fs); {
 	case readErr == nil, errors.Is(readErr, iofs.ErrNotExist):
 		delete(unreadableConfigs, workingConfigFile)
 	default:
@@ -288,9 +289,10 @@ func IsWithinProjectDir(path string) (bool, error) {
 	return false, nil
 }
 
-// saveConfig serializes viper writes under an exclusive OS-level file lock.
-// viper.WriteConfigAs has no locking, so concurrent astro invocations can
-// interleave writes and corrupt ~/.astro/config.yaml.
+// saveConfig serializes config writes under an exclusive OS-level file lock,
+// so concurrent astro invocations cannot interleave writes and corrupt
+// ~/.astro/config.yaml, and publishes the file whole (writeConfigFile), so a
+// process reading it without the lock never sees half of one.
 //
 // The `<file>.lock` sidecar is only ever a handle for flock — the OS releases
 // the lock when the holding process exits regardless of whether the file is
@@ -309,8 +311,8 @@ func saveConfig(v *viper.Viper, file string) error {
 	}
 
 	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
-	// dir hasn't been created yet. viper.WriteConfigAs creates the parent on
-	// its own, but we need the lock held before we write — so do it upfront.
+	// dir hasn't been created yet, and the lock is held before the write — so
+	// create it upfront.
 	if err := os.MkdirAll(filepath.Dir(file), dirPerm); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
@@ -329,40 +331,24 @@ func saveConfig(v *viper.Viper, file string) error {
 	}
 	defer func() { _ = lock.Unlock() }() //nolint:errcheck // error deliberately ignored in this shell code
 
-	// viper's WriteConfigAs creates a new file 0644. Both configs are made
-	// 0600 instead: the home one holds the API token, and the project one has
-	// been 0600 since CreateConfig chmod'd it, which is the mode this moves
-	// rather than invents. CreateConfig used to set it at startup while the
-	// file was still empty; now that the file appears on first write, the
-	// mode has to be established here.
-	//
-	// Only when the file is absent, so an existing file keeps whatever mode
-	// its owner gave it and the common path costs no extra syscall. Before
-	// the write rather than after, so a token is never momentarily
-	// world-readable.
-	created := false
-	if _, statErr := configFs.Stat(file); errors.Is(statErr, iofs.ErrNotExist) {
-		handle, oerr := configFs.OpenFile(file, os.O_CREATE|os.O_EXCL|os.O_WRONLY, filePerm)
-		if oerr != nil {
-			return fmt.Errorf("creating config file %s: %w", file, oerr)
-		}
-		if cerr := handle.Close(); cerr != nil {
-			return fmt.Errorf("creating config file %s: %w", file, cerr)
-		}
-		created = true
-	}
-
 	home := v == viperHome && file == HomeConfigFile
 	if home {
 		takeUnchangedLogins()
 	}
-	if err := v.WriteConfigAs(file); err != nil {
-		if created {
-			// Take the empty file back out. An empty config parses cleanly,
-			// so leaving it would make the next run read a healthy file full
-			// of nothing and say so to no one.
-			_ = configFs.Remove(file) //nolint:errcheck // the write error below is the one worth reporting
-		}
+	// What viper's WriteConfigAs wrote, which is its YAML codec — yaml.v3 —
+	// over AllSettings, without the write: viper writes in place, and a
+	// reader taking no lock could see the file truncated (writeConfigFile).
+	//
+	// A new file is made 0600 rather than viper's 0644: the home config holds
+	// the API token, and the project one has been 0600 since CreateConfig
+	// chmod'd it. An existing file keeps the mode its owner gave it. The temp
+	// file the content is written to is 0600 from the start, so a token is
+	// never momentarily world-readable.
+	data, err := yaml.Marshal(v.AllSettings())
+	if err != nil {
+		return fmt.Errorf("error saving config: %w", err)
+	}
+	if err := writeConfigFile(configFs, file, data); err != nil {
 		return fmt.Errorf("error saving config: %w", err)
 	}
 	if home {

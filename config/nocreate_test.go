@@ -158,33 +158,41 @@ func (s *Suite) TestRemovingABrokenConfigClearsTheRecord() {
 	s.False(back)
 }
 
-// A write that fails takes its half-made file with it.
+// A write that fails leaves the config as it was, and nothing beside it.
 //
-// saveConfig creates the file before viper writes it, to fix the mode while
-// it is still empty. If the write then fails — a full disk, a quota — an
-// empty config.yaml would be left where there had been nothing, and an empty
-// config parses cleanly: the next run would read a healthy file full of
-// defaults and report nothing wrong.
-//
-// The viper object is given a read-only view of the same filesystem, so the
-// create succeeds and the write does not.
-func (s *Suite) TestAFailedWriteLeavesNoEmptyConfig() {
+// saveConfig publishes the file through a temp file and a rename. If the
+// rename fails — a full disk, a quota, a read-only directory entry — the temp
+// file is taken back out, and the file that was there is untouched: a failed
+// save must not leave an empty config where there had been a full one, since
+// an empty config parses cleanly and the next run would read a healthy file
+// full of defaults and report nothing wrong.
+func (s *Suite) TestAFailedWriteLeavesTheConfigAsItWas() {
 	s.restoreConfigGlobals()
 	memfs := afero.NewMemMapFs()
-	file := filepath.Join(s.T().TempDir(), ConfigDir, ConfigFileNameWithExt)
+	dir := filepath.Join(s.T().TempDir(), ConfigDir)
+	file := filepath.Join(dir, ConfigFileNameWithExt)
+	s.Require().NoError(afero.WriteFile(memfs, file, []byte("before: kept\n"), 0o600))
 
-	configFs = memfs
+	configFs = renameFailsFs{memfs}
 	v := viper.New()
-	v.SetFs(afero.NewReadOnlyFs(memfs))
 	v.SetConfigType(ConfigFileType)
-	v.SetConfigFile(file)
+	v.Set("after", "lost")
 
-	s.Error(saveConfig(v, file), "the write cannot succeed against a read-only filesystem")
+	s.Error(saveConfig(v, file), "the rename cannot succeed")
 
-	there, err := afero.Exists(memfs, file)
+	got, err := afero.ReadFile(memfs, file)
 	s.NoError(err)
-	s.False(there, "a failed write must not leave an empty config behind")
+	s.Equal("before: kept\n", string(got), "a failed write must leave the config as it was")
+	entries, err := afero.ReadDir(memfs, dir)
+	s.NoError(err)
+	s.Len(entries, 1, "a failed write must not leave its temp file behind")
 }
+
+// renameFailsFs is a filesystem on which every write succeeds and no rename
+// does.
+type renameFailsFs struct{ afero.Fs }
+
+func (renameFailsFs) Rename(string, string) error { return os.ErrPermission }
 
 // The project config gets the same treatment as the home config: a file that
 // is gone is not a file a write could destroy.

@@ -124,7 +124,7 @@ func (c cfg) GetStringFor(projectDir string) string {
 		v := viper.New()
 		v.SetFs(configFs)
 		v.SetConfigFile(filepath.Join(projectDir, ConfigDir, ConfigFileNameWithExt))
-		if err := v.ReadInConfig(); err == nil && v.IsSet(c.Path) {
+		if err := readConfigFile(v, configFs); err == nil && v.IsSet(c.Path) {
 			return v.GetString(c.Path)
 		}
 	}

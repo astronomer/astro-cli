@@ -106,6 +106,8 @@ func (s *Suite) TestInitProject() {
 // care which writer wins, only that the file is parseable and contains one
 // of the expected values.
 func (s *Suite) TestSaveConfig_ConcurrentWritesProduceValidYAML() {
+	s.restoreConfigGlobals()
+	configFs = afero.NewOsFs()
 	dir := s.T().TempDir()
 	file := filepath.Join(dir, "config.yaml")
 
