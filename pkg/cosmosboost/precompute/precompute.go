@@ -177,9 +177,11 @@ func processProject(dir, version string, opts Options) Result {
 				data, _ := json.Marshal(buildSlimManifest(doc, version))
 				slim, writeErr := writeSlimManifest(dir, e.Name(), data)
 				if writeErr != nil {
-					r.Err = writeErr
-					r.Duration = time.Since(start)
-					return r
+					// A failure slimming one candidate doesn't cost the
+					// project its tree-hash sidecar, or a sibling candidate
+					// its own already-written slim file.
+					r.Warning = joinNotes(r.Warning, e.Name()+": could not write its slim manifest ("+writeErr.Error()+")")
+					continue
 				}
 				manifests[e.Name()] = ManifestVersion{
 					Version: ProjectVersion{Algo: algoManifestJSON, Hash: hashDocument(doc)},
