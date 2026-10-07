@@ -2,8 +2,6 @@ package astro
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -605,22 +603,19 @@ func TestDeploymentCoreOutputUsage(t *testing.T) {
 	}
 }
 
-// --deployment-file takes -o too. A file that fails validation under -o json
-// is the json error object, exit 1, like any other failure; nothing is asked
-// of the API, so the client mocks nothing.
-func TestDeploymentFromFileJSONError(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "no-name.yaml")
-	require.NoError(t, os.WriteFile(path, []byte("deployment:\n  configuration:\n    description: no name\n"), 0o600))
-	for _, verb := range []string{"create", "update"} {
-		t.Run(verb, func(t *testing.T) {
-			r := execDeploymentRun(t, new(astrov1_mocks.ClientWithResponsesInterface), "", verb, "--deployment-file", path, "-o", "json")
-			assert.Equal(t, cliout.ExitFailure, r.code)
-			var got errorJSON
-			decodeOne(t, r.stdout, &got)
-			assert.Equal(t, cliout.ExitFailure, got.Code)
-			assert.Contains(t, got.Error, "name")
-			assert.NotContains(t, got.Error, "cannot be used with other arguments", "-o is allowed beside the file")
-			assert.Empty(t, r.stderr)
-		})
+// v2 removed the deployments-as-code flags, with no alias: each is cobra's
+// unknown flag, a usage error (exit 2), refused before the API is asked
+// anything, so the client mocks nothing.
+func TestDeploymentAsCodeFlagsRemoved(t *testing.T) {
+	for _, args := range [][]string{
+		{"create", "--deployment-file", "deployment.yaml"},
+		{"update", "--deployment-file", "deployment.yaml"},
+		{"inspect", coreDeploymentID, "--template"},
+		{"inspect", coreDeploymentID, "-t"},
+	} {
+		r := execDeploymentRun(t, new(astrov1_mocks.ClientWithResponsesInterface), "", args...)
+		require.Error(t, r.err, args)
+		assert.Equal(t, cliout.ExitUsage, r.code, args)
+		assert.Contains(t, r.err.Error(), "unknown", args)
 	}
 }

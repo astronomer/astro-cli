@@ -285,24 +285,11 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
-		mockV1Client.AssertExpectations(t)
-	})
-	t.Run("prints a deployment template in yaml format to stdout", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", true, false)
-		assert.NoError(t, err)
-		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
-		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
-		assert.NotContains(t, out.String(), deploymentName)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment in json format to stdout", func(t *testing.T) {
@@ -311,24 +298,11 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, deploymentID, "json", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "json", mockV1Client, out, "", false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentResponse.Namespace)
 		assert.Contains(t, out.String(), deploymentName)
 		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
-		mockV1Client.AssertExpectations(t)
-	})
-	t.Run("prints a deployment template in json format to stdout", func(t *testing.T) {
-		out := new(bytes.Buffer)
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-
-		err := printAs(workspaceID, deploymentID, "json", mockV1Client, out, "", true, false)
-		assert.NoError(t, err)
-		assert.Contains(t, out.String(), deploymentResponse.RuntimeVersion)
-		assert.NotContains(t, out.String(), deploymentResponse.Namespace)
-		assert.NotContains(t, out.String(), deploymentName)
 		mockV1Client.AssertExpectations(t)
 	})
 	t.Run("prints a deployment's specific field to stdout", func(t *testing.T) {
@@ -337,7 +311,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.cluster_name", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.cluster_name", false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), *deploymentResponse.ClusterName)
 		mockV1Client.AssertExpectations(t)
@@ -349,7 +323,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, "", "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, "", "yaml", mockV1Client, out, "", false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), deploymentName)
 		mockV1Client.AssertExpectations(t)
@@ -359,7 +333,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, errGetDeployment).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -367,7 +341,7 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, errGetDeployment).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false)
 		assert.ErrorIs(t, err, errGetDeployment)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -377,7 +351,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "no-exist-information", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "no-exist-information", false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, "", out.String())
 		mockV1Client.AssertExpectations(t)
@@ -391,7 +365,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false)
 		assert.ErrorIs(t, err, errMarshal)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -399,7 +373,7 @@ func TestInspect(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		out := new(bytes.Buffer)
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false)
 		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 		mockV1Client.AssertExpectations(t)
 	})
@@ -414,7 +388,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err = printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false, false)
+		err = printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "", false)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), "N/A")
 		assert.Contains(t, out.String(), deploymentName)
@@ -426,7 +400,7 @@ func TestInspect(t *testing.T) {
 	t.Run("when no deployments in workspace", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&emptyListDeploymentsResponse, nil).Once()
-		err := printAs(workspaceID, "", "yaml", mockV1Client, out, "", false, false)
+		err := printAs(workspaceID, "", "yaml", mockV1Client, out, "", false)
 		assert.NoError(t, err)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -437,7 +411,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, false)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false)
 		assert.ErrorIs(t, err, errKeyNotFound)
 		assert.Equal(t, out.String(), "")
 		mockV1Client.AssertExpectations(t)
@@ -449,7 +423,7 @@ func TestInspect(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentResponse, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
 
-		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", false, true)
+		err := printAs(workspaceID, deploymentID, "yaml", mockV1Client, out, "configuration.workload_identity", true)
 		assert.NoError(t, err)
 		assert.Contains(t, out.String(), workloadIdentity)
 		mockV1Client.AssertExpectations(t)
@@ -465,7 +439,7 @@ func TestInspectRemoteExecutionAPIURL(t *testing.T) {
 		AllowedIpAddressRanges: []string{"0.0.0.0/0"},
 		RemoteApiUrl:           remoteAPIURL,
 	}
-	run := func(t *testing.T, d astrov1.Deployment, outputFormat, requestedField string, template bool) (string, error) {
+	run := func(t *testing.T, d astrov1.Deployment, outputFormat, requestedField string) (string, error) {
 		t.Helper()
 		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
 		resp := astrov1.GetDeploymentResponse{HTTPResponse: &http.Response{StatusCode: http.StatusOK}, JSON200: &d}
@@ -473,13 +447,13 @@ func TestInspectRemoteExecutionAPIURL(t *testing.T) {
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&resp, nil).Once()
 		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Maybe()
 		out := new(bytes.Buffer)
-		err := printAs("test-ws-id", deploymentID, outputFormat, mockV1Client, out, requestedField, template, false)
+		err := printAs("test-ws-id", deploymentID, outputFormat, mockV1Client, out, requestedField, false)
 		mockV1Client.AssertExpectations(t)
 		return out.String(), err
 	}
 
 	t.Run("yaml output carries the url in metadata", func(t *testing.T) {
-		out, err := run(t, withRemoteExecution, "yaml", "", false)
+		out, err := run(t, withRemoteExecution, "yaml", "")
 		require.NoError(t, err)
 		var parsed FormattedDeployment
 		require.NoError(t, yaml.Unmarshal([]byte(out), &parsed))
@@ -489,7 +463,7 @@ func TestInspectRemoteExecutionAPIURL(t *testing.T) {
 		assert.Equal(t, 1, strings.Count(out, remoteAPIURL), "the url belongs in metadata only, not under configuration.remote_execution")
 	})
 	t.Run("json output carries the url in metadata", func(t *testing.T) {
-		out, err := run(t, withRemoteExecution, "json", "", false)
+		out, err := run(t, withRemoteExecution, "json", "")
 		require.NoError(t, err)
 		var parsed FormattedDeployment
 		require.NoError(t, json.Unmarshal([]byte(out), &parsed))
@@ -499,26 +473,17 @@ func TestInspectRemoteExecutionAPIURL(t *testing.T) {
 		assert.Equal(t, 1, strings.Count(out, remoteAPIURL))
 	})
 	t.Run("--key metadata.remote_execution_api_url prints the url alone", func(t *testing.T) {
-		out, err := run(t, withRemoteExecution, "yaml", "metadata.remote_execution_api_url", false)
+		out, err := run(t, withRemoteExecution, "yaml", "metadata.remote_execution_api_url")
 		require.NoError(t, err)
 		assert.Equal(t, remoteAPIURL+"\n", out)
 	})
-	for _, format := range []string{"yaml", "json"} {
-		t.Run("a "+format+" template leaves the url out", func(t *testing.T) {
-			out, err := run(t, withRemoteExecution, format, "", true)
-			require.NoError(t, err)
-			assert.NotContains(t, out, remoteAPIURL)
-			assert.NotContains(t, out, "remote_execution_api_url")
-			assert.Contains(t, out, "remote_execution", "the editable remote execution settings stay in the template")
-		})
-	}
 	t.Run("a deployment without remote execution has no url key", func(t *testing.T) {
 		for _, format := range []string{"yaml", "json"} {
-			out, err := run(t, newSourceDeployment(), format, "", false)
+			out, err := run(t, newSourceDeployment(), format, "")
 			require.NoError(t, err)
 			assert.NotContains(t, out, "remote_execution_api_url")
 		}
-		_, err := run(t, newSourceDeployment(), "yaml", "metadata.remote_execution_api_url", false)
+		_, err := run(t, newSourceDeployment(), "yaml", "metadata.remote_execution_api_url")
 		assert.ErrorIs(t, err, errKeyNotFound)
 	})
 	t.Run("an empty url from the API is left out", func(t *testing.T) {
@@ -907,7 +872,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
         - email2
 `
 		var orderedAndTaggedDeployment, unorderedDeployment FormattedDeployment
-		actualPrintableDeployment, err := formatPrintableDeployment("", false, printableDeployment)
+		actualPrintableDeployment, err := formatPrintableDeployment("", printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid yaml
 		err = yaml.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
@@ -923,82 +888,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.Equal(t, orderedAndTaggedDeployment, unorderedDeployment, "structs should match")
 		// testing the order is not equal
 		assert.NotEqual(t, string(unordered), string(actualPrintableDeployment), "order should not match")
-	})
-	t.Run("returns a yaml formatted template deployment", func(t *testing.T) {
-		sourceDeployment2 := sourceDeployment
-		sourceDeployment2.Type = &hybridType
-		sourceDeployment2.Executor = &executorCelery
-		description = "description"
-		sourceDeployment2.Description = &description
-		empty := ""
-		sourceDeployment2.CloudProvider = nil
-		sourceDeployment2.Region = &empty
-
-		info, _ := getDeploymentInfo(sourceDeployment2)
-		config, err := getDeploymentConfig(&sourceDeployment2, mockV1Client, false)
-		assert.NoError(t, err)
-		additional := getAdditionalNullableFields(&sourceDeployment2, nodePools)
-
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-				"hibernation_schedules": additional["hibernation_schedules"],
-			},
-		}
-		expectedDeployment := `deployment:
-    environment_variables:
-        - is_secret: false
-          key: foo
-          updated_at: "2023-02-01T12:00:00Z"
-          value: bar
-    configuration:
-        name: ""
-        description: description
-        runtime_version: 6.0.0
-        dag_deploy_enabled: true
-        ci_cd_enforcement: false
-        is_high_availability: false
-        is_development_mode: true
-        executor: CELERY
-        scheduler_au: 5
-        scheduler_count: 3
-        cluster_name: test-cluster
-        workspace_name: test-ws
-        deployment_type: HYBRID
-        cloud_provider: ""
-        region: ""
-        workload_identity: ""
-    worker_queues:
-        - name: default
-          max_worker_count: 130
-          min_worker_count: 12
-          worker_concurrency: 110
-          worker_type: test-instance-type
-        - name: test-queue-1
-          max_worker_count: 175
-          min_worker_count: 8
-          worker_concurrency: 150
-          worker_type: test-instance-type-1
-    alert_emails:
-        - email1
-        - email2
-    hibernation_schedules:
-        - hibernate_at: 1 * * * *
-          wake_at: 2 * * * *
-          description: hibernation schedule 1
-          enabled: true
-`
-		var orderedAndTaggedDeployment FormattedDeployment
-		actualPrintableDeployment, err := formatPrintableDeployment("", true, printableDeployment)
-		assert.NoError(t, err)
-		// testing we get valid yaml
-		err = yaml.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
-		assert.NoError(t, err)
-		assert.Equal(t, expectedDeployment, string(actualPrintableDeployment), "tag and order should match")
 	})
 
 	t.Run("returns a yaml formatted standard deployment", func(t *testing.T) {
@@ -1106,7 +995,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
           enabled: true
 `
 		var orderedAndTaggedDeployment FormattedDeployment
-		actualPrintableDeployment, err := formatPrintableDeployment("", false, printableDeployment)
+		actualPrintableDeployment, err := formatPrintableDeployment("", printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid yaml
 		err = yaml.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
@@ -1205,7 +1094,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
     }
 }`
 		var orderedAndTaggedDeployment, unorderedDeployment FormattedDeployment
-		actualPrintableDeployment, err := formatPrintableDeployment("json", false, printableDeployment)
+		actualPrintableDeployment, err := formatPrintableDeployment("json", printableDeployment)
 		assert.NoError(t, err)
 		// testing we get valid json
 		err = json.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
@@ -1222,79 +1111,6 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		// testing the order is not equal
 		assert.NotEqual(t, string(unordered), string(actualPrintableDeployment), "order should not match")
 	})
-	t.Run("returns a json formatted template deployment", func(t *testing.T) {
-		sourceDeployment.Executor = &executorKubernetes
-		sourceDeployment.WorkerQueues = nil
-		empty := ""
-		sourceDeployment.CloudProvider = nil
-		sourceDeployment.Region = &empty
-
-		info, _ := getDeploymentInfo(sourceDeployment)
-		config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
-		assert.NoError(t, err)
-		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-				"hibernation_schedules": additional["hibernation_schedules"],
-			},
-		}
-
-		expectedDeployment := `{
-    "deployment": {
-        "environment_variables": [
-            {
-                "is_secret": false,
-                "key": "foo",
-                "updated_at": "2023-02-01T12:00:00Z",
-                "value": "bar"
-            }
-        ],
-        "configuration": {
-            "name": "",
-            "description": "description",
-            "runtime_version": "6.0.0",
-            "dag_deploy_enabled": true,
-            "ci_cd_enforcement": false,
-            "is_high_availability": false,
-            "is_development_mode": true,
-            "executor": "KUBERNETES",
-            "scheduler_au": 5,
-            "scheduler_count": 3,
-            "cluster_name": "test-cluster",
-            "workspace_name": "test-ws",
-            "deployment_type": "HYBRID",
-            "cloud_provider": "",
-            "region": "",
-            "workload_identity": ""
-        },
-        "worker_queues": [],
-        "alert_emails": [
-            "email1",
-            "email2"
-        ],
-        "hibernation_schedules": [
-            {
-                "hibernate_at": "1 * * * *",
-                "wake_at": "2 * * * *",
-                "description": "hibernation schedule 1",
-                "enabled": true
-            }
-        ]
-    }
-}`
-		var orderedAndTaggedDeployment FormattedDeployment
-		actualPrintableDeployment, err := formatPrintableDeployment("json", true, printableDeployment)
-		assert.NoError(t, err)
-		// testing we get valid json
-		err = json.Unmarshal(actualPrintableDeployment, &orderedAndTaggedDeployment)
-		assert.NoError(t, err)
-		assert.Equal(t, compactJSON(t, expectedDeployment), string(actualPrintableDeployment), "tag and order should match")
-	})
 	t.Run("returns an error if decoding to struct fails", func(t *testing.T) {
 		originalDecode := decodeToStruct
 		decodeToStruct = errorReturningDecode
@@ -1304,7 +1120,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
-		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
+		actualPrintableDeployment, err := formatPrintableDeployment("", getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
@@ -1317,7 +1133,7 @@ func TestFormatPrintableDeployment(t *testing.T) {
 		assert.NoError(t, err)
 		additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
 		expectedPrintableDeployment = []byte{}
-		actualPrintableDeployment, err := formatPrintableDeployment("", false, getPrintableDeployment(info, config, additional))
+		actualPrintableDeployment, err := formatPrintableDeployment("", getPrintableDeployment(info, config, additional))
 		assert.ErrorIs(t, err, errMarshal)
 		assert.Contains(t, string(actualPrintableDeployment), string(expectedPrintableDeployment))
 	})
@@ -1441,119 +1257,12 @@ func TestGetWorkerTypeFromNodePoolID(t *testing.T) {
 	})
 }
 
-func TestGetTemplate(t *testing.T) {
-	sourceDeployment = newSourceDeployment()
-	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-	testUtil.InitTestConfig(testUtil.CloudPlatform)
-
-	info, _ := getDeploymentInfo(sourceDeployment)
-	config, err := getDeploymentConfig(&sourceDeployment, mockV1Client, false)
-	assert.NoError(t, err)
-	additional := getAdditionalNullableFields(&sourceDeployment, nodePools)
-
-	t.Run("returns a formatted template", func(t *testing.T) {
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"alert_emails":          additional["alert_emails"],
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
-		var decoded, expected FormattedDeployment
-		err := decodeToStruct(printableDeployment, &decoded)
-		assert.NoError(t, err)
-		err = decodeToStruct(printableDeployment, &expected)
-		assert.NoError(t, err)
-		expected.Deployment.Configuration.Name = ""
-		expected.Deployment.Metadata = nil
-		newEnvVars := []EnvironmentVariable{}
-		for i := range expected.Deployment.EnvVars {
-			if !expected.Deployment.EnvVars[i].IsSecret {
-				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
-			}
-		}
-		expected.Deployment.EnvVars = newEnvVars
-		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = "2023-02-01T12:00:00Z"
-		}
-
-		actual := getTemplate(&decoded)
-		assert.Equal(t, expected, actual)
-	})
-	t.Run("returns a template without env vars if they are empty", func(t *testing.T) {
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":      info,
-				"configuration": config,
-				"alert_emails":  additional["alert_emails"],
-				"worker_queues": additional["worker_queues"],
-			},
-		}
-		var decoded, expected FormattedDeployment
-		err := decodeToStruct(printableDeployment, &decoded)
-		assert.NoError(t, err)
-		err = decodeToStruct(printableDeployment, &expected)
-		assert.NoError(t, err)
-		err = decodeToStruct(printableDeployment, &decoded)
-		assert.NoError(t, err)
-		err = decodeToStruct(printableDeployment, &expected)
-		assert.NoError(t, err)
-		expected.Deployment.Configuration.Name = ""
-		expected.Deployment.Metadata = nil
-		expected.Deployment.EnvVars = nil
-		newEnvVars := []EnvironmentVariable{}
-		for i := range expected.Deployment.EnvVars {
-			if !expected.Deployment.EnvVars[i].IsSecret {
-				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
-			}
-		}
-		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = "2023-02-01T12:00:00Z"
-		}
-		expected.Deployment.EnvVars = newEnvVars
-		actual := getTemplate(&decoded)
-		assert.Equal(t, expected, actual)
-	})
-	t.Run("returns a template without alert emails if they are empty", func(t *testing.T) {
-		printableDeployment := map[string]interface{}{
-			"deployment": map[string]interface{}{
-				"metadata":              info,
-				"configuration":         config,
-				"worker_queues":         additional["worker_queues"],
-				"environment_variables": additional["environment_variables"],
-			},
-		}
-		var decoded, expected FormattedDeployment
-		err := decodeToStruct(printableDeployment, &decoded)
-		assert.NoError(t, err)
-		err = decodeToStruct(printableDeployment, &expected)
-		assert.NoError(t, err)
-		expected.Deployment.Configuration.Name = ""
-		expected.Deployment.Metadata = nil
-		expected.Deployment.AlertEmails = nil
-		newEnvVars := []EnvironmentVariable{}
-		for i := range expected.Deployment.EnvVars {
-			if !expected.Deployment.EnvVars[i].IsSecret {
-				newEnvVars = append(newEnvVars, expected.Deployment.EnvVars[i])
-			}
-		}
-		for i := range expected.Deployment.EnvVars {
-			expected.Deployment.EnvVars[i].UpdatedAt = ""
-		}
-		expected.Deployment.EnvVars = newEnvVars
-		actual := getTemplate(&decoded)
-		assert.Equal(t, expected, actual)
-	})
-}
-
 // formatPrintableDeployment is the bytes Print hands its Renderer for a
 // printable map, without the newline it ends them with: the YAML, or with
 // outputFormat "json" the value a stand-in for the Renderer encodes compactly,
 // as the CLI's one encoder does off a terminal.
-func formatPrintableDeployment(outputFormat string, template bool, printableDeployment map[string]interface{}) ([]byte, error) {
-	formatted, err := formatDeployment(template, printableDeployment)
+func formatPrintableDeployment(outputFormat string, printableDeployment map[string]interface{}) ([]byte, error) {
+	formatted, err := formatDeployment(printableDeployment)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -1566,9 +1275,9 @@ func formatPrintableDeployment(outputFormat string, template bool, printableDepl
 
 // printAs runs Print the way a command does, with a stand-in for its
 // Renderer in json mode when outputFormat is "json".
-func printAs(wsID, deploymentID, outputFormat string, astroV1Client astrov1.APIClient, out io.Writer, requestedField string, template, showWorkloadIdentity bool) error {
+func printAs(wsID, deploymentID, outputFormat string, astroV1Client astrov1.APIClient, out io.Writer, requestedField string, showWorkloadIdentity bool) error {
 	r := testUtil.Renderer{JSON: outputFormat == "json", Out: out}
-	return Print(wsID, "", deploymentID, astroV1Client, out, r, requestedField, template, showWorkloadIdentity)
+	return Print(wsID, "", deploymentID, astroV1Client, out, r, requestedField, showWorkloadIdentity)
 }
 
 // compactJSON is s on one line, the layout formatPrintableDeployment's json

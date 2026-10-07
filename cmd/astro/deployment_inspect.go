@@ -12,16 +12,13 @@ import (
 
 var (
 	outputFormat, requestedField string
-	template                     bool
 	cleanOutput                  bool
 	showWorkloadIdentity         bool
 )
 
 // formatYAML is the --output value inspect offers beyond text and json, kept
-// because a deployment file is YAML: `inspect --template` output is what
-// `astro deployment create --deployment-file` reads, and
-// astronomer/deploy-action round-trips it. text renders the same YAML, so the
-// default prints what it always has.
+// because inspect has always printed YAML and scripts read it. text renders
+// the same YAML, so the default prints what it always has.
 const formatYAML cliout.Format = "yaml"
 
 func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
@@ -29,12 +26,11 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 		Use:     "inspect",
 		Aliases: []string{"in"},
 		Short:   "Inspect a deployment configuration",
-		Long:    "Inspect an Astro Deployment configuration, which can be useful if you manage deployments as code or use Deployment configuration templates. This command returns the Deployment's configuration as YAML (the default, and the format `astro deployment create --deployment-file` reads) or JSON, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations.",
+		Long:    "Inspect an Astro Deployment configuration. This command returns the Deployment's configuration as YAML (the default) or JSON, which includes information about resources, such as cluster ID, region, and Airflow API URL, as well as scheduler and worker queue configurations.",
 		Example: `
   $ astro deployment inspect <deployment-id>
   $ astro deployment inspect <deployment-id> --output json
   $ astro deployment inspect --deployment my-deployment --key configuration.cluster_id
-  $ astro deployment inspect <deployment-id> --template > deployment.yaml
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentInspect(cmd, args, out)
@@ -44,7 +40,6 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	addDeploymentFlag(cmd.Flags(), "Deployment to inspect: a link name from pyproject.toml, a Deployment id, or a Deployment name")
 	cliout.AddOutputFlag(cmd, &outputFormat, formatYAML)
 	cmd.PersistentFlags().Lookup("output").Usage += ". text prints the deployment as YAML, the same as yaml."
-	cmd.Flags().BoolVarP(&template, "template", "t", false, "Create a template from the deployment being inspected.")
 	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "A specific key for the deployment. Use --key configuration.cluster_id to get a deployment's cluster id.")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "clean output to only include inspect yaml or json file in any situation.")
 	cmd.Flags().BoolVarP(&showWorkloadIdentity, "show-workload-identity", "", false, "Include the workload identity configured for the deployment in the output.")
@@ -79,5 +74,5 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	// is yaml) is the renderer's text. --key bypasses both and prints the bare
 	// value to out, as it always has.
 	r := cliout.Renderer{Format: format, Out: out}
-	return inspect.Print(wsID, deploymentName, deploymentID, astroV1Client, out, r, requestedField, template, showWorkloadIdentity)
+	return inspect.Print(wsID, deploymentName, deploymentID, astroV1Client, out, r, requestedField, showWorkloadIdentity)
 }

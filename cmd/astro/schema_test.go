@@ -111,13 +111,11 @@ var publishedPayloads = []cliouttest.Case{
 	// object a finished deploy prints.
 	{Name: "deploy", Value: deployJSON{}},
 
-	// astro deployment inspect -o json, and -o json --template, which is the
-	// same shape with metadata dropped. Its keys predate the CLI's json rules
-	// and are snake_case already; the --deployment-file round trip and
-	// astronomer/deploy-action read them, so they do not move. The bytes of
-	// every inspect output are pinned too, in testdata/deployment_inspect.
-	// `deployment create` and `update` -o json publish the Deployment they
-	// leave in this shape too, as their --deployment-file echo does.
+	// astro deployment inspect -o json. Its keys predate the CLI's json rules
+	// and are snake_case already; astronomer/deploy-action reads them, so
+	// they do not move. The bytes of every inspect output are pinned too, in
+	// testdata/deployment_inspect. `deployment create` and `update` -o json
+	// publish the Deployment they leave in this shape too.
 	{Name: "deployment-inspect", Value: inspect.FormattedDeployment{}},
 
 	// astro deployment delete: what it deleted.

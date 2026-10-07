@@ -27,7 +27,7 @@ var deploymentOutput string
 // In json it is the Deployment as `astro deployment inspect -o json` shows it
 // (inspect.FormattedDeployment, pinned by deployment-inspect.json), read
 // afresh, so a script reads a created or updated Deployment the way it reads
-// an inspected one, and the way `--deployment-file` echoes one. Read afresh
+// an inspected one. Read afresh
 // because the answer to the create or the update can be some minutes old by
 // the time a --wait ends, and its status with it.
 //

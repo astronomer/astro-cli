@@ -120,10 +120,9 @@ const notApplicable = "N/A"
 // Print prints a deployment. The whole deployment is handed to r, the
 // command's cliout.Renderer: in json mode r encodes it, and in any other mode
 // r runs the YAML renderer here, which is what inspect's default, -o text and
-// -o yaml all print, and what `deployment create|update --deployment-file`
-// echoes after reading a YAML file. A --key prints the bare value to out in
-// every mode, which is how deploy-action reads it.
-func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIClient, out io.Writer, r output.Emitter, requestedField string, template, showWorkloadIdentity bool) error {
+// -o yaml all print. A --key prints the bare value to out in every mode,
+// which is how deploy-action reads it.
+func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIClient, out io.Writer, r output.Emitter, requestedField string, showWorkloadIdentity bool) error {
 	// get or select the deployment
 	requestedDeployment, err := deployment.GetDeployment(wsID, deploymentID, deploymentName, true, nil, astroV1Client)
 	if err != nil {
@@ -148,7 +147,7 @@ func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIC
 		return nil
 	}
 	// print the entire deployment
-	formatted, err := formatDeployment(template, printableDeployment)
+	formatted, err := formatDeployment(printableDeployment)
 	if err != nil {
 		return err
 	}
@@ -157,14 +156,13 @@ func Print(wsID, deploymentName, deploymentID string, astroV1Client astrov1.APIC
 
 // Formatted is d as `deployment inspect --show-workload-identity` publishes
 // it, for a command that already has the Deployment in hand: `deployment
-// create` and `update` publish the Deployment they leave in the same shape,
-// as the --deployment-file echo of either does.
+// create` and `update` publish the Deployment they leave in the same shape.
 func Formatted(d *astrov1.Deployment, astroV1Client astrov1.APIClient) (FormattedDeployment, error) {
 	printable, err := getPrintable(d, astroV1Client, true)
 	if err != nil {
 		return FormattedDeployment{}, err
 	}
-	return formatDeployment(false, printable)
+	return formatDeployment(printable)
 }
 
 // getPrintable is d as one map, in the sections inspect prints: its metadata,
@@ -410,21 +408,18 @@ func getHibernationSchedulesMap(sourceHibernationSchedules []astrov1.DeploymentH
 }
 
 // formatDeployment orders the printable map into the FormattedDeployment both
-// formats print, cut down to a template when one was asked for.
-func formatDeployment(template bool, printableDeployment map[string]interface{}) (FormattedDeployment, error) {
+// formats print.
+func formatDeployment(printableDeployment map[string]interface{}) (FormattedDeployment, error) {
 	var formatWithOrder FormattedDeployment
 	// use mapstructure to decode to a struct
 	if err := decodeToStruct(printableDeployment, &formatWithOrder); err != nil {
 		return FormattedDeployment{}, err
 	}
-	if template {
-		formatWithOrder = getTemplate(&formatWithOrder)
-	}
 	return formatWithOrder, nil
 }
 
 // writeYAML is the text renderer: the deployment as YAML, the bytes
-// deploy-action and `--deployment-file` read.
+// deploy-action reads.
 func writeYAML(d *FormattedDeployment) func(io.Writer) error {
 	return func(w io.Writer) error {
 		b, err := yamlMarshal(d)
@@ -485,36 +480,6 @@ func getWorkerTypeFromNodePoolID(poolID string, nodePools []astrov1.NodePool) st
 		}
 	}
 	return ""
-}
-
-// getTemplate returns a Formatted Deployment that can be used as a template.
-// It has no metadata, no name and no updatedAt timestamp for environment_variables.
-// The output templates can be modified and used to create deployments.
-func getTemplate(formattedDeployment *FormattedDeployment) FormattedDeployment {
-	template := *formattedDeployment
-	template.Deployment.Configuration.Name = ""
-	template.Deployment.Metadata = nil
-	newEnvVars := []EnvironmentVariable{}
-
-	for i := range template.Deployment.EnvVars {
-		if !template.Deployment.EnvVars[i].IsSecret {
-			newEnvVars = append(newEnvVars, template.Deployment.EnvVars[i])
-		}
-	}
-	template.Deployment.EnvVars = newEnvVars
-	if template.Deployment.Configuration.Executor == deployment.KubeExecutor {
-		var newWorkerQs []Workerq
-		for i := range template.Deployment.WorkerQs {
-			if template.Deployment.WorkerQs[i].Name == "default" {
-				template.Deployment.WorkerQs[i].PodCPU = ""
-				template.Deployment.WorkerQs[i].PodRAM = ""
-				newWorkerQs = append(newWorkerQs, template.Deployment.WorkerQs[i])
-			}
-		}
-		template.Deployment.WorkerQs = newWorkerQs
-	}
-
-	return template
 }
 
 func GetDefaultWorkerType(taskPodNodePoolID, clusterID string, astroV1Client astrov1.APIClient) (string, error) {

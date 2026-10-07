@@ -33,8 +33,7 @@ import (
 //   - anywhere in this package, in cmd/cliout, where Emit lives, and in the
 //     renderers below cmd/ that the Astro tree hands its Renderer to
 //     (pkg/output, internal/platform/astro/env, and the deployment inspect
-//     and deployment-file packages), including at file scope, not only
-//     inside funcs
+//     package), including at file scope, not only inside funcs
 //   - everywhere except the body of Renderer.emit, the one method Emit and
 //     EmitEvent both lead through
 //
@@ -54,7 +53,6 @@ func TestEmitIsTheOnlyJSONEncoder(t *testing.T) {
 		filepath.Join("..", "..", "pkg", "output"),
 		filepath.Join("..", "..", "internal", "platform", "astro", "env"),
 		filepath.Join("..", "..", "internal", "platform", "astro", "deployment", "inspect"),
-		filepath.Join("..", "..", "internal", "platform", "astro", "deployment", "fromfile"),
 	} {
 		entries, err := os.ReadDir(dir)
 		require.NoError(t, err)

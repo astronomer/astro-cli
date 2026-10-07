@@ -3,25 +3,21 @@ package astro
 import (
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/fromfile"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
 	"github.com/astronomer/astro-cli/internal/platform/astro/team"
 	"github.com/astronomer/astro-cli/internal/platform/astro/user"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
-	"github.com/astronomer/astro-cli/pkg/output"
 )
 
 const (
@@ -29,6 +25,12 @@ const (
 	disable   = "disable"
 	standard  = "standard"
 	dedicated = "dedicated"
+
+	// --type also takes the deployment types the API names, as `deployment
+	// inspect` prints them.
+	hostedStandard  = "HOSTED_STANDARD"
+	hostedShared    = "HOSTED_SHARED"
+	hostedDedicated = "HOSTED_DEDICATED"
 
 	deploymentWaitTime = 600 * time.Second
 )
@@ -59,7 +61,6 @@ var (
 	useEnvFile                 bool
 	makeSecret                 bool
 	executor                   string
-	inputFile                  string
 	cloudProvider              string
 	region                     string
 	schedulerSize              string
@@ -115,7 +116,6 @@ var (
 		$ astro deployment variable update --deployment <deployment-id> --load --env .env.my-deployment
 		`
 	httpClient              = httputil.NewHTTPClient()
-	errFlag                 = errors.New("--deployment-file cannot be used with other arguments. See --help for usage")
 	errInvalidExecutor      = errors.New("not a valid executor")
 	errInvalidCloudProvider = errors.New("not a valid cloud provider. It can only be gcp, azure or aws")
 )
@@ -454,7 +454,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 		Use:     "create",
 		Aliases: []string{"cr"},
 		Short:   "Create a new Astro Deployment",
-		Long:    "Create a new Deployment — an Airflow environment running on Astro. Configurable options include the executor type (Celery, Kubernetes, Astro), runtime version, worker queues, cloud provider, and region. On hosted Astro, a Deployment can be standard (shared infrastructure) or dedicated (isolated cluster). Use --deployment-file to create from a YAML/JSON configuration template. Use --wait to block until the Deployment is healthy.",
+		Long:    "Create a new Deployment — an Airflow environment running on Astro. Configurable options include the executor type (Celery, Kubernetes, Astro), runtime version, worker queues, cloud provider, and region. On hosted Astro, a Deployment can be standard (shared infrastructure) or dedicated (isolated cluster). Use --wait to block until the Deployment is healthy.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deploymentCreate(cmd, args, out)
 		},
@@ -467,7 +467,6 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the Deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment. Possible values can be CeleryExecutor, KubernetesExecutor, or AstroExecutor.")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
-	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the Deployment to create. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&waitForStatus, "wait", "i", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTimeForDeployment, "wait-time", deploymentWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "", false, "clean output to only include inspect yaml or json file in any situation.")
@@ -512,7 +511,6 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	addWorkspaceFlag(cmd.Flags(), "w", "Workspace the Deployment is located in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "", "The executor to use for the deployment. Possible values can be CeleryExecutor, KubernetesExecutor or AstroExecutor.")
-	cmd.Flags().StringVarP(&inputFile, "deployment-file", "", "", "Location of file containing the deployment to update. File can be in either JSON or YAML format.")
 	cmd.Flags().BoolVarP(&forceUpdate, "yes", "y", false, "Don't ask for confirmation, including after a warning about the Deployment's CI/CD enforcement")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable.")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
@@ -814,13 +812,13 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	if developmentMode != "" && !(developmentMode == enable || developmentMode == disable) {
 		return errors.New("Invalid --development-mode value")
 	}
-	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared || deploymentType == fromfile.HostedDedicated) {
+	if organization.IsOrgHosted() && !(deploymentType == standard || deploymentType == dedicated || deploymentType == hostedStandard || deploymentType == hostedShared || deploymentType == hostedDedicated) {
 		return errors.New("Invalid --type value")
 	}
 	if cicdEnforcement != "" && !(cicdEnforcement == enable || cicdEnforcement == disable) {
 		return errors.New("Invalid --cicd-enforcement value")
 	}
-	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared) {
+	if organization.IsOrgHosted() && clusterID != "" && (deploymentType == standard || deploymentType == hostedStandard || deploymentType == hostedShared) {
 		return errors.New("flag --cluster-id cannot be used to create a standard deployment. If you want to create a dedicated deployment, use --type dedicated along with --cluster-id")
 	}
 	if cmd.Flags().Changed("allowed-ip-address-ranges") {
@@ -847,26 +845,16 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	}
 
 	var coreDeploymentType astrov1.DeploymentType
-	if deploymentType == standard || deploymentType == fromfile.HostedStandard || deploymentType == fromfile.HostedShared {
+	if deploymentType == standard || deploymentType == hostedStandard || deploymentType == hostedShared {
 		coreDeploymentType = astrov1.DeploymentTypeSTANDARD
 	}
-	if deploymentType == dedicated || deploymentType == fromfile.HostedDedicated {
+	if deploymentType == dedicated || deploymentType == hostedDedicated {
 		coreDeploymentType = astrov1.DeploymentTypeDEDICATED
 	}
 
 	if !organization.IsOrgHosted() {
 		coreDeploymentType = astrov1.DeploymentTypeHYBRID
 	}
-	// request is to create from a file
-	if inputFile != "" {
-		// --yes answers the file path's own confirmation, so it is allowed
-		// beside the file like --wait.
-		if onlyFlagsSet(cmd, "wait", "wait-time", "deployment-file", "yes", "verbosity", "output") {
-			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out, format), waitForStatus, waitTimeForDeployment, forceUpdate)
-		}
-		return errFlag
-	}
-
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value)")
 	}
@@ -902,22 +890,6 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 	return failedAfterResult(cmd, format, err)
 }
 
-// deploymentFileEcho is the Renderer `deployment create|update
-// --deployment-file` prints the deployment it made or changed through, in the
-// format of the file it read: a JSON file's echo is a json result, from the
-// CLI's one encoder, so it is pretty on a terminal and one line when piped;
-// a YAML file's is the deployment's YAML, as `deployment inspect` prints it.
-// Under -o json the echo is json whatever the file was: stdout then holds
-// the one object, the same FormattedDeployment the flag path publishes.
-func deploymentFileEcho(out io.Writer, format cliout.Format) fromfile.Echo {
-	return func(fromJSON bool) output.Emitter {
-		if fromJSON || format == cliout.FormatJSON {
-			return cliout.Renderer{Format: cliout.FormatJSON, Out: out}
-		}
-		return cliout.Renderer{Format: cliout.FormatText, Out: out}
-	}
-}
-
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	// Reject a bad -o before anything else, so it is a usage error.
 	format, err := cliout.ParseFormat(deploymentOutput)
@@ -945,15 +917,6 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	// check if executor is valid
 	if executor != "" && !deployment.IsValidExecutor(executor, runtimeVersion, deploymentType) {
 		return fmt.Errorf("%s is %w", executor, errInvalidExecutor)
-	}
-	// request is to update from a file
-	if inputFile != "" {
-		// --yes answers the file path's own confirmation. Counting every set
-		// flag also refused it, and the global --verbosity with it.
-		if onlyFlagsSet(cmd, "deployment-file", "yes", "verbosity", "output") {
-			return fromfile.CreateOrUpdate(inputFile, cmd.Name(), astroV1Client, out, deploymentFileEcho(out, format), false, 0*time.Second, forceUpdate)
-		}
-		return errFlag
 	}
 	if dagDeploy != "" && !(dagDeploy == enable || dagDeploy == disable) {
 		return errors.New("Invalid --dag-deploy value")
@@ -1720,15 +1683,4 @@ func getOverrideUntil(until, forDuration string) (*time.Time, error) {
 func fromCsv(s string) *[]string {
 	ss := strings.Split(strings.TrimSpace(s), ",")
 	return &ss
-}
-
-// onlyFlagsSet reports whether every flag set on cmd is one of allowed.
-func onlyFlagsSet(cmd *cobra.Command, allowed ...string) bool {
-	ok := true
-	cmd.Flags().Visit(func(f *pflag.Flag) {
-		if !slices.Contains(allowed, f.Name) {
-			ok = false
-		}
-	})
-	return ok
 }

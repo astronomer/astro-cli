@@ -82,10 +82,8 @@ func goldenInspectDeployment() astrov1.Deployment {
 }
 
 // The bytes `astro deployment inspect` prints are a contract with
-// astronomer/deploy-action, which parses them, and with every deployment-as-
-// code pipeline that writes the --template YAML to a file and hands it to
-// `astro deployment create --deployment-file`. Each case here is an invocation
-// shape the action uses (see #414), plus the -o values; the goldens were
+// astronomer/deploy-action, which parses them. Each case here is an
+// invocation shape the action uses (see #414), plus the -o values; the goldens were
 // written before `-o text` existed, so a case that renders the same golden as
 // another is the claim that the two invocations print identical bytes.
 //
@@ -112,14 +110,6 @@ func TestDeploymentInspectPrintsPinnedBytes(t *testing.T) {
 		{"clean output", []string{id, "--clean-output"}, "full.yaml"},
 		{"output json", []string{id, "-o", "json"}, "full.json"},
 		{"clean output json", []string{id, "--clean-output", "-o", "json"}, "full.json"},
-
-		// The preview-create round trip: written to a file and read back by
-		// `astro deployment create --deployment-file`.
-		{"template", []string{id, "--template"}, "template.yaml"},
-		{"clean output template", []string{id, "--clean-output", "--template"}, "template.yaml"},
-		{"clean output template short", []string{id, "-c", "-t"}, "template.yaml"},
-		{"text template", []string{id, "-o", "text", "--template"}, "template.yaml"},
-		{"json template", []string{id, "-o", "json", "--template"}, "template.json"},
 
 		// The single values deploy-action reads with --clean-output --key.
 		{"key deployment_id", []string{id, "--clean-output", "--key", "metadata.deployment_id"}, "key-deployment_id.txt"},

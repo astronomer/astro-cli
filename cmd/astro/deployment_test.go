@@ -7,12 +7,9 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,7 +21,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/internal/platform/astro/deployment/inspect"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -617,68 +613,6 @@ func TestDeploymentLogsMultipleComponents(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 }
 
-// deploymentFileYAML is a --deployment-file template naming the cluster and
-// workspace the fixtures above list.
-const deploymentFileYAML = `
-deployment:
-  environment_variables:
-    - is_secret: false
-      key: foo
-      updated_at: NOW
-      value: bar
-    - is_secret: true
-      key: bar
-      updated_at: NOW+1
-      value: baz
-  configuration:
-    name: test-deployment-label
-    description: description
-    runtime_version: 6.0.0
-    dag_deploy_enabled: true
-    executor: CeleryExecutor
-    scheduler_au: 5
-    scheduler_count: 3
-    cluster_name: test-cluster
-    workspace_name: test-workspace
-    deployment_type: HYBRID
-  worker_queues:
-    - name: default
-      is_default: true
-      max_worker_count: 130
-      min_worker_count: 12
-      worker_concurrency: 180
-      worker_type: test-worker-1
-    - name: test-queue-1
-      is_default: false
-      max_worker_count: 175
-      min_worker_count: 8
-      worker_concurrency: 176
-      worker_type: test-worker-2
-  metadata:
-    deployment_id: test-deployment-id
-    workspace_id: test-ws-id
-    cluster_id: cluster-id
-    release_name: great-release-name
-    airflow_version: 2.4.0
-    status: UNHEALTHY
-    created_at: 2022-11-17T13:25:55.275697-08:00
-    updated_at: 2022-11-17T13:25:55.275697-08:00
-    deployment_url: cloud.astronomer.io/test-ws-id/deployments/test-deployment-id
-    webserver_url: some-url
-  alert_emails:
-    - test1@test.com
-    - test2@test.com
-`
-
-// writeDeploymentFile writes deploymentFileYAML to a temporary file and
-// returns its path.
-func writeDeploymentFile(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "test-deployment.yaml")
-	require.NoError(t, os.WriteFile(path, []byte(deploymentFileYAML), 0o600))
-	return path
-}
-
 // newCreateUpdateMock gives a subtest its own mock client, so one subtest's
 // unmet or leftover expectations cannot pass or fail another's. It also
 // resets the command state a previous run leaves behind: the remote-execution
@@ -825,62 +759,6 @@ func TestDeploymentCreate(t *testing.T) {
 		newCreateUpdateMock(t)
 		_, err := execDeploymentCmd("create", "--name", "test-name", "--workspace-id", ws, "--cluster-id", csID, "--remote-execution-enabled")
 		assert.ErrorContains(t, err, "unknown flag: --remote-execution-enabled")
-	})
-	t.Run("creates a deployment from file", func(t *testing.T) {
-		m := newCreateUpdateMock(t)
-		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		m.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
-		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-
-		_, err := execDeploymentCmd("create", "--deployment-file", writeDeploymentFile(t))
-		assert.NoError(t, err)
-		m.AssertExpectations(t)
-	})
-	t.Run("returns an error if creating a deployment from file fails", func(t *testing.T) {
-		newCreateUpdateMock(t)
-		_, err := execDeploymentCmd("create", "--deployment-file", "test-file-name.json")
-		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
-	})
-	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
-		newCreateUpdateMock(t)
-		_, err := execDeploymentCmd("create", "--deployment-file", "test-deployment.yaml", "--description", "fail")
-		assert.ErrorIs(t, err, errFlag)
-	})
-	t.Run("creates a deployment from file when supported flags are set", func(t *testing.T) {
-		m := newCreateUpdateMock(t)
-		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Times(2)
-		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Once()
-		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(2)
-		m.On("CreateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockCreateDeploymentResponse, nil).Once()
-		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
-		// With no Airflow API URL, --wait has no Airflow to probe once healthy.
-		unprobedDeployment := *deploymentResponse.JSON200
-		unprobedDeployment.WebServerAirflowApiUrl = ""
-		unprobedResponse := deploymentResponse
-		unprobedResponse.JSON200 = &unprobedDeployment
-		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&unprobedResponse, nil).Times(4)
-		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-
-		origSleep, origTick := deployment.SleepTime, deployment.TickNum
-		deployment.SleepTime, deployment.TickNum = 0, 1
-		t.Cleanup(func() { deployment.SleepTime, deployment.TickNum = origSleep, origTick })
-
-		_, err := execDeploymentCmd("create", "--deployment-file", writeDeploymentFile(t), "--wait", "--verbosity", "debug")
-		assert.NoError(t, err)
-		m.AssertExpectations(t)
-	})
-	t.Run("returns an error if from-file is specified with supported and unsupported flags", func(t *testing.T) {
-		newCreateUpdateMock(t)
-		_, err := execDeploymentCmd("create", "--deployment-file", "test-deployment.yaml", "--wait", "--description", "fail")
-		assert.ErrorIs(t, err, errFlag)
 	})
 
 	// A standard create: options, the workspace, then the create. Each case
@@ -1140,79 +1018,6 @@ func TestDeploymentUpdate(t *testing.T) {
 		resp, err := execDeploymentCmd("update", "-n", "doesnotexist")
 		assert.ErrorContains(t, err, "failed to find a valid Workspace")
 		assert.Contains(t, resp, "Usage:\n")
-	})
-	t.Run("updates a deployment from file", func(t *testing.T) {
-		m := newCreateUpdateMock(t)
-		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
-		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
-		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
-		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-
-		_, err := execDeploymentCmd("update", "--deployment-file", writeDeploymentFile(t))
-		assert.NoError(t, err)
-		m.AssertExpectations(t)
-	})
-	// The deployment an update from a file echoes, in the format of that
-	// file: its YAML, or a json result from the CLI's one encoder.
-	echoFromFile := func(t *testing.T, name string, data []byte, extra ...string) string {
-		t.Helper()
-		m := newCreateUpdateMock(t)
-		m.On("ListClustersWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListClustersResponse, nil).Once()
-		m.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&GetDeploymentOptionsResponseOK, nil).Once()
-		m.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsCreateResponse, nil).Times(3)
-		m.On("UpdateDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&mockUpdateDeploymentResponse, nil).Once()
-		m.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(3)
-		m.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Once()
-		m.On("ListWorkspacesWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&ListWorkspacesResponseOK, nil).Once()
-		path := filepath.Join(t.TempDir(), name)
-		require.NoError(t, os.WriteFile(path, data, 0o600))
-		out, err := execDeploymentCmd(append([]string{"update", "--deployment-file", path}, extra...)...)
-		require.NoError(t, err)
-		m.AssertExpectations(t)
-		return out
-	}
-	t.Run("echoes a deployment updated from a JSON file as one json result", func(t *testing.T) {
-		data, err := yaml.YAMLToJSON([]byte(deploymentFileYAML))
-		require.NoError(t, err)
-		out := echoFromFile(t, "test-deployment.json", data)
-		// a result, and a test's stdout is not a terminal: one compact line
-		assert.Equal(t, 1, strings.Count(out, "\n"), out)
-		assert.True(t, strings.HasPrefix(out, `{"deployment":{`), out)
-		var echoed inspect.FormattedDeployment
-		require.NoError(t, json.Unmarshal([]byte(out), &echoed))
-		assert.Equal(t, deploymentResponse.JSON200.Name, echoed.Deployment.Configuration.Name)
-	})
-	t.Run("echoes a deployment updated from a YAML file as YAML", func(t *testing.T) {
-		out := echoFromFile(t, "test-deployment.yaml", []byte(deploymentFileYAML))
-		assert.True(t, strings.HasPrefix(out, "deployment:\n"), out)
-		var echoed inspect.FormattedDeployment
-		require.NoError(t, yaml.Unmarshal([]byte(out), &echoed))
-		assert.Equal(t, deploymentResponse.JSON200.Name, echoed.Deployment.Configuration.Name)
-	})
-	// -o json makes the echo json whatever the file was, so stdout holds one
-	// object; -o text keeps the file's own format.
-	t.Run("echoes a deployment updated from a YAML file as json under -o json", func(t *testing.T) {
-		out := echoFromFile(t, "test-deployment.yaml", []byte(deploymentFileYAML), "-o", "json")
-		var echoed inspect.FormattedDeployment
-		decodeOne(t, out, &echoed)
-		assert.Equal(t, deploymentResponse.JSON200.Name, echoed.Deployment.Configuration.Name)
-	})
-	t.Run("echoes a deployment updated from a YAML file as YAML under -o text", func(t *testing.T) {
-		out := echoFromFile(t, "test-deployment.yaml", []byte(deploymentFileYAML), "-o", "text")
-		assert.True(t, strings.HasPrefix(out, "deployment:\n"), out)
-	})
-	t.Run("returns an error if updating a deployment from file fails", func(t *testing.T) {
-		newCreateUpdateMock(t)
-		_, err := execDeploymentCmd("update", "--deployment-file", "test-file-name.json")
-		assert.ErrorContains(t, err, "open test-file-name.json: no such file or directory")
-	})
-	t.Run("returns an error if from-file is specified with any other flags", func(t *testing.T) {
-		newCreateUpdateMock(t)
-		_, err := execDeploymentCmd("update", "--deployment-file", "test-deployment.yaml", "--description", "fail")
-		assert.ErrorIs(t, err, errFlag)
 	})
 	t.Run("updates a deployment with small scheduler size", func(t *testing.T) {
 		setHostedOrg(t, ws)
@@ -1661,24 +1466,4 @@ func TestIsValidCloudProvider(t *testing.T) {
 		actual := isValidCloudProvider("ibm")
 		assert.False(t, actual)
 	})
-}
-
-// --yes answers the --deployment-file path's own confirmation and --verbosity
-// is global, so neither is refused beside the file; the missing file is what
-// fails, after the flag check. Any other flag still is. TestDeploymentCreate
-// and TestDeploymentUpdate pass the file only beside --wait and --verbosity.
-func TestDeploymentFromFileTakesYes(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
-
-	for _, verb := range []string{"create", "update"} {
-		for _, extra := range [][]string{{"--yes"}, {"-y"}, {"--verbosity", "debug"}} {
-			args := append([]string{verb, "--deployment-file", "test-file-name.json"}, extra...)
-			_, err := execDeploymentCmd(args...)
-			assert.NotErrorIs(t, err, errFlag, "%v", args)
-			assert.ErrorContains(t, err, "test-file-name.json", "%v", args)
-		}
-		_, err := execDeploymentCmd(verb, "--deployment-file", "test-file-name.json", "--description", "x")
-		assert.ErrorIs(t, err, errFlag, verb)
-	}
 }

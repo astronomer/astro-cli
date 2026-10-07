@@ -41,16 +41,6 @@ func TestNewDeploymentInspectCmd(t *testing.T) {
 		assert.Contains(t, resp, deploymentResponse.JSON200.RuntimeVersion)
 		mockV1Client.AssertExpectations(t)
 	})
-	t.Run("returns deployment template in yaml format when a deployment id was provided", func(t *testing.T) {
-		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
-		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
-		mockV1Client.On("GetClusterWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockGetClusterResponse, nil).Times(1)
-		cmdArgs := []string{"inspect", "test-id-1", "--template"}
-		resp, err := execDeploymentCmd(cmdArgs...)
-		assert.NoError(t, err)
-		assert.Contains(t, resp, deploymentResponse.JSON200.RuntimeVersion)
-		mockV1Client.AssertExpectations(t)
-	})
 	t.Run("returns a deployment's specific field", func(t *testing.T) {
 		mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Times(1)
 		mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponse, nil).Times(1)
