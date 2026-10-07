@@ -9,6 +9,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houston_mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // stubHouston answers every construction-time Houston call offline, with every
@@ -48,8 +49,14 @@ func stubHouston(t *testing.T) *houston_mocks.ClientInterface {
 // The APC root is built last on purpose: apcCmd.AddCmds stores its client,
 // app config and platform version in package-level variables, so building it
 // leaves those set for whatever runs next.
+//
+// Construction reads the config (cmd/astro asks whether the current
+// organization is hosted), so it is initialized here rather than left to
+// whichever test ran first: run alone, or first under -shuffle, a tree test
+// used to panic on a nil viper.
 func rootsUnderTest(t *testing.T) map[string]*cobra.Command {
 	t.Helper()
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	roots := map[string]*cobra.Command{}
 	for _, platform := range []string{cloudPlatform, apcPlatform} {
 		roots[platform] = newRootCmd(rootOptions{

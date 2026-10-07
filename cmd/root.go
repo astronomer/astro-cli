@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -20,7 +19,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	"github.com/astronomer/astro-cli/internal/telemetry"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
@@ -96,16 +94,9 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "astro",
 		Short: "Run Apache Airflow locally and interact with Astronomer",
-		Long: `
- ________   ______   _________  ______    ______             ______   __        ________
-/_______/\ /_____/\ /________/\/_____/\  /_____/\           /_____/\ /_/\      /_______/\
-\::: _  \ \\::::_\/_\__.::.__\/\:::_ \ \ \:::_ \ \   _______\:::__\/ \:\ \     \__.::._\/
- \::(_)  \ \\:\/___/\  \::\ \   \:(_) ) )_\:\ \ \ \ /______/\\:\ \  __\:\ \       \::\ \
-  \:: __  \ \\_::._\:\  \::\ \   \: __ '\ \\:\ \ \ \\__::::\/ \:\ \/_/\\:\ \____  _\::\ \__
-   \:.\ \  \ \ /____\:\  \::\ \   \ \ '\ \ \\:\_\ \ \          \:\_\ \ \\:\/___/\/__\::\__/\
-    \__\/\__\/ \_____\/   \__\/    \_\/ \_\/ \_____\/           \_____\/ \_____\/\________\/
-
-Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, APC, or Local Development.`,
+		// The ASCII banner above this is drawn by the help func (rootBanner),
+		// not kept here, because Long is wrapped and the art is not prose.
+		Long: "Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, APC, or Local Development.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip heavy pre-run logic for commands that opt out via annotation
 			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
@@ -167,9 +158,8 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)
-	rootCmd.SetUsageTemplate(rootUsageTemplate(rootCmd))
-	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, o.platform))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	installHelp(rootCmd, o.platform, houstonVersion)
 
 	return rootCmd
 }
@@ -236,10 +226,6 @@ var commandOrder = func() map[string]int {
 	return m
 }()
 
-func init() {
-	cobra.AddTemplateFunc("spellings", commandSpellings)
-}
-
 func groupCommands(rootCmd *cobra.Command) {
 	for _, g := range commandGroups {
 		rootCmd.AddGroup(&cobra.Group{ID: g.id, Title: g.title})
@@ -261,8 +247,8 @@ func groupCommands(rootCmd *cobra.Command) {
 	rootCmd.SetCompletionCommandGroupID(groupCLI)
 }
 
-// commandSpellings is every word a command answers to, as the root menu prints
-// it: "organization, org".
+// commandSpellings is every word a command answers to, as a command list
+// prints it: "organization, org".
 //
 // Cobra shows a command's aliases only on that command's own help page, so
 // `astro org` was reachable but discoverable nowhere. Naming them in the list
@@ -273,33 +259,4 @@ func commandSpellings(cmd *cobra.Command) string {
 		spellings += ", " + alias
 	}
 	return spellings
-}
-
-// rootUsageTemplate is cobra's default with the name column widened to hold the
-// aliases. The width is measured here rather than left to NamePadding, which
-// only knows about names.
-func rootUsageTemplate(rootCmd *cobra.Command) string {
-	width := 0
-	for _, cmd := range rootCmd.Commands() {
-		if cmd.Hidden {
-			continue
-		}
-		if n := len(commandSpellings(cmd)); n > width {
-			width = n
-		}
-	}
-	line := fmt.Sprintf("\n  {{rpad (spellings .) %d}} {{.Short}}{{end}}{{end}}", width)
-	template := rootCmd.UsageTemplate()
-	return strings.ReplaceAll(template,
-		"\n  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}", line)
-}
-
-func getResourcesHelpTemplate(houstonVersion, ctx string) string {
-	return fmt.Sprintf(`{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
-
-Current Context: %s{{if and (eq "%s" "APC") (ne "%s" "")}}
-Platform Version: %s{{end}}
-
-{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}
-`, ansi.Bold(ctx), ctx, houstonVersion, ansi.Bold(houstonVersion))
 }
