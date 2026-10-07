@@ -47,17 +47,11 @@ The argument can be either:
   - A path of an Astro Cloud API endpoint (e.g., /organizations/{organizationId})
   - An operation ID from the API spec (e.g., GetDeployment, ListOrganizations)
 
-Placeholder values {organizationId} and {workspaceId} will be replaced
-with values from the current context. Other path parameters can be provided
-using the -p/--path-param flag.
+Placeholder values {organizationId} and {workspaceId} will be replaced with values from the current context. Other path parameters can be provided using the -p/--path-param flag.
 
-The default HTTP request method is GET normally and POST if any parameters
-were added. Override the method with --method. When using an operation ID,
-the method is auto-detected from the API spec.
+The default HTTP request method is GET normally and POST if any parameters were added. Override the method with --method. When using an operation ID, the method is auto-detected from the API spec.
 
-Pass one or more -f/--raw-field values in key=value format to add static string
-parameters to the request payload. To add non-string or placeholder-determined
-values, see -F/--field below.
+Pass one or more -f/--raw-field values in key=value format to add static string parameters to the request payload. To add non-string or placeholder-determined values, see -F/--field below.
 
 The -F/--field flag has magic type conversion based on the format of the value:
   - literal values true, false, null, and integer numbers get converted to
@@ -65,8 +59,7 @@ The -F/--field flag has magic type conversion based on the format of the value:
   - if the value starts with @, the rest of the value is interpreted as a
     filename to read the value from. Pass - to read from standard input.
 
-To pass nested parameters in the request payload, use key[subkey]=value syntax.
-To pass nested values as arrays, declare multiple fields with key[]=value1.`,
+To pass nested parameters in the request payload, use key[subkey]=value syntax. To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 		Example: `  # List all Cloud API endpoints
   astro api cloud ls
 
@@ -446,8 +439,7 @@ func NewCloudListCmd(out io.Writer, parentOpts *CloudOptions) *cobra.Command {
 		Short:   "List available Astro Cloud API endpoints",
 		Long: `List all available endpoints from the Astro Cloud API.
 
-You can optionally provide a filter to search for specific endpoints.
-The filter matches against endpoint paths, methods, operation IDs, summaries, and tags.`,
+You can optionally provide a filter to search for specific endpoints. The filter matches against endpoint paths, methods, operation IDs, summaries, and tags.`,
 		Example: `  # List all endpoints
   astro api cloud ls
 

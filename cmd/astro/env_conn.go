@@ -91,8 +91,8 @@ func newEnvConnSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <ID_OR_KEY>",
 		Short: "Set a connection",
-		Long: "Set a connection, creating it if it does not exist. Pass --no-create to fail\n" +
-			"instead. Give it whole with --value, as a URI or JSON, or field by field with\n" +
+		Long: "Set a connection, creating it if it does not exist. Pass --no-create to fail " +
+			"instead. Give it whole with --value, as a URI or JSON, or field by field with " +
 			"--type, --host and the rest.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

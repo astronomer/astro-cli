@@ -16,16 +16,13 @@ func newTelemetryCmd(out io.Writer) *cobra.Command {
 		Short: "Manage anonymous telemetry settings",
 		Long: `Manage anonymous telemetry settings for the Astro CLI.
 
-Telemetry helps us understand how the CLI is used and improve it.
-We collect anonymous usage data including:
+Telemetry helps us understand how the CLI is used and improve it. We collect anonymous usage data including:
 - Commands used (not arguments or values)
 - CLI version
 - Operating system
 - Invocation context (CI, interactive, etc.)
 
-No personally identifiable information is collected.
-You can opt out at any time using 'astro telemetry disable' or by setting
-the ASTRO_TELEMETRY_DISABLED=1 environment variable.`,
+No personally identifiable information is collected. You can opt out at any time using 'astro telemetry disable' or by setting the ASTRO_TELEMETRY_DISABLED=1 environment variable.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return telemetryStatus(out)
 		},

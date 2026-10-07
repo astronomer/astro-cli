@@ -217,8 +217,7 @@ func NewRegistryListCmd(out io.Writer, parentOpts *RegistryOptions) *cobra.Comma
 		Short:   "List available registry API endpoints",
 		Long: `List all available endpoints from the Airflow Provider Registry API.
 
-You can optionally provide a filter to search for specific endpoints.
-The filter matches against endpoint paths, methods, operation IDs, summaries, and tags.`,
+You can optionally provide a filter to search for specific endpoints. The filter matches against endpoint paths, methods, operation IDs, summaries, and tags.`,
 		Example: `  # List all endpoints
   astro api registry ls
 

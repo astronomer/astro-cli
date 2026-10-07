@@ -61,29 +61,15 @@ The argument can be either:
   - A path of an Airflow API endpoint (e.g., /dags, /dags/my_dag)
   - An operation ID from the API spec (e.g., get_dags, get_dag)
 
-A request needs a target; there is no default. Pass -d/--deployment to talk to
-a deployment your project links in pyproject.toml — an Astro Deployment, an
-MWAA or Composer environment, or a plain URL, each reached with the
-credentials that deployment's link calls for. A name no link declares is read
-as an Astro Deployment id. Pass --url to reach an Airflow no project declares.
-For this project's local Airflow, use 'astro local api' instead.
+A request needs a target; there is no default. Pass -d/--deployment to talk to a deployment your project links in pyproject.toml — an Astro Deployment, an MWAA or Composer environment, or a plain URL, each reached with the credentials that deployment's link calls for. A name no link declares is read as an Astro Deployment id. Pass --url to reach an Airflow no project declares. For this project's local Airflow, use 'astro local api' instead.
 
-The ls and describe subcommands only read the API spec, so they need no
-target: without one they read the spec for --airflow-version, or for Airflow
-` + defaultAirflowVersion + `.
+The ls and describe subcommands only read the API spec, so they need no target: without one they read the spec for --airflow-version, or for Airflow ` + defaultAirflowVersion + `.
 
-The API generation is detected from the instance itself, so /dags reaches
-/api/v2/dags on Airflow 3 and /api/v1/dags on Airflow 2. The version it reports
-also picks the API specification; use --airflow-version to override it if the
-instance is unreachable.
+The API generation is detected from the instance itself, so /dags reaches /api/v2/dags on Airflow 3 and /api/v1/dags on Airflow 2. The version it reports also picks the API specification; use --airflow-version to override it if the instance is unreachable.
 
-The default HTTP request method is GET normally and POST if any parameters
-were added. Override the method with --method. When using an operation ID,
-the method is auto-detected from the API spec.
+The default HTTP request method is GET normally and POST if any parameters were added. Override the method with --method. When using an operation ID, the method is auto-detected from the API spec.
 
-Pass one or more -f/--raw-field values in key=value format to add static string
-parameters to the request payload. To add non-string or placeholder-determined
-values, see -F/--field below.
+Pass one or more -f/--raw-field values in key=value format to add static string parameters to the request payload. To add non-string or placeholder-determined values, see -F/--field below.
 
 The -F/--field flag has magic type conversion based on the format of the value:
   - literal values true, false, null, and integer numbers get converted to
@@ -91,8 +77,7 @@ The -F/--field flag has magic type conversion based on the format of the value:
   - if the value starts with @, the rest of the value is interpreted as a
     filename to read the value from. Pass - to read from standard input.
 
-To pass nested parameters in the request payload, use key[subkey]=value syntax.
-To pass nested values as arrays, declare multiple fields with key[]=value1.`,
+To pass nested parameters in the request payload, use key[subkey]=value syntax. To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 		Example: `  # List Airflow API endpoints
   astro api airflow ls
   astro api airflow ls --filter variable
@@ -474,9 +459,7 @@ func NewAirflowListCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command
 		Short:   "List available Airflow API endpoints",
 		Long: `List all available endpoints from the Airflow API.
 
-You can optionally provide a filter to search for specific endpoints, as an
-argument or with --filter. The filter matches against endpoint paths, methods,
-operation IDs, summaries, and tags.`,
+You can optionally provide a filter to search for specific endpoints, as an argument or with --filter. The filter matches against endpoint paths, methods, operation IDs, summaries, and tags.`,
 		Example: `  # List all endpoints
   astro api airflow ls
 
@@ -535,10 +518,7 @@ func NewAirflowSpecCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command
 		Short: "Print the Airflow API's OpenAPI specification",
 		Long: `Print the OpenAPI specification this command reads, as JSON.
 
-It is the document ls and describe work from: the published specification for
-the Airflow version the target reports, or the one --airflow-version names. An
-Airflow 2 specification is YAML at its source and is printed as JSON all the
-same, so a script piping it into jq does not have to know which it reached.`,
+It is the document ls and describe work from: the published specification for the Airflow version the target reports, or the one --airflow-version names. An Airflow 2 specification is YAML at its source and is printed as JSON all the same, so a script piping it into jq does not have to know which it reached.`,
 		Example: `  # The whole document
   astro api airflow spec
 

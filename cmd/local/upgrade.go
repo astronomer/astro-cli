@@ -66,11 +66,11 @@ func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "airflow [VERSION]",
 		Short: "Move this project to a new Airflow version",
-		Long: "Set this project's Airflow version in pyproject.toml: the apache-airflow requirement,\n" +
-			"plus requires-python and the runtime pin when they have to move. With no version, use the\n" +
-			"newest Airflow the runtime catalog offers in the project's own Airflow generation. It never\n" +
+		Long: "Set this project's Airflow version in pyproject.toml: the apache-airflow requirement, " +
+			"plus requires-python and the runtime pin when they have to move. With no version, use the " +
+			"newest Airflow the runtime catalog offers in the project's own Airflow generation. It never " +
 			"moves an Airflow 2 project to Airflow 3. It says when Airflow 3 is available.\n\n" +
-			"Dag code, providers and a declared Dockerfile are not changed. If Airflow is running,\n" +
+			"Dag code, providers and a declared Dockerfile are not changed. If Airflow is running, " +
 			"restart it afterwards.",
 		Example: "  # Move to the newest Airflow in the project's generation\n" +
 			"  astro local upgrade airflow\n\n" +

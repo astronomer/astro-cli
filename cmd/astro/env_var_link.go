@@ -40,7 +40,7 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 		Use:     "link",
 		Aliases: []string{"links"},
 		Short:   "Manage which deployments a workspace variable reaches",
-		Long: "Control which deployments a workspace variable reaches, and give a deployment\n" +
+		Long: "Control which deployments a workspace variable reaches, and give a deployment " +
 			"its own value. Identify the variable with --variable-key or --variable-id.",
 		Example: envVarLinkExamples,
 
@@ -97,9 +97,9 @@ func newEnvVarLinkSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
 		Short: "Link a variable to a deployment",
-		Long: "Link a workspace variable to a deployment. --value gives that deployment its\n" +
-			"own value; leaving it out clears any it had. --exclude opts the deployment out\n" +
-			"of an auto-linked variable instead. Pass --no-create to fail if it is not\n" +
+		Long: "Link a workspace variable to a deployment. --value gives that deployment its " +
+			"own value; leaving it out clears any it had. --exclude opts the deployment out " +
+			"of an auto-linked variable instead. Pass --no-create to fail if it is not " +
 			"already linked.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarLinkSet(cmd, out)

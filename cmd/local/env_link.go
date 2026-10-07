@@ -108,17 +108,17 @@ func newEnvLinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "link " + k.arg + " [DIR...]",
 		Short: "Limit a global " + k.label + " in the vault to specific projects",
-		Long: "Link a global " + k.label + " in the encrypted vault to projects, so it reaches\n" +
+		Long: "Link a global " + k.label + " in the encrypted vault to projects, so it reaches " +
 			"those projects and no others. With no link it is auto-linked to every project.\n\n" +
-			"Each DIR is a project directory; the default is the current project. A link\n" +
-			"to a project also reaches its git worktrees. --this-checkout links the\n" +
-			"checkout itself instead, so a worktree gets the value and its main project\n" +
-			"does not. --auto-link removes the links, and the value is auto-linked to every project\n" +
+			"Each DIR is a project directory; the default is the current project. A link " +
+			"to a project also reaches its git worktrees. --this-checkout links the " +
+			"checkout itself instead, so a worktree gets the value and its main project " +
+			"does not. --auto-link removes the links, and the value is auto-linked to every project " +
 			"again.\n\n" +
-			"Only global vault entries have links: a project secret already reaches only\n" +
+			"Only global vault entries have links: a project secret already reaches only " +
 			"its own project.\n\n" +
-			"Whatever reaches a project is passed to its Airflow at start, declared or not,\n" +
-			"so linking is how to keep a global out of the projects that should not get\n" +
+			"Whatever reaches a project is passed to its Airflow at start, declared or not, " +
+			"so linking is how to keep a global out of the projects that should not get " +
 			"it. Astro Desktop reads the same links.",
 		Example: `
   # limit it to the current project (and its worktrees)
@@ -148,12 +148,12 @@ func newEnvUnlinkCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	return &cobra.Command{
 		Use:   "unlink " + k.arg + " [DIR...]",
 		Short: "Stop a global " + k.label + " in the vault reaching specific projects",
-		Long: "Unlink a global " + k.label + " in the encrypted vault from projects. Each DIR\n" +
-			"is a project directory, or a linked path that no longer exists; the default\n" +
-			"is the current project. Afterwards the checkout is not reached, whether it\n" +
+		Long: "Unlink a global " + k.label + " in the encrypted vault from projects. Each DIR " +
+			"is a project directory, or a linked path that no longer exists; the default " +
+			"is the current project. Afterwards the checkout is not reached, whether it " +
 			"was linked as a project or on its own.\n\n" +
-			"An entry with no links is auto-linked to every project, so there is nothing to unlink\n" +
-			"it from: link it to the projects it should reach instead. Unlinking the last\n" +
+			"An entry with no links is auto-linked to every project, so there is nothing to unlink " +
+			"it from: link it to the projects it should reach instead. Unlinking the last " +
 			"project leaves it reaching no project.",
 		Example: `
   # stop it reaching the current project

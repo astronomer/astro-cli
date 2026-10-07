@@ -81,8 +81,8 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export",
 		Short: "Export environment variables as a .env file",
-		Long: "Write the scope's environment variables as KEY=VALUE lines. Secret values are\n" +
-			"left blank unless --include-secrets is set. With -o json, the variables as\n" +
+		Long: "Write the scope's environment variables as KEY=VALUE lines. Secret values are " +
+			"left blank unless --include-secrets is set. With -o json, the variables as " +
 			"`list -o json` prints them.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarList(cmd, out, true)
@@ -121,7 +121,7 @@ func newEnvVarSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set [ID_OR_KEY]",
 		Short: "Set an environment variable",
-		Long: "Set an environment variable, creating it if it does not exist. Pass --no-create\n" +
+		Long: "Set an environment variable, creating it if it does not exist. Pass --no-create " +
 			"to fail instead, or --from-file to set many from a dotenv file.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

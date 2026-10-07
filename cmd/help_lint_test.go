@@ -92,6 +92,49 @@ var helpRules = []helpRule{
 			"argument and flag values.",
 		check: checkExampleRuns,
 	},
+	{
+		name: "long-unwrapped",
+		why: "A paragraph of a Long is one line, separated from the next by a blank line: help wraps prose to the " +
+			"terminal itself, so a paragraph broken by hand at a fixed width renders as a short line in mid-sentence " +
+			"followed by the renderer's own wrapping. A list (`- ` items) or an indented literal starts after a blank line " +
+			"or a heading ending in a colon; any other line directly after another is a paragraph broken by hand.",
+		check: checkLongUnwrapped,
+	},
+}
+
+// checkLongUnwrapped finds a Long laid out by hand. Each unindented line is a
+// whole paragraph, a heading, or a list item, so the only lines that may
+// follow one directly, with no blank line between, are:
+//
+//   - a list item after a heading (a line ending in a colon) or after another
+//     list item;
+//   - an indented line (a command or a literal) after a heading.
+//
+// Anything else is a paragraph broken by hand: in mid-sentence, after a
+// sentence (one sentence per line renders as a run of short lines), after an
+// abbreviation or a version number, inside a list item, or onto a line that a
+// stray leading space makes look indented. Telling those apart from a real
+// sentence end is guesswork, so the rule does not try: a new paragraph, list
+// or literal starts after a blank line or a heading, and nowhere else.
+func checkLongUnwrapped(cmd *cobra.Command) string {
+	lines := strings.Split(strings.Trim(cmd.Long, "\n"), "\n")
+	blank := func(line string) bool { return strings.TrimSpace(line) == "" }
+	indented := func(line string) bool { return strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") }
+	item := func(line string) bool { return strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") }
+	heading := func(line string) bool { return !item(line) && strings.HasSuffix(strings.TrimSpace(line), ":") }
+	for i := 0; i+1 < len(lines); i++ {
+		line, next := lines[i], lines[i+1]
+		if blank(line) || indented(line) || blank(next) {
+			continue
+		}
+		switch {
+		case item(next) && (heading(line) || item(line)):
+		case indented(next) && heading(line):
+		default:
+			return fmt.Sprintf("Long breaks a paragraph by hand: %q is followed by %q", line, next)
+		}
+	}
+	return ""
 }
 
 func checkShort(cmd *cobra.Command) string {

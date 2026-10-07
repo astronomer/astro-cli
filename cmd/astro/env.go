@@ -127,7 +127,7 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List every environment object in the scope",
-		Long: "List every environment object in the scope, grouped by kind. Values are not\n" +
+		Long: "List every environment object in the scope, grouped by kind. Values are not " +
 			"shown; use a kind's own list to see them.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -190,11 +190,9 @@ func newEnvRootCmd(out io.Writer) *cobra.Command {
 		RunE:                       helpOrUnknownSubcommand,
 		SuggestionsMinimumDistance: 2,
 		Short:                      "Manage environment objects on Astro",
-		Long: `Manage environment objects on Astro: environment variables, connections,
-Airflow variables, and metrics exports, scoped to a workspace or a deployment.
+		Long: `Manage environment objects on Astro: environment variables, connections, Airflow variables, and metrics exports, scoped to a workspace or a deployment.
 
-Objects here can be shared across deployments from a workspace, or set on
-one deployment with --deployment.`,
+Objects here can be shared across deployments from a workspace, or set on one deployment with --deployment.`,
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
 	cmd.SetOut(out)

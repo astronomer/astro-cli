@@ -33,7 +33,7 @@ func newOttoCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "otto [ARGS]...",
 		Short:              "Start the Otto AI agent",
-		Long:               "Start the Otto AI agent for AI-assisted Airflow development and operations.\nAll flags and arguments are forwarded directly to Otto.",
+		Long:               "Start the Otto AI agent for AI-assisted Airflow development and operations. All flags and arguments are forwarded directly to Otto.",
 		SilenceUsage:       true,
 		DisableFlagParsing: true,
 		RunE:               ottoRun,

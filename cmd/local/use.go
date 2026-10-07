@@ -36,9 +36,9 @@ func newUseCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "use [DEPLOYMENT]",
 		Short: "Select the Deployment this project's commands act on",
-		Long: "Select which linked Deployment this project's commands act on. Your selection is saved on your\n" +
+		Long: "Select which linked Deployment this project's commands act on. Your selection is saved on your " +
 			"machine, not in the repo, so it affects only you.\n\n" +
-			"Commands pick a Deployment in this order: -d/--deployment, " + instances.EnvVar + ", your selection,\n" +
+			"Commands pick a Deployment in this order: -d/--deployment, " + instances.EnvVar + ", your selection, " +
 			"then the project's default link.",
 		Example: "  astro use            # pick from the linked Deployments\n" +
 			"  astro use prod       # select prod\n" +

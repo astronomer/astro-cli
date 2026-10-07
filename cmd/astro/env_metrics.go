@@ -85,7 +85,7 @@ func newEnvMetricsSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <ID_OR_KEY>",
 		Short: "Set a metrics export",
-		Long: "Set a metrics export, creating it if it does not exist. Pass --no-create to fail\n" +
+		Long: "Set a metrics export, creating it if it does not exist. Pass --no-create to fail " +
 			"instead. Creating one needs --endpoint and --exporter-type.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -86,7 +86,7 @@ func newEnvAirflowVarSetCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set [ID_OR_KEY]",
 		Short: "Set an Airflow variable",
-		Long: "Set an Airflow variable, creating it if it does not exist. Pass --no-create to\n" +
+		Long: "Set an Airflow variable, creating it if it does not exist. Pass --no-create to " +
 			"fail instead, or --from-file to set many from a dotenv file.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

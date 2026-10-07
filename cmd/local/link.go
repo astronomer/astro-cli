@@ -79,7 +79,7 @@ func NewLinkCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "link",
 		Short: "Link Deployments to this project",
-		Long: "Link the Deployments this project works with. Links are\n" +
+		Long: "Link the Deployments this project works with. Links are " +
 			"saved in the project, so everyone who clones it gets them. `astro use` lists them.",
 		Example: "  astro link add                              # pick a Deployment to link\n" +
 			"  astro link add prod --deployment clx123abc\n" +
@@ -107,10 +107,10 @@ func newLinkAddCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add [NAME] [-- COMMAND...]",
 		Short: "Link a Deployment to this project",
-		Long: "Link a Deployment to this project as NAME. In a terminal, with no --deployment, it asks\n" +
-			"which Astro Deployment to link and, with no NAME, names the link after it: lowercased, with\n" +
+		Long: "Link a Deployment to this project as NAME. In a terminal, with no --deployment, it asks " +
+			"which Astro Deployment to link and, with no NAME, names the link after it: lowercased, with " +
 			"each run of spaces and punctuation turned into one dash.\n\n" +
-			"MWAA, Composer and other Airflows are linked with flags. Credentials are never saved: the\n" +
+			"MWAA, Composer and other Airflows are linked with flags. Credentials are never saved: the " +
 			"*-env flags name the environment variables they are read from.",
 		Example: "  astro link add\n" +
 			"  astro link add prod --deployment clx123abc\n" +
@@ -181,7 +181,7 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "default [NAME]",
 		Short: "Choose the Deployment commands use by default",
-		Long: "Choose the linked Deployment commands use when you don't name one. `astro deploy` still\n" +
+		Long: "Choose the linked Deployment commands use when you don't name one. `astro deploy` still " +
 			"asks, with it preselected. In a terminal, with no NAME, it asks which one.",
 		Example: "  astro link default prod\n" +
 			"  astro link default --unset",

@@ -146,17 +146,16 @@ func newEnvCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "env",
 		Short: "Manage environment values for local Airflow",
-		// Wrapped by hand at the same width as `astro env --help`, which cobra
-		// does not do for us. The keyring requirement and --plain are on
-		// `set --help`, and the files' 0600 mode is in docs/secrets.md.
-		Long: "Manage environment values for local Airflow: environment variables,\n" +
+		// The keyring requirement and --plain are on `set --help`, and the
+		// files' 0600 mode is in docs/secrets.md.
+		Long: "Manage environment values for local Airflow: environment variables, " +
 			"connections, and Airflow variables.\n\n" +
-			"Values are stored in the encrypted vault, for the project or with --global for\n" +
-			"every project. Pass --plain to store one unencrypted: in the project's .env,\n" +
+			"Values are stored in the encrypted vault, for the project or with --global for " +
+			"every project. Pass --plain to store one unencrypted: in the project's .env, " +
 			"or for a global, in the vault without encryption.\n\n" +
-			"At start, each value comes from the first of: project .env, shell env, project\n" +
-			"vault, global vault, the linked workspace's Environment Manager, a declaration's\n" +
-			"default. Every source reaches Airflow whole, declared or not.\n" +
+			"At start, each value comes from the first of: project .env, shell env, project " +
+			"vault, global vault, the linked workspace's Environment Manager, a declaration's " +
+			"default. Every source reaches Airflow whole, declared or not. " +
 			"A workspace that cannot be read is skipped with a note.",
 		Args:                       cobra.ArbitraryArgs,
 		RunE:                       helpOrUnknownSubcommand,
@@ -362,16 +361,16 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	in := &setInput{}
 	fields := &connFields{}
 	long := "Set " + k.article + " " + k.label + ", creating it if it does not exist.\n\n" +
-		"The value comes from a prompt with echo off, --stdin, or --value; never a bare\n" +
+		"The value comes from a prompt with echo off, --stdin, or --value; never a bare " +
 		"argument, which would land in shell history.\n\n" +
-		"The value is stored in the encrypted vault, which needs an OS keyring. --plain\n" +
-		"stores it unencrypted instead and needs none: a project value in the project's\n" +
-		".env, a global in the vault, marked plain. --plain is refused for a name the\n" +
+		"The value is stored in the encrypted vault, which needs an OS keyring. --plain " +
+		"stores it unencrypted instead and needs none: a project value in the project's " +
+		".env, a global in the vault, marked plain. --plain is refused for a name the " +
 		"project's pyproject.toml declares secret.\n\n" +
-		"A new global reaches no project until you link it with\n" +
-		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --auto-link creates it\n" +
-		"auto-linked to every project instead. Updating an existing global keeps its links.\n" +
-		"A global goes to the Airflow of every project it reaches, whether or not the\n" +
+		"A new global reaches no project until you link it with " +
+		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --auto-link creates it " +
+		"auto-linked to every project instead. Updating an existing global keeps its links. " +
+		"A global goes to the Airflow of every project it reaches, whether or not the " +
 		"project declares it."
 	cmdLine, name := "astro local env "+localenv.Noun(k.kind)+" set", exampleName(k.kind)
 	example := `  # Set it, typing the value at a prompt with echo off
@@ -383,7 +382,7 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
   # Create a global that reaches every project
   ` + cmdLine + ` ` + name + ` --global --auto-link`
 	if k.kind == localenv.KindConn {
-		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type,\n" +
+		long += "\n\nGive the connection whole, as a URI or JSON, or field by field with --type, " +
 			"--host and the rest."
 		example = `  # Set it from a URI
   ` + cmdLine + ` ` + name + ` --value 'postgres://admin@db.example.com:5432/warehouse'
@@ -541,11 +540,11 @@ func newEnvDeleteCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		Aliases: []string{"rm"},
 		Short:   "Delete " + k.article + " " + k.label,
 		Long: "Delete " + k.article + " " + k.label + "'s value.\n\n" +
-			"A declaration in the project's pyproject.toml is not a value, so delete leaves\n" +
-			"it in place and says what the name resolves to now: another source, nothing\n" +
-			"(list shows it as absent), or, for a required name, nothing the next start\n" +
-			"will accept. --undeclare also removes the declaration, as undeclare does.\n" +
-			"With --global it removes it only from the current project's pyproject.toml,\n" +
+			"A declaration in the project's pyproject.toml is not a value, so delete leaves " +
+			"it in place and says what the name resolves to now: another source, nothing " +
+			"(list shows it as absent), or, for a required name, nothing the next start " +
+			"will accept. --undeclare also removes the declaration, as undeclare does. " +
+			"With --global it removes it only from the current project's pyproject.toml, " +
 			"and refuses outside a project.",
 		Example: "  # Delete its value\n" +
 			"  astro local env " + localenv.Noun(k.kind) + " delete " + exampleName(k.kind) + "\n\n" +
@@ -579,10 +578,10 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		cmdLine = "astro local env " + localenv.Noun(only) + " list"
 	}
 	if only == "" {
-		long = "List every declared value and where it resolves from, and every undeclared\n" +
-			"value a start passes to this project anyway. Whatever reaches a project goes\n" +
-			"to its Airflow, declared or not: declaring a name makes it a requirement, and\n" +
-			"`link` narrows which projects a global reaches. Values are not shown; use get\n" +
+		long = "List every declared value and where it resolves from, and every undeclared " +
+			"value a start passes to this project anyway. Whatever reaches a project goes " +
+			"to its Airflow, declared or not: declaring a name makes it a requirement, and " +
+			"`link` narrows which projects a global reaches. Values are not shown; use get " +
 			"to see one."
 	}
 	cmd := &cobra.Command{

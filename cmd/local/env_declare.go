@@ -90,20 +90,19 @@ func sectionFor(kind localenv.Kind) envschema.Section {
 
 func newEnvDeclareCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 	in := &declareInput{}
-	long := "Declare " + k.article + " " + k.label + " in the project's pyproject.toml, or change how it is\n" +
+	long := "Declare " + k.article + " " + k.label + " in the project's pyproject.toml, or change how it is " +
 		"declared. A declared name is required at start unless it is optional.\n\n" +
-		"Only the annotations you pass change; the rest of the declaration, and any\n" +
+		"Only the annotations you pass change; the rest of the declaration, and any " +
 		"comments around it, stay as they are. No value is stored: use set for that."
 	if k.kind == localenv.KindConn {
-		long += "\n\nA connection is always secret and takes no default, type or enum; --type\n" +
+		long += "\n\nA connection is always secret and takes no default, type or enum; --type " +
 			"is the connection type, as it is for set."
 	} else {
-		long += "\n\n--secret keeps the value out of plain files: set stores it only in the\n" +
+		long += "\n\n--secret keeps the value out of plain files: set stores it only in the " +
 			"vault. A secret name cannot have a default."
 	}
-	long += "\n\n--source workspace resolves the name from the workspace's Environment Manager\n" +
-		"when no local file sets it. A name with a default cannot resolve from the\n" +
-		"workspace."
+	long += "\n\n--source workspace resolves the name from the workspace's Environment Manager " +
+		"when no local file sets it. A name with a default cannot resolve from the workspace."
 	cmdLine := "astro local env " + localenv.Noun(k.kind) + " declare " + exampleName(k.kind)
 	example := "  # Require it at start, with a note for whoever supplies it\n" +
 		"  " + cmdLine + " --description 'Ask the data team for it'\n\n"

@@ -48,9 +48,9 @@ func newPackageCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "package [TARGET]",
 		Short: "Build a platform's deployable artifact without shipping it",
-		Long: "Build the artifact a given Airflow platform consumes — for CI, or to hand a\n" +
-			"prebuilt image to `astro deploy --image-name`. TARGET is astro (the default),\n" +
-			"mwaa, composer, or oss. astro builds an image; mwaa and composer build a\n" +
+		Long: "Build the artifact a given Airflow platform consumes — for CI, or to hand a " +
+			"prebuilt image to `astro deploy --image-name`. TARGET is astro (the default), " +
+			"mwaa, composer, or oss. astro builds an image; mwaa and composer build a " +
 			"bucket-shaped directory; only oss is not built yet.",
 		Example: "  # Build the image Astro runs\n" +
 			"  astro package\n\n" +

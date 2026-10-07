@@ -159,7 +159,7 @@ func newEnvLinkRootCmd(out io.Writer, n *linkNoun) *cobra.Command {
 		Use:     "link",
 		Aliases: []string{"links"},
 		Short:   fmt.Sprintf("Manage which deployments a workspace %s reaches", n.what),
-		Long: fmt.Sprintf("Control which deployments a workspace %s reaches, and give a deployment\n"+
+		Long: fmt.Sprintf("Control which deployments a workspace %s reaches, and give a deployment "+
 			"its own values. Identify the %s with --%s-key or --%s-id.", n.what, n.what, n.noun, n.noun),
 		Example:                    n.examples,
 		Args:                       cobra.ArbitraryArgs,
@@ -200,9 +200,9 @@ func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set",
 		Short: fmt.Sprintf("Link %s to a deployment", article(n.what)),
-		Long: fmt.Sprintf("Link a workspace %s to a deployment. The override flags give that deployment\n"+
-			"its own values and describe the whole override: a value the link had that\n"+
-			"they leave out is cleared. --exclude opts the deployment out of an auto-linked\n"+
+		Long: fmt.Sprintf("Link a workspace %s to a deployment. The override flags give that deployment "+
+			"its own values and describe the whole override: a value the link had that "+
+			"they leave out is cleared. --exclude opts the deployment out of an auto-linked "+
 			"%s instead. Pass --no-create to fail if it is not already linked.", n.what, n.what),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvLinkSet(cmd, out, n, f)

@@ -200,3 +200,41 @@ func TestExampleRunsCatchesWhatCobraWouldRefuse(t *testing.T) {
 	}
 	assert.False(t, get.Flags().Changed("details"), "linting an example sets nothing on the command")
 }
+
+// TestLongUnwrappedFindsHandWrappedProse proves the long-unwrapped rule is not
+// vacuous, and that it leaves alone the line breaks a Long means to keep.
+func TestLongUnwrappedFindsHandWrappedProse(t *testing.T) {
+	for _, tc := range []struct {
+		name, long string
+		flagged    bool
+	}{
+		{"a paragraph wrapped by hand", "Declare a name in pyproject.toml, or change how it is\ndeclared.", true},
+		{"a break before a code span", "Link it with\n`astro link`, as in Desktop.", true},
+		{"a break inside a parenthesis", "It is optional (see\nbelow).", true},
+		{"one line per paragraph", "One paragraph, however long.\n\nAnother.", false},
+		{"a heading and its list", "Shows, including:\n- Path parameters\n- Response schema", false},
+		{"list items without periods", "- CLI version\n- Operating system", false},
+		{"an indented list and its continuation", "The flag converts:\n  - literal values, which get\n    converted", false},
+		{"a heading and its command", "Run it as:\n  astro deploy\n\nto ship.", false},
+		{"a list, then a paragraph after a blank line", "We collect:\n- The version\n\nNothing else.", false},
+		// One sentence per line renders as a run of short lines, and a
+		// sentence end cannot be told from an abbreviation or a version.
+		{"a sentence per line", "Start Otto.\nFlags are forwarded.", true},
+		{"a sentence ending in a code span", "Use `astro use`.\nIt lists them.", true},
+		{"a break after an abbreviation", "Works with providers, hooks, etc.\nand sensors too", true},
+		{"a break inside a version number", "Runs on Airflow 2.\n10 and later", true},
+		{"a list item wrapped by hand", "We collect:\n- Invocation context (CI,\ninteractive, etc.)", true},
+		{"a list item continued by indenting", "We collect:\n- Invocation context (CI,\n  interactive, etc.)", true},
+		{"a break after a colon in mid-sentence", "Store one unencrypted:\nin the project's .env.", true},
+		{"a continuation with a stray space", "Link a global value to projects, so it\n reaches those projects", true},
+		{"a command inside a sentence", "Run it as\n  astro deploy\nto ship.", true},
+		{"a paragraph straight after a list", "We collect:\n- The version\nNothing else.", true},
+	} {
+		got := checkLongUnwrapped(&cobra.Command{Use: "x", Long: tc.long})
+		if tc.flagged {
+			assert.NotEmpty(t, got, tc.name)
+		} else {
+			assert.Empty(t, got, tc.name)
+		}
+	}
+}
