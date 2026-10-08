@@ -152,8 +152,13 @@ func (c cfg) GetProjectString() string {
 	return viperProject.GetString(c.Path)
 }
 
-// GetHomeString will return config from home string
+// GetHomeString will return config from home string, or "" before InitConfig
+// has read one, so a caller like GetCurrentDomain reports no context (its
+// ErrGetHomeString) rather than panicking on a config that is not there yet.
 func (c cfg) GetHomeString() string {
+	if viperHome == nil {
+		return ""
+	}
 	return viperHome.GetString(c.Path)
 }
 

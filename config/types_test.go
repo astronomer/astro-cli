@@ -50,3 +50,17 @@ func (s *Suite) TestGetBool() {
 	val = cfg.GetBool()
 	s.Equal(false, val)
 }
+
+// Before InitConfig has read a home config there is no context to find, and
+// asking says so: a code path that builds the command tree before loading the
+// config (a test run first by -shuffle) must not panic on the nil viper.
+func (s *Suite) TestNoHomeConfigYetIsNoContext() {
+	prev := viperHome
+	viperHome = nil
+	defer func() { viperHome = prev }()
+	s.T().Setenv("ASTRO_DOMAIN", "")
+
+	s.Equal("", CFG.Context.GetHomeString())
+	_, err := GetCurrentContext()
+	s.ErrorIs(err, ErrGetHomeString)
+}
