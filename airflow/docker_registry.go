@@ -80,7 +80,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 	return nil
 }
 
-// dockerLogin performs docker login using bash command instead of Docker API
+// dockerLogin performs docker login by invoking the container runtime binary directly, instead of the Docker API.
 // This is useful for OAuth-based registries that require special authentication flows
 func dockerLogin(registryName, username, token string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
@@ -92,8 +92,7 @@ func dockerLogin(registryName, username, token string) error {
 		// Remove Bearer prefix if present (consistent with pushWithBash)
 		const prefix = "Bearer "
 		pass := strings.TrimPrefix(token, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + registryName + " -u " + username + " --password-stdin"
-		err = cmdExec("bash", nil, os.Stderr, "-c", cmd)
+		err = cmdExecWithStdin(containerRuntime, pass, nil, os.Stderr, "login", registryName, "-u", username, "--password-stdin")
 		if err != nil {
 			return fmt.Errorf("docker login failed: %w", err)
 		}
