@@ -503,6 +503,55 @@ func (s *Suite) TestEnvExport() {
 	})
 }
 
+func (s *Suite) TestEnvExportConnectionsCleansUpTempFile() {
+	s.Run("export, read, and remove all target the same in-container temp path", func() {
+		exportedPath := strings.TrimPrefix(catConnFile, "cat ")
+		s.True(strings.HasPrefix(exportedPath, "/tmp/"), "connections should be exported under /tmp inside the container, got %q", exportedPath)
+		s.Contains(airflowConnExport, exportedPath, "export command should write to the same path the cat command reads")
+		s.Equal(exportedPath, strings.TrimPrefix(rmConnFile, "rm "), "remove command should target the same path the file was exported to")
+	})
+
+	s.Run("removes the temp file on success", func() {
+		var commands []string
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
+			commands = append(commands, airflowCommand)
+			switch airflowCommand {
+			case airflowConnExport:
+				return "1 connections successfully exported", nil
+			case catConnFile:
+				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema", nil
+			default:
+				return "", nil
+			}
+		}
+
+		err := EnvExportConnections("id", "testfiles/test.env")
+		s.NoError(err)
+		s.Contains(commands, rmConnFile)
+		_ = fileutil.WriteStringToFile("testfiles/test.env", "")
+	})
+
+	s.Run("still removes the temp file when reading the connections back fails", func() {
+		var commands []string
+		execAirflowCommand = func(id, airflowCommand string) (string, error) {
+			commands = append(commands, airflowCommand)
+			switch airflowCommand {
+			case airflowConnExport:
+				return "1 connections successfully exported", nil
+			case catConnFile:
+				return "", fmt.Errorf("boom")
+			default:
+				return "", nil
+			}
+		}
+
+		err := EnvExportConnections("id", "testfiles/test.env")
+		s.Error(err)
+		s.Contains(err.Error(), "error reading connections file")
+		s.Contains(commands, rmConnFile, "the temp file should still be removed even though the read failed")
+	})
+}
+
 func (s *Suite) TestExport() {
 	s.Run("success", func() {
 		WorkingPath = "./testfiles/"
