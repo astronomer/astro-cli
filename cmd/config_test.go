@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 
@@ -146,6 +147,7 @@ func (s *CmdSuite) TestConfigSetWithNoArgumentsReportsArity() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	_, err := executeCommand("config", "set")
 	s.ErrorIs(err, errInvalidSetArgs)
+	s.True(cliout.IsUsage(err), "the wrong number of arguments is a usage error, exit 2")
 }
 
 func (s *CmdSuite) TestConfigSetCommandFailure() {
@@ -155,6 +157,22 @@ func (s *CmdSuite) TestConfigSetCommandFailure() {
 
 	_, err = executeCommand("config", "set", "test", "-g")
 	s.ErrorIs(err, errInvalidSetArgs)
+	s.True(cliout.IsUsage(err), "the wrong number of arguments is a usage error, exit 2")
+}
+
+// Outside a project and without -g, the group's pre-run would refuse the
+// scope before configSet saw the count, as a plain error exiting 1. The count
+// is checked first, as Args, so a wrong one is a usage error wherever it is.
+func (s *CmdSuite) TestConfigSetWithOneArgumentOutsideAProjectIsAUsageError() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	s.useWorkingPath(s.T().TempDir())
+
+	for _, args := range [][]string{{"config", "set", "webserver.port"}, {"config", "set", "a", "b", "c"}} {
+		_, err := executeCommand(args...)
+		s.ErrorIs(err, errInvalidSetArgs, args)
+		s.True(cliout.IsUsage(err), "the wrong number of arguments is a usage error, exit 2: %v", args)
+		s.Equal(2, cliout.ExitCode(context.Background(), err), args)
+	}
 }
 
 func (s *CmdSuite) TestConfigSetCommandSuccess() {

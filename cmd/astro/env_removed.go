@@ -130,35 +130,3 @@ func hasFromFileArg(args []string) bool {
 	}
 	return false
 }
-
-// helpOrUnknownSubcommand is the RunE for a group that only holds
-// subcommands: help when called bare, an error naming what was typed
-// otherwise.
-//
-// A group needs this because cobra, given no Run, prints help and exits 0 for
-// an unknown subcommand — `astro env bogus` looked like success. That matters
-// more now that the write verbs collapsed, since a mistyped one is exactly
-// what a stale script will produce. Returning the error restores the failure;
-// SuggestionsFor restores the "Did you mean this?" cobra's own legacyArgs path
-// would have appended.
-//
-// cmd/local open-codes the same check in several places without the
-// suggestions, so the two trees do not yet answer a typo identically; lifting
-// one helper into a shared package is the fix, and is not this change.
-func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return cmd.Help()
-	}
-	msg := fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath())
-	// SuggestionsFor, unlike cobra's internal findSuggestions, does not apply
-	// the default minimum distance; the groups set it declaratively so this
-	// and cobra's own path agree. (At zero, prefix matches still fire — only
-	// the edit-distance ones are lost.)
-	if suggestions := cmd.SuggestionsFor(args[0]); len(suggestions) > 0 {
-		msg += "\n\nDid you mean this?\n"
-		for _, s := range suggestions {
-			msg += "\t" + s + "\n"
-		}
-	}
-	return errors.New(msg)
-}

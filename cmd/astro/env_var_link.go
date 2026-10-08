@@ -45,7 +45,7 @@ func newEnvVarLinkRootCmd(out io.Writer) *cobra.Command {
 		Example: envVarLinkExamples,
 
 		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
+		RunE:                       cliout.GroupHelp,
 		SuggestionsMinimumDistance: 2,
 	}
 	cmd.AddCommand(

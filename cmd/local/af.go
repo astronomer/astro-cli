@@ -45,7 +45,7 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 		// and exits 0 even on a typo.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return cmd.Help()
+				return cliout.GroupHelp(cmd, nil)
 			}
 			// This group answers to `airflow`, which used to name the local
 			// project and became `astro dev` in 2019. An old invocation
@@ -55,7 +55,7 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Local Airflow lives under `astro local`: use `%s`",
 					args[0], cmd.CommandPath(), replacement))
 			}
-			return cliout.Usage(fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath()))
+			return cliout.UnknownSubcommand(cmd, args[0])
 		},
 	}
 	// The group renders no data of its own; the flag is here because every

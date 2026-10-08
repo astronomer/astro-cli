@@ -131,7 +131,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 		// validates args), so drive both cases here.
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return cmd.Help()
+				return cliout.GroupHelp(cmd, nil)
 			}
 			// Spellings that used to work here, or that someone reaches for
 			// out of v1 habit, get named rather than refused: `init` moved up
@@ -139,7 +139,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			if replacement, ok := devReplacementFor(args[0]); ok {
 				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use `%s`", args[0], cmd.CommandPath(), replacement))
 			}
-			return cliout.Usage(fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath()))
+			return cliout.UnknownSubcommand(cmd, args[0])
 		},
 	}
 	cliout.AddOutputFlag(cmd, &c.output)

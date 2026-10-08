@@ -166,7 +166,7 @@ func newEnvLinkRootCmd(out io.Writer, n *linkNoun) *cobra.Command {
 			"its own values. Identify the %s with --%s-key or --%s-id.", n.what, n.what, n.noun, n.noun),
 		Example:                    n.examples,
 		Args:                       cobra.ArbitraryArgs,
-		RunE:                       helpOrUnknownSubcommand,
+		RunE:                       cliout.GroupHelp,
 		SuggestionsMinimumDistance: 2,
 	}
 	f := &linkFlags{}

@@ -44,4 +44,18 @@ case "${ASTRO_E2E_MAX_TIER:-0}" in
   *) timeout=45m ;;
 esac
 
-exec go test -count=1 -race -shuffle=on -timeout="$timeout" -tags e2e "$@" ./...
+# -race everywhere but macOS. The suite forks the CLI a few thousand times
+# (TestEveryCommandWritesOnlyJSONToStdout alone runs every command in four
+# states), and on macOS a race-enabled test binary occasionally dies in
+# ThreadSanitizer between fork and exec: "ThreadSanitizer: CHECK failed", exit
+# 66, or a signal with no output, before the CLI has started. The detector
+# watches only the harness there, never the CLI, which buildAstro builds
+# without -race. CI runs this on Linux and Windows, where it keeps -race.
+# -race=false rather than nothing on macOS, so a GOFLAGS=-race in the
+# environment cannot turn it back on: the flag on the command line wins.
+race=-race
+if [[ "$(uname -s)" == Darwin ]]; then
+  race=-race=false
+fi
+
+exec go test -count=1 "$race" -shuffle=on -timeout="$timeout" -tags e2e "$@" ./...

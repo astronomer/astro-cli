@@ -65,6 +65,12 @@ func ExitCode(ctx context.Context, err error) int {
 // parse, a wrong argument count, a pre-run that finds no login and a missing
 // required flag all fail outside it, and under `-o json` each of those used to
 // reach stderr as prose.
+//
+// It also answers a group that cannot run, which cobra would answer with its
+// help and success: bare under json, and given an argument that names no
+// subcommand in either mode, it is a usage error (bareGroups). A group with a
+// RunE of its own gets the same answer by returning GroupHelp from it. See
+// group.go.
 func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.Writer, kinds Kinds) error {
 	markUsageErrors(root)
 	quietErrors, quietUsage := root.SilenceErrors, root.SilenceUsage
@@ -73,9 +79,15 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 
 	defer input.SetGuard(refuseUnderJSON(root, args))()
 
+	refusedBareGroup, restoreHelp := bareGroups(root, findTarget(root, args))
+	defer restoreHelp()
+
 	ResetStream()
 	root.SetArgs(args)
 	cmd, err := root.ExecuteContextC(ctx)
+	if err == nil {
+		err = refusedBareGroup(cmd)
+	}
 	if err == nil {
 		return nil
 	}
@@ -126,12 +138,8 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 // the guard answers from the value the command itself sees, with no reading
 // of raw arguments.
 func refuseUnderJSON(root *cobra.Command, args []string) func() string {
-	find := root.Find
-	if root.TraverseChildren {
-		find = root.Traverse
-	}
-	cmd, _, err := find(args)
-	if err != nil || cmd == nil {
+	cmd := findTarget(root, args)
+	if cmd == nil {
 		return nil
 	}
 	return func() string {
@@ -141,6 +149,20 @@ func refuseUnderJSON(root *cobra.Command, args []string) func() string {
 		}
 		return "with --output json it cannot"
 	}
+}
+
+// findTarget is the command args resolve to, found the way cobra will find
+// it, or nil when they resolve to none.
+func findTarget(root *cobra.Command, args []string) *cobra.Command {
+	find := root.Find
+	if root.TraverseChildren {
+		find = root.Traverse
+	}
+	cmd, _, err := find(args)
+	if err != nil {
+		return nil
+	}
+	return cmd
 }
 
 // markUsageErrors makes the usage errors cobra produces through a hook

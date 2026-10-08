@@ -133,7 +133,16 @@ func newConfigSetCmd(_ io.Writer) *cobra.Command {
 		Short:   "Set a CLI setting",
 		Long:    "Update or override a particular setting in your config.yaml file",
 		Example: configSetExample,
-		RunE:    configSet,
+		// Cobra checks Args before the group's PersistentPreRunE, so a wrong
+		// count is refused here, as a usage error, before ensureGlobalFlag or
+		// refuseRemovedConfigKey can read args[0] and fail some other way.
+		Args: func(_ *cobra.Command, args []string) error {
+			if len(args) != 2 {
+				return cliout.Usage(errInvalidSetArgs)
+			}
+			return nil
+		},
+		RunE: configSet,
 	}
 	return cmd
 }
@@ -160,9 +169,9 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 }
 
 func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
-	// Cobra runs a PersistentPreRunE before the subcommand's own argument
-	// check, so a bare `astro config set` arrives here with nothing to index
-	// and used to panic. Let it through; configSet reports the arity.
+	// Cobra has checked the subcommand's Args before this runs, so set
+	// arrives with two arguments and get with one. list arrives with none,
+	// and there is nothing here to check for it.
 	if len(args) == 0 {
 		return nil
 	}
@@ -240,10 +249,6 @@ func configSet(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if len(args) != 2 {
-		return errInvalidSetArgs
-	}
-
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 

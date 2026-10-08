@@ -170,34 +170,19 @@ func newEnvCmd(c *cli) *cobra.Command {
 	return cmd
 }
 
-// helpOrUnknownSubcommand is the RunE for a group that only holds
-// subcommands: help when called bare, an error naming what was typed
-// otherwise.
-//
-// A group needs this at all because cobra, given no Run, prints help and
-// exits 0 for an unknown subcommand — so `astro local env connection seet x`
-// would look like success to a script. Returning the error restores the
-// failure; SuggestionsFor restores the "Did you mean this?" that cobra's own
-// legacyArgs path would have appended and a hand-rolled error drops.
+// helpOrUnknownSubcommand is the RunE of the local env groups: cliout.GroupHelp,
+// which every group's bare or mistyped invocation answers to, with one thing
+// of this tree's own ahead of it. An argument that is a verb the 1.x layout
+// had (`astro local env set API_TOKEN`) is refused with the command that
+// replaced it, since GroupHelp's "unknown command" and its suggestions would
+// not point there.
 func helpOrUnknownSubcommand(cmd *cobra.Command, args []string) error {
-	if len(args) == 0 {
-		return cmd.Help()
-	}
-	if hint := removedVerbHint(cmd, args[0]); hint != "" {
-		return cliout.Usage(errors.New(hint))
-	}
-	msg := fmt.Sprintf("unknown command %q for %q", args[0], cmd.CommandPath())
-	// SuggestionsFor, unlike cobra's internal findSuggestions, does not apply
-	// the default minimum distance; the groups set it declaratively so both
-	// this and cobra's own path agree. (At zero, prefix matches still fire —
-	// only the edit-distance ones are lost.)
-	if suggestions := cmd.SuggestionsFor(args[0]); len(suggestions) > 0 {
-		msg += "\n\nDid you mean this?\n"
-		for _, s := range suggestions {
-			msg += "\t" + s + "\n"
+	if len(args) > 0 {
+		if hint := removedVerbHint(cmd, args[0]); hint != "" {
+			return cliout.Usage(errors.New(hint))
 		}
 	}
-	return cliout.Usage(errors.New(msg))
+	return cliout.GroupHelp(cmd, args)
 }
 
 // removedVerbHint names the replacement for a verb-first form this tree used

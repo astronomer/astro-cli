@@ -176,7 +176,11 @@ func buildAstro(dir string) error {
 	// Package mode ("." rather than main.go), which is how the binary is
 	// released. File mode also disables the toolchain's VCS stamping, so a
 	// build made that way answers differently about its own version.
-	cmd := exec.Command("go", "build", "-o", astroBin, "-ldflags", ldflags, ".")
+	//
+	// -race=false because the CLI that ships has no race detector, and a
+	// command-line flag overrides a -race in GOFLAGS, from the environment or
+	// `go env -w`.
+	cmd := exec.Command("go", "build", "-race=false", "-o", astroBin, "-ldflags", ldflags, ".")
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("building the CLI: %w\n%s", err, out)

@@ -180,9 +180,9 @@ func newQueryCmd(d Deps, t target, cmd *cobra.Command, builders ...func(*query) 
 	// driven here — the same shape `astro local` uses.
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			return cmd.Help()
+			return cliout.GroupHelp(cmd, nil)
 		}
-		return cliout.Usage(fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath()))
+		return cliout.UnknownSubcommand(cmd, args[0])
 	}
 	// Every leaf is built over the one query, so they share the family's flags.
 	for _, build := range builders {
