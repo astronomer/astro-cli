@@ -28,7 +28,7 @@ func (s *Suite) TestReleasesEndpointAPITimeout() {
 	httpClient := &http.Client{Timeout: 100 * time.Microsecond} // client side timeout should be less than server side sleep defined above
 
 	ctx := context.Background()
-	release, err := getLatestRelease(ctx, httpClient, ts.URL)
+	release, err := getLatestRelease(ctx, httpClient, ts.URL, 1)
 	// assert error returned is related to client timeout
 	s.Nil(release)
 	s.Error(err)
@@ -58,7 +58,7 @@ func (s *Suite) TestGetLatestRelease() {
 	httpClient := &http.Client{}
 
 	ctx := context.Background()
-	release, err := getLatestRelease(ctx, httpClient, ts.URL)
+	release, err := getLatestRelease(ctx, httpClient, ts.URL, 1)
 	s.Nil(err)
 	s.Equal(semver.MustParse("1.21.0"), release)
 }
@@ -72,7 +72,7 @@ func (s *Suite) TestGetLatestReleaseWithErrorCode() {
 	httpClient := &http.Client{}
 
 	ctx := context.Background()
-	release, err := getLatestRelease(ctx, httpClient, ts.URL)
+	release, err := getLatestRelease(ctx, httpClient, ts.URL, 1)
 	s.Nil(release)
 	s.ErrorContains(err, "request failed")
 }
@@ -100,7 +100,7 @@ func (s *Suite) TestGetLatestReleaseGetsLatestParsedVersion() {
 	httpClient := &http.Client{}
 
 	ctx := context.Background()
-	release, err := getLatestRelease(ctx, httpClient, ts.URL)
+	release, err := getLatestRelease(ctx, httpClient, ts.URL, 1)
 	s.Nil(err)
 	s.Equal(semver.MustParse("1.20.1"), release)
 }
@@ -121,7 +121,39 @@ func (s *Suite) TestGetLatestReleaseErrorsForEmptyReleases() {
 	httpClient := &http.Client{}
 
 	ctx := context.Background()
-	release, err := getLatestRelease(ctx, httpClient, ts.URL)
+	release, err := getLatestRelease(ctx, httpClient, ts.URL, 1)
 	s.Nil(release)
 	s.ErrorContains(err, "0 results")
+}
+
+func (s *Suite) TestGetLatestReleaseIgnoresOtherMajors() {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := `
+		{
+		  "available_releases": [
+				{
+					"version": "1.45.0"
+				},
+				{
+					"version": "2.0.0"
+				}
+			]
+		}
+		`
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(response))
+	}))
+	defer ts.Close()
+
+	httpClient := &http.Client{}
+
+	ctx := context.Background()
+	release, err := getLatestRelease(ctx, httpClient, ts.URL, 1)
+	s.Nil(err)
+	s.Equal(semver.MustParse("1.45.0"), release)
+
+	release, err = getLatestRelease(ctx, httpClient, ts.URL, 3)
+	s.Nil(release)
+	s.ErrorContains(err, "0 valid versions for major version 3")
 }
