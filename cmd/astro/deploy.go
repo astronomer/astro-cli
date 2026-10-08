@@ -197,7 +197,7 @@ func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
 //
 // Refusing beats ignoring. A deploy that quietly skipped --pytest is a deploy
 // someone believes ran their tests, and the flag having no effect is exactly
-// the thing they cannot see. Porting them is an earlier fix.
+// the thing they cannot see. Porting them is not done yet.
 //
 // --force and --prompt are deliberately absent: the manifest path reads neither, but
 // neither leaves a false belief behind. There is no uncommitted-changes gate on

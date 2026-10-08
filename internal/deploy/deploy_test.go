@@ -147,7 +147,7 @@ func TestResolveTarget(t *testing.T) {
 		assert.Contains(t, err.Error(), "name one")
 	})
 
-	// The heart of an earlier fix: the default marker moves the cursor, and the
+	// The heart of "deploy always asks": the default marker moves the cursor, and the
 	// question is asked anyway.
 	t.Run("the default link preselects the prompt and never skips it", func(t *testing.T) {
 		d := &stubDeployer{answer: "prod"}

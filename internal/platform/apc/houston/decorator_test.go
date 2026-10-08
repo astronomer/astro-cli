@@ -177,9 +177,8 @@ func (s *Suite) TestCall() {
 }
 
 // The upgrade mutations exist only where Houston still serves them:
-// updateDeploymentAirflow is a no-op stub from 0.37.0,
-// and updateDeploymentRuntime and cancelRuntimeUpdate are gone from 1.0.43
-//.
+// updateDeploymentAirflow is a no-op stub from 0.37.0, and
+// updateDeploymentRuntime and cancelRuntimeUpdate are gone from 1.0.43.
 func (s *Suite) TestUpgradeMutationsAreGatedToTheHoustonsThatServeThem() {
 	for _, c := range []struct {
 		api, version string

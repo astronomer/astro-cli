@@ -18,8 +18,8 @@ import (
 // The suite claims astro's compose objects and leaves everyone else's alone.
 //
 // The label filter finds every compose project on the machine, which on a
-// developer's laptop includes their own work. Real names, from a machine that
-// had both kinds on it.
+// developer's laptop includes their own work. Names in the shapes found on a
+// machine that had both kinds on it.
 func TestTheCensusClaimsOnlyAstroProjects(t *testing.T) {
 	tier(t, 0)
 	for _, name := range []string{

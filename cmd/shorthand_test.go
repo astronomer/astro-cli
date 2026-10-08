@@ -12,7 +12,7 @@ import (
 )
 
 // shellDashDExceptions are the shell flags that spell -d as something other than a
-// deployment. They are grandfathered, not endorsed: an earlier fix settled -d for
+// deployment. They are grandfathered, not endorsed: v2 settles -d for
 // --deployment across the core tree, harmonizing with the shell's own --deployment-id,
 // and every one of these predates that. Nothing may be added — a new flag
 // wanting -d for something else is the collision this test exists to catch,
@@ -34,7 +34,7 @@ var shellDashDExceptions = map[string]bool{
 // TestDashDMeansDeploymentOutsideTheAllowlist guards the seam the per-tree test
 // cannot see: cmd/local enforces one meaning per shorthand inside the core tree,
 // but that tree mounts on the shell root, where older commands spell -d several
-// other ways. an earlier fix settled -d for the deployment selector, matching the shell's
+// other ways. v2 settles -d for the deployment selector, matching the shell's
 // own --deployment-id, so every new -d has to be one of those two; the
 // survivors are grandfathered by name above.
 //
@@ -67,7 +67,7 @@ func TestDashDMeansDeploymentOutsideTheAllowlist(t *testing.T) {
 					if f.Shorthand != "d" || f.Name == "deployment" || f.Name == "deployment-id" || shellDashDExceptions[f.Name] {
 						return
 					}
-					t.Errorf("[%s] %s: -d is --%s; an earlier fix settled -d for the deployment selector", tree.name, cmd.CommandPath(), f.Name)
+					t.Errorf("[%s] %s: -d is --%s; -d is the deployment selector in v2", tree.name, cmd.CommandPath(), f.Name)
 				})
 			})
 		}

@@ -27,7 +27,7 @@ type InitSubscription struct {
 type StartSubscription struct {
 	// ID names the operation: the server tags its frames for it with this,
 	// and a stop names it (subscriptions-transport-ws, which Houston serves
-	// subscriptions with: Houston).
+	// subscriptions with).
 	ID      string      `json:"id,omitempty"`
 	Type    string      `json:"type"`
 	Payload interface{} `json:"payload"`
@@ -72,8 +72,7 @@ const subscriptionID = "1"
 
 // ErrLogStreamClosed is the connection closing under a log subscription.
 // Houston itself does not close it when a login expires: it checks the token
-// once, when the connection opens (houston-api
-// ), and a token it refuses then is a
+// once, when the connection opens, and a token it refuses then is a
 // connection_error frame instead. A close is a proxy, a restart, or the
 // network.
 var ErrLogStreamClosed = errors.New("the log stream was closed")
@@ -193,9 +192,8 @@ func handleFrame(message []byte, onLog func(DeploymentLog) error) error {
 	case "data":
 		// A GraphQL execution error comes in a data frame too, with
 		// payload.errors: a permission denial, or a failure setting the
-		// subscription up (subscriptions-transport-ws, which Houston serves
-		// the subscription with: Houston). It is
-		// not a record.
+		// subscription up (subscriptions-transport-ws, which Houston serves the
+		// subscription with). It is not a record.
 		var payload struct {
 			Data *struct {
 				Log *struct {
@@ -221,8 +219,7 @@ func handleFrame(message []byte, onLog func(DeploymentLog) error) error {
 		return onLog(DeploymentLog{ID: l.ID, CreatedAt: l.CreatedAt, Log: l.Log})
 	case "connection_error":
 		// Houston refused the token when the connection opened: its onConnect
-		// found no user for it, an unknown or expired one, and returned false
-		//.
+		// found no user for it, an unknown or expired one, and returned false.
 		return fmt.Errorf("the log stream refused your login (%s); it may have expired: log in again with `astro login`", frameMessage(frame.Payload))
 	case "error":
 		return fmt.Errorf("the log subscription failed: %s", frameMessage(frame.Payload))

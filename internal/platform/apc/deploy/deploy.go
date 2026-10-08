@@ -50,9 +50,8 @@ var (
 	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster")
 	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation = errors.New("no DAGs found in the dags folder. User canceled the operation")
-	// Houston reads the host from its registry.protectedCustomRegistry.updateRegistry.host
-	//, under
-	// astronomer.houston.config in the platform's values.
+	// Houston reads the host from its registry.protectedCustomRegistry.updateRegistry.host,
+	// under astronomer.houston.config in the platform's values.
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
 	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
 	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
@@ -298,13 +297,11 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	}
 	// A custom image's own tag names only the source. To the APC registry it
 	// is pushed as <release>/airflow:<nextTag>, as a build is: Houston deploys
-	// only a push to that repository (houston-api
-	//  ),
-	// skips a push tagged "latest" (),
-	// and does not roll out a tag it has deployed before (), so
-	// the user's tag would deploy nothing for "latest" or a reused tag. It used
-	// to be pushed as <registry>:<tag>, which Houston never deployed at all. A
-	// BYO registry takes the image by the mutation instead, under its tag.
+	// only a push to that repository, skips a push tagged "latest", and does
+	// not roll out a tag it has deployed before, so the user's tag would deploy
+	// nothing for "latest" or a reused tag. It used to be pushed as
+	// <registry>:<tag>, which Houston never deployed at all. A BYO registry
+	// takes the image by the mutation instead, under its tag.
 	if customImageName != "" && byoRegistryEnabled {
 		if tagFromImageName := getGetTagFromImageName(customImageName); tagFromImageName != "" {
 			remoteImage = fmt.Sprintf("%s:%s", registry, tagFromImageName)

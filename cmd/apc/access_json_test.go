@@ -63,8 +63,7 @@ func TestServiceAccountJSON(t *testing.T) {
 		assert.Empty(t, run.stderr)
 	})
 
-	// Houston returns the key whole for ten minutes after the create
-	//; a list
+	// Houston returns the key whole for ten minutes after the create; a list
 	// publishes none, whole or masked.
 	t.Run("list publishes no key", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
@@ -258,10 +257,9 @@ func TestWorkspaceUserJSON(t *testing.T) {
 	})
 
 	// workspaceUser answers for any active user with the email, with no
-	// bindings when they hold none in the Workspace
-	//: that user is
-	// refused before anything is sent, and an unknown email never sends an
-	// empty user ID.
+	// bindings when they hold none in the Workspace: that user is refused
+	// before anything is sent, and an unknown email never sends an empty user
+	// ID.
 	t.Run("remove: a user with no role on the Workspace is refused", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		api := newAccessClient()
@@ -431,8 +429,8 @@ func TestWorkspaceAndDeploymentTeamJSON(t *testing.T) {
 	})
 
 	// Houston answers [] for a Deployment with no team and for one that does
-	// not exist alike,
-	// so the text's refusal never told them apart; a list is [] when empty.
+	// not exist alike, so the text's refusal never told them apart; a list is
+	// [] when empty.
 	t.Run("deployment list: none is [] under json, and still refused in text", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		api := newAccessClient()
@@ -494,10 +492,10 @@ func TestWorkspaceAndDeploymentTeamJSON(t *testing.T) {
 	})
 
 	// Houston removes nothing for a team with no binding in the Workspace
-	// and reports no error:
-	// the command said it had removed it, and exited 0. A team whose only
-	// binding there is on a Deployment, or that holds only a custom role
-	// assignment, holds no Workspace role, and is refused the same way.
+	// and reports no error: the command said it had removed it, and exited 0.
+	// A team whose only binding there is on a Deployment, or that holds only a
+	// custom role assignment, holds no Workspace role, and is refused the same
+	// way.
 	t.Run("workspace remove of a team with no Workspace role fails", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		api := newAccessClient()
@@ -514,10 +512,9 @@ func TestWorkspaceAndDeploymentTeamJSON(t *testing.T) {
 	})
 
 	// Looking the team up needs workspace.teams.get, which removing it does
-	// not, and
-	// Houston refuses the lookup the same way for a team with no binding in
-	// the Workspace (). So the removal is sent anyway,
-	// and the result says it was not verified.
+	// not, and Houston refuses the lookup the same way for a team with no
+	// binding in the Workspace. So the removal is sent anyway, and the result
+	// says it was not verified.
 	t.Run("workspace remove when the lookup is refused sends the removal, unverified", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 		api := newAccessClient()

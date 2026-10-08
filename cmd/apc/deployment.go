@@ -516,10 +516,9 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	// The settings that decide create's questions (namespace management, DAG
-	// deploy mechanisms) are resolved per cluster and workspace (houston-api
-	// ), so a --namespace is
-	// judged against those, not the defaults the tree was built with. A
-	// failed lookup used to be dropped, leaving no settings to read.
+	// deploy mechanisms) are resolved per cluster and workspace, so a
+	// --namespace is judged against those, not the defaults the tree was built
+	// with. A failed lookup used to be dropped, leaving no settings to read.
 	if clusterID != "" || createNamespace != "" {
 		appConfig, err = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: clusterID, WorkspaceUUID: ws})
 		if err != nil {

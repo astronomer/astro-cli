@@ -26,8 +26,8 @@ var errWorkspaceContextNotSet = errors.New("current workspace context not set, y
 // errNoWorkspace is a mutation answered with no workspace and no error. Houston
 // answers createWorkspace and updateWorkspace with the record Prisma wrote,
 // and an update of a workspace that does not exist throws rather than
-// answering null. So this is what is left if that ever
-// changes: an error, where it used to panic printing a nil workspace.
+// answering null. So this is what is left if that ever changes: an error,
+// where it used to panic printing a nil workspace.
 var errNoWorkspace = errors.New("the platform answered with no workspace")
 
 // Create creates a workspace, and returns it as Houston stored it.
@@ -49,9 +49,8 @@ func List(client houston.ClientInterface) ([]houston.Workspace, error) {
 
 // Delete deletes a workspace, and returns the record Houston removed: its
 // id, label and description. Houston fails, rather than answering null, on
-// a workspace that does not exist or still has Deployments
-// ( and :66-68), so
-// nil comes back only if that ever changes.
+// a workspace that does not exist or still has Deployments, so nil comes
+// back only if that ever changes.
 func Delete(id string, client houston.ClientInterface) (*houston.Workspace, error) {
 	return houston.Call(client.DeleteWorkspace)(id)
 }

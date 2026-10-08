@@ -3,7 +3,7 @@
 // Package localstandalone runs local Airflow as host processes from the
 // project's uv-managed venv: the standalone-mode implementation of the
 // pkg/localrt Airflow contract. The lifecycle is lifted from
-// Astro Desktop's runtime/standalone.go — callback-based, context-aware,
+// Astro Desktop's standalone runtime — callback-based, context-aware,
 // with state cleared on failed health so a reused PID cannot masquerade as
 // a running Airflow — adapted onto the v2 plan/state/proxy seams, with the
 // environment provisioned by pkg/uv from the project's pyproject.toml
@@ -858,7 +858,7 @@ func (a *airflow) Status() (rt.Status, error) {
 // standalone` spawns scheduler/api-server/triggerer into the group and the
 // master often exits on SIGTERM well before its children finish, so
 // watching only the master leaks them (the bug v1's stop and airflowrt's
-// StopProcess still have; an earlier fix fixes it there).
+// StopProcess still have; fixing it there is separate work).
 func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	e := a.eng
 	if opts.Force {

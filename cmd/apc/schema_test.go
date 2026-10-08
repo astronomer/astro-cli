@@ -67,10 +67,9 @@ var publishedPayloads = []cliouttest.Case{
 	// category never given, an account never used): they are null, never "".
 	{Name: "service-account-without-values", Value: serviceAccountJSON{ID: "x", Label: sp("x")}, AsGiven: true},
 	// astro deployment|workspace service-account list: api_key is always
-	// null. Houston returns the key whole for ten minutes after the create
-	//, and a
-	// list is not where a script should come by it. Pinned as given, since
-	// populating every field would show a key.
+	// null. Houston returns the key whole for ten minutes after the create,
+	// and a list is not where a script should come by it. Pinned as given,
+	// since populating every field would show a key.
 	{Name: "service-account-list", Value: serviceAccountListJSON{ServiceAccounts: []serviceAccountJSON{
 		{ID: "x", Label: sp("x"), Category: sp("x"), Active: true, CreatedAt: sp("x"), LastUsedAt: sp("x")},
 	}}, AsGiven: true},

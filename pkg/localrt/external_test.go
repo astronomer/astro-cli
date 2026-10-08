@@ -122,7 +122,7 @@ func TestClaimPublishesARuntimeTheRestOfTheToolchainCanSee(t *testing.T) {
 	assert.Equal(t, pgid, rec.Pgid, "the record's group is the group it belongs to")
 
 	// The probing reader — what `astro local status` answers with — calls it
-	// running, which is the fact the whole wave turns on.
+	// running, which is the fact everything here turns on.
 	live, err := r.ReadStatus(project)
 	require.NoError(t, err)
 	assert.Equal(t, StateRunning, live.State)
@@ -134,7 +134,7 @@ func TestClaimPublishesARuntimeTheRestOfTheToolchainCanSee(t *testing.T) {
 	assert.Equal(t, 8081, all[0].Port)
 }
 
-// The hazard this wave exists to close, asserted through the gate that closes
+// The hazard this exists to close, asserted through the gate that closes
 // it: refuseLiveStart is the first thing Runtime.Start calls, so a claimed
 // project makes `astro local start` refuse instead of standing up a second
 // Airflow against the same directory.

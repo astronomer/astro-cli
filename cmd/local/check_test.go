@@ -461,7 +461,7 @@ func TestCheckImportErrorShowsTheExceptionThenTheFrames(t *testing.T) {
 	}
 }
 
-// Every traceback shape the review of #177 turned up, plus the degenerate
+// Every traceback shape a review turned up, plus the degenerate
 // ones. The rule is "the line closing the final frame block", not "the last
 // line" — see exceptionLine.
 func TestExceptionLine(t *testing.T) {
@@ -623,7 +623,7 @@ func TestExceptionLine(t *testing.T) {
 			// handling it. Python renders chains oldest-first, so the group is
 			// the FIRST block and the exception that killed the run is the last
 			// — taking the first group reported a handled exception, which is
-			// the failure #184 exists to prevent.
+			// the failure this exists to prevent.
 			//
 			// Captured from CPython 3.12.
 			"a handled group does not outrank what actually failed",

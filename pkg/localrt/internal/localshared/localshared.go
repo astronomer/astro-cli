@@ -1,6 +1,6 @@
 // Package localshared holds the pieces both local engines (standalone and
 // docker) need: port choice, hostname fallback, proxy-route teardown, and daemon
-// lifecycle. an earlier fix rule is that anything both modes need lives here, never
+// lifecycle. The rule is that anything both modes need lives here, never
 // copied — one copy is how "works in docker, broken in standalone" stops shipping.
 // Like the engines it serves, it follows the layer rules in
 // docs/architecture.md: nothing here prints.

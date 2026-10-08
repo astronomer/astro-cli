@@ -10,11 +10,9 @@ import (
 
 // A custom --image-name pushed to the APC registry goes to
 // <registry>/<release>/airflow:<nextTag>, whatever its own tag. Houston
-// deploys only a push to <release>/airflow (houston-api
-//  ),
-// skips a push tagged "latest" (), and
-// does not roll out a tag it has deployed before (). Pushed
-// under the user's tag, "latest" or a reused tag would deploy nothing.
+// deploys only a push to <release>/airflow, skips a push tagged "latest",
+// and does not roll out a tag it has deployed before. Pushed under the
+// user's tag, "latest" or a reused tag would deploy nothing.
 func (s *Suite) TestCustomImageToTheAPCRegistryTakesTheNextTag() {
 	config.InitConfig(s.fsForDockerConfig)
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(&houston.DeploymentConfig{AirflowImages: mockAirflowImageList}, nil)

@@ -284,7 +284,7 @@ func copyTree(t *testing.T, src, dst string) {
 //
 // The login does not expire, so the pre-run takes it without renewing it, and
 // the command goes on to its request, which fails. A note printed along the
-// way would be on stdout ahead of the error object: where #486's bug was.
+// way would be on stdout ahead of the error object, as it once was.
 func writeLogin(t *testing.T, p *project, platform string) {
 	t.Helper()
 	cfg := fmt.Sprintf(`context: localhost

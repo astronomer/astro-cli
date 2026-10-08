@@ -34,8 +34,8 @@ const currentWS = "ck05r3bor07h40d02y2hw4n4v"
 var (
 	wsCurrent = houston.Workspace{ID: currentWS, Label: "airflow", Description: new("desc a"), CreatedAt: "2019-10-16T21:14:22.105Z", UpdatedAt: "2019-10-16T21:14:22.105Z"}
 	wsOther   = houston.Workspace{ID: "ckbv8pwbq00wk0760us7ktcgd", Label: "second", Description: new("desc b"), CreatedAt: "2020-01-02T03:04:05.000Z", UpdatedAt: "2020-01-02T03:04:05.000Z"}
-	// Houston's description is nullable (, model
-	// Workspace), and a workspace made outside the CLI may have none.
+	// Houston's description is nullable, and a workspace made outside the
+	// CLI may have none.
 	wsBare = houston.Workspace{ID: "ckc0j8y1101xo0760or02jdi7", Label: "third"}
 )
 
@@ -299,8 +299,7 @@ func TestWorkspaceCreateAndUpdateJSON(t *testing.T) {
 func TestWorkspaceDeleteJSON(t *testing.T) {
 	t.Run("what it removed", func(t *testing.T) {
 		api := wsClient()
-		// Houston answers with the record it removed, id, label and
-		// description.
+		// Houston answers with the record it removed: id, label and description.
 		api.On("DeleteWorkspace", wsOther.ID).Return(&houston.Workspace{ID: wsOther.ID, Label: wsOther.Label, Description: wsOther.Description}, nil)
 
 		got := runWorkspaceTree(t, api, "", true, "workspace", "delete", wsOther.ID, "-o", "json")
@@ -314,9 +313,7 @@ func TestWorkspaceDeleteJSON(t *testing.T) {
 	})
 	t.Run("a workspace with Deployments is refused, exit 1", func(t *testing.T) {
 		api := wsClient()
-		// Houston refuses rather than deleting (houston-api
-		//  the
-		// message ).
+		// Houston refuses rather than deleting.
 		api.On("DeleteWorkspace", wsOther.ID).Return(nil, errors.New("You must first deprovision all deployments before you can delete your workspace."))
 
 		got := runWorkspaceTree(t, api, "", true, "workspace", "delete", wsOther.ID, "-o", "json")

@@ -6,7 +6,7 @@
 # within one package, so an exported function whose last caller went away is
 # invisible to it. golang.org/x/tools/cmd/deadcode builds the call graph from
 # main() and sees those too. Astro Desktop runs the same tool at the same
-# version from its pre-push hook.
+# version.
 #
 # Three things keep it from reporting what is not dead:
 #

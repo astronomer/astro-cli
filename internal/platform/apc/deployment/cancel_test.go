@@ -13,10 +13,10 @@ import (
 //   - 1.0.0–1.0.42 select desiredRuntimeVersion (houston DeploymentGetRequest
 //     1.0.0/1.0.1), so a pending upgrade is canceled, and with none pending
 //     cancelRuntimeUpdate is not called at all; Houston would refuse it with
-//     CancelRuntimeUpdateError.
-//   - 1.0.43 and later removed cancelRuntimeUpdate and the desired version
-//    . The call is gated off (ErrAPINotImplemented)
-//     and there is nothing pending to cancel.
+//     CancelRuntimeUpdateError (as of v1.0.42).
+//   - 1.0.43 and later removed cancelRuntimeUpdate and the desired version.
+//     The call is gated off (ErrAPINotImplemented) and there is nothing
+//     pending to cancel.
 func (s *Suite) TestRuntimeCancelOnEachHouston() {
 	s.Run("1.0.x, an upgrade pending", func() {
 		api := new(mocks.ClientInterface)

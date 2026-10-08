@@ -437,11 +437,10 @@ func (s *Suite) TestUpdateWorkspace() {
 }
 
 // The CLI counts pages from 0 and Houston, since v0.31.6, from 1: it skips
-// (pageNumber - 1) * take rows and reads 0 as 1 (houston-api
-// ). Sent as 1, the second page came back
-// as the first. Before v0.31.6 the resolver skipped pageNumber * take, so a
-// page goes out as it is. The first page is 0 on both, whatever the version,
-// so a version read wrong cannot lose it.
+// (pageNumber - 1) * take rows and reads 0 as 1. Sent as 1, the second page
+// came back as the first. Before v0.31.6 the resolver skipped
+// pageNumber * take, so a page goes out as it is. The first page is 0 on
+// both, whatever the version, so a version read wrong cannot lose it.
 func (s *Suite) TestWorkspacesPageNumber() {
 	for _, v := range []string{"1.0.0", "0.31.6", "0.35.2", "", "invalid"} {
 		s.Equal(0, WorkspacesPageNumber(0, v), "Houston %q, first page", v)

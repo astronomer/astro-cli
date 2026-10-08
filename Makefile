@@ -102,7 +102,7 @@ lint-goos:
 	done
 
 # Functions no path from main() reaches, on every platform CI builds for. The
-# version matches Astro Desktop's pre-push hook; scripts/deadcode.sh says what
+# version matches the one Astro Desktop runs; scripts/deadcode.sh says what
 # it leaves out and why.
 DEADCODE_VERSION=v0.32.0
 

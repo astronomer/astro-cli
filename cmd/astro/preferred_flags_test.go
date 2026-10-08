@@ -122,7 +122,7 @@ func TestEnvTakesALinkNameAsDeployment(t *testing.T) {
 
 	out, err := execEnvCmd("variable", "list", "--deployment", "test")
 	require.NoError(t, err)
-	assert.Contains(t, out, "using workspace Examplefrom pyproject.toml (link test)\n")
+	assert.Contains(t, out, "using workspace Example from pyproject.toml (link test)\n")
 	mc.AssertExpectations(t)
 }
 

@@ -17,7 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
-// Standalone log parsing, lifted from Astro Desktop's standalone_logs.go.
+// Standalone log parsing, lifted from Astro Desktop.
 // `airflow standalone` prefixes each line with the component that wrote it
 // ("scheduler ", "api-server ", ...); the parser peels that off, extracts
 // the line's own timestamp when it has one, and strips the metadata that

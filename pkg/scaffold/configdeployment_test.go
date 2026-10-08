@@ -171,7 +171,7 @@ func TestConfigInstancesReadTheIDUnderAuth(t *testing.T) {
 	res, about := convertWithConfig(t, "project:\n  name: example-project\n"+
 		"instances:\n"+
 		"  - auth:\n      context: astronomer.io\n      deployment_id: cexampledeployment0000001\n      kind: astro_pat\n"+
-		"    name: example-dev\n    source: astro\n    url: https://cexampledeployment0000001.wl.astronomer.run/dy1rw0wl\n"+
+		"    name: example-dev\n    source: astro\n    url: https://cexampledeployment0000001.astronomer.run/t0000001\n"+
 		"  - auth:\n      kind: astro_pat\n    name: example\n    source: astro\n"+
 		"  - auth:\n      deployment_id: cm1auth\n    deployment_id: cm1top\n    name: both\n    source: astro\n")
 	require.Len(t, about, 1, "notes: %v", res.Notes)

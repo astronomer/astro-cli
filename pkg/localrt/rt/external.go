@@ -16,7 +16,8 @@ import "time"
 // `astro local start` would stand up a SECOND one against the same project
 // directory, because the live-start guard had no record to read.
 //
-// This is the same shape of gap the earlier move closed one level up. The dispatch, the
+// This is the same shape of gap that moving Runtime out of cmd/local closed
+// one level up. The dispatch, the
 // start lock and the refuse-a-live-start rules were CLI-private, so a second
 // consumer had no way to reach them without reimplementing them differently;
 // see Runtime's own doc comment. The record writer was the next layer of that.

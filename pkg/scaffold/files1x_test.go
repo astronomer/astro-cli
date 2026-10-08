@@ -405,7 +405,7 @@ func TestPlanConvertsA1xProjectWithNoManifest(t *testing.T) {
 		"an include could not be carried, so the file is still the only record of it")
 }
 
-// Which Dockerfiles the conversion removes, and which it leaves alone. O27.
+// Which Dockerfiles the conversion removes, and which it leaves alone.
 //
 // The asymmetry is the point: a file wrongly kept is untidy, a file wrongly
 // deleted is a build someone wrote and no longer has. So every case that is not

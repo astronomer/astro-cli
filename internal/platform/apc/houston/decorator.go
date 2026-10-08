@@ -37,15 +37,14 @@ var houstonAPIAvailabilityByVersion = map[string]VersionRestrictions{
 	"DeleteTeamSystemRoleBinding": {GTE: "0.29.2"},
 
 	// Houston removed updateDeploymentRuntime and cancelRuntimeUpdate in
-	// 1.0.43; a Runtime upgrade there is an
-	// upsertDeployment(runtimeVersion) with nothing pending to cancel.
+	// 1.0.43; a Runtime upgrade there is an upsertDeployment(runtimeVersion)
+	// with nothing pending to cancel.
 	"UpdateDeploymentRuntime":       {GTE: "0.29.0", LT: "1.0.43"},
 	"CancelUpdateDeploymentRuntime": {GTE: "0.29.0", LT: "1.0.43"},
 	"GetRuntimeReleases":            {GTE: "0.29.0"},
 	// From 0.37.0 updateDeploymentAirflow is a stub that changes nothing and
-	// returns {},
-	// and 1.0.43 removed it; calling it would report an upgrade that never
-	// started.
+	// returns {} (the Astronomer Certified deprecation), and 1.0.43 removed
+	// it; calling it would report an upgrade that never started.
 	"UpdateDeploymentAirflow": {LT: "0.37.0"},
 
 	"GetTeam":                    {GTE: "0.28.0"},

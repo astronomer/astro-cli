@@ -273,7 +273,7 @@ func TestEvaluateSlowParseIsWarningStrictMakesItFail(t *testing.T) {
 }
 
 func TestExitCodesAreDistinctIntegers(t *testing.T) {
-	// The three outcomes must be different integers (an earlier fix: no substring
+	// The three outcomes must be different integers (no substring
 	// overlap, no ambiguity).
 	assert.NotEqual(t, ExitOK, ExitChecksFailed)
 	assert.NotEqual(t, ExitOK, ExitEnvNotReady)

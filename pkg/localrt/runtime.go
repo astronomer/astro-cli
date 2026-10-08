@@ -19,7 +19,7 @@ import (
 // engines, standalone and docker, and read paths dispatch on the mode the state
 // record captured at start — so any tool stops what another started.
 //
-// This was cmd/local's modeRuntime, which is why the earlier move exists: the dispatch, the
+// This was cmd/local's modeRuntime, which is why it moved here: the dispatch, the
 // start lock, and the refuse-a-live-start rules were CLI-private, so a second
 // consumer had no way to reach them without reimplementing them differently.
 // Moved here verbatim, error strings included.

@@ -11,9 +11,8 @@ import (
 )
 
 // Runtime versions compare as Houston compares them: an Airflow 3 Runtime,
-// M.m-p, is (M*1000).m.p,
-// so it is newer than every Airflow 2 Runtime. Read as semver, 3.0-1 was a
-// prerelease of 3.0.0, older than 12.x.
+// M.m-p, is (M*1000).m.p, so it is newer than every Airflow 2 Runtime. Read
+// as semver, 3.0-1 was a prerelease of 3.0.0, older than 12.x.
 func (s *Suite) TestRuntimeVersionsCompareAsHoustonComparesThem() {
 	s.Equal("3000.0.1", normalizeRuntimeVersion("3.0-1"))
 	s.Equal("3000.1.12", normalizeRuntimeVersion("3.1-12"))
@@ -29,8 +28,7 @@ func (s *Suite) TestRuntimeVersionsCompareAsHoustonComparesThem() {
 		"Error: You tried to set --desired-runtime-version to v4.2.4, but this Runtime Deployment is already running 4.2.4. Please indicate a higher version of Runtime and try again.")
 
 	// The picker offers a 3.x Runtime to a Deployment on 12.x. Houston 1.0.x
-	// returns the newest Runtime per Airflow line (houston-api
-	// ).
+	// returns the newest Runtime per Airflow line.
 	api := new(mocks.ClientInterface)
 	api.On("GetRuntimeReleases", mock.Anything).Return(houston.RuntimeReleases{
 		{Version: "12.1.1", AirflowVersion: "2.10.5"},

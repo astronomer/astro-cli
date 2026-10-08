@@ -59,9 +59,8 @@ func (s *Suite) TestFreeFormNamespaceFollowsHoustonsRule() {
 }
 
 // When both namespace settings are on, Houston takes the free-form name and
-// skips the pre-created list (houston-api
-// ); when neither is, it ignores
-// a namespace and names one itself.
+// skips the pre-created list; when neither is, it ignores a namespace and
+// names one itself.
 func (s *Suite) TestCreateNamespaceSettings() {
 	req := &CreateDeploymentRequest{Label: "l", WS: "ws", Executor: houston.CeleryExecutorType, ClusterID: "c", Namespace: "not-in-the-pool", TriggererReplicas: -1}
 

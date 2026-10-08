@@ -24,10 +24,9 @@ func Log(deploymentID, component, search string, since time.Duration, client hou
 		Timestamp:    &timestamp,
 	}
 	// --since asks for the window it names. Sent as timestamp alone, Houston
-	// searches the whole UTC day that timestamp falls in (houston-api
-	// ), so --since 5m returned the
-	// day; with startTime and endTime it searches exactly the window. With
-	// no --since, today's logs, as before.
+	// searches the whole UTC day that timestamp falls in, so --since 5m
+	// returned the day; with startTime and endTime it searches exactly the
+	// window. With no --since, today's logs, as before.
 	if since > 0 {
 		request.LogWindow = &houston.LogWindow{StartTime: timestamp, EndTime: now}
 	}

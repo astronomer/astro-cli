@@ -146,7 +146,7 @@ linters:
       # but `make lint-submodules` runs each one from its own directory and
       # golangci-lint still reports paths relative to THIS file — so one
       # repo-rooted pattern covers both runs. cmd/astro was listed here for the
-      # short-lived core composition root; the name now
+      # short-lived core composition root, since removed; the name now
       # holds the shell Astro tree, which gets no core exemption.
       - linters: [gocritic]
         path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack|plan)|pkg/(airflowapi|imagebuild|instance|awsauth|googleauth|localrt|proxy))

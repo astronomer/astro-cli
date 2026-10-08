@@ -35,9 +35,8 @@ func AddTeam(workspaceID, teamID, role string, client houston.ClientInterface) (
 	return orWorkspace(w, workspaceID), nil
 }
 
-// permissionDenied is the message of Houston's shield refusal
-//, which the client hands on
-// as the error's text.
+// permissionDenied is the message of Houston's shield refusal, which the
+// client hands on as the error's text.
 const permissionDenied = "Insufficient permissions."
 
 // TeamRemoval is what a Workspace team remove did. Verified is false when
@@ -52,18 +51,16 @@ type TeamRemoval struct {
 // Houston returned it.
 //
 // Houston removes nothing for a team with no binding in the Workspace and
-// still answers with the Workspace, no error (houston-api
-// ), so it looks
-// the team up first and refuses one that holds no Workspace role there; a
-// team with only a custom role assignment is one, since the removal deletes
-// role bindings only.
+// still answers with the Workspace, no error, so it looks the team up first
+// and refuses one that holds no Workspace role there; a team with only a
+// custom role assignment is one, since the removal deletes role bindings
+// only.
 //
-// The lookup needs workspace.teams.get, which the removal does not
-//, and
+// The lookup needs workspace.teams.get, which the removal does not, and
 // Houston refuses it as "Insufficient permissions." both for a login
-// without that and for a team with no binding in the Workspace
-// (). The two cannot be told apart, so on that refusal
-// the removal is sent anyway, unverified, and Houston decides.
+// without that and for a team with no binding in the Workspace. The two
+// cannot be told apart, so on that refusal the removal is sent anyway,
+// unverified, and Houston decides.
 func RemoveTeam(workspaceID, teamID string, client houston.ClientInterface) (TeamRemoval, error) {
 	verified := true
 	team, err := houston.Call(client.GetWorkspaceTeamRole)(houston.GetWorkspaceTeamRoleRequest{WorkspaceID: workspaceID, TeamID: teamID})

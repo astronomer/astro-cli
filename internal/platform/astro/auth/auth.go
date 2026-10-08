@@ -336,19 +336,17 @@ func (a *Authenticator) authDeviceLogin(authConfig Config, shouldDisplayLoginLin
 	return res, nil
 }
 
-const previewSeedUser = "seed@example.com"
-
-// noOrganizationPrompt asks whether to create an organization. A PR preview is
-// its own throwaway database whose seeded data belongs to one shared test user,
-// so there the prompt says how to reach that data and what a new org would be.
+// noOrganizationPrompt asks whether to create an organization. A preview
+// environment is temporary and comes with data of its own, so there the prompt
+// also says how to reach that data and that a new organization is temporary too.
 func noOrganizationPrompt(domain string, out io.Writer) string {
 	pr, _ := domainutil.GetPRSubDomain(domain)
 	if pr == "" {
 		return "No organization found. Create your own free organization now"
 	}
-	fmt.Fprintf(out, "This PR preview has no organization for you. Its seeded data belongs to %s: to use it, run %s and sign in as that user. That login replaces yours on every PR preview, since they share one.\n",
-		previewSeedUser, ansi.Cyan("astro login "+pr+" --force"))
-	return "Or create a scratch organization in " + pr + " now (it is deleted with the preview)"
+	fmt.Fprintf(out, "This is a preview environment, and you have no organization in it. To use its existing data, run %s and sign in with the account it was set up with.\n",
+		ansi.Cyan("astro login "+pr+" --force"))
+	return "Or create a temporary organization in " + pr + " now (it is removed with the environment)"
 }
 
 // bootstrapOrganization creates a brand-new account's first organization and

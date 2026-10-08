@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// Lifted from Astro Desktop's runtime/logwriter.go.
+// Lifted from Astro Desktop.
 
 const (
 	maxLogSize  = 50 * 1024 * 1024 // 50 MB

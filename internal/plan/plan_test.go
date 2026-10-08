@@ -108,7 +108,7 @@ func TestBuildFillsPlanFromManifest(t *testing.T) {
 func TestBuildWritesAGitSourceIntoTheDependencies(t *testing.T) {
 	dir := t.TempDir()
 	body := "[project]\nname = 'demo'\nrequires-python = '>=3.10'\ndependencies = ['apache-airflow==3.1.*', 'example-lib']\n\n[tool.astro]\n\n" +
-		"[tool.uv.sources]\ncorona = { git = 'https://github.com/example-org/example-lib.git', rev = 'abc123' }\n"
+		"[tool.uv.sources]\nexample-lib = { git = 'https://github.com/example-org/example-lib.git', rev = 'abc123' }\n"
 	if err := os.WriteFile(filepath.Join(dir, project.Marker), []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

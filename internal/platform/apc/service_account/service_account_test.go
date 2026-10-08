@@ -24,8 +24,7 @@ func TestServiceAccount(t *testing.T) {
 
 // created is what Houston returns for a create: the new row with no role
 // bindings loaded, so entityType reads SYSTEM and the deploymentUuid or
-// workspaceUuid is null, both being derived from the bindings
-//. The API
+// workspaceUuid is null, both being derived from the bindings. The API
 // key is whole.
 var created = ServiceAccount{
 	ID:        "ckbvcbqs1014t0760u4bszmcs",
@@ -100,8 +99,8 @@ func (s *Suite) TestCreateUsingWorkspaceUUID() {
 }
 
 // A list returns each key whole for ten minutes after its create and masked
-// after that: its first six characters, then * to the full length
-//. lastUsedAt is null until the account is used.
+// after that: its first six characters, then * to the full length.
+// lastUsedAt is null until the account is used.
 var listed = []houston.ServiceAccount{
 	{ID: "sa-1", APIKey: "60f2f4**************************", Label: "ci", Category: "default", CreatedAt: "2020-06-25T22:10:42.385Z", LastUsedAt: "2020-06-26T10:00:00.000Z", Active: true},
 	{ID: "sa-2", APIKey: "8d1e0a3b5c7f9e2d4a6b8c0d1e2f3a4b", Label: "new", CreatedAt: "2020-06-27T22:10:42.385Z", Active: true},
@@ -162,8 +161,7 @@ func (s *Suite) TestDelete() {
 		s.NoError(err)
 		s.Equal("sa-1", got.ID)
 	})
-	// An unknown account is an error, never a null answer
-	//.
+	// An unknown account is an error, never a null answer.
 	s.Run("error", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteWorkspaceServiceAccount", houston.DeleteServiceAccountRequest{WorkspaceID: "ws-1", ServiceAccountID: "sa-1"}).Return(nil, errMock)
@@ -173,8 +171,9 @@ func (s *Suite) TestDelete() {
 }
 
 // Every create and delete mutation returns a nullable ServiceAccount
-//. A null answer with no error is refused,
-// not read.
+// (createDeploymentServiceAccount, createWorkspaceServiceAccount,
+// deleteDeploymentServiceAccount, deleteWorkspaceServiceAccount). A null
+// answer with no error is refused, not read.
 func (s *Suite) TestNullAnswers() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	api := new(mocks.ClientInterface)

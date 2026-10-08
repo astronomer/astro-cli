@@ -110,7 +110,7 @@ type Result struct {
 var ErrAlreadyAstroProject = errors.New("is already an Astro project")
 
 // Project files are the user's own; world-readable is right (never the 1.x
-// helpers' 0o777 — an earlier fix).
+// helpers' 0o777).
 const (
 	dirPerm  = 0o755
 	filePerm = 0o644
@@ -304,7 +304,7 @@ func Run(dir string, opts Options) (*Result, error) {
 //
 // The split exists because this package's output lands in someone's repository.
 // A command can reasonably scaffold on request, but Astro Desktop offers to
-// convert a project the user already has, and O3 requires it to show the diff
+// convert a project the user already has, and it has to show the diff
 // first — which is impossible if the only way to learn what a run does is to
 // let it happen. Plan reads the project (it has to: an adopted manifest is
 // computed from the one already there) and writes nothing.

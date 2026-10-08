@@ -16,9 +16,8 @@ var errMock = errors.New("api error")
 // returns must not change it for the next run of the suite (-count=N).
 //
 // workspaceUser returns the first active user with the email, whatever the
-// Workspace, and narrows their bindings to the Workspace asked about
-//: a user with no role there comes
-// back with no bindings, not as an error.
+// Workspace, and narrows their bindings to the Workspace asked about: a
+// user with no role there comes back with no bindings, not as an error.
 func mockRoles() houston.WorkspaceUserRoleBindings {
 	return houston.WorkspaceUserRoleBindings{
 		ID:       "u-1",
@@ -77,8 +76,7 @@ func (s *Suite) TestRemove() {
 		s.Equal("airflow", w.Label)
 	})
 
-	// A user who is not a member is an error
-	//.
+	// A user who is not a member is an error.
 	s.Run("houston failure", func() {
 		api := new(mocks.ClientInterface)
 		api.On("DeleteWorkspaceUser", req).Return(nil, errMock)
@@ -90,8 +88,7 @@ func (s *Suite) TestRemove() {
 
 func (s *Suite) TestListRoles() {
 	wsID := "ck1qg6whg001r08691y117hub"
-	// workspaceUsers narrows each user's bindings to the Workspace
-	//.
+	// workspaceUsers narrows each user's bindings to the Workspace.
 	mockResponse := []houston.WorkspaceUserRoleBindings{
 		{
 			ID:           "ckbv7zpkh00og0760ki4mhl6r",
@@ -216,8 +213,7 @@ func (s *Suite) TestUpdateRole() {
 	s.Run("returns the role before and after", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)
-		// workspaceUpsertUserRole answers with the role it set
-		//.
+		// workspaceUpsertUserRole answers with the role it set.
 		api.On("UpdateWorkspaceUserRole", update).Return(houston.WorkspaceAdminRole, nil)
 
 		got, err := UpdateRole(id, email, houston.WorkspaceAdminRole, api)
@@ -227,7 +223,7 @@ func (s *Suite) TestUpdateRole() {
 	})
 
 	// It answers null when the user holds more than one binding, having set
-	// the role all the same (workspace-upsert-user-role/index.js).
+	// the role all the same.
 	s.Run("a null answer is the role asked for", func() {
 		api := new(mocks.ClientInterface)
 		api.On("GetWorkspaceUserRole", houston.GetWorkspaceUserRoleRequest{WorkspaceID: id, Email: email}).Return(mockRoles(), nil)

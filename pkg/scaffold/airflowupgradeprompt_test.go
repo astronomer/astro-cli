@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// promptBase is the change the cases below vary, the same one the desktop's
-// airflowUpgradePrompt.test.ts starts from.
+// promptBase is the change the cases below vary, the same one Astro Desktop's
+// own prompt tests start from.
 func promptBase() AirflowPinChange {
 	return AirflowPinChange{
 		Previous:     "2.9",
@@ -106,7 +106,7 @@ func TestAirflowUpgradePromptToleratesNoRequirements(t *testing.T) {
 	assert.Contains(t, AirflowUpgradePrompt(&c, desktopPromptOptions), "already pins `3.1`")
 }
 
-// What the desktop's buildPinUpgradePrompt returns for the same changes,
+// What Astro Desktop's own prompt builder returns for the same changes,
 // captured from it verbatim, so the two builders cannot drift apart a word at
 // a time: every field set, then the other branch of each choice.
 const (
@@ -141,7 +141,7 @@ func TestAirflowUpgradePromptUsesTheCallersWords(t *testing.T) {
 
 func ptr[T any](v T) *T { return &v }
 
-// What the desktop's buildPinFallbackPrompt returns for the same inputs,
+// What Astro Desktop's own fallback prompt builder returns for the same inputs,
 // captured from it verbatim.
 const desktopFallbackPrompt = "/skill:airflow-upgrade Upgrade my Airflow from 2.9 to 3.1. This project has no Dockerfile: its Airflow version is the `apache-airflow` requirement in the `[project] dependencies` array of pyproject.toml, and its providers are in the same array. Astro Desktop tried to move the requirement and could not: pyproject.toml: invalid TOML. Tell me why. If the cause is in the project, for example a pyproject.toml that does not parse, fix it, then move the apache-airflow requirement to the new version. If the version itself was refused, do not set it. Then check those providers for outdated Airflow providers and propose updates, and migrate any Dag code the upgrade breaks."
 

@@ -157,7 +157,7 @@ func TestParseSchemaNonTableSection(t *testing.T) {
 
 // The annotation grammar: what a table declaration may carry.
 //
-// D3 owed this and O19 gated the desktop's move onto it, because
+// Astro Desktop could not move onto this grammar until it existed, because
 // [tool.astro.env] could express a default and a source and nothing else —
 // while the schema it has to replace carries type, secret, description and
 // enum.

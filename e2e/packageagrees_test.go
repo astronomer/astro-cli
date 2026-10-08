@@ -16,7 +16,7 @@ import (
 // `astro package astro` are separate callers of pkg/imagebuild, and a declared
 // Dockerfile had already been broken once on exactly that seam: the composition
 // root's adapter dropped Dockerfile and Context on the way to the builder, so
-// docker mode built nothing at all until #252. One caller getting the file and
+// docker mode built nothing at all until that was fixed. One caller getting the file and
 // the other not is the failure this is for — "works locally, wrong in the
 // artifact", which nobody sees until the artifact is deployed.
 //

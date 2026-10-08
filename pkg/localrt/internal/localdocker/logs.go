@@ -7,7 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
-// Compose log parsing, ported from Astro Desktop's runtime/docker_logs.go.
+// Compose log parsing, ported from Astro Desktop.
 // `compose logs --timestamps` lines look like:
 //
 //	api-server-1  | 2026-07-21T10:00:00.123456789Z the message

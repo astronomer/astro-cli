@@ -95,9 +95,7 @@ func (s *Suite) TestCreate() {
 }
 
 // Houston answers createWorkspace and updateWorkspace with the record it
-// wrote or an error, never null (houston-api
-// 
-// update-workspace/). A null with no error is refused rather
+// wrote or an error, never null. A null with no error is refused rather
 // than printed from nothing, which used to panic.
 func (s *Suite) TestCreateAndUpdateRefuseNoWorkspace() {
 	testUtil.InitTestConfig("software")
@@ -152,8 +150,7 @@ func (s *Suite) TestListError() {
 }
 
 // Houston answers deleteWorkspace with the record it removed: id, label and
-// description, which is what the CLI's mutation asks for (houston-api
-// ).
+// description, which is what the CLI's mutation asks for.
 func (s *Suite) TestDelete() {
 	testUtil.InitTestConfig("software")
 
@@ -455,7 +452,7 @@ func (s *Suite) TestUpdate() {
 func (s *Suite) TestUpdateError() {
 	testUtil.InitTestConfig("software")
 
-	// prepare houston-api fake response
+	// prepare Houston fake response
 	id := "test"
 	args := map[string]string{"1": "2"}
 

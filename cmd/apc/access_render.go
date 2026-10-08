@@ -61,8 +61,7 @@ type serviceAccountJSON struct {
 	// APIKey is the account's credential, published by a create only: it is
 	// the result a script runs the command for, the one moment it is meant
 	// to be read. A list publishes null. Houston returns the key whole for
-	// ten minutes after the create and masked after that (houston-api
-	// ), and a list run in
+	// ten minutes after the create and masked after that, and a list run in
 	// CI within those ten minutes would put it in the job's log. The text
 	// table shows what Houston returns, as it always has. It is never
 	// written to an error or a log.

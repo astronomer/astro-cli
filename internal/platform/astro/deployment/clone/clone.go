@@ -156,16 +156,15 @@ var (
 	gcpServiceAccount = regexp.MustCompile(`^([^@]+)@[^@]+\.iam\.gserviceaccount\.com$`)
 )
 
-// gcpServiceAccountIDMax is GCP's cap on a service account id, to which core
-// cuts "astro-" and the release name.
+// gcpServiceAccountIDMax is GCP's cap on a service account id, to which the
+// platform cuts "astro-" and the release name.
 const gcpServiceAccountIDMax = 30
 
 // isDefaultIdentity reports whether id is the identity Astro made for src,
 // rather than one somebody set. Only a set one would be worth copying, and
 // the GET cannot say which it is, so the copy takes the default either way.
 //
-// The default is the one core's DefaultWorkloadIdentity
-// picks:
+// The default is the one the platform picks:
 //   - GCP, any type: the service account "astro-<release>", cut to 30
 //     characters;
 //   - AWS STANDARD or DEDICATED: the per-Deployment role astro-<release>;

@@ -28,8 +28,8 @@ type query struct {
 // thing that differs between a family's two registrations: at the top level it
 // resolves a deployment and carries the selector flags, under `astro local` it
 // is this machine and carries none. Everything else — the leaves, their flags,
-// the service calls, the rendering, the json rows — is one implementation
-//, and TestBothRegistrationsAreTheSameCommands holds it that way.
+// the service calls, the rendering, the json rows — is one implementation,
+// and TestBothRegistrationsAreTheSameCommands holds it that way.
 type target interface {
 	// register adds the flags this target needs to a family's parent command.
 	register(cmd *cobra.Command)

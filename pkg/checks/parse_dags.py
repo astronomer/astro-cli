@@ -20,7 +20,7 @@
 # The contract with the Go side is the JSON shape below. It always exits 0
 # when it can emit valid JSON: a missing/broken Airflow is reported in the
 # "fatal" field rather than through the exit code, so the caller never has to
-# read meaning into an exit status (the an earlier fix lesson).
+# read meaning into an exit status.
 import ast
 import json
 import logging

@@ -909,8 +909,8 @@ func (s *Suite) TestUpdateDeploymentImage() {
 }
 
 // The window goes only to a Houston that takes it: startTime and endTime came
-// in 0.25.6. Before it the query declares neither and
-// the variables carry neither.
+// in 0.25.6. Before it the query declares neither and the variables carry
+// neither.
 func (s *Suite) TestListDeploymentLogsWindowByVersion() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	prevVersion := version
@@ -943,8 +943,8 @@ func (s *Suite) TestListDeploymentLogsWindowByVersion() {
 }
 
 // GetDeployment asks for desiredRuntimeVersion only where Houston serves it:
-// 0.29.0 up to 1.0.43, which removed it. Asked for
-// after that, the whole query would fail validation.
+// 0.29.0 up to 1.0.43, which removed it. Asked for after that, the whole
+// query would fail validation.
 func (s *Suite) TestGetDeploymentSelectsTheDesiredRuntimeVersionWhereServed() {
 	for _, c := range []struct {
 		houston string

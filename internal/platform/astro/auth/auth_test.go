@@ -2042,13 +2042,14 @@ func TestNoOrganizationPrompt(t *testing.T) {
 		assert.Empty(t, out.String())
 	})
 
-	t.Run("points a PR preview at its seeded user and offers a scratch org", func(t *testing.T) {
+	t.Run("points a preview environment at its existing data and offers a temporary org", func(t *testing.T) {
 		out := new(bytes.Buffer)
 		prompt := noOrganizationPrompt("pr41517.astronomer-dev.io", out)
-		assert.Contains(t, out.String(), "seed@example.com")
+		assert.Contains(t, out.String(), "This is a preview environment")
 		assert.Contains(t, out.String(), "astro login pr41517 --force")
-		assert.Contains(t, out.String(), "replaces yours on every PR preview")
-		assert.Contains(t, prompt, "scratch organization in pr41517")
+		assert.Contains(t, out.String(), "the account it was set up with")
+		assert.NotContains(t, out.String(), "@", "the message names no account")
+		assert.Contains(t, prompt, "temporary organization in pr41517")
 	})
 }
 

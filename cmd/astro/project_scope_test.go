@@ -86,7 +86,7 @@ func TestEnvFollowsTheProjectWorkspace(t *testing.T) {
 
 	out, err := execEnvCmd("variable", "list")
 	require.NoError(t, err)
-	assert.Contains(t, out, "using workspace Examplefrom pyproject.toml\n")
+	assert.Contains(t, out, "using workspace Example from pyproject.toml\n")
 	mc.AssertExpectations(t)
 }
 
@@ -104,7 +104,7 @@ func TestEnvNamesTheWorkspaceFromTheProjectsOrganization(t *testing.T) {
 
 	out, err := execEnvCmd("variable", "list")
 	require.NoError(t, err)
-	assert.Contains(t, out, "using workspace Examplefrom pyproject.toml\n")
+	assert.Contains(t, out, "using workspace Example from pyproject.toml\n")
 }
 
 func TestEnvWorkspaceFlagWinsOverTheProject(t *testing.T) {
@@ -134,7 +134,7 @@ func TestEnvTakesALinkNameAsTheDeployment(t *testing.T) {
 
 	out, err := execEnvCmd("variable", "list", "--deployment-id", "test")
 	require.NoError(t, err)
-	assert.Contains(t, out, "using workspace Examplefrom pyproject.toml (link test)\n")
+	assert.Contains(t, out, "using workspace Example from pyproject.toml (link test)\n")
 	mc.AssertExpectations(t)
 }
 
@@ -194,7 +194,7 @@ contexts:
 	out, err := execEnvCmd("variable", "list")
 	require.NoError(t, err)
 	assert.Equal(t, "astronomer.io", os.Getenv("ASTRO_DOMAIN"))
-	assert.Contains(t, out, "using workspace Exampleon astronomer.io from pyproject.toml\n")
+	assert.Contains(t, out, "using workspace Example on astronomer.io from pyproject.toml\n")
 	assert.Equal(t, "astronomer-dev.io", config.CFG.Context.GetHomeString())
 	mc.AssertExpectations(t)
 }
@@ -238,7 +238,7 @@ contexts:
 	out, err := execEnvCmd("variable", "list")
 	require.NoError(t, err)
 	assert.Empty(t, os.Getenv("ASTRO_DOMAIN"))
-	assert.Contains(t, out, "using workspace Examplefrom pyproject.toml\n")
+	assert.Contains(t, out, "using workspace Example from pyproject.toml\n")
 	mc.AssertExpectations(t)
 }
 

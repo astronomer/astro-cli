@@ -22,10 +22,10 @@ type PaginatedListWorkspaceRequest struct {
 
 // oneBasedPagesSince is the first Houston whose paginatedWorkspaces counts
 // pages from 1. It skips (pageNumber - 1) * take rows, and reads a
-// pageNumber of 0 as 1. Before it, the resolver skipped pageNumber * take
-// ( at 84611262, v0.30.3).
-// Sent unchanged to a newer Houston, the second page (1) came back as the
-// first, and every later one a page behind.
+// pageNumber of 0 as 1, first released in v0.31.6. Before it (as in
+// v0.30.3), the resolver skipped pageNumber * take. Sent unchanged to a
+// newer Houston, the second page (1) came back as the first, and every later
+// one a page behind.
 const oneBasedPagesSince = "0.31.6"
 
 // WorkspacesPageNumber is the pageNumber that Houston at houstonVersion reads

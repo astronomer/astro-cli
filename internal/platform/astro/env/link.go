@@ -833,10 +833,10 @@ func kindOf(obj *astrov1.EnvironmentObject) linkKind {
 //
 // One field it cannot keep: the platform masks a password override on GET,
 // and unlike every other secret it restores a stored one only when the
-// update's is set (the platform's link type
-// its restore rule tests != nil), so a password override is lost
-// on update whatever the CLI sends. The basic token and Datadog key are
-// restored as absent, as other secrets are.
+// update's own override field is set, which the CLI cannot do with a value it
+// only ever sees masked. So a password override is lost on update whatever
+// the CLI sends. The basic token and Datadog key are restored as absent, as
+// other secrets are.
 var metricsExportLinks = linkKind{
 	objectType: objectTypeMetrics,
 	noun:       "metrics export",

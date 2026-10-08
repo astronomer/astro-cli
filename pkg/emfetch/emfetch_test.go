@@ -83,7 +83,7 @@ func (r *reader[T]) read(_ context.Context, showSecrets bool) (T, error) {
 	return r.answer(showSecrets)
 }
 
-// result stands in for the desktop's cloudenv.Result: a struct of slices, not a
+// result stands in for Astro Desktop's own result type: a struct of slices, not a
 // slice. The consumers of this module return a struct pointer and a map, so the
 // fallback is generic over the whole result rather than over a row type.
 type result struct {

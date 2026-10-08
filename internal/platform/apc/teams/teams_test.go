@@ -59,8 +59,7 @@ func (s *Suite) TestGet() {
 		mockClient.AssertNotCalled(s.T(), "GetTeamUsers", "test-id")
 	})
 
-	// teamUsers answers [] for a team with no users, and for an unknown one
-	//.
+	// teamUsers answers [] for a team with no users, and for an unknown one.
 	s.Run("no users is empty, not nil", func() {
 		mockClient := new(houston_mocks.ClientInterface)
 		mockClient.On("GetTeam", "test-id").Return(mockTeamResp, nil).Once()

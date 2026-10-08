@@ -15,7 +15,7 @@ import (
 )
 
 // The compose file is a port of v1's airflow/include templates, thinned for
-// v2: ports are always parametrized (v1 hardcoded 8080 in places — an earlier fix),
+// v2: ports are always parametrized (v1 hardcoded 8080 in places),
 // everything binds loopback-only, Airflow env comes fully layered from the
 // Plan instead of env_file/settings plumbing, and postgres always persists to
 // a named volume so a plain stop keeps the database and only --clean drops it.

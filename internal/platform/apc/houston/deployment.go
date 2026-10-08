@@ -23,9 +23,8 @@ type ListDeploymentLogsRequest struct {
 	Search       string     `json:"search"`
 	Timestamp    *time.Time `json:"timestamp,omitempty"`
 	// LogWindow, when set, bounds the search. With timestamp alone Houston
-	// searches that whole UTC calendar day (houston-api
-	// ); with a window it searches
-	// exactly the window, of at most 2 days (:66-75).
+	// searches that whole UTC calendar day; with a window it searches
+	// exactly the window, of at most 2 days.
 	*LogWindow
 }
 
@@ -712,10 +711,10 @@ var (
 
 	// DeploymentGetRequest is one Deployment by id. The 1.x entries select
 	// workspace { id }: update reads it for the app config it asks for, and
-	// deploy for its registry login.
-	// 1.0.0 and 1.0.1 select desiredRuntimeVersion, so a runtime cancel can see
-	// whether anything is pending; Houston 1.0.43 removed it (houston-api
-	// 69595020), and the 1.0.43 entry leaves it out.
+	// deploy for its registry login (never null for a Deployment created or
+	// adopted through current code). 1.0.0 and 1.0.1 select
+	// desiredRuntimeVersion, so a runtime cancel can see whether anything is
+	// pending; Houston 1.0.43 removed it, and the 1.0.43 entry leaves it out.
 	DeploymentGetRequest = queryList{
 		{
 			version: "0.25.0",
@@ -963,8 +962,8 @@ var (
 	}
 
 	// DeploymentLogsGetRequest is a Deployment's log records. Houston 0.25.6
-	// added startTime and endTime; before it, the
-	// window is left out and timestamp alone bounds the search.
+	// added startTime and endTime; before it, the window is left out and
+	// timestamp alone bounds the search.
 	DeploymentLogsGetRequest = queryList{
 		{
 			version: "0.25.0",

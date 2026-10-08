@@ -22,9 +22,8 @@ import (
 // when it holds an empty one, as Houston returns them. createdAt and
 // updatedAt are never null in Houston's table, but come back only where the
 // query asks for them: list, create, update and switch do, delete does not;
-// they are null where it did not. Houston requires a label on create and update and refuses a blank one
-// (
-// update-workspace/), so the label is always a string.
+// they are null where it did not. Houston requires a label on create and
+// update and refuses a blank one, so the label is always a string.
 type workspaceJSON struct {
 	ID          string  `json:"id"`
 	Label       string  `json:"label"`

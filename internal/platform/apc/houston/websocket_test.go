@@ -96,9 +96,9 @@ func (s *Suite) TestSubscribe() {
 	})
 
 	// A GraphQL execution error inside a subscription arrives in a data
-	// frame, with payload.errors, as subscriptions-transport-ws sends it
-	// (houston-api serves subscriptions with it: ). It
-	// is a failure, not an empty record.
+	// frame, with payload.errors, as subscriptions-transport-ws (which Houston
+	// serves subscriptions with) sends it. It is a failure, not an empty
+	// record.
 	s.Run("a data frame with errors fails the stream", func() {
 		srv := scriptedServer([]string{`{"type":"data","id":"1","payload":{"errors":[{"message":"Insufficient permissions."}]}}`, `{"type":"complete","id":"1"}`}, false)
 		defer srv.Close()
@@ -119,8 +119,7 @@ func (s *Suite) TestSubscribe() {
 	})
 
 	// A token Houston refuses when the connection opens is a
-	// connection_error frame, then a close (houston-api
-	// ); its message is the failure.
+	// connection_error frame, then a close; its message is the failure.
 	s.Run("a connection_error frame fails the stream with its message", func() {
 		srv := scriptedServer([]string{`{"type":"connection_error","payload":{"message":"Prohibited connection!"}}`}, false)
 		defer srv.Close()
@@ -206,8 +205,7 @@ func (s *Suite) TestSubscribe() {
 }
 
 // The window reaches Houston as top-level startTime and endTime, and is left
-// out when there is none: Houston then reads timestamp as a day (houston-api
-// ).
+// out when there is none: Houston then reads timestamp as a day.
 func (s *Suite) TestListDeploymentLogsRequestVariables() {
 	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	b, err := json.Marshal(ListDeploymentLogsRequest{DeploymentID: "d", Timestamp: &at})

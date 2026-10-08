@@ -9,8 +9,7 @@ import (
 const userDeploymentID = "ckgqw2k2600081qc90nbage4h"
 
 // A Deployment user as deploymentUsers returns them: their bindings narrowed
-// to this Deployment, plus their Workspace binding, whose deployment is null
-//.
+// to this Deployment, plus their Workspace binding, whose deployment is null.
 var deploymentUser = houston.DeploymentUser{
 	ID:       "ckgqw2k2600081qc90nbamgno",
 	FullName: "Some Person",
@@ -47,8 +46,7 @@ func (s *Suite) TestUserList() {
 		s.ErrorIs(err, ErrNoDeploymentUsers)
 	})
 
-	// An unknown Deployment is an error, "Invalid deployment"
-	//.
+	// An unknown Deployment is an error, "Invalid deployment".
 	s.Run("houston failure", func() {
 		api := new(mocks.ClientInterface)
 		api.On("ListDeploymentUsers", houston.ListDeploymentUsersRequest{DeploymentID: userDeploymentID}).Return(nil, errMock)
@@ -59,8 +57,7 @@ func (s *Suite) TestUserList() {
 }
 
 // The add, update and remove mutations return the role binding they made,
-// changed or deleted, its user resolved from its foreign key
-//.
+// changed or deleted, its user resolved from its foreign key.
 func boundTo(role string) *houston.RoleBinding {
 	return &houston.RoleBinding{
 		Role:       role,

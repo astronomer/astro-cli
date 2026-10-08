@@ -214,9 +214,9 @@ func TestDeploymentCreateUpdateAdoptJSON(t *testing.T) {
 		assert.Equal(t, "dep-rt", got.DeploymentID)
 	})
 
-	// Namespace management is resolved per cluster and workspace (houston-api
-	// ). Off by default, on for
-	// this cluster: --namespace is judged by the cluster's settings.
+	// Namespace management is resolved per cluster and workspace. Off by
+	// default, on for this cluster: --namespace is judged by the cluster's
+	// settings.
 	t.Run("create reads the cluster's settings for --namespace", func(t *testing.T) {
 		api := new(mocks.ClientInterface)
 		api.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil)
@@ -481,9 +481,8 @@ func TestDeploymentLogsJSON(t *testing.T) {
 		}, decodeLines[logEntryJSON](t, run.stdout))
 	})
 
-	// Houston refuses a window over 2 days (houston-api
-	// ); the CLI says so first, as a
-	// usage error, without asking.
+	// Houston refuses a window over 2 days; the CLI says so first, as a usage
+	// error, without asking.
 	t.Run("--since over 48h is a usage error", func(t *testing.T) {
 		api := newAPCClient()
 		run := runAPC(t, api, "", "deployment", "logs", "scheduler", "dep-ac", "--since", "49h", "-o", "json")

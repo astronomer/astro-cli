@@ -177,7 +177,7 @@ func TestQuerySurfaceHasEveryCommand(t *testing.T) {
 	}
 }
 
-// TestBothRegistrationsAreTheSameCommands is the hard requirement of an earlier fix,
+// TestBothRegistrationsAreTheSameCommands is a hard requirement,
 // checked structurally: every family exists twice — once against a deployment,
 // once against this machine — and the two registrations are identical except
 // for the selector flags, which only the deployment side carries. A forked

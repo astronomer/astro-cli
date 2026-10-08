@@ -11,8 +11,7 @@ import (
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 )
 
-// Houston's own words when public sign-ups are off, the default
-//.
+// Houston's own words when public sign-ups are off, the default.
 var errSignupsDisabled = errors.New("Public sign ups are disabled, a valid inviteToken is required to login to the platform. Public sign ups can be enabled via configuration change.")
 
 type Suite struct {

@@ -100,9 +100,8 @@ func Create(req *CreateDeploymentRequest, client houston.ClientInterface, out io
 	}
 
 	// Free-form entry wins when both are on, as it does in Houston, which
-	// then skips the pre-created list (houston-api
-	// ). Asking for both used to
-	// have the free-form answer replace the picked one.
+	// then skips the pre-created list. Asking for both used to have the
+	// free-form answer replace the picked one.
 	switch {
 	case appConfig.Flags.NamespaceFreeFormEntry:
 		namespace, err := getDeploymentNamespaceName(req.Namespace)
@@ -217,9 +216,9 @@ func getDeploymentSelectionNamespaces(client houston.ClientInterface, out io.Wri
 // getDeploymentNamespaceName is a namespace name of the person's own: given
 // (--namespace), or asked for. It is checked as Houston will check it, so a
 // bad name fails here with the rule rather than there with "Namespace name not
-// formatted correctly.": not empty, at most 63 characters, a DNS-1123 label
-//. Whether it is free, and the platform's
-// pre-deployment webhook, only Houston can check.
+// formatted correctly.": not empty, at most 63 characters, a DNS-1123 label.
+// Whether it is free, and the platform's pre-deployment webhook, only Houston
+// can check.
 func getDeploymentNamespaceName(given string) (string, error) {
 	namespaceName := given
 	if namespaceName == "" {
@@ -239,8 +238,7 @@ func getDeploymentNamespaceName(given string) (string, error) {
 	return namespaceName, nil
 }
 
-// maxNamespaceLength and namespaceNamePattern are Houston's namespace rule
-//.
+// maxNamespaceLength and namespaceNamePattern are Houston's namespace rule.
 const maxNamespaceLength = 63
 
 var namespaceNamePattern = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
@@ -253,8 +251,7 @@ func (e errInvalidNamespaceName) Error() string {
 }
 
 // errNamespaceNotAsked is --namespace on a platform that names namespaces
-// itself: Houston ignores the argument then (houston-api
-// ), so the name given would not
+// itself: Houston ignores the argument then, so the name given would not
 // be the one used.
 var errNamespaceNotAsked = errors.New("--namespace is not used here: this platform names each Deployment's namespace itself")
 
@@ -443,8 +440,8 @@ func RuntimeUpgradeCancel(id string, client houston.ClientInterface) (*VersionCh
 		switch {
 		case errors.As(err, &notServed):
 			// Houston 1.0.43 removed cancelRuntimeUpdate along with the
-			// pending desired version: a Runtime
-			// upgrade there is a direct upsert, with nothing left to cancel.
+			// pending desired version: a Runtime upgrade there is a direct
+			// upsert, with nothing left to cancel.
 			// Its GetDeployment has no desired version for the check above
 			// to compare, so this is where that is known.
 			return change, nil
@@ -662,8 +659,8 @@ var airflowV3RuntimePattern = regexp.MustCompile(`^(\d+)\.(\d+)-(\d+)(?:-[a-zA-Z
 
 // normalizeRuntimeVersion is a Runtime version as Houston compares it: an
 // Airflow 3 version M.m-p becomes (M*1000).m.p, so it orders above every
-// Airflow 2 Runtime (12.x, 13.x), as Houston orders it (houston-api
-// ). Anything else is unchanged.
+// Airflow 2 Runtime (12.x, 13.x), as Houston orders it. Anything else is
+// unchanged.
 func normalizeRuntimeVersion(v string) string {
 	m := airflowV3RuntimePattern.FindStringSubmatch(v)
 	if m == nil {

@@ -62,7 +62,7 @@ func TestRunFreshScaffold(t *testing.T) {
 
 // TestScaffoldedProjectLocksWithRealUv scaffolds a project and runs a real
 // `uv lock` against it, proving init produces a manifest uv can actually
-// resolve — the end-to-end gap an earlier fix closed. It needs uv and network, so it
+// resolve — the end-to-end gap this closes. It needs uv and network, so it
 // skips under -short or when uv is absent (as CI is).
 func TestScaffoldedProjectLocksWithRealUv(t *testing.T) {
 	if testing.Short() {
@@ -299,8 +299,7 @@ func TestRunAdoptsAManifestWithNoProjectTable(t *testing.T) {
 }
 
 // [project] and [tool.astro] are what make the directory an Astro project, so
-// they lead the manifest instead of trailing every tool's own section
-//.
+// they lead the manifest instead of trailing every tool's own section.
 func TestRunAdoptsPuttingTheAstroSectionsFirst(t *testing.T) {
 	dir := t.TempDir()
 	tools := "[tool.sqlfluff]\ndialect = 'snowflake'\n\n# AIR = airflow ruleset\n[tool.ruff.lint]\nselect = ['AIR']\n\n[tool.mypy]\nstrict = true\n"

@@ -43,7 +43,7 @@ type Change struct {
 	// Content is the bytes to write, for CreateFile and UpdateFile.
 	//
 	// Not serialized: a change set crosses a process boundary only to be
-	// DISPLAYED — the desktop calls this package in process, so the side
+	// DISPLAYED — Astro Desktop calls this package in process, so the side
 	// that applies is always the side that planned. Sending file contents to a
 	// UI that only needs to list them is payload for nothing, and a diff view
 	// can read the file itself. Apply refuses a write whose Content is nil, so a

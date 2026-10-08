@@ -26,8 +26,7 @@ func (s *Suite) TestLog() {
 	})
 
 	// --since is a window: startTime and endTime, which Houston searches
-	// exactly; timestamp alone is a whole UTC day there (houston-api
-	// ).
+	// exactly; timestamp alone is a whole UTC day there.
 	s.Run("since is sent as a window", func() {
 		api := new(mocks.ClientInterface)
 		var got houston.ListDeploymentLogsRequest

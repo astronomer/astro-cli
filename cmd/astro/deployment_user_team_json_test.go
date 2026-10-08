@@ -108,7 +108,7 @@ func deploymentUserTeamTextCases() []tokenCase {
 		{name: "user remove the API refuses", root: dep, client: with(all, refusesUserRoles), args: []string{"deployment", "user", "remove", "ada@example.com", d}, check: empty, wantErr: "you may not grant that role"},
 
 		// The team add and update lines name the team by ID, and remove by
-		// name, as the workspace team commands did before #467 fixed them.
+		// name, as the workspace team commands once did.
 		{name: "team add", root: dep, client: with(all, setsTeamRoles("team-eng")), args: []string{"deployment", "team", "add", "team-eng", "--role", "custom-role", d}, check: exactly("The team team-eng was successfully added to the deployment with the role custom-role\n")},
 		{name: "team add with the default role", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", d}, check: exactly("The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")},
 		{name: "team add with -w", root: dep, client: with(all, setsTeamRoles("team-idp")), args: []string{"deployment", "team", "add", "team-idp", "-w", tokDeploymentID}, check: exactly("The team team-idp was successfully added to the deployment with the role DEPLOYMENT_ADMIN\n")},

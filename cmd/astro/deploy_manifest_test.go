@@ -805,7 +805,7 @@ func TestDeployRoutes1xProject(t *testing.T) {
 // Eight flags reach astro deploy that the manifest path never reads. Accepting them
 // silently means a deploy someone believes ran their tests, shipped from a
 // DAGs path it never looked at, or saved a target it did not save. Each is
-// refused with what to do instead until an earlier fix ports the ones worth porting.
+// refused with what to do instead until the ones worth porting are ported.
 //
 // Eight rather than nine: --build-secret is deliberately NOT in this table any
 // more, because the manifest path READS it now. It still needs a project Dockerfile

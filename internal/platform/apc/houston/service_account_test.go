@@ -15,8 +15,7 @@ func (s *Suite) TestCreateDeploymentServiceAccount() {
 	mockResponse := &Response{
 		Data: ResponseData{
 			// A create answers with the bare row: no bindings loaded, so
-			// entityType reads SYSTEM and deploymentUuid is null
-			//.
+			// entityType reads SYSTEM and deploymentUuid is null.
 			CreateDeploymentServiceAccount: &DeploymentServiceAccount{
 				ServiceAccount: ServiceAccount{
 					ID:        "id",

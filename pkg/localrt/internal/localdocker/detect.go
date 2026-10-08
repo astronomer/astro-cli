@@ -10,7 +10,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/container"
 )
 
-// Multi-engine detection, ported from Astro Desktop's runtime/docker_logs.go:
+// Multi-engine detection, ported from Astro Desktop:
 // a project's containers may run under docker, OrbStack, or podman, and the
 // engine that started them is not necessarily the one detection would pick
 // today. Attach-side operations (logs, exec, status, stop) therefore probe

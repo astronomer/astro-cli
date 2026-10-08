@@ -36,9 +36,8 @@ type deploymentJSON struct {
 	ClusterID   *string `json:"cluster_id"`
 	Namespace   *string `json:"namespace"`
 	// ChartVersion is the Airflow Helm chart version the Deployment runs,
-	// the tables' ASTRO column: Houston's Deployment.version (houston-api
-	// ). It is null on what create returns, until
-	// Houston's worker sets it (src/workers/deployment-upserted-for-create).
+	// the tables' ASTRO column: Houston's Deployment.version. It is null on
+	// what create returns, until Houston's worker sets it.
 	ChartVersion *string `json:"chart_version"`
 	// AirflowVersion is set on an Astronomer Certified image,
 	// RuntimeVersion on a Runtime one.

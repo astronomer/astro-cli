@@ -66,8 +66,8 @@ func TestAirflow2ComesUpInDocker(t *testing.T) {
 	// And the admin account the Airflow 2 startup seeds.
 	//
 	// Airflow 2 is the only generation that has one: its one-shot database
-	// service runs `airflow users create` after the migration and sync-perm
-	//, Airflow 3 seeds nothing, and so nothing else in this suite
+	// service runs `airflow users create` after the migration and sync-perm,
+	// Airflow 3 seeds nothing, and so nothing else in this suite
 	// exercises that command at all.
 	//
 	// Two halves, because either alone is worthless. The CLI reading the API is

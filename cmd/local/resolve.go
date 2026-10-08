@@ -86,7 +86,8 @@ type deploymentFlags struct {
 
 // addDeploymentFlags registers the selector flags on cmd. One registration
 // keeps the spelling identical across the whole query surface: -d is settled
-// for --deployment, and --url is the escape hatch for an Airflow no project
+// for --deployment (harmonizing with v1, where -d already means
+// deployment), and --url is the escape hatch for an Airflow no project
 // declares.
 func addDeploymentFlags(cmd *cobra.Command, f *deploymentFlags) {
 	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on: a link name from the manifest, or a Deployment id")

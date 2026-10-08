@@ -275,9 +275,8 @@ type Workspace struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
 	// Description is nil when Houston has none, and "" when it holds an
-	// empty one: the column is nullable (houston-api ,
-	// model Workspace) and so is the GraphQL field (src/generated/schema.graphql,
-	// type Workspace), and an update may store "".
+	// empty one: the column is nullable and so is the GraphQL field, and an
+	// update may store "".
 	Description *string `json:"description"`
 	Users       []User  `json:"users"`
 	// groups

@@ -698,7 +698,7 @@ func multiGroupHeader(lines []string) (string, bool) {
 	// Only the last link of a chain. A group that was CAUGHT, with something
 	// else raised while handling it, is not what killed the run — reporting it
 	// would name a handled exception several frames above the real one, which
-	// is the very thing #184 set out to stop.
+	// is the very thing this sets out to stop.
 	lines = lines[lastChainStart(lines):]
 
 	inGroup := false

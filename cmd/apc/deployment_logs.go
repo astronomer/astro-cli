@@ -168,9 +168,8 @@ func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
 // fetchRemoteLogs prints a component's log records, one per line, or under
 // json one object per line: a stream, which --follow keeps open.
 func fetchRemoteLogs(cmd *cobra.Command, component string, args []string, out io.Writer) error {
-	// Houston searches at most 2 days of logs and refuses a longer window
-	//. A follow
-	// ignores --since, so only a search is held to it.
+	// Houston searches at most 2 days of logs and refuses a longer window. A
+	// follow ignores --since, so only a search is held to it.
 	if !follow && since > maxLogsSince {
 		return cliout.Usage(fmt.Errorf("--since %s is longer than the %s of logs APC searches at most", since, maxLogsSince))
 	}

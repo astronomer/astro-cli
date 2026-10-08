@@ -9,8 +9,7 @@ func (s *Suite) TestAddTeam() {
 	req := houston.AddDeploymentTeamRequest{DeploymentID: "deployment-id", TeamID: "team-id", Role: houston.DeploymentEditorRole}
 	s.Run("returns the role Houston bound", func() {
 		mock := new(houston_mocks.ClientInterface)
-		// deploymentAddTeamRole returns the binding it created
-		//.
+		// deploymentAddTeamRole returns the binding it created.
 		mock.On("AddDeploymentTeam", req).Return(&houston.RoleBinding{Role: houston.DeploymentEditorRole}, nil)
 
 		role, err := AddTeam("deployment-id", "team-id", houston.DeploymentEditorRole, mock)
@@ -50,8 +49,7 @@ func (s *Suite) TestListTeamRoles() {
 	s.Run("the teams with a role on the Deployment, and that role", func() {
 		mock := new(houston_mocks.ClientInterface)
 		// Each team carries all of its bindings, on every Workspace and
-		// Deployment, so the
-		// list has to pick the one on this Deployment.
+		// Deployment, so the list has to pick the one on this Deployment.
 		mock.On("ListDeploymentTeamsAndRoles", "deployment-id").Return(
 			[]houston.Team{
 				{ID: "test-id-1", Name: "test-name-1", RoleBindings: []houston.RoleBinding{
@@ -71,8 +69,7 @@ func (s *Suite) TestListTeamRoles() {
 	})
 
 	// deploymentTeams is [] for a Deployment with no team and for one that
-	// does not exist alike: the resolver checks nothing
-	//.
+	// does not exist alike: the resolver checks nothing.
 	s.Run("none", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("ListDeploymentTeamsAndRoles", "deployment-id").Return([]houston.Team{}, nil)

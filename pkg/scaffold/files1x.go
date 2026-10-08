@@ -27,7 +27,8 @@ import (
 // made after the manifest is rendered, because only then is it known what
 // actually reached it.
 //
-// That decision was a separate one until O27 and 2c settled it, and the
+// Whether to remove the 1.x files at all was a separate decision until the
+// conversion settled it, and the
 // reasoning it replaced is worth keeping: the 1.x files used to stay put so that
 // a conversion the user had not reviewed was reversible by ignoring it. What
 // replaces that guarantee is narrower and worth stating plainly — a file is
@@ -246,7 +247,7 @@ func read1xProject(dir string) (*project1x, error) {
 			}
 		}
 		// A Dockerfile that is not pin-only and drew no note is kept and
-		// unmentioned, which O27 says it must not be: the point of keeping it
+		// unmentioned, which it must not be: the point of keeping it
 		// is that the project still has a build the manifest does not describe,
 		// and the user has to be told. buildStepsNote covers the RUN/COPY/ENV
 		// shapes; this covers the rest — a second stage, an instruction no
@@ -266,7 +267,7 @@ func read1xProject(dir string) (*project1x, error) {
 // dockerfileIsPinOnly reports a Dockerfile that says nothing except which
 // runtime image to build on, so the manifest's airflow pin can replace it whole.
 //
-// This is the test, and it is an allowlist of ONE thing rather than a denylist
+// This is the pin-only test, and it is an allowlist of ONE thing rather than a denylist
 // of instructions. The first version asked buildInstructionRe — the regex naming
 // RUN, COPY, ENV and eleven others for the note it writes — and read "no match"
 // as "nothing here". That is backwards for a decision that deletes. MAINTAINER

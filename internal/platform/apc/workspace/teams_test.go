@@ -11,8 +11,7 @@ func (s *Suite) TestAddTeam() {
 	req := houston.AddWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id", Role: houston.WorkspaceEditorRole}
 	s.Run("returns the Workspace", func() {
 		mock := new(houston_mocks.ClientInterface)
-		// workspaceAddTeam returns the whole Workspace row
-		//.
+		// workspaceAddTeam returns the whole Workspace row.
 		mock.On("AddWorkspaceTeam", req).Return(&houston.Workspace{ID: "workspace-id", Label: "label"}, nil)
 
 		w, err := AddTeam("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)
@@ -32,8 +31,7 @@ func (s *Suite) TestAddTeam() {
 func (s *Suite) TestRemoveTeam() {
 	get := houston.GetWorkspaceTeamRoleRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}
 	req := houston.DeleteWorkspaceTeamRequest{WorkspaceID: "workspace-id", TeamID: "team-id"}
-	// The team query returns all of the team's bindings
-	//.
+	// The team query returns all of the team's bindings.
 	member := &houston.Team{ID: "team-id", RoleBindings: []houston.RoleBinding{
 		{Role: houston.SystemViewerRole},
 		{Role: houston.WorkspaceViewerRole, Workspace: houston.Workspace{ID: "workspace-id"}},
@@ -51,11 +49,10 @@ func (s *Suite) TestRemoveTeam() {
 	})
 
 	// workspaceRemoveTeam deletes role bindings only, and removes nothing,
-	// with no error, for a team that has none there
-	//.
-	// The lookup passes Houston's shield for a team with any binding in the
-	// Workspace, a Deployment's included ();
-	// one with no Workspace role is refused before anything is sent.
+	// with no error, for a team that has none there. The lookup passes
+	// Houston's shield for a team with any binding in the Workspace, a
+	// Deployment's included; one with no Workspace role is refused before
+	// anything is sent.
 	s.Run("a team with no Workspace role is refused", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", get).Return(&houston.Team{ID: "team-id", RoleBindings: []houston.RoleBinding{
@@ -69,8 +66,8 @@ func (s *Suite) TestRemoveTeam() {
 	})
 
 	// The lookup needs workspace.teams.get and the removal only
-	// workspace.iam.update ( against 893-896), and the
-	// shield's refusal reads the same for a non-member: so it is sent anyway.
+	// workspace.iam.update, and the shield's refusal reads the same for a
+	// non-member: so it is sent anyway.
 	s.Run("a refused lookup still sends the removal, unverified", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", get).Return(nil, errors.New("Insufficient permissions."))
@@ -138,8 +135,7 @@ func (s *Suite) TestUpdateTeamRole() {
 	s.Run("returns the team, its role before and after", func() {
 		mock := new(houston_mocks.ClientInterface)
 		mock.On("GetWorkspaceTeamRole", get).Return(team, nil)
-		// workspaceUpdateTeamRole answers with the new role
-		//.
+		// workspaceUpdateTeamRole answers with the new role.
 		mock.On("UpdateWorkspaceTeamRole", update).Return(houston.WorkspaceEditorRole, nil)
 
 		got, err := UpdateTeamRole("workspace-id", "team-id", houston.WorkspaceEditorRole, mock)

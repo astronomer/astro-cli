@@ -92,7 +92,7 @@ const localIgnoreHeader = "# Per-machine files Astro tools write into the projec
 //
 // A plan rather than a write so the appended bytes can be shown to a person
 // before they land: this edits a file the user wrote, which is exactly the case
-// O3 requires a preview for.
+// that needs a preview.
 func planIgnoreRules(projectDir string) (*Change, error) {
 	data, err := os.ReadFile(filepath.Join(projectDir, fileGitignore))
 	if errors.Is(err, os.ErrNotExist) {

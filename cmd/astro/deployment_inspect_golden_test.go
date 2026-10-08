@@ -84,7 +84,7 @@ func goldenInspectDeployment() astrov1.Deployment {
 
 // The bytes `astro deployment inspect` prints are a contract with
 // astronomer/deploy-action, which parses them. Each case here is an
-// invocation shape the action uses (see #414), plus the -o values; the goldens were
+// invocation shape the action uses, plus the -o values; the goldens were
 // written before `-o text` existed, so a case that renders the same golden as
 // another is the claim that the two invocations print identical bytes.
 //
