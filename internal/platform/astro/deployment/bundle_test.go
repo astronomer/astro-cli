@@ -301,7 +301,7 @@ func (s *Suite) TestDeleteBundle() {
 		}, nil).Once()
 
 		err := DeleteBundle("", "missing", "", ws, testBundleDeploymentID, true, out, mockV1Client, mockV1Alpha1Client)
-		s.ErrorContains(err, `no DAG bundle named "missing"`)
+		s.ErrorContains(err, `no Dag bundle named "missing"`)
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "DeleteBundleWithResponse")
 	})
 }

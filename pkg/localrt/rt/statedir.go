@@ -142,7 +142,7 @@ func spellingOnDisk(dir, want string) string {
 // stat'd, or is claimed more than once — because trueCase is best effort and a
 // spelling it cannot verify is left as the caller wrote it.
 func sameEntrySpelling(dir string, entries []os.DirEntry, want string) string {
-	target, err := os.Lstat(filepath.Join(dir, want)) //nolint:gosec // G703: an Lstat to learn a spelling; CanonicalPath's callers pass paths to resolve, some read from git's pointer files
+	target, err := os.Lstat(filepath.Join(dir, want))
 	if err != nil {
 		return want
 	}

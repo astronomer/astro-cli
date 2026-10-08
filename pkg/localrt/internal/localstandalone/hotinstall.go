@@ -195,7 +195,7 @@ func removeIfPresent(path string) bool {
 // failure to rewrite it costs a needless resync on the next start, which is the
 // safe direction and not worth failing an install that already worked.
 func restoreMarker(path string) {
-	//nolint:gosec,errcheck // G703: the path is built here from the project root, and a failed rewrite is deliberate, for the reason above
+	//nolint:errcheck // a failed rewrite is deliberate, for the reason above
 	_ = os.WriteFile(path, nil, markerMode)
 }
 

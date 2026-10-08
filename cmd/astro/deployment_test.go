@@ -666,7 +666,7 @@ func TestDeploymentCreate(t *testing.T) {
 	jsonResponse, err := json.Marshal(mockResponse)
 	require.NoError(t, err)
 
-	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+	httpClient = testUtil.NewTestClient(func(_ *http.Request) *http.Response {
 		return &http.Response{
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),

@@ -484,7 +484,7 @@ func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
 	cmd.Flags().BoolVar(&logWorkers, "workers", false, "Show logs from the workers")
 	cmd.Flags().BoolVar(&logTriggerer, "triggerer", false, "Show logs from the triggerer")
-	cmd.Flags().BoolVar(&logDagProcessor, "dag-processor", false, "Show logs from the DAG processor")
+	cmd.Flags().BoolVar(&logDagProcessor, "dag-processor", false, "Show logs from the Dag processor")
 	cmd.Flags().StringSliceVar(&logComponents, "component", nil, "Show logs from a component by name, repeatable or comma-separated, instead of a flag such as --scheduler or --triggerer")
 	cliout.AddOutputFlag(cmd, &deploymentLogsOutput)
 	return cmd
@@ -506,7 +506,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	addWorkspaceFlag(cmd.Flags(), "w", "Workspace to create the Deployment in")
 	cmd.Flags().StringVarP(&description, "description", "d", "", "Description of the Deployment. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&runtimeVersion, "runtime-version", "v", "", "Runtime version for the Deployment")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the Deployment")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables Dag-only deploys for the Deployment")
 	cmd.Flags().StringVarP(&executor, "executor", "e", "CeleryExecutor", "The executor to use for the Deployment: CeleryExecutor, KubernetesExecutor or AstroExecutor")
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "When enabled CI/CD Enforcement where deploys to deployment must use an API Key or Token. This essentially forces Deploys to happen through CI/CD. Possible values disable/enable")
 	cmd.Flags().StringVar(&cloneSource, "clone", "", cloneFlagUsage)
@@ -564,7 +564,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&cicdEnforcement, "cicd-enforcement", "", "", "Whether deploys to the Deployment must use an API key or token, which forces them through CI/CD: enable or disable")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "", "", "Name of the deployment to update")
 	addDeploymentFlag(cmd.Flags(), "Deployment to update: a link name from pyproject.toml, a Deployment id, or a Deployment name")
-	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables DAG-only deploys for the deployment")
+	cmd.Flags().StringVarP(&dagDeploy, "dag-deploy", "", "", "Enables Dag-only deploys for the deployment")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "Print only the Deployment's YAML or JSON, with no other output")
 	cmd.Flags().StringVarP(&workloadIdentity, "workload-identity", "", "", "The Workload Identity to use for the Deployment")
 	if organization.IsOrgHosted() {
@@ -592,7 +592,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 		Use:     "delete [DEPLOYMENT_ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete an Astro Deployment",
-		Long:    "Permanently delete a Deployment and all of its data including DAGs, task logs, Airflow metadata, environment variables, connections, API tokens, and alerts. Running tasks are terminated without waiting. Cluster resources are deallocated asynchronously. This action cannot be undone.",
+		Long:    "Permanently delete a Deployment and all of its data including Dags, task logs, Airflow metadata, environment variables, connections, API tokens, and alerts. Running tasks are terminated without waiting. Cluster resources are deallocated asynchronously. This action cannot be undone.",
 		Example: `  # Delete a Deployment
   astro deployment delete <DEPLOYMENT_ID>
 
@@ -612,7 +612,7 @@ func newDeploymentVariableRootCmd(out io.Writer) *cobra.Command {
 		Use:     "variable",
 		Aliases: []string{"var", "variables"},
 		Short:   "Manage Deployment environment variables",
-		Long: `Manage environment variables stored on the Deployment record. These variables can be used in DAGs or to customize your Airflow environment.
+		Long: `Manage environment variables stored on the Deployment record. These variables can be used in Dags or to customize your Airflow environment.
 
 For variables shared across deployments or scoped to a workspace, see 'astro env variable'.`,
 	}

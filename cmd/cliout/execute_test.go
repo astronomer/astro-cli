@@ -228,6 +228,36 @@ func TestUsageErrors(t *testing.T) {
 	}
 }
 
+// A flag error func the root already has is not replaced by Execute's: it is
+// handed the error first, and what it returns is still reported as a usage
+// error, in either mode.
+func TestTheRootsOwnFlagErrorFuncStillRuns(t *testing.T) {
+	for _, args := range [][]string{
+		{"thing", "list", "--bogus"},
+		{"thing", "list", "--bogus", "-o", "json"},
+		{"thing", "plain", "--bogus"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			root := testTree(nil)
+			var seen []string
+			root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+				seen = append(seen, c.Name()+": "+err.Error())
+				return err
+			})
+			r := execTree(context.Background(), root, args...)
+			require.Error(t, r.err)
+			assert.True(t, IsUsage(r.err))
+			assert.Equal(t, []string{args[1] + ": unknown flag: --bogus"}, seen)
+		})
+	}
+
+	root := testTree(nil)
+	root.SetFlagErrorFunc(func(*cobra.Command, error) error { return nil })
+	r := execTree(context.Background(), root, "thing", "plain", "--bogus")
+	require.EqualError(t, r.err, "unknown flag: --bogus", "a func returning nil does not turn the error into success")
+	assert.True(t, IsUsage(r.err))
+}
+
 // Find's failure carries cobra's pointer to help rather than the usage block.
 func TestAnUnknownRootCommandPointsAtHelp(t *testing.T) {
 	r := execTree(context.Background(), testTree(nil), "bogus")
