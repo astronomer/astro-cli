@@ -1,0 +1,8 @@
+# Terraform working files. State is local and is the only record of what each
+# stack built — keep the .tfstate files, do not commit them.
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log

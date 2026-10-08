@@ -1,68 +1,71 @@
 # Contributing
 
-The Astro CLI is a command-line interface for data orchestration. It allows you to get started with Apache Airflow quickly and it can be used with all Astronomer products.
+Changes reach `main` through pull requests; a prek hook blocks commits made directly on `main`. The layer rules and type contracts live in [docs/architecture.md](docs/architecture.md) — read that before you write code, and link to it here rather than restating it.
 
-## Local development
+## Set up and build
 
-1. Install `Go` 1.19 or later. See [Download and install Go](https://go.dev/doc/install).
+1. Install Go. Use the version pinned in [go.mod](go.mod) (`go 1.26.1` today; any later 1.26.x works). See [Download and install Go](https://go.dev/doc/install). CI reads the version straight from go.mod, so keep your local Go at or above that line.
 
 2. Clone and build:
 
     ```bash
-    cd $GOPATH/src/github.com/astronomer/astro-cli
     git clone git@github.com:astronomer/astro-cli.git
     cd astro-cli
     make build
     ```
 
-3. Run the following command to install `pre-commit` and run lint on every commit:
+    `make build` writes an `astro` binary in the repo root (gitignored). The first build takes a bit; later builds are near-instant.
 
-    `brew install prek`
+    To try that build against a real project, `make install` puts it in a directory your shell already searches, and `make uninstall` takes it back out. It tells you plainly when what it wrote is not the `astro` you would get by typing the name. Pass `INSTALL_DIR=` to choose the directory yourself, or `NAME=astro-dev` to sit beside a released `astro` rather than shadow it.
 
-    `prek install`
-
-    Run lint locally:
-
-    `prek run --all-files`
-
-4. Lint the `Go` code with the following command:
+3. Install the hook runner so lint and formatting run on every commit:
 
     ```bash
-    make lint
+    brew install prek   # macOS; on Linux grab a release binary from https://github.com/j178/prek/releases
+    prek install
     ```
 
-## Test locally
-
-To test Astro locally you'll need to update your global or local config to point to right platform type and local Astro endpoint. For example:
-
-```yaml
-local:
-  platform: cloud
-  astro: http://localhost:8871/v1
-```
-
-Similarly, to test software locally you'll need to update the platform type and local houston endpoint. For example:
-
-```yaml
-local:
-  platform: software
-  houston: http://localhost:8871/v1
-```
-
-## Run tests
-
-Before you run tests, make sure you have running locally houston or Astro on http://localhost:8871/v1. This is a requirement for running some tests.
-
-To run unit-tests run:
+## Test
 
 ```bash
 make test
 ```
 
-## Generate mocks
+`make test` runs the unit tests for the root module. Nothing needs to be listening on any port — there is no Houston or Astro backend to start first. It writes a gitignored `coverage.txt` and `config/test.yaml.lock`.
 
-Astronomer uses [mockery](https://github.com/vektra/mockery) to generate mocks for Golang interfaces.
+Some `pkg/*` directories are separate sub-modules with their own `go.mod` (the rest are ordinary packages in the root module that `make test` does cover). `go test ./...` never descends into a nested module, so `make test-submodules` runs each one in turn; CI runs both targets. Test one directly with `cd pkg/<name> && go test ./...`.
 
-To regenerate an existing interface mocks, run `make mock`.
+Match the test style of the package you're editing — some packages use testify, others plain `testing`. Don't rewrite one into the other and don't mix them within a package (see the code conventions in [docs/architecture.md](docs/architecture.md)).
 
-To generate mocks for a new interface, add it to [.mockery.yml](.mockery.yml) and rerun `make mock`.
+The layer rules are enforced by a plain Go test in `internal/archlint`, so `make test` catches violations with no extra tooling. It checks that `internal/` never imports `cmd/`, that core packages below `cmd/` never print or exit or log fatally, and that core packages never import `config/` or the shell `cmd` tree (see core and shell in [docs/architecture.md](docs/architecture.md#core-and-shell)).
+
+## Lint and format
+
+```bash
+make lint
+make fmt
+```
+
+`make lint` runs golangci-lint through prek and is the only correct way to lint the root module — the version is pinned in [prek.toml](prek.toml), and invoking golangci-lint another way can pick up the wrong one. `make fmt` runs gofumpt. CI runs `make fmt` and then fails if it changed anything, so run `make fmt` before you push.
+
+A root run never descends into a nested module, and prek always runs from the repo root, so `make lint-submodules` lints the `pkg/*` sub-modules one at a time using the same pinned version. It covers every module listed in `LINT_SUBMODULES` in the [Makefile](Makefile), which is every `pkg/*` sub-module: `TestEveryPkgSubmoduleIsLinted` fails on one missing from it.
+
+## Generated code
+
+Mocks (`mocks/` directories) are generated by [mockery](https://github.com/vektra/mockery). Run `make mock` to regenerate them; to mock a new interface, add it to [.mockery.yaml](.mockery.yaml) and rerun `make mock`.
+
+The OpenAPI clients (`*.gen.go`) are generated by `make generate` and committed. Regenerating them needs the API specs, which are not in this repo, so it is a maintainer step; you only need it when the API bindings change.
+
+## Where new code goes
+
+The short version of [docs/architecture.md](docs/architecture.md): `cmd/` parses flags, calls one function, and formats output; `internal/` holds CLI-private logic and may import `pkg/` but never `cmd/`; `pkg/` holds shared leaf sub-modules that depend on nothing else in the repo. Anything a second consumer (Astro Desktop, a future VSCode extension) needs belongs in a `pkg/` sub-module. The recipe for wiring a new sub-module in — its own `go.mod` plus a require/replace pair in the root module — is the "Sub-module rules" section of that doc.
+
+## What CI checks
+
+Every pull request runs [.github/workflows/ci.yaml](.github/workflows/ci.yaml):
+
+- **lint** — `make fmt` with no resulting diff, then `make lint`, `make lint-submodules` and `make lint-e2e`.
+- **test** — `make test` and the sub-module tests on Linux, then the e2e suite through tier 1: it builds the CLI and drives it through argv, including a real Airflow environment built with uv.
+- **test-windows** — the same unit and sub-module tests, plus e2e tier 0, which needs no tools.
+
+All of these must be green before merge.
