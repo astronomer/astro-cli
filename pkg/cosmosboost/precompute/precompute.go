@@ -173,7 +173,7 @@ func processProject(dir, version string, opts Options) Result {
 				if !isDbt {
 					continue
 				}
-				// Nothing mutates doc afterward here, unlike computeManifest.
+				// Marshal before hashDocument mutates doc below (see computeManifest).
 				data, _ := json.Marshal(buildSlimManifest(doc, version))
 				slim, writeErr := writeSlimManifest(dir, e.Name(), data)
 				if writeErr != nil {
