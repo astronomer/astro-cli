@@ -196,7 +196,7 @@ func getCLIReleases(ctx context.Context, client *http.Client, url string) (*astr
 	return &releases, nil
 }
 
-func getLatestRelease(ctx context.Context, client *http.Client, url string) (*semver.Version, error) {
+func getLatestRelease(ctx context.Context, client *http.Client, url string, major uint64) (*semver.Version, error) {
 	releases, err := getCLIReleases(ctx, client, url)
 	if err != nil {
 		return nil, err
@@ -208,15 +208,14 @@ func getLatestRelease(ctx context.Context, client *http.Client, url string) (*se
 
 	var latest *semver.Version
 	for _, r := range releases.AvailableReleases {
-		// discard any versions that we cannot parse
 		v, err := semver.NewVersion(r.Version)
-		if err == nil && (latest == nil || v.GreaterThan(latest)) {
+		if err == nil && v.Major() == major && (latest == nil || v.GreaterThan(latest)) {
 			latest = v
 		}
 	}
 
 	if latest == nil {
-		return nil, errors.New("astro-cli releases endpoint returned 0 valid versions")
+		return nil, fmt.Errorf("astro-cli releases endpoint returned 0 valid versions for major version %d", major)
 	}
 
 	return latest, nil
@@ -230,14 +229,13 @@ func CompareVersions(ctx context.Context, client *http.Client) error {
 		return nil
 	}
 
-	// Get the latest release
-	latestSemver, err := getLatestRelease(ctx, client, astroCLIReleaseURL)
+	currentSemver, err := semver.NewVersion(Current())
 	if err != nil {
 		return err
 	}
 
-	// Parse the current and latest versions into semver objects
-	currentSemver, err := semver.NewVersion(Current())
+	// Only suggest upgrades within the running major, so a new major stays opt-in
+	latestSemver, err := getLatestRelease(ctx, client, astroCLIReleaseURL, currentSemver.Major())
 	if err != nil {
 		return err
 	}
