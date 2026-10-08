@@ -35,7 +35,7 @@ const (
 func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "ORGANIZATION ROLE", "CREATED", "CREATED BY"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "TYPE", "ORGANIZATION ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
@@ -263,6 +263,7 @@ func ListTokens(client astrov1.APIClient, out io.Writer) error {
 			apiTokens[i].Name,
 			apiTokens[i].Description,
 			string(apiTokens[i].Scope),
+			string(apiTokens[i].Kind),
 			orgRoleOf(apiTokens[i]),
 			created,
 			createdBy,

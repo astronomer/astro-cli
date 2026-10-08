@@ -34,14 +34,14 @@ const (
 func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "TYPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
+		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "TYPE", "WORKSPACE ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
@@ -133,6 +133,7 @@ func ListTokens(client astrov1.APIClient, workspaceID string, tokenTypes *[]Toke
 			apiTokens[i].Name,
 			apiTokens[i].Description,
 			string(apiTokens[i].Scope),
+			string(apiTokens[i].Kind),
 			workspaceRoleOf(apiTokens[i], workspaceID),
 			created,
 			createdBy,
@@ -393,6 +394,7 @@ func selectTokens(workspaceID string, apiTokens []astrov1.ApiToken) (astrov1.Api
 			apiTokens[i].Name,
 			apiTokens[i].Description,
 			string(apiTokens[i].Scope),
+			string(apiTokens[i].Kind),
 			workspaceRoleOf(apiTokens[i], workspaceID),
 			created,
 			createdBy,
