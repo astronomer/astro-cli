@@ -47,5 +47,15 @@ func ValidateRegistryEndpoint(endpoint string) error {
 		return fmt.Errorf("registry endpoint cannot start or end with slashes")
 	}
 
+	// The repository path (everything after the first slash) must not contain
+	// an embedded image tag. A colon before the first slash is a valid registry
+	// port (e.g. "localhost:5000/repo"), but a colon after it means the user
+	// included a ":tag" on the repository path, which the CLI will double up
+	// with its own "deploy-<timestamp>" tag and produce an invalid reference.
+	repoPath := endpoint[strings.Index(endpoint, "/")+1:]
+	if strings.Contains(repoPath, ":") {
+		return fmt.Errorf("registry endpoint must not include an image tag -- got %q, use 'registry[:port]/repository/path' without a trailing ':tag' (the CLI appends its own deploy tag automatically)", endpoint)
+	}
+
 	return nil
 }
