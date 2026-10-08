@@ -19,7 +19,11 @@ func main() {
 	// TODO: Remove this when version logic is implemented
 	fs := afero.NewOsFs()
 	config.InitConfig(fs)
-	if err := cmd.NewRootCmd().Execute(); err != nil {
+	rootCmd := cmd.NewRootCmd()
+	if cmd.HandleUnknownCommand(rootCmd, os.Args[1:], os.Stderr) {
+		os.Exit(1)
+	}
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 

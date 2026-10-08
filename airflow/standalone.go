@@ -1084,7 +1084,7 @@ func standaloneExecDefault(dir string, env, args []string, stdin io.Reader, stdo
 	return airflowrt.ExecWithEnv(dir, env, args, stdin, stdout, stderr)
 }
 
-func (s *Standalone) Build(_, _ string, _ bool) error {
+func (s *Standalone) Build(_ string, _ []string, _ bool) error {
 	return errors.New("astro dev build builds a Docker image and is not available in standalone mode")
 }
 
@@ -1159,6 +1159,7 @@ func (s *Standalone) ExportSettings(settingsFile, envFile string, connections, v
 	}
 
 	origExec := settings.SetExecAirflowCommand(s.standaloneExecAirflowCommand)
+	//nolint:staticcheck // SA9010: the return value is the command being replaced, deliberately discarded; this call is the restore.
 	defer settings.SetExecAirflowCommand(origExec)
 
 	afVersion := s.airflowMajorVersionUint()
@@ -1193,7 +1194,7 @@ func (s *Standalone) ComposeExport(_, _ string) error {
 }
 
 // Pytest runs pytest on DAGs using the local venv.
-func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString, _ string) (string, error) {
+func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString string, _ []string) (string, error) {
 	if err := s.ensureVenv(); err != nil {
 		return "", err
 	}
@@ -1215,7 +1216,7 @@ func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString, _ string) (strin
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			return fmt.Sprintf("%d", exitErr.ExitCode()), errors.New("something went wrong while Pytesting your DAGs")
+			return fmt.Sprintf("%d", exitErr.ExitCode()), errors.New("something went wrong while Pytesting your Dags")
 		}
 		return "", err
 	}
@@ -1223,7 +1224,7 @@ func (s *Standalone) Pytest(pytestFile, _, _, pytestArgsString, _ string) (strin
 }
 
 // Parse validates DAGs by running the default integrity test.
-func (s *Standalone) Parse(_, _, _ string) error {
+func (s *Standalone) Parse(_, _ string, _ []string) error {
 	path := filepath.Join(s.airflowHome, DefaultTestPath)
 
 	fileExist, err := fileutil.Exists(path, nil)
@@ -1235,20 +1236,20 @@ func (s *Standalone) Parse(_, _, _ string) error {
 		return nil
 	}
 
-	fmt.Println("Checking your DAGs for errors…")
+	fmt.Println("Checking your Dags for errors…")
 
-	exitCode, err := s.Pytest(DefaultTestPath, "", "", "", "")
+	exitCode, err := s.Pytest(DefaultTestPath, "", "", "", nil)
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
-			return errors.New("See above for errors detected in your DAGs")
+			return errors.New("See above for errors detected in your Dags")
 		}
-		return errors.Wrap(err, "something went wrong while parsing your DAGs")
+		return errors.Wrap(err, "something went wrong while parsing your Dags")
 	}
-	fmt.Println(ansi.Green("\u2714") + " No errors detected in your DAGs ")
+	fmt.Println(ansi.Green("\u2714") + " No errors detected in your Dags ")
 	return nil
 }
 
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
+func (s *Standalone) UpgradeTest(_, _, _ string, _ []string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
 	return errors.New("astro dev upgrade-test is not available in standalone mode")
 }
 

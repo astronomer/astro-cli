@@ -1,6 +1,7 @@
 !airflow/include/*/requirements.txt
 *.ndjson.gz
 *.test
+*.yaml.lock
 .astro/
 .DS_Store
 .env
@@ -18,6 +19,8 @@ coverage-2.txt
 coverage.txt
 dist/
 hello-astro/
+# generated at release time from godownloader.sh, uploaded as a release asset
+install.sh
 meta/
 packages.txt
 requirements.txt
@@ -26,3 +29,6 @@ testbin/
 testbin/golangci-lint
 upgrade-test*
 vendor/github.com/theupdateframework/notary/Dockerfile
+
+# config flock sidecars (transient, created by saveConfig during tests/runs)
+*.yaml.lock

@@ -278,3 +278,19 @@ func (s *DbtSuite) mockGetTestDeployment() {
 		},
 	}, nil)
 }
+
+func (s *DbtSuite) TestDbtCleanup_RemovesArtifacts() {
+	dir := s.T().TempDir()
+	artifact := filepath.Join(dir, ".astro", "dbt_metadata.json")
+	assert.NoError(s.T(), os.MkdirAll(filepath.Dir(artifact), 0o755))
+	assert.NoError(s.T(), os.WriteFile(artifact, []byte(`{"generated_by": {"application": "astro"}}`), 0o644))
+
+	err := testExecCmd(newDbtCleanupCmd(), dir)
+	assert.NoError(s.T(), err)
+	assert.NoFileExists(s.T(), artifact)
+}
+
+func (s *DbtSuite) TestDbtCleanup_NonexistentPath() {
+	err := testExecCmd(newDbtCleanupCmd(), filepath.Join(s.T().TempDir(), "does-not-exist"))
+	assert.Error(s.T(), err)
+}

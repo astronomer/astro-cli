@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
+	"github.com/astronomer/astro-cli/cloud/pagination"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -152,7 +153,7 @@ func Switch(workspaceNameOrID string, client astrov1.APIClient, out io.Writer) e
 		}
 
 		if wsID == "" {
-			return errors.Wrap(err, "workspace id/name could not be found")
+			return errors.New("workspace id/name could not be found")
 		}
 	}
 
@@ -375,6 +376,8 @@ func selectWorkspace(workspaces []astrov1.Workspace) (astrov1.Workspace, error) 
 	return selected, nil
 }
 
+// GetWorkspaces returns every Workspace in the current Organization, paging
+// through the API as needed.
 func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
@@ -382,22 +385,16 @@ func GetWorkspaces(client astrov1.APIClient) ([]astrov1.Workspace, error) {
 	}
 
 	sorts := []astrov1.ListWorkspacesParamsSorts{"name:asc"}
-	limit := 1000
-	workspaceListParams := &astrov1.ListWorkspacesParams{
-		Limit: &limit,
-		Sorts: &sorts,
-	}
-
-	resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, workspaceListParams)
-	if err != nil {
-		return []astrov1.Workspace{}, err
-	}
-	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return []astrov1.Workspace{}, err
-	}
-
-	workspaces := resp.JSON200.Workspaces
-
-	return workspaces, nil
+	return pagination.Collect("workspaces", func(offset int) ([]astrov1.Workspace, int, error) {
+		pageSize := 1000
+		params := &astrov1.ListWorkspacesParams{Limit: &pageSize, Offset: &offset, Sorts: &sorts}
+		resp, err := client.ListWorkspacesWithResponse(httpContext.Background(), ctx.Organization, params)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
+		}
+		return resp.JSON200.Workspaces, resp.JSON200.TotalCount, nil
+	})
 }

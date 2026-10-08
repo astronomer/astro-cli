@@ -66,13 +66,13 @@ Flags:
 Image Flags:
 {{filterDeployFlags .LocalFlags "image" | trimTrailingWhitespaces}}{{end}}{{if hasDeployFlags .LocalFlags "dag"}}
 
-DAG Flags:
+Dag Flags:
 {{filterDeployFlags .LocalFlags "dag" | trimTrailingWhitespaces}}{{end}}{{if hasDeployFlags .LocalFlags "test"}}
 
 Test Flags:
 {{filterDeployFlags .LocalFlags "test" | trimTrailingWhitespaces}}{{end}}{{if hasDeployFlags .LocalFlags "non-dags"}}
 
-Non-DAG Bundle Flags:
+Non-Dag Bundle Flags:
 {{filterDeployFlags .LocalFlags "non-dags" | trimTrailingWhitespaces}}{{end}}{{end}}{{if .HasAvailableInheritedFlags}}
 
 Global Flags:

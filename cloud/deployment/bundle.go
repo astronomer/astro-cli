@@ -21,10 +21,10 @@ import (
 const bundleListLimit = 1000
 
 var (
-	errCreateBundleTarget   = errors.New("specify exactly one of --name (DAG bundle) or --mount-path (non-DAG bundle)")
-	errDagBundleNonDagFlags = errors.New("--bundle-type and --dag-bundle-ids are only valid for non-DAG bundles (--mount-path)")
+	errCreateBundleTarget   = errors.New("specify exactly one of --name (Dag bundle) or --mount-path (non-Dag bundle)")
+	errDagBundleNonDagFlags = errors.New("--bundle-type and --dag-bundle-ids are only valid for non-Dag bundles (--mount-path)")
 	errUpdateBundleNoOp     = errors.New("specify at least one of --description or --dag-bundle-ids")
-	errBundleSelector       = errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (DAG bundle), or --mount-path (non-DAG bundle)")
+	errBundleSelector       = errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (Dag bundle), or --mount-path (non-Dag bundle)")
 )
 
 // BundleList is the wire shape for `bundle list` output.
@@ -244,9 +244,9 @@ func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath 
 	}
 
 	if bundleName != "" {
-		return "", fmt.Errorf("no DAG bundle named %q on deployment %s", bundleName, deploymentID)
+		return "", fmt.Errorf("no Dag bundle named %q on deployment %s", bundleName, deploymentID)
 	}
-	return "", fmt.Errorf("no non-DAG bundle mounted at %q on deployment %s", bundleMountPath, deploymentID)
+	return "", fmt.Errorf("no non-Dag bundle mounted at %q on deployment %s", bundleMountPath, deploymentID)
 }
 
 // ListBundlesWithFormat prints every bundle on a deployment in the requested format.

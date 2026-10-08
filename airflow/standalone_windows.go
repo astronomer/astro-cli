@@ -31,14 +31,14 @@ func StandaloneInit(airflowHome, envFile, dockerfile string) (*Standalone, error
 	return nil, errStandaloneWindows
 }
 
-func (s *Standalone) Start(_ *types.StartOptions) error { return errStandaloneWindows }
-func (s *Standalone) Stop(_ bool) error                 { return errStandaloneWindows }
-func (s *Standalone) PS() (*types.PSStatus, error)      { return nil, errStandaloneWindows }
-func (s *Standalone) Kill() error                       { return errStandaloneWindows }
-func (s *Standalone) Logs(_ bool, _ ...string) error    { return errStandaloneWindows }
-func (s *Standalone) Run(_ []string, _ string) error    { return errStandaloneWindows }
-func (s *Standalone) Bash(_ string) error               { return errStandaloneWindows }
-func (s *Standalone) Build(_, _ string, _ bool) error   { return errStandaloneWindows }
+func (s *Standalone) Start(_ *types.StartOptions) error        { return errStandaloneWindows }
+func (s *Standalone) Stop(_ bool) error                        { return errStandaloneWindows }
+func (s *Standalone) PS() (*types.PSStatus, error)             { return nil, errStandaloneWindows }
+func (s *Standalone) Kill() error                              { return errStandaloneWindows }
+func (s *Standalone) Logs(_ bool, _ ...string) error           { return errStandaloneWindows }
+func (s *Standalone) Run(_ []string, _ string) error           { return errStandaloneWindows }
+func (s *Standalone) Bash(_ string) error                      { return errStandaloneWindows }
+func (s *Standalone) Build(_ string, _ []string, _ bool) error { return errStandaloneWindows }
 func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {
 	return errStandaloneWindows
 }
@@ -47,10 +47,10 @@ func (s *Standalone) ExportSettings(_, _ string, _, _, _, _ bool) error {
 	return errStandaloneWindows
 }
 func (s *Standalone) ComposeExport(_, _ string) error { return errStandaloneWindows }
-func (s *Standalone) Pytest(_, _, _, _, _ string) (string, error) {
+func (s *Standalone) Pytest(_, _, _, _ string, _ []string) (string, error) {
 	return "", errStandaloneWindows
 }
-func (s *Standalone) Parse(_, _, _ string) error { return errStandaloneWindows }
-func (s *Standalone) UpgradeTest(_, _, _, _ string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
+func (s *Standalone) Parse(_, _ string, _ []string) error { return errStandaloneWindows }
+func (s *Standalone) UpgradeTest(_, _, _ string, _ []string, _, _, _, _, _ bool, _ string, _ astrov1.ClientWithResponsesInterface) error {
 	return errStandaloneWindows
 }

@@ -156,3 +156,157 @@ func (s *Suite) TestSaveConfig_ConcurrentWritesProduceValidYAML() {
 	s.Require().True(ok, "writer key missing or not a string: %v", parsed)
 	s.Regexp(`^w\d+$`, winner)
 }
+
+func (s *Suite) TestDefaultsAreNotWrittenToDisk() {
+	fs := afero.NewMemMapFs()
+	initHome(fs)
+	initProject(fs)
+
+	// A freshly created config holds nothing the user did not ask for, so a later
+	// change to any default reaches them.
+	contents, err := afero.ReadFile(fs, HomeConfigFile)
+	s.NoError(err)
+	s.NotContains(string(contents), "postgres")
+	s.Equal(PostgresTagDefault, CFG.PostgresTag.GetString())
+
+	// Writing one setting must not drag every other default onto disk with it.
+	s.NoError(CFG.PageSize.SetHomeString("30"))
+	contents, err = afero.ReadFile(fs, HomeConfigFile)
+	s.NoError(err)
+	s.NotContains(string(contents), "postgres")
+	s.Equal("30", CFG.PageSize.GetString())
+	s.Equal(PostgresTagDefault, CFG.PostgresTag.GetString())
+}
+
+// writeHomeConfig lays down a config file an older CLI would have left behind, then
+// starts up against it. The file has to exist before initHome runs: creating one is what
+// stamps it, and a stamped file is never migrated.
+func (s *Suite) writeHomeConfig(fs afero.Fs, content string) {
+	initHome(fs)
+	s.NoError(afero.WriteFile(fs, HomeConfigFile, []byte(content), 0o600))
+	initHome(fs)
+	initProject(fs)
+}
+
+const legacyHomeConfig = `context: astronomer.io
+contexts:
+    astronomer_io:
+        domain: astronomer.io
+        token: Bearer sometoken
+        workspace: someworkspace
+duplicate_volumes: "true"
+page_size: "20"
+postgres:
+    port: "5432"
+    tag: "12.6"
+    user: postgres
+webserver:
+    port: "8080"
+`
+
+func (s *Suite) TestMigrateHomeConfig() {
+	s.Run("drops entries matching a default the CLI has shipped", func() {
+		fs := afero.NewMemMapFs()
+		s.writeHomeConfig(fs, legacyHomeConfig)
+
+		migrateHomeConfig(fs)
+
+		// 12.6 was the default when the file was written, so it was never a choice.
+		s.False(viperHome.IsSet(CFG.PostgresTag.Path))
+		s.Equal(PostgresTagDefault, CFG.PostgresTag.GetString())
+		// Values still matching the current default go too, so a future change to any
+		// of them reaches this user.
+		s.False(viperHome.IsSet(CFG.PageSize.Path))
+		s.False(viperHome.IsSet(CFG.WebserverPort.Path))
+		s.False(viperHome.IsSet(CFG.DuplicateImageVolumes.Path))
+		s.Equal(20, CFG.PageSize.GetInt())
+		s.True(CFG.DuplicateImageVolumes.GetBool())
+	})
+
+	s.Run("keeps everything the user chose", func() {
+		fs := afero.NewMemMapFs()
+		s.writeHomeConfig(fs, "page_size: \"50\"\npostgres:\n    tag: \"13.4\"\n")
+
+		migrateHomeConfig(fs)
+
+		s.Equal("13.4", CFG.PostgresTag.GetString())
+		s.Equal(50, CFG.PageSize.GetInt())
+	})
+
+	s.Run("leaves contexts and tokens untouched", func() {
+		fs := afero.NewMemMapFs()
+		s.writeHomeConfig(fs, legacyHomeConfig)
+
+		migrateHomeConfig(fs)
+
+		ctx, err := GetCurrentContext()
+		s.NoError(err)
+		s.Equal("Bearer sometoken", ctx.Token)
+		s.Equal("someworkspace", ctx.Workspace)
+		s.Equal("astronomer.io", ctx.Domain)
+	})
+
+	s.Run("stamps the file and never runs again", func() {
+		fs := afero.NewMemMapFs()
+		s.writeHomeConfig(fs, legacyHomeConfig)
+
+		migrateHomeConfig(fs)
+		s.Equal(currentConfigVersion, viperHome.GetInt(configVersionKey))
+
+		// Once stamped, a value equal to a shipped default is the user's own.
+		s.NoError(CFG.PostgresTag.SetHomeString("12.6"))
+		migrateHomeConfig(fs)
+		s.Equal("12.6", CFG.PostgresTag.GetString())
+	})
+
+	s.Run("a file this version wrote is never scanned", func() {
+		fs := afero.NewMemMapFs()
+		initHome(fs)
+		initProject(fs)
+
+		contents, err := afero.ReadFile(fs, HomeConfigFile)
+		s.NoError(err)
+		s.Contains(string(contents), configVersionKey)
+		s.Equal(currentConfigVersion, viperHome.GetInt(configVersionKey))
+	})
+
+	s.Run("startup runs the migration", func() {
+		// Calling migrateHomeConfig directly proves the migration works; this proves
+		// the CLI actually performs it.
+		fs := afero.NewMemMapFs()
+		initHome(fs)
+		s.NoError(afero.WriteFile(fs, HomeConfigFile, []byte(legacyHomeConfig), 0o600))
+
+		InitConfig(fs)
+
+		s.Equal(currentConfigVersion, viperHome.GetInt(configVersionKey))
+		s.Equal(PostgresTagDefault, CFG.PostgresTag.GetString())
+	})
+
+	s.Run("an unwritable config is not fatal and prints nothing", func() {
+		fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
+		initHome(fs)
+		initProject(fs)
+
+		s.NotPanics(func() { migrateHomeConfig(fs) })
+	})
+}
+
+func (s *Suite) TestDeleteNested() {
+	settings := map[string]any{
+		"postgres":  map[string]any{"tag": "12.6", "user": "postgres"},
+		"page_size": "20",
+	}
+
+	deleteNested(settings, "postgres.tag")
+	s.Equal(map[string]any{"postgres": map[string]any{"user": "postgres"}, "page_size": "20"}, settings)
+
+	// A parent left empty goes with its last child.
+	deleteNested(settings, "postgres.user")
+	s.Equal(map[string]any{"page_size": "20"}, settings)
+
+	// Absent keys and non-map parents are left alone.
+	deleteNested(settings, "nothing.here")
+	deleteNested(settings, "page_size.nested")
+	s.Equal(map[string]any{"page_size": "20"}, settings)
+}

@@ -459,7 +459,7 @@ func Logout(domain string, out io.Writer) error {
 func FetchDomainAuthConfig(domain string) (Config, error) {
 	if !context.IsCloudDomain(domain) {
 		return Config{}, errors.New("Error! Invalid domain. You are attempting to login into Astro. " +
-			"Are you trying to authenticate to Astro Private Cloud? If so, please change your current context with 'astro context switch'")
+			"Are you trying to authenticate to APC? If so, please change your current context with 'astro context switch'")
 	}
 
 	addr := domainutil.GetURLToEndpoint("https", domain, astroauth.AuthConfigEndpoint)

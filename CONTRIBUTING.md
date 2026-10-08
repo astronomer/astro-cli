@@ -31,6 +31,13 @@ The Astro CLI is a command-line interface for data orchestration. It allows you 
     make lint
     ```
 
+    `make lint` runs two layers in sequence:
+
+    - `make lint-go` runs `golangci-lint`, which catches in-package issues (unused identifiers, formatting, etc.) inline.
+    - `make lint-deadcode` runs [`golang.org/x/tools/cmd/deadcode`](https://pkg.go.dev/golang.org/x/tools/cmd/deadcode) across the whole program (`-test` mode) and fails if any function is unreachable from the CLI entry point or any test binary. Catches cross-package orphans that `golangci-lint` cannot, e.g. an exported helper that no caller imports.
+
+    The deadcode check covers the whole main module except the `pkg/` tree; the exclusion and its rationale live in `scripts/check-deadcode.sh`.
+
 ## Test locally
 
 To test Astro locally you'll need to update your global or local config to point to right platform type and local Astro endpoint. For example:

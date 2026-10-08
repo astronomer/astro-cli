@@ -17,6 +17,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	"github.com/astronomer/astro-cli/cloud/organization"
+	"github.com/astronomer/astro-cli/cloud/pagination"
 	"github.com/astronomer/astro-cli/cloud/workspace"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/ansi"
@@ -903,21 +904,21 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 	switch dagDeploy {
 	case enable:
 		if currentDeployment.IsDagDeployEnabled {
-			fmt.Println("\nDAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled.")
+			fmt.Println("\nDag deploys are already enabled for this Deployment. Your Dags will continue to run as scheduled.")
 			return nil
 		}
 
-		fmt.Printf("\nYou enabled DAG-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled." +
-			"\nRun `astro deploy --dags` to complete enabling this feature and resume your DAGs. It may take a few minutes for the Airflow UI to update..\n\n")
+		fmt.Printf("\nYou enabled Dag-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled." +
+			"\nRun `astro deploy --dags` to complete enabling this feature and resume your Dags. It may take a few minutes for the Airflow UI to update..\n\n")
 		dagDeployEnabled = true
 	case disable:
 		if !currentDeployment.IsDagDeployEnabled {
-			fmt.Println("\nDAG-only deploys is already disabled for this deployment.")
+			fmt.Println("\nDag-only deploys is already disabled for this deployment.")
 			return nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
-			fmt.Printf("\nWarning: This command will disable DAG-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
-				"\nRun `astro deploy` after this command to restart your DAGs. It may take a few minutes for the Airflow UI to update.")
+			fmt.Printf("\nWarning: This command will disable Dag-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled" +
+				"\nRun `astro deploy` after this command to restart your Dags. It may take a few minutes for the Airflow UI to update.")
 			confirmWithUser = true
 		}
 		dagDeployEnabled = false
@@ -1679,6 +1680,8 @@ var CoreDeleteDeploymentHibernationOverride = func(orgID, deploymentID string, a
 	return nil
 }
 
+// ListDeployments returns every Deployment in the given Workspace (or the whole
+// Organization when ws is empty), paging through the API as needed.
 var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
 	if orgID == "" {
 		c, err := config.GetCurrentContext()
@@ -1687,26 +1690,20 @@ var ListDeployments = func(ws, orgID string, astroV1Client astrov1.APIClient) ([
 		}
 		orgID = c.Organization
 	}
-	deploymentListParams := &astrov1.ListDeploymentsParams{
-		Limit: &listLimit,
-	}
-	if ws != "" {
-		deploymentListParams.WorkspaceIds = &[]string{ws}
-	}
-
-	resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, deploymentListParams)
-	if err != nil {
-		return []astrov1.Deployment{}, err
-	}
-	err = astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body)
-	if err != nil {
-		return []astrov1.Deployment{}, err
-	}
-
-	deploymentResponse := *resp.JSON200
-	deployments := deploymentResponse.Deployments
-
-	return deployments, nil
+	return pagination.Collect("deployments", func(offset int) ([]astrov1.Deployment, int, error) {
+		params := &astrov1.ListDeploymentsParams{Limit: &listLimit, Offset: &offset}
+		if ws != "" {
+			params.WorkspaceIds = &[]string{ws}
+		}
+		resp, err := astroV1Client.ListDeploymentsWithResponse(context.Background(), orgID, params)
+		if err != nil {
+			return nil, 0, err
+		}
+		if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+			return nil, 0, err
+		}
+		return resp.JSON200.Deployments, resp.JSON200.TotalCount, nil
+	})
 }
 
 //nolint:dupl
