@@ -200,7 +200,7 @@ func TestDeploymentCoreText(t *testing.T) {
 			name:   "update to dag deploys it already has",
 			client: func(t *testing.T) astrov1.APIClient { return coreMock(t, coreDeployment()) },
 			args:   []string{"update", coreDeploymentID, "--dag-deploy", "enable"},
-			check:  says("DAG deploys are already enabled for this Deployment. Your DAGs will continue to run as scheduled."),
+			check:  says("Dag deploys are already enabled for this Deployment. Your Dags will continue to run as scheduled."),
 		},
 		{
 			name: "update, declining an executor change",

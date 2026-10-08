@@ -11,9 +11,9 @@ import (
 // help (cmd/help.go) lists a flag annotated "Image" under "Image Flags:".
 const (
 	deployGroupImage  = "Image"
-	deployGroupDAG    = "DAG"
+	deployGroupDAG    = "Dag"
 	deployGroupTest   = "Test"
-	deployGroupNonDAG = "Non-DAG Bundle"
+	deployGroupNonDAG = "Non-Dag Bundle"
 )
 
 // The annotation keys cmd/help.go reads a flag's section and the sections'

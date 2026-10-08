@@ -285,7 +285,7 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 		// req.Host is whatever the client sent, and it is the one field here a
 		// caller controls. slog's own handlers quote a value carrying control
 		// characters, but an embedder can install one that does not.
-		slog.Debug("proxy error", "host", safeHost(req.Host), "error", proxyErr) //nolint:gosec // G706: sanitized at safeHost, which gosec cannot see through
+		slog.Debug("proxy error", "host", safeHost(req.Host), "error", proxyErr)
 		if p.ErrorHandler != nil {
 			p.ErrorHandler(rw, req, proxyErr)
 			return
@@ -372,7 +372,7 @@ func isNilPointer(v any) bool {
 	rv := reflect.ValueOf(v)
 	//nolint:exhaustive // every other kind cannot be nil, which is what default answers
 	switch rv.Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.UnsafePointer, reflect.Interface:
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.UnsafePointer, reflect.Interface:
 		return rv.IsNil()
 	default:
 		return false

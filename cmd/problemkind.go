@@ -78,6 +78,14 @@ var problemKinds = append(append(cliout.Kinds{}, local.ProblemKinds...), cloudKi
 // Execute builds the root for this machine and runs it against the process's
 // arguments under the output contract (cliout.Execute). The error it returns
 // is for cliout.ExitCode; it has already been reported.
+//
+// A run refused as a usage error may have been a command the CLI does not
+// have, which is recorded once the refusal is out (trackUnknownCommand).
 func Execute(ctx context.Context) error {
-	return cliout.Execute(ctx, NewRootCmd(), os.Args[1:], os.Stdout, problemKinds)
+	root, args := NewRootCmd(), os.Args[1:]
+	err := cliout.Execute(ctx, root, args, os.Stdout, problemKinds)
+	if cliout.IsUsage(err) {
+		trackUnknownCommand(root, args)
+	}
+	return err
 }

@@ -158,6 +158,12 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)
+	// A flag the CLI does not have is recorded here, before cliout reports it:
+	// cobra parses flags before the tracking hook in PersistentPreRunE runs,
+	// so a mistyped flag would otherwise send nothing. cliout.Execute keeps
+	// this func and runs it ahead of its own (markUsageErrors). An unknown
+	// command is recorded by Execute, after the run it failed.
+	rootCmd.SetFlagErrorFunc(trackUnknownFlag)
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	installHelp(rootCmd, o.platform, houstonVersion)
 

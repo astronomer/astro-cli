@@ -112,14 +112,14 @@ func TestDeploymentUpdateWarningsGoToStderr(t *testing.T) {
 			name:      "enable DAG deploys",
 			dep:       dagDeployOff,
 			dagDeploy: "enable",
-			warnings:  []string{"You enabled DAG-only deploys for this Deployment."},
+			warnings:  []string{"You enabled Dag-only deploys for this Deployment."},
 			stdout:    []string{"Successfully updated Deployment"},
 		},
 		{
 			name:      "disable DAG deploys",
 			dep:       coreDeployment(),
 			dagDeploy: "disable",
-			warnings:  []string{"Warning: This command will disable DAG-only deploys for this Deployment."},
+			warnings:  []string{"Warning: This command will disable Dag-only deploys for this Deployment."},
 			stdout:    []string{"Are you sure you want to update the", "Successfully updated Deployment"},
 		},
 	}

@@ -117,7 +117,7 @@ func TestDeployManifestDags_DagDeployDisabled(t *testing.T) {
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "DAG-only deploys are not enabled")
+	assert.Contains(t, err.Error(), "Dag-only deploys are not enabled")
 	client.AssertExpectations(t)
 }
 

@@ -85,7 +85,7 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	cliout.AddOutputFlag(cmd, &deployOutput)
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
-		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only DAGs to your Deployment")
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only Dags to your Deployment")
 	}
 	return cmd
 }

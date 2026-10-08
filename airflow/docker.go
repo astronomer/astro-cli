@@ -86,7 +86,7 @@ func (d *DAGChecker) Pytest(pytestFile, customImageName, deployImageName, pytest
 	if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 0 { // exit code 0 means the pytests passed
 		return "", nil
 	}
-	return exitCode, errors.New("something went wrong while Pytesting your DAGs")
+	return exitCode, errors.New("something went wrong while Pytesting your Dags")
 }
 
 func (d *DAGChecker) Parse(customImageName, deployImageName string, buildSecrets []string) error {
@@ -108,16 +108,16 @@ func (d *DAGChecker) Parse(customImageName, deployImageName string, buildSecrets
 		return nil
 	}
 
-	fmt.Println("Checking your DAGs for errors…")
+	fmt.Println("Checking your Dags for errors…")
 
 	pytestFile := DefaultTestPath
 	exitCode, err := d.Pytest(pytestFile, customImageName, deployImageName, "", buildSecrets)
 	if err != nil {
 		if code, convErr := strconv.Atoi(exitCode); convErr == nil && code == 1 { // exit code 1 means tests failed
-			return errors.New("See above for errors detected in your DAGs")
+			return errors.New("See above for errors detected in your Dags")
 		}
-		return errors.Wrap(err, "something went wrong while parsing your DAGs")
+		return errors.Wrap(err, "something went wrong while parsing your Dags")
 	}
-	fmt.Println(ansi.Green("✔") + " No errors detected in your DAGs ")
+	fmt.Println(ansi.Green("✔") + " No errors detected in your Dags ")
 	return err
 }

@@ -109,7 +109,7 @@ func (s *Suite) TestDAGCheckerPytest() {
 		checker.imageHandler = imageHandler
 
 		resp, err := checker.Pytest("", "", "", "", nil)
-		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Contains(err.Error(), "something went wrong while Pytesting your Dags")
 		s.Equal(mockResponse, resp)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -123,7 +123,7 @@ func (s *Suite) TestDAGCheckerPytest() {
 		checker.imageHandler = imageHandler
 
 		resp, err := checker.Pytest("", "", "", "", nil)
-		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Contains(err.Error(), "something went wrong while Pytesting your Dags")
 		s.Equal("10", resp)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -136,7 +136,7 @@ func (s *Suite) TestDAGCheckerPytest() {
 		checker.imageHandler = imageHandler
 
 		resp, err := checker.Pytest("", "", "", "", nil)
-		s.Contains(err.Error(), "something went wrong while Pytesting your DAGs")
+		s.Contains(err.Error(), "something went wrong while Pytesting your Dags")
 		s.Equal("130", resp)
 		imageHandler.AssertExpectations(s.T())
 	})
@@ -169,12 +169,12 @@ func (s *Suite) TestDAGCheckerParse() {
 		wantErr  string
 	}{
 		{"success", "0", ""},
-		{"exit code 1", "1", "See above for errors detected in your DAGs"},
-		{"exit code 2", "2", "something went wrong while parsing your DAGs"},
+		{"exit code 1", "1", "See above for errors detected in your Dags"},
+		{"exit code 2", "2", "something went wrong while parsing your Dags"},
 		// exit codes 10 and 130 (Ctrl-C) substring-contain "1"; the old check
 		// reported them as a clean DAG error
-		{"internal error exit code 10", "10", "something went wrong while parsing your DAGs"},
-		{"interrupt exit code 130", "130", "something went wrong while parsing your DAGs"},
+		{"internal error exit code 10", "10", "something went wrong while parsing your Dags"},
+		{"interrupt exit code 130", "130", "something went wrong while parsing your Dags"},
 	} {
 		s.Run(tc.name, func() {
 			project := parseProject(s)

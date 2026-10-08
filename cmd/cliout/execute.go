@@ -168,8 +168,21 @@ func findTarget(root *cobra.Command, args []string) *cobra.Command {
 // markUsageErrors makes the usage errors cobra produces through a hook
 // recognizable as such: a flag that does not parse (the flag error func, which
 // every command inherits from the root) and an argument-count validator.
+//
+// A flag error func the root already has still runs, first: the CLI's root
+// records a flag it does not have there (cmd.trackUnknownFlag). As in
+// AddOutputFlag, a func that returns nil does not turn the error into success.
 func markUsageErrors(root *cobra.Command) {
-	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return Usage(err) })
+	own := root.FlagErrorFunc()
+	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		if e := own(c, err); e != nil {
+			err = e
+		}
+		if IsUsage(err) {
+			return err
+		}
+		return Usage(err)
+	})
 	walk(root, func(c *cobra.Command) {
 		validate := c.Args
 		if validate == nil {

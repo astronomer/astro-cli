@@ -86,16 +86,16 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   # The OpenAPI specification those come from, as JSON
   astro api airflow spec
 
-  # Get all DAGs from a deployment this project links in pyproject.toml
+  # Get all Dags from a deployment this project links in pyproject.toml
   astro api airflow -d prod /dags
 
-  # Get a specific DAG by path
+  # Get a specific Dag by path
   astro api airflow -d prod /dags/example_dag
 
   # Use operation ID (path params supplied via -p)
   astro api airflow -d prod get_dag -p dag_id=example_dag
 
-  # Pause a DAG via operation ID
+  # Pause a Dag via operation ID
   astro api airflow -d prod patch_dag -p dag_id=example_dag -F is_paused=true
 
   # Use jq filter on response

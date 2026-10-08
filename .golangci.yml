@@ -51,6 +51,11 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
+      # goconst gained a CompositeLit context type; it flags every cobra
+      # command's Use/Short field. "Call" is goconst's own default.
+      exclude-types:
+        - Call
+        - CompositeLit
       ignore-string-values:
         - 'true'
         - 'True'
@@ -151,6 +156,9 @@ linters:
       - linters: [gocritic]
         path: ^(cmd/local|internal/(localenv|envresolve|deploy|instance|pack|plan)|pkg/(airflowapi|imagebuild|instance|awsauth|googleauth|localrt|proxy))
         text: 'hugeParam:'
+      # govet's inline analyzer reporting its own limitation, not a defect
+      - linters: [govet]
+        text: 'inline: cannot inline: type parameter inference is not yet supported'
       # gosec rules newly surfaced in v2, fix incrementally
       - linters: [gosec]
         text: 'G115:'
