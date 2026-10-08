@@ -117,7 +117,7 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
 	addWorkspaceFlag(cmd.Flags(), "w", "Workspace to make current after the switch")
-	addRemovedFlag(cmd, "login-link", "l", true, errLoginLinkRemoved)
+	cliout.AddRemovedFlag(cmd, "login-link", "l", true, errLoginLinkRemoved)
 
 	return cmd
 }
@@ -159,6 +159,13 @@ func newOrganizationExportAuditLogs(out io.Writer) *cobra.Command {
 		},
 	}
 	cliout.AddOutputFlag(cmd, &auditLogsOutput)
+	// -o was --output-file's shorthand here until it became --output, so a
+	// script passing -o <path> is refused saying where the path goes now. Every
+	// refused value gets it: a 1.x filename need not look like a path
+	// (`-o audit_logs`), and for a mistyped format the hint is still true.
+	cliout.OnBadFormat(cmd, func(_ string, refused error) error {
+		return fmt.Errorf("%w; -o is the output format, and --output-file takes the path", refused)
+	})
 	cmd.Flags().StringVarP(&orgName, "organization-name", "n", "", "Name of the Organization to manage audit logs for")
 	// No shorthand: -o is --output, as on every other command.
 	cmd.Flags().StringVar(&auditLogsOutputFilePath, "output-file", "", "Path to a file for storing exported audit logs. Defaults to a file in the current directory named for the Organization, the days and the date")
@@ -305,9 +312,7 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
 	format, err := cliout.ParseFormat(auditLogsOutput)
 	if err != nil {
-		// -o was --output-file's shorthand here until it became --output,
-		// so a script passing -o <path> lands here.
-		return fmt.Errorf("%w; -o is the output format, and --output-file takes the path", err)
+		return err
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true

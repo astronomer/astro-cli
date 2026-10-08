@@ -193,12 +193,16 @@ func TestRegistryCmd_Execute_404(t *testing.T) {
 	cmd := NewRegistryCmd(&out)
 	cmd.SetArgs([]string{"/nonexistent.json", "--registry-url", srv.URL})
 
+	// No body was printed, so the failure is a RequestError for the CLI to
+	// report, not a SilentError, which would leave the run saying nothing.
 	err := cmd.Execute()
-	require.Error(t, err)
-
+	require.EqualError(t, err, "API request failed with status 404")
+	var reqErr *RequestError
+	require.ErrorAs(t, err, &reqErr)
+	assert.Equal(t, http.StatusNotFound, reqErr.StatusCode)
 	var silentErr *SilentError
-	require.ErrorAs(t, err, &silentErr)
-	assert.Equal(t, http.StatusNotFound, silentErr.StatusCode)
+	assert.NotErrorAs(t, err, &silentErr)
+	assert.Empty(t, out.String())
 }
 
 func TestRegistryCmd_Execute_500WithBody(t *testing.T) {

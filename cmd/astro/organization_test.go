@@ -363,4 +363,17 @@ func TestOrganizationAuditLogsExportOutput(t *testing.T) {
 		assert.Empty(t, r.stdout)
 		assert.NoFileExists(t, "audit.gz")
 	})
+
+	// Every refused value gets the hint: a bare 1.x filename does not look like
+	// a path, and for a mistyped format the hint is still true.
+	t.Run("-o with a bare filename or a mistyped format", func(t *testing.T) {
+		t.Chdir(t.TempDir())
+		for _, value := range []string{"audit_logs", "jsno", `logs\audit`} {
+			r := execAstroCmd(t, new(astrov1_mocks.ClientWithResponsesInterface), "", newOrganizationCmd, append(args, "-o", value)...)
+			assert.Equal(t, cliout.ExitUsage, r.code, value)
+			assert.EqualError(t, r.err, fmt.Sprintf("unknown output format %q (supported: text, json); "+
+				"-o is the output format, and --output-file takes the path", value), value)
+			assert.NoFileExists(t, value)
+		}
+	})
 }

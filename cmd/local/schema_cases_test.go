@@ -104,7 +104,7 @@ var publishedPayloads = []schemaCase{
 	{"package-result", pack.Result{}},
 	{"start-missing-env", plan.MissingPayload{}},
 	// A row of `astro local api ls --output json`'s endpoints. The row is
-	// apirequest's because `astro api airflow ls --json` prints the same one.
+	// apirequest's because `astro api airflow ls -o json` prints the same one.
 	{"api-endpoint-row", apirequest.EndpointRow{}},
 
 	// Every list publishes one object with its rows under a named key (see

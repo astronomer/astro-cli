@@ -236,10 +236,10 @@ func TestKeyProblemsReportsWhatIsNotSnakeCase(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.json"),
 		[]byte(`{"ok_key":1,"Capital":{"nested_ok":[{"camelCase":true}]}}`), 0o600))
 
-	got := KeyProblems(t, dir, true, map[string]string{"a.json: camelCase": "legacy", "a.json: goneKey": "legacy"})
+	got := KeyProblems(t, dir, true)
 	require.Len(t, got, 2)
 	assert.Contains(t, got[0], "a.json: Capital is not snake_case")
-	assert.Contains(t, got[1], "a.json: goneKey is excused")
+	assert.Contains(t, got[1], "a.json: camelCase is not snake_case")
 }
 
 // failRecorder is a testing.TB that records a failure instead of ending the
@@ -277,8 +277,8 @@ func TestAMissingGoldenDirectoryPassesOnlyWithNoCases(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing")
 	cases := []Case{{Name: "a"}}
 
-	assert.False(t, fails(t, func(tb testing.TB) { KeyProblems(tb, missing, false, nil) }))
+	assert.False(t, fails(t, func(tb testing.TB) { KeyProblems(tb, missing, false) }))
 	assert.False(t, fails(t, func(tb testing.TB) { Orphans(tb, missing, nil) }))
-	assert.True(t, fails(t, func(tb testing.TB) { KeyProblems(tb, missing, true, nil) }))
+	assert.True(t, fails(t, func(tb testing.TB) { KeyProblems(tb, missing, true) }))
 	assert.True(t, fails(t, func(tb testing.TB) { Orphans(tb, missing, cases) }))
 }

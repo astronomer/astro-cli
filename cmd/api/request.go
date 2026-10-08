@@ -17,6 +17,7 @@ import (
 
 	"github.com/fatih/color"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
@@ -29,15 +30,52 @@ const (
 	minTokenLength     = 8
 )
 
+// requestFailed is the one wording of a refused request, presented or not.
+func requestFailed(status int) string {
+	return fmt.Sprintf("API request failed with status %d", status)
+}
+
 // SilentError is returned when the error has already been presented to the
-// user (e.g. an HTTP error body was printed) and cobra should exit non-zero
-// without printing the error text again.
+// user (the API's JSON error body was printed), so the run exits non-zero
+// without the error text printed again.
 type SilentError struct {
 	StatusCode int
 }
 
-func (e *SilentError) Error() string {
-	return fmt.Sprintf("API request failed with status %d", e.StatusCode)
+func (e *SilentError) Error() string { return requestFailed(e.StatusCode) }
+
+// Unwrap makes a SilentError a cliout.ExitError, the CLI's mark for a failure
+// its command has already presented: cliout.Execute prints nothing more for
+// it, in text or json, and the run exits 1.
+func (e *SilentError) Unwrap() error {
+	return &cliout.ExitError{Code: cliout.ExitFailure}
+}
+
+// RequestError is a refused request that has not been presented: its body
+// was empty or not JSON. cliout.Execute prints it, once.
+type RequestError struct {
+	StatusCode int
+}
+
+func (e *RequestError) Error() string { return requestFailed(e.StatusCode) }
+
+// refusedResponse reports a response the API refused (status 400 and up).
+//
+// A JSON body is the API's own account of what went wrong: it is printed,
+// formatted, on out, and the SilentError returned adds nothing after it. Any
+// other body (a proxy's HTML error page, plain text) is not a result, so it
+// goes to errOut, trimmed and ending in a newline, and a RequestError is
+// returned for the run to report the status after it; an empty or
+// whitespace-only body prints nothing, and only the RequestError is reported.
+func refusedResponse(out, errOut io.Writer, status int, body []byte) error {
+	if json.Valid(body) {
+		_ = writeColorizedJSON(out, body, isColorEnabled(out), "  ") //nolint:errcheck // the request already failed; a write error changes nothing
+		return &SilentError{StatusCode: status}
+	}
+	if text := bytes.TrimSpace(body); len(text) > 0 {
+		fmt.Fprintf(errOut, "%s\n", text)
+	}
+	return &RequestError{StatusCode: status}
 }
 
 // isConnectionError reports whether err indicates a network-level connection
@@ -252,14 +290,8 @@ func executeSingleRequest(opts *RequestOptions, method, requestURL, token string
 		apirequest.WriteHead(opts.Out, result.Proto+" "+result.Status, result.Header, isColorEnabled(opts.Out))
 	}
 
-	// Handle error responses: print the body, then return a SilentError so cobra
-	// exits non-zero without printing its own "Error: ..." line (SilenceErrors is
-	// set on the parent api command).
 	if result.StatusCode >= httpStatusError {
-		if len(result.Body) > 0 {
-			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ") //nolint:errcheck // error deliberately ignored in this shell code
-		}
-		return &SilentError{StatusCode: result.StatusCode}
+		return refusedResponse(opts.Out, opts.GetErrOut(), result.StatusCode, result.Body)
 	}
 
 	return outputResponseBody(opts, result.Body)
@@ -376,13 +408,8 @@ func fetchPage(opts *RequestOptions, method, requestURL, token string, params ma
 		return nil, 0, 0, err
 	}
 
-	// Handle error responses: print the body for diagnostics, then return a
-	// SilentError to match the executeSingleRequest behavior.
 	if result.StatusCode >= httpStatusError {
-		if len(result.Body) > 0 {
-			_ = writeColorizedJSON(opts.Out, result.Body, isColorEnabled(opts.Out), "  ") //nolint:errcheck // error deliberately ignored in this shell code
-		}
-		return nil, 0, 0, &SilentError{StatusCode: result.StatusCode}
+		return nil, 0, 0, refusedResponse(opts.Out, opts.GetErrOut(), result.StatusCode, result.Body)
 	}
 
 	total, pageSize = extractPageInfo(result.Body, opts.TotalCountField)

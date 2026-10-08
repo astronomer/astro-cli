@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
@@ -304,10 +305,7 @@ func runAirflowThroughTransport(ctx stdctx.Context, opts *AirflowOptions, target
 		return err
 	}
 	if resp.StatusCode >= httpStatusError {
-		if len(resp.Body) > 0 {
-			_ = writeColorizedJSON(opts.Out, resp.Body, isColorEnabled(opts.Out), "  ") //nolint:errcheck // the request already failed; a write error changes nothing
-		}
-		return &SilentError{StatusCode: resp.StatusCode}
+		return refusedResponse(opts.Out, opts.GetErrOut(), resp.StatusCode, resp.Body)
 	}
 	return outputResponseBody(&opts.RequestOptions, resp.Body)
 }
@@ -451,7 +449,7 @@ func NewAirflowListCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Command
 	var filterFlag string
 	var verbose bool
 	var refresh bool
-	var jsonOut bool
+	var format cliout.Format
 
 	cmd := &cobra.Command{
 		Use:     "ls [FILTER]",
@@ -483,7 +481,7 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 				return err
 			}
 
-			if !jsonOut {
+			if format != cliout.FormatJSON {
 				fmt.Fprintf(out, "Airflow version: %s\n\n", parentOpts.detectedVersion)
 			}
 
@@ -494,7 +492,7 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 				Filter:    filter,
 				Verbose:   verbose,
 				Refresh:   refresh,
-				JSON:      jsonOut,
+				Format:    format,
 			}
 
 			return runList(listOpts)
@@ -504,7 +502,7 @@ You can optionally provide a filter to search for specific endpoints, as an argu
 	cmd.Flags().StringVar(&filterFlag, "filter", "", "Only list endpoints matching this, the same as the positional filter")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint list as JSON")
+	addOutputFlags(cmd, &format)
 
 	return cmd
 }
@@ -554,7 +552,7 @@ func NewAirflowDescribeCmd(out io.Writer, parentOpts *AirflowOptions) *cobra.Com
 	var method string
 	var refresh bool
 	var verbose bool
-	var jsonOut bool
+	var format cliout.Format
 
 	cmd := &cobra.Command{
 		Use:   "describe <ENDPOINT>",
@@ -587,7 +585,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 				Method:    method,
 				Refresh:   refresh,
 				Verbose:   verbose,
-				JSON:      jsonOut,
+				Format:    format,
 			}
 
 			return runDescribe(descOpts)
@@ -597,7 +595,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET, POST, PUT, PATCH, DELETE)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output the endpoint schema as JSON")
+	addOutputFlags(cmd, &format)
 
 	return cmd
 }

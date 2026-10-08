@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
@@ -88,7 +89,7 @@ func TestRunList(t *testing.T) {
 	t.Run("json output", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &ListOptions{Out: &buf, specCache: cache, JSON: true}
+		opts := &ListOptions{Out: &buf, specCache: cache, Format: cliout.FormatJSON}
 
 		require.NoError(t, runList(opts))
 
@@ -109,7 +110,7 @@ func TestRunList(t *testing.T) {
 	t.Run("json empty array when filter matches nothing", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &ListOptions{Out: &buf, specCache: cache, Filter: "nonexistent", JSON: true}
+		opts := &ListOptions{Out: &buf, specCache: cache, Filter: "nonexistent", Format: cliout.FormatJSON}
 
 		require.NoError(t, runList(opts))
 
@@ -138,7 +139,7 @@ func TestRunList_EmptySpec(t *testing.T) {
 	assert.Contains(t, err.Error(), "no endpoints found")
 }
 
-// decodeEndpoints reads what ls --json and describe --json print: the
+// decodeEndpoints reads what ls -o json and describe -o json print: the
 // endpoints under "endpoints", with a count that agrees with them.
 func decodeEndpoints(t *testing.T, out []byte) []map[string]any {
 	t.Helper()

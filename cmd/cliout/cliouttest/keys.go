@@ -20,12 +20,9 @@ var snakeCase = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 // usually a Go field name that reached the wire because somebody forgot a
 // tag: encoding/json falls back to the field's own name.
 //
-// legacy names the keys a tree published before the rule, as "golden.json:
-// key", with the reason each stays; changing one now would break whoever
-// reads it. An entry that no longer matches a key is reported too, so the
-// list cannot outlive what it excuses. hasCases is whether the tree pins
-// anything: a missing directory is read as goldenEntries reads it.
-func KeyProblems(t testing.TB, dir string, hasCases bool, legacy map[string]string) []string {
+// hasCases is whether the tree pins anything: a missing directory is read as
+// goldenEntries reads it.
+func KeyProblems(t testing.TB, dir string, hasCases bool) []string {
 	t.Helper()
 	entries := goldenEntries(t, dir, hasCases)
 
@@ -59,14 +56,7 @@ func KeyProblems(t testing.TB, dir string, hasCases bool, legacy map[string]stri
 
 	var out []string
 	for key := range seen {
-		if legacy[key] == "" {
-			out = append(out, key+" is not snake_case; give the field a json tag that is, and run `make update-schemas`")
-		}
-	}
-	for key := range legacy {
-		if !seen[key] {
-			out = append(out, key+" is excused as a legacy key, and no golden publishes it any more; drop the entry")
-		}
+		out = append(out, key+" is not snake_case; give the field a json tag that is, and run `make update-schemas`")
 	}
 	sort.Strings(out)
 	return out

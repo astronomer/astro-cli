@@ -38,7 +38,7 @@ func ListFilter(args []string, flag string) (string, error) {
 }
 
 // EndpointRow is the machine-readable form of one `ls` row: a lean summary, as
-// against `describe --json`'s full resolved schema.
+// against `describe -o json`'s full resolved schema.
 type EndpointRow struct {
 	Method         string   `json:"method"`
 	Path           string   `json:"path"`
@@ -68,7 +68,7 @@ func Rows(endpoints []openapi.Endpoint) []EndpointRow {
 	return rows
 }
 
-// EndpointList is the `ls` listing, for `astro api … ls --json` and `astro
+// EndpointList is the `ls` listing, for `astro api … ls -o json` and `astro
 // local api ls -o json` alike: the rows under "endpoints", [] when nothing
 // matched, and their count. The key and the count are af's `api ls`.
 type EndpointList struct {
@@ -79,17 +79,6 @@ type EndpointList struct {
 // NewEndpointList wraps rows as the listing.
 func NewEndpointList(rows []EndpointRow) EndpointList {
 	return EndpointList{Endpoints: rows, Count: len(rows)}
-}
-
-// WriteEndpointsJSON writes the listing as one indented JSON object: `astro
-// api ls --json`'s shape.
-func WriteEndpointsJSON(out io.Writer, endpoints []openapi.Endpoint) error {
-	enc := json.NewEncoder(out)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(NewEndpointList(Rows(endpoints))); err != nil {
-		return fmt.Errorf("encoding list output as JSON: %w", err)
-	}
-	return nil
 }
 
 // WriteEndpoints writes the human listing of already-filtered endpoints: a

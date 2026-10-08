@@ -7,6 +7,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // NewAPICmd creates the parent 'astro api' command.
@@ -19,10 +21,9 @@ func NewAPICmdWithOutput(out io.Writer) *cobra.Command {
 	var noColor bool
 
 	cmd := &cobra.Command{
-		Use:           "api",
-		Short:         "Make authenticated API requests to Astronomer services",
-		SilenceErrors: true, // API commands print error bodies themselves; don't let cobra double-print
-		SilenceUsage:  true,
+		Use:          "api",
+		Short:        "Make authenticated API requests to Astronomer services",
+		SilenceUsage: true,
 		Long: `Make authenticated HTTP requests to Astronomer APIs and print responses.
 
 The 'astro api' command provides direct access to Astronomer's REST APIs.
@@ -49,10 +50,10 @@ Use "astro api [command] --help" for more information about a command.`,
 			// it here. The cmd parameter is the actual subcommand being executed,
 			// not the parent where PersistentPreRunE is defined.
 			//
-			// Note: we do NOT propagate SilenceErrors. The parent api command
-			// sets SilenceErrors to avoid double-printing HTTP error bodies
-			// (SilentError), but subcommands need cobra to print non-silent
-			// errors like connection failures.
+			// Errors are not silenced anywhere in the family: a failure is
+			// reported once, by cliout.Execute. A request whose error body was
+			// already printed returns a SilentError, which Execute takes as
+			// already presented and adds nothing to.
 			cmd.SilenceUsage = true
 
 			if noColor {
@@ -61,9 +62,8 @@ Use "astro api [command] --help" for more information about a command.`,
 
 			return nil
 		},
-		Run: func(cmd *cobra.Command, args []string) {
-			_ = cmd.Help() //nolint:errcheck // error deliberately ignored in this shell code
-		},
+		// No Run: `astro api` is a group, so cobra prints its help, with no
+		// pre-run, when it is run bare.
 	}
 
 	cmd.PersistentFlags().BoolVar(&noColor, "no-color", false, "Disable colorized output")
@@ -73,4 +73,18 @@ Use "astro api [command] --help" for more information about a command.`,
 	cmd.AddCommand(NewRegistryCmd(out))
 
 	return cmd
+}
+
+// addOutputFlags gives ls or describe the CLI's shared -o text|json, written
+// into format, and a tombstone for the --json it replaced. The requests
+// themselves have no -o: they print the API's own response, and shape it with
+// --jq and --template.
+//
+// Neither needs checking here. The -o flag refuses a format it does not offer
+// while cobra parses flags, so format only ever holds text or json; the
+// tombstone refuses --json in Args. Both fail before any pre-run refreshes a
+// token or records telemetry, and before a spec is fetched.
+func addOutputFlags(cmd *cobra.Command, format *cliout.Format) {
+	cliout.AddOutputFlag(cmd, (*string)(format))
+	cliout.AddRemovedFlag(cmd, "json", "", true, cliout.ErrJSONFlagRemoved)
 }

@@ -206,7 +206,7 @@ func newConfigSectionList(rows []configSectionRow, total int) configSectionList 
 }
 
 // newEndpointList is `astro local api ls`: apirequest.EndpointList, the
-// shape `astro api … ls --json` publishes too.
+// shape `astro api … ls -o json` publishes too.
 func newEndpointList(rows []apirequest.EndpointRow, _ int) apirequest.EndpointList {
 	return apirequest.NewEndpointList(rows)
 }

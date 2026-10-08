@@ -18,6 +18,6 @@ import (
 // to act on. Nothing noticed until the shapes were pinned and somebody read
 // the file. cliouttest.KeyProblems checks the class, for every tree.
 func TestPublishedKeysAreSnakeCase(t *testing.T) {
-	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0, nil),
+	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0),
 		"add a json tag — snake_case — and run `make update-schemas`.")
 }

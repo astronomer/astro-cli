@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/color"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
@@ -29,7 +30,7 @@ type DescribeOptions struct {
 	Method    string
 	Refresh   bool
 	Verbose   bool
-	JSON      bool
+	Format    cliout.Format
 }
 
 // runDescribe executes the describe command.
@@ -38,7 +39,7 @@ func runDescribe(opts *DescribeOptions) error {
 		return fmt.Errorf("API specification not initialized. Ensure you are logged in and try again")
 	}
 
-	if opts.Verbose && !opts.JSON {
+	if opts.Verbose && opts.Format != cliout.FormatJSON {
 		fmt.Fprintf(opts.Out, "Spec URL: %s\n\n", opts.specCache.GetSpecURL())
 	}
 
@@ -97,18 +98,18 @@ func runDescribe(opts *DescribeOptions) error {
 	// in request/response bodies expand to their fields.
 	resolver := openapi.NewSchemaResolverWithSchemas(opts.specCache.GetSchemas())
 
-	if opts.JSON {
-		return writeEndpointsJSON(opts.Out, matches, resolver)
-	}
-
-	for i := range matches {
-		if i > 0 {
-			fmt.Fprintln(opts.Out, "\n"+strings.Repeat("─", separatorWidth)+"\n")
+	// The resolved schemas are built only under json: resolving every $ref is
+	// work the text, which prints from the spec as it goes, never needs.
+	r := cliout.Renderer{Format: opts.Format, Out: opts.Out}
+	return r.Emit(cliout.Lazy(func() any { return newDescribeOutput(matches, resolver) }), func(w io.Writer) error {
+		for i := range matches {
+			if i > 0 {
+				fmt.Fprintln(w, "\n"+strings.Repeat("─", separatorWidth)+"\n")
+			}
+			printEndpointDetails(w, &matches[i], resolver)
 		}
-		printEndpointDetails(opts.Out, &matches[i], resolver)
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // printEndpointDetails prints detailed information about an endpoint.

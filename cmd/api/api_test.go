@@ -91,3 +91,25 @@ func TestNewAPICmdWithOutput_Flags(t *testing.T) {
 	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
 	assert.NotNil(t, apiCmd.PersistentFlags().Lookup("no-color"))
 }
+
+// `astro api` is a group with no run of its own: run bare, cobra prints its
+// help and exits 0, and no pre-run (token refresh, telemetry) happens.
+func TestBareAPIPrintsHelpAndRunsNothing(t *testing.T) {
+	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
+	assert.False(t, apiCmd.Runnable(), "astro api has a run of its own")
+
+	preRuns := 0
+	root := &cobra.Command{
+		Use:               "astro",
+		PersistentPreRunE: func(*cobra.Command, []string) error { preRuns++; return nil },
+	}
+	root.AddCommand(apiCmd)
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs([]string{"api"})
+	require.NoError(t, root.Execute())
+	assert.Contains(t, out.String(), "Make authenticated HTTP requests to Astronomer APIs")
+	assert.Contains(t, out.String(), "Available Commands:")
+	assert.Zero(t, preRuns)
+}

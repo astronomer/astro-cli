@@ -928,7 +928,7 @@ const twoPathSpec = `{"openapi":"3.0.0","info":{"title":"Airflow","version":"1"}
 // af spells the ls filter --filter; the positional argument astro has always
 // taken still works beside it.
 func TestAirflowListFilterFlag(t *testing.T) {
-	for _, args := range [][]string{{"--filter", "variable", "--json"}, {"variable", "--json"}} {
+	for _, args := range [][]string{{"--filter", "variable", "-o", "json"}, {"variable", "-o", "json"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			var out bytes.Buffer
 			cmd := NewAirflowListCmd(&out, specOpts(t, twoPathSpec))

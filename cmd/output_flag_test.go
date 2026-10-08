@@ -27,10 +27,14 @@ var outputExempt = map[string]string{
 	"astro auth login":  "the same flow as astro login",
 	"astro auth logout": "the same as astro logout",
 	"astro otto":        "launches an interactive agent session",
-	// `astro api` and everything under it print the API's own response and
-	// shape it with --jq and --template; an --output there would be a second
-	// answer to that question.
-	"astro api": "the api family has --jq and --template",
+	// The requests `astro api` makes print the API's own response and shape
+	// it with --jq and --template; an --output there would be a second answer
+	// to that question. Their ls and describe are not here: those publish the
+	// CLI's own listing and schemas, and take -o like every other command.
+	"astro api airflow":      "prints the Airflow API's response; shaped with --jq and --template",
+	"astro api cloud":        "prints the Astro API's response; shaped with --jq and --template",
+	"astro api registry":     "prints the registry's response; shaped with --jq and --template",
+	"astro api airflow spec": "prints the Airflow API's own OpenAPI document, always JSON",
 }
 
 // lacksOutputFlag lists, per platform, the runnable commands that cannot reach
@@ -63,14 +67,10 @@ func visibleRunnable(cmd *cobra.Command) bool {
 	return true
 }
 
-// exemptByDesign reports whether path is, or sits under, an outputExempt entry.
+// exemptByDesign reports whether path is an outputExempt entry. Only the
+// command itself: a subcommand added under an exempt one is not excused by it.
 func exemptByDesign(path string) bool {
-	for p := range outputExempt {
-		if path == p || strings.HasPrefix(path, p+" ") {
-			return true
-		}
-	}
-	return false
+	return outputExempt[path] != ""
 }
 
 func TestEveryCommandCanReachOutputJSON(t *testing.T) {
@@ -152,16 +152,24 @@ func TestOutputFlagAllowlistOnlyShrinks(t *testing.T) {
 	}
 }
 
-// Each exemption names a command that exists in some platform, so the list of
-// reasons cannot outlive what it excuses.
+// Each exemption names a command that exists in some platform and still has
+// no --output json, so the list of reasons cannot outlive what it excuses.
 func TestOutputExemptionsExist(t *testing.T) {
-	exists := map[string]bool{}
+	exists, hasJSON := map[string]bool{}, map[string]bool{}
 	for _, tree := range rootsUnderTest(t) {
-		walkCmd(tree.root, func(cmd *cobra.Command) { exists[cmd.CommandPath()] = true })
+		walkCmd(tree.root, func(cmd *cobra.Command) {
+			exists[cmd.CommandPath()] = true
+			if reachesJSONOutput(cmd) {
+				hasJSON[cmd.CommandPath()] = true
+			}
+		})
 	}
 	for p := range outputExempt {
-		if !exists[p] {
+		switch {
+		case !exists[p]:
 			t.Errorf("outputExempt names %q, which no longer exists; delete the entry", p)
+		case hasJSON[p]:
+			t.Errorf("outputExempt names %q, which has --output json now; delete the entry", p)
 		}
 	}
 }

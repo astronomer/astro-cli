@@ -69,9 +69,9 @@ func TestSpecJSONRefusesSomethingThatIsNeither(t *testing.T) {
 // --- Rows --------------------------------------------------------------------
 
 func TestRowsAreNeverNil(t *testing.T) {
-	var buf bytes.Buffer
-	require.NoError(t, WriteEndpointsJSON(&buf, nil))
-	assert.JSONEq(t, `{"endpoints":[],"count":0}`, buf.String())
+	got, err := json.Marshal(NewEndpointList(Rows(nil)))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"endpoints":[],"count":0}`, string(got))
 }
 
 // --- colorizeMethod ----------------------------------------------------------

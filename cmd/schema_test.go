@@ -98,7 +98,7 @@ func emitWatch() cliouttest.Watch {
 // Every key a golden here publishes is snake_case: a capital in one is a Go
 // field name that reached the wire because a tag was forgotten.
 func TestPublishedKeysAreSnakeCase(t *testing.T) {
-	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0, nil))
+	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0))
 }
 
 // textTo is a text renderer onto w, for a test calling a command's function

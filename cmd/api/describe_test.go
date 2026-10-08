@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
@@ -680,7 +681,7 @@ func TestRunDescribe_JSONOutput(t *testing.T) {
 
 	var buf bytes.Buffer
 	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "CreateDeployment", JSON: true}
+	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "CreateDeployment", Format: cliout.FormatJSON}
 	require.NoError(t, runDescribe(opts))
 
 	endpoints := decodeEndpoints(t, buf.Bytes())
@@ -713,7 +714,7 @@ func TestRunDescribe_JSONOutputMultipleMatches(t *testing.T) {
 
 	var buf bytes.Buffer
 	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags", JSON: true}
+	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags", Format: cliout.FormatJSON}
 	require.NoError(t, runDescribe(opts))
 
 	endpoints := decodeEndpoints(t, buf.Bytes())
@@ -1090,7 +1091,7 @@ func TestPrintSchema_UnresolvedRefKeepsName(t *testing.T) {
 }
 
 // TestReadOnly_RequestHidesButJSONShows pins the intentional asymmetry: text
-// request bodies hide read-only fields; --json keeps them flagged.
+// request bodies hide read-only fields; -o json keeps them flagged.
 func TestReadOnly_RequestHidesButJSONShows(t *testing.T) {
 	schema := &openapi.Schema{
 		Type: "object",

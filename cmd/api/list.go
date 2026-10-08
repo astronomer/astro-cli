@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/apirequest"
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
@@ -15,7 +16,7 @@ type ListOptions struct {
 	Filter    string
 	Verbose   bool
 	Refresh   bool
-	JSON      bool
+	Format    cliout.Format
 }
 
 // runList executes the list command. The rendering is apirequest's, shared
@@ -26,7 +27,7 @@ func runList(opts *ListOptions) error {
 		return fmt.Errorf("API specification not initialized. Ensure you are logged in and try again")
 	}
 
-	if opts.Verbose && !opts.JSON {
+	if opts.Verbose && opts.Format != cliout.FormatJSON {
 		fmt.Fprintf(opts.Out, "Spec URL: %s\n\n", opts.specCache.GetSpecURL())
 	}
 
@@ -40,10 +41,12 @@ func runList(opts *ListOptions) error {
 	}
 	endpoints = openapi.FilterEndpoints(endpoints, opts.Filter)
 
-	// JSON output: emit the (possibly empty) list under "endpoints" and stop.
-	if opts.JSON {
-		return apirequest.WriteEndpointsJSON(opts.Out, endpoints)
-	}
-	apirequest.WriteEndpoints(opts.Out, endpoints, opts.Filter, opts.Verbose)
-	return nil
+	// The (possibly empty) list goes under "endpoints". The rows are built
+	// only under json: text draws from the endpoints themselves.
+	r := cliout.Renderer{Format: opts.Format, Out: opts.Out}
+	return r.Emit(cliout.Lazy(func() any { return apirequest.NewEndpointList(apirequest.Rows(endpoints)) }),
+		func(w io.Writer) error {
+			apirequest.WriteEndpoints(w, endpoints, opts.Filter, opts.Verbose)
+			return nil
+		})
 }

@@ -141,8 +141,8 @@ test:
 
 # The `--output json` payloads are pinned against goldens in
 # cmd/local/testdata/schema, cmd/astro/testdata/schema, cmd/testdata/schema,
-# cmd/apc/testdata/schema and cmd/api/testdata/schema (`astro api describe
-# --json`), and `astro deployment inspect`'s bytes against
+# cmd/apc/testdata/schema and cmd/api/testdata/schema (`astro api … describe
+# -o json`), and `astro deployment inspect`'s bytes against
 # cmd/astro/testdata/deployment_inspect.
 # A deliberate change to one — a new field, a rename — regenerates them; the
 # diff then lands in the PR, which is the point. Read what it writes before

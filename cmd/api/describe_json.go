@@ -1,20 +1,16 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-
 	"github.com/astronomer/astro-cli/pkg/openapi"
 )
 
-// The types below are the machine-readable form of `describe`, emitted with the
-// --json flag. Schemas are resolved down the $ref stack so an agent gets the
+// The types below are the machine-readable form of `describe`, emitted under
+// -o json. Schemas are resolved down the $ref stack so an agent gets the
 // actual fields without needing the spec; genuine cycles are cut and marked
 // with "circular": true rather than recursing forever.
 //
 // Matched endpoints are always a list under "endpoints", with their count, as
-// `ls --json` publishes its rows, so callers can rely on one shape for zero,
+// `ls -o json` publishes its rows, so callers can rely on one shape for zero,
 // one or many matches.
 
 // maxJSONSchemaDepth bounds resolveSchemaJSON's recursion. Cycles are already
@@ -81,25 +77,19 @@ type propertyJSON struct {
 	Schema *schemaJSON `json:"schema"`
 }
 
-// describeOutput is `describe --json`: the matched endpoints, resolved.
+// describeOutput is `describe -o json`: the matched endpoints, resolved.
 type describeOutput struct {
 	Endpoints []endpointJSON `json:"endpoints"`
 	Count     int            `json:"count"`
 }
 
-// writeEndpointsJSON marshals the matched endpoints as one describeOutput.
-func writeEndpointsJSON(out io.Writer, matches []openapi.Endpoint, resolver *openapi.SchemaResolver) error {
+// newDescribeOutput is the matched endpoints as one describeOutput.
+func newDescribeOutput(matches []openapi.Endpoint, resolver *openapi.SchemaResolver) describeOutput {
 	eps := make([]endpointJSON, 0, len(matches))
 	for i := range matches {
 		eps = append(eps, buildEndpointJSON(&matches[i], resolver))
 	}
-
-	enc := json.NewEncoder(out)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(describeOutput{Endpoints: eps, Count: len(eps)}); err != nil {
-		return fmt.Errorf("encoding describe output as JSON: %w", err)
-	}
-	return nil
+	return describeOutput{Endpoints: eps, Count: len(eps)}
 }
 
 func buildEndpointJSON(ep *openapi.Endpoint, resolver *openapi.SchemaResolver) endpointJSON {

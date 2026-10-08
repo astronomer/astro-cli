@@ -140,6 +140,14 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
   astro env list --deployment <DEPLOYMENT_ID> -o json`,
 	}
 	cliout.AddOutputFlag(cmd, &envOutput)
+	// dotenv is a format the per-kind listings offer; this one refuses it
+	// saying why, rather than as a format it has never heard of.
+	cliout.OnBadFormat(cmd, func(value string, refused error) error {
+		if value == string(formatDotenv) {
+			return env.ErrInventoryHasNoValues
+		}
+		return refused
+	})
 	// The scope flags are persistent on each noun rather than on `env`, so a
 	// command sitting directly under the group has to register its own. They
 	// are worded exactly as addScopePersistentFlags words them, and the
@@ -162,13 +170,8 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	// Checked before the parse, which would refuse it with the generic
-	// wording, and before the call: there is no reason to fetch every object
-	// in the scope to then refuse to print it.
-	if envOutput == string(formatDotenv) {
-		cmd.SilenceUsage = true
-		return cliout.Usage(env.ErrInventoryHasNoValues)
-	}
+	// -o dotenv never gets here: the flag refuses it while parsing, with
+	// env.ErrInventoryHasNoValues (newEnvListCmd).
 	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err

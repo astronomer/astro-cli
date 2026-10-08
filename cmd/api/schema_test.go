@@ -8,13 +8,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
+	"github.com/astronomer/astro-cli/internal/apirequest"
 )
 
-// The shape `astro api airflow|cloud|registry describe --json` publishes,
+// The shape `astro api airflow|cloud|registry describe -o json` publishes,
 // pinned by a golden in testdata/schema the way the command trees pin theirs
 // (see cliouttest). cmd cannot pin it: it imports this package, and the
-// describe types are unexported. `ls --json` publishes apirequest.EndpointList,
+// describe types are unexported. `ls -o json` publishes apirequest.EndpointList,
 // the listing `astro local api ls` shares, and cmd/local pins it once, as
 // api-endpoint-list. `make update-schemas` rewrites the golden; read the diff
 // before committing it.
@@ -49,7 +51,7 @@ func describeSample() describeOutput {
 }
 
 var publishedPayloads = []cliouttest.Case{
-	// describe --json: the matched endpoints under "endpoints", schemas
+	// describe -o json: the matched endpoints under "endpoints", schemas
 	// resolved.
 	{Name: "api-describe", Value: describeSample(), AsGiven: true},
 }
@@ -106,6 +108,33 @@ func TestDescribeSampleSetsEveryField(t *testing.T) {
 	}
 }
 
+// minWatchedPayloads is a floor under the tally, not a target: an empty tally
+// reads exactly like a clean one, so without it the observer coming unwired
+// would be silent. Three shapes reach Emit in this package's tests today:
+// describe's payload, ls's listing and the error object.
+// Lower it only saying why.
+const minWatchedPayloads = 3
+
+// pinnedElsewhere names the shapes that reach Emit here and are pinned by
+// another tree's goldens, keyed by type, with where.
+var pinnedElsewhere = map[reflect.Type]string{
+	// ls's listing, shared with `astro local api ls`.
+	reflect.TypeOf(apirequest.EndpointList{}): "cmd/local/testdata/schema/api-endpoint-list.json",
+	// The failure object cliout.Execute publishes for every command, whichever
+	// tree it is in.
+	reflect.TypeOf(cliout.ErrorObject{}): "cmd/local/testdata/schema/error.json",
+}
+
+// emitWatch is this package's configuration of the observer TestMain arms.
+func emitWatch() cliouttest.Watch {
+	return cliouttest.Watch{
+		Cases:           publishedPayloads,
+		PinnedElsewhere: pinnedElsewhere,
+		Floor:           minWatchedPayloads,
+		File:            "cmd/api/schema_test.go",
+	}
+}
+
 func TestEveryGoldenHasACase(t *testing.T) {
 	assert.Empty(t, cliouttest.Orphans(t, schemaDir, publishedPayloads),
 		"these goldens have no case in publishedPayloads; delete the file, or the one a renamed case left behind.")
@@ -116,6 +145,6 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // published key. Values under enum, default and example are the spec's data;
 // the sample sets them to scalars, so no spec key reaches the golden.
 func TestPublishedKeysAreSnakeCase(t *testing.T) {
-	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0, nil),
+	assert.Empty(t, cliouttest.KeyProblems(t, schemaDir, len(publishedPayloads) > 0),
 		"give the field a snake_case json tag and run `make update-schemas`")
 }

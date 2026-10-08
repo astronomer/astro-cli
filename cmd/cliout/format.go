@@ -11,6 +11,7 @@ package cliout
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/mattn/go-isatty"
 	jsoncolor "github.com/neilotoole/jsoncolor"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // Format selects how a command renders its results.
@@ -54,10 +56,116 @@ func ParseFormat(s string, extras ...Format) (Format, error) {
 // format beyond text and json for a special use (dotenv for `astro env
 // variable list`, yaml for `astro deployment inspect`) names it as an extra,
 // and passes the same extras to ParseFormat.
+//
+// The flag validates its own value: a format the command does not offer fails
+// while cobra parses flags, as the usage error ParseFormat returns, before any
+// pre-run refreshes a token, records telemetry or asks an API anything. So a
+// command's ParseFormat of the parsed value only converts it.
+//
+// It owns cmd's flag error func: one set on cmd beforehand is replaced. Any
+// flag error other than a refused --output goes to the parent's, which is
+// looked up when the error happens, so a func an ancestor gains later (the
+// root's, which Execute sets) is consulted. On a root there is no parent, and
+// Execute's handling takes over when it runs the tree, replacing this func.
 func AddOutputFlag(cmd *cobra.Command, target *string, extras ...Format) {
 	names := formatNames(extras)
 	usage := "Output format: " + strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
-	cmd.PersistentFlags().StringVarP(target, "output", "o", string(FormatText), usage)
+	*target = string(FormatText)
+	cmd.PersistentFlags().VarP(&formatValue{target: target, extras: extras}, "output", "o", usage)
+	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		if bad := badFormat(err); bad != nil {
+			return bad.refusal()
+		}
+		if cmd.HasParent() {
+			// A func that returns nil must not turn a flag error into
+			// success, so the error stands unless it gives another.
+			if e := cmd.Parent().FlagErrorFunc()(c, err); e != nil {
+				err = e
+			}
+		}
+		if IsUsage(err) {
+			return err
+		}
+		return Usage(err)
+	})
+}
+
+// formatValue is --output's value: a string that refuses a format the command
+// does not offer, and what the command has to say when it does (OnBadFormat).
+type formatValue struct {
+	target  *string
+	extras  []Format
+	explain func(value string, refused error) error
+}
+
+func (v *formatValue) String() string { return *v.target }
+
+// Type is "string", what the flag was before it validated, so the help still
+// reads `-o, --output string`.
+func (v *formatValue) Type() string { return "string" }
+
+func (v *formatValue) Set(s string) error {
+	if _, err := ParseFormat(s, v.extras...); err != nil {
+		return err
+	}
+	*v.target = s
+	return nil
+}
+
+// OnBadFormat lets cmd say more than "unknown output format" when its
+// --output value is refused: explain gets the value and the refusal, and what
+// it returns is reported instead, as a usage error. Returning nil, or refused
+// itself, keeps the plain refusal. For a value with a story: `-o <path>` from
+// when -o named audit-logs export's file, or dotenv on a listing that has no
+// values.
+//
+// The explanation is kept on the flag, so cmd must be the command that
+// registered --output with AddOutputFlag; anything else is a programming
+// error, and panics.
+func OnBadFormat(cmd *cobra.Command, explain func(value string, refused error) error) {
+	f := cmd.PersistentFlags().Lookup("output")
+	if f == nil {
+		panic("cliout.OnBadFormat: " + cmd.CommandPath() + " has no --output of its own; call AddOutputFlag on it first")
+	}
+	v, ok := f.Value.(*formatValue)
+	if !ok {
+		panic("cliout.OnBadFormat: " + cmd.CommandPath() + "'s --output is not cliout's; register it with AddOutputFlag")
+	}
+	v.explain = explain
+}
+
+// refusedFormat is a value an --output flag refused, and why.
+type refusedFormat struct {
+	flag  *formatValue
+	value string
+	err   error
+}
+
+// refusal is what a run reports for it: the command's explanation, if it has
+// one to give, else ParseFormat's own usage error, without pflag's `invalid
+// argument "x" for "-o, --output" flag:` in front of it.
+func (r *refusedFormat) refusal() error {
+	if r.flag.explain == nil {
+		return r.err
+	}
+	explained := r.flag.explain(r.value, r.err)
+	if explained == nil || explained == r.err {
+		return r.err
+	}
+	return Usage(explained)
+}
+
+// badFormat returns err as a refused --output value, or nil if it is not one.
+func badFormat(err error) *refusedFormat {
+	var bad *pflag.InvalidValueError
+	if !errors.As(err, &bad) {
+		return nil
+	}
+	v, ok := bad.GetFlag().Value.(*formatValue)
+	if !ok {
+		return nil
+	}
+	return &refusedFormat{flag: v, value: bad.GetValue(), err: bad.Unwrap()}
 }
 
 // formatNames lists text, json and the extras, in that order.
@@ -186,6 +294,12 @@ func (r Renderer) EmitEvent(v any, text func(w io.Writer) error) error {
 // traceback reads better than \u003c. The value decoded is the same either
 // way.
 func (r Renderer) emit(v any, text func(w io.Writer) error, style Style) error {
+	if lazy, ok := v.(Lazy); ok {
+		if r.Format != FormatJSON {
+			return r.text(text)
+		}
+		v = lazy()
+	}
 	if EmitObserver != nil {
 		EmitObserver(v)
 	}
@@ -207,6 +321,19 @@ func (r Renderer) emit(v any, text func(w io.Writer) error, style Style) error {
 		}
 		return enc.Encode(v)
 	}
+	return r.text(text)
+}
+
+// Lazy is a payload built only if it is published: Emit calls it in json mode
+// and never in text mode, for a value that costs something to build and that
+// the text rendering does not read (describe's resolved schemas).
+//
+// A Lazy emitted in text mode publishes nothing, so EmitObserver is not told
+// of it: there is no value to hand it without building one.
+type Lazy func() any
+
+// text runs the text renderer, which must exist in text mode.
+func (r Renderer) text(text func(w io.Writer) error) error {
 	if text == nil {
 		panic("Renderer.Emit: text mode with no text renderer — this value is " +
 			"json-only, so the caller must not reach here in text mode. The " +
