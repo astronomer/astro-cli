@@ -38,7 +38,7 @@ var (
 	forceRotate                bool
 	tokenExpiration            int
 	validWorkspaceRoles        []string
-	workspaceListOutput        string
+	workspaceListOutput        cliout.Format
 )
 
 const (
@@ -597,20 +597,11 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 }
 
 func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceTeamOutput)
-	if err != nil {
-		return err
-	}
-
 	cmd.SilenceUsage = true
-	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", cliout.Renderer{Format: format, Out: out})
+	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", cliout.Renderer{Format: workspaceTeamOutput, Out: out})
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceTeamOutput)
-	if err != nil {
-		return err
-	}
 	var id string
 
 	// if an id was provided in the args we use it
@@ -627,7 +618,7 @@ func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &r, fmt.Sprintf("Astro Team %s was successfully removed from workspace %s", r.Name, r.WorkspaceID))
+	return renderLines(workspaceTeamOutput, out, &r, fmt.Sprintf("Astro Team %s was successfully removed from workspace %s", r.Name, r.WorkspaceID))
 }
 
 func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
@@ -654,10 +645,6 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 }
 
 func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceTeamOutput)
-	if err != nil {
-		return err
-	}
 	var id string
 
 	// if an id was provided in the args we use it
@@ -674,7 +661,7 @@ func addWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &t, fmt.Sprintf("The team %s was successfully added to the workspace with the role %s", teamLabel(&t), t.WorkspaceRole))
+	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("The team %s was successfully added to the workspace with the role %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -702,10 +689,6 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceTeamOutput)
-	if err != nil {
-		return err
-	}
 	var id string
 
 	// if an id was provided in the args we use it
@@ -714,6 +697,7 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	}
 	if updateWorkspaceRole == "" {
 		// no role was provided so ask the user for it
+		var err error
 		updateWorkspaceRole, err = selectWorkspaceRole()
 		if err != nil {
 			return err
@@ -730,26 +714,16 @@ func updateWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &t, fmt.Sprintf("The workspace team %s role was successfully updated to %s", teamLabel(&t), t.WorkspaceRole))
+	return renderLines(workspaceTeamOutput, out, &t, fmt.Sprintf("The workspace team %s role was successfully updated to %s", teamLabel(&t), t.WorkspaceRole))
 }
 
 func workspaceList(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceListOutput)
-	if err != nil {
-		return err
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return workspace.ListWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
+	return workspace.ListWithFormat(astroV1Client, cliout.Renderer{Format: workspaceListOutput, Out: out})
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
-	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
-	if err != nil {
-		return err
-	}
-
 	workspaceNameOrID := ""
 
 	if len(args) == 1 {
@@ -757,31 +731,23 @@ func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, cliout.NotesTo(cmd, format, out))
+	ws, err := workspace.SwitchTo(workspaceNameOrID, astroV1Client, cliout.NotesTo(cmd, workspaceLifecycleOutput, out))
 	if err != nil {
 		return err
 	}
-	return emitWorkspaceSwitch(cliout.Renderer{Format: format, Out: out}, ws)
+	return emitWorkspaceSwitch(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, ws)
 }
 
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	ws, err := workspace.Create(workspaceName, workspaceDescription, enforceCD, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return emitWorkspace(cliout.Renderer{Format: format, Out: out}, ws, fmt.Sprintf("Astro Workspace %s was successfully created", ws.Name))
+	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, ws, fmt.Sprintf("Astro Workspace %s was successfully created", ws.Name))
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
-	if err != nil {
-		return err
-	}
 	id := ""
 
 	if len(args) == 1 {
@@ -797,38 +763,30 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 			return workspace.ErrWrongEnforceInput
 		}
 	}
-	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforce, cliout.NotesTo(cmd, format, out), astroV1Client)
+	res, err := workspace.Update(id, workspaceName, workspaceDescription, enforce, cliout.NotesTo(cmd, workspaceLifecycleOutput, out), astroV1Client)
 	if err != nil {
 		return err
 	}
 	// The line names the Workspace as it was called before the update.
-	return emitWorkspace(cliout.Renderer{Format: format, Out: out}, &res.Workspace, fmt.Sprintf("Astro Workspace %s was successfully updated", res.PreviousName))
+	return emitWorkspace(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, &res.Workspace, fmt.Sprintf("Astro Workspace %s was successfully updated", res.PreviousName))
 }
 
 func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-	format, err := cliout.ParseFormat(workspaceLifecycleOutput)
-	if err != nil {
-		return err
-	}
 	id := ""
 
 	if len(args) == 1 {
 		id = args[0]
 	}
 	cmd.SilenceUsage = true
-	removal, err := workspace.Delete(id, workspaceDeleteYes, cliout.NotesTo(cmd, format, out), astroV1Client)
+	removal, err := workspace.Delete(id, workspaceDeleteYes, cliout.NotesTo(cmd, workspaceLifecycleOutput, out), astroV1Client)
 	if err != nil || removal == nil {
 		// nil, nil is a declined question, which has said so.
 		return err
 	}
-	return emitWorkspaceRemoval(cliout.Renderer{Format: format, Out: out}, removal)
+	return emitWorkspaceRemoval(cliout.Renderer{Format: workspaceLifecycleOutput, Out: out}, removal)
 }
 
 func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceUserOutput)
-	if err != nil {
-		return err
-	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -847,24 +805,15 @@ func addWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &u, fmt.Sprintf("The user %s was successfully added to the workspace with the role %s", u.Email, u.WorkspaceRole))
+	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("The user %s was successfully added to the workspace with the role %s", u.Email, u.WorkspaceRole))
 }
 
 func listWorkspaceUser(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceUserOutput)
-	if err != nil {
-		return err
-	}
-
 	cmd.SilenceUsage = true
-	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: format, Out: out})
+	return user.ListWorkspaceUsersWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: workspaceUserOutput, Out: out})
 }
 
 func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceUserOutput)
-	if err != nil {
-		return err
-	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -892,14 +841,10 @@ func updateWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &u, fmt.Sprintf("The workspace user %s role was successfully updated to %s", u.Email, u.WorkspaceRole))
+	return renderLines(workspaceUserOutput, out, &u, fmt.Sprintf("The workspace user %s role was successfully updated to %s", u.Email, u.WorkspaceRole))
 }
 
 func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(workspaceUserOutput)
-	if err != nil {
-		return err
-	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -918,7 +863,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &r, fmt.Sprintf("The user %s was successfully removed from the workspace", r.Email))
+	return renderLines(workspaceUserOutput, out, &r, fmt.Sprintf("The user %s was successfully removed from the workspace", r.Email))
 }
 
 func coalesceWorkspace() (string, error) {

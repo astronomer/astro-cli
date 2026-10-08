@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	sa "github.com/astronomer/astro-cli/internal/platform/apc/service_account"
 )
@@ -99,10 +100,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentSACreateRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
@@ -116,10 +114,7 @@ func deploymentSaCreate(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentSaList(cmd *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	sas, err := sa.GetDeploymentServiceAccounts(deploymentID, houstonClient)
@@ -130,10 +125,7 @@ func deploymentSaList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentSaDelete(cmd *cobra.Command, args []string, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	deleted, err := sa.DeleteUsingDeploymentUUID(args[0], deploymentID, houstonClient)

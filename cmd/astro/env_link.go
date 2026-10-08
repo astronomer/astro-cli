@@ -36,7 +36,7 @@ type linkFlags struct {
 	objectID, objectKey string
 	deploymentID        string
 	exclude, noCreate   bool
-	output              string
+	output              cliout.Format
 	value               string
 	conn                struct {
 		connType, host, login, password, schema, extra string
@@ -275,10 +275,7 @@ func runEnvLinkSet(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags)
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
@@ -312,10 +309,7 @@ func runEnvLinkDelete(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFla
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
@@ -341,10 +335,6 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	format, err := cliout.ParseFormat(f.output)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := f.idOrKey(n)
@@ -355,7 +345,7 @@ func runEnvLinkList(cmd *cobra.Command, out io.Writer, n *linkNoun, f *linkFlags
 	if err != nil {
 		return err
 	}
-	return env.WriteLinks(report, cliout.Renderer{Format: format, Out: out})
+	return env.WriteLinks(report, cliout.Renderer{Format: f.output, Out: out})
 }
 
 // article prefixes a noun with "a" or "an".

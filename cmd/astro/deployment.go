@@ -92,9 +92,9 @@ var (
 	allowedIPAddressRanges     *[]string
 	taskLogBucket              *string
 	taskLogURLPattern          *string
-	deploymentListOutput       string
-	deploymentUserOutput       string
-	deploymentTeamOutput       string
+	deploymentListOutput       cliout.Format
+	deploymentUserOutput       cliout.Format
+	deploymentTeamOutput       cliout.Format
 
 	deploymentType                = standard
 	deploymentVariableListExample = `  # List a Deployment's variables
@@ -224,22 +224,13 @@ func listDeploymentTeam(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	format, err := cliout.ParseFormat(deploymentTeamOutput)
-	if err != nil {
-		return err
-	}
-
 	cmd.SilenceUsage = true
-	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: format, Out: out})
+	return team.ListDeploymentTeamsWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentTeamOutput, Out: out})
 }
 
 func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	format, err := cliout.ParseFormat(deploymentTeamOutput)
-	if err != nil {
-		return err
 	}
 	var id string
 
@@ -257,7 +248,7 @@ func removeDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &r, fmt.Sprintf("Astro Team %s was successfully removed from deployment %s", r.Name, r.DeploymentID))
+	return renderLines(deploymentTeamOutput, out, &r, fmt.Sprintf("Astro Team %s was successfully removed from deployment %s", r.Name, r.DeploymentID))
 }
 
 func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command {
@@ -285,10 +276,6 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := cliout.ParseFormat(deploymentTeamOutput)
-	if err != nil {
-		return err
-	}
 	var id string
 
 	if len(args) > 0 {
@@ -304,7 +291,7 @@ func addDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &t, fmt.Sprintf("The team %s was successfully added to the deployment with the role %s", t.ID, t.DeploymentRole))
+	return renderLines(deploymentTeamOutput, out, &t, fmt.Sprintf("The team %s was successfully added to the deployment with the role %s", t.ID, t.DeploymentRole))
 }
 
 func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -327,10 +314,6 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	format, err := cliout.ParseFormat(deploymentTeamOutput)
-	if err != nil {
-		return err
 	}
 	var id string
 
@@ -357,7 +340,7 @@ func updateDeploymentTeam(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &t, fmt.Sprintf("The deployment team %s role was successfully updated to %s", t.ID, t.DeploymentRole))
+	return renderLines(deploymentTeamOutput, out, &t, fmt.Sprintf("The deployment team %s role was successfully updated to %s", t.ID, t.DeploymentRole))
 }
 
 func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
@@ -781,12 +764,6 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
-	// Reject a bad -o before anything that needs a login.
-	format, err := cliout.ParseFormat(deploymentListOutput)
-	if err != nil {
-		return err
-	}
-
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid workspace")
@@ -800,18 +777,13 @@ func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: format, Out: out})
+	return deployment.ListWithFormat(ws, allDeployments, astroV1Client, cliout.Renderer{Format: deploymentListOutput, Out: out})
 }
 
 func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deploymentLogsOutput)
-	if err != nil {
-		return err
-	}
 	// The Deployment lookup prints its notes to bare stdout; under json they
 	// are notes, not log records.
-	defer strayStdoutToStderr(format)()
+	defer strayStdoutToStderr(deploymentLogsOutput)()
 
 	// Get release name from args, if passed
 	if len(args) > 0 {
@@ -828,15 +800,11 @@ func deploymentLogs(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitLogs(cmd, cliout.Renderer{Format: format, Out: out}, res)
+	return emitLogs(cmd, cliout.Renderer{Format: deploymentLogsOutput, Out: out}, res)
 }
 
 func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //nolint:gocognit,gocyclo // v1 complexity, refactor tracked separately
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deploymentOutput)
-	if err != nil {
-		return err
-	}
+	format := deploymentOutput
 	// The create prints its progress (the Workspace, a picker, the wait) to
 	// bare stdout; under json that is a note, not the result.
 	defer strayStdoutToStderr(format)()
@@ -964,14 +932,9 @@ func deploymentCreate(cmd *cobra.Command, _ []string, out io.Writer) error { //n
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deploymentOutput)
-	if err != nil {
-		return err
-	}
 	// The update prints its warnings and notes to bare stdout; under json
 	// they are notes, not the result.
-	defer strayStdoutToStderr(format)()
+	defer strayStdoutToStderr(deploymentOutput)()
 	if err := normalizeSchedulerSizeFlag(); err != nil {
 		return err
 	}
@@ -1023,7 +986,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return emitUpdated(cliout.Renderer{Format: format, Out: out}, &res)
+	return emitUpdated(cliout.Renderer{Format: deploymentOutput, Out: out}, &res)
 }
 
 // normalizeSchedulerSizeFlag refuses a --scheduler-size that is not a size,
@@ -1043,12 +1006,7 @@ func normalizeSchedulerSizeFlag() error {
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deploymentOutput)
-	if err != nil {
-		return err
-	}
-	defer strayStdoutToStderr(format)()
+	defer strayStdoutToStderr(deploymentOutput)()
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return errors.Wrap(err, "failed to find a valid Workspace")
@@ -1067,15 +1025,11 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 		// nil, nil is a declined question, which has said so.
 		return err
 	}
-	return emitRemoval(cliout.Renderer{Format: format, Out: out}, removal)
+	return emitRemoval(cliout.Renderer{Format: deploymentOutput, Out: out}, removal)
 }
 
 func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(deploymentVariableOutput)
-	if err != nil {
-		return err
-	}
-	defer strayStdoutToStderr(format)()
+	defer strayStdoutToStderr(deploymentVariableOutput)()
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -1089,7 +1043,7 @@ func deploymentVariableList(cmd *cobra.Command, _ []string, out io.Writer) error
 	if err != nil {
 		return err
 	}
-	return emitVariableList(cmd, cliout.Renderer{Format: format, Out: out}, vars)
+	return emitVariableList(cmd, cliout.Renderer{Format: deploymentVariableOutput, Out: out}, vars)
 }
 
 func deploymentVariableCreate(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -1104,11 +1058,7 @@ func deploymentVariableUpdate(cmd *cobra.Command, args []string, out io.Writer) 
 // an existing key takes the new value, and in the capital of their workspace
 // error, which is kept as it was.
 func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, update bool, wsErr string) error {
-	format, err := cliout.ParseFormat(deploymentVariableOutput)
-	if err != nil {
-		return err
-	}
-	defer strayStdoutToStderr(format)()
+	defer strayStdoutToStderr(deploymentVariableOutput)()
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -1123,15 +1073,11 @@ func deploymentVariableModify(cmd *cobra.Command, args []string, out io.Writer, 
 	if err != nil {
 		return err
 	}
-	return emitVariableModify(cliout.Renderer{Format: format, Out: out}, res)
+	return emitVariableModify(cliout.Renderer{Format: deploymentVariableOutput, Out: out}, res)
 }
 
 func deploymentOverrideHibernation(cmd *cobra.Command, args []string, out io.Writer, isHibernating bool) error {
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deploymentOutput)
-	if err != nil {
-		return err
-	}
+	format := deploymentOutput
 	// The --wait prints its progress to bare stdout; under json that is a
 	// note, not the result.
 	defer strayStdoutToStderr(format)()
@@ -1195,10 +1141,6 @@ func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := cliout.ParseFormat(deploymentUserOutput)
-	if err != nil {
-		return err
-	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -1217,7 +1159,7 @@ func addDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &u, fmt.Sprintf("The user %s was successfully added to the deployment with the role %s", u.Email, u.DeploymentRole))
+	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The user %s was successfully added to the deployment with the role %s", u.Email, u.DeploymentRole))
 }
 
 func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
@@ -1225,22 +1167,13 @@ func listDeploymentUser(cmd *cobra.Command, out io.Writer) error {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
 
-	format, err := cliout.ParseFormat(deploymentUserOutput)
-	if err != nil {
-		return err
-	}
-
 	cmd.SilenceUsage = true
-	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: format, Out: out})
+	return user.ListDeploymentUsersWithFormat(astroV1Client, deploymentID, cliout.Renderer{Format: deploymentUserOutput, Out: out})
 }
 
 func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	format, err := cliout.ParseFormat(deploymentUserOutput)
-	if err != nil {
-		return err
 	}
 	var email string
 
@@ -1269,16 +1202,12 @@ func updateDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &u, fmt.Sprintf("The deployment user %s role was successfully updated to %s", u.Email, u.DeploymentRole))
+	return renderLines(deploymentUserOutput, out, &u, fmt.Sprintf("The deployment user %s role was successfully updated to %s", u.Email, u.DeploymentRole))
 }
 
 func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
-	}
-	format, err := cliout.ParseFormat(deploymentUserOutput)
-	if err != nil {
-		return err
 	}
 	var email string
 
@@ -1298,7 +1227,7 @@ func removeDeploymentUser(cmd *cobra.Command, args []string, out io.Writer) erro
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &r, fmt.Sprintf("The user %s was successfully removed from the deployment", r.Email))
+	return renderLines(deploymentUserOutput, out, &r, fmt.Sprintf("The user %s was successfully removed from the deployment", r.Email))
 }
 
 func newDeploymentTokenRootCmd(out io.Writer) *cobra.Command {
@@ -1609,8 +1538,7 @@ func removeOrgTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it
@@ -1620,15 +1548,14 @@ func removeOrgTokenFromDeploymentRole(cmd *cobra.Command, args []string, out io.
 	}
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenRemove(format, out, tokenKindOrganization)
+	return runDeploymentTokenRemove(deploymentTokenOutput, out, tokenKindOrganization)
 }
 
 func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it
@@ -1638,7 +1565,7 @@ func removeWorkspaceTokenDeploymentRole(cmd *cobra.Command, args []string, out i
 	}
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenRemove(format, out, tokenKindWorkspace)
+	return runDeploymentTokenRemove(deploymentTokenOutput, out, tokenKindWorkspace)
 }
 
 func newListOrganizationTokensInDeployment(out io.Writer) *cobra.Command {
@@ -1673,48 +1600,44 @@ func listOrganizationTokensInDeployment(cmd *cobra.Command, out io.Writer) error
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenList(format, out, deployment.DeploymentTokenTypeORGANIZATION)
+	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeORGANIZATION)
 }
 
 func listWorkspaceTokensInDeployment(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenList(format, out, deployment.DeploymentTokenTypeWORKSPACE)
+	return runDeploymentTokenList(deploymentTokenOutput, out, deployment.DeploymentTokenTypeWORKSPACE)
 }
 
 func listDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	cmd.SilenceUsage = true
-	return runDeploymentTokenList(format, out)
+	return runDeploymentTokenList(deploymentTokenOutput, out)
 }
 
 func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	if tokenName == "" {
@@ -1736,15 +1659,14 @@ func createDeploymentToken(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenCreate(format, out)
+	return runDeploymentTokenCreate(deploymentTokenOutput, out)
 }
 
 func updateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it
@@ -1754,15 +1676,14 @@ func updateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 	}
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenUpdate(format, out)
+	return runDeploymentTokenUpdate(deploymentTokenOutput, out)
 }
 
 func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it
@@ -1771,15 +1692,14 @@ func rotateDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 		tokenID = strings.ToLower(args[0])
 	}
 	cmd.SilenceUsage = true
-	return runDeploymentTokenRotate(format, out)
+	return runDeploymentTokenRotate(deploymentTokenOutput, out)
 }
 
 func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) error {
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it
@@ -1789,7 +1709,7 @@ func deleteDeploymentToken(cmd *cobra.Command, args []string, out io.Writer) err
 	}
 
 	cmd.SilenceUsage = true
-	return runDeploymentTokenDelete(format, out)
+	return runDeploymentTokenDelete(deploymentTokenOutput, out)
 }
 
 func getOverrideUntil(until, forDuration string) (*time.Time, error) {

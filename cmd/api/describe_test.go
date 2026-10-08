@@ -658,7 +658,7 @@ func TestRunDescribe_ExpandsRefSchemas(t *testing.T) {
 
 	var buf bytes.Buffer
 	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "CreateDeployment"}
+	opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "CreateDeployment"}
 
 	require.NoError(t, runDescribe(opts))
 	out := buf.String()
@@ -761,7 +761,7 @@ func TestRunDescribe(t *testing.T) {
 	t.Run("find by operation ID", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "get_dags"}
+		opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "get_dags"}
 
 		err := runDescribe(opts)
 		require.NoError(t, err)
@@ -771,7 +771,7 @@ func TestRunDescribe(t *testing.T) {
 	t.Run("find by path", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags"}
+		opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "/dags"}
 
 		err := runDescribe(opts)
 		require.NoError(t, err)
@@ -782,7 +782,7 @@ func TestRunDescribe(t *testing.T) {
 	t.Run("find by path without leading slash", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "health"}
+		opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "health"}
 
 		err := runDescribe(opts)
 		require.NoError(t, err)
@@ -792,7 +792,7 @@ func TestRunDescribe(t *testing.T) {
 	t.Run("filter by method", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags", Method: "POST"}
+		opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "/dags", Method: "POST"}
 
 		err := runDescribe(opts)
 		require.NoError(t, err)
@@ -803,7 +803,7 @@ func TestRunDescribe(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "nonexistent"}
+		opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "nonexistent"}
 
 		err := runDescribe(opts)
 		require.Error(t, err)
@@ -813,7 +813,7 @@ func TestRunDescribe(t *testing.T) {
 	t.Run("method filter no match", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags", Method: "DELETE"}
+		opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "/dags", Method: "DELETE"}
 
 		err := runDescribe(opts)
 		require.Error(t, err)
@@ -833,7 +833,7 @@ func TestRunDescribe_EmptySpec(t *testing.T) {
 
 	var buf bytes.Buffer
 	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-	opts := &DescribeOptions{Out: &buf, specCache: cache, Endpoint: "/dags"}
+	opts := &DescribeOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Endpoint: "/dags"}
 
 	err := runDescribe(opts)
 	require.Error(t, err)

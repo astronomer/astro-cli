@@ -70,7 +70,7 @@ func envScope() (env.Scope, error) {
 var (
 	envWorkspaceID    string
 	envDeploymentID   string
-	envOutput         string
+	envOutput         cliout.Format
 	envIncludeSecrets bool
 	envResolveLinked  bool
 	envYes            bool
@@ -172,17 +172,13 @@ func runEnvList(cmd *cobra.Command, out io.Writer) error {
 	}
 	// -o dotenv never gets here: the flag refuses it while parsing, with
 	// env.ErrInventoryHasNoValues (newEnvListCmd).
-	f, err := cliout.ParseFormat(envOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 
 	items, err := env.ListInventory(scope, envResolveLinked, astroV1Client)
 	if err != nil {
 		return err
 	}
-	return env.WriteInventory(items, cliout.Renderer{Format: f, Out: out})
+	return env.WriteInventory(items, cliout.Renderer{Format: envOutput, Out: out})
 }
 
 func newEnvRootCmd(out io.Writer) *cobra.Command {

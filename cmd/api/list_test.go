@@ -44,7 +44,7 @@ func TestRunList(t *testing.T) {
 	t.Run("lists all endpoints", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &ListOptions{Out: &buf, specCache: cache}
+		opts := &ListOptions{Out: &buf, Format: cliout.FormatText, specCache: cache}
 
 		err := runList(opts)
 		require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestRunList(t *testing.T) {
 	t.Run("filters endpoints", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &ListOptions{Out: &buf, specCache: cache, Filter: "dags"}
+		opts := &ListOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Filter: "dags"}
 
 		err := runList(opts)
 		require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestRunList(t *testing.T) {
 	t.Run("filter no matches", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &ListOptions{Out: &buf, specCache: cache, Filter: "nonexistent"}
+		opts := &ListOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Filter: "nonexistent"}
 
 		err := runList(opts)
 		require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestRunList(t *testing.T) {
 	t.Run("verbose mode", func(t *testing.T) {
 		var buf bytes.Buffer
 		cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-		opts := &ListOptions{Out: &buf, specCache: cache, Verbose: true}
+		opts := &ListOptions{Out: &buf, Format: cliout.FormatText, specCache: cache, Verbose: true}
 
 		err := runList(opts)
 		require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestRunList_EmptySpec(t *testing.T) {
 
 	var buf bytes.Buffer
 	cache := openapi.NewCacheWithOptions(ts.URL, t.TempDir()+"/cache.json")
-	opts := &ListOptions{Out: &buf, specCache: cache}
+	opts := &ListOptions{Out: &buf, Format: cliout.FormatText, specCache: cache}
 
 	err := runList(opts)
 	require.Error(t, err)

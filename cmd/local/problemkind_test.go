@@ -147,7 +147,7 @@ func TestAnUnclassifiedFailurePublishesNoKind(t *testing.T) {
 // every command's failure is reported — through cliout.Execute, with this
 // package's table — so the object asserted on is the one a user would see.
 func emitJSONError(w io.Writer, err error) {
-	var output string
+	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:  "fail",
 		RunE: func(*cobra.Command, []string) error { return err },

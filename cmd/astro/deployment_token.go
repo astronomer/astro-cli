@@ -21,18 +21,13 @@ import (
 
 // deploymentTokenOutput is the --output of the whole `deployment token`
 // family, registered once on its group.
-var deploymentTokenOutput string
+var deploymentTokenOutput cliout.Format
 
 // deploymentTokenUpdateRole is `deployment token update --role`. It is its own
 // variable, not the tokenRole the other token commands share: each of them
 // re-registers that one with its own default, so a default given here would
 // be overwritten by whichever registered last. "" leaves the role alone.
 var deploymentTokenUpdateRole string
-
-// tokenFormat parses the deployment token family's --output.
-func tokenFormat() (cliout.Format, error) {
-	return tokenFormatOf(deploymentTokenOutput)
-}
 
 // tokenPicker picks among the Deployment's tokens, a choice the token ID or
 // --name answers.
@@ -139,8 +134,7 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 	if deploymentID == "" {
 		return errRequiredFlag("deployment", "astro deployment list")
 	}
-	format, err := tokenFormat()
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(deploymentTokenOutput); err != nil {
 		return err
 	}
 	// if an id was provided in the args we use it, lowercased
@@ -163,7 +157,7 @@ func setTokenDeploymentRole(cmd *cobra.Command, args []string, out io.Writer, ki
 		tokenRole = answer
 	}
 	cmd.SilenceUsage = true
-	return runDeploymentTokenUpsert(format, out, kind, operation)
+	return runDeploymentTokenUpsert(deploymentTokenOutput, out, kind, operation)
 }
 
 // runDeploymentTokenUpsert adds or updates the Deployment role of a Workspace

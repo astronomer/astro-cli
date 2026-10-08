@@ -56,19 +56,15 @@ const withWorkspaceHelp = "With Airflow stopped, fetch the values declared sourc
 // stored in a package variable.
 type cli struct {
 	d      Deps
-	output string
+	output cliout.Format
 	// outage watches the astro link this run opened, if it opened one.
 	outage *outageWatch
 	// opened is the Airflow this run opened a client on.
 	opened instances.Instance
 }
 
-func (c *cli) renderer() (cliout.Renderer, error) {
-	f, err := cliout.ParseFormat(c.output)
-	if err != nil {
-		return cliout.Renderer{}, err
-	}
-	return cliout.Renderer{Format: f, Out: c.d.Stdout, Style: c.d.JSONStyle}, nil
+func (c *cli) renderer() cliout.Renderer {
+	return cliout.Renderer{Format: c.output, Out: c.d.Stdout, Style: c.d.JSONStyle}
 }
 
 // projectPath discovers the project that contains the working directory,
@@ -216,10 +212,7 @@ func newStartCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag []string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return err
@@ -544,10 +537,7 @@ func newStopCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runStop(ctx context.Context, opts localrt.StopOptions) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	af, err := c.attach()
 	if errors.Is(err, localrt.ErrNotRunning) {
 		if opts.Clean {
@@ -594,10 +584,7 @@ func newRestartCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSecretFlag []string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return err
@@ -693,10 +680,7 @@ func newStatusCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runStatus() error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	st, err := c.readStatus()
 	if err != nil {
 		return err
@@ -772,10 +756,7 @@ func newListCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runList(all, clean bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	if clean {
 		return c.runListClean(r)
 	}
@@ -942,10 +923,7 @@ func newLogsCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runLogs(ctx context.Context, follow bool, tail int, components []string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	af, err := c.logSource()
 	if err != nil {
 		return err
@@ -1038,10 +1016,7 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 		}
 	}
 	if withWorkspace && len(workspace) > 0 {
-		r, err := c.renderer()
-		if err != nil {
-			return nil, err
-		}
+		r := c.renderer()
 		return nil, c.reportBuildError(r, &plan.MissingEnvError{
 			Project: built.Project.Dir,
 			Missing: workspace,
@@ -1157,10 +1132,7 @@ type urlResult struct {
 }
 
 func (c *cli) runOpen(printURL bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	st, err := c.readStatus()
 	if err != nil {
 		return err
@@ -1202,10 +1174,7 @@ func newResetCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runReset(ctx context.Context, yes bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	if err := c.confirmUnless(yes, "Wipe this project's local Airflow state?"); err != nil {
 		return err
 	}

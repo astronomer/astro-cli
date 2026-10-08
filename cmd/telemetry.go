@@ -16,7 +16,7 @@ import (
 
 // telemetryOutput is the -o of `astro telemetry` and its two subcommands,
 // registered once on the group.
-var telemetryOutput string
+var telemetryOutput cliout.Format
 
 // telemetryState is what `astro telemetry`, `enable` and `disable` publish:
 // whether this CLI sends telemetry now, after the command ran.
@@ -89,16 +89,12 @@ func newTelemetryDisableCmd(out io.Writer) *cobra.Command {
 // runTelemetry runs one of the telemetry commands, which returns the line text
 // prints, and publishes the state it left.
 func runTelemetry(out io.Writer, run func() (string, error)) error {
-	format, err := cliout.ParseFormat(telemetryOutput)
-	if err != nil {
-		return err
-	}
 	line, err := run()
 	if err != nil {
 		return err
 	}
 	state := currentTelemetryState()
-	return cliout.Renderer{Format: format, Out: out}.Emit(&state, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: telemetryOutput, Out: out}.Emit(&state, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintln(b, line)
 	}))
 }

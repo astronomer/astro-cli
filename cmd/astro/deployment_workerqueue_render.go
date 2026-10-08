@@ -17,9 +17,9 @@ import (
 var (
 	// deploymentWorkerQueueOutput is --output for the worker-queue family,
 	// registered once on its root.
-	deploymentWorkerQueueOutput string
+	deploymentWorkerQueueOutput cliout.Format
 	// deploymentLogsOutput is `deployment logs`'s --output.
-	deploymentLogsOutput string
+	deploymentLogsOutput cliout.Format
 )
 
 // emitWorkerQueue publishes a queue change: in text, the line it always

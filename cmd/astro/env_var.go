@@ -177,10 +177,7 @@ func runEnvVarList(cmd *cobra.Command, out io.Writer, export bool) error {
 	if err != nil {
 		return err
 	}
-	f, err := cliout.ParseFormat(envOutput, formatDotenv)
-	if err != nil {
-		return err
-	}
+	f := envOutput
 	if export && f == cliout.FormatText {
 		f = formatDotenv
 	}
@@ -204,20 +201,16 @@ func runEnvVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	f, err := cliout.ParseFormat(envOutput, formatDotenv)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 
 	obj, err := env.GetVar(idOrKey, scope, envIncludeSecrets, astroV1Client)
 	if err != nil {
 		return err
 	}
-	if f == formatDotenv && obj != nil {
+	if envOutput == formatDotenv && obj != nil {
 		return env.WriteVarDotenv([]astrov1.EnvironmentObject{*obj}, envIncludeSecrets, out)
 	}
-	return env.WriteVar(obj, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
+	return env.WriteVar(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
 }
 
 func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
@@ -225,10 +218,7 @@ func runEnvVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateVar, env.UpdateVar, env.GetVar})
 }
@@ -238,10 +228,7 @@ func runEnvVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))

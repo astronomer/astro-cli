@@ -16,7 +16,7 @@ var (
 	ideProjectID     string
 	ideSessionID     string
 	ideImportYes     bool
-	ideProjectOutput string
+	ideProjectOutput cliout.Format
 )
 
 func newIDECommand(out io.Writer) *cobra.Command {
@@ -108,23 +108,15 @@ func newIDEExportProjectCmd(out io.Writer) *cobra.Command {
 }
 
 func listIDEProjects(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(ideProjectOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	list, err := ide.List(astroV1Alpha1Client)
 	if err != nil {
 		return err
 	}
-	return emitIDEProjects(cliout.Renderer{Format: format, Out: out}, list)
+	return emitIDEProjects(cliout.Renderer{Format: ideProjectOutput, Out: out}, list)
 }
 
 func importIDEProject(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(ideProjectOutput)
-	if err != nil {
-		return err
-	}
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err
@@ -136,18 +128,15 @@ func importIDEProject(cmd *cobra.Command, out io.Writer) error {
 	}
 
 	cmd.SilenceUsage = true
-	res, err := ide.ImportProject(cmd.Context(), astroV1Alpha1Client, astroIDEExporter, ideProjectID, ideSessionID, orgID, wsID, ideImportYes, cliout.NotesTo(cmd, format, out))
+	res, err := ide.ImportProject(cmd.Context(), astroV1Alpha1Client, astroIDEExporter, ideProjectID, ideSessionID, orgID, wsID, ideImportYes, cliout.NotesTo(cmd, ideProjectOutput, out))
 	if err != nil {
 		return err
 	}
-	return emitIDEImport(cliout.Renderer{Format: format, Out: out}, res)
+	return emitIDEImport(cliout.Renderer{Format: ideProjectOutput, Out: out}, res)
 }
 
 func exportProject(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(ideProjectOutput)
-	if err != nil {
-		return err
-	}
+	format := ideProjectOutput
 	ctx, err := context.GetCurrentContext()
 	if err != nil {
 		return err

@@ -23,7 +23,7 @@ type groupRun struct {
 // its parent's help. withRunE gives the group GroupHelp as its RunE; without
 // it the group is not runnable, as most groups are built.
 func newGroupTree(withRunE bool) *cobra.Command {
-	var output string
+	var output Format
 	root := &cobra.Command{Use: "astro"}
 	group := &cobra.Command{Use: "thing", Short: "Manage things"}
 	if withRunE {
@@ -151,7 +151,7 @@ func TestUnknownSubcommandSuggestsAsCobraDoes(t *testing.T) {
 // message in an empty list.
 func TestABareGroupWithNothingVisibleSaysSo(t *testing.T) {
 	root := &cobra.Command{Use: "astro"}
-	var output string
+	var output Format
 	group := &cobra.Command{Use: "thing"}
 	AddOutputFlag(group, &output)
 	group.AddCommand(&cobra.Command{Use: "secret", Hidden: true, RunE: func(*cobra.Command, []string) error { return nil }})

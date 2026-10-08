@@ -71,10 +71,7 @@ type useResult struct {
 }
 
 func (c *cli) runUse(name string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	dir, set, err := c.deploymentSet()
 	if err != nil {
 		return err
@@ -107,10 +104,7 @@ func (c *cli) warnEnvOverridesPin(pin string) {
 }
 
 func (c *cli) runUseUnset() error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	dir, err := c.projectPath()
 	if err != nil {
 		return err
@@ -217,10 +211,7 @@ var layerFrom = map[instances.Layer]string{
 const noLinks = "This project links no Deployments yet: link one with astro link add"
 
 func (c *cli) runUseShow() error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	set, req, err := c.standing()
 	if err != nil {
 		return err

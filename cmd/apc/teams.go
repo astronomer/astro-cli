@@ -40,10 +40,7 @@ func newTeamGetCmd(out io.Writer) *cobra.Command {
   astro team get <TEAM_ID> --all`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r, err := accessRenderer(out)
-			if err != nil {
-				return err
-			}
+			r := cliout.Renderer{Format: accessOutput, Out: out}
 			cmd.SilenceUsage = true
 			d, err := teams.Get(args[0], usersEnabled || all, houstonClient)
 			if err != nil {
@@ -93,10 +90,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
   astro team update <TEAM_ID> --role SYSTEM_EDITOR`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r, err := accessRenderer(out)
-			if err != nil {
-				return err
-			}
+			r := cliout.Renderer{Format: accessOutput, Out: out}
 			cmd.SilenceUsage = true
 			change, err := teams.Update(args[0], teamRole, houstonClient)
 			if err != nil {
@@ -112,10 +106,7 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func listTeam(cmd *cobra.Command, out io.Writer, paginated bool, pageSize int) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)
 	}

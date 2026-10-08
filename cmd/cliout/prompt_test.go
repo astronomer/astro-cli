@@ -18,7 +18,7 @@ import (
 // confirmation a flag can skip, and a free-text answer. Each records what it
 // was told, so a test can see a prompt that was answered.
 func promptTree(answered *string) *cobra.Command {
-	var output string
+	var output Format
 	var force bool
 	root := &cobra.Command{Use: "astro"}
 	AddOutputFlag(root, &output)

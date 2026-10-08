@@ -169,10 +169,7 @@ func runEnvVarLinkSet(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
@@ -206,10 +203,7 @@ func runEnvVarLinkDelete(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
@@ -235,10 +229,6 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := cliout.ParseFormat(envOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 
 	idOrKey, err := linkVariableIDOrKey()
@@ -249,5 +239,5 @@ func runEnvVarLinkList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return env.WriteVarLinks(report, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
+	return env.WriteVarLinks(report, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
 }

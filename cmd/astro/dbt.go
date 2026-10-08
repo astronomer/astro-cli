@@ -70,16 +70,12 @@ func newDbtCleanupCmd() *cobra.Command {
 }
 
 func cleanupDbt(cmd *cobra.Command, args []string) error {
-	format, err := cliout.ParseFormat(dbtOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	report, err := cosmosboost.Cleanup(args...)
 	if err != nil {
 		return err
 	}
-	return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(newDbtCleanupJSON(&report), cliout.Text(renderDbtCleanup))
+	return cliout.Renderer{Format: dbtOutput, Out: cmd.OutOrStdout()}.Emit(newDbtCleanupJSON(&report), cliout.Text(renderDbtCleanup))
 }
 
 //nolint:dupl // the duplication is acceptable here
@@ -112,10 +108,7 @@ func newDbtDeployCmd() *cobra.Command {
 }
 
 func deployDbt(cmd *cobra.Command, args []string) error {
-	format, err := cliout.ParseFormat(dbtOutput)
-	if err != nil {
-		return err
-	}
+	format := dbtOutput
 	cmd.SilenceUsage = true
 	// The notes below, and the ones the platform code prints on the way, are
 	// the output text mode has always shown; under json they go to stderr.
@@ -229,10 +222,7 @@ func newDbtDeleteCmd() *cobra.Command {
 }
 
 func deleteDbt(cmd *cobra.Command, args []string) error {
-	format, err := cliout.ParseFormat(dbtOutput)
-	if err != nil {
-		return err
-	}
+	format := dbtOutput
 	cmd.SilenceUsage = true
 	defer strayStdoutToStderr(format)()
 

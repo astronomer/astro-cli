@@ -14,18 +14,14 @@ type versionOutput struct {
 }
 
 func newVersionCommand() *cobra.Command {
-	var output string
+	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "List running version of the Astro CLI",
 		Long:  `The astro semantic version.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
-			format, err := cliout.ParseFormat(output)
-			if err != nil {
-				return err
-			}
-			return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(
+			return cliout.Renderer{Format: output, Out: cmd.OutOrStdout()}.Emit(
 				versionOutput{Version: version.Current()},
 				version.PrintVersion,
 			)

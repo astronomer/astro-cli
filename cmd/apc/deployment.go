@@ -33,7 +33,7 @@ const (
 
 var (
 	skipPrompt                  bool
-	deploymentOutput            string
+	deploymentOutput            cliout.Format
 	allDeployments              bool
 	cancel                      bool
 	executor                    string
@@ -507,21 +507,8 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// deploymentRenderer parses -o, before anything else so a bad value is a
-// usage error, and returns the Renderer the command publishes through.
-func deploymentRenderer(out io.Writer) (cliout.Renderer, error) {
-	format, err := cliout.ParseFormat(deploymentOutput)
-	if err != nil {
-		return cliout.Renderer{}, err
-	}
-	return cliout.Renderer{Format: format, Out: out}, nil
-}
-
 func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -615,10 +602,7 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	// Deletions are always hard deletes now (PLX-575): all data associated with
@@ -644,10 +628,7 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 }
 
 func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -676,10 +657,7 @@ func deploymentAdopt(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -709,10 +687,7 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	ws, err := coalesceWorkspace()
 	if err != nil {
@@ -751,10 +726,7 @@ func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 }
 
 func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
 	argsMap := map[string]string{}
 	if deploymentUpdateDescription != "" {
@@ -822,13 +794,13 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 }
 
 func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	var change *deployment.VersionChange
+	var (
+		change *deployment.VersionChange
+		err    error
+	)
 	if cancel {
 		change, err = deployment.AirflowUpgradeCancel(deploymentID, houstonClient)
 	} else {
@@ -841,13 +813,13 @@ func deploymentAirflowUpgrade(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	var change *deployment.VersionChange
+	var (
+		change *deployment.VersionChange
+		err    error
+	)
 	if cancel {
 		change, err = deployment.RuntimeUpgradeCancel(deploymentID, houstonClient)
 	} else {
@@ -860,13 +832,13 @@ func deploymentRuntimeUpgrade(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentRuntimeMigrate(cmd *cobra.Command, out io.Writer) error {
-	r, err := deploymentRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	var change *deployment.VersionChange
+	var (
+		change *deployment.VersionChange
+		err    error
+	)
 	if cancel {
 		change, err = deployment.RuntimeMigrateCancel(deploymentID, houstonClient)
 	} else {

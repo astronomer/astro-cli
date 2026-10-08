@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	outputFormat, requestedField string
-	cleanOutput                  bool
-	showWorkloadIdentity         bool
+	outputFormat         cliout.Format
+	requestedField       string
+	cleanOutput          bool
+	showWorkloadIdentity bool
 )
 
 // formatYAML is the --output value inspect offers beyond text and json, kept
@@ -53,14 +54,6 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	cmd.SilenceUsage = true
 
-	format, err := cliout.ParseFormat(outputFormat, formatYAML)
-	if err != nil {
-		return err
-	}
-	if format == cliout.FormatText {
-		format = formatYAML
-	}
-
 	wsID, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -74,9 +67,13 @@ func deploymentInspect(cmd *cobra.Command, args []string, out io.Writer) error {
 	deployment.CleanOutput = cleanOutput
 
 	// json goes through the CLI's one encoder, so it is pretty on a terminal
-	// and compact when piped like every other result; yaml (and text, which
-	// is yaml) is the renderer's text. --key bypasses both and prints the bare
+	// and compact when piped like every other result; yaml is text here, the
+	// renderer's text being the YAML. --key bypasses both and prints the bare
 	// value to out, as it always has.
+	format := outputFormat
+	if format == formatYAML {
+		format = cliout.FormatText
+	}
 	r := cliout.Renderer{Format: format, Out: out}
 	return inspect.Print(wsID, deploymentName, deploymentID, astroV1Client, out, r, requestedField, showWorkloadIdentity)
 }

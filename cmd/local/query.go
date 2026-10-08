@@ -257,15 +257,12 @@ func attachTarget(q *query, cmd *cobra.Command) {
 	markSkipPreRun(cmd)
 }
 
-// open is the first line of every query leaf: validate the output format, find
-// the Airflow this command acts on, and open a client on it. The format is
-// checked first so a misspelled --output fails before anything reaches the
+// open is the first line of every query leaf: find the Airflow this command
+// acts on, open a client on it, and return the Renderer for -o. A misspelled
+// --output has already failed while flags parsed, before anything reaches the
 // network.
 func (q *query) open(ctx context.Context) (cliout.Renderer, *airflowapi.Client, error) {
-	r, err := q.renderer()
-	if err != nil {
-		return cliout.Renderer{}, nil, err
-	}
+	r := q.renderer()
 	client, err := q.t.open(ctx, q.cli)
 	if err != nil {
 		return cliout.Renderer{}, nil, err

@@ -118,7 +118,7 @@ func TestACloudCommandFailsAsOneJSONObject(t *testing.T) {
 			}
 			if !reachesJSONOutput(list) {
 				// APC's has none yet; give it one, since the point is the root.
-				var output string
+				var output cliout.Format
 				cliout.AddOutputFlag(list, &output)
 			}
 			list.Annotations = map[string]string{telemetry.SkipPreRunAnnotation: "true"}

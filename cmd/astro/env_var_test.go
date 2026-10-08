@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -52,7 +53,7 @@ func expectAbsent(mc *astrov1_mocks.ClientWithResponsesInterface, key string) {
 func resetEnvFlags() {
 	envWorkspaceID = ""
 	envDeploymentID = ""
-	envOutput = ""
+	envOutput = cliout.FormatText
 	envIncludeSecrets = false
 	envResolveLinked = false
 	envYes = false

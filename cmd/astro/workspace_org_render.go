@@ -22,9 +22,9 @@ import (
 // so they share it), of `organization switch`, and of the `organization role`
 // group.
 var (
-	workspaceLifecycleOutput string
-	organizationSwitchOutput string
-	organizationRoleOutput   string
+	workspaceLifecycleOutput cliout.Format
+	organizationSwitchOutput cliout.Format
+	organizationRoleOutput   cliout.Format
 )
 
 // emitWorkspace publishes the Workspace a create or an update left, as

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/user"
 )
 
@@ -37,10 +38,7 @@ func newUserCreateCmd(out io.Writer) *cobra.Command {
 		Long:    "Create a user in the APC platform, user will receive an invite at the email address provided",
 		Example: createUserExample,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			r, err := accessRenderer(out)
-			if err != nil {
-				return err
-			}
+			r := cliout.Renderer{Format: accessOutput, Out: out}
 			cmd.SilenceUsage = true
 			created, err := user.Create(userEmail, userPassword, houstonClient)
 			if err != nil {

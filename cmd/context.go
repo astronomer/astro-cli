@@ -56,23 +56,19 @@ func newContextCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Comman
 }
 
 func newContextListCmd(out io.Writer) *cobra.Command {
-	var output string
+	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all contexts",
 		Long:    "List all Astro and APC contexts or domains that you've authenticated to on this machine",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := cliout.ParseFormat(output)
-			if err != nil {
-				return err
-			}
 			cmd.SilenceUsage = true
 			list, err := context.List()
 			if err != nil {
 				return err
 			}
-			return emitContextList(cliout.Renderer{Format: format, Out: out}, &list)
+			return emitContextList(cliout.Renderer{Format: output, Out: out}, &list)
 		},
 		Example: `  # List the contexts saved on this machine
   astro context list`,
@@ -98,18 +94,14 @@ func emitContextList(r cliout.Renderer, list *context.InfoList) error {
 }
 
 func newContextSwitchCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {
-	var output string
+	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:     "switch [DOMAIN]",
 		Aliases: []string{"sw"},
 		Short:   "Switch to a different context",
 		Long:    "Switch to a different context. With no domain, pick one from the contexts saved on this machine. For Astro, the saved login for the domain is refreshed if it can be; the command never opens a browser.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := cliout.ParseFormat(output)
-			if err != nil {
-				return err
-			}
-			return switchContext(cmd, args, astroV1Client, cliout.Renderer{Format: format, Out: out})
+			return switchContext(cmd, args, astroV1Client, cliout.Renderer{Format: output, Out: out})
 		},
 		Args: cobra.MaximumNArgs(1),
 		Example: `  # Pick a context from the ones saved on this machine
@@ -245,24 +237,20 @@ func noteDomainOverride(errOut io.Writer, domain string) {
 }
 
 func newContextDeleteCmd() *cobra.Command {
-	var output string
+	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:     "delete <DOMAIN>",
 		Aliases: []string{"de"},
 		Short:   "Delete a context",
 		Long:    "Delete a locally stored context to Astro or APC",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := cliout.ParseFormat(output)
-			if err != nil {
-				return err
-			}
 			cmd.SilenceUsage = true
 			out := cmd.OutOrStdout()
-			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt, cliout.NotesTo(cmd, format, out))
+			removal, err := context.Delete(domainutil.ExpandShortName(args[0]), noPrompt, cliout.NotesTo(cmd, output, out))
 			if err != nil || removal == nil {
 				return err
 			}
-			return cliout.Renderer{Format: format, Out: out}.Emit(removal, cliout.Text(func(b *bufio.Writer) {
+			return cliout.Renderer{Format: output, Out: out}.Emit(removal, cliout.Text(func(b *bufio.Writer) {
 				fmt.Fprintf(b, "Successfully deleted context: %s\n", removal.Domain)
 			}))
 		},

@@ -111,10 +111,7 @@ func newWorkspaceTeamsListCmd(out io.Writer) *cobra.Command {
 }
 
 func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -134,10 +131,7 @@ func workspaceTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 }
 
 func workspaceTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -157,10 +151,7 @@ func workspaceTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error
 }
 
 func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -176,10 +167,7 @@ func workspaceTeamRm(cmd *cobra.Command, out io.Writer, args []string) error {
 }
 
 func workspaceTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)

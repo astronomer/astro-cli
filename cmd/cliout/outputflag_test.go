@@ -13,8 +13,8 @@ import (
 
 // outputTree is a root whose pre-run counts into preRuns, over a group that
 // registers --output for its family (with extras) and a leaf under it.
-func outputTree(preRuns, runs *int, extras ...Format) (root *cobra.Command, output *string) {
-	output = new(string)
+func outputTree(preRuns, runs *int, extras ...Format) (root *cobra.Command, output *Format) {
+	output = new(Format)
 	root = &cobra.Command{
 		Use:               "astro",
 		PersistentPreRunE: func(*cobra.Command, []string) error { *preRuns++; return nil },
@@ -58,10 +58,10 @@ func TestAnUnknownFormatIsRefusedBeforeAnyPreRun(t *testing.T) {
 func TestTheOutputFlagHonorsExtras(t *testing.T) {
 	var preRuns, runs int
 	root, output := outputTree(&preRuns, &runs, "yaml")
-	assert.Equal(t, "text", *output)
+	assert.Equal(t, FormatText, *output)
 	root.SetArgs([]string{"group", "leaf", "-o", "yaml"})
 	require.NoError(t, root.Execute())
-	assert.Equal(t, "yaml", *output)
+	assert.Equal(t, Format("yaml"), *output)
 	assert.Equal(t, 1, runs)
 
 	root, _ = outputTree(&preRuns, &runs, "yaml")

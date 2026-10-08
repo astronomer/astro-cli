@@ -71,7 +71,7 @@ var (
 
 // configOutput is the -o of `astro config get`, `set` and `list`, registered
 // once on the group as -g is.
-var configOutput string
+var configOutput cliout.Format
 
 // configSetting is one setting as `astro config get`, `set` and `list`
 // publish it: its key, its value, the scope the value was read from or
@@ -154,11 +154,7 @@ func newConfigListCmd(out io.Writer) *cobra.Command {
 		Long:  "List every CLI setting with its value and where the value comes from: project (a 1.x project's .astro/config.yaml), global, or default. With -g, list the global values only",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			format, err := cliout.ParseFormat(configOutput)
-			if err != nil {
-				return err
-			}
-			return configList(cliout.Renderer{Format: format, Out: out})
+			return configList(cliout.Renderer{Format: configOutput, Out: out})
 		},
 		Example: `  # List every setting, with where its value comes from
   astro config list
@@ -222,10 +218,6 @@ func isShellSafe(r rune) bool {
 // other; set says whether that scope sets the key. `config list` is where the
 // value in effect, and the scope it comes from, are published.
 func configGet(cmd *cobra.Command, args []string) error {
-	format, err := cliout.ParseFormat(configOutput)
-	if err != nil {
-		return err
-	}
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
@@ -239,16 +231,12 @@ func configGet(cmd *cobra.Command, args []string) error {
 	if globalFlag {
 		setting = configSetting{Key: cfg.Path, Value: cfg.GetHomeString(), Scope: globalScope, Set: cfg.HomeScope() == globalScope}
 	}
-	return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: configOutput, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintf(b, "%s: %s\n", setting.Key, setting.Value)
 	}))
 }
 
 func configSet(cmd *cobra.Command, args []string) error {
-	format, err := cliout.ParseFormat(configOutput)
-	if err != nil {
-		return err
-	}
 	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 
@@ -270,6 +258,7 @@ func configSet(cmd *cobra.Command, args []string) error {
 	}
 
 	setting := configSetting{Key: cfg.Path, Value: args[1], Scope: projectScope, Set: true}
+	var err error
 	if globalFlag {
 		setting.Scope = globalScope
 		err = cfg.SetHomeString(args[1])
@@ -280,7 +269,7 @@ func configSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
+	return cliout.Renderer{Format: configOutput, Out: cmd.OutOrStdout()}.Emit(&setting, cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintf(b, configSetSuccessMsg+"\n", setting.Key, setting.Value)
 	}))
 }

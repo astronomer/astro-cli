@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	sa "github.com/astronomer/astro-cli/internal/platform/apc/service_account"
 )
@@ -97,10 +98,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -119,10 +117,7 @@ func workspaceSaCreate(cmd *cobra.Command, out io.Writer) error {
 }
 
 func workspaceSaList(cmd *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err
@@ -138,10 +133,7 @@ func workspaceSaList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func workspaceSaDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return err

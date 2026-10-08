@@ -111,10 +111,7 @@ func newDeploymentTeamListCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	ts, err := deployment.ListTeamRoles(deploymentID, houstonClient)
@@ -132,10 +129,7 @@ func deploymentTeamsList(cmd *cobra.Command, out io.Writer, _ []string) error {
 }
 
 func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
@@ -150,10 +144,7 @@ func deploymentTeamAdd(cmd *cobra.Command, out io.Writer, _ []string) error {
 }
 
 func deploymentTeamRemove(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	if err := deployment.RemoveTeam(deploymentID, args[0], houstonClient); err != nil {
@@ -163,10 +154,7 @@ func deploymentTeamRemove(cmd *cobra.Command, out io.Writer, args []string) erro
 }
 
 func deploymentTeamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}

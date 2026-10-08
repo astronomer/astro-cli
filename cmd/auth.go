@@ -224,7 +224,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 	var (
 		tokenDomain string
 		forceRenew  bool
-		output      string
+		output      cliout.Format
 	)
 	cmd := &cobra.Command{
 		Use:   "token",
@@ -232,11 +232,7 @@ func newAuthTokenCommand(out io.Writer) *cobra.Command {
 		Long:  "Print the current authentication token to standard output. This is useful for using the token in scripts or CI/CD pipelines.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := cliout.ParseFormat(output)
-			if err != nil {
-				return err
-			}
-			return printAuthToken(cmd, tokenDomain, forceRenew, cliout.Renderer{Format: format, Out: out})
+			return printAuthToken(cmd, tokenDomain, forceRenew, cliout.Renderer{Format: output, Out: out})
 		},
 		Example: `  # Print the current context's token
   astro auth token

@@ -17,7 +17,7 @@ var (
 	bundleDescription  string
 	bundleDagBundleIDs []string
 	forceBundleDelete  bool
-	bundleListOutput   string
+	bundleListOutput   cliout.Format
 )
 
 func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
@@ -77,16 +77,12 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro deployment bundle list --deployment <id>
   astro deployment bundle list --deployment <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			format, err := cliout.ParseFormat(bundleListOutput)
-			if err != nil {
-				return err
-			}
 			ws, err := coalesceWorkspace()
 			if err != nil {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: format, Out: out}, astroV1Client, astroV1Alpha1Client)
+			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleListOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	cliout.AddOutputFlag(cmd, &bundleListOutput)

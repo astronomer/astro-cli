@@ -29,7 +29,7 @@ type run struct {
 // testTree is a root with one group and a leaf that fails with fail, and a
 // second leaf with no --output flag at all.
 func testTree(fail error) *cobra.Command {
-	var output string
+	var output Format
 	root := &cobra.Command{Use: "astro"}
 	group := &cobra.Command{Use: "thing"}
 	leaf := &cobra.Command{
@@ -116,7 +116,7 @@ func TestAddOutputFlagUsage(t *testing.T) {
 		{[]Format{"dotenv"}, "Output format: text, json or dotenv"},
 		{[]Format{"yaml", "toml"}, "Output format: text, json, yaml or toml"},
 	} {
-		var v string
+		var v Format
 		cmd := &cobra.Command{Use: "x"}
 		AddOutputFlag(cmd, &v, c.extras...)
 		f := cmd.PersistentFlags().Lookup("output")

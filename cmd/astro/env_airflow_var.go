@@ -137,10 +137,6 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	f, err := cliout.ParseFormat(envOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 
 	objs, err := env.ListAirflowVars(scope, envResolveLinked, envIncludeSecrets, astroV1Client)
@@ -150,15 +146,11 @@ func runEnvAirflowVarList(cmd *cobra.Command, out io.Writer) error {
 	if envIncludeSecrets {
 		fmt.Fprintln(os.Stderr, includeSecretsWarning)
 	}
-	return env.WriteAirflowVarList(objs, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
+	return env.WriteAirflowVarList(objs, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
 }
 
 func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) error {
 	scope, err := envScope()
-	if err != nil {
-		return err
-	}
-	f, err := cliout.ParseFormat(envOutput)
 	if err != nil {
 		return err
 	}
@@ -168,7 +160,7 @@ func runEnvAirflowVarGet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	return env.WriteAirflowVar(obj, envIncludeSecrets, cliout.Renderer{Format: f, Out: out})
+	return env.WriteAirflowVar(obj, envIncludeSecrets, cliout.Renderer{Format: envOutput, Out: out})
 }
 
 func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
@@ -176,10 +168,7 @@ func runEnvAirflowVarSetFromFile(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 	return runFromFileSet(cmd, r, scope, autoLinkPtr(cmd), envVarSecret, envVarNoCreate, envVarFromFile, fromFileFns{env.CreateAirflowVar, env.UpdateAirflowVar, env.GetAirflowVar})
 }
@@ -189,10 +178,7 @@ func runEnvAirflowVarSet(cmd *cobra.Command, out io.Writer, idOrKey string) erro
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 
 	value, err := readSetValue(cmd, "value", envVarValue, fmt.Sprintf("new value for %s", idOrKey))

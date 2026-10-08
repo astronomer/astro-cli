@@ -118,11 +118,7 @@ func newDeploymentWorkerQueueDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.Writer) error {
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deploymentWorkerQueueOutput)
-	if err != nil {
-		return err
-	}
+	format := deploymentWorkerQueueOutput
 	cmd.SilenceUsage = true
 	// The Deployment picker and the update the change is sent as print to
 	// bare stdout; under json that is a note, not the result.
@@ -150,11 +146,7 @@ func deploymentWorkerQueueCreateOrUpdate(cmd *cobra.Command, _ []string, out io.
 }
 
 func deploymentWorkerQueueDelete(cmd *cobra.Command, _ []string, out io.Writer) error {
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deploymentWorkerQueueOutput)
-	if err != nil {
-		return err
-	}
+	format := deploymentWorkerQueueOutput
 	cmd.SilenceUsage = true
 	defer strayStdoutToStderr(format)()
 

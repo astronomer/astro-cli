@@ -69,10 +69,7 @@ func newCheckCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runCheck(ctx context.Context, strict bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	project, err := c.projectPath()
 	if err != nil {
 		// Not in a project directory. No verdict was reached, so it takes the
@@ -126,10 +123,7 @@ func (c *cli) runCheck(ctx context.Context, strict bool) error {
 // report per target. It picks a single exit code: the worst across the targets
 // (operational error over findings over clean), so CI fails on any of them.
 func (c *cli) runTargetCheck(ctx context.Context, targets []string, strict bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	for _, t := range targets {
 		if !checks.KnownTarget(t) {
 			return blocked(r, fmt.Errorf("unknown target %q (supported: astro, mwaa, composer)", t))

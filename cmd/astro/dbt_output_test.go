@@ -310,7 +310,7 @@ func TestPublishThenWaitReportsBothFailures(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	root := &cobra.Command{Use: "astro"}
-	var format string
+	var format cliout.Format
 	cmd := &cobra.Command{Use: "x", RunE: func(cmd *cobra.Command, _ []string) error {
 		return publishThenWait(cmd, cliout.FormatJSON, true, dbtTestDeploymentID, time.Second, func(waitErr error) error {
 			assert.Same(t, timedOut, waitErr)

@@ -96,13 +96,9 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 					houstonClient: stubHoustonAt(t, "1.0.0"),
 					out:           out,
 				})
-				var output string
+				var output cliout.Format
 				probe := &cobra.Command{Use: "probe", RunE: func(cmd *cobra.Command, _ []string) error {
-					format, err := cliout.ParseFormat(output)
-					if err != nil {
-						return err
-					}
-					return cliout.Renderer{Format: format, Out: out}.Emit(versionOutput{Version: "probe"}, nil)
+					return cliout.Renderer{Format: output, Out: out}.Emit(versionOutput{Version: "probe"}, nil)
 				}}
 				cliout.AddOutputFlag(probe, &output)
 				root.AddCommand(probe)

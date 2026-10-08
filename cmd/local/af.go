@@ -62,7 +62,7 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 	// runnable core command can reach one (TestTreeInvariants), and because
 	// `astro af -o json` should not fail before it can print help. Each family
 	// registers its own below, which shadows this one for everything under it.
-	var output string
+	var output cliout.Format
 	cliout.AddOutputFlag(cmd, &output)
 	// The families carry the selector flags themselves, one target each. The
 	// group deliberately registers none: a -d on this node would fill a target

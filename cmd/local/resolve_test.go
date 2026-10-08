@@ -460,7 +460,7 @@ func TestJSONRunsNeverPrompt(t *testing.T) {
 	d, _, errOut := instanceDeps(t, dir)
 	d.Stdin = strings.NewReader("2\n")
 	d.Interactive = func() bool { return true }
-	c := &cli{d: d, output: string(cliout.FormatJSON)}
+	c := &cli{d: d, output: cliout.FormatJSON}
 
 	_, err := c.resolveDeployment(deploymentFlags{})
 	var ambiguous *instances.AmbiguousError

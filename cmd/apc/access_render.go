@@ -29,17 +29,7 @@ import (
 
 // accessOutput is the --output of every access command. One process runs one
 // command, and registering the flag resets it, so they can share it.
-var accessOutput string
-
-// accessRenderer parses -o, before anything else so a bad value is a usage
-// error, and returns the Renderer the command publishes through.
-func accessRenderer(out io.Writer) (cliout.Renderer, error) {
-	format, err := cliout.ParseFormat(accessOutput)
-	if err != nil {
-		return cliout.Renderer{}, err
-	}
-	return cliout.Renderer{Format: format, Out: out}, nil
-}
+var accessOutput cliout.Format
 
 func addAccessOutputFlag(cmd *cobra.Command) {
 	cliout.AddOutputFlag(cmd, &accessOutput)

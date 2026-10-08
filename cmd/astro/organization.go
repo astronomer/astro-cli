@@ -27,7 +27,7 @@ var (
 	wsSwitch                           = workspace.SwitchTo
 	orgName                            string
 	auditLogsOutputFilePath            string
-	auditLogsOutput                    string
+	auditLogsOutput                    cliout.Format
 	auditLogsEarliestParam             int
 	auditLogsEarliestParamDefaultValue = 1
 	role                               string
@@ -41,8 +41,8 @@ var (
 	teamOrgRole                        string
 	validOrganizationRoles             []string
 	shouldIncludeDefaultRoles          bool
-	organizationListOutput             string
-	organizationClusterListOutput      string
+	organizationListOutput             cliout.Format
+	organizationClusterListOutput      cliout.Format
 	forceTeam                          bool
 )
 
@@ -248,21 +248,13 @@ func newOrganizationUserUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func organizationList(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationListOutput)
-	if err != nil {
-		return err
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
-	return organization.ListWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
+	return organization.ListWithFormat(astroV1Client, cliout.Renderer{Format: organizationListOutput, Out: out})
 }
 
 func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
-	format, err := cliout.ParseFormat(organizationSwitchOutput)
-	if err != nil {
-		return err
-	}
+	format := organizationSwitchOutput
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -310,27 +302,19 @@ func organizationSwitch(cmd *cobra.Command, out io.Writer, args []string) error 
 }
 
 func organizationExportAuditLogs(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(auditLogsOutput)
-	if err != nil {
-		return err
-	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	fmt.Fprintln(cliout.NotesTo(cmd, format, out), "This may take some time depending on how many days are being exported.")
+	fmt.Fprintln(cliout.NotesTo(cmd, auditLogsOutput, out), "This may take some time depending on how many days are being exported.")
 	export, err := orgExportAuditLogs(astroV1Client,
 		orgName, auditLogsOutputFilePath, auditLogsEarliestParam)
 	if err != nil {
 		return err
 	}
-	return emitAuditLogExport(cliout.Renderer{Format: format, Out: out}, export)
+	return emitAuditLogExport(cliout.Renderer{Format: auditLogsOutput, Out: out}, export)
 }
 
 func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationUserOutput)
-	if err != nil {
-		return err
-	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -351,24 +335,15 @@ func userInvite(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &inv, fmt.Sprintf("invite for %s with role %s created", inv.Email, inv.Role))
+	return renderLines(organizationUserOutput, out, &inv, fmt.Sprintf("invite for %s with role %s created", inv.Email, inv.Role))
 }
 
 func listUsers(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationUserOutput)
-	if err != nil {
-		return err
-	}
-
 	cmd.SilenceUsage = true
-	return user.ListOrgUsersWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
+	return user.ListOrgUsersWithFormat(astroV1Client, cliout.Renderer{Format: organizationUserOutput, Out: out})
 }
 
 func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationUserOutput)
-	if err != nil {
-		return err
-	}
 	var email string
 
 	// if an email was provided in the args we use it
@@ -396,7 +371,7 @@ func userUpdate(cmd *cobra.Command, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &u, fmt.Sprintf("The user %s role was successfully updated to %s", u.Email, u.OrgRole))
+	return renderLines(organizationUserOutput, out, &u, fmt.Sprintf("The user %s role was successfully updated to %s", u.Email, u.OrgRole))
 }
 
 func newOrganizationTeamRootCmd(out io.Writer) *cobra.Command {
@@ -434,13 +409,8 @@ func newOrganizationTeamListCmd(out io.Writer) *cobra.Command {
 }
 
 func listTeams(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationTeamOutput)
-	if err != nil {
-		return err
-	}
-
 	cmd.SilenceUsage = true
-	return team.ListOrgTeamsWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
+	return team.ListOrgTeamsWithFormat(astroV1Client, cliout.Renderer{Format: organizationTeamOutput, Out: out})
 }
 
 func newTeamUpdateCmd(out io.Writer) *cobra.Command {
@@ -471,10 +441,6 @@ func newTeamUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	format, err := cliout.ParseFormat(organizationTeamOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 
 	id := ""
@@ -486,7 +452,7 @@ func teamUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 	}
 
 	upd, err := team.UpdateTeam(id, teamName, teamDescription, updateOrganizationRole, forceTeam, astroV1Client)
-	return renderTeamUpdate(format, out, upd, err)
+	return renderTeamUpdate(organizationTeamOutput, out, upd, err)
 }
 
 func newTeamCreateCmd(out io.Writer) *cobra.Command {
@@ -515,10 +481,6 @@ func newTeamCreateCmd(out io.Writer) *cobra.Command {
 }
 
 func teamCreate(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationTeamOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	if teamOrgRole == "" {
 		// Refused before the line introducing the choice, so a run that
@@ -528,6 +490,7 @@ func teamCreate(cmd *cobra.Command, out io.Writer) error {
 		}
 		fmt.Fprintln(os.Stderr, "select a Organization Role for the new team:")
 		// no role was provided so ask the user for it
+		var err error
 		teamOrgRole, err = selectOrganizationRole()
 		if err != nil {
 			return err
@@ -537,7 +500,7 @@ func teamCreate(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderLines(format, out, &t, fmt.Sprintf("Astro Team %s was successfully created", t.Name))
+	return renderLines(organizationTeamOutput, out, &t, fmt.Sprintf("Astro Team %s was successfully created", t.Name))
 }
 
 func newTeamDeleteCmd(out io.Writer) *cobra.Command {
@@ -563,10 +526,6 @@ func newTeamDeleteCmd(out io.Writer) *cobra.Command {
 }
 
 func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-	format, err := cliout.ParseFormat(organizationTeamOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 
 	id := ""
@@ -581,7 +540,7 @@ func teamDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 	if err != nil || r == nil {
 		return err
 	}
-	return renderLines(format, out, r, fmt.Sprintf("Astro Team %s was successfully deleted", r.Name))
+	return renderLines(organizationTeamOutput, out, r, fmt.Sprintf("Astro Team %s was successfully deleted", r.Name))
 }
 
 func newOrganizationTeamUserRootCmd(out io.Writer) *cobra.Command {
@@ -620,10 +579,6 @@ func newTeamRemoveUserCmd(out io.Writer) *cobra.Command {
 }
 
 func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationTeamOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	if err := mayPickTeamAndUser("a team member"); err != nil {
 		return err
@@ -632,7 +587,7 @@ func removeTeamUser(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderMembership(format, out, m)
+	return renderMembership(organizationTeamOutput, out, m)
 }
 
 // mayPickTeamAndUser refuses, under --output json, a team user command given
@@ -671,10 +626,6 @@ func newTeamAddUserCmd(out io.Writer) *cobra.Command {
 }
 
 func addTeamUser(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationTeamOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	if err := mayPickTeamAndUser("a user"); err != nil {
 		return err
@@ -683,7 +634,7 @@ func addTeamUser(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderMembership(format, out, m)
+	return renderMembership(organizationTeamOutput, out, m)
 }
 
 func newTeamListUsersCmd(out io.Writer) *cobra.Command {
@@ -707,10 +658,6 @@ func newTeamListUsersCmd(out io.Writer) *cobra.Command {
 }
 
 func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationTeamOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	if teamID == "" {
 		if err := mayPick("a team", teamIDFlag); err != nil {
@@ -721,7 +668,7 @@ func listUsersCmd(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTeamMembers(format, out, &list)
+	return renderTeamMembers(organizationTeamOutput, out, &list)
 }
 
 // org tokens
@@ -940,16 +887,12 @@ func newOrganizationRoleListCmd(out io.Writer) *cobra.Command {
 }
 
 func listRoles(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationRoleOutput)
-	if err != nil {
-		return err
-	}
 	cmd.SilenceUsage = true
 	roles, err := roleClient.ListData(astroV1Client, shouldIncludeDefaultRoles)
 	if err != nil {
 		return err
 	}
-	return emitRoles(cliout.Renderer{Format: format, Out: out}, roles)
+	return emitRoles(cliout.Renderer{Format: organizationRoleOutput, Out: out}, roles)
 }
 
 func newOrganizationClusterRootCmd(out io.Writer) *cobra.Command {
@@ -983,11 +926,6 @@ func newOrganizationClusterListCmd(out io.Writer) *cobra.Command {
 }
 
 func listClusters(cmd *cobra.Command, out io.Writer) error {
-	format, err := cliout.ParseFormat(organizationClusterListOutput)
-	if err != nil {
-		return err
-	}
-
 	cmd.SilenceUsage = true
-	return organization.ListClustersWithFormat(astroV1Client, cliout.Renderer{Format: format, Out: out})
+	return organization.ListClustersWithFormat(astroV1Client, cliout.Renderer{Format: organizationClusterListOutput, Out: out})
 }

@@ -34,15 +34,20 @@ const (
 	FormatJSON Format = "json"
 )
 
-// ParseFormat validates an --output flag value against text, json and the
-// extras the command declared when it registered the flag. A value it does
-// not know is a usage error: the command was invoked wrongly, and nothing ran.
+// ParseFormat validates an --output value against text, json and extras. A
+// value it does not know is a usage error: the command was invoked wrongly,
+// and nothing ran.
 //
-// This is the one place --output is parsed. A command that renders through a
-// package below cmd/ (pkg/output, internal/platform/astro/env) hands it a
-// Renderer built from the result, as that package's output.Emitter: those
-// packages may not import cmd/, so they take the interface, draw only the
-// text, and leave the json to Emit.
+// This is the one place --output is parsed. A flag AddOutputFlag registered
+// calls it as the value is set, so a command with one reads the Format the
+// flag wrote and never calls this. The one caller besides the flag is `astro
+// deploy`, whose --output is a plain string flag because it is ignored
+// outside a pyproject.toml project, and so is checked only inside one.
+//
+// A command that renders through a package below cmd/ (pkg/output,
+// internal/platform/astro/env) hands it a Renderer built from the result, as
+// that package's output.Emitter: those packages may not import cmd/, so they
+// take the interface, draw only the text, and leave the json to Emit.
 func ParseFormat(s string, extras ...Format) (Format, error) {
 	f := Format(s)
 	if f == FormatText || f == FormatJSON || slices.Contains(extras, f) {
@@ -52,25 +57,32 @@ func ParseFormat(s string, extras ...Format) (Format, error) {
 }
 
 // AddOutputFlag registers the shared --output flag on cmd's persistent flags,
-// so one registration covers a whole command family. A command that offers a
-// format beyond text and json for a special use (dotenv for `astro env
-// variable list`, yaml for `astro deployment inspect`) names it as an extra,
-// and passes the same extras to ParseFormat.
+// so one registration covers a whole command family, and writes its value into
+// target, FormatText until a value is given. A command that offers a format
+// beyond text and json for a special use (dotenv for `astro env variable
+// list`, yaml for `astro deployment inspect`) names it as an extra, here and
+// nowhere else.
 //
 // The flag validates its own value: a format the command does not offer fails
 // while cobra parses flags, as the usage error ParseFormat returns, before any
-// pre-run refreshes a token, records telemetry or asks an API anything. So a
-// command's ParseFormat of the parsed value only converts it.
+// pre-run refreshes a token, records telemetry or asks an API anything. So
+// target only ever holds a format the command offers, and the command reads
+// it as it is. The one --output that does not fail there is `astro deploy`'s,
+// which is not this flag (see ParseFormat).
+//
+// An extra never reaches a Renderer, which renders text and json only (see
+// Emit): the command maps it first, to text whose renderer draws it (inspect's
+// yaml) or to a writer of its own (dotenv).
 //
 // It owns cmd's flag error func: one set on cmd beforehand is replaced. Any
 // flag error other than a refused --output goes to the parent's, which is
 // looked up when the error happens, so a func an ancestor gains later (the
 // root's, which Execute sets) is consulted. On a root there is no parent, and
 // Execute's handling takes over when it runs the tree, replacing this func.
-func AddOutputFlag(cmd *cobra.Command, target *string, extras ...Format) {
+func AddOutputFlag(cmd *cobra.Command, target *Format, extras ...Format) {
 	names := formatNames(extras)
 	usage := "Output format: " + strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
-	*target = string(FormatText)
+	*target = FormatText
 	cmd.PersistentFlags().VarP(&formatValue{target: target, extras: extras}, "output", "o", usage)
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		if bad := badFormat(err); bad != nil {
@@ -90,25 +102,26 @@ func AddOutputFlag(cmd *cobra.Command, target *string, extras ...Format) {
 	})
 }
 
-// formatValue is --output's value: a string that refuses a format the command
+// formatValue is --output's value: a Format that refuses a format the command
 // does not offer, and what the command has to say when it does (OnBadFormat).
 type formatValue struct {
-	target  *string
+	target  *Format
 	extras  []Format
 	explain func(value string, refused error) error
 }
 
-func (v *formatValue) String() string { return *v.target }
+func (v *formatValue) String() string { return string(*v.target) }
 
 // Type is "string", what the flag was before it validated, so the help still
 // reads `-o, --output string`.
 func (v *formatValue) Type() string { return "string" }
 
 func (v *formatValue) Set(s string) error {
-	if _, err := ParseFormat(s, v.extras...); err != nil {
+	f, err := ParseFormat(s, v.extras...)
+	if err != nil {
 		return err
 	}
-	*v.target = s
+	*v.target = f
 	return nil
 }
 
@@ -290,10 +303,20 @@ func (r Renderer) EmitEvent(v any, text func(w io.Writer) error) error {
 // emit is the door both lead through, and the one place in cmd/ that holds a
 // json encoder for output (TestEmitIsTheOnlyJSONEncoder in cmd/local).
 //
+// It renders text and json, and panics on any other Format: "" from a
+// variable no flag was bound to, or an extra the command did not map before
+// it built the Renderer. Either is a programming error, and rendering it as
+// text would hide it behind exit 0.
+//
 // HTML escaping is off: nothing here is embedded in a page, and `<` in a
 // traceback reads better than \u003c. The value decoded is the same either
 // way.
 func (r Renderer) emit(v any, text func(w io.Writer) error, style Style) error {
+	if r.Format != FormatText && r.Format != FormatJSON {
+		panic(fmt.Sprintf("Renderer.Emit: format %q is neither text nor json. A Renderer's Format "+
+			"comes from a flag AddOutputFlag bound, and a command maps an extra it offers "+
+			"(yaml, dotenv) before it builds the Renderer.", r.Format))
+	}
 	if lazy, ok := v.(Lazy); ok {
 		if r.Format != FormatJSON {
 			return r.text(text)

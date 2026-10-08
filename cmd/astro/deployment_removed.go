@@ -57,7 +57,7 @@ func newRemovedDeploymentObjectCmd(o removedDeploymentObject) *cobra.Command {
 			return removedCmdError(removedDeploymentObjectGuidance(o, args))
 		},
 	}
-	cliout.AddOutputFlag(cmd, new(string))
+	cliout.AddOutputFlag(cmd, new(cliout.Format))
 	return cmd
 }
 

@@ -26,7 +26,7 @@ var (
 	search     string
 	follow     bool
 	since      time.Duration
-	logsOutput string
+	logsOutput cliout.Format
 
 	// subscribeLogs is a variable so a test can follow a stream without a
 	// websocket server.
@@ -168,10 +168,6 @@ func newTriggererLogsCmd(out io.Writer) *cobra.Command { //nolint:dupl // the du
 // fetchRemoteLogs prints a component's log records, one per line, or under
 // json one object per line: a stream, which --follow keeps open.
 func fetchRemoteLogs(cmd *cobra.Command, component string, args []string, out io.Writer) error {
-	format, err := cliout.ParseFormat(logsOutput)
-	if err != nil {
-		return err
-	}
 	// Houston searches at most 2 days of logs and refuses a longer window
 	//. A follow
 	// ignores --since, so only a search is held to it.
@@ -179,9 +175,9 @@ func fetchRemoteLogs(cmd *cobra.Command, component string, args []string, out io
 		return cliout.Usage(fmt.Errorf("--since %s is longer than the %s of logs APC searches at most", since, maxLogsSince))
 	}
 	cmd.SilenceUsage = true
-	r := cliout.Renderer{Format: format, Out: out}
+	r := cliout.Renderer{Format: logsOutput, Out: out}
 	if follow {
-		return subscribeLogs(args[0], component, search, since, cliout.NotesTo(cmd, format, out),
+		return subscribeLogs(args[0], component, search, since, cliout.NotesTo(cmd, logsOutput, out),
 			func(l houston.DeploymentLog) error { return emitLogEntry(r, component, l, true) })
 	}
 	logs, err := deployment.Log(args[0], component, search, since, houstonClient)

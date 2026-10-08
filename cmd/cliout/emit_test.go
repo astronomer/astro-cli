@@ -44,6 +44,31 @@ func TestEmitPanicsInTextModeWithNoTextRenderer(t *testing.T) {
 	assert.Empty(t, out.String(), "nothing should reach the writer")
 }
 
+// A Format that is neither text nor json never came through a flag
+// AddOutputFlag bound: "" is a variable no flag was bound to, and an extra
+// (yaml, dotenv) is the command's to map before it builds a Renderer. Both
+// are programming errors, and rendering them as text would hide one behind
+// exit 0, so every door panics on them, with a text renderer or without, and
+// for a Lazy too, before anything reaches the writer or the observer.
+func TestEmitPanicsOnAFormatThatIsNeitherTextNorJSON(t *testing.T) {
+	text := func(w io.Writer) error {
+		_, err := io.WriteString(w, "rendered")
+		return err
+	}
+	observed := 0
+	EmitObserver = func(any) { observed++ }
+	t.Cleanup(func() { EmitObserver = nil })
+	for _, f := range []Format{"", "yaml", "dotenv", "xml"} {
+		var out bytes.Buffer
+		r := Renderer{Format: f, Out: &out}
+		assert.Panics(t, func() { _ = r.Emit("v", text) }, "Emit, format %q", f)
+		assert.Panics(t, func() { _ = r.EmitEvent("v", text) }, "EmitEvent, format %q", f)
+		assert.Panics(t, func() { _ = r.Emit(Lazy(func() any { return "v" }), text) }, "a Lazy, format %q", f)
+		assert.Empty(t, out.String(), "format %q: nothing should reach the writer", f)
+	}
+	assert.Zero(t, observed, "nothing should reach the observer")
+}
+
 // The ordinary path still runs the text renderer over the same value.
 func TestEmitTextModeRunsTheRenderer(t *testing.T) {
 	var out bytes.Buffer

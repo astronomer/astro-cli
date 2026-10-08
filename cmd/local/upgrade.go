@@ -92,10 +92,7 @@ func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runUpgradeAirflow(ctx context.Context, version string, withOtto bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	if withOtto && r.Format == cliout.FormatJSON {
 		return fmt.Errorf("--%s starts an interactive session, so it cannot be combined with --output json", flagWithOtto)
 	}

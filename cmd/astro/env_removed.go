@@ -70,7 +70,7 @@ func removedVerbStub(verb string, aliases []string, guidance func(args []string)
 			return removedCmdError(guidance(args))
 		},
 	}
-	cliout.AddOutputFlag(cmd, new(string))
+	cliout.AddOutputFlag(cmd, new(cliout.Format))
 	return cmd
 }
 

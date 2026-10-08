@@ -165,10 +165,7 @@ var annotationFlags = []string{
 }
 
 func (c *cli) runEnvDeclare(cmd *cobra.Command, scope *scopeFlags, in *declareInput, kind localenv.Kind, name string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	dir, err := c.declarationProject(scope)
 	if err != nil {
 		return err
@@ -230,10 +227,7 @@ func (c *cli) runEnvDeclare(cmd *cobra.Command, scope *scopeFlags, in *declareIn
 }
 
 func (c *cli) runEnvUndeclare(scope *scopeFlags, kind localenv.Kind, name string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	dir, err := c.declarationProject(scope)
 	if err != nil {
 		return err

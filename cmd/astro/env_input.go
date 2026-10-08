@@ -222,10 +222,7 @@ func runEnvDelete(cmd *cobra.Command, out io.Writer, noun, idOrKey string, del f
 	if err != nil {
 		return err
 	}
-	r, err := envRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: envOutput, Out: out}
 	cmd.SilenceUsage = true
 
 	if !envYes {

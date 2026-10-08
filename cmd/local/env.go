@@ -674,10 +674,7 @@ func plaintextRefusal(kind localenv.Kind, name, manifestPath string) error {
 }
 
 func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value string, everywhere, replaceSecret bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	store, projectDir, err := c.envStore(route)
 	if err != nil {
 		return err
@@ -861,10 +858,7 @@ func (c *cli) noteUndeclaredGlobal(kind localenv.Kind, name string) {
 }
 
 func (c *cli) runEnvGet(scope *scopeFlags, kind localenv.Kind, name string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	// A scope or store flag reads that scope; no flag resolves the whole chain
 	// and reports the winning source.
 	if scope.project || scope.global || scope.plain {
@@ -1072,10 +1066,7 @@ func (c *cli) emitValue(r cliout.Renderer, v envValue) error {
 // current project's manifest, so it is refused outside a project before
 // anything is deleted, --global or not.
 func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string, undeclare bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	projectDir, perr := c.discoverProject()
 	if undeclare && perr != nil {
 		return fmt.Errorf("--undeclare removes a declaration from the current project's %s, and there is no project here, so nothing was deleted. It never edits another project's", project.Marker)
@@ -1241,10 +1232,7 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 // so a narrowed list reports exactly what the full one would have for that
 // kind, resolution order and all.
 func (c *cli) runEnvList(scope *scopeFlags, all bool, only localenv.Kind) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	projectDir, _ := c.discoverProject() //nolint:errcheck // outside a project, list still shows the global vault
 	m, schema, err := c.loadManifestSchema(projectDir)
 	if err != nil {

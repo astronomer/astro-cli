@@ -20,7 +20,7 @@ import (
 )
 
 // dbtOutput is --output for the `dbt` family.
-var dbtOutput string
+var dbtOutput cliout.Format
 
 // waitForBundle waits for a Deployment to take a bundle deploy or delete. A
 // var so a test need not sit through the poll's sleeps.

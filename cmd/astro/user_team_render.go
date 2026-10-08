@@ -20,10 +20,10 @@ import (
 // The -o of each group: `workspace user`, `workspace team`, `organization
 // user`, and `organization team` with its `user` commands.
 var (
-	workspaceUserOutput    string
-	workspaceTeamOutput    string
-	organizationUserOutput string
-	organizationTeamOutput string
+	workspaceUserOutput    cliout.Format
+	workspaceTeamOutput    cliout.Format
+	organizationUserOutput cliout.Format
+	organizationTeamOutput cliout.Format
 )
 
 // What answers each picker these commands can open, for the refusal under

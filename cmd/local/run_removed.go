@@ -29,7 +29,7 @@ var dagIDRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 // exits 2, as `astro run` did before this stub existed, and under --output
 // json it is the one error object every command publishes.
 func newRunRemovedCmd() *cobra.Command {
-	var output string
+	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:                nameRun,
 		Short:              "Removed in v2 — use `" + replaceRunDag + "`",

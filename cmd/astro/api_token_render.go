@@ -29,19 +29,16 @@ const (
 	organizationRoleHeader = "ORGANIZATION ROLE"
 )
 
-// tokenFormatOf parses a token family's --output. A command calls it before
-// it asks anything, so a bad value fails as usage before a prompt.
-// --clean-output (create and rotate) is a text format of its own, so it and
-// json together are a usage error rather than one silently winning.
-func tokenFormatOf(output string) (cliout.Format, error) {
-	format, err := cliout.ParseFormat(output)
-	if err != nil {
-		return "", err
-	}
+// refuseCleanOutputWithJSON refuses --clean-output under a token family's
+// --output json. --clean-output (create and rotate) is a text format of its
+// own, so the two together are a usage error rather than one silently
+// winning. A command calls it before it asks anything, so the pair fails as
+// usage before a prompt.
+func refuseCleanOutputWithJSON(format cliout.Format) error {
 	if format == cliout.FormatJSON && cleanTokenOutput {
-		return "", cliout.Usage(errCleanOutputWithJSON)
+		return cliout.Usage(errCleanOutputWithJSON)
 	}
-	return format, nil
+	return nil
 }
 
 // renderTokenList renders a token list, its role column headed roleHeader.

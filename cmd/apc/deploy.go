@@ -20,7 +20,7 @@ var (
 	forceDeploy      bool
 	forcePrompt      bool
 	saveDeployConfig bool
-	deployOutput     string
+	deployOutput     cliout.Format
 	deployYes        bool
 
 	ignoreCacheDeploy = false
@@ -116,12 +116,6 @@ type deployJSON struct {
 }
 
 func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
-	// Reject a bad -o before anything else, so it is a usage error.
-	format, err := cliout.ParseFormat(deployOutput)
-	if err != nil {
-		return err
-	}
-
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -164,8 +158,8 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	// The deploy's progress (its notes, the image push, the DAG upload) goes
 	// where it always has in text, and to stderr under json, where stdout
 	// carries the result.
-	opts := deploy.Options{Progress: cliout.NotesTo(cmd, format, out), Yes: deployYes}
-	r := cliout.Renderer{Format: format, Out: out}
+	opts := deploy.Options{Progress: cliout.NotesTo(cmd, deployOutput, out), Yes: deployYes}
+	r := cliout.Renderer{Format: deployOutput, Out: out}
 	result := deployJSON{Workspace: ws}
 
 	if isDagOnlyDeploy {

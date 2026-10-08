@@ -306,10 +306,7 @@ func (c *cli) linkProject() (dir, path string, m *manifest.Manifest, err error) 
 }
 
 func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, command []string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	dir, path, m, err := c.linkProject()
 	if err != nil {
 		return err
@@ -565,10 +562,7 @@ func article(kind manifest.LinkKind) string {
 }
 
 func (c *cli) runLinkRemove(name string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	dir, path, m, err := c.linkProject()
 	if err != nil {
 		return err
@@ -598,10 +592,7 @@ func (c *cli) runLinkRemove(name string) error {
 }
 
 func (c *cli) runLinkDefault(name string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	dir, path, m, err := c.linkProject()
 	if err != nil {
 		return err

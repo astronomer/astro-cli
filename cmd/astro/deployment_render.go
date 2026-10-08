@@ -20,7 +20,7 @@ import (
 
 // deploymentOutput is --output for the five commands here. One run is one
 // command, so they share it.
-var deploymentOutput string
+var deploymentOutput cliout.Format
 
 // emitDeployment publishes d, the Deployment a create or an update left.
 //

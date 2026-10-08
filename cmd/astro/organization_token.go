@@ -21,11 +21,10 @@ import (
 
 // organizationTokenOutput is the --output of the whole `organization token`
 // family, registered once on its group.
-var organizationTokenOutput string
+var organizationTokenOutput cliout.Format
 
 func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
-	format, err := tokenFormatOf(organizationTokenOutput)
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	cmd.SilenceUsage = true
@@ -33,12 +32,11 @@ func listOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenList(format, out, tokens, organizationRoleHeader)
+	return renderTokenList(organizationTokenOutput, out, tokens, organizationRoleHeader)
 }
 
 func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := tokenFormatOf(organizationTokenOutput)
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
@@ -52,12 +50,11 @@ func listOrganizationTokenRoles(cmd *cobra.Command, args []string, out io.Writer
 	for _, r := range roles {
 		tab.AddRow(r.EntityType, r.EntityID, r.Role)
 	}
-	return cliout.Renderer{Format: format, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.Text(tab.Render))
+	return cliout.Renderer{Format: organizationTokenOutput, Out: out}.Emit(apitoken.RoleList{Roles: roles}, cliout.Text(tab.Render))
 }
 
 func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
-	format, err := tokenFormatOf(organizationTokenOutput)
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	if tokenName == "" {
@@ -74,6 +71,7 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 		}
 		fmt.Fprintln(os.Stderr, "select a Organization Role for the new API token:")
 		// no role was provided so ask the user for it
+		var err error
 		tokenRole, err = selectOrganizationRole()
 		if err != nil {
 			return err
@@ -85,12 +83,11 @@ func createOrganizationToken(cmd *cobra.Command, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return renderTokenSecret(format, out, &created, "Organization", "created", tokenName, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, &created, "Organization", "created", tokenName, cleanTokenOutput)
 }
 
 func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := tokenFormatOf(organizationTokenOutput)
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
@@ -100,12 +97,11 @@ func updateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, res.Token, fmt.Sprintf("Astro Organization API token %s was successfully updated", res.PreviousName))
+	return renderTokenLine(organizationTokenOutput, out, res.Token, fmt.Sprintf("Astro Organization API token %s was successfully updated", res.PreviousName))
 }
 
 func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := tokenFormatOf(organizationTokenOutput)
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
@@ -132,12 +128,11 @@ func rotateOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 		return err
 	}
 	// Named as found, which a rotate by ID knows only after the lookup.
-	return renderTokenSecret(format, out, &rotated, "Organization", "rotated", token.Name, cleanTokenOutput)
+	return renderTokenSecret(organizationTokenOutput, out, &rotated, "Organization", "rotated", token.Name, cleanTokenOutput)
 }
 
 func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) error {
-	format, err := tokenFormatOf(organizationTokenOutput)
-	if err != nil {
+	if err := refuseCleanOutputWithJSON(organizationTokenOutput); err != nil {
 		return err
 	}
 	tokenArg(args, &tokenID)
@@ -162,5 +157,5 @@ func deleteOrganizationToken(cmd *cobra.Command, args []string, out io.Writer) e
 	if err != nil {
 		return err
 	}
-	return renderTokenLine(format, out, removal, fmt.Sprintf("Astro Organization API token %s was successfully deleted", removal.Name))
+	return renderTokenLine(organizationTokenOutput, out, removal, fmt.Sprintf("Astro Organization API token %s was successfully deleted", removal.Name))
 }

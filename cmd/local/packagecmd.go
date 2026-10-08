@@ -89,10 +89,7 @@ type packageOptions struct {
 }
 
 func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOptions) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	// Resolve the target first, so an unknown name errors without needing a
 	// project in the working directory.
 	target, err := c.packageRegistry().Lookup(targetName)

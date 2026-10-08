@@ -85,6 +85,6 @@ Use "astro api [command] --help" for more information about a command.`,
 // tombstone refuses --json in Args. Both fail before any pre-run refreshes a
 // token or records telemetry, and before a spec is fetched.
 func addOutputFlags(cmd *cobra.Command, format *cliout.Format) {
-	cliout.AddOutputFlag(cmd, (*string)(format))
+	cliout.AddOutputFlag(cmd, format)
 	cliout.AddRemovedFlag(cmd, "json", "", true, cliout.ErrJSONFlagRemoved)
 }

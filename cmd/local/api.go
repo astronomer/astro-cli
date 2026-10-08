@@ -121,13 +121,7 @@ type apiOptions struct {
 }
 
 func (c *cli) runAPI(ctx context.Context, endpoint string, opts apiOptions) error {
-	// The format is validated even though the response is printed as it came: a
-	// misspelled --output should fail here rather than quietly change how the
-	// failure below is reported.
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	req, err := opts.request(endpoint, c.d.Stdin)
 	if err != nil {
 		return err
@@ -268,10 +262,7 @@ func newAPIListCmd(c *cli) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			r, err := c.renderer()
-			if err != nil {
-				return err
-			}
+			r := c.renderer()
 			endpoints, err := c.machineEndpoints(cmd.Context())
 			if err != nil {
 				return err
@@ -302,10 +293,7 @@ func newAPISpecCmd(c *cli) *cobra.Command {
 			"  astro local api spec | jq '.paths | keys'",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			r, err := c.renderer()
-			if err != nil {
-				return err
-			}
+			r := c.renderer()
 			raw, _, err := c.machineSpec(cmd.Context())
 			if err != nil {
 				return err

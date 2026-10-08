@@ -121,10 +121,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
 }
 
 func workspaceUserAdd(cmd *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -144,10 +141,7 @@ func workspaceUserAdd(cmd *cobra.Command, out io.Writer) error {
 }
 
 func workspaceUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -167,10 +161,7 @@ func workspaceUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error
 }
 
 func workspaceUserRemove(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -199,10 +190,7 @@ func workspaceUserRemove(cmd *cobra.Command, out io.Writer, args []string) error
 var errListPaginatedUnderJSON = errors.New("--paginated pages through the list by asking which page to show next, so it cannot be used with --output json; leave it out to publish the whole list")
 
 func workspaceUserList(_ *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if paginated && r.Format == cliout.FormatJSON {
 		return cliout.Usage(errListPaginatedUnderJSON)
 	}

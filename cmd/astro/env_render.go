@@ -17,16 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/env"
 )
 
-// envRenderer parses the -o every `astro env` command inherits from the
-// group, text or json. The reads that offer more (dotenv) parse their own.
-func envRenderer(out io.Writer) (cliout.Renderer, error) {
-	f, err := cliout.ParseFormat(envOutput)
-	if err != nil {
-		return cliout.Renderer{}, err
-	}
-	return cliout.Renderer{Format: f, Out: out}, nil
-}
-
 // getFn matches the per-type GetVar / GetConn / GetAirflowVar /
 // GetMetricsExport signature.
 type getFn func(idOrKey string, scope env.Scope, includeSecrets bool, client astrov1.APIClient) (*astrov1.EnvironmentObject, error)

@@ -183,10 +183,7 @@ func exampleName(kind localenv.Kind) string {
 }
 
 func (c *cli) runEnvLink(scope *scopeFlags, kind localenv.Kind, name string, dirs []string, thisCheckout, everywhere bool) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	if everywhere && len(dirs) > 0 {
 		return errors.New("--auto-link reaches every project, so it takes no directories")
 	}
@@ -234,10 +231,7 @@ func (c *cli) runEnvLink(scope *scopeFlags, kind localenv.Kind, name string, dir
 }
 
 func (c *cli) runEnvUnlink(scope *scopeFlags, kind localenv.Kind, name string, dirs []string) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
+	r := c.renderer()
 	w, err := c.linkWriter(scope, kind, name)
 	if err != nil {
 		return err

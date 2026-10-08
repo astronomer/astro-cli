@@ -54,11 +54,8 @@ func newInitCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) error {
-	r, err := c.renderer()
-	if err != nil {
-		return err
-	}
-	dir, err = c.resolveDir(dir)
+	r := c.renderer()
+	dir, err := c.resolveDir(dir)
 	if err != nil {
 		return err
 	}

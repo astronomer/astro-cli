@@ -25,7 +25,7 @@ var (
 	workspaceUpdateDescription string
 	workspacePaginated         bool
 	workspacePageSize          int
-	workspaceOutput            string
+	workspaceOutput            cliout.Format
 	workspaceDeleteExample     = `
   astro workspace delete <WORKSPACE_ID>
 `
@@ -150,21 +150,8 @@ func newWorkspaceUpdateCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// workspaceRenderer parses -o, before anything else so a bad value is a
-// usage error, and returns the Renderer the command publishes through.
-func workspaceRenderer(out io.Writer) (cliout.Renderer, error) {
-	format, err := cliout.ParseFormat(workspaceOutput)
-	if err != nil {
-		return cliout.Renderer{}, err
-	}
-	return cliout.Renderer{Format: format, Out: out}, nil
-}
-
 func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
-	r, err := workspaceRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	if workspaceCreateLabel == "" {
 		return errCreateWorkspaceMissingLabel
 	}
@@ -183,10 +170,7 @@ func workspaceCreate(cmd *cobra.Command, out io.Writer) error {
 }
 
 func workspaceList(cmd *cobra.Command, out io.Writer) error {
-	r, err := workspaceRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	ws, err := workspace.List(houstonClient)
@@ -203,10 +187,7 @@ func workspaceList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := workspaceRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
@@ -218,10 +199,7 @@ func workspaceDelete(cmd *cobra.Command, out io.Writer, args []string) error {
 }
 
 func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := workspaceRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	argsMap := map[string]string{}
 	if workspaceUpdateDescription != "" {
 		argsMap["description"] = workspaceUpdateDescription
@@ -245,10 +223,7 @@ func workspaceUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
 }
 
 func workspaceSwitch(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := workspaceRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: workspaceOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 

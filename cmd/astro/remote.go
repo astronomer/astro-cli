@@ -78,7 +78,7 @@ func newRemoteDeployCmd() *cobra.Command {
 }
 
 // remoteOutput is --output for `astro remote deploy`.
-var remoteOutput string
+var remoteOutput cliout.Format
 
 // deployClientImage builds and pushes the client image. A var so a test can
 // stand in for Docker and the registry.
@@ -86,15 +86,11 @@ var deployClientImage = astrodeploy.DeployClientImage
 
 // remoteDeploy handles the remote deploy functionality
 func remoteDeploy(cmd *cobra.Command, args []string) error {
-	format, err := cliout.ParseFormat(remoteOutput)
-	if err != nil {
-		return err
-	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	// The build's and the push's own output, and the notes on the way, are
 	// what text mode has always shown; under json they go to stderr.
-	defer strayStdoutToStderr(format)()
+	defer strayStdoutToStderr(remoteOutput)()
 
 	deployInput := astrodeploy.InputClientDeploy{
 		Path:         config.WorkingPath,
@@ -108,5 +104,5 @@ func remoteDeploy(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(newRemoteDeployJSON(&res), renderRemoteDeploy(res.Image))
+	return cliout.Renderer{Format: remoteOutput, Out: cmd.OutOrStdout()}.Emit(newRemoteDeployJSON(&res), renderRemoteDeploy(res.Image))
 }

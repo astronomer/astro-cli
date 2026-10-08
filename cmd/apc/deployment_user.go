@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
@@ -126,10 +127,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentUserList(cmd *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	users, err := deployment.UserList(deploymentID, deploymentUserEmail, deploymentUserID, deploymentUserFullname, houstonClient)
@@ -143,10 +141,7 @@ func deploymentUserList(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentUserAdd(cmd *cobra.Command, out io.Writer) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}
@@ -161,10 +156,7 @@ func deploymentUserAdd(cmd *cobra.Command, out io.Writer) error {
 }
 
 func deploymentUserRemove(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	u, err := deployment.RemoveUser(deploymentID, args[0], houstonClient)
@@ -175,10 +167,7 @@ func deploymentUserRemove(cmd *cobra.Command, out io.Writer, args []string) erro
 }
 
 func deploymentUserUpdate(cmd *cobra.Command, out io.Writer, args []string) error {
-	r, err := accessRenderer(out)
-	if err != nil {
-		return err
-	}
+	r := cliout.Renderer{Format: accessOutput, Out: out}
 	if err := validateDeploymentRole(deploymentUserRole); err != nil {
 		return fmt.Errorf("failed to find a valid role: %w", err)
 	}

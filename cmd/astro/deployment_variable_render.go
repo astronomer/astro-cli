@@ -19,7 +19,7 @@ import (
 
 // deploymentVariableOutput is --output for the whole `deployment variable`
 // family, registered once on the family's root.
-var deploymentVariableOutput string
+var deploymentVariableOutput cliout.Format
 
 // strayStdoutToStderr points os.Stdout at stderr for the rest of a json-mode
 // run, and returns what puts it back.
