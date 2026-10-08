@@ -230,7 +230,7 @@ contexts:
 	ctx, err := GetCurrentContext()
 	s.Require().NoError(err)
 	s.Require().NoError(ctx.SetContextKey("token", "Bearer new"))
-	s.Require().NoError(ctx.SetExpiresIn(3600))
+	s.Require().NoError(ctx.SetExpiresIn(3600 * time.Second))
 
 	reread, err := GetCurrentContext()
 	s.Require().NoError(err)
@@ -264,7 +264,7 @@ func (s *Suite) TestSetOrganizationContext() {
 func (s *Suite) TestExpiresIn() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
-	err := ctx.SetExpiresIn(12)
+	err := ctx.SetExpiresIn(12 * time.Second)
 	s.NoError(err)
 
 	outCtx, err := ctx.GetContext()
@@ -279,7 +279,7 @@ func (s *Suite) TestExpiresIn() {
 func (s *Suite) TestExpiresInFailure() {
 	initTestConfig()
 	ctx := Context{}
-	err := ctx.SetExpiresIn(1)
+	err := ctx.SetExpiresIn(1 * time.Second)
 	s.ErrorIs(err, ErrCtxConfigErr)
 
 	val, err := ctx.GetExpiresIn()
