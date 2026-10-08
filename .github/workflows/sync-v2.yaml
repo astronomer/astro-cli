@@ -1,0 +1,61 @@
+name: Sync main into v2
+
+# v2 takes every commit on main while both are live. When main moves ahead,
+# this opens a PR from main itself into v2, so the PR follows main without
+# anything being pushed, and turns on auto-merge as a merge commit: a squash
+# would drop main as a parent and lose the sync. Conflicts, or v2's stricter
+# lint failing on main's code, are resolved on a branch by hand; once that
+# lands, GitHub marks this PR merged on its own.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-v2
+  cancel-in-progress: false
+
+jobs:
+  open-pr:
+    if: github.repository == 'astronomer/astro-cli'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      # GitHub runs no CI on a PR the built-in token opens, so its required checks would never start
+      - name: Get token via Octo STS
+        uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
+        id: sync-token
+        with:
+          scope: astronomer
+          identity: astro-cli-sync
+
+      - name: Open the main -> v2 PR
+        env:
+          GH_TOKEN: ${{ steps.sync-token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          behind=$(gh api "repos/${REPO}/compare/v2...main" --jq .ahead_by)
+          if [ "$behind" = 0 ]; then
+            echo "v2 already has every commit on main."
+            exit 0
+          fi
+          pr=$(gh pr list --repo "$REPO" --base v2 --head main --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            echo "v2 is ${behind} commit(s) behind main; #${pr} already follows it."
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/body.md" <<'EOF'
+          Merges `main` into `v2`. Opened by `sync-v2.yaml`, which runs on every push to `main`.
+
+          The head is `main` itself, so this PR follows `main` until it merges. Auto-merge is on as **a merge commit**: once CI passes and someone approves, it merges itself. Don't squash it — a squash drops `main` as a parent, and the next sync would bring the same commits again.
+
+          **If it conflicts, or `v2`'s CI fails on `main`'s code:** make a branch from `v2`, run `git merge origin/main`, fix it there, and open that branch as a PR, merged with "Create a merge commit". When that lands, GitHub marks this PR merged.
+          EOF
+          url=$(gh pr create --repo "$REPO" --base v2 --head main --title "Sync main into v2" --body-file "$RUNNER_TEMP/body.md")
+          echo "Opened ${url} (v2 is ${behind} commit(s) behind main)."
+          gh pr merge "$url" --repo "$REPO" --auto --merge
