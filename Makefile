@@ -33,30 +33,38 @@ fmt:
 
 # Release tag helpers — used by CI and locally.
 # Nightly tags are semver-compliant: vX.Y.Z-nightly.YYYYMMDD
-# where X.Y.Z is the next minor version (latest minor + 1, patch 0).
+# where X.Y.Z is the next minor version of MAJOR (latest minor + 1, patch 0),
+# or MAJOR.0.0 before MAJOR has a GA release.
 # Usage:
-#   make nightly-tag                    # semver nightly from main (v1.43.0-nightly.20260522)
+#   make nightly-tag MAJOR=1            # semver nightly (v1.43.0-nightly.20260522)
+#   make prev-ga-tag MAJOR=2            # latest GA tag of major 2 or lower (v2.3.1)
 #   make rc-tag VERSION=1.43.0          # auto-increment RC (v1.43.0-rc.1, rc.2, ...)
 #   make release-tag VERSION=1.43.0     # GA tag (requires at least one RC, validates commit)
 
-.PHONY: nightly-tag rc-tag release-tag validate-version
+.PHONY: nightly-tag prev-ga-tag rc-tag release-tag validate-version validate-major
 
 validate-version:
 ifndef VERSION
 	$(error VERSION is required. Usage: make rc-tag VERSION=1.43.0)
 endif
 
-nightly-tag:
+validate-major:
+ifndef MAJOR
+	$(error MAJOR is required. Usage: make nightly-tag MAJOR=1)
+endif
+
+prev-ga-tag: validate-major
+	@git tag -l "v[0-9]*.[0-9]*.[0-9]*" | grep -v -- '-' | grep -vx -- "$(EXCLUDE)" | sed 's/^v//' | awk -F. -v major="$(MAJOR)" '$$1 <= major' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | sed 's/^/v/'
+
+nightly-tag: validate-major
 	@set -e; \
-	LATEST_TAG=$$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | grep -v -- '-' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | sed 's/^/v/'); \
+	LATEST_TAG=$$(git tag -l "v$(MAJOR).[0-9]*.[0-9]*" | grep -v -- '-' | sed 's/^v//' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1 | sed 's/^/v/'); \
 	if [ -z "$$LATEST_TAG" ]; then \
-		echo "Error: no existing release tags found. Cannot compute next version for nightly." >&2; \
-		exit 1; \
+		NEXT_VERSION="$(MAJOR).0.0"; \
+	else \
+		MINOR=$$(echo "$$LATEST_TAG" | sed 's/^v//; s/^[0-9]*\.//; s/\..*//' ); \
+		NEXT_VERSION="$(MAJOR).$$((MINOR + 1)).0"; \
 	fi; \
-	MAJOR=$$(echo "$$LATEST_TAG" | sed 's/^v//; s/\..*//' ); \
-	MINOR=$$(echo "$$LATEST_TAG" | sed 's/^v//; s/^[0-9]*\.//; s/\..*//' ); \
-	NEXT_MINOR=$$((MINOR + 1)); \
-	NEXT_VERSION="$$MAJOR.$$NEXT_MINOR.0"; \
 	DATE=$$(date -u +%Y%m%d); \
 	EXISTING=$$(git tag -l "v$$NEXT_VERSION-nightly.$$DATE" "v$$NEXT_VERSION-nightly.$$DATE.*" 2>/dev/null | wc -l | tr -d ' '); \
 	if [ "$$EXISTING" -eq 0 ]; then \
