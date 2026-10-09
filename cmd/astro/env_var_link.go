@@ -84,7 +84,7 @@ func linkVariableIDOrKey() (string, error) {
 // addressed by two flags rather than a positional.
 func newRemovedLinkCreateCmd() *cobra.Command {
 	return removedVerbStub("create", []string{"cr"}, func([]string) string {
-		return "`astro env variable link create` was removed in v2.\n" +
+		return "`astro env variable link create` was removed in Astro CLI v2.\n" +
 			"  use:  astro env variable link set --variable-key <key> --deployment <id>\n" +
 			"`set` links the deployment when it is not linked and updates the link when it is. " +
 			"It also treats --value as the whole override, so omitting it now CLEARS an existing " +

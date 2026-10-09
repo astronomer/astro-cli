@@ -1,5 +1,7 @@
 {
   "error": "x",
+  "code": -1,
+  "kind": "x",
   "typed_command": "x",
   "replacement": "x",
   "mapping": [

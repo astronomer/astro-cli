@@ -75,6 +75,9 @@ type treeUnderTest struct {
 	// execute is whether a test may run the tree, not only read it; see
 	// treeConfigs.
 	execute bool
+	// out is the writer the root was built with, where a command publishes
+	// its result (os.Stdout in production).
+	out *bytes.Buffer
 }
 
 // treesToExecute is the trees rootsUnderTest builds that a test may run.
@@ -172,15 +175,17 @@ func buildTree(t *testing.T, c treeConfig) treeUnderTest {
 			t.Fatal(err)
 		}
 	}
+	out := new(bytes.Buffer)
 	return treeUnderTest{
 		name:     c.name,
 		platform: c.platform,
 		execute:  c.execute,
+		out:      out,
 		root: newRootCmd(rootOptions{
 			platform:      c.platform,
 			loggedIn:      true,
 			houstonClient: houstonClient,
-			out:           new(bytes.Buffer),
+			out:           out,
 		}),
 	}
 }

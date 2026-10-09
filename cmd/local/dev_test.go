@@ -352,7 +352,7 @@ func TestDevStartReadsTheProjectAndTheTree(t *testing.T) {
 	if err := execute(t, d, "dev", "start", "--build-secret", "id=netrc,env=NETRC_CONTENT", "--output", "json"); err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	var payload devRemoved
+	var payload DevRemoved
 	if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
 		t.Fatalf("stdout is not one JSON object: %v\n%s", err, out.String())
 	}
@@ -380,8 +380,15 @@ func TestDevStubJSONOutput(t *testing.T) {
 	if err == nil {
 		t.Fatal("json mode must still fail")
 	}
+	// A usage error, as cobra's unknown command is, and the error object's
+	// keys lead the payload.
+	if code := cliout.ExitCode(context.Background(), err); code != cliout.ExitUsage {
+		t.Errorf("exit code = %d, want %d", code, cliout.ExitUsage)
+	}
 	var payload struct {
 		Error       string `json:"error"`
+		Code        int    `json:"code"`
+		Kind        string `json:"kind"`
 		Typed       string `json:"typed_command"`
 		Replacement string `json:"replacement"`
 		Mapping     []struct {
@@ -391,6 +398,9 @@ func TestDevStubJSONOutput(t *testing.T) {
 	}
 	if jsonErr := json.Unmarshal(out.Bytes(), &payload); jsonErr != nil {
 		t.Fatalf("stdout is not one JSON object: %v\n%s", jsonErr, out.String())
+	}
+	if payload.Code != cliout.ExitUsage || payload.Kind != string(cliout.KindUsage) || payload.Error != err.Error() {
+		t.Errorf("error object = %q, %d, %q; want %q, %d, %q", payload.Error, payload.Code, payload.Kind, err.Error(), cliout.ExitUsage, cliout.KindUsage)
 	}
 	if payload.Replacement != "astro local status" {
 		t.Errorf("replacement = %q, want astro local status", payload.Replacement)

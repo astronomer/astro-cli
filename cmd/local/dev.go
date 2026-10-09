@@ -23,13 +23,21 @@ type devReplacement = scaffold.DevReplacement
 
 func devReplacements() []devReplacement { return scaffold.DevReplacements() }
 
-// devRemoved is the data behind the stub's output: the JSON payload in json
-// mode, and the source the human message is rendered from.
-type devRemoved struct {
-	Error       string           `json:"error"`
-	Typed       string           `json:"typed_command,omitempty"`
-	Replacement string           `json:"replacement,omitempty"`
-	Mapping     []devReplacement `json:"mapping"`
+// DevRemoved is the data behind the stub's output: the JSON payload in json
+// mode, and the source the human message is rendered from. Its first three
+// keys are the error object every failure publishes (cliout.ErrorObject), so
+// a consumer reading only those reads it as it reads any other. Exported for
+// the assembled root's tests, which see it published and name its golden
+// (cmd/schema_test.go).
+type DevRemoved struct {
+	Error string `json:"error"`
+	// Code and Kind are set only in json mode: the usage error's exit status
+	// and kind.
+	Code        int                `json:"code"`
+	Kind        cliout.ProblemKind `json:"kind"`
+	Typed       string             `json:"typed_command,omitempty"`
+	Replacement string             `json:"replacement,omitempty"`
+	Mapping     []devReplacement   `json:"mapping"`
 	// Is1xProject is set when the current directory holds a 1.x
 	// project, which the replacements only work in once it is converted.
 	Is1xProject bool `json:"v1_project,omitempty"`
@@ -90,7 +98,10 @@ func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
 	})
+	// A usage error, the kind cobra's own unknown command is, as every other
+	// removed command's stub fails: it exits 2.
 	if devWantsJSON(args) {
+		payload.Code, payload.Kind = cliout.ExitUsage, cliout.KindUsage
 		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout, Style: c.d.JSONStyle}
 		if err := r.Emit(payload, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, renderDevRemoved(payload))
@@ -98,9 +109,11 @@ func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 		}); err != nil {
 			return err
 		}
-		return errors.New(payload.Error)
+		// The payload is the error object, with the mapping besides, so
+		// nothing is added on top of it.
+		return cliout.JSONShown(cliout.Usage(errors.New(payload.Error)))
 	}
-	return errors.New(renderDevRemoved(payload))
+	return cliout.Usage(errors.New(renderDevRemoved(payload)))
 }
 
 // devTypedSubcommand extracts what the user typed after `astro dev`: the
@@ -149,9 +162,9 @@ func devReplacementFor(typed string) (string, bool) {
 	return "", false
 }
 
-func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
+func buildDevRemoved(typed string, args []string, dc devContext) DevRemoved {
 	mapping := devReplacements()
-	p := devRemoved{
+	p := DevRemoved{
 		Typed:       strings.TrimSpace("astro dev " + typed),
 		Mapping:     mapping,
 		Is1xProject: dc.is1x,
@@ -296,7 +309,7 @@ func (c *cli) declaresDockerfile() bool {
 
 // renderDevRemoved is the human rendering of the same payload json mode
 // emits.
-func renderDevRemoved(p devRemoved) string {
+func renderDevRemoved(p DevRemoved) string {
 	var b strings.Builder
 	b.WriteString(p.Error)
 	switch {

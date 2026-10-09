@@ -151,6 +151,9 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// command on a machine that never logged in leaves no config/ state behind
 	// (config.initHome, and TestInitLeavesNoHomeConfigBehind in e2e).
 	coreDeps := local.NewDeps()
+	// The root's out, os.Stdout in production, so a test of the assembled
+	// root reads what a core command publishes where it reads the rest.
+	coreDeps.Stdout = o.out
 	wireLinkPickers(&coreDeps, o.platform, astroV1Client, o.out)
 	// A single positional argument is Otto's first message in an interactive
 	// session.

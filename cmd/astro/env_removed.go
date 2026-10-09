@@ -66,6 +66,10 @@ func removedVerbStub(verb string, aliases []string, guidance func(args []string)
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
 		SilenceUsage:       true,
+		// Overrides the env group's pre-run, which resolves the project and
+		// checks the login: the guidance should need neither, and a script
+		// on a machine that is logged out should still be told what to run.
+		PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
 		RunE: func(_ *cobra.Command, args []string) error {
 			return removedCmdError(guidance(args))
 		},
@@ -92,7 +96,7 @@ func removedCmdError(guidance string) error {
 // though: connection and metrics-export never took it, so offering it would
 // trade a dead verb for a dead flag.
 func removedVerbGuidance(verb, noun string, args []string) string {
-	head := fmt.Sprintf("`astro env %s %s` was removed in v2.\n", noun, verb)
+	head := fmt.Sprintf("`astro env %s %s` was removed in Astro CLI v2.\n", noun, verb)
 
 	if hasFromFileArg(args) && nounsWithFromFile[noun] {
 		return head + fmt.Sprintf(
