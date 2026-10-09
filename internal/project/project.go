@@ -37,15 +37,11 @@ type NotFoundError struct {
 	// marker, so without this the error would only say what is missing, not
 	// that `astro init` upgrades what is there.
 	Project1xDir string
-	// UnderAPC says the current context is Astro Private Cloud, where a 1.x
-	// project is not to be converted yet (Project1xUnderAPC). Set by
-	// AdviseUnderAPC, since this package does not read the context.
-	UnderAPC bool
 }
 
 func (e *NotFoundError) Error() string {
 	if e.Project1xDir != "" {
-		return project1xMessage(e.Start, e.Project1xDir, e.UnderAPC)
+		return project1xMessage(e.Start, e.Project1xDir)
 	}
 	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun `%s` to make this directory one",
 		Marker, e.Start, initCommand)
@@ -61,13 +57,11 @@ type NoAstroSectionError struct {
 	Dir   string
 	// Has1xProject is whether Dir also holds a 1.x project (see Is1xProject).
 	Has1xProject bool
-	// UnderAPC is NotFoundError.UnderAPC.
-	UnderAPC bool
 }
 
 func (e *NoAstroSectionError) Error() string {
 	if e.Has1xProject {
-		return project1xMessage(e.Start, e.Dir, e.UnderAPC)
+		return project1xMessage(e.Start, e.Dir)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
 		"Run `%s` in %s to add one; the rest of the file is left alone",
@@ -77,16 +71,17 @@ func (e *NoAstroSectionError) Error() string {
 func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection }
 
 // project1xMessage says that project1xDir holds a 1.x project and how to upgrade it,
-// naming the directory only when it is not the one the command ran in. Under
-// an Astro Private Cloud context (apc) it says what Project1xUnderAPC says
-// instead.
-func project1xMessage(start, project1xDir string, apc bool) string {
+// naming the directory only when it is not the one the command ran in.
+//
+// Under an Astro Private Cloud context (UnderAPC) it is Project1xUnderAPC
+// instead, which names the project's directory whatever the start.
+func project1xMessage(start, project1xDir string) string {
+	if UnderAPC() {
+		return Project1xUnderAPC(project1xDir)
+	}
 	where, there := "this directory", "here"
 	if project1xDir != start {
 		where, there = project1xDir, "in "+project1xDir
-	}
-	if apc {
-		return Project1xUnderAPC(where)
 	}
 	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
 		"Run `%s` %s to upgrade it in place", where, initCommand, there)
@@ -204,7 +199,7 @@ func HasManifest(dir string) bool {
 // directory a project with a manifest. `astro init` converts a 1.x directory,
 // reporting the 1.x files it could not read rather than refusing them, and
 // consults this only under an Astro Private Cloud context, where it refuses
-// one (Project1xUnderAPC).
+// one (Enclosing1xProject, Project1xUnderAPC).
 func Is1xProject(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
 		return false

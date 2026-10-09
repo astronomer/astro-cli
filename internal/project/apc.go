@@ -1,18 +1,36 @@
 package project
 
 import (
-	"errors"
-	"strings"
+	"path/filepath"
+	"sync/atomic"
 )
 
-// Project1xUnderAPC is the one account of a 1.x project under an Astro
-// Private Cloud context, where is the directory holding it as a sentence
-// begins with it. APC's deploy still builds the 1.x layout, so astro init
-// refuses to convert one there, and every hint that would otherwise say to
-// run it says this instead: astro init's refusal, the errors of a command run
-// in such a project, and the astro dev stub.
-func Project1xUnderAPC(where string) string {
-	return where + " holds a project made by Astro CLI 1.x (Dockerfile and .astro/), and the current context is " +
+// underAPC is whether the current context is Astro Private Cloud, whose
+// deploy still builds the 1.x layout, so a 1.x project there is not to be
+// converted yet. Package state, set once at startup (SetUnderAPC), because
+// the advice about a 1.x project is built in many places — this package's
+// errors, astro init, the astro dev stub, and whatever reports them — and
+// none of them reads the context: it lives in config/, which the core never
+// imports. One setting read where the message is built is what keeps them
+// from disagreeing.
+var underAPC atomic.Bool
+
+// SetUnderAPC records whether the current context is Astro Private Cloud.
+// The root calls it once, before any command runs. A test that sets it
+// restores it with t.Cleanup and does not run in parallel.
+func SetUnderAPC(apc bool) { underAPC.Store(apc) }
+
+// UnderAPC reports what SetUnderAPC recorded; false, Astro, when nothing did.
+func UnderAPC() bool { return underAPC.Load() }
+
+// Project1xUnderAPC is the one account of the 1.x project in dir under an
+// Astro Private Cloud context. APC's deploy still builds the 1.x layout, so
+// astro init refuses to convert one there, and every hint that would
+// otherwise say to run it says this instead: astro init's refusal, the
+// errors of a command run in or below such a project (project1xMessage), and
+// the astro dev stub.
+func Project1xUnderAPC(dir string) string {
+	return dir + " holds a project made by Astro CLI 1.x (Dockerfile and .astro/), and the current context is " +
 		"Astro Private Cloud, whose astro deploy still builds that layout. Leave the project as it is for now: " +
 		"astro deploy keeps working with it on Astro Private Cloud, and converting it will be available once " +
 		"Astro Private Cloud deploys pyproject.toml projects. To convert it anyway, for Astro or for local " +
@@ -20,36 +38,26 @@ func Project1xUnderAPC(where string) string {
 		"to sign in to Astro) and run " + initCommand + " again"
 }
 
-// AdviseUnderAPC returns err with a 1.x project's NotFoundError or
-// NoAstroSectionError in it marked as met under an Astro Private Cloud
-// context, so its message says what Project1xUnderAPC says. A wrapping
-// fmt.Errorf has already rendered the old message into its own, so that text
-// is replaced in the outer message too; errors.Is and errors.As still see
-// everything err wraps.
-func AdviseUnderAPC(err error) error {
-	var before, after string
-	var nf *NotFoundError
-	var ns *NoAstroSectionError
-	switch {
-	case errors.As(err, &nf) && nf.Project1xDir != "" && !nf.UnderAPC:
-		before = nf.Error()
-		nf.UnderAPC = true
-		after = nf.Error()
-	case errors.As(err, &ns) && ns.Has1xProject && !ns.UnderAPC:
-		before = ns.Error()
-		ns.UnderAPC = true
-		after = ns.Error()
-	default:
-		return err
+// Enclosing1xProject is the 1.x project start is in or below, the one
+// Discover would name, or "" when there is none: the walk up stops at a
+// directory that is already a project (HasManifest), as a 1.x project inside
+// it is that project's business. start need not exist yet.
+func Enclosing1xProject(start string) string {
+	abs, err := filepath.Abs(start)
+	if err != nil {
+		return ""
 	}
-	return &advisedError{err: err, msg: strings.Replace(err.Error(), before, after, 1)}
+	for dir := abs; ; {
+		if Is1xProject(dir) {
+			return dir
+		}
+		if HasManifest(dir) {
+			return ""
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }
-
-// advisedError is err with its message rewritten by AdviseUnderAPC.
-type advisedError struct {
-	err error
-	msg string
-}
-
-func (e *advisedError) Error() string { return e.msg }
-func (e *advisedError) Unwrap() error { return e.err }

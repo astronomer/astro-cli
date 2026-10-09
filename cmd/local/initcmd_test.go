@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -296,7 +297,7 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 	for _, format := range []string{"text", "json"} {
 		t.Run(format, func(t *testing.T) {
 			d, dir, stdout := initDeps(t)
-			d.DeploysToAPC = true
+			setUnderAPC(t)
 			files := write1xProject(t, dir)
 			before := listTree(t, dir)
 
@@ -385,7 +386,7 @@ func TestInitConverts1xProjectUnderAstro(t *testing.T) {
 // and says nothing of APC.
 func TestInitScaffoldsUnderAPCWithANote(t *testing.T) {
 	d, dir, stdout := initDeps(t)
-	d.DeploysToAPC = true
+	setUnderAPC(t)
 	if err := execute(t, d, "init"); err != nil {
 		t.Fatalf("astro init: %v", err)
 	}
@@ -406,34 +407,119 @@ func TestInitScaffoldsUnderAPCWithANote(t *testing.T) {
 	}
 }
 
+// setUnderAPC records an APC context for one test, as the root does at
+// startup, and puts it back. Tests that call it do not run in parallel.
+func setUnderAPC(t *testing.T) {
+	t.Helper()
+	project.SetUnderAPC(true)
+	t.Cleanup(func() { project.SetUnderAPC(false) })
+}
+
+// Under APC, init refuses a directory inside a 1.x project too, as discovery
+// would find it, naming the project rather than the directory it ran in.
+func TestInitRefusesInsideA1xProjectUnderAPC(t *testing.T) {
+	for _, args := range [][]string{{"init"}, {"init", "fresh"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			d, root, _ := initDeps(t)
+			setUnderAPC(t)
+			files := write1xProject(t, root)
+			sub := filepath.Join(root, "dags")
+			if err := os.Mkdir(sub, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			d.WorkingDir = func() (string, error) { return sub, nil }
+			before := listTree(t, root)
+			err := execute(t, d, args...)
+			if err == nil || !cliout.IsUsage(err) {
+				t.Fatalf("want a usage error, got %v", err)
+			}
+			requireAPCAdvice(t, err, root)
+			requireUnchanged(t, root, before, files)
+		})
+	}
+}
+
 // Under APC, every other hint about a 1.x project says what init's refusal
-// says rather than to run astro init: a command that discovers the project,
-// and the astro dev stub. Under Astro they still say to convert.
+// says rather than to run astro init, in text and json: a command that
+// discovers the project, and the astro dev stub. Under Astro they still say
+// to convert.
 func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
 	for _, apc := range []bool{true, false} {
 		t.Run(map[bool]string{true: "apc", false: "astro"}[apc], func(t *testing.T) {
-			d, dir, _ := initDeps(t)
-			d.DeploysToAPC = apc
+			d, dir, stdout := initDeps(t)
+			if apc {
+				setUnderAPC(t)
+			}
 			write1xProject(t, dir)
+			advice := project.Project1xUnderAPC(dir)
 
 			err := execute(t, d, "local", "status")
 			if err == nil {
 				t.Fatal("astro local status in a 1.x project must fail")
 			}
-			if got := strings.Contains(err.Error(), project.Project1xUnderAPC("this directory")); got != apc {
+			if got := strings.Contains(err.Error(), advice); got != apc {
 				t.Errorf("discovery error carries the APC advice = %v, want %v:\n%v", got, apc, err)
+			}
+			if err := execute(t, d, "local", "status", "-o", "json"); err == nil ||
+				strings.Contains(stdout.String(), "astro init` here") == apc {
+				t.Errorf("json discovery error under apc = %v:\n%s", apc, stdout)
 			}
 
 			err = execute(t, d, "dev", "start")
 			if err == nil {
 				t.Fatal("astro dev must fail")
 			}
-			if got := strings.Contains(err.Error(), project.Project1xUnderAPC("This directory")); got != apc {
+			if got := strings.Contains(err.Error(), advice); got != apc {
 				t.Errorf("dev stub carries the APC advice = %v, want %v:\n%v", got, apc, err)
 			}
 			if converts := strings.Contains(err.Error(), "to convert it in place"); converts == apc {
 				t.Errorf("dev stub says to convert = %v under apc = %v:\n%v", converts, apc, err)
 			}
 		})
+	}
+}
+
+// Under APC the astro dev stub in a 1.x project says in json what it says in
+// text: under_apc, the advice in notes, and no astro init, neither as the
+// replacement for astro dev init nor in the mapping. A build secret still
+// means the project builds in Docker mode once converted.
+func TestTheDevStubUnderAPC(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	setUnderAPC(t)
+	write1xProject(t, dir)
+
+	err := execute(t, d, "dev", "init", "-o", "json")
+	if err == nil {
+		t.Fatal("astro dev must fail")
+	}
+	var p devRemoved
+	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
+		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
+	}
+	if !p.UnderAPC || !p.Is1xProject || p.Convert != "" || p.Replacement != "" {
+		t.Errorf("payload = %+v", p)
+	}
+	if !slices.Contains(p.Notes, project.Project1xUnderAPC(dir)) {
+		t.Errorf("notes lack the APC advice: %q", p.Notes)
+	}
+	for _, m := range p.Mapping {
+		if m.Replacement == replaceInit {
+			t.Errorf("the mapping offers %s under APC", replaceInit)
+		}
+	}
+	text := renderDevRemoved(p)
+	for _, n := range p.Notes {
+		if !strings.Contains(text, n) {
+			t.Errorf("text lacks the note %q:\n%s", n, text)
+		}
+	}
+	if strings.Contains(text, "# was: astro dev init") || strings.Contains(text, "Use `"+replaceInit) {
+		t.Errorf("text offers %s under APC:\n%s", replaceInit, text)
+	}
+
+	stdout.Reset()
+	err = execute(t, d, "dev", "start", "--build-secret", "id=mysecret,src=secret.txt")
+	if err == nil || !strings.Contains(err.Error(), replaceStart+" --docker") {
+		t.Errorf("a build secret still means Docker mode under APC:\n%v", err)
 	}
 }

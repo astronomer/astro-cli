@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 )
@@ -51,6 +52,10 @@ func detectRootOptions() rootOptions {
 	if !context.IsCloudContext() {
 		platform = apcPlatform
 	}
+	// Once, before any command runs and from the same check: under an APC
+	// context, whose deploy still builds the 1.x layout, everything that
+	// speaks of a 1.x project says so (project.SetUnderAPC).
+	project.SetUnderAPC(platform == apcPlatform)
 	return rootOptions{
 		platform:      platform,
 		loggedIn:      true,
@@ -155,9 +160,6 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// A single positional argument is Otto's first message in an interactive
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
-	// The deploy this tree mounted: APC's still builds the 1.x layout, so
-	// astro init refuses to convert a 1.x project under it.
-	coreDeps.DeploysToAPC = !isCloudCtx
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)

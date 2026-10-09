@@ -4,7 +4,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/project"
 )
 
 // AddCmds returns every top-level core command, ready to register on a root.
@@ -34,27 +33,8 @@ func AddCmds(d Deps) []*cobra.Command {
 	cmds = append(cmds, rootAliasCmds(d)...)
 	for _, cmd := range cmds {
 		silenceUsage(cmd)
-		if d.DeploysToAPC {
-			adviseUnderAPC(cmd)
-		}
 	}
 	return cmds
-}
-
-// adviseUnderAPC makes every command in the tree report a 1.x project the way
-// astro init's refusal does under an Astro Private Cloud context
-// (project.AdviseUnderAPC), rather than say to run astro init, which refuses
-// there. A command meets one through project discovery, from many places, so
-// it is done once here around each command's RunE.
-func adviseUnderAPC(cmd *cobra.Command) {
-	for _, sub := range cmd.Commands() {
-		adviseUnderAPC(sub)
-	}
-	if run := cmd.RunE; run != nil {
-		cmd.RunE = func(c *cobra.Command, args []string) error {
-			return project.AdviseUnderAPC(run(c, args))
-		}
-	}
 }
 
 // queryFamilies builds every Airflow-facing command family from one

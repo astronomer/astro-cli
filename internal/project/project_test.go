@@ -250,24 +250,40 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 	})
 }
 
-// Under an Astro Private Cloud context a 1.x project's errors give the one
-// APC account rather than say to run astro init, through any wrapping; other
-// errors, and a directory with no 1.x project, are left as they were.
-func TestAdviseUnderAPC(t *testing.T) {
-	nf := &NotFoundError{Start: "/p", Project1xDir: "/p"}
-	before := nf.Error()
-	require.Contains(t, before, "Run `astro init`")
-	err := AdviseUnderAPC(fmt.Errorf("wrapped: %w", nf))
-	assert.Equal(t, "wrapped: "+Project1xUnderAPC("this directory"), err.Error())
-
-	ns := &NoAstroSectionError{Start: "/p/dags", Dir: "/p", Has1xProject: true}
-	assert.Equal(t, Project1xUnderAPC("/p"), AdviseUnderAPC(ns).Error())
-
+// Under an Astro Private Cloud context (SetUnderAPC) a 1.x project's errors
+// give the one APC account, naming the project's directory, rather than say
+// to run astro init, however they are wrapped; an error about no 1.x project
+// is unchanged. Not parallel: it flips package state.
+func TestUnderAPCAdvice(t *testing.T) {
+	nf := &NotFoundError{Start: "/p/dags", Project1xDir: "/p"}
+	ns := &NoAstroSectionError{Start: "/p", Dir: "/p", Has1xProject: true}
 	plain := &NotFoundError{Start: "/q"}
-	want := plain.Error()
-	assert.Equal(t, want, AdviseUnderAPC(plain).Error())
-	assert.NoError(t, AdviseUnderAPC(nil))
+	require.Contains(t, nf.Error(), "Run `astro init`")
+	plainBefore := plain.Error()
+
+	SetUnderAPC(true)
+	t.Cleanup(func() { SetUnderAPC(false) })
+	assert.Equal(t, "wrapped: "+Project1xUnderAPC("/p"), fmt.Errorf("wrapped: %w", nf).Error())
+	assert.Equal(t, Project1xUnderAPC("/p"), ns.Error())
+	assert.Equal(t, plainBefore, plain.Error())
 	assert.NotContains(t, Project1xUnderAPC("/p"), "`")
+}
+
+// Enclosing1xProject finds the 1.x project a directory is in or below, as
+// discovery does, and stops at a project with a manifest.
+func TestEnclosing1xProject(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".astro"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "dags", "inner"), 0o755))
+
+	assert.Equal(t, root, Enclosing1xProject(root))
+	assert.Equal(t, root, Enclosing1xProject(filepath.Join(root, "dags", "inner")))
+	assert.Equal(t, root, Enclosing1xProject(filepath.Join(root, "dags", "not-yet")))
+
+	writeManifest(t, filepath.Join(root, "dags"), validManifest)
+	assert.Empty(t, Enclosing1xProject(filepath.Join(root, "dags", "inner")), "a project inside stops the walk")
+	assert.Empty(t, Enclosing1xProject(t.TempDir()))
 }
 
 func TestLoadError(t *testing.T) {

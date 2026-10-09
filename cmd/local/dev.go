@@ -37,21 +37,24 @@ type devRemoved struct {
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
 	// Convert is the command that converts a 1.x project in place, set with
-	// Is1xProject unless the current context is Astro Private Cloud, where
-	// astro init refuses one.
+	// Is1xProject unless UnderAPC.
 	Convert string `json:"convert,omitempty"`
-	// underAPC says the stub ran under an Astro Private Cloud context, for
-	// the text rendering's account of a 1.x project.
-	underAPC bool
+	// UnderAPC is set with Is1xProject when the current context is Astro
+	// Private Cloud, where astro init refuses a 1.x project: Notes then say
+	// why it stays as it is and how to convert it anyway, the mapping leaves
+	// out astro init, and nothing names a command to convert with.
+	UnderAPC bool `json:"under_apc,omitempty"`
 }
 
 // devContext is what the stub reads about the directory it runs in and the
 // command tree it points into.
 type devContext struct {
 	is1x bool
+	// dir1x is the 1.x project's directory, set with is1x.
+	dir1x string
 	// apc is set under an Astro Private Cloud context, where astro init
-	// refuses a 1.x project, so the stub says what that refusal says
-	// (project.Project1xUnderAPC) rather than to convert.
+	// refuses a 1.x project, so the stub gives project.Project1xUnderAPC's
+	// account of one rather than say to convert it.
 	apc bool
 	// dockerfile is set when the current project declares [tool.astro]
 	// dockerfile, which only Docker mode builds.
@@ -92,9 +95,11 @@ func NewDevCmd(d Deps) *cobra.Command {
 }
 
 func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
+	dir1x := c.project1xDir()
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
-		is1x:               c.is1xProject(),
-		apc:                c.d.DeploysToAPC,
+		is1x:               dir1x != "",
+		dir1x:              dir1x,
+		apc:                project.UnderAPC(),
 		dockerfile:         c.declaresDockerfile(),
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
@@ -164,10 +169,14 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 		Typed:       strings.TrimSpace("astro dev " + typed),
 		Mapping:     mapping,
 		Is1xProject: dc.is1x,
-		underAPC:    dc.apc,
 	}
-	if dc.is1x && !dc.apc {
-		p.Convert = replaceInit
+	// Under APC a 1.x project stays as it is (project.Project1xUnderAPC), so
+	// nothing offers astro init, which refuses it there.
+	stays := dc.is1x && dc.apc
+	if dc.is1x {
+		if !stays {
+			p.Convert = replaceInit
+		}
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
 		// project builds it in Docker mode.
@@ -175,20 +184,28 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 			dc.dockerfile = true
 		}
 	}
+	if stays {
+		p.UnderAPC = true
+		p.Mapping = slices.DeleteFunc(slices.Clone(mapping), func(m devReplacement) bool { return m.Replacement == replaceInit })
+	}
 	if typed == "" {
 		p.Error = "astro dev was removed in Astro CLI v2"
-		return p
-	}
-	if replacement, ok := devReplacementFor(typed); ok {
-		p.Replacement = replacement
-		switch replacement {
-		case replaceStart, replaceRestart:
-			p.Replacement, p.Notes = devStartReplacement(replacement, args, dc)
-		case replacePackage:
-			p.Replacement, p.Notes = devBuildReplacement(args, dc)
+	} else {
+		if replacement, ok := devReplacementFor(typed); ok && (!stays || replacement != replaceInit) {
+			p.Replacement = replacement
+			switch replacement {
+			case replaceStart, replaceRestart:
+				p.Replacement, p.Notes = devStartReplacement(replacement, args, dc)
+			case replacePackage:
+				p.Replacement, p.Notes = devBuildReplacement(args, dc)
+			}
 		}
+		p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
 	}
-	p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
+	if stays {
+		p.Notes = append(p.Notes, project.Project1xUnderAPC(dc.dir1x),
+			"The astro local commands work only in a converted project, which Astro Private Cloud cannot deploy yet")
+	}
 	return p
 }
 
@@ -325,7 +342,9 @@ func renderDevRemoved(p devRemoved) string {
 	examples := []devReplacement{
 		{Command: nameStart, Replacement: replaceStart},
 		{Command: nameLogs, Replacement: replaceLogs},
-		{Command: nameInit, Replacement: replaceInit},
+	}
+	if !p.UnderAPC {
+		examples = append(examples, devReplacement{Command: nameInit, Replacement: replaceInit})
 	}
 	if p.Replacement != "" {
 		typed := devReplacement{Command: strings.TrimPrefix(p.Typed, "astro dev "), Replacement: p.Replacement}
@@ -339,10 +358,8 @@ func renderDevRemoved(p devRemoved) string {
 		seen[e.Command] = true
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
-	switch {
-	case p.Is1xProject && p.underAPC:
-		b.WriteString("\n\n" + project.Project1xUnderAPC("This directory") + ".")
-	case p.Is1xProject:
+	// Under APC, Notes above already gave the account of the 1.x project.
+	if p.Is1xProject && !p.UnderAPC {
 		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
 			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
 			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
@@ -350,12 +367,12 @@ func renderDevRemoved(p devRemoved) string {
 	return b.String()
 }
 
-// is1xProject reports whether the working directory holds a 1.x project,
-// per project.Is1xProject.
-func (c *cli) is1xProject() bool {
+// project1xDir is the working directory when it holds a 1.x project, per
+// project.Is1xProject, and "" otherwise.
+func (c *cli) project1xDir() string {
 	wd, err := c.d.WorkingDir()
-	if err != nil {
-		return false
+	if err != nil || !project.Is1xProject(wd) {
+		return ""
 	}
-	return project.Is1xProject(wd)
+	return wd
 }

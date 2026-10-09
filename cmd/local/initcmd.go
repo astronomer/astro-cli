@@ -90,7 +90,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// Only a run that made the directory a project gets here: init refuses one
 	// that already is (scaffold.ErrAlreadyAstroProject), so the note is said
 	// once, when the project is new.
-	if c.d.DeploysToAPC {
+	if project.UnderAPC() {
 		res.Notes = append(res.Notes, apcDeployNote)
 	}
 	return r.Emit(res, func(w io.Writer) error {
@@ -104,17 +104,20 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // converted under an APC context would stop deploying there. Until APC
 // deploys pyproject.toml projects, init refuses to convert one under an APC
 // context and changes nothing (project.Project1xUnderAPC says why, and how to
-// convert anyway). A directory that is not a 1.x project
-// (project.Is1xProject) is made a project as anywhere, with a note that APC
-// cannot deploy it yet.
+// convert anyway). A directory in or below no 1.x project is made a project
+// as anywhere, with a note that APC cannot deploy it yet.
 
-// refuse1xUnderAPC refuses a 1.x project under an APC context, as a usage
-// error: nothing ran, and nothing was written.
+// refuse1xUnderAPC refuses, under an APC context, a dir that is a 1.x project
+// or lies inside one (project.Enclosing1xProject, the walk discovery makes),
+// as a usage error naming that project: nothing ran, and nothing was written.
 func (c *cli) refuse1xUnderAPC(dir string) error {
-	if !c.d.DeploysToAPC || !project.Is1xProject(dir) {
+	if !project.UnderAPC() {
 		return nil
 	}
-	return cliout.Usage(errors.New(project.Project1xUnderAPC(dir)))
+	if found := project.Enclosing1xProject(dir); found != "" {
+		return cliout.Usage(errors.New(project.Project1xUnderAPC(found)))
+	}
+	return nil
 }
 
 // apcDeployNote says that a project init just made does not deploy to the
