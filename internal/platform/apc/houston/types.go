@@ -124,6 +124,11 @@ type Deployment struct {
 	UpdatedAt             time.Time           `json:"updatedAt"`
 	DagDeployment         DagDeploymentConfig `json:"dagDeployment"`
 	ClusterID             string              `json:"clusterId"`
+	// DagDeploymentRead is whether the query this Deployment was read with
+	// asked for its dagDeployment. GetDeployment does from 0.29.0 on, by the
+	// query it chose; before that, and from any other query, an empty
+	// DagDeployment.Type says nothing about the Deployment.
+	DagDeploymentRead bool `json:"-"`
 }
 
 type DagDeploymentConfig struct {
