@@ -117,11 +117,10 @@ func (e *removedFlagErr) Error() string { return e.msg }
 // before any pre-run logs in or asks an API anything, and as a usage error
 // (exit 2), which Execute reports under --output json as the error object.
 func removedFlagError(cmd *cobra.Command, err error) error {
-	var notExist *pflag.NotExistError
-	if !errors.As(err, &notExist) {
+	typed, isShorthand, spelling := unknownFlag(err)
+	if spelling == "" {
 		return nil
 	}
-	typed, isShorthand := notExist.GetSpecifiedName(), notExist.GetSpecifiedShortnames() != ""
 	v1 := v1FlagOn(cmd, typed, isShorthand)
 	if v1 == nil {
 		return nil
@@ -129,10 +128,6 @@ func removedFlagError(cmd *cobra.Command, err error) error {
 	f := findRemovedFlag(cmd, v1.name)
 	if f == nil {
 		return nil
-	}
-	spelling := "--" + typed
-	if isShorthand {
-		spelling = "-" + typed
 	}
 	return cliout.Usage(&removedFlagErr{f.message(cmd, spelling)})
 }
@@ -185,7 +180,8 @@ func forceRemoved(cmd *cobra.Command, typed string) string {
 	if yes.Shorthand != "" {
 		spelled += " (-" + yes.Shorthand + ")"
 	}
-	if yes.Changed {
+	// Changed alone would include --yes=false, which skips nothing.
+	if yes.Changed && yes.Value.String() == "true" {
 		return "--force was removed in Astro CLI v2: " + spelled + ", which you passed, already skips the confirmation, so drop " + typed
 	}
 	return "--force was removed in Astro CLI v2: use " + spelled
@@ -211,21 +207,33 @@ const (
 	v1TreeAnnotation  = "v1-tree"
 )
 
-// markV1Tree records on root which of 1.x's trees a script on this machine
-// was written against: APC's, or Astro's for a hosted organization or not,
-// decided as cmd/astro decides the hosted-only flags it registers.
+// markV1Tree records on root which platform's 1.x tree a script on this
+// machine was written against, APC's or Astro's. Whether Astro's is the one
+// for a hosted organization is left to v1TreeOf, so that building a root reads
+// no context: only a run that passes an unknown flag, or asks for
+// completions, needs to know.
 func markV1Tree(root *cobra.Command, platform string) {
 	tree := v1TreeAstro
-	switch {
-	case platform == apcPlatform:
+	if platform == apcPlatform {
 		tree = v1TreeAPC
-	case organization.IsOrgHosted():
-		tree = v1TreeAstroHosted
 	}
 	if root.Annotations == nil {
 		root.Annotations = map[string]string{}
 	}
 	root.Annotations[v1TreeAnnotation] = tree
+}
+
+// v1TreeOf is the 1.x tree a script was written against on the machine root
+// was built on: APC's, or Astro's for a hosted organization or not, decided
+// as cmd/astro decides the hosted-only flags it registers. A run reads it at
+// most a few times, when a flag fails to parse or a shell asks for
+// completions, and the context does not change in between.
+func v1TreeOf(root *cobra.Command) string {
+	tree := root.Annotations[v1TreeAnnotation]
+	if tree == v1TreeAstro && organization.IsOrgHosted() {
+		return v1TreeAstroHosted
+	}
+	return tree
 }
 
 // v1FlagsFile is every flag 1.x had, on every command, in each tree.
@@ -241,19 +249,27 @@ type v1Flag struct {
 }
 
 // v1Flags is v1_flags.tsv, read the first time a run needs it: a run that
-// passes no unknown flag never does.
-var v1Flags = sync.OnceValue(func() []v1Flag {
-	flags, err := parseV1Flags(v1FlagsFile)
+// passes no unknown flag never does. A file that does not parse is
+// TestV1FlagsFileIsWellFormed's to catch; a run given one reports every flag
+// it does not know as cobra does, rather than failing over a tombstone.
+var v1Flags = sync.OnceValue(func() []v1Flag { return loadV1Flags(v1FlagsFile) })
+
+// loadV1Flags is the flags in file, or none when it does not parse.
+func loadV1Flags(file string) []v1Flag {
+	flags, err := parseV1Flags(file)
 	if err != nil {
-		panic(err) // embedded, and read by every test of this file
+		return nil
 	}
 	return flags
-})
+}
 
+// parseV1Flags reads v1_flags.tsv. It takes CRLF line ends as well as LF:
+// .gitattributes pins the file to LF, but a checkout that predates that, or
+// a tool that rewrites it, embeds whatever is on disk.
 func parseV1Flags(file string) ([]v1Flag, error) {
 	var flags []v1Flag
 	for line := range strings.Lines(file) {
-		line = strings.TrimSuffix(line, "\n")
+		line = strings.TrimRight(line, "\r\n")
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -269,22 +285,57 @@ func parseV1Flags(file string) ([]v1Flag, error) {
 // v1FlagsOn is every flag 1.x had on the command at cmd's path, in the tree
 // cmd's root was built for.
 func v1FlagsOn(cmd *cobra.Command) []v1Flag {
-	tree, path := cmd.Root().Annotations[v1TreeAnnotation], pathBelowRoot(cmd)
+	return v1FlagsAt(v1Flags(), v1TreeOf(cmd.Root()), pathSpellings(cmd), false)
+}
+
+// v1FlagsAt is every flag in flags that tree had on a command at one of paths,
+// or, with below, on one of those commands or anything under it.
+func v1FlagsAt(flags []v1Flag, tree string, paths []string, below bool) []v1Flag {
 	var on []v1Flag
-	for _, f := range v1Flags() {
-		if f.path == path && slices.Contains(f.trees, tree) {
+	for _, f := range flags {
+		if !slices.Contains(f.trees, tree) {
+			continue
+		}
+		if slices.ContainsFunc(paths, func(p string) bool {
+			return f.path == p || (below && strings.HasPrefix(f.path, p+" "))
+		}) {
 			on = append(on, f)
 		}
 	}
 	return on
 }
 
+// pathSpellings is every way to type cmd's path below the root, each word
+// its command's name or one of its aliases, the names alone first: a command
+// v2 renamed and kept the 1.x name of as an alias is at the 1.x path under
+// one of these.
+func pathSpellings(cmd *cobra.Command) []string {
+	if !cmd.HasParent() {
+		return nil
+	}
+	names := append([]string{cmd.Name()}, cmd.Aliases...)
+	if !cmd.Parent().HasParent() {
+		return names
+	}
+	var out []string
+	for _, parent := range pathSpellings(cmd.Parent()) {
+		for _, name := range names {
+			out = append(out, parent+" "+name)
+		}
+	}
+	return out
+}
+
 // v1FlagOn is the flag 1.x had on cmd typed as typed (a shorthand's letter
 // when isShorthand), or nil when it had none.
 func v1FlagOn(cmd *cobra.Command, typed string, isShorthand bool) *v1Flag {
-	for _, f := range v1FlagsOn(cmd) {
-		if (isShorthand && f.shorthand == typed) || (!isShorthand && f.name == typed) {
-			return &f
+	return findV1Flag(v1FlagsOn(cmd), typed, isShorthand)
+}
+
+func findV1Flag(flags []v1Flag, typed string, isShorthand bool) *v1Flag {
+	for i := range flags {
+		if f := &flags[i]; (isShorthand && f.shorthand == typed) || (!isShorthand && f.name == typed) {
+			return f
 		}
 	}
 	return nil
@@ -313,7 +364,7 @@ func isRemovedFlagErr(err error) bool {
 // fails the completion on any flag it does not know. So the command it
 // completes gets each removed flag 1.x had on it as a hidden flag of the
 // same arity, which offers nothing and runs nothing, since a completion
-// request never runs the command.
+// request never runs the command (acceptForCompletion).
 func acceptRemovedFlags(root *cobra.Command, args []string) {
 	if isShellCompletion(args) {
 		if len(args) > 1 {
@@ -332,26 +383,161 @@ func acceptRemovedFlags(root *cobra.Command, args []string) {
 	})
 }
 
+// acceptForCompletion readies the tree for a completion request whose words
+// before the one being completed are args.
+//
+// Cobra finds the command to complete as it finds one to run, and there it
+// takes a flag it does not know on the command it has reached so far to have
+// a value: `api airflow --json ls` would hide ls behind 1.x's boolean --json.
+// So the walk here follows cobra's, and a flag the command reached so far does
+// not have, that 1.x had on it or on something under it, is added to that
+// command as a hidden flag of 1.x's arity first, which is what cobra then
+// reads. The command the walk ends on then gets every removed flag 1.x had
+// on it, as cobra parses them all there: but only when a flag typed is one it
+// does not have, so a request that passes no unknown flag (nearly all) never
+// reads the inventory.
 func acceptForCompletion(root *cobra.Command, args []string) {
-	cmd, _, err := root.Find(args)
-	if err != nil || cmd.DisableFlagParsing {
-		return
-	}
-	for _, f := range v1FlagsOn(cmd) {
-		if cmd.Flag(f.name) != nil || findRemovedFlag(cmd, f.name) == nil {
+	cmd, descend := root, true
+	var typed []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			break
+		}
+		if strings.HasPrefix(arg, "-") && arg != "-" {
+			typed = append(typed, arg)
+			if descend {
+				hasTypedFlag(cmd, arg, true)
+				if consumesNextValue(mergedFlags(cmd), arg) {
+					i++
+				}
+			}
 			continue
 		}
-		shorthand := f.shorthand
-		if shorthand == "h" || cmd.LocalFlags().ShorthandLookup(shorthand) != nil || cmd.InheritedFlags().ShorthandLookup(shorthand) != nil {
-			shorthand = ""
+		if descend {
+			if sub := subcommandNamed(cmd, arg); sub != nil {
+				cmd = sub
+			} else {
+				descend = false
+			}
 		}
-		if f.isBool {
-			cmd.Flags().BoolP(f.name, shorthand, false, "")
-		} else {
-			cmd.Flags().StringP(f.name, shorthand, "", "")
-		}
-		_ = cmd.Flags().MarkHidden(f.name) //nolint:errcheck // it was registered on the line above
 	}
+	if cmd.DisableFlagParsing || !slices.ContainsFunc(typed, func(arg string) bool { return !hasTypedFlag(cmd, arg, false) }) {
+		return
+	}
+	on := v1FlagsOn(cmd)
+	for i := range on {
+		if findRemovedFlag(cmd, on[i].name) != nil {
+			addHiddenFlag(cmd, &on[i])
+		}
+	}
+}
+
+// hasTypedFlag reports whether cmd has every flag arg names that pflag would
+// read: a long flag, or each letter of a shorthand group up to one that takes
+// the rest as its value. With accept, a flag cmd lacks that 1.x had on cmd or
+// below it is added to cmd first, hidden (addHiddenFlag).
+func hasTypedFlag(cmd *cobra.Command, arg string, accept bool) bool {
+	v1Below := func(typed string, isShorthand bool) *v1Flag {
+		if !accept {
+			return nil
+		}
+		return v1FlagBelow(cmd, typed, isShorthand)
+	}
+	if name, ok := strings.CutPrefix(arg, "--"); ok {
+		name, _, _ = strings.Cut(name, "=")
+		if cmd.Flag(name) != nil {
+			return true
+		}
+		if f := v1Below(name, false); f != nil {
+			addHiddenFlag(cmd, f)
+		}
+		return cmd.Flag(name) != nil
+	}
+	letters, _, _ := strings.Cut(arg[1:], "=")
+	for i := range len(letters) {
+		letter := letters[i : i+1]
+		flag := shorthandFlag(cmd, letter)
+		if flag == nil {
+			if f := v1Below(letter, true); f != nil {
+				addHiddenFlag(cmd, f)
+				flag = shorthandFlag(cmd, letter)
+			}
+		}
+		if flag == nil {
+			return false
+		}
+		if flag.NoOptDefVal == "" {
+			return true // the rest of the group is its value
+		}
+	}
+	return true
+}
+
+// v1FlagBelow is the flag 1.x had typed as typed on cmd, or failing that on
+// the commands under it, when those agree on whether it takes a value: -f
+// was --force on some and --raw-field on others, and the arity is all a
+// completion needs of it. nil when there is none, or they disagree.
+func v1FlagBelow(cmd *cobra.Command, typed string, isShorthand bool) *v1Flag {
+	if f := v1FlagOn(cmd, typed, isShorthand); f != nil {
+		return f
+	}
+	var found *v1Flag
+	for _, f := range v1FlagsAt(v1Flags(), v1TreeOf(cmd.Root()), pathSpellings(cmd), true) {
+		if (isShorthand && f.shorthand != typed) || (!isShorthand && f.name != typed) {
+			continue
+		}
+		if found != nil && found.isBool != f.isBool {
+			return nil
+		}
+		found = &f
+	}
+	return found
+}
+
+// addHiddenFlag gives cmd 1.x's flag f as a hidden flag of the same arity,
+// for a completion request to parse, unless cmd has a flag of that name. It
+// drops a shorthand cmd uses already, as pflag panics on a second one.
+func addHiddenFlag(cmd *cobra.Command, f *v1Flag) {
+	if cmd.Flag(f.name) != nil {
+		return
+	}
+	shorthand := f.shorthand
+	if shorthand == "h" || shorthandFlag(cmd, shorthand) != nil {
+		shorthand = ""
+	}
+	if f.isBool {
+		cmd.Flags().BoolP(f.name, shorthand, false, "")
+	} else {
+		cmd.Flags().StringP(f.name, shorthand, "", "")
+	}
+	_ = cmd.Flags().MarkHidden(f.name) //nolint:errcheck // it was registered on the line above
+}
+
+func shorthandFlag(cmd *cobra.Command, letter string) *pflag.Flag {
+	if f := cmd.LocalFlags().ShorthandLookup(letter); f != nil {
+		return f
+	}
+	return cmd.InheritedFlags().ShorthandLookup(letter)
+}
+
+// mergedFlags is every flag cmd takes, its own and those it inherits, as
+// cobra merges them before it parses.
+func mergedFlags(cmd *cobra.Command) *pflag.FlagSet {
+	flags := cmd.Flags()
+	flags.AddFlagSet(cmd.InheritedFlags())
+	return flags
+}
+
+// subcommandNamed is cmd's subcommand called name or aliased to it, as cobra
+// matches one, or nil.
+func subcommandNamed(cmd *cobra.Command, name string) *cobra.Command {
+	for _, sub := range cmd.Commands() {
+		if sub.Name() == name || sub.HasAlias(name) {
+			return sub
+		}
+	}
+	return nil
 }
 
 // asksForHelp reports whether args pass -h or --help as a word of their own

@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	astrocontext "github.com/astronomer/astro-cli/context"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // The trees the removed-flag tests run: Astro for a non-hosted organization
@@ -197,6 +199,8 @@ func TestRemovedForceSaysWhenYesIsAlreadyThere(t *testing.T) {
 		{[]string{"--yes=true", "--force"}, passed + "--force"},
 		{[]string{"-fy"}, use},
 		{[]string{"--force", "--yes"}, use},
+		{[]string{"--yes=false", "--force"}, use},
+		{[]string{"--yes=false", "-f"}, use},
 		{[]string{"-fh"}, use},
 	} {
 		args := append([]string{"deployment", "delete", "dep-id"}, tc.flags...)
@@ -346,6 +350,14 @@ func TestRemovedFlagsLeaveCompletionsAlone(t *testing.T) {
 		{[]string{"__complete", "deployment", "list", "--json", "--o"}, "--output"},
 		{[]string{"__completeNoDesc", "deployment", "list", "--template", "{{.}}", "--o"}, "--output"},
 		{[]string{"__complete", "deployment", "delete", "-f", "--y"}, "--yes"},
+		// A removed flag before the subcommand: cobra would take an
+		// unknown flag to have a value, here ls, and complete api airflow.
+		{[]string{"__complete", "api", "airflow", "--json", "ls", "--fi"}, "--filter"},
+		{[]string{"__complete", "api", "airflow", "--json", "ls", "--refresh", "--fi"}, "--filter"},
+		{[]string{"__complete", "api", "airflow", "--api-url", "http://localhost:8080", "ls", "--fi"}, "--filter"},
+		{[]string{"__complete", "api", "airflow", "--api-url=http://localhost:8080", "ls", "--fi"}, "--filter"},
+		{[]string{"__complete", "api", "airflow", "--deployment-id", "dep-id", "describe", "--re"}, "--refresh"},
+		{[]string{"__complete", "deployment", "-f", "delete", "--y"}, "--yes"},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			root, _ := disarmedTree(t, astroTree)
@@ -384,30 +396,120 @@ func TestRemovedFlagsLeaveCompletionsAlone(t *testing.T) {
 				continue
 			}
 			removed := cmd.Flag(f.name) == nil
-			require.NotPanics(t, func() { acceptForCompletion(root, strings.Fields(f.path)) }, "%s: %s", tc.tree.name, f.path)
-			if !removed {
-				continue
-			}
 			arg := "--" + f.name
 			if !f.isBool {
 				arg += "=x"
+			}
+			require.NotPanics(t, func() { acceptForCompletion(root, append(strings.Fields(f.path), arg)) }, "%s: %s", tc.tree.name, f.path)
+			if !removed {
+				continue
 			}
 			assert.NoError(t, cmd.ParseFlags([]string{arg}), "%s: astro %s %s", tc.tree.name, f.path, arg)
 		}
 	}
 }
 
-// Every root says which 1.x tree a script on its machine was written for.
-func TestEveryTreeNamesItsV1Tree(t *testing.T) {
-	for _, tc := range v1Trees {
-		root := buildTree(t, tc.tree).root
-		assert.Equal(t, tc.v1, root.Annotations[v1TreeAnnotation], tc.tree.name)
+// A completion request that passes no flag its command lacks never reads the
+// inventory, and one that does reads it.
+func TestCompletionsReadTheInventoryOnlyForAnUnknownFlag(t *testing.T) {
+	read := false
+	orig := v1Flags
+	v1Flags = func() []v1Flag { read = true; return orig() }
+	t.Cleanup(func() { v1Flags = orig })
+
+	for _, tc := range []struct {
+		args []string
+		read bool
+	}{
+		{[]string{"deployment", "list", "--all", "-o", "json"}, false},
+		{[]string{"api", "airflow", "--deployment", "dep-id", "ls", "--refresh"}, false},
+		{[]string{"deployment", "delete", "dep-id", "-y"}, false},
+		{[]string{"deployment", "list", "--json"}, true},
+		{[]string{"api", "airflow", "--json", "ls"}, true},
+		{[]string{"deployment", "delete", "dep-id", "-yf"}, true},
+	} {
+		read = false
+		root := buildTree(t, astroTree).root
+		acceptForCompletion(root, tc.args)
+		assert.Equal(t, tc.read, read, strings.Join(tc.args, " "))
 	}
 }
 
+// Every root says which 1.x tree a script on its machine was written for,
+// and whether that is Astro's for a hosted organization is read from the
+// context when it is asked, not when the root is built.
+func TestEveryTreeNamesItsV1Tree(t *testing.T) {
+	for _, tc := range v1Trees {
+		root := buildTree(t, tc.tree).root
+		assert.Equal(t, tc.v1, v1TreeOf(root), tc.tree.name)
+	}
+	root := buildTree(t, astroTree).root
+	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.CloudPlatform) })
+	ctx, err := astrocontext.GetCurrentContext()
+	require.NoError(t, err)
+	require.NoError(t, ctx.SetContextKey("organization_product", "HOSTED"))
+	assert.Equal(t, v1TreeAstroHosted, v1TreeOf(root), "a root built before the context said hosted")
+}
+
+// A 1.x path a v2 command answers to by an alias finds the flags 1.x had
+// there, as does the v2 name.
+func TestV1FlagsMatchAliasedPaths(t *testing.T) {
+	root := &cobra.Command{Use: "astro"}
+	group := &cobra.Command{Use: "deployment", Aliases: []string{"deployments"}}
+	renamed := &cobra.Command{Use: "variable", Aliases: []string{"airflow-variable"}}
+	root.AddCommand(group)
+	group.AddCommand(renamed)
+	assert.Equal(t, []string{
+		"deployment variable", "deployment airflow-variable",
+		"deployments variable", "deployments airflow-variable",
+	}, pathSpellings(renamed))
+
+	flags := []v1Flag{
+		{trees: []string{v1TreeAstro}, path: "deployment airflow-variable", name: "json", isBool: true},
+		{trees: []string{v1TreeAPC}, path: "deployment airflow-variable", name: "force", isBool: true},
+		{trees: []string{v1TreeAstro}, path: "deployment pool", name: "template"},
+	}
+	on := v1FlagsAt(flags, v1TreeAstro, pathSpellings(renamed), false)
+	require.Len(t, on, 1)
+	assert.Equal(t, "json", on[0].name)
+	assert.Len(t, v1FlagsAt(flags, v1TreeAstro, pathSpellings(group), true), 2)
+	assert.Empty(t, v1FlagsAt(flags, v1TreeAstro, pathSpellings(group), false))
+}
+
+// v1_flags.tsv reads the same with CRLF line ends, as a Windows checkout
+// without .gitattributes' eol=lf would embed it, and a file that does not
+// parse is an error here rather than a panic in a run.
+func TestV1FlagsFileParsesWithCRLF(t *testing.T) {
+	lf, err := parseV1Flags(v1FlagsFile)
+	require.NoError(t, err)
+	crlf, err := parseV1Flags(strings.ReplaceAll(v1FlagsFile, "\n", "\r\n"))
+	require.NoError(t, err)
+	assert.Equal(t, lf, crlf)
+
+	const malformed = "astro\tdeployment list\tjson\t\tmaybe\n"
+	_, err = parseV1Flags(malformed)
+	require.ErrorContains(t, err, "malformed line")
+	assert.Nil(t, loadV1Flags(malformed))
+	assert.NotEmpty(t, loadV1Flags(strings.ReplaceAll(v1FlagsFile, "\n", "\r\n")))
+
+	// With no inventory, a removed flag is an unknown flag, as cobra says,
+	// and a completion request is left as cobra would take it.
+	orig := v1Flags
+	v1Flags = func() []v1Flag { return loadV1Flags(malformed) }
+	t.Cleanup(func() { v1Flags = orig })
+	root, _ := disarmedTree(t, astroTree)
+	_, _, err = executeRoot(root, "deployment", "delete", "dep-id", "--force")
+	require.EqualError(t, err, "unknown flag: --force")
+	assert.True(t, cliout.IsUsage(err))
+	root = buildTree(t, astroTree).root
+	assert.NotPanics(t, func() { acceptForCompletion(root, []string{"api", "airflow", "--json", "ls", "--force"}) })
+}
+
 // v1_flags.tsv parses, names only the trees there are, and is in order, so a
-// regenerated one diffs line by line.
+// regenerated one diffs line by line. It is checked in with LF line ends,
+// which .gitattributes keeps on every checkout.
 func TestV1FlagsFileIsWellFormed(t *testing.T) {
+	assert.NotContains(t, v1FlagsFile, "\r", "v1_flags.tsv has CRLF line ends: is it still text eol=lf in .gitattributes?")
 	flags, err := parseV1Flags(v1FlagsFile)
 	require.NoError(t, err)
 	require.Greater(t, len(flags), 900)
@@ -440,11 +542,23 @@ func TestEveryV1FlagStillWorksOrSaysWhatReplacedIt(t *testing.T) {
 			if !slices.Contains(f.trees, tc.v1) {
 				continue
 			}
-			cmd, _, err := root.Find(strings.Fields(f.path))
-			if err != nil || cmd.CommandPath() != root.Name()+" "+f.path || cmd.DisableFlagParsing {
+			label := tc.tree.name + ": astro " + f.path + " --" + f.name
+			cmd, rest, err := root.Find(strings.Fields(f.path))
+			if !assert.NoError(t, err, label) {
 				continue
 			}
-			label := tc.tree.name + ": astro " + f.path + " --" + f.name
+			if len(rest) > 0 {
+				// The words left over name no command under the deepest one
+				// that matched: a dropped command, which is its own
+				// tombstone (`astro dev`), or a rename that kept no alias.
+				assert.True(t, cmd.Hidden, "%s: 1.x's path resolves to `%s` with %v left over; a renamed command should keep its 1.x name as an alias", label, cmd.CommandPath(), rest)
+				continue
+			}
+			// A command renamed with its 1.x name kept as an alias is reached
+			// at the 1.x path, and checked there.
+			if !assert.Contains(t, pathSpellings(cmd), f.path, label) || cmd.DisableFlagParsing {
+				continue
+			}
 			checked++
 
 			if cmd.Flag(f.name) == nil {
