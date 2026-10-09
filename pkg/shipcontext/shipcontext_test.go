@@ -182,31 +182,139 @@ func TestLooksSecret(t *testing.T) {
 		"config/aws_credentials", "credentials.json", "gcp-key.json", "gcp_key.json",
 		"service-account-prod.json", "sa-prod.json", ".aws/config", "home/.ssh/known_hosts",
 		".netrc", ".npmrc", ".pypirc", "prod.kubeconfig", "kubeconfig", ".env", ".env.local",
+		"id_ed25519", "id_ed25519.pub", "id_ecdsa", "id_dsa", "AuthKey.p8", "release.jks", "app.keystore",
+		"putty.ppk", "prod.tfvars", "terraform.tfstate", "prod.env", "local.env", "app.env.prod",
 	} {
 		assert.True(t, LooksSecret(p), p)
 	}
 	for _, p := range []string{
 		"target/manifest.json", "dags/keys.py", "include/key.txt", "aws/config.yaml",
-		"service.json", "sa.json", "env.py", "include/monkey.json",
+		"service.json", "sa.json", "env.py", "include/monkey.json", "environment.py", "envoy.yaml",
 	} {
 		assert.False(t, LooksSecret(p), p)
 	}
 }
 
-func TestSecretsError(t *testing.T) {
-	assert.NoError(t, SecretsError(nil))
-	err := SecretsError([]string{"a.pem"})
+func TestSecretsErrorAndCappedList(t *testing.T) {
+	assert.NoError(t, (&Survey{}).SecretsError())
+	err := (&Survey{Secrets: []string{"a.pem"}}).SecretsError()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "a.pem")
 	assert.Contains(t, err.Error(), "ignored by git")
 	assert.Contains(t, err.Error(), "pushed to a registry")
 	assert.Contains(t, err.Error(), ".dockerignore")
 
+	err = (&Survey{Secrets: []string{"a.pem"}, GitSkipped: []string{"x: git: boom"}}).SecretsError()
+	assert.Contains(t, err.Error(), "could not say whether they are tracked")
+
 	many := make([]string, 12)
 	for i := range many {
 		many[i] = fmt.Sprintf("k%02d.pem", i)
 	}
-	err = SecretsError(many)
-	assert.Contains(t, err.Error(), "k09.pem and 2 more")
-	assert.NotContains(t, err.Error(), "k10.pem")
+	got := CappedList(many)
+	assert.Contains(t, got, "k09.pem and 2 more")
+	assert.NotContains(t, got, "k10.pem")
+	assert.Equal(t, "a, b", CappedList([]string{"a", "b"}))
+}
+
+func TestWarnings(t *testing.T) {
+	assert.Empty(t, (&Survey{}).Warnings())
+	w := (&Survey{Gitignored: []string{"target/manifest.json"}, GitSkipped: []string{"the project's repository: git: detected dubious ownership"}}).Warnings()
+	require.Len(t, w, 2)
+	assert.Contains(t, w[0], "target/manifest.json")
+	assert.Contains(t, w[0], "Add them to .dockerignore")
+	assert.Contains(t, w[1], "skipped for the project's repository: git: detected dubious ownership")
+}
+
+func TestNonce(t *testing.T) {
+	a, b := Nonce(), Nonce()
+	assert.Regexp(t, `^[0-9a-f]{8}$`, a)
+	assert.NotEqual(t, a, b)
+}
+
+func gitRun(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.invalid", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.invalid")
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+}
+
+// Where git cannot answer, the check is skipped for that repository, said so,
+// and every shipping file that looks like a credential is refused instead,
+// tracked or not.
+func TestTakeFailsClosedWhenGitCannotAnswer(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{".git/HEAD": "ref: refs/heads/main\n", "certs/prod.pem": "k", "dags/a.py": "", "README.md": ""})
+	t.Setenv("PATH", "")
+	s, err := Take(dir, Options{Ignore: ".git\n", Git: true})
+	require.NoError(t, err)
+	require.Len(t, s.GitSkipped, 1)
+	assert.Contains(t, s.GitSkipped[0], "the project's repository")
+	assert.Equal(t, []string{"certs/prod.pem"}, s.Secrets)
+	assert.Empty(t, s.Gitignored)
+}
+
+// A submodule's files are asked about from inside it, since git refuses to
+// answer for them from the superproject; and a nested repository the
+// enclosing one ignores as a whole has all its files counted as ignored.
+func TestTakeAsksEachRepositoryAboutItsOwnFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	sub := filepath.Join(dir, "vendor", "lib")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	gitRun(t, sub, "init", "-q")
+	writeFiles(t, sub, map[string]string{".gitignore": "local.key\n", "lib.py": "", "local.key": "k"})
+	gitRun(t, sub, "add", "lib.py", ".gitignore")
+	gitRun(t, sub, "commit", "-q", "-m", "lib")
+	gitRun(t, dir, "add", "vendor/lib")
+	ignoredRepo := filepath.Join(dir, "scratch")
+	require.NoError(t, os.MkdirAll(ignoredRepo, 0o755))
+	gitRun(t, ignoredRepo, "init", "-q")
+	writeFiles(t, dir, map[string]string{".gitignore": "scratch/\n", "scratch/notes.txt": "n", "dags/a.py": ""})
+
+	s, err := Take(dir, Options{Ignore: "**/.git\n", Git: true})
+	require.NoError(t, err)
+	assert.Empty(t, s.GitSkipped, "every repository answered")
+	assert.ElementsMatch(t, []string{"vendor/lib/local.key", "scratch/notes.txt"}, s.Gitignored)
+	assert.Equal(t, []string{"vendor/lib/local.key"}, s.Secrets)
+}
+
+// Under ignore rules that leave .git in (a declared Dockerfile with no
+// .dockerignore), the repository's own metadata ships, and asking git about
+// it does not spoil the answer for the project's files.
+func TestTakeDoesNotAskGitAboutItsOwnMetadata(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	writeFiles(t, dir, map[string]string{".gitignore": "build/\n", "build/out.bin": "b", "dags/a.py": ""})
+	s, err := Take(dir, Options{Git: true})
+	require.NoError(t, err)
+	assert.Empty(t, s.GitSkipped)
+	assert.Equal(t, []string{"build/out.bin"}, s.Gitignored)
+	assert.Contains(t, s.Files, ".git/HEAD", "the metadata ships, under these rules")
+}
+
+// A declared Dockerfile's build reads <Dockerfile>.dockerignore, else
+// .dockerignore; on podman a .containerignore first.
+func TestDeclaredIgnore(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{".dockerignore": "docker\n", ".containerignore": "container\n"})
+	got, err := DeclaredIgnore(dir, "Dockerfile", false)
+	require.NoError(t, err)
+	assert.Equal(t, "docker\n", got)
+	got, err = DeclaredIgnore(dir, "Dockerfile", true)
+	require.NoError(t, err)
+	assert.Equal(t, "container\n", got)
+
+	writeFiles(t, dir, map[string]string{"Dockerfile.dockerignore": "own\n"})
+	got, err = DeclaredIgnore(dir, "Dockerfile", false)
+	require.NoError(t, err)
+	assert.Equal(t, "own\n", got)
 }

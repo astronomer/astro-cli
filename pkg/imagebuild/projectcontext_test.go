@@ -73,21 +73,34 @@ func engineWith(version string, buildx bool, buildHelp, driver, check string, fa
 const dockerVersion = "Docker version 29.4.0, build 1234567"
 
 // checkBuild plays the ignore-file check build's export into dest: "honors"
-// exports the kept file, "ignores" both, "empty" nothing, and "fails" exports
-// the kept file and then fails.
+// exports the kept files only, "ignores" the markers too, "rootonly" the
+// marker in the subdirectory (a "**/" rule matching only at the root),
+// "nosub" leaves out the subdirectory's kept file, "empty" exports nothing,
+// and "fails" exports the kept files and then fails.
 func checkBuild(dest, check string) error {
-	if err := os.MkdirAll(dest, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Join(dest, probeSub), 0o700); err != nil {
 		return err
 	}
 	if check == "empty" {
 		return nil
 	}
-	if err := os.WriteFile(filepath.Join(dest, probeKeep), nil, 0o600); err != nil {
+	write := func(rel string) error { return os.WriteFile(filepath.Join(dest, rel), nil, 0o600) }
+	if err := write(probeKeep); err != nil {
 		return err
+	}
+	if check != "nosub" {
+		if err := write(filepath.Join(probeSub, probeKeep)); err != nil {
+			return err
+		}
 	}
 	switch check {
 	case "ignores":
-		return os.WriteFile(filepath.Join(dest, probeMarker), nil, 0o600)
+		if err := write(probeMarker); err != nil {
+			return err
+		}
+		return write(filepath.Join(probeSub, probeMarker))
+	case "rootonly":
+		return write(filepath.Join(probeSub, probeMarker))
 	case "fails":
 		return errors.New("exit status 1")
 	}
@@ -322,7 +335,7 @@ func TestProjectIgnoreKeepsTheProjectsRulesAndPutsTheCLIsAfter(t *testing.T) {
 	project := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(project, ".dockerignore"), []byte("secrets/\n!.env.example"), 0o600))
 
-	got, err := ProjectIgnore(project, []string{"dags"})
+	got, err := ProjectBuilder{}.ProjectIgnore(project, []string{"dags"})
 	require.NoError(t, err)
 
 	lines := strings.Split(strings.TrimSuffix(got, "\n"), "\n")
@@ -330,9 +343,9 @@ func TestProjectIgnoreKeepsTheProjectsRulesAndPutsTheCLIsAfter(t *testing.T) {
 	assert.Equal(t, "dags", lines[len(lines)-1], "the caller's excludes last")
 	// 1.x's default .dockerignore, then v2's per-machine files.
 	for _, rule := range []string{
-		"astro", ".git", "airflow_settings.yaml", "logs", "airflow.db", "airflow.cfg",
-		".astro", "**/.venv", "**/.env", "**/.env.*", "**/.envrc", "**/__pycache__", "**/*.pyc",
-		"plugins/fix_local_executor_pickle.py", "requirements.txt", "packages.txt",
+		"astro", "logs", "airflow.db", "airflow.cfg",
+		"**/.git", "**/airflow_settings.yaml", "**/.astro", "**/.venv", "**/.env", "**/.env.*", "**/.envrc",
+		"**/__pycache__", "**/*.pyc", "plugins/fix_local_executor_pickle.py", "requirements.txt", "packages.txt",
 	} {
 		assert.Contains(t, lines, rule)
 	}
@@ -342,9 +355,92 @@ func TestProjectIgnoreKeepsTheProjectsRulesAndPutsTheCLIsAfter(t *testing.T) {
 }
 
 func TestProjectIgnoreWithoutAProjectFile(t *testing.T) {
-	got, err := ProjectIgnore(t.TempDir(), nil)
+	got, err := ProjectBuilder{}.ProjectIgnore(t.TempDir(), nil)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(got, projectIgnoreHeader), got)
+}
+
+// Podman and buildah read .containerignore before .dockerignore, so on
+// podman that file's rules are the project's; Docker never reads it.
+func TestProjectIgnoreReadsContainerignoreOnPodman(t *testing.T) {
+	project := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(project, ".dockerignore"), []byte("from-docker\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(project, ".containerignore"), []byte("from-container\n"), 0o600))
+
+	got, err := ProjectBuilder{podman: true}.ProjectIgnore(project, nil)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(got, "from-container\n"), got)
+	assert.NotContains(t, got, "from-docker")
+
+	got, err = ProjectBuilder{}.ProjectIgnore(project, nil)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(got, "from-docker\n"), got)
+
+	require.NoError(t, os.Remove(filepath.Join(project, ".containerignore")))
+	got, err = ProjectBuilder{podman: true}.ProjectIgnore(project, nil)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(got, "from-docker\n"), "without .containerignore podman reads .dockerignore: %s", got)
+}
+
+// The step that copies the project calls BeforeProjectCopy after the
+// dependency build and before the copy, and stops on its error.
+func TestBuildProjectLooksAgainBeforeTheCopy(t *testing.T) {
+	var order []string
+	cmd := &fakeCmd{run: engine(dockerVersion, true, "", func(call string) error {
+		if strings.Contains(call, "--tag ") {
+			order = append(order, "build "+map[bool]string{true: "deps", false: "project"}[strings.Contains(call, "-deps ")])
+		}
+		return nil
+	})}
+	req := projectRequest(t, t.TempDir())
+	req.BeforeProjectCopy = func() error { order = append(order, "look"); return nil }
+	_, err := testBuilder(cmd).BuildLocal(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"build deps", "look", "build project"}, order)
+
+	stop := errors.New("a credential appeared")
+	req.BeforeProjectCopy = func() error { return stop }
+	cmd = &fakeCmd{run: engine(dockerVersion, true, "", nil)}
+	_, err = testBuilder(cmd).BuildLocal(context.Background(), req, rt.Callbacks{})
+	require.ErrorIs(t, err, stop)
+	assert.Empty(t, callsContaining(cmd.calls, projectDockerfileName), "nothing is copied")
+	assert.Contains(t, cmd.calls[len(cmd.calls)-1], "image rm --no-prune", "the intermediate tag is still dropped")
+}
+
+// The check build's context has an ignore file of its own that leaves out
+// nothing, and the CLI's leaves out the marker with a "**/" rule.
+func TestCheckBuildContext(t *testing.T) {
+	var seen map[string]string
+	cmd := &fakeCmd{run: func(call string, s rt.Stdio) error {
+		if _, dest, ok := strings.Cut(call, "--output type=local,dest="); ok {
+			fields := strings.Fields(dest)
+			ctxDir := fields[len(fields)-1]
+			df := fields[0][:strings.LastIndex(fields[0], "/out")] + "/Dockerfile.check"
+			seen = map[string]string{}
+			for _, f := range []string{
+				filepath.Join(ctxDir, ".dockerignore"), filepath.Join(ctxDir, ".containerignore"), df + ".dockerignore",
+				filepath.Join(ctxDir, probeMarker), filepath.Join(ctxDir, probeSub, probeMarker),
+			} {
+				b, err := os.ReadFile(f)
+				if err == nil {
+					seen[filepath.Base(filepath.Dir(f))+"/"+filepath.Base(f)] = string(b)
+				}
+			}
+			return checkBuild(fields[0], "honors")
+		}
+		return engine(dockerVersion, true, "", nil)(call, s)
+	}}
+	_, err := testBuilder(cmd).CanShipProject(context.Background(), Request{Bin: "docker"})
+	require.NoError(t, err)
+	assert.Equal(t, "unrelated\n", seen["context/.dockerignore"])
+	assert.Equal(t, "unrelated\n", seen["context/.containerignore"])
+	assert.Contains(t, seen, "context/"+probeMarker)
+	assert.Contains(t, seen, probeSub+"/"+probeMarker)
+	for k, v := range seen {
+		if strings.HasSuffix(k, "Dockerfile.check.dockerignore") {
+			assert.Equal(t, "**/"+probeMarker+"\n", v)
+		}
+	}
 }
 
 func TestShipProject(t *testing.T) {
@@ -389,7 +485,7 @@ func TestBuildProjectRefusesABuilderWithoutTheDockerDriver(t *testing.T) {
 // refused before anything is built.
 func TestBuildProjectRefusesABuilderThatFailsTheIgnoreFileCheck(t *testing.T) {
 	for _, engineName := range []string{"docker", "podman"} {
-		for _, check := range []string{"ignores", "fails", "empty"} {
+		for _, check := range []string{"ignores", "fails", "empty", "rootonly", "nosub"} {
 			t.Run(engineName+" "+check, func(t *testing.T) {
 				version := dockerVersion
 				if engineName == "podman" {
@@ -443,18 +539,4 @@ func TestCanShipProject(t *testing.T) {
 	no := &fakeCmd{run: engine(dockerVersion, false, "", nil)}
 	_, err = testBuilder(no).CanShipProject(context.Background(), Request{Bin: "docker"})
 	require.ErrorIs(t, err, ErrNoProjectBuilder)
-}
-
-func TestGitignoredWarning(t *testing.T) {
-	assert.Empty(t, GitignoredWarning(nil))
-	assert.Equal(t, "the image will carry 2 file(s) that .gitignore ignores and .dockerignore does not: a.txt, b/c.bin. Add them to .dockerignore to keep them out of the image",
-		GitignoredWarning([]string{"a.txt", "b/c.bin"}))
-	many := make([]string, 13)
-	for i := range many {
-		many[i] = string(rune('a'+i)) + ".txt"
-	}
-	got := GitignoredWarning(many)
-	assert.Contains(t, got, "13 file(s)")
-	assert.Contains(t, got, "j.txt and 3 more.")
-	assert.NotContains(t, got, "k.txt")
 }

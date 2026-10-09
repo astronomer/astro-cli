@@ -20,7 +20,20 @@ const (
 	projectDockerfileName = "Dockerfile.astro-project"
 	// ignoreFile is the project's own ignore file, at its root.
 	ignoreFile = ".dockerignore"
+	// containerIgnoreFile is podman's and buildah's own name for it, which
+	// they read before .dockerignore.
+	containerIgnoreFile = ".containerignore"
 )
+
+// ProjectBuilder is how this engine runs a ProjectContext build, as
+// CanShipProject found it. Its zero value is "not asked yet".
+type ProjectBuilder struct {
+	ok     bool
+	podman bool
+	// builder is the buildx builder both Docker builds run on.
+	builder string
+	env     []string
+}
 
 // projectIgnoreRules are left out of every ProjectContext copy, after the
 // project's own rules, so a "!" there cannot bring one back.
@@ -28,27 +41,34 @@ const (
 //   - Everything the 1.x CLI's default .dockerignore left out (`astro dev
 //     init`'s template: astro, .git, .env, airflow_settings.yaml, logs/,
 //     .venv, airflow.db, airflow.cfg), so a project converted from 1.x ships
-//     no less safely than it did. airflow_settings.yaml holds connection
-//     secrets in clear text.
+//     no less safely than it did.
 //   - The per-machine files v2's tools and Python write: .astro/ (standalone
-//     Airflow's state, local overrides, Otto's tokens), any .venv, .env, .env.*
-//     and .envrc at any depth, bytecode, and the pickling fix the standalone
-//     engine drops into plugins/ for Airflow 2 on macOS (pkg/scaffold's
-//     pickleFixRule).
+//     Airflow's state, local overrides, Otto's tokens), .venv, .env, .env.*,
+//     .envrc, bytecode, and the pickling fix the standalone engine drops into
+//     plugins/ for Airflow 2 on macOS (pkg/scaffold's pickleFixRule).
 //   - The project's own requirements.txt and packages.txt, which a 1.x layout
 //     may still carry. The generated ones are what the image installed, and
 //     stay in AIRFLOW_HOME.
+//
+// What can hold a secret or a machine's state wherever it sits is left out
+// at any depth (**/): a .git directory or a submodule's .git file (a remote
+// URL with a token in it), airflow_settings.yaml (connection secrets in clear
+// text), .astro, .env files, virtualenvs and bytecode. The rest stay anchored
+// at the root, as 1.x had them: astro, logs, airflow.db and airflow.cfg are
+// what a 1.x project kept at its root as AIRFLOW_HOME, while a logs/
+// directory or an airflow.cfg template under include/ is the project's own
+// data, which 1.x shipped.
 //
 // No rule starts with "/": .dockerignore patterns are anchored at the context
 // root already, and buildah's parser and Docker's agree on that spelling.
 var projectIgnoreRules = []string{
 	"astro",
-	".git",
-	"airflow_settings.yaml",
 	"logs",
 	"airflow.db",
 	"airflow.cfg",
-	".astro",
+	"**/.git",
+	"**/airflow_settings.yaml",
+	"**/.astro",
 	"**/.venv",
 	"**/.env",
 	"**/.env.*",
@@ -78,16 +98,26 @@ func ShipProject(req *Request, projectDir string, withDags bool) {
 	}
 }
 
-// ProjectIgnore is the ignore file a ProjectContext copy is built with: the
-// project's own .dockerignore, then projectIgnoreRules, then excludes. It is
-// written beside the generated Dockerfile as <Dockerfile>.dockerignore, which
-// BuildKit reads instead of the context's .dockerignore, so the project's file
-// is never edited. `astro package astro` reads it to address the image by
-// what it copies.
-func ProjectIgnore(projectDir string, excludes []string) (string, error) {
-	own, err := os.ReadFile(filepath.Join(projectDir, ignoreFile))
+// ProjectIgnore is the ignore file a ProjectContext copy is built with on
+// this engine: the project's own rules, then projectIgnoreRules, then
+// excludes. It is written beside the generated Dockerfile as
+// <Dockerfile>.dockerignore, which BuildKit reads instead of the context's
+// own, and handed to podman with --ignorefile, so the project's file is never
+// edited. A deploy and `astro package astro` survey the project under it.
+//
+// The project's own rules are the file the engine would read itself: Docker's
+// .dockerignore, and on podman .containerignore when there is one, which
+// podman and buildah read before .dockerignore.
+func (p ProjectBuilder) ProjectIgnore(projectDir string, excludes []string) (string, error) {
+	name := ignoreFile
+	if p.podman {
+		if _, err := os.Stat(filepath.Join(projectDir, containerIgnoreFile)); err == nil {
+			name = containerIgnoreFile
+		}
+	}
+	own, err := os.ReadFile(filepath.Join(projectDir, name))
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return "", fmt.Errorf("reading the project's %s: %w", ignoreFile, err)
+		return "", fmt.Errorf("reading the project's %s: %w", name, err)
 	}
 	var b strings.Builder
 	b.Write(own)
@@ -140,7 +170,7 @@ func (b *Builder) buildProject(ctx context.Context, req Request, dfPath, context
 	}
 	defer b.untag(context.WithoutCancel(ctx), req, pb, deps.Tag)
 
-	ignore, err := ProjectIgnore(req.ProjectContext, req.ProjectExcludes)
+	ignore, err := pb.ProjectIgnore(req.ProjectContext, req.ProjectExcludes)
 	if err != nil {
 		return "", err
 	}
@@ -151,6 +181,14 @@ func (b *Builder) buildProject(ctx context.Context, req Request, dfPath, context
 	ignorePath := projectDF + ignoreFile
 	if err := os.WriteFile(ignorePath, []byte(ignore), filePermRW); err != nil {
 		return "", fmt.Errorf("writing %s: %w", ignorePath, err)
+	}
+
+	// The project may have changed during the dependency build, which takes
+	// minutes: the caller looks again, at what is about to be sent.
+	if req.BeforeProjectCopy != nil {
+		if err := req.BeforeProjectCopy(); err != nil {
+			return "", err
+		}
 	}
 
 	// No --pull: the base is the image just built, which no registry has. No
@@ -170,16 +208,6 @@ func (b *Builder) buildProject(ctx context.Context, req Request, dfPath, context
 // registry. Such a build is refused, never run without it; CanShipProject
 // lets a caller find out first.
 var ErrNoProjectBuilder = errors.New("copying the project into the image needs a builder that reads the ignore file keeping .env, airflow_settings.yaml and other local files out of it")
-
-// ProjectBuilder is how this engine runs a ProjectContext build, as
-// CanShipProject found it. Its zero value is "not asked yet".
-type ProjectBuilder struct {
-	ok     bool
-	podman bool
-	// builder is the buildx builder both Docker builds run on.
-	builder string
-	env     []string
-}
 
 // args is the command line of the second build.
 func (p ProjectBuilder) args(dockerfile, ignorePath string, req Request) []string {
@@ -263,21 +291,29 @@ func (b *Builder) CanShipProject(ctx context.Context, req Request) (ProjectBuild
 	return pb, nil
 }
 
-// probe file names: the check build's context holds both, and its ignore file
-// leaves out the second.
+// probe file names: the check build's context holds both at its root and in
+// a subdirectory, and its ignore file leaves out the second at any depth.
 const (
 	probeKeep   = "keep"
 	probeMarker = "left-out"
+	probeSub    = "sub"
 )
 
-// probeIgnoreFile runs a check build the way the second build runs, over a
-// two-file context whose <Dockerfile>.dockerignore (or --ignorefile) leaves
-// one file out, exporting the result to a directory rather than an image, and
-// fails unless the kept file arrived and the left-out one did not.
+// probeIgnoreFile runs a check build the way the second build runs, and fails
+// unless the builder applied the ignore file the CLI hands it.
+//
+// The context holds a kept file and a marker, at its root and in a
+// subdirectory, and an ignore file of its own (.dockerignore, and on podman
+// .containerignore too) that leaves out neither. The CLI's file
+// (<Dockerfile>.dockerignore, or --ignorefile) leaves out the marker with a
+// "**/" rule. The result, exported to a directory rather than an image, must
+// hold both kept files and neither marker: proof that the CLI's file is read,
+// that it wins over the context's own, and that "**/" rules match at the root
+// and below it.
 //
 // It proves what a version number would only suggest, on this engine, this
 // builder and this connection (a remote podman machine included). It costs a
-// FROM scratch build of two tiny files, a fraction of a second, writes no
+// FROM scratch build of a few tiny files, a fraction of a second, writes no
 // image, and runs once per build: the answer travels with Request.Builder.
 func (b *Builder) probeIgnoreFile(ctx context.Context, req Request, pb ProjectBuilder) error {
 	dir, err := os.MkdirTemp("", "astro-ignore-check-")
@@ -288,10 +324,14 @@ func (b *Builder) probeIgnoreFile(ctx context.Context, req Request, pb ProjectBu
 	ctxDir, outDir := filepath.Join(dir, "context"), filepath.Join(dir, "out")
 	df := filepath.Join(dir, "Dockerfile.check")
 	files := map[string]string{
-		filepath.Join(ctxDir, probeKeep):   "kept\n",
-		filepath.Join(ctxDir, probeMarker): "left out\n",
-		df:                                 "FROM scratch\nCOPY . /\n",
-		df + ignoreFile:                    probeMarker + "\n",
+		filepath.Join(ctxDir, probeKeep):             "kept\n",
+		filepath.Join(ctxDir, probeMarker):           "left out\n",
+		filepath.Join(ctxDir, probeSub, probeKeep):   "kept\n",
+		filepath.Join(ctxDir, probeSub, probeMarker): "left out\n",
+		filepath.Join(ctxDir, ignoreFile):            "unrelated\n",
+		filepath.Join(ctxDir, containerIgnoreFile):   "unrelated\n",
+		df:              "FROM scratch\nCOPY . /\n",
+		df + ignoreFile: "**/" + probeMarker + "\n",
 	}
 	for path, body := range files {
 		if err := os.MkdirAll(filepath.Dir(path), contextDirPerm); err != nil {
@@ -311,13 +351,28 @@ func (b *Builder) probeIgnoreFile(ctx context.Context, req Request, pb ProjectBu
 	if err := b.cmd.Run(ctx, env, rt.Stdio{Out: &output, Err: &output}, req.Bin, args...); err != nil {
 		return fmt.Errorf("%w; a check build of the ignore file failed: %w: %s", ErrNoProjectBuilder, err, strings.TrimSpace(output.String()))
 	}
-	if _, err := os.Stat(filepath.Join(outDir, probeKeep)); err != nil {
-		return fmt.Errorf("%w; a check build of the ignore file copied nothing", ErrNoProjectBuilder)
+	for _, kept := range []string{probeKeep, filepath.Join(probeSub, probeKeep)} {
+		if _, err := os.Stat(filepath.Join(outDir, kept)); err != nil {
+			return fmt.Errorf("%w; a check build of the ignore file did not copy %s", ErrNoProjectBuilder, filepath.ToSlash(kept))
+		}
 	}
-	if _, err := os.Stat(filepath.Join(outDir, probeMarker)); err == nil {
-		return fmt.Errorf("%w; a check build copied a file its ignore file leaves out, so this builder does not read it", ErrNoProjectBuilder)
+	for _, left := range []string{probeMarker, filepath.Join(probeSub, probeMarker)} {
+		if _, err := os.Stat(filepath.Join(outDir, left)); err == nil {
+			return fmt.Errorf("%w; a check build copied %s, which the ignore file the CLI handed it leaves out, so this builder does not read that file", ErrNoProjectBuilder, filepath.ToSlash(left))
+		}
 	}
 	return nil
+}
+
+// IsPodman reports whether the engine req.Bin runs is podman, the
+// podman-docker shim included, by what `--version` says. req needs only Bin
+// and Env.
+func (b *Builder) IsPodman(ctx context.Context, req Request) bool {
+	var o strings.Builder
+	if err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &o}, req.Bin, "--version"); err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(o.String()), "podman")
 }
 
 // inspectDriver reads the Driver line of `docker buildx inspect`.
@@ -359,25 +414,4 @@ func (b *Builder) untag(ctx context.Context, req Request, pb ProjectBuilder, ref
 	}
 	//nolint:errcheck // best effort; a leftover tag changes nothing
 	b.cmd.Run(ctx, req.Env, rt.Stdio{}, req.Bin, args...)
-}
-
-// gitignoredShown caps how many gitignored files GitignoredWarning names.
-const gitignoredShown = 10
-
-// GitignoredWarning is the warning for project files a build will copy into
-// the image although git ignores them: the image takes the project as a
-// docker context does, under .dockerignore, and .gitignore is not that file.
-// paths are project-relative; "" when there are none.
-func GitignoredWarning(paths []string) string {
-	if len(paths) == 0 {
-		return ""
-	}
-	shown := paths
-	more := ""
-	if len(shown) > gitignoredShown {
-		shown = shown[:gitignoredShown]
-		more = fmt.Sprintf(" and %d more", len(paths)-gitignoredShown)
-	}
-	return fmt.Sprintf("the image will carry %d file(s) that .gitignore ignores and .dockerignore does not: %s%s. Add them to .dockerignore to keep them out of the image",
-		len(paths), strings.Join(shown, ", "), more)
 }

@@ -3,7 +3,6 @@ package pack
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -18,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
+	"github.com/astronomer/astro-cli/pkg/shipcontext"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -188,19 +188,19 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	}
 
 	// The astro artifact is an image, so a container engine is required.
-	cli, err := t.reachProjectEngine(ctx, req.ProjectDir, &breq)
+	cli, files, err := t.reachProjectEngine(ctx, req.ProjectDir, req.Manifest.Astro.Dockerfile, &breq)
 	if err != nil {
 		return Result{}, err
 	}
+	warnings = append(warnings, files.warnings...)
 
-	hash, fileWarnings, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectContext, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, files.digest, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
 	if err != nil {
 		return Result{}, err
 	}
-	warnings = append(warnings, fileWarnings...)
 
 	// The build context lives in a scratch dir the target owns unless the caller
 	// pins one (a test). A pinned WorkDir is left in place; a made one is removed.
@@ -217,7 +217,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// with nothing to install it still builds the one-line image over the base.
 	// A random part keeps two packages of one checkout at once from building
 	// over each other's working and intermediate tags.
-	workingTag := fmt.Sprintf("astro-package/%s:src-%s-%s", name, hash, buildNonce())
+	workingTag := fmt.Sprintf("astro-package/%s:src-%s-%s", name, hash, shipcontext.Nonce())
 	breq.WorkDir = workDir
 	breq.Tag = workingTag
 	breq.Platform = req.Platform
@@ -319,29 +319,33 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	return res, nil
 }
 
-// reachProjectEngine is reachEngine, and, for a build that copies the project
+// reachProjectEngine is reachEngine; and, for a build that copies the project
 // in, the engine's answer to whether it can (imagebuild.Builder
-// .CanShipProject), handed to the build so the engine is asked once.
+// .CanShipProject), handed to the build so the engine is asked once; and the
+// survey of the files the build will copy (surveyFiles), for a declared
+// Dockerfile's build as for a generated one.
 //
 // One that cannot is refused, not given a package of the dependencies alone:
 // such an image carries no DAGs, and deployed with --image-name to a
 // Deployment without DAG deploys it would leave that Deployment with none.
-func (t *AstroTarget) reachProjectEngine(ctx context.Context, projectDir string, breq *imagebuild.Request) (engineCLI, error) {
+func (t *AstroTarget) reachProjectEngine(ctx context.Context, projectDir, dockerfile string, breq *imagebuild.Request) (engineCLI, projectFiles, error) {
 	cli, err := t.reachEngine(ctx, projectDir)
-	if err != nil || breq.ProjectContext == "" {
-		return cli, err
-	}
-	pb, err := imagebuild.New(cli.run, time.Now).CanShipProject(ctx, imagebuild.Request{Bin: cli.bin, Env: cli.env})
 	if err != nil {
-		return engineCLI{}, fmt.Errorf("%w. A packaged image carries the project's DAGs, which a Deployment without DAG deploys runs from it, and an image built without the project would have none", err)
+		return cli, projectFiles{}, err
 	}
-	breq.Builder = pb
-	return cli, nil
+	if breq.ProjectContext != "" {
+		pb, err := imagebuild.New(cli.run, time.Now).CanShipProject(ctx, imagebuild.Request{Bin: cli.bin, Env: cli.env})
+		if err != nil {
+			return engineCLI{}, projectFiles{}, fmt.Errorf("%w. A packaged image carries the project's DAGs, which a Deployment without DAG deploys runs from it, and an image built without the project would have none", err)
+		}
+		breq.Builder = pb
+	}
+	files, err := surveyFiles(ctx, cli, projectDir, dockerfile, breq)
+	if err != nil {
+		return engineCLI{}, projectFiles{}, err
+	}
+	return cli, files, nil
 }
-
-// dagsIgnoredWarning is the warning for ignore rules that leave every DAG
-// file out of a generated image.
-const dagsIgnoredWarning = "no DAG file in dags/ reaches the image: .dockerignore leaves them all out, or dags/ links outside the project. A Deployment without DAG deploys runs only the image's DAGs; remove the rule, or move the DAGs into the project, to package them"
 
 // reachEngine resolves the container engine for the project and probes it up
 // front, so an engine that is missing or down is a plain ErrNoDocker rather
@@ -527,18 +531,9 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-// buildNonce is a short random hex string that makes a working tag this
-// build's alone.
-func buildNonce() string {
-	var b [4]byte
-	_, _ = rand.Read(b[:])
-	return fmt.Sprintf("%x", b)
-}
-
-// contentHash's project is the ProjectContext a generated build copies in, ""
-// for a declared Dockerfile. Reading it also finds what the package warns
-// about the project's files, which comes back with the hash.
-func contentHash(base, platform string, deps, packages []string, project string, df declaredDockerfile) (hash string, warnings []string, err error) {
+// contentHash's filesDigest is the digest of what a generated build copies
+// from the project (surveyFiles), "" for a declared Dockerfile.
+func contentHash(base, platform string, deps, packages []string, filesDigest string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -551,21 +546,16 @@ func contentHash(base, platform string, deps, packages []string, project string,
 	for _, p := range sortedCopy(packages) {
 		writeField("pkg", p)
 	}
-	if project != "" {
-		digest, fileWarnings, err := contextDigest(project)
-		if err != nil {
-			return "", nil, err
-		}
-		writeField("files", digest)
-		warnings = append(warnings, fileWarnings...)
+	if filesDigest != "" {
+		writeField("files", filesDigest)
 	}
 	if df.abs != "" {
 		writeField("dockerfile", filepath.ToSlash(df.rel))
 		body, err := os.ReadFile(df.abs)
 		if err != nil {
-			return "", nil, fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
+			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
 		}
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}
-	return fmt.Sprintf("%x", h.Sum(nil))[:7], warnings, nil
+	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
 }

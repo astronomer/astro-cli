@@ -55,7 +55,9 @@ func (f *fakeImageCmd) Run(_ context.Context, _ []string, s localrt.Stdio, name 
 	for _, a := range args {
 		if dest, ok := strings.CutPrefix(a, "type=local,dest="); ok {
 			_ = os.MkdirAll(dest, 0o700)
+			_ = os.MkdirAll(filepath.Join(dest, "sub"), 0o700)
 			_ = os.WriteFile(filepath.Join(dest, "keep"), nil, 0o600)
+			_ = os.WriteFile(filepath.Join(dest, "sub", "keep"), nil, 0o600)
 		}
 	}
 	return f.err

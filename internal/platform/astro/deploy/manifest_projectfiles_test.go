@@ -566,3 +566,79 @@ func TestRepositoryName(t *testing.T) {
 	}
 	assert.True(t, strings.HasPrefix(deployImageTag(filepath.Join(t.TempDir(), "My Project")), "astro-deploy/my-project"))
 }
+
+// gitInit makes dir a git repository.
+func gitInit(t *testing.T, dir string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	git := exec.Command("git", "-C", dir, "init", "-q")
+	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	require.NoError(t, git.Run())
+}
+
+// A declared Dockerfile's build copies from the project too, under its own
+// ignore file, so gitignored credentials it would carry refuse the deploy as
+// well.
+func TestDeployManifestImage_DeclaredDockerfileRefusesGitignoredSecrets(t *testing.T) {
+	dir := projectWithCode(t)
+	gitInit(t, dir)
+	for name, body := range map[string]string{
+		"Dockerfile": "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nCOPY . .\n", ".gitignore": "keys/\n", "keys/deploy.key": "k",
+	} {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+	cmd := withProjectStep(t)
+	_, _, err := deployWith(t, true, false, &ManifestImageDeployInput{
+		Build:       imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"},
+		IncludeDags: true,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keys/deploy.key")
+	assert.False(t, hasImageCall(cmd.calls, " --tag "), "refused before the build, got %v", cmd.calls)
+
+	// Its own ignore file keeps the key out, and the deploy goes ahead.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile.dockerignore"), []byte("keys\n"), 0o600))
+	withProjectStep(t)
+	countUploads(t)
+	_, _, err = deployWith(t, true, false, &ManifestImageDeployInput{
+		Build:       imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"},
+		IncludeDags: true,
+	})
+	require.NoError(t, err)
+}
+
+// secretDuringDepsCmd is projectStepCmd that writes a gitignored key into the
+// project while the dependency build runs, as a slow build gives time for.
+type secretDuringDepsCmd struct {
+	projectStepCmd
+	dir string
+}
+
+func (f *secretDuringDepsCmd) Run(ctx context.Context, env []string, s localrt.Stdio, name string, args ...string) error {
+	if strings.Contains(strings.Join(args, " "), "-deps --file") {
+		_ = os.MkdirAll(filepath.Join(f.dir, "keys"), 0o755)
+		_ = os.WriteFile(filepath.Join(f.dir, "keys", "late.pem"), []byte("k"), 0o600)
+	}
+	return f.projectStepCmd.Run(ctx, env, s, name, args...)
+}
+
+// A credential that appears while the dependency build runs is caught just
+// before the project is copied in, and nothing is copied.
+func TestDeployManifestImage_LooksAgainBeforeCopyingTheProject(t *testing.T) {
+	dir := projectWithCode(t)
+	gitInit(t, dir)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("keys/\n"), 0o600))
+	withImageSeams(t, "3.1-2")
+	cmd := &secretDuringDepsCmd{dir: dir}
+	newImageBuildCommander = func() imagebuild.Commander { return cmd }
+
+	_, client, err := deployWith(t, true, false, &ManifestImageDeployInput{Build: manifestBuildOf(dir), IncludeDags: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keys/late.pem")
+	assert.Empty(t, cmd.projectContext, "the project was not copied")
+	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}

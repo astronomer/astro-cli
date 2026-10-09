@@ -110,7 +110,9 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 		for _, a := range args {
 			if dest, ok := strings.CutPrefix(a, "type=local,dest="); ok {
 				_ = os.MkdirAll(dest, 0o700)
+				_ = os.MkdirAll(filepath.Join(dest, "sub"), 0o700)
 				_ = os.WriteFile(filepath.Join(dest, "keep"), nil, 0o600)
+				_ = os.WriteFile(filepath.Join(dest, "sub", "keep"), nil, 0o600)
 			}
 		}
 	case verb == "image" && len(args) > 1 && args[1] == "inspect":
@@ -770,4 +772,54 @@ func TestAstroBuildWorkingTagsAreUnique(t *testing.T) {
 	assert.NotEqual(t, first.gotReq.Tag, second.gotReq.Tag)
 	assert.Regexp(t, regexp.MustCompile(`^astro-package/my-project:src-[0-9a-f]{7}-[0-9a-f]{8}$`), first.gotReq.Tag)
 	assert.Equal(t, a.Image, b.Image)
+}
+
+func gitInitPack(t *testing.T, dir string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	git := exec.Command("git", "-C", dir, "init", "-q")
+	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	require.NoError(t, git.Run())
+}
+
+func writeProject(t *testing.T, dir string, files map[string]string) {
+	t.Helper()
+	for name, body := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+}
+
+// A declared Dockerfile's build copies from the project under its own ignore
+// file, so gitignored credentials it would carry refuse the package too.
+func TestAstroBuildWithADeclaredDockerfileRefusesGitignoredSecrets(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nCOPY . .\n")
+	gitInitPack(t, req.ProjectDir)
+	writeProject(t, req.ProjectDir, map[string]string{".gitignore": "*.p12\n", "client.p12": "k"})
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "client.p12")
+	assert.Empty(t, builder.gotReq.Tag, "nothing was built")
+}
+
+// The build looks again just before it copies the project, and a credential
+// that appeared since the survey stops it.
+func TestAstroBuildLooksAgainBeforeCopyingTheProject(t *testing.T) {
+	req := testRequest(t)
+	gitInitPack(t, req.ProjectDir)
+	writeProject(t, req.ProjectDir, map[string]string{".gitignore": "keys/\n", "dags/a.py": "#"})
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	require.NotNil(t, builder.gotReq.BeforeProjectCopy)
+	require.NoError(t, builder.gotReq.BeforeProjectCopy())
+
+	writeProject(t, req.ProjectDir, map[string]string{"keys/late.pem": "k"})
+	err = builder.gotReq.BeforeProjectCopy()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keys/late.pem")
 }

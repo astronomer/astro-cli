@@ -200,6 +200,13 @@ func deployImageProject(t *testing.T, name string) *project {
 		".env.local":            "SECRET=1\n",
 		"include/.envrc":        "export SECRET=1\n",
 		"astro/legacy.txt":      "1.x's own directory\n",
+		// The same, nested: a vendored repository's .git with a token in its
+		// remote, and settings and per-machine state below the root.
+		"include/shared/.git/config":         "[remote \"origin\"]\n\turl = https://x:ghp_e2efaketoken@github.com/x/y\n",
+		"include/shared/lib.py":              "L = 1\n",
+		"include/airflow_settings.yaml":      "connections:\n  - conn_password: hunter2\n",
+		"plugins/.astro/standalone/state.db": "state\n",
+		"include/.venv/bin/python":           "a virtualenv\n",
 	} {
 		full := filepath.Join(p.Dir, filepath.FromSlash(path))
 		mkdir(t, filepath.Dir(full))
@@ -213,7 +220,7 @@ func deployImageProject(t *testing.T, name string) *project {
 // deployImageProject carries, and what none does.
 func assertShipsTheProject(t *testing.T, got map[string]string) {
 	t.Helper()
-	for _, want := range []string{"plugins/x.py", "utils/u.py", "tests/test_dag.py", "pyproject.toml"} {
+	for _, want := range []string{"plugins/x.py", "utils/u.py", "tests/test_dag.py", "pyproject.toml", "include/shared/lib.py"} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("%s is not in the image", want)
 		}
@@ -227,6 +234,7 @@ func assertShipsTheProject(t *testing.T, got map[string]string) {
 		for _, never := range []string{
 			"__pycache__", ".env", ".venv/", ".astro/", "include/private.txt",
 			"airflow_settings.yaml", "logs/", "airflow.db", "airflow.cfg", "astro/legacy.txt",
+			".git/", ".astro/",
 		} {
 			if strings.Contains(path, never) {
 				t.Errorf("%s is in the image", path)
@@ -662,5 +670,33 @@ func TestTheDeployRefusesDagsBehindALinkThatDanglesInTheImage(t *testing.T) {
 	r := p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
 	if !strings.Contains(r.Stdout, "no DAG file in dags/ would reach the image") {
 		t.Errorf("the deploy should refuse a dags/ link that dangles in the image\n%s", r.output())
+	}
+}
+
+// A declared Dockerfile's build copies from the project too, under its own
+// ignore file, so a gitignored credential it would carry refuses the deploy
+// and the package as well.
+func TestGitignoredSecretsAreRefusedForADeclaredDockerfile(t *testing.T) {
+	tier(t, 3)
+	p := deployImageProject(t, "declaredsecrets")
+	needsDocker(t, p)
+	gitProject(t, p)
+	write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM "+runtimeImageFor(t, p)+"\nCOPY . .\n")
+	write(t, filepath.Join(p.Dir, "requirements.txt"), "")
+	write(t, filepath.Join(p.Dir, "packages.txt"), "")
+	declareDockerfile(t, p)
+	write(t, filepath.Join(p.Dir, ".gitignore"), read(t, filepath.Join(p.Dir, ".gitignore"))+"\nsecrets/\n")
+	mkdir(t, p.Dir, "secrets")
+	write(t, filepath.Join(p.Dir, "secrets", "sa-prod.json"), "{}\n")
+	writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{dagDeploy: true}).URL)
+	repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
+	t.Cleanup(func() { removeImagesNamed(t, repo) })
+	t.Cleanup(func() { removeImagesNamed(t, "astro-package/declaredsecrets") })
+
+	for _, args := range [][]string{{"deploy", "dep-e2e"}, {"package", "astro"}} {
+		r := p.runSlow(append(args, "--output", "json")...).requireFailure()
+		if !strings.Contains(r.Stdout, "secrets/sa-prod.json") {
+			t.Errorf("%v should refuse, naming the key\n%s", args, r.output())
+		}
 	}
 }

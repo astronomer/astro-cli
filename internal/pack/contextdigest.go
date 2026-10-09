@@ -1,38 +1,73 @@
 package pack
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/shipcontext"
 )
 
-// contextDigest is a digest of what a generated build copies from the project
-// at dir into the image: every path the build's ignore file
-// (imagebuild.ProjectIgnore) leaves in, with its kind, whether it is
-// executable, and its bytes or link text (shipcontext.Take, one walk). It
-// also returns what the package warns about those files: no DAG file reaching
-// the image, and files git ignores that the image will carry; and it refuses
-// gitignored files that look like credentials (shipcontext.SecretsError).
-func contextDigest(dir string) (digest string, warnings []string, err error) {
-	ignore, err := imagebuild.ProjectIgnore(dir, nil)
+// projectFiles is what the package found surveying the project files its
+// build will copy: the content address of a generated build's copy, and what
+// to warn about.
+type projectFiles struct {
+	digest   string
+	warnings []string
+}
+
+// dagsIgnoredWarning is the warning for ignore rules that leave every DAG
+// file out of a generated image.
+const dagsIgnoredWarning = "no DAG file in dags/ reaches the image: .dockerignore leaves them all out, or dags/ links outside the project. A Deployment without DAG deploys runs only the image's DAGs; remove the rule, or move the DAGs into the project, to package them"
+
+// surveyFiles surveys the project files the build will copy, in one walk
+// (shipcontext.Take), under the ignore rules the engine will apply: a
+// generated build's (the ProjectBuilder's ProjectIgnore), or the file a
+// declared Dockerfile's build reads (shipcontext.DeclaredIgnore). It refuses
+// files that look like credentials and that git ignores or cannot vouch for,
+// and, for a generated build, digests the copy, warns when no DAG file reaches
+// the image, and has the build look again just before it copies the project
+// (Request.BeforeProjectCopy), since the dependency build before it takes
+// minutes.
+func surveyFiles(ctx context.Context, cli engineCLI, projectDir, dockerfile string, breq *imagebuild.Request) (projectFiles, error) {
+	opts := shipcontext.Options{Git: true}
+	var err error
+	if breq.ProjectContext != "" {
+		opts.Ignore, err = breq.Builder.ProjectIgnore(projectDir, breq.ProjectExcludes)
+	} else {
+		podman := imagebuild.New(cli.run, time.Now).IsPodman(ctx, imagebuild.Request{Bin: cli.bin, Env: cli.env})
+		opts.Ignore, err = shipcontext.DeclaredIgnore(projectDir, dockerfile, podman)
+	}
 	if err != nil {
-		return "", nil, err
+		return projectFiles{}, err
 	}
 	h := sha256.New()
-	survey, err := shipcontext.Take(dir, shipcontext.Options{Ignore: ignore, Digest: h, Git: true})
-	if err != nil {
-		return "", nil, err
+	if breq.ProjectContext != "" {
+		opts.Digest = h
 	}
-	if err := shipcontext.SecretsError(survey.Secrets); err != nil {
-		return "", nil, err
+	survey, err := shipcontext.Take(projectDir, opts)
+	if err != nil {
+		return projectFiles{}, err
+	}
+	if err := survey.SecretsError(); err != nil {
+		return projectFiles{}, err
+	}
+	files := projectFiles{warnings: survey.Warnings()}
+	if breq.ProjectContext == "" {
+		return files, nil
 	}
 	if survey.DagsOnDisk > 0 && survey.DagsShipped == 0 {
-		warnings = append(warnings, dagsIgnoredWarning)
+		files.warnings = append(files.warnings, dagsIgnoredWarning)
 	}
-	if w := imagebuild.GitignoredWarning(survey.Gitignored); w != "" {
-		warnings = append(warnings, w)
+	files.digest = fmt.Sprintf("%x", h.Sum(nil))
+	breq.BeforeProjectCopy = func() error {
+		again, err := shipcontext.Take(projectDir, shipcontext.Options{Ignore: opts.Ignore, Git: true})
+		if err != nil {
+			return err
+		}
+		return again.SecretsError()
 	}
-	return fmt.Sprintf("%x", h.Sum(nil)), warnings, nil
+	return files, nil
 }

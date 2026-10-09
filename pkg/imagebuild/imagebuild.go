@@ -194,6 +194,11 @@ type Request struct {
 	// runtime image's ONBUILD triggers read requirements.txt and packages.txt
 	// from the main build context, which therefore cannot be the project.
 	ProjectContext string
+	// BeforeProjectCopy, when set, runs just before a ProjectContext build
+	// copies the project in, after the dependency build, which can take
+	// minutes; an error stops the build there. A caller that checked the
+	// project before the build checks it again, as it now is.
+	BeforeProjectCopy func() error
 	// Builder is how this engine runs a ProjectContext build, as
 	// Builder.CanShipProject found it. A caller that asked hands the answer
 	// over here, so the engine is asked once; left zero, the build asks.
