@@ -59,6 +59,26 @@ func TestInitSuggestsDockerForAKeptDockerfile(t *testing.T) {
 	}
 }
 
+// The platform the root mounted reaches the conversion: APC's deploy builds the
+// 1.x Dockerfile, so under an APC context a pin-only one is kept, and under
+// Astro it is retired as before.
+func TestInitKeepsThe1xBuildForAPC(t *testing.T) {
+	for _, apc := range []bool{true, false} {
+		d, dir, _ := initDeps(t)
+		d.DeploysToAPC = apc
+		if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := execute(t, d, "init"); err != nil {
+			t.Fatalf("astro init (APC %v): %v", apc, err)
+		}
+		_, err := os.Stat(filepath.Join(dir, "Dockerfile"))
+		if kept := err == nil; kept != apc {
+			t.Errorf("APC %v: Dockerfile kept = %v, want %v", apc, kept, apc)
+		}
+	}
+}
+
 // OS packages are the other thing only Docker mode applies.
 func TestInitSuggestsDockerForOSPackages(t *testing.T) {
 	d, dir, stdout := initDeps(t)

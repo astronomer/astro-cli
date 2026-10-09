@@ -33,8 +33,9 @@ either of these. Everything else on this page is safe to do without asking.
 2. **Deleting files `init` kept.** `init` removes the 1.x files it carried
    across completely. A file it keeps is still read or still needs a decision:
    a `Dockerfile` it declared as the project's build, with the
-   `requirements.txt` and `packages.txt` that build installs. Ask before you
-   remove one.
+   `requirements.txt` and `packages.txt` that build installs, or the same
+   three kept because the project deploys to Astro Private Cloud. Ask before
+   you remove one.
 
 Report what you changed when you finish. Say which files you wrote, what you
 put in the Airflow pin, and what you left alone.
@@ -179,6 +180,7 @@ What `init` converts:
 | `packages.txt` | Each line becomes an entry in `packages` under `[tool.astro]`. Removed, unless a kept Dockerfile still installs it. |
 | `airflow_settings.yaml` | Connection and variable values go to this machine's encrypted vault, and `[tool.astro.env]` declares them without their values. A variable with an empty value is declared optional, so `astro local start` runs without it, as v1 did. Pools go to `[tool.astro.pools]`, and `astro local start` creates them in Airflow. The file is removed once everything in it is carried. |
 | `Dockerfile` | Its `FROM` line is read for the Airflow version (below). A Dockerfile that only names a base image is removed, since the requirement now says the same thing. Any other Dockerfile is kept and declared as the project's build (`[tool.astro] dockerfile`), and `init` writes a `.dockerignore` for it. |
+| `Dockerfile`, `requirements.txt` and `packages.txt` under an Astro Private Cloud context | Kept, even where the rows above remove them. A Dockerfile that only names a base image stays undeclared, so Astro and `astro local` still build from `pyproject.toml`. APC's `astro deploy` still builds the 1.x layout: it builds this Dockerfile, and the runtime base image installs `requirements.txt` and `packages.txt` during that build. Their contents are carried into `pyproject.toml` as well, for `astro local`, so Left to do asks you to change both together while the project deploys to APC. `init` also writes a `.dockerignore` for that build. The current context is the one `astro deploy` uses; no context counts as Astro. |
 | `.astro/config.yaml` | A saved deploy target (`project.deployment` with `project.workspace`) becomes a link named `default` under `[tool.astro.deployments]`, marked `default = true`, when both are Astro ids. Anything else is listed as a note naming the entry to add by hand. |
 | `docker-compose.yml` | Nothing to do: `astro local start` replaces it. |
 | `docker-compose.override.yml` | Kept. `astro local start --docker` merges it over the services it generates, as 1.x did, and `astro local stop` and `reset` take its services down too. Standalone mode runs no containers, so there it does nothing, and `astro local start` says so. |

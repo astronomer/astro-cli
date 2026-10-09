@@ -63,6 +63,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
+	opts.DeploysToAPC = c.d.DeploysToAPC
 	// Called by scaffold only when nothing in the project states an Airflow,
 	// so converting a pinned project makes no request. The lookup never fails
 	// init: offline, it answers the built-in series.

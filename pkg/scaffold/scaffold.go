@@ -61,6 +61,14 @@ type Options struct {
 	// airflow_settings.yaml carries, at the project scope the writer itself
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
+	// DeploysToAPC says the project deploys to Astro Private Cloud: the CLI's
+	// current context is an APC one. APC's `astro deploy` builds only the 1.x
+	// layout, from the Dockerfile, and the runtime base image's ONBUILD
+	// installs requirements.txt and packages.txt from the build context. So
+	// the run keeps all three, and keeps per-machine files out of that
+	// context, even where a pin-only Dockerfile would otherwise be retired.
+	// Not the default, because Astro builds a manifest project without them.
+	DeploysToAPC bool
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -291,7 +299,7 @@ type manifestFacts struct {
 // Run is Plan followed by Apply, which is what a command wants: nobody is going
 // to review a change set at a terminal that has already asked for it. A caller
 // that shows the change set to a person first calls the two halves itself.
-func Run(dir string, opts Options) (*Result, error) {
+func Run(dir string, opts Options) (*Result, error) { //nolint:gocritic // by value, as Plan takes it: Astro Desktop calls both
 	cs, err := Plan(dir, opts)
 	if err != nil {
 		return nil, err
@@ -308,7 +316,7 @@ func Run(dir string, opts Options) (*Result, error) {
 // first — which is impossible if the only way to learn what a run does is to
 // let it happen. Plan reads the project (it has to: an adopted manifest is
 // computed from the one already there) and writes nothing.
-func Plan(dir string, opts Options) (*Changeset, error) {
+func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // by value: Astro Desktop builds Options as a literal
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
@@ -333,6 +341,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	if err != nil {
 		return nil, err
 	}
+	from1x.markAPCBuild(opts.DeploysToAPC)
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
@@ -343,11 +352,11 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	data, readErr := os.ReadFile(marker)
 	switch {
 	case readErr == nil:
-		out, manifestLabels, pin, err = adopt(abs, data, opts, from1x, &cs.Result)
+		out, manifestLabels, pin, err = adopt(abs, data, &opts, from1x, &cs.Result)
 	case errors.Is(readErr, os.ErrNotExist):
 		// No labels from this arm: a scaffolded manifest is created rather than
 		// edited, so its one line is the filename, supplied below.
-		out, pin, err = scaffoldManifest(abs, opts, from1x, &cs.Result)
+		out, pin, err = scaffoldManifest(abs, &opts, from1x, &cs.Result)
 	default:
 		err = fmt.Errorf("reading %s: %w", marker, readErr)
 	}
@@ -430,8 +439,10 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	// That state does make a rerun refuse, since a manifest carrying
 	// [tool.astro] is what ErrAlreadyAstroProject tests. Refusing over a project
 	// whose dependencies are intact is the better half of the trade.
-	for _, name := range planRetirements(from1x,
-		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
+	retire := planRetirements(from1x,
+		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion)
+	retire = keepAPCBuild(from1x, retire, cs)
+	for _, name := range retire {
 		label := name + " (migrated into " + manifest.Marker + ", removed)"
 		if name == SettingsRelPath {
 			switch {
@@ -585,6 +596,53 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	return out
 }
 
+// apcBuildFiles are the files APC's `astro deploy` builds a 1.x project from:
+// the Dockerfile, and the two its runtime base's ONBUILD copies in.
+var apcBuildFiles = []string{fileDockerfile, "requirements.txt", "packages.txt"}
+
+// markAPCBuild records that APC's deploy builds this project's Dockerfile: the
+// project deploys to Astro Private Cloud and has one.
+func (from1x *project1x) markAPCBuild(deploysToAPC bool) {
+	from1x.apcBuild = deploysToAPC && slices.Contains(from1x.present, fileDockerfile)
+}
+
+// keepAPCBuild takes the files APC's deploy builds from out of retire, for a
+// project that deploys to Astro Private Cloud, returns what is left, and adds
+// a note naming what it took. It runs after planRetirements, so what it took
+// is exactly what this run would have deleted and APC still needs: the note
+// names those, and no file some other rule already kept.
+//
+// APC's deploy requires .astro/config.yaml, which a conversion keeps, and
+// builds the Dockerfile, which a conversion retires when it only names a base
+// image. Without this, a converted project passed the deploy's project check
+// and then failed its build.
+func keepAPCBuild(from1x *project1x, retire []string, cs *Changeset) []string {
+	if !from1x.apcBuild {
+		return retire
+	}
+	var left, kept []string
+	for _, name := range retire {
+		if slices.Contains(apcBuildFiles, name) {
+			kept = append(kept, name)
+			continue
+		}
+		left = append(left, name)
+	}
+	if len(kept) > 0 {
+		cs.Notes = append(cs.Notes, apcBuildNote(kept))
+	}
+	return left
+}
+
+// apcBuildNote says why keepAPCBuild kept names, and what keeping them asks of
+// the user: the manifest now holds the same pin and lists, for `astro local`.
+func apcBuildNote(names []string) string {
+	return joinNames(names) + ": kept, because the current context is Astro Private Cloud, whose " +
+		"`astro deploy` builds this project from its Dockerfile, and the runtime base image installs " +
+		"requirements.txt and packages.txt during that build. " + manifest.Marker + " says the same for " +
+		"`astro local`, so change both together while this project deploys to Astro Private Cloud"
+}
+
 // dockerfileIsSpent reports a Dockerfile with nothing left to say: it names only
 // a base image, and the version that image named is the one the manifest pinned.
 //
@@ -682,7 +740,7 @@ func namedInAny(notes []string, name string) bool {
 // scaffoldManifest renders the manifest for a directory that has none, and
 // records on the Result what it chose. It returns the manifest rather than
 // writing it, so write puts every file on disk in one place.
-func scaffoldManifest(dir string, opts Options, from1x *project1x, res *Result) ([]byte, manifestFacts, error) {
+func scaffoldManifest(dir string, opts *Options, from1x *project1x, res *Result) ([]byte, manifestFacts, error) {
 	name, nameAdvisory := chooseName(dir, opts, from1x)
 	pick := pickAirflowVersion(opts.AirflowVersion, nil, from1x, opts.Default)
 	if opts.AirflowVersion != "" {
@@ -1023,7 +1081,7 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 // this key with a fallback to it. A global project.name would otherwise rename
 // every project converted on that machine to the same thing, which is a worse
 // answer than the directory in every case where the two differ.
-func chooseName(dir string, opts Options, from1x *project1x) (name, advisory string) {
+func chooseName(dir string, opts *Options, from1x *project1x) (name, advisory string) {
 	if opts.Name != "" {
 		return opts.Name, ""
 	}

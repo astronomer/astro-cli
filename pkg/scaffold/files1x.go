@@ -88,6 +88,10 @@ type project1x struct {
 	// inside it, and deleting that file while keeping the build that reads it is
 	// worse than either outcome alone.
 	dockerfileBody []byte
+	// apcBuild reports a Dockerfile that APC's `astro deploy` builds, because
+	// the caller said the project deploys there (Options.DeploysToAPC). Set by
+	// Plan, not read from the files.
+	apcBuild bool
 	// projectName is the name .astro/config.yaml states, before any
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.

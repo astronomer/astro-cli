@@ -97,6 +97,10 @@ type case1x struct {
 	notes      []string
 	advisories []string
 	noNotes    bool
+	// platform, when set, gives the run a current context on that platform
+	// ("software" for APC, "cloud" for Astro; see writeLogin). Empty is a
+	// machine that never logged in, which the CLI treats as Astro.
+	platform string
 }
 
 // stock1xSettings is the airflow_settings.yaml 1.x's `astro dev init` wrote,
@@ -178,6 +182,44 @@ func cases1x() []case1x {
 			retired:       []string{"Dockerfile", "requirements.txt"},
 			// Everything carried, so the run has nothing to report.
 			noNotes: true,
+		},
+		{
+			// The same project, logged in to Astro: Astro's deploy builds a
+			// manifest project without the Dockerfile, so it goes as it does
+			// on a machine that never logged in.
+			name: "a runtime tag that names the Airflow version, under an Astro context",
+			files: map[string]string{
+				"Dockerfile":       runtime3,
+				"requirements.txt": "pandas==2.1.0\n",
+			},
+			platform: "cloud",
+			airflow:  "3.1",
+			retired:  []string{"Dockerfile", "requirements.txt"},
+			noNotes:  true,
+		},
+		{
+			// And logged in to Astro Private Cloud, whose `astro deploy` still
+			// builds the 1.x layout: .astro/config.yaml, which a conversion
+			// keeps, and the Dockerfile, whose runtime base installs
+			// requirements.txt and packages.txt. Retiring them left a project
+			// that passed APC's project check and failed its build.
+			name: "a runtime tag that names the Airflow version, under an APC context",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n",
+				"Dockerfile":         runtime3,
+				"requirements.txt":   "pandas==2.1.0\n",
+				"packages.txt":       "libpq-dev\n",
+			},
+			platform:      "software",
+			airflow:       "3.1",
+			projectName:   "orders-pipeline",
+			manifestLines: []string{"dependencies = [\n    'apache-airflow==3.1.*',\n    'pandas==2.1.0',\n]"},
+			// Kept, not declared: Astro and `astro local` still build from the
+			// manifest.
+			manifestLacks: []string{"dockerfile ="},
+			kept:          []string{"Dockerfile", "requirements.txt", "packages.txt", ".astro/config.yaml"},
+			keptHas:       map[string]string{"Dockerfile": "astro-runtime:3.1-12", "requirements.txt": "pandas==2.1.0"},
+			notes:         []string{"kept, because the current context is Astro Private Cloud"},
 		},
 		{
 			// A Dockerfile that does more than pin becomes the project's
@@ -547,7 +589,13 @@ func TestInitConvertsA1xProject(t *testing.T) {
 			}
 
 			var res initResult
-			p.run("init", "--output", "json").requireSuccess().requireJSON(&res)
+			if tc.platform == "" {
+				p.run("init", "--output", "json").requireSuccess().requireJSON(&res)
+			} else {
+				// runIn keeps every request off the network.
+				writeContext(t, p, tc.platform)
+				runIn(t, p, "init", "--output", "json").requireSuccess().requireJSON(&res)
+			}
 
 			if tc.airflow != "" && res.Airflow != tc.airflow {
 				t.Errorf("airflow = %q, want %q", res.Airflow, tc.airflow)
@@ -566,6 +614,19 @@ func TestInitConvertsA1xProject(t *testing.T) {
 			// tier on a keyring prompt.
 			checkVaultUntouched(t, p)
 		})
+	}
+}
+
+// writeContext gives p's home a current context on platform ("cloud" or
+// "software", the config's local.platform for a localhost domain) and no
+// login. Not writeLogin: a stored token is moved to the OS keyring by the
+// root, which would trip checkVaultUntouched, and init reads no session.
+func writeContext(t *testing.T, p *project, platform string) {
+	t.Helper()
+	cfg := "context: localhost\nlocal:\n  platform: " + platform + "\ncontexts:\n  localhost:\n    domain: localhost\n"
+	dir := mkdir(t, p.home, ".astro")
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(cfg), 0o600); err != nil {
+		t.Fatalf("writing the home config: %v", err)
 	}
 }
 
