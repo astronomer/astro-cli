@@ -342,7 +342,7 @@ func acceptForCompletion(root *cobra.Command, args []string) {
 			continue
 		}
 		shorthand := f.shorthand
-		if shorthand == "h" || cmd.Flags().ShorthandLookup(shorthand) != nil || cmd.InheritedFlags().ShorthandLookup(shorthand) != nil {
+		if shorthand == "h" || cmd.LocalFlags().ShorthandLookup(shorthand) != nil || cmd.InheritedFlags().ShorthandLookup(shorthand) != nil {
 			shorthand = ""
 		}
 		if f.isBool {

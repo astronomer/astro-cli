@@ -370,6 +370,31 @@ func TestRemovedFlagsLeaveCompletionsAlone(t *testing.T) {
 			}
 		})
 	}
+	// Every command 1.x had takes its removed flags for a completion, without
+	// a name or shorthand clashing with one it has (pflag panics on that),
+	// and then parses each of them.
+	for _, tc := range v1Trees {
+		root := buildTree(t, tc.tree).root
+		for _, f := range v1Flags() {
+			if !slices.Contains(f.trees, tc.v1) {
+				continue
+			}
+			cmd, _, err := root.Find(strings.Fields(f.path))
+			if err != nil || pathBelowRoot(cmd) != f.path || cmd.DisableFlagParsing {
+				continue
+			}
+			removed := cmd.Flag(f.name) == nil
+			require.NotPanics(t, func() { acceptForCompletion(root, strings.Fields(f.path)) }, "%s: %s", tc.tree.name, f.path)
+			if !removed {
+				continue
+			}
+			arg := "--" + f.name
+			if !f.isBool {
+				arg += "=x"
+			}
+			assert.NoError(t, cmd.ParseFlags([]string{arg}), "%s: astro %s %s", tc.tree.name, f.path, arg)
+		}
+	}
 }
 
 // Every root says which 1.x tree a script on its machine was written for.
