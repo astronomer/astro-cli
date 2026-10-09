@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -26,6 +27,10 @@ func TestAPCRootAsksThePlatformOnlyForAPCCommands(t *testing.T) {
 		{"--jklsdjkfljsfd"},
 		{"context", "list"},
 		{"local", "start", "--help"},
+		// Tab-completing a root word: the word being completed is not the command.
+		{cobra.ShellCompRequestCmd, ""},
+		{cobra.ShellCompRequestCmd, "de"},
+		{cobra.ShellCompNoDescRequestCmd},
 	} {
 		client := new(houston_mocks.ClientInterface) // no expectations: any call panics
 		require.NotPanics(t, func() {
@@ -41,4 +46,9 @@ func TestAPCRootAsksThePlatformOnlyForAPCCommands(t *testing.T) {
 	create, _, err := root.Find([]string{"deployment", "create"})
 	require.NoError(t, err)
 	require.NotNil(t, create.Flags().Lookup("mode"))
+
+	// Completing a word under an APC command asks, so the flags it offers are the platform's.
+	client = stubHoustonAt(t, newestAPCVersion)
+	newRootCmd(&rootOptions{platform: apcPlatform, loggedIn: true, houstonClient: client, out: new(bytes.Buffer), args: []string{cobra.ShellCompRequestCmd, "deployment", "create", "--"}})
+	client.AssertCalled(t, "GetPlatformVersion", nil)
 }

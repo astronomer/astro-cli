@@ -59,6 +59,7 @@ func LoadPlatform(client houston.ClientInterface) {
 	houstonVersion, err = client.GetPlatformVersion(nil)
 	if err != nil {
 		InitDebugLogs = append(InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
+		appConfig = nil // nothing this platform said, rather than what an earlier load left
 		return
 	}
 	// There is no clusterID in the GetAppConfig call at this point of lifecycle, so we are getting the app config for the default cluster
@@ -74,30 +75,27 @@ func PlatformVersion() string {
 	return houstonVersion
 }
 
-// NeedsPlatform reports whether args run one of the commands AddCmds builds,
-// and so whether LoadPlatform has to run before they are built. rootFlags are
-// the root's persistent flags, which cobra needs to tell a flag's value from a
-// command name (`--verbosity debug deployment list`).
+// NeedsPlatform reports whether words, the command line's words that name a
+// command, run one of the commands AddCmds builds, and so whether LoadPlatform
+// has to run before they are built. rootFlags are the root's persistent flags,
+// which cobra needs to tell a flag's value from a command name (`--verbosity
+// debug deployment list`).
 //
 // It answers by finding the command in a probe tree built from these commands
-// alone, the way cobra will find it in the real one. `help <command>` asks
-// about the command named; a completion request asks about the words before
-// the one being completed, so tab-completing a root word does not reach the
-// network.
-func NeedsPlatform(args []string, rootFlags *pflag.FlagSet) bool {
-	if len(args) > 0 {
-		switch args[0] {
-		case cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
-			args = args[1:max(len(args)-1, 1)]
-		case "help":
-			args = args[1:]
-		}
-	}
+// alone, the way cobra will find it in the real one. The probe has a stand-in
+// for cobra's help command, so `help <command>` asks about the command named,
+// wherever on the line it stands.
+func NeedsPlatform(words []string, rootFlags *pflag.FlagSet) bool {
 	probe := &cobra.Command{Use: "astro"}
 	probe.PersistentFlags().AddFlagSet(rootFlags)
 	probe.AddCommand(newCmds(io.Discard)...)
-	found, _, err := probe.Find(args)
-	return err == nil && found != probe
+	help := &cobra.Command{Use: "help"}
+	probe.AddCommand(help)
+	found, rest, err := probe.Find(words)
+	if err == nil && found == help {
+		found, _, err = probe.Find(rest)
+	}
+	return err == nil && found != probe && found != help
 }
 
 // SetUpLogs set the log output and the log level

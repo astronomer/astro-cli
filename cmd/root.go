@@ -133,7 +133,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		// the host does not answer. So only a line that runs one of them asks.
 		// `astro --help`, `astro version` and a mistyped command return at
 		// once, and the root help names no platform version (#2289).
-		platformLoaded := apcCmd.NeedsPlatform(o.args, rootCmd.PersistentFlags())
+		platformLoaded := apcCmd.NeedsPlatform(commandWords(o.args), rootCmd.PersistentFlags())
 		if platformLoaded {
 			apcCmd.LoadPlatform(houstonClient)
 			houstonVersion = apcCmd.PlatformVersion()

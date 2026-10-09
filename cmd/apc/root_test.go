@@ -141,11 +141,9 @@ func (s *AddCmdSuite) TestNeedsPlatform() {
 		{[]string{"team", "list"}, true},
 		{[]string{"--verbosity", "debug", "deployment", "list"}, true},
 		{[]string{"help", "deployment", "create"}, true},
+		{[]string{"--verbosity", "debug", "help", "deployment"}, true},
 		{[]string{"help", "version"}, false},
-		{[]string{cobra.ShellCompRequestCmd}, false},
-		{[]string{cobra.ShellCompRequestCmd, "de"}, false},
-		{[]string{cobra.ShellCompRequestCmd, "deployment", ""}, true},
-		{[]string{cobra.ShellCompNoDescRequestCmd, "deployment", "create", "--"}, true},
+		{[]string{"help", "help"}, false},
 	} {
 		s.Equal(tt.want, NeedsPlatform(tt.args, rootFlags), "%q", tt.args)
 	}
