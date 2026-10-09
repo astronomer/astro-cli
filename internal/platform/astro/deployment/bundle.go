@@ -26,6 +26,7 @@ var (
 	errDagBundleNonDagFlags = errors.New("--bundle-type and --dag-bundle-ids are only valid for non-Dag bundles (--mount-path)")
 	errUpdateBundleNoOp     = errors.New("specify at least one of --description or --dag-bundle-ids")
 	errBundleSelector       = errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (Dag bundle), or --mount-path (non-Dag bundle)")
+	errNoBundleInResponse   = errors.New("the API returned no bundle")
 )
 
 // BundleList is the wire shape for `bundle list` output.
@@ -52,14 +53,28 @@ type BundleInfo struct {
 }
 
 // BundleRemoval is what `astro deployment bundle delete` did, as it publishes it
-// under --output json: the bundle's id, under the key bundle list gives it,
-// the Deployment it was on, and the action `astro deployment delete` and the
-// token removals publish.
+// under --output json, under the keys bundle list gives a bundle: its id, the
+// --name or --mount-path it was picked by (absent when it was picked by id),
+// the Deployment it is on, and the action.
+//
+// The API removes a bundle in the background (bundle list shows it with
+// deletion_is_pending until it is gone), so the action of a delete is
+// deletion_requested, not the deleted of a removal that is done when it
+// returns. canceled is a question answered no, which a run under --output
+// json never sees: there it is refused, and the run passes --yes.
 type BundleRemoval struct {
-	ID           string `json:"id"`
-	DeploymentID string `json:"deployment_id"`
-	Action       string `json:"action"`
+	ID              string `json:"id"`
+	Name            string `json:"name,omitempty"`
+	NonDagMountPath string `json:"non_dag_mount_path,omitempty"`
+	DeploymentID    string `json:"deployment_id"`
+	Action          string `json:"action"`
 }
+
+// The actions a BundleRemoval publishes.
+const (
+	bundleDeletionRequested = "deletion_requested"
+	bundleDeletionCanceled  = "canceled"
+)
 
 func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
 	return BundleInfo{
@@ -163,8 +178,16 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 		return err
 	}
 
-	return r.Emit(bundleToInfo(resp.JSON200), func(w io.Writer) error {
-		_, err := fmt.Fprintf(w, "Created bundle %s on deployment %s\n", resp.JSON200.Id, dep.Id)
+	// A success with no bundle in the body (a 204, or a body that is not
+	// one) still created it: its name or mount path finds it.
+	bundle := resp.JSON200
+	if bundle == nil {
+		if bundle, err = findBundle(dep.OrganizationId, dep.Id, name, mountPath, astroV1Alpha1Client); err != nil {
+			return fmt.Errorf("created the bundle on deployment %s, but could not read it back: %w", dep.Id, err)
+		}
+	}
+	return r.Emit(bundleToInfo(bundle), func(w io.Writer) error {
+		_, err := fmt.Fprintf(w, "Created bundle %s on deployment %s\n", bundle.Id, dep.Id)
 		return err
 	})
 }
@@ -207,7 +230,14 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 		return err
 	}
 
-	return r.Emit(bundleToInfo(resp.JSON200), func(w io.Writer) error {
+	// A success with no bundle in the body still updated it; read it back.
+	bundle := resp.JSON200
+	if bundle == nil {
+		if bundle, err = getBundle(dep.OrganizationId, dep.Id, bundleID, astroV1Alpha1Client); err != nil {
+			return fmt.Errorf("updated bundle %s on deployment %s, but could not read it back: %w", bundleID, dep.Id, err)
+		}
+	}
+	return r.Emit(bundleToInfo(bundle), func(w io.Writer) error {
 		_, err := fmt.Fprintf(w, "Updated bundle %s on deployment %s\n", bundleID, dep.Id)
 		return err
 	})
@@ -281,27 +311,51 @@ func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath 
 	if bundleID != "" {
 		return bundleID, nil
 	}
-
-	bundles, err := listAllBundles(orgID, deploymentID, astroV1Alpha1Client)
+	bundle, err := findBundle(orgID, deploymentID, bundleName, bundleMountPath, astroV1Alpha1Client)
 	if err != nil {
 		return "", err
+	}
+	return bundle.Id, nil
+}
+
+// findBundle finds the Dag bundle named bundleName, or the non-Dag bundle
+// mounted at bundleMountPath, among a deployment's bundles.
+func findBundle(orgID, deploymentID, bundleName, bundleMountPath string, astroV1Alpha1Client astrov1alpha1.APIClient) (*astrov1alpha1.DeploymentBundle, error) {
+	bundles, err := listAllBundles(orgID, deploymentID, astroV1Alpha1Client)
+	if err != nil {
+		return nil, err
 	}
 
 	for i := range bundles {
 		bundle := &bundles[i]
 		isDagBundle := bundle.IsDagBundle != nil && *bundle.IsDagBundle
 		if bundleName != "" && isDagBundle && bundle.Name != nil && *bundle.Name == bundleName {
-			return bundle.Id, nil
+			return bundle, nil
 		}
 		if bundleMountPath != "" && !isDagBundle && bundle.NonDagMountPath != nil && *bundle.NonDagMountPath == bundleMountPath {
-			return bundle.Id, nil
+			return bundle, nil
 		}
 	}
 
 	if bundleName != "" {
-		return "", fmt.Errorf("no Dag bundle named %q on deployment %s", bundleName, deploymentID)
+		return nil, fmt.Errorf("no Dag bundle named %q on deployment %s", bundleName, deploymentID)
 	}
-	return "", fmt.Errorf("no non-Dag bundle mounted at %q on deployment %s", bundleMountPath, deploymentID)
+	return nil, fmt.Errorf("no non-Dag bundle mounted at %q on deployment %s", bundleMountPath, deploymentID)
+}
+
+// getBundle reads one bundle by id.
+func getBundle(orgID, deploymentID, bundleID string, astroV1Alpha1Client astrov1alpha1.APIClient) (*astrov1alpha1.DeploymentBundle, error) {
+	resp, err := astroV1Alpha1Client.GetBundleWithResponse(httpContext.Background(), orgID, deploymentID, bundleID)
+	if err != nil {
+		return nil, err
+	}
+	if err := astrov1alpha1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
+		return nil, err
+	}
+	if resp.JSON200 == nil {
+		return nil, errNoBundleInResponse
+	}
+	return resp.JSON200, nil
 }
 
 // ListBundlesWithFormat prints every bundle on a deployment in the requested format.
@@ -316,10 +370,9 @@ func ListBundlesWithFormat(wsID, deploymentID string, r output.Emitter, astroV1C
 
 // DeleteBundle removes a bundle from a deployment, after asking unless force.
 // The bundle is identified by id, DAG bundle name, or non-DAG mount path. It
-// publishes what it deleted through r, and says on out when the question was
-// declined, which under --output json it never is: the question is refused
-// there, so a run passes --yes.
-func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID string, force bool, out io.Writer, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+// publishes what it did (BundleRemoval): the deletion it requested, or that the
+// question was declined.
+func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID string, force bool, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
 		return err
 	}
@@ -333,6 +386,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 	if err != nil {
 		return err
 	}
+	removal := BundleRemoval{ID: bundleID, Name: bundleName, NonDagMountPath: bundleMountPath, DeploymentID: dep.Id}
 
 	if !force {
 		confirmed, err := input.Confirm(fmt.Sprintf("Are you sure you want to delete bundle %s from deployment %s?", bundleID, dep.Id), input.AnsweredBy("--yes"))
@@ -340,8 +394,11 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 			return err
 		}
 		if !confirmed {
-			fmt.Fprintln(out, "Canceling bundle deletion")
-			return nil
+			removal.Action = bundleDeletionCanceled
+			return r.Emit(removal, func(w io.Writer) error {
+				_, err := fmt.Fprintln(w, "Canceling bundle deletion")
+				return err
+			})
 		}
 	}
 
@@ -354,7 +411,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 		return err
 	}
 
-	removal := BundleRemoval{ID: bundleID, DeploymentID: dep.Id, Action: actionDeleted}
+	removal.Action = bundleDeletionRequested
 	return r.Emit(removal, func(w io.Writer) error {
 		_, err := fmt.Fprintf(w, "Deleted bundle %s from deployment %s\n", bundleID, dep.Id)
 		return err

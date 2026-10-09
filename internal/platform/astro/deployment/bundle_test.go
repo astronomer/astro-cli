@@ -2,6 +2,8 @@ package deployment
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/stretchr/testify/mock"
@@ -251,7 +253,7 @@ func (s *Suite) TestDeleteBundle() {
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		}, nil).Once()
 
-		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, true, out, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
+		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, true, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Deleted bundle bundle-1")
 		mockV1Alpha1Client.AssertExpectations(s.T())
@@ -263,7 +265,7 @@ func (s *Suite) TestDeleteBundle() {
 		s.mockGetDeployment()
 		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
 
-		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, false, out, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
+		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, false, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Canceling bundle deletion")
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "DeleteBundleWithResponse")
@@ -285,7 +287,7 @@ func (s *Suite) TestDeleteBundle() {
 			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		}, nil).Once()
 
-		err := DeleteBundle("", "", mountPath, ws, testBundleDeploymentID, true, out, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
+		err := DeleteBundle("", "", mountPath, ws, testBundleDeploymentID, true, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
 		s.Contains(out.String(), "Deleted bundle bundle-7")
 		mockV1Alpha1Client.AssertExpectations(s.T())
@@ -300,8 +302,113 @@ func (s *Suite) TestDeleteBundle() {
 			JSON200:      &astrov1alpha1.BundlesPaginated{TotalCount: 0},
 		}, nil).Once()
 
-		err := DeleteBundle("", "missing", "", ws, testBundleDeploymentID, true, out, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
+		err := DeleteBundle("", "missing", "", ws, testBundleDeploymentID, true, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.ErrorContains(err, `no Dag bundle named "missing"`)
 		mockV1Alpha1Client.AssertNotCalled(s.T(), "DeleteBundleWithResponse")
+	})
+
+	s.Run("publishes the deletion it requested, with the selector used", func() {
+		out := &bytes.Buffer{}
+		s.mockGetDeployment()
+		name := "my-dags"
+		isDag := true
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.ListBundlesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200: &astrov1alpha1.BundlesPaginated{
+				TotalCount: 1,
+				Bundles:    []astrov1alpha1.DeploymentBundle{{Id: "bundle-1", Name: &name, IsDagBundle: &isDag}},
+			},
+		}, nil).Once()
+		mockV1Alpha1Client.On("DeleteBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1").Return(&astrov1alpha1.DeleteBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
+		}, nil).Once()
+
+		err := DeleteBundle("", name, "", ws, testBundleDeploymentID, true, testUtil.Renderer{JSON: true, Out: out}, mockV1Client, mockV1Alpha1Client)
+		s.NoError(err)
+		var got BundleRemoval
+		s.NoError(json.Unmarshal(out.Bytes(), &got))
+		s.Equal(BundleRemoval{ID: "bundle-1", Name: name, DeploymentID: testBundleDeploymentID, Action: "deletion_requested"}, got)
+	})
+}
+
+// A create or update that succeeds with no bundle in the response (a 204, or
+// a body that is not one) reads the bundle back rather than failing on it, and
+// says the change was made when it cannot.
+func (s *Suite) TestBundleWritesWithNoBundleInTheResponse() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	name := "my-dags"
+	isDag := true
+	listing := func(bundles ...astrov1alpha1.DeploymentBundle) *astrov1alpha1.ListBundlesResponse {
+		return &astrov1alpha1.ListBundlesResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      &astrov1alpha1.BundlesPaginated{TotalCount: len(bundles), Bundles: bundles},
+		}
+	}
+	created := &astrov1alpha1.CreateBundleResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
+	updated := &astrov1alpha1.UpdateBundleResponse{HTTPResponse: &http.Response{StatusCode: http.StatusNoContent}}
+
+	for _, asJSON := range []bool{false, true} {
+		s.Run(fmt.Sprintf("create finds the bundle by its name (json %t)", asJSON), func() {
+			out := &bytes.Buffer{}
+			s.mockGetDeployment()
+			mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+			mockV1Alpha1Client.On("CreateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(created, nil).Once()
+			mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				Return(listing(astrov1alpha1.DeploymentBundle{Id: "bundle-3", Name: &name, IsDagBundle: &isDag}), nil).Once()
+
+			err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, mockV1Client, mockV1Alpha1Client)
+			s.NoError(err)
+			if asJSON {
+				var got BundleInfo
+				s.NoError(json.Unmarshal(out.Bytes(), &got))
+				s.Equal("bundle-3", got.ID)
+			} else {
+				s.Equal("Created bundle bundle-3 on deployment test-id-1\n", out.String())
+			}
+		})
+
+		s.Run(fmt.Sprintf("update reads the bundle back (json %t)", asJSON), func() {
+			out := &bytes.Buffer{}
+			s.mockGetDeployment()
+			mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+			mockV1Alpha1Client.On("UpdateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything).Return(updated, nil).Once()
+			mockV1Alpha1Client.On("GetBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1").Return(&astrov1alpha1.GetBundleResponse{
+				HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+				JSON200:      &astrov1alpha1.DeploymentBundle{Id: "bundle-1", Name: &name},
+			}, nil).Once()
+
+			err := UpdateBundle("bundle-1", "", "", "d", nil, ws, testBundleDeploymentID, testUtil.Renderer{JSON: asJSON, Out: out}, mockV1Client, mockV1Alpha1Client)
+			s.NoError(err)
+			if asJSON {
+				var got BundleInfo
+				s.NoError(json.Unmarshal(out.Bytes(), &got))
+				s.Equal(&name, got.Name)
+			} else {
+				s.Equal("Updated bundle bundle-1 on deployment test-id-1\n", out.String())
+			}
+		})
+	}
+
+	s.Run("create says it created the bundle when it cannot find it", func() {
+		s.mockGetDeployment()
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("CreateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(created, nil).Once()
+		mockV1Alpha1Client.On("ListBundlesWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(listing(), nil).Once()
+
+		err := CreateBundle(name, "", "", "", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: &bytes.Buffer{}}, mockV1Client, mockV1Alpha1Client)
+		s.ErrorContains(err, "created the bundle on deployment test-id-1, but could not read it back")
+	})
+
+	s.Run("update says it updated the bundle when it cannot read it", func() {
+		s.mockGetDeployment()
+		mockV1Alpha1Client := new(astrov1alpha1_mocks.ClientWithResponsesInterface)
+		mockV1Alpha1Client.On("UpdateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything).Return(updated, nil).Once()
+		mockV1Alpha1Client.On("GetBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1").Return(&astrov1alpha1.GetBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusNoContent},
+		}, nil).Once()
+
+		err := UpdateBundle("bundle-1", "", "", "d", nil, ws, testBundleDeploymentID, testUtil.Renderer{Out: &bytes.Buffer{}}, mockV1Client, mockV1Alpha1Client)
+		s.ErrorContains(err, "updated bundle bundle-1 on deployment test-id-1, but could not read it back")
 	})
 }

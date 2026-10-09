@@ -180,7 +180,7 @@ func TestDeploymentBundleJSON(t *testing.T) {
 		require.NoError(t, err, "stderr:\n%s", stderr)
 		var got deployment.BundleRemoval
 		decodeOne(t, stdout, &got)
-		assert.Equal(t, deployment.BundleRemoval{ID: "bundle-1", DeploymentID: "test-id-1", Action: "deleted"}, got)
+		assert.Equal(t, deployment.BundleRemoval{ID: "bundle-1", DeploymentID: "test-id-1", Action: "deletion_requested"}, got)
 		assert.NotContains(t, stderr, "bundle-1", "the result went to stderr")
 		alpha.AssertExpectations(t)
 	})
