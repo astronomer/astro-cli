@@ -22,12 +22,6 @@ require github.com/astronomer/astro-cli/pkg/runtimeversions v0.0.0-0001010100000
 // requires of its own.
 require github.com/astronomer/astro-cli/pkg/airflowrt v0.0.0-00010101000000-000000000000
 
-// Docker's own .dockerignore matcher, so the project files a generated build
-// ships are filtered by the rules docker would apply to a project context. A
-// leaf with no requires of its own; the root module and pkg/scaffold already
-// use it.
-require github.com/moby/patternmatcher v0.6.1
-
 require github.com/stretchr/testify v1.11.1
 
 require (

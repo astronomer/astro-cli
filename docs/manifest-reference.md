@@ -135,7 +135,7 @@ Changing the requirement through Astro Desktop (or anything else calling `SetAir
 
 ### `dockerfile`
 
-A project-relative path to the project's own Dockerfile — the escape hatch for a multi-stage build, or anything else this section cannot express. Omit it, which is the common case, and the image is generated for you from the Airflow requirement, `packages`, and the rest of `[project] dependencies`, with the project's `plugins/` and `include/` (and `dags/`, where the image is what runs them) copied in when it is deployed or packaged (see [What the image carries](deploy.md#what-the-image-carries)).
+A project-relative path to the project's own Dockerfile — the escape hatch for a multi-stage build, or anything else this section cannot express. Omit it, which is the common case, and the image is generated for you from the Airflow requirement, `packages`, and the rest of `[project] dependencies`, with the project copied in when it is deployed or packaged, under its `.dockerignore` and with `dags/` left out where the DAGs ship as an upload (see [What the image carries](deploy.md#what-the-image-carries)).
 
 Set it and **that file is the build**: the Airflow requirement, `packages` and your other dependencies stop describing the image, because the Dockerfile decides what goes in. Install your Python and OS packages inside the file itself. The Airflow requirement is still required and still read — standalone mode installs it, and it tells the CLI which Airflow generation to run (the service set differs between 2 and 3) — but it no longer picks the image. [`runtime`](#runtime) is refused beside it, since the `FROM` line picks the base.
 

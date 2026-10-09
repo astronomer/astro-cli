@@ -232,3 +232,32 @@ func TestPlanWritesDockerignoreForAKeptDockerfile(t *testing.T) {
 		})
 	}
 }
+
+func TestIgnoresDir(t *testing.T) {
+	for _, tc := range []struct {
+		name, ignore, dockerfile, own string
+		want                          bool
+	}{
+		{name: "no ignore file"},
+		{name: "the directory", ignore: "dags/\n", want: true},
+		{name: "without the slash", ignore: "dags\n", want: true},
+		{name: "everything in it", ignore: "dags/*\n", want: true},
+		{name: "a parent rule", ignore: "*\n", want: true},
+		{name: "one file in it", ignore: "dags/secret.py\n"},
+		{name: "another directory", ignore: "dagsx/\n"},
+		{name: "taken back", ignore: "*\n!dags\n"},
+		{name: "a declared Dockerfile's own ignore file wins", ignore: "dags/\n", dockerfile: "Dockerfile", own: "plugins/\n"},
+		{name: "a declared Dockerfile without its own reads .dockerignore", ignore: "dags/\n", dockerfile: "Dockerfile", want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.ignore != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte(tc.ignore), 0o600))
+			}
+			if tc.own != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, tc.dockerfile+".dockerignore"), []byte(tc.own), 0o600))
+			}
+			assert.Equal(t, tc.want, IgnoresDir(dir, tc.dockerfile, "dags"))
+		})
+	}
+}

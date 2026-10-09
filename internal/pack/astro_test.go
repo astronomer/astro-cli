@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -574,37 +575,47 @@ func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	assert.Empty(t, lines)
 }
 
-// A generated build ships the project's dags/, plugins/ and include/: the
-// package cannot know whether the Deployment it is later deployed to takes DAG
-// uploads, and one that does replaces the image's dags/ with the upload.
-func TestAstroBuildShipsTheProjectsCode(t *testing.T) {
+// A generated build ships the project, dags/ included: the package cannot
+// know whether the Deployment it is later deployed to takes DAG uploads.
+func TestAstroBuildShipsTheProject(t *testing.T) {
 	builder := &fakeBuilder{}
 	req := testRequest(t)
-	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
-	assert.Equal(t, []string{"dags", "plugins", "include"}, builder.gotReq.ProjectFiles)
-	assert.Equal(t, req.ProjectDir, builder.gotReq.ProjectDir)
+	assert.Equal(t, req.ProjectDir, builder.gotReq.ProjectContext)
+	assert.Empty(t, builder.gotReq.ProjectExcludes, "dags/ is not left out")
+	assert.Empty(t, res.Warnings)
 }
 
-// A declared Dockerfile's context is the project already; it is asked for no
-// project files.
-func TestAstroBuildWithADeclaredDockerfileShipsNoProjectFiles(t *testing.T) {
+// A declared Dockerfile's context is the project already.
+func TestAstroBuildWithADeclaredDockerfileShipsNoProjectContext(t *testing.T) {
 	builder := &fakeBuilder{}
 	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\n")
 	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
-	assert.Empty(t, builder.gotReq.ProjectFiles)
+	assert.Empty(t, builder.gotReq.ProjectContext)
 }
 
-// The content address covers the shipped code, so editing a plugin moves the
-// tag, while a file that does not ship does not.
-func TestAstroBuildContentAddressCoversTheProjectsCode(t *testing.T) {
+// An image whose ignore file leaves dags/ out carries no DAGs, which the
+// package says and still builds.
+func TestAstroBuildWarnsWhenTheIgnoreFileLeavesDagsOut(t *testing.T) {
 	req := testRequest(t)
-	write := func(name, body string) {
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte("dags/\n"), 0o600))
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{dagsIgnoredWarning}, res.Warnings)
+}
+
+// The content address covers what the build copies from the project, and
+// nothing it leaves out.
+func TestAstroBuildContentAddressCoversTheProject(t *testing.T) {
+	req := testRequest(t)
+	write := func(name, body string, mode os.FileMode) {
 		t.Helper()
 		path := filepath.Join(req.ProjectDir, filepath.FromSlash(name))
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+		require.NoError(t, os.WriteFile(path, []byte(body), mode))
+		require.NoError(t, os.Chmod(path, mode))
 	}
 	tag := func() string {
 		t.Helper()
@@ -612,14 +623,43 @@ func TestAstroBuildContentAddressCoversTheProjectsCode(t *testing.T) {
 		require.NoError(t, err)
 		return res.Image
 	}
-	write("plugins/x.py", "X = 1\n")
+	write("plugins/x.py", "X = 1\n", 0o644)
+	write("utils/u.py", "U = 1\n", 0o644)
 	first := tag()
-	assert.Equal(t, first, tag(), "the same code gives the same tag")
+	assert.Equal(t, first, tag(), "the same project gives the same tag")
 
-	write("tests/test_x.py", "# not shipped\n")
-	write("plugins/__pycache__/x.cpython-312.pyc", "cache")
-	assert.Equal(t, first, tag(), "a file that does not ship leaves the tag alone")
+	write("plugins/__pycache__/x.cpython-312.pyc", "cache", 0o644)
+	write(".venv/bin/python", "venv", 0o755)
+	write(".astro/standalone/airflow.db", "db", 0o644)
+	write(".env", "SECRET=1", 0o600)
+	assert.Equal(t, first, tag(), "a file the build leaves out leaves the tag alone")
 
-	write("plugins/x.py", "X = 2\n")
-	assert.NotEqual(t, first, tag(), "an edited plugin moves the tag")
+	write("plugins/x.py", "X = 1\n", 0o664)
+	assert.Equal(t, first, tag(), "a mode change other than the executable bit leaves the tag alone")
+
+	write("plugins/x.py", "X = 1\n", 0o755)
+	exec := tag()
+	assert.NotEqual(t, first, exec, "the executable bit moves the tag")
+
+	write("utils/u.py", "U = 2\n", 0o644)
+	assert.NotEqual(t, exec, tag(), "an edit anywhere the build copies moves the tag")
+
+	write(".dockerignore", "utils/\n", 0o644)
+	assert.NotEqual(t, exec, tag(), "so does what the ignore file leaves in")
+}
+
+// A directory the build leaves out is never read, so one that cannot be read
+// does not fail the package.
+func TestAstroBuildDoesNotReadAnExcludedDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions are not enforced the same way on Windows")
+	}
+	req := testRequest(t)
+	locked := filepath.Join(req.ProjectDir, ".venv")
+	require.NoError(t, os.MkdirAll(filepath.Join(locked, "lib"), 0o755))
+	require.NoError(t, os.Chmod(locked, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
 }

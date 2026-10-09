@@ -333,27 +333,44 @@ func TestDeployManifestTextUnchanged(t *testing.T) {
 	assert.Equal(t, "→ prod (astro deployment clx-dep)\n", errOut)
 }
 
-// A "both" deploy to a Deployment without DAG deploys uploads no bundle, its
-// DAGs being inside the image, so the summary does not name a bundle version
-// and the json omits one, keeping its type.
-func TestDeployManifestDagsInsideTheImage(t *testing.T) {
-	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
-		WorkspaceID:    "clw-ws",
-		RuntimeVersion: "3.1-2",
-		ImageTag:       "deploy-2026-07-23T18-40",
-		URL:            "https://cloud.astronomer.io/deployments/clx-dep",
-	}})
+// A "both" deploy that uploads no bundle says where its DAGs went, and claims
+// they are inside the image only when this deploy built them in. The json
+// omits the bundle version and keeps its type.
+func TestDeployManifestSaysWhereTheDagsWent(t *testing.T) {
+	for dags, want := range map[string]string{
+		manifestdeploy.DagsBuiltIn:   "Deployed image (tag deploy-2026-07-23T18-40), with the project's DAGs inside it, to prod (deployment clx-dep).\n",
+		manifestdeploy.DagsFromImage: "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep). The Deployment takes no DAG deploys, so it runs the DAGs the image carries; none were uploaded.\n",
+		manifestdeploy.DagsNone:      "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep). The Deployment runs remote execution, so no DAGs were deployed with it.\n",
+	} {
+		t.Run(dags, func(t *testing.T) {
+			setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
+				WorkspaceID:    "clw-ws",
+				RuntimeVersion: "3.1-2",
+				ImageTag:       "deploy-2026-07-23T18-40",
+				URL:            "https://cloud.astronomer.io/deployments/clx-dep",
+				Dags:           dags,
+			}})
 
-	out, _, err := execDeployIO("", "prod")
-	require.NoError(t, err)
-	assert.Contains(t, out, "Deployed image (tag deploy-2026-07-23T18-40), with the DAGs inside it, to prod (deployment clx-dep).\n")
+			out, _, err := execDeployIO("", "prod")
+			require.NoError(t, err)
+			assert.Contains(t, out, want)
 
-	out, err = execDeployCapture("--deployment", "prod", "--output", "json")
-	require.NoError(t, err)
-	m := decodeOneJSON(t, out)
-	assert.Equal(t, "image-and-dag", m["type"])
-	_, hasDag := m["dag_bundle_version"]
-	assert.False(t, hasDag, "no bundle was uploaded")
+			out, err = execDeployCapture("--deployment", "prod", "--output", "json")
+			require.NoError(t, err)
+			m := decodeOneJSON(t, out)
+			assert.Equal(t, "image-and-dag", m["type"])
+			_, hasDag := m["dag_bundle_version"]
+			assert.False(t, hasDag, "no bundle was uploaded")
+		})
+	}
+}
+
+// The transport's names for where the DAGs went are the ones cmd renders.
+func TestDeployDagsValuesAgree(t *testing.T) {
+	assert.Equal(t, manifestdeploy.DagsUploaded, astrodeploy.DagsUploaded)
+	assert.Equal(t, manifestdeploy.DagsBuiltIn, astrodeploy.DagsBuiltIn)
+	assert.Equal(t, manifestdeploy.DagsFromImage, astrodeploy.DagsFromImage)
+	assert.Equal(t, manifestdeploy.DagsNone, astrodeploy.DagsNone)
 }
 
 // The announce line lands before the build line and after the target is

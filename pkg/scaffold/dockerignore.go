@@ -1,8 +1,8 @@
 // A declared Dockerfile builds with the whole project as its context, so only
 // the ignore file keeps per-machine files out of an image that gets pushed to a
-// registry. A generated build makes its own context, copying in only dags/,
-// plugins/ and include/, and leaves the per-machine files out itself
-// (pkg/imagebuild's perMachineExcludes), so it needs none of this.
+// registry. A generated build that ships the project (a deploy, a package)
+// reads the project's .dockerignore too, but adds the per-machine rules itself
+// (pkg/imagebuild's projectIgnoreRules), so it needs none of this.
 
 package scaffold
 
@@ -122,6 +122,21 @@ func planDockerignore(dir, dockerfile string) (*Change, error) {
 		Content: []byte(b.String()),
 		Labels:  []string{path + " (added the per-machine rules)"},
 	}, nil
+}
+
+// IgnoresDir reports whether the ignore file a build of dockerfile reads
+// leaves the project directory dir/rel out of the build context whole: a rule
+// naming it or a parent, or one such as rel/* that leaves out everything in
+// it. dir is the project root, rel is slash-separated, and dockerfile is the
+// manifest's [tool.astro] dockerfile, "" for a generated build, which reads
+// .dockerignore. An ignore file that cannot be read or parsed leaves nothing
+// out here; the build reports it.
+func IgnoresDir(dir, dockerfile, rel string) bool {
+	pm, _, err := readDockerignore(dir, dockerignorePath(dir, dockerfile))
+	if err != nil {
+		return false
+	}
+	return excludes(pm, filepath.FromSlash(rel), true)
 }
 
 // LocalFilesWarning names the per-machine files a build of the project's own

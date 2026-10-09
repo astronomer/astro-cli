@@ -18,26 +18,30 @@ The manifest path lives beside the 1.x path in the same package (`manifest.go`, 
 
 The image is built by [`pkg/imagebuild`](../pkg/imagebuild/imagebuild.go), the same builder Docker-mode `astro local start` and `astro package astro` use, so the three produce the same image from the same manifest. `imagebuild.ForManifest` picks the build:
 
-- **Generated (the common case).** A one-line `FROM astrocrpublic.azurecr.io/runtime:<tag>` Dockerfile, plus a `requirements.txt` holding `[project] dependencies` without `apache-airflow`/`apache-airflow-core` (`manifest.WithoutAirflow`) and a `packages.txt` holding `[tool.astro] packages`, and the project directories the image ships (see [What the image carries](#what-the-image-carries)). The tag is `[tool.astro] runtime` when set, else the series of the Airflow requirement (`runtime:3.3`). When `[project] requires-python` does not admit that build's default Python, the tag is instead the exact build's Python flavor, `runtime:3.3-8-python-3.13`, for the newest Python the build ships that it admits; with no `runtime` set, the build is the catalog's newest of the series. A `requires-python` admitting none of the build's Pythons is refused before the build, and without a readable catalog the default Python is kept (`imagebuild.RuntimeImageForPython`). The Python is `runtimeversions.ProjectPython`'s choice, which a standalone environment of the same manifest runs too (`imagebuild.StandalonePython`) (see [`requires-python`](manifest-reference.md#requires-python)). Deploy builds only Airflow 3 bases from a generated build.
+- **Generated (the common case).** A one-line `FROM astrocrpublic.azurecr.io/runtime:<tag>` Dockerfile, plus a `requirements.txt` holding `[project] dependencies` without `apache-airflow`/`apache-airflow-core` (`manifest.WithoutAirflow`) and a `packages.txt` holding `[tool.astro] packages`. A deploy and a package then copy the project in over it (see [What the image carries](#what-the-image-carries)). The tag is `[tool.astro] runtime` when set, else the series of the Airflow requirement (`runtime:3.3`). When `[project] requires-python` does not admit that build's default Python, the tag is instead the exact build's Python flavor, `runtime:3.3-8-python-3.13`, for the newest Python the build ships that it admits; with no `runtime` set, the build is the catalog's newest of the series. A `requires-python` admitting none of the build's Pythons is refused before the build, and without a readable catalog the default Python is kept (`imagebuild.RuntimeImageForPython`). The Python is `runtimeversions.ProjectPython`'s choice, which a standalone environment of the same manifest runs too (`imagebuild.StandalonePython`) (see [`requires-python`](manifest-reference.md#requires-python)). Deploy builds only Airflow 3 bases from a generated build.
 - **Declared Dockerfile.** When `[tool.astro] dockerfile` is set, that file is the build, with the project directory as context. No base is resolved.
 
 ### What the image carries
 
-The runtime image's last `ONBUILD` step is `COPY . .`, which copies the build context into `AIRFLOW_HOME` (`/usr/local/airflow`). A generated build's context is a directory the CLI writes, not the project, so the image holds only what is copied into it (`imagebuild.Request.ProjectFiles`):
+A deploy and `astro package astro` ship the project in the image, the way the 1.x CLI built it: with the **project directory as the build context**, so Docker applies the project's `.dockerignore` and its own symlink rules (a symlink is copied as a link, and nothing outside the project can be reached). Which DAGs go in depends on where they run:
 
-| | `plugins/`, `include/` | `dags/` |
+| | the project (`plugins/`, `include/`, `tests/`, top-level code such as `utils/`) | `dags/` |
 | --- | --- | --- |
 | deploy to a Deployment with DAG deploys | in the image | uploaded as the DAG tarball, not in the image |
 | deploy to a Deployment without DAG deploys | in the image | in the image; nothing is uploaded |
-| deploy to a Deployment with remote execution | in the image | not in the image (as on the 1.x path) |
+| deploy to a Deployment with remote execution (DAG deploys on or off) | in the image | not in the image, and not uploaded |
+| `--image-name` (a prebuilt image) | as built | whatever the image carries; uploaded too to a Deployment with DAG deploys |
+| declared Dockerfile | as its `COPY` lines decide | as its `COPY` lines decide; uploaded to a Deployment with DAG deploys |
 | `astro package astro` | in the image | in the image |
-| Docker-mode `astro local start` | not copied: mounted into the containers | not copied: mounted |
+| Docker-mode `astro local start`, Astro Desktop | not copied: mounted into the containers | not copied: mounted |
 
-This is the 1.x path's rule. It builds with the project as its context, and keeps `dags/` out of the image (with a temporary `.dockerignore` line) only for a Deployment that takes DAG deploys or runs remote execution. `tests/` is mounted locally but not shipped, and nothing else at the project root reaches a generated image.
+This is the 1.x path's rule (`buildImage` and `buildImageWithoutDags` in `internal/platform/astro/deploy/deploy.go`): the image is the project, with `dags/` left out for a Deployment that takes DAG deploys or runs remote execution, and an image deploy uploads no DAGs under remote execution.
 
-The copy honours the project's `.dockerignore`, as `docker build` would, and always leaves out the per-machine files Astro tools and Python write, whatever the ignore file says: `.venv`, `.env`, `.git`, `__pycache__`, `*.pyc`, `.astro/` and `plugins/fix_local_executor_pickle.py`. A directory that does not exist is skipped. File modes are kept, a symlink inside a directory is copied as a link, and a directory that is itself a symlink (a linked `dags/`) ships what it points at. `COPY . .` runs after the dependency installs, so editing a DAG or a plugin does not reinstall anything.
+How it is built. The runtime image's `ONBUILD` triggers read `requirements.txt` and `packages.txt` from the main build context and end in `COPY . .`, so the main context of the first build is the small generated one, as it has always been, tagged `<image>:<tag>-deps`. A second build starts `FROM` that image (whose triggers have run, so none fire again) with the project as its context and runs `COPY --chown=astro:0 . .`. Its ignore file is written beside the generated Dockerfile as `<Dockerfile>.dockerignore`, which BuildKit reads instead of the context's `.dockerignore` (Podman is pointed at it with `--ignorefile`), so the project's file is read and never rewritten. It holds the project's `.dockerignore`, then the rules the CLI always adds, which a `!` in the project's file cannot undo: `**/.venv`, `**/.env`, `**/__pycache__`, `**/*.pyc`, `.git`, `.astro`, `plugins/fix_local_executor_pickle.py`, and the project's own top-level `requirements.txt` and `packages.txt` (the generated ones are what the image installed, and they stay). Then `dags/`, when the DAGs are not to be in the image. The `-deps` tag is removed after the second build. The copy is the last layer, after the dependency installs, so editing a DAG or a plugin reinstalls nothing.
 
-A declared Dockerfile builds the project as its context, and its own `COPY` lines decide what goes in. Local Docker mode, and Astro Desktop, build the generated image without these directories, because they mount them.
+**An ignore file that leaves `dags/` out is refused when the DAGs are to be built in.** For a Deployment without DAG deploys, a `.dockerignore` rule that leaves out `dags/` (or everything in it) would ship an image with no DAGs to a Deployment that runs only the image's. The 1.x path removed a `dags/` line from the project's `.dockerignore` before every image deploy; this one edits nothing and refuses instead, for a generated build and a declared Dockerfile alike: `found a dags entry in the project's .dockerignore. …` `astro package astro` builds anyway and warns.
+
+The text summary says where the DAGs went: uploaded (with the bundle version), built into the image by this deploy, left to the image a prebuilt `--image-name` or a declared Dockerfile carries, or not deployed because the Deployment runs remote execution.
 
 Before anything is built, the deploy checks the project:
 
@@ -54,7 +58,7 @@ The pipeline, in order (`DeployManifestImage` in [`manifest_image.go`](../intern
 5. Check the planned runtime before the build. The planned runtime is `[tool.astro] runtime`, else the base's tag without any `-python-X.Y` (the series, or the exact build a Python flavor names), or for a declared Dockerfile the runtime its final `FROM` names (`airflowrt.ReadDeclaredBase`). An exact version gets the full rules: no downgrade, a version the Deployment offers, and the Airflow 2→3 floor. A series is refused only when it is older than the Deployment's, or the Deployment offers no build of it. A downgrade error names the line to change. This makes a bad pin fail in seconds rather than after a long build.
 6. Build for `linux/amd64` and print "Building your project image, this can take a few minutes...".
 7. Read `io.astronomer.docker.runtime.version` off the built image and run the runtime rules again on it. The label is the authority, because the requirement states what the project intends and the label states what the image is.
-8. Create the deploy, push the image as user `cli` with the session token, upload the DAG tarball for a both deploy to a Deployment with DAG deploys, finalize, and wait for health with `--wait`.
+8. Create the deploy, push the image as user `cli` with the session token, upload the DAG tarball for a both deploy to a Deployment with DAG deploys and no remote execution, finalize, and wait for health with `--wait`.
 
 **A deploy to Astro requires an Astro Runtime base.** An image without the runtime label is refused, never deployed on the requirement's word:
 
@@ -108,9 +112,9 @@ An unknown target lists the known ones.
 
 The image build from [section 1](#1-image-deploys), without the transport: resolve the base, build `linux/amd64` (`--platform` overrides), read the runtime label, stop. It needs Docker.
 
-A generated image carries `dags/`, `plugins/` and `include/` (see [What the image carries](#what-the-image-carries)). `dags/` goes in because a package cannot know the DAG mode of the Deployment it will be deployed to with `--image-name`: one without DAG deploys runs the DAGs in the image, and a default deploy to one with them uploads the working directory's `dags/` as well, which replaces the image's.
+A generated image carries the project, `dags/` included (see [What the image carries](#what-the-image-carries)). `dags/` goes in because a package cannot know the DAG mode of the Deployment it will be deployed to with `--image-name`: one without DAG deploys runs the DAGs in the image, and a default deploy to one with them uploads the working directory's `dags/` as well, which replaces the image's.
 
-- **Tag:** `astro-package/<project name>:<runtime>-<hash>`, plus a moving `astro-package/<project name>:latest`. The 7-character hash covers the base, the platform, the dependencies, the OS packages, the files a generated build copies in (names, modes and contents, after the ignore rules), and a declared Dockerfile's path and contents, so the same inputs give the same tag. `--tag <ref>` replaces the name and writes no `:latest`.
+- **Tag:** `astro-package/<project name>:<runtime>-<hash>`, plus a moving `astro-package/<project name>:latest`. The 7-character hash covers the base, the platform, the dependencies, the OS packages, what a generated build copies from the project (each path the build's ignore rules leave in, with its kind, its executable bit and its contents or link target; other mode bits, which a checkout or umask changes, do not count, and an excluded directory is not read), and a declared Dockerfile's path and contents, so the same inputs give the same tag. `--tag <ref>` replaces the name and writes no `:latest`.
 - **`--save <file>.tar`** also runs `docker save`, for uploading the image as a CI artifact.
 - **Declared Dockerfile without a runtime label:** the image is still produced, with a warning that `astro deploy` will refuse it.
 - **Declared env values** are not in the image. When the manifest declares any, the build warns and lists them: set them on the Deployment.
@@ -213,7 +217,7 @@ The 1.x-only flags (`--save`, `--pytest`, `--env`, `--test`, `--parse`, `--deplo
 }
 ```
 
-`deployment`, `workspace` and `type` (`dag-only`, `image-only` or `image-and-dag`) are always present. The rest are omitted when they do not apply: a dags-only deploy has no `image_tag`, an image-only deploy no `dag_bundle_version`, nor does an `image-and-dag` deploy to a Deployment without DAG deploys, whose DAGs are inside the image, a Deployment named by id no `link`, a deploy with no recorded commit no `git`.
+`deployment`, `workspace` and `type` (`dag-only`, `image-only` or `image-and-dag`) are always present. The rest are omitted when they do not apply: a dags-only deploy has no `image_tag`, an image-only deploy no `dag_bundle_version`, nor does an `image-and-dag` deploy that uploaded none (a Deployment without DAG deploys, or with remote execution), a Deployment named by id no `link`, a deploy with no recorded commit no `git`.
 
 **`astro package --output json`** streams the build's log lines as `{"event":"log",…}` objects, then prints one result object:
 

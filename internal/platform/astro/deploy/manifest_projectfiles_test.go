@@ -3,11 +3,9 @@ package deploy
 import (
 	"context"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 
@@ -22,45 +20,47 @@ import (
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-// contextListingCmd is fakeImageCmd that also lists the build context a
-// `build` was handed, while it still exists: the deploy removes its build
-// directory as soon as the build returns.
-type contextListingCmd struct {
+// projectStepCmd is fakeImageCmd that also records the step that copies the
+// project into the image: its context, and the ignore file beside its
+// Dockerfile, read while it still exists (the deploy removes its build
+// directory once the build returns).
+type projectStepCmd struct {
 	fakeImageCmd
-	context []string
+	projectContext string
+	ignore         []string
 }
 
-func (f *contextListingCmd) Run(ctx context.Context, env []string, s localrt.Stdio, name string, args ...string) error {
+func (f *projectStepCmd) Run(ctx context.Context, env []string, s localrt.Stdio, name string, args ...string) error {
 	if len(args) > 0 && args[0] == "build" {
-		dir := args[len(args)-1]
-		_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
+		for i, a := range args {
+			if a == "--file" && i+1 < len(args) && strings.HasSuffix(args[i+1], "Dockerfile.astro-project") {
+				f.projectContext = args[len(args)-1]
+				data, err := os.ReadFile(args[i+1] + ".dockerignore")
+				if err == nil {
+					f.ignore = strings.Split(strings.TrimSpace(string(data)), "\n")
+				}
 			}
-			rel, _ := filepath.Rel(dir, path)
-			f.context = append(f.context, filepath.ToSlash(rel))
-			return nil
-		})
-		sort.Strings(f.context)
+		}
 	}
 	return f.fakeImageCmd.Run(ctx, env, s, name, args...)
 }
 
-// withContextListing replaces withImageSeams' build commander with one that
-// lists what each build's context held.
-func withContextListing(t *testing.T) *contextListingCmd {
+// withProjectStep replaces withImageSeams' build commander with one that
+// records the project step.
+func withProjectStep(t *testing.T) *projectStepCmd {
 	t.Helper()
 	withImageSeams(t, "3.1-2")
-	cmd := &contextListingCmd{}
+	cmd := &projectStepCmd{}
 	newImageBuildCommander = func() imagebuild.Commander { return cmd }
 	return cmd
 }
 
-// projectWithCode is a project with a DAG, a plugin and an include file.
+// projectWithCode is a project with a DAG, a plugin, an include file and a
+// top-level package.
 func projectWithCode(t *testing.T) string {
 	t.Helper()
 	dir := manifestProjectDir(t)
-	for name, body := range map[string]string{"plugins/x.py": "X = 1\n", "include/y.sql": "select 1;\n"} {
+	for name, body := range map[string]string{"plugins/x.py": "X = 1\n", "include/y.sql": "select 1;\n", "utils/u.py": "U = 1\n"} {
 		path := filepath.Join(dir, filepath.FromSlash(name))
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
@@ -68,7 +68,7 @@ func projectWithCode(t *testing.T) string {
 	return dir
 }
 
-// mockDeploymentWith stubs the Deployment lookup with dep's DAG settings over
+// mockDeploymentWith stubs the Deployment lookup with these DAG settings over
 // the usual fixture.
 func mockDeploymentWith(client *astrov1_mocks.ClientWithResponsesInterface, dagDeploy, remoteExecution bool) {
 	standard := astrov1.DeploymentTypeSTANDARD
@@ -104,56 +104,58 @@ func manifestBuildOf(dir string) imagebuild.ManifestBuild {
 	return imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dependencies: []string{"pandas"}}
 }
 
-// A Deployment that takes DAG uploads gets plugins/ and include/ in the image
-// and its DAGs as the upload, as the 1.x path builds it without dags/.
-func TestDeployManifestImage_DagDeployShipsPluginsAndIncludeInTheImageAndUploadsDags(t *testing.T) {
+// deployWith runs a deploy against a Deployment with these DAG settings and
+// the create/finalize calls stubbed.
+func deployWith(t *testing.T, dagDeploy, remote bool, in *ManifestImageDeployInput) (ManifestImageDeployResult, *astrov1_mocks.ClientWithResponsesInterface, error) {
+	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockDeploymentWith(client, true, false)
+	mockDeploymentWith(client, dagDeploy, remote)
 	mockDeploymentOptions(client, "3.1-2")
-	mockCreateImageDeploy(client, "https://upload-url")
+	upload := ""
+	if dagDeploy {
+		upload = "https://upload-url"
+	}
+	mockCreateImageDeploy(client, upload)
 	mockFinalizeDeploy(client)
-	uploads := countUploads(t)
-	cmd := withContextListing(t)
-
-	res, err := DeployManifestImage(ManifestImageDeployInput{
-		Build:        manifestBuildOf(projectWithCode(t)),
-		DeploymentID: "test-deployment-id",
-		IncludeDags:  true,
-	}, client)
-	require.NoError(t, err)
-
-	assert.Equal(t, []string{"include/y.sql", "packages.txt", "plugins/x.py", "requirements.txt"}, cmd.context)
-	assert.Equal(t, 1, *uploads)
-	assert.Equal(t, "tarball-v1", res.DagTarballVersion)
+	in.DeploymentID = "test-deployment-id"
+	res, err := DeployManifestImage(*in, client)
+	return res, client, err
 }
 
-// A Deployment that takes no DAG uploads runs the image's DAGs, so a "both"
-// deploy bakes dags/ in and uploads nothing, as the 1.x path does, rather than
-// refusing.
-func TestDeployManifestImage_NoDagDeployBakesDagsIntoTheImage(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockDeploymentWith(client, false, false)
-	mockDeploymentOptions(client, "3.1-2")
-	mockCreateImageDeploy(client, "")
-	mockFinalizeDeploy(client)
+// A Deployment that takes DAG deploys gets the project in the image, without
+// dags/, and its DAGs as the upload: the 1.x path's build without dags.
+func TestDeployManifestImage_DagDeployShipsTheProjectWithoutDagsAndUploadsThem(t *testing.T) {
+	cmd := withProjectStep(t)
 	uploads := countUploads(t)
-	cmd := withContextListing(t)
+	dir := projectWithCode(t)
 
-	res, err := DeployManifestImage(ManifestImageDeployInput{
-		Build:        manifestBuildOf(projectWithCode(t)),
-		DeploymentID: "test-deployment-id",
-		IncludeDags:  true,
-	}, client)
+	res, _, err := deployWith(t, true, false, &ManifestImageDeployInput{Build: manifestBuildOf(dir), IncludeDags: true})
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"dags/example.py", "include/y.sql", "packages.txt", "plugins/x.py", "requirements.txt"}, cmd.context)
+	assert.Equal(t, dir, cmd.projectContext, "the project is the build context")
+	assert.Equal(t, "dags/", cmd.ignore[len(cmd.ignore)-1])
+	assert.Equal(t, 1, *uploads)
+	assert.Equal(t, "tarball-v1", res.DagTarballVersion)
+	assert.Equal(t, DagsUploaded, res.Dags)
+}
+
+// A Deployment that takes no DAG deploys runs the image's DAGs, so a "both"
+// deploy builds dags/ in and uploads nothing, as the 1.x path does, rather
+// than refusing.
+func TestDeployManifestImage_NoDagDeployBuildsDagsIntoTheImage(t *testing.T) {
+	cmd := withProjectStep(t)
+	uploads := countUploads(t)
+	dir := projectWithCode(t)
+
+	res, client, err := deployWith(t, false, false, &ManifestImageDeployInput{Build: manifestBuildOf(dir), IncludeDags: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, dir, cmd.projectContext)
+	assert.NotContains(t, cmd.ignore, "dags/")
 	assert.Zero(t, *uploads, "nothing is uploaded to a Deployment that takes no DAG deploys")
 	assert.Empty(t, res.DagTarballVersion)
-	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
-	// The deploy is recorded as the 1.x path records it, image and DAGs, and
-	// finalized with no bundle.
+	assert.Equal(t, DagsBuiltIn, res.Dags)
 	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool {
 		return r.Type == astrov1.CreateDeployRequestTypeIMAGEANDDAG
 	}))
@@ -162,22 +164,60 @@ func TestDeployManifestImage_NoDagDeployBakesDagsIntoTheImage(t *testing.T) {
 	}))
 }
 
+// An ignore file that leaves dags/ out would ship an image with no DAGs to a
+// Deployment that runs only the image's. 1.x removed a "dags/" line before the
+// build; this refuses, naming the entry, and edits nothing.
+func TestDeployManifestImage_RefusesToBuildDagsInWhenTheIgnoreFileLeavesThemOut(t *testing.T) {
+	for name, build := range map[string]func(dir string) imagebuild.ManifestBuild{
+		"generated": manifestBuildOf,
+		"declared Dockerfile": func(dir string) imagebuild.ManifestBuild {
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600))
+			return imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cmd := withProjectStep(t)
+			dir := projectWithCode(t)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("dags/\n"), 0o600))
+
+			_, client, err := deployWith(t, false, false, &ManifestImageDeployInput{Build: build(dir), IncludeDags: true})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "found a dags entry in the project's .dockerignore")
+			assert.False(t, hasImageCall(cmd.calls, "build --tag"), "refused before the build, got %v", cmd.calls)
+			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			got, err := os.ReadFile(filepath.Join(dir, ".dockerignore"))
+			require.NoError(t, err)
+			assert.Equal(t, "dags/\n", string(got), "the project's file is not edited")
+		})
+	}
+}
+
+// With DAG deploys on, the DAGs are left out of the image anyway, so the same
+// rule is no reason to refuse.
+func TestDeployManifestImage_DagsInTheIgnoreFileAreFineWithDagDeploy(t *testing.T) {
+	withProjectStep(t)
+	countUploads(t)
+	dir := projectWithCode(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("dags/\n"), 0o600))
+
+	_, _, err := deployWith(t, true, false, &ManifestImageDeployInput{Build: manifestBuildOf(dir), IncludeDags: true})
+	require.NoError(t, err)
+}
+
 // --image leaves the running DAGs in place, which a Deployment whose DAGs are
-// in its image cannot do: a new image without them would remove them. The 1.x
-// path refuses it, before anything is built.
+// in its image cannot do. The 1.x path refuses it, before anything is built.
 func TestDeployManifestImage_ImageOnlyIsRefusedWithoutDagDeploy(t *testing.T) {
 	for name, imageName := range map[string]string{"built": "", "prebuilt": "astro-package/demo:latest"} {
 		t.Run(name, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			client := new(astrov1_mocks.ClientWithResponsesInterface)
 			mockDeploymentWith(client, false, false)
-			cmd := withContextListing(t)
+			cmd := withProjectStep(t)
 
 			_, err := DeployManifestImage(ManifestImageDeployInput{
 				Build:        manifestBuildOf(projectWithCode(t)),
 				DeploymentID: "test-deployment-id",
 				ImageName:    imageName,
-				IncludeDags:  false,
 			}, client)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "without --image")
@@ -190,95 +230,79 @@ func TestDeployManifestImage_ImageOnlyIsRefusedWithoutDagDeploy(t *testing.T) {
 
 // With DAG deploys on, --image keeps DAGs out of the image and uploads none.
 func TestDeployManifestImage_ImageOnlyWithDagDeployShipsNoDags(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockDeploymentWith(client, true, false)
-	mockDeploymentOptions(client, "3.1-2")
-	mockCreateImageDeploy(client, "")
-	mockFinalizeDeploy(client)
+	cmd := withProjectStep(t)
 	uploads := countUploads(t)
-	cmd := withContextListing(t)
 
-	_, err := DeployManifestImage(ManifestImageDeployInput{
-		Build:        manifestBuildOf(projectWithCode(t)),
-		DeploymentID: "test-deployment-id",
-		IncludeDags:  false,
-	}, client)
+	res, _, err := deployWith(t, true, false, &ManifestImageDeployInput{Build: manifestBuildOf(projectWithCode(t))})
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"include/y.sql", "packages.txt", "plugins/x.py", "requirements.txt"}, cmd.context)
+	assert.Equal(t, "dags/", cmd.ignore[len(cmd.ignore)-1])
 	assert.Zero(t, *uploads)
+	assert.Empty(t, res.Dags)
 }
 
-// Remote execution runs the DAGs elsewhere, so, as on the 1.x path, the image
-// carries none even with DAG deploys off, and --image is not refused.
-func TestDeployManifestImage_RemoteExecutionKeepsDagsOutOfTheImage(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockDeploymentWith(client, false, true)
-	mockDeploymentOptions(client, "3.1-2")
-	mockCreateImageDeploy(client, "")
-	mockFinalizeDeploy(client)
-	uploads := countUploads(t)
-	cmd := withContextListing(t)
+// Remote execution runs the DAGs elsewhere. As on the 1.x path, the image
+// carries none and none are uploaded, whether DAG deploys are on or off, and
+// --image is not refused.
+func TestDeployManifestImage_RemoteExecutionShipsNoDags(t *testing.T) {
+	for _, dagDeploy := range []bool{true, false} {
+		for _, both := range []bool{true, false} {
+			t.Run(map[bool]string{true: "dag deploy on", false: "dag deploy off"}[dagDeploy]+map[bool]string{true: ", both", false: ", --image"}[both], func(t *testing.T) {
+				cmd := withProjectStep(t)
+				uploads := countUploads(t)
 
-	_, err := DeployManifestImage(ManifestImageDeployInput{
-		Build:        manifestBuildOf(projectWithCode(t)),
-		DeploymentID: "test-deployment-id",
-		IncludeDags:  false,
-	}, client)
-	require.NoError(t, err)
+				res, _, err := deployWith(t, dagDeploy, true, &ManifestImageDeployInput{Build: manifestBuildOf(projectWithCode(t)), IncludeDags: both})
+				require.NoError(t, err)
 
-	assert.Equal(t, []string{"include/y.sql", "packages.txt", "plugins/x.py", "requirements.txt"}, cmd.context)
-	assert.Zero(t, *uploads)
+				assert.Equal(t, "dags/", cmd.ignore[len(cmd.ignore)-1])
+				assert.Zero(t, *uploads)
+				if both {
+					assert.Equal(t, DagsNone, res.Dags)
+				}
+			})
+		}
+	}
 }
 
 // A prebuilt image to a Deployment without DAG deploys ships as it is, with
-// whatever DAGs it carries, and nothing is uploaded.
-func TestDeployManifestImage_PrebuiltImageWithoutDagDeployUploadsNothing(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockDeploymentWith(client, false, false)
-	mockDeploymentOptions(client, "3.1-2")
-	mockCreateImageDeploy(client, "")
-	mockFinalizeDeploy(client)
+// whatever DAGs it carries, and nothing is uploaded; the result says the CLI
+// did not put them there.
+func TestDeployManifestImage_PrebuiltImageWithoutDagDeploy(t *testing.T) {
+	cmd := withProjectStep(t)
 	uploads := countUploads(t)
-	cmd := withContextListing(t)
 
-	_, err := DeployManifestImage(ManifestImageDeployInput{
-		Build:        imagebuild.ManifestBuild{ProjectDir: projectWithCode(t)},
-		DeploymentID: "test-deployment-id",
-		ImageName:    "astro-package/demo:latest",
-		IncludeDags:  true,
-	}, client)
+	res, _, err := deployWith(t, false, false, &ManifestImageDeployInput{
+		Build:       imagebuild.ManifestBuild{ProjectDir: projectWithCode(t)},
+		ImageName:   "astro-package/demo:latest",
+		IncludeDags: true,
+	})
 	require.NoError(t, err)
 	assert.False(t, hasImageCall(cmd.calls, "build --tag"), "a prebuilt image is not built, got %v", cmd.calls)
 	assert.Zero(t, *uploads)
+	assert.Equal(t, DagsFromImage, res.Dags)
 }
 
-// A declared Dockerfile's context is the project already: nothing is staged.
-func TestDeployManifestImage_DeclaredDockerfileStagesNothing(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	client := new(astrov1_mocks.ClientWithResponsesInterface)
-	mockDeploymentWith(client, false, false)
-	mockDeploymentOptions(client, "3.1-2")
-	mockCreateImageDeploy(client, "")
-	mockFinalizeDeploy(client)
-	cmd := withContextListing(t)
+// A declared Dockerfile's context is the project already: there is no project
+// step, and its own COPY lines decide what DAGs the image carries.
+func TestDeployManifestImage_DeclaredDockerfileWithoutDagDeploy(t *testing.T) {
+	cmd := withProjectStep(t)
+	countUploads(t)
 	dir := projectWithCode(t)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600))
 
-	_, err := DeployManifestImage(ManifestImageDeployInput{
-		Build:        imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"},
-		DeploymentID: "test-deployment-id",
-		IncludeDags:  true,
-	}, client)
+	res, _, err := deployWith(t, false, false, &ManifestImageDeployInput{
+		Build:       imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"},
+		IncludeDags: true,
+	})
 	require.NoError(t, err)
-	var build string
+	assert.Empty(t, cmd.projectContext, "no project step")
+	var builds []string
 	for _, c := range cmd.calls {
 		if strings.HasPrefix(c, "docker build") {
-			build = c
+			builds = append(builds, c)
 		}
 	}
-	assert.True(t, strings.HasSuffix(build, " "+dir), "the project is the context: %q", build)
+	require.Len(t, builds, 1)
+	assert.True(t, strings.HasSuffix(builds[0], " "+dir), builds[0])
+	assert.Equal(t, DagsFromImage, res.Dags)
 }

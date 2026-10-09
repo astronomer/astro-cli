@@ -62,8 +62,8 @@ type baseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // ForLocalManifest, the same rule over a base that also takes Airflow 2.
 //
 // The caller fills the rest: WorkDir, Tag, Platform ("linux/amd64" for a
-// deploy), Bin, Env, Secrets, and the ProjectFiles a generated build ships. A
-// generated build reads only the manifest.RuntimeSecretID secret.
+// deploy), Bin, Env, and Secrets. A generated build reads only the
+// manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
 	return forManifestWith(context.Background(), m, func(_ context.Context, m ManifestBuild) (string, error) {
 		return RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
@@ -88,7 +88,6 @@ func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Op
 // Dockerfile.
 func forManifestWith(ctx context.Context, m ManifestBuild, base baseImageFunc) (Request, error) {
 	req := Request{
-		ProjectDir:   m.ProjectDir,
 		Dependencies: m.Dependencies,
 		Packages:     m.Packages,
 	}

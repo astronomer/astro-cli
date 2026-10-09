@@ -49,13 +49,12 @@ type ImageBuilder interface {
 
 // AstroTarget builds the Astro artifact: a container image over Astronomer's
 // runtime base with the project's dependencies and OS packages installed and
-// its dags/, plugins/ and include/ copied in, the image build from section 1
-// with the shipping steps removed.
+// the project copied in, the image build from section 1 with the shipping
+// steps removed.
 //
-// dags/ goes in whatever the target, because a package cannot know where it
-// will be deployed: a Deployment without DAG deploys runs the image's DAGs,
-// and one with them replaces the image's dags/ with the bundle a deploy
-// uploads.
+// dags/ goes in, because a package cannot know where it will be deployed: a
+// Deployment without DAG deploys runs the image's DAGs, and a default deploy
+// to one with them uploads the DAGs, which replace the image's.
 //
 // By default the image lands in the local Docker store; --save also writes it to a tarball so
 // another CI job can load it and `astro deploy --image-name` consume it.
@@ -179,7 +178,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
-	shipProjectCode(&breq)
+	warnings = shipProject(req.ProjectDir, &breq, warnings)
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
 		return Result{}, err
@@ -191,10 +190,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, shippedFiles{
-		dir:   req.ProjectDir,
-		paths: breq.ProjectFiles,
-	}, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectContext, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -317,14 +313,27 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	return res, nil
 }
 
-// shipProjectCode asks a generated build to copy the project's dags/, plugins/
-// and include/ in. A declared Dockerfile's context is the project already and
-// its own COPY lines decide, so it is asked for nothing.
-func shipProjectCode(breq *imagebuild.Request) {
-	if !breq.FromDeclaredDockerfile() {
-		breq.ProjectFiles = imagebuild.ProjectCode(true)
+// shipProject asks a generated build to copy the project in, dags/ included,
+// as a deploy to a Deployment without DAG deploys does. A declared
+// Dockerfile's context is the project already and its own COPY lines decide,
+// so it is asked for nothing.
+//
+// It adds a warning to warnings when the project's ignore file leaves dags/
+// out, since such an image carries no DAGs, and a Deployment without DAG
+// deploys runs only the image's. `astro deploy` refuses that build.
+func shipProject(projectDir string, breq *imagebuild.Request, warnings []string) []string {
+	if breq.FromDeclaredDockerfile() {
+		return warnings
 	}
+	breq.ProjectContext = projectDir
+	if scaffold.IgnoresDir(projectDir, "", "dags") {
+		warnings = append(warnings, dagsIgnoredWarning)
+	}
+	return warnings
 }
+
+// dagsIgnoredWarning is shipProject's warning.
+const dagsIgnoredWarning = "the project's .dockerignore leaves dags/ out, so the image carries no DAGs. A Deployment without DAG deploys runs only the image's DAGs; remove the entry to package them"
 
 // reachEngine resolves the container engine for the project and probes it up
 // front, so an engine that is missing or down is a plain ErrNoDocker rather
@@ -460,10 +469,11 @@ func (c engineCLI) save(ctx context.Context, image, path string, cb localrt.Call
 // gave two different images the same content-addressed tag, and editing the
 // Dockerfile republished under the tag the previous image already held.
 //
-// A generated build contributes imagebuild.ProjectFilesDigest of the dags/,
-// plugins/ and include/ it copies in (files), so editing a plugin moves the
-// tag. Only those directories, filtered by .dockerignore and with the
-// per-machine files left out, so the trouble described below does not apply.
+// A generated build contributes contextDigest of what it copies from the
+// project (files), so editing a DAG or a plugin moves the tag. That walk takes
+// the build's own ignore rules, which leave out the virtualenv, .astro/ and
+// the rest of the per-machine files, and reads nothing it leaves out, so the
+// trouble described below does not apply to it.
 //
 // NOT a declared Dockerfile's build CONTEXT, which the Dockerfile can also COPY
 // from, so that address is incomplete and knowingly so. A first attempt hashed
@@ -509,14 +519,9 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-// shippedFiles are the project-relative paths a generated build copies in from
-// the project at dir; none for a declared Dockerfile.
-type shippedFiles struct {
-	dir   string
-	paths []string
-}
-
-func contentHash(base, platform string, deps, packages []string, files shippedFiles, df declaredDockerfile) (string, error) {
+// contentHash's project is the ProjectContext a generated build copies in, ""
+// for a declared Dockerfile.
+func contentHash(base, platform string, deps, packages []string, project string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -529,10 +534,10 @@ func contentHash(base, platform string, deps, packages []string, files shippedFi
 	for _, p := range sortedCopy(packages) {
 		writeField("pkg", p)
 	}
-	if len(files.paths) > 0 {
-		digest, err := imagebuild.ProjectFilesDigest(files.dir, files.paths)
+	if project != "" {
+		digest, err := contextDigest(project)
 		if err != nil {
-			return "", fmt.Errorf("reading the project's files: %w", err)
+			return "", err
 		}
 		writeField("files", digest)
 	}

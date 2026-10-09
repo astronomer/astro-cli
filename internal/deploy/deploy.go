@@ -118,7 +118,25 @@ type Result struct {
 	// LinkName is the manifest link the deploy resolved to, "" if unlinked.
 	LinkName string
 	Git      Git
+	// Dags says where an "image-and-dag" deploy's DAGs went, one of the Dags*
+	// constants; "" for the other types.
+	Dags string
 }
+
+// Where an image-and-dag deploy's DAGs went.
+const (
+	// DagsUploaded: the dags/ tarball, to a Deployment that takes DAG deploys.
+	DagsUploaded = "uploaded"
+	// DagsBuiltIn: the CLI built the project's dags/ into the image, for a
+	// Deployment that takes no DAG deploys.
+	DagsBuiltIn = "built-in"
+	// DagsFromImage: the Deployment takes no DAG deploys and runs the DAGs
+	// the image carries, which the CLI did not put there (a prebuilt image, or
+	// a declared Dockerfile's own COPY lines).
+	DagsFromImage = "image"
+	// DagsNone: remote execution runs the Deployment's DAGs; none shipped.
+	DagsNone = "none"
+)
 
 // Git is what a deploy recorded about the commit it shipped.
 type Git struct {
@@ -185,7 +203,8 @@ type ImageDeploy struct {
 }
 
 // ImageResult is what the transport reports after an image deploy. A "both"
-// deploy also carries a DagTarballVersion.
+// deploy also carries where its DAGs went (Dags), and a DagTarballVersion when
+// they were uploaded.
 type ImageResult struct {
 	WorkspaceID       string
 	RuntimeVersion    string
@@ -193,6 +212,7 @@ type ImageResult struct {
 	DagTarballVersion string
 	URL               string
 	Git               Git
+	Dags              string
 }
 
 // Deployer is the seam onto the deploy transport. The CLI wires it to the
@@ -371,6 +391,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		URL:               img.URL,
 		LinkName:          target.LinkName,
 		Git:               img.Git,
+		Dags:              img.Dags,
 	}, nil
 }
 
