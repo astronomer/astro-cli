@@ -78,7 +78,7 @@ var (
 
 var (
 	errDagsParseFailed = errors.New("your local Dags did not parse. Fix the listed errors or use astro deploy [deployment-id] -f to force deploy") //nolint:revive // intentional in this shell code
-	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive // intentional in this shell code
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                //nolint:revive // intentional in this shell code
 )
 
 var (
