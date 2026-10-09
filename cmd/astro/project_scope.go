@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -44,8 +45,15 @@ type projectPick struct {
 // take a link name wherever they take a Deployment id. group is the command
 // the hook is set on, so the hook can run the one above it, which cobra would
 // otherwise skip.
+//
+// A removed command's stub (cliout.RemovedCommand) acts on nothing, so it
+// skips the project, and gets only the pre-run above it, which logs and
+// records it.
 func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		if cliout.IsRemovedCommand(cmd) {
+			return parentPreRun(group, cmd, args)
+		}
 		before, _ := config.GetCurrentContext() //nolint:errcheck // with no context there is nothing to compare, and the login check below reports it
 		pick, err := followProject(cmd, args)
 		if err != nil {
@@ -61,13 +69,8 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 			}
 		}
 		projectWorkspaceID = pick.workspace
-		for p := group.Parent(); p != nil; p = p.Parent() {
-			if p.PersistentPreRunE != nil {
-				if err := p.PersistentPreRunE(cmd, args); err != nil {
-					return err
-				}
-				break
-			}
+		if err := parentPreRun(group, cmd, args); err != nil {
+			return err
 		}
 		if note := projectNote(cmd.Context(), pick, before.Workspace, switched); note != "" {
 			fmt.Fprintln(cmd.ErrOrStderr(), note)
@@ -205,6 +208,17 @@ func astroLinkNames(m *manifest.Manifest) []string {
 // projectNote is the line that says the project, not the context, chose where
 // the command runs. It is empty when the project chose what the context would
 // have.
+// parentPreRun runs the nearest pre-run above group, which cobra skips once it
+// has run group's.
+func parentPreRun(group, cmd *cobra.Command, args []string) error {
+	for p := group.Parent(); p != nil; p = p.Parent() {
+		if p.PersistentPreRunE != nil {
+			return p.PersistentPreRunE(cmd, args)
+		}
+	}
+	return nil
+}
+
 func projectNote(ctx context.Context, pick projectPick, contextWorkspace string, switched bool) string {
 	if !switched && (pick.workspace == "" || pick.workspace == contextWorkspace) {
 		return ""

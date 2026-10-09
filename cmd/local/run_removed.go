@@ -20,30 +20,15 @@ const replaceRunDag = "astro local run airflow dags test"
 // dagIDRe is the shape of a Dag id safe to repeat in a command line.
 var dagIDRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
-// newRunRemovedCmd builds the `astro run` removal stub. The shape follows the
-// `astro dev` stub: hidden, any arguments, flag parsing off so an old
-// invocation's --dag-file or --execution-date reaches the guidance instead of
-// dying on the flag.
-//
-// The failure is a usage error, the kind cobra's own unknown command is: it
-// exits 2, as `astro run` did before this stub existed, and under --output
-// json it is the one error object every command publishes.
+// newRunRemovedCmd builds the `astro run` removal stub (cliout.RemovedCommand),
+// so an old invocation's --dag-file or --execution-date reaches the guidance
+// instead of dying on the flag. The failure is a usage error, the kind cobra's
+// own unknown command is: it exits 2, as `astro run` did before this stub
+// existed.
 func newRunRemovedCmd() *cobra.Command {
-	var output cliout.Format
-	cmd := &cobra.Command{
-		Use:                nameRun,
-		Short:              "Removed in v2 — use `" + replaceRunDag + "`",
-		Hidden:             true,
-		Args:               cobra.ArbitraryArgs,
-		DisableFlagParsing: true,
-		SilenceUsage:       true,
-		RunE: func(_ *cobra.Command, args []string) error {
-			return cliout.Usage(errors.New(runRemovedGuidance(args)))
-		},
-	}
-	cliout.AddOutputFlag(cmd, &output)
-	markSkipPreRun(cmd)
-	return cmd
+	return cliout.RemovedCommand(nameRun, nil, "Removed in v2 — use `"+replaceRunDag+"`", func(_ *cobra.Command, args []string) error {
+		return cliout.Usage(errors.New(runRemovedGuidance(args)))
+	})
 }
 
 // runRemovedGuidance names the replacement, carrying the Dag id typed when it

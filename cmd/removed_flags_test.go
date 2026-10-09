@@ -51,9 +51,11 @@ func disarmedTree(t *testing.T, c treeConfig) (root *cobra.Command, preRuns *int
 	return root, preRuns
 }
 
-// disarmedTreeKeeping is disarmedTree leaving alone the hooks and run of every
-// command keep reports, and of none below it. out is the writer the root was
-// built with, where a command publishes its result.
+// disarmedTreeKeeping is disarmedTree leaving a command keep reports to run as
+// it does in production: its own hooks and run, those of everything below it,
+// and the pre-runs above it, which run for it as they would. Any other
+// command they run is still disarmed. out is the writer the root was built
+// with, where a command publishes its result.
 func disarmedTreeKeeping(t *testing.T, c treeConfig, keep func(*cobra.Command) bool) (root *cobra.Command, out *bytes.Buffer, preRuns *int) {
 	t.Helper()
 	tree := buildTree(t, c)
@@ -61,13 +63,26 @@ func disarmedTreeKeeping(t *testing.T, c treeConfig, keep func(*cobra.Command) b
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)
 	preRuns = new(int)
+	// The pre-runs as built, which a kept command gets from the nearest
+	// command that has one, as cobra gives it.
+	original := map[*cobra.Command]func(*cobra.Command, []string) error{}
 	var disarm func(*cobra.Command)
 	disarm = func(cmd *cobra.Command) {
 		if keep(cmd) {
 			return
 		}
+		original[cmd] = cmd.PersistentPreRunE
+		self := cmd
 		cmd.PersistentPreRun, cmd.PreRun, cmd.PreRunE = nil, nil, nil
-		cmd.PersistentPreRunE = func(*cobra.Command, []string) error {
+		cmd.PersistentPreRunE = func(run *cobra.Command, args []string) error {
+			if keep(run) {
+				for p := self; p != nil; p = p.Parent() {
+					if pre := original[p]; pre != nil {
+						return pre(run, args)
+					}
+				}
+				return nil
+			}
 			*preRuns++
 			return errRan
 		}

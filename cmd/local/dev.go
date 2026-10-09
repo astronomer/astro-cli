@@ -24,20 +24,18 @@ type devReplacement = scaffold.DevReplacement
 func devReplacements() []devReplacement { return scaffold.DevReplacements() }
 
 // DevRemoved is the data behind the stub's output: the JSON payload in json
-// mode, and the source the human message is rendered from. Its first three
-// keys are the error object every failure publishes (cliout.ErrorObject), so
-// a consumer reading only those reads it as it reads any other. Exported for
+// mode, and the source the human message is rendered from. It is the error
+// object every failure publishes (cliout.ErrorObject, whose keys lead it),
+// with the mapping besides, so a consumer reading only those keys reads it as
+// it reads any other failure. Error is the message's first sentence; code and
+// kind are filled in json mode, from the error the run returns. Exported for
 // the assembled root's tests, which see it published and name its golden
 // (cmd/schema_test.go).
 type DevRemoved struct {
-	Error string `json:"error"`
-	// Code and Kind are set only in json mode: the usage error's exit status
-	// and kind.
-	Code        int                `json:"code"`
-	Kind        cliout.ProblemKind `json:"kind"`
-	Typed       string             `json:"typed_command,omitempty"`
-	Replacement string             `json:"replacement,omitempty"`
-	Mapping     []devReplacement   `json:"mapping"`
+	cliout.ErrorObject
+	Typed       string           `json:"typed_command,omitempty"`
+	Replacement string           `json:"replacement,omitempty"`
+	Mapping     []devReplacement `json:"mapping"`
 	// Is1xProject is set when the current directory holds a 1.x
 	// project, which the replacements only work in once it is converted.
 	Is1xProject bool `json:"v1_project,omitempty"`
@@ -67,41 +65,30 @@ type devContext struct {
 // one command that accepts any subcommand, names the exact replacement for
 // what was typed, and fails — so scripts and CI break loudly, and both
 // humans and coding agents learn the new surface from the error text.
+//
+// It is a stub like every removed command's (cliout.RemovedCommand), whose
+// guidance is a usage error, the kind cobra's own unknown command is: it
+// exits 2.
 func NewDevCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
-	cmd := &cobra.Command{
-		Use:     nameDev,
-		Aliases: []string{"d"},
-		Short:   "Removed in v2 — local Airflow lives under `astro local`",
-		// Listed nowhere: the guidance is for someone who typed the old
-		// command, not a menu entry teaching a command that is gone.
-		Hidden: true,
-		Args:   cobra.ArbitraryArgs,
-		// Old invocations carry flags this stub does not know; parsing
-		// them would fail before the guidance prints.
-		DisableFlagParsing: true,
-		// Usage is silenced (the guidance is the whole point); the error is
-		// not, so the runner prints the tombstone message.
-		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.runDevRemoved(cmd.Root(), args)
-		},
-	}
-	markSkipPreRun(cmd)
-	return cmd
+	return cliout.RemovedCommand(nameDev, []string{"d"}, "Removed in v2 — local Airflow lives under `astro local`", func(cmd *cobra.Command, args []string) error {
+		return c.runDevRemoved(cmd, args)
+	})
 }
 
-func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
+func (c *cli) runDevRemoved(cmd *cobra.Command, args []string) error {
+	root := cmd.Root()
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
 		is1x:               c.is1xProject(),
 		dockerfile:         c.declaresDockerfile(),
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
 	})
-	// A usage error, the kind cobra's own unknown command is, as every other
-	// removed command's stub fails: it exits 2.
 	if devWantsJSON(args) {
-		payload.Code, payload.Kind = cliout.ExitUsage, cliout.KindUsage
+		// The error object Execute would publish for this failure, as it
+		// would derive it, with the mapping besides.
+		err := cliout.Usage(errors.New(payload.Error))
+		payload.Code, payload.Kind = cliout.ExitCode(cmd.Context(), err), ProblemKinds.Of(err)
 		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout, Style: c.d.JSONStyle}
 		if err := r.Emit(payload, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, renderDevRemoved(payload))
@@ -109,9 +96,8 @@ func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 		}); err != nil {
 			return err
 		}
-		// The payload is the error object, with the mapping besides, so
-		// nothing is added on top of it.
-		return cliout.JSONShown(cliout.Usage(errors.New(payload.Error)))
+		// The payload is the error object, so nothing is added on top of it.
+		return cliout.JSONShown(err)
 	}
 	return cliout.Usage(errors.New(renderDevRemoved(payload)))
 }

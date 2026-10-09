@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,7 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/telemetry"
+	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 )
 
 // v1CommandsFile is the 1.x command inventory. Unlike v1_flags.tsv, nothing
@@ -62,42 +64,20 @@ var v1CommandTrees = []struct {
 	{v1: v1TreeAPC, tree: treeConfig{name: "apc " + oldestAPCVersion, platform: apcPlatform, apcVersion: oldestAPCVersion}, belowGates: true},
 }
 
-// removedStubShort starts the Short of every removed command's stub.
-const removedStubShort = "Removed in v2"
-
-// isRemovedCommandStub reports whether cmd is a removed command's stub (`astro
-// dev`, `astro run`, `astro deployment pool`, `astro env variable create`,
-// ...): hidden, so help teaches only what exists, with flag parsing off, so an
-// old invocation's flags reach the guidance, and a Short saying it was
-// removed. An APC command the platform is too old for is hidden with flag
-// parsing off too, and says what version it needs instead.
-func isRemovedCommandStub(cmd *cobra.Command) bool {
-	return cmd.Hidden && cmd.DisableFlagParsing && strings.HasPrefix(cmd.Short, removedStubShort)
-}
-
 // isVersionGateStub reports whether cmd stands in for an APC command the
-// platform is too old for.
+// platform is too old for (cmd/apc's removeCmd): hidden, with flag parsing
+// off, like a removed command's stub, but saying what version it needs.
 func isVersionGateStub(cmd *cobra.Command) bool {
-	return cmd.Hidden && cmd.DisableFlagParsing && !isRemovedCommandStub(cmd)
+	return cmd.Hidden && cmd.DisableFlagParsing && !cliout.IsRemovedCommand(cmd)
 }
 
 // stubTree builds c's tree with every hook and run disarmed, as disarmedTree
-// does, except the removed commands' stubs, which keep their own run and
-// pre-run: running one is what the test is for. The root's disarmed pre-run
-// lets a command through that skips it in production
-// (telemetry.SkipPreRunAnnotation), as the real one does; any other pre-run
-// that starts is counted.
+// does, except for a removed command's stub (cliout.RemovedCommand), which
+// runs as it does in production, pre-runs and all: running one is what the
+// test is for.
 func stubTree(t *testing.T, c treeConfig) (root *cobra.Command, out *bytes.Buffer, preRuns *int) {
 	t.Helper()
-	root, out, preRuns = disarmedTreeKeeping(t, c, isRemovedCommandStub)
-	disarmed := root.PersistentPreRunE
-	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
-			return nil
-		}
-		return disarmed(cmd, args)
-	}
-	return root, out, preRuns
+	return disarmedTreeKeeping(t, c, cliout.IsRemovedCommand)
 }
 
 // Every command 1.x had still runs in v2, under its own name or a 1.x name it
@@ -106,10 +86,11 @@ func stubTree(t *testing.T, c treeConfig) (root *cobra.Command, out *bytes.Buffe
 // group's help. A command dropped without a stub fails here, as does one
 // renamed without its 1.x name kept as an alias.
 //
-// Each stub a 1.x path reaches is run, in text and under --output json, before
-// any pre-run: a usage error (exit 2) whose message says it was removed and
-// names the replacement or says there is none, and under json the one error
-// object on stdout.
+// Each stub a 1.x path reaches is run, in text and under --output json, with
+// the pre-runs it gets in production and every other hook disarmed: a usage
+// error (exit 2) whose message says it was removed and names the replacement
+// or says there is none, and under json the one error object on stdout. That
+// it needs no login is TestRemovedCommandStubsNeedNoLoginAndAreRecorded's.
 func TestEveryV1CommandStillRunsOrSaysWhatReplacedIt(t *testing.T) {
 	commands := readV1Commands(t)
 	for _, tc := range v1CommandTrees {
@@ -126,11 +107,16 @@ func TestEveryV1CommandStillRunsOrSaysWhatReplacedIt(t *testing.T) {
 					continue
 				}
 				switch {
-				case isRemovedCommandStub(cmd):
+				case cliout.IsRemovedCommand(cmd):
 					stubbed++
 					assertStubSaysWhatReplacedIt(t, root, out, preRuns, strings.Fields(c.path), label)
-				case tc.belowGates && isVersionGateStub(cmd):
-					gated++
+				case isVersionGateStub(cmd):
+					// Below the gates, as 1.x refused it there too. In any
+					// other tree, a 1.x command still gated, or gated away by
+					// a newer platform, is one no script can run.
+					if assert.True(t, tc.belowGates, "%s: reaches `%s`, which stands in for a command this platform version does not have", label, cmd.CommandPath()) {
+						gated++
+					}
 				default:
 					if !assert.Empty(t, rest, "%s: resolves to `%s` with %v left over, which names no command: "+
 						"give a removed command a hidden stub that says what replaced it, and a renamed one its 1.x name as an alias", label, cmd.CommandPath(), rest) {
@@ -142,9 +128,6 @@ func TestEveryV1CommandStillRunsOrSaysWhatReplacedIt(t *testing.T) {
 			}
 			t.Logf("%s: %d 1.x commands still run, %d need a newer platform, %d reach a removed command's stub", tc.tree.name, exists, gated, stubbed)
 			assert.Greater(t, exists, 50, "%s: the inventory matched few commands; is v1_commands.tsv still read right?", tc.tree.name)
-			if !tc.belowGates {
-				assert.Zero(t, gated)
-			}
 		})
 	}
 }
@@ -168,7 +151,7 @@ func assertStubSaysWhatReplacedIt(t *testing.T, root *cobra.Command, out *bytes.
 	assert.NotErrorIs(t, err, errRan, "%s: ran a disarmed command", label)
 	msg := err.Error()
 	assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(t.Context(), err), "%s: not a usage error: %v", label, err)
-	assert.Equal(t, before, *preRuns, "%s: a pre-run started before the stub", label)
+	assert.Equal(t, before, *preRuns, "%s: a disarmed pre-run started for the stub", label)
 	_, guidance, removed := strings.Cut(msg, "was removed in Astro CLI v2")
 	if assert.True(t, removed, "%s: does not say it was removed in Astro CLI v2: %s", label, msg) {
 		assert.True(t, namesReplacement(guidance), "%s: names no replacement, and does not say there is none: %s", label, msg)
@@ -181,7 +164,7 @@ func assertStubSaysWhatReplacedIt(t *testing.T, root *cobra.Command, out *bytes.
 		return
 	}
 	assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(t.Context(), err), "%s -o json: not a usage error: %v", label, err)
-	assert.Equal(t, before, *preRuns, "%s -o json: a pre-run started before the stub", label)
+	assert.Equal(t, before, *preRuns, "%s -o json: a disarmed pre-run started for the stub", label)
 	assert.Empty(t, stderr, label+" -o json")
 	if !assert.Equal(t, 1, strings.Count(stdout, "\n"), "%s -o json: stdout is not one line: %q", label, stdout) {
 		return
@@ -245,7 +228,7 @@ func TestEveryRemovedCommandStubIsA1xCommand(t *testing.T) {
 	for _, tc := range v1CommandTrees {
 		root := buildTree(t, tc.tree).root
 		walkCmd(root, func(cmd *cobra.Command) {
-			if isRemovedCommandStub(cmd) && !slices.Contains(all, cmd.CommandPath()) {
+			if cliout.IsRemovedCommand(cmd) && !slices.Contains(all, cmd.CommandPath()) {
 				all = append(all, cmd.CommandPath())
 			}
 		})
@@ -253,7 +236,7 @@ func TestEveryRemovedCommandStubIsA1xCommand(t *testing.T) {
 			if !slices.Contains(c.trees, tc.v1) {
 				continue
 			}
-			if cmd, _, err := root.Find(strings.Fields(c.path)); err == nil && isRemovedCommandStub(cmd) {
+			if cmd, _, err := root.Find(strings.Fields(c.path)); err == nil && cliout.IsRemovedCommand(cmd) {
 				reached[cmd.CommandPath()] = true
 			}
 		}
@@ -262,4 +245,64 @@ func TestEveryRemovedCommandStubIsA1xCommand(t *testing.T) {
 	for _, path := range all {
 		assert.True(t, reached[path], "%s is a removed command's stub that no 1.x command in v1_commands.tsv reaches", path)
 	}
+}
+
+// A removed command's stub runs no login, version check or project lookup,
+// so a logged-out machine, or one in a project it cannot read, is still told
+// what to run; but it is recorded, which is what tells us when nobody types
+// it any more. Run on the real tree, every hook armed.
+func TestRemovedCommandStubsNeedNoLoginAndAreRecorded(t *testing.T) {
+	var platformRuns []string
+	origPlatform := platformPreRun
+	platformPreRun = func(astrov1.APIClient) func(*cobra.Command, []string) error {
+		return func(cmd *cobra.Command, _ []string) error {
+			platformRuns = append(platformRuns, cmd.CommandPath())
+			return errors.New("the login and version check ran")
+		}
+	}
+	var recorded []string
+	origRecord := recordRemovedCommand
+	recordRemovedCommand = func(cmd *cobra.Command) { recorded = append(recorded, cmd.CommandPath()) }
+	// A project whose manifest does not parse: a command that looks the
+	// project up fails on it.
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"x\"\n[tool.astro]\nnot = = toml\n"), 0o600))
+	origWorking := config.WorkingPath
+	config.WorkingPath = dir
+	t.Cleanup(func() {
+		platformPreRun, recordRemovedCommand, config.WorkingPath = origPlatform, origRecord, origWorking
+	})
+
+	for _, tc := range []struct {
+		tree treeConfig
+		args []string
+		want string // the stub recorded
+	}{
+		{astroTree, []string{"dev", "start"}, "astro dev"},
+		{astroTree, []string{"run", "my_dag"}, "astro run"},
+		{astroTree, []string{"deployment", "pool", "list"}, "astro deployment pool"},
+		{astroTree, []string{"deployment", "connection", "create", "--conn-id", "c"}, "astro deployment connection"},
+		{astroTree, []string{"env", "variable", "create", "--key", "K"}, "astro env variable create"},
+		{astroTree, []string{"env", "variable", "link", "create"}, "astro env variable link create"},
+		{apcTree, []string{"dev", "ps", "-o", "json"}, "astro dev"},
+	} {
+		t.Run(tc.tree.name+": astro "+strings.Join(tc.args, " "), func(t *testing.T) {
+			platformRuns, recorded = nil, nil
+			root := buildTree(t, tc.tree).root
+			_, _, err := executeRoot(root, tc.args...)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
+			assert.True(t, cliout.IsUsage(err), "not a usage error: %v", err)
+			assert.Empty(t, platformRuns)
+			assert.Equal(t, []string{tc.want}, recorded)
+		})
+	}
+
+	// The control: a command that is not removed runs the project lookup.
+	recorded = nil
+	root := buildTree(t, astroTree).root
+	_, _, err := executeRoot(root, "env", "variable", "list")
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "was removed")
+	assert.Empty(t, recorded)
 }

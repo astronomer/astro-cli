@@ -12,6 +12,7 @@ import (
 	apcCmd "github.com/astronomer/astro-cli/cmd/apc"
 	"github.com/astronomer/astro-cli/cmd/api"
 	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
@@ -27,6 +28,11 @@ var (
 	houstonClient  houston.ClientInterface
 	houstonVersion string
 )
+
+// platformPreRun is the root pre-run's version check and login
+// (CreateRootPersistentPreRunE); a test swaps it to see which commands reach
+// it.
+var platformPreRun = CreateRootPersistentPreRunE
 
 const (
 	apcPlatform   = "APC"
@@ -98,13 +104,18 @@ func newRootCmd(o rootOptions) *cobra.Command {
 		// not kept here, because Long is wrapped and the art is not prose.
 		Long: "Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, APC, or Local Development.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// A removed command's stub only says what replaced it: it needs no
+			// login and checks no version, but it is logged and recorded.
+			if cliout.IsRemovedCommand(cmd) {
+				return utils.ChainRunEs(SetupLogging, trackRemovedCommand)(cmd, args)
+			}
 			// Skip heavy pre-run logic for commands that opt out via annotation
 			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
 				return nil
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				CreateRootPersistentPreRunE(astroV1Client),
+				platformPreRun(astroV1Client),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},

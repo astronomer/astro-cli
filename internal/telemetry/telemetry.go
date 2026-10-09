@@ -200,6 +200,19 @@ func TrackCommand(cmd *cobra.Command) {
 	track(EventCommandExecution, buildCommandProperties(cmd))
 }
 
+// TrackRemovedCommand sends the command event for the stub of a command Astro
+// CLI v2 removed, which TrackCommand leaves out because the stub is hidden.
+// The event marks it removed_command: the events are what tell us when nobody
+// types the command any more, and its stub can go.
+func TrackRemovedCommand(cmd *cobra.Command) {
+	if GetCommandPath(cmd) == "" || !canTrack(cmd) {
+		return
+	}
+	properties := buildCommandProperties(cmd)
+	properties["removed_command"] = true
+	track(EventCommandExecution, properties)
+}
+
 // canTrack reports whether an event for cmd should be sent, and shows the
 // first-run notice when it should. It runs before every event, so that a
 // command which sends nothing says nothing — notably `astro telemetry

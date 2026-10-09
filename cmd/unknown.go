@@ -68,6 +68,18 @@ func trackUnknownFlag(cmd *cobra.Command, err error) error {
 // recordUnknownFlag sends the event; a test swaps it to see what was sent.
 var recordUnknownFlag = telemetry.TrackUnknownFlag
 
+// trackRemovedCommand is the root's pre-run for a removed command's stub
+// (cliout.RemovedCommand), after logging is set up. The command event is what
+// tells us when nobody types the command any more, and its stub can go; it
+// is the only pre-run a stub runs, so it needs no login.
+func trackRemovedCommand(cmd *cobra.Command, _ []string) error {
+	recordRemovedCommand(cmd)
+	return nil
+}
+
+// recordRemovedCommand sends the event; a test swaps it to see what was sent.
+var recordRemovedCommand = telemetry.TrackRemovedCommand
+
 // unknownFlag reports the flag pflag has no such flag for: its name as typed
 // (a shorthand's letter alone), whether it was a shorthand, and its spelling
 // ("--force", "-f"). The spelling is "" for every other parse error: a
