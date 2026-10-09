@@ -147,3 +147,55 @@ func TestDagsOnlyDeployRefusesADagsSymlinkToNoDirectory(t *testing.T) {
 		})
 	}
 }
+
+// A dags directory found but not listable (mode 000: finding it takes only
+// search permission) is not one with no DAGs, to be uploaded as none.
+func TestDagsOnlyDeployFailsOnADagsDirectoryItCannotList(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores the directory modes this failure is injected with")
+	}
+	for name, unreadable := range map[string]string{"dags": "dags", "a directory under it": filepath.Join("dags", "sub")} {
+		t.Run(name, func(t *testing.T) {
+			parent := t.TempDir()
+			dir := filepath.Join(parent, unreadable)
+			require.NoError(t, os.MkdirAll(dir, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "a.py"), []byte("a"), 0o600))
+			require.NoError(t, os.Chmod(dir, 0o000))
+			t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+			prevConfirm := confirmEmptyDags
+			t.Cleanup(func() { confirmEmptyDags = prevConfirm })
+			confirmEmptyDags = func(string, ...input.Option) (bool, error) {
+				t.Error("asked whether to deploy no DAGs, of a dags directory it could not list")
+				return false, nil
+			}
+			client, url, uploads := takesUploads(t)
+			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{})
+			require.Error(t, err)
+			assert.NotErrorIs(t, err, ErrNoDagsDirectory)
+			assert.ErrorIs(t, err, syscall.EACCES)
+			assert.ErrorContains(t, err, "reading the dags directory")
+			assert.Empty(t, *uploads)
+		})
+	}
+}
+
+// A dags symlink to the project, or above it, would archive the tarball
+// being written, and the project, into the upload: it is refused.
+func TestDagsOnlyDeployRefusesADagsDirectoryHoldingTheProject(t *testing.T) {
+	for name, target := range map[string]string{"to .": ".", "to ..": ".."} {
+		t.Run(name, func(t *testing.T) {
+			parent := filepath.Join(t.TempDir(), "project")
+			require.NoError(t, os.Mkdir(parent, 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(parent, "a.py"), []byte("a"), 0o600))
+			require.NoError(t, os.Symlink(target, filepath.Join(parent, "dags")))
+			client, url, uploads := takesUploads(t)
+			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{Yes: true})
+			assert.ErrorIs(t, err, ErrDagsDirHoldsProject)
+			assert.NotErrorIs(t, err, ErrNoDagsDirectory)
+			assert.Empty(t, *uploads)
+			_, statErr := os.Stat(filepath.Join(parent, "dags.tar"))
+			assert.ErrorIs(t, statErr, os.ErrNotExist, "no tarball was written")
+		})
+	}
+}

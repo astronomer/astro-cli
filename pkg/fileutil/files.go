@@ -124,16 +124,34 @@ func TarDir(source, target, baseDir string) error {
 	return writeTar(source, target, baseDir, nil, true)
 }
 
-func writeTar(source, target, baseDir string, excludePathPrefixes []string, mustExist bool) error {
-	tarfile, err := os.Create(target)
+// createTarFile creates the tarball writeTar writes; a test fails its Close.
+var createTarFile = func(name string) (io.WriteCloser, error) { return os.Create(name) }
+
+// writeTar writes the tarball. A tarball whose footer or file did not close
+// is not one, so failing to close either fails it.
+func writeTar(source, target, baseDir string, excludePathPrefixes []string, mustExist bool) (err error) {
+	tarfile, err := createTarFile(target)
 	if err != nil {
 		return err
 	}
-	defer tarfile.Close()
+	defer func() {
+		if cerr := tarfile.Close(); err == nil {
+			err = cerr
+		}
+	}()
 
 	tarball := tar.NewWriter(tarfile)
-	defer tarball.Close() //nolint:errcheck // best-effort close
+	// Closing writes the footer; deferred after the file's, it runs first.
+	defer func() {
+		if cerr := tarball.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	return addToTar(tarball, source, target, baseDir, excludePathPrefixes, mustExist)
+}
 
+// addToTar writes the directory source into tarball, as writeTar says.
+func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPrefixes []string, mustExist bool) error {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		if mustExist {
@@ -229,8 +247,22 @@ func ReadFileToString(filename string) (string, error) {
 
 // This function finds all files of a specific extension
 func GetFilesWithSpecificExtension(folderPath, ext string) []string {
+	files, _ := filesWithExtension(folderPath, ext, false) //nolint:errcheck // a path it cannot read is skipped
+	return files
+}
+
+// FilesWithExtension is GetFilesWithSpecificExtension failing on a path
+// under folderPath it cannot read, rather than counting it as having none.
+func FilesWithExtension(folderPath, ext string) ([]string, error) {
+	return filesWithExtension(folderPath, ext, true)
+}
+
+func filesWithExtension(folderPath, ext string, strict bool) ([]string, error) {
 	var files []string
-	filepath.Walk(folderPath, func(path string, f os.FileInfo, _ error) error { //nolint:errcheck // error deliberately ignored in this shell code
+	err := filepath.Walk(folderPath, func(path string, f os.FileInfo, walkErr error) error {
+		if walkErr != nil && strict {
+			return walkErr
+		}
 		if f != nil && !f.IsDir() {
 			r, err := regexp.MatchString(ext, f.Name())
 			if err == nil && r {
@@ -239,8 +271,7 @@ func GetFilesWithSpecificExtension(folderPath, ext string) []string {
 		}
 		return nil
 	})
-
-	return files
+	return files, err
 }
 
 func backOff(retryDelayInMS, backoffFactor int) int {

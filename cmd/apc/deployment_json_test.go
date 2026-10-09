@@ -1026,7 +1026,7 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 	toUpload := deployPushed
 	toUpload.Dags = deploy.DagsFromUpload
 	down := errors.New("houston is down")
-	undecided := fmt.Sprintf(warningDagsUndecided, "failed to get app config: houston is down")
+	undecided := fmt.Sprintf(noticeDagsUndecided, "failed to get app config: houston is down", "dep-ac")
 	for _, tc := range []struct {
 		name string
 		dep  *houston.Deployment
@@ -1047,9 +1047,9 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 		// not placed: DagsOnlyDeploy reads the config again, and decides.
 		{"dag_deploy whose cluster config is read the second time skips the upload, and says so", dagsDeployment(houston.DagOnlyDeploymentType, true), []func() (*houston.AppConfig, error){cfgFails(down), cfgOf(takesDagUploads)}, 1, []string{noDagsNotice("", true)}, []string{noDagsNotice("", true)}},
 		{"dag_deploy whose cluster config is read the second time and refuses says nothing", dagsDeployment(houston.DagOnlyDeploymentType, true), []func() (*houston.AppConfig, error){cfgFails(down), cfgOf(&houston.AppConfig{Version: "2.0.0"})}, 1, nil, nil},
-		// Read neither time: the image update stands, and the deploy
-		// warns it could not tell.
-		{"dag_deploy whose cluster config cannot be read warns, and succeeds", dagsDeployment(houston.DagOnlyDeploymentType, true), []func() (*houston.AppConfig, error){cfgFails(down)}, 1, []string{undecided}, nil},
+		// Read neither time: the image update stands, and the deploy says
+		// the DAGs were not updated, whatever show_warnings is.
+		{"dag_deploy whose cluster config cannot be read says so, and succeeds", dagsDeployment(houston.DagOnlyDeploymentType, true), []func() (*houston.AppConfig, error){cfgFails(down)}, 1, []string{undecided}, []string{undecided}},
 	} {
 		for _, quiet := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s quiet=%v", tc.name, quiet), func(t *testing.T) {

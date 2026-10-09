@@ -63,6 +63,9 @@ var (
 	// ErrAppConfigUnread is DagsOnlyDeploy failing to read the cluster
 	// config its refusals are decided by.
 	ErrAppConfigUnread = errors.New("failed to get app config")
+	// ErrDagsDirHoldsProject is DagsOnlyDeploy refusing a dags directory
+	// that resolves to the directory its tarball is written to, or above it.
+	ErrDagsDirHoldsProject = errors.New("the dags directory is the project directory or one above it")
 	// Houston reads the host from its registry.protectedCustomRegistry.updateRegistry.host,
 	// under astronomer.houston.config in the platform's values.
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
@@ -633,7 +636,8 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 // a dags symlink is uploaded as the directory it points at, not as a link.
 // It returns ErrNoDagsDirectory when dagsPath is not there (a dangling link
 // included) or not a directory, and any other failure to look at it as
-// itself: a dags directory that cannot be read is not one that is missing.
+// itself: a dags directory that cannot be read is not one that is missing,
+// nor one with no DAGs in it.
 func resolveDagsDir(dagsPath string) (string, error) {
 	resolved, err := filepath.EvalSymlinks(dagsPath)
 	var info fs.FileInfo
@@ -641,12 +645,45 @@ func resolveDagsDir(dagsPath string) (string, error) {
 		info, err = os.Stat(resolved)
 	}
 	if err == nil && info.IsDir() {
-		return resolved, nil
+		// Finding it takes only search permission; listing it takes read.
+		if err = canList(resolved); err == nil {
+			return resolved, nil
+		}
+		return "", fmt.Errorf("reading the dags directory: %w", err)
 	}
 	if err == nil || errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 		return "", fmt.Errorf("%w: %s is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had", ErrNoDagsDirectory, dagsPath)
 	}
 	return "", fmt.Errorf("reading the dags directory: %w", err)
+}
+
+// canList fails on a directory whose entries cannot be read. An empty one
+// can be.
+func canList(dir string) error {
+	f, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.Readdirnames(1); err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
+	return nil
+}
+
+// refuseDagsHoldingTarball fails when the dags directory is the directory
+// the tarball is written to, or above it (a dags symlink to . or ..): the
+// tarball would be archived into itself, with the whole project.
+func refuseDagsHoldingTarball(dagsDir, dagsPath, tarballDir string) error {
+	resolvedTarballDir, err := filepath.EvalSymlinks(tarballDir)
+	if err != nil {
+		return fmt.Errorf("reading the dags directory: %w", err)
+	}
+	rel, err := filepath.Rel(dagsPath, resolvedTarballDir)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil
+	}
+	return fmt.Errorf("%w: %s resolves to %s, so the upload would archive the project into itself. Nothing was uploaded, and the Deployment keeps the Dags it had", ErrDagsDirHoldsProject, dagsDir, dagsPath)
 }
 
 func getDagDeployURL(deploymentInfo *houston.Deployment) string {
@@ -686,7 +723,9 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 // is refused as such, whatever is on disk. Then, with no dags directory
 // under dagsParentPath, it returns ErrNoDagsDirectory and uploads nothing:
 // the empty bundle it would otherwise send deletes every DAG the Deployment
-// has. The bundle is made from the directory found, and making it fails if
+// has. A dags directory it cannot list, or that resolves to the project
+// directory or above it, fails it. The bundle is made from the directory
+// found, and making it fails if
 // that directory has gone, so one removed meanwhile is not uploaded as no
 // DAGs either.
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, opts Options) (string, error) {
@@ -734,9 +773,15 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	if err != nil {
 		return deploymentID, err
 	}
+	if err := refuseDagsHoldingTarball(dagsDir, dagsPath, dagsParentPath); err != nil {
+		return deploymentID, err
+	}
 	dagsTarPath := filepath.Join(dagsParentPath, "dags.tar")
 	dagsTarGzPath := dagsTarPath + ".gz"
-	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
+	dagFiles, err := fileutil.FilesWithExtension(dagsPath, ".py")
+	if err != nil {
+		return deploymentID, fmt.Errorf("reading the dags directory: %w", err)
+	}
 
 	// Alert the user if dags folder is empty
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !opts.Yes {

@@ -294,6 +294,28 @@ func (s *Suite) TestTarDir() {
 	s.NoError(Tar(missing, filepath.Join(dir, "missing-tar.tar"), true, nil), "Tar is unchanged")
 }
 
+// failingClose is a tarball file whose writes land and whose Close fails.
+type failingClose struct{ bytes.Buffer }
+
+func (*failingClose) Close() error { return errors.New("close failed") }
+
+// A tarball that did not close is not one: TarDir and Tar both fail on it.
+func (s *Suite) TestTarFailsOnAFailedClose() {
+	prev := createTarFile
+	defer func() { createTarFile = prev }()
+	var written *failingClose
+	createTarFile = func(string) (io.WriteCloser, error) {
+		written = &failingClose{}
+		return written, nil
+	}
+	source := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.py"), []byte("a"), 0o600))
+
+	s.EqualError(TarDir(source, "dags.tar", "dags"), "close failed")
+	s.Positive(written.Len(), "the footer was flushed before the file was closed")
+	s.EqualError(Tar(source, "dags.tar", true, nil), "close failed")
+}
+
 func (s *Suite) TestReadFileToString() {
 	filePath := "./test.out"
 	content := "testing"
