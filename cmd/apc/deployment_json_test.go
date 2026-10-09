@@ -70,6 +70,7 @@ func runAPC(t *testing.T, api houston.ClientInterface, answers string, args ...s
 	t.Cleanup(func() { os.Stdout, os.Stderr, os.Stdin = prevOut, prevErr, prevIn })
 
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
+	LoadPlatform(api) // as the root does for a line that runs one of these commands
 	root.AddCommand(AddCmds(api, stdout)...)
 	root.SetOut(stdout)
 	root.SetErr(stderr)

@@ -61,7 +61,18 @@ var (
 	}
 )
 
+// execDeploymentCmd builds the deployment commands against the version
+// houstonClient reports, as the root does once LoadPlatform has asked for it,
+// and runs args on them. The suite's version is put back afterwards, so the
+// one a test's mock reports does not leak into the next.
 func execDeploymentCmd(args ...string) (string, error) {
+	prevVersion := houstonVersion
+	defer func() { houstonVersion = prevVersion }()
+	if houstonClient != nil {
+		if version, err := houstonClient.GetPlatformVersion(nil); err == nil {
+			houstonVersion = version
+		}
+	}
 	buf := new(bytes.Buffer)
 	cmd := newDeploymentRootCmd(buf)
 	cmd.SetOut(buf)

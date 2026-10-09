@@ -176,11 +176,16 @@ func buildTree(t *testing.T, c treeConfig) treeUnderTest {
 		name:     c.name,
 		platform: c.platform,
 		execute:  c.execute,
-		root: newRootCmd(rootOptions{
+		root: newRootCmd(&rootOptions{
 			platform:      c.platform,
 			loggedIn:      true,
 			houstonClient: houstonClient,
 			out:           new(bytes.Buffer),
+			// A line that runs an APC command, so an APC root asks the
+			// platform for its version and flags and builds the APC tree
+			// against them, as it does for any `astro deployment ...`. With
+			// no line it asks nothing, and the version gates go untested.
+			args: []string{"deployment"},
 		}),
 	}
 }

@@ -43,6 +43,7 @@ func newAccessClient() *mocks.ClientInterface {
 // own, with the tree's out as given: production's shape.
 func bindAccessTree(api houston.ClientInterface, out io.Writer) *cobra.Command {
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
+	LoadPlatform(api) // as the root does for a line that runs one of these commands
 	root.AddCommand(AddCmds(api, out)...)
 	return root
 }

@@ -90,7 +90,7 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 
 			var runErr error
 			stdout, stderr := captureProcessOutput(t, func(out io.Writer) {
-				root := newRootCmd(rootOptions{
+				root := newRootCmd(&rootOptions{
 					platform:      cloudPlatform,
 					loggedIn:      true,
 					houstonClient: stubHoustonAt(t, "1.0.0"),

@@ -104,6 +104,18 @@ func resumeLoginVault(args []string) error {
 	return c.ResumeLoginVault()
 }
 
+// currentPlatformVersion is the version of the APC platform the current context
+// points at. A login to APC reads it to decide whether to page the workspace
+// list, and it is asked for here rather than when the root is built
+// (cmd/root.go), so no other command waits on Houston for it. The Houston
+// client talks to the current context, so a cloud context has nothing to ask.
+func currentPlatformVersion() string {
+	if houstonVersion == "" && !context.IsCloudContext() {
+		houstonVersion, _ = houstonClient.GetPlatformVersion(nil) //nolint:errcheck // an unknown version reads as the newest, as it did when the root asked
+	}
+	return houstonVersion
+}
+
 func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -120,7 +132,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 			if context.IsCloudDomain(ctx.Domain) {
 				fmt.Fprintf(out, "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
-			return apcLogin(domain, oAuth, "", "", houstonVersion, houstonClient, out)
+			return apcLogin(domain, oAuth, "", "", currentPlatformVersion(), houstonClient, out)
 		}
 		return cloudLogin(domain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(domain), forceLogin)
 	}
@@ -132,7 +144,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(ctx.Domain), forceLogin)
 	}
-	return apcLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
+	return apcLogin(ctx.Domain, oAuth, "", "", currentPlatformVersion(), houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {
