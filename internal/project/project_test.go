@@ -218,7 +218,7 @@ func TestNotFoundErrorPointsAtInit(t *testing.T) {
 	var nf *NotFoundError
 	require.ErrorAs(t, err, &nf)
 	assert.Empty(t, nf.Project1xDir)
-	assert.Contains(t, err.Error(), "`astro init`")
+	assert.Contains(t, err.Error(), "astro init")
 	assert.NotContains(t, err.Error(), "v1")
 }
 
@@ -237,7 +237,7 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
 		assert.Contains(t, err.Error(), "this directory holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` here")
+		assert.Contains(t, err.Error(), "Run astro init here")
 	})
 	t.Run("below the root", func(t *testing.T) {
 		_, err := Discover(dags)
@@ -245,7 +245,7 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
 		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` in "+root)
+		assert.Contains(t, err.Error(), "Run astro init in "+root)
 	})
 }
 
@@ -261,7 +261,7 @@ func TestLoadError(t *testing.T) {
 		assert.False(t, ns.Has1xProject)
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
 		assert.Contains(t, err.Error(), "no [tool.astro] section")
-		assert.Contains(t, err.Error(), "`astro init`")
+		assert.Contains(t, err.Error(), "astro init")
 	})
 	t.Run("a tools-only pyproject in a 1.x project", func(t *testing.T) {
 		dir := t.TempDir()
@@ -274,14 +274,14 @@ func TestLoadError(t *testing.T) {
 		assert.True(t, ns.Has1xProject)
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
 		assert.Contains(t, err.Error(), "project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` here")
+		assert.Contains(t, err.Error(), "Run astro init here")
 
 		// From below the root, `astro init` "here" would scaffold a second
 		// project inside the 1.x one, so the root is named instead.
 		dags := filepath.Join(dir, "dags")
 		require.NoError(t, os.Mkdir(dags, 0o700))
 		err = LoadError(dags, dir, manifest.ErrNoAstroSection)
-		assert.Contains(t, err.Error(), "Run `astro init` in "+dir)
+		assert.Contains(t, err.Error(), "Run astro init in "+dir)
 		assert.NotContains(t, err.Error(), "here")
 	})
 }

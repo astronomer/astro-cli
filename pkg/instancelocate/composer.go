@@ -213,7 +213,7 @@ func composerCoordinatesOf(i instances.Instance) (composerCoordinates, error) {
 func composerOutage(ctx context.Context, o Options, name string, at composerCoordinates, status int, body []byte) error {
 	switch status {
 	case http.StatusUnauthorized:
-		return fmt.Errorf("Google rejected the credentials for %q — refresh them with `gcloud auth application-default login`", name)
+		return fmt.Errorf("Google rejected the credentials for %q — refresh them with gcloud auth application-default login", name)
 	case http.StatusForbidden:
 		msg := fmt.Sprintf("not allowed to read Composer environment %s in project %s — the account needs roles/composer.user",
 			at.environment, at.project)
@@ -224,7 +224,7 @@ func composerOutage(ctx context.Context, o Options, name string, at composerCoor
 		}
 		return errors.New(msg)
 	case http.StatusNotFound:
-		return fmt.Errorf("Composer environment %s does not exist in project %s, location %s — check the link's `environment` and [tool.astro.targets.composer] in pyproject.toml",
+		return fmt.Errorf("Composer environment %s does not exist in project %s, location %s — check the link's environment and [tool.astro.targets.composer] in pyproject.toml",
 			at.environment, at.project, at.location)
 	}
 	return fmt.Errorf("the Composer API answered %d %s looking up %q: %s",

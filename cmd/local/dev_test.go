@@ -78,11 +78,11 @@ func TestDevStubNamesTheReplacement(t *testing.T) {
 				t.Fatal("astro dev must fail")
 			}
 			msg := err.Error()
-			if !strings.Contains(msg, "Use `"+m.Replacement+"` instead") {
+			if !strings.Contains(msg, "Use "+m.Replacement+" instead") {
 				t.Errorf("error does not name the replacement %q:\n%s", m.Replacement, msg)
 			}
 			typed := "astro dev " + m.Command
-			if !strings.Contains(msg, "`"+typed+"` was removed") {
+			if !strings.Contains(msg, typed+" was removed") {
 				t.Errorf("error does not name the typed command %q:\n%s", typed, msg)
 			}
 		})
@@ -93,7 +93,7 @@ func TestDevStubBareAndUnknown(t *testing.T) {
 	d, _ := testDeps(t)
 	err := execute(t, d, "dev")
 	if err == nil || !strings.Contains(err.Error(), "astro dev was removed in Astro CLI v2") {
-		t.Errorf("bare `astro dev` message wrong: %v", err)
+		t.Errorf("bare astro dev message wrong: %v", err)
 	}
 
 	err = execute(t, d, "dev", "upgrade-test")
@@ -134,7 +134,7 @@ func TestDevStub1xNotice(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), notice) {
 			t.Errorf("a 1.x dir with a tools-only pyproject.toml should get the 1.x notice: %v", err)
 		}
-		if err != nil && !strings.Contains(err.Error(), "Run `astro init` here to convert it in place") {
+		if err != nil && !strings.Contains(err.Error(), "Run astro init here to convert it in place") {
 			t.Errorf("the 1.x notice should point at astro init: %v", err)
 		}
 	})
@@ -178,15 +178,15 @@ func TestDevStubLeadsWithTheConversionInA1xProject(t *testing.T) {
 	d.WorkingDir = func() (string, error) { return project1xWithToolsPyproject(t), nil }
 
 	err := execute(t, d, "dev", "pytest")
-	if err == nil || !strings.Contains(err.Error(), "Convert with `astro init`, then use `uv run pytest`") {
+	if err == nil || !strings.Contains(err.Error(), "Convert with astro init, then use uv run pytest") {
 		t.Errorf("a 1.x project should be told to convert before using the replacement: %v", err)
 	}
 
 	err = execute(t, d, "dev", "init")
-	if err == nil || !strings.Contains(err.Error(), "Use `astro init` instead") {
+	if err == nil || !strings.Contains(err.Error(), "Use astro init instead") {
 		t.Errorf("astro dev init should name astro init once, as its replacement: %v", err)
 	}
-	if err != nil && strings.Contains(err.Error(), "then use `astro init`") {
+	if err != nil && strings.Contains(err.Error(), "then use astro init") {
 		t.Errorf("astro dev init should not be told to convert and then convert: %v", err)
 	}
 }
@@ -227,14 +227,14 @@ func TestDevStubIgnoresFlagsWhenResolving(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "astro local start") {
 		t.Errorf("flags must not hide the typed subcommand: %v", err)
 	}
-	if err != nil && !strings.Contains(err.Error(), "`astro dev start` was removed") {
+	if err != nil && !strings.Contains(err.Error(), "astro dev start was removed") {
 		t.Errorf("flag values must not leak into the echoed command: %v", err)
 	}
 }
 
 func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 	const waitNote = "--wait is now the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable, a Go duration: ASTRO_LOCAL_HEALTH_TIMEOUT="
-	const restartNote = "With nothing running, restart starts in standalone mode, which builds no image; use `astro local start --docker` then"
+	const restartNote = "With nothing running, restart starts in standalone mode, which builds no image; then use astro local start --docker"
 	withDockerfile := devContext{dockerfile: true, buildSecret: true, packageBuildSecret: true}
 	cases := []struct {
 		name  string

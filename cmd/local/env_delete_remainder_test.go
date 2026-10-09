@@ -49,9 +49,9 @@ func TestDeleteOfAnOptionalDeclaredNameSaysItIsAbsent(t *testing.T) {
 	out := deleteText(t, dir, "variable", "delete", "DEMO_VAR2")
 	manifestPath := filepath.Join(dir, "pyproject.toml")
 	assert.Contains(t, out, "deleted variable DEMO_VAR2 from project")
-	assert.Contains(t, out, "DEMO_VAR2 is still declared in "+manifestPath+", so `astro local env list` shows it as absent. "+
-		"Remove the declaration with `astro local env variable undeclare DEMO_VAR2`.")
-	assert.NotContains(t, out, "next `astro local start`")
+	assert.Contains(t, out, "DEMO_VAR2 is still declared in "+manifestPath+", so astro local env list shows it as absent. "+
+		"Remove the declaration with astro local env variable undeclare DEMO_VAR2.")
+	assert.NotContains(t, out, "next astro local start")
 	assert.Contains(t, declared(t, dir).EnvVars, "DEMO_VAR2", "delete removed the declaration")
 
 	writeEnvFile(t, dir, "DEMO_VAR2=x\n")
@@ -71,8 +71,8 @@ func TestDeleteOfARequiredDeclaredNameSaysStartRefuses(t *testing.T) {
 
 	out := deleteText(t, dir, "variable", "delete", "API_URL")
 	assert.Contains(t, out, "API_URL is still declared in "+filepath.Join(dir, "pyproject.toml")+
-		", and required: the next `astro local start` refuses until a value is set with `astro local env variable set API_URL`. "+
-		"Remove the declaration with `astro local env variable undeclare API_URL`.")
+		", and required: the next astro local start refuses until a value is set with astro local env variable set API_URL. "+
+		"Remove the declaration with astro local env variable undeclare API_URL.")
 	assert.NotContains(t, out, "s3cr3t-url")
 
 	writeEnvFile(t, dir, "API_URL=s3cr3t-url\n")

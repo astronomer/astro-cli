@@ -1148,9 +1148,9 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 		out = append(out, linksNote)
 	}
 	checks := []struct{ file, note string }{
-		{"docker-compose.yml", "not read — `astro local start` replaces it"},
-		{"docker-compose.yaml", "not read — `astro local start` replaces it"},
-		{"docker-compose.override.yml", "read in Docker mode — `astro local start --docker` merges it over the services it generates; standalone mode does not run it"},
+		{"docker-compose.yml", "not read — astro local start replaces it"},
+		{"docker-compose.yaml", "not read — astro local start replaces it"},
+		{"docker-compose.override.yml", "read in Docker mode — astro local start --docker merges it over the services it generates; standalone mode does not run it"},
 		{"docker-compose.override.yaml", "not read — Docker mode merges docker-compose.override.yml, so rename it to use it there"},
 	}
 	for _, c := range checks {
@@ -1206,12 +1206,12 @@ func instancesNote(instances []instance1x) string {
 		default:
 			cmd = "astro link add " + name + " --target <platform>"
 		}
-		if !slices.Contains(cmds, "`"+cmd+"`") {
-			cmds = append(cmds, "`"+cmd+"`")
+		if !slices.Contains(cmds, cmd) {
+			cmds = append(cmds, cmd)
 		}
 	}
-	return "its `instances` list names deployment links this run did not carry into " + manifest.Marker +
-		". Link each one with " + strings.Join(cmds, ", ")
+	return "its instances list names deployment links this run did not carry into " + manifest.Marker +
+		". Link each one with " + strings.Join(cmds, "; ")
 }
 
 // deployTargetNote says what .astro/config.yaml saved and what a manifest entry

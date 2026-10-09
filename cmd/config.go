@@ -36,12 +36,12 @@ var unlistedConfigs = map[string]bool{
 // that would change nothing; a 1.x CLI sharing the config file still reads
 // what it wrote itself.
 var removedConfigKeys = map[string]string{
-	"dev.mode": "Local Airflow runs in standalone mode by default; start it in Docker with `astro local start --docker`. " +
-		"`astro local restart` keeps the mode it is running in.",
+	"dev.mode": "Local Airflow runs in standalone mode by default; start it in Docker with astro local start --docker. " +
+		"astro local restart keeps the mode it is running in.",
 	"proxy.port": "The local proxy listens on 6563, or on another free port when 6563 is taken, and has no setting.",
-	"api-server.port": "Pick the local Airflow port with `astro local start --port <port>`; " +
+	"api-server.port": "Pick the local Airflow port with astro local start --port <port>; " +
 		"without it a free port is chosen.",
-	"webserver.port": "Pick the local Airflow port with `astro local start --port <port>`; " +
+	"webserver.port": "Pick the local Airflow port with astro local start --port <port>; " +
 		"without it a free port is chosen.",
 }
 
@@ -52,7 +52,7 @@ func refuseRemovedConfigKey(key string) error {
 	if !ok {
 		return nil
 	}
-	return cliout.Usage(fmt.Errorf("`%s` was removed in Astro CLI v2: nothing reads it. %s", key, replacement))
+	return cliout.Usage(fmt.Errorf("%s was removed in Astro CLI v2: nothing reads it. %s", key, replacement))
 }
 
 var (
@@ -101,7 +101,7 @@ func newConfigRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:               "config",
 		Short:             "Manage CLI settings for this machine",
-		Long:              "Manage CLI settings, stored globally with -g or in a 1.x project's .astro/config.yaml. Run `astro config list` to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
+		Long:              "Manage CLI settings, stored globally with -g or in a 1.x project's .astro/config.yaml. Run astro config list to see every setting, or see https://www.astronomer.io/docs/astro/cli/configure-cli#available-cli-configurations for what each one does",
 		PersistentPreRunE: ensureGlobalFlag,
 		Annotations:       map[string]string{astroCmd.NoLoginAnnotation: "true"},
 	}

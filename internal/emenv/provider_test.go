@@ -160,7 +160,7 @@ func TestLoggedOutProviderAbsent(t *testing.T) {
 	_, ok := p.Lookup("DATA_WAREHOUSE_URI")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: not logged in to localhost)", p.Label())
-	require.Equal(t, "not logged in to localhost. Log in with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "not logged in to localhost. Log in with astro login localhost", p.(envresolve.Diagnoser).Diagnose("X"))
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
@@ -182,7 +182,7 @@ func TestManifestDomainPicksTheLogin(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: not logged in to astronomer.io)", p.Label())
-	require.Equal(t, "not logged in to astronomer.io. Log in with `astro login astronomer.io`", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "not logged in to astronomer.io. Log in with astro login astronomer.io", p.(envresolve.Diagnoser).Diagnose("X"))
 	require.Empty(t, usedDomain, "no client is built without a login for the manifest's domain")
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 
@@ -204,7 +204,7 @@ func TestNoWorkspaceUnavailable(t *testing.T) {
 
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
-	require.Contains(t, p.Label(), "unavailable: the manifest sets no `workspace`")
+	require.Contains(t, p.Label(), "unavailable: the manifest sets no workspace")
 	require.Contains(t, p.(envresolve.Diagnoser).Diagnose("X"), "Link a workspace to the project in Astro Desktop")
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
@@ -262,7 +262,7 @@ func TestFailedRefreshReportsSessionExpired(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: session expired)", p.Label())
-	require.Equal(t, "your localhost session expired. Log in again with `astro login localhost`", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "your localhost session expired. Log in again with astro login localhost", p.(envresolve.Diagnoser).Diagnose("X"))
 	mc.AssertNotCalled(t, "ListEnvironmentObjectsWithResponse")
 }
 
@@ -275,9 +275,9 @@ func TestFailureModeMessages(t *testing.T) {
 		wantLabel string
 		wantCause string
 	}{
-		{"expired", http.StatusUnauthorized, "token expired", "workspace (unavailable: session expired)", "your localhost session expired. Log in again with `astro login localhost`"},
-		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: no access)", "you don't have access to this workspace on localhost. Check your current organization (`astro organization switch`), or ask an org admin"},
-		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "workspace cmws123 was not found on localhost. Check `workspace` and `domain` in pyproject.toml, and your current organization"},
+		{"expired", http.StatusUnauthorized, "token expired", "workspace (unavailable: session expired)", "your localhost session expired. Log in again with astro login localhost"},
+		{"revoked", http.StatusForbidden, "forbidden", "workspace (unavailable: no access)", "you don't have access to this workspace on localhost. Check your current organization (astro organization switch), or ask an org admin"},
+		{"deleted", http.StatusNotFound, "not found", "workspace (unavailable: workspace not found)", "workspace cmws123 was not found on localhost. Check the workspace and domain keys in pyproject.toml, and your current organization"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -327,7 +327,7 @@ func TestUnauthorizedWithAPITokenNamesTheVariable(t *testing.T) {
 	_, ok := p.Lookup("X")
 	require.False(t, ok)
 	require.Equal(t, "workspace (unavailable: session expired)", p.Label())
-	require.Equal(t, "localhost rejected the token in ASTRO_API_TOKEN. Check it, or unset it to use your `astro login` session", p.(envresolve.Diagnoser).Diagnose("X"))
+	require.Equal(t, "localhost rejected the token in ASTRO_API_TOKEN. Check it, or unset it to use your astro login session", p.(envresolve.Diagnoser).Diagnose("X"))
 }
 
 // A secret value the org will not release is a hard miss whose cause names the

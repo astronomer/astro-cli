@@ -82,9 +82,9 @@ func (t *deploymentTarget) register(cmd *cobra.Command) {
 func (t *deploymentTarget) which() string { return "whichever deployment this project resolves to" }
 
 func (t *deploymentTarget) note() string {
-	return "Which deployment depends on -d/--deployment, then " + instances.EnvVar + ", then `astro use`, then the " +
+	return "Which deployment depends on -d/--deployment, then " + instances.EnvVar + ", then astro use, then the " +
 		"manifest's default link. --url reaches an Airflow no project declares. For the Airflow running on this " +
-		"machine, spell it `" + t.localForm() + "`."
+		"machine, spell it " + t.localForm() + "."
 }
 
 // suggest carries the selector forward. A run told which Airflow to act on
@@ -139,7 +139,7 @@ func (t *deploymentTarget) nameTheLocalForm(err error) error {
 	if !errors.Is(err, instances.ErrNone) && !errors.As(err, &ambiguous) {
 		return err
 	}
-	return fmt.Errorf("%w\nFor this machine: `%s`", err, t.localForm())
+	return fmt.Errorf("%w\nFor this machine: %s", err, t.localForm())
 }
 
 // machineTarget is the `astro local` registration: this project's own running
@@ -153,8 +153,8 @@ func (machineTarget) register(*cobra.Command) {}
 func (machineTarget) which() string { return "the Airflow running on this machine" }
 
 func (machineTarget) note() string {
-	return "This acts on the Airflow `astro local start` runs for this project, and only that one — there is no " +
-		"flag to point it elsewhere. Drop the `local` to act on a deployment instead."
+	return "This acts on the Airflow astro local start runs for this project, and only that one — there is no " +
+		"flag to point it elsewhere. Drop local from the command to act on a deployment instead."
 }
 
 func (machineTarget) suggest(command string) string { return "astro local " + afName + " " + command }

@@ -39,7 +39,7 @@ func (s *Suite) TestVersionMatchCmds() {
 		w.Close()
 		io.Copy(b, r)
 		s.Error(err)
-		s.Contains(err.Error(), "`astro team` needs Astro Private Cloud 0.28.0 or newer")
+		s.Contains(err.Error(), "astro team needs Astro Private Cloud 0.28.0 or newer")
 		s.Contains(err.Error(), "this platform reports 0.27.0")
 	})
 
@@ -73,7 +73,7 @@ func (s *Suite) TestVersionMatchCmds() {
 		w.Close()
 		io.Copy(b, r)
 		s.Error(err)
-		s.Contains(err.Error(), "`astro team update` needs Astro Private Cloud 0.29.2 or newer")
+		s.Contains(err.Error(), "astro team update needs Astro Private Cloud 0.29.2 or newer")
 		s.Contains(err.Error(), "this platform reports 0.29.0")
 	})
 
@@ -132,7 +132,7 @@ func (s *Suite) TestVersionMatchCmds() {
 		w.Close()
 		io.Copy(b, r)
 		s.Error(err)
-		s.Contains(err.Error(), "`astro deployment adopt` needs Astro Private Cloud 2.1.0 or newer")
+		s.Contains(err.Error(), "astro deployment adopt needs Astro Private Cloud 2.1.0 or newer")
 		s.Contains(err.Error(), "this platform reports 1.0.1")
 	})
 
@@ -191,7 +191,7 @@ func (s *Suite) TestVersionMatchCmds() {
 		w.Close()
 		io.Copy(b, r)
 		s.Error(err)
-		s.Contains(err.Error(), "`astro deployment unadopt` needs Astro Private Cloud 2.1.0 or newer")
+		s.Contains(err.Error(), "astro deployment unadopt needs Astro Private Cloud 2.1.0 or newer")
 		s.Contains(err.Error(), "this platform reports 1.0.1")
 	})
 

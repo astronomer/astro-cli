@@ -32,7 +32,7 @@ func newRunRemovedCmd() *cobra.Command {
 	var output cliout.Format
 	cmd := &cobra.Command{
 		Use:                nameRun,
-		Short:              "Removed in v2 — use `" + replaceRunDag + "`",
+		Short:              "Removed in v2 — use " + replaceRunDag,
 		Hidden:             true,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
@@ -54,7 +54,7 @@ func runRemovedGuidance(args []string) string {
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") && dagIDRe.MatchString(args[0]) {
 		dagID = args[0]
 	}
-	return fmt.Sprintf("`astro run` was removed in Astro CLI v2. Use `%s %s` instead.\n"+
+	return fmt.Sprintf("astro run was removed in Astro CLI v2. Use %s %s instead.\n"+
 		"It runs the Dag in this project's Airflow environment and needs no running Airflow in a standalone project. "+
 		"Pass a logical date as the argument after the Dag id, in place of --execution-date.", replaceRunDag, dagID)
 }

@@ -402,7 +402,7 @@ func (r Renderer) text(text func(w io.Writer) error) error {
 	if text == nil {
 		panic("Renderer.Emit: text mode with no text renderer — this value is " +
 			"json-only, so the caller must not reach here in text mode. The " +
-			"`if r.Format == FormatJSON` branch around a streaming Emit is what " +
+			"branch on r.Format == FormatJSON around a streaming Emit is what " +
 			"prevents it.")
 	}
 	return text(r.Out)

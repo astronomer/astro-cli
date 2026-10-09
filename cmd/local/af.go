@@ -52,7 +52,7 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 			// arrives here and got told its subcommand was unknown for
 			// `astro af` — a different thing, and no route onward.
 			if replacement, ok := devReplacementFor(args[0]); ok {
-				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Local Airflow lives under `astro local`: use `%s`",
+				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Local Airflow lives under astro local: use %s",
 					args[0], cmd.CommandPath(), replacement))
 			}
 			return cliout.UnknownSubcommand(cmd, args[0])

@@ -24,7 +24,7 @@ func (e *hibernatingError) Error() string {
 	if e.name != "" {
 		named = fmt.Sprintf("%s (%q)", e.deploymentID, e.name)
 	}
-	hint := fmt.Sprintf("Astro Deployment %s is hibernating, so it cannot take a deploy — wake it with `astro deployment wake-up %s`, which takes about a minute, then deploy again",
+	hint := fmt.Sprintf("Astro Deployment %s is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up %s, which takes about a minute, then deploy again",
 		named, e.deploymentID)
 	if namesHibernation(e.refusal) {
 		return hint

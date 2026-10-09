@@ -75,13 +75,13 @@ func (c Cause) TextFor(r Read) string {
 	domain := r.Domain
 	switch c {
 	case CauseNotLoggedIn:
-		return fmt.Sprintf("not logged in to %s. Log in with `astro login %s`", domain, domain)
+		return fmt.Sprintf("not logged in to %s. Log in with astro login %s", domain, domain)
 	case CauseSessionExpired:
-		return fmt.Sprintf("your %s session expired. Log in again with `astro login %s`", domain, domain)
+		return fmt.Sprintf("your %s session expired. Log in again with astro login %s", domain, domain)
 	case CauseNoAccess:
-		return fmt.Sprintf("you don't have access to this workspace on %s. Check your current organization (`astro organization switch`), or ask an org admin", domain)
+		return fmt.Sprintf("you don't have access to this workspace on %s. Check your current organization (astro organization switch), or ask an org admin", domain)
 	case CauseNotFound:
-		return fmt.Sprintf("workspace %s was not found on %s. Check `workspace` and `domain` in pyproject.toml, and your current organization", r.Workspace, domain)
+		return fmt.Sprintf("workspace %s was not found on %s. Check the workspace and domain keys in pyproject.toml, and your current organization", r.Workspace, domain)
 	case CauseSecretsWithheld:
 		if r.Organization != "" {
 			return fmt.Sprintf("organization %s disables Environment Secrets Fetching. Ask an org admin to enable it, or set the value locally", r.Organization)
@@ -92,10 +92,10 @@ func (c Cause) TextFor(r Read) string {
 	case CauseOffline:
 		return fmt.Sprintf("could not reach %s. Check your connection, or set the value locally", domain)
 	case CauseNoWorkspace:
-		return "the manifest sets no `workspace`. Link a workspace to the project in Astro Desktop, or set the value locally"
+		return "the manifest sets no workspace key. Link a workspace to the project in Astro Desktop, or set the value locally"
 	case CauseNoOrganizationAccess:
 		return fmt.Sprintf("could not read workspace %s in organization %s on %s, which pyproject.toml names. "+
-			"Check that you belong to it with `astro organization list`, and `organization` and `workspace` under [tool.astro]",
+			"Check that you belong to it with astro organization list, and the organization and workspace keys under [tool.astro]",
 			r.Workspace, r.Organization, domain)
 	}
 	return fmt.Sprintf("unknown cause %d", int(c))

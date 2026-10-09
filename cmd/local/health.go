@@ -27,9 +27,9 @@ func newHealthCmd(d Deps, t target) *cobra.Command {
 			"runs are distributed across states.\n\nEach part is read on its own and a part that fails is reported " +
 			"as failed rather than ending the command, so an Airflow that serves three of the four still gives " +
 			"you three. The command itself succeeds whenever it could produce a report; overall_status is the " +
-			"verdict.\n\nEach part is also a command of its own, for when one of them is the question: `" +
-			t.suggest("version") + "`, `" + t.suggest("dags errors") + "`, `" + t.suggest("dags warnings") + "`, and `" +
-			t.suggest("dags stats") + "`. The configuration it runs with is `" + t.suggest("config") + "`.",
+			"verdict.\n\nEach part is also a command of its own, for when one of them is the question: " +
+			t.suggest("version") + ", " + t.suggest("dags errors") + ", " + t.suggest("dags warnings") + ", and " +
+			t.suggest("dags stats") + ". The configuration it runs with is " + t.suggest("config") + ".",
 		Args: cobra.NoArgs,
 		Example: afExample(t,
 			"Check whether an Airflow is in good shape", "health",

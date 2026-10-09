@@ -140,7 +140,7 @@ func (d Deps) viaProvider(ctx context.Context, i Instance, baseURL string, m man
 // try.
 func errNoProvider(name string, m manifest.AuthMethod) error {
 	return fmt.Errorf(
-		"cannot reach %q here: it authenticates with %s, which this build does not carry — use the Astro CLI for it (`astro use %s`)",
+		"cannot reach %q here: it authenticates with %s, which this build does not carry — use the Astro CLI for it (astro use %s)",
 		name, m, name,
 	)
 }

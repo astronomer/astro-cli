@@ -431,8 +431,8 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 	case !req.Interactive:
 		// The question an interactive run asks, refused: input_required under
 		// --output json, in deploy's own words.
-		return Target{}, input.Required(fmt.Errorf("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>. "+
-			"Deploy never picks for you — `astro use`, %s, or `default = true` only preselect the prompt. Deployable links: %s",
+		return Target{}, input.Required(fmt.Errorf("a deploy must name the deployment it ships to: astro deploy <name> or --deployment <name>. "+
+			"Deploy never picks for you — astro use, %s, or default = true only preselect the prompt. Deployable links: %s",
 			deploymentEnvVar, strings.Join(deployable, ", ")))
 	}
 

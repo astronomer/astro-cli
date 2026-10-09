@@ -615,7 +615,7 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 	if token == "" {
 		var refused *input.RequiredError
 		if errors.As(input.MayAsk("Log in to Astro"), &refused) {
-			return fmt.Errorf("%w; %s — run `astro login` first, or set ASTRO_API_TOKEN", ErrLoginNeeded, refused.Reason)
+			return fmt.Errorf("%w; %s — run astro login first, or set ASTRO_API_TOKEN", ErrLoginNeeded, refused.Reason)
 		}
 	}
 

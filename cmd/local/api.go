@@ -47,7 +47,7 @@ func newAPICmd(c *cli) *cobra.Command {
 		Use:   "api <ENDPOINT>",
 		Short: "Make one request to this machine's Airflow API",
 		Long: "Send a request to the Airflow running on this machine and print what it sent back, unchanged.\n\n" +
-			"The endpoint is a path relative to the API base, so `/dags` (or `dags`) reaches /api/v2/dags on " +
+			"The endpoint is a path relative to the API base, so /dags (or dags) reaches /api/v2/dags on " +
 			"Airflow 3 and /api/v1/dags on Airflow 2 — the generation is detected, not assumed. A query string " +
 			"typed onto the path is sent as one. --root (or --raw) addresses the server below the version prefix, " +
 			"for the few paths Airflow serves unversioned.\n\n" +
@@ -59,8 +59,8 @@ func newAPICmd(c *cli) *cobra.Command {
 			"branch on the exit code without parsing anything. -i puts the status line and headers in front of it; " +
 			"with --output json it prints one {status_code, headers, body} object instead. Otherwise the output is " +
 			"Airflow's own, and --output governs how a failure is reported.\n\n" +
-			"`ls` lists the endpoints this Airflow serves and `spec` prints its OpenAPI document, both read from " +
-			"the Airflow itself. For a deployment, `astro api airflow` is the same idea with the published API spec " +
+			"The ls command lists the endpoints this Airflow serves and spec prints its OpenAPI document, both read from " +
+			"the Airflow itself. For a deployment, astro api airflow is the same idea with the published API spec " +
 			"behind it.",
 		Example: "  # Every DAG, as Airflow itself reports them\n" +
 			"  astro local api /dags\n\n" +
@@ -252,7 +252,7 @@ func newAPIListCmd(c *cli) *cobra.Command {
 			"specification.\n\n" +
 			"A filter, as an argument or with --filter, keeps the endpoints whose path, method, operation id, " +
 			"summary or tag contains it, ignoring case. Paths are shown relative to the API base, the form " +
-			"`astro local api` takes them in. --output json prints one object, its endpoints under an endpoints key.",
+			"astro local api takes them in. --output json prints one object, its endpoints under an endpoints key.",
 		Example: "  astro local api ls\n" +
 			"  astro local api ls --filter variable\n" +
 			"  astro local api ls dagRun --verbose",

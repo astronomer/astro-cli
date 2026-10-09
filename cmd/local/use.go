@@ -301,7 +301,7 @@ func savePin(projectDir, name string) error {
 func pinStateError(err error) error {
 	var decode *userstate.DecodeError
 	if errors.As(err, &decode) {
-		return fmt.Errorf("%w\nclear it with `astro use --unset`", err)
+		return fmt.Errorf("%w\nclear it with astro use --unset", err)
 	}
 	return err
 }

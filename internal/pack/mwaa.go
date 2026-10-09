@@ -144,10 +144,10 @@ func mwaaBucket(m *manifest.Manifest) string {
 func mwaaNextSteps(outDir string, hasPlugins bool, bucket string) []string {
 	steps := []string{
 		fmt.Sprintf("aws s3 sync %s/ %s", outDir, bucket),
-		"Point the environment at the new requirements.txt object version (MWAA console, or `aws mwaa update-environment --requirements-s3-object-version <ver>`).",
+		"Point the environment at the new requirements.txt object version (MWAA console, or aws mwaa update-environment --requirements-s3-object-version <ver>).",
 	}
 	if hasPlugins {
-		steps = append(steps, "Point the environment at the new plugins.zip object version (`--plugins-s3-object-version <ver>`).")
+		steps = append(steps, "Point the environment at the new plugins.zip object version (--plugins-s3-object-version <ver>).")
 	}
 	return steps
 }

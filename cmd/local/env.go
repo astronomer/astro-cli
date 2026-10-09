@@ -209,7 +209,7 @@ func removedVerbHint(cmd *cobra.Command, arg string) string {
 			verb = "delete"
 		}
 		return fmt.Sprintf(
-			"`astro local env %s <NAME>` was removed in v2: each kind is its own noun now.\n"+
+			"astro local env %s <NAME> was removed in v2: each kind is its own noun now.\n"+
 				"  env var:           astro local env variable %s <NAME>\n"+
 				"  connection:        astro local env connection %s <id>\n"+
 				"  Airflow Variable:  astro local env airflow-variable %s <key>",
@@ -353,7 +353,7 @@ func newEnvSetCmd(c *cli, scope *scopeFlags, k envKind) *cobra.Command {
 		".env, a global in the vault, marked plain. --plain is refused for a name the " +
 		"project's pyproject.toml declares secret.\n\n" +
 		"A new global reaches no project until you link it with " +
-		"`astro local env " + localenv.Noun(k.kind) + " link`, as in Astro Desktop. --auto-link creates it " +
+		"astro local env " + localenv.Noun(k.kind) + " link, as in Astro Desktop. --auto-link creates it " +
 		"auto-linked to every project instead. Updating an existing global keeps its links. " +
 		"A global goes to the Airflow of every project it reaches, whether or not the " +
 		"project declares it."
@@ -567,8 +567,8 @@ func newEnvListCmd(c *cli, scope *scopeFlags, only localenv.Kind, short string) 
 		long = "List every declared value and where it resolves from, and every undeclared " +
 			"value a start passes to this project anyway. Whatever reaches a project goes " +
 			"to its Airflow, declared or not: declaring a name makes it a requirement, and " +
-			"`link` narrows which projects a global reaches. Values are not shown; use get " +
-			"to see one."
+			"linking narrows which projects a global reaches. Values are not shown; use the get " +
+			"command to see one."
 	}
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -669,7 +669,7 @@ func plaintextRefusal(kind localenv.Kind, name, manifestPath string) error {
 			name, manifestPath)
 	}
 	return fmt.Errorf("%s %s is declared secret in %s, so it can only be stored encrypted. "+
-		"Drop --plain to store it in the vault, or remove `secret = true` from its declaration to store it unencrypted",
+		"Drop --plain to store it in the vault, or remove secret = true from its declaration to store it unencrypted",
 		localenv.Noun(kind), name, manifestPath)
 }
 
@@ -718,7 +718,7 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	}
 	switch {
 	case created && !everywhere:
-		fmt.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with `%s`, or re-run with --auto-link.\n",
+		fmt.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with %s, or re-run with --auto-link.\n",
 			name, localenv.LinkHint(kind, name))
 	case !created && everywhere:
 		fmt.Fprintf(c.d.Stderr, "note: %s already existed, so its links were kept; to auto-link it to every project run: %s --auto-link\n",
@@ -1211,10 +1211,10 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	case res.Undeclared:
 		_, err = fmt.Fprintf(w, "undeclared %s %s in %s\n", noun, res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderAbsent:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, so `astro local env list` shows it as absent. Remove the declaration with `%s`.\n",
+		_, err = fmt.Fprintf(w, "%s is still declared in %s, so astro local env list shows it as absent. Remove the declaration with %s.\n",
 			res.Name, res.Manifest, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderRequired:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and required: the next `astro local start` refuses until a value is set with `%s`. Remove the declaration with `%s`.\n",
+		_, err = fmt.Fprintf(w, "%s is still declared in %s, and required: the next astro local start refuses until a value is set with %s. Remove the declaration with %s.\n",
 			res.Name, res.Manifest, res.SetHint, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderSupplied && res.Source == envresolve.SourceDefault:
 		_, err = fmt.Fprintf(w, "%s is still declared in %s, and its declared default now applies.\n", res.Name, res.Manifest)
@@ -1560,5 +1560,5 @@ func (c *cli) warnUnignoredEnv(path string, scope localenv.Scope, projectDir str
 	if err != nil || ignored {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "warning: %s is not covered by .gitignore; add a line `.env` to it so the file is never committed\n", path)
+	fmt.Fprintf(c.d.Stderr, "warning: %s is not covered by .gitignore; add a .env line to it so the file is never committed\n", path)
 }

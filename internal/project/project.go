@@ -43,7 +43,7 @@ func (e *NotFoundError) Error() string {
 	if e.Project1xDir != "" {
 		return project1xMessage(e.Start, e.Project1xDir)
 	}
-	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun `%s` to make this directory one",
+	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun %s to make this directory one",
 		Marker, e.Start, initCommand)
 }
 
@@ -64,7 +64,7 @@ func (e *NoAstroSectionError) Error() string {
 		return project1xMessage(e.Start, e.Dir)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
-		"Run `%s` in %s to add one; the rest of the file is left alone",
+		"Run %s in %s to add one; the rest of the file is left alone",
 		filepath.Join(e.Dir, Marker), initCommand, e.Dir)
 }
 
@@ -78,7 +78,7 @@ func project1xMessage(start, project1xDir string) string {
 		where, there = project1xDir, "in "+project1xDir
 	}
 	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
-		"Run `%s` %s to upgrade it in place", where, initCommand, there)
+		"Run %s %s to upgrade it in place", where, initCommand, there)
 }
 
 // LoadError returns the error to report for a manifest.Load of dir's marker,

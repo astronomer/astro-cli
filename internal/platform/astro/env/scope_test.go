@@ -130,7 +130,7 @@ func (s *Suite) TestDeleteByIDOnlyWithinTheScope() {
 				// Metrics exports have no link commands to suggest.
 				s.NotContains(err.Error(), "link")
 			} else {
-				s.Contains(err.Error(), "`astro env "+k.name+" link delete`")
+				s.Contains(err.Error(), "astro env "+k.name+" link delete")
 			}
 			mc.AssertExpectations(s.T())
 			mc.AssertNotCalled(s.T(), "DeleteEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything)
@@ -219,7 +219,7 @@ func (s *Suite) TestUpdateAndGetByIDOnlyWithinTheScope() {
 
 				err := call(id, Scope{DeploymentID: depID}, mc)
 				s.ErrorIs(err, ErrOutOfScope)
-				s.NotErrorIs(err, ErrNotFound, "a miss would send `set` on to create")
+				s.NotErrorIs(err, ErrNotFound, "a miss would send set on to create")
 				mc.AssertNotCalled(s.T(), "UpdateEnvironmentObjectWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			})
 		}

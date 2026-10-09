@@ -145,7 +145,7 @@ func TestConnectionEnv(t *testing.T) {
 		m := &Manager{engine: Podman, podman: &fakePodman{machines: []ListedMachine{{Name: "astro-machine"}}}, host: mac}
 		_, err := m.ConnectionEnv()
 		require.ErrorIs(t, err, ErrMachineNotRunning)
-		assert.Contains(t, err.Error(), "`podman machine start astro-machine`")
+		assert.Contains(t, err.Error(), "podman machine start astro-machine")
 	})
 
 	t.Run("podman names the default among several stopped machines", func(t *testing.T) {
@@ -153,7 +153,7 @@ func TestConnectionEnv(t *testing.T) {
 		m := &Manager{engine: Podman, podman: &fakePodman{machines: []ListedMachine{{Name: "first"}, {Name: "mine", Default: true}}}, host: mac}
 		_, err := m.ConnectionEnv()
 		require.ErrorIs(t, err, ErrMachineNotRunning)
-		assert.Contains(t, err.Error(), "`podman machine start mine`")
+		assert.Contains(t, err.Error(), "podman machine start mine")
 	})
 
 	t.Run("podman with no machine at all on mac says to create one", func(t *testing.T) {

@@ -138,7 +138,7 @@ func environment(src *astrov1.Deployment) (*[]astrov1.DeploymentEnvironmentVaria
 	var notes []Note
 	if len(secrets) > 0 {
 		notes = append(notes, Note(fmt.Sprintf(
-			"Not copied: secret environment variables %s. The API does not return their values; set them on the new Deployment with `astro deployment variable create --secret`.",
+			"Not copied: secret environment variables %s. The API does not return their values; set them on the new Deployment with astro deployment variable create --secret.",
 			strings.Join(secrets, ", "))))
 	}
 	if len(vars) == 0 {
@@ -210,7 +210,7 @@ func identityNotes(src *astrov1.Deployment) []Note {
 	var notes []Note
 	if id := src.EffectiveWorkloadIdentity; id != nil && !isDefaultIdentity(src, *id) {
 		notes = append(notes, Note(fmt.Sprintf(
-			"Not copied: the workload identity %s, which looks custom. The new Deployment has Astro's default; set it with `astro deployment update --workload-identity` if it should match.",
+			"Not copied: the workload identity %s, which looks custom. The new Deployment has Astro's default; set it with astro deployment update --workload-identity if it should match.",
 			*id)))
 	}
 	// --workload-identity sets the primary identity only; nothing in the CLI

@@ -76,7 +76,7 @@ const (
 	noticeDagsUndecided = "Dags were NOT updated: whether this Deployment takes Dag uploads could not be read (%v). The image was deployed, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
 )
 
-var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy <deployment-id> --force` to deploy anyway")
+var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use astro deploy <deployment-id> --force to deploy anyway")
 
 func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{

@@ -30,7 +30,7 @@ const (
 	configSetDefaultWorkspace = "\n\"%s\" Workspace found. This is your default Workspace.\n"
 
 	registryAuthSuccessMsg      = "\nSuccessfully authenticated to %s\n"
-	defaultRegistryLoginFailMsg = "\nNot able to login to the private registry, please use `docker login %s` to manually login to the registry\n"
+	defaultRegistryLoginFailMsg = "\nNot able to login to the private registry, please use docker login %s to manually login to the registry\n"
 	registryAuthFailMsg         = "\nFailed to authenticate to the registry. Do you have Docker running?\nYou will not be able to push new images to your Airflow Deployment unless Docker is running.\nIf Docker is running and you are seeing this message, the registry is down or cannot be reached.\n"
 
 	localhostDomain      = "localhost"

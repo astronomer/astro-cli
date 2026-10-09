@@ -227,7 +227,7 @@ func TestNoWriterKeepsTheFile(t *testing.T) {
 	require.False(t, anyContains(res.Deleted, SettingsRelPath), "%v", res.Deleted)
 	require.Contains(t, res.Notes, SettingsRelPath+": the values of its 1 connection and 1 Airflow variable "+
 		"stayed in the file. Convert this project in Astro Desktop, or run "+
-		"`astro local env connection set <id>` and `astro local env airflow-variable set <key>`, "+
+		"astro local env connection set <id> and astro local env airflow-variable set <key>, "+
 		"to move them into the encrypted vault")
 }
 
@@ -506,7 +506,7 @@ func TestAnEmptyVariableIsDeclaredOptionalAndNotStored(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, string(raw), "region = {optional = true, secret = true}")
 	require.Contains(t, res.Advisories,
-		"region: declared as an optional Airflow variable, since it had no value to carry. Set it with `astro local env airflow-variable set region`")
+		"region: declared as an optional Airflow variable, since it had no value to carry. Set it with astro local env airflow-variable set region")
 	for _, a := range res.Advisories {
 		require.NotContains(t, a, "required")
 	}

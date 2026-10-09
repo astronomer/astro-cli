@@ -41,7 +41,7 @@ func hintUpdateAvailable(w io.Writer) {
 		return
 	}
 	if isVersionNewer(state.LatestKnown, installed) {
-		fmt.Fprintf(w, "Otto %s is available. Run `astro otto update` to upgrade.\n", state.LatestKnown)
+		fmt.Fprintf(w, "Otto %s is available. Run astro otto update to upgrade.\n", state.LatestKnown)
 	}
 }
 

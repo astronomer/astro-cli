@@ -35,7 +35,7 @@ var (
 	errInvalidAirflowVersionSelection = errors.New("invalid Airflow version selection")
 	errInvalidRuntimeVersionSelection = errors.New("invalid Runtime version selection")
 
-	errDeploymentNotOnRuntime     = errors.New("deployment is not using Runtime image, please migrate to Runtime image via `astro deployment runtime migrate` before trying to upgrade Runtime version")
+	errDeploymentNotOnRuntime     = errors.New("deployment is not using Runtime image, please migrate to Runtime image via astro deployment runtime migrate before trying to upgrade Runtime version")
 	errDeploymentNotOnAirflow     = errors.New("deployment is not using Airflow image, please make sure deployment is using Airflow image before trying to upgrade Airflow version")
 	errDeploymentAlreadyOnRuntime = errors.New("deployment is already using runtime image")
 	errRuntimeUpdateFailed        = errors.New("failed to update the deployment runtime version")

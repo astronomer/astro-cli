@@ -61,7 +61,7 @@ func removedVerbStub(verb string, aliases []string, guidance func(args []string)
 	cmd := &cobra.Command{
 		Use:                verb,
 		Aliases:            aliases,
-		Short:              "Removed in v2 — use `set`, which creates or updates",
+		Short:              "Removed in v2 — use set, which creates or updates",
 		Hidden:             true,
 		Args:               cobra.ArbitraryArgs,
 		DisableFlagParsing: true,
@@ -92,24 +92,24 @@ func removedCmdError(guidance string) error {
 // though: connection and metrics-export never took it, so offering it would
 // trade a dead verb for a dead flag.
 func removedVerbGuidance(verb, noun string, args []string) string {
-	head := fmt.Sprintf("`astro env %s %s` was removed in v2.\n", noun, verb)
+	head := fmt.Sprintf("astro env %s %s was removed in v2.\n", noun, verb)
 
 	if hasFromFileArg(args) && nounsWithFromFile[noun] {
 		return head + fmt.Sprintf(
 			"  use:  astro env %s set --from-file <file>\n"+
-				"`set` creates each entry that does not exist and updates each one that does, "+
-				"so it replaces both `create --from-file` and `update --from-file`. "+
+				"The set command creates each entry that does not exist and updates each one that does, "+
+				"so it replaces both create --from-file and update --from-file. "+
 				"Pass --no-create to fail on an entry that does not exist instead of creating it.",
 			noun)
 	}
 
 	body := fmt.Sprintf("  use:  astro env %s set <id-or-key>\n", noun)
 	if verb == "create" {
-		body += "`set` creates the object when it does not exist and updates it when it does, " +
-			"so it replaces both `create` and `update`. The key is now the positional argument " +
+		body += "The set command creates the object when it does not exist and updates it when it does, " +
+			"so it replaces both create and update. The key is now the positional argument " +
 			"rather than --key. Pass --no-create to fail instead of creating."
 	} else {
-		body += "`set` is the same operation and also creates the object when it does not exist. " +
+		body += "The set command is the same operation and also creates the object when it does not exist. " +
 			"Pass --no-create for the old behavior of failing on a key that is not there."
 		// --strict only ever existed on the two nouns whose update upserted,
 		// so only their readers have a script passing it to rewrite.

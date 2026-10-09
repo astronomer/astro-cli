@@ -42,7 +42,7 @@ func TestNoLinkIndexLeavesTheStartGateUnchanged(t *testing.T) {
 	const wantMsg = "this project needs 1 environment value(s) that are not set on this machine:\n" +
 		"  - env var ABSENT\n" +
 		"      provide it:  astro local env variable set ABSENT --project\n" +
-		"provide them, then run `astro local start` again — or start without them: `astro local start --allow-missing`."
+		"provide them, then run astro local start again — or start without them: astro local start --allow-missing."
 	if got := missing.Error(); got != wantMsg {
 		t.Errorf("gate message changed:\n got: %q\nwant: %q", got, wantMsg)
 	}

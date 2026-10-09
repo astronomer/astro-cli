@@ -239,7 +239,7 @@ func TestBearerForNamesTheDomainWhenARefreshFails(t *testing.T) {
 	prodLogin(t, "Bearer old", "refresh-1")
 	stubRefresh(t, func(string, string) (*astroauth.TokenResponse, error) { return nil, errors.New("invalid_grant") })
 	_, err := BearerFor(context.Background(), "astronomer.io")
-	want := "your astronomer.io session expired. Log in again with `astro login astronomer.io`"
+	want := "your astronomer.io session expired. Log in again with astro login astronomer.io"
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
@@ -274,7 +274,7 @@ func TestBearerForNamesTheDomainWithNoLogin(t *testing.T) {
 	t.Setenv(EnvAPIToken, "")
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	_, err := BearerFor(context.Background(), "astronomer-stage.io")
-	want := "not logged in to astronomer-stage.io. Log in with `astro login astronomer-stage.io`"
+	want := "not logged in to astronomer-stage.io. Log in with astro login astronomer-stage.io"
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}

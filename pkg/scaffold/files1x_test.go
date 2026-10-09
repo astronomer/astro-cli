@@ -1033,7 +1033,7 @@ func TestKeptDockerfilePipInstallsAreReported(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, res.Notes, "Dockerfile: its RUN steps install "+
 		"\"example-lib @ git+https://github.com/example-org/example-lib.git@0a1b2c3\". "+
-		"Standalone mode and `astro local check` do not have it unless you add it to [project] dependencies")
+		"Standalone mode and astro local check do not have it unless you add it to [project] dependencies")
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.NotContains(t, strings.Join(m.Project.Dependencies, "\n"), "example-lib", "the note reports; it does not add")

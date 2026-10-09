@@ -233,7 +233,7 @@ func (r *VenvRunner) Parse(ctx context.Context, in ParseInput) (ParseReport, err
 		// condition on the advice as a whole and drew the question of whether
 		// any of it applied outside Docker.
 		return ParseReport{}, fmt.Errorf(
-			"%w at %s — `astro local start` builds one, or `uv sync` if this project builds in Docker",
+			"%w at %s — astro local start builds one, or uv sync if this project builds in Docker",
 			ErrNoInterpreter, python,
 		)
 	}

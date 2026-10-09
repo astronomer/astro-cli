@@ -25,7 +25,7 @@ var (
 	ErrInvalidTokenName    = errors.New("no name provided for the workspace token. Retry with a valid name")
 	ErrWorkspaceNotFound   = errors.New("no workspace was found for the ID you provided")
 	ErrNoWorkspaceExists   = errors.New("no workspace was found in your organization")
-	ErrWrongEnforceInput   = errors.New("the input to the `--enforce-cicd` flag")
+	ErrWrongEnforceInput   = errors.New("the input to the --enforce-cicd flag")
 )
 
 var workspaceTableConfig = output.BuildTableConfig(

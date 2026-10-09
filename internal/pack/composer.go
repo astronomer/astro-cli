@@ -79,7 +79,7 @@ func (t *ComposerTarget) Build(_ context.Context, req Request, cb localrt.Callba
 
 	checklist, err := envChecklist(m.Project.Name, m.Astro.Env,
 		"Composer does not read this project's [tool.astro.env] section. Set these on the environment before your DAGs run.",
-		"Set plain values with `gcloud composer environments update --update-env-variables`; add connections and variables through the Airflow UI or CLI.")
+		"Set plain values with gcloud composer environments update --update-env-variables; add connections and variables through the Airflow UI or CLI.")
 	if err != nil {
 		return Result{}, fmt.Errorf("building the env checklist: %w", err)
 	}

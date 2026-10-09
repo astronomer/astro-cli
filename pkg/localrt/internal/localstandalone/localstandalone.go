@@ -401,7 +401,7 @@ func (e *startInterrupted) Unwrap() error { return e.err }
 // answers as soon as Airflow finishes its own startup.
 func leftRunning(port int) string {
 	return fmt.Sprintf(
-		"Airflow is still starting on port %d — `astro local status` shows it, `astro local stop` ends it",
+		"Airflow is still starting on port %d — astro local status shows it, astro local stop ends it",
 		port)
 }
 
@@ -416,10 +416,10 @@ func (e *Engine) checkNotRunning(projectPath string) error {
 		return err
 	}
 	if rec.Mode != rt.ModeStandalone {
-		return fmt.Errorf("this project's local Airflow is already recorded in %s mode; stop it first with `astro local stop`", rec.Mode)
+		return fmt.Errorf("this project's local Airflow is already recorded in %s mode; stop it first with astro local stop", rec.Mode)
 	}
 	if e.groupAlive(rec) {
-		return fmt.Errorf("local Airflow is already running for this project (PID %d); `astro local stop` stops it", rec.PID)
+		return fmt.Errorf("local Airflow is already running for this project (PID %d); astro local stop stops it", rec.PID)
 	}
 	return nil
 }
@@ -609,7 +609,7 @@ func (e *Engine) Stopped(p rt.Plan) (rt.Airflow, error) {
 	}
 	if _, err := os.Stat(filepath.Join(projectPath, ".venv", "bin", "python")); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("%w, and it has no environment yet: `astro local start` builds one, or `astro local start --docker` runs it in Docker", localstate.ErrNotRunning)
+			return nil, fmt.Errorf("%w, and it has no environment yet: astro local start builds one, or astro local start --docker runs it in Docker", localstate.ErrNotRunning)
 		}
 		return nil, err
 	}

@@ -103,7 +103,7 @@ func (d *DAGChecker) Parse(customImageName, deployImageName string, buildSecrets
 		// project without it has never had a parse check to run, so the deploy
 		// goes on, as it always has, but says so.
 		fmt.Println("\nSkipping the DAG parse check: it runs " + path + ", which this project does not have. " +
-			"Astro CLI 1.x's `astro dev init` created that file; add it back to the project to run the check.")
+			"Astro CLI 1.x's astro dev init created that file; add it back to the project to run the check.")
 
 		return nil
 	}

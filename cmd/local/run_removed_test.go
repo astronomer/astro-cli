@@ -16,11 +16,11 @@ func TestRunStubNamesTheReplacement(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"dag id", []string{"run", "my_dag"}, "`astro local run airflow dags test my_dag`"},
-		{"old flags", []string{"run", "my_dag", "--execution-date", "2026-01-01", "--dag-file", "dags/a.py", "--no-cache"}, "`astro local run airflow dags test my_dag`"},
-		{"bare", []string{"run"}, "`astro local run airflow dags test <dag-id>`"},
-		{"flag first", []string{"run", "--verbose", "my_dag"}, "`astro local run airflow dags test <dag-id>`"},
-		{"not an id", []string{"run", "a b;c"}, "`astro local run airflow dags test <dag-id>`"},
+		{"dag id", []string{"run", "my_dag"}, "astro local run airflow dags test my_dag"},
+		{"old flags", []string{"run", "my_dag", "--execution-date", "2026-01-01", "--dag-file", "dags/a.py", "--no-cache"}, "astro local run airflow dags test my_dag"},
+		{"bare", []string{"run"}, "astro local run airflow dags test <dag-id>"},
+		{"flag first", []string{"run", "--verbose", "my_dag"}, "astro local run airflow dags test <dag-id>"},
+		{"not an id", []string{"run", "a b;c"}, "astro local run airflow dags test <dag-id>"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d, out := testDeps(t)
@@ -31,7 +31,7 @@ func TestRunStubNamesTheReplacement(t *testing.T) {
 			if !cliout.IsUsage(err) {
 				t.Errorf("want a usage error (exit 2, as an unknown command was), got %T", err)
 			}
-			if !strings.Contains(err.Error(), "`astro run` was removed in Astro CLI v2") || !strings.Contains(err.Error(), tc.want) {
+			if !strings.Contains(err.Error(), "astro run was removed in Astro CLI v2") || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("error does not name %s:\n%s", tc.want, err)
 			}
 			if out.Len() != 0 {
