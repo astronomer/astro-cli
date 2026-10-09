@@ -89,17 +89,17 @@ Run inside a 1.x project, an `astro dev` command first tells you to run `astro i
 
 | 1.x | v2 | where |
 | --- | --- | --- |
-| `--force`, `-f` | `--yes`, `-y` | every command that asks for confirmation (deployment, token, team, worker-queue and context commands). `astro deploy --force` is unchanged |
+| `--force`, `-f` | `--yes`, `-y` | every command that asks for confirmation (deployment, bundle, token, team, worker-queue and context commands). `astro deploy --force` is unchanged |
 | `--json` | `-o json` | `list` commands, `astro api … ls` / `describe` |
 | `--template` | `-o json`, and jq | `list` commands |
-| `-o table`, `-o template`, `-o yaml` | `-o text` (the default) or `-o json` | everywhere `-o` existed |
-| `--format` | `-o` | `astro env … get` / `list` |
+| `-o table`, `-o template`, `-o yaml` | `-o text` (the default) or `-o json` | everywhere `-o` existed, except `astro deployment inspect`, which keeps `-o yaml` |
+| `--format` | `-o json`, or `-o dotenv` on `astro env variable get` / `list`; there is no yaml | `astro env … get` / `list` |
 | `--deployment-file` | the [Astro Terraform provider](https://registry.terraform.io/providers/astronomer/astro/latest) | `astro deployment create` / `update` |
 | `--template` | `astro deployment create --clone`, or Terraform | `astro deployment inspect` |
 | `--login-link`, `-l` | `astro login --login-link` | `astro organization switch` |
 | `-o <file>` | `--output-file <file>` (`-o` is the output format now) | `astro organization audit-logs export` |
-| `--api-url` | `--url` | `astro api airflow` |
-| `--deployment-id` | `--deployment`, `-d` | `astro api airflow` |
+| `--api-url` | `--url` | `astro api airflow`, and its `ls` / `describe` |
+| `--deployment-id` | `--deployment`, `-d` | `astro api airflow`, and its `ls` / `describe` |
 
 Some flags were renamed but still work, hidden from help: `--deployment-name` (`-n`) and `--deployment-id` on most Deployment commands now `--deployment`, `--workspace-id` now `--workspace`, and `astro deploy --dags-path`.
 
