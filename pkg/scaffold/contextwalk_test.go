@@ -130,3 +130,58 @@ func TestIgnoreFor(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "b\n", got, "a Dockerfile's own ignore file wins, as BuildKit reads it")
 }
+
+func needsSymlinks(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need a privilege Windows does not grant by default")
+	}
+}
+
+// A project reached through a symlink is walked for what it holds.
+func TestWalkContextOfAProjectReachedThroughASymlink(t *testing.T) {
+	needsSymlinks(t)
+	target := t.TempDir()
+	writeFiles(t, target, map[string]string{"dags/a.py": "", "plugins/p.py": ""})
+	link := filepath.Join(t.TempDir(), "project")
+	require.NoError(t, os.Symlink(target, link))
+
+	assert.Equal(t, []string{"dags/a.py", "plugins/p.py"}, walked(t, link, "", ""))
+	onDisk, shipped, err := DagFiles(link, "")
+	require.NoError(t, err)
+	assert.Equal(t, 1, onDisk)
+	assert.Equal(t, 1, shipped)
+}
+
+// A dags/ linked to a directory inside the project ships its DAGs, since the
+// context carries the target too; one linked outside the project is a
+// dangling link in the image, and ships none.
+func TestDagFilesThroughALinkedDagsDirectory(t *testing.T) {
+	needsSymlinks(t)
+	t.Run("inside the project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFiles(t, dir, map[string]string{"src/airflow_dags/a.py": "", "src/airflow_dags/b.py": ""})
+		require.NoError(t, os.Symlink(filepath.Join("src", "airflow_dags"), filepath.Join(dir, "dags")))
+		for ignore, want := range map[string]int{
+			"":                        2,
+			"src/airflow_dags/b.py\n": 1,
+			"dags\n":                  0,
+			"src\n":                   0,
+		} {
+			onDisk, shipped, err := DagFiles(dir, ignore)
+			require.NoError(t, err)
+			assert.Equal(t, 2, onDisk, ignore)
+			assert.Equal(t, want, shipped, ignore)
+		}
+	})
+	t.Run("outside the project", func(t *testing.T) {
+		outside := t.TempDir()
+		writeFiles(t, outside, map[string]string{"a.py": ""})
+		dir := t.TempDir()
+		require.NoError(t, os.Symlink(outside, filepath.Join(dir, "dags")))
+		onDisk, shipped, err := DagFiles(dir, "")
+		require.NoError(t, err)
+		assert.Equal(t, 1, onDisk)
+		assert.Zero(t, shipped)
+	})
+}

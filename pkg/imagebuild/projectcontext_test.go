@@ -30,26 +30,39 @@ func projectRequest(t *testing.T, project string) Request {
 }
 
 // engine is a fakeCmd hook answering the probes as an engine would: what
-// `--version` prints, whether `buildx version` answers, and the help of
-// `build`. fail, when set, fails the calls it matches.
+// `--version` prints, whether `buildx version` answers, the help of `build`,
+// and, for Docker, a current context "orbstack" whose builder has the docker
+// driver; for podman, a local service. fail, when set, fails the calls it
+// matches, probes included.
 func engine(version string, buildx bool, buildHelp string, fail func(call string) error) func(string, rt.Stdio) error {
+	return engineWith(version, buildx, buildHelp, "docker", "false", fail)
+}
+
+// engineWith is engine with the builder's driver and podman's remoteness
+// chosen.
+func engineWith(version string, buildx bool, buildHelp, driver, remote string, fail func(call string) error) func(string, rt.Stdio) error {
 	return func(call string, s rt.Stdio) error {
+		if fail != nil {
+			if err := fail(call); err != nil {
+				return err
+			}
+		}
 		_, args, _ := strings.Cut(call, " ")
 		switch args {
 		case "--version":
 			_, _ = io.WriteString(s.Out, version)
-			return nil
 		case "buildx version":
 			if !buildx {
 				return errors.New("docker: 'buildx' is not a docker command")
 			}
-			return nil
 		case "build --help":
 			_, _ = io.WriteString(s.Out, buildHelp)
-			return nil
-		}
-		if fail != nil {
-			return fail(call)
+		case "context show":
+			_, _ = io.WriteString(s.Out, "orbstack\n")
+		case "buildx inspect orbstack":
+			_, _ = io.WriteString(s.Out, "Name:          orbstack\nDriver:        "+driver+"\nLast Activity: now\n")
+		case "info --format {{.Host.ServiceIsRemote}}":
+			_, _ = io.WriteString(s.Out, remote+"\n")
 		}
 		return nil
 	}
@@ -79,19 +92,20 @@ func TestBuildShipsTheProjectAsTheContextOfASecondStep(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "astro-deploy/p-abc123", got)
 
-	assert.Equal(t, []string{"docker --version", "docker buildx version"}, cmd.calls[:2], "the engine is asked before anything is built")
-	deps := callsContaining(cmd.calls, "docker build --tag")
+	assert.Equal(t, []string{"docker --version", "docker buildx version", "docker context show", "docker buildx inspect orbstack"}, cmd.calls[:4],
+		"the engine is asked before anything is built")
+	deps := callsContaining(cmd.calls, "--tag astro-deploy/p-abc123:latest-deps ")
 	require.Len(t, deps, 1, "%v", cmd.calls)
-	assert.Contains(t, deps[0], "--tag astro-deploy/p-abc123:latest-deps ")
+	assert.True(t, strings.HasPrefix(deps[0], "docker buildx build --builder orbstack --load --tag astro-deploy/p-abc123:latest-deps "), deps[0])
 	assert.Contains(t, deps[0], "--pull")
 	assert.Contains(t, deps[0], "--secret id=netrc,env=NETRC")
 	assert.True(t, strings.HasSuffix(deps[0], " "+filepath.Join(req.WorkDir, buildContextDir)), deps[0])
 
 	projectDF := filepath.Join(req.WorkDir, projectDockerfileName)
 	proj := callsContaining(cmd.calls, "buildx build")
-	require.Len(t, proj, 1, "%v", cmd.calls)
-	assert.Equal(t, "docker buildx build --load --tag astro-deploy/p-abc123 --file "+projectDF+" --platform linux/amd64 "+project, proj[0],
-		"BuildKit only, no --pull (the base is local), no secrets (nothing runs), the project as the context")
+	require.Len(t, proj, 2, "%v", cmd.calls)
+	assert.Equal(t, "docker buildx build --builder orbstack --load --tag astro-deploy/p-abc123 --file "+projectDF+" --platform linux/amd64 "+project, proj[1],
+		"BuildKit on the current context's docker-driver builder, no --pull (the base is local), no secrets (nothing runs), the project as the context")
 	df, err := os.ReadFile(projectDF)
 	require.NoError(t, err)
 	assert.Equal(t, "FROM astro-deploy/p-abc123:latest-deps\nCOPY --chown=astro:0 . .\n", string(df))
@@ -130,9 +144,9 @@ func (e *envCmd) Run(ctx context.Context, env []string, s rt.Stdio, name string,
 func TestBuildProjectRefusesDockerWithoutBuildx(t *testing.T) {
 	cmd := &fakeCmd{run: engine(dockerVersion, false, "", nil)}
 	_, err := testBuilder(cmd).BuildLocal(context.Background(), projectRequest(t, t.TempDir()), rt.Callbacks{})
-	require.ErrorIs(t, err, errNoProjectBuilder)
+	require.ErrorIs(t, err, ErrNoProjectBuilder)
 	assert.Contains(t, err.Error(), "buildx")
-	assert.Empty(t, callsContaining(cmd.calls, "build --"), "nothing is built: %v", cmd.calls)
+	assert.Empty(t, callsContaining(cmd.calls, "--tag"), "nothing is built: %v", cmd.calls)
 }
 
 func TestBuildWithAProjectContextSkipsTheFastPath(t *testing.T) {
@@ -141,7 +155,7 @@ func TestBuildWithAProjectContextSkipsTheFastPath(t *testing.T) {
 	got, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.Equal(t, req.Tag, got)
-	assert.Len(t, callsContaining(cmd.calls, "build --"), 2)
+	assert.Len(t, callsContaining(cmd.calls, "build --builder"), 2)
 }
 
 // Without a ProjectContext the build is what it always was: one build over
@@ -195,7 +209,7 @@ func TestBuildProjectRefusesPodmanWithoutIgnorefile(t *testing.T) {
 	req := projectRequest(t, t.TempDir())
 	req.Bin = "podman"
 	_, err := testBuilder(cmd).BuildLocal(context.Background(), req, rt.Callbacks{})
-	require.ErrorIs(t, err, errNoProjectBuilder)
+	require.ErrorIs(t, err, ErrNoProjectBuilder)
 	assert.Contains(t, err.Error(), "--ignorefile")
 	assert.Empty(t, callsContaining(cmd.calls, "build --tag"))
 }
@@ -247,7 +261,7 @@ func (c *ctxCmd) Run(ctx context.Context, env []string, s rt.Stdio, name string,
 
 func TestBuildDependencyStepFailureStopsBeforeTheProject(t *testing.T) {
 	cmd := &fakeCmd{run: engine(dockerVersion, true, "", func(call string) error {
-		if strings.Contains(call, ":latest-deps") {
+		if strings.Contains(call, "--tag astro-deploy/p-abc123:latest-deps") {
 			return errors.New("exit status 1")
 		}
 		return nil
@@ -255,7 +269,7 @@ func TestBuildDependencyStepFailureStopsBeforeTheProject(t *testing.T) {
 	_, err := testBuilder(cmd).BuildLocal(context.Background(), projectRequest(t, t.TempDir()), rt.Callbacks{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "installing the project's dependencies")
-	assert.Empty(t, callsContaining(cmd.calls, "buildx build"))
+	assert.Empty(t, callsContaining(cmd.calls, projectDockerfileName))
 	assert.Empty(t, callsContaining(cmd.calls, "image rm"))
 }
 
@@ -324,4 +338,53 @@ func TestDepsTag(t *testing.T) {
 	} {
 		assert.Equal(t, want, depsTag(tag), tag)
 	}
+}
+
+// A builder that is not the docker driver (docker-container, remote,
+// kubernetes) cannot see the local image the second build starts FROM, so
+// the build is refused before anything is built.
+func TestBuildProjectRefusesABuilderWithoutTheDockerDriver(t *testing.T) {
+	cmd := &fakeCmd{run: engineWith(dockerVersion, true, "", "docker-container", "", nil)}
+	_, err := testBuilder(cmd).BuildLocal(context.Background(), projectRequest(t, t.TempDir()), rt.Callbacks{})
+	require.ErrorIs(t, err, ErrNoProjectBuilder)
+	assert.Contains(t, err.Error(), `"orbstack"`)
+	assert.Empty(t, callsContaining(cmd.calls, "--tag"))
+}
+
+// A remote podman client sends the context to its machine, and whether it
+// applies --ignorefile there is not something this can check.
+func TestBuildProjectRefusesARemotePodman(t *testing.T) {
+	for name, remote := range map[string]string{"remote": "true", "unknown": "<no value>"} {
+		t.Run(name, func(t *testing.T) {
+			cmd := &fakeCmd{run: engineWith("podman version 5.8.2", false, "--ignorefile", "", remote, nil)}
+			req := projectRequest(t, t.TempDir())
+			req.Bin = "podman"
+			_, err := testBuilder(cmd).BuildLocal(context.Background(), req, rt.Callbacks{})
+			require.ErrorIs(t, err, ErrNoProjectBuilder)
+			assert.Contains(t, err.Error(), "remote client")
+		})
+	}
+}
+
+func TestCanShipProject(t *testing.T) {
+	ok := &fakeCmd{run: engine(dockerVersion, true, "", nil)}
+	require.NoError(t, testBuilder(ok).CanShipProject(context.Background(), Request{Bin: "docker"}))
+	assert.Empty(t, callsContaining(ok.calls, "--tag"), "a probe builds nothing")
+
+	no := &fakeCmd{run: engine(dockerVersion, false, "", nil)}
+	require.ErrorIs(t, testBuilder(no).CanShipProject(context.Background(), Request{Bin: "docker"}), ErrNoProjectBuilder)
+}
+
+func TestGitignoredWarning(t *testing.T) {
+	assert.Empty(t, GitignoredWarning(nil))
+	assert.Equal(t, "the image will carry 2 file(s) that .gitignore ignores and .dockerignore does not: a.txt, b/c.bin. Add them to .dockerignore to keep them out of the image",
+		GitignoredWarning([]string{"a.txt", "b/c.bin"}))
+	many := make([]string, 13)
+	for i := range many {
+		many[i] = string(rune('a'+i)) + ".txt"
+	}
+	got := GitignoredWarning(many)
+	assert.Contains(t, got, "13 file(s)")
+	assert.Contains(t, got, "j.txt and 3 more.")
+	assert.NotContains(t, got, "k.txt")
 }

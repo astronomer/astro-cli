@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
@@ -15,9 +17,9 @@ import (
 // contextDigest is a digest of what a generated build copies from the project
 // at dir into the image: every path the build's ignore file
 // (imagebuild.ProjectIgnore) leaves in, with its kind, whether it is
-// executable, and its bytes or link target. It also reports whether the
-// ignore rules leave out every DAG file in dags/, which the package warns
-// about.
+// executable, and its bytes or link target. It also returns what the package
+// warns about those files: ignore rules that leave out every DAG file in
+// dags/, and files git ignores that the image will carry.
 //
 // Only what git keeps and docker copies decides it: the executable bit and not
 // the rest of the mode, which a umask or a checkout changes for the same
@@ -25,24 +27,42 @@ import (
 // a link. The project is walked once (scaffold.WalkContext), and an excluded
 // directory is not entered unless a "!" rule could match beneath it, so a
 // virtualenv or a directory the user cannot read costs nothing and fails
-// nothing.
-func contextDigest(dir string) (digest string, dagsIgnored bool, err error) {
+// nothing. The DAG files are counted in the same pass; only when it finds none
+// is dags/ looked at again, to tell an empty dags/ from rules that leave it out.
+func contextDigest(dir string) (digest string, warnings []string, err error) {
 	ignore, err := imagebuild.ProjectIgnore(dir, nil)
 	if err != nil {
-		return "", false, err
+		return "", nil, err
 	}
 	h := sha256.New()
+	var files []string
+	dags := 0
 	err = scaffold.WalkContext(dir, "", ignore, func(rel string, d fs.DirEntry) error {
-		return digestEntry(h, filepath.Join(dir, rel), filepath.ToSlash(rel), d)
+		slash := filepath.ToSlash(rel)
+		if !d.IsDir() {
+			files = append(files, slash)
+			if strings.HasPrefix(slash, "dags/") && strings.HasSuffix(slash, ".py") {
+				dags++
+			}
+		}
+		return digestEntry(h, filepath.Join(dir, rel), slash, d)
 	})
 	if err != nil {
-		return "", false, fmt.Errorf("reading the project's files: %w", err)
+		return "", nil, fmt.Errorf("reading the project's files: %w", err)
 	}
-	onDisk, shipped, err := scaffold.DagFiles(dir, ignore)
-	if err != nil {
-		return "", false, fmt.Errorf("reading the project's dags/: %w", err)
+	if dags == 0 {
+		onDisk, shipped, err := scaffold.DagFiles(dir, ignore)
+		if err != nil {
+			return "", nil, fmt.Errorf("reading the project's dags/: %w", err)
+		}
+		if onDisk > 0 && shipped == 0 {
+			warnings = append(warnings, dagsIgnoredWarning)
+		}
 	}
-	return fmt.Sprintf("%x", h.Sum(nil)), onDisk > 0 && shipped == 0, nil
+	if w := imagebuild.GitignoredWarning(git.CheckIgnored(dir, files)); w != "" {
+		warnings = append(warnings, w)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), warnings, nil
 }
 
 // digestEntry writes one path's name, kind, executable bit and contents.

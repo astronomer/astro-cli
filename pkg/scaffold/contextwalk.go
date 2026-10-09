@@ -21,16 +21,16 @@ import (
 //
 // A directory the rules leave out is not entered, unless a "!" rule could
 // match something beneath it, so a virtualenv or an unreadable directory the
-// rules exclude costs nothing and fails nothing. Symlinks are visited, never
-// followed, as docker copies them.
+// rules exclude costs nothing and fails nothing. Symlinks below dir are
+// visited, never followed, as docker copies them; dir itself is resolved
+// first, since docker sends what a project reached through a symlink holds.
 func WalkContext(dir, sub, ignore string, visit func(rel string, d fs.DirEntry) error) error {
-	patterns, err := ignorefile.ReadAll(strings.NewReader(ignore))
+	pm, err := ignoreMatcher(ignore)
 	if err != nil {
-		return fmt.Errorf("reading the ignore rules: %w", err)
+		return err
 	}
-	pm, err := patternmatcher.New(patterns)
-	if err != nil {
-		return fmt.Errorf("reading the ignore rules: %w", err)
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
 	}
 	root := filepath.Join(dir, filepath.FromSlash(sub))
 	if _, err := os.Lstat(root); os.IsNotExist(err) {
@@ -64,6 +64,18 @@ func WalkContext(dir, sub, ignore string, visit func(rel string, d fs.DirEntry) 
 		}
 		return visit(rel, d)
 	})
+}
+
+func ignoreMatcher(ignore string) (*patternmatcher.PatternMatcher, error) {
+	patterns, err := ignorefile.ReadAll(strings.NewReader(ignore))
+	if err != nil {
+		return nil, fmt.Errorf("reading the ignore rules: %w", err)
+	}
+	pm, err := patternmatcher.New(patterns)
+	if err != nil {
+		return nil, fmt.Errorf("reading the ignore rules: %w", err)
+	}
+	return pm, nil
 }
 
 // exclusionBeneath reports whether a "!" rule could match a path below the
@@ -112,22 +124,69 @@ func IgnoreFor(dir, dockerfile string) (string, error) {
 
 // DagFiles counts the DAG files under dir/dags, as the 1.x CLI counted them
 // (.py files at any depth): onDisk is how many there are, and shipped how many
-// the ignore rules in ignore leave in a build context of dir. A dags/ that
+// reach a build context of dir under the ignore rules in ignore. A dags/ that
 // does not exist has none.
+//
+// A dags/ that is a symlink is copied by docker as a link. Its DAGs reach the
+// image when it points at a directory inside the project, which the context
+// carries too: they are counted there, under the rules, provided the link
+// itself is not left out. One pointing outside the project is a dangling link
+// in the image, and ships none of the DAGs it reaches on disk.
 func DagFiles(dir, ignore string) (onDisk, shipped int, err error) {
-	count := func(n *int) func(string, fs.DirEntry) error {
-		return func(rel string, d fs.DirEntry) error {
-			if !d.IsDir() && strings.HasSuffix(rel, ".py") {
-				*n++
-			}
-			return nil
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
+	}
+	sub := "dags"
+	if target, inside, ok := dagsLink(dir); ok {
+		onDisk, err = countDagFiles(target, "", "")
+		if err != nil || !inside {
+			return onDisk, 0, err
 		}
-	}
-	if err := WalkContext(dir, "dags", "", count(&onDisk)); err != nil {
+		pm, err := ignoreMatcher(ignore)
+		if err != nil {
+			return 0, 0, err
+		}
+		if excluded, err := pm.MatchesOrParentMatches("dags"); err != nil || excluded {
+			return onDisk, 0, err
+		}
+		rel, err := filepath.Rel(dir, target)
+		if err != nil {
+			return 0, 0, err
+		}
+		sub = filepath.ToSlash(rel)
+	} else if onDisk, err = countDagFiles(dir, "dags", ""); err != nil {
 		return 0, 0, err
 	}
-	if err := WalkContext(dir, "dags", ignore, count(&shipped)); err != nil {
-		return 0, 0, err
+	shipped, err = countDagFiles(dir, sub, ignore)
+	return onDisk, shipped, err
+}
+
+// dagsLink reports whether dir/dags is a symlink to a directory, and where it
+// leads and whether that is inside dir.
+func dagsLink(dir string) (target string, inside, ok bool) {
+	info, err := os.Lstat(filepath.Join(dir, "dags"))
+	if err != nil || info.Mode()&fs.ModeSymlink == 0 {
+		return "", false, false
 	}
-	return onDisk, shipped, nil
+	target, err = filepath.EvalSymlinks(filepath.Join(dir, "dags"))
+	if err != nil {
+		return "", false, false
+	}
+	if info, err := os.Stat(target); err != nil || !info.IsDir() {
+		return "", false, false
+	}
+	rel, err := filepath.Rel(dir, target)
+	return target, err == nil && filepath.IsLocal(rel), true
+}
+
+// countDagFiles counts the .py files WalkContext visits under dir/sub.
+func countDagFiles(dir, sub, ignore string) (int, error) {
+	n := 0
+	err := WalkContext(dir, sub, ignore, func(rel string, d fs.DirEntry) error {
+		if !d.IsDir() && strings.HasSuffix(rel, ".py") {
+			n++
+		}
+		return nil
+	})
+	return n, err
 }

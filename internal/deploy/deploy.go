@@ -123,17 +123,18 @@ type Result struct {
 	Dags string
 }
 
-// Where an image-and-dag deploy's DAGs went.
+// Where an image-and-dag deploy's DAGs went. The values are what `astro
+// deploy --output json` reports as "dags".
 const (
 	// DagsUploaded: the dags/ tarball, to a Deployment that takes DAG deploys.
 	DagsUploaded = "uploaded"
 	// DagsBuiltIn: the CLI built the project's dags/ into the image, for a
 	// Deployment that takes no DAG deploys.
-	DagsBuiltIn = "built-in"
+	DagsBuiltIn = "built_in"
 	// DagsFromImage: the Deployment takes no DAG deploys and runs the DAGs
 	// the image carries, which the CLI did not put there (a prebuilt image, or
 	// a declared Dockerfile's own COPY lines).
-	DagsFromImage = "image"
+	DagsFromImage = "from_image"
 	// DagsNone: remote execution runs the Deployment's DAGs; none shipped.
 	DagsNone = "none"
 	// DagsEmpty: the CLI built the project into the image for a Deployment

@@ -360,6 +360,7 @@ func TestDeployManifestSaysWhereTheDagsWent(t *testing.T) {
 			require.NoError(t, err)
 			m := decodeOneJSON(t, out)
 			assert.Equal(t, "image-and-dag", m["type"])
+			assert.Equal(t, dags, m["dags"], "the json says where the DAGs went")
 			_, hasDag := m["dag_bundle_version"]
 			assert.False(t, hasDag, "no bundle was uploaded")
 		})

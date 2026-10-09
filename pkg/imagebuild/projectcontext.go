@@ -115,8 +115,10 @@ func ProjectIgnore(projectDir string, excludes []string) (string, error) {
 //
 // The ignore file is what keeps .env, airflow_settings.yaml and the rest out
 // of an image that is pushed to a registry, so the second build only runs on
-// a builder known to read it (projectBuilder). The engine is asked before the
-// first build, so a refusal costs nothing.
+// a builder known to read it (projectBuilder), and it is asked before the
+// first build, so a refusal costs nothing. On Docker both builds run on the
+// docker-driver builder of the current context, which reads the local image
+// store, so the second finds the first.
 //
 // The intermediate tag is removed once the second build has run, whether or
 // not it succeeded, and even when ctx was canceled; its layers stay, as the
@@ -128,6 +130,7 @@ func (b *Builder) buildProject(ctx context.Context, req Request, dfPath, context
 	}
 	deps := req
 	deps.Tag = depsTag(req.Tag)
+	deps.builder = pb.builder
 	if _, err := b.build(ctx, deps, dfPath, contextDir, cb); err != nil {
 		return "", err
 	}
@@ -157,16 +160,28 @@ func (b *Builder) buildProject(ctx context.Context, req Request, dfPath, context
 	return req.Tag, nil
 }
 
-// errNoProjectBuilder refuses a ProjectContext build on an engine that cannot
-// be shown to read the ignore file, rather than risk copying .env and the
-// rest of what it leaves out into an image bound for a registry.
-var errNoProjectBuilder = errors.New("this build copies the project into the image, and needs a builder that reads the ignore file keeping .env, airflow_settings.yaml and other local files out of it")
+// ErrNoProjectBuilder reports an engine that cannot be shown to read the
+// ignore file a ProjectContext build copies the project under, which keeps
+// .env, airflow_settings.yaml and the rest out of an image bound for a
+// registry. Such a build is refused, never run without it; CanShipProject
+// lets a caller find out first and fall back to a build that ships no project
+// files.
+var ErrNoProjectBuilder = errors.New("copying the project into the image needs a builder that reads the ignore file keeping .env, airflow_settings.yaml and other local files out of it")
 
-// projectBuilder is how the second build of a ProjectContext build runs on
-// this engine.
+// CanShipProject reports whether this engine can run a ProjectContext build,
+// and why not when it cannot (wrapping ErrNoProjectBuilder). req needs only
+// Bin and Env.
+func (b *Builder) CanShipProject(ctx context.Context, req Request) error {
+	_, err := b.projectBuilder(ctx, req)
+	return err
+}
+
+// projectBuilder is how a ProjectContext build runs on this engine.
 type projectBuilder struct {
 	podman bool
-	env    []string
+	// builder is the buildx builder both Docker builds run on.
+	builder string
+	env     []string
 }
 
 // args is the command line of the second build.
@@ -177,13 +192,7 @@ func (p projectBuilder) args(dockerfile, ignorePath string, req Request) []strin
 		// <Dockerfile>.dockerignore.
 		args = []string{"build", "--tag", req.Tag, "--file", dockerfile, "--ignorefile", ignorePath}
 	} else {
-		// buildx, never the legacy builder: only BuildKit reads
-		// <Dockerfile>.dockerignore, and `docker build` falls back to the
-		// legacy builder under DOCKER_BUILDKIT=0, before Docker 23 on Linux,
-		// or without the buildx plugin, where it would read the project's
-		// .dockerignore alone. `docker buildx build` is BuildKit or nothing.
-		// --load puts the image in the local store whatever the driver.
-		args = []string{"buildx", "build", "--load", "--tag", req.Tag, "--file", dockerfile}
+		args = append(buildxArgs(p.builder), "--tag", req.Tag, "--file", dockerfile)
 	}
 	if req.Platform != "" {
 		args = append(args, "--platform", req.Platform)
@@ -191,30 +200,81 @@ func (p projectBuilder) args(dockerfile, ignorePath string, req Request) []strin
 	return append(args, req.ProjectContext)
 }
 
-// projectBuilder finds out how this engine runs the second build, and
+// buildxArgs starts a build on the named buildx builder: BuildKit or nothing,
+// never the legacy builder, which ignores <Dockerfile>.dockerignore (it is
+// what `docker build` runs under DOCKER_BUILDKIT=0, before Docker 23 on Linux,
+// or without the buildx plugin). --load puts the image in the local store.
+func buildxArgs(builder string) []string {
+	return []string{"buildx", "build", "--builder", builder, "--load"}
+}
+
+// projectBuilder finds out how this engine runs a ProjectContext build, and
 // refuses one that cannot be shown to read its ignore file.
 //
+// Docker needs the buildx plugin, and runs both builds on the builder of the
+// current Docker context (`docker context show`), whose driver must be
+// "docker". That builder exists for every context and shares the engine's
+// image store, so the second build can start FROM the first. The user's
+// selected builder may not: a docker-container, remote or kubernetes builder
+// (what docker/setup-buildx-action selects in CI) cannot see a local image.
+// The builder named "default" is not the answer either: it belongs to the
+// context called default, not to the one in use.
+//
 // Podman is recognized by what `<bin> --version` says, so the podman-docker
-// shim, a `docker` that runs podman, is podman too; its build must offer
-// --ignorefile. Docker must have the buildx plugin: `docker buildx version`
-// has to answer.
+// shim, a `docker` that runs podman, is podman too. It must be local
+// (`podman info` reports no remote service) and its build must offer
+// --ignorefile. A remote client, which is how podman runs on macOS and
+// Windows, sends the build context to the machine, and whether it applies
+// --ignorefile when it does is not something this can check, so it is
+// treated as unable to.
 func (b *Builder) projectBuilder(ctx context.Context, req Request) (projectBuilder, error) {
-	var version strings.Builder
-	if err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &version}, req.Bin, "--version"); err != nil {
-		return projectBuilder{}, fmt.Errorf("%w; `%s --version` failed: %w", errNoProjectBuilder, req.Bin, err)
+	out := func(args ...string) (string, error) {
+		var o strings.Builder
+		err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &o}, req.Bin, args...)
+		return strings.TrimSpace(o.String()), err
 	}
-	if strings.Contains(strings.ToLower(version.String()), "podman") {
-		var help strings.Builder
-		err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &help}, req.Bin, "build", "--help")
-		if err != nil || !strings.Contains(help.String(), "--ignorefile") {
-			return projectBuilder{}, fmt.Errorf("%w, and this podman's build has no --ignorefile; upgrade podman", errNoProjectBuilder)
+	version, err := out("--version")
+	if err != nil {
+		return projectBuilder{}, fmt.Errorf("%w; `%s --version` failed: %w", ErrNoProjectBuilder, req.Bin, err)
+	}
+	if strings.Contains(strings.ToLower(version), "podman") {
+		return podmanBuilder(out)
+	}
+	if _, err := out("buildx", "version"); err != nil {
+		return projectBuilder{}, fmt.Errorf("%w (Docker BuildKit), and `%s buildx version` failed. Install the Docker buildx plugin (docker-buildx), or use Docker Desktop or Docker Engine 23 or newer", ErrNoProjectBuilder, req.Bin)
+	}
+	name, err := out("context", "show")
+	if err != nil || name == "" {
+		return projectBuilder{}, fmt.Errorf("%w, and `%s context show` named no Docker context", ErrNoProjectBuilder, req.Bin)
+	}
+	inspect, err := out("buildx", "inspect", name)
+	if err != nil || inspectDriver(inspect) != "docker" {
+		return projectBuilder{}, fmt.Errorf("%w, and the buildx builder %q of the current Docker context is not one with the docker driver", ErrNoProjectBuilder, name)
+	}
+	return projectBuilder{builder: name, env: []string{"DOCKER_BUILDKIT=1"}}, nil
+}
+
+// podmanBuilder is projectBuilder for podman, out running podman commands.
+func podmanBuilder(out func(args ...string) (string, error)) (projectBuilder, error) {
+	remote, err := out("info", "--format", "{{.Host.ServiceIsRemote}}")
+	if err != nil || remote != "false" {
+		return projectBuilder{}, fmt.Errorf("%w, and this podman is a remote client (a podman machine), which may not apply --ignorefile to the context it sends. Install the Docker buildx plugin and use Docker, or build on Linux with a local podman", ErrNoProjectBuilder)
+	}
+	help, err := out("build", "--help")
+	if err != nil || !strings.Contains(help, "--ignorefile") {
+		return projectBuilder{}, fmt.Errorf("%w, and this podman's build has no --ignorefile; upgrade podman", ErrNoProjectBuilder)
+	}
+	return projectBuilder{podman: true}, nil
+}
+
+// inspectDriver reads the Driver line of `docker buildx inspect`.
+func inspectDriver(inspect string) string {
+	for _, line := range strings.Split(inspect, "\n") {
+		if k, v, ok := strings.Cut(line, ":"); ok && strings.TrimSpace(k) == "Driver" {
+			return strings.TrimSpace(v)
 		}
-		return projectBuilder{podman: true}, nil
 	}
-	if err := b.cmd.Run(ctx, req.Env, rt.Stdio{}, req.Bin, "buildx", "version"); err != nil {
-		return projectBuilder{}, fmt.Errorf("%w (Docker BuildKit), and `%s buildx version` failed; install the Docker buildx plugin, or use Docker Desktop or Docker Engine 23 or newer", errNoProjectBuilder, req.Bin)
-	}
-	return projectBuilder{env: []string{"DOCKER_BUILDKIT=1"}}, nil
+	return ""
 }
 
 // depsTag is the intermediate tag of a ProjectContext build's dependency
@@ -246,4 +306,25 @@ func (b *Builder) untag(ctx context.Context, req Request, pb projectBuilder, ref
 	}
 	//nolint:errcheck // best effort; a leftover tag changes nothing
 	b.cmd.Run(ctx, req.Env, rt.Stdio{}, req.Bin, args...)
+}
+
+// gitignoredShown caps how many gitignored files GitignoredWarning names.
+const gitignoredShown = 10
+
+// GitignoredWarning is the warning for project files a build will copy into
+// the image although git ignores them: the image takes the project as a
+// docker context does, under .dockerignore, and .gitignore is not that file.
+// paths are project-relative; "" when there are none.
+func GitignoredWarning(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	shown := paths
+	more := ""
+	if len(shown) > gitignoredShown {
+		shown = shown[:gitignoredShown]
+		more = fmt.Sprintf(" and %d more", len(paths)-gitignoredShown)
+	}
+	return fmt.Sprintf("the image will carry %d file(s) that .gitignore ignores and .dockerignore does not: %s%s. Add them to .dockerignore to keep them out of the image",
+		len(paths), strings.Join(shown, ", "), more)
 }

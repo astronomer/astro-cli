@@ -3,6 +3,7 @@ package pack
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -178,7 +179,9 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
-	shipProject(req.ProjectDir, &breq)
+	// The project, dags/ included, as a deploy to a Deployment without DAG
+	// deploys builds it: a package cannot know where it will be deployed.
+	imagebuild.ShipProject(&breq, req.ProjectDir, true)
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
 		return Result{}, err
@@ -189,6 +192,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if err != nil {
 		return Result{}, err
 	}
+	warnings = append(warnings, checkProjectBuilder(ctx, cli, &breq)...)
 
 	hash, fileWarnings, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectContext, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
@@ -212,7 +216,9 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 
 	// Build into a source-hash working tag, which BuildLocal always returns:
 	// with nothing to install it still builds the one-line image over the base.
-	workingTag := fmt.Sprintf("astro-package/%s:src-%s", name, hash)
+	// A random part keeps two packages of one checkout at once from building
+	// over each other's working and intermediate tags.
+	workingTag := fmt.Sprintf("astro-package/%s:src-%s-%s", name, hash, buildNonce())
 	breq.WorkDir = workDir
 	breq.Tag = workingTag
 	breq.Platform = req.Platform
@@ -314,17 +320,25 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	return res, nil
 }
 
-// shipProject asks a generated build to copy the project in, dags/ included,
-// as a deploy to a Deployment without DAG deploys does
-// (imagebuild.ShipProject). A declared Dockerfile's context is the project
-// already and its own COPY lines decide, so it is asked for nothing.
-func shipProject(projectDir string, breq *imagebuild.Request) {
-	imagebuild.ShipProject(breq, projectDir, true)
+// checkProjectBuilder holds a build that copies the project to an engine that
+// can (imagebuild.Builder.CanShipProject). One that cannot gets the package
+// built from the dependencies alone, as it was before packages carried the
+// project, and a warning saying so.
+func checkProjectBuilder(ctx context.Context, c engineCLI, breq *imagebuild.Request) []string {
+	if breq.ProjectContext == "" {
+		return nil
+	}
+	err := imagebuild.New(c.run, time.Now).CanShipProject(ctx, imagebuild.Request{Bin: c.bin, Env: c.env})
+	if err == nil {
+		return nil
+	}
+	breq.ProjectContext, breq.ProjectExcludes = "", nil
+	return []string{"this image carries only the project's dependencies: dags/, plugins/, include/ and the rest of the project are NOT in it. " + err.Error()}
 }
 
 // dagsIgnoredWarning is the warning for ignore rules that leave every DAG
 // file out of a generated image.
-const dagsIgnoredWarning = "the project's .dockerignore leaves out every DAG file in dags/, so the image carries no DAGs. A Deployment without DAG deploys runs only the image's DAGs; remove the rule to package them"
+const dagsIgnoredWarning = "no DAG file in dags/ reaches the image: .dockerignore leaves them all out, or dags/ links outside the project. A Deployment without DAG deploys runs only the image's DAGs; remove the rule, or move the DAGs into the project, to package them"
 
 // reachEngine resolves the container engine for the project and probes it up
 // front, so an engine that is missing or down is a plain ErrNoDocker rather
@@ -510,6 +524,14 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
+// buildNonce is a short random hex string that makes a working tag this
+// build's alone.
+func buildNonce() string {
+	var b [4]byte
+	_, _ = rand.Read(b[:])
+	return fmt.Sprintf("%x", b)
+}
+
 // contentHash's project is the ProjectContext a generated build copies in, ""
 // for a declared Dockerfile. Reading it also finds what the package warns
 // about the project's files, which comes back with the hash.
@@ -527,14 +549,12 @@ func contentHash(base, platform string, deps, packages []string, project string,
 		writeField("pkg", p)
 	}
 	if project != "" {
-		digest, dagsIgnored, err := contextDigest(project)
+		digest, fileWarnings, err := contextDigest(project)
 		if err != nil {
 			return "", nil, err
 		}
 		writeField("files", digest)
-		if dagsIgnored {
-			warnings = append(warnings, dagsIgnoredWarning)
-		}
+		warnings = append(warnings, fileWarnings...)
 	}
 	if df.abs != "" {
 		writeField("dockerfile", filepath.ToSlash(df.rel))

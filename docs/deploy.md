@@ -53,17 +53,28 @@ In this code the two conditions are `dagsInImage` and `dagsUploaded` in [`manife
 
 Then `dags`, when the DAGs are not to be in the image.
 
-**Only a builder that reads that ignore file runs the copy.** BuildKit reads `<Dockerfile>.dockerignore`; Docker's legacy builder does not, and would copy `.env` and the rest into an image bound for a registry. So the second build runs as `docker buildx build --load` with `DOCKER_BUILDKIT=1`, which is BuildKit or nothing, and the deploy first checks that `docker buildx version` answers. Podman, recognized by what `<engine> --version` says (so the podman-docker shim counts), is passed the file with `--ignorefile`, and its `build --help` must offer that flag. An engine that passes neither check is refused before anything is built.
+**Only a builder that reads that ignore file runs the copy.** BuildKit reads `<Dockerfile>.dockerignore`. Docker's legacy builder does not, and would copy `.env` and the rest into an image bound for a registry.
 
-**The DAGs that are to be built in are checked.** For a Deployment without DAG deploys, the deploy counts the DAG files (`.py`, as 1.x counts them) under `dags/` that the ignore rules leave in:
+- **Docker:** both builds run as `docker buildx build --builder <current context> --load` with `DOCKER_BUILDKIT=1`, which is BuildKit or nothing. Before anything is built the deploy checks that `docker buildx version` answers, and that the builder named after the current Docker context (`docker context show`) has the `docker` driver (`docker buildx inspect`).
+  - That builder exists for every context and shares the engine's image store, so the second build finds the first.
+  - The builder the user selected may not share it: a `docker-container`, remote or kubernetes builder, which is what `docker/setup-buildx-action` selects in CI, cannot see a local image.
+  - The builder called `default` belongs to the context called default, not the one in use.
+- **Podman:** recognized by what `<engine> --version` says, so the podman-docker shim counts. It is passed the file with `--ignorefile`, which its `build --help` must offer, and it must be local: `podman info` must report no remote service. A remote client, which is how podman runs on macOS and Windows, sends the context to its machine, and whether `--ignorefile` is applied there is not something the CLI can check, so it counts as unable.
+- **An engine that is unable** builds what a deploy built before it shipped the project: the image from the dependencies alone, with a warning that `plugins/`, `include/` and the rest are not in it. The exception is a deploy whose DAGs have to be built in (a Deployment without DAG deploys or remote execution), which is refused, because that image would carry no DAGs. `astro package astro` falls back the same way, with the warning. Current runtimes' install step mounts a build secret, which the legacy builder cannot do, so without BuildKit only older runtimes build at all.
 
-- Rules that leave out every one of them, such as `dags/`, `dags/**` or `**/*.py`, would ship an image with no DAGs to a Deployment that runs only the image's, so the deploy refuses before it builds: `the project's .dockerignore leaves out every DAG file in dags/. …`. This applies to a declared Dockerfile too, using the ignore file its build reads. The 1.x path instead removed a `dags/` line from the project's `.dockerignore` before every image deploy; this one edits nothing.
+**Local tags.** A deploy tags its image `astro-deploy/<dir>-<hash>:<dags|nodags|deps>-<random>` (the intermediate `…-deps` beside it), unique per build, so two deploys from one checkout at once cannot push or untag each other's image. The tag is removed once the image is pushed; a failed deploy leaves it, to look at. `astro package astro` builds under a random working tag too, and its final tag stays the content address.
+
+**Files git ignores.** The image takes the project as a 1.x build did, under `.dockerignore`; `.gitignore` is not applied. When the project is in a git repository, the deploy and the package warn about the files they will copy that git ignores, naming up to ten, and suggest adding them to `.dockerignore`. Anything going wrong with git skips the warning, never the build.
+
+**The DAGs that are to be built in are checked.** For a Deployment without DAG deploys, the deploy counts the DAG files (`.py`, as 1.x counts them) under `dags/` that reach the build context under the ignore rules. A `dags/` that is a symlink is copied as a link: its DAGs count when it points at a directory inside the project, which the context carries too, and not when it points outside, since the link would dangle in the image.
+
+- When none would reach the image of a generated build, because rules such as `dags/`, `dags/**` or `**/*.py` leave them all out or `dags/` links outside the project, the deploy refuses before it builds: `no DAG file in dags/ would reach the image: …`. The 1.x path instead removed a `dags/` line from the project's `.dockerignore` before every image deploy; this one edits nothing. A declared Dockerfile whose ignore file leaves them out may make its DAGs itself, so that is a warning, not a refusal.
 - With no DAG files at all, the deploy goes ahead, as 1.x did, and warns that the Deployment will run none.
 - `--image-name` or a declared Dockerfile goes ahead, as on 1.x, with a warning that the Deployment will run only the DAGs inside the image, since the CLI did not put them there.
 
-`astro package astro` builds anyway, and warns when the rules leave every DAG file out.
+`astro package astro` builds anyway, and warns when no DAG file would reach its image.
 
-The text summary says where the DAGs went: uploaded (with the bundle version), built into the image by this deploy, none to build in, left to the image a prebuilt `--image-name` or a declared Dockerfile carries, or not deployed because the Deployment runs remote execution.
+The text summary says where the DAGs went, and so does `dags` in the `--output json` result: `uploaded` (with the bundle version), `built_in` (built into the image by this deploy), `empty` (none to build in), `from_image` (left to the image a prebuilt `--image-name` or a declared Dockerfile carries), or `none` (the Deployment runs remote execution).
 
 Before anything is built, the deploy checks the project:
 
@@ -235,11 +246,12 @@ The 1.x-only flags (`--save`, `--pytest`, `--env`, `--test`, `--parse`, `--deplo
     "commit_sha": "0123abc…",
     "branch": "main",
     "commit_url": "https://github.com/…/commit/0123abc…"
-  }
+  },
+  "dags": "uploaded"
 }
 ```
 
-`deployment`, `workspace` and `type` (`dag-only`, `image-only` or `image-and-dag`) are always present. The rest are omitted when they do not apply: a dags-only deploy has no `image_tag`, an image-only deploy no `dag_bundle_version`, nor does an `image-and-dag` deploy that uploaded none (a Deployment without DAG deploys, or with remote execution), a Deployment named by id no `link`, a deploy with no recorded commit no `git`.
+`deployment`, `workspace` and `type` (`dag-only`, `image-only` or `image-and-dag`) are always present. The rest are omitted when they do not apply: a dags-only deploy has no `image_tag`, an image-only deploy no `dag_bundle_version`, nor does an `image-and-dag` deploy that uploaded none (a Deployment without DAG deploys, or with remote execution), a Deployment named by id no `link`, a deploy with no recorded commit no `git`. `dags` is present on an `image-and-dag` deploy only.
 
 **`astro package --output json`** streams the build's log lines as `{"event":"log",…}` objects, then prints one result object:
 

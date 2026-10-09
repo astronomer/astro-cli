@@ -605,6 +605,9 @@ type deployJSON struct {
 	RuntimeVersion   string         `json:"runtime_version,omitempty"`
 	URL              string         `json:"url,omitempty"`
 	Git              *deployGitJSON `json:"git,omitempty"`
+	// Dags is where an image-and-dag deploy's DAGs went: uploaded, built_in,
+	// empty, from_image or none.
+	Dags string `json:"dags,omitempty"`
 }
 
 type deployGitJSON struct {
@@ -631,6 +634,7 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		DagBundleVersion: res.DagTarballVersion,
 		RuntimeVersion:   res.RuntimeVersion,
 		URL:              res.URL,
+		Dags:             res.Dags,
 	}
 	if c := res.Git.Commit; c != nil {
 		obj.Git = &deployGitJSON{CommitSHA: c.SHA, Branch: c.Branch, CommitURL: c.URL}

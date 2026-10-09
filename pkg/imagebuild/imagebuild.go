@@ -194,6 +194,10 @@ type Request struct {
 	// runtime image's ONBUILD triggers read requirements.txt and packages.txt
 	// from the main build context, which therefore cannot be the project.
 	ProjectContext string
+	// builder, when set, is the buildx builder a ProjectContext build's
+	// dependency step runs on, so that the step copying the project, on the
+	// same builder, finds its image.
+	builder string
 	// ProjectExcludes are more .dockerignore rules for the ProjectContext copy,
 	// applied after the project's own: "dags/" keeps the DAGs out of an image
 	// for a Deployment that takes them as an upload.
@@ -354,7 +358,11 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	// registry can serve — see shouldPull. A pinned platform (deploy wants
 	// linux/amd64) is added only when set, so the host-platform local build
 	// keeps its exact command.
-	args := []string{"build", "--tag", req.Tag, "--file", dockerfile}
+	args := []string{"build"}
+	if req.builder != "" {
+		args = buildxArgs(req.builder)
+	}
+	args = append(args, "--tag", req.Tag, "--file", dockerfile)
 	if shouldPull(req.Dockerfile, dockerfile) {
 		args = append(args, "--pull")
 	}

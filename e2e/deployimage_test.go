@@ -79,7 +79,7 @@ func TestTheDeployRefusesDagsTheIgnoreFileLeavesOut(t *testing.T) {
 			t.Cleanup(func() { removeImagesNamed(t, repo) })
 
 			r := p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
-			if !strings.Contains(r.Stdout, "leaves out every DAG file in dags/") {
+			if !strings.Contains(r.Stdout, "no DAG file in dags/ would reach the image") {
 				t.Errorf("the refusal should say the ignore rules leave the DAGs out\n%s", r.output())
 			}
 			if images, err := dockerLines(t.Context(), "images", "--format", "{{.Repository}}:{{.Tag}}", repo); err != nil || len(images) != 0 {
@@ -237,13 +237,21 @@ func assertShipsTheProject(t *testing.T, got map[string]string) {
 // is removed when the test ends.
 func deployUntilTheCreate(t *testing.T, p *project, dep fakeDeployment) string {
 	t.Helper()
+	image, _ := deployUntilTheCreateWith(t, p, dep, nil)
+	return image
+}
+
+// deployUntilTheCreateWith is deployUntilTheCreate with more environment, and
+// it returns the run too.
+func deployUntilTheCreateWith(t *testing.T, p *project, dep fakeDeployment, extra map[string]string) (string, *result) {
+	t.Helper()
 	writeLoginTo(t, p, fakeAstroAPI(t, dep).URL)
 	repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
 	// Before the build that creates it: a deploy that fails after building
 	// leaves its image, and a failing case is the run where cleanup matters.
 	t.Cleanup(func() { removeImagesNamed(t, repo) })
 
-	r := p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
+	r := p.runBounded(slowCommandTimeout, extra, "deploy", "dep-e2e", "--output", "json").requireFailure()
 	if !strings.Contains(r.Stdout+r.Stderr, fakeCreateRefusal) {
 		t.Fatalf("the deploy should have built its image and stopped at the fake create\n%s", r.output())
 	}
@@ -251,7 +259,7 @@ func deployUntilTheCreate(t *testing.T, p *project, dep fakeDeployment) string {
 	if err != nil || len(images) != 1 {
 		t.Fatalf("expected one deploy image under %s, found %v (%v)\n%s", repo, images, err, r.output())
 	}
-	return images[0]
+	return images[0], r
 }
 
 // stampKeyringUnavailable keeps a login in the config rather than moving it to
@@ -369,4 +377,178 @@ func imageTree(t *testing.T, image string) map[string]string {
 	sort.Strings(names)
 	t.Logf("%s holds in AIRFLOW_HOME: %v", image, names)
 	return got
+}
+
+// The build runs on the docker-driver builder of the current Docker context,
+// whatever builder the user selected: one that cannot see the local image the
+// project step starts FROM (a docker-container builder, as CI's
+// setup-buildx-action selects) would fail it. A selected builder that does not
+// exist at all stands in for one.
+func TestTheDeployBuildsOnTheContextsBuilderWhateverIsSelected(t *testing.T) {
+	tier(t, 3)
+	p := deployImageProject(t, "builderpick")
+	needsDocker(t, p)
+	image, _ := deployUntilTheCreateWith(t, p, fakeDeployment{dagDeploy: true}, map[string]string{"BUILDX_BUILDER": "astro-e2e-no-such-builder"})
+	if _, ok := imageTree(t, image)["plugins/x.py"]; !ok {
+		t.Error("the project is not in the image")
+	}
+}
+
+// Two deploys from one checkout, to Deployments of different DAG modes, build
+// images of their own, each tagged with what it carries.
+func TestTheDeploysOfOneCheckoutTagTheirOwnImages(t *testing.T) {
+	tier(t, 3)
+	p := deployImageProject(t, "twodeploys")
+	needsDocker(t, p)
+	first := deployUntilTheCreate(t, p, fakeDeployment{dagDeploy: true})
+	repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
+	// The same deploy again, then one to a Deployment without DAG deploys.
+	p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
+	writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{}).URL)
+	p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
+	images, err := dockerLines(t.Context(), "images", "--format", "{{.Repository}}:{{.Tag}}", repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(images)
+	var nodags, dags int
+	for _, image := range images {
+		switch {
+		case strings.Contains(image, ":nodags-"):
+			nodags++
+		case strings.Contains(image, ":dags-"):
+			dags++
+		}
+		if strings.HasSuffix(image, "-deps") {
+			t.Errorf("an intermediate tag was left behind: %s", image)
+		}
+	}
+	if nodags != 2 || dags != 1 || !strings.Contains(first, ":nodags-") {
+		t.Errorf("want each deploy's own image, two without DAGs and one with them; found %v", images)
+	}
+}
+
+// noBuildx is the environment of a docker CLI that has no buildx plugin: a
+// config directory without it, and the engine of the current context named
+// directly. It skips when buildx is installed somewhere such a config does not
+// hide, as a system package installs it on Linux.
+func noBuildx(t *testing.T) map[string]string {
+	t.Helper()
+	host, err := exec.CommandContext(t.Context(), "docker", "context", "inspect", "--format", "{{.Endpoints.docker.Host}}").Output()
+	if err != nil {
+		t.Skipf("reading the current Docker context: %v", err)
+	}
+	cfg := t.TempDir()
+	probe := exec.CommandContext(t.Context(), "docker", "--config", cfg, "buildx", "version")
+	if probe.Run() == nil {
+		t.Skip("buildx is installed outside the Docker config directory, so it cannot be hidden here")
+	}
+	return map[string]string{"DOCKER_CONFIG": cfg, "DOCKER_HOST": strings.TrimSpace(string(host))}
+}
+
+// Without buildx the project cannot be copied in under the ignore rules. A
+// deploy whose DAGs are uploaded falls back to the dependency-only image it
+// built before, saying the project is not in it; one whose DAGs would have to
+// be built in is refused, since that image would carry none.
+func TestTheDeployWithoutBuildx(t *testing.T) {
+	tier(t, 3)
+	// The fallback is the build a deploy ran before it shipped the project.
+	// On a current runtime that build cannot succeed without BuildKit either:
+	// the runtime's ONBUILD install mounts a build secret, which the legacy
+	// builder refuses ("the --mount option requires BuildKit"). So this checks
+	// the warning, and the image only if the legacy build got that far.
+	t.Run("falls back", func(t *testing.T) {
+		p := deployImageProject(t, "nobuildxfallback")
+		needsDocker(t, p)
+		env := noBuildx(t)
+		removeNewDanglingImages(t)
+		writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{dagDeploy: true}).URL)
+		repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
+		t.Cleanup(func() { removeImagesNamed(t, repo) })
+
+		r := p.runBounded(slowCommandTimeout, env, "deploy", "dep-e2e", "--output", "json").requireFailure()
+		if !strings.Contains(r.Stderr, "are NOT in it") {
+			t.Errorf("the deploy should warn that the project is not in the image\n%s", r.output())
+		}
+		if !strings.Contains(r.Stdout, fakeCreateRefusal) {
+			if !strings.Contains(r.Stdout, "installing the project's dependencies") {
+				t.Errorf("the deploy should have run the dependency-only build\n%s", r.output())
+			}
+			t.Logf("the legacy builder could not build this runtime: %s", r.Stdout)
+			return
+		}
+		images, err := dockerLines(t.Context(), "images", "--format", "{{.Repository}}:{{.Tag}}", repo)
+		if err != nil || len(images) != 1 {
+			t.Fatalf("expected one deploy image under %s, found %v (%v)", repo, images, err)
+		}
+		if _, ok := imageTree(t, images[0])["plugins/x.py"]; ok {
+			t.Error("plugins/x.py is in an image built without buildx")
+		}
+	})
+	t.Run("refuses to build DAGs in", func(t *testing.T) {
+		p := deployImageProject(t, "nobuildxrefuse")
+		needsDocker(t, p)
+		env := noBuildx(t)
+		writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{}).URL)
+		repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
+		t.Cleanup(func() { removeImagesNamed(t, repo) })
+		r := p.runBounded(slowCommandTimeout, env, "deploy", "dep-e2e", "--output", "json").requireFailure()
+		if !strings.Contains(r.Stdout, "its DAGs have to be built into the image") {
+			t.Errorf("the refusal should say why\n%s", r.output())
+		}
+	})
+}
+
+// A dags/ that links to a directory inside the project ships its DAGs: docker
+// copies the link, and the directory it names is in the context too.
+func TestTheDeployImageCarriesDagsLinkedInsideTheProject(t *testing.T) {
+	tier(t, 3)
+	p := deployImageProject(t, "linkeddags")
+	needsDocker(t, p)
+	if err := os.Rename(filepath.Join(p.Dir, "dags"), filepath.Join(p.Dir, "airflow_dags")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("airflow_dags", filepath.Join(p.Dir, "dags")); err != nil {
+		t.Fatal(err)
+	}
+	image, r := deployUntilTheCreateWith(t, p, fakeDeployment{}, nil)
+	got := imageTree(t, image)
+	if got["dags"] != "link" {
+		t.Errorf("dags should be in the image as a link, found %q", got["dags"])
+	}
+	if _, ok := got["airflow_dags/mine.py"]; !ok {
+		t.Errorf("the DAGs dags/ links to are not in the image\n%s", r.output())
+	}
+}
+
+// removeNewDanglingImages removes, when the test ends, the untagged images
+// that appeared during it. Docker's legacy builder keeps an image per step as
+// its cache, and one that fails partway leaves the last of them untagged,
+// which no repository filter, the leak census's included, can see. Only images
+// that were not there before are touched; removing the newest takes its
+// parents with it.
+func removeNewDanglingImages(t *testing.T) {
+	t.Helper()
+	dangling := func() map[string]bool {
+		ids, err := dockerLines(context.Background(), "images", "--quiet", "--no-trunc", "--filter", "dangling=true")
+		if err != nil {
+			t.Logf("listing untagged images: %v", err)
+		}
+		set := map[string]bool{}
+		for _, id := range ids {
+			set[id] = true
+		}
+		return set
+	}
+	before := dangling()
+	t.Cleanup(func() {
+		for id := range dangling() {
+			if before[id] {
+				continue
+			}
+			if err := exec.Command("docker", "image", "rm", id).Run(); err != nil {
+				t.Logf("removing %s: %v", id, err)
+			}
+		}
+	})
 }
