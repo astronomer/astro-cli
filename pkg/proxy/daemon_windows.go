@@ -2,23 +2,26 @@
 
 package proxy
 
-import "errors"
+import (
+	"errors"
+	"os/exec"
+)
 
 // errUnsupportedWindows is every lifecycle answer on Windows, where the daemon
 // does not run yet. A host there serves its own proxy in process instead.
 var errUnsupportedWindows = errors.New("proxy daemon is not supported on Windows")
 
-// EnsureRunning is not supported on Windows.
-func (d *Daemon) EnsureRunning(string) (string, error) { return "", errUnsupportedWindows }
+// startDetached is not supported on Windows.
+func startDetached(func() *exec.Cmd) (*exec.Cmd, error) { return nil, errUnsupportedWindows }
 
-// Start is not supported on Windows.
-func (d *Daemon) Start(string) (string, error) { return "", errUnsupportedWindows }
+// requestStop has nothing to ask on Windows: no daemon can be running.
+var requestStop = func(int) bool { return false }
 
-// Serve is not supported on Windows.
-func (d *Daemon) Serve(string) error { return errUnsupportedWindows }
+// killProcess has nothing to end on Windows.
+var killProcess = func(int) {}
 
-// Stop is a no-op on Windows: no daemon can be running.
-func (d *Daemon) Stop() error { return nil }
+// stopRequests is not supported on Windows.
+func stopRequests() (<-chan struct{}, func(), error) { return nil, nil, errUnsupportedWindows }
 
-// StopIfEmpty is a no-op on Windows.
-func (d *Daemon) StopIfEmpty() {}
+// processLooksLikeProxy never matches on Windows, where no daemon runs.
+var processLooksLikeProxy = func(*Daemon, int) bool { return false }
