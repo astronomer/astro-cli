@@ -52,6 +52,10 @@ var deployExample = `  # Deploy this project, picking the Deployment from a list
   # Deploy a custom image built on this machine
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>`
 
+// warningImageNameDagsInImage is printed when --image-name deploys to a
+// Deployment that runs the DAGs in its image, which this deploy did not build.
+const warningImageNameDagsInImage = "Warning: this Deployment runs the Dags in its image, so it now runs only the Dags in %s; the project's dags folder is not deployed. An image astro package generated has none: declare a dockerfile under [tool.astro] so astro package builds the project's Dags in.\n"
+
 var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy <deployment-id> --force` to deploy anyway")
 
 func NewDeployCmd(out io.Writer) *cobra.Command {
@@ -200,6 +204,13 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	_, err = DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description, opts)
 	// Don't throw the error if dag-deploy itself is disabled
 	if deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
+		// A Deployment that runs the DAGs in its image got its DAGs from the
+		// image just pushed. A build from this project baked them in; an image
+		// built elsewhere carries whatever it carries, possibly none, and
+		// nothing else would say so.
+		if imageName != "" && errors.As(err, new(deploy.DagsInImageError)) {
+			fmt.Fprintf(opts.Progress, warningImageNameDagsInImage, imageName)
+		}
 		return emitDeploy(r, &result)
 	}
 	if err != nil {

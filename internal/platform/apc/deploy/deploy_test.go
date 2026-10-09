@@ -839,7 +839,41 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
 		_, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description, Options{})
 		s.ErrorIs(err, ErrDagOnlyDeployNotEnabledForDeployment)
+		// A volume Deployment gets its DAGs from the volume, not its image.
+		s.False(errors.As(err, new(DagsInImageError)))
 	})
+
+	// An image Deployment's refusal says its DAGs come from its image, whether
+	// the Deployment or the cluster refuses, and still reads as the refusal.
+	for _, tc := range []struct {
+		name    string
+		enabled bool
+		want    error
+	}{
+		{"at the deployment level", true, ErrDagOnlyDeployNotEnabledForDeployment},
+		{"at the cluster level", false, ErrDagOnlyDeployDisabledInConfig},
+	} {
+		s.Run("When DAG-only deploy is refused "+tc.name+" for an image Deployment", func() {
+			getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+				return deploymentID, nil, nil
+			}
+			appConfig := &houston.AppConfig{
+				Version: "2.0.0",
+				Flags:   houston.FeatureFlags{DagOnlyDeployment: tc.enabled},
+			}
+			deployment := &houston.Deployment{
+				DagDeployment: houston.DagDeploymentConfig{Type: houston.ImageDeploymentType},
+				ClusterID:     "test-cluster-id",
+				ID:            deploymentID,
+			}
+			s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
+			s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
+			_, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description, Options{})
+			s.ErrorIs(err, tc.want)
+			s.True(errors.As(err, new(DagsInImageError)))
+			s.Equal(tc.want.Error(), err.Error())
+		})
+	}
 
 	s.Run("Valid Houston config, but unable to get context from astro-cli config", func() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {

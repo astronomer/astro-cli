@@ -524,6 +524,26 @@ func errDagOnlyDeployDisabledAtCluster(appConfig *houston.AppConfig) error {
 	return ErrDagOnlyDeployDisabledInConfigLegacy
 }
 
+// DagsInImageError is DagsOnlyDeploy refusing a Deployment whose DAGs come
+// from its image (DAG deployment type image), rather than from a DAG upload,
+// git-sync or a volume. It reads as the refusal it wraps, which errors.Is
+// still finds, so a caller that only needs to know DAG-only deploy was refused
+// sees no difference. A caller that pushed an image it did not build looks
+// for it: that Deployment now runs only the DAGs the image carries.
+type DagsInImageError struct{ Err error }
+
+func (e DagsInImageError) Error() string { return e.Err.Error() }
+func (e DagsInImageError) Unwrap() error { return e.Err }
+
+// refusedDagOnly marks a DAG-only refusal as a DagsInImageError when the
+// Deployment takes its DAGs from its image.
+func refusedDagOnly(deploymentInfo *houston.Deployment, err error) error {
+	if deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType {
+		return DagsInImageError{Err: err}
+	}
+	return err
+}
+
 func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment) bool {
 	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
 }
@@ -593,10 +613,10 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
-		return deploymentID, errDagOnlyDeployDisabledAtCluster(appConfig)
+		return deploymentID, refusedDagOnly(deploymentInfo, errDagOnlyDeployDisabledAtCluster(appConfig))
 	}
 	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
-		return deploymentID, ErrDagOnlyDeployNotEnabledForDeployment
+		return deploymentID, refusedDagOnly(deploymentInfo, ErrDagOnlyDeployNotEnabledForDeployment)
 	}
 
 	uploadURL := ""

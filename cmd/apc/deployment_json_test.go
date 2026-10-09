@@ -599,6 +599,56 @@ func TestDeployJSON(t *testing.T) {
 		assert.Equal(t, "image", got.Type)
 	})
 
+	// An image Deployment runs the DAGs in its image. A build from the project
+	// baked them in; an --image-name image was built elsewhere and may carry
+	// none, so the deploy says so, on stderr, and still succeeds.
+	dagsInImage := deploy.DagsInImageError{Err: deploy.ErrDagOnlyDeployNotEnabledForDeployment}
+	t.Run("--image-name to an image Deployment warns that only the image's DAGs run", func(t *testing.T) {
+		deployMocks(t, pushed, dagsInImage)
+		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "astro-package/proj:latest", "-o", "json")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		var got deployJSON
+		decodeOne(t, run.stdout, &got)
+		assert.Equal(t, deployJSON{Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "image", Image: pushed.Image, URL: pushed.URL}, got)
+		assert.Contains(t, run.stderr, "Warning: this Deployment runs the Dags in its image, so it now runs only the Dags in astro-package/proj:latest")
+		assert.Contains(t, run.stderr, "declare a dockerfile under [tool.astro]")
+	})
+
+	t.Run("--image-name --remote to an image Deployment warns too", func(t *testing.T) {
+		deployMocks(t, pushed, dagsInImage)
+		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "registry/img:1", "--remote", "--runtime-version", "12.1.1", "-o", "json")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		var got deployJSON
+		decodeOne(t, run.stdout, &got)
+		assert.Equal(t, "image", got.Type)
+		assert.Contains(t, run.stderr, "runs only the Dags in registry/img:1")
+	})
+
+	t.Run("--image-name warns in text too", func(t *testing.T) {
+		deployMocks(t, pushed, dagsInImage)
+		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "astro-package/proj:latest")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Contains(t, run.stdout+run.stderr, "runs only the Dags in astro-package/proj:latest")
+	})
+
+	// No warning where it would mislead: a build from the project baked its
+	// DAGs in, and a git-sync or volume Deployment gets them from elsewhere.
+	for _, tc := range []struct {
+		name string
+		dags error
+		args []string
+	}{
+		{"a build from the project to an image Deployment", dagsInImage, []string{"deploy", "dep-ac", "-o", "json"}},
+		{"--image-name to a git-sync Deployment", deploy.ErrDagOnlyDeployNotEnabledForDeployment, []string{"deploy", "dep-ac", "--image-name", "img:1", "-o", "json"}},
+	} {
+		t.Run(tc.name+" does not warn", func(t *testing.T) {
+			deployMocks(t, pushed, tc.dags)
+			run := runAPC(t, newAPCClient(), "", tc.args...)
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			assert.NotContains(t, run.stderr, "runs only the Dags in")
+		})
+	}
+
 	t.Run("--image", func(t *testing.T) {
 		deployMocks(t, pushed, errors.New("must not deploy DAGs"))
 		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image", "-o", "json")
