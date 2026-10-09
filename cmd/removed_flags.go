@@ -362,7 +362,7 @@ func isRemovedFlagErr(err error) bool {
 func acceptRemovedFlags(root *cobra.Command, args []string) {
 	if isShellCompletion(args) {
 		if len(args) > 1 {
-			acceptForCompletion(root, args[1:len(args)-1])
+			acceptForCompletion(root, commandWords(args))
 		}
 		return
 	}

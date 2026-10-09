@@ -75,54 +75,81 @@ func (s *AddCmdSuite) TestNoLegacySoftwareBrandingInDescriptions() {
 	}
 }
 
+// Building the commands asks the platform nothing: a mock with no expectations
+// panics on any call.
 func (s *AddCmdSuite) TestAddCmds() {
-	appConfig = &houston.AppConfig{
-		TriggererEnabled: true,
-		Flags: houston.FeatureFlags{
-			TriggererEnabled: true,
-		},
-	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
-	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
 	buf := new(bytes.Buffer)
 	cmds := AddCmds(houstonMock, buf)
 	for cmdIdx := range cmds {
 		s.Contains([]string{"deployment", "deploy [DEPLOYMENT_ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
 	}
 	houstonMock.AssertExpectations(s.T())
+}
+
+func (s *AddCmdSuite) TestLoadPlatform() {
+	want := &houston.AppConfig{Flags: houston.FeatureFlags{TriggererEnabled: true}}
+	houstonMock := new(houston_mocks.ClientInterface)
+	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
+	houstonMock.On("GetAppConfig", mock.Anything).Return(want, nil)
+	LoadPlatform(houstonMock)
+	houstonMock.AssertExpectations(s.T())
+	s.Equal("0.30.0", PlatformVersion())
+	s.Equal(want, appConfig)
 }
 
 func (s *AddCmdSuite) TestAppConfigFailure() {
 	houstonMock := new(houston_mocks.ClientInterface)
 	houstonMock.On("GetAppConfig", mock.Anything).Return(nil, errMock)
 	houstonMock.On("GetPlatformVersion", nil).Return("0.30.0", nil)
-	buf := new(bytes.Buffer)
-	cmds := AddCmds(houstonMock, buf)
-	for cmdIdx := range cmds {
-		s.Contains([]string{"deployment", "deploy [DEPLOYMENT_ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
-	}
+	LoadPlatform(houstonMock)
 	houstonMock.AssertExpectations(s.T())
 	s.Contains(InitDebugLogs, fmt.Sprintf("Error checking feature flag: %s", errMock))
 }
 
+// A platform that does not answer for its version is not asked for its app
+// config: the same host would make the command wait out a second timeout.
 func (s *AddCmdSuite) TestPlatformVersionFailure() {
-	appConfig = &houston.AppConfig{
-		TriggererEnabled: true,
-		Flags: houston.FeatureFlags{
-			TriggererEnabled: true,
-		},
-	}
 	houstonMock := new(houston_mocks.ClientInterface)
-	houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil)
 	houstonMock.On("GetPlatformVersion", nil).Return("", errMock)
-	buf := new(bytes.Buffer)
-	cmds := AddCmds(houstonMock, buf)
-	for cmdIdx := range cmds {
-		s.Contains([]string{"deployment", "deploy [DEPLOYMENT_ID]", "user", "workspace", "team"}, cmds[cmdIdx].Use)
-	}
+	LoadPlatform(houstonMock)
 	houstonMock.AssertExpectations(s.T())
+	houstonMock.AssertNotCalled(s.T(), "GetAppConfig", mock.Anything)
 	s.Contains(InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", errMock))
+}
+
+func (s *AddCmdSuite) TestNeedsPlatform() {
+	rootFlags := pflag.NewFlagSet("astro", pflag.ContinueOnError)
+	rootFlags.String("verbosity", "", "")
+	for _, tt := range []struct {
+		args []string
+		want bool
+	}{
+		{nil, false},
+		{[]string{"--help"}, false},
+		{[]string{"version"}, false},
+		{[]string{"jjklsjdfklsjfklsdf"}, false},
+		{[]string{"--jklsdjkfljsfd"}, false},
+		{[]string{"help"}, false},
+		{[]string{"local", "start"}, false},
+		// The removal stubs say what replaced them without the platform.
+		{[]string{"dev", "start"}, false},
+		{[]string{"run", "my_dag", "-o", "json"}, false},
+		{[]string{"deployment"}, true},
+		{[]string{"deployment", "create", "--help"}, true},
+		{[]string{"de", "ls"}, true},
+		{[]string{"deploy", "dep-id"}, true},
+		{[]string{"workspace", "switch"}, true},
+		{[]string{"user", "create"}, true},
+		{[]string{"team", "list"}, true},
+		{[]string{"--verbosity", "debug", "deployment", "list"}, true},
+		{[]string{"help", "deployment", "create"}, true},
+		{[]string{"--verbosity", "debug", "help", "deployment"}, true},
+		{[]string{"help", "version"}, false},
+		{[]string{"help", "help"}, false},
+	} {
+		s.Equal(tt.want, NeedsPlatform(tt.args, rootFlags), "%q", tt.args)
+	}
 }
 
 func (s *AddCmdSuite) TestSetupLogs() {
