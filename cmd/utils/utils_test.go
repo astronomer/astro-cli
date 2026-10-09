@@ -38,6 +38,9 @@ func TestEnsureProjectDir(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "this is not an Astro project directory.\nDeploying to APC needs a Dockerfile-based project, one with a .astro/config.yaml")
 	assert.NotContains(t, err.Error(), "astro init")
+	// it points a pyproject.toml project at the path that does reach APC
+	assert.Contains(t, err.Error(), `declare dockerfile = "Dockerfile" under [tool.astro]`)
+	assert.Contains(t, err.Error(), "run astro package, and deploy the image it tags with --image-name")
 
 	// success case
 	config.WorkingPath = currentWorkingPath

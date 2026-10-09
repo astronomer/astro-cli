@@ -31,9 +31,12 @@ func EnsureProjectDir(cmd *cobra.Command, args []string) error {
 
 // EnsureDockerfileProjectDir is EnsureProjectDir for APC deploy, which builds a
 // Dockerfile project and has no path for the pyproject.toml project astro init
-// writes, so advice to run astro init would only lead back here.
+// writes, so advice to run astro init would only lead back here. Such a project
+// reaches APC through its image instead: with a declared Dockerfile, astro
+// package builds the whole project (the runtime base's ONBUILD COPY bakes the
+// DAGs in) and tags an image carrying the runtime label --image-name requires.
 func EnsureDockerfileProjectDir(cmd *cobra.Command, args []string) error {
-	return ensureProjectDir("Deploying to APC needs a Dockerfile-based project, one with a .astro/config.yaml, such as a project made with Astro CLI 1.x. Change to one, or use --image-name to deploy an image you built")
+	return ensureProjectDir("Deploying to APC needs a Dockerfile-based project, one with a .astro/config.yaml, such as a project made with Astro CLI 1.x. From a pyproject.toml project, declare dockerfile = \"Dockerfile\" under [tool.astro] (a Dockerfile FROM an Astro Runtime image), run astro package, and deploy the image it tags with --image-name")
 }
 
 func ensureProjectDir(advice string) error {
