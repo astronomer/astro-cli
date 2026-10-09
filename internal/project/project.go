@@ -199,8 +199,12 @@ func HasManifest(dir string) bool {
 // directory a project with a manifest. `astro init` converts a 1.x directory,
 // reporting the 1.x files it could not read rather than refusing them, and
 // consults this only under an Astro Private Cloud context, where it refuses
-// one (Enclosing1xProject, Project1xUnderAPC).
+// one (Project1xAt, Project1xUnderAPC). The home directory is never one: its
+// .astro/ is the CLI's own settings (isCLIHome).
 func Is1xProject(dir string) bool {
+	if isCLIHome(dir) {
+		return false
+	}
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
 		return false
 	}

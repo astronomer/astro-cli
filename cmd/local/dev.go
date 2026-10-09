@@ -42,7 +42,8 @@ type devRemoved struct {
 	// UnderAPC is set with Is1xProject when the current context is Astro
 	// Private Cloud, where astro init refuses a 1.x project: Notes then say
 	// why it stays as it is and how to convert it anyway, the mapping leaves
-	// out astro init, and nothing names a command to convert with.
+	// out astro init, and there is no Replacement or Convert, since no
+	// astro local command runs in that project.
 	UnderAPC bool `json:"under_apc,omitempty"`
 }
 
@@ -185,27 +186,29 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 		}
 	}
 	if stays {
+		// No astro local command runs in this project, so none is named as
+		// the replacement; the notes say why and what to do instead.
 		p.UnderAPC = true
 		p.Mapping = slices.DeleteFunc(slices.Clone(mapping), func(m devReplacement) bool { return m.Replacement == replaceInit })
+		p.Notes = []string{
+			project.Project1xUnderAPC(dc.dir1x),
+			"The astro local commands work only in a converted project, which Astro Private Cloud cannot deploy yet",
+		}
 	}
 	if typed == "" {
 		p.Error = "astro dev was removed in Astro CLI v2"
-	} else {
-		if replacement, ok := devReplacementFor(typed); ok && (!stays || replacement != replaceInit) {
-			p.Replacement = replacement
-			switch replacement {
-			case replaceStart, replaceRestart:
-				p.Replacement, p.Notes = devStartReplacement(replacement, args, dc)
-			case replacePackage:
-				p.Replacement, p.Notes = devBuildReplacement(args, dc)
-			}
+		return p
+	}
+	if replacement, ok := devReplacementFor(typed); ok && !stays {
+		p.Replacement = replacement
+		switch replacement {
+		case replaceStart, replaceRestart:
+			p.Replacement, p.Notes = devStartReplacement(replacement, args, dc)
+		case replacePackage:
+			p.Replacement, p.Notes = devBuildReplacement(args, dc)
 		}
-		p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
 	}
-	if stays {
-		p.Notes = append(p.Notes, project.Project1xUnderAPC(dc.dir1x),
-			"The astro local commands work only in a converted project, which Astro Private Cloud cannot deploy yet")
-	}
+	p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
 	return p
 }
 
@@ -331,6 +334,8 @@ func renderDevRemoved(p devRemoved) string {
 		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
 	case p.Replacement != "":
 		fmt.Fprintf(&b, ". Use `%s` instead", p.Replacement)
+	case p.UnderAPC:
+		// The notes below say what to do instead.
 	case p.Typed != "astro dev":
 		b.WriteString(" and has no direct replacement")
 	}
@@ -367,12 +372,20 @@ func renderDevRemoved(p devRemoved) string {
 	return b.String()
 }
 
-// project1xDir is the working directory when it holds a 1.x project, per
-// project.Is1xProject, and "" otherwise.
+// project1xDir is the 1.x project the stub speaks of, or "". Under an APC
+// context it is the one discovery finds the working directory in or below
+// (project.Project1xAt), as astro init's refusal does; otherwise the working
+// directory when it holds one (project.Is1xProject), since the convert
+// advice says to run astro init here.
 func (c *cli) project1xDir() string {
 	wd, err := c.d.WorkingDir()
-	if err != nil || !project.Is1xProject(wd) {
+	switch {
+	case err != nil:
 		return ""
+	case project.UnderAPC():
+		return project.Project1xAt(wd)
+	case project.Is1xProject(wd):
+		return wd
 	}
-	return wd
+	return ""
 }

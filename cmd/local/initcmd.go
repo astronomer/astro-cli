@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -105,19 +107,33 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // deploys pyproject.toml projects, init refuses to convert one under an APC
 // context and changes nothing (project.Project1xUnderAPC says why, and how to
 // convert anyway). A directory in or below no 1.x project is made a project
-// as anywhere, with a note that APC cannot deploy it yet.
+// as anywhere, with a note that APC cannot deploy it yet. That includes a
+// Dockerfile with no .astro/, which APC's deploy refuses as it stands (it
+// requires .astro/config.yaml), so converting it takes nothing away there.
 
 // refuse1xUnderAPC refuses, under an APC context, a dir that is a 1.x project
-// or lies inside one (project.Enclosing1xProject, the walk discovery makes),
-// as a usage error naming that project: nothing ran, and nothing was written.
+// or an existing, non-empty directory inside one, as discovery finds it
+// (project.Project1xAt), as a usage error naming that project: nothing ran,
+// and nothing was written. A new or empty directory inside one is a new
+// project of its own and leaves the 1.x project as it is, so it is allowed.
 func (c *cli) refuse1xUnderAPC(dir string) error {
 	if !project.UnderAPC() {
 		return nil
 	}
-	if found := project.Enclosing1xProject(dir); found != "" {
-		return cliout.Usage(errors.New(project.Project1xUnderAPC(found)))
+	found := project.Project1xAt(dir)
+	if found == "" || filepath.Clean(dir) != filepath.Clean(found) && isNewOrEmpty(dir) {
+		return nil
 	}
-	return nil
+	return cliout.Usage(errors.New(project.Project1xUnderAPC(found)))
+}
+
+// isNewOrEmpty reports a directory that does not exist yet or holds nothing.
+func isNewOrEmpty(dir string) bool {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return true
+	}
+	return err == nil && len(entries) == 0
 }
 
 // apcDeployNote says that a project init just made does not deploy to the

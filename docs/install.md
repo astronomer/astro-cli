@@ -175,11 +175,13 @@ There is one project format, and `init` converts the same way whichever
 platform you deploy to. The exception, for now, is Astro Private Cloud: its
 `astro deploy` still builds the 1.x layout, so when the current context is an
 Astro Private Cloud one, `init` refuses a 1.x project (a `Dockerfile` beside
-`.astro/`), or a directory inside one, and changes nothing. Leave the project
+`.astro/`), or a non-empty directory inside one, and changes nothing (a new
+or empty directory inside one becomes a project of its own). Leave the project
 as it is, and `astro deploy` keeps working with it. Converting will be
 available once Astro Private Cloud deploys `pyproject.toml` projects. To convert anyway, for Astro or for local
 development only, switch to an Astro context first (`astro context switch
-astronomer.io`, or `astro login`) and run `init` again. A new project `init`
+astronomer.io`, or `astro login`) and run `init` in the 1.x project's
+directory. A new project `init`
 creates under an Astro Private Cloud context says, under Left to do, that
 Astro Private Cloud cannot deploy it yet.
 

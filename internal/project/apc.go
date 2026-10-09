@@ -1,8 +1,12 @@
 package project
 
 import (
+	"errors"
+	"os"
 	"path/filepath"
 	"sync/atomic"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // underAPC is whether the current context is Astro Private Cloud, whose
@@ -35,29 +39,58 @@ func Project1xUnderAPC(dir string) string {
 		"astro deploy keeps working with it on Astro Private Cloud, and converting it will be available once " +
 		"Astro Private Cloud deploys pyproject.toml projects. To convert it anyway, for Astro or for local " +
 		"development only, switch to an Astro context first (astro context switch astronomer.io, or astro login " +
-		"to sign in to Astro) and run " + initCommand + " again"
+		"to sign in to Astro) and run " + initCommand + " in " + dir
 }
 
-// Enclosing1xProject is the 1.x project start is in or below, the one
-// Discover would name, or "" when there is none: the walk up stops at a
-// directory that is already a project (HasManifest), as a 1.x project inside
-// it is that project's business. start need not exist yet.
-func Enclosing1xProject(start string) string {
-	abs, err := filepath.Abs(start)
+// Project1xAt is the 1.x project dir is in or below, as discovery reports it
+// to every command (NotFoundError.Project1xDir, NoAstroSectionError's Dir),
+// or "" when discovery names none. dir need not exist yet.
+func Project1xAt(dir string) string {
+	proj, err := Discover(dir)
+	if err == nil {
+		if _, loadErr := manifest.Load(filepath.Join(proj.Dir, Marker)); loadErr != nil {
+			err = LoadError(dir, proj.Dir, loadErr)
+		}
+	}
+	var nf *NotFoundError
+	if errors.As(err, &nf) {
+		return nf.Project1xDir
+	}
+	var ns *NoAstroSectionError
+	if errors.As(err, &ns) && ns.Has1xProject {
+		return ns.Dir
+	}
+	return ""
+}
+
+// isCLIHome reports a directory whose .astro/ is the CLI's own settings
+// rather than a 1.x project's: the home directory, and ASTRO_HOME when it
+// moves the settings (config.initHome reads the same two). A stray
+// Dockerfile there does not make it a 1.x project.
+func isCLIHome(dir string) bool {
+	for _, home := range []string{os.Getenv("ASTRO_HOME"), userHome()} {
+		if home != "" && samePath(dir, home) {
+			return true
+		}
+	}
+	return false
+}
+
+func userHome() string {
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	for dir := abs; ; {
-		if Is1xProject(dir) {
-			return dir
-		}
-		if HasManifest(dir) {
-			return ""
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return ""
-		}
-		dir = parent
+	return home
+}
+
+// samePath compares two paths as written and with symlinks resolved, so a
+// home under /var reached as /private/var still matches.
+func samePath(a, b string) bool {
+	if filepath.Clean(a) == filepath.Clean(b) {
+		return true
 	}
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && ra == rb
 }
