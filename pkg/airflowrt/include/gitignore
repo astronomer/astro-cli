@@ -15,4 +15,4 @@ airflow.db
 .astro/*.local.yaml
 
 **/.astro/dbt_metadata.json
-**/.astro/manifest.slim.json
+**/.astro/*manifest*.slim.json

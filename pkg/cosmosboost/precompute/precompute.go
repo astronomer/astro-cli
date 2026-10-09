@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -18,18 +19,20 @@ const (
 	kindManifest = "manifest"
 )
 
+type unit struct{ kind, path string }
+
 // Result records what happened for one unit of work: either a dbt project
-// directory or a standalone manifest.json.
+// directory or a standalone manifest.
 type Result struct {
 	Kind     string        // "project" or "manifest"
-	Path     string        // project directory, or manifest.json path
+	Path     string        // project directory, or manifest path
 	Hash     string        // version hash (empty if Err != nil or Skipped)
 	Files    int           // files hashed (1 for a manifest)
 	Bytes    int64         // total bytes hashed
 	Duration time.Duration // time spent on this unit
-	Skipped  bool          // a manifest.json that isn't a dbt manifest (no sidecar written)
+	Skipped  bool          // a manifest-like file that isn't a dbt manifest (no sidecar written)
 	Warning  string        // non-fatal note (sidecar still written), e.g. an unresolved template
-	Err      error         // non-nil if hashing, writing the sidecar, or writing the slim manifest failed
+	Err      error         // non-nil if hashing, writing the sidecar, or writing a slim manifest failed
 }
 
 // Summary is the structured outcome of a precompute run. It backs both the
@@ -43,26 +46,24 @@ type Summary struct {
 // hash sidecars.
 type Options struct {
 	// SlimManifest also writes a slim, field-filtered copy of each discovered
-	// manifest.json (see buildSlimManifest) next to its sidecar.
+	// manifest (see buildSlimManifest) next to its sidecar.
 	SlimManifest bool
 }
 
-// Run finds every dbt project (a directory with dbt_project.yml) and standalone
-// dbt manifest.json under the given roots, and writes a .astro/dbt_metadata.json
-// hash sidecar next to each. Units are processed concurrently — one worker each,
-// bounded by GOMAXPROCS — and each is hashed over sorted input, so results are
-// deterministic with no cross-worker coordination.
+// Run finds every dbt project (a directory with dbt_project.yml) and every
+// standalone dbt manifest under the given roots, and writes a
+// .astro/dbt_metadata.json hash sidecar next to each. version is recorded in
+// each sidecar's generated_by.
 //
-// Per-unit failures are best-effort: a unit that fails is recorded in its Result
-// and does not stop the others. Run only returns a non-nil error for a top-level
-// problem, such as a root that cannot be walked. version is recorded in each
-// sidecar's generated_by.
+// Per-unit failures are best-effort: a unit that fails is recorded in its
+// Result and does not stop the others. Run only returns a non-nil error for a
+// top-level problem, such as a root that cannot be walked.
 //
-// With opts.SlimManifest set, every dbt manifest.json also gets a slim,
-// field-filtered copy (see buildSlimManifest) written into the .astro/ beside
-// it, for the Cosmos Boost plugin to load in place of the full manifest at
-// DAG-parse time. That includes one in a project's own root, which is not a
-// discovery unit of its own and is handled by processProject.
+// Manifest units are computed concurrently, then written in a second pass
+// grouped by directory: two manifests sharing a directory (see
+// isManifestCandidateName) share one dbt_metadata.json, so writing it twice
+// from two goroutines would race. Project units need no such grouping - each
+// owns its directory exclusively.
 func Run(roots []string, version string, opts Options) (Summary, error) {
 	start := time.Now()
 
@@ -88,7 +89,6 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 		}
 	}
 
-	type unit struct{ kind, path string }
 	var units []unit
 	for d := range projectDirs {
 		units = append(units, unit{kindProject, d})
@@ -103,6 +103,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 	})
 
 	results := make([]Result, len(units))
+	computations := make([]manifestComputation, len(units))
 	sem := make(chan struct{}, max(1, runtime.GOMAXPROCS(0)))
 	var wg sync.WaitGroup
 	for i, u := range units {
@@ -114,11 +115,21 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 			if u.kind == kindProject {
 				results[i] = processProject(u.path, version, opts)
 			} else {
-				results[i] = processManifest(u.path, version, opts)
+				computations[i] = computeManifest(u.path, version, opts)
 			}
 		}(i, u)
 	}
 	wg.Wait()
+
+	byDir := map[string][]int{}
+	for i, u := range units {
+		if u.kind == kindManifest {
+			byDir[filepath.Dir(u.path)] = append(byDir[filepath.Dir(u.path)], i)
+		}
+	}
+	for dir, idxs := range byDir {
+		writeManifestGroup(dir, idxs, units, computations, results, version)
+	}
 
 	return Summary{Duration: time.Since(start), Results: results}, nil
 }
@@ -140,78 +151,165 @@ func processProject(dir, version string, opts Options) Result {
 			" in dbt_project.yml hold unresolved Jinja templates; using the dbt default directories for exclusion (the real ones may add cache churn)"
 	}
 
-	// A manifest.json in the project root is not a unit of its own - its .astro/
-	// is this project's, so it would collide with the sidecar written below - and
-	// findManifests skips it for that reason. Slim it here instead, leaving the
-	// project's own hash as the anchor the pointer hangs off.
-	var filtered *FilteredManifest
+	// A manifest-like file in the project root is not a unit of its own -
+	// its .astro/ is this project's - so findManifests skips it. Slim every
+	// one found directly here instead, leaving the project's own hash as the
+	// anchor.
+	manifests := map[string]ManifestVersion{}
 	if opts.SlimManifest {
-		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, manifestFile)); readErr == nil && isDbt {
-			// Nothing mutates doc afterward here, unlike processManifest.
-			data, _ := json.Marshal(buildSlimManifest(doc, version))
-			if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
-				r.Duration = time.Since(start)
-				return r
+		entries, readErr := os.ReadDir(dir)
+		if readErr != nil {
+			r.Warning = joinNotes(r.Warning, "could not scan for manifests to slim: "+readErr.Error())
+		} else {
+			for _, e := range entries {
+				if e.IsDir() || !isManifestCandidateName(e.Name()) {
+					continue
+				}
+				doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, e.Name()))
+				if readErr != nil {
+					r.Warning = joinNotes(r.Warning, e.Name()+": could not read as a manifest ("+readErr.Error()+")")
+					continue
+				}
+				if !isDbt {
+					continue
+				}
+				// Marshal before hashDocument mutates doc below (see computeManifest).
+				data, _ := json.Marshal(buildSlimManifest(doc, version))
+				slim, writeErr := writeSlimManifest(dir, e.Name(), data)
+				if writeErr != nil {
+					// A failure slimming one candidate doesn't cost the
+					// project its tree-hash sidecar, or a sibling candidate
+					// its own already-written slim file.
+					r.Warning = joinNotes(r.Warning, e.Name()+": could not write its slim manifest ("+writeErr.Error()+")")
+					continue
+				}
+				manifests[e.Name()] = ManifestVersion{
+					Version: ProjectVersion{Algo: algoManifestJSON, Hash: hashDocument(doc)},
+					Slim:    slim,
+				}
 			}
 		}
 	}
 
-	r.Err = writeSidecar(dir, algoProjectTree, hash, version, filtered)
+	r.Err = writeSidecar(dir, algoProjectTree, hash, version, manifests)
 	r.Duration = time.Since(start)
 	return r
 }
 
-// processManifest hashes one manifest.json and writes a sidecar next to it,
-// plus a slim, field-filtered copy of the manifest when opts asks for one (see
-// buildSlimManifest). A file that isn't a dbt manifest is skipped (nothing is
-// written) so unrelated manifest.json files in the project aren't stamped.
-func processManifest(path, version string, opts Options) Result {
-	start := time.Now()
-	doc, bytes, isDbt, err := readManifestDoc(path)
-	var hash string
-	var slimData []byte
-	if err == nil && isDbt {
-		if opts.SlimManifest {
-			// Marshal before hashDocument mutates doc: the slim manifest shares
-			// doc's nested values, so only turning it into bytes here decouples
-			// the two. It holds JSON-native types only, so this cannot fail.
-			slimData, _ = json.Marshal(buildSlimManifest(doc, version))
-		}
-		hash = hashDocument(doc)
-	}
-	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
-	switch {
-	case err != nil:
-		r.Err = err
-	case !isDbt:
-		r.Skipped = true
-	default:
-		dir := filepath.Dir(path)
-		// The sidecar goes last: it carries the filtered_manifest pointer, so it
-		// must never exist before the file it points at. Stopping short of it
-		// looks like "nothing was stamped", which BestEffortPreDeploy treats as
-		// safe.
-		var filtered *FilteredManifest
-		if slimData != nil {
-			filtered, r.Err = writeSlimManifest(dir, slimData)
-		}
-		if r.Err == nil {
-			r.Err = writeSidecar(dir, algoManifestJSON, hash, version, filtered)
-		}
-	}
-	return r
+// manifestComputation is what one manifest unit produces before any writes -
+// Run groups these by directory so siblings share one sidecar write instead
+// of racing each other for it (see writeManifestGroup).
+type manifestComputation struct {
+	start    time.Time
+	bytes    int64
+	isDbt    bool
+	hash     string
+	slimData []byte
+	err      error
 }
 
-// writeSlimManifest writes data as dir's slim manifest and returns the sidecar
-// pointer describing it. data must already be marshaled, so a caller that later
-// mutates the source doc cannot leak into it (see processManifest).
-func writeSlimManifest(dir string, data []byte) (*FilteredManifest, error) {
-	if err := writeArtifact(dir, slimManifestName, data); err != nil {
+// computeManifest reads and hashes one manifest-like file, and builds its
+// slim copy when opts asks for one. A file that isn't actually a dbt manifest
+// is left unhashed, so an unrelated *.json file whose name happens to contain
+// "manifest" isn't stamped.
+func computeManifest(path, version string, opts Options) manifestComputation {
+	c := manifestComputation{start: time.Now()}
+	doc, bytes, isDbt, err := readManifestDoc(path)
+	c.bytes = bytes
+	c.isDbt = isDbt
+	if err != nil {
+		c.err = err
+		return c
+	}
+	if !isDbt {
+		return c
+	}
+	if opts.SlimManifest {
+		// Marshal before hashDocument mutates doc: the slim manifest shares
+		// doc's nested values, so only turning it into bytes here decouples
+		// the two. It holds JSON-native types only, so this cannot fail.
+		c.slimData, _ = json.Marshal(buildSlimManifest(doc, version))
+	}
+	c.hash = hashDocument(doc)
+	return c
+}
+
+// writeManifestGroup writes the slim file for each manifest in idxs that
+// computed successfully, then one shared sidecar naming all of them -
+// idxs are every kindManifest unit found in dir, so this is the directory's
+// only writer. Units whose computation failed, or weren't dbt manifests, get
+// their Result set here too and are left out of the sidecar.
+func writeManifestGroup(dir string, idxs []int, units []unit, computations []manifestComputation, results []Result, version string) {
+	manifests := map[string]ManifestVersion{}
+	for _, i := range idxs {
+		path, c := units[i].path, computations[i]
+		r := Result{Kind: kindManifest, Path: path, Files: 1, Bytes: c.bytes}
+		switch {
+		case c.err != nil:
+			r.Err = c.err
+		case !c.isDbt:
+			r.Skipped = true
+		default:
+			r.Hash = c.hash
+			var slim *SlimManifest
+			if c.slimData != nil {
+				slim, r.Err = writeSlimManifest(dir, filepath.Base(path), c.slimData)
+			}
+			if r.Err == nil {
+				manifests[filepath.Base(path)] = ManifestVersion{
+					Version: ProjectVersion{Algo: algoManifestJSON, Hash: c.hash},
+					Slim:    slim,
+				}
+			}
+		}
+		r.Duration = time.Since(c.start)
+		results[i] = r
+	}
+
+	if len(manifests) == 0 {
+		return
+	}
+	// The sidecar's top-level Version mirrors one manifest for a reader that
+	// doesn't yet look at Manifests; sorted keys make that choice stable
+	// across runs rather than whichever unit's goroutine finished last.
+	names := make([]string, 0, len(manifests))
+	for name := range manifests {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	primary := manifests[names[0]]
+
+	sidecarErr := writeSidecar(dir, primary.Version.Algo, primary.Version.Hash, version, manifests)
+	if sidecarErr == nil {
+		return
+	}
+	for _, i := range idxs {
+		if results[i].Err == nil && !results[i].Skipped {
+			results[i].Err = sidecarErr
+		}
+	}
+}
+
+// joinNotes appends add to existing, semicolon-separated.
+func joinNotes(existing, add string) string {
+	if existing == "" {
+		return add
+	}
+	return existing + "; " + add
+}
+
+// writeSlimManifest writes data as the slim companion of manifestFilename
+// (see slimNameFor) inside dir, and returns the sidecar entry describing it.
+// data must already be marshaled, so a caller that later mutates the source
+// doc cannot leak into it.
+func writeSlimManifest(dir, manifestFilename string, data []byte) (*SlimManifest, error) {
+	name := slimNameFor(manifestFilename)
+	if err := writeArtifact(dir, name, data); err != nil {
 		return nil, err
 	}
-	return &FilteredManifest{
+	return &SlimManifest{
 		Schema:  slimSchemaVersion,
-		Path:    slimManifestName,
+		Path:    name,
 		Version: ProjectVersion{Algo: algoFilteredManifest, Hash: sha256Hex(data)},
 	}, nil
 }
@@ -227,8 +325,8 @@ func (s Summary) CountFailed() int {
 	return n
 }
 
-// CountSkipped returns the number of units skipped (manifest.json files that aren't
-// dbt manifests).
+// CountSkipped returns the number of units skipped (manifest-like files that
+// aren't dbt manifests).
 func (s Summary) CountSkipped() int {
 	n := 0
 	for _, r := range s.Results {

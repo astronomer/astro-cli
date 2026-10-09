@@ -96,6 +96,57 @@ func TestCleanupRemovesSlimManifestAlongsideSidecar(t *testing.T) {
 	}
 }
 
+// TestCleanupRemovesCustomNamedSlimManifest: Cleanup matches by the
+// .slim.json suffix, not a fixed literal name.
+func TestCleanupRemovesCustomNamedSlimManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	summary, err := Run([]string{dir}, "test", Options{SlimManifest: true})
+	if err != nil || summary.CountFailed() > 0 {
+		t.Fatalf("stamping fixture manifest failed: err=%v failed=%d", err, summary.CountFailed())
+	}
+	slimPath := filepath.Join(dir, sidecarDir, "manifest_full.slim.json")
+	if _, err := os.Stat(slimPath); err != nil {
+		t.Fatalf("fixture setup: slim manifest not written: %v", err)
+	}
+
+	cleanupSummary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if got := len(cleanupSummary.Results); got != 2 {
+		t.Fatalf("results = %d, want 2 (sidecar + slim manifest)", got)
+	}
+	if cleanupSummary.CountFailed() != 0 || cleanupSummary.CountKept() != 0 {
+		t.Fatalf("failed=%d kept=%d, want 0/0", cleanupSummary.CountFailed(), cleanupSummary.CountKept())
+	}
+	if _, err := os.Stat(slimPath); !os.IsNotExist(err) {
+		t.Fatalf("custom-named slim manifest still present after cleanup: %v", err)
+	}
+}
+
+// TestCleanupKeepsForeignSlimJSONSuffixedFile: the broader suffix match must
+// not weaken the ownership check for a *.slim.json file we didn't write.
+func TestCleanupKeepsForeignSlimJSONSuffixedFile(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		".astro/some_other_tool.slim.json": `{"_generated_by": {"application": "someone-else"}}`,
+	})
+
+	summary, err := Cleanup([]string{dir})
+	if err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if got := summary.CountKept(); got != 1 {
+		t.Fatalf("kept = %d, want 1", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, sidecarDir, "some_other_tool.slim.json")); err != nil {
+		t.Fatalf("foreign *.slim.json file was removed: %v", err)
+	}
+}
+
 // TestCleanupJudgesEachArtifactSeparately: provenance is read per file, never
 // inferred from the neighbor. Deleting on the neighbor's marker would destroy
 // a file we do not own in one direction, and strand a stale artifact of ours -

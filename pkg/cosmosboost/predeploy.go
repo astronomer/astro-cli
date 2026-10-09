@@ -32,7 +32,7 @@ func slimManifestEnabled() bool {
 // (dbt_project.yml) gets a .astro/dbt_metadata.json sidecar carrying its
 // content hash, which the Cosmos Boost plugin uses as a cache version key at
 // parse time instead of hashing the project tree itself. Every standalone dbt
-// manifest.json gets a hash sidecar too, plus a slim, field-filtered copy for
+// manifest gets a hash sidecar too, plus a slim, field-filtered copy for
 // the plugin to load in place of the full manifest at DAG-parse time.
 func PreDeploy(path string) error {
 	opts := precompute.Options{SlimManifest: slimManifestEnabled()}
