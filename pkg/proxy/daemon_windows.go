@@ -113,11 +113,36 @@ func stopRequests() (<-chan struct{}, func(), error) {
 	return stop, release, nil
 }
 
-// requestStop has nothing to ask on Windows yet.
-var requestStop = func(int) bool { return false }
+// requestStop asks the daemon at pid to stop by setting its stop event, and
+// reports whether it could.
+//
+// False means there is no such event: pid is not a daemon that ever listened
+// for one, most likely a process that recycled a stale record's PID, or one in
+// another session. The caller then neither waits nor forces it, because forcing
+// would end a process that is not ours.
+var requestStop = func(pid int) bool {
+	name, err := windows.UTF16PtrFromString(stopEventName(pid))
+	if err != nil {
+		return false
+	}
+	ev, err := windows.OpenEvent(windows.EVENT_MODIFY_STATE, false, name)
+	if err != nil {
+		return false
+	}
+	defer windows.CloseHandle(ev) //nolint:errcheck // nothing to do if it fails
+	return windows.SetEvent(ev) == nil
+}
 
-// killProcess has nothing to end on Windows yet.
-var killProcess = func(int) {}
+// killProcess ends pid without asking. It is only reached for a daemon that
+// took its stop event and did not exit within stopTimeout.
+var killProcess = func(pid int) {
+	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, uint32(pid)) //nolint:gosec // a pid from our own record
+	if err != nil {
+		return
+	}
+	defer windows.CloseHandle(h)   //nolint:errcheck // nothing to do if it fails
+	windows.TerminateProcess(h, 1) //nolint:errcheck // nothing left to try
+}
 
 // processLooksLikeProxy never matches on Windows. The unix fallback reads the
 // command line with ps, which Windows has no equivalent of short of reading

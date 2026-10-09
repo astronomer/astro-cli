@@ -5,6 +5,7 @@ package proxy
 import (
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
 	"testing"
 	"time"
@@ -75,4 +76,94 @@ func TestServeStopsWhenItsEventIsSet(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("Serve did not return after its stop event was set")
 	}
+}
+
+// The test binary doubles as the daemon and as a bystander process, picked by
+// environment variable, so these tests spawn real detached processes without
+// needing an astro build.
+const (
+	helperServeEnv = "ASTRO_PROXY_TEST_SERVE_DIR"
+	helperIdleEnv  = "ASTRO_PROXY_TEST_IDLE"
+)
+
+func TestMain(m *testing.M) {
+	if dir := os.Getenv(helperServeEnv); dir != "" {
+		// Spawned by Daemon.Start as <exe> serve --port <port>.
+		d := &Daemon{Store: NewStore(dir)}
+		if err := d.Serve(os.Args[len(os.Args)-1]); err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	if os.Getenv(helperIdleEnv) != "" {
+		time.Sleep(time.Minute)
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+
+// A real daemon, start to stop: EnsureRunning spawns it detached and records
+// it, a second EnsureRunning adopts it by its signature rather than starting
+// another, and Stop ends it through its event.
+func TestDaemonStartsAdoptsAndStopsOnWindows(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(helperServeEnv, dir)
+	d := &Daemon{Store: NewStore(dir), Exe: os.Args[0], ServeArgs: []string{"serve"}, Version: "test"}
+
+	port, err := d.EnsureRunning(freePort(t))
+	if err != nil {
+		t.Fatalf("EnsureRunning: %v (log: %s)", err, readLog(d))
+	}
+	pid, alive := d.IsRunning()
+	if !alive {
+		t.Fatal("no live daemon after EnsureRunning")
+	}
+	t.Cleanup(func() { killProcess(pid) })
+	if !probeProxySignature(port) {
+		t.Fatalf("port %s does not answer as the proxy", port)
+	}
+
+	again, err := d.EnsureRunning(port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != port {
+		t.Errorf("second EnsureRunning = %s, want the running daemon's %s", again, port)
+	}
+	if p2, _ := d.IsRunning(); p2 != pid {
+		t.Errorf("second EnsureRunning replaced the daemon (pid %d, was %d)", p2, pid)
+	}
+
+	if err := d.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the daemon to exit", func() bool { return !IsPIDAlive(pid) })
+	if _, err := os.Stat(d.RecordPath()); !os.IsNotExist(err) {
+		t.Error("the record survived the stop")
+	}
+}
+
+// A live process with no stop event is not ours, so asking it to stop reports
+// false and nothing ends it.
+func TestRequestStopLeavesAProcessWithNoEvent(t *testing.T) {
+	cmd := exec.Command(os.Args[0])
+	cmd.Env = append(os.Environ(), helperIdleEnv+"=1")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { cmd.Process.Kill() }) //nolint:errcheck // test cleanup
+	pid := cmd.Process.Pid
+
+	if requestStop(pid) {
+		t.Error("requestStop reported a stop for a process with no stop event")
+	}
+	time.Sleep(200 * time.Millisecond)
+	if !IsPIDAlive(pid) {
+		t.Error("the bystander died")
+	}
+}
+
+func readLog(d *Daemon) string {
+	b, _ := os.ReadFile(d.LogPath()) //nolint:errcheck // diagnostics only
+	return string(b)
 }
