@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -58,6 +60,9 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	dir, err := c.resolveDir(dir)
 	if err != nil {
 		return err
+	}
+	if isNewProjectInHome(dir) {
+		return cliout.Usage(fmt.Errorf("%s is your home directory: a project there would take in every file under it. Run astro init in a directory of its own, or name one: astro init my-project", dir))
 	}
 	// A 1.x airflow_settings.yaml's connection and variable values go to
 	// the shared vault at this project's scope rather than into the manifest.
@@ -130,6 +135,25 @@ func (c *cli) resolveDir(dir string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(wd, dir), nil
+}
+
+// isNewProjectInHome reports whether init would make a new project of the
+// home directory, as os.UserHomeDir names it (this tree does not import
+// config/). The same directory under another spelling counts when both can be
+// read. A home directory that already has a manifest is init's to re-run, as
+// any project is.
+func isNewProjectInHome(dir string) bool {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return false
+	}
+	same := filepath.Clean(dir) == filepath.Clean(home)
+	if !same {
+		a, errA := os.Stat(dir)
+		b, errB := os.Stat(home)
+		same = errA == nil && errB == nil && os.SameFile(a, b)
+	}
+	return same && !project.HasManifest(dir)
 }
 
 func renderInit(w io.Writer, res *scaffold.Result, next string) error {

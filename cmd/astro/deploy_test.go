@@ -188,6 +188,10 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 	// Without --image-name, the project-dir check should still run and propagate.
 	err = execDeployCmd("-f", "test-deployment-id")
 	assert.ErrorIs(t, err, assert.AnError)
+
+	// An empty --image-name= names no image, so the check still runs.
+	err = execDeployCmd("-f", "test-deployment-id", "--image-name=")
+	assert.ErrorIs(t, err, assert.AnError)
 }
 
 func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {

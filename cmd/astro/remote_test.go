@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -270,4 +271,22 @@ func TestRemoteCommandIntegration(t *testing.T) {
 		assert.Contains(t, deployCmd.Example, "--deployment ")
 		assert.Contains(t, deployCmd.Example, "checking its runtime against a Deployment")
 	})
+}
+
+// --image-name pushes a prebuilt image, so like astro deploy --image-name it
+// needs no project; an empty --image-name= builds one, and the project check
+// runs.
+func TestRemoteDeployImageNameSkipsTheProjectCheck(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prev := config.WorkingPath
+	defer func() { config.WorkingPath = prev }()
+	config.WorkingPath = t.TempDir()
+
+	cmd := newRemoteDeployCmd()
+	assert.NoError(t, cmd.ParseFlags([]string{"--image-name", "custom-image:latest"}))
+	assert.NoError(t, cmd.PreRunE(cmd, nil))
+
+	cmd = newRemoteDeployCmd()
+	assert.NoError(t, cmd.ParseFlags([]string{"--image-name="}))
+	assert.ErrorContains(t, cmd.PreRunE(cmd, nil), "not an Astro project directory")
 }
