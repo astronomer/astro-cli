@@ -83,10 +83,9 @@ func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 	cmd.SilenceUsage = true
 
 	if context.IsCloudDomain(domain) {
-		cloudLogout(domain, out)
-	} else {
-		apcLogout(domain)
+		return cloudLogout(domain, out)
 	}
+	apcLogout(domain)
 	return nil
 }
 

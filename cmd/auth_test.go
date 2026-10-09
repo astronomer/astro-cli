@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 
@@ -64,8 +65,13 @@ func (s *CmdSuite) TestLogout() {
 	localDomain := "localhost"
 	apcDomain := "astronomer_dev.com"
 
-	cloudLogout = func(domain string, out io.Writer) {
+	origCloudLogout, origAPCLogout := cloudLogout, apcLogout
+	defer func() { cloudLogout, apcLogout = origCloudLogout, origAPCLogout }()
+
+	var cloudLogoutErr error
+	cloudLogout = func(domain string, out io.Writer) error {
 		s.Equal(localDomain, domain)
+		return cloudLogoutErr
 	}
 	apcLogout = func(domain string) {
 		s.Equal(apcDomain, domain)
@@ -74,6 +80,12 @@ func (s *CmdSuite) TestLogout() {
 	// cloud logout success
 	err := logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
 	s.NoError(err)
+
+	// a cloud logout that fails fails the command, so it exits non-zero
+	cloudLogoutErr = errors.New("failed to clear the credentials")
+	err = logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
+	s.ErrorIs(err, cloudLogoutErr)
+	cloudLogoutErr = nil
 
 	// software logout success
 	err = logout(&cobra.Command{}, []string{apcDomain}, os.Stdout)
