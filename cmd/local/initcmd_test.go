@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/project"
 )
 
 // initDeps pins WorkingDir to one directory (testDeps mints a fresh temp dir
@@ -296,7 +297,6 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 		t.Run(format, func(t *testing.T) {
 			d, dir, stdout := initDeps(t)
 			d.DeploysToAPC = true
-			d.ContextDomain = "apc.example.com"
 			files := write1xProject(t, dir)
 			before := listTree(t, dir)
 
@@ -308,15 +308,7 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 			if err == nil || !cliout.IsUsage(err) {
 				t.Fatalf("want a usage error, got %v", err)
 			}
-			for _, want := range []string{
-				"is an Astro CLI 1.x project, and the current context (apc.example.com) is Astro Private Cloud",
-				"leaves the project as it is for now",
-				"once Astro Private Cloud deploys pyproject.toml projects",
-			} {
-				if !strings.Contains(err.Error(), want) {
-					t.Errorf("error missing %q:\n%v", want, err)
-				}
-			}
+			requireAPCAdvice(t, err, dir)
 			requireUnchanged(t, dir, before, files)
 			if format == "json" {
 				var obj cliout.ErrorObject
@@ -328,6 +320,29 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// requireAPCAdvice fails unless err is the one account every hint under APC
+// gives (project.Project1xUnderAPC) of the 1.x project in dir: why it stays,
+// and how to convert anyway, in plain text.
+func requireAPCAdvice(t *testing.T, err error, dir string) {
+	t.Helper()
+	if want := project.Project1xUnderAPC(dir); err.Error() != want {
+		t.Errorf("error = %q\nwant    %q", err, want)
+	}
+	for _, want := range []string{
+		"the current context is Astro Private Cloud",
+		"Leave the project as it is for now",
+		"once Astro Private Cloud deploys pyproject.toml projects",
+		"switch to an Astro context first (astro context switch astronomer.io",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error missing %q:\n%v", want, err)
+		}
+	}
+	if strings.Contains(err.Error(), "`") {
+		t.Errorf("the advice is plain text:\n%v", err)
 	}
 }
 
@@ -349,7 +364,6 @@ func requireUnchanged(t *testing.T, dir string, before []string, files map[strin
 // Under an Astro context, or none, a 1.x project converts as it always has.
 func TestInitConverts1xProjectUnderAstro(t *testing.T) {
 	d, dir, stdout := initDeps(t)
-	d.ContextDomain = "astronomer.io"
 	write1xProject(t, dir)
 	if err := execute(t, d, "init"); err != nil {
 		t.Fatalf("astro init: %v", err)
@@ -366,20 +380,60 @@ func TestInitConverts1xProjectUnderAstro(t *testing.T) {
 }
 
 // A directory that is not a 1.x project is made a project under APC too, with
-// a note that APC does not deploy it yet.
+// a note that APC does not deploy it yet. The note comes with the run that
+// made the project, and only that run: init again is refused, as anywhere,
+// and says nothing of APC.
 func TestInitScaffoldsUnderAPCWithANote(t *testing.T) {
 	d, dir, stdout := initDeps(t)
 	d.DeploysToAPC = true
-	d.ContextDomain = "apc.example.com"
 	if err := execute(t, d, "init"); err != nil {
 		t.Fatalf("astro init: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
 		t.Errorf("missing pyproject.toml: %v", err)
 	}
-	want := "The current context (apc.example.com) is Astro Private Cloud, which does not deploy pyproject.toml " +
-		"projects yet"
-	if !strings.Contains(stdout.String(), want) {
+	if !strings.Contains(stdout.String(), apcDeployNote) {
 		t.Errorf("want the APC note:\n%s", stdout)
+	}
+
+	stdout.Reset()
+	err := execute(t, d, "init")
+	if err == nil || !strings.Contains(err.Error(), "is already an Astro project") {
+		t.Fatalf("want init again refused, got %v", err)
+	}
+	if strings.Contains(stdout.String()+err.Error(), "Astro Private Cloud") {
+		t.Errorf("a rerun repeats the APC note:\n%s\n%v", stdout, err)
+	}
+}
+
+// Under APC, every other hint about a 1.x project says what init's refusal
+// says rather than to run astro init: a command that discovers the project,
+// and the astro dev stub. Under Astro they still say to convert.
+func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
+	for _, apc := range []bool{true, false} {
+		t.Run(map[bool]string{true: "apc", false: "astro"}[apc], func(t *testing.T) {
+			d, dir, _ := initDeps(t)
+			d.DeploysToAPC = apc
+			write1xProject(t, dir)
+
+			err := execute(t, d, "local", "status")
+			if err == nil {
+				t.Fatal("astro local status in a 1.x project must fail")
+			}
+			if got := strings.Contains(err.Error(), project.Project1xUnderAPC("this directory")); got != apc {
+				t.Errorf("discovery error carries the APC advice = %v, want %v:\n%v", got, apc, err)
+			}
+
+			err = execute(t, d, "dev", "start")
+			if err == nil {
+				t.Fatal("astro dev must fail")
+			}
+			if got := strings.Contains(err.Error(), project.Project1xUnderAPC("This directory")); got != apc {
+				t.Errorf("dev stub carries the APC advice = %v, want %v:\n%v", got, apc, err)
+			}
+			if converts := strings.Contains(err.Error(), "to convert it in place"); converts == apc {
+				t.Errorf("dev stub says to convert = %v under apc = %v:\n%v", converts, apc, err)
+			}
+		})
 	}
 }

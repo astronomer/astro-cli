@@ -37,14 +37,22 @@ type devRemoved struct {
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
 	// Convert is the command that converts a 1.x project in place, set with
-	// Is1xProject.
+	// Is1xProject unless the current context is Astro Private Cloud, where
+	// astro init refuses one.
 	Convert string `json:"convert,omitempty"`
+	// underAPC says the stub ran under an Astro Private Cloud context, for
+	// the text rendering's account of a 1.x project.
+	underAPC bool
 }
 
 // devContext is what the stub reads about the directory it runs in and the
 // command tree it points into.
 type devContext struct {
 	is1x bool
+	// apc is set under an Astro Private Cloud context, where astro init
+	// refuses a 1.x project, so the stub says what that refusal says
+	// (project.Project1xUnderAPC) rather than to convert.
+	apc bool
 	// dockerfile is set when the current project declares [tool.astro]
 	// dockerfile, which only Docker mode builds.
 	dockerfile bool
@@ -86,6 +94,7 @@ func NewDevCmd(d Deps) *cobra.Command {
 func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
 		is1x:               c.is1xProject(),
+		apc:                c.d.DeploysToAPC,
 		dockerfile:         c.declaresDockerfile(),
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
@@ -155,8 +164,9 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 		Typed:       strings.TrimSpace("astro dev " + typed),
 		Mapping:     mapping,
 		Is1xProject: dc.is1x,
+		underAPC:    dc.apc,
 	}
-	if dc.is1x {
+	if dc.is1x && !dc.apc {
 		p.Convert = replaceInit
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
@@ -329,7 +339,10 @@ func renderDevRemoved(p devRemoved) string {
 		seen[e.Command] = true
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
-	if p.Is1xProject {
+	switch {
+	case p.Is1xProject && p.underAPC:
+		b.WriteString("\n\n" + project.Project1xUnderAPC("This directory") + ".")
+	case p.Is1xProject:
 		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
 			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
 			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)

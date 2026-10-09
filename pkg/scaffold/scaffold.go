@@ -576,7 +576,7 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// alone would be. `RUN pip install -r requirements.txt` is the common one,
 	// and packages.txt is consumed the same way by the runtime image's ONBUILD
 	// step, from the build context.
-	if !slices.Contains(out, "Dockerfile") && from1x.hasDockerfile() {
+	if !slices.Contains(out, "Dockerfile") && len(from1x.dockerfileBody) > 0 {
 		body := string(from1x.dockerfileBody)
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return strings.Contains(body, name)
@@ -606,24 +606,15 @@ func dockerfileIsSpent(from1x *project1x, pinned string) bool {
 // times, any refinement (a file with only comments and a FROM, an ARG-only one)
 // lands in some of them and the label and the declaration disagree.
 func declaresDockerfile(from1x *project1x) bool {
-	return from1x.hasDockerfile() && !from1x.dockerfilePinOnly
+	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly
 }
 
-// hasDockerfile reports a Dockerfile with something in it to build: the one
-// fact declaresDockerfile and planRetirements' check of a surviving file
-// share, since an empty file builds nothing.
-func (from1x *project1x) hasDockerfile() bool {
-	return len(from1x.dockerfileBody) > 0
-}
-
-// buildPython is the Python the Dockerfile's runtime base runs when its tag
-// names one ("3.1-12-python-3.12"), or "". A Dockerfile that is only a pin
-// gives it too: a conversion that retires that file carries the choice as
-// requires-python, which a generated image honors
-// (imagebuild.RuntimeImageForPython), where reading nothing dropped it and
-// the image ran the runtime's default Python.
+// buildPython is the Python this project's image runs when its Dockerfile is
+// the build and the base's tag names one, or "". A Dockerfile that is only a
+// pin gives nothing here: the image is then generated from the runtime series
+// and runs that runtime's default Python.
 func (from1x *project1x) buildPython() string {
-	if !from1x.hasDockerfile() {
+	if !declaresDockerfile(from1x) {
 		return ""
 	}
 	return from1x.basePython

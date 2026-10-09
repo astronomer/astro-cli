@@ -39,7 +39,6 @@ const (
 // either platform branch with no ambient config and no network.
 type rootOptions struct {
 	platform      string // cloudPlatform or apcPlatform
-	domain        string // the current context's, empty with none
 	loggedIn      bool
 	houstonClient houston.ClientInterface
 	out           io.Writer
@@ -48,19 +47,12 @@ type rootOptions struct {
 // detectRootOptions reads the machine. It is the only ambient part of building
 // the root, so newRootCmd below stays a pure function of what this returns.
 func detectRootOptions() rootOptions {
-	// One read of the current context, which IsCloudContext would repeat: no
-	// context is Astro, with no domain to name.
 	platform := cloudPlatform
-	var domain string
-	if c, err := context.GetCurrentContext(); err == nil {
-		domain = c.Domain
-		if !context.IsCloudDomain(domain) {
-			platform = apcPlatform
-		}
+	if !context.IsCloudContext() {
+		platform = apcPlatform
 	}
 	return rootOptions{
 		platform:      platform,
-		domain:        domain,
 		loggedIn:      true,
 		houstonClient: houston.NewClient(houston.NewHTTPClient()),
 		out:           os.Stdout,
@@ -164,9 +156,8 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
 	// The deploy this tree mounted: APC's still builds the 1.x layout, so
-	// `astro init` refuses to convert a 1.x project under it.
+	// astro init refuses to convert a 1.x project under it.
 	coreDeps.DeploysToAPC = !isCloudCtx
-	coreDeps.ContextDomain = o.domain
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)

@@ -156,14 +156,12 @@ type Deps struct {
 	LaunchOtto func(prompt string) error
 
 	// DeploysToAPC reports that the current context is Astro Private Cloud,
-	// whose `astro deploy` builds only a 1.x project, so `astro init` refuses
-	// to convert one there (refuse1xUnderAPC). The root sets it from the
-	// platform it mounted, because the context lives in config/, which this
-	// tree never imports. false is Astro, as it is with no context.
+	// whose deploy builds only a 1.x project, so astro init refuses to
+	// convert one there and every hint about a 1.x project says the same
+	// (project.Project1xUnderAPC). The root sets it from the platform it
+	// mounted, because the context lives in config/, which this tree never
+	// imports. false is Astro, as it is with no context.
 	DeploysToAPC bool
-	// ContextDomain is the current context's domain, for the message that
-	// names it. Empty when no context is current.
-	ContextDomain string
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an

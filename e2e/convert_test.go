@@ -744,7 +744,8 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 	}
 	e := lastErrorObject(r.Stdout)
 	if e == nil || e.Kind != "usage" || !strings.Contains(e.Error, "Astro Private Cloud") ||
-		!strings.Contains(e.Error, "leaves the project as it is for now") {
+		!strings.Contains(e.Error, "Leave the project as it is for now") ||
+		!strings.Contains(e.Error, "astro context switch astronomer.io") {
 		t.Errorf("want one usage error object naming APC on stdout:\n%s", r.output())
 	}
 	for name, body := range files {

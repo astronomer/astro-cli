@@ -177,8 +177,11 @@ platform you deploy to. The exception, for now, is Astro Private Cloud: its
 Astro Private Cloud one, `init` refuses a 1.x project (a `Dockerfile` beside
 `.astro/`) and changes nothing. Leave the project as it is, and `astro deploy`
 keeps working with it. Converting will be available once Astro Private Cloud
-deploys `pyproject.toml` projects. A new project `init` creates under such a
-context says, under Left to do, that Astro Private Cloud cannot deploy it yet.
+deploys `pyproject.toml` projects. To convert anyway, for Astro or for local
+development only, switch to an Astro context first (`astro context switch
+astronomer.io`, or `astro login`) and run `init` again. A new project `init`
+creates under an Astro Private Cloud context says, under Left to do, that
+Astro Private Cloud cannot deploy it yet.
 
 What `init` converts:
 
@@ -199,13 +202,11 @@ the first of:
 
 1. `--airflow-version`;
 2. an `apache-airflow` pin already in `pyproject.toml`;
-3. the Dockerfile's `FROM`, when a stage builds on an Astro Runtime image: a
-   repository named `runtime` or `astro-runtime`, on any registry, so a
-   private mirror counts. A tag like `runtime:3.3-2`, or the floating
-   `runtime:3.3`, names Airflow 3.3. An `astro-runtime` tag like `9.1.0` is a
-   *runtime* version that does not name the Airflow minor (its `3.0` is
-   Runtime 3, an Airflow 2 image), so `init` pins `apache-airflow==2.*` and
-   says so under Left to do;
+3. the Dockerfile's `FROM`, when a stage builds on an Astro Runtime image. A
+   tag like `runtime:3.3-2` names Airflow 3.3. An older tag like
+   `astro-runtime:9.1.0` is a *runtime* version that does not name the
+   Airflow minor, so `init` pins `apache-airflow==2.*` and says so under Left
+   to do;
 4. an `apache-airflow==` pin in `requirements.txt`;
 5. the newest supported series from the runtime catalog.
 
@@ -223,8 +224,8 @@ one release. Keep the version you run today, and upgrade later as its own step
 (`astro local upgrade airflow`): porting and upgrading at once turns one
 failure into two. The requirement is the only place the version goes.
 
-`init` also writes `requires-python` for the version it pins (`==3.13.*` when
-the Dockerfile's tag names Python 3.13, whether the file is kept or removed). If you change the pin, check it: an
+`init` also writes `requires-python` for the version it pins (`==3.13.*` when a
+kept Dockerfile's tag names Python 3.13). If you change the pin, check it: an
 older Airflow has no wheels for a recent Python, and the install then fails
 while compiling a dependency, which reads like a broken package rather than a
 Python that is too new. Airflow 2.7 wants 3.11 or lower.

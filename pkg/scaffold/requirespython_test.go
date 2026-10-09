@@ -141,11 +141,11 @@ func TestADeclaredDockerfilesPythonIsTheProjects(t *testing.T) {
 			">=3.12",
 		},
 		{
-			// The file goes, so its Python choice is carried, and a
-			// generated image runs the Python requires-python admits.
-			"a Dockerfile that is only a pin carries its Python",
+			// The file goes, and the generated image runs the runtime's
+			// default Python rather than the tag's.
+			"a Dockerfile that is only a pin keeps the rule",
 			"FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\n",
-			"==3.13.*",
+			">=3.12",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -159,26 +159,6 @@ func TestADeclaredDockerfilesPythonIsTheProjects(t *testing.T) {
 			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, m.Project.RequiresPython)
-		})
-	}
-}
-
-// A pin-only Dockerfile naming a Python, floating tag or pinned, is retired
-// with its Python carried as requires-python, so the choice is not dropped.
-func TestARetiredPinOnlyDockerfileCarriesItsPython(t *testing.T) {
-	for _, tag := range []string{"3.1-python-3.12", "3.1-12-python-3.12"} {
-		t.Run(tag, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
-				[]byte("FROM astrocrpublic.azurecr.io/runtime:"+tag+"\n"), 0o600))
-
-			_, err := Run(dir, Options{})
-			require.NoError(t, err)
-
-			assert.NoFileExists(t, filepath.Join(dir, "Dockerfile"))
-			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
-			require.NoError(t, err)
-			assert.Equal(t, "==3.12.*", m.Project.RequiresPython)
 		})
 	}
 }

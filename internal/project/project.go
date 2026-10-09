@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -37,11 +38,15 @@ type NotFoundError struct {
 	// marker, so without this the error would only say what is missing, not
 	// that `astro init` upgrades what is there.
 	Project1xDir string
+	// UnderAPC says the current context is Astro Private Cloud, where a 1.x
+	// project is not to be converted yet (Project1xUnderAPC). Set by
+	// AdviseUnderAPC, since this package does not read the context.
+	UnderAPC bool
 }
 
 func (e *NotFoundError) Error() string {
 	if e.Project1xDir != "" {
-		return project1xMessage(e.Start, e.Project1xDir)
+		return project1xMessage(e.Start, e.Project1xDir, e.UnderAPC)
 	}
 	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun `%s` to make this directory one",
 		Marker, e.Start, initCommand)
@@ -57,11 +62,13 @@ type NoAstroSectionError struct {
 	Dir   string
 	// Has1xProject is whether Dir also holds a 1.x project (see Is1xProject).
 	Has1xProject bool
+	// UnderAPC is NotFoundError.UnderAPC.
+	UnderAPC bool
 }
 
 func (e *NoAstroSectionError) Error() string {
 	if e.Has1xProject {
-		return project1xMessage(e.Start, e.Dir)
+		return project1xMessage(e.Start, e.Dir, e.UnderAPC)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
 		"Run `%s` in %s to add one; the rest of the file is left alone",
@@ -71,15 +78,69 @@ func (e *NoAstroSectionError) Error() string {
 func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection }
 
 // project1xMessage says that project1xDir holds a 1.x project and how to upgrade it,
-// naming the directory only when it is not the one the command ran in.
-func project1xMessage(start, project1xDir string) string {
+// naming the directory only when it is not the one the command ran in. Under
+// an Astro Private Cloud context (apc) it says what Project1xUnderAPC says
+// instead.
+func project1xMessage(start, project1xDir string, apc bool) string {
 	where, there := "this directory", "here"
 	if project1xDir != start {
 		where, there = project1xDir, "in "+project1xDir
 	}
+	if apc {
+		return Project1xUnderAPC(where)
+	}
 	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
 		"Run `%s` %s to upgrade it in place", where, initCommand, there)
 }
+
+// Project1xUnderAPC is the one account of a 1.x project under an Astro
+// Private Cloud context, where is the directory holding it as a sentence
+// begins with it. APC's deploy still builds the 1.x layout, so astro init
+// refuses to convert one there, and every hint that would otherwise say to
+// run it says this instead: astro init's refusal, the errors of a command run
+// in such a project, and the astro dev stub.
+func Project1xUnderAPC(where string) string {
+	return where + " holds a project made by Astro CLI 1.x (Dockerfile and .astro/), and the current context is " +
+		"Astro Private Cloud, whose astro deploy still builds that layout. Leave the project as it is for now: " +
+		"astro deploy keeps working with it on Astro Private Cloud, and converting it will be available once " +
+		"Astro Private Cloud deploys pyproject.toml projects. To convert it anyway, for Astro or for local " +
+		"development only, switch to an Astro context first (astro context switch astronomer.io, or astro login " +
+		"to sign in to Astro) and run " + initCommand + " again"
+}
+
+// AdviseUnderAPC returns err with a 1.x project's NotFoundError or
+// NoAstroSectionError in it marked as met under an Astro Private Cloud
+// context, so its message says what Project1xUnderAPC says. A wrapping
+// fmt.Errorf has already rendered the old message into its own, so that text
+// is replaced in the outer message too; errors.Is and errors.As still see
+// everything err wraps.
+func AdviseUnderAPC(err error) error {
+	var before, after string
+	var nf *NotFoundError
+	var ns *NoAstroSectionError
+	switch {
+	case errors.As(err, &nf) && nf.Project1xDir != "" && !nf.UnderAPC:
+		before = nf.Error()
+		nf.UnderAPC = true
+		after = nf.Error()
+	case errors.As(err, &ns) && ns.Has1xProject && !ns.UnderAPC:
+		before = ns.Error()
+		ns.UnderAPC = true
+		after = ns.Error()
+	default:
+		return err
+	}
+	return &advisedError{err: err, msg: strings.Replace(err.Error(), before, after, 1)}
+}
+
+// advisedError is err with its message rewritten by AdviseUnderAPC.
+type advisedError struct {
+	err error
+	msg string
+}
+
+func (e *advisedError) Error() string { return e.msg }
+func (e *advisedError) Unwrap() error { return e.err }
 
 // LoadError returns the error to report for a manifest.Load of dir's marker,
 // discovered from start, that failed with err: a *NoAstroSectionError in place
@@ -193,7 +254,7 @@ func HasManifest(dir string) bool {
 // directory a project with a manifest. `astro init` converts a 1.x directory,
 // reporting the 1.x files it could not read rather than refusing them, and
 // consults this only under an Astro Private Cloud context, where it refuses
-// one because APC's deploy still builds the 1.x layout.
+// one (Project1xUnderAPC).
 func Is1xProject(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
 		return false

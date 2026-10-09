@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -86,8 +87,11 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found.
 	c.writeAstroBuild(ctx, res.Dir)
+	// Only a run that made the directory a project gets here: init refuses one
+	// that already is (scaffold.ErrAlreadyAstroProject), so the note is said
+	// once, when the project is new.
 	if c.d.DeploysToAPC {
-		res.Notes = append(res.Notes, apcDeployNote(c.d.ContextDomain))
+		res.Notes = append(res.Notes, apcDeployNote)
 	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
@@ -95,13 +99,14 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 }
 
 // There is one project format, and `astro init` converts a 1.x project to it
-// the same way on every platform. Astro Private Cloud's `astro deploy` still
-// builds only the 1.x layout (a Dockerfile and .astro/config.yaml), so a
-// project converted under an APC context would stop deploying there. Until
-// APC deploys pyproject.toml projects, init refuses to convert one under an
-// APC context and changes nothing; the project keeps deploying as it is. A
-// directory that is not a 1.x project (project.Is1xProject) is made a project
-// as anywhere, with a note that APC cannot deploy it yet.
+// the same way on every platform. Astro Private Cloud's deploy still builds
+// only the 1.x layout (a Dockerfile and .astro/config.yaml), so a project
+// converted under an APC context would stop deploying there. Until APC
+// deploys pyproject.toml projects, init refuses to convert one under an APC
+// context and changes nothing (project.Project1xUnderAPC says why, and how to
+// convert anyway). A directory that is not a 1.x project
+// (project.Is1xProject) is made a project as anywhere, with a note that APC
+// cannot deploy it yet.
 
 // refuse1xUnderAPC refuses a 1.x project under an APC context, as a usage
 // error: nothing ran, and nothing was written.
@@ -109,26 +114,13 @@ func (c *cli) refuse1xUnderAPC(dir string) error {
 	if !c.d.DeploysToAPC || !project.Is1xProject(dir) {
 		return nil
 	}
-	return cliout.Usage(fmt.Errorf("%s is an Astro CLI 1.x project, and the current context%s is Astro Private Cloud, "+
-		"whose astro deploy still builds the 1.x layout, so astro init leaves the project as it is for now and "+
-		"astro deploy keeps working with it. Converting it will be available once Astro Private Cloud deploys "+
-		"pyproject.toml projects", dir, inParens(c.d.ContextDomain)))
+	return cliout.Usage(errors.New(project.Project1xUnderAPC(dir)))
 }
 
-// apcDeployNote says that the project init just made does not deploy to the
+// apcDeployNote says that a project init just made does not deploy to the
 // Astro Private Cloud the current context names, yet.
-func apcDeployNote(domain string) string {
-	return "The current context" + inParens(domain) + " is Astro Private Cloud, which does not deploy " +
-		"pyproject.toml projects yet, so astro deploy there will not deploy this project until it does"
-}
-
-// inParens is " (s)", or nothing for an empty s.
-func inParens(s string) string {
-	if s == "" {
-		return ""
-	}
-	return " (" + s + ")"
-}
+const apcDeployNote = "The current context is Astro Private Cloud, which does not deploy pyproject.toml " +
+	"projects yet, so astro deploy there will not deploy this project until it does"
 
 // nextStart is the start command to suggest once init is done. Standalone
 // mode builds no image, so a project whose manifest declares a Dockerfile or
