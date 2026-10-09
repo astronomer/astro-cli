@@ -178,7 +178,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
-	warnings = shipProject(req.ProjectDir, &breq, warnings)
+	shipProject(req.ProjectDir, &breq)
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
 		return Result{}, err
@@ -190,13 +190,14 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectContext, declaredDockerfile{
+	hash, fileWarnings, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectContext, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
 	if err != nil {
 		return Result{}, err
 	}
+	warnings = append(warnings, fileWarnings...)
 
 	// The build context lives in a scratch dir the target owns unless the caller
 	// pins one (a test). A pinned WorkDir is left in place; a made one is removed.
@@ -314,26 +315,16 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 }
 
 // shipProject asks a generated build to copy the project in, dags/ included,
-// as a deploy to a Deployment without DAG deploys does. A declared
-// Dockerfile's context is the project already and its own COPY lines decide,
-// so it is asked for nothing.
-//
-// It adds a warning to warnings when the project's ignore file leaves dags/
-// out, since such an image carries no DAGs, and a Deployment without DAG
-// deploys runs only the image's. `astro deploy` refuses that build.
-func shipProject(projectDir string, breq *imagebuild.Request, warnings []string) []string {
-	if breq.FromDeclaredDockerfile() {
-		return warnings
-	}
-	breq.ProjectContext = projectDir
-	if scaffold.IgnoresDir(projectDir, "", "dags") {
-		warnings = append(warnings, dagsIgnoredWarning)
-	}
-	return warnings
+// as a deploy to a Deployment without DAG deploys does
+// (imagebuild.ShipProject). A declared Dockerfile's context is the project
+// already and its own COPY lines decide, so it is asked for nothing.
+func shipProject(projectDir string, breq *imagebuild.Request) {
+	imagebuild.ShipProject(breq, projectDir, true)
 }
 
-// dagsIgnoredWarning is shipProject's warning.
-const dagsIgnoredWarning = "the project's .dockerignore leaves dags/ out, so the image carries no DAGs. A Deployment without DAG deploys runs only the image's DAGs; remove the entry to package them"
+// dagsIgnoredWarning is the warning for ignore rules that leave every DAG
+// file out of a generated image.
+const dagsIgnoredWarning = "the project's .dockerignore leaves out every DAG file in dags/, so the image carries no DAGs. A Deployment without DAG deploys runs only the image's DAGs; remove the rule to package them"
 
 // reachEngine resolves the container engine for the project and probes it up
 // front, so an engine that is missing or down is a plain ErrNoDocker rather
@@ -520,8 +511,9 @@ type declaredDockerfile struct {
 }
 
 // contentHash's project is the ProjectContext a generated build copies in, ""
-// for a declared Dockerfile.
-func contentHash(base, platform string, deps, packages []string, project string, df declaredDockerfile) (string, error) {
+// for a declared Dockerfile. Reading it also finds what the package warns
+// about the project's files, which comes back with the hash.
+func contentHash(base, platform string, deps, packages []string, project string, df declaredDockerfile) (hash string, warnings []string, err error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -535,19 +527,22 @@ func contentHash(base, platform string, deps, packages []string, project string,
 		writeField("pkg", p)
 	}
 	if project != "" {
-		digest, err := contextDigest(project)
+		digest, dagsIgnored, err := contextDigest(project)
 		if err != nil {
-			return "", err
+			return "", nil, err
 		}
 		writeField("files", digest)
+		if dagsIgnored {
+			warnings = append(warnings, dagsIgnoredWarning)
+		}
 	}
 	if df.abs != "" {
 		writeField("dockerfile", filepath.ToSlash(df.rel))
 		body, err := os.ReadFile(df.abs)
 		if err != nil {
-			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
+			return "", nil, fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
 		}
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}
-	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
+	return fmt.Sprintf("%x", h.Sum(nil))[:7], warnings, nil
 }

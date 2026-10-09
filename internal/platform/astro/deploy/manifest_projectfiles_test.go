@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -31,7 +32,7 @@ type projectStepCmd struct {
 }
 
 func (f *projectStepCmd) Run(ctx context.Context, env []string, s localrt.Stdio, name string, args ...string) error {
-	if len(args) > 0 && args[0] == "build" {
+	if len(args) > 0 && (args[0] == "build" || args[0] == "buildx") {
 		for i, a := range args {
 			if a == "--file" && i+1 < len(args) && strings.HasSuffix(args[i+1], "Dockerfile.astro-project") {
 				f.projectContext = args[len(args)-1]
@@ -134,10 +135,10 @@ func TestDeployManifestImage_DagDeployShipsTheProjectWithoutDagsAndUploadsThem(t
 	require.NoError(t, err)
 
 	assert.Equal(t, dir, cmd.projectContext, "the project is the build context")
-	assert.Equal(t, "dags/", cmd.ignore[len(cmd.ignore)-1])
+	assert.Equal(t, "dags", cmd.ignore[len(cmd.ignore)-1])
 	assert.Equal(t, 1, *uploads)
 	assert.Equal(t, "tarball-v1", res.DagTarballVersion)
-	assert.Equal(t, DagsUploaded, res.Dags)
+	assert.Equal(t, manifestdeploy.DagsUploaded, res.Dags)
 }
 
 // A Deployment that takes no DAG deploys runs the image's DAGs, so a "both"
@@ -152,10 +153,10 @@ func TestDeployManifestImage_NoDagDeployBuildsDagsIntoTheImage(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, dir, cmd.projectContext)
-	assert.NotContains(t, cmd.ignore, "dags/")
+	assert.NotContains(t, cmd.ignore, "dags")
 	assert.Zero(t, *uploads, "nothing is uploaded to a Deployment that takes no DAG deploys")
 	assert.Empty(t, res.DagTarballVersion)
-	assert.Equal(t, DagsBuiltIn, res.Dags)
+	assert.Equal(t, manifestdeploy.DagsBuiltIn, res.Dags)
 	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool {
 		return r.Type == astrov1.CreateDeployRequestTypeIMAGEANDDAG
 	}))
@@ -164,10 +165,23 @@ func TestDeployManifestImage_NoDagDeployBuildsDagsIntoTheImage(t *testing.T) {
 	}))
 }
 
-// An ignore file that leaves dags/ out would ship an image with no DAGs to a
-// Deployment that runs only the image's. 1.x removed a "dags/" line before the
-// build; this refuses, naming the entry, and edits nothing.
+// Ignore rules that leave every DAG file out would ship an image with no DAGs
+// to a Deployment that runs only the image's. 1.x removed a "dags/" line
+// before the build; this refuses, for any rule that drops them all, and edits
+// nothing.
 func TestDeployManifestImage_RefusesToBuildDagsInWhenTheIgnoreFileLeavesThemOut(t *testing.T) {
+	for _, rule := range []string{"dags/", "dags", "dags/**", "dags/*", "**/*.py", "*"} {
+		t.Run(rule, func(t *testing.T) {
+			cmd := withProjectStep(t)
+			dir := projectWithCode(t)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte(rule+"\n"), 0o600))
+
+			_, _, err := deployWith(t, false, false, &ManifestImageDeployInput{Build: manifestBuildOf(dir), IncludeDags: true})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "leaves out every DAG file in dags/")
+			assert.False(t, hasImageCall(cmd.calls, "build --tag"), "refused before the build, got %v", cmd.calls)
+		})
+	}
 	for name, build := range map[string]func(dir string) imagebuild.ManifestBuild{
 		"generated": manifestBuildOf,
 		"declared Dockerfile": func(dir string) imagebuild.ManifestBuild {
@@ -182,7 +196,7 @@ func TestDeployManifestImage_RefusesToBuildDagsInWhenTheIgnoreFileLeavesThemOut(
 
 			_, client, err := deployWith(t, false, false, &ManifestImageDeployInput{Build: build(dir), IncludeDags: true})
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "found a dags entry in the project's .dockerignore")
+			assert.Contains(t, err.Error(), "leaves out every DAG file in dags/")
 			assert.False(t, hasImageCall(cmd.calls, "build --tag"), "refused before the build, got %v", cmd.calls)
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			got, err := os.ReadFile(filepath.Join(dir, ".dockerignore"))
@@ -236,7 +250,7 @@ func TestDeployManifestImage_ImageOnlyWithDagDeployShipsNoDags(t *testing.T) {
 	res, _, err := deployWith(t, true, false, &ManifestImageDeployInput{Build: manifestBuildOf(projectWithCode(t))})
 	require.NoError(t, err)
 
-	assert.Equal(t, "dags/", cmd.ignore[len(cmd.ignore)-1])
+	assert.Equal(t, "dags", cmd.ignore[len(cmd.ignore)-1])
 	assert.Zero(t, *uploads)
 	assert.Empty(t, res.Dags)
 }
@@ -254,10 +268,10 @@ func TestDeployManifestImage_RemoteExecutionShipsNoDags(t *testing.T) {
 				res, _, err := deployWith(t, dagDeploy, true, &ManifestImageDeployInput{Build: manifestBuildOf(projectWithCode(t)), IncludeDags: both})
 				require.NoError(t, err)
 
-				assert.Equal(t, "dags/", cmd.ignore[len(cmd.ignore)-1])
+				assert.Equal(t, "dags", cmd.ignore[len(cmd.ignore)-1])
 				assert.Zero(t, *uploads)
 				if both {
-					assert.Equal(t, DagsNone, res.Dags)
+					assert.Equal(t, manifestdeploy.DagsNone, res.Dags)
 				}
 			})
 		}
@@ -279,7 +293,7 @@ func TestDeployManifestImage_PrebuiltImageWithoutDagDeploy(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, hasImageCall(cmd.calls, "build --tag"), "a prebuilt image is not built, got %v", cmd.calls)
 	assert.Zero(t, *uploads)
-	assert.Equal(t, DagsFromImage, res.Dags)
+	assert.Equal(t, manifestdeploy.DagsFromImage, res.Dags)
 }
 
 // A declared Dockerfile's context is the project already: there is no project
@@ -304,5 +318,93 @@ func TestDeployManifestImage_DeclaredDockerfileWithoutDagDeploy(t *testing.T) {
 	}
 	require.Len(t, builds, 1)
 	assert.True(t, strings.HasSuffix(builds[0], " "+dir), builds[0])
-	assert.Equal(t, DagsFromImage, res.Dags)
+	assert.Equal(t, manifestdeploy.DagsFromImage, res.Dags)
+}
+
+// A rule that leaves out only some DAG files, or other files in dags/, is not
+// a reason to refuse.
+func TestDeployManifestImage_SomeDagsLeftOutIsFine(t *testing.T) {
+	withProjectStep(t)
+	dir := projectWithCode(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dags", "other.py"), []byte("# dag\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("dags/example.py\n"), 0o600))
+
+	res, _, err := deployWith(t, false, false, &ManifestImageDeployInput{Build: manifestBuildOf(dir), IncludeDags: true})
+	require.NoError(t, err)
+	assert.Equal(t, manifestdeploy.DagsBuiltIn, res.Dags)
+}
+
+// With no DAG files to build in, the deploy goes ahead, as 1.x did, and says
+// the Deployment will run none rather than claiming DAGs are in the image.
+func TestDeployManifestImage_NoDagFilesToBuildIn(t *testing.T) {
+	for name, prep := range map[string]func(dir string){
+		"no dags directory": func(dir string) { require.NoError(t, os.RemoveAll(filepath.Join(dir, "dags"))) },
+		"no .py files":      func(dir string) { require.NoError(t, os.Remove(filepath.Join(dir, "dags", "example.py"))) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			withProjectStep(t)
+			dir := projectWithCode(t)
+			prep(dir)
+			var warnings []string
+
+			res, _, err := deployWith(t, false, false, &ManifestImageDeployInput{
+				Build: manifestBuildOf(dir), IncludeDags: true,
+				Warn: func(w string) { warnings = append(warnings, w) },
+			})
+			require.NoError(t, err)
+			assert.Equal(t, manifestdeploy.DagsEmpty, res.Dags)
+			require.Len(t, warnings, 1)
+			assert.Contains(t, warnings[0], "dags/ holds no DAG files")
+		})
+	}
+}
+
+// A prebuilt image or a declared Dockerfile to a Deployment without DAG
+// deploys is all the Deployment will run, and the CLI did not put DAGs in it,
+// so the deploy says so. 1.x deployed both silently.
+func TestDeployManifestImage_WarnsThatOnlyTheImagesDagsWillRun(t *testing.T) {
+	t.Run("prebuilt", func(t *testing.T) {
+		withProjectStep(t)
+		var warnings []string
+		res, _, err := deployWith(t, false, false, &ManifestImageDeployInput{
+			Build:     imagebuild.ManifestBuild{ProjectDir: projectWithCode(t)},
+			ImageName: "astro-package/demo:latest", IncludeDags: true,
+			Warn: func(w string) { warnings = append(warnings, w) },
+		})
+		require.NoError(t, err)
+		assert.Equal(t, manifestdeploy.DagsFromImage, res.Dags)
+		require.Len(t, warnings, 1)
+		assert.Contains(t, warnings[0], "runs only the DAGs inside astro-package/demo:latest")
+	})
+	t.Run("declared Dockerfile", func(t *testing.T) {
+		withProjectStep(t)
+		dir := projectWithCode(t)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600))
+		var warnings []string
+		res, _, err := deployWith(t, false, false, &ManifestImageDeployInput{
+			Build:       imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"},
+			IncludeDags: true,
+			Warn:        func(w string) { warnings = append(warnings, w) },
+		})
+		require.NoError(t, err)
+		assert.Equal(t, manifestdeploy.DagsFromImage, res.Dags)
+		require.Len(t, warnings, 1)
+		assert.Contains(t, warnings[0], "runs only the DAGs that Dockerfile copies into the image")
+	})
+}
+
+// A declared Dockerfile's build reads its own <Dockerfile>.dockerignore when
+// there is one, so that is the file the DAG check reads.
+func TestDeployManifestImage_DeclaredDockerfileOwnIgnoreFileLeavingDagsOutIsRefused(t *testing.T) {
+	withProjectStep(t)
+	dir := projectWithCode(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile.dockerignore"), []byte("dags\n"), 0o600))
+
+	_, _, err := deployWith(t, false, false, &ManifestImageDeployInput{
+		Build:       imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"},
+		IncludeDags: true,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "leaves out every DAG file in dags/")
 }

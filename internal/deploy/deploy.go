@@ -136,6 +136,9 @@ const (
 	DagsFromImage = "image"
 	// DagsNone: remote execution runs the Deployment's DAGs; none shipped.
 	DagsNone = "none"
+	// DagsEmpty: the CLI built the project into the image for a Deployment
+	// that takes no DAG deploys, and dags/ held no DAG files.
+	DagsEmpty = "empty"
 )
 
 // Git is what a deploy recorded about the commit it shipped.
@@ -193,6 +196,8 @@ type ImageDeploy struct {
 	// RUN of the project's own to consume one; a generated build drops them.
 	BuildSecrets []string
 	ImageName    string
+	// Warn is Request.Warn, for the transport to call.
+	Warn func(string)
 	// OnBuild is Request.OnBuild, for the transport to call.
 	OnBuild       func()
 	IncludeDags   bool
@@ -367,6 +372,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		Build:         imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
 		BuildSecrets:  req.BuildSecrets,
 		ImageName:     req.ImageName,
+		Warn:          req.Warn,
 		OnBuild:       req.OnBuild,
 		IncludeDags:   includeDags,
 		Description:   req.Description,

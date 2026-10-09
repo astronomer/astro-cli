@@ -124,21 +124,6 @@ func planDockerignore(dir, dockerfile string) (*Change, error) {
 	}, nil
 }
 
-// IgnoresDir reports whether the ignore file a build of dockerfile reads
-// leaves the project directory dir/rel out of the build context whole: a rule
-// naming it or a parent, or one such as rel/* that leaves out everything in
-// it. dir is the project root, rel is slash-separated, and dockerfile is the
-// manifest's [tool.astro] dockerfile, "" for a generated build, which reads
-// .dockerignore. An ignore file that cannot be read or parsed leaves nothing
-// out here; the build reports it.
-func IgnoresDir(dir, dockerfile, rel string) bool {
-	pm, _, err := readDockerignore(dir, dockerignorePath(dir, dockerfile))
-	if err != nil {
-		return false
-	}
-	return excludes(pm, filepath.FromSlash(rel), true)
-}
-
 // LocalFilesWarning names the per-machine files a build of the project's own
 // Dockerfile would copy into its image, and the ignore file to add them to. dir
 // is the project root and dockerfile the manifest's [tool.astro] dockerfile. It

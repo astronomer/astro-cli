@@ -17,6 +17,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/containercfg"
+	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -62,6 +63,8 @@ type ManifestImageDeployInput struct {
 	WaitTime      time.Duration
 	// Progress takes the Wait progress; nil is stderr.
 	Progress io.Writer
+	// Warn reports a finding the deploy goes ahead despite; nil drops it.
+	Warn func(string)
 }
 
 // ManifestImageDeployResult reports the outcome for cmd to render.
@@ -72,27 +75,10 @@ type ManifestImageDeployResult struct {
 	DagTarballVersion string
 	URL               string
 	Git               ManifestDeployGit
-	// Dags says where a "both" deploy's DAGs went, one of the Dags*
-	// constants; "" for an image-only deploy.
+	// Dags says where a "both" deploy's DAGs went, one of internal/deploy's
+	// Dags* values; "" for an image-only deploy.
 	Dags string
 }
-
-// Where a "both" deploy's DAGs went. The values are internal/deploy's
-// Dags* constants, which cmd renders.
-const (
-	// DagsUploaded: the dags/ tarball, to a Deployment that takes DAG deploys.
-	DagsUploaded = "uploaded"
-	// DagsBuiltIn: the CLI built the project's dags/ into the image, for a
-	// Deployment that takes no DAG deploys.
-	DagsBuiltIn = "built-in"
-	// DagsFromImage: the Deployment takes no DAG deploys and runs whatever
-	// DAGs the image carries, which the CLI did not put there: a prebuilt
-	// --image-name, or a declared Dockerfile's own COPY lines.
-	DagsFromImage = "image"
-	// DagsNone: remote execution runs the Deployment's DAGs, so the image
-	// deploy ships none, as on the 1.x path.
-	DagsNone = "none"
-)
 
 // errNoDocker is the plain, actionable message for the no-Docker user
 // (docs/deploy.md, section 5). An image deploy needs a container builder;
@@ -213,7 +199,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	// pushed, to a Deployment that takes one. One that does not runs the DAGs
 	// the image carries, and remote execution runs them elsewhere.
 	var tarballVersion string
-	if dags == DagsUploaded {
+	if dags == manifestdeploy.DagsUploaded {
 		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 		if err != nil {
 			return ManifestImageDeployResult{}, err
@@ -242,43 +228,79 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 }
 
 // errDagsIgnored refuses to build a Deployment's DAGs into its image when the
-// project's ignore file leaves dags/ out, which would ship an image with no
+// ignore rules leave every DAG file out, which would ship an image with no
 // DAGs to a Deployment that runs only the image's. The 1.x path removed a
 // "dags/" line from .dockerignore before every image deploy; this one does not
 // edit the project, and says so instead.
-const errDagsIgnored = "found a dags entry in the project's .dockerignore. Deployment %s takes no DAG deploys, so it runs the DAGs inside the image, and that rule would leave them out. Remove the entry and try again, or enable DAG deploys with 'astro deployment update %s --dag-deploy enable'"
+const errDagsIgnored = "the project's .dockerignore leaves out every DAG file in dags/. Deployment %s takes no DAG deploys, so it runs only the DAGs inside the image, and this image would have none. Remove the rule that leaves them out and try again, or enable DAG deploys with 'astro deployment update %s --dag-deploy enable'"
 
 // shipProject decides what of the project goes into the image the deploy
-// builds, and where a "both" deploy's DAGs go, by the 1.x path's rule: the
-// whole project (under its .dockerignore) is in a generated image, with dags/
-// left out for a Deployment that takes DAG deploys or runs remote execution.
-// A declared Dockerfile's context is the project already, and its COPY lines
-// decide; a prebuilt image is shipped as it is.
+// builds, and where a "both" deploy's DAGs go, by the 1.x path's rule (see
+// dagsInImage and dagsUploaded): the whole project, under its ignore rules, is
+// in a generated image, with dags/ left out unless the image is where the
+// Deployment's DAGs run. A declared Dockerfile's context is the project
+// already, and its COPY lines decide; a prebuilt image ships as it is.
+//
+// When the DAGs are to be in the image, it refuses ignore rules that leave
+// every DAG file out, warns when there are none to ship, and warns that a
+// prebuilt image or a declared Dockerfile is all the Deployment will run, since
+// the CLI did not put DAGs in it.
 func shipProject(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment) (string, error) {
-	remote := deployment.IsRemoteExecutionEnabled(dep)
-	bake := !dep.IsDagDeployEnabled && !remote
-	generated := in.ImageName == "" && !req.FromDeclaredDockerfile()
-	if bake && in.ImageName == "" && scaffold.IgnoresDir(in.Build.ProjectDir, in.Build.Dockerfile, "dags") {
-		return "", fmt.Errorf(errDagsIgnored, in.DeploymentID, in.DeploymentID)
+	inImage := dagsInImage(dep)
+	if in.ImageName == "" {
+		imagebuild.ShipProject(req, in.Build.ProjectDir, inImage)
 	}
-	if generated {
-		req.ProjectContext = in.Build.ProjectDir
-		if !bake {
-			req.ProjectExcludes = []string{"dags/"}
-		}
+	warn := in.Warn
+	if warn == nil {
+		warn = func(string) {}
 	}
 	switch {
 	case !in.IncludeDags:
 		return "", nil
-	case remote:
-		return DagsNone, nil
-	case dep.IsDagDeployEnabled:
-		return DagsUploaded, nil
-	case generated:
-		return DagsBuiltIn, nil
-	default:
-		return DagsFromImage, nil
+	case dagsUploaded(dep):
+		return manifestdeploy.DagsUploaded, nil
+	case !inImage:
+		return manifestdeploy.DagsNone, nil
+	case in.ImageName != "":
+		warn(fmt.Sprintf("Deployment %s takes no DAG deploys, so after this deploy it runs only the DAGs inside %s, and none are uploaded", in.DeploymentID, in.ImageName))
+		return manifestdeploy.DagsFromImage, nil
 	}
+	onDisk, shipped, err := dagFilesShipped(in, req)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case onDisk > 0 && shipped == 0:
+		return "", fmt.Errorf(errDagsIgnored, in.DeploymentID, in.DeploymentID)
+	case req.FromDeclaredDockerfile():
+		warn(fmt.Sprintf("Deployment %s takes no DAG deploys, so after this deploy it runs only the DAGs that %s copies into the image, and none are uploaded", in.DeploymentID, in.Build.Dockerfile))
+		return manifestdeploy.DagsFromImage, nil
+	case shipped == 0:
+		warn(fmt.Sprintf("dags/ holds no DAG files, and Deployment %s takes no DAG deploys, so after this deploy it runs no DAGs", in.DeploymentID))
+		return manifestdeploy.DagsEmpty, nil
+	default:
+		return manifestdeploy.DagsBuiltIn, nil
+	}
+}
+
+// dagFilesShipped counts the DAG files in dags/ and those the build's ignore
+// rules leave in: the generated build's (imagebuild.ProjectIgnore), or the
+// ignore file a declared Dockerfile's build reads.
+func dagFilesShipped(in *ManifestImageDeployInput, req *imagebuild.Request) (onDisk, shipped int, err error) {
+	var ignore string
+	if req.FromDeclaredDockerfile() {
+		ignore, err = scaffold.IgnoreFor(in.Build.ProjectDir, in.Build.Dockerfile)
+	} else {
+		ignore, err = imagebuild.ProjectIgnore(in.Build.ProjectDir, req.ProjectExcludes)
+	}
+	if err != nil {
+		return 0, 0, err
+	}
+	onDisk, shipped, err = scaffold.DagFiles(in.Build.ProjectDir, ignore)
+	if err != nil {
+		return 0, 0, fmt.Errorf("reading the project's dags/: %w", err)
+	}
+	return onDisk, shipped, nil
 }
 
 // checkDeployment fetches the deployment and confirms the deploy is allowed:
@@ -311,10 +333,22 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 const imageOnlyDagsInImageMsg = "--image deploys only the image and leaves the Deployment's DAGs in place, but Deployment %s takes no DAG deploys, so its DAGs are inside the image. Run 'astro deploy' without --image to ship the image with dags/ inside it, or enable DAG deploys with 'astro deployment update %s --dag-deploy enable'"
 
 // dagsInImage reports whether a Deployment runs the DAGs inside its image:
-// one that takes no DAG deploys, unless it runs them through remote execution.
-// It is the 1.x path's condition for building the image with dags/.
+// one that takes no DAG deploys, unless it runs remote execution. It is the
+// 1.x path's condition for building the image with dags/
+// (internal/platform/astro/deploy/deploy.go buildImage: buildImageWithoutDags
+// when dagDeployEnabled || isRemoteExecutionEnabled), and for refusing --image
+// (Deploy: deployInput.Image && !isRemoteExecutionEnabled && !dagDeployEnabled).
 func dagsInImage(dep *astrov1.Deployment) bool {
 	return !dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(dep)
+}
+
+// dagsUploaded reports whether a "both" deploy uploads the DAG tarball: to a
+// Deployment that takes DAG deploys and does not run remote execution. 1.x
+// uploads when dagDeployEnabled && len(dagFiles) > 0, and leaves dagFiles empty
+// under remote execution (Deploy: `if !deployInfo.isRemoteExecutionEnabled {
+// dagFiles = ... }`), so it uploads nothing there.
+func dagsUploaded(dep *astrov1.Deployment) bool {
+	return dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(dep)
 }
 
 // uploadDeployDags tars and uploads a project's dags/ directory to the

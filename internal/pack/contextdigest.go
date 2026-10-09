@@ -7,66 +7,42 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
-
-	"github.com/moby/patternmatcher"
-	"github.com/moby/patternmatcher/ignorefile"
 
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // contextDigest is a digest of what a generated build copies from the project
 // at dir into the image: every path the build's ignore file
 // (imagebuild.ProjectIgnore) leaves in, with its kind, whether it is
-// executable, and its bytes or link target.
+// executable, and its bytes or link target. It also reports whether the
+// ignore rules leave out every DAG file in dags/, which the package warns
+// about.
 //
 // Only what git keeps and docker copies decides it: the executable bit and not
 // the rest of the mode, which a umask or a checkout changes for the same
 // commit; link targets, not what they point at, since docker copies a link as
-// a link. An excluded directory is not read, and with no "!" rule to bring
-// anything back it is not even entered, so a virtualenv or a directory the
-// user cannot read costs nothing and fails nothing.
-func contextDigest(dir string) (string, error) {
+// a link. The project is walked once (scaffold.WalkContext), and an excluded
+// directory is not entered unless a "!" rule could match beneath it, so a
+// virtualenv or a directory the user cannot read costs nothing and fails
+// nothing.
+func contextDigest(dir string) (digest string, dagsIgnored bool, err error) {
 	ignore, err := imagebuild.ProjectIgnore(dir, nil)
 	if err != nil {
-		return "", err
-	}
-	patterns, err := ignorefile.ReadAll(strings.NewReader(ignore))
-	if err != nil {
-		return "", fmt.Errorf("reading the project's .dockerignore: %w", err)
-	}
-	pm, err := patternmatcher.New(patterns)
-	if err != nil {
-		return "", fmt.Errorf("reading the project's .dockerignore: %w", err)
+		return "", false, err
 	}
 	h := sha256.New()
-	err = filepath.WalkDir(dir, func(path string, d fs.DirEntry, walkErr error) error {
-		rel, err := filepath.Rel(dir, path)
-		if err != nil {
-			return err
-		}
-		if rel == "." {
-			return walkErr
-		}
-		excluded, err := pm.MatchesOrParentMatches(rel)
-		if err != nil {
-			return err
-		}
-		if excluded {
-			if walkErr == nil && d.IsDir() && !pm.Exclusions() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if walkErr != nil {
-			return walkErr
-		}
-		return digestEntry(h, path, filepath.ToSlash(rel), d)
+	err = scaffold.WalkContext(dir, "", ignore, func(rel string, d fs.DirEntry) error {
+		return digestEntry(h, filepath.Join(dir, rel), filepath.ToSlash(rel), d)
 	})
 	if err != nil {
-		return "", fmt.Errorf("reading the project's files: %w", err)
+		return "", false, fmt.Errorf("reading the project's files: %w", err)
 	}
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
+	onDisk, shipped, err := scaffold.DagFiles(dir, ignore)
+	if err != nil {
+		return "", false, fmt.Errorf("reading the project's dags/: %w", err)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), onDisk > 0 && shipped == 0, nil
 }
 
 // digestEntry writes one path's name, kind, executable bit and contents.

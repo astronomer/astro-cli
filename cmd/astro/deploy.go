@@ -660,6 +660,8 @@ func writeImageAndDags(b *bufio.Writer, res *manifestdeploy.Result, target strin
 		fmt.Fprintf(b, "Deployed image (tag %s), with the project's DAGs inside it, to %s.\n", res.ImageTag, target)
 	case manifestdeploy.DagsFromImage:
 		fmt.Fprintf(b, "Deployed image (tag %s) to %s. The Deployment takes no DAG deploys, so it runs the DAGs the image carries; none were uploaded.\n", res.ImageTag, target)
+	case manifestdeploy.DagsEmpty:
+		fmt.Fprintf(b, "Deployed image (tag %s) to %s. The Deployment takes no DAG deploys and dags/ held no DAG files, so it runs none.\n", res.ImageTag, target)
 	case manifestdeploy.DagsNone:
 		fmt.Fprintf(b, "Deployed image (tag %s) to %s. The Deployment runs remote execution, so no DAGs were deployed with it.\n", res.ImageTag, target)
 	default:
@@ -864,6 +866,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		DeploymentID:  in.DeploymentID,
 		BuildSecrets:  in.BuildSecrets,
 		ImageName:     in.ImageName,
+		Warn:          in.Warn,
 		OnBuild:       in.OnBuild,
 		IncludeDags:   in.IncludeDags,
 		Description:   in.Description,

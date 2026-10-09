@@ -63,28 +63,55 @@ func TestTheDeployImageCarriesTheProject(t *testing.T) {
 }
 
 // Building the DAGs into the image of a Deployment without DAG deploys, under
-// an ignore file that leaves dags/ out, would ship no DAGs to a Deployment
-// that runs only the image's. The deploy refuses before it builds, and leaves
-// the project's file alone.
+// ignore rules that leave every DAG file out, would ship no DAGs to a
+// Deployment that runs only the image's. The deploy refuses before it builds,
+// and leaves the project's file alone.
 func TestTheDeployRefusesDagsTheIgnoreFileLeavesOut(t *testing.T) {
 	tier(t, 3)
-	p := deployImageProject(t, "dagsignored")
-	needsDocker(t, p)
-	ignore := filepath.Join(p.Dir, ".dockerignore")
-	write(t, ignore, read(t, ignore)+"dags/\n")
-	writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{}).URL)
-	repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
-	t.Cleanup(func() { removeImagesNamed(t, repo) })
+	for _, rule := range []string{"dags/", "**/*.py"} {
+		t.Run(strings.NewReplacer("/", "-", "*", "x").Replace(rule), func(t *testing.T) {
+			p := deployImageProject(t, "dagsignored")
+			needsDocker(t, p)
+			ignore := filepath.Join(p.Dir, ".dockerignore")
+			write(t, ignore, read(t, ignore)+rule+"\n")
+			writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{}).URL)
+			repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
+			t.Cleanup(func() { removeImagesNamed(t, repo) })
 
-	r := p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
-	if !strings.Contains(r.Stdout, "found a dags entry in the project's .dockerignore") {
-		t.Errorf("the refusal should name the ignore file's entry\n%s", r.output())
+			r := p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
+			if !strings.Contains(r.Stdout, "leaves out every DAG file in dags/") {
+				t.Errorf("the refusal should say the ignore rules leave the DAGs out\n%s", r.output())
+			}
+			if images, err := dockerLines(t.Context(), "images", "--format", "{{.Repository}}:{{.Tag}}", repo); err != nil || len(images) != 0 {
+				t.Errorf("refused before the build, yet found %v (%v)", images, err)
+			}
+			if !strings.HasSuffix(read(t, ignore), rule+"\n") {
+				t.Error("the project's .dockerignore was edited")
+			}
+		})
 	}
-	if images, err := dockerLines(t.Context(), "images", "--format", "{{.Repository}}:{{.Tag}}", repo); err != nil || len(images) != 0 {
-		t.Errorf("refused before the build, yet found %v (%v)", images, err)
+}
+
+// A prebuilt image deployed to a Deployment without DAG deploys replaces the
+// DAGs it runs with the image's, which the CLI did not put there. The deploy
+// says so on stderr before it goes ahead.
+func TestTheDeployOfAPrebuiltImageWarnsWhatDagsWillRun(t *testing.T) {
+	tier(t, 3)
+	p := deployImageProject(t, "prebuiltwarn")
+	needsDocker(t, p)
+	t.Cleanup(func() { removeImagesNamed(t, "astro-package/prebuiltwarn") })
+	var res struct {
+		Image string `json:"image"`
 	}
-	if !strings.HasSuffix(read(t, ignore), "dags/\n") {
-		t.Error("the project's .dockerignore was edited")
+	p.runSlow("package", "astro", "--output", "json").requireSuccess().requireLastJSON(&res)
+	writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{}).URL)
+
+	r := p.runSlow("deploy", "dep-e2e", "--image-name", res.Image, "--output", "json").requireFailure()
+	if !strings.Contains(r.Stdout+r.Stderr, fakeCreateRefusal) {
+		t.Fatalf("the deploy should have reached the fake create\n%s", r.output())
+	}
+	if !strings.Contains(r.Stderr, "runs only the DAGs inside "+res.Image) {
+		t.Errorf("the deploy should warn that only the image's DAGs will run\n%s", r.output())
 	}
 }
 
@@ -161,6 +188,15 @@ func deployImageProject(t *testing.T, name string) *project {
 		".venv/bin/python":                  "a virtualenv\n",
 		".astro/standalone/airflow.db":      "a local database\n",
 		"include/private.txt":               "kept out by .dockerignore\n",
+		// What 1.x's default .dockerignore kept out, and .env variants:
+		// secrets and local state that must never reach a registry.
+		"airflow_settings.yaml": "connections:\n  - conn_password: hunter2\n",
+		"logs/scheduler.log":    "a log\n",
+		"airflow.db":            "a database\n",
+		"airflow.cfg":           "[core]\n",
+		".env.local":            "SECRET=1\n",
+		"include/.envrc":        "export SECRET=1\n",
+		"astro/legacy.txt":      "1.x's own directory\n",
 	} {
 		full := filepath.Join(p.Dir, filepath.FromSlash(path))
 		mkdir(t, filepath.Dir(full))
@@ -185,7 +221,10 @@ func assertShipsTheProject(t *testing.T, got map[string]string) {
 		}
 	}
 	for path := range got {
-		for _, never := range []string{"__pycache__", ".env", ".venv/", ".astro/", "include/private.txt"} {
+		for _, never := range []string{
+			"__pycache__", ".env", ".venv/", ".astro/", "include/private.txt",
+			"airflow_settings.yaml", "logs/", "airflow.db", "airflow.cfg", "astro/legacy.txt",
+		} {
 			if strings.Contains(path, never) {
 				t.Errorf("%s is in the image", path)
 			}

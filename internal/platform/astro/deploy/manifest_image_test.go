@@ -200,7 +200,7 @@ func containerdStore(t *testing.T, runtimeVersion string) (cmd *fakeImageCmd, ha
 			return h
 		}
 		label := ""
-		if hasImageCall(cmd.calls, "build --tag "+name+" ") {
+		if hasImageCall(cmd.calls, "build --tag "+name+" ") || hasImageCall(cmd.calls, "build --load --tag "+name+" ") {
 			label = runtimeVersion
 		}
 		h := new(mocks.ImageHandler)
@@ -241,7 +241,7 @@ func TestDeployManifestImage_NothingToInstallBuildsASinglePlatformImage(t *testi
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 
 	tag := deployImageTag(dir)
-	assert.True(t, hasImageCall(cmd.calls, "build --tag "+tag+" "), "nothing to install still builds, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, "buildx build --load --tag "+tag+" "), "nothing to install still builds, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "at linux/amd64, got %v", cmd.calls)
 	assert.False(t, hasImageCall(cmd.calls, "docker pull"), "a pulled base is not what ships, got %v", cmd.calls)
 	require.Contains(t, handlers, tag, "the built tag is what is inspected and pushed")

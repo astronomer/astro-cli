@@ -681,7 +681,7 @@ func cfgFails(err error) func() (*houston.AppConfig, error) {
 // inImageWarning is the warning for an --image-name image that is all an
 // image Deployment's DAGs.
 func inImageWarning(image string) string {
-	return "this Deployment runs the Dags inside the image " + image + "; the dags folder is not uploaded. They are the ones in the project's dags folder when the image was built: astro package copies them in, so package again to change them."
+	return "this Deployment runs the Dags inside the image " + image + "; the dags folder is not uploaded. An image astro package built carries the project's dags folder as it was when packaged, unless .dockerignore leaves it out, or, with a dockerfile declared under [tool.astro], what that file copies in."
 }
 
 // noDagsNotice is the notice for a DAG upload skipped for want of a dags

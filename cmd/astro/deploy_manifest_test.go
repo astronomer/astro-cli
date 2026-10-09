@@ -340,6 +340,7 @@ func TestDeployManifestSaysWhereTheDagsWent(t *testing.T) {
 	for dags, want := range map[string]string{
 		manifestdeploy.DagsBuiltIn:   "Deployed image (tag deploy-2026-07-23T18-40), with the project's DAGs inside it, to prod (deployment clx-dep).\n",
 		manifestdeploy.DagsFromImage: "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep). The Deployment takes no DAG deploys, so it runs the DAGs the image carries; none were uploaded.\n",
+		manifestdeploy.DagsEmpty:     "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep). The Deployment takes no DAG deploys and dags/ held no DAG files, so it runs none.\n",
 		manifestdeploy.DagsNone:      "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep). The Deployment runs remote execution, so no DAGs were deployed with it.\n",
 	} {
 		t.Run(dags, func(t *testing.T) {
@@ -363,14 +364,6 @@ func TestDeployManifestSaysWhereTheDagsWent(t *testing.T) {
 			assert.False(t, hasDag, "no bundle was uploaded")
 		})
 	}
-}
-
-// The transport's names for where the DAGs went are the ones cmd renders.
-func TestDeployDagsValuesAgree(t *testing.T) {
-	assert.Equal(t, manifestdeploy.DagsUploaded, astrodeploy.DagsUploaded)
-	assert.Equal(t, manifestdeploy.DagsBuiltIn, astrodeploy.DagsBuiltIn)
-	assert.Equal(t, manifestdeploy.DagsFromImage, astrodeploy.DagsFromImage)
-	assert.Equal(t, manifestdeploy.DagsNone, astrodeploy.DagsNone)
 }
 
 // The announce line lands before the build line and after the target is

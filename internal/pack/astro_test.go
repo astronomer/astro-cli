@@ -87,6 +87,9 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 	switch {
 	case verb == "build" && len(args) > 2 && args[1] == "--tag":
 		f.built[args[2]] = true
+	case verb == "buildx" && len(args) > 4 && args[3] == "--tag":
+		// buildx build --load --tag <ref>: the step that copies the project in.
+		f.built[args[4]] = true
 	case verb == "tag" && len(args) == 3:
 		f.built[args[2]] = f.built[args[1]]
 	}
@@ -599,11 +602,17 @@ func TestAstroBuildWithADeclaredDockerfileShipsNoProjectContext(t *testing.T) {
 // An image whose ignore file leaves dags/ out carries no DAGs, which the
 // package says and still builds.
 func TestAstroBuildWarnsWhenTheIgnoreFileLeavesDagsOut(t *testing.T) {
-	req := testRequest(t)
-	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte("dags/\n"), 0o600))
-	res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
-	require.NoError(t, err)
-	assert.Equal(t, []string{dagsIgnoredWarning}, res.Warnings)
+	for _, rule := range []string{"dags/", "**/*.py", "dags/**"} {
+		t.Run(rule, func(t *testing.T) {
+			req := testRequest(t)
+			require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, "dags"), 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "dags", "a.py"), []byte("# dag\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte(rule+"\n"), 0o600))
+			res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+			require.NoError(t, err)
+			assert.Equal(t, []string{dagsIgnoredWarning}, res.Warnings)
+		})
+	}
 }
 
 // The content address covers what the build copies from the project, and

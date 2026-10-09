@@ -30,18 +30,40 @@ A deploy and `astro package astro` ship the project in the image, the way the 1.
 | deploy to a Deployment with DAG deploys | in the image | uploaded as the DAG tarball, not in the image |
 | deploy to a Deployment without DAG deploys | in the image | in the image; nothing is uploaded |
 | deploy to a Deployment with remote execution (DAG deploys on or off) | in the image | not in the image, and not uploaded |
-| `--image-name` (a prebuilt image) | as built | whatever the image carries; uploaded too to a Deployment with DAG deploys |
-| declared Dockerfile | as its `COPY` lines decide | as its `COPY` lines decide; uploaded to a Deployment with DAG deploys |
+| `--image-name` (a prebuilt image) | as built | uploaded to a Deployment with DAG deploys; otherwise the image's are what runs, with a warning |
+| declared Dockerfile | as its `COPY` lines decide | uploaded to a Deployment with DAG deploys; otherwise what the file copies in is what runs, with a warning |
 | `astro package astro` | in the image | in the image |
 | Docker-mode `astro local start`, Astro Desktop | not copied: mounted into the containers | not copied: mounted |
 
-This is the 1.x path's rule (`buildImage` and `buildImageWithoutDags` in `internal/platform/astro/deploy/deploy.go`): the image is the project, with `dags/` left out for a Deployment that takes DAG deploys or runs remote execution, and an image deploy uploads no DAGs under remote execution.
+This is the 1.x path's rule, in `internal/platform/astro/deploy/deploy.go` (the same code as `cloud/deploy/deploy.go` on `main`):
 
-How it is built. The runtime image's `ONBUILD` triggers read `requirements.txt` and `packages.txt` from the main build context and end in `COPY . .`, so the main context of the first build is the small generated one, as it has always been, tagged `<image>:<tag>-deps`. A second build starts `FROM` that image (whose triggers have run, so none fire again) with the project as its context and runs `COPY --chown=astro:0 . .`. Its ignore file is written beside the generated Dockerfile as `<Dockerfile>.dockerignore`, which BuildKit reads instead of the context's `.dockerignore` (Podman is pointed at it with `--ignorefile`), so the project's file is read and never rewritten. It holds the project's `.dockerignore`, then the rules the CLI always adds, which a `!` in the project's file cannot undo: `**/.venv`, `**/.env`, `**/__pycache__`, `**/*.pyc`, `.git`, `.astro`, `plugins/fix_local_executor_pickle.py`, and the project's own top-level `requirements.txt` and `packages.txt` (the generated ones are what the image installed, and they stay). Then `dags/`, when the DAGs are not to be in the image. The `-deps` tag is removed after the second build. The copy is the last layer, after the dependency installs, so editing a DAG or a plugin reinstalls nothing.
+- `buildImage` builds without `dags/` (`buildImageWithoutDags`) when `dagDeployEnabled || isRemoteExecutionEnabled`, and with the whole project otherwise.
+- `Deploy` lists the DAG files only `if !deployInfo.isRemoteExecutionEnabled`, and uploads `if deployInfo.dagDeployEnabled && len(dagFiles) > 0`, so under remote execution it uploads nothing, whatever the DAG deploy setting.
+- `Deploy` refuses `--image` when `!isRemoteExecutionEnabled` and `!dagDeployEnabled`.
 
-**An ignore file that leaves `dags/` out is refused when the DAGs are to be built in.** For a Deployment without DAG deploys, a `.dockerignore` rule that leaves out `dags/` (or everything in it) would ship an image with no DAGs to a Deployment that runs only the image's. The 1.x path removed a `dags/` line from the project's `.dockerignore` before every image deploy; this one edits nothing and refuses instead, for a generated build and a declared Dockerfile alike: `found a dags entry in the project's .dockerignore. …` `astro package astro` builds anyway and warns.
+In this code the two conditions are `dagsInImage` and `dagsUploaded` in [`manifest_image.go`](../internal/platform/astro/deploy/manifest_image.go).
 
-The text summary says where the DAGs went: uploaded (with the bundle version), built into the image by this deploy, left to the image a prebuilt `--image-name` or a declared Dockerfile carries, or not deployed because the Deployment runs remote execution.
+**How it is built.** The runtime image's `ONBUILD` triggers read `requirements.txt` and `packages.txt` from the main build context and end in `COPY . .`, so the main context of the first build is the small generated one, as it has always been, tagged `<image>:<tag>-deps`. A second build starts `FROM` that image (whose triggers have run, so none fire again) with the project as its context and runs `COPY --chown=astro:0 . .`. The `-deps` tag is removed afterwards, also when the build is interrupted. The copy is the last layer, after the dependency installs, so editing a DAG or a plugin reinstalls nothing.
+
+**What the copy leaves out.** The second build's ignore file is written beside the generated Dockerfile as `<Dockerfile>.dockerignore`, so the project's `.dockerignore` is read and never rewritten. It holds the project's `.dockerignore`, then rules the CLI always adds, which a `!` in the project's file cannot undo:
+
+- everything 1.x's default `.dockerignore` left out: `astro`, `.git`, `.env`, `airflow_settings.yaml` (connection secrets in clear text), `logs`, `.venv`, `airflow.db`, `airflow.cfg`;
+- v2's per-machine files: `.astro` (standalone Airflow's state, local overrides, Otto's tokens), and at any depth `.venv`, `.env`, `.env.*`, `.envrc`, `__pycache__` and `*.pyc`, plus `plugins/fix_local_executor_pickle.py`;
+- the project's own top-level `requirements.txt` and `packages.txt`. The generated ones are what the image installed, and they stay.
+
+Then `dags`, when the DAGs are not to be in the image.
+
+**Only a builder that reads that ignore file runs the copy.** BuildKit reads `<Dockerfile>.dockerignore`; Docker's legacy builder does not, and would copy `.env` and the rest into an image bound for a registry. So the second build runs as `docker buildx build --load` with `DOCKER_BUILDKIT=1`, which is BuildKit or nothing, and the deploy first checks that `docker buildx version` answers. Podman, recognized by what `<engine> --version` says (so the podman-docker shim counts), is passed the file with `--ignorefile`, and its `build --help` must offer that flag. An engine that passes neither check is refused before anything is built.
+
+**The DAGs that are to be built in are checked.** For a Deployment without DAG deploys, the deploy counts the DAG files (`.py`, as 1.x counts them) under `dags/` that the ignore rules leave in:
+
+- Rules that leave out every one of them, such as `dags/`, `dags/**` or `**/*.py`, would ship an image with no DAGs to a Deployment that runs only the image's, so the deploy refuses before it builds: `the project's .dockerignore leaves out every DAG file in dags/. …`. This applies to a declared Dockerfile too, using the ignore file its build reads. The 1.x path instead removed a `dags/` line from the project's `.dockerignore` before every image deploy; this one edits nothing.
+- With no DAG files at all, the deploy goes ahead, as 1.x did, and warns that the Deployment will run none.
+- `--image-name` or a declared Dockerfile goes ahead, as on 1.x, with a warning that the Deployment will run only the DAGs inside the image, since the CLI did not put them there.
+
+`astro package astro` builds anyway, and warns when the rules leave every DAG file out.
+
+The text summary says where the DAGs went: uploaded (with the bundle version), built into the image by this deploy, none to build in, left to the image a prebuilt `--image-name` or a declared Dockerfile carries, or not deployed because the Deployment runs remote execution.
 
 Before anything is built, the deploy checks the project:
 
