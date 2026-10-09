@@ -58,7 +58,7 @@ Every command takes `-o json` (`--output json`), with a stable shape for scripts
 
 ## Breaking changes
 
-Everything below fails with an error naming the replacement, instead of an "unknown command" or "unknown flag".
+Everything below fails with an error naming the replacement, instead of an "unknown command" or "unknown flag". A removed flag gets that error on the commands that had it in 1.x; on a command 1.x did not have, such as `astro local reset --force`, it is an unknown flag.
 
 ### Commands
 
@@ -89,7 +89,7 @@ Run inside a 1.x project, an `astro dev` command first tells you to run `astro i
 
 | 1.x | v2 | where |
 | --- | --- | --- |
-| `--force`, `-f` | `--yes`, `-y` | every command that asks for confirmation (deployment, bundle, token, team, worker-queue and context commands). `astro deploy --force` is unchanged |
+| `--force`, `-f` | `--yes`, `-y` | the 1.x commands that took it and ask for confirmation now (deployment, bundle, token, team, worker-queue and context commands). `astro deploy --force` is unchanged |
 | `--json` | `-o json` | `list` commands, `astro api … ls` / `describe` |
 | `--template` | `-o json`, and jq | `list` commands |
 | `-o table`, `-o template`, `-o yaml` | `-o text` (the default) or `-o json` | everywhere `-o` existed, except `astro deployment inspect`, which keeps `-o yaml` |
