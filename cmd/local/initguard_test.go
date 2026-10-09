@@ -3,29 +3,45 @@ package local
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	homedir "github.com/mitchellh/go-homedir"
-
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
-// setHome makes home the home directory, as the root wires it: the same
-// directory however it is spelled.
+// setHome makes home the home directory, with the CLI's settings in it, as
+// the root wires them with no ASTRO_HOME: the same directory however it is
+// spelled.
 func setHome(d *Deps, home string) {
 	d.IsHomeDir = func(dir string) bool { return fileutil.SamePath(dir, home) }
+	settings := filepath.Join(home, ".astro", "config.yaml")
+	d.IsSettingsFile = func(path string) bool { return fileutil.SamePath(path, settings) }
+}
+
+// writeSettings writes the CLI's settings file under home.
+func writeSettings(t *testing.T, home string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".astro", "config.yaml"), []byte("context: cloud\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // astro init in the home directory would make all of ~ the project, so it
-// is a usage error and writes nothing. A DIRECTORY naming somewhere under it
-// is a project of its own and goes ahead.
+// is a usage error and writes nothing, the CLI's settings there
+// notwithstanding. A DIRECTORY naming somewhere under it is a project of its
+// own and goes ahead.
 func TestInitRefusesTheHomeDirectory(t *testing.T) {
 	d, dir, stdout := initDeps(t)
 	setHome(&d, dir)
+	writeSettings(t, dir)
 
 	err := execute(t, d, "init")
 	if err == nil || !cliout.IsUsage(err) || !strings.Contains(err.Error(), "home directory") {
@@ -53,6 +69,23 @@ func TestInitRefusesTheHomeDirectory(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "my-project", "pyproject.toml")); err != nil {
 		t.Errorf("missing my-project/pyproject.toml: %v", err)
+	}
+}
+
+// A home directory that already is a project is init's to re-run, as any
+// project is: the answer is what init says of a project anywhere, not the
+// home directory's refusal.
+func TestInitReRunsInAHomeDirectoryProject(t *testing.T) {
+	d, dir, _ := initDeps(t)
+	writeSettings(t, dir)
+	if err := execute(t, d, "init"); err != nil { // made before it was ~
+		t.Fatalf("astro init: %v", err)
+	}
+	want := execute(t, d, "init")
+	setHome(&d, dir)
+	err := execute(t, d, "init")
+	if !errors.Is(err, scaffold.ErrAlreadyAstroProject) || cliout.IsUsage(err) {
+		t.Fatalf("astro init again in a home directory that is a project = %v, want what it says anywhere: %v", err, want)
 	}
 }
 
@@ -103,8 +136,9 @@ func TestInitRefusesTheHomeDirectoryThroughASymlink(t *testing.T) {
 }
 
 // Only a directory that is a project, as astro deploy's advice counts one
-// (project.IsAstroProject), draws the warning. The home directory and an
-// ancestor whose pyproject.toml cannot be parsed never do.
+// (project.IsAstroProject), draws the warning, the home directory as any
+// other. An ancestor whose pyproject.toml cannot be parsed never does, nor
+// does the CLI's settings file.
 func TestInitWarnsOnlyInsideAProject(t *testing.T) {
 	write := func(t *testing.T, path, content string) {
 		t.Helper()
@@ -149,6 +183,12 @@ func TestInitWarnsOnlyInsideAProject(t *testing.T) {
 			name:  "a manifest in the home directory",
 			setup: func(t *testing.T, p string) { write(t, filepath.Join(p, "pyproject.toml"), manifest) },
 			home:  true,
+			warn:  true,
+		},
+		{
+			name:  "the CLI's settings in the home directory",
+			setup: func(t *testing.T, p string) { writeSettings(t, p) },
+			home:  true,
 		},
 		{
 			name:  "a malformed pyproject.toml in the home directory",
@@ -170,42 +210,6 @@ func TestInitWarnsOnlyInsideAProject(t *testing.T) {
 			warned := strings.Contains(stderr.String(), "inside the Astro project at "+parent)
 			if warned != tc.warn {
 				t.Errorf("warned = %v, want %v: %q", warned, tc.warn, stderr)
-			}
-		})
-	}
-}
-
-// Deps from NewDeps know the home directory without the root wiring
-// config.IsHomeDir, and ~/.astro/config.yaml, the CLI's own settings, never
-// makes ~ the project above another, even with no IsHomeDir at all: the
-// predicate rules it out itself.
-func TestInitUnderHomeDrawsNoFalseNestedWarning(t *testing.T) {
-	d, home, _ := initDeps(t)
-	if err := os.MkdirAll(filepath.Join(home, ".astro"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(home, ".astro", "config.yaml"), []byte("context: cloud\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	homedir.Reset()
-	t.Cleanup(homedir.Reset)
-
-	defaults := NewDeps()
-	if defaults.IsHomeDir == nil || !defaults.IsHomeDir(home) {
-		t.Fatal("NewDeps does not know the home directory")
-	}
-	for name, isHome := range map[string]func(string) bool{"from-NewDeps": defaults.IsHomeDir, "unset": nil} {
-		t.Run(name, func(t *testing.T) {
-			stderr := &bytes.Buffer{}
-			d.Stderr = stderr
-			d.IsHomeDir = isHome
-			if err := execute(t, d, "init", name); err != nil {
-				t.Fatalf("astro init: %v", err)
-			}
-			if strings.Contains(stderr.String(), "inside the Astro project") {
-				t.Errorf("~/.astro/config.yaml drew a nested-project warning: %q", stderr)
 			}
 		})
 	}

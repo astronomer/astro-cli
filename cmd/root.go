@@ -152,7 +152,7 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// command on a machine that never logged in leaves no config/ state behind
 	// (config.initHome, and TestInitLeavesNoHomeConfigBehind in e2e).
 	coreDeps := local.NewDeps()
-	coreDeps.IsHomeDir = config.IsHomeDir
+	coreDeps.IsHomeDir, coreDeps.IsSettingsFile = config.IsHomeDir, config.IsSettingsFile
 	wireLinkPickers(&coreDeps, o.platform, astroV1Client, o.out)
 	// A single positional argument is Otto's first message in an interactive
 	// session.

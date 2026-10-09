@@ -7,7 +7,6 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -258,42 +257,43 @@ func configExists(v *viper.Viper) bool {
 }
 
 // IsHomeDir reports whether path is the home directory, HomePath: the same
-// directory, however it is spelled, symlinks and case included. It is the one
-// test of "is this ~" the project checks make, so a test that points HomePath
-// elsewhere moves all of them.
-//
-// HomePath is read once per value it takes, not once per call: a walk up the
-// tree asks at every level.
+// directory, however it is spelled, symlinks and case included. The home
+// directory is an ordinary directory to the project checks; this only picks
+// what they say in it when it is no project, and refuses scaffolding one there.
 func IsHomeDir(path string) bool {
-	homeDirCache.Lock()
-	if homeDirCache.is == nil || homeDirCache.path != HomePath {
-		homeDirCache.path, homeDirCache.is = HomePath, fileutil.SamePathAs(HomePath)
-	}
-	is := homeDirCache.is
-	homeDirCache.Unlock()
-	return is(path)
+	return fileutil.SamePath(path, HomePath)
 }
 
-// homeDirCache is IsHomeDir's comparison against HomePath, made again when
-// HomePath changes.
-var homeDirCache struct {
-	sync.Mutex
-	path string
-	is   func(string) bool
+// IsSettingsFile reports whether path is a settings file of the CLI's own, a
+// .astro/config.yaml that is never a 1.x project's marker: HomeConfigFile,
+// wherever ASTRO_HOME puts it, or the one in the home directory, where the
+// settings live without ASTRO_HOME and where Astro CLI 1.x keeps its own.
+// Counting only the first would, under ASTRO_HOME, make the home directory a
+// 1.x project and every directory below it part of one.
+func IsSettingsFile(path string) bool {
+	return fileutil.SamePath(path, HomeConfigFile) ||
+		fileutil.SamePath(path, filepath.Join(HomePath, ConfigDir, ConfigFileNameWithExt))
+}
+
+// IsAstroProject is project.IsAstroProject with the CLI's settings file
+// (IsSettingsFile) not taken for a project's .astro/config.yaml.
+func IsAstroProject(dir string) (bool, error) {
+	return project.IsAstroProject(dir, IsSettingsFile)
 }
 
 // IsProjectDir reports whether path is a 1.x project directory, one with a
-// .astro/config.yaml (project.HasLegacyConfig). The home directory never is.
+// .astro/config.yaml (project.HasLegacyConfig) that is not the CLI's own
+// settings file.
 func IsProjectDir(path string) (bool, error) {
-	if path == "" || IsHomeDir(path) {
+	if path == "" {
 		return false, nil
 	}
-	return project.HasLegacyConfig(path)
+	return project.HasLegacyConfig(path, IsSettingsFile)
 }
 
 // IsWithinProjectDir returns true if the path is at or within an Astro project directory
 func IsWithinProjectDir(path string) (bool, error) {
-	dir, err := fileutil.NearestDir(path, IsHomeDir, project.HasLegacyConfig)
+	dir, err := fileutil.NearestDir(path, IsProjectDir)
 	return dir != "", err
 }
 

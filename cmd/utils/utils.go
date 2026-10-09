@@ -10,10 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 type RunE func(cmd *cobra.Command, args []string) error
@@ -48,37 +46,24 @@ const (
 	// a .astro/config.yaml and no Dockerfile, which would otherwise pass here
 	// and fail later, parsing the Dockerfile. %s is the directory.
 	APCNoDockerfileAdvice = "%s has a .astro/config.yaml but no Dockerfile, which APC deploy builds its image from. Add a Dockerfile FROM an Astro Runtime image, or deploy an image built elsewhere with --image-name"
-	// HomeDirAdvice is either check's advice in the home directory, unless it
-	// holds a manifest that loads. Its .astro/config.yaml holds the CLI's own
-	// settings, and astro init there would make the whole home directory a
-	// project and its build context.
+	// HomeDirAdvice is either check's advice in the home directory when it is
+	// no project. A .astro/config.yaml there is the CLI's own settings, and
+	// astro init there would make the whole home directory a project and its
+	// build context.
 	HomeDirAdvice = "This is your home directory, and its .astro/config.yaml holds the CLI's own settings, not a project's. Change to a project directory"
 	// EnclosingProjectAdvice is either check's advice in a subdirectory of a
 	// project, where astro init would nest a second one. %s is the project.
 	EnclosingProjectAdvice = "This directory is inside the project at %s: run this from there"
 
 	notProjectDirMsg = "this is not an Astro project directory"
-	verifyFailedMsg  = "failed to verify that your working directory is an Astro project"
 )
 
 // EnsureProjectDir fails outside an Astro project directory: one with a
-// pyproject.toml carrying [tool.astro], or a 1.x project's .astro/config.yaml.
-// (project.IsAstroProject). Accepting both here is what makes its advice to
+// pyproject.toml carrying [tool.astro], or a 1.x project's .astro/config.yaml
+// (config.IsAstroProject). Accepting both here is what makes its advice to
 // run astro init true: the project astro init writes passes.
-//
-// The home directory is one only with a manifest that loads, as in a container
-// whose WORKDIR is $HOME: its .astro/config.yaml is the CLI's own settings,
-// and a pyproject.toml there that does not load says nothing about a project.
 func EnsureProjectDir(cmd *cobra.Command, args []string) error {
-	if dir := config.WorkingPath; config.IsHomeDir(dir) && manifestLoads(dir) {
-		return nil
-	}
-	return ensureDir(project.IsAstroProject, AstroProjectDirAdvice, nil)
-}
-
-func manifestLoads(dir string) bool {
-	_, err := manifest.Load(filepath.Join(dir, manifest.Marker))
-	return err == nil
+	return ensureDir(config.IsAstroProject, AstroProjectDirAdvice, nil)
 }
 
 // EnsureDockerfileProjectDir is EnsureProjectDir for APC deploy, which builds
@@ -96,35 +81,37 @@ func EnsureDockerfileProjectDir(cmd *cobra.Command, args []string) error {
 }
 
 // ensureDir is what both checks share: the working directory passes when
-// isProject accepts it, and the home directory, which its callers let through
-// first if they take it, never does. Otherwise nearly, when set, may say what
-// dir is short of; failing that, the advice names the project dir is inside,
-// if there is one, over fallback.
+// isProject accepts it, the home directory included. An error reading it is
+// reported as itself, since it is what to fix, and advice to run astro init
+// would send the user to make a project they may have; inside a project
+// isProject recognizes, that project is named first. Otherwise the home
+// directory gets its own advice, nearly, when set, may say what dir is short
+// of, and the advice names the project dir is inside, if there is one, over
+// fallback.
 func ensureDir(isProject func(string) (bool, error), fallback string, nearly func(string) error) error {
 	dir := config.WorkingPath
-	if config.IsHomeDir(dir) {
-		return notProjectDir(HomeDirAdvice)
-	}
 	ok, err := isProject(dir)
 	if ok {
 		return nil
 	}
-	// A pyproject.toml that does not parse is reported as itself: the error
-	// is what loading the manifest says, and what to fix. Advice to run
-	// astro init would send the user to make a project they have.
-	var parseErr *manifest.ParseError
-	if errors.As(err, &parseErr) {
+	if err != nil {
+		if enclosing := enclosingProject(dir, isProject); enclosing != "" {
+			return fmt.Errorf("%s\n%w", ansi.Red(notProjectDirMsg+".\n"+fmt.Sprintf(EnclosingProjectAdvice, enclosing)), err)
+		}
 		return err
 	}
-	if err != nil {
-		return verifyFailed(err, fallback)
+	if config.IsHomeDir(dir) {
+		return notProjectDir(HomeDirAdvice)
 	}
 	if nearly != nil {
 		if err := nearly(dir); err != nil {
 			return err
 		}
 	}
-	return notProjectDir(advice(dir, fallback, isProject))
+	if enclosing := enclosingProject(dir, isProject); enclosing != "" {
+		return notProjectDir(fmt.Sprintf(EnclosingProjectAdvice, enclosing))
+	}
+	return notProjectDir(fallback)
 }
 
 // isDockerfileProject is the project APC deploy builds: a .astro/config.yaml
@@ -141,23 +128,14 @@ func isDockerfileProject(dir string) (bool, error) {
 	return err == nil, err
 }
 
-// advice is what to say in dir, which is not a project: fallback, unless dir
-// is inside a project isProject recognizes, where fallback's advice to make
-// dir a project would be wrong. The home directory never encloses one, and an
-// ancestor that cannot be read is not one.
-func advice(dir, fallback string, isProject func(string) (bool, error)) string {
+// enclosingProject is the nearest directory above dir that isProject
+// recognizes, or "". An ancestor that cannot be read is not one.
+func enclosingProject(dir string, isProject func(string) (bool, error)) string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return fallback
+		return ""
 	}
-	if enclosing := fileutil.NearestReadableDir(filepath.Dir(abs), config.IsHomeDir, isProject); enclosing != "" {
-		return fmt.Sprintf(EnclosingProjectAdvice, enclosing)
-	}
-	return fallback
-}
-
-func verifyFailed(err error, advice string) error {
-	return errors.Wrap(err, ansi.Red(verifyFailedMsg+".\n"+advice))
+	return fileutil.NearestReadableDir(filepath.Dir(abs), isProject)
 }
 
 func notProjectDir(advice string) error {

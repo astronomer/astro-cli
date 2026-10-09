@@ -28,7 +28,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -63,12 +62,13 @@ type Deps struct {
 	// themselves so tests can pin it.
 	WorkingDir func() (string, error)
 
-	// IsHomeDir reports whether a directory is the home directory, which
-	// `astro init` refuses and never counts as a project above another.
-	// NewDeps sets fileutil.IsHomeDir; the root replaces it with
-	// config.IsHomeDir, the test the project checks under cmd/ make, since
-	// this tree never imports config/. nil knows no home directory.
-	IsHomeDir func(dir string) bool
+	// IsHomeDir reports whether a directory is the home directory, where
+	// `astro init` does not scaffold a new project. IsSettingsFile reports
+	// whether a file is the CLI's own settings file, which is never a 1.x
+	// project's .astro/config.yaml. The root wires both to config/ (this tree
+	// never imports it); nil knows no home directory and no settings file.
+	IsHomeDir      func(dir string) bool
+	IsSettingsFile func(path string) bool
 
 	// OpenURL opens a URL in the user's browser (`astro local open`).
 	OpenURL func(url string) error
@@ -202,7 +202,6 @@ func NewDeps() Deps {
 		CheckVenv:        runner,
 		Provisioner:      newUVProvisioner,
 		WorkingDir:       os.Getwd,
-		IsHomeDir:        fileutil.IsHomeDir,
 		OpenURL:          browser.OpenURL,
 		WorkspaceClients: emenv.Clients,
 		Session:          astrosession.BearerFor,

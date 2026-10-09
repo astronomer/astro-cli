@@ -221,6 +221,21 @@ func TestDeployProjectCheck(t *testing.T) {
 	assert.NotContains(t, err.Error(), "astro init")
 }
 
+// In a home directory with a manifest that fails validation, the project
+// check passes, as it does for that manifest anywhere, and the deploy reports
+// what is wrong with it rather than advice about the home directory.
+func TestDeployReportsAnInvalidManifestInTheHomeDirectory(t *testing.T) {
+	prevEnsure, prevWorking := EnsureProjectDir, config.WorkingPath
+	t.Cleanup(func() { EnsureProjectDir, config.WorkingPath = prevEnsure, prevWorking })
+	EnsureProjectDir = utils.EnsureProjectDir
+	config.WorkingPath = homeManifestProject(t)
+
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id")
+	var invalid *manifest.ValidationError
+	require.ErrorAs(t, err, &invalid)
+	assert.NotContains(t, err.Error(), utils.HomeDirAdvice)
+}
+
 func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
@@ -392,6 +407,17 @@ func (s *NonDagsDeploySuite) TestWithinAstroProject() {
 	defer cleanup()
 
 	err = testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt", "--non-dags-local-path", projectDir)
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "within an Astro project")
+}
+
+// A bundle inside a home directory that is a project is refused like one
+// inside any other project.
+func (s *NonDagsDeploySuite) TestWithinAHomeDirectoryProject() {
+	bundle := filepath.Join(homeManifestProject(s.T()), "dbt")
+	s.Require().NoError(os.MkdirAll(bundle, 0o755))
+
+	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt", "--non-dags-local-path", bundle)
 	assert.Error(s.T(), err)
 	assert.Contains(s.T(), err.Error(), "within an Astro project")
 }

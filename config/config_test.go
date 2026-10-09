@@ -24,48 +24,80 @@ func TestConfig(t *testing.T) {
 }
 
 func (s *Suite) TestIsProjectDir() {
-	homeDir, _ := fileutil.GetHomeDir()
-	tests := []struct {
-		name string
-		in   string
-		out  bool
-	}{
-		{"False", "", false},
-		{"HomePath False", homeDir, false},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got, err := IsProjectDir(tt.in)
-			s.NoError(err)
-			s.Equal(got, tt.out)
-		})
-	}
+	got, err := IsProjectDir("")
+	s.NoError(err)
+	s.False(got, "an empty path names no directory, not the working one")
 }
 
 // The home directory is the same directory however it is reached: through a
-// symlink, or spelled with a trailing separator. Neither is a project.
+// symlink, or spelled with a trailing separator.
 func (s *Suite) TestIsHomeDir() {
 	prev := HomePath
 	defer func() { HomePath = prev }()
 	home := s.T().TempDir()
 	link := filepath.Join(s.T().TempDir(), "home")
 	s.Require().NoError(os.Symlink(home, link))
-	s.Require().NoError(os.MkdirAll(filepath.Join(home, ConfigDir), 0o755))
-	s.Require().NoError(os.WriteFile(filepath.Join(home, ConfigDir, ConfigFileNameWithExt), []byte("{}\n"), 0o600))
 
 	HomePath = link
 	s.True(IsHomeDir(home))
 	s.True(IsHomeDir(home + string(os.PathSeparator)))
 	s.False(IsHomeDir(filepath.Join(home, "project")))
-	isProject, err := IsProjectDir(home)
-	s.NoError(err)
-	s.False(isProject, "the home directory reached through a symlink is still not a project")
-	within, err := IsWithinProjectDir(filepath.Join(home, "project"))
-	s.NoError(err)
-	s.False(within, "nothing under ~ is inside a project because of ~/.astro/config.yaml")
 
 	HomePath = ""
 	s.False(IsHomeDir(home), "no home directory known names none")
+}
+
+// The CLI's settings file is no project's .astro/config.yaml, wherever
+// ASTRO_HOME puts it, and neither is the one in the home directory, where the
+// settings live without it: under ASTRO_HOME, that one would otherwise put
+// everything below ~ inside a 1.x project.
+func (s *Suite) TestTheSettingsFileIsNoProject() {
+	prevHome := HomePath
+	defer func() { HomePath = prevHome }()
+	write := func(dir string) {
+		s.Require().NoError(os.MkdirAll(filepath.Join(dir, ConfigDir), 0o755))
+		s.Require().NoError(os.WriteFile(filepath.Join(dir, ConfigDir, ConfigFileNameWithExt), []byte("context: cloud\n"), 0o600))
+	}
+	notProject := func(dir string) {
+		s.T().Helper()
+		isProject, err := IsProjectDir(dir)
+		s.NoError(err)
+		s.False(isProject, "the settings file made %s a project", dir)
+		within, err := IsWithinProjectDir(filepath.Join(dir, "sub"))
+		s.NoError(err)
+		s.False(within)
+		ok, err := IsAstroProject(dir)
+		s.NoError(err)
+		s.False(ok)
+	}
+	home, astroHome := s.T().TempDir(), s.T().TempDir()
+	write(home)
+	write(astroHome)
+	HomePath = home
+
+	s.Run("in the home directory", func() {
+		s.withAstroHome("")
+		initHome(afero.NewOsFs())
+		notProject(home)
+	})
+	s.Run("under ASTRO_HOME", func() {
+		s.withAstroHome(astroHome)
+		initHome(afero.NewOsFs())
+		notProject(astroHome)
+		isProject, err := IsProjectDir(home)
+		s.NoError(err)
+		s.False(isProject, "with the settings under ASTRO_HOME, ~/.astro/config.yaml made ~ a project")
+		within, err := IsWithinProjectDir(filepath.Join(home, "sub"))
+		s.NoError(err)
+		s.False(within)
+	})
+	s.Run("under ASTRO_HOME through a symlink", func() {
+		link := filepath.Join(s.T().TempDir(), "astro-home")
+		s.Require().NoError(os.Symlink(astroHome, link))
+		s.withAstroHome(link)
+		initHome(afero.NewOsFs())
+		notProject(astroHome)
+	})
 }
 
 func (s *Suite) TestIsWithinProjectDir() {

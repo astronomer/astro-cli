@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -198,21 +197,21 @@ func manifestPresent(dir string) (bool, error) {
 
 // IsAstroProject reports whether dir is an Astro project, as the commands that
 // need one check it and the advice they give names one: a pyproject.toml
-// carrying [tool.astro], valid or not, or a 1.x project's .astro/config.yaml.
-// It is the one definition, so `astro init` warning about a project above it
-// and `astro deploy` naming the project it ran below agree on what that is.
+// carrying [tool.astro], valid or not, or a 1.x project's .astro/config.yaml
+// (HasLegacyConfig). It is the one definition, the same in every directory,
+// the home directory included, so `astro init` warning about a project above
+// it and `astro deploy` naming the project it ran below agree on what that is.
 //
 // The manifest is looked at first, so a project that has one is a project
 // whatever state a .astro beside it is in. An error says dir could not be
 // read well enough to tell; a walk asking about ancestors treats that as no
-// project. The home directory's .astro/config.yaml does not make it one
-// (HasLegacyConfig); a manifest there does.
-func IsAstroProject(dir string) (bool, error) {
+// project.
+func IsAstroProject(dir string, isSettings func(path string) bool) (bool, error) {
 	present, manifestErr := manifestPresent(dir)
 	if present {
 		return true, nil
 	}
-	legacy, err := HasLegacyConfig(dir)
+	legacy, err := HasLegacyConfig(dir, isSettings)
 	if legacy || err != nil {
 		return legacy, err
 	}
@@ -221,8 +220,7 @@ func IsAstroProject(dir string) (bool, error) {
 
 // LegacyConfigDir and LegacyConfigFile name the file that marks a 1.x
 // project, dir/.astro/config.yaml. config.ConfigDir and
-// config.ConfigFileNameWithExt are the same names, for the CLI's own settings
-// in the home directory.
+// config.ConfigFileNameWithExt are the same names, for the CLI's own settings.
 const (
 	LegacyConfigDir  = ".astro"
 	LegacyConfigFile = "config.yaml"
@@ -230,16 +228,18 @@ const (
 
 // HasLegacyConfig reports whether dir holds a 1.x project's
 // .astro/config.yaml. It is the one test of that marker, which
-// config.IsProjectDir makes too. The home directory's never counts: the same
-// file there holds the CLI's own settings, not a project's. An error says dir
-// could not be read well enough to tell.
-func HasLegacyConfig(dir string) (bool, error) {
-	_, err := os.Stat(filepath.Join(dir, LegacyConfigDir, LegacyConfigFile))
+// config.IsProjectDir makes too. A file isSettings reports is the CLI's own
+// settings file (config.IsSettingsFile) is not a project's, wherever the CLI
+// keeps it; nil reports none. An error says dir could not be read well enough
+// to tell.
+func HasLegacyConfig(dir string, isSettings func(path string) bool) (bool, error) {
+	marker := filepath.Join(dir, LegacyConfigDir, LegacyConfigFile)
+	_, err := os.Stat(marker)
 	switch {
 	case err == nil:
-		// Asked only of a directory that has one, so a walk up the tree
-		// does not read ~ at every level.
-		return !fileutil.IsHomeDir(dir), nil
+		// Asked only of a marker that exists, so a walk up the tree does
+		// not compare against the settings file at every level.
+		return isSettings == nil || !isSettings(marker), nil
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
 		return false, nil
 	default:

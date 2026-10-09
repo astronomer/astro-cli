@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -407,7 +406,7 @@ func TestIsAstroProject(t *testing.T) {
 	}
 	is := func(t *testing.T, dir string) bool {
 		t.Helper()
-		ok, err := IsAstroProject(dir)
+		ok, err := IsAstroProject(dir, nil)
 		require.NoError(t, err)
 		return ok
 	}
@@ -452,7 +451,7 @@ func TestIsAstroProject(t *testing.T) {
 	t.Run("a pyproject that does not parse cannot say", func(t *testing.T) {
 		dir := t.TempDir()
 		writeManifest(t, dir, "this is not : valid = toml [[[\n")
-		ok, err := IsAstroProject(dir)
+		ok, err := IsAstroProject(dir, nil)
 		assert.False(t, ok)
 		assert.Error(t, err, "HasManifest's benefit of the doubt is not an answer here")
 		write1x(t, dir)
@@ -460,26 +459,27 @@ func TestIsAstroProject(t *testing.T) {
 	})
 }
 
-// The home directory's .astro/config.yaml is the CLI's own settings, so it
-// does not make ~ a project, for any caller; a manifest there does.
-func TestIsAstroProjectInTheHomeDirectory(t *testing.T) {
-	home := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(home, LegacyConfigDir), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(home, LegacyConfigDir, LegacyConfigFile), []byte("context: cloud\n"), 0o600))
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	homedir.Reset()
-	t.Cleanup(homedir.Reset)
+// The CLI's own settings file is not a 1.x project's marker, wherever it is;
+// a manifest beside it still makes the directory a project.
+func TestIsAstroProjectIgnoresTheSettingsFile(t *testing.T) {
+	dir := t.TempDir()
+	settings := filepath.Join(dir, LegacyConfigDir, LegacyConfigFile)
+	require.NoError(t, os.MkdirAll(filepath.Dir(settings), 0o755))
+	require.NoError(t, os.WriteFile(settings, []byte("context: cloud\n"), 0o600))
+	isSettings := func(p string) bool { return p == settings }
 
-	legacy, err := HasLegacyConfig(home)
+	legacy, err := HasLegacyConfig(dir, isSettings)
 	require.NoError(t, err)
 	assert.False(t, legacy)
-	ok, err := IsAstroProject(home)
+	legacy, err = HasLegacyConfig(dir, nil)
+	require.NoError(t, err)
+	assert.True(t, legacy, "with no settings file named, the marker is a marker")
+	ok, err := IsAstroProject(dir, isSettings)
 	require.NoError(t, err)
 	assert.False(t, ok)
 
-	writeManifest(t, home, validManifest)
-	ok, err = IsAstroProject(home)
+	writeManifest(t, dir, validManifest)
+	ok, err = IsAstroProject(dir, isSettings)
 	require.NoError(t, err)
 	assert.True(t, ok)
 }

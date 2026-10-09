@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
@@ -166,6 +167,17 @@ func (s *DbtSuite) TestDbtDeploy_WithinManifestProject() {
 // A repository root whose pyproject.toml does not parse, and has no
 // [tool.astro] anyone can see, is not an Astro project, as astro init and the
 // project checks count one: the dbt project below it deploys.
+// The home directory is a project when it has a manifest, as any directory
+// is, so a dbt project inside it is refused like one inside any other.
+func (s *DbtSuite) TestDbtDeploy_WithinAHomeDirectoryProject() {
+	nested := filepath.Join(homeManifestProject(s.T()), "analytics")
+	assert.NoError(s.T(), os.MkdirAll(nested, 0o755))
+
+	err := testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--project-path", nested)
+	assert.Error(s.T(), err)
+	assert.Contains(s.T(), err.Error(), "dbt project is within an Astro project")
+}
+
 func (s *DbtSuite) TestDbtDeploy_BelowAPyprojectThatDoesNotParse() {
 	root := s.T().TempDir()
 	assert.NoError(s.T(), os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("[tool.ruff\nline-length = 120\n"), 0o600))
@@ -330,4 +342,19 @@ func (s *DbtSuite) TestDbtCleanup_RemovesArtifacts() {
 func (s *DbtSuite) TestDbtCleanup_NonexistentPath() {
 	err := testExecCmd(newDbtCleanupCmd(), filepath.Join(s.T().TempDir(), "does-not-exist"))
 	assert.Error(s.T(), err)
+}
+
+// homeManifestProject makes a temp directory the home directory, with the
+// CLI's settings in it and a manifest beside them, and returns it.
+func homeManifestProject(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, config.ConfigDir), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(home, config.ConfigDir, config.ConfigFileNameWithExt), []byte("context: cloud\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(home, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	prevHome, prevSettings := config.HomePath, config.HomeConfigFile
+	t.Cleanup(func() { config.HomePath, config.HomeConfigFile = prevHome, prevSettings })
+	config.HomePath = home
+	config.HomeConfigFile = filepath.Join(home, config.ConfigDir, config.ConfigFileNameWithExt)
+	return home
 }

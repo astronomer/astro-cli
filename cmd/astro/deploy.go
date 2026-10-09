@@ -879,11 +879,10 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 // meant to stop it.
 //
 // A project is what astro init and the project checks' advice count as one,
-// project.IsAstroProject: a pyproject.toml that does not parse is not, since
+// config.IsAstroProject: a pyproject.toml that does not parse is not, since
 // nothing says it carries [tool.astro], so it does not stop a dbt project
-// that keeps one at the repository root. The home directory is not a project
-// for this any more than for the others: a pyproject.toml in ~ does not put
-// everything under it inside one.
+// that keeps one at the repository root. The home directory is a project here
+// exactly when it is one anywhere: when it has a manifest.
 func isWithinManifestProject(path string) bool {
-	return fileutil.NearestReadableDir(path, config.IsHomeDir, project.IsAstroProject) != ""
+	return fileutil.NearestReadableDir(path, config.IsAstroProject) != ""
 }

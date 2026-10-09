@@ -3,8 +3,11 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -15,12 +18,23 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// inDir points the project checks at dir, with home as the home directory.
+// inDir points the project checks at dir, with home as the home directory
+// and the CLI's settings in it, as they are with no ASTRO_HOME.
 func inDir(t *testing.T, dir, home string) {
 	t.Helper()
-	prevWorking, prevHome := config.WorkingPath, config.HomePath
-	t.Cleanup(func() { config.WorkingPath, config.HomePath = prevWorking, prevHome })
+	inDirWithSettings(t, dir, home, home)
+}
+
+// inDirWithSettings is inDir with the CLI's settings under settingsHome, as
+// ASTRO_HOME puts them.
+func inDirWithSettings(t *testing.T, dir, home, settingsHome string) {
+	t.Helper()
+	prevWorking, prevHome, prevSettings := config.WorkingPath, config.HomePath, config.HomeConfigFile
+	t.Cleanup(func() {
+		config.WorkingPath, config.HomePath, config.HomeConfigFile = prevWorking, prevHome, prevSettings
+	})
 	config.WorkingPath, config.HomePath = dir, home
+	config.HomeConfigFile = filepath.Join(settingsHome, config.ConfigDir, config.ConfigFileNameWithExt)
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -51,12 +65,11 @@ func ensure(f func(*cobra.Command, []string) error) error {
 func TestEnsureProjectDir(t *testing.T) {
 	home := t.TempDir()
 
-	t.Run("an unreadable path", func(t *testing.T) {
+	t.Run("an unreadable path is reported as itself", func(t *testing.T) {
 		inDir(t, "./\000x", home)
 		err := ensure(EnsureProjectDir)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), verifyFailedMsg)
-		assert.Contains(t, err.Error(), AstroProjectDirAdvice)
+		assert.NotContains(t, err.Error(), "astro init")
 	})
 
 	t.Run("not a project: astro init, which the check then accepts", func(t *testing.T) {
@@ -80,7 +93,7 @@ func TestEnsureProjectDir(t *testing.T) {
 		assert.NoError(t, ensure(EnsureProjectDir))
 	})
 
-	t.Run("the home directory is never one, and is not told to run astro init", func(t *testing.T) {
+	t.Run("the home directory with only the CLI's settings is not told to run astro init", func(t *testing.T) {
 		write1xProject(t, home, false) // ~/.astro/config.yaml is the CLI's settings
 		inDir(t, home, home)
 		err := ensure(EnsureProjectDir)
@@ -123,21 +136,23 @@ func TestEnsureProjectDirReadsTheManifestFirst(t *testing.T) {
 // A manifest that loads, as astro init writes it once its Airflow is pinned.
 const loadableManifest = "[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"
 
-// The home directory is a project only with a manifest that loads, as in a
-// container whose WORKDIR is $HOME. Its .astro/config.yaml is the CLI's own
-// settings, and a manifest there that does not load is refused with the home
-// directory's advice, not taken for a project. APC deploy, which builds a
-// .astro/config.yaml project, never accepts it.
+// The home directory is an ordinary directory: a project when it has a
+// manifest, valid or not, as anywhere, and never because of the CLI's own
+// settings in its .astro/config.yaml. With no project there it gets its own
+// advice; a pyproject.toml there that does not parse is reported as itself.
+// APC deploy, which builds a .astro/config.yaml project, never takes the
+// settings for one.
 func TestEnsureProjectDirInTheHomeDirectory(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		content string // pyproject.toml; "" writes none
 		accept  bool
+		parse   bool
 	}{
 		{name: "a manifest that loads", content: loadableManifest, accept: true},
-		{name: "a manifest that fails validation", content: "[project]\nname = \"demo\"\n\n[tool.astro]\n"},
-		{name: "a pyproject that fails to parse", content: "this is not : valid = toml [[[\n"},
-		{name: "a [tool.astro] with a typo", content: "[project]\nname = \"demo\"\n\n[tool.astro\n"},
+		{name: "a manifest that fails validation", content: "[project]\nname = \"demo\"\n\n[tool.astro]\n", accept: true},
+		{name: "a pyproject that fails to parse", content: "this is not : valid = toml [[[\n", parse: true},
+		{name: "a plain pyproject.toml", content: "[project]\nname = \"demo\"\n"},
 		{name: "only .astro/config.yaml"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -148,9 +163,13 @@ func TestEnsureProjectDirInTheHomeDirectory(t *testing.T) {
 			}
 			inDir(t, home, home)
 			err := ensure(EnsureProjectDir)
-			if tc.accept {
+			switch {
+			case tc.accept:
 				assert.NoError(t, err)
-			} else {
+			case tc.parse:
+				var parseErr *manifest.ParseError
+				require.ErrorAs(t, err, &parseErr)
+			default:
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), HomeDirAdvice)
 			}
@@ -159,6 +178,99 @@ func TestEnsureProjectDirInTheHomeDirectory(t *testing.T) {
 			assert.Contains(t, err.Error(), HomeDirAdvice)
 		})
 	}
+}
+
+// A project in the home directory is a project like any other: a
+// subdirectory of it is told to run from ~, not to make a project of its own.
+func TestEnsureProjectDirNamesAProjectInTheHomeDirectory(t *testing.T) {
+	home := t.TempDir()
+	write1xProject(t, home, false) // the CLI's settings
+	writeManifestProject(t, home)
+	dags := filepath.Join(home, "dags")
+	require.NoError(t, os.MkdirAll(dags, 0o755))
+	inDir(t, dags, home)
+	err := ensure(EnsureProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), fmt.Sprintf(EnclosingProjectAdvice, home))
+}
+
+// With ASTRO_HOME, the CLI's settings live elsewhere, and that directory's
+// .astro/config.yaml is not a project's either.
+func TestEnsureProjectDirUnderAstroHome(t *testing.T) {
+	astroHome := t.TempDir()
+	write1xProject(t, astroHome, true)
+	inDirWithSettings(t, astroHome, t.TempDir(), astroHome)
+	err := ensure(EnsureProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), AstroProjectDirAdvice)
+	err = ensure(EnsureDockerfileProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), APCProjectDirAdvice)
+
+	// Below it, nothing is inside a project because of the settings.
+	sub := filepath.Join(astroHome, "sub")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	inDirWithSettings(t, sub, t.TempDir(), astroHome)
+	err = ensure(EnsureProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), AstroProjectDirAdvice)
+
+	// Nor below a home directory holding the settings ASTRO_HOME moved away
+	// from: that file is the CLI's too, not a 1.x project's.
+	home := t.TempDir()
+	write1xProject(t, home, true)
+	sub = filepath.Join(home, "sub")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	inDirWithSettings(t, sub, home, astroHome)
+	err = ensure(EnsureProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), AstroProjectDirAdvice)
+}
+
+// A pyproject.toml that exists and cannot be read is reported as the read
+// error, the problem to fix, not with advice to run astro init.
+func TestEnsureProjectDirReportsAnUnreadableManifest(t *testing.T) {
+	t.Run("a directory", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "pyproject.toml"), 0o755))
+		inDir(t, dir, t.TempDir())
+		err := ensure(EnsureProjectDir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), filepath.Join(dir, "pyproject.toml"))
+		assert.NotContains(t, err.Error(), "astro init")
+	})
+	t.Run("no permission", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("file modes do not stop this user reading")
+		}
+		dir := t.TempDir()
+		writeManifestProject(t, dir)
+		path := filepath.Join(dir, "pyproject.toml")
+		require.NoError(t, os.Chmod(path, 0o000))
+		inDir(t, dir, t.TempDir())
+		err := ensure(EnsureProjectDir)
+		require.ErrorIs(t, err, fs.ErrPermission)
+		assert.Contains(t, err.Error(), path)
+		assert.NotContains(t, err.Error(), "astro init")
+	})
+}
+
+// A subdirectory whose own pyproject.toml does not parse, inside a project, is
+// told about the project first and the parse error after it.
+func TestEnsureProjectDirPrefersTheEnclosingProjectToAParseError(t *testing.T) {
+	proj := t.TempDir()
+	writeManifestProject(t, proj)
+	sub := filepath.Join(proj, "tools")
+	writeFile(t, filepath.Join(sub, "pyproject.toml"), "this is not : valid = toml [[[\n")
+	inDir(t, sub, t.TempDir())
+	err := ensure(EnsureProjectDir)
+	require.Error(t, err)
+	msg := err.Error()
+	assert.Contains(t, msg, fmt.Sprintf(EnclosingProjectAdvice, proj))
+	var parseErr *manifest.ParseError
+	require.ErrorAs(t, err, &parseErr)
+	assert.Less(t, strings.Index(msg, fmt.Sprintf(EnclosingProjectAdvice, proj)), strings.Index(msg, filepath.Join(sub, "pyproject.toml")),
+		"the enclosing project comes first")
 }
 
 // A pyproject.toml that does not parse is reported as itself, as the deploy
@@ -179,7 +291,6 @@ func TestEnsureProjectDirReportsAManifestThatDoesNotParse(t *testing.T) {
 			require.ErrorAs(t, err, &parseErr)
 			assert.Contains(t, err.Error(), filepath.Join(dir, "pyproject.toml"))
 			assert.NotContains(t, err.Error(), "astro init")
-			assert.NotContains(t, err.Error(), verifyFailedMsg)
 		})
 	}
 }
@@ -191,19 +302,15 @@ func TestEnsureProjectDirKnowsHomeThroughASymlink(t *testing.T) {
 	link := filepath.Join(t.TempDir(), "home")
 	require.NoError(t, os.Symlink(home, link))
 	write1xProject(t, home, false)
-	inDir(t, home, link)
+	inDirWithSettings(t, home, link, link)
 	err := ensure(EnsureProjectDir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), HomeDirAdvice)
 
-	writeFile(t, filepath.Join(home, "pyproject.toml"), loadableManifest)
-	assert.NoError(t, ensure(EnsureProjectDir), "a manifest that loads in ~ is a project, through the symlink too")
-	require.NoError(t, os.Remove(filepath.Join(home, "pyproject.toml")))
-
-	// And a project below it is not told it is inside ~.
+	// And a directory below it is not told it is inside ~.
 	sub := filepath.Join(home, "elsewhere")
 	require.NoError(t, os.MkdirAll(sub, 0o755))
-	inDir(t, sub, link)
+	inDirWithSettings(t, sub, link, link)
 	err = ensure(EnsureProjectDir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), AstroProjectDirAdvice)
@@ -270,12 +377,11 @@ func TestEnsureAdviceNamesTheChecksOwnProjects(t *testing.T) {
 func TestEnsureDockerfileProjectDir(t *testing.T) {
 	home := t.TempDir()
 
-	t.Run("an unreadable path", func(t *testing.T) {
+	t.Run("an unreadable path is reported as itself", func(t *testing.T) {
 		inDir(t, "./\000x", home)
 		err := ensure(EnsureDockerfileProjectDir)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), verifyFailedMsg)
-		assert.Contains(t, err.Error(), APCProjectDirAdvice)
+		assert.NotContains(t, err.Error(), APCProjectDirAdvice)
 	})
 
 	t.Run("not a project: the path a pyproject.toml project has to APC", func(t *testing.T) {
