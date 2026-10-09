@@ -60,9 +60,6 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if err != nil {
 		return err
 	}
-	if err := c.refuse1xUnderAPC(dir); err != nil {
-		return err
-	}
 	// A 1.x airflow_settings.yaml's connection and variable values go to
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
@@ -74,6 +71,10 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		opts.Default = func() (string, string, runtimeversions.Source) {
 			return c.d.AirflowDefault(ctx)
 		}
+	}
+	// Before anything is planned or written, so a refusal changes nothing.
+	if err := c.refuse1xUnderAPC(dir); err != nil {
+		return err
 	}
 
 	res, err := scaffold.Run(dir, opts)
