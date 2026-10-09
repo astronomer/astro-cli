@@ -807,6 +807,77 @@ To cancel, run:
 	})
 }
 
+func (s *Suite) TestHibernate() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	mockDeployment := &houston.Deployment{
+		ID:          "ckbv818oa00r107606ywhoqtw",
+		Label:       "test123",
+		ReleaseName: "burning-terrestrial-5940",
+	}
+
+	s.Run("hibernate with duration success", func() {
+		api := new(mocks.ClientInterface)
+		api.On("HibernateOverrideDeployment", mock.MatchedBy(func(vars map[string]interface{}) bool {
+			override, ok := vars["hibernationOverride"].(map[string]interface{})
+			return ok && vars["deploymentId"] == mockDeployment.ID && override["hibernate"] == true && override["overrideUntil"] != nil
+		})).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Hibernate(mockDeployment.ID, true, false, "", "2h", true, api, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully set deployment burning-terrestrial-5940 to hibernate")
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("wake up without override expiry success", func() {
+		api := new(mocks.ClientInterface)
+		api.On("HibernateOverrideDeployment", mock.MatchedBy(func(vars map[string]interface{}) bool {
+			override, ok := vars["hibernationOverride"].(map[string]interface{})
+			_, hasUntil := override["overrideUntil"]
+			return ok && override["hibernate"] == false && !hasUntil
+		})).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Hibernate(mockDeployment.ID, false, false, "", "", true, api, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully woke up deployment burning-terrestrial-5940")
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("remove override sends nil hibernationOverride", func() {
+		api := new(mocks.ClientInterface)
+		api.On("HibernateOverrideDeployment", mock.MatchedBy(func(vars map[string]interface{}) bool {
+			v, exists := vars["hibernationOverride"]
+			return exists && v == nil
+		})).Return(mockDeployment, nil)
+
+		buf := new(bytes.Buffer)
+		err := Hibernate(mockDeployment.ID, true, true, "", "", true, api, buf)
+		s.NoError(err)
+		s.Contains(buf.String(), "Successfully removed the hibernation override")
+		api.AssertExpectations(s.T())
+	})
+
+	s.Run("invalid duration returns error before calling API", func() {
+		api := new(mocks.ClientInterface)
+		buf := new(bytes.Buffer)
+		err := Hibernate(mockDeployment.ID, true, false, "", "not-a-duration", true, api, buf)
+		s.Error(err)
+		api.AssertNotCalled(s.T(), "HibernateOverrideDeployment", mock.Anything)
+	})
+
+	s.Run("API error is surfaced", func() {
+		api := new(mocks.ClientInterface)
+		api.On("HibernateOverrideDeployment", mock.Anything).Return(nil, errUpdateDeploymentMock)
+
+		buf := new(bytes.Buffer)
+		err := Hibernate(mockDeployment.ID, true, false, "", "", true, api, buf)
+		s.Error(err, errUpdateDeploymentMock.Error())
+		api.AssertExpectations(s.T())
+	})
+}
+
 func (s *Suite) TestAirflowUpgradeCancel() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	deploymentID := "ckggzqj5f4157qtc9lescmehm"

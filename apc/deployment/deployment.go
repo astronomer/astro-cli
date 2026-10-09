@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	semver "github.com/Masterminds/semver/v3"
 	"github.com/fatih/camelcase"
@@ -360,6 +361,80 @@ func Update(id, cloudRole string, args map[string]string, dagDeploymentType, nfs
 	tab.Print(out)
 
 	return nil
+}
+
+func Hibernate(id string, isHibernating, removeOverride bool, until, forDuration string, force bool, client houston.ClientInterface, out io.Writer) error {
+	action := "wake up"
+	if isHibernating {
+		action = "hibernate"
+	}
+	if removeOverride {
+		action = "remove the hibernation override on"
+	}
+
+	if !force {
+		y, _ := input.Confirm(fmt.Sprintf("\nAre you sure you want to %s this deployment?", action))
+		if !y {
+			fmt.Fprintln(out, "Canceling deployment hibernation update..")
+			return nil
+		}
+	}
+
+	override := map[string]interface{}{}
+	if !removeOverride {
+		override["hibernate"] = isHibernating
+
+		overrideUntil, err := getOverrideUntil(until, forDuration)
+		if err != nil {
+			return err
+		}
+		if overrideUntil != nil {
+			override["overrideUntil"] = overrideUntil.Format(time.RFC3339)
+		}
+	}
+
+	vars := map[string]interface{}{"deploymentId": id}
+	// A nil hibernationOverride clears the override server-side; a present one sets it.
+	if removeOverride {
+		vars["hibernationOverride"] = nil
+	} else {
+		vars["hibernationOverride"] = override
+	}
+
+	d, err := houston.Call(client.HibernateOverrideDeployment)(vars)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case removeOverride:
+		fmt.Fprintf(out, "\nSuccessfully removed the hibernation override on deployment %s. The regular hibernation schedule will resume.\n", d.ReleaseName)
+	case isHibernating:
+		fmt.Fprintf(out, "\nSuccessfully set deployment %s to hibernate.\n", d.ReleaseName)
+	default:
+		fmt.Fprintf(out, "\nSuccessfully woke up deployment %s.\n", d.ReleaseName)
+	}
+
+	return nil
+}
+
+func getOverrideUntil(until, forDuration string) (*time.Time, error) {
+	if until != "" {
+		untilParsed, err := time.Parse(time.RFC3339, until)
+		if err != nil {
+			return nil, err
+		}
+		return &untilParsed, nil
+	}
+	if forDuration != "" {
+		forDurationParsed, err := time.ParseDuration(forDuration)
+		if err != nil {
+			return nil, err
+		}
+		overrideUntil := time.Now().Add(forDurationParsed)
+		return &overrideUntil, nil
+	}
+	return nil, nil
 }
 
 // Upgrade airflow deployment
