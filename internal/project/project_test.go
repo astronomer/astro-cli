@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -457,4 +458,28 @@ func TestIsAstroProject(t *testing.T) {
 		write1x(t, dir)
 		assert.True(t, is(t, dir), "a 1.x project whose ruff settings do not parse is still one")
 	})
+}
+
+// The home directory's .astro/config.yaml is the CLI's own settings, so it
+// does not make ~ a project, for any caller; a manifest there does.
+func TestIsAstroProjectInTheHomeDirectory(t *testing.T) {
+	home := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, LegacyConfigDir), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(home, LegacyConfigDir, LegacyConfigFile), []byte("context: cloud\n"), 0o600))
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	homedir.Reset()
+	t.Cleanup(homedir.Reset)
+
+	legacy, err := HasLegacyConfig(home)
+	require.NoError(t, err)
+	assert.False(t, legacy)
+	ok, err := IsAstroProject(home)
+	require.NoError(t, err)
+	assert.False(t, ok)
+
+	writeManifest(t, home, validManifest)
+	ok, err = IsAstroProject(home)
+	require.NoError(t, err)
+	assert.True(t, ok)
 }

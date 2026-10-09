@@ -81,3 +81,39 @@ func TestNearestDir(t *testing.T) {
 	_, err = NearestDir(inner, nil, func(string) (bool, error) { return false, boom })
 	assert.ErrorIs(t, err, boom)
 }
+
+// A directory match cannot read is no match, and the walk goes on above it.
+func TestNearestReadableDir(t *testing.T) {
+	root := t.TempDir()
+	outer := filepath.Join(root, "outer")
+	inner := filepath.Join(outer, "inner")
+	require.NoError(t, os.MkdirAll(inner, 0o755))
+	boom := errors.New("boom")
+	match := func(d string) (bool, error) {
+		switch d {
+		case inner:
+			return true, boom // unreadable, whatever it says
+		case outer:
+			return true, nil
+		}
+		return false, nil
+	}
+	assert.Equal(t, outer, NearestReadableDir(inner, nil, match))
+	assert.Empty(t, NearestReadableDir(inner, func(d string) bool { return d == outer }, match))
+}
+
+// SamePathAs answers as SamePath does, for a b read once.
+func TestSamePathAs(t *testing.T) {
+	dir := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	require.NoError(t, os.Symlink(dir, link))
+	isDir := SamePathAs(dir)
+	assert.True(t, isDir(link))
+	assert.True(t, isDir(dir))
+	assert.False(t, isDir(t.TempDir()))
+	assert.False(t, isDir(""))
+	assert.False(t, SamePathAs("")(dir))
+
+	missing := filepath.Join(dir, "missing")
+	assert.True(t, SamePathAs(missing)(filepath.Join(dir, ".", "missing")), "a b that cannot be read is compared by path")
+}

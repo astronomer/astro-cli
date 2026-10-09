@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // inDir points the project checks at dir, with home as the home directory.
@@ -119,22 +120,66 @@ func TestEnsureProjectDirReadsTheManifestFirst(t *testing.T) {
 	assert.NoError(t, ensure(EnsureProjectDir))
 }
 
-// The home directory is refused before anything in it is read, so neither a
-// manifest there nor one that cannot be read makes it a project.
-func TestEnsureProjectDirRefusesHomeWithAManifest(t *testing.T) {
-	for name, content := range map[string]string{
-		"a manifest":                      "[project]\nname = \"demo\"\n\n[tool.astro]\n",
-		"a pyproject that fails to parse": "this is not : valid = toml [[[\n",
+// A manifest that loads, as astro init writes it once its Airflow is pinned.
+const loadableManifest = "[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"
+
+// The home directory is a project only with a manifest that loads, as in a
+// container whose WORKDIR is $HOME. Its .astro/config.yaml is the CLI's own
+// settings, and a manifest there that does not load is refused with the home
+// directory's advice, not taken for a project. APC deploy, which builds a
+// .astro/config.yaml project, never accepts it.
+func TestEnsureProjectDirInTheHomeDirectory(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		content string // pyproject.toml; "" writes none
+		accept  bool
+	}{
+		{name: "a manifest that loads", content: loadableManifest, accept: true},
+		{name: "a manifest that fails validation", content: "[project]\nname = \"demo\"\n\n[tool.astro]\n"},
+		{name: "a pyproject that fails to parse", content: "this is not : valid = toml [[[\n"},
+		{name: "a [tool.astro] with a typo", content: "[project]\nname = \"demo\"\n\n[tool.astro\n"},
+		{name: "only .astro/config.yaml"},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
-			writeFile(t, filepath.Join(home, "pyproject.toml"), content)
+			write1xProject(t, home, true) // ~/.astro/config.yaml, the CLI's settings
+			if tc.content != "" {
+				writeFile(t, filepath.Join(home, "pyproject.toml"), tc.content)
+			}
 			inDir(t, home, home)
-			for _, check := range []func(*cobra.Command, []string) error{EnsureProjectDir, EnsureDockerfileProjectDir} {
-				err := ensure(check)
+			err := ensure(EnsureProjectDir)
+			if tc.accept {
+				assert.NoError(t, err)
+			} else {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), HomeDirAdvice)
 			}
+			err = ensure(EnsureDockerfileProjectDir)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), HomeDirAdvice)
+		})
+	}
+}
+
+// A pyproject.toml that does not parse is reported as itself, as the deploy
+// that loads it would report it, not with advice to run astro init in a
+// project the user already has.
+func TestEnsureProjectDirReportsAManifestThatDoesNotParse(t *testing.T) {
+	for name, content := range map[string]string{
+		"a syntax error": "[project]\nname = \"demo\"\n\n[tool.astro\n",
+		"a type error":   "[project]\nname = 3\n\n[tool.astro]\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, "pyproject.toml"), content)
+			inDir(t, dir, t.TempDir())
+			err := ensure(EnsureProjectDir)
+			require.Error(t, err)
+			var parseErr *manifest.ParseError
+			require.ErrorAs(t, err, &parseErr)
+			assert.Contains(t, err.Error(), filepath.Join(dir, "pyproject.toml"))
+			assert.NotContains(t, err.Error(), "astro init")
+			assert.NotContains(t, err.Error(), verifyFailedMsg)
 		})
 	}
 }
@@ -145,11 +190,15 @@ func TestEnsureProjectDirKnowsHomeThroughASymlink(t *testing.T) {
 	home := t.TempDir()
 	link := filepath.Join(t.TempDir(), "home")
 	require.NoError(t, os.Symlink(home, link))
-	writeManifestProject(t, home)
+	write1xProject(t, home, false)
 	inDir(t, home, link)
 	err := ensure(EnsureProjectDir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), HomeDirAdvice)
+
+	writeFile(t, filepath.Join(home, "pyproject.toml"), loadableManifest)
+	assert.NoError(t, ensure(EnsureProjectDir), "a manifest that loads in ~ is a project, through the symlink too")
+	require.NoError(t, os.Remove(filepath.Join(home, "pyproject.toml")))
 
 	// And a project below it is not told it is inside ~.
 	sub := filepath.Join(home, "elsewhere")

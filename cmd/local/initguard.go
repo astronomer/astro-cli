@@ -49,12 +49,7 @@ func (c *cli) warnInitNested(dir string) {
 	if err != nil {
 		return
 	}
-	readable := func(d string) (bool, error) {
-		ok, err := project.IsAstroProject(d)
-		return ok && err == nil, nil
-	}
-	outer, _ := fileutil.NearestDir(filepath.Dir(abs), c.isHomeDir, readable) //nolint:errcheck // readable returns no error, so neither does the walk
-	if outer != "" {
+	if outer := fileutil.NearestReadableDir(filepath.Dir(abs), c.isHomeDir, project.IsAstroProject); outer != "" {
 		fmt.Fprintf(c.d.Stderr, warnInitNested, dir, outer)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -14,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
@@ -259,26 +261,39 @@ func configExists(v *viper.Viper) bool {
 // directory, however it is spelled, symlinks and case included. It is the one
 // test of "is this ~" the project checks make, so a test that points HomePath
 // elsewhere moves all of them.
+//
+// HomePath is read once per value it takes, not once per call: a walk up the
+// tree asks at every level.
 func IsHomeDir(path string) bool {
-	return fileutil.SamePath(path, HomePath)
+	homeDirCache.Lock()
+	if homeDirCache.is == nil || homeDirCache.path != HomePath {
+		homeDirCache.path, homeDirCache.is = HomePath, fileutil.SamePathAs(HomePath)
+	}
+	is := homeDirCache.is
+	homeDirCache.Unlock()
+	return is(path)
 }
 
-// IsProjectDir returns a boolean depending on if path is a valid project dir
-func IsProjectDir(path string) (bool, error) {
-	configPath := filepath.Join(path, ConfigDir)
-	configFile := filepath.Join(configPath, ConfigFileNameWithExt)
+// homeDirCache is IsHomeDir's comparison against HomePath, made again when
+// HomePath changes.
+var homeDirCache struct {
+	sync.Mutex
+	path string
+	is   func(string) bool
+}
 
-	// Home directory is not a project directory
-	if IsHomeDir(path) {
+// IsProjectDir reports whether path is a 1.x project directory, one with a
+// .astro/config.yaml (project.HasLegacyConfig). The home directory never is.
+func IsProjectDir(path string) (bool, error) {
+	if path == "" || IsHomeDir(path) {
 		return false, nil
 	}
-
-	return fileutil.Exists(configFile, nil)
+	return project.HasLegacyConfig(path)
 }
 
 // IsWithinProjectDir returns true if the path is at or within an Astro project directory
 func IsWithinProjectDir(path string) (bool, error) {
-	dir, err := fileutil.NearestDir(path, IsHomeDir, IsProjectDir)
+	dir, err := fileutil.NearestDir(path, IsHomeDir, project.HasLegacyConfig)
 	return dir != "", err
 }
 

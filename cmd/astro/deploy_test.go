@@ -12,11 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -188,6 +190,35 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 	// Without --image-name, the project-dir check should still run and propagate.
 	err = execDeployCmd("-f", "test-deployment-id")
 	assert.ErrorIs(t, err, assert.AnError)
+}
+
+// The real project check, not a stand-in: an empty --image-name names no
+// image, so the deploy builds one and the directory has to be a project; and
+// a manifest that does not parse is reported as itself, the error deploy()
+// would give loading it, not as advice to run astro init.
+func TestDeployProjectCheck(t *testing.T) {
+	prevEnsure, prevWorking, prevImage := EnsureProjectDir, config.WorkingPath, imageName
+	t.Cleanup(func() { EnsureProjectDir, config.WorkingPath, imageName = prevEnsure, prevWorking, prevImage })
+	EnsureProjectDir = utils.EnsureProjectDir
+	config.WorkingPath = t.TempDir()
+
+	preRun := func(args ...string) error {
+		cmd := NewDeployCmd()
+		require.NoError(t, cmd.ParseFlags(args))
+		return cmd.PreRunE(cmd, nil)
+	}
+
+	assert.NoError(t, preRun("--image-name", "prebuilt:1"), "an image built elsewhere needs no project")
+	err := preRun("--image-name=")
+	require.Error(t, err, "an empty --image-name builds from a directory that has to be a project")
+	assert.Contains(t, err.Error(), utils.AstroProjectDirAdvice)
+
+	require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro\n"), 0o600))
+	err = preRun()
+	require.Error(t, err)
+	var parseErr *manifest.ParseError
+	require.ErrorAs(t, err, &parseErr, "the manifest's own error")
+	assert.NotContains(t, err.Error(), "astro init")
 }
 
 func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {

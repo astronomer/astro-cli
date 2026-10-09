@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/proxy"
@@ -204,19 +205,43 @@ func manifestPresent(dir string) (bool, error) {
 // The manifest is looked at first, so a project that has one is a project
 // whatever state a .astro beside it is in. An error says dir could not be
 // read well enough to tell; a walk asking about ancestors treats that as no
-// project. It knows nothing of the home directory, which is never a project:
-// its callers rule that out first.
+// project. The home directory's .astro/config.yaml does not make it one
+// (HasLegacyConfig); a manifest there does.
 func IsAstroProject(dir string) (bool, error) {
 	present, manifestErr := manifestPresent(dir)
 	if present {
 		return true, nil
 	}
-	_, err := os.Stat(filepath.Join(dir, ".astro", "config.yaml"))
+	legacy, err := HasLegacyConfig(dir)
+	if legacy || err != nil {
+		return legacy, err
+	}
+	return false, manifestErr
+}
+
+// LegacyConfigDir and LegacyConfigFile name the file that marks a 1.x
+// project, dir/.astro/config.yaml. config.ConfigDir and
+// config.ConfigFileNameWithExt are the same names, for the CLI's own settings
+// in the home directory.
+const (
+	LegacyConfigDir  = ".astro"
+	LegacyConfigFile = "config.yaml"
+)
+
+// HasLegacyConfig reports whether dir holds a 1.x project's
+// .astro/config.yaml. It is the one test of that marker, which
+// config.IsProjectDir makes too. The home directory's never counts: the same
+// file there holds the CLI's own settings, not a project's. An error says dir
+// could not be read well enough to tell.
+func HasLegacyConfig(dir string) (bool, error) {
+	_, err := os.Stat(filepath.Join(dir, LegacyConfigDir, LegacyConfigFile))
 	switch {
 	case err == nil:
-		return true, nil
+		// Asked only of a directory that has one, so a walk up the tree
+		// does not read ~ at every level.
+		return !fileutil.IsHomeDir(dir), nil
 	case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
-		return false, manifestErr
+		return false, nil
 	default:
 		return false, err
 	}

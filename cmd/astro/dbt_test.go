@@ -163,6 +163,24 @@ func (s *DbtSuite) TestDbtDeploy_WithinManifestProject() {
 	assert.Contains(s.T(), err.Error(), "dbt project is within an Astro project")
 }
 
+// A repository root whose pyproject.toml does not parse, and has no
+// [tool.astro] anyone can see, is not an Astro project, as astro init and the
+// project checks count one: the dbt project below it deploys.
+func (s *DbtSuite) TestDbtDeploy_BelowAPyprojectThatDoesNotParse() {
+	root := s.T().TempDir()
+	assert.NoError(s.T(), os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("[tool.ruff\nline-length = 120\n"), 0o600))
+	nested := filepath.Join(root, "analytics")
+	assert.NoError(s.T(), os.MkdirAll(nested, 0o755))
+	s.createDbtProjectFile(filepath.Join(nested, "dbt_project.yml"))
+
+	DeployBundle = func(*astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+		return astrodeploy.BundleDeploy{}, nil
+	}
+	defer testUtil.MockUserInput(s.T(), "1")()
+	err := testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--project-path", nested)
+	assert.NoError(s.T(), err)
+}
+
 func (s *DbtSuite) TestDbtDelete_PickDeployment() {
 	s.createDbtProjectFile("dbt_project.yml")
 	defer os.Remove("dbt_project.yml")

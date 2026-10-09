@@ -96,7 +96,9 @@ func NewDeployCmd() *cobra.Command {
 		Long:  "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
+			// The value, not whether the flag was given: an empty
+			// --image-name= names no image, and the deploy builds one here.
+			if imageName != "" || cmd.Flags().Changed(nonDagsFlag) {
 				return nil
 			}
 			// EnsureProjectDir accepts a project with a pyproject.toml too; deploy()
@@ -876,10 +878,12 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 // a dbt project or a non-DAG bundle nested inside one shipped where the check
 // meant to stop it.
 //
-// The home directory is not a project for this any more than for the others:
-// a pyproject.toml in ~ does not put everything under it inside one.
+// A project is what astro init and the project checks' advice count as one,
+// project.IsAstroProject: a pyproject.toml that does not parse is not, since
+// nothing says it carries [tool.astro], so it does not stop a dbt project
+// that keeps one at the repository root. The home directory is not a project
+// for this any more than for the others: a pyproject.toml in ~ does not put
+// everything under it inside one.
 func isWithinManifestProject(path string) bool {
-	hasManifest := func(dir string) (bool, error) { return project.HasManifest(dir), nil }
-	dir, _ := fileutil.NearestDir(path, config.IsHomeDir, hasManifest) //nolint:errcheck // hasManifest returns no error, so neither does the walk
-	return dir != ""
+	return fileutil.NearestReadableDir(path, config.IsHomeDir, project.IsAstroProject) != ""
 }

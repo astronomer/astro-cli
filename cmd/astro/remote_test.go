@@ -10,6 +10,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -278,10 +279,22 @@ func TestRemoteDeployProjectCheck(t *testing.T) {
 	assert.Contains(t, err.Error(), utils.AstroProjectDirAdvice)
 
 	// The project astro init writes passes, as the advice promises.
-	require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	pyproject := filepath.Join(config.WorkingPath, "pyproject.toml")
+	require.NoError(t, os.WriteFile(pyproject, []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
 	cmd = newRemoteDeployCmd()
 	require.NoError(t, cmd.ParseFlags(nil))
 	assert.NoError(t, cmd.PreRunE(cmd, nil))
+
+	// One that does not parse is reported as itself, as astro deploy reports
+	// it, not with advice to run astro init.
+	require.NoError(t, os.WriteFile(pyproject, []byte("[project]\nname = \"demo\"\n\n[tool.astro\n"), 0o600))
+	cmd = newRemoteDeployCmd()
+	require.NoError(t, cmd.ParseFlags(nil))
+	err = cmd.PreRunE(cmd, nil)
+	require.Error(t, err)
+	var parseErr *manifest.ParseError
+	require.ErrorAs(t, err, &parseErr)
+	assert.NotContains(t, err.Error(), "astro init")
 }
 
 // Test that ensures the remote command integrates properly with the root command
