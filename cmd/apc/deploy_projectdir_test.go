@@ -13,11 +13,14 @@ import (
 // nothing, so a 1.x project without a Dockerfile and a pyproject.toml project
 // both make one; an image deploy needs the .astro/config.yaml and the
 // Dockerfile, and says which is missing. A non-empty --image-name skips the
-// check; an empty one does not.
+// check; an empty one does not. --remote builds nothing either, so RunE, not
+// the project check, says --image-name is missing.
 func (s *Suite) TestDeployProjectCheckFollowsTheDeploy() {
+	prevConfig, prevEnsure, prevPath, prevImage, prevDags := appConfig, EnsureProjectDir, config.WorkingPath, DeployAirflowImage, DagsOnlyDeploy
+	s.T().Cleanup(func() {
+		appConfig, EnsureProjectDir, config.WorkingPath, DeployAirflowImage, DagsOnlyDeploy = prevConfig, prevEnsure, prevPath, prevImage, prevDags
+	})
 	appConfig = &houston.AppConfig{}
-	prevEnsure, prevPath, prevImage := EnsureProjectDir, config.WorkingPath, DeployAirflowImage
-	defer func() { EnsureProjectDir, config.WorkingPath, DeployAirflowImage = prevEnsure, prevPath, prevImage }()
 	EnsureProjectDir = ensureDeployProjectDir
 	DeployAirflowImage = func(houston.ClientInterface, string, string, string, bool, bool, string, bool, string, deploy.Options) (deploy.Deployed, error) {
 		return deploy.Deployed{DeploymentID: "dep"}, nil
@@ -42,6 +45,8 @@ func (s *Suite) TestDeployProjectCheckFollowsTheDeploy() {
 	s.ErrorContains(err, "has no .astro/config.yaml and no Dockerfile")
 	s.ErrorContains(err, "astro package --tag <image>, then astro deploy <deployment-id> --image-name <image>")
 	s.NoError(execDeployCmd("dep", "--force", "--image-name", "img:1"), "--image-name needs no project")
+	s.ErrorContains(execDeployCmd("dep", "--dags", "--force", "--save"), "--save stores the deployment in .astro/config.yaml")
+	s.NoFileExists(filepath.Join(pyproject, ".astro", "config.yaml"), "a refused --save writes nothing")
 
 	config.WorkingPath = noDockerfile
 	s.NoError(execDeployCmd("dep", "--dags", "--force"), "a DAG-only deploy needs no Dockerfile")
@@ -52,4 +57,5 @@ func (s *Suite) TestDeployProjectCheckFollowsTheDeploy() {
 	config.WorkingPath = empty
 	s.ErrorContains(execDeployCmd("dep", "--dags", "--force"), "run astro init")
 	s.ErrorContains(execDeployCmd("dep", "--force", "--image-name="), "has no .astro/config.yaml and no Dockerfile", "an empty --image-name= still checks the project")
+	s.ErrorIs(execDeployCmd("dep", "--force", "--remote", "--image-name="), ErrImageNameNotPassedForRemoteFlag)
 }

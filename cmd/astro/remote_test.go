@@ -273,20 +273,16 @@ func TestRemoteCommandIntegration(t *testing.T) {
 	})
 }
 
-// --image-name pushes a prebuilt image, so like astro deploy --image-name it
-// needs no project; an empty --image-name= builds one, and the project check
-// runs.
-func TestRemoteDeployImageNameSkipsTheProjectCheck(t *testing.T) {
+// --image-name does not skip the project check: remote deploy reads the
+// registry it pushes to from the project's .astro/config.yaml, so outside a
+// project it would push to whichever registry the global config names.
+func TestRemoteDeployImageNameStillChecksTheProject(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	prev := config.WorkingPath
-	defer func() { config.WorkingPath = prev }()
+	prevPath, prevImage := config.WorkingPath, remoteImageName
+	t.Cleanup(func() { config.WorkingPath, remoteImageName = prevPath, prevImage })
 	config.WorkingPath = t.TempDir()
 
 	cmd := newRemoteDeployCmd()
-	assert.NoError(t, cmd.ParseFlags([]string{"--image-name", "custom-image:latest"}))
-	assert.NoError(t, cmd.PreRunE(cmd, nil))
-
-	cmd = newRemoteDeployCmd()
-	assert.NoError(t, cmd.ParseFlags([]string{"--image-name="}))
+	assert.NoError(t, cmd.ParseFlags([]string{"--image-name", "img"}))
 	assert.ErrorContains(t, cmd.PreRunE(cmd, nil), "not an Astro project directory")
 }

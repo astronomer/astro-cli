@@ -29,9 +29,10 @@ func ChainRunEs(runEs ...RunE) RunE {
 // EnsureProjectDir fails outside a project directory, with advice to run astro
 // init. Its callers on Astro accept the pyproject.toml project astro init writes
 // before they get here, so the advice leads somewhere. In the home directory it
-// says only to change directory: astro init will not make all of ~ a project.
+// says only to change directory: a project there would take in every file
+// under ~.
 func EnsureProjectDir(cmd *cobra.Command, args []string) error {
-	if isHomeDir(config.WorkingPath) {
+	if config.IsHomeDir(config.WorkingPath) {
 		return errors.New(ansi.Red("this is your home directory, not an Astro project directory.\nChange to an Astro project directory\n"))
 	}
 	return ensureProjectDir("Change to an Astro project directory, or run astro init to make this one an Astro project")
@@ -50,7 +51,7 @@ const apcAdvice = "Deploying to APC needs a Dockerfile-based project: a .astro/c
 // root, and says which of them is missing. It never suggests astro init, whose
 // project APC deploy cannot build.
 func EnsureDockerfileProjectDir(cmd *cobra.Command, args []string) error {
-	if isHomeDir(config.WorkingPath) {
+	if config.IsHomeDir(config.WorkingPath) {
 		return errors.New(ansi.Red("this is your home directory, not an Astro project directory.\n" + apcAdvice + "\n"))
 	}
 	isProjectDir, err := config.IsProjectDir(config.WorkingPath)
@@ -71,20 +72,6 @@ func EnsureDockerfileProjectDir(cmd *cobra.Command, args []string) error {
 		return errors.New(ansi.Red("this directory has no " + strings.Join(missing, " and no ") + ", so APC deploy cannot build it.\n" + apcAdvice + "\n"))
 	}
 	return nil
-}
-
-// isHomeDir reports whether dir is the home directory: the same spelling once
-// cleaned, or, when both can be read, the same directory under another one.
-func isHomeDir(dir string) bool {
-	if dir == "" || config.HomePath == "" {
-		return false
-	}
-	if filepath.Clean(dir) == filepath.Clean(config.HomePath) {
-		return true
-	}
-	a, errA := os.Stat(dir)
-	b, errB := os.Stat(config.HomePath)
-	return errA == nil && errB == nil && os.SameFile(a, b)
 }
 
 func ensureProjectDir(advice string) error {

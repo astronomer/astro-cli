@@ -58,12 +58,7 @@ func newRemoteDeployCmd() *cobra.Command {
 			// reject it. astro deploy grew this bypass and its sibling here
 			// never did, which left remote deploy refusing every such project
 			// with advice to run astro dev init, a command v2 removed.
-			// A prebuilt image is pushed as it is, as astro deploy
-			// --image-name does: the project is read only to build one, and
-			// for Dockerfile.client when --deployment-id checks a runtime,
-			// which says so itself when the file is missing. The value, not
-			// whether the flag was given: an empty --image-name= builds.
-			if remoteImageName != "" || project.HasManifest(config.WorkingPath) {
+			if project.HasManifest(config.WorkingPath) {
 				return nil
 			}
 			return utils.EnsureProjectDir(cmd, args)

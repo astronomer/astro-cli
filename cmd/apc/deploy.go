@@ -64,7 +64,10 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// The value, not whether the flag was given: an empty
 			// --image-name= names no image, and the deploy builds one here.
-			if imageName != "" {
+			// --remote builds nothing either: it points the Deployment at an
+			// image already in the registry, and RunE says when --image-name
+			// is missing.
+			if imageName != "" || (imagePresentOnRemote && !isDagOnlyDeploy) {
 				return nil
 			}
 			return EnsureProjectDir(cmd, args)
@@ -108,6 +111,21 @@ func ensureDeployProjectDir(cmd *cobra.Command, args []string) error {
 	return utils.EnsureProjectDir(cmd, args)
 }
 
+// saveDeployment is --save. It writes .astro/config.yaml, which would turn a
+// pyproject.toml project into a 1.x one, so such a project is refused.
+func saveDeployment(deploymentID string) error {
+	if project.HasManifest(config.WorkingPath) {
+		isProjectDir, err := config.IsProjectDir(config.WorkingPath)
+		if err != nil {
+			return err
+		}
+		if !isProjectDir {
+			return cliout.Usage(errors.New("--save stores the deployment in .astro/config.yaml, which a pyproject.toml project does not have; pass the deployment id on each deploy instead"))
+		}
+	}
+	return config.CFG.ProjectDeployment.SetProjectString(deploymentID)
+}
+
 // The kinds of deploy deployJSON.Type names.
 const (
 	deployTypeImageAndDags = "image_and_dags"
@@ -148,8 +166,7 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// Save release name in config if specified
 	if deploymentID != "" && saveDeployConfig {
-		err = config.CFG.ProjectDeployment.SetProjectString(deploymentID)
-		if err != nil {
+		if err := saveDeployment(deploymentID); err != nil {
 			return err
 		}
 	}

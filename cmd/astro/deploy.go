@@ -268,7 +268,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return errors.New("cannot use --dag-bundle-name with --image; named Dag bundles apply only to deploys that include Dags")
 	}
 
-	if cmd.Flags().Changed(imageNameFlag) {
+	if imageName != "" {
 		for _, f := range []string{"dags", "dags-path", "no-dags-base-dir", "pytest", "parse", "build-secret", "dag-bundle-name"} {
 			if cmd.Flags().Changed(f) {
 				return fmt.Errorf("cannot use --%s with --image-name; --image-name implies an image-only deploy", f)
