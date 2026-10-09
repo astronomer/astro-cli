@@ -70,7 +70,7 @@ func (s *Suite) TestDeploy() {
 		if description == "" {
 			return deploy.Deployed{DeploymentID: deploymentID}, fmt.Errorf("description should not be empty")
 		}
-		return deploy.Deployed{DeploymentID: deploymentID}, nil
+		return deploy.Deployed{DeploymentID: deploymentID, Dags: deploy.DagsFromUpload}, nil
 	}
 
 	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
@@ -96,7 +96,7 @@ func (s *Suite) TestDeploy() {
 		if description != expectedDesc {
 			return deploy.Deployed{DeploymentID: deploymentID}, fmt.Errorf("expected description to be '%s', but got '%s'", expectedDesc, description)
 		}
-		return deploy.Deployed{DeploymentID: deploymentID}, nil
+		return deploy.Deployed{DeploymentID: deploymentID, Dags: deploy.DagsFromUpload}, nil
 	}
 
 	err = execDeployCmd([]string{"test-deployment-id", "--force"}...)
@@ -114,7 +114,7 @@ func (s *Suite) TestDeploy() {
 		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
 
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
+			return deploy.Deployed{DeploymentID: deploymentID, Dags: deploy.DagsFromUpload}, nil
 		}
 	})
 
@@ -149,7 +149,7 @@ func (s *Suite) TestDeploy() {
 
 	s.Run("Test for the flag --image for dags-only deployment", func() {
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
+			return deploy.Deployed{DeploymentID: deploymentID, Dags: deploy.DagsFromUpload}, nil
 		}
 		// This function is not called since --image is passed
 		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
@@ -163,7 +163,7 @@ func (s *Suite) TestDeploy() {
 		var capturedImageName string
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
 			capturedImageName = imageName // Capture the imageName
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
+			return deploy.Deployed{DeploymentID: deploymentID, Dags: deploy.DagsFromUpload}, nil
 		}
 		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
 			return deploymentID, nil
@@ -185,7 +185,7 @@ func (s *Suite) TestDeploy() {
 		// Mock function for DeployAirflowImage
 		DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
 			deployAirflowImageCalled = true // Set the flag if this function is called
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
+			return deploy.Deployed{DeploymentID: deploymentID, Dags: deploy.DagsFromUpload}, nil
 		}
 		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (deploy.Deployed, error) {
 			return deploy.Deployed{}, nil

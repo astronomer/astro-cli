@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -54,15 +52,16 @@ var deployExample = `  # Deploy this project, picking the Deployment from a list
   # Deploy a custom image built on this machine
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>`
 
-// The warnings an --image-name deploy can give. That image was not built from
-// the working directory, which need not be a project at all.
+// The warnings a deploy can give about its DAGs.
 const (
 	// warningImageNameDagsInImage: the Deployment runs the DAGs inside its
-	// image, and nothing here put any there.
+	// image, and nothing here put any there. --image-name's image was not
+	// built from the working directory, which need not be a project at all.
 	warningImageNameDagsInImage = "this Deployment runs only the Dags inside the image %s; Dags are not uploaded separately. If astro package built the image from a generated build, it has none: declare a dockerfile under [tool.astro] so the build includes the project's Dags."
-	// warningImageNameNoDagsDir: the Deployment takes DAG uploads, and there
-	// is no dags directory to upload. An empty upload would delete its DAGs.
-	warningImageNameNoDagsDir = "no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had. Run the deploy from the project directory to upload them."
+	// noticeNoDagsDir: the Deployment takes DAG uploads, and there is no
+	// dags directory to upload, so DagsOnlyDeploy uploaded nothing. An empty
+	// upload would have deleted its DAGs.
+	noticeNoDagsDir = "no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had. Run the deploy from the project directory to upload them."
 )
 
 var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy <deployment-id> --force` to deploy anyway")
@@ -128,8 +127,8 @@ type deployJSON struct {
 	URL string `json:"url,omitempty"`
 	// Warnings are what the deploy warned about without failing, as text
 	// prints them (less the "Warning: " prefix): an --image-name image that
-	// is all an image Deployment's DAGs, or a DAG upload skipped for want of
-	// a dags directory. None when show_warnings is off.
+	// is all an image Deployment's DAGs (not when show_warnings is off), or
+	// a DAG upload skipped for want of a dags directory (always).
 	Warnings []string `json:"warnings,omitempty"`
 }
 
@@ -219,38 +218,60 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		return emitDeploy(r, &result)
 	}
 
-	if err := deployDagsAfterImage(ws, deploymentID, dags, opts, &result); err != nil {
+	after := &dagsAfterImage{client: houstonClient, workspace: ws, deployment: deploymentID, path: config.WorkingPath, imageName: imageName, description: description, dags: dags}
+	if err := deployDagsAfterImage(after, opts, &result); err != nil {
 		return err
 	}
 	return emitDeploy(r, &result)
 }
 
+// dagsAfterImage is what the DAG upload after an image deploy goes on.
+type dagsAfterImage struct {
+	client     houston.ClientInterface
+	workspace  string
+	deployment string
+	// path is the directory whose dags directory is uploaded.
+	path string
+	// imageName is --image-name: an image not built from path, which need
+	// not be a project at all.
+	imageName   string
+	description string
+	// dags is where the Deployment takes its DAGs from, as the image deploy
+	// found it.
+	dags deploy.DagsFrom
+}
+
 // deployDagsAfterImage uploads the working directory's DAGs to a Deployment
 // whose image was just deployed, when it takes DAG uploads, and records in
 // result what it did and what it warned about.
-func deployDagsAfterImage(ws, deploymentID string, dags deploy.DagsFrom, opts deploy.Options, result *deployJSON) error {
-	// --image-name skips the project check, so the working directory may hold
-	// no dags directory. Uploading it anyway sends an empty bundle, which
-	// deletes the Deployment's DAGs; with --yes or show_warnings off, without
-	// asking. A dags directory, even an empty one, is uploaded as ever.
-	if imageName != "" && dags == deploy.DagsFromUpload && !isDir(filepath.Join(config.WorkingPath, "dags")) {
-		warn(result, opts.Progress, fmt.Sprintf(warningImageNameNoDagsDir, config.WorkingPath))
-		return nil
-	}
-
-	_, err := DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description, opts)
-	// Don't throw the error if dag-deploy itself is disabled
-	if deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment) {
-		// A Deployment that runs the DAGs in its image got its DAGs from the
-		// image just pushed. A build from this project baked them in; an image
-		// built elsewhere carries whatever it carries, possibly none, and
-		// nothing else would say so.
-		if imageName != "" && dags == deploy.DagsFromImage {
-			warn(result, opts.Progress, fmt.Sprintf(warningImageNameDagsInImage, imageName))
+func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deployJSON) error {
+	switch a.dags {
+	case deploy.DagsFromImage:
+		// The Deployment got its DAGs from the image just pushed. A build
+		// from this project baked them in; an image built elsewhere carries
+		// whatever it carries, possibly none, and nothing else would say so.
+		if a.imageName != "" {
+			warn(result, opts.Progress, fmt.Sprintf(warningImageNameDagsInImage, a.imageName))
 		}
 		return nil
+	case deploy.DagsFromElsewhere:
+		return nil
+	case deploy.DagsFromUpload:
+		// Uploaded below.
 	}
-	if err != nil {
+
+	_, err := DagsOnlyDeploy(a.client, a.workspace, a.deployment, a.path, nil, true, a.description, opts)
+	switch {
+	case errors.Is(err, deploy.ErrNoDagsDirectory):
+		// The upload was asked for and did not happen, so this is said
+		// whatever show_warnings is.
+		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path))
+		return nil
+	case deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment):
+		// Placed as an upload without the cluster config (it could not be
+		// read), or changed since: the image deploy stands, as it always has.
+		return nil
+	case err != nil:
 		return err
 	}
 	result.Type = deployTypeImageAndDags
@@ -264,14 +285,15 @@ func warn(result *deployJSON, progress io.Writer, msg string) {
 	if !config.CFG.ShowWarnings.GetBool() {
 		return
 	}
-	fmt.Fprintln(progress, "Warning: "+msg)
-	result.Warnings = append(result.Warnings, msg)
+	alwaysWarn(result, progress, msg)
 }
 
-// isDir reports whether path is a directory.
-func isDir(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
+// alwaysWarn prints a deploy warning and records it in the json result, as
+// warn does, whatever show_warnings is: for a part of the deploy that was
+// asked for and did not happen.
+func alwaysWarn(result *deployJSON, progress io.Writer, msg string) {
+	fmt.Fprintln(progress, "Warning: "+msg)
+	result.Warnings = append(result.Warnings, msg)
 }
 
 // emitDeploy publishes a finished deploy under json. In text the deploy has

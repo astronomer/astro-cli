@@ -50,6 +50,11 @@ var (
 	ErrDagOnlyDeployDisabledInConfig        = errors.New("to perform this operation, set both deployments.deployMechanisms.dagOnlyDeployment.enabled and deployments.deployMechanisms.configureDagDeployment.enabled to true in your APC cluster")
 	ErrDagOnlyDeployNotEnabledForDeployment = errors.New("to perform this operation, first set the Deployment type to 'dag_deploy' via the UI or the API or the CLI")
 	ErrEmptyDagFolderUserCancelledOperation = errors.New("no Dags found in the dags folder. User canceled the operation")
+	// ErrNoDagsDirectory is DagsOnlyDeploy's refusal when there is no dags
+	// directory to upload. An upload of nothing would replace the
+	// Deployment's DAGs with none, so nothing is sent and nothing is asked of
+	// Houston.
+	ErrNoDagsDirectory = errors.New("no dags directory to upload")
 	// Houston reads the host from its registry.protectedCustomRegistry.updateRegistry.host,
 	// under astronomer.houston.config in the platform's values.
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
@@ -100,8 +105,8 @@ const (
 	// the DAGs either.
 	DagsFromElsewhere DagsFrom = iota
 	// DagsFromImage is a Deployment that runs the DAGs inside its image: DAG
-	// deployment type image, or no type on a cluster that takes no DAG-only
-	// deploys. The image just deployed is all the DAGs it has.
+	// deployment type image, or no type at all, which Houston deploys as an
+	// image Deployment. The image just deployed is all the DAGs it has.
 	DagsFromImage
 	// DagsFromUpload is a Deployment that takes DAG-only deploys: an upload
 	// replaces its DAGs, and an empty one leaves it none.
@@ -109,25 +114,28 @@ const (
 )
 
 // isImageDagDeployment reports whether the Deployment's DAG deployment type
-// is image. Every check of that type goes through here.
+// is image.
 func isImageDagDeployment(deploymentInfo *houston.Deployment) bool {
 	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType
 }
 
 // dagsFrom places a Deployment's DAGs from the Deployment and its merged
 // cluster config, by the same tests DagsOnlyDeploy refuses on. A Deployment
-// with no type on a cluster that takes no DAG-only deploys runs its image's
-// DAGs; one with no type on a cluster that does is DagsFromElsewhere, as
-// DagsOnlyDeploy's refusal has always left it.
+// with no type runs its image's DAGs on any cluster: git-sync, volume and
+// DAG-only Deployments all carry their type, and one created without a type
+// (or before Houston had them) is deployed by its image. DagsOnlyDeploy
+// refuses it, as it refuses an image Deployment.
 func dagsFrom(deploymentInfo *houston.Deployment, appConfig *houston.AppConfig) DagsFrom {
-	clusterTakesDagOnly := isDagOnlyDeploymentEnabled(appConfig)
-	switch {
-	case isImageDagDeployment(deploymentInfo):
+	if deploymentInfo == nil {
+		return DagsFromElsewhere
+	}
+	switch deploymentInfo.DagDeployment.Type {
+	case houston.ImageDeploymentType, "":
 		return DagsFromImage
-	case !clusterTakesDagOnly && deploymentInfo != nil && deploymentInfo.DagDeployment.Type == "":
-		return DagsFromImage
-	case clusterTakesDagOnly && isDagOnlyDeploymentEnabledForDeployment(deploymentInfo):
-		return DagsFromUpload
+	case houston.DagOnlyDeploymentType:
+		if isDagOnlyDeploymentEnabled(appConfig) {
+			return DagsFromUpload
+		}
 	}
 	return DagsFromElsewhere
 }
@@ -320,10 +328,12 @@ func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID st
 	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
 	if err != nil {
 		logger.Debugf("could not read the cluster config to place the Deployment's DAGs: %s", err.Error())
-		if isImageDagDeployment(deploymentInfo) {
-			return DagsFromImage
+		// A DAG-only Deployment is taken at its word, as one a DAG upload is
+		// for: DagsOnlyDeploy reads the cluster config again itself.
+		if isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
+			return DagsFromUpload
 		}
-		return DagsFromElsewhere
+		return dagsFrom(deploymentInfo, nil)
 	}
 	return dagsFrom(deploymentInfo, appConfig)
 }
@@ -635,7 +645,16 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 // DagsOnlyDeploy uploads the project's DAGs to a Deployment and returns the
 // Deployment it deployed to: the one named, or the one picked when none was.
 // It returns that Deployment on a failure too, once it is known.
+//
+// With no dags directory under dagsParentPath it returns ErrNoDagsDirectory
+// before anything else, Houston included: the empty bundle it would
+// otherwise upload deletes every DAG the Deployment has.
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, opts Options) (string, error) {
+	dagsPath := filepath.Join(dagsParentPath, "dags")
+	if info, err := os.Stat(dagsPath); err != nil || !info.IsDir() {
+		return deploymentID, fmt.Errorf("%w: %s is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had", ErrNoDagsDirectory, dagsPath)
+	}
+
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
 		return deploymentID, err
@@ -675,7 +694,6 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 		uploadURL = *dagDeployURL
 	}
 
-	dagsPath := filepath.Join(dagsParentPath, "dags")
 	dagsTarPath := filepath.Join(dagsParentPath, "dags.tar")
 	dagsTarGzPath := dagsTarPath + ".gz"
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
