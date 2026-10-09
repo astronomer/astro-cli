@@ -130,6 +130,21 @@ func InitFromTemplate(templateDir, destDir string) error {
 	return nil
 }
 
+// containedPath joins relativePath onto dest and rejects anything that would
+// escape dest, either through an absolute path or a ../ sequence. entryName is
+// the original tar header name, used only to make the error clear.
+func containedPath(dest, relativePath, entryName string) (string, error) {
+	if filepath.IsAbs(relativePath) {
+		return "", fmt.Errorf("invalid tarball entry %q: absolute paths are not allowed", entryName)
+	}
+	targetPath := filepath.Join(dest, relativePath)
+	rel, err := filepath.Rel(dest, targetPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("invalid tarball entry %q: path escapes destination directory", entryName)
+	}
+	return targetPath, nil
+}
+
 func extractTarGz(r io.Reader, dest, templateDir string) error {
 	gr, err := gzip.NewReader(r)
 	if err != nil {
@@ -169,27 +184,45 @@ func extractTarGz(r io.Reader, dest, templateDir string) error {
 		}
 
 		relativePath := strings.TrimPrefix(templatePath, templateDir+"/")
-		targetPath := filepath.Join(dest, relativePath)
 
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(targetPath, 0o755); err != nil { //nolint:mnd
-				return fmt.Errorf("failed to create directory: %w", err)
-			}
-		case tar.TypeReg:
-			outFile, err := os.Create(targetPath)
-			if err != nil {
-				return fmt.Errorf("failed to create file: %w", err)
-			}
+		// Guard against Zip-Slip: make sure the entry lands inside dest and
+		// never escapes it via absolute paths or ../ sequences.
+		targetPath, err := containedPath(dest, relativePath, header.Name)
+		if err != nil {
+			return err
+		}
 
-			if _, err := io.Copy(outFile, tarReader); err != nil { //nolint
-				outFile.Close()
-				return fmt.Errorf("failed to copy file contents: %w", err)
-			}
+		if err := writeTarEntry(header, targetPath, tarReader); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-			if err := outFile.Close(); err != nil {
-				return fmt.Errorf("failed to close file: %w", err)
-			}
+// writeTarEntry creates a single directory or regular file at targetPath from
+// the tar entry. Symlinks and hardlinks are rejected so their targets cannot
+// point outside the destination.
+func writeTarEntry(header *tar.Header, targetPath string, tarReader *tar.Reader) error {
+	switch header.Typeflag {
+	case tar.TypeSymlink, tar.TypeLink:
+		return fmt.Errorf("invalid tarball entry %q: symlinks and hardlinks are not allowed", header.Name)
+	case tar.TypeDir:
+		if err := os.MkdirAll(targetPath, 0o755); err != nil { //nolint:mnd
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+	case tar.TypeReg:
+		outFile, err := os.Create(targetPath)
+		if err != nil {
+			return fmt.Errorf("failed to create file: %w", err)
+		}
+
+		if _, err := io.Copy(outFile, tarReader); err != nil { //nolint
+			outFile.Close()
+			return fmt.Errorf("failed to copy file contents: %w", err)
+		}
+
+		if err := outFile.Close(); err != nil {
+			return fmt.Errorf("failed to close file: %w", err)
 		}
 	}
 	return nil
