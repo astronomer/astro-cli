@@ -163,6 +163,26 @@ func TestADeclaredDockerfilesPythonIsTheProjects(t *testing.T) {
 	}
 }
 
+// A pin-only Dockerfile naming a Python, floating tag or pinned, is retired
+// with its Python carried as requires-python, so the choice is not dropped.
+func TestARetiredPinOnlyDockerfileCarriesItsPython(t *testing.T) {
+	for _, tag := range []string{"3.1-python-3.12", "3.1-12-python-3.12"} {
+		t.Run(tag, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"),
+				[]byte("FROM astrocrpublic.azurecr.io/runtime:"+tag+"\n"), 0o600))
+
+			_, err := Run(dir, Options{})
+			require.NoError(t, err)
+
+			assert.NoFileExists(t, filepath.Join(dir, "Dockerfile"))
+			m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+			require.NoError(t, err)
+			assert.Equal(t, "==3.12.*", m.Project.RequiresPython)
+		})
+	}
+}
+
 // Adoption leaves a stated requires-python alone here too, and says so when
 // it is not the image's.
 func TestAdoptNotesARequiresPythonThatIsNotTheImages(t *testing.T) {

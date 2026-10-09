@@ -97,12 +97,6 @@ type case1x struct {
 	notes      []string
 	advisories []string
 	noNotes    bool
-	// platform, when set, gives the run a current context on that platform
-	// ("software" for APC, "cloud" for Astro; see writeLogin). Empty is a
-	// machine that never logged in, which the CLI treats as Astro.
-	platform string
-	// args are passed to init after its own.
-	args []string
 }
 
 // stock1xSettings is the airflow_settings.yaml 1.x's `astro dev init` wrote,
@@ -184,134 +178,6 @@ func cases1x() []case1x {
 			retired:       []string{"Dockerfile", "requirements.txt"},
 			// Everything carried, so the run has nothing to report.
 			noNotes: true,
-		},
-		{
-			// The same project, logged in to Astro: Astro's deploy builds a
-			// manifest project without the Dockerfile, so it goes as it does
-			// on a machine that never logged in.
-			name: "a runtime tag that names the Airflow version, under an Astro context",
-			files: map[string]string{
-				"Dockerfile":       runtime3,
-				"requirements.txt": "pandas==2.1.0\n",
-			},
-			platform: "cloud",
-			airflow:  "3.1",
-			retired:  []string{"Dockerfile", "requirements.txt"},
-			noNotes:  true,
-		},
-		{
-			// And logged in to Astro Private Cloud, whose `astro deploy` still
-			// builds the 1.x layout: .astro/config.yaml, which a conversion
-			// keeps, and the Dockerfile, whose runtime base installs
-			// requirements.txt and packages.txt. Retiring them left a project
-			// that passed APC's project check and failed its build.
-			name: "a runtime tag that names the Airflow version, under an APC context",
-			files: map[string]string{
-				".astro/config.yaml": "project:\n  name: orders-pipeline\n",
-				"Dockerfile":         runtime3,
-				"requirements.txt":   "pandas==2.1.0\n",
-				"packages.txt":       "libpq-dev\n",
-			},
-			platform:      "software",
-			airflow:       "3.1",
-			projectName:   "orders-pipeline",
-			manifestLines: []string{"dependencies = [\n    'apache-airflow==3.1.*',\n    'pandas==2.1.0',\n]"},
-			// Kept, not declared: Astro and `astro local` still build from the
-			// manifest.
-			manifestLacks: []string{"dockerfile ="},
-			kept:          []string{"Dockerfile", "requirements.txt", "packages.txt", ".astro/config.yaml"},
-			keptHas:       map[string]string{"Dockerfile": "astro-runtime:3.1-12", "requirements.txt": "pandas==2.1.0"},
-			notes: []string{"Dockerfile, packages.txt and requirements.txt: kept for Astro Private Cloud, " +
-				"whose `astro deploy` builds the project from its Dockerfile as it stands; " +
-				"its runtime base image installs packages.txt and requirements.txt during that build. " +
-				"pyproject.toml carries the same Airflow version, dependencies and OS packages for `astro local` and Astro, " +
-				"so change both together while the project deploys to Astro Private Cloud, and delete them if it deploys " +
-				"to Astro instead. This run converted the project for Astro Private Cloud because the current context is " +
-				"Astro Private Cloud (localhost); to convert for Astro instead, first delete the pyproject.toml this run " +
-				"created (`rm pyproject.toml`), then convert again and pass --deploy-target astro"},
-		},
-		{
-			// The flag outranks the context, in both directions.
-			name: "a runtime tag that names the Airflow version, --deploy-target astro under an APC context",
-			files: map[string]string{
-				"Dockerfile":       runtime3,
-				"requirements.txt": "pandas==2.1.0\n",
-			},
-			platform: "software",
-			args:     []string{"--deploy-target", "astro"},
-			airflow:  "3.1",
-			retired:  []string{"Dockerfile", "requirements.txt"},
-			noNotes:  true,
-		},
-		{
-			// A saved deploy target in its cuid shape is what both platforms
-			// save, so the context decides it, and the link follows the same
-			// answer the retirement does: under APC the target stays a note
-			// beside the kept build rather than becoming an Astro link.
-			name: "a saved cuid deploy target, under an APC context",
-			files: map[string]string{
-				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
-					"  deployment: cm1ordersdeployment000001\n  workspace: cm1ordersworkspace0000001\n",
-				"Dockerfile": runtime3,
-			},
-			platform:      "software",
-			airflow:       "3.1",
-			projectName:   "orders-pipeline",
-			manifestLacks: []string{"[tool.astro.deployments]", "dockerfile ="},
-			kept:          []string{"Dockerfile", ".astro/config.yaml"},
-			notes: []string{
-				"Dockerfile: kept for Astro Private Cloud",
-				"cm1ordersdeployment000001 in workspace cm1ordersworkspace0000001 is this project's saved deploy target, " +
-					"which Astro Private Cloud's `astro deploy` reads from this file, so it stays here rather than " +
-					"becoming a [tool.astro.deployments] link",
-			},
-		},
-		{
-			// --deploy-target apc converts for APC under an Astro context, and
-			// a saved target that looks like a Software release name does not
-			// decide either way: the flag did, and the notes say so.
-			name: "a saved release name, --deploy-target apc under an Astro context",
-			files: map[string]string{
-				".astro/config.yaml": "project:\n  name: orders-pipeline\n  deployment: celestial-gravity-1234\n",
-				"Dockerfile":         runtime3,
-				"requirements.txt":   "pandas==2.1.0\n",
-			},
-			platform:      "cloud",
-			args:          []string{"--deploy-target", "apc"},
-			airflow:       "3.1",
-			projectName:   "orders-pipeline",
-			manifestLacks: []string{"[tool.astro.deployments]", "dockerfile ="},
-			kept:          []string{"Dockerfile", "requirements.txt", ".astro/config.yaml"},
-			notes: []string{
-				"Dockerfile and requirements.txt: kept for Astro Private Cloud",
-				"This run converted the project for Astro Private Cloud because of --deploy-target apc; " +
-					"to convert for Astro instead, first delete the pyproject.toml this run created " +
-					"(`rm pyproject.toml`), then convert again and pass --deploy-target astro",
-			},
-		},
-		{
-			// Without the flag the same project converts for the Astro
-			// context: the release-name shape is no signal, since an Astro
-			// Deployment's namespace has it too.
-			name: "a saved release name, under an Astro context",
-			files: map[string]string{
-				".astro/config.yaml": "project:\n  name: orders-pipeline\n  deployment: celestial-gravity-1234\n",
-				"Dockerfile":         runtime3,
-				"requirements.txt":   "pandas==2.1.0\n",
-			},
-			platform:    "cloud",
-			airflow:     "3.1",
-			projectName: "orders-pipeline",
-			retired:     []string{"Dockerfile", "requirements.txt"},
-			kept:        []string{".astro/config.yaml"},
-			notes: []string{
-				"celestial-gravity-1234 is this project's saved deploy target. If that is an Astro Deployment, " +
-					"give it a name under [tool.astro.deployments]",
-				"This run converted the project for Astro because the current context is Astro (localhost); " +
-					"to convert for Astro Private Cloud instead, first restore Dockerfile and requirements.txt from " +
-					"version control and delete the pyproject.toml this run created (`git checkout -- Dockerfile " +
-					"requirements.txt && rm pyproject.toml`), then convert again and pass --deploy-target apc",
-			},
 		},
 		{
 			// A Dockerfile that does more than pin becomes the project's
@@ -681,14 +547,7 @@ func TestInitConvertsA1xProject(t *testing.T) {
 			}
 
 			var res initResult
-			args := append([]string{"init", "--output", "json"}, tc.args...)
-			if tc.platform == "" {
-				p.run(args...).requireSuccess().requireJSON(&res)
-			} else {
-				// runIn keeps every request off the network.
-				writeContext(t, p, tc.platform)
-				runIn(t, p, args...).requireSuccess().requireJSON(&res)
-			}
+			p.run("init", "--output", "json").requireSuccess().requireJSON(&res)
 
 			if tc.airflow != "" && res.Airflow != tc.airflow {
 				t.Errorf("airflow = %q, want %q", res.Airflow, tc.airflow)
@@ -856,6 +715,56 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 	// where it used to send people looking.
 	if !strings.Contains(r.Stderr, "project config") {
 		t.Errorf("the parse failure should be reported on stderr, naming the project's config:\n%s", r.output())
+	}
+}
+
+// Under an Astro Private Cloud context, whose `astro deploy` still builds the
+// 1.x layout, init refuses to convert a 1.x project and leaves every file as
+// it was: a usage error, published as the one error object under json. A
+// directory that is not a 1.x project is still made a project there, with a
+// note that APC does not deploy it yet.
+func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+	writeContext(t, p, "software")
+	files := map[string]string{
+		filepath.Join(".astro", "config.yaml"): "project:\n  name: orders-pipeline\n",
+		"Dockerfile":                           "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
+		"requirements.txt":                     "pandas==2.1.0\n",
+	}
+	mkdir(t, filepath.Join(p.Dir, ".astro"))
+	for name, body := range files {
+		write(t, filepath.Join(p.Dir, name), body)
+	}
+
+	r := p.run("init", "--output", "json").requireFailure()
+	if r.ExitCode != 2 {
+		t.Errorf("exit code %d, want 2 (usage)\n%s", r.ExitCode, r.output())
+	}
+	e := lastErrorObject(r.Stdout)
+	if e == nil || e.Kind != "usage" || !strings.Contains(e.Error, "Astro Private Cloud") ||
+		!strings.Contains(e.Error, "leaves the project as it is for now") {
+		t.Errorf("want one usage error object naming APC on stdout:\n%s", r.output())
+	}
+	for name, body := range files {
+		got, err := os.ReadFile(filepath.Join(p.Dir, name))
+		if err != nil || string(got) != body {
+			t.Errorf("%s changed: %q, %v", name, got, err)
+		}
+	}
+	for _, name := range []string{"pyproject.toml", ".gitignore", "AGENTS.md", "dags"} {
+		if _, err := os.Lstat(filepath.Join(p.Dir, name)); err == nil {
+			t.Errorf("a refused run wrote %s", name)
+		}
+	}
+
+	fresh := newProject(t)
+	writeContext(t, fresh, "software")
+	var res initResult
+	fresh.run("init", "--output", "json").requireSuccess().requireJSON(&res)
+	if !reports(res.Notes, "is Astro Private Cloud, which does not deploy pyproject.toml projects yet") {
+		t.Errorf("want the APC note on a new project, got %q", res.Notes)
 	}
 }
 

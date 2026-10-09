@@ -108,7 +108,7 @@ func TestChooseNameTakesWhatTheProjectCallsItself(t *testing.T) {
 				from1x = read
 			}
 
-			got, advisory := chooseName(dir, &Options{Name: tc.optsName}, from1x)
+			got, advisory := chooseName(dir, Options{Name: tc.optsName}, from1x)
 			assert.Equal(t, tc.want, got)
 			if tc.wantAdvisory == "" {
 				assert.Empty(t, advisory, "a name carried as written needs no comment")

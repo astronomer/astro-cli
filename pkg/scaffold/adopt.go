@@ -31,7 +31,7 @@ import (
 // is called, and --name is the only thing that overrules that. Everything else
 // goes through chooseName, so the order --name, then the 1.x config, then the
 // directory is written in one place rather than half here.
-func setProjectName(ed tomledit.Editor, dir string, opts *Options, from1x *project1x) (advisory string, err error) {
+func setProjectName(ed tomledit.Editor, dir string, opts Options, from1x *project1x) (advisory string, err error) {
 	raw, has := ed.Get([]string{"project", "name"})
 	stated, _ := raw.(string)
 	if opts.Name == "" && has && stated != "" {
@@ -51,7 +51,7 @@ func setProjectName(ed tomledit.Editor, dir string, opts *Options, from1x *proje
 	return advisory, nil
 }
 
-func adopt(dir string, data []byte, opts *Options, from1x *project1x, target *deployTarget, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
+func adopt(dir string, data []byte, opts Options, from1x *project1x, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
 	path := filepath.Join(dir, manifest.Marker)
 	ed, err := tomledit.NewSurgical(data)
 	if err != nil {
@@ -85,7 +85,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, target *de
 			"dependencies from [project] dynamic", path, airflowRequirement(example))
 	}
 	pick := pickAirflowVersion(opts.AirflowVersion, deps, from1x, opts.Default)
-	if err := refuseAdoptedDockerfileOfAnotherAirflow(dir, from1x, target, opts.AirflowVersion, deps); err != nil {
+	if err := refuseAdoptedDockerfileOfAnotherAirflow(dir, from1x, opts.AirflowVersion, deps); err != nil {
 		return nil, nil, pin, err
 	}
 	version, defaulted := pick.version, pick.defaulted()
@@ -158,7 +158,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, target *de
 	// it is load-bearing there for the same reason it is in the greenfield arm.
 	// Both arms declare it or the field would only be true of projects that
 	// arrived one particular way.
-	if err := set1xDeclarations(ed, from1x, target.apc); err != nil {
+	if err := set1xDeclarations(ed, from1x); err != nil {
 		return nil, nil, pin, err
 	}
 

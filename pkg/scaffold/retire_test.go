@@ -19,7 +19,7 @@ func writeAll(t *testing.T, dir string, files map[string]string) {
 	}
 }
 
-func runIn(t *testing.T, dir string, opts Options) *Changeset { //nolint:gocritic // a test helper, called with literals
+func runIn(t *testing.T, dir string, opts Options) *Changeset {
 	t.Helper()
 	cs, err := Plan(dir, opts)
 	require.NoError(t, err)

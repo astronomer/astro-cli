@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -28,7 +29,6 @@ func NewInitCmd(d Deps) *cobra.Command {
 
 func newInitCmd(c *cli) *cobra.Command {
 	var opts scaffold.Options
-	var target deployTargetValue
 	cmd := &cobra.Command{
 		Use:   "init [DIRECTORY]",
 		Short: "Make a directory an Astro project",
@@ -38,25 +38,19 @@ func newInitCmd(c *cli) *cobra.Command {
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
-			"  astro init my-project --airflow-version 3.1\n\n" +
-			"  # Convert a 1.x project for Astro Private Cloud, whatever the current context\n" +
-			"  astro init --deploy-target apc",
+			"  astro init my-project --airflow-version 3.1",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
 			if len(args) == 1 {
 				dir = args[0]
 			}
-			opts.DeploysToAPC, opts.DeployTargetBasis = initDeployTarget(target, &c.d)
 			return c.runInit(cmd.Context(), dir, opts)
 		},
 	}
 	cmd.Flags().StringVar(&opts.AirflowVersion, "airflow-version", "",
 		"Airflow version to pin in the manifest (default: the pin already in the manifest, else the newest supported Airflow series)")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Project name (default: the directory name)")
-	cmd.Flags().Var(&target, flagDeployTarget,
-		"Where the project deploys, astro or apc, which decides what converting a 1.x project keeps for its build "+
-			"(default: the current context's platform, Astro when there is none)")
 	return cmd
 }
 
@@ -66,18 +60,13 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if err != nil {
 		return err
 	}
+	if err := c.refuse1xUnderAPC(dir); err != nil {
+		return err
+	}
 	// A 1.x airflow_settings.yaml's connection and variable values go to
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
-	// Read here, before scaffold, whose Plan stays offline, and only for a
-	// conversion for APC whose kept Dockerfile names one Airflow 2 runtime
-	// build, which scaffold.NeedsRuntimeCatalog tells offline: the catalog
-	// says which Airflow series that runtime carries. A cached copy answers
-	// offline; none leaves the series unknown, and the conversion says so.
-	if opts.DeploysToAPC && c.d.RuntimeCatalog != nil && scaffold.NeedsRuntimeCatalog(dir) {
-		opts.RuntimeCatalog = c.d.RuntimeCatalog(ctx)
-	}
 	// Called by scaffold only when nothing in the project states an Airflow,
 	// so converting a pinned project makes no request. The lookup never fails
 	// init: offline, it answers the built-in series.
@@ -96,9 +85,48 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found.
 	c.writeAstroBuild(ctx, res.Dir)
+	if c.d.DeploysToAPC {
+		res.Notes = append(res.Notes, apcDeployNote(c.d.ContextDomain))
+	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
+}
+
+// There is one project format, and `astro init` converts a 1.x project to it
+// the same way on every platform. Astro Private Cloud's `astro deploy` still
+// builds only the 1.x layout (a Dockerfile and .astro/config.yaml), so a
+// project converted under an APC context would stop deploying there. Until
+// APC deploys pyproject.toml projects, init refuses to convert one under an
+// APC context and changes nothing; the project keeps deploying as it is. A
+// directory that is not a 1.x project (project.Is1xProject) is made a project
+// as anywhere, with a note that APC cannot deploy it yet.
+
+// refuse1xUnderAPC refuses a 1.x project under an APC context, as a usage
+// error: nothing ran, and nothing was written.
+func (c *cli) refuse1xUnderAPC(dir string) error {
+	if !c.d.DeploysToAPC || !project.Is1xProject(dir) {
+		return nil
+	}
+	return cliout.Usage(fmt.Errorf("%s is an Astro CLI 1.x project, and the current context%s is Astro Private Cloud, "+
+		"whose astro deploy still builds the 1.x layout, so astro init leaves the project as it is for now and "+
+		"astro deploy keeps working with it. Converting it will be available once Astro Private Cloud deploys "+
+		"pyproject.toml projects", dir, inParens(c.d.ContextDomain)))
+}
+
+// apcDeployNote says that the project init just made does not deploy to the
+// Astro Private Cloud the current context names, yet.
+func apcDeployNote(domain string) string {
+	return "The current context" + inParens(domain) + " is Astro Private Cloud, which does not deploy " +
+		"pyproject.toml projects yet, so astro deploy there will not deploy this project until it does"
+}
+
+// inParens is " (s)", or nothing for an empty s.
+func inParens(s string) string {
+	if s == "" {
+		return ""
+	}
+	return " (" + s + ")"
 }
 
 // nextStart is the start command to suggest once init is done. Standalone

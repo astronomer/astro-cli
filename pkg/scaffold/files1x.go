@@ -89,11 +89,6 @@ type project1x struct {
 	// inside it, and deleting that file while keeping the build that reads it is
 	// worse than either outcome alone.
 	dockerfileBody []byte
-	// onbuild is what the Dockerfile's base does with requirements.txt and
-	// packages.txt when it is built: an Astro Runtime image installs both
-	// through its ONBUILD steps, a -base one (runtime:3.1-12-base) is the
-	// flavor built without them, and any other base is not known here.
-	onbuild onbuildKind
 	// projectName is the name .astro/config.yaml states, before any
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.
@@ -173,7 +168,7 @@ const config1xRelPath = ".astro/config.yaml"
 func read1xProject(dir string) (*project1x, error) {
 	from1x := &project1x{}
 
-	if data, err := readIfPresent(filepath.Join(dir, fileRequirements)); err != nil {
+	if data, err := readIfPresent(filepath.Join(dir, "requirements.txt")); err != nil {
 		return nil, err
 	} else if data != nil {
 		deps, notes := parseRequirements(data)
@@ -181,14 +176,14 @@ func read1xProject(dir string) (*project1x, error) {
 		if pinsAirflow(deps) {
 			from1x.statedVersion = true
 		}
-		from1x.present = append(from1x.present, fileRequirements)
+		from1x.present = append(from1x.present, "requirements.txt")
 	}
 
-	if data, err := readIfPresent(filepath.Join(dir, filePackages)); err != nil {
+	if data, err := readIfPresent(filepath.Join(dir, "packages.txt")); err != nil {
 		return nil, err
 	} else if data != nil {
 		from1x.packages = parsePackages(data)
-		from1x.present = append(from1x.present, filePackages)
+		from1x.present = append(from1x.present, "packages.txt")
 	}
 
 	// The project's own name, which is the one thing in .astro/config.yaml a
@@ -215,7 +210,7 @@ func read1xProject(dir string) (*project1x, error) {
 		from1x.present = append(from1x.present, SettingsRelPath)
 	}
 
-	if data, err := readIfPresent(filepath.Join(dir, fileDockerfile)); err != nil {
+	if data, err := readIfPresent(filepath.Join(dir, "Dockerfile")); err != nil {
 		return nil, err
 	} else if data != nil {
 		version, stated, notes := airflowFromDockerfile(data)
@@ -224,16 +219,15 @@ func read1xProject(dir string) (*project1x, error) {
 		from1x.notes = append(from1x.notes, notes...)
 		from1x.notes = append(from1x.notes, build...)
 		from1x.notes = append(from1x.notes, pipInstallNote(data)...)
-		from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
+		from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, "Dockerfile"))...)
 		if stated {
 			from1x.statedVersion = true
 		}
-		from1x.present = append(from1x.present, fileDockerfile)
+		from1x.present = append(from1x.present, "Dockerfile")
 		from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
 		from1x.dockerfileBody = data
 		if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); runtimeRepoOf(base.Image) != notRuntimeRepo && base.Tag != "" {
 			_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
-			from1x.onbuild = runtimeOnbuild(base.Tag)
 		}
 		// Two sources for one list, so say it rather than let someone find out.
 		//
@@ -245,7 +239,7 @@ func read1xProject(dir string) (*project1x, error) {
 		// at once is deliberate and is exactly the kind of thing that reads as a
 		// conversion bug when nothing mentions it.
 		if !from1x.dockerfilePinOnly {
-			for _, kept := range []string{fileRequirements, filePackages} {
+			for _, kept := range []string{"requirements.txt", "packages.txt"} {
 				if slices.Contains(from1x.present, kept) {
 					from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
 						"during the build. Its contents are in pyproject.toml as well, which is what a project "+
@@ -587,13 +581,9 @@ var oldRuntimeTagRe = regexp.MustCompile(`^\d+(\.\d+){0,2}(?:[.-].+)?$`)
 
 // runtimeRepo is the Astro Runtime repository an image reference names, read
 // from the last segment of its repository path on any registry, so a private
-// mirror (artifactory.example.com/astronomer/runtime), common where projects
-// deploy to Astro Private Cloud, reads as the image it mirrors. It is the one
-// rule this package uses to decide that a FROM is an Astro Runtime image, so
-// the version read from a 1.x Dockerfile and the check of an APC build's FROM
-// against the pin cannot disagree about which images they read. The published
-// names are ".../runtime" and ".../astro-runtime"; a private myco/our-runtime
-// is neither.
+// mirror (artifactory.example.com/astronomer/runtime) reads as the image it
+// mirrors. The published names are ".../runtime" and ".../astro-runtime"; a
+// private myco/our-runtime is neither.
 //
 // airflowrt.IsAstroRuntimeImage is narrower on purpose, matching Astronomer's
 // registries, because Docker mode's compose file depends on that image's
@@ -626,29 +616,6 @@ func runtimeRepoOf(image string) runtimeRepo {
 	return notRuntimeRepo
 }
 
-// airflow2LineageTagRe is an astro-runtime tag naming a runtime version,
-// floating or not, flavor stripped: every one of them an Airflow 2 runtime.
-var airflow2LineageTagRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
-
-// runtimeTagOf reads the runtime version a FROM names, flavor stripped, and
-// what it says about Airflow, by runtimeRepo's rule. ok is false for a base
-// that is unknown, not a runtime image, pinned by digest, or tagged in a way
-// neither format reads. An astro-runtime tag naming a runtime version is
-// Airflow 2 whatever its number, so "3.0" there is a floating Airflow 2 tag;
-// the Airflow 3 format ("3.1-12") reads as Airflow 3 on either repository.
-func runtimeTagOf(b airflowrt.DeclaredBase) (version string, tag manifest.RuntimeTag, ok bool) {
-	repo := runtimeRepoOf(b.Image)
-	if !b.Known || repo == notRuntimeRepo || b.Tag == "" {
-		return "", manifest.RuntimeTag{}, false
-	}
-	version, _ = airflowrt.ParseRuntimeTagPython(strings.TrimPrefix(b.Tag, "v"))
-	if repo == astroRuntimeRepo && airflow2LineageTagRe.MatchString(version) {
-		return version, manifest.RuntimeTag{Major: "2", Build: strings.Count(version, ".") == 2}, true
-	}
-	tag, ok = manifest.ParseRuntimeTag(version)
-	return version, tag, ok
-}
-
 // airflowFromDockerfile reads the Airflow version a 1.x Dockerfile's runtime tag
 // names. The second return reports that the Dockerfile stated a version at all,
 // whether or not it could be used.
@@ -671,7 +638,8 @@ func runtimeTagOf(b airflowrt.DeclaredBase) (version string, tag manifest.Runtim
 //
 //   - "3.1-12" is the format Airflow 3 introduced, where the leading X.Y IS the
 //     Airflow version. Fully derivable, offline. Its floating tags, "3.1" and
-//     "3", name the series and only the generation respectively.
+//     "3", name the series and only the generation respectively, and are read
+//     so only on Airflow 3's repository (runtimeRepo).
 //   - "12.1.0" is the older format, which names the RUNTIME version. The Airflow
 //     minor is not in it. Recovering it means a reverse lookup through the
 //     published release index, which is a network fetch — and Plan is offline by
@@ -681,9 +649,7 @@ func runtimeTagOf(b airflowrt.DeclaredBase) (version string, tag manifest.Runtim
 // Airflow 2" (pkg/imagebuild matches a partial pin by prefix), which is exactly
 // what is known. It is honest rather than approximate, and a caller that wants
 // the exact minor resolves the tag itself and passes Options.AirflowVersion,
-// which wins over anything read here. A conversion for APC, which deploys that
-// one runtime, reads the minor from the catalog the caller passes as
-// Options.RuntimeCatalog (pinAPCBuildSeries).
+// which wins over anything read here.
 func airflowFromDockerfile(data []byte) (version string, stated bool, notes []string) {
 	const prefix = "Dockerfile: "
 
@@ -729,20 +695,11 @@ func airflowFromDockerfile(data []byte) (version string, stated bool, notes []st
 		}
 		return floating.Major, true, nil
 	case oldRuntimeTagRe.MatchString(bare):
-		return "2", true, []string{prefix + "runtime " + tag + minorlessClause +
+		return "2", true, []string{prefix + "runtime " + tag + " is an Airflow 2 image whose tag does not name the Airflow minor, " +
 			"so the pin is \"2\", meaning the newest Airflow 2. Set it explicitly if this project needs a particular one"}
 	default:
 		return "", true, []string{prefix + "the tag " + tag + " is not an Astro Runtime version, so the Airflow version was not read from it"}
 	}
-}
-
-// minorlessClause is what marks airflowFromDockerfile's note on an Airflow 2
-// tag, so pinAPCBuildSeries can find the note it replaces.
-const minorlessClause = " is an Airflow 2 image whose tag does not name the Airflow minor, "
-
-// isMinorlessNote reports airflowFromDockerfile's note on an Airflow 2 tag.
-func isMinorlessNote(note string) bool {
-	return strings.HasPrefix(note, "Dockerfile: runtime ") && strings.Contains(note, minorlessClause)
 }
 
 // buildInstructionRe finds a Dockerfile instruction that is not FROM.

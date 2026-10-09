@@ -190,9 +190,10 @@ func HasManifest(dir string) bool {
 // qualify — `astro dev` must not claim such a directory is 1.x. A
 // pyproject.toml does not rule 1.x out: plenty of 1.x repositories keep one
 // for ruff or pytest settings, and only one that HasManifest accepts makes the
-// directory a project with a manifest. `astro init` does not consult this: it
-// converts a 1.x directory too, and reports the 1.x files it could not read
-// rather than refusing them.
+// directory a project with a manifest. `astro init` converts a 1.x directory,
+// reporting the 1.x files it could not read rather than refusing them, and
+// consults this only under an Astro Private Cloud context, where it refuses
+// one because APC's deploy still builds the 1.x layout.
 func Is1xProject(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
 		return false

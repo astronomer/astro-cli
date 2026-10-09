@@ -70,36 +70,9 @@ func CheckDockerfileAirflow(dir string, m *manifest.Manifest) error {
 // requirement is the Airflow requirement the manifest would carry, and source
 // names where its version came from, for the message. The problem is the one
 // start would report, wrapped as a *manifest.ValidationError.
-//
-// A project that deploys to Astro Private Cloud (target.apc, see deployTarget)
-// keeps its Dockerfile undeclared as the build APC's `astro deploy` runs, and a
-// disagreement is refused there too, more strictly: the project would deploy
-// one Airflow and run another under `astro local`, and the APC note's claim
-// that pyproject.toml pins the same Airflow would be false. That build carries
-// one series, so a pin naming only the generation ("3" beside runtime:3.1-12)
-// is refused as well (apcBuild.disagrees), and the fix named is that series.
-// Nothing on a run path checks an undeclared Dockerfile, so that refusal is a
-// plain error rather than the manifest problem, whose fix
-// (MatchAirflowToDockerfile) needs a declared one, and it says what decided
-// the platform and how to choose the other.
-func refuseKeptDockerfileOfAnotherAirflow(dir string, from1x *project1x, target *deployTarget, requirement, source string) error {
-	if !buildsDockerfile(from1x, target.apc) {
-		return nil
-	}
+func refuseKeptDockerfileOfAnotherAirflow(dir string, from1x *project1x, requirement, source string) error {
 	if !declaresDockerfile(from1x) {
-		b := &target.build
-		if pin, ok := manifest.AirflowPin(requirement); !ok || !b.disagrees(pin) {
-			return nil
-		}
-		carries, fix := b.carries()
-		msg := fmt.Sprintf("%s disagrees with the %s this conversion keeps for Astro Private Cloud, whose `astro deploy` "+
-			"builds it as it stands: it builds FROM %s, which is %s, so the project would deploy one Airflow and "+
-			"run another under `astro local`. %s, or change the FROM line to a runtime of the Airflow you want first",
-			source, fileDockerfile, b.base.Ref(), carries, fix)
-		if d := target.decided(); d != "" {
-			msg += ". " + d
-		}
-		return errors.New(msg)
+		return nil
 	}
 	m := &manifest.Manifest{
 		Project: manifest.Project{Dependencies: []string{requirement}},
@@ -118,14 +91,14 @@ func refuseKeptDockerfileOfAnotherAirflow(dir string, from1x *project1x, target 
 // for the adopt arm, where the version comes from --airflow-version when it is
 // given, which rewrites the requirement, and otherwise from the requirement
 // the existing manifest already carries, which is kept.
-func refuseAdoptedDockerfileOfAnotherAirflow(dir string, from1x *project1x, target *deployTarget, flag string, deps []string) error {
+func refuseAdoptedDockerfileOfAnotherAirflow(dir string, from1x *project1x, flag string, deps []string) error {
 	if flag != "" {
-		return refuseKeptDockerfileOfAnotherAirflow(dir, from1x, target, airflowRequirement(flag), "--airflow-version "+flag)
+		return refuseKeptDockerfileOfAnotherAirflow(dir, from1x, airflowRequirement(flag), "--airflow-version "+flag)
 	}
 	for _, spec := range deps {
 		if _, ok := manifest.AirflowPin(spec); ok {
 			spec = strings.TrimSpace(spec)
-			return refuseKeptDockerfileOfAnotherAirflow(dir, from1x, target, spec,
+			return refuseKeptDockerfileOfAnotherAirflow(dir, from1x, spec,
 				"The Airflow requirement "+spec+" already in "+manifest.Marker)
 		}
 	}

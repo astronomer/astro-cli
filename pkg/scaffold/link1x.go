@@ -19,18 +19,12 @@ var astroIDRe = regexp.MustCompile(`^c[a-z0-9]{24}$`)
 // whether it can become one.
 //
 // It can when .astro/config.yaml names both an Astro Deployment id and the
-// workspace it lives in, and the project deploys to Astro. A link needs a
-// workspace to parse, and the conversion has no login to look one up with, so
-// a saved target without one stays a note.
-//
-// The id shape alone cannot say the target is Astro's. cmd/apc/deploy.go saves
-// a Houston deployment id under the same key, and Houston's deployment and
-// workspace ids are cuids too, so an APC project that saved both reads exactly
-// as an Astro one does. apc (deployTarget) is what decides: under APC the pair
-// stays a note, and the 1.x build it deploys with stays beside it, rather than
-// becoming an Astro link that `astro deploy` on APC never reads.
-func (from1x *project1x) deployLink(apc bool) (Link, bool) {
-	if apc || !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
+// workspace it lives in. The key also holds a Software release name, which
+// cmd/apc/deploy.go saves there, and the id shape is what tells the two apart.
+// A link needs a workspace to parse, and the conversion has no login to look
+// one up with, so a saved target without one stays a note.
+func (from1x *project1x) deployLink() (Link, bool) {
+	if !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
 		return Link{}, false
 	}
 	return Link{Name: Link1xName, Kind: manifest.KindAstro, Deployment: from1x.deployment, Workspace: from1x.workspace}, true
@@ -43,8 +37,8 @@ func (from1x *project1x) deployLink(apc bool) (Link, bool) {
 // exactly true: both arms only reach here for a file with no [tool.astro] of
 // its own, so there is no workspace, target or link for the new one to inherit
 // or keep.
-func setDeployLink(ed tomledit.Editor, from1x *project1x, apc bool) error {
-	l, ok := from1x.deployLink(apc)
+func setDeployLink(ed tomledit.Editor, from1x *project1x) error {
+	l, ok := from1x.deployLink()
 	if !ok {
 		return nil
 	}
@@ -58,8 +52,8 @@ func setDeployLink(ed tomledit.Editor, from1x *project1x, apc bool) error {
 }
 
 // deployLinkAdvisory says what setDeployLink wrote, or "" when it wrote nothing.
-func (from1x *project1x) deployLinkAdvisory(apc bool) string {
-	l, ok := from1x.deployLink(apc)
+func (from1x *project1x) deployLinkAdvisory() string {
+	l, ok := from1x.deployLink()
 	if !ok {
 		return ""
 	}

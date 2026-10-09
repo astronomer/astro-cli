@@ -61,36 +61,6 @@ type Options struct {
 	// airflow_settings.yaml carries, at the project scope the writer itself
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
-	// DeploysToAPC says the project deploys to Astro Private Cloud; false is
-	// Astro. It is the whole decision: nothing in the project's files
-	// overrides it, since no saved deploy target's shape belongs to one
-	// platform (resolveDeployTarget). Every caller that converts a project
-	// should set it — `astro init` from --deploy-target, else the current
-	// context, and Astro Desktop from its own choice of platform, else the
-	// current context's domain the same way (context.IsCloudDomain false).
-	//
-	// It matters because APC's `astro deploy` builds only the 1.x layout, from
-	// the Dockerfile as it stands, whose runtime base installs requirements.txt
-	// and packages.txt. A project deploying there keeps all three, undeclared,
-	// with a .dockerignore for that build's context and a note saying why;
-	// its saved deploy target stays where APC's deploy reads it rather than
-	// becoming an Astro link; and the Airflow pin is held to the exact series
-	// the kept Dockerfile's FROM carries, read from it when nothing else pins
-	// one and refused when a pin disagrees.
-	DeploysToAPC bool
-	// DeployTargetBasis says what decided DeploysToAPC and how to choose the
-	// other platform, for the notes and the refusal that turn on it. Optional:
-	// the zero value leaves both unsaid.
-	DeployTargetBasis DeployTargetBasis
-	// RuntimeCatalog is the runtime catalog the caller read before calling,
-	// or nil when it has none: data, so Plan stays offline. It is read only
-	// for a project that deploys to APC from a Dockerfile whose FROM names one
-	// Airflow 2 runtime build, a tag that names no Airflow series: the catalog
-	// says which one that build carries. NeedsRuntimeCatalog says offline
-	// whether a project is one, so a caller reads the catalog only then. Without it, or when it does
-	// not list that runtime, the series is unknown, and the conversion says
-	// which of the two rather than pin a series it cannot vouch for.
-	RuntimeCatalog *runtimeversions.Catalog
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -261,17 +231,11 @@ const (
 	fileClaude       = "CLAUDE.md"
 	// fileDockerfile is the one place a 1.x layout can put a Dockerfile, so it
 	// is both the file the retirement decision is about and the value the
-	// manifest declaration carries. The spellings left in files1x.go are
-	// note prefixes with the name inside prose ("Dockerfile: its RUN
-	// instructions..."), which a constant cannot cover; a name that is a value
-	// on its own is the constant.
+	// manifest declaration carries. The literals in files1x.go are left alone
+	// deliberately: several of them are note prefixes with the name inside
+	// prose ("Dockerfile: its RUN instructions..."), which a constant cannot
+	// cover, and half-converting them would read worse than neither.
 	fileDockerfile = "Dockerfile"
-	// fileRequirements and filePackages are the two lists a 1.x project kept
-	// beside its Dockerfile, which the runtime base image's ONBUILD steps
-	// install. The same rule applies: a name inside a note's prose stays a
-	// literal.
-	fileRequirements = "requirements.txt"
-	filePackages     = "packages.txt"
 )
 
 // projectDirs are the standard project directories, in creation order.
@@ -327,7 +291,7 @@ type manifestFacts struct {
 // Run is Plan followed by Apply, which is what a command wants: nobody is going
 // to review a change set at a terminal that has already asked for it. A caller
 // that shows the change set to a person first calls the two halves itself.
-func Run(dir string, opts Options) (*Result, error) { //nolint:gocritic // by value, as Plan takes it: Astro Desktop calls both
+func Run(dir string, opts Options) (*Result, error) {
 	cs, err := Plan(dir, opts)
 	if err != nil {
 		return nil, err
@@ -344,7 +308,7 @@ func Run(dir string, opts Options) (*Result, error) { //nolint:gocritic // by va
 // first — which is impossible if the only way to learn what a run does is to
 // let it happen. Plan reads the project (it has to: an adopted manifest is
 // computed from the one already there) and writes nothing.
-func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // by value: Astro Desktop builds Options as a literal
+func Plan(dir string, opts Options) (*Changeset, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
@@ -369,12 +333,6 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 	if err != nil {
 		return nil, err
 	}
-	// Where the project deploys decides what a conversion may retire and
-	// whether its saved deploy target becomes an Astro link, so it is settled
-	// once, here, and handed to each of those decisions. A build APC deploys
-	// carries one Airflow series, which is then the pin its Dockerfile names.
-	target := resolveDeployTarget(abs, &opts, from1x)
-	pinAPCBuildSeries(from1x, &target.build)
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
@@ -385,11 +343,11 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 	data, readErr := os.ReadFile(marker)
 	switch {
 	case readErr == nil:
-		out, manifestLabels, pin, err = adopt(abs, data, &opts, from1x, &target, &cs.Result)
+		out, manifestLabels, pin, err = adopt(abs, data, opts, from1x, &cs.Result)
 	case errors.Is(readErr, os.ErrNotExist):
 		// No labels from this arm: a scaffolded manifest is created rather than
 		// edited, so its one line is the filename, supplied below.
-		out, pin, err = scaffoldManifest(abs, &opts, from1x, &target, &cs.Result)
+		out, pin, err = scaffoldManifest(abs, opts, from1x, &cs.Result)
 	default:
 		err = fmt.Errorf("reading %s: %w", marker, readErr)
 	}
@@ -400,7 +358,7 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 	if err := planFiles(abs, goos != windowsOS, cs); err != nil {
 		return nil, err
 	}
-	if err := planKeptDockerfileIgnore(abs, from1x, target.apc, cs); err != nil {
+	if err := planKeptDockerfileIgnore(abs, from1x, cs); err != nil {
 		return nil, err
 	}
 
@@ -424,7 +382,7 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 	// The 1.x notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
-	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x, &target)
+	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
 	cs.Notes = slices.Concat(from1x.notes, pin.migrationNotes, lefts)
 
 	// The values airflow_settings.yaml supplied. They ride the changeset rather
@@ -472,11 +430,8 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 	// That state does make a rerun refuse, since a manifest carrying
 	// [tool.astro] is what ErrAlreadyAstroProject tests. Refusing over a project
 	// whose dependencies are intact is the better half of the trade.
-	retire, keptForAPC := planRetirements(from1x,
-		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion, target.apc)
-	target.adviseUndo(cs.Notes, retire, cs.Adopted)
-	cs.Notes = append(cs.Notes, apcBuildNotes(&target, from1x, keptForAPC)...)
-	for _, name := range retire {
+	for _, name := range planRetirements(from1x,
+		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion) {
 		label := name + " (migrated into " + manifest.Marker + ", removed)"
 		if name == SettingsRelPath {
 			switch {
@@ -500,7 +455,7 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 	// a change already made.
 	cs.Advisories = append(cs.Advisories, from1x.settings.carriedAdvisories()...)
 	cs.Advisories = append(cs.Advisories, from1x.settings.pools.advisories...)
-	if a := from1x.deployLinkAdvisory(target.apc); a != "" {
+	if a := from1x.deployLinkAdvisory(); a != "" {
 		cs.Advisories = append(cs.Advisories, a)
 	}
 
@@ -574,24 +529,13 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 // It is not a clever test and it does not need to be. It errs toward keeping,
 // which is the direction to err: a file wrongly kept is untidy, a file wrongly
 // deleted is gone.
-//
-// apc is whether the project deploys to Astro Private Cloud (deployTarget),
-// whose `astro deploy` builds the 1.x Dockerfile as it stands, so a Dockerfile
-// there is a built one exactly as a declared one is. forAPC names what is kept
-// for that reason alone: what this would have retired for a project that
-// deploys to Astro.
-func planRetirements(from1x *project1x, notes []string, pinned string, apc bool) (out, forAPC []string) {
-	builds := buildsDockerfile(from1x, apc)
+func planRetirements(from1x *project1x, notes []string, pinned string) []string {
+	var out []string
 	for _, name := range from1x.present {
 		if namedInAny(notes, name) {
 			continue
 		}
-		if name == fileDockerfile && !dockerfileIsSpent(from1x, pinned) {
-			continue
-		}
-		// A spent Dockerfile is still the build APC's deploy runs.
-		if name == fileDockerfile && builds {
-			forAPC = append(forAPC, name)
+		if name == "Dockerfile" && !dockerfileIsSpent(from1x, pinned) {
 			continue
 		}
 		// airflow_settings.yaml is retired only when nothing in it stays
@@ -622,20 +566,9 @@ func planRetirements(from1x *project1x, notes []string, pinned string, apc bool)
 	// Kept rather than un-migrated: the manifest lists stay, because a project
 	// that later drops its Dockerfile needs them, and they cost nothing while the
 	// declaration stands. The note below tells the user both exist.
-	//
-	// The rule is a Dockerfile that will be built (buildsDockerfile), and on
-	// APC an undeclared one is: its deploy builds the 1.x Dockerfile whatever
-	// the manifest says.
-	if builds {
-		declared := declaresDockerfile(from1x)
+	if declaresDockerfile(from1x) {
 		out = slices.DeleteFunc(out, func(name string) bool {
-			if name != fileRequirements && name != filePackages {
-				return false
-			}
-			if !declared {
-				forAPC = append(forAPC, name)
-			}
-			return true
+			return name == "requirements.txt" || name == "packages.txt"
 		})
 	}
 	// A Dockerfile that SURVIVES may name the other files inside it, and a build
@@ -643,13 +576,13 @@ func planRetirements(from1x *project1x, notes []string, pinned string, apc bool)
 	// alone would be. `RUN pip install -r requirements.txt` is the common one,
 	// and packages.txt is consumed the same way by the runtime image's ONBUILD
 	// step, from the build context.
-	if !slices.Contains(out, fileDockerfile) && from1x.hasDockerfile() {
+	if !slices.Contains(out, "Dockerfile") && from1x.hasDockerfile() {
 		body := string(from1x.dockerfileBody)
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return strings.Contains(body, name)
 		})
 	}
-	return out, forAPC
+	return out
 }
 
 // dockerfileIsSpent reports a Dockerfile with nothing left to say: it names only
@@ -676,6 +609,13 @@ func declaresDockerfile(from1x *project1x) bool {
 	return from1x.hasDockerfile() && !from1x.dockerfilePinOnly
 }
 
+// hasDockerfile reports a Dockerfile with something in it to build: the one
+// fact declaresDockerfile and planRetirements' check of a surviving file
+// share, since an empty file builds nothing.
+func (from1x *project1x) hasDockerfile() bool {
+	return len(from1x.dockerfileBody) > 0
+}
+
 // buildPython is the Python the Dockerfile's runtime base runs when its tag
 // names one ("3.1-12-python-3.12"), or "". A Dockerfile that is only a pin
 // gives it too: a conversion that retires that file carries the choice as
@@ -689,14 +629,14 @@ func (from1x *project1x) buildPython() string {
 	return from1x.basePython
 }
 
-func set1xDeclarations(ed tomledit.Editor, from1x *project1x, apc bool) error {
+func set1xDeclarations(ed tomledit.Editor, from1x *project1x) error {
 	if err := setDockerfileDeclaration(ed, from1x); err != nil {
 		return err
 	}
 	if err := setEnvDeclarations(ed, &from1x.settings); err != nil {
 		return err
 	}
-	if err := setDeployLink(ed, from1x, apc); err != nil {
+	if err := setDeployLink(ed, from1x); err != nil {
 		return err
 	}
 	return setPools(ed, from1x.settings.pools.byName)
@@ -751,16 +691,16 @@ func namedInAny(notes []string, name string) bool {
 // scaffoldManifest renders the manifest for a directory that has none, and
 // records on the Result what it chose. It returns the manifest rather than
 // writing it, so write puts every file on disk in one place.
-func scaffoldManifest(dir string, opts *Options, from1x *project1x, target *deployTarget, res *Result) ([]byte, manifestFacts, error) {
+func scaffoldManifest(dir string, opts Options, from1x *project1x, res *Result) ([]byte, manifestFacts, error) {
 	name, nameAdvisory := chooseName(dir, opts, from1x)
 	pick := pickAirflowVersion(opts.AirflowVersion, nil, from1x, opts.Default)
 	if opts.AirflowVersion != "" {
-		if err := refuseKeptDockerfileOfAnotherAirflow(dir, from1x, target, airflowRequirement(pick.version),
+		if err := refuseKeptDockerfileOfAnotherAirflow(dir, from1x, airflowRequirement(pick.version),
 			"--airflow-version "+opts.AirflowVersion); err != nil {
 			return nil, manifestFacts{}, err
 		}
 	}
-	pyproject, notes, err := renderPyproject(name, pick, from1x, target.apc)
+	pyproject, notes, err := renderPyproject(name, pick, from1x)
 	if err != nil {
 		return nil, manifestFacts{}, err
 	}
@@ -918,7 +858,7 @@ func defaultAirflow(def DefaultAirflow) airflowPick {
 // refuses an invalid --airflow-version before this runs. [project.dependencies]
 // leads with the requirement that states the Airflow version, the only place
 // the manifest states it, so init → start needs no hand-edit.
-func renderPyproject(name string, pick airflowPick, from1x *project1x, apc bool) (pyproject []byte, notes []string, err error) {
+func renderPyproject(name string, pick airflowPick, from1x *project1x) (pyproject []byte, notes []string, err error) {
 	version := pick.version
 	tmpl := "[project]\n" +
 		"name = 'astro-project'\n" +
@@ -979,7 +919,7 @@ func renderPyproject(name string, pick airflowPick, from1x *project1x, apc bool)
 			return nil, nil, err
 		}
 	}
-	if err := set1xDeclarations(ed, from1x, apc); err != nil {
+	if err := set1xDeclarations(ed, from1x); err != nil {
 		return nil, nil, err
 	}
 	data, err := ed.Bytes()
@@ -1092,7 +1032,7 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 // this key with a fallback to it. A global project.name would otherwise rename
 // every project converted on that machine to the same thing, which is a worse
 // answer than the directory in every case where the two differ.
-func chooseName(dir string, opts *Options, from1x *project1x) (name, advisory string) {
+func chooseName(dir string, opts Options, from1x *project1x) (name, advisory string) {
 	if opts.Name != "" {
 		return opts.Name, ""
 	}
@@ -1175,7 +1115,7 @@ func sanitizeName(s string) string {
 // alive after the manifest had already taken its pin. The comment further down
 // this file flags that hazard for environment variable names; this is the same
 // one, arriving through a different door.
-func leftovers(dir, version string, facts *manifestFacts, from1x *project1x, target *deployTarget) (notes, forRetirement []string) {
+func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (notes, forRetirement []string) {
 	// requirements.txt, packages.txt, the Dockerfile, airflow_settings.yaml and
 	// .astro/config.yaml are READ now, so none of them is matched on presence
 	// here: whatever they could not carry is a note from the reader that says
@@ -1199,15 +1139,14 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x, tar
 	//
 	// Called a saved deploy target rather than a Deployment because the key
 	// holds either. cmd/astro/deploy.go saves an Astro Deployment id here and
-	// cmd/apc/deploy.go saves a Houston deployment id, a cuid of the same shape
-	// (the 0.x CLI saved a Software release name there), and nothing in the
-	// file tells the two ids apart, so the note says what to do with it if it
-	// is the first rather than asserting that it is.
+	// cmd/apc/deploy.go saves a Software release name, and nothing in the file
+	// tells them apart, so the note says what to do with it if it is the first
+	// rather than asserting that it is.
 	var deployNote string
 	// A target the conversion linked (setDeployLink) is carried, so it is an
 	// advisory rather than a note; only one it could not link is left to do.
-	if _, linked := from1x.deployLink(target.apc); from1x.deployment != "" && !linked {
-		deployNote = config1xRelPath + ": " + deployTargetNote(from1x.deployment, from1x.workspace, target)
+	if _, linked := from1x.deployLink(); from1x.deployment != "" && !linked {
+		deployNote = config1xRelPath + ": " + deployTargetNote(from1x.deployment, from1x.workspace)
 		out = append(out, deployNote)
 	}
 	// Kept out of forRetirement for the reason deployNote is: planRetirements
@@ -1295,48 +1234,24 @@ func instancesNote(instances []instance1x) string {
 // value carrying a newline would put a second, unindented line under "Left to
 // do:" and a multi-line string into the json notes array a consumer groups by
 // the file name each note starts with.
-//
-// The advice follows the platform the run converted for (target). Under APC
-// the target is what APC's `astro deploy` reads from this file, so the note
-// says it stays there, not how to make it an Astro link beside a build kept
-// for APC. Either way it ends saying what decided the platform and how to
-// choose the other, which under Astro is the way out for a target that is
-// APC's after all.
-func deployTargetNote(deployment, workspace string, target *deployTarget) string {
-	var subject string
-	switch {
-	case !plainDeployID(deployment):
-		subject = "project.deployment holds this project's saved deploy target"
-	case plainDeployID(workspace):
-		subject = deployment + " in workspace " + workspace + " is this project's saved deploy target"
-	default:
-		subject = deployment + " is this project's saved deploy target"
+func deployTargetNote(deployment, workspace string) string {
+	const entry = ". If that is an Astro Deployment, give it a name under " +
+		"[tool.astro.deployments], say [tool.astro.deployments.prod], with "
+	if !plainDeployID(deployment) {
+		return "project.deployment holds this project's saved deploy target" + entry +
+			"deployment set to it and the workspace it lives in"
 	}
-	var note string
-	if target.apc {
-		note = subject + ", which Astro Private Cloud's `astro deploy` reads from this file, so it stays here " +
-			"rather than becoming a [tool.astro.deployments] link"
-	} else {
-		const entry = ". If that is an Astro Deployment, give it a name under " +
-			"[tool.astro.deployments], say [tool.astro.deployments.prod], with "
-		switch {
-		case !plainDeployID(deployment):
-			note = subject + entry + "deployment set to it and the workspace it lives in"
-		case plainDeployID(workspace):
-			note = subject + entry + "deployment = '" + deployment + "' and workspace = '" + workspace + "'"
-		default:
-			note = subject + entry + "deployment = '" + deployment + "' and the workspace it lives in"
-		}
+	if plainDeployID(workspace) {
+		return deployment + " in workspace " + workspace + " is this project's saved deploy target" +
+			entry + "deployment = '" + deployment + "' and workspace = '" + workspace + "'"
 	}
-	if d := target.decided(); d != "" {
-		note += ". " + d
-	}
-	return note
+	return deployment + " is this project's saved deploy target" + entry +
+		"deployment = '" + deployment + "' and the workspace it lives in"
 }
 
 // plainDeployID reports a value safe to read at the end of a note: one line, no
-// spaces, and short. The shapes this key holds qualify: a cuid, which both
-// platforms save, and a Software release name, which the 0.x CLI saved.
+// spaces, and short. Both shapes this key holds qualify, an Astro Deployment
+// cuid and a Software release name.
 func plainDeployID(s string) bool {
 	if s == "" || len(s) > 96 {
 		return false

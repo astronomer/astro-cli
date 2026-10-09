@@ -156,18 +156,13 @@ type Deps struct {
 	LaunchOtto func(prompt string) error
 
 	// DeploysToAPC reports that the current context is Astro Private Cloud,
-	// whose `astro deploy` builds only a 1.x project. `astro init` converts
-	// for the platform it names unless --deploy-target names one
-	// (initDeployTarget): for APC it keeps the Dockerfile, requirements.txt
-	// and packages.txt it would otherwise retire, and leaves a saved deploy
-	// target where APC's deploy reads it rather than making it an Astro link.
-	// The root sets it from the platform it mounted, because the context
-	// lives in config/, which this tree never imports. false is Astro, as it
-	// is with no context.
+	// whose `astro deploy` builds only a 1.x project, so `astro init` refuses
+	// to convert one there (refuse1xUnderAPC). The root sets it from the
+	// platform it mounted, because the context lives in config/, which this
+	// tree never imports. false is Astro, as it is with no context.
 	DeploysToAPC bool
 	// ContextDomain is the current context's domain, for the message that
-	// says the context decided a conversion's platform. Empty when no context
-	// is current.
+	// names it. Empty when no context is current.
 	ContextDomain string
 }
 

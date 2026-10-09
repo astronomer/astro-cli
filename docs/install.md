@@ -33,9 +33,8 @@ either of these. Everything else on this page is safe to do without asking.
 2. **Deleting files `init` kept.** `init` removes the 1.x files it carried
    across completely. A file it keeps is still read or still needs a decision:
    a `Dockerfile` it declared as the project's build, with the
-   `requirements.txt` and `packages.txt` that build installs, or the same
-   three kept because the project deploys to Astro Private Cloud. Ask before
-   you remove one.
+   `requirements.txt` and `packages.txt` that build installs. Ask before you
+   remove one.
 
 Report what you changed when you finish. Say which files you wrote, what you
 put in the Airflow pin, and what you left alone.
@@ -172,6 +171,15 @@ In a 1.x project, `init` converts what it can read and says what it did. Its
 output ends with **Left to do**: what it found and could not carry. That list
 is the work. Take it one line at a time.
 
+There is one project format, and `init` converts the same way whichever
+platform you deploy to. The exception, for now, is Astro Private Cloud: its
+`astro deploy` still builds the 1.x layout, so when the current context is an
+Astro Private Cloud one, `init` refuses a 1.x project (a `Dockerfile` beside
+`.astro/`) and changes nothing. Leave the project as it is, and `astro deploy`
+keeps working with it. Converting will be available once Astro Private Cloud
+deploys `pyproject.toml` projects. A new project `init` creates under such a
+context says, under Left to do, that Astro Private Cloud cannot deploy it yet.
+
 What `init` converts:
 
 | 1.x file | What `init` does |
@@ -180,8 +188,7 @@ What `init` converts:
 | `packages.txt` | Each line becomes an entry in `packages` under `[tool.astro]`. Removed, unless a kept Dockerfile still installs it. |
 | `airflow_settings.yaml` | Connection and variable values go to this machine's encrypted vault, and `[tool.astro.env]` declares them without their values. A variable with an empty value is declared optional, so `astro local start` runs without it, as v1 did. Pools go to `[tool.astro.pools]`, and `astro local start` creates them in Airflow. The file is removed once everything in it is carried. |
 | `Dockerfile` | Its `FROM` line is read for the Airflow version (below). A Dockerfile that only names a base image is removed, since the requirement now says the same thing. Any other Dockerfile is kept and declared as the project's build (`[tool.astro] dockerfile`), and `init` writes a `.dockerignore` for it. |
-| `Dockerfile`, `requirements.txt` and `packages.txt` in a project that deploys to Astro Private Cloud | Kept, even where the rows above remove them. A Dockerfile that only names a base image stays undeclared, so Astro and `astro local` still build from `pyproject.toml`. APC's `astro deploy` still builds the 1.x layout: it builds this Dockerfile as it stands, and a runtime base image installs `requirements.txt` and `packages.txt` during that build (a `-base` runtime tag runs no ONBUILD steps, so it installs neither unless the Dockerfile does). Their contents are carried into `pyproject.toml` as well, for `astro local`, so Left to do names each file kept for APC and asks you to change both together while the project deploys there. `init` also writes a `.dockerignore` for that build. The Airflow pin is held to the exact series that Dockerfile's `FROM` carries, since that is what APC deploys: `init` reads it from the `FROM` when nothing else pins one, and refuses an `--airflow-version` (or an existing requirement) naming another series or only the generation (`3` beside `runtime:3.1-12`, which `astro local` would resolve to the newest 3.x). An Airflow 2 tag (`12.1.0`) names a runtime version, not an Airflow one, so its series comes from the runtime catalog (a cached copy works offline); when the catalog cannot be read or does not list that runtime, Left to do says which, says the pin was not checked, and asks you to set it. Where the project deploys is `--deploy-target astro` or `--deploy-target apc` when you pass it, and otherwise the current context's platform, the one `astro deploy` uses; no context counts as Astro. Nothing in the project's files decides it. Each note and refusal that turns on it says which decided and how to choose the other; a note, read after the conversion, first names what to restore (the files it removed, and `pyproject.toml`), since `init` refuses a project that is already converted. |
-| `.astro/config.yaml` | A saved deploy target (`project.deployment` with `project.workspace`) becomes a link named `default` under `[tool.astro.deployments]`, marked `default = true`, when both are Astro ids and the project deploys to Astro. APC saves ids of the same shape, so a project that deploys to APC (see the row above) leaves it where APC's `astro deploy` reads it, and Left to do says so. Under Astro, anything else is listed as a note naming the entry to add by hand. |
+| `.astro/config.yaml` | A saved deploy target (`project.deployment` with `project.workspace`) becomes a link named `default` under `[tool.astro.deployments]`, marked `default = true`, when both are Astro ids. Anything else is listed as a note naming the entry to add by hand. |
 | `docker-compose.yml` | Nothing to do: `astro local start` replaces it. |
 | `docker-compose.override.yml` | Kept. `astro local start --docker` merges it over the services it generates, as 1.x did, and `astro local stop` and `reset` take its services down too. Standalone mode runs no containers, so there it does nothing, and `astro local start` says so. |
 
@@ -192,11 +199,13 @@ the first of:
 
 1. `--airflow-version`;
 2. an `apache-airflow` pin already in `pyproject.toml`;
-3. the Dockerfile's `FROM`, when a stage builds on an Astro Runtime image. A
-   tag like `runtime:3.3-2` names Airflow 3.3. An older tag like
-   `astro-runtime:9.1.0` is a *runtime* version that does not name the
-   Airflow minor, so `init` pins `apache-airflow==2.*` and says so under Left
-   to do;
+3. the Dockerfile's `FROM`, when a stage builds on an Astro Runtime image: a
+   repository named `runtime` or `astro-runtime`, on any registry, so a
+   private mirror counts. A tag like `runtime:3.3-2`, or the floating
+   `runtime:3.3`, names Airflow 3.3. An `astro-runtime` tag like `9.1.0` is a
+   *runtime* version that does not name the Airflow minor (its `3.0` is
+   Runtime 3, an Airflow 2 image), so `init` pins `apache-airflow==2.*` and
+   says so under Left to do;
 4. an `apache-airflow==` pin in `requirements.txt`;
 5. the newest supported series from the runtime catalog.
 
@@ -214,8 +223,8 @@ one release. Keep the version you run today, and upgrade later as its own step
 (`astro local upgrade airflow`): porting and upgrading at once turns one
 failure into two. The requirement is the only place the version goes.
 
-`init` also writes `requires-python` for the version it pins (`==3.13.*` when a
-kept Dockerfile's tag names Python 3.13). If you change the pin, check it: an
+`init` also writes `requires-python` for the version it pins (`==3.13.*` when
+the Dockerfile's tag names Python 3.13, whether the file is kept or removed). If you change the pin, check it: an
 older Airflow has no wheels for a recent Python, and the install then fails
 while compiling a dependency, which reads like a broken package rather than a
 Python that is too new. Airflow 2.7 wants 3.11 or lower.
