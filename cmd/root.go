@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -42,6 +41,7 @@ type rootOptions struct {
 	loggedIn      bool
 	houstonClient houston.ClientInterface
 	out           io.Writer
+	args          []string // the command line, without the program name
 }
 
 // detectRootOptions reads the machine. It is the only ambient part of building
@@ -56,15 +56,17 @@ func detectRootOptions() rootOptions {
 		loggedIn:      true,
 		houstonClient: houston.NewClient(houston.NewHTTPClient()),
 		out:           os.Stdout,
+		args:          os.Args[1:],
 	}
 }
 
 // NewRootCmd adds all of the primary commands for the cli
 func NewRootCmd() *cobra.Command {
-	return newRootCmd(detectRootOptions())
+	o := detectRootOptions()
+	return newRootCmd(&o)
 }
 
-func newRootCmd(o rootOptions) *cobra.Command {
+func newRootCmd(o *rootOptions) *cobra.Command {
 	// Cobra sorts a parent's children alphabetically the first time it renders
 	// them, latching the result. Turning it off makes registration order the
 	// rendered order everywhere, which is what lets the root menu below read in
@@ -83,13 +85,6 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	v1Alpha1Client := astrov1alpha1.NewV1Alpha1Client(httputil.NewHTTPClient())
 
 	isCloudCtx := o.platform == cloudPlatform
-	if !isCloudCtx {
-		version, err := houstonClient.GetPlatformVersion(nil)
-		if err != nil {
-			apcCmd.InitDebugLogs = append(apcCmd.InitDebugLogs, fmt.Sprintf("Unable to get Houston version: %s", err.Error()))
-		}
-		houstonVersion = version
-	}
 
 	rootCmd := &cobra.Command{
 		Use:   "astro",
@@ -109,6 +104,10 @@ func newRootCmd(o rootOptions) *cobra.Command {
 			)(cmd, args)
 		},
 	}
+	// Defined ahead of the commands rather than with the rest of the root's
+	// setup below: apcCmd.NeedsPlatform reads the root's persistent flags to
+	// find which command a line runs.
+	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 
 	rootCmd.AddCommand(
 		newLoginCommand(astroV1Client, o.out),
@@ -128,10 +127,25 @@ func newRootCmd(o rootOptions) *cobra.Command {
 			astroCmd.AddCmds(astroV1Client, v1Alpha1Client, v1Alpha1Client, o.out)...,
 		)
 	} else { // Include all the commands to be exposed for APC users
+		// The APC commands take their flags, examples and some subcommands
+		// from the platform's version and feature flags, and asking for those
+		// is a round trip to Houston: one that waits out the dial timeout when
+		// the host does not answer. So only a line that runs one of them asks.
+		// `astro --help`, `astro version` and a mistyped command return at
+		// once, and the root help names no platform version (#2289).
+		platformLoaded := apcCmd.NeedsPlatform(commandWords(o.args), rootCmd.PersistentFlags())
+		if platformLoaded {
+			apcCmd.LoadPlatform(houstonClient)
+			houstonVersion = apcCmd.PlatformVersion()
+		}
 		rootCmd.AddCommand(
 			apcCmd.AddCmds(houstonClient, o.out)...,
 		)
-		apcCmd.VersionMatchCmds(rootCmd, []string{"astro"})
+		// Hiding what the platform is too old for needs its version; with
+		// none asked for, nothing is hidden.
+		if platformLoaded {
+			apcCmd.VersionMatchCmds(rootCmd, []string{"astro"})
+		}
 	}
 
 	// The core tree (`astro local`, `astro init`, the start/stop/logs aliases,
@@ -167,7 +181,6 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// is recorded by Execute, after the run it failed.
 	rootCmd.SetFlagErrorFunc(flagError)
 	markV1Tree(rootCmd, o.platform)
-	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	installHelp(rootCmd, o.platform, houstonVersion)
 
 	return rootCmd

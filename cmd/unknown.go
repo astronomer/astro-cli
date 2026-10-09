@@ -94,6 +94,19 @@ func isShellCompletion(args []string) bool {
 	return args[0] == cobra.ShellCompRequestCmd || args[0] == cobra.ShellCompNoDescRequestCmd
 }
 
+// commandWords is the part of args that names the command a line is about. For
+// a completion request that is the words before the one being completed, which
+// cobra resolves the command from; for any other line it is all of args.
+func commandWords(args []string) []string {
+	if !isShellCompletion(args) {
+		return args
+	}
+	if len(args) < 2 {
+		return nil
+	}
+	return args[1 : len(args)-1]
+}
+
 // findUnknownCommand returns the first word that names no command, or nil when
 // every word resolves. A command that runs takes its own arguments, so a word
 // after one is an argument and not a guess at a command name.
