@@ -80,8 +80,7 @@ func ParseFormat(s string, extras ...Format) (Format, error) {
 // root's, which Execute sets) is consulted. On a root there is no parent, and
 // Execute's handling takes over when it runs the tree, replacing this func.
 func AddOutputFlag(cmd *cobra.Command, target *Format, extras ...Format) {
-	names := formatNames(extras)
-	usage := "Output format: " + strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+	usage := "Output format: " + listFormats(extras)
 	*target = FormatText
 	cmd.PersistentFlags().VarP(&formatValue{target: target, extras: extras}, "output", "o", usage)
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
@@ -147,19 +146,40 @@ func OnBadFormat(cmd *cobra.Command, explain func(value string, refused error) e
 	v.explain = explain
 }
 
-// Formats is what cmd's --output takes, text and json first, or nil when cmd
-// has no --output registered with AddOutputFlag (`astro deploy`'s is a plain
-// string). It reads the flag cmd inherits too, as a run of cmd would.
-func Formats(cmd *cobra.Command) []Format {
+// HasOutput reports whether cmd has the --output AddOutputFlag registers, its
+// own or inherited, as a run of cmd would. `astro deploy`'s --output is a
+// plain string flag, and not it.
+func HasOutput(cmd *cobra.Command) bool {
+	return outputValue(cmd) != nil
+}
+
+// FormatList is what cmd's --output takes, in the words its help gives them
+// ("text, json or dotenv"), or "" when cmd has no such flag (HasOutput).
+func FormatList(cmd *cobra.Command) string {
+	v := outputValue(cmd)
+	if v == nil {
+		return ""
+	}
+	return listFormats(v.extras)
+}
+
+// Offers reports whether cmd's --output takes f.
+func Offers(cmd *cobra.Command, f Format) bool {
+	v := outputValue(cmd)
+	return v != nil && (f == FormatText || f == FormatJSON || slices.Contains(v.extras, f))
+}
+
+// outputValue is the value of cmd's --output when AddOutputFlag registered
+// it, or nil.
+func outputValue(cmd *cobra.Command) *formatValue {
 	f := cmd.Flag("output")
 	if f == nil {
 		return nil
 	}
-	v, ok := f.Value.(*formatValue)
-	if !ok {
-		return nil
+	if v, ok := f.Value.(*formatValue); ok {
+		return v
 	}
-	return append([]Format{FormatText, FormatJSON}, v.extras...)
+	return nil
 }
 
 // refusedFormat is a value an --output flag refused, and why.
@@ -194,6 +214,13 @@ func badFormat(err error) *refusedFormat {
 		return nil
 	}
 	return &refusedFormat{flag: v, value: bad.GetValue(), err: bad.Unwrap()}
+}
+
+// listFormats joins text, json and the extras the way --output's help names
+// them: "text, json or dotenv".
+func listFormats(extras []Format) string {
+	names := formatNames(extras)
+	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
 }
 
 // formatNames lists text, json and the extras, in that order.

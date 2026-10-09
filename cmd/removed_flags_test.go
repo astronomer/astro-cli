@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,13 +16,26 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
-// The trees the removed-flag tests run: Astro for a non-hosted organization,
-// and APC at the newest platform version, where every version-gated command
-// is mounted. Each test builds its own, so it runs against that tree's state.
+// The trees the removed-flag tests run: Astro for a non-hosted organization
+// and for a hosted one, and APC at the newest platform version, where every
+// version-gated command is mounted. Each test builds its own, so it runs
+// against that tree's state.
 var (
-	astroTree = treeConfig{name: "astro", platform: cloudPlatform}
-	apcTree   = treeConfig{name: "apc " + newestAPCVersion, platform: apcPlatform, apcVersion: newestAPCVersion}
+	astroTree       = treeConfig{name: "astro", platform: cloudPlatform}
+	astroHostedTree = treeConfig{name: "astro hosted", platform: cloudPlatform, hosted: true}
+	apcTree         = treeConfig{name: "apc " + newestAPCVersion, platform: apcPlatform, apcVersion: newestAPCVersion}
 )
+
+// v1Trees pairs each tree of v1_flags.tsv with the v2 tree a script written
+// against it now runs.
+var v1Trees = []struct {
+	v1   string
+	tree treeConfig
+}{
+	{v1TreeAstro, astroTree},
+	{v1TreeAstroHosted, astroHostedTree},
+	{v1TreeAPC, apcTree},
+}
 
 var errRan = errors.New("the command got past flag parsing")
 
@@ -54,8 +67,8 @@ func disarmedTree(t *testing.T, c treeConfig) (root *cobra.Command, preRuns *int
 	return root, preRuns
 }
 
-// removedFlagCase is a run passing a removed flag on a command that does not
-// have it, and what it must be told.
+// removedFlagCase is a run passing a removed flag on a command that had it
+// in 1.x and does not now, and what it must be told.
 type removedFlagCase struct {
 	tree treeConfig
 	args []string // the command, and its arguments before the flag
@@ -68,11 +81,11 @@ type removedFlagCase struct {
 }
 
 // removedFlagCases holds at least one case for every entry in removedFlags
-// (TestRemovedFlagsSayWhatReplacedThem checks that), on a command the flag
-// reaches, with the message it gives there.
+// (TestRemovedFlagsSayWhatReplacedThem checks that), with the message it
+// gives there.
 var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"deployment", "create", "--name", "x"}, flag: "deployment-file", value: "deployment.yaml", want: errDeploymentFileRemoved},
-	{tree: astroTree, args: []string{"deployment", "update", "dep-id"}, flag: "deployment-file", value: "deployment.yaml", want: errDeploymentFileRemoved},
+	{tree: astroHostedTree, args: []string{"deployment", "update", "dep-id"}, flag: "deployment-file", value: "deployment.yaml", want: errDeploymentFileRemoved},
 	{tree: astroTree, args: []string{"deployment", "inspect", "dep-id"}, flag: "template", shorthand: "t", want: errInspectTemplateRemoved},
 	{tree: astroTree, args: []string{"organization", "switch", "my-org"}, flag: "login-link", shorthand: "l", want: errLoginLinkRemoved},
 	{tree: astroTree, args: []string{"api", "airflow", "GET", "/dags"}, flag: "api-url", value: "http://localhost:8080", want: errAPIURLFlagRemoved},
@@ -81,7 +94,7 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"api", "airflow"}, flag: "deployment-id", value: "dep-id", want: errDeploymentIDAPIFlag},
 	{tree: apcTree, args: []string{"api", "airflow", "ls"}, flag: "deployment-id", value: "dep-id", want: errDeploymentIDAPIFlag},
 	{tree: astroTree, args: []string{"workspace", "list"}, flag: "json", want: errJSONFlagRemoved},
-	{tree: astroTree, args: []string{"deployment", "list", "-a"}, flag: "json", want: errJSONFlagRemoved},
+	{tree: astroHostedTree, args: []string{"deployment", "list", "-a"}, flag: "json", want: errJSONFlagRemoved},
 	{tree: astroTree, args: []string{"api", "cloud", "ls"}, flag: "json", want: errJSONFlagRemoved},
 	{tree: astroTree, args: []string{"deployment", "list"}, flag: "template", value: "{{.}}", want: errTemplateFlagRemoved},
 	{tree: astroTree, args: []string{"organization", "team", "list"}, flag: "template", value: "{{.}}", want: errTemplateFlagRemoved},
@@ -94,13 +107,13 @@ var removedFlagCases = []removedFlagCase{
 		want: "--format was removed in Astro CLI v2: use -o (--output), which takes text or json; there is no yaml, so use -o json",
 	},
 	{tree: astroTree, args: []string{"deployment", "delete", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
-	{tree: astroTree, args: []string{"deployment", "bundle", "delete"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
-	{tree: apcTree, args: []string{"deployment", "delete", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
+	{tree: astroHostedTree, args: []string{"deployment", "bundle", "delete"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
+	{tree: apcTree, args: []string{"deployment", "update", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
 }
 
 // spellings is every way the case's flag can be typed: --name, --name=value
 // and --name value (or the boolean alone), the shorthand, and the shorthand
-// first in a group.
+// first in a group, before a letter that would ask for help.
 func (c *removedFlagCase) spellings() [][]string {
 	value := c.value
 	if value == "" {
@@ -137,10 +150,10 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 					root, preRuns := disarmedTree(t, c.tree)
 					target, _, err := root.Find(c.args)
 					require.NoError(t, err)
-					if f := findRemovedFlag(target, c.flag, false); f != nil {
+					if f := findRemovedFlag(target, c.flag); f != nil {
 						reached[f] = true
 					}
-					if asJSON && cliout.Formats(target) == nil {
+					if asJSON && !cliout.HasOutput(target) {
 						t.Skip("no --output here: an `astro api` request prints the API's response, and bundle delete prints nothing")
 					}
 
@@ -168,6 +181,36 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 	}
 }
 
+// --force's message changes when the run passed --yes already, ahead of it:
+// pflag has set -y by the time it reaches the f of -yf. After it (-fy), the
+// run has not got there yet, and is told to use what it is about to pass.
+func TestRemovedForceSaysWhenYesIsAlreadyThere(t *testing.T) {
+	const use = "--force was removed in Astro CLI v2: use --yes (-y)"
+	const passed = "--force was removed in Astro CLI v2: --yes (-y), which you passed, already skips the confirmation, so drop "
+	for _, tc := range []struct {
+		flags []string
+		want  string
+	}{
+		{[]string{"-yf"}, passed + "-f"},
+		{[]string{"-y", "-f"}, passed + "-f"},
+		{[]string{"--yes", "--force"}, passed + "--force"},
+		{[]string{"--yes=true", "--force"}, passed + "--force"},
+		{[]string{"-fy"}, use},
+		{[]string{"--force", "--yes"}, use},
+		{[]string{"-fh"}, use},
+	} {
+		args := append([]string{"deployment", "delete", "dep-id"}, tc.flags...)
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			root, preRuns := disarmedTree(t, astroTree)
+			_, _, err := executeRoot(root, args...)
+			require.Error(t, err)
+			assert.Equal(t, tc.want, err.Error())
+			assert.True(t, cliout.IsUsage(err))
+			assert.Zero(t, *preRuns)
+		})
+	}
+}
+
 // Each entry's under names a command a tree has, so an entry cannot quietly
 // stop applying when a command is renamed.
 func TestRemovedFlagsNameRealCommands(t *testing.T) {
@@ -186,9 +229,9 @@ func TestRemovedFlagsNameRealCommands(t *testing.T) {
 	}
 }
 
-// A command that still has the flag runs with it, and one where the
-// replacement does not exist is told what cobra always told it: the message
-// would be false there.
+// A command that still has the flag runs with it, and one that did not have
+// it in 1.x is told what cobra always told it: "was removed" would be false
+// there, or name the wrong flag (-f meant other things on other commands).
 func TestRemovedFlagsLeaveOtherCommandsAlone(t *testing.T) {
 	for _, tc := range []struct {
 		tree treeConfig
@@ -202,13 +245,17 @@ func TestRemovedFlagsLeaveOtherCommandsAlone(t *testing.T) {
 		{astroTree, []string{"login", "--login-link"}, errRan.Error()},
 		{astroTree, []string{"api", "airflow", "--template", "{{.}}"}, errRan.Error()},
 		{apcTree, []string{"deployment", "team", "list", "--deployment-id", "dep-id"}, errRan.Error()},
-		// `local stop` has --force, without a -f: "--force was removed" would be false.
+		// 1.x had no `local` commands (`astro dev` was), and so none of
+		// these flags on them.
 		{astroTree, []string{"local", "stop", "-f"}, "unknown shorthand flag: 'f' in -f"},
-		// No --yes, no -o, outside api airflow, no `deployment create --clone`.
+		{astroTree, []string{"local", "reset", "-f"}, "unknown shorthand flag: 'f' in -f"},
+		{astroTree, []string{"local", "reset", "--force"}, "unknown flag: --force"},
+		// Commands 1.x had, without these flags.
 		{astroTree, []string{"version", "--force"}, "unknown flag: --force"},
 		{astroTree, []string{"deploy", "--json"}, "unknown flag: --json"},
 		{astroTree, []string{"deployment", "logs", "dep-id", "--deployment-id", "x"}, "unknown flag: --deployment-id"},
 		{apcTree, []string{"deployment", "create", "--deployment-file", "f.yaml"}, "unknown flag: --deployment-file"},
+		{apcTree, []string{"deployment", "delete", "dep-id", "--force"}, "unknown flag: --force"},
 		{astroTree, []string{"deployment", "list", "-t"}, "unknown shorthand flag: 't' in -t"},
 	} {
 		t.Run(tc.tree.name+": astro "+strings.Join(tc.args, " "), func(t *testing.T) {
@@ -245,48 +292,127 @@ func TestRemovedFlagsStillReachTelemetry(t *testing.T) {
 	}, got)
 }
 
-// v1Flag is a line of testdata/v1_flags.tsv.
-type v1Flag struct {
-	tree, path, name, shorthand string
-	isBool                      bool
+// Asking for help gets the help, wherever the removed flag stands. Only a
+// shorthand group that reaches the removed letter before the h is refused,
+// as pflag stops there.
+func TestRemovedFlagsGiveWayToHelp(t *testing.T) {
+	for _, args := range [][]string{
+		{"deployment", "list", "--json", "--help"},
+		{"deployment", "list", "--help", "--json"},
+		{"deployment", "list", "--json", "-h"},
+		{"deployment", "list", "--json", "-h", "-o", "json"},
+		{"deployment", "delete", "dep-id", "-f", "-h"},
+		{"deployment", "delete", "dep-id", "-hf"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			root, preRuns := disarmedTree(t, astroTree)
+			var out strings.Builder
+			root.SetOut(&out)
+			stdout, _, err := executeRootKeepingOut(root, args...)
+			require.NoError(t, err)
+			assert.Empty(t, stdout)
+			target, _, err := root.Find(args)
+			require.NoError(t, err)
+			assert.Contains(t, out.String(), "Usage:\n  "+target.UseLine(), "no help for %s", target.CommandPath())
+			assert.Zero(t, *preRuns)
+		})
+	}
+	// A -h that is a value is still read as asking for help, and the worst
+	// that does is show help: the flag stays refused for a run that is going
+	// to run.
+	root, _ := disarmedTree(t, astroTree)
+	_, _, err := executeRoot(root, "deployment", "list", "--json", "--", "-h")
+	require.EqualError(t, err, errJSONFlagRemoved)
 }
 
-func readV1Flags(t *testing.T) []v1Flag {
-	t.Helper()
-	file, err := os.Open("testdata/v1_flags.tsv")
-	require.NoError(t, err)
-	defer file.Close()
-	var flags []v1Flag
-	lines := bufio.NewScanner(file)
-	for lines.Scan() {
-		line := lines.Text()
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		f := strings.Split(line, "\t")
-		require.Len(t, f, 5, line)
-		flags = append(flags, v1Flag{tree: f[0], path: f[1], name: f[2], shorthand: f[3], isBool: f[4] == "bool"})
+// executeRootKeepingOut runs root like executeRoot, but leaves the out writer
+// the test set on it, where cobra prints help.
+func executeRootKeepingOut(root *cobra.Command, args ...string) (stdout, stderr string, err error) {
+	var out, errOut strings.Builder
+	root.SetErr(&errOut)
+	err = execute(context.Background(), root, args, &out)
+	return out.String(), errOut.String(), err
+}
+
+// A shell asking for completions after a removed flag gets them: cobra
+// parses the flags of the command it completes without the flag error func,
+// and would fail the completion on any flag it does not know.
+func TestRemovedFlagsLeaveCompletionsAlone(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string // a completion offered, or "" for none at all
+	}{
+		{[]string{"__complete", "deployment", "list", "--json", "-"}, "--all"},
+		{[]string{"__complete", "deployment", "list", "--json", "--o"}, "--output"},
+		{[]string{"__completeNoDesc", "deployment", "list", "--template", "{{.}}", "--o"}, "--output"},
+		{[]string{"__complete", "deployment", "delete", "-f", "--y"}, "--yes"},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			root, _ := disarmedTree(t, astroTree)
+			// cobra's __complete runs under the root's pre-run, which the real
+			// one lets through and the disarmed one would not.
+			root.PersistentPreRunE = nil
+			var out strings.Builder
+			root.SetOut(&out)
+			_, stderr, err := executeRootKeepingOut(root, tc.args...)
+			require.NoError(t, err)
+			assert.NotContains(t, stderr, "Error")
+			lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+			require.NotEmpty(t, lines)
+			directive := lines[len(lines)-1]
+			assert.NotEqual(t, ":1", directive, "cobra reported an error: %s", stderr)
+			if tc.want != "" {
+				offered := make([]string, 0, len(lines)-1)
+				for _, l := range lines[:len(lines)-1] {
+					offered = append(offered, strings.SplitN(l, "\t", 2)[0])
+				}
+				assert.Contains(t, offered, tc.want)
+			}
+		})
 	}
-	require.NoError(t, lines.Err())
-	require.NotEmpty(t, flags)
-	return flags
+}
+
+// Every root says which 1.x tree a script on its machine was written for.
+func TestEveryTreeNamesItsV1Tree(t *testing.T) {
+	for _, tc := range v1Trees {
+		root := buildTree(t, tc.tree).root
+		assert.Equal(t, tc.v1, root.Annotations[v1TreeAnnotation], tc.tree.name)
+	}
+}
+
+// v1_flags.tsv parses, names only the trees there are, and is in order, so a
+// regenerated one diffs line by line.
+func TestV1FlagsFileIsWellFormed(t *testing.T) {
+	flags, err := parseV1Flags(v1FlagsFile)
+	require.NoError(t, err)
+	require.Greater(t, len(flags), 900)
+	known := []string{v1TreeAstro, v1TreeAstroHosted, v1TreeAPC}
+	seen := map[string]bool{}
+	var lines []string
+	for _, f := range flags {
+		for _, tree := range f.trees {
+			assert.Contains(t, known, tree, "%s --%s", f.path, f.name)
+			seen[tree] = true
+		}
+		lines = append(lines, f.path+"\t"+f.name+"\t"+f.shorthand)
+	}
+	assert.Len(t, seen, len(known), "a tree has no flags")
+	assert.True(t, slices.IsSorted(lines), "v1_flags.tsv is not sorted by command path and flag")
 }
 
 // Every flag 1.x had, on a command v2 still has, either still parses there or
-// fails with what replaced it, so a script written for 1.x is never told only
-// "unknown flag". A flag v2 drops without an entry in removedFlags fails here.
-// A command v2 dropped altogether is its own tombstone (`astro dev`, `astro
-// run`, `env ... create`), and is skipped.
+// fails with what replaced it, word for word, so a script written for 1.x is
+// never told only "unknown flag". A flag v2 drops without an entry in
+// removedFlags fails here, as does an entry no 1.x flag reaches. A command v2
+// dropped altogether is its own tombstone (`astro dev`, `astro run`, `env ...
+// create`), and is skipped.
 func TestEveryV1FlagStillWorksOrSaysWhatReplacedIt(t *testing.T) {
-	flags := readV1Flags(t)
-	checked := 0
-	for _, tc := range []struct {
-		v1   string
-		tree treeConfig
-	}{{"cloud", astroTree}, {"software", apcTree}} {
+	reached := map[*removedFlag]bool{}
+	for _, tc := range v1Trees {
 		root, preRuns := disarmedTree(t, tc.tree)
-		for _, f := range flags {
-			if f.tree != tc.v1 {
+		checked := 0
+		for _, f := range v1Flags() {
+			if !slices.Contains(f.trees, tc.v1) {
 				continue
 			}
 			cmd, _, err := root.Find(strings.Fields(f.path))
@@ -298,31 +424,44 @@ func TestEveryV1FlagStillWorksOrSaysWhatReplacedIt(t *testing.T) {
 
 			if cmd.Flag(f.name) == nil {
 				spelling := "--" + f.name
+				arg := spelling
 				if !f.isBool {
-					spelling += "=x"
+					arg += "=x"
 				}
-				assertSaysWhatReplacedIt(t, root, preRuns, f, spelling, label)
+				reached[assertSaysWhatReplacedIt(t, root, preRuns, cmd, &f, arg, spelling, label)] = true
 			}
 			// The shorthand may have moved with a rename (-d is --deployment
 			// now, as -d was --deployment-id); if nothing has it, it says
 			// what replaced the flag too.
 			if f.shorthand != "" && cmd.LocalFlags().ShorthandLookup(f.shorthand) == nil && cmd.InheritedFlags().ShorthandLookup(f.shorthand) == nil {
-				assertSaysWhatReplacedIt(t, root, preRuns, f, "-"+f.shorthand, label+" (-"+f.shorthand+")")
+				reached[assertSaysWhatReplacedIt(t, root, preRuns, cmd, &f, "-"+f.shorthand, "-"+f.shorthand, label+" (-"+f.shorthand+")")] = true
 			}
 		}
+		t.Logf("%s: %d flags checked", tc.tree.name, checked)
+		assert.Greater(t, checked, 200, "%s: the inventory matched few commands; is v1_flags.tsv still read right?", tc.tree.name)
 	}
-	assert.Greater(t, checked, 500, "the inventory matched few commands; is testdata/v1_flags.tsv still read right?")
+	for i := range removedFlags {
+		assert.True(t, reached[&removedFlags[i]], "removedFlags[%d] (--%s) applies to no flag 1.x had on a command v2 has", i, removedFlags[i].name)
+	}
 }
 
-func assertSaysWhatReplacedIt(t *testing.T, root *cobra.Command, preRuns *int, f v1Flag, spelling, label string) {
+// assertSaysWhatReplacedIt runs cmd with arg and checks it is refused with
+// the message of the entry for f there, and returns that entry.
+func assertSaysWhatReplacedIt(t *testing.T, root *cobra.Command, preRuns *int, cmd *cobra.Command, f *v1Flag, arg, spelling, label string) *removedFlag {
 	t.Helper()
-	root.SetArgs(append(strings.Fields(f.path), spelling))
+	entry := findRemovedFlag(cmd, f.name)
+	if !assert.NotNil(t, entry, "%s: no entry in removedFlags applies", label) {
+		return nil
+	}
+	root.SetArgs(append(strings.Fields(f.path), arg))
 	before := *preRuns
 	_, err := root.ExecuteC()
 	if !assert.Error(t, err, label) {
-		return
+		return entry
 	}
+	assert.Equal(t, entry.message(cmd, spelling), err.Error(), label)
 	assert.True(t, strings.HasPrefix(err.Error(), "--"+f.name+" was removed in Astro CLI v2"), "%s: %v", label, err)
 	assert.True(t, cliout.IsUsage(err), "%s: not a usage error", label)
 	assert.Equal(t, before, *preRuns, "%s: a pre-run started", label)
+	return entry
 }

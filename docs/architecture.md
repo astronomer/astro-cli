@@ -200,15 +200,16 @@ A script written for Astro CLI 1.x is told what replaced what it typed rather th
 
 A removed command stays in the tree as a hidden stub that fails naming its replacement: `astro dev` ([`cmd/local/dev.go`](../cmd/local/dev.go)), `astro run`, `astro deployment airflow-variable|connection|pool`, and `astro env … create|update`.
 
-A removed flag is not registered on any command. It is an entry in `removedFlags` in [`cmd/removed_flags.go`](../cmd/removed_flags.go), keyed by the flag's name and shorthand, with its message. The root's flag error func (`flagError` in [`cmd/unknown.go`](../cmd/unknown.go)) consults the registry when cobra reports a flag the invoked command does not have. It records the flag in telemetry like any unknown flag, and returns the message of the first entry that applies there. This happens while flags parse, so it fails before any pre-run logs in or asks an API anything. A command that still has a flag of that name never reaches it.
+A removed flag is not registered on any command. Two files in `cmd/` describe it:
 
-An entry applies to every command where the flag is unknown, not only to those that had it in 1.x, so its message has to be true on each of them:
+- [`cmd/v1_flags.tsv`](../cmd/v1_flags.tsv) is the 1.x inventory, embedded in the binary: every visible flag on every runnable 1.x command, its own and those it inherited, with its shorthand and whether it took a value. It records three 1.x trees: Astro for a non-hosted organization (`astro`), Astro for a hosted one (`astro-hosted`, whose `deployment create` and `update` had flags of their own), and APC (`apc`). It records 1.x, so nothing in v2 changes it.
+- `removedFlags` in [`cmd/removed_flags.go`](../cmd/removed_flags.go) is the registry of messages, keyed by flag name.
 
-- `needs` limits it to commands that have the replacement: `--force` maps to `--yes` only where a command has `--yes`;
-- `under` limits it to a command and everything below it: `--api-url` only under `astro api airflow`;
-- where one name had different replacements, the narrower entry comes first.
+The root's flag error func (`flagError` in [`cmd/unknown.go`](../cmd/unknown.go)) runs when cobra reports a flag the invoked command does not have. It records the flag in telemetry like any unknown flag. Then, if the inventory says 1.x had that flag (or that shorthand) on that command in the tree this machine's root was built for (`markV1Tree`: APC, or Astro hosted or not), it returns the message of the first registry entry that applies there, as a usage error. This happens while flags parse, so it fails before any pre-run logs in or asks an API anything. A command that still has a flag of that name never gets there. Neither does one 1.x did not have, or had without the flag: `astro local reset -f` gets cobra's own error, because 1.x had no `local reset`. A registry entry can narrow itself further. `needs` limits it to commands that have the replacement (`--json` maps to `-o json` only where there is an `-o`), and `under` limits it to a command and everything below it, for a name whose replacement differs by command (`--template` on `deployment inspect`). Where names overlap, the narrower entry comes first.
 
-To remove a flag, delete it and add an entry. `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` fails on any flag in [`cmd/testdata/v1_flags.tsv`](../cmd/testdata/v1_flags.tsv), the 1.x inventory, that v2 neither has nor reports. `TestRemovedFlagsSayWhatReplacedThem` needs a case for every entry. The entries go in v3, once the unknown-flag events show nobody still passes them.
+A run that asks for help (`-h` or `--help`) gets the help, not the refusal. A shell asking for completions (`__complete`) gets them: cobra parses flags itself there, without the flag error func, so `acceptRemovedFlags` gives the command being completed each removed flag 1.x had on it as a hidden flag, for that run only.
+
+To remove a flag, delete it and add an entry for its name if none applies yet. `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` runs every inventory flag against its v2 tree. It fails on any flag v2 neither has nor reports, checks that each refusal is the message its entry gives there, and fails on an entry that no flag in the inventory reaches. `TestRemovedFlagsSayWhatReplacedThem` needs a case for every entry. The entries go in v3, once the unknown-flag events show nobody still passes them.
 
 ## Help
 

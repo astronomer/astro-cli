@@ -161,10 +161,12 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// A flag the CLI does not have is recorded here, before cliout reports it:
 	// cobra parses flags before the tracking hook in PersistentPreRunE runs,
 	// so a mistyped flag would otherwise send nothing. A removed 1.x flag is
-	// reported here too, by what replaced it (removedFlags). cliout.Execute
-	// keeps this func and runs it ahead of its own (markUsageErrors). An
-	// unknown command is recorded by Execute, after the run it failed.
+	// reported here too, by what replaced it (removedFlags), on a command
+	// that had it in the 1.x tree markV1Tree names. cliout.Execute keeps this
+	// func and runs it ahead of its own (markUsageErrors). An unknown command
+	// is recorded by Execute, after the run it failed.
 	rootCmd.SetFlagErrorFunc(flagError)
+	markV1Tree(rootCmd, o.platform)
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
 	installHelp(rootCmd, o.platform, houstonVersion)
 
