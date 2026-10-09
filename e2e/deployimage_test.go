@@ -47,6 +47,9 @@ func TestTheDeployImageCarriesTheProject(t *testing.T) {
 		{name: "remote-dag-deploy-off", remoteExecution: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			// The two builds leave nothing untagged behind once the image is
+			// gone: the dependency image goes with it.
+			assertNoNewDanglingImages(t)
 			p := deployImageProject(t, "carries-"+tc.name)
 			needsDocker(t, p)
 			image := deployUntilTheCreate(t, p, fakeDeployment{dagDeploy: tc.dagDeploy, remoteExecution: tc.remoteExecution})
@@ -485,6 +488,16 @@ func TestTheDeployWithoutBuildx(t *testing.T) {
 			t.Error("plugins/x.py is in an image built without buildx")
 		}
 	})
+	t.Run("refuses to package", func(t *testing.T) {
+		p := deployImageProject(t, "nobuildxpackage")
+		needsDocker(t, p)
+		env := noBuildx(t)
+		t.Cleanup(func() { removeImagesNamed(t, "astro-package/nobuildxpackage") })
+		r := p.runBounded(slowCommandTimeout, env, "package", "astro", "--output", "json").requireFailure()
+		if !strings.Contains(r.Stdout, "an image built without the project would have none") {
+			t.Errorf("the refusal should say why\n%s", r.output())
+		}
+	})
 	t.Run("refuses to build DAGs in", func(t *testing.T) {
 		p := deployImageProject(t, "nobuildxrefuse")
 		needsDocker(t, p)
@@ -551,4 +564,103 @@ func removeNewDanglingImages(t *testing.T) {
 			}
 		}
 	})
+}
+
+// assertNoNewDanglingImages fails the test if, when it ends, there are
+// untagged images that were not there when it began. Registered first, it
+// runs after the test's other cleanups have removed its images.
+func assertNoNewDanglingImages(t *testing.T) {
+	t.Helper()
+	dangling := func() map[string]bool {
+		ids, err := dockerLines(context.Background(), "images", "--quiet", "--no-trunc", "--filter", "dangling=true")
+		if err != nil {
+			t.Logf("listing untagged images: %v", err)
+		}
+		set := map[string]bool{}
+		for _, id := range ids {
+			set[id] = true
+		}
+		return set
+	}
+	before := dangling()
+	t.Cleanup(func() {
+		for id := range dangling() {
+			if !before[id] {
+				t.Errorf("an untagged image was left behind: %s", id)
+			}
+		}
+	})
+}
+
+// gitProject makes p a git repository, as most projects are.
+func gitProject(t *testing.T, p *project) {
+	t.Helper()
+	cmd := exec.CommandContext(t.Context(), "git", "-C", p.Dir, "init", "-q")
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Skipf("git init: %v\n%s", err, out)
+	}
+}
+
+// A file git ignores ships, as on 1.x (a dbt target/ often is), with a
+// warning; one that looks like a credential is refused, by the deploy and by
+// astro package, before anything is built.
+func TestGitignoredSecretsAreRefused(t *testing.T) {
+	tier(t, 3)
+	p := deployImageProject(t, "gitsecrets")
+	needsDocker(t, p)
+	gitProject(t, p)
+	write(t, filepath.Join(p.Dir, ".gitignore"), read(t, filepath.Join(p.Dir, ".gitignore"))+"\ntarget/\ncerts/\n")
+	mkdir(t, p.Dir, "target")
+	write(t, filepath.Join(p.Dir, "target", "manifest.json"), "{}\n")
+	mkdir(t, p.Dir, "certs")
+	write(t, filepath.Join(p.Dir, "certs", "prod.pem"), "-----BEGIN PRIVATE KEY-----\n")
+	writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{dagDeploy: true}).URL)
+	repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
+	t.Cleanup(func() { removeImagesNamed(t, repo) })
+	t.Cleanup(func() { removeImagesNamed(t, "astro-package/gitsecrets") })
+
+	for _, args := range [][]string{{"deploy", "dep-e2e"}, {"package", "astro"}} {
+		r := p.runSlow(append(args, "--output", "json")...).requireFailure()
+		if !strings.Contains(r.Stdout, "certs/prod.pem") || !strings.Contains(r.Stdout, "pushed to a registry") {
+			t.Errorf("%v should refuse, naming the key\n%s", args, r.output())
+		}
+	}
+	if images, err := dockerLines(t.Context(), "images", "--format", "{{.Repository}}:{{.Tag}}", repo); err != nil || len(images) != 0 {
+		t.Errorf("refused before the build, yet found %v (%v)", images, err)
+	}
+
+	// Left out by .dockerignore, the key no longer ships, and the gitignored
+	// dbt output does, with a warning.
+	ignore := filepath.Join(p.Dir, ".dockerignore")
+	write(t, ignore, read(t, ignore)+"certs/\n")
+	r := p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
+	if !strings.Contains(r.Stdout, fakeCreateRefusal) {
+		t.Fatalf("the deploy should have built and stopped at the fake create\n%s", r.output())
+	}
+	if !strings.Contains(r.Stderr, "target/manifest.json") {
+		t.Errorf("the deploy should warn about the gitignored file it ships\n%s", r.output())
+	}
+}
+
+// A dags/ linked by absolute path, even into the project, is copied as a link
+// to a path that does not exist in the image, so its DAGs do not ship, and a
+// deploy that has to build them in is refused.
+func TestTheDeployRefusesDagsBehindALinkThatDanglesInTheImage(t *testing.T) {
+	tier(t, 3)
+	p := deployImageProject(t, "absdags")
+	needsDocker(t, p)
+	if err := os.Rename(filepath.Join(p.Dir, "dags"), filepath.Join(p.Dir, "airflow_dags")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(p.Dir, "airflow_dags"), filepath.Join(p.Dir, "dags")); err != nil {
+		t.Fatal(err)
+	}
+	writeLoginTo(t, p, fakeAstroAPI(t, fakeDeployment{}).URL)
+	repo := "astro-deploy/" + filepath.Base(p.Dir) + "-*"
+	t.Cleanup(func() { removeImagesNamed(t, repo) })
+	r := p.runSlow("deploy", "dep-e2e", "--output", "json").requireFailure()
+	if !strings.Contains(r.Stdout, "no DAG file in dags/ would reach the image") {
+		t.Errorf("the deploy should refuse a dags/ link that dangles in the image\n%s", r.output())
+	}
 }

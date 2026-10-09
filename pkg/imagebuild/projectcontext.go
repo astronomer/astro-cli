@@ -115,8 +115,9 @@ func ProjectIgnore(projectDir string, excludes []string) (string, error) {
 //
 // The ignore file is what keeps .env, airflow_settings.yaml and the rest out
 // of an image that is pushed to a registry, so the second build only runs on
-// a builder known to read it (projectBuilder), and it is asked before the
-// first build, so a refusal costs nothing. On Docker both builds run on the
+// a builder shown to read it (CanShipProject), asked before the first build,
+// so a refusal costs nothing. A caller that asked already hands the answer in
+// as req.Builder, and the engine is not asked again. On Docker both builds run on the
 // docker-driver builder of the current context, which reads the local image
 // store, so the second finds the first.
 //
@@ -124,9 +125,12 @@ func ProjectIgnore(projectDir string, excludes []string) (string, error) {
 // not it succeeded, and even when ctx was canceled; its layers stay, as the
 // final image's parent.
 func (b *Builder) buildProject(ctx context.Context, req Request, dfPath, contextDir string, cb rt.Callbacks) (string, error) {
-	pb, err := b.projectBuilder(ctx, req)
-	if err != nil {
-		return "", err
+	pb := req.Builder
+	if !pb.ok {
+		var err error
+		if pb, err = b.CanShipProject(ctx, req); err != nil {
+			return "", err
+		}
 	}
 	deps := req
 	deps.Tag = depsTag(req.Tag)
@@ -164,20 +168,13 @@ func (b *Builder) buildProject(ctx context.Context, req Request, dfPath, context
 // ignore file a ProjectContext build copies the project under, which keeps
 // .env, airflow_settings.yaml and the rest out of an image bound for a
 // registry. Such a build is refused, never run without it; CanShipProject
-// lets a caller find out first and fall back to a build that ships no project
-// files.
+// lets a caller find out first.
 var ErrNoProjectBuilder = errors.New("copying the project into the image needs a builder that reads the ignore file keeping .env, airflow_settings.yaml and other local files out of it")
 
-// CanShipProject reports whether this engine can run a ProjectContext build,
-// and why not when it cannot (wrapping ErrNoProjectBuilder). req needs only
-// Bin and Env.
-func (b *Builder) CanShipProject(ctx context.Context, req Request) error {
-	_, err := b.projectBuilder(ctx, req)
-	return err
-}
-
-// projectBuilder is how a ProjectContext build runs on this engine.
-type projectBuilder struct {
+// ProjectBuilder is how this engine runs a ProjectContext build, as
+// CanShipProject found it. Its zero value is "not asked yet".
+type ProjectBuilder struct {
+	ok     bool
 	podman bool
 	// builder is the buildx builder both Docker builds run on.
 	builder string
@@ -185,7 +182,7 @@ type projectBuilder struct {
 }
 
 // args is the command line of the second build.
-func (p projectBuilder) args(dockerfile, ignorePath string, req Request) []string {
+func (p ProjectBuilder) args(dockerfile, ignorePath string, req Request) []string {
 	var args []string
 	if p.podman {
 		// Podman reads the ignore file it is pointed at; it does not look for
@@ -208,8 +205,10 @@ func buildxArgs(builder string) []string {
 	return []string{"buildx", "build", "--builder", builder, "--load"}
 }
 
-// projectBuilder finds out how this engine runs a ProjectContext build, and
-// refuses one that cannot be shown to read its ignore file.
+// CanShipProject finds out how this engine runs a ProjectContext build, and
+// refuses one that cannot be shown to read its ignore file (wrapping
+// ErrNoProjectBuilder). req needs only Bin and Env. Hand the answer to the
+// build as Request.Builder, so the engine is asked once.
 //
 // Docker needs the buildx plugin, and runs both builds on the builder of the
 // current Docker context (`docker context show`), whose driver must be
@@ -221,13 +220,12 @@ func buildxArgs(builder string) []string {
 // context called default, not to the one in use.
 //
 // Podman is recognized by what `<bin> --version` says, so the podman-docker
-// shim, a `docker` that runs podman, is podman too. It must be local
-// (`podman info` reports no remote service) and its build must offer
-// --ignorefile. A remote client, which is how podman runs on macOS and
-// Windows, sends the build context to the machine, and whether it applies
-// --ignorefile when it does is not something this can check, so it is
-// treated as unable to.
-func (b *Builder) projectBuilder(ctx context.Context, req Request) (projectBuilder, error) {
+// shim, a `docker` that runs podman, is podman too, and its build must offer
+// --ignorefile.
+//
+// Then, on either, a check build proves the ignore file is honored, rather
+// than a version taken on trust (probeIgnoreFile).
+func (b *Builder) CanShipProject(ctx context.Context, req Request) (ProjectBuilder, error) {
 	out := func(args ...string) (string, error) {
 		var o strings.Builder
 		err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: &o}, req.Bin, args...)
@@ -235,36 +233,91 @@ func (b *Builder) projectBuilder(ctx context.Context, req Request) (projectBuild
 	}
 	version, err := out("--version")
 	if err != nil {
-		return projectBuilder{}, fmt.Errorf("%w; `%s --version` failed: %w", ErrNoProjectBuilder, req.Bin, err)
+		return ProjectBuilder{}, fmt.Errorf("%w; `%s --version` failed: %w", ErrNoProjectBuilder, req.Bin, err)
 	}
+	var pb ProjectBuilder
 	if strings.Contains(strings.ToLower(version), "podman") {
-		return podmanBuilder(out)
+		help, err := out("build", "--help")
+		if err != nil || !strings.Contains(help, "--ignorefile") {
+			return ProjectBuilder{}, fmt.Errorf("%w, and this podman's build has no --ignorefile; upgrade podman", ErrNoProjectBuilder)
+		}
+		pb = ProjectBuilder{podman: true}
+	} else {
+		if _, err := out("buildx", "version"); err != nil {
+			return ProjectBuilder{}, fmt.Errorf("%w (Docker BuildKit), and `%s buildx version` failed. Install the Docker buildx plugin (docker-buildx), or use Docker Desktop or Docker Engine 23 or newer", ErrNoProjectBuilder, req.Bin)
+		}
+		name, err := out("context", "show")
+		if err != nil || name == "" {
+			return ProjectBuilder{}, fmt.Errorf("%w, and `%s context show` named no Docker context", ErrNoProjectBuilder, req.Bin)
+		}
+		inspect, err := out("buildx", "inspect", name)
+		if err != nil || inspectDriver(inspect) != "docker" {
+			return ProjectBuilder{}, fmt.Errorf("%w, and the buildx builder %q of the current Docker context is not one with the docker driver", ErrNoProjectBuilder, name)
+		}
+		pb = ProjectBuilder{builder: name, env: []string{"DOCKER_BUILDKIT=1"}}
 	}
-	if _, err := out("buildx", "version"); err != nil {
-		return projectBuilder{}, fmt.Errorf("%w (Docker BuildKit), and `%s buildx version` failed. Install the Docker buildx plugin (docker-buildx), or use Docker Desktop or Docker Engine 23 or newer", ErrNoProjectBuilder, req.Bin)
+	if err := b.probeIgnoreFile(ctx, req, pb); err != nil {
+		return ProjectBuilder{}, err
 	}
-	name, err := out("context", "show")
-	if err != nil || name == "" {
-		return projectBuilder{}, fmt.Errorf("%w, and `%s context show` named no Docker context", ErrNoProjectBuilder, req.Bin)
-	}
-	inspect, err := out("buildx", "inspect", name)
-	if err != nil || inspectDriver(inspect) != "docker" {
-		return projectBuilder{}, fmt.Errorf("%w, and the buildx builder %q of the current Docker context is not one with the docker driver", ErrNoProjectBuilder, name)
-	}
-	return projectBuilder{builder: name, env: []string{"DOCKER_BUILDKIT=1"}}, nil
+	pb.ok = true
+	return pb, nil
 }
 
-// podmanBuilder is projectBuilder for podman, out running podman commands.
-func podmanBuilder(out func(args ...string) (string, error)) (projectBuilder, error) {
-	remote, err := out("info", "--format", "{{.Host.ServiceIsRemote}}")
-	if err != nil || remote != "false" {
-		return projectBuilder{}, fmt.Errorf("%w, and this podman is a remote client (a podman machine), which may not apply --ignorefile to the context it sends. Install the Docker buildx plugin and use Docker, or build on Linux with a local podman", ErrNoProjectBuilder)
+// probe file names: the check build's context holds both, and its ignore file
+// leaves out the second.
+const (
+	probeKeep   = "keep"
+	probeMarker = "left-out"
+)
+
+// probeIgnoreFile runs a check build the way the second build runs, over a
+// two-file context whose <Dockerfile>.dockerignore (or --ignorefile) leaves
+// one file out, exporting the result to a directory rather than an image, and
+// fails unless the kept file arrived and the left-out one did not.
+//
+// It proves what a version number would only suggest, on this engine, this
+// builder and this connection (a remote podman machine included). It costs a
+// FROM scratch build of two tiny files, a fraction of a second, writes no
+// image, and runs once per build: the answer travels with Request.Builder.
+func (b *Builder) probeIgnoreFile(ctx context.Context, req Request, pb ProjectBuilder) error {
+	dir, err := os.MkdirTemp("", "astro-ignore-check-")
+	if err != nil {
+		return fmt.Errorf("%w; making the check build's directory: %w", ErrNoProjectBuilder, err)
 	}
-	help, err := out("build", "--help")
-	if err != nil || !strings.Contains(help, "--ignorefile") {
-		return projectBuilder{}, fmt.Errorf("%w, and this podman's build has no --ignorefile; upgrade podman", ErrNoProjectBuilder)
+	defer os.RemoveAll(dir) //nolint:errcheck // best-effort removal of the check build
+	ctxDir, outDir := filepath.Join(dir, "context"), filepath.Join(dir, "out")
+	df := filepath.Join(dir, "Dockerfile.check")
+	files := map[string]string{
+		filepath.Join(ctxDir, probeKeep):   "kept\n",
+		filepath.Join(ctxDir, probeMarker): "left out\n",
+		df:                                 "FROM scratch\nCOPY . /\n",
+		df + ignoreFile:                    probeMarker + "\n",
 	}
-	return projectBuilder{podman: true}, nil
+	for path, body := range files {
+		if err := os.MkdirAll(filepath.Dir(path), contextDirPerm); err != nil {
+			return fmt.Errorf("%w; writing the check build: %w", ErrNoProjectBuilder, err)
+		}
+		if err := os.WriteFile(path, []byte(body), filePermRW); err != nil {
+			return fmt.Errorf("%w; writing the check build: %w", ErrNoProjectBuilder, err)
+		}
+	}
+	args := []string{"buildx", "build", "--builder", pb.builder, "--file", df}
+	if pb.podman {
+		args = []string{"build", "--file", df, "--ignorefile", df + ignoreFile}
+	}
+	args = append(args, "--output", "type=local,dest="+outDir, ctxDir)
+	env := append(append([]string{}, req.Env...), pb.env...)
+	var output strings.Builder
+	if err := b.cmd.Run(ctx, env, rt.Stdio{Out: &output, Err: &output}, req.Bin, args...); err != nil {
+		return fmt.Errorf("%w; a check build of the ignore file failed: %w: %s", ErrNoProjectBuilder, err, strings.TrimSpace(output.String()))
+	}
+	if _, err := os.Stat(filepath.Join(outDir, probeKeep)); err != nil {
+		return fmt.Errorf("%w; a check build of the ignore file copied nothing", ErrNoProjectBuilder)
+	}
+	if _, err := os.Stat(filepath.Join(outDir, probeMarker)); err == nil {
+		return fmt.Errorf("%w; a check build copied a file its ignore file leaves out, so this builder does not read it", ErrNoProjectBuilder)
+	}
+	return nil
 }
 
 // inspectDriver reads the Driver line of `docker buildx inspect`.
@@ -295,7 +348,7 @@ const untagTimeout = 30 * time.Second
 // as the parent of what was built over it. It runs on a context of its own,
 // so an interrupted build does not leave a runtime-sized tag behind. Best
 // effort: a leftover tag changes nothing.
-func (b *Builder) untag(ctx context.Context, req Request, pb projectBuilder, ref string) {
+func (b *Builder) untag(ctx context.Context, req Request, pb ProjectBuilder, ref string) {
 	ctx, cancel := context.WithTimeout(ctx, untagTimeout)
 	defer cancel()
 	args := []string{"image", "rm", "--no-prune", ref}

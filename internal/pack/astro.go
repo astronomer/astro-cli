@@ -188,11 +188,10 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	}
 
 	// The astro artifact is an image, so a container engine is required.
-	cli, err := t.reachEngine(ctx, req.ProjectDir)
+	cli, err := t.reachProjectEngine(ctx, req.ProjectDir, &breq)
 	if err != nil {
 		return Result{}, err
 	}
-	warnings = append(warnings, checkProjectBuilder(ctx, cli, &breq)...)
 
 	hash, fileWarnings, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectContext, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
@@ -320,20 +319,24 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	return res, nil
 }
 
-// checkProjectBuilder holds a build that copies the project to an engine that
-// can (imagebuild.Builder.CanShipProject). One that cannot gets the package
-// built from the dependencies alone, as it was before packages carried the
-// project, and a warning saying so.
-func checkProjectBuilder(ctx context.Context, c engineCLI, breq *imagebuild.Request) []string {
-	if breq.ProjectContext == "" {
-		return nil
+// reachProjectEngine is reachEngine, and, for a build that copies the project
+// in, the engine's answer to whether it can (imagebuild.Builder
+// .CanShipProject), handed to the build so the engine is asked once.
+//
+// One that cannot is refused, not given a package of the dependencies alone:
+// such an image carries no DAGs, and deployed with --image-name to a
+// Deployment without DAG deploys it would leave that Deployment with none.
+func (t *AstroTarget) reachProjectEngine(ctx context.Context, projectDir string, breq *imagebuild.Request) (engineCLI, error) {
+	cli, err := t.reachEngine(ctx, projectDir)
+	if err != nil || breq.ProjectContext == "" {
+		return cli, err
 	}
-	err := imagebuild.New(c.run, time.Now).CanShipProject(ctx, imagebuild.Request{Bin: c.bin, Env: c.env})
-	if err == nil {
-		return nil
+	pb, err := imagebuild.New(cli.run, time.Now).CanShipProject(ctx, imagebuild.Request{Bin: cli.bin, Env: cli.env})
+	if err != nil {
+		return engineCLI{}, fmt.Errorf("%w. A packaged image carries the project's DAGs, which a Deployment without DAG deploys runs from it, and an image built without the project would have none", err)
 	}
-	breq.ProjectContext, breq.ProjectExcludes = "", nil
-	return []string{"this image carries only the project's dependencies: dags/, plugins/, include/ and the rest of the project are NOT in it. " + err.Error()}
+	breq.Builder = pb
+	return cli, nil
 }
 
 // dagsIgnoredWarning is the warning for ignore rules that leave every DAG

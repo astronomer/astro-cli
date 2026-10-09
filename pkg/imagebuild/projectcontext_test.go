@@ -35,12 +35,13 @@ func projectRequest(t *testing.T, project string) Request {
 // driver; for podman, a local service. fail, when set, fails the calls it
 // matches, probes included.
 func engine(version string, buildx bool, buildHelp string, fail func(call string) error) func(string, rt.Stdio) error {
-	return engineWith(version, buildx, buildHelp, "docker", "false", fail)
+	return engineWith(version, buildx, buildHelp, "docker", "honors", fail)
 }
 
-// engineWith is engine with the builder's driver and podman's remoteness
-// chosen.
-func engineWith(version string, buildx bool, buildHelp, driver, remote string, fail func(call string) error) func(string, rt.Stdio) error {
+// engineWith is engine with the builder's driver chosen, and what the
+// ignore-file check build does: "honors" the ignore file, "ignores" it
+// (copies the left-out file), or "fails".
+func engineWith(version string, buildx bool, buildHelp, driver, check string, fail func(call string) error) func(string, rt.Stdio) error {
 	return func(call string, s rt.Stdio) error {
 		if fail != nil {
 			if err := fail(call); err != nil {
@@ -61,8 +62,9 @@ func engineWith(version string, buildx bool, buildHelp, driver, remote string, f
 			_, _ = io.WriteString(s.Out, "orbstack\n")
 		case "buildx inspect orbstack":
 			_, _ = io.WriteString(s.Out, "Name:          orbstack\nDriver:        "+driver+"\nLast Activity: now\n")
-		case "info --format {{.Host.ServiceIsRemote}}":
-			_, _ = io.WriteString(s.Out, remote+"\n")
+		}
+		if _, dest, ok := strings.Cut(call, "--output type=local,dest="); ok {
+			return checkBuild(strings.Fields(dest)[0], check)
 		}
 		return nil
 	}
@@ -70,9 +72,37 @@ func engineWith(version string, buildx bool, buildHelp, driver, remote string, f
 
 const dockerVersion = "Docker version 29.4.0, build 1234567"
 
+// checkBuild plays the ignore-file check build's export into dest: "honors"
+// exports the kept file, "ignores" both, "empty" nothing, and "fails" exports
+// the kept file and then fails.
+func checkBuild(dest, check string) error {
+	if err := os.MkdirAll(dest, 0o700); err != nil {
+		return err
+	}
+	if check == "empty" {
+		return nil
+	}
+	if err := os.WriteFile(filepath.Join(dest, probeKeep), nil, 0o600); err != nil {
+		return err
+	}
+	switch check {
+	case "ignores":
+		return os.WriteFile(filepath.Join(dest, probeMarker), nil, 0o600)
+	case "fails":
+		return errors.New("exit status 1")
+	}
+	return nil
+}
+
+// callsContaining are the calls containing sub. The ignore-file check build
+// is left out unless sub asks for it, so a count of builds counts the image
+// builds.
 func callsContaining(calls []string, sub string) []string {
 	var out []string
 	for _, c := range calls {
+		if strings.Contains(c, "--output type=local") && !strings.Contains(sub, "--output") {
+			continue
+		}
 		if strings.Contains(c, sub) {
 			out = append(out, c)
 		}
@@ -94,6 +124,8 @@ func TestBuildShipsTheProjectAsTheContextOfASecondStep(t *testing.T) {
 
 	assert.Equal(t, []string{"docker --version", "docker buildx version", "docker context show", "docker buildx inspect orbstack"}, cmd.calls[:4],
 		"the engine is asked before anything is built")
+	assert.Contains(t, cmd.calls[4], "docker buildx build --builder orbstack --file ")
+	assert.Contains(t, cmd.calls[4], "--output type=local,dest=", "then a check build proves the ignore file is read")
 	deps := callsContaining(cmd.calls, "--tag astro-deploy/p-abc123:latest-deps ")
 	require.Len(t, deps, 1, "%v", cmd.calls)
 	assert.True(t, strings.HasPrefix(deps[0], "docker buildx build --builder orbstack --load --tag astro-deploy/p-abc123:latest-deps "), deps[0])
@@ -344,35 +376,73 @@ func TestDepsTag(t *testing.T) {
 // kubernetes) cannot see the local image the second build starts FROM, so
 // the build is refused before anything is built.
 func TestBuildProjectRefusesABuilderWithoutTheDockerDriver(t *testing.T) {
-	cmd := &fakeCmd{run: engineWith(dockerVersion, true, "", "docker-container", "", nil)}
+	cmd := &fakeCmd{run: engineWith(dockerVersion, true, "", "docker-container", "honors", nil)}
 	_, err := testBuilder(cmd).BuildLocal(context.Background(), projectRequest(t, t.TempDir()), rt.Callbacks{})
 	require.ErrorIs(t, err, ErrNoProjectBuilder)
 	assert.Contains(t, err.Error(), `"orbstack"`)
 	assert.Empty(t, callsContaining(cmd.calls, "--tag"))
 }
 
-// A remote podman client sends the context to its machine, and whether it
-// applies --ignorefile there is not something this can check.
-func TestBuildProjectRefusesARemotePodman(t *testing.T) {
-	for name, remote := range map[string]string{"remote": "true", "unknown": "<no value>"} {
-		t.Run(name, func(t *testing.T) {
-			cmd := &fakeCmd{run: engineWith("podman version 5.8.2", false, "--ignorefile", "", remote, nil)}
-			req := projectRequest(t, t.TempDir())
-			req.Bin = "podman"
-			_, err := testBuilder(cmd).BuildLocal(context.Background(), req, rt.Callbacks{})
-			require.ErrorIs(t, err, ErrNoProjectBuilder)
-			assert.Contains(t, err.Error(), "remote client")
-		})
+// A check build that copies the file its ignore file leaves out, or that
+// fails, shows a builder that cannot be trusted with the ignore file: on
+// Docker and on podman, a remote podman machine included, the build is
+// refused before anything is built.
+func TestBuildProjectRefusesABuilderThatFailsTheIgnoreFileCheck(t *testing.T) {
+	for _, engineName := range []string{"docker", "podman"} {
+		for _, check := range []string{"ignores", "fails", "empty"} {
+			t.Run(engineName+" "+check, func(t *testing.T) {
+				version := dockerVersion
+				if engineName == "podman" {
+					version = "podman version 5.8.2"
+				}
+				cmd := &fakeCmd{run: engineWith(version, true, "--ignorefile", "docker", check, nil)}
+				req := projectRequest(t, t.TempDir())
+				req.Bin = engineName
+				_, err := testBuilder(cmd).BuildLocal(context.Background(), req, rt.Callbacks{})
+				require.ErrorIs(t, err, ErrNoProjectBuilder)
+				assert.Contains(t, err.Error(), "check build")
+				assert.Empty(t, callsContaining(cmd.calls, "--tag"))
+			})
+		}
 	}
+}
+
+// A podman check build is told the ignore file with --ignorefile.
+func TestPodmanCheckBuildUsesIgnorefile(t *testing.T) {
+	cmd := &fakeCmd{run: engine("podman version 5.8.2", false, "--ignorefile", nil)}
+	_, err := testBuilder(cmd).CanShipProject(context.Background(), Request{Bin: "podman"})
+	require.NoError(t, err)
+	check := callsContaining(cmd.calls, "--output type=local")
+	require.Len(t, check, 1)
+	assert.Contains(t, check[0], "podman build --file ")
+	assert.Contains(t, check[0], "--ignorefile ")
+}
+
+// The answer handed over as Request.Builder is used as it is: the engine is
+// asked once.
+func TestBuildUsesTheBuilderItIsHanded(t *testing.T) {
+	cmd := &fakeCmd{run: engine(dockerVersion, true, "", nil)}
+	pb, err := testBuilder(cmd).CanShipProject(context.Background(), Request{Bin: "docker"})
+	require.NoError(t, err)
+	asked := len(cmd.calls)
+
+	req := projectRequest(t, t.TempDir())
+	req.Builder = pb
+	_, err = testBuilder(cmd).BuildLocal(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Empty(t, callsContaining(cmd.calls[asked:], "--version"), "not asked again: %v", cmd.calls[asked:])
+	assert.Empty(t, callsContaining(cmd.calls[asked:], "--output type=local"))
 }
 
 func TestCanShipProject(t *testing.T) {
 	ok := &fakeCmd{run: engine(dockerVersion, true, "", nil)}
-	require.NoError(t, testBuilder(ok).CanShipProject(context.Background(), Request{Bin: "docker"}))
+	_, err := testBuilder(ok).CanShipProject(context.Background(), Request{Bin: "docker"})
+	require.NoError(t, err)
 	assert.Empty(t, callsContaining(ok.calls, "--tag"), "a probe builds nothing")
 
 	no := &fakeCmd{run: engine(dockerVersion, false, "", nil)}
-	require.ErrorIs(t, testBuilder(no).CanShipProject(context.Background(), Request{Bin: "docker"}), ErrNoProjectBuilder)
+	_, err = testBuilder(no).CanShipProject(context.Background(), Request{Bin: "docker"})
+	require.ErrorIs(t, err, ErrNoProjectBuilder)
 }
 
 func TestGitignoredWarning(t *testing.T) {

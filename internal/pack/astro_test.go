@@ -105,6 +105,14 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 		io.WriteString(s.Out, "default\n")
 	case verb == "buildx" && len(args) > 1 && args[1] == "inspect" && s.Out != nil:
 		io.WriteString(s.Out, "Name: default\nDriver: docker\n")
+	case verb == "buildx" && len(args) > 1 && args[1] == "build" && strings.Contains(strings.Join(args, " "), "type=local,dest="):
+		// The ignore-file check build: export the kept file only.
+		for _, a := range args {
+			if dest, ok := strings.CutPrefix(a, "type=local,dest="); ok {
+				_ = os.MkdirAll(dest, 0o700)
+				_ = os.WriteFile(filepath.Join(dest, "keep"), nil, 0o600)
+			}
+		}
 	case verb == "image" && len(args) > 1 && args[1] == "inspect":
 		ref := args[len(args)-1]
 		f.mu.Lock()
@@ -684,16 +692,47 @@ func TestAstroBuildDoesNotReadAnExcludedDirectory(t *testing.T) {
 }
 
 // An engine that cannot copy the project in under the ignore rules (here, no
-// buildx) gets the package built from the dependencies alone, as before, and a
-// warning that the project is not in it.
-func TestAstroBuildWithoutBuildxShipsTheDependenciesAndWarns(t *testing.T) {
+// buildx) is refused: a package of the dependencies alone carries no DAGs,
+// and could reach a Deployment that runs only its image's.
+func TestAstroBuildWithoutBuildxIsRefused(t *testing.T) {
 	builder := &fakeBuilder{}
-	res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2", noBuildx: true}).Build(context.Background(), testRequest(t), localrt.Callbacks{})
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2", noBuildx: true}).Build(context.Background(), testRequest(t), localrt.Callbacks{})
+	require.ErrorIs(t, err, imagebuild.ErrNoProjectBuilder)
+	assert.Contains(t, err.Error(), "buildx")
+	assert.Contains(t, err.Error(), "an image built without the project would have none")
+	assert.Empty(t, builder.gotReq.Tag, "nothing was built")
+}
+
+// The engine is asked once: its answer is handed to the build.
+func TestAstroBuildHandsTheBuilderItFoundToTheBuild(t *testing.T) {
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), testRequest(t), localrt.Callbacks{})
 	require.NoError(t, err)
-	assert.Empty(t, builder.gotReq.ProjectContext)
-	require.Len(t, res.Warnings, 1)
-	assert.Contains(t, res.Warnings[0], "are NOT in it")
-	assert.Contains(t, res.Warnings[0], "buildx")
+	assert.NotEqual(t, imagebuild.ProjectBuilder{}, builder.gotReq.Builder)
+}
+
+// Gitignored files that look like credentials would be baked into an image
+// pushed to a registry, so the package is refused, naming them.
+func TestAstroBuildRefusesGitignoredSecrets(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	req := testRequest(t)
+	for name, body := range map[string]string{".gitignore": "keys/\n", "keys/gcp-key.json": "{}", "dags/a.py": "#"} {
+		path := filepath.Join(req.ProjectDir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+	git := exec.Command("git", "-C", req.ProjectDir, "init", "-q")
+	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	require.NoError(t, git.Run())
+
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keys/gcp-key.json")
+	assert.Contains(t, err.Error(), "pushed to a registry")
+	assert.Empty(t, builder.gotReq.Tag, "nothing was built")
 }
 
 // Files git ignores that the image will carry are named in a warning.

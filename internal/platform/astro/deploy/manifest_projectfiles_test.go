@@ -462,7 +462,7 @@ func TestDeployManifestImage_TagsEachBuildUniquely(t *testing.T) {
 		tag := builtTag(t, cmd.calls, deployImageTag(dir))
 		mode := map[bool]string{true: ":nodags-", false: ":dags-"}[dagDeploy]
 		assert.Contains(t, tag, mode)
-		assert.Contains(t, cmd.calls, "docker image rm --no-prune "+tag, "the pushed tag is dropped")
+		assert.Contains(t, cmd.calls, "docker image rm "+tag, "the pushed image is removed, with the dependency image under it")
 		tags[tag] = true
 	}
 	assert.Len(t, tags, 3, "every build has a tag of its own")
@@ -498,4 +498,71 @@ func TestDeployManifestImage_WarnsAboutGitignoredFilesItWillCarry(t *testing.T) 
 	warnings := deploy()
 	require.Len(t, warnings, 1)
 	assert.Contains(t, warnings[0], "notes.txt")
+}
+
+// Gitignored files that look like credentials would be baked into an image
+// pushed to a registry, so the deploy is refused before it builds, naming
+// them; other gitignored files (a dbt target/, say) ship, with the warning.
+func TestDeployManifestImage_RefusesGitignoredSecrets(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	dir := projectWithCode(t)
+	for name, body := range map[string]string{".gitignore": "target/\nsecrets/\n", "target/manifest.json": "{}", "secrets/prod.pem": "k"} {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+	git := exec.Command("git", "-C", dir, "init", "-q")
+	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	require.NoError(t, git.Run())
+
+	cmd := withProjectStep(t)
+	_, client, err := deployWith(t, true, false, &ManifestImageDeployInput{Build: manifestBuildOf(dir), IncludeDags: true})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secrets/prod.pem")
+	assert.NotContains(t, err.Error(), "target/manifest.json")
+	assert.False(t, hasImageCall(cmd.calls, " --tag "), "refused before the build, got %v", cmd.calls)
+	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("secrets/\n"), 0o600))
+	withProjectStep(t)
+	countUploads(t)
+	var warnings []string
+	_, _, err = deployWith(t, true, false, &ManifestImageDeployInput{
+		Build: manifestBuildOf(dir), IncludeDags: true,
+		Warn: func(w string) { warnings = append(warnings, w) },
+	})
+	require.NoError(t, err, "left out by .dockerignore, the key no longer ships")
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "target/manifest.json")
+}
+
+// The engine is asked once per deploy: the answer is handed to the build.
+func TestDeployManifestImage_AsksTheEngineOnce(t *testing.T) {
+	cmd := withProjectStep(t)
+	countUploads(t)
+	_, _, err := deployWith(t, true, false, &ManifestImageDeployInput{Build: manifestBuildOf(projectWithCode(t)), IncludeDags: true})
+	require.NoError(t, err)
+	n := 0
+	for _, c := range cmd.calls {
+		if strings.Contains(c, "type=local,dest=") {
+			n++
+		}
+	}
+	assert.Equal(t, 1, n, "one check build: %v", cmd.calls)
+}
+
+func TestRepositoryName(t *testing.T) {
+	for name, want := range map[string]string{
+		"MyProject":       "myproject",
+		"my_project.v2":   "my-project-v2",
+		"--Odd  Name!!--": "odd-name",
+		"日本":              "project",
+		"":                "project",
+		"a":               "a",
+	} {
+		assert.Equal(t, want, repositoryName(name), name)
+	}
+	assert.True(t, strings.HasPrefix(deployImageTag(filepath.Join(t.TempDir(), "My Project")), "astro-deploy/my-project"))
 }

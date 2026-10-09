@@ -50,6 +50,14 @@ func (f *fakeImageCmd) Run(_ context.Context, _ []string, s localrt.Stdio, name 
 			_, _ = io.WriteString(s.Out, "Name: desktop\nDriver: docker\n")
 		}
 	}
+	// The ignore-file check build: export the kept file only, as a builder
+	// that reads the ignore file does.
+	for _, a := range args {
+		if dest, ok := strings.CutPrefix(a, "type=local,dest="); ok {
+			_ = os.MkdirAll(dest, 0o700)
+			_ = os.WriteFile(filepath.Join(dest, "keep"), nil, 0o600)
+		}
+	}
 	return f.err
 }
 
