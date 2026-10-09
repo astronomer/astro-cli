@@ -252,9 +252,15 @@ func (proxyDaemon) EnsureRunning() (string, error) {
 
 func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
 
-// newProxyDaemon returns the daemon seam, or nil on Windows, where the proxy
-// is unsupported (docs/architecture.md, "Platform support"): the engines skip the daemon and Airflow stays
-// reachable on its direct localhost port.
+// newProxyDaemon returns the daemon seam, or nil on Windows, where astro local
+// does not start the proxy (docs/architecture.md, "Platform support"): the
+// engines skip the daemon and Airflow stays reachable on its direct localhost
+// port.
+//
+// TODO(windows-proxy): pkg/proxy's daemon now builds and runs on Windows, for
+// Astro Desktop to share. Return proxyDaemon{} here too once it has been run on
+// a real Windows host: started, adopted across two tools, stopped, and the
+// starting terminal closed.
 func newProxyDaemon() localrt.ProxyDaemon {
 	if runtime.GOOS == "windows" {
 		return nil

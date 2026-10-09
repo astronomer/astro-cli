@@ -256,7 +256,7 @@ Docker mode reads a project's `docker-compose.override.yml` (not the `.yaml` spe
 
 ## Platform support
 
-Windows runs Docker mode only. Standalone mode and the proxy daemon are macOS and Linux.
+Windows runs Docker mode only. Standalone mode is macOS and Linux. The proxy daemon in `pkg/proxy` runs on all three, but `astro local` starts it only on macOS and Linux for now, so on Windows a project is reached on its direct localhost port.
 
 ## Dev-mode Airflow defaults
 

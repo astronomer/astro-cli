@@ -2,23 +2,152 @@
 
 package proxy
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"os/signal"
+	"sync"
+	"syscall"
 
-// errUnsupportedWindows is every lifecycle answer on Windows, where the daemon
-// does not run yet. A host there serves its own proxy in process instead.
-var errUnsupportedWindows = errors.New("proxy daemon is not supported on Windows")
+	"golang.org/x/sys/windows"
+)
 
-// EnsureRunning is not supported on Windows.
-func (d *Daemon) EnsureRunning(string) (string, error) { return "", errUnsupportedWindows }
+// detachedFlags start the daemon with no console of its own and outside the
+// starting console's process group.
+//
+// DETACHED_PROCESS rather than CREATE_NO_WINDOW: the daemon writes only to its
+// log file, so it needs no console at all, and the two are mutually exclusive
+// (CREATE_NO_WINDOW is ignored alongside DETACHED_PROCESS). Without a console
+// it is not one of the processes Windows ends when the starting terminal is
+// closed. CREATE_NEW_PROCESS_GROUP keeps a Ctrl+C or Ctrl+Break meant for the
+// starting process from reaching it.
+const detachedFlags = windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP
 
-// Start is not supported on Windows.
-func (d *Daemon) Start(string) (string, error) { return "", errUnsupportedWindows }
+// startDetached starts the command build returns with no console and, where
+// allowed, outside the starting process's job object.
+//
+// The job is the one thing that can still take the daemon down with whatever
+// started it: a process in a job with kill-on-close (some terminals and IDEs
+// run their children that way) ends with the job, and the daemon is meant to
+// outlive its starter. CREATE_BREAKAWAY_FROM_JOB leaves the job, but a job that
+// does not permit breakaway refuses the whole CreateProcess with access
+// denied. So it is tried first, and the start is retried without it, in which
+// case the daemon lives as long as that job does.
+func startDetached(build func() *exec.Cmd) (*exec.Cmd, error) {
+	cmd := build()
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: detachedFlags | windows.CREATE_BREAKAWAY_FROM_JOB}
+	err := cmd.Start()
+	if err == nil || !errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+		return cmd, err
+	}
+	cmd = build()
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: detachedFlags}
+	err = cmd.Start()
+	return cmd, err
+}
 
-// Serve is not supported on Windows.
-func (d *Daemon) Serve(string) error { return errUnsupportedWindows }
+// stopEventName is the named event a daemon with this pid waits on to stop.
+//
+// A named event rather than a signal, which Windows does not have between
+// unrelated processes, and rather than a shutdown request on the proxy's port,
+// which would put a stop button on a port any local process can reach and need
+// a secret in the record to guard it. Local\ is the starting user's session,
+// where both tools that share the daemon run.
+func stopEventName(pid int) string { return fmt.Sprintf(`Local\astro-proxy-stop-%d`, pid) }
 
-// Stop is a no-op on Windows: no daemon can be running.
-func (d *Daemon) Stop() error { return nil }
+// stopRequests returns a channel that is closed when the daemon is asked to
+// stop: its stop event set by requestStop, or Ctrl+C (and the console close,
+// logoff and shutdown events Go delivers as SIGTERM) when it runs in a
+// terminal. The func it returns stops listening.
+//
+// The event is created before Serve writes the port file, since a record can
+// name this process from then on and a stop has to have somewhere to land.
+func stopRequests() (stop <-chan struct{}, release func(), err error) {
+	name, err := windows.UTF16PtrFromString(stopEventName(os.Getpid()))
+	if err != nil {
+		return nil, nil, err
+	}
+	// Manual reset, so a set that lands before the wait below starts is not
+	// lost. CreateEvent also answers ERROR_ALREADY_EXISTS with a usable handle;
+	// only a zero handle is a failure.
+	ev, err := windows.CreateEvent(nil, 1, 0, name)
+	if ev == 0 {
+		return nil, nil, fmt.Errorf("creating the stop event: %w", err)
+	}
 
-// StopIfEmpty is a no-op on Windows.
-func (d *Daemon) StopIfEmpty() {}
+	done := make(chan struct{})
+	var once sync.Once
+	fire := func() { once.Do(func() { close(done) }) }
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		fire()
+	}()
+
+	// The waiter owns the handle and closes it once the wait returns. Closing
+	// it from release while the wait is pending is undefined behavior, so
+	// release wakes the waiter by setting the event instead, and the mutex
+	// keeps that set from landing on a handle the waiter has already closed.
+	var mu sync.Mutex
+	closed := false
+	go func() {
+		windows.WaitForSingleObject(ev, windows.INFINITE) //nolint:errcheck // any return ends the wait
+		fire()
+		mu.Lock()
+		closed = true
+		windows.CloseHandle(ev) //nolint:errcheck // nothing to do if it fails
+		mu.Unlock()
+	}()
+
+	release = func() {
+		signal.Stop(sigCh)
+		mu.Lock()
+		if !closed {
+			windows.SetEvent(ev) //nolint:errcheck // only wakes the waiter
+		}
+		mu.Unlock()
+	}
+	return done, release, nil
+}
+
+// requestStop asks the daemon at pid to stop by setting its stop event, and
+// reports whether it could.
+//
+// False means there is no such event: pid is not a daemon that ever listened
+// for one, most likely a process that recycled a stale record's PID, or one in
+// another session. The caller then neither waits nor forces it, because forcing
+// would end a process that is not ours.
+var requestStop = func(pid int) bool {
+	name, err := windows.UTF16PtrFromString(stopEventName(pid))
+	if err != nil {
+		return false
+	}
+	ev, err := windows.OpenEvent(windows.EVENT_MODIFY_STATE, false, name)
+	if err != nil {
+		return false
+	}
+	defer windows.CloseHandle(ev) //nolint:errcheck // nothing to do if it fails
+	return windows.SetEvent(ev) == nil
+}
+
+// killProcess ends pid without asking. It is only reached for a daemon that
+// took its stop event and did not exit within stopTimeout.
+var killProcess = func(pid int) {
+	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, uint32(pid))
+	if err != nil {
+		return
+	}
+	defer windows.CloseHandle(h)   //nolint:errcheck // nothing to do if it fails
+	windows.TerminateProcess(h, 1) //nolint:errcheck // nothing left to try
+}
+
+// processLooksLikeProxy never matches on Windows. The unix fallback reads the
+// command line with ps, which Windows has no equivalent of short of reading
+// another process's memory. So a live PID whose recorded port does not answer
+// with the proxy's signature is treated as not the daemon, which is the same
+// verdict unix reaches when the command line does not match either.
+var processLooksLikeProxy = func(*Daemon, int) bool { return false }
