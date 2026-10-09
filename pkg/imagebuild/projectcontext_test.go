@@ -415,7 +415,7 @@ func TestCheckBuildContext(t *testing.T) {
 		if _, dest, ok := strings.Cut(call, "--output type=local,dest="); ok {
 			fields := strings.Fields(dest)
 			ctxDir := fields[len(fields)-1]
-			df := fields[0][:strings.LastIndex(fields[0], "/out")] + "/Dockerfile.check"
+			df := filepath.Join(filepath.Dir(fields[0]), "Dockerfile.check")
 			seen = map[string]string{}
 			for _, f := range []string{
 				filepath.Join(ctxDir, ".dockerignore"), filepath.Join(ctxDir, ".containerignore"), df + ".dockerignore",
