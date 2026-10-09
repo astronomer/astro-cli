@@ -269,49 +269,6 @@ func TestUnderAPCAdvice(t *testing.T) {
 	assert.NotContains(t, Project1xUnderAPC("/p"), "`")
 }
 
-// Project1xAt names the 1.x project discovery finds a directory in or below:
-// with no pyproject.toml, and with one that only configures tools; a project
-// with a manifest stops it.
-func TestProject1xAt(t *testing.T) {
-	root := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
-	require.NoError(t, os.MkdirAll(filepath.Join(root, ".astro"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(root, "dags", "inner"), 0o755))
-
-	assert.Equal(t, root, Project1xAt(root))
-	assert.Equal(t, root, Project1xAt(filepath.Join(root, "dags", "inner")))
-	assert.Equal(t, root, Project1xAt(filepath.Join(root, "dags", "not-yet")))
-
-	writeManifest(t, root, toolsOnlyPyproject)
-	assert.Equal(t, root, Project1xAt(filepath.Join(root, "dags")), "a tools-only pyproject.toml is still 1.x")
-
-	writeManifest(t, filepath.Join(root, "dags"), validManifest)
-	assert.Empty(t, Project1xAt(filepath.Join(root, "dags", "inner")), "a project inside stops the walk")
-	assert.Empty(t, Project1xAt(t.TempDir()))
-}
-
-// The home directory's .astro/ is the CLI's own settings, so a stray
-// Dockerfile beside it does not make home a 1.x project, nor ASTRO_HOME
-// when it moves the settings.
-func TestTheHomeDirectoryIsNot1x(t *testing.T) {
-	for _, env := range []string{"HOME", "ASTRO_HOME"} {
-		t.Run(env, func(t *testing.T) {
-			home := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(home, "Dockerfile"), []byte("FROM x\n"), 0o600))
-			require.NoError(t, os.MkdirAll(filepath.Join(home, ".astro"), 0o755))
-			require.NoError(t, os.WriteFile(filepath.Join(home, ".astro", "config.yaml"), []byte("context: x\n"), 0o600))
-			require.True(t, Is1xProject(home), "the shape, outside home")
-
-			t.Setenv(env, home)
-			if env == "HOME" && runtime.GOOS == windowsOS {
-				t.Setenv("USERPROFILE", home)
-			}
-			assert.False(t, Is1xProject(home))
-			assert.Empty(t, Project1xAt(filepath.Join(home, "work", "new")))
-		})
-	}
-}
-
 func TestLoadError(t *testing.T) {
 	other := errors.New("other")
 	assert.Same(t, other, LoadError(t.TempDir(), t.TempDir(), other))

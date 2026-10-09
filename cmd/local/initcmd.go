@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -106,34 +104,20 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // converted under an APC context would stop deploying there. Until APC
 // deploys pyproject.toml projects, init refuses to convert one under an APC
 // context and changes nothing (project.Project1xUnderAPC says why, and how to
-// convert anyway). A directory in or below no 1.x project is made a project
-// as anywhere, with a note that APC cannot deploy it yet. That includes a
-// Dockerfile with no .astro/, which APC's deploy refuses as it stands (it
-// requires .astro/config.yaml), so converting it takes nothing away there.
+// convert anyway). Any other directory is made a project as anywhere, with a
+// note that APC cannot deploy it yet: one below a 1.x project, since that
+// leaves the 1.x project's Dockerfile and .astro/ as they were and APC's
+// deploy of it keeps working, and a Dockerfile with no .astro/, which APC's
+// deploy refuses as it stands (it requires .astro/config.yaml).
 
-// refuse1xUnderAPC refuses, under an APC context, a dir that is a 1.x project
-// or an existing, non-empty directory inside one, as discovery finds it
-// (project.Project1xAt), as a usage error naming that project: nothing ran,
-// and nothing was written. A new or empty directory inside one is a new
-// project of its own and leaves the 1.x project as it is, so it is allowed.
+// refuse1xUnderAPC refuses, under an APC context, a dir that is itself a 1.x
+// project (project.Is1xProject), as a usage error: nothing ran, and nothing
+// was written.
 func (c *cli) refuse1xUnderAPC(dir string) error {
-	if !project.UnderAPC() {
+	if !project.UnderAPC() || !project.Is1xProject(dir) {
 		return nil
 	}
-	found := project.Project1xAt(dir)
-	if found == "" || filepath.Clean(dir) != filepath.Clean(found) && isNewOrEmpty(dir) {
-		return nil
-	}
-	return cliout.Usage(errors.New(project.Project1xUnderAPC(found)))
-}
-
-// isNewOrEmpty reports a directory that does not exist yet or holds nothing.
-func isNewOrEmpty(dir string) bool {
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return true
-	}
-	return err == nil && len(entries) == 0
+	return cliout.Usage(errors.New(project.Project1xUnderAPC(dir)))
 }
 
 // apcDeployNote says that a project init just made does not deploy to the

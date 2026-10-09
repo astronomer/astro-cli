@@ -343,13 +343,16 @@ func renderDevRemoved(p devRemoved) string {
 	for _, n := range p.Notes {
 		b.WriteString("\n" + n)
 	}
+	// Under APC, in a 1.x project no astro local command runs, so the notes
+	// are the whole answer.
+	if p.UnderAPC {
+		return b.String()
+	}
 	b.WriteString("\nLocal Airflow now lives under `astro local`:\n\n")
 	examples := []devReplacement{
 		{Command: nameStart, Replacement: replaceStart},
 		{Command: nameLogs, Replacement: replaceLogs},
-	}
-	if !p.UnderAPC {
-		examples = append(examples, devReplacement{Command: nameInit, Replacement: replaceInit})
+		{Command: nameInit, Replacement: replaceInit},
 	}
 	if p.Replacement != "" {
 		typed := devReplacement{Command: strings.TrimPrefix(p.Typed, "astro dev "), Replacement: p.Replacement}
@@ -363,8 +366,7 @@ func renderDevRemoved(p devRemoved) string {
 		seen[e.Command] = true
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
-	// Under APC, Notes above already gave the account of the 1.x project.
-	if p.Is1xProject && !p.UnderAPC {
+	if p.Is1xProject {
 		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
 			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
 			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
@@ -372,20 +374,13 @@ func renderDevRemoved(p devRemoved) string {
 	return b.String()
 }
 
-// project1xDir is the 1.x project the stub speaks of, or "". Under an APC
-// context it is the one discovery finds the working directory in or below
-// (project.Project1xAt), as astro init's refusal does; otherwise the working
-// directory when it holds one (project.Is1xProject), since the convert
-// advice says to run astro init here.
+// project1xDir is the working directory when it holds a 1.x project, per
+// project.Is1xProject, and "" otherwise: the same check astro init's
+// refusal under APC makes, so v1_project means the same in both contexts.
 func (c *cli) project1xDir() string {
 	wd, err := c.d.WorkingDir()
-	switch {
-	case err != nil:
+	if err != nil || !project.Is1xProject(wd) {
 		return ""
-	case project.UnderAPC():
-		return project.Project1xAt(wd)
-	case project.Is1xProject(wd):
-		return wd
 	}
-	return ""
+	return wd
 }

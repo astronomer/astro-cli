@@ -415,76 +415,67 @@ func setUnderAPC(t *testing.T) {
 	t.Cleanup(func() { project.SetUnderAPC(false) })
 }
 
-// Under APC, init refuses a directory inside a 1.x project too, as discovery
-// would find it, naming the project rather than the directory it ran in.
-func TestInitRefusesInsideA1xProjectUnderAPC(t *testing.T) {
+// Under APC, init checks only the directory it was given. One below a 1.x
+// project is made a project of its own, leaving the 1.x project's Dockerfile
+// and .astro/ as they were, so APC's deploy of it keeps working.
+func TestInitUnderAPCAllowsADirectoryBelowA1xProject(t *testing.T) {
 	d, root, _ := initDeps(t)
 	setUnderAPC(t)
 	files := write1xProject(t, root)
-	files["dags/orders.py"] = "# a DAG\n"
-	for _, dir := range []string{"dags", "empty"} {
-		if err := os.Mkdir(filepath.Join(root, dir), 0o755); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(root, "dags", "orders.py"), []byte(files["dags/orders.py"]), 0o600); err != nil {
+	sub := filepath.Join(root, "dags")
+	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	sub := filepath.Join(root, "dags")
 	d.WorkingDir = func() (string, error) { return sub, nil }
-	before := listTree(t, root)
-
-	// The project's own directory, from below it, is refused, naming the
-	// project, and the advice says where to run astro init.
-	err := execute(t, d, "init")
-	if err == nil || !cliout.IsUsage(err) {
-		t.Fatalf("want a usage error, got %v", err)
-	}
-	requireAPCAdvice(t, err, root)
-	if !strings.Contains(err.Error(), "run astro init in "+root) {
-		t.Errorf("the advice says where to convert:\n%v", err)
-	}
-	requireUnchanged(t, root, before, files)
-
-	// A new directory, or an empty one, is a project of its own and leaves the
-	// 1.x project as it was.
-	for _, target := range []string{"fresh", filepath.Join(root, "empty")} {
-		if err := execute(t, d, "init", target); err != nil {
-			t.Errorf("astro init %s: %v", target, err)
+	for _, args := range [][]string{{"init"}, {"init", "fresh"}} {
+		if err := execute(t, d, args...); err != nil {
+			t.Errorf("astro %s: %v", strings.Join(args, " "), err)
 		}
-	}
-	if _, err := os.Stat(filepath.Join(sub, "fresh", "pyproject.toml")); err != nil {
-		t.Errorf("a new directory inside is a new project: %v", err)
 	}
 	for name, body := range files {
 		if got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name))); err != nil || string(got) != body {
 			t.Errorf("%s changed: %q, %v", name, got, err)
 		}
 	}
+	if _, err := os.Stat(filepath.Join(root, "pyproject.toml")); err == nil {
+		t.Error("the 1.x project's root gained a manifest")
+	}
 }
 
-// The home directory's .astro/ is the CLI's own settings, so a stray
-// Dockerfile there does not make every directory below home part of a 1.x
-// project under APC.
-func TestInitUnderAPCIgnoresTheHomeDirectory(t *testing.T) {
-	d, _, _ := initDeps(t)
-	setUnderAPC(t)
-	home := t.TempDir()
-	write1xProject(t, home)
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-	work := filepath.Join(home, "work")
-	if err := os.MkdirAll(work, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(work, "notes.txt"), []byte("x\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	for _, target := range []string{work, filepath.Join(work, "new")} {
-		if err := execute(t, d, "init", target); err != nil {
-			t.Errorf("astro init %s: %v", target, err)
+// The check is on the directory itself, whatever is above or around it: a
+// 1.x project in a monorepo whose root pyproject.toml only configures tools is
+// refused, and so is one that is the home directory.
+func TestInitUnderAPCRefusesA1xProjectWhereverItIs(t *testing.T) {
+	t.Run("in a monorepo", func(t *testing.T) {
+		d, repo, _ := initDeps(t)
+		setUnderAPC(t)
+		if err := os.WriteFile(filepath.Join(repo, "pyproject.toml"), []byte("[tool.ruff]\nline-length = 100\n"), 0o600); err != nil {
+			t.Fatal(err)
 		}
-	}
+		proj := filepath.Join(repo, "airflow")
+		files := write1xProject(t, proj)
+		before := listTree(t, proj)
+		err := execute(t, d, "init", "airflow")
+		if err == nil || !cliout.IsUsage(err) {
+			t.Fatalf("want a usage error, got %v", err)
+		}
+		requireAPCAdvice(t, err, proj)
+		requireUnchanged(t, proj, before, files)
+	})
+	t.Run("as the home directory", func(t *testing.T) {
+		d, home, _ := initDeps(t)
+		setUnderAPC(t)
+		t.Setenv("HOME", home)
+		t.Setenv("USERPROFILE", home)
+		files := write1xProject(t, home)
+		before := listTree(t, home)
+		err := execute(t, d, "init")
+		if err == nil || !cliout.IsUsage(err) {
+			t.Fatalf("want a usage error, got %v", err)
+		}
+		requireAPCAdvice(t, err, home)
+		requireUnchanged(t, home, before, files)
+	})
 }
 
 // Under APC, every other hint about a 1.x project says what init's refusal
@@ -555,24 +546,19 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 			t.Errorf("the mapping offers %s under APC", replaceInit)
 		}
 	}
+	// The text is the notes and nothing else: no replacement, and no table
+	// of astro local commands, none of which runs in this project.
 	text := renderDevRemoved(p)
 	for _, n := range p.Notes {
 		if !strings.Contains(text, n) {
 			t.Errorf("text lacks the note %q:\n%s", n, text)
 		}
 	}
-	if strings.Contains(text, "# was: astro dev init") || strings.Contains(text, "Use `"+replaceInit) {
-		t.Errorf("text offers %s under APC:\n%s", replaceInit, text)
+	if strings.Contains(text, "Use `") || strings.Contains(text, "# was: astro dev") {
+		t.Errorf("text names astro local commands under APC:\n%s", text)
 	}
 
-	// No astro local command runs in this project, so none is the
-	// replacement, flags or not, from the project or below it; the notes say
-	// what to do instead, in json and text alike.
-	sub := filepath.Join(dir, "dags")
-	if err := os.Mkdir(sub, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	d.WorkingDir = func() (string, error) { return sub, nil }
+	// With flags too: a build secret names no replacement here.
 	stdout.Reset()
 	err = execute(t, d, "dev", "start", "--build-secret", "id=mysecret,src=secret.txt", "-o", "json")
 	if err == nil {
@@ -582,11 +568,26 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}
-	if p.Replacement != "" || !p.UnderAPC || !slices.Contains(p.Notes, project.Project1xUnderAPC(dir)) {
-		t.Errorf("payload from below the project = %+v", p)
+	if p.Replacement != "" || !p.UnderAPC || !p.Is1xProject {
+		t.Errorf("payload with a build secret = %+v", p)
 	}
-	text = renderDevRemoved(p)
-	if strings.Contains(text, "Use `") || !strings.Contains(text, project.Project1xUnderAPC(dir)) {
-		t.Errorf("text names a replacement, or lacks the advice:\n%s", text)
+
+	// v1_project means what it means under Astro: the working directory
+	// itself. Below the 1.x project the stub is the ordinary one.
+	sub := filepath.Join(dir, "dags")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return sub, nil }
+	stdout.Reset()
+	if err := execute(t, d, "dev", "start", "-o", "json"); err == nil {
+		t.Fatal("astro dev must fail")
+	}
+	p = devRemoved{}
+	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
+		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
+	}
+	if p.Is1xProject || p.UnderAPC || p.Replacement != replaceStart {
+		t.Errorf("payload below the project = %+v", p)
 	}
 }
