@@ -1347,3 +1347,10 @@ func (h ClientImplementation) CancelUpdateDeploymentRuntime(variables map[string
 
 	return res.Data.CancelUpdateDeploymentRuntime, nil
 }
+
+// DeploymentGetSelectsDagDeployment reports whether GetDeployment asks for
+// the Deployment's dagDeployment on the platform version given. Where it
+// does not (before 0.29.0) every Deployment reads as one with no type.
+func DeploymentGetSelectsDagDeployment(platformVersion string) bool {
+	return strings.Contains(DeploymentGetRequest.GreatestLowerBound(platformVersion), "dagDeployment")
+}

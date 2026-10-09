@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/docker/docker/api/types/versions"
@@ -36,6 +38,9 @@ var (
 	gzipFile = fileutil.GzipFile
 
 	getDeploymentIDForCurrentCommandVar = getDeploymentIDForCurrentCommand
+
+	// confirmEmptyDags asks whether to upload a dags directory with no DAGs.
+	confirmEmptyDags = input.Confirm
 )
 
 var (
@@ -100,44 +105,51 @@ type Deployed struct {
 type DagsFrom int
 
 const (
-	// DagsFromElsewhere is a git-sync or volume Deployment, or one this CLI
-	// cannot place: a DAG upload is refused, and the image does not decide
-	// the DAGs either.
-	DagsFromElsewhere DagsFrom = iota
+	// DagsFromUnknown is a Deployment the deploy did not place. It is the
+	// zero value, so a path that never sets it uploads the DAGs as a deploy
+	// always has, and DagsOnlyDeploy's own checks decide.
+	DagsFromUnknown DagsFrom = iota
 	// DagsFromImage is a Deployment that runs the DAGs inside its image: DAG
-	// deployment type image, or no type at all, which Houston deploys as an
-	// image Deployment. The image just deployed is all the DAGs it has.
+	// deployment type image, or no type at all on a Houston that reports
+	// the type, which deploys it as an image Deployment. The image just
+	// deployed is all the DAGs it has.
 	DagsFromImage
 	// DagsFromUpload is a Deployment that takes DAG-only deploys: an upload
 	// replaces its DAGs, and an empty one leaves it none.
 	DagsFromUpload
+	// DagsFromElsewhere is a git-sync or volume Deployment, or a DAG-only
+	// one on a cluster without DAG-only deploys: a DAG upload is refused,
+	// and the image does not decide the DAGs either.
+	DagsFromElsewhere
 )
 
-// isImageDagDeployment reports whether the Deployment's DAG deployment type
-// is image.
-func isImageDagDeployment(deploymentInfo *houston.Deployment) bool {
-	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType
-}
-
-// dagsFrom places a Deployment's DAGs from the Deployment and its merged
-// cluster config, by the same tests DagsOnlyDeploy refuses on. A Deployment
-// with no type runs its image's DAGs on any cluster: git-sync, volume and
-// DAG-only Deployments all carry their type, and one created without a type
-// (or before Houston had them) is deployed by its image. DagsOnlyDeploy
-// refuses it, as it refuses an image Deployment.
-func dagsFrom(deploymentInfo *houston.Deployment, appConfig *houston.AppConfig) DagsFrom {
+// dagsFrom places a Deployment's DAGs from the Deployment, its merged
+// cluster config and the platform version it was read on, by the same tests
+// DagsOnlyDeploy refuses on. A Deployment with no type runs its image's DAGs
+// on any cluster: git-sync, volume and DAG-only Deployments all carry their
+// type. That holds only where the Deployment was read with its type: before
+// 0.29.0 GetDeployment does not ask for it, and every Deployment reads as
+// one with none.
+func dagsFrom(deploymentInfo *houston.Deployment, appConfig *houston.AppConfig, platformVersion string) DagsFrom {
 	if deploymentInfo == nil {
-		return DagsFromElsewhere
+		return DagsFromUnknown
 	}
 	switch deploymentInfo.DagDeployment.Type {
-	case houston.ImageDeploymentType, "":
+	case houston.ImageDeploymentType:
 		return DagsFromImage
+	case "":
+		if houston.DeploymentGetSelectsDagDeployment(platformVersion) {
+			return DagsFromImage
+		}
 	case houston.DagOnlyDeploymentType:
 		if isDagOnlyDeploymentEnabled(appConfig) {
 			return DagsFromUpload
 		}
+		return DagsFromElsewhere
+	case houston.GitSyncDeploymentType, houston.VolumeDeploymentType:
+		return DagsFromElsewhere
 	}
-	return DagsFromElsewhere
+	return DagsFromUnknown
 }
 
 // Options is what a deploy's caller decides about its output and its
@@ -151,6 +163,10 @@ type Options struct {
 	// Yes answers the deploy's confirmations yes: an image tag that is not
 	// recommended, and a DAGs folder with no DAGs in it.
 	Yes bool
+	// PlatformVersion is the Houston version the deploy's queries are
+	// chosen by, which decides whether a Deployment is read with its DAG
+	// deployment type. "" is the newest, as it is for the queries.
+	PlatformVersion string
 }
 
 func (o Options) progress() io.Writer {
@@ -210,7 +226,8 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	// isImageOnlyDeploy is not valid for image-based deployments since image-based deployments inherently mean that the image itself contains dags.
 	// If we deploy only the image, the deployment will not have any dags for image-based deployments.
 	// Even on astro, image-based deployments are not allowed to be deployed with --image flag.
-	if isImageOnlyDeploy && isImageDagDeployment(deploymentInfo) {
+	dags := dagsFrom(deploymentInfo, appConfig, opts.PlatformVersion)
+	if isImageOnlyDeploy && dags == DagsFromImage {
 		return Deployed{DeploymentID: deploymentID}, ErrDeploymentTypeIncorrectForImageOnly
 	}
 	// We don't need to exclude the dags from the image because the dags present in the image are not respected anyways for non-image based deployments
@@ -226,7 +243,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
 	fmt.Fprintf(opts.progress(), "Successfully pushed Docker image to the APC registry, it can take a few minutes to update the deployment with the new image. Navigate to the APC UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
-	return Deployed{DeploymentID: deploymentID, Image: pushed, URL: deploymentLink, Dags: dagsFrom(deploymentInfo, appConfig)}, nil
+	return Deployed{DeploymentID: deploymentID, Image: pushed, URL: deploymentLink, Dags: dags}, nil
 }
 
 // Find deployment ID in deployments slice
@@ -317,13 +334,13 @@ func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, 
 		return Deployed{DeploymentID: deploymentID}, err
 	}
 	fmt.Fprintln(opts.progress(), "Image successfully updated")
-	return Deployed{DeploymentID: deploymentID, Image: imageName, Dags: remoteDagsFrom(houstonClient, wsID, deploymentID, deployments, deploymentInfo)}, nil
+	return Deployed{DeploymentID: deploymentID, Image: imageName, Dags: remoteDagsFrom(houstonClient, wsID, deploymentID, deployments, deploymentInfo, opts.PlatformVersion)}, nil
 }
 
 // remoteDagsFrom places the DAGs of a Deployment whose image was just
 // updated. The update has happened, so failing to read the cluster config
 // does not fail it: the Deployment's own type is then all there is to go on.
-func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID string, deployments []houston.Deployment, deploymentInfo *houston.Deployment) DagsFrom {
+func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID string, deployments []houston.Deployment, deploymentInfo *houston.Deployment, platformVersion string) DagsFrom {
 	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
 	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
 	if err != nil {
@@ -333,9 +350,9 @@ func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID st
 		if isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
 			return DagsFromUpload
 		}
-		return dagsFrom(deploymentInfo, nil)
+		return dagsFrom(deploymentInfo, nil, platformVersion)
 	}
-	return dagsFrom(deploymentInfo, appConfig)
+	return dagsFrom(deploymentInfo, appConfig, platformVersion)
 }
 
 func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string, opts Options) (string, error) {
@@ -613,6 +630,20 @@ func validateIfDagDeployURLCanBeConstructed(deploymentInfo *houston.Deployment) 
 	return nil
 }
 
+// checkDagsDir returns ErrNoDagsDirectory when dagsPath is not there or not
+// a directory, and any other failure to look at it as itself: a dags
+// directory that cannot be read is not one that is missing.
+func checkDagsDir(dagsPath string) error {
+	info, err := os.Stat(dagsPath)
+	if err == nil && info.IsDir() {
+		return nil
+	}
+	if err == nil || errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return fmt.Errorf("%w: %s is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had", ErrNoDagsDirectory, dagsPath)
+	}
+	return fmt.Errorf("reading the dags directory: %w", err)
+}
+
 func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 	// Checks if dagserver URL exists and returns the URL
 	for _, url := range deploymentInfo.Urls {
@@ -648,11 +679,13 @@ func getDagDeployURL(deploymentInfo *houston.Deployment) string {
 //
 // With no dags directory under dagsParentPath it returns ErrNoDagsDirectory
 // before anything else, Houston included: the empty bundle it would
-// otherwise upload deletes every DAG the Deployment has.
+// otherwise upload deletes every DAG the Deployment has. It looks again
+// before it reads the directory and once the bundle is made, so a dags
+// directory removed meanwhile is refused too, not uploaded as no DAGs.
 func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, opts Options) (string, error) {
 	dagsPath := filepath.Join(dagsParentPath, "dags")
-	if info, err := os.Stat(dagsPath); err != nil || !info.IsDir() {
-		return deploymentID, fmt.Errorf("%w: %s is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had", ErrNoDagsDirectory, dagsPath)
+	if err := checkDagsDir(dagsPath); err != nil {
+		return deploymentID, err
 	}
 
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
@@ -696,11 +729,15 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 
 	dagsTarPath := filepath.Join(dagsParentPath, "dags.tar")
 	dagsTarGzPath := dagsTarPath + ".gz"
+	// The directory may have gone while Houston was asked.
+	if err := checkDagsDir(dagsPath); err != nil {
+		return deploymentID, err
+	}
 	dagFiles := fileutil.GetFilesWithSpecificExtension(dagsPath, ".py")
 
 	// Alert the user if dags folder is empty
 	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !opts.Yes {
-		i, err := input.Confirm("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?", input.AnsweredBy("--yes"))
+		i, err := confirmEmptyDags("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?", input.AnsweredBy("--yes"))
 		if err != nil {
 			return deploymentID, err
 		}
@@ -716,6 +753,12 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 	if cleanUpFiles {
 		defer os.Remove(dagsTarPath) //nolint:errcheck // best-effort cleanup
+	}
+	// Tar makes an empty bundle of a source that is not there, so the
+	// directory has to be there still once it is made: the question above
+	// can take as long as anyone likes to answer.
+	if err := checkDagsDir(dagsPath); err != nil {
+		return deploymentID, err
 	}
 
 	// Gzip the tar

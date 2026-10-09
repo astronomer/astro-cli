@@ -963,3 +963,15 @@ func (s *Suite) TestGetDeploymentSelectsTheDesiredRuntimeVersionWhereServed() {
 		}
 	}
 }
+
+// GetDeployment reads a Deployment's DAG deployment type from 0.29.0 on, and
+// on a version it cannot read, whose query is the newest.
+func (s *Suite) TestDeploymentGetSelectsDagDeployment() {
+	for version, want := range map[string]bool{
+		"0.25.0": false, "0.28.9": false,
+		"0.29.0": true, "0.34.1": true, "1.0.0": true, "1.0.43": true, "2.1.0": true,
+		"": true, "not-a-version": true,
+	} {
+		s.Equal(want, DeploymentGetSelectsDagDeployment(version), version)
+	}
+}
