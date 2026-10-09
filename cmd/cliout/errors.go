@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
-	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 // ExitError carries a process exit code up to main, which is the only place
@@ -100,17 +98,13 @@ type ErrorObject struct {
 // payload leaves by one door: a test can record what passes through Emit,
 // and a payload that goes around it is one nothing can see.
 //
-// The message is plain text: the backticks its prose puts around a command
-// are dropped (ansi.StripBackticks), as they are on a terminal, so a consumer
-// shows it as it is.
-//
 // The text renderer writes nothing because there is nothing to write: in text
 // mode Execute prints the error itself. Spelled out rather than passed as nil
 // so that a caller in text mode gets silence by intent instead of a panic.
 func EmitError(w io.Writer, err error, code int, kind ProblemKind) {
 	//nolint:errcheck // the command already failed; a write error changes nothing
 	Renderer{Format: FormatJSON, Out: w}.Emit(
-		ErrorObject{Error: ansi.StripBackticks(err.Error()), Code: code, Kind: kind},
+		ErrorObject{Error: err.Error(), Code: code, Kind: kind},
 		func(io.Writer) error { return nil },
 	)
 }

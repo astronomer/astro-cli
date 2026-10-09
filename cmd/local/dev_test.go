@@ -82,7 +82,7 @@ func TestDevStubNamesTheReplacement(t *testing.T) {
 				t.Errorf("error does not name the replacement %q:\n%s", m.Replacement, msg)
 			}
 			typed := "astro dev " + m.Command
-			if !strings.Contains(msg, typed+" was removed") {
+			if !strings.Contains(msg, "`"+typed+"` was removed") {
 				t.Errorf("error does not name the typed command %q:\n%s", typed, msg)
 			}
 		})
@@ -227,7 +227,7 @@ func TestDevStubIgnoresFlagsWhenResolving(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "astro local start") {
 		t.Errorf("flags must not hide the typed subcommand: %v", err)
 	}
-	if err != nil && !strings.Contains(err.Error(), "astro dev start was removed") {
+	if err != nil && !strings.Contains(err.Error(), "`astro dev start` was removed") {
 		t.Errorf("flag values must not leak into the echoed command: %v", err)
 	}
 }

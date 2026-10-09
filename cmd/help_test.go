@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"io"
 	"strings"
 	"testing"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/internal/telemetry"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 const testHelpWidth = 80
@@ -125,7 +123,7 @@ func TestOfflineCommandHasNoContextLine(t *testing.T) {
 
 func TestCommandRowPutsWideSpellingsOnTheirOwnLine(t *testing.T) {
 	_, offline := helpTree()
-	row := commandRow(offline, 12, testHelpWidth, ansi.ForWriter(io.Discard))
+	row := commandRow(offline, 12, testHelpWidth)
 	lines := strings.Split(row, "\n")
 	require.Len(t, lines, 2, row)
 	assert.Equal(t, "  local, lo, locally-running-airflow-instance", lines[0])
@@ -155,7 +153,7 @@ func TestFlagUsagesWrapsPastAWordWiderThanTheRoom(t *testing.T) {
 		"Secret to expose to the build. See "+url+". Repeat to specify multiple secrets.")
 	cmd.Flags().String("format", "text", "Output format")
 
-	got := flagUsages(cmd.Flags(), 60, ansi.ForWriter(io.Discard))
+	got := flagUsages(cmd.Flags(), 60)
 	for _, line := range strings.Split(got, "\n") {
 		if !strings.Contains(line, url) {
 			assert.LessOrEqual(t, len(line), 60, "%q", line)

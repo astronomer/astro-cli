@@ -426,7 +426,7 @@ const remoteDeployTail = "Successfully pushed client image to registry.example.c
 	"The client image has been pushed to your private registry.\n" +
 	"Your next step would be to update the agent component to use the new client image.\n" +
 	"For that you would either need to update the helm chart values.yaml file or update your CI/CD pipeline to use the new client image.\n" +
-	"If you are using Astronomer provided Agent Helm chart, you would need to update the image field for each of the workers, dagProcessor, and triggerer component sections to the new image: registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
+	"If you are using Astronomer provided Agent Helm chart, you would need to update the `image` field for each of the workers, dagProcessor, and triggerer component sections to the new image: registry.example.com/agents/client:deploy-2026-10-07T14-53\n" +
 	"Once you have updated the helm chart values.yaml file, you can run 'helm upgrade' or update via your CI/CD pipeline to update the agent components\n"
 
 // stubClientDeploy stands in for the build and the push, printing one of the

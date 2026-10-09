@@ -61,7 +61,7 @@ func TestDevSubcommandsAreRemoved(t *testing.T) {
 		t.Run(tc.typed, func(t *testing.T) {
 			r := p.run(append([]string{"dev"}, strings.Fields(tc.typed)...)...).requireFailure()
 			r.requireStderr("removed in Astro CLI v2")
-			r.requireStderr("Use " + tc.replacement + " instead")
+			r.requireStderr("Use `" + tc.replacement + "` instead")
 		})
 	}
 }
@@ -102,7 +102,7 @@ func TestDevBareIsRemoved(t *testing.T) {
 	newProject(t).run("dev").
 		requireFailure().
 		requireStderr("astro dev was removed in Astro CLI v2").
-		requireStderr("Local Airflow now lives under astro local")
+		requireStderr("Local Airflow now lives under `astro local`")
 }
 
 // A subcommand v1 never had says so, rather than guessing a replacement.
@@ -228,7 +228,7 @@ func TestDevInA1xProjectLeadsWithTheConversion(t *testing.T) {
 
 	p.run("dev", "pytest").
 		requireFailure().
-		requireStderr("Convert with astro init, then use uv run pytest").
+		requireStderr("Convert with `astro init`, then use `uv run pytest`").
 		requireStderr("project made by Astro CLI 1.x (Dockerfile and .astro/)")
 
 	var payload struct {

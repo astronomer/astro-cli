@@ -145,7 +145,7 @@ func TestUpgradeAirflowSaysARunningAirflowNeedsARestart(t *testing.T) {
 		stdout := d.Stdout.(interface{ String() string })
 		require.NoError(t, execute(t, d, "local", "upgrade", "airflow", "3.41"))
 		assert.Contains(t, stdout.String(),
-			"Airflow is still running the old version. Run astro local restart when the project is ready.", state)
+			"Airflow is still running the old version. Run `astro local restart` when the project is ready.", state)
 	}
 	d, _, _ := upgradeDeps(t, upgradeFixture)
 	d.Runtime = statusRuntime{state: localrt.StateStopped}

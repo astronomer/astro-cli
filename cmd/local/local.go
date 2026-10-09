@@ -19,7 +19,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/envresolve"
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/internal/project"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -492,15 +491,10 @@ func sectionLabel(s envschema.Section) string {
 // emitWarning is the one definition of what a warning looks like on the wire,
 // in both modes. Every warning source goes through it, so the shape cannot
 // drift between them.
-//
-// Its prose may put a command in backticks: the text renders them for the
-// stream (ansi.Backticks), and the record carries the prose as plain text.
 func emitWarning(r cliout.Renderer, e event) {
-	record := e
-	record.Text, record.Reason = ansi.StripBackticks(e.Text), ansi.StripBackticks(e.Reason)
 	//nolint:errcheck // a warning write failure surfaces on the command's own output
-	r.EmitEvent(record, func(w io.Writer) error {
-		_, werr := ansi.Fprintf(w, "warning: %s\n", e.Text)
+	r.EmitEvent(e, func(w io.Writer) error {
+		_, werr := fmt.Fprintf(w, "warning: %s\n", e.Text)
 		return werr
 	})
 }

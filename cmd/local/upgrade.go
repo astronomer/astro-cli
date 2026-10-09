@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -271,6 +270,6 @@ func renderAirflowUpgrade(w io.Writer, res airflowUpgrade) error {
 	if res.RestartNeeded {
 		lines = append(lines, fmt.Sprintf("Airflow is still running the old version. Run `%s` when the project is ready.", replaceRestart))
 	}
-	_, err := io.WriteString(w, ansi.Backticks(w, strings.Join(lines, "\n")+"\n"))
+	_, err := io.WriteString(w, strings.Join(lines, "\n")+"\n")
 	return err
 }

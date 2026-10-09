@@ -40,8 +40,6 @@ linters:
         - fmt.Println
         - fmt.Fprintf
         - fmt.Fprintln
-        # fmt.Fprintf, with the message's backticked spans rendered for w.
-        - github.com/astronomer/astro-cli/pkg/ansi.Fprintf
     forbidigo:
       forbid:
         - pattern: '^fmt\.Print(f|ln)?$'

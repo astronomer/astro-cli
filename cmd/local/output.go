@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -44,12 +43,12 @@ func (c *cli) callbacks(r cliout.Renderer) localrt.Callbacks {
 		OnState: func(s localrt.State, err error) {
 			e := event{Event: "state", State: s}
 			if err != nil {
-				e.Error = ansi.StripBackticks(err.Error())
+				e.Error = err.Error()
 			}
 			//nolint:errcheck // see the comment above
 			r.EmitEvent(e, func(w io.Writer) error {
 				if err != nil {
-					_, werr := ansi.Fprintf(w, "airflow: %s (%s)\n", s, err)
+					_, werr := fmt.Fprintf(w, "airflow: %s (%s)\n", s, err)
 					return werr
 				}
 				_, werr := fmt.Fprintf(w, "airflow: %s\n", s)

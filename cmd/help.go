@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -101,33 +102,25 @@ func installHelp(rootCmd *cobra.Command, platform, platformVersion string) {
 		}
 	})
 	rootCmd.SetUsageFunc(func(c *cobra.Command) error {
-		w := c.OutOrStderr()
-		_, err := io.WriteString(w, usageText(c, helpWidth(), ansi.ForWriter(w)))
+		_, err := io.WriteString(c.OutOrStderr(), usageText(c, helpWidth()))
 		return err
 	})
 	rootCmd.SetHelpFunc(func(c *cobra.Command, _ []string) {
-		w := c.OutOrStdout()
-		io.WriteString(w, helpPage(c, platform, platformVersion, helpWidth(), ansi.ForWriter(w))) //nolint:errcheck // cobra's help func has nowhere to return an error, and cobra's own drops it too
+		io.WriteString(c.OutOrStdout(), helpPage(c, platform, platformVersion, helpWidth())) //nolint:errcheck // cobra's help func has nowhere to return an error, and cobra's own drops it too
 	})
 }
 
 // helpPage is everything `--help` prints for c.
-//
-// The prose on it, a description and each command's and flag's, writes a
-// command or flag the way the docs do, in backticks; code renders them for the
-// stream the page goes to (ansi.Backticks): bold on a terminal, plain text
-// anywhere else. Examples and the usage line are command lines, printed as
-// written.
-func helpPage(c *cobra.Command, platform, platformVersion string, width int, code ansi.Palette) string {
+func helpPage(c *cobra.Command, platform, platformVersion string, width int) string {
 	var b strings.Builder
 	if !c.HasParent() {
 		b.WriteString(rootBanner + "\n")
 	}
 	if text := strings.TrimSpace(firstNonEmpty(commandLong(c), c.Short)); text != "" {
-		b.WriteString(wrapText(code.Backticks(text), width) + "\n\n")
+		b.WriteString(wrapText(text, width) + "\n\n")
 	}
 	if c.Runnable() || c.HasSubCommands() {
-		b.WriteString(usageText(c, width, code))
+		b.WriteString(usageText(c, width))
 	}
 	if contextMatters(c) {
 		b.WriteString("\n" + contextLine(platform, platformVersion) + "\n")
@@ -179,7 +172,7 @@ func contextLine(platform, platformVersion string) string {
 //
 // Each section is a block separated from the next by one blank line; a
 // section with nothing to show is left out entirely.
-func usageText(c *cobra.Command, width int, code ansi.Palette) string {
+func usageText(c *cobra.Command, width int) string {
 	var blocks []string
 
 	usage := "Usage:"
@@ -195,8 +188,8 @@ func usageText(c *cobra.Command, width int, code ansi.Palette) string {
 		blocks = append(blocks, "Aliases:\n  "+c.NameAndAliases())
 	}
 
-	blocks = append(blocks, commandSections(c, width, code)...)
-	blocks = append(blocks, flagSections(c, width, code)...)
+	blocks = append(blocks, commandSections(c, width)...)
+	blocks = append(blocks, flagSections(c, width)...)
 
 	if c.HasExample() {
 		blocks = append(blocks, "Examples:\n"+strings.Trim(c.Example, "\n"))
@@ -212,7 +205,7 @@ func usageText(c *cobra.Command, width int, code ansi.Palette) string {
 // commandSections lists a command's children: one section per group the
 // command declares, in declaration order, then the ungrouped ones, then the
 // help topics (commands that only group others and run nothing).
-func commandSections(c *cobra.Command, width int, code ansi.Palette) []string {
+func commandSections(c *cobra.Command, width int) []string {
 	var available, topics []*cobra.Command
 	for _, sub := range c.Commands() {
 		switch {
@@ -242,7 +235,7 @@ func commandSections(c *cobra.Command, width int, code ansi.Palette) []string {
 		var b strings.Builder
 		b.WriteString(title)
 		for _, sub := range cmds {
-			b.WriteString("\n" + commandRow(sub, column, width, code))
+			b.WriteString("\n" + commandRow(sub, column, width))
 		}
 		sections = append(sections, b.String())
 	}
@@ -271,12 +264,12 @@ func commandSections(c *cobra.Command, width int, code ansi.Palette) []string {
 // commandRow is one line of a command list: its spellings padded to the
 // column, then its description wrapped under itself. Spellings wider than the
 // column take a line of their own.
-func commandRow(sub *cobra.Command, column, width int, code ansi.Palette) string {
+func commandRow(sub *cobra.Command, column, width int) string {
 	const indent = 2
 	const gap = 2
 	names := commandSpellings(sub)
 	descIndent := indent + column + gap
-	desc := wrapHanging(code.Backticks(sub.Short), width, descIndent)
+	desc := wrapHanging(sub.Short, width, descIndent)
 	pad := strings.Repeat(" ", indent)
 	if len(names) > column {
 		return pad + names + "\n" + strings.Repeat(" ", descIndent) + desc
@@ -288,7 +281,7 @@ func commandRow(sub *cobra.Command, column, width int, code ansi.Palette) string
 // group annotation names, then the flags it inherits. Ungrouped flags come
 // first under "Flags:"; the groups follow in the order their first flag was
 // defined, which is the order the command's author wrote them in.
-func flagSections(c *cobra.Command, width int, code ansi.Palette) []string {
+func flagSections(c *cobra.Command, width int) []string {
 	var sections []string
 
 	local := c.LocalFlags()
@@ -309,13 +302,13 @@ func flagSections(c *cobra.Command, width int, code ansi.Palette) []string {
 		groups[group].AddFlag(f)
 	})
 	if set := groups[""]; set != nil {
-		sections = append(sections, "Flags:\n"+flagUsages(set, width, code))
+		sections = append(sections, "Flags:\n"+flagUsages(set, width))
 	}
 	for _, group := range definitionOrder(c, order) {
 		if group == "" {
 			continue
 		}
-		sections = append(sections, group+" Flags:\n"+flagUsages(groups[group], width, code))
+		sections = append(sections, group+" Flags:\n"+flagUsages(groups[group], width))
 	}
 
 	inherited := pflag.NewFlagSet("inherited", pflag.ContinueOnError)
@@ -326,7 +319,7 @@ func flagSections(c *cobra.Command, width int, code ansi.Palette) []string {
 		inherited.AddFlag(f)
 	})
 	if inherited.HasFlags() {
-		sections = append(sections, "Global Flags:\n"+flagUsages(inherited, width, code))
+		sections = append(sections, "Global Flags:\n"+flagUsages(inherited, width))
 	}
 	return sections
 }
@@ -370,7 +363,7 @@ func definitionOrder(c *cobra.Command, groups []string) []string {
 // unwrapped, and split back into the two columns pflag joined: that keeps its
 // spelling of value names, defaults and deprecations, which this does not
 // restate.
-func flagUsages(set *pflag.FlagSet, width int, code ansi.Palette) string {
+func flagUsages(set *pflag.FlagSet, width int) string {
 	type row struct{ left, usage string }
 	var rows []row
 	column := 0
@@ -389,7 +382,7 @@ func flagUsages(set *pflag.FlagSet, width int, code ansi.Palette) string {
 	for _, r := range rows {
 		var parts []string
 		for _, line := range strings.Split(r.usage, "\n") {
-			parts = append(parts, wrapHanging(code.Backticks(line), width, column+gap))
+			parts = append(parts, wrapHanging(line, width, column+gap))
 		}
 		desc := strings.Join(parts, "\n"+strings.Repeat(" ", column+gap))
 		lines = append(lines, r.left+strings.Repeat(" ", column-len(r.left)+gap)+desc)
@@ -424,7 +417,7 @@ func splitFlagUsage(rendered string) (left, usage string) {
 func wrapText(text string, width int) string {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
-		if ansi.VisibleWidth(line) <= width || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+		if utf8.RuneCountInString(line) <= width || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 			continue
 		}
 		hang := 0
@@ -439,8 +432,7 @@ func wrapText(text string, width int) string {
 // wrapHanging breaks text into lines that end by column width and indents
 // every line after the first by hang spaces. The first line is the caller's
 // to place, and is taken to start at column hang too. A word longer than the
-// room left is not broken. Widths are what a terminal shows, so a word in bold
-// (a rendered backtick span) is as wide as its letters.
+// room left is not broken.
 func wrapHanging(text string, width, hang int) string {
 	words := strings.Fields(text)
 	if len(words) == 0 {
@@ -452,7 +444,7 @@ func wrapHanging(text string, width, hang int) string {
 	for i, word := range words {
 		switch {
 		case i == 0:
-		case lineLen+1+ansi.VisibleWidth(word) > room:
+		case lineLen+1+utf8.RuneCountInString(word) > room:
 			b.WriteString("\n" + strings.Repeat(" ", hang))
 			lineLen = 0
 		default:
@@ -460,7 +452,7 @@ func wrapHanging(text string, width, hang int) string {
 			lineLen++
 		}
 		b.WriteString(word)
-		lineLen += ansi.VisibleWidth(word)
+		lineLen += utf8.RuneCountInString(word)
 	}
 	return b.String()
 }

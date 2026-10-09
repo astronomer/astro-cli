@@ -15,7 +15,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/pack"
 	"github.com/astronomer/astro-cli/internal/plan"
-	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/util"
@@ -260,7 +259,7 @@ func renderNextSteps(w io.Writer, steps []string) error {
 		return err
 	}
 	for _, step := range steps {
-		if _, err := ansi.Fprintf(w, "  %s\n", step); err != nil {
+		if _, err := fmt.Fprintf(w, "  %s\n", step); err != nil {
 			return err
 		}
 	}
@@ -277,7 +276,7 @@ func renderWarnings(w io.Writer, warnings []string) error {
 		return err
 	}
 	for _, warning := range warnings {
-		if _, err := ansi.Fprintf(w, "  - %s\n", warning); err != nil {
+		if _, err := fmt.Fprintf(w, "  - %s\n", warning); err != nil {
 			return err
 		}
 	}
