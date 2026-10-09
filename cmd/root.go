@@ -158,6 +158,7 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)
+	tombstoneRemovedV1Flags(rootCmd)
 	// A flag the CLI does not have is recorded here, before cliout reports it:
 	// cobra parses flags before the tracking hook in PersistentPreRunE runs,
 	// so a mistyped flag would otherwise send nothing. cliout.Execute keeps

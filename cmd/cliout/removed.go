@@ -38,7 +38,7 @@ func AddRemovedFlag(cmd *cobra.Command, name, shorthand string, isBool bool, msg
 }
 
 // ErrJSONFlagRemoved is what a run passing 1.x's --json is told. That flag
-// spelled --output json on the commands that had it (`astro deployment list`,
-// `astro api … ls` and `describe`); v2 has -o everywhere instead. Delete it
-// in v3.
+// spelled --output json on the commands that had it (`astro api … ls` and
+// `describe`, and the `list` commands, which cmd's removedV1Flags covers);
+// v2 has -o everywhere instead. Delete it in v3.
 const ErrJSONFlagRemoved = "--json was removed in Astro CLI v2: use -o json"
