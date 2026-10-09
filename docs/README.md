@@ -6,6 +6,7 @@ For users:
 
 - [install.md](install.md): install the CLI, sign in, and convert an Airflow repo into an Astro project. Written so a coding agent can follow it.
 - [manifest-reference.md](manifest-reference.md): every key the CLI reads from `pyproject.toml`.
+- [upgrading-from-v1.md](upgrading-from-v1.md): what v2 changes for someone coming from Astro CLI 1.x, and what replaced each removed command and flag.
 
 How v2 works:
 
