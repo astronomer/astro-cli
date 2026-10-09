@@ -141,11 +141,11 @@ func TestADeclaredDockerfilesPythonIsTheProjects(t *testing.T) {
 			">=3.12",
 		},
 		{
-			// The file goes, and the generated image runs the runtime's
-			// default Python rather than the tag's.
-			"a Dockerfile that is only a pin keeps the rule",
+			// The file goes, so its Python choice is carried, and a
+			// generated image runs the Python requires-python admits.
+			"a Dockerfile that is only a pin carries its Python",
 			"FROM astrocrpublic.azurecr.io/runtime:3.3-2-python-3.13\n",
-			">=3.12",
+			"==3.13.*",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

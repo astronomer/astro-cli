@@ -163,12 +163,14 @@ func buildsDockerfile(from1x *project1x, apc bool) bool {
 type apcBuild struct {
 	// base is the FROM read.
 	base airflowrt.DeclaredBase
-	// tag is base's tag as manifest.ParseRuntimeTag reads it, when parsed
-	// says it could. An Airflow 2 tag names a runtime version, not an Airflow
-	// series, so its Series is the catalog's for that runtime, when the
-	// catalog lists it.
-	tag    manifest.RuntimeTag
-	parsed bool
+	// version is base's runtime version, flavor stripped, and tag what it says
+	// about Airflow (runtimeTagOf), when parsed says it could be read. An
+	// Airflow 2 tag names a runtime version, not an Airflow series, so its
+	// Series is the catalog's for that runtime, when the tag names one build
+	// and the catalog lists it.
+	version string
+	tag     manifest.RuntimeTag
+	parsed  bool
 	// catalogRead says a catalog was there to ask, so an Airflow 2 series
 	// still unknown is one the catalog does not list rather than one nobody
 	// could look up.
@@ -179,13 +181,41 @@ type apcBuild struct {
 // read, or nil.
 func apcBuildOf(dir string, catalog *runtimeversions.Catalog) apcBuild {
 	b := apcBuild{base: airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)), catalogRead: catalog != nil}
-	b.tag, b.parsed = manifest.ParseRuntimeTag(b.base.RuntimeVersion())
-	if b.parsed && b.tag.Series == "" && catalog != nil {
-		if v := versionForTag(b.tag, b.base.RuntimeVersion(), AirflowPinOptions{Catalog: catalog}); v != b.tag.Major {
+	b.version, b.tag, b.parsed = runtimeTagOf(b.base)
+	if b.needsCatalog() && catalog != nil {
+		if v := versionForTag(b.tag, b.version, AirflowPinOptions{Catalog: catalog}); v != b.tag.Major {
 			b.tag.Series = v
 		}
 	}
 	return b
+}
+
+// needsCatalog reports an Airflow 2 tag naming one runtime build, the only
+// FROM whose series the catalog can answer: a floating one ("12", "13.1")
+// names whatever the registry serves under it when APC builds, so no series
+// can be vouched for, and an Airflow 3 tag names its own.
+func (b *apcBuild) needsCatalog() bool {
+	return b.parsed && b.tag.Major == "2" && b.tag.Build
+}
+
+// floating2 reports an Airflow 2 tag that names no one runtime build.
+func (b *apcBuild) floating2() bool {
+	return b.parsed && b.tag.Major == "2" && !b.tag.Build
+}
+
+// NeedsRuntimeCatalog reports that converting the project in dir for Astro
+// Private Cloud would ask the runtime catalog (Options.RuntimeCatalog): it has
+// a Dockerfile that only names its base, which APC builds as it stands, and
+// that base's tag names one Airflow 2 runtime build, whose Airflow series only
+// the catalog says. It reads one file and makes no request, so a caller can
+// fetch the catalog only when it will be used.
+func NeedsRuntimeCatalog(dir string) bool {
+	data, err := readIfPresent(filepath.Join(dir, fileDockerfile))
+	if err != nil || len(data) == 0 || !dockerfileIsPinOnly(data) {
+		return false
+	}
+	b := apcBuildOf(dir, nil)
+	return b.needsCatalog()
 }
 
 // disagrees reports a pin this build would not deploy: one the tag does not
@@ -203,7 +233,7 @@ func (b *apcBuild) disagrees(pin string) bool {
 // seriesUnknown says why an Airflow 2 build's series is not known.
 func (b *apcBuild) seriesUnknown() string {
 	if b.catalogRead {
-		return "the runtime catalog does not list runtime " + b.base.RuntimeVersion()
+		return "the runtime catalog does not list runtime " + b.version
 	}
 	return "the runtime catalog, which says which, could not be read"
 }
@@ -216,9 +246,14 @@ func (b *apcBuild) carries() (carries, fix string) {
 		return "Airflow " + b.tag.Series, "Convert with --airflow-version " + b.tag.Series
 	case b.tag.Major == "3":
 		return "a floating Airflow 3 tag that names no series", "Convert with --airflow-version 3"
+	case b.floating2():
+		return "a floating Airflow 2 tag, naming whatever runtime the registry serves under it when it builds, " +
+				"so no exact Airflow series can be vouched for",
+			"Pin the FROM line to a full runtime version and convert with --airflow-version set to the Airflow 2 " +
+				"series that runtime carries, or convert with --airflow-version set to the Airflow 2 series you intend"
 	}
 	return "an Airflow 2 runtime whose tag does not name the Airflow series",
-		"Convert with --airflow-version set to the Airflow 2 series runtime " + b.base.RuntimeVersion() +
+		"Convert with --airflow-version set to the Airflow 2 series runtime " + b.version +
 			" carries (" + b.seriesUnknown() + ")"
 }
 
@@ -239,6 +274,12 @@ func pinAPCBuildSeries(from1x *project1x, b *apcBuild) {
 		if i >= 0 {
 			from1x.notes = slices.Delete(from1x.notes, i, i+1)
 		}
+	case i >= 0 && b.floating2():
+		from1x.notes[i] = "Dockerfile: runtime " + b.base.Tag + " is an Airflow 2 image whose tag floats, naming " +
+			"whatever runtime the registry serves under it when Astro Private Cloud's `astro deploy` builds it, so no " +
+			"exact Airflow series can be vouched for and the Airflow requirement in " + manifest.Marker + " was not " +
+			"checked against it. Pin the FROM line to a full runtime version, and the requirement to the Airflow " +
+			"series that runtime carries: one naming only the generation follows the newest Airflow 2 under `astro local`"
 	case i >= 0:
 		from1x.notes[i] = "Dockerfile: runtime " + b.base.Tag + " is an Airflow 2 image whose tag does not name the " +
 			"Airflow minor, and " + b.seriesUnknown() + ", so the Airflow requirement in " + manifest.Marker +
@@ -279,9 +320,10 @@ func runtimeOnbuild(tag string) onbuildKind {
 // kept is what planRetirements kept for APC alone.
 //
 // Each clause is about what it names: pyproject.toml is said to carry the
-// same Airflow version only for a Dockerfile kept here (one kept for another
-// reason, a note of its own or a release of its series the pin named, is
-// named and claims nothing), the lists are said to be installed only by a base
+// same Airflow version only for a Dockerfile kept here whose exact series is
+// the pin (one kept for another reason, a note of its own or a release of its
+// series the pin named, is named and claims nothing, and neither does one
+// whose tag floats or whose series nobody could look up), the lists are said to be installed only by a base
 // that installs them, and deleting is offered only for what was kept here,
 // which is exactly what would otherwise have retired because the manifest
 // carries all of it.
@@ -298,8 +340,11 @@ func apcBuildNotes(target *deployTarget, from1x *project1x, kept []string) []str
 	}
 	// In the order a manifest states them, whatever order kept came in.
 	var lists, same []string
-	if slices.Contains(kept, fileDockerfile) {
-		// Kept here only when spent: its tag is the pin that won.
+	// Kept here only when spent, its tag the pin that won, but the pin is the
+	// same Airflow only when it is the exact series the FROM carries: a pin
+	// naming only the generation, beside a floating tag or a series nobody
+	// could look up, follows the newest of it under `astro local`.
+	if s := target.build.tag.Series; slices.Contains(kept, fileDockerfile) && s != "" && from1x.airflow == s {
 		same = append(same, "Airflow version")
 	}
 	for _, f := range []struct{ name, carried string }{{fileRequirements, "dependencies"}, {filePackages, "OS packages"}} {
@@ -324,7 +369,8 @@ func apcBuildNotes(target *deployTarget, from1x *project1x, kept []string) []str
 			b.WriteString("; that build installs " + installs + " only if the Dockerfile or its base image does")
 		}
 	}
-	if len(same) > 0 {
+	switch {
+	case len(same) > 0:
 		carried := same[len(same)-1]
 		if len(same) > 1 {
 			carried = strings.Join(same[:len(same)-1], ", ") + " and " + carried
@@ -336,6 +382,8 @@ func apcBuildNotes(target *deployTarget, from1x *project1x, kept []string) []str
 		b.WriteString(". " + manifest.Marker + " carries the same " + carried + " for `astro local` and Astro, " +
 			"so change both together while the project deploys to Astro Private Cloud, and delete " + deletable +
 			" if it deploys to Astro instead")
+	case len(kept) > 0:
+		b.WriteString(". Delete " + joinNames(kept) + " if the project deploys to Astro instead")
 	}
 	if d := target.decided(); d != "" {
 		b.WriteString(". " + d)

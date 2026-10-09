@@ -96,8 +96,7 @@ func TestInitDeployTargetDecidesTheBuild(t *testing.T) {
 			if !tc.apcContext {
 				d.ContextDomain = "astronomer.io"
 			}
-			// Read by the command before scaffold, whose Plan stays offline,
-			// and only for a conversion for APC.
+			// An Airflow 3 tag names its series, so nothing reads the catalog.
 			read := 0
 			d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { read++; return nil }
 			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600); err != nil {
@@ -110,8 +109,8 @@ func TestInitDeployTargetDecidesTheBuild(t *testing.T) {
 			if err := execute(t, d, args...); err != nil {
 				t.Fatalf("astro init: %v", err)
 			}
-			if want := map[bool]int{false: 0, true: 1}[tc.wantKept]; read != want {
-				t.Errorf("catalog read %d times, want %d", read, want)
+			if read != 0 {
+				t.Errorf("catalog read %d times, want none", read)
 			}
 			_, err := os.Stat(filepath.Join(dir, "Dockerfile"))
 			if kept := err == nil; kept != tc.wantKept {
@@ -123,6 +122,39 @@ func TestInitDeployTargetDecidesTheBuild(t *testing.T) {
 			}
 			if tc.wantDecision == "" && strings.Contains(out, "Astro Private Cloud") {
 				t.Errorf("an Astro conversion with nothing kept says nothing of APC:\n%s", out)
+			}
+		})
+	}
+}
+
+// The catalog is read before scaffold, whose Plan stays offline, and only for
+// a conversion for APC that will use it: a kept Dockerfile naming one Airflow
+// 2 runtime build, whose series only the catalog says.
+func TestInitReadsTheCatalogOnlyWhenTheAPCBuildNeedsIt(t *testing.T) {
+	for _, tc := range []struct {
+		name, dockerfile string
+		want             int
+	}{
+		{"greenfield", "", 0},
+		{"an Airflow 3 tag", "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n", 0},
+		{"a floating Airflow 2 tag", "FROM quay.io/astronomer/astro-runtime:12\n", 0},
+		{"a pinned Airflow 2 tag", "FROM quay.io/astronomer/astro-runtime:12.1.0\n", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, dir, _ := initDeps(t)
+			d.DeploysToAPC = true
+			read := 0
+			d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { read++; return nil }
+			if tc.dockerfile != "" {
+				if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(tc.dockerfile), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := execute(t, d, "init"); err != nil {
+				t.Fatalf("astro init: %v", err)
+			}
+			if read != tc.want {
+				t.Errorf("catalog read %d times, want %d", read, tc.want)
 			}
 		})
 	}

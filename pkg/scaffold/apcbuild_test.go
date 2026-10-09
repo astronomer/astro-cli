@@ -453,6 +453,8 @@ func TestAPCSaysWhenAnAirflow2SeriesIsUnknown(t *testing.T) {
 					"Airflow minor, and "+tc.why+", so the Airflow requirement in pyproject.toml was not checked against it")
 				assert.NotContains(t, joined, `a pin of "2"`, "pin %q", pin)
 				assert.NotContains(t, joined, "meaning the newest Airflow 2. Set it explicitly")
+				assert.NotContains(t, apcNote(cs.Notes), "carries the same Airflow version",
+					"a pin nobody could check is not claimed to agree, pin %q", pin)
 			}
 
 			dir := t.TempDir()
@@ -469,7 +471,7 @@ func TestAPCSaysWhenAnAirflow2SeriesIsUnknown(t *testing.T) {
 
 // The floating Airflow 3 tags name their series as the pinned ones do, so
 // under APC they pin and refuse at that series, and the kept Dockerfile is in
-// the note claiming the pin agrees. Read as the old runtime-version format,
+// the note claiming the pin agrees where the tag names a series. Read as the old runtime-version format,
 // "3.1" was an Airflow 2 image: kept beside a "2" pin, with a note saying the
 // two agreed.
 func TestAPCReadsFloatingAirflow3Tags(t *testing.T) {
@@ -485,7 +487,15 @@ func TestAPCReadsFloatingAirflow3Tags(t *testing.T) {
 			cs := runIn(t, dir, Options{DeploysToAPC: true})
 			assert.Equal(t, tc.series, cs.AirflowVersion)
 			assert.Contains(t, apcNote(cs.Notes), "Dockerfile: kept for Astro Private Cloud")
-			assert.Contains(t, apcNote(cs.Notes), "carries the same Airflow version")
+			if tc.series == "3" {
+				// A pin naming only the generation, beside a tag naming
+				// only the generation, is not the same Airflow: each
+				// follows the newest 3.x on its own.
+				assert.NotContains(t, apcNote(cs.Notes), "carries the same Airflow version")
+				assert.Contains(t, apcNote(cs.Notes), "Delete Dockerfile if the project deploys to Astro instead")
+			} else {
+				assert.Contains(t, apcNote(cs.Notes), "carries the same Airflow version")
+			}
 
 			dir = t.TempDir()
 			writeAll(t, dir, map[string]string{fileDockerfile: dockerfile})
@@ -498,6 +508,105 @@ func TestAPCReadsFloatingAirflow3Tags(t *testing.T) {
 				assert.Contains(t, err.Error(), "which is Airflow "+tc.series)
 				assert.Contains(t, err.Error(), "Convert with --airflow-version "+tc.series+",")
 			}
+		})
+	}
+}
+
+// An astro-runtime tag names a runtime version whatever its number, so a
+// legacy "3.0" there is Astro Runtime 3, an Airflow 2 image, under APC as
+// anywhere: a 3.x pin against it is refused, not read as agreeing.
+func TestAPCReadsALegacyAstroRuntime3TagAsAirflow2(t *testing.T) {
+	dir := t.TempDir()
+	writeAll(t, dir, map[string]string{fileDockerfile: "FROM quay.io/astronomer/astro-runtime:3.0\n"})
+	_, err := Plan(dir, Options{DeploysToAPC: true, AirflowVersion: "3.0"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "which is a floating Airflow 2 tag")
+}
+
+// The repository decides that a FROM is a runtime image, on any registry, so a
+// private mirror, common under APC, is checked like the image it mirrors.
+func TestAPCChecksAMirroredRuntime(t *testing.T) {
+	const dockerfile = "FROM artifactory.corp/astronomer/runtime:3.1-12\n"
+	dir := t.TempDir()
+	writeAll(t, dir, map[string]string{fileDockerfile: dockerfile})
+	_, err := Plan(dir, Options{DeploysToAPC: true, AirflowVersion: "3.0"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "artifactory.corp/astronomer/runtime:3.1-12, which is Airflow 3.1")
+
+	dir = t.TempDir()
+	writeAll(t, dir, map[string]string{fileDockerfile: dockerfile})
+	cs := runIn(t, dir, Options{DeploysToAPC: true})
+	assert.Equal(t, "3.1", cs.AirflowVersion)
+	assert.Contains(t, apcNote(cs.Notes), "carries the same Airflow version")
+}
+
+// A floating Airflow 2 tag names whatever runtime the registry serves under
+// it when APC builds, so the catalog is not asked and not blamed: the
+// conversion says the tag floats and how to pin it.
+func TestAPCSaysAFloatingAirflow2TagCannotBeVouchedFor(t *testing.T) {
+	catalog := airflow2Catalog(t)
+	for _, tag := range []string{"12", "12.1"} {
+		t.Run(tag, func(t *testing.T) {
+			dockerfile := "FROM quay.io/astronomer/astro-runtime:" + tag + "\n"
+			dir := t.TempDir()
+			writeAll(t, dir, map[string]string{fileDockerfile: dockerfile})
+			assert.False(t, NeedsRuntimeCatalog(dir))
+			cs := runIn(t, dir, Options{DeploysToAPC: true, RuntimeCatalog: catalog})
+			assert.Equal(t, "2", cs.AirflowVersion)
+			joined := strings.Join(cs.Notes, "\n")
+			assert.Contains(t, joined, "Dockerfile: runtime "+tag+" is an Airflow 2 image whose tag floats")
+			assert.Contains(t, joined, "Pin the FROM line to a full runtime version")
+			assert.NotContains(t, joined, "runtime catalog")
+			assert.NotContains(t, apcNote(cs.Notes), "carries the same Airflow version")
+
+			dir = t.TempDir()
+			writeAll(t, dir, map[string]string{fileDockerfile: dockerfile})
+			_, err := Plan(dir, Options{DeploysToAPC: true, RuntimeCatalog: catalog, AirflowVersion: "3.1"})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "which is a floating Airflow 2 tag")
+			assert.Contains(t, err.Error(), "Pin the FROM line to a full runtime version")
+			assert.NotContains(t, err.Error(), "runtime catalog")
+		})
+	}
+}
+
+// NeedsRuntimeCatalog says, offline, whether a conversion for APC would ask
+// the catalog: only for a pin-only Dockerfile naming one Airflow 2 runtime
+// build.
+func TestNeedsRuntimeCatalog(t *testing.T) {
+	for _, tc := range []struct {
+		name, dockerfile string
+		want             bool
+	}{
+		{"no Dockerfile", "", false},
+		{"an Airflow 3 tag", pinOnlyDockerfile, false},
+		{"a floating Airflow 2 tag", "FROM quay.io/astronomer/astro-runtime:12\n", false},
+		{"a pinned Airflow 2 tag", airflow2Dockerfile, true},
+		{"a mirrored pinned Airflow 2 tag", "FROM registry.corp/astronomer/astro-runtime:12.1.0-python-3.11\n", true},
+		{"a declared Dockerfile", airflow2Dockerfile + "RUN echo hi\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.dockerfile != "" {
+				writeAll(t, dir, map[string]string{fileDockerfile: tc.dockerfile})
+			}
+			assert.Equal(t, tc.want, NeedsRuntimeCatalog(dir))
+		})
+	}
+}
+
+// A pin-only Dockerfile naming a Python carries it as requires-python when
+// it retires, so the Python the project ran is not dropped.
+func TestARetiredPinOnlyDockerfileCarriesItsPython(t *testing.T) {
+	for _, tag := range []string{"3.1-python-3.12", "3.1-12-python-3.12"} {
+		t.Run(tag, func(t *testing.T) {
+			dir := t.TempDir()
+			writeAll(t, dir, map[string]string{fileDockerfile: "FROM astrocrpublic.azurecr.io/runtime:" + tag + "\n"})
+			runIn(t, dir, Options{})
+			assert.NoFileExists(t, filepath.Join(dir, fileDockerfile))
+			m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			assert.Equal(t, "==3.12.*", m.Project.RequiresPython)
 		})
 	}
 }

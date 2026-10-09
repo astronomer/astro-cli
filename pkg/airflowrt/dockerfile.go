@@ -165,9 +165,10 @@ func IsRuntime3(baseTag string) bool {
 // requires only the contract leaf, deliberately, so it cannot import this
 // module. Its isAstroBase is the same rule, checked on its own side.
 //
-// Two other definitions exist and are NOT this one. pkg/scaffold matches the
-// substring "runtime" when reading a version out of a v1 Dockerfile, so it
-// reads one from a private myco/our-runtime that docker mode then refuses.
+// Two other definitions exist and are NOT this one. pkg/scaffold matches a
+// repository path ending in /runtime or /astro-runtime on any registry when
+// reading a version out of a v1 Dockerfile, so it reads one from a private
+// mirror that docker mode then refuses.
 // internal/platform/apc names a wider set — including astronomerinc/ap-airflow
 // — for the v1 Software deploy path, which warns rather than refusing and does
 // not write this compose file. Neither is safe to fold in here without knowing

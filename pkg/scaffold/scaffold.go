@@ -84,9 +84,10 @@ type Options struct {
 	DeployTargetBasis DeployTargetBasis
 	// RuntimeCatalog is the runtime catalog the caller read before calling,
 	// or nil when it has none: data, so Plan stays offline. It is read only
-	// for a project that deploys to APC from a Dockerfile whose FROM is an
-	// Airflow 2 runtime version, a tag that names no Airflow series: the
-	// catalog says which one that build carries. Without it, or when it does
+	// for a project that deploys to APC from a Dockerfile whose FROM names one
+	// Airflow 2 runtime build, a tag that names no Airflow series: the catalog
+	// says which one that build carries. NeedsRuntimeCatalog says offline
+	// whether a project is one, so a caller reads the catalog only then. Without it, or when it does
 	// not list that runtime, the series is unknown, and the conversion says
 	// which of the two rather than pin a series it cannot vouch for.
 	RuntimeCatalog *runtimeversions.Catalog
@@ -675,12 +676,14 @@ func declaresDockerfile(from1x *project1x) bool {
 	return from1x.hasDockerfile() && !from1x.dockerfilePinOnly
 }
 
-// buildPython is the Python this project's image runs when its Dockerfile is
-// the build and the base's tag names one, or "". A Dockerfile that is only a
-// pin gives nothing here: the image is then generated from the runtime series
-// and runs that runtime's default Python.
+// buildPython is the Python the Dockerfile's runtime base runs when its tag
+// names one ("3.1-12-python-3.12"), or "". A Dockerfile that is only a pin
+// gives it too: a conversion that retires that file carries the choice as
+// requires-python, which a generated image honors
+// (imagebuild.RuntimeImageForPython), where reading nothing dropped it and
+// the image ran the runtime's default Python.
 func (from1x *project1x) buildPython() string {
-	if !declaresDockerfile(from1x) {
+	if !from1x.hasDockerfile() {
 		return ""
 	}
 	return from1x.basePython

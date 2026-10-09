@@ -71,10 +71,11 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
 	// Read here, before scaffold, whose Plan stays offline, and only for a
-	// conversion for APC: it says which Airflow series a kept Dockerfile's
-	// Airflow 2 runtime tag carries. A cached copy answers offline; none
-	// leaves the series unknown, and the conversion says so.
-	if opts.DeploysToAPC && c.d.RuntimeCatalog != nil {
+	// conversion for APC whose kept Dockerfile names one Airflow 2 runtime
+	// build, which scaffold.NeedsRuntimeCatalog tells offline: the catalog
+	// says which Airflow series that runtime carries. A cached copy answers
+	// offline; none leaves the series unknown, and the conversion says so.
+	if opts.DeploysToAPC && c.d.RuntimeCatalog != nil && scaffold.NeedsRuntimeCatalog(dir) {
 		opts.RuntimeCatalog = c.d.RuntimeCatalog(ctx)
 	}
 	// Called by scaffold only when nothing in the project states an Airflow,

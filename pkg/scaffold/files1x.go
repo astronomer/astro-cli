@@ -231,7 +231,7 @@ func read1xProject(dir string) (*project1x, error) {
 		from1x.present = append(from1x.present, fileDockerfile)
 		from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
 		from1x.dockerfileBody = data
-		if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); base.RuntimeVersion() != "" {
+		if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); runtimeRepoOf(base.Image) != notRuntimeRepo && base.Tag != "" {
 			_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
 			from1x.onbuild = runtimeOnbuild(base.Tag)
 		}
@@ -585,13 +585,69 @@ var runtimeTagRe = regexp.MustCompile(`^(\d+)\.(\d+)-\d+(?:[.-].+)?$`)
 // A leading "v" is trimmed before matching, mirroring stripVersionPrefix.
 var oldRuntimeTagRe = regexp.MustCompile(`^\d+(\.\d+){0,2}(?:[.-].+)?$`)
 
-// runtimeImageHint is what makes an image reference an Astro Runtime image.
+// runtimeRepo is the Astro Runtime repository an image reference names, read
+// from the last segment of its repository path on any registry, so a private
+// mirror (artifactory.example.com/astronomer/runtime), common where projects
+// deploy to Astro Private Cloud, reads as the image it mirrors. It is the one
+// rule this package uses to decide that a FROM is an Astro Runtime image, so
+// the version read from a 1.x Dockerfile and the check of an APC build's FROM
+// against the pin cannot disagree about which images they read. The published
+// names are ".../runtime" and ".../astro-runtime"; a private myco/our-runtime
+// is neither.
 //
-// Substring rather than an exact repository, matching isAirflow3Runtime in the
-// desktop: the published names are ".../runtime" and ".../astro-runtime", and an
-// earlier hand-rolled check elsewhere matched only a path segment literally
-// named "runtime" and missed the second.
-const runtimeImageHint = "runtime"
+// airflowrt.IsAstroRuntimeImage is narrower on purpose, matching Astronomer's
+// registries, because Docker mode's compose file depends on that image's
+// conventions; a conversion only reads a version, and a mirror's tags mean
+// what the original's do.
+type runtimeRepo int
+
+const (
+	// notRuntimeRepo is any other image.
+	notRuntimeRepo runtimeRepo = iota
+	// astroRuntimeRepo is .../astro-runtime, the repository of the Airflow 2
+	// lineage, whose tags name a runtime version: its "3.0" is Astro Runtime 3,
+	// which carried Airflow 2.2, not Airflow 3.0.
+	astroRuntimeRepo
+	// airflow3RuntimeRepo is .../runtime, the repository Airflow 3 introduced,
+	// whose tags lead with the Airflow series.
+	airflow3RuntimeRepo
+)
+
+// runtimeRepoOf names the runtime repository of an image reference without
+// its tag, pinned by digest or not.
+func runtimeRepoOf(image string) runtimeRepo {
+	image, _, _ = strings.Cut(image, "@")
+	switch {
+	case strings.HasSuffix(image, "/astro-runtime"):
+		return astroRuntimeRepo
+	case strings.HasSuffix(image, "/runtime"):
+		return airflow3RuntimeRepo
+	}
+	return notRuntimeRepo
+}
+
+// airflow2LineageTagRe is an astro-runtime tag naming a runtime version,
+// floating or not, flavor stripped: every one of them an Airflow 2 runtime.
+var airflow2LineageTagRe = regexp.MustCompile(`^\d+(\.\d+){0,2}$`)
+
+// runtimeTagOf reads the runtime version a FROM names, flavor stripped, and
+// what it says about Airflow, by runtimeRepo's rule. ok is false for a base
+// that is unknown, not a runtime image, pinned by digest, or tagged in a way
+// neither format reads. An astro-runtime tag naming a runtime version is
+// Airflow 2 whatever its number, so "3.0" there is a floating Airflow 2 tag;
+// the Airflow 3 format ("3.1-12") reads as Airflow 3 on either repository.
+func runtimeTagOf(b airflowrt.DeclaredBase) (version string, tag manifest.RuntimeTag, ok bool) {
+	repo := runtimeRepoOf(b.Image)
+	if !b.Known || repo == notRuntimeRepo || b.Tag == "" {
+		return "", manifest.RuntimeTag{}, false
+	}
+	version, _ = airflowrt.ParseRuntimeTagPython(strings.TrimPrefix(b.Tag, "v"))
+	if repo == astroRuntimeRepo && airflow2LineageTagRe.MatchString(version) {
+		return version, manifest.RuntimeTag{Major: "2", Build: strings.Count(version, ".") == 2}, true
+	}
+	tag, ok = manifest.ParseRuntimeTag(version)
+	return version, tag, ok
+}
 
 // airflowFromDockerfile reads the Airflow version a 1.x Dockerfile's runtime tag
 // names. The second return reports that the Dockerfile stated a version at all,
@@ -638,10 +694,11 @@ func airflowFromDockerfile(data []byte) (version string, stated bool, notes []st
 
 	// Last runtime stage wins. Anything else in the file is a builder.
 	var ref, tag string
+	var repo runtimeRepo
 	for _, m := range stages {
 		image, t := splitImageRef(m[1])
-		if strings.Contains(image, runtimeImageHint) {
-			ref, tag = image, t
+		if r := runtimeRepoOf(image); r != notRuntimeRepo {
+			ref, tag, repo = image, t, r
 		}
 	}
 	if ref == "" {
@@ -663,8 +720,10 @@ func airflowFromDockerfile(data []byte) (version string, stated bool, notes []st
 		return p[1] + "." + p[2], true, nil
 	// The floating Airflow 3 tags ("3.1", "3", "3.1-python-3.12"), which the
 	// old format below would read as Airflow 2. manifest.ParseRuntimeTag is the
-	// grammar every other reader of a FROM line uses, so it decides.
-	case isRuntime && floating.Major == "3":
+	// grammar every other reader of a FROM line uses, so it decides, but only
+	// on Airflow 3's repository: astro-runtime:3.0 is Astro Runtime 3, an
+	// Airflow 2 image, and takes the old format's path (runtimeRepo).
+	case repo == airflow3RuntimeRepo && isRuntime && floating.Major == "3":
 		if floating.Series != "" {
 			return floating.Series, true, nil
 		}
