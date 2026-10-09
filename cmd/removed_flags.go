@@ -30,14 +30,14 @@ const (
 
 	errDeploymentFileRemoved = "--deployment-file was removed in Astro CLI v2. " +
 		"To manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL + ". " +
-		"To copy a Deployment, use `astro deployment create --clone <deployment> --name <new name>`"
+		"To copy a Deployment, use astro deployment create --clone <deployment> --name <new name>"
 	errInspectTemplateRemoved = "--template was removed in Astro CLI v2. " +
-		"To copy a Deployment, use `astro deployment create --clone <deployment> --name <new name>`. " +
+		"To copy a Deployment, use astro deployment create --clone <deployment> --name <new name>. " +
 		"To manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL
 	// A switch has not logged in again since 2023, so there is no login to
 	// link to.
 	errLoginLinkRemoved = "--login-link was removed in Astro CLI v2: switching organizations no longer re-authenticates. " +
-		"To log in on another device, use `astro login --login-link`"
+		"To log in on another device, use astro login --login-link"
 )
 
 // removedFlag is what a run passing a flag Astro CLI 1.x had and v2 dropped

@@ -492,7 +492,7 @@ func cases1x() []case1x {
 			airflow:     "2",
 			projectName: "example-project",
 			kept:        []string{"Dockerfile", ".astro/config.yaml"},
-			notes:       []string{"`astro link add example-dev --deployment cexampledeployment0000001`"},
+			notes:       []string{"astro link add example-dev --deployment cexampledeployment0000001"},
 		},
 		{
 			// A stated name that cannot be a [project] name as written is

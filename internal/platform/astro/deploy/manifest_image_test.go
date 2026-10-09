@@ -305,7 +305,7 @@ func TestDeployManifestImage_NoPodmanMachineNamesThePodmanFix(t *testing.T) {
 
 	origResolve := resolveContainerEngine
 	resolveContainerEngine = func() (string, []string, error) {
-		return "", nil, fmt.Errorf("%w, and none exists yet; create and start one with `podman machine init --now`", container.ErrMachineNotRunning)
+		return "", nil, fmt.Errorf("%w, and none exists yet; create and start one with podman machine init --now", container.ErrMachineNotRunning)
 	}
 	t.Cleanup(func() { resolveContainerEngine = origResolve })
 

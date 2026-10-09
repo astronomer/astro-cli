@@ -55,7 +55,7 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "trigger-wait <DAG_ID>",
 		Short: "Start a run of a DAG and wait for it to finish",
-		Long: "Start a run of a DAG, as `runs trigger` does, then check on it every --poll-interval until it " +
+		Long: "Start a run of a DAG, as runs trigger does, then check on it every --poll-interval until it " +
 			"succeeds, fails, or --timeout passes. A failed run is reported with the task instances that failed " +
 			"or never ran because something upstream did.\n\n" +
 			"--timeout and --poll-interval take a number of seconds (300) or a duration (5m, 1h30m).\n\n" +
@@ -63,7 +63,7 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 			"command itself did), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed out with the run " +
 			"still going. The run is reported in every case, and a timeout leaves it running: stopping the wait " +
 			"does not stop the run.\n\n" +
-			"A paused DAG is unpaused first, as `runs trigger` does, or the wait would last until the timeout " +
+			"A paused DAG is unpaused first, as runs trigger does, or the wait would last until the timeout " +
 			"for a run that is never scheduled.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
@@ -201,14 +201,14 @@ func (q *query) awaitRun(ctx context.Context, client *airflowapi.Client, run air
 		select {
 		case <-ctx.Done():
 			timer.Stop()
-			return run, false, fmt.Errorf("stopped waiting for %s run %s, which is still %s; check on it with `%s`: %w",
+			return run, false, fmt.Errorf("stopped waiting for %s run %s, which is still %s; check on it with %s: %w",
 				run.DAGID, run.DAGRunID, run.State, q.t.suggest("runs get "+run.DAGID+" "+run.DAGRunID), ctx.Err())
 		case <-timer.C:
 		}
 		next, err := client.GetDAGRun(ctx, run.DAGID, run.DAGRunID)
 		if err != nil {
 			return run, false, fmt.Errorf("could not check on %s run %s, which was triggered and may still be running; "+
-				"check on it with `%s`: %w", run.DAGID, run.DAGRunID, q.t.suggest("runs get "+run.DAGID+" "+run.DAGRunID), err)
+				"check on it with %s: %w", run.DAGID, run.DAGRunID, q.t.suggest("runs get "+run.DAGID+" "+run.DAGRunID), err)
 		}
 		// Keep the ids the trigger answered with: they address the run, and a
 		// body that omitted one would otherwise point the next check nowhere.
@@ -225,7 +225,7 @@ func (q *query) awaitRun(ctx context.Context, client *airflowapi.Client, run air
 func (q *query) renderWaitedRun(w io.Writer, result waitedRun) error {
 	if result.TimedOut {
 		_, err := fmt.Fprintf(w, "%s run %s is still %s after %s; stopped waiting, and the run carries on\n"+
-			"check on it with `%s`\n",
+			"check on it with %s\n",
 			result.DAGID, result.RunID, result.State, formatDuration(result.ElapsedSeconds),
 			q.t.suggest("runs get "+result.DAGID+" "+result.RunID))
 		return err
@@ -288,7 +288,7 @@ func allTaskInstances(ctx context.Context, client *airflowapi.Client, dagID, run
 			return all, nil
 		}
 	}
-	return all, errors.New("this run has more task instances than one command reads; list them with `runs tasks`")
+	return all, errors.New("this run has more task instances than one command reads; list them with runs tasks")
 }
 
 // renderFailedTasks writes the failed task instances under a run, and how to
@@ -314,7 +314,7 @@ func (q *query) renderFailedTasks(w io.Writer, dagID, runID string, failed []tas
 		if row.MapIndex >= 0 {
 			command += " -m " + strconv.Itoa(row.MapIndex)
 		}
-		_, err := fmt.Fprintf(w, "\nread why %s failed with `%s`\n", row.TaskID, q.t.suggest(command))
+		_, err := fmt.Fprintf(w, "\nread why %s failed with %s\n", row.TaskID, q.t.suggest(command))
 		return err
 	}
 	return nil

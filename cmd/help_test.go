@@ -337,7 +337,7 @@ func TestLongUnwrappedFindsHandWrappedProse(t *testing.T) {
 		flagged    bool
 	}{
 		{"a paragraph wrapped by hand", "Declare a name in pyproject.toml, or change how it is\ndeclared.", true},
-		{"a break before a code span", "Link it with\n`astro link`, as in Desktop.", true},
+		{"a break before a code span", "Link it with\nastro link, as in Desktop.", true},
 		{"a break inside a parenthesis", "It is optional (see\nbelow).", true},
 		{"one line per paragraph", "One paragraph, however long.\n\nAnother.", false},
 		{"a heading and its list", "Shows, including:\n- Path parameters\n- Response schema", false},
@@ -348,7 +348,7 @@ func TestLongUnwrappedFindsHandWrappedProse(t *testing.T) {
 		// One sentence per line renders as a run of short lines, and a
 		// sentence end cannot be told from an abbreviation or a version.
 		{"a sentence per line", "Start Otto.\nFlags are forwarded.", true},
-		{"a sentence ending in a code span", "Use `astro use`.\nIt lists them.", true},
+		{"a sentence ending in a code span", "Use astro use.\nIt lists them.", true},
 		{"a break after an abbreviation", "Works with providers, hooks, etc.\nand sensors too", true},
 		{"a break inside a version number", "Runs on Airflow 2.\n10 and later", true},
 		{"a list item wrapped by hand", "We collect:\n- Invocation context (CI,\ninteractive, etc.)", true},

@@ -55,7 +55,7 @@ func NormalizeAPIError(httpResp *http.Response, body []byte) error {
 			}
 		}
 		if pr, ok := unlinkedPRPreview(httpResp, decode.Message); ok {
-			return &StatusError{StatusCode: httpResp.StatusCode, msg: fmt.Sprintf("you're logged in to PR previews, but %s has no user for you yet. Run `astro login %s` to create it, then run the command again", pr, pr)}
+			return &StatusError{StatusCode: httpResp.StatusCode, msg: fmt.Sprintf("you're logged in to PR previews, but %s has no user for you yet. Run astro login %s to create it, then run the command again", pr, pr)}
 		}
 		return &StatusError{StatusCode: httpResp.StatusCode, msg: decode.Message}
 	}

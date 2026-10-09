@@ -330,7 +330,7 @@ func adviseDatabaseNewer(err error) error {
 	if !errors.Is(err, localrt.ErrDatabaseNewerThanAirflow) {
 		return err
 	}
-	return fmt.Errorf("%w. To start over with an empty database, run `astro local reset`; "+
+	return fmt.Errorf("%w. To start over with an empty database, run astro local reset; "+
 		"it deletes the Dag runs, connections and variables stored there. "+
 		"To keep them, go back to the newer Airflow: the apache-airflow requirement in pyproject.toml, "+
 		"or the base image in your Dockerfile if the project declares one", err)

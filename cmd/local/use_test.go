@@ -281,7 +281,7 @@ func TestEveryListedNameIsSelectable(t *testing.T) {
 	for _, row := range res.Deployments {
 		sel, _, _ := instanceDeps(t, dir)
 		if err := execute(t, sel, "use", row.Name); err != nil {
-			t.Errorf("`astro use %s` refused a name the listing printed: %v", row.Name, err)
+			t.Errorf("astro use %s refused a name the listing printed: %v", row.Name, err)
 		}
 	}
 }

@@ -1139,7 +1139,7 @@ func TestDeployManifestWithNoLoginForTheManifestDomain(t *testing.T) {
 
 	_, err := execDeployCapture("test", "--dags")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not logged in to astronomer.io. Log in with `astro login astronomer.io`")
+	assert.Contains(t, err.Error(), "not logged in to astronomer.io. Log in with astro login astronomer.io")
 }
 
 // A project that names the host the CLI is already on deploys under the

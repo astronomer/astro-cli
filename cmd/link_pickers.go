@@ -163,9 +163,9 @@ func currentDomain() string {
 func sessionExpired() error {
 	domain := currentDomain()
 	if domain == "" {
-		return errors.New("you are not logged in. Log in with `astro login`")
+		return errors.New("you are not logged in. Log in with astro login")
 	}
-	return fmt.Errorf("your %s session expired. Log in again with `astro login %s`", domain, domain)
+	return fmt.Errorf("your %s session expired. Log in again with astro login %s", domain, domain)
 }
 
 // offline is the workspace link's cause for no response, on the current

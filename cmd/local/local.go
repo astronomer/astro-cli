@@ -133,7 +133,7 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			// out of v1 habit, get named rather than refused: `init` moved up
 			// to `astro init`, and `ps` was always `status`.
 			if replacement, ok := devReplacementFor(args[0]); ok {
-				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use `%s`", args[0], cmd.CommandPath(), replacement))
+				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use %s", args[0], cmd.CommandPath(), replacement))
 			}
 			return cliout.UnknownSubcommand(cmd, args[0])
 		},
@@ -541,7 +541,7 @@ func (c *cli) runStop(ctx context.Context, opts localrt.StopOptions) error {
 	af, err := c.attach()
 	if errors.Is(err, localrt.ErrNotRunning) {
 		if opts.Clean {
-			return fmt.Errorf("%w; `astro local reset` removes a stopped project's derived state", err)
+			return fmt.Errorf("%w; astro local reset removes a stopped project's derived state", err)
 		}
 		// Nothing to stop is the state the caller asked for, so it succeeds,
 		// the way `docker compose stop` does.
@@ -1020,7 +1020,7 @@ func (c *cli) environment(withWorkspace bool) (localrt.Airflow, error) {
 		return nil, c.reportBuildError(r, &plan.MissingEnvError{
 			Project: built.Project.Dir,
 			Missing: workspace,
-			Next:    "provide them, then run the command again — or run it without them: leave off `--" + flagWithWorkspace + "`.",
+			Next:    "provide them, then run the command again — or run it without them: leave off --" + flagWithWorkspace + ".",
 		})
 	}
 	// On stderr: stdout belongs to the command being run.
@@ -1054,7 +1054,7 @@ func warnWorkspaceSkipped(r cliout.Renderer, missing []envresolve.Missing) {
 // errDockerDown reports a docker-mode project whose containers are down, which
 // `run` and `shell` execute inside. It is a not_running failure, but a record
 // does exist, so it does not carry the sentinel's own text.
-var errDockerDown = notRunning("this project's Docker containers are not running; start them first: `astro local start --docker`")
+var errDockerDown = notRunning("this project's Docker containers are not running; start them first: astro local start --docker")
 
 type notRunning string
 
@@ -1141,7 +1141,7 @@ func (c *cli) runOpen(printURL bool) error {
 		// Wrapping the sentinel, like the query commands: this is the same
 		// condition a consumer branches on, and it published no kind while
 		// `astro local stop` published one for the identical situation.
-		return fmt.Errorf("%w: local Airflow is %s; run `%s` first",
+		return fmt.Errorf("%w: local Airflow is %s; run %s first",
 			localrt.ErrNotRunning, st.State, replaceStart)
 	}
 	url := primaryURL(st)

@@ -77,7 +77,7 @@ var (
 	// state of the checkout it runs in.
 	hasUncommittedChanges = git.HasUncommittedChanges
 
-	errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy [deployment-id] --force` to deploy anyway")
+	errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use astro deploy [deployment-id] --force to deploy anyway")
 )
 
 const (
@@ -92,7 +92,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy [DEPLOYMENT_ID]",
 		Short: "Ship this project's code to a Deployment",
-		Long:  "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
+		Long:  "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use astro remote deploy instead. It does not include any metadata associated with your local Airflow environment.",
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
@@ -210,13 +210,13 @@ var manifestDeployIgnores = []struct {
 	flag string
 	do   string
 }{
-	{"pytest", "run your tests before deploying: `uv run pytest && astro deploy`"},
-	{"parse", "check your DAGs before deploying: `astro local check && astro deploy`"},
+	{"pytest", "run your tests before deploying: uv run pytest && astro deploy"},
+	{"parse", "check your DAGs before deploying: astro local check && astro deploy"},
 	{"dags-path", "deploy from the project directory; a DAGs path other than dags/ is not supported yet"},
 	{"dag-bundle-name", "named DAG bundles are not supported here yet"},
-	{"test", "run your tests before deploying: `uv run pytest <path> && astro deploy`"},
-	{"env", "this deploy runs no tests, so it reads no test env file; run `uv run pytest` yourself"},
-	{"save", "this deploy always asks; mark a link `default = true` in [tool.astro.deployments] to move the cursor"},
+	{"test", "run your tests before deploying: uv run pytest <path> && astro deploy"},
+	{"env", "this deploy runs no tests, so it reads no test env file; run your tests yourself with uv run pytest"},
+	{"save", "this deploy always asks; set default = true on a link in [tool.astro.deployments] to move the cursor"},
 	{"deployment-name", "name the target with --deployment, which takes a link name or a Deployment id"},
 }
 
@@ -766,7 +766,7 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 		// sentinel is for. Input that ends instead fails with Ended.
 		Invalid: manifestdeploy.ErrAborted,
 		ByName:  true,
-		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")),
+		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: astro deploy <name> or --deployment <name>")),
 	}
 	for i, choice := range choices {
 		cells := []string{choice.Name, choice.Where}
@@ -791,7 +791,7 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 // chosen deployment id.
 func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
 	if !d.login.current {
-		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
+		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run astro context switch %[1]s", d.login.context.Domain)
 	}
 	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
 	if err != nil {

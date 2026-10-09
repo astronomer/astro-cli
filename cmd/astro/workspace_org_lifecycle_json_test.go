@@ -192,7 +192,7 @@ func TestWorkspaceOrganizationLifecycleText(t *testing.T) {
 	runTokenCases(t, []tokenCase{
 		{name: "workspace create", root: ws, client: workspacesMock(nil, createsWorkspace(staging)), args: []string{"workspace", "create", "--name", "Staging"}, check: says("Astro Workspace Staging was successfully created\n")},
 		{name: "workspace create with no name", root: ws, client: workspacesMock(nil), args: []string{"workspace", "create"}, check: says(""), wantErr: "no name provided for the workspace. Retry with a valid name"},
-		{name: "workspace create with a bad --enforce-cicd", root: ws, client: workspacesMock(nil), args: []string{"workspace", "create", "--name", "Staging", "--enforce-cicd", "on"}, check: says(""), wantErr: "the input to the `--enforce-cicd` flag"},
+		{name: "workspace create with a bad --enforce-cicd", root: ws, client: workspacesMock(nil), args: []string{"workspace", "create", "--name", "Staging", "--enforce-cicd", "on"}, check: says(""), wantErr: "the input to the --enforce-cicd flag"},
 		// The line names the Workspace as it was called before the update.
 		{name: "workspace update", root: ws, client: workspacesMock(both, updatesWorkspace("ws-prod", renamed)), args: []string{"workspace", "update", "ws-prod", "--name", "Prod"}, check: says("Astro Workspace Production was successfully updated\n")},
 		{

@@ -71,7 +71,7 @@ var helpRules = []helpRule{
 		name: "use",
 		why: "A positional argument in Use is <UPPER_SNAKE> when required and [UPPER_SNAKE] when optional, " +
 			"with ... inside or after the brackets of one that repeats, so every page spells an argument the same way. " +
-			"`astro af` set the convention: `astro af runs get <DAG_ID> <RUN_ID>`. Arguments handed on after `--` " +
+			"astro af set the convention: astro af runs get <DAG_ID> <RUN_ID>. Arguments handed on after `--` " +
 			"are spelled `[-- COMMAND...]`, last.",
 		check: checkUse,
 	},

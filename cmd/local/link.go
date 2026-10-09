@@ -80,7 +80,7 @@ func NewLinkCmd(d Deps) *cobra.Command {
 		Use:   "link",
 		Short: "Link Deployments to this project",
 		Long: "Link the Deployments this project works with. Links are " +
-			"saved in the project, so everyone who clones it gets them. `astro use` lists them.",
+			"saved in the project, so everyone who clones it gets them. astro use lists them.",
 		Example: "  astro link add                              # pick a Deployment to link\n" +
 			"  astro link add prod --deployment clx123abc\n" +
 			"  astro link default prod",
@@ -183,7 +183,7 @@ func newLinkDefaultCmd(c *cli) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "default [NAME]",
 		Short: "Choose the Deployment commands use by default",
-		Long: "Choose the linked Deployment commands use when you don't name one. `astro deploy` still " +
+		Long: "Choose the linked Deployment commands use when you don't name one. astro deploy still " +
 			"asks, with it preselected. In a terminal, with no NAME, it asks which one.",
 		Example: "  astro link default prod\n" +
 			"  astro link default --unset",
@@ -582,7 +582,7 @@ func (c *cli) runLinkRemove(name string) error {
 	// Left pointing at a link that is gone, it fails every command until
 	// cleared, which is better said now than at the next one.
 	if state, serr := userstate.Load(dir); serr == nil && state.Instance == name {
-		fmt.Fprintf(c.d.Stderr, "note: `astro use` still names %s for this project. Clear it with `astro use --unset`\n", name)
+		fmt.Fprintf(c.d.Stderr, "note: astro use still names %s for this project. Clear it with astro use --unset\n", name)
 	}
 	res := linkResult{Name: name, Kind: kind, Status: linkStatusRemoved, Manifest: path}
 	return r.Emit(res, func(w io.Writer) error {

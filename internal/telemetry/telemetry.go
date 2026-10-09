@@ -151,7 +151,7 @@ func showFirstRunNotice() {
 			"A command or flag the CLI does not have is tracked too, so we can see what to add.\n"+
 			"While you are logged in, events are linked to your Astro organization.\n"+
 			"Logged-out usage stays anonymous.\n"+
-			"Opt out anytime: `astro telemetry disable` or ASTRO_TELEMETRY_DISABLED=1")
+			"Opt out anytime: astro telemetry disable or ASTRO_TELEMETRY_DISABLED=1")
 	_ = config.CFG.TelemetryNoticeShown.SetHomeString(noticeVersion) //nolint:errcheck // best-effort telemetry write
 }
 

@@ -378,7 +378,7 @@ func (q *query) trigger(ctx context.Context, client *airflowapi.Client, dagID st
 		if unpaused {
 			// The unpause already happened and outlives this failure, so say so
 			// rather than leave the DAG changed by a command that reported none.
-			return airflowapi.DAGRun{}, true, fmt.Errorf("%w\n%s is now unpaused; pause it again with `%s`", err, dagID, q.t.suggest("dags pause "+dagID))
+			return airflowapi.DAGRun{}, true, fmt.Errorf("%w\n%s is now unpaused; pause it again with %s", err, dagID, q.t.suggest("dags pause "+dagID))
 		}
 		return airflowapi.DAGRun{}, false, err
 	}
@@ -398,7 +398,7 @@ func (q *query) ensureUnpaused(ctx context.Context, client *airflowapi.Client, d
 		return false, nil
 	}
 	if !auto {
-		return false, fmt.Errorf("DAG %q is paused, so a new run would never be scheduled; unpause it with `%s`, or drop --no-auto-unpause", dagID, q.t.suggest("dags unpause "+dagID))
+		return false, fmt.Errorf("DAG %q is paused, so a new run would never be scheduled; unpause it with %s, or drop --no-auto-unpause", dagID, q.t.suggest("dags unpause "+dagID))
 	}
 	if _, err := client.UnpauseDAG(ctx, dagID); err != nil {
 		return false, err

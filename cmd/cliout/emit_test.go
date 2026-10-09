@@ -37,7 +37,7 @@ func TestEmitPanicsInTextModeWithNoTextRenderer(t *testing.T) {
 	assert.PanicsWithValue(t,
 		"Renderer.Emit: text mode with no text renderer — this value is "+
 			"json-only, so the caller must not reach here in text mode. The "+
-			"`if r.Format == FormatJSON` branch around a streaming Emit is what "+
+			"branch on r.Format == FormatJSON around a streaming Emit is what "+
 			"prevents it.",
 		func() { _ = r.Emit(map[string]string{"k": "v"}, nil) })
 

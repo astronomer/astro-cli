@@ -25,7 +25,7 @@ func newDagsErrorsCmd(q *query) *cobra.Command {
 		Use:   "errors",
 		Short: "List the DAG files that failed to parse, with their tracebacks",
 		Long: "List the import errors on this Airflow: every DAG file the DAG processor could not parse, and the " +
-			"traceback it raised. A DAG missing from `dags list` is nearly always here.\n\nThe command succeeds " +
+			"traceback it raised. A DAG missing from dags list is nearly always here.\n\nThe command succeeds " +
 			"whether or not there are errors; an empty listing is the good news.",
 		Args: cobra.NoArgs,
 		Example: afExample(q.t,
@@ -130,8 +130,8 @@ func newDagsExploreCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "explore <DAG_ID>",
 		Short: "Show one DAG's definition, its tasks, and its source together",
-		Long: "Read everything there is to know about one DAG in one go: what `dags get` shows, the tasks it " +
-			"defines as `tasks list` shows them, and the source Airflow parsed.\n\nEach part is read on its own, " +
+		Long: "Read everything there is to know about one DAG in one go: what dags get shows, the tasks it " +
+			"defines as tasks list shows them, and the source Airflow parsed.\n\nEach part is read on its own, " +
 			"and one that fails is reported in its place rather than ending the command. It fails only when none " +
 			"of the three could be read, which is what a DAG id Airflow does not know looks like.",
 		Args: cobra.ExactArgs(1),

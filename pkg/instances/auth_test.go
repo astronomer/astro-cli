@@ -161,7 +161,7 @@ func TestAstroMethodReportsTheOutageItWasGiven(t *testing.T) {
 	src, _, err = credentials(context.Background(), i, "", Deps{
 		LookupEnv: instancestest.Env(nil),
 		Session: func(context.Context) (string, error) {
-			return "", errors.New("your session expired — log in again with `astro login`")
+			return "", errors.New("your session expired — log in again with astro login")
 		},
 	})
 	if err != nil {

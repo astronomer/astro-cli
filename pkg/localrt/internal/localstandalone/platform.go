@@ -40,7 +40,7 @@ func checkPlatform(projectPath, goos, goarch string) error {
 	if goos == goosDarwin && goarch == goarchIntel {
 		name = "Intel macOS"
 	}
-	return fmt.Errorf("%w (%s): uv will not build its environment here. Run it in Docker mode with `astro local start --docker`, "+
+	return fmt.Errorf("%w (%s): uv will not build its environment here. Run it in Docker mode with astro local start --docker, "+
 		"or add \"sys_platform == '%s' and platform_machine == '%s'\" to [tool.uv] environments in %s",
 		ErrPlatformExcluded, name, goos, facts["platform_machine"], manifest.Marker)
 }

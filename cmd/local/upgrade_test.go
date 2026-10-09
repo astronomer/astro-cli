@@ -145,7 +145,7 @@ func TestUpgradeAirflowSaysARunningAirflowNeedsARestart(t *testing.T) {
 		stdout := d.Stdout.(interface{ String() string })
 		require.NoError(t, execute(t, d, "local", "upgrade", "airflow", "3.41"))
 		assert.Contains(t, stdout.String(),
-			"Airflow is still running the old version. Run `astro local restart` when the project is ready.", state)
+			"Airflow is still running the old version. Run astro local restart when the project is ready.", state)
 	}
 	d, _, _ := upgradeDeps(t, upgradeFixture)
 	d.Runtime = statusRuntime{state: localrt.StateStopped}
@@ -199,7 +199,7 @@ func TestUpgradeAirflowWithOttoHandsOttoThePrompt(t *testing.T) {
 	}, cliUpgradePrompt)
 	assert.Equal(t, want, *launched)
 	assert.Contains(t, *launched, "The Astro CLI has already made the mechanical edit")
-	assert.Contains(t, *launched, "bring Airflow up on 3.41: `astro local restart` if it is running, `astro local start` if it is stopped.")
+	assert.Contains(t, *launched, "bring Airflow up on 3.41: astro local restart if it is running, astro local start if it is stopped.")
 }
 
 func TestUpgradeAirflowWithOttoReportsOttosFailure(t *testing.T) {
@@ -308,7 +308,7 @@ func TestUpgradeAirflowWithNoVersionNeedsTheCatalog(t *testing.T) {
 			d.RuntimeCatalog = catalog
 			err := execute(t, d, "local", "upgrade", "airflow", "--with-otto")
 			require.ErrorContains(t, err, "could not read the runtime catalog")
-			require.ErrorContains(t, err, "Pass a version instead, like `astro local upgrade airflow 3.1`")
+			require.ErrorContains(t, err, "Pass a version instead, like astro local upgrade airflow 3.1")
 			assert.Equal(t, upgradeFixture, readText(t, path))
 			assert.Empty(t, *launched, "a version that cannot be picked starts no Otto")
 		})

@@ -225,7 +225,7 @@ func (i Instance) baseURL(ctx context.Context, d Deps) (string, error) {
 		// A local instance with no URL means the record carried no port, which
 		// only happens if the runtime record was written by a build that did
 		// not record one.
-		return "", fmt.Errorf("the local Airflow for %s records no port; restart it with `astro local restart`", i.Project)
+		return "", fmt.Errorf("the local Airflow for %s records no port; restart it with astro local restart", i.Project)
 	}
 	if d.Locator == nil {
 		// Only reachable when a caller builds Deps by hand and leaves the

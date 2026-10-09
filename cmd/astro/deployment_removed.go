@@ -64,7 +64,7 @@ func newRemovedDeploymentObjectCmd(o removedDeploymentObject) *cobra.Command {
 // removedDeploymentObjectGuidance names the replacement for the verb typed,
 // which is the first argument when there is one.
 func removedDeploymentObjectGuidance(o removedDeploymentObject, args []string) string {
-	head := fmt.Sprintf("`astro deployment %s` was removed in v2.\n", o.noun)
+	head := fmt.Sprintf("astro deployment %s was removed in v2.\n", o.noun)
 	if o.envNoun == "" {
 		return head + fmt.Sprintf("Airflow %ss are not in the Environment Manager yet. "+
 			"Until they are, manage them in the Airflow UI or through the Airflow REST API.", o.noun)
@@ -80,7 +80,7 @@ func removedDeploymentObjectGuidance(o removedDeploymentObject, args []string) s
 		return head + fmt.Sprintf("  use:  %s list --deployment <deployment-id>", envCmd)
 	case "create", "cr", "update", "up":
 		return head + fmt.Sprintf("  use:  %s set <key> --deployment <deployment-id>\n"+
-			"`set` creates the object when it does not exist and updates it when it does.", envCmd)
+			"The set command creates the object when it does not exist and updates it when it does.", envCmd)
 	case "delete", "rm":
 		return head + fmt.Sprintf("  use:  %s delete <key> --deployment <deployment-id>", envCmd)
 	case "copy", "cp":

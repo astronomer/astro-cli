@@ -79,9 +79,9 @@ func (m *Manager) ConnectionEnv() ([]string, error) {
 	name := runningMachine(machines, windows)
 	if name == "" {
 		if windows && anyRunning(machines) {
-			const makeDefault = "make the running one the default with `podman system connection default <name>`"
+			const makeDefault = "make the running one the default with podman system connection default <name>"
 			if stopped := stoppedMachine(machines); stopped != "" {
-				return nil, fmt.Errorf("%w as the default; start it with `podman machine start %s`, or "+makeDefault,
+				return nil, fmt.Errorf("%w as the default; start it with podman machine start %s, or "+makeDefault,
 					ErrMachineNotRunning, stopped)
 			}
 			return nil, fmt.Errorf("%w as the default; "+makeDefault, ErrMachineNotRunning)
@@ -93,12 +93,12 @@ func (m *Manager) ConnectionEnv() ([]string, error) {
 			// `podman machine start` has nothing to start here. This is the
 			// state most people upgrading from astro's own machine are in: it
 			// made astro-machine on start and removed it on stop.
-			return nil, fmt.Errorf("%w, and none exists yet; create and start one with `podman machine init --now`", ErrMachineNotRunning)
+			return nil, fmt.Errorf("%w, and none exists yet; create and start one with podman machine init --now", ErrMachineNotRunning)
 		}
 		// Named: a bare `podman machine start` starts only
 		// podman-machine-default, which fails for a leftover astro-machine or
 		// any machine the user named themselves.
-		return nil, fmt.Errorf("%w; start it with `podman machine start %s`", ErrMachineNotRunning, stoppedMachine(machines))
+		return nil, fmt.Errorf("%w; start it with podman machine start %s", ErrMachineNotRunning, stoppedMachine(machines))
 	}
 
 	// A machine ls just listed as running that inspect cannot read is a podman

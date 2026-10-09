@@ -95,7 +95,7 @@ const BuildSecretUsage = "Secret to expose to the build. See https://docs.docker
 // ErrBuildSecretNeedsDockerfile refuses a --build-secret other than netrc for
 // a project whose image is generated rather than built from its own
 // Dockerfile.
-var ErrBuildSecretNeedsDockerfile = errors.New("a generated image reads only the netrc build secret, which the runtime image mounts as /root/.netrc while it installs your requirements. To use another secret, declare a Dockerfile with `dockerfile` under [tool.astro] in pyproject.toml and mount the secret in a RUN step")
+var ErrBuildSecretNeedsDockerfile = errors.New("a generated image reads only the netrc build secret, which the runtime image mounts as /root/.netrc while it installs your requirements. To use another secret, declare a Dockerfile with the dockerfile key under [tool.astro] in pyproject.toml and mount the secret in a RUN step")
 
 // CheckGeneratedBuildSecrets refuses a --build-secret that a generated
 // image's build cannot read: a spec that does not parse, and any id but

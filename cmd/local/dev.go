@@ -64,7 +64,7 @@ func NewDevCmd(d Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     nameDev,
 		Aliases: []string{"d"},
-		Short:   "Removed in v2 — local Airflow lives under `astro local`",
+		Short:   "Removed in v2 — local Airflow lives under astro local",
 		// Listed nowhere: the guidance is for someone who typed the old
 		// command, not a menu entry teaching a command that is gone.
 		Hidden: true,
@@ -178,7 +178,7 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 			p.Replacement, p.Notes = devBuildReplacement(args, dc)
 		}
 	}
-	p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
+	p.Error = fmt.Sprintf("%s was removed in Astro CLI v2", p.Typed)
 	return p
 }
 
@@ -202,7 +202,7 @@ func devStartReplacement(replacement string, args []string, dc devContext) (comm
 	}
 	cmd, notes = withBuildSecrets(cmd, args, dc.buildSecret, dc)
 	if builds && replacement == replaceRestart {
-		notes = append(notes, fmt.Sprintf("With nothing running, restart starts in standalone mode, which builds no image; use `%s --docker` then", replaceStart))
+		notes = append(notes, fmt.Sprintf("With nothing running, restart starts in standalone mode, which builds no image; then use %s --docker", replaceStart))
 	}
 	if slices.ContainsFunc(args, isWaitFlag) {
 		example := "10m"
@@ -301,9 +301,9 @@ func renderDevRemoved(p devRemoved) string {
 	b.WriteString(p.Error)
 	switch {
 	case p.Replacement != "" && p.Convert != "" && p.Replacement != p.Convert:
-		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
+		fmt.Fprintf(&b, ". Convert with %s, then use %s", p.Convert, p.Replacement)
 	case p.Replacement != "":
-		fmt.Fprintf(&b, ". Use `%s` instead", p.Replacement)
+		fmt.Fprintf(&b, ". Use %s instead", p.Replacement)
 	case p.Typed != "astro dev":
 		b.WriteString(" and has no direct replacement")
 	}
@@ -311,7 +311,7 @@ func renderDevRemoved(p devRemoved) string {
 	for _, n := range p.Notes {
 		b.WriteString("\n" + n)
 	}
-	b.WriteString("\nLocal Airflow now lives under `astro local`:\n\n")
+	b.WriteString("\nLocal Airflow now lives under astro local:\n\n")
 	examples := []devReplacement{
 		{Command: nameStart, Replacement: replaceStart},
 		{Command: nameLogs, Replacement: replaceLogs},
@@ -331,7 +331,7 @@ func renderDevRemoved(p devRemoved) string {
 	}
 	if p.Is1xProject {
 		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
-			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
+			"Run %s here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
 			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
 	}
 	return b.String()

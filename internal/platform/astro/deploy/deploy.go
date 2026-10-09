@@ -77,8 +77,8 @@ var (
 )
 
 var (
-	errDagsParseFailed = errors.New("your local Dags did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive // intentional in this shell code
-	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive // intentional in this shell code
+	errDagsParseFailed = errors.New("your local Dags did not parse. Fix the listed errors or use astro deploy [deployment-id] -f to force deploy") //nolint:revive // intentional in this shell code
+	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                //nolint:revive // intentional in this shell code
 )
 
 var (
@@ -1178,7 +1178,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			if err != nil {
 				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file.")
 				fmt.Println("This could be because either your token has expired or you don't have permission to pull the base agent image.")
-				fmt.Println("Please re-login via `astro login` to refresh the credentials or validate that `ASTRO_API_TOKEN` environment variable is set with the correct token and try again")
+				fmt.Println("Please re-login via astro login to refresh the credentials or validate that ASTRO_API_TOKEN environment variable is set with the correct token and try again")
 				return ClientDeploy{}, fmt.Errorf("failed to authenticate with registry %s: %w", baseImageRegistry, err)
 			}
 		}
@@ -1226,7 +1226,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			fmt.Printf("\n--------------------------------\n")
 			fmt.Printf("Failed to push client image to %s\n", registryEndpoint)
 			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")
-			fmt.Printf("Please ensure that you have logged in to `%s` via `docker login` and try again\n\n", registryEndpoint)
+			fmt.Printf("Please ensure that you have logged in to %s via docker login and try again\n\n", registryEndpoint)
 		}
 		return ClientDeploy{}, fmt.Errorf("failed to push client image: %w", err)
 	}

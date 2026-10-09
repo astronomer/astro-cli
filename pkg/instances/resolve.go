@@ -54,7 +54,7 @@ var ErrMutuallyExclusive = errors.New("--deployment and --url cannot be used tog
 // than waiting quietly at the bottom of the rule, so a run that finds no
 // deployment must not leave the reader thinking there is nothing to talk to.
 // The command layer adds the family's own `astro local` form on top.
-const localSpelling = "The Airflow on this machine is not a deployment and never resolves here; it has its own commands, under `astro local`."
+const localSpelling = "The Airflow on this machine is not a deployment and never resolves here; it has its own commands, under astro local."
 
 // ErrNone reports a project with no deployment to act on.
 var ErrNone = errors.New("no deployment to act on: this project links none ([tool.astro.deployments] in pyproject.toml). " +
@@ -64,9 +64,9 @@ var ErrNone = errors.New("no deployment to act on: this project links none ([too
 // a flag, the env var, or a pin left by an older release. The name is reserved
 // rather than unknown, so the message says where the machine went instead of
 // listing deployments it is not one of.
-var ErrLocalNotADeployment = errors.New("`" + LocalName + "` is not a deployment: it is this machine, and it has its own commands — " +
-	"`astro local start` runs it, `astro local af dags list` and `astro local af health` read it. " +
-	"`astro use` selects among deployments only")
+var ErrLocalNotADeployment = errors.New(LocalName + " is not a deployment: it is this machine, and it has its own commands — " +
+	"astro local start runs it, astro local af dags list and astro local af health read it. " +
+	"astro use selects among deployments only")
 
 // UnknownError reports a name no link declares.
 type UnknownError struct {
@@ -84,7 +84,7 @@ func (e *UnknownError) Error() string {
 	case LayerEnv:
 		fmt.Fprintf(&b, " (from %s)", EnvVar)
 	case LayerPin:
-		b.WriteString(" (selected with `astro use`; clear it with `astro use --unset`)")
+		b.WriteString(" (selected with astro use; clear it with astro use --unset)")
 	case LayerFlag, LayerURL, LayerDefault:
 	}
 	if len(e.Known) == 0 {
@@ -104,7 +104,7 @@ type AmbiguousError struct {
 }
 
 func (e *AmbiguousError) Error() string {
-	return fmt.Sprintf("several deployments are linked and none is the default (%s): pick one with -d <name>, export %s=<name>, or select one with `astro use <name>`",
+	return fmt.Sprintf("several deployments are linked and none is the default (%s): pick one with -d <name>, export %s=<name>, or select one with astro use <name>",
 		strings.Join(e.Choices, ", "), EnvVar)
 }
 
@@ -119,7 +119,7 @@ func (s Set) Unknown(layer Layer, name string) error {
 	if layer == LayerPin {
 		// A pin an older release wrote fails every command until it is cleared,
 		// so the way out has to travel with the refusal.
-		return fmt.Errorf("%w (clear it with `astro use --unset`)", ErrLocalNotADeployment)
+		return fmt.Errorf("%w (clear it with astro use --unset)", ErrLocalNotADeployment)
 	}
 	return ErrLocalNotADeployment
 }

@@ -82,8 +82,8 @@ func newEnvVarExportCmd(out io.Writer) *cobra.Command {
 		Use:   "export",
 		Short: "Export environment variables as a .env file",
 		Long: "Write the scope's environment variables as KEY=VALUE lines. Secret values are " +
-			"left blank unless --include-secrets is set. With -o json, the variables as " +
-			"`list -o json` prints them.",
+			"left blank unless --include-secrets is set. With -o json, the variables in the shape " +
+			"list -o json prints.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runEnvVarList(cmd, out, true)
 		},

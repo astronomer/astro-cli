@@ -319,7 +319,7 @@ func (c *carriedSettings) readConnections(conns []settingsConn) {
 			// anyway, minus the part where nothing said so.
 			c.advisories = append(c.advisories, id+
 				": declared as a required connection, with no value to carry. "+
-				"Set it with `astro local env connection set "+id+"`")
+				"Set it with astro local env connection set "+id)
 			continue
 		}
 		c.secrets = append(c.secrets, SecretWrite{
@@ -369,7 +369,7 @@ func (c *carriedSettings) readVariables(vars []settingsVar) {
 			c.schema.AirflowVariables[name] = envschema.ValueSpec{Secret: true, HasSecret: true, Optional: true}
 			c.advisories = append(c.advisories, name+
 				": declared as an optional Airflow variable, since it had no value to carry. "+
-				"Set it with `astro local env airflow-variable set "+name+"`")
+				"Set it with astro local env airflow-variable set "+name)
 			continue
 		}
 		c.schema.AirflowVariables[name] = envschema.ValueSpec{Secret: true, HasSecret: true}
@@ -671,10 +671,10 @@ func valueCount(writes []SecretWrite) string {
 func setCommands(writes []SecretWrite) string {
 	var cmds []string
 	if slices.ContainsFunc(writes, func(w SecretWrite) bool { return w.Kind == secrets.KindConn }) {
-		cmds = append(cmds, "`astro local env connection set <id>`")
+		cmds = append(cmds, "astro local env connection set <id>")
 	}
 	if slices.ContainsFunc(writes, func(w SecretWrite) bool { return w.Kind == secrets.KindVar }) {
-		cmds = append(cmds, "`astro local env airflow-variable set <key>`")
+		cmds = append(cmds, "astro local env airflow-variable set <key>")
 	}
 	return strings.Join(cmds, " and ")
 }

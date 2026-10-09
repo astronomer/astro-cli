@@ -21,7 +21,7 @@ import (
 
 const blockedByHibernation = `{"message":"Deploy is blocked because Deployment is in HIBERNATING state","statusCode":400}`
 
-const wakeUpHint = "Astro Deployment test-deployment-id (\"test-deployment\") is hibernating, so it cannot take a deploy — wake it with `astro deployment wake-up test-deployment-id`"
+const wakeUpHint = "Astro Deployment test-deployment-id (\"test-deployment\") is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id"
 
 func refuse(status int, body string) error {
 	return httputil.NormalizeAPIError(&http.Response{StatusCode: status}, []byte(body))
@@ -129,7 +129,7 @@ func TestDeleteBundle_HibernatingSaysHowToWakeIt(t *testing.T) {
 			name: "a Deployment named by id",
 			dep:  nil,
 			body: blockedByHibernation,
-			hint: "Astro Deployment test-deployment-id is hibernating, so it cannot take a deploy — wake it with `astro deployment wake-up test-deployment-id`",
+			hint: "Astro Deployment test-deployment-id is hibernating, so it cannot take a deploy — wake it with astro deployment wake-up test-deployment-id",
 		},
 	}
 	for _, tc := range cases {

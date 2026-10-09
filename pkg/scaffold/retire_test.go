@@ -158,6 +158,6 @@ func TestTheComposeOverrideNotesNameDockerMode(t *testing.T) {
 	res, err := Run(dir, Options{})
 	require.NoError(t, err)
 
-	assert.Contains(t, res.Notes, "docker-compose.override.yml: read in Docker mode — `astro local start --docker` merges it over the services it generates; standalone mode does not run it")
+	assert.Contains(t, res.Notes, "docker-compose.override.yml: read in Docker mode — astro local start --docker merges it over the services it generates; standalone mode does not run it")
 	assert.Contains(t, res.Notes, "docker-compose.override.yaml: not read — Docker mode merges docker-compose.override.yml, so rename it to use it there")
 }

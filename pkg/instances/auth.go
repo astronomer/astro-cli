@@ -70,7 +70,7 @@ func credentials(ctx context.Context, i Instance, baseURL string, d Deps) (airfl
 
 // errLoggedOut reports a machine with neither a session nor the CI token. Both
 // ways of having no session say the same thing, because the fix is the same.
-var errLoggedOut = errors.New("you are not logged in — log in with `astro login`, or set " + EnvAPIToken)
+var errLoggedOut = errors.New("you are not logged in — log in with astro login, or set " + EnvAPIToken)
 
 // astroCredentials proves the caller with the Astro session. ASTRO_API_TOKEN
 // wins when it is set, because that is how CI supplies an identity with no

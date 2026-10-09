@@ -164,7 +164,7 @@ func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
 		return nil
 	}
 	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
-		"`astro` user and takes its service set from the runtime tag, so another base cannot start. "+
+		"astro user and takes its service set from the runtime tag, so another base cannot start. "+
 		"Base the final stage on astrocrpublic.azurecr.io/runtime",
 		airflowrt.ErrUnsupportedBase, declared, base.Image)
 }
@@ -972,7 +972,7 @@ func (a *airflow) Env() ([]string, error) {
 // errContainersDown is an exec into a project whose record is left but whose
 // containers are down. It matches localstate.ErrNotRunning, so a caller reports
 // it as not running, without that sentinel's "nothing recorded" text.
-var errContainersDown = containersDown("this project's Docker containers are not running; start them first: `astro local start --docker`")
+var errContainersDown = containersDown("this project's Docker containers are not running; start them first: astro local start --docker")
 
 type containersDown string
 

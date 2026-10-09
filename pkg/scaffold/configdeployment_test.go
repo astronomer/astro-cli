@@ -156,9 +156,9 @@ func TestConfigInstancesAreReported(t *testing.T) {
 		"  - name: not a plain name\n    source: astro\n    deployment_id: cm1odd\n"+
 		"  - name: orders\n    source: mwaa\n")
 	require.Len(t, about, 1, "notes: %v", res.Notes)
-	assert.Equal(t, ".astro/config.yaml: its `instances` list names deployment links this run did not carry into pyproject.toml. "+
-		"Link each one with `astro link add prod --deployment cm1prod`, `astro link add dev --deployment cm1dev`, "+
-		"`astro link add <name> --deployment cm1odd`, `astro link add orders --target mwaa`", about[0])
+	assert.Equal(t, ".astro/config.yaml: its instances list names deployment links this run did not carry into pyproject.toml. "+
+		"Link each one with astro link add prod --deployment cm1prod; astro link add dev --deployment cm1dev; "+
+		"astro link add <name> --deployment cm1odd; astro link add orders --target mwaa", about[0])
 	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.Empty(t, m.Astro.Deployments, "the links are reported, not converted")
@@ -175,7 +175,7 @@ func TestConfigInstancesReadTheIDUnderAuth(t *testing.T) {
 		"  - auth:\n      kind: astro_pat\n    name: example\n    source: astro\n"+
 		"  - auth:\n      deployment_id: cm1auth\n    deployment_id: cm1top\n    name: both\n    source: astro\n")
 	require.Len(t, about, 1, "notes: %v", res.Notes)
-	assert.Equal(t, ".astro/config.yaml: its `instances` list names deployment links this run did not carry into pyproject.toml. "+
-		"Link each one with `astro link add example-dev --deployment cexampledeployment0000001`, "+
-		"`astro link add example --deployment <id>`, `astro link add both --deployment cm1top`", about[0])
+	assert.Equal(t, ".astro/config.yaml: its instances list names deployment links this run did not carry into pyproject.toml. "+
+		"Link each one with astro link add example-dev --deployment cexampledeployment0000001; "+
+		"astro link add example --deployment <id>; astro link add both --deployment cm1top", about[0])
 }
