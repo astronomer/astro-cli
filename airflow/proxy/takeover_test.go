@@ -19,7 +19,6 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
-	"github.com/astronomer/astro-cli/version"
 )
 
 // fakeV1PortEnv makes the test binary act as an astro 1.x proxy on the port it
@@ -167,45 +166,9 @@ func TestV1ProxyPort(t *testing.T) {
 	}
 }
 
-func TestIsNewerVersion(t *testing.T) {
-	assert.True(t, isNewerVersion("2.1.0", "2.0.0"))
-	assert.True(t, isNewerVersion("v2.0.1", "2.0.0"))
-	assert.False(t, isNewerVersion("2.0.0", "2.0.0"))
-	assert.False(t, isNewerVersion("1.45.0", "2.0.0"))
-	assert.False(t, isNewerVersion("3.0.0", "2.0.0"), "another major version is not adopted")
-	assert.False(t, isNewerVersion("SNAPSHOT-1da4950", "2.0.0"))
-	assert.False(t, isNewerVersion("2.1.0", "SNAPSHOT-1da4950"))
-}
-
-// Two v2 builds side by side, say from two release channels, must not stop
-// each other's daemon: the older one adopts the newer one's.
-func TestEnsureRunningKeepsANewerDaemon(t *testing.T) {
-	setupTestDir(t)
-	origVersion := version.CurrVersion
-	version.CurrVersion = "2.0.0"
-	t.Cleanup(func() { version.CurrVersion = origVersion })
-
-	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
-	require.NoError(t, pkgproxy.WriteRecord(pidFilePath(), pkgproxy.Record{PID: os.Getpid(), Version: "2.1.0", Port: "16123"}))
-
-	origIsProxy := isProxyDaemon
-	isProxyDaemon = func(int, string) bool { return true }
-	t.Cleanup(func() { isProxyDaemon = origIsProxy })
-	origStart := StartDaemon
-	StartDaemon = func(string) (string, error) {
-		t.Fatal("a newer daemon must be adopted, not replaced")
-		return "", nil
-	}
-	t.Cleanup(func() { StartDaemon = origStart })
-
-	port, err := EnsureRunning("6563")
-	require.NoError(t, err)
-	assert.Equal(t, "16123", port)
-}
-
-// A real process that runs the way a 1.x proxy runs holds a port; starting the
-// daemon for that port stops it and finds the port free.
-func TestEnsureRunningTakesThePortFromARunningV1Proxy(t *testing.T) {
+// A real process that runs the way a 1.x proxy runs holds a port; what the
+// daemon runs before starting on that port stops it and finds the port free.
+func TestBeforeStartTakesThePortFromARunningV1Proxy(t *testing.T) {
 	astroHome := setupAstroHome(t)
 	origList, origStop := listOwnProcesses, stopProcess
 	listOwnProcesses, stopProcess = ownProcesses, realStopProcess
@@ -224,36 +187,14 @@ func TestEnsureRunningTakesThePortFromARunningV1Proxy(t *testing.T) {
 	t.Cleanup(func() { fake.Process.Kill() })
 	require.Eventually(t, func() bool { return !pkgproxy.IsPortAvailable(port) }, 5*time.Second, 20*time.Millisecond)
 
-	origStart := StartDaemon
-	StartDaemon = func(p string) (string, error) {
-		assert.True(t, pkgproxy.IsPortAvailable(p), "the 1.x proxy should be gone before the daemon starts")
-		return p, nil
-	}
-	t.Cleanup(func() { StartDaemon = origStart })
+	// The daemon's own BeforeStart, which is what pkg/proxy runs before a
+	// start; that it runs there, and before the start, is pkg/proxy's test.
+	daemon().BeforeStart(port)
 
-	got, err := EnsureRunning(port)
-	require.NoError(t, err)
-	assert.Equal(t, port, got)
+	assert.True(t, pkgproxy.IsPortAvailable(port), "the 1.x proxy should be gone before the daemon starts")
 	select {
 	case <-exited:
 	case <-time.After(stopTimeout):
 		t.Fatal("the 1.x proxy is still running")
 	}
-}
-
-func TestStartProxyRemembersItsFallbackPort(t *testing.T) {
-	setupTestDir(t)
-	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
-	taken := listen(t, http.NotFoundHandler())
-
-	first, err := startProxy(taken)
-	require.NoError(t, err)
-	fallback := first.Port()
-	first.Stop()
-	require.NotEqual(t, taken, fallback)
-
-	second, err := startProxy(taken)
-	require.NoError(t, err)
-	defer second.Stop()
-	assert.Equal(t, fallback, second.Port(), "the second start should reuse the port the first fell back to")
 }
