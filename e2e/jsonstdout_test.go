@@ -287,6 +287,29 @@ func copyTree(t *testing.T, src, dst string) {
 // way would be on stdout ahead of the error object, as it once was.
 func writeLogin(t *testing.T, p *project, platform string) {
 	t.Helper()
+	writeHomeContext(t, p, platform, `    token: Bearer e2e-not-a-token
+    expiresin: 2100-01-01T00:00:00Z
+    organization: e2e-organization
+    organization_product: HOSTED
+    workspace: e2e-workspace
+    last_used_workspace: e2e-workspace
+    user_email: e2e@example.invalid
+`)
+}
+
+// writeContext is writeLogin without the login: a current context on platform,
+// at the same refusing hosts, and no session. For a command that reads only
+// which platform is current, where a stored token would be a liability: the
+// root moves it to the OS keyring, which trips checkVaultUntouched.
+func writeContext(t *testing.T, p *project, platform string) {
+	t.Helper()
+	writeHomeContext(t, p, platform, "")
+}
+
+// writeHomeContext writes the home config writeLogin and writeContext share,
+// with login appended to the localhost context's fields.
+func writeHomeContext(t *testing.T, p *project, platform, login string) {
+	t.Helper()
 	cfg := fmt.Sprintf(`context: localhost
 local:
   core: %[1]s
@@ -295,14 +318,7 @@ local:
 contexts:
   localhost:
     domain: localhost
-    token: Bearer e2e-not-a-token
-    expiresin: 2100-01-01T00:00:00Z
-    organization: e2e-organization
-    organization_product: HOSTED
-    workspace: e2e-workspace
-    last_used_workspace: e2e-workspace
-    user_email: e2e@example.invalid
-`, refusingHost, platform)
+`, refusingHost, platform) + login
 	dir := mkdir(t, p.home, ".astro")
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(cfg), 0o600); err != nil {
 		t.Fatalf("writing the home config: %v", err)

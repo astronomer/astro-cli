@@ -155,8 +155,9 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// A single positional argument is Otto's first message in an interactive
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
-	// The deploy this tree mounted decides what `astro init` may retire: APC's
-	// builds a converted project's 1.x Dockerfile.
+	// The deploy this tree mounted is where `astro init` assumes a converted
+	// project deploys when the project does not say: APC's builds its 1.x
+	// Dockerfile, so it is kept, and a saved target is not made an Astro link.
 	coreDeps.DeploysToAPC = !isCloudCtx
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 

@@ -88,10 +88,11 @@ type project1x struct {
 	// inside it, and deleting that file while keeping the build that reads it is
 	// worse than either outcome alone.
 	dockerfileBody []byte
-	// apcBuild reports a Dockerfile that APC's `astro deploy` builds, because
-	// the caller said the project deploys there (Options.DeploysToAPC). Set by
-	// Plan, not read from the files.
-	apcBuild bool
+	// onbuild is what the Dockerfile's base does with requirements.txt and
+	// packages.txt when it is built: an Astro Runtime image installs both
+	// through its ONBUILD steps, a -base one (runtime:3.1-12-base) is the
+	// flavor built without them, and any other base is not known here.
+	onbuild onbuildKind
 	// projectName is the name .astro/config.yaml states, before any
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.
@@ -171,7 +172,7 @@ const config1xRelPath = ".astro/config.yaml"
 func read1xProject(dir string) (*project1x, error) {
 	from1x := &project1x{}
 
-	if data, err := readIfPresent(filepath.Join(dir, "requirements.txt")); err != nil {
+	if data, err := readIfPresent(filepath.Join(dir, fileRequirements)); err != nil {
 		return nil, err
 	} else if data != nil {
 		deps, notes := parseRequirements(data)
@@ -179,14 +180,14 @@ func read1xProject(dir string) (*project1x, error) {
 		if pinsAirflow(deps) {
 			from1x.statedVersion = true
 		}
-		from1x.present = append(from1x.present, "requirements.txt")
+		from1x.present = append(from1x.present, fileRequirements)
 	}
 
-	if data, err := readIfPresent(filepath.Join(dir, "packages.txt")); err != nil {
+	if data, err := readIfPresent(filepath.Join(dir, filePackages)); err != nil {
 		return nil, err
 	} else if data != nil {
 		from1x.packages = parsePackages(data)
-		from1x.present = append(from1x.present, "packages.txt")
+		from1x.present = append(from1x.present, filePackages)
 	}
 
 	// The project's own name, which is the one thing in .astro/config.yaml a
@@ -213,7 +214,7 @@ func read1xProject(dir string) (*project1x, error) {
 		from1x.present = append(from1x.present, SettingsRelPath)
 	}
 
-	if data, err := readIfPresent(filepath.Join(dir, "Dockerfile")); err != nil {
+	if data, err := readIfPresent(filepath.Join(dir, fileDockerfile)); err != nil {
 		return nil, err
 	} else if data != nil {
 		version, stated, notes := airflowFromDockerfile(data)
@@ -222,15 +223,16 @@ func read1xProject(dir string) (*project1x, error) {
 		from1x.notes = append(from1x.notes, notes...)
 		from1x.notes = append(from1x.notes, build...)
 		from1x.notes = append(from1x.notes, pipInstallNote(data)...)
-		from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, "Dockerfile"))...)
+		from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
 		if stated {
 			from1x.statedVersion = true
 		}
-		from1x.present = append(from1x.present, "Dockerfile")
+		from1x.present = append(from1x.present, fileDockerfile)
 		from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
 		from1x.dockerfileBody = data
 		if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); base.RuntimeVersion() != "" {
 			_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
+			from1x.onbuild = runtimeOnbuild(base.Tag)
 		}
 		// Two sources for one list, so say it rather than let someone find out.
 		//
@@ -242,7 +244,7 @@ func read1xProject(dir string) (*project1x, error) {
 		// at once is deliberate and is exactly the kind of thing that reads as a
 		// conversion bug when nothing mentions it.
 		if !from1x.dockerfilePinOnly {
-			for _, kept := range []string{"requirements.txt", "packages.txt"} {
+			for _, kept := range []string{fileRequirements, filePackages} {
 				if slices.Contains(from1x.present, kept) {
 					from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
 						"during the build. Its contents are in pyproject.toml as well, which is what a project "+

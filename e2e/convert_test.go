@@ -219,7 +219,41 @@ func cases1x() []case1x {
 			manifestLacks: []string{"dockerfile ="},
 			kept:          []string{"Dockerfile", "requirements.txt", "packages.txt", ".astro/config.yaml"},
 			keptHas:       map[string]string{"Dockerfile": "astro-runtime:3.1-12", "requirements.txt": "pandas==2.1.0"},
-			notes:         []string{"kept, because the current context is Astro Private Cloud"},
+			notes:         []string{"Dockerfile, packages.txt and requirements.txt: kept for Astro Private Cloud (the current context)"},
+		},
+		{
+			// A saved deploy target in its cuid shape is what both platforms
+			// save, so the context decides it, and the link follows the same
+			// answer the retirement does: under APC the target stays a note
+			// beside the kept build rather than becoming an Astro link.
+			name: "a saved cuid deploy target, under an APC context",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
+					"  deployment: cm1ordersdeployment000001\n  workspace: cm1ordersworkspace0000001\n",
+				"Dockerfile": runtime3,
+			},
+			platform:      "software",
+			airflow:       "3.1",
+			projectName:   "orders-pipeline",
+			manifestLacks: []string{"[tool.astro.deployments]", "dockerfile ="},
+			kept:          []string{"Dockerfile", ".astro/config.yaml"},
+			notes:         []string{"Dockerfile: kept for Astro Private Cloud", "is this project's saved deploy target"},
+		},
+		{
+			// The project's own answer outranks the context's: a saved Software
+			// release name is no Astro Deployment, so the APC build is kept
+			// under an Astro context too, and the note says why.
+			name: "a saved release name, under an Astro context",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n  deployment: celestial-gravity-1234\n",
+				"Dockerfile":         runtime3,
+				"requirements.txt":   "pandas==2.1.0\n",
+			},
+			platform:    "cloud",
+			airflow:     "3.1",
+			projectName: "orders-pipeline",
+			kept:        []string{"Dockerfile", "requirements.txt", ".astro/config.yaml"},
+			notes:       []string{"saves celestial-gravity-1234 as its deploy target, an Astro Private Cloud release name"},
 		},
 		{
 			// A Dockerfile that does more than pin becomes the project's
@@ -614,19 +648,6 @@ func TestInitConvertsA1xProject(t *testing.T) {
 			// tier on a keyring prompt.
 			checkVaultUntouched(t, p)
 		})
-	}
-}
-
-// writeContext gives p's home a current context on platform ("cloud" or
-// "software", the config's local.platform for a localhost domain) and no
-// login. Not writeLogin: a stored token is moved to the OS keyring by the
-// root, which would trip checkVaultUntouched, and init reads no session.
-func writeContext(t *testing.T, p *project, platform string) {
-	t.Helper()
-	cfg := "context: localhost\nlocal:\n  platform: " + platform + "\ncontexts:\n  localhost:\n    domain: localhost\n"
-	dir := mkdir(t, p.home, ".astro")
-	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(cfg), 0o600); err != nil {
-		t.Fatalf("writing the home config: %v", err)
 	}
 }
 

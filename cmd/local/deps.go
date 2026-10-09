@@ -156,11 +156,13 @@ type Deps struct {
 	LaunchOtto func(prompt string) error
 
 	// DeploysToAPC reports that the current context is Astro Private Cloud,
-	// whose `astro deploy` builds only a 1.x project, so `astro init` keeps
-	// the Dockerfile, requirements.txt and packages.txt it would otherwise
-	// retire (scaffold.Options.DeploysToAPC). The root sets it from the
-	// platform it mounted, because the context lives in config/, which this
-	// tree never imports. false is Astro, as it is with no context at all.
+	// whose `astro deploy` builds only a 1.x project. `astro init` hands it to
+	// the conversion as scaffold.Options.DeploysToAPC, the answer used when
+	// the project does not say where it deploys: it then keeps the Dockerfile,
+	// requirements.txt and packages.txt it would otherwise retire, and leaves
+	// a saved deploy target a note rather than an Astro link. The root sets it
+	// from the platform it mounted, because the context lives in config/,
+	// which this tree never imports. false is Astro, as it is with no context.
 	DeploysToAPC bool
 }
 

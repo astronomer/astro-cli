@@ -51,7 +51,7 @@ func setProjectName(ed tomledit.Editor, dir string, opts *Options, from1x *proje
 	return advisory, nil
 }
 
-func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
+func adopt(dir string, data []byte, opts *Options, from1x *project1x, apc bool, res *Result) (out []byte, labels []string, pin manifestFacts, err error) {
 	path := filepath.Join(dir, manifest.Marker)
 	ed, err := tomledit.NewSurgical(data)
 	if err != nil {
@@ -85,7 +85,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 			"dependencies from [project] dynamic", path, airflowRequirement(example))
 	}
 	pick := pickAirflowVersion(opts.AirflowVersion, deps, from1x, opts.Default)
-	if err := refuseAdoptedDockerfileOfAnotherAirflow(dir, from1x, opts.AirflowVersion, deps); err != nil {
+	if err := refuseAdoptedDockerfileOfAnotherAirflow(dir, from1x, apc, opts.AirflowVersion, deps); err != nil {
 		return nil, nil, pin, err
 	}
 	version, defaulted := pick.version, pick.defaulted()
@@ -158,7 +158,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 	// it is load-bearing there for the same reason it is in the greenfield arm.
 	// Both arms declare it or the field would only be true of projects that
 	// arrived one particular way.
-	if err := set1xDeclarations(ed, from1x); err != nil {
+	if err := set1xDeclarations(ed, from1x, apc); err != nil {
 		return nil, nil, pin, err
 	}
 
