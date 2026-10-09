@@ -101,6 +101,8 @@ type case1x struct {
 	// ("software" for APC, "cloud" for Astro; see writeLogin). Empty is a
 	// machine that never logged in, which the CLI treats as Astro.
 	platform string
+	// args are passed to init after its own.
+	args []string
 }
 
 // stock1xSettings is the airflow_settings.yaml 1.x's `astro dev init` wrote,
@@ -219,7 +221,26 @@ func cases1x() []case1x {
 			manifestLacks: []string{"dockerfile ="},
 			kept:          []string{"Dockerfile", "requirements.txt", "packages.txt", ".astro/config.yaml"},
 			keptHas:       map[string]string{"Dockerfile": "astro-runtime:3.1-12", "requirements.txt": "pandas==2.1.0"},
-			notes:         []string{"Dockerfile, packages.txt and requirements.txt: kept for Astro Private Cloud (the current context)"},
+			notes: []string{"Dockerfile, packages.txt and requirements.txt: kept for Astro Private Cloud, " +
+				"whose `astro deploy` builds the project from its Dockerfile as it stands; " +
+				"its runtime base image installs packages.txt and requirements.txt during that build. " +
+				"pyproject.toml carries the same Airflow version, dependencies and OS packages for `astro local` and Astro, " +
+				"so change both together while the project deploys to Astro Private Cloud, and delete them if it deploys " +
+				"to Astro instead. This run converted the project for Astro Private Cloud because the current context is " +
+				"Astro Private Cloud (localhost); to convert for Astro instead, pass --deploy-target astro"},
+		},
+		{
+			// The flag outranks the context, in both directions.
+			name: "a runtime tag that names the Airflow version, --deploy-target astro under an APC context",
+			files: map[string]string{
+				"Dockerfile":       runtime3,
+				"requirements.txt": "pandas==2.1.0\n",
+			},
+			platform: "software",
+			args:     []string{"--deploy-target", "astro"},
+			airflow:  "3.1",
+			retired:  []string{"Dockerfile", "requirements.txt"},
+			noNotes:  true,
 		},
 		{
 			// A saved deploy target in its cuid shape is what both platforms
@@ -237,12 +258,39 @@ func cases1x() []case1x {
 			projectName:   "orders-pipeline",
 			manifestLacks: []string{"[tool.astro.deployments]", "dockerfile ="},
 			kept:          []string{"Dockerfile", ".astro/config.yaml"},
-			notes:         []string{"Dockerfile: kept for Astro Private Cloud", "is this project's saved deploy target"},
+			notes: []string{
+				"Dockerfile: kept for Astro Private Cloud",
+				"cm1ordersdeployment000001 in workspace cm1ordersworkspace0000001 is this project's saved deploy target, " +
+					"which Astro Private Cloud's `astro deploy` reads from this file, so it stays here rather than " +
+					"becoming a [tool.astro.deployments] link",
+			},
 		},
 		{
-			// The project's own answer outranks the context's: a saved Software
-			// release name is no Astro Deployment, so the APC build is kept
-			// under an Astro context too, and the note says why.
+			// --deploy-target apc converts for APC under an Astro context, and
+			// a saved target that looks like a Software release name does not
+			// decide either way: the flag did, and the notes say so.
+			name: "a saved release name, --deploy-target apc under an Astro context",
+			files: map[string]string{
+				".astro/config.yaml": "project:\n  name: orders-pipeline\n  deployment: celestial-gravity-1234\n",
+				"Dockerfile":         runtime3,
+				"requirements.txt":   "pandas==2.1.0\n",
+			},
+			platform:      "cloud",
+			args:          []string{"--deploy-target", "apc"},
+			airflow:       "3.1",
+			projectName:   "orders-pipeline",
+			manifestLacks: []string{"[tool.astro.deployments]", "dockerfile ="},
+			kept:          []string{"Dockerfile", "requirements.txt", ".astro/config.yaml"},
+			notes: []string{
+				"Dockerfile and requirements.txt: kept for Astro Private Cloud",
+				"This run converted the project for Astro Private Cloud because of --deploy-target apc; " +
+					"to convert for Astro instead, pass --deploy-target astro",
+			},
+		},
+		{
+			// Without the flag the same project converts for the Astro
+			// context: the release-name shape is no signal, since an Astro
+			// Deployment's namespace has it too.
 			name: "a saved release name, under an Astro context",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: orders-pipeline\n  deployment: celestial-gravity-1234\n",
@@ -252,8 +300,14 @@ func cases1x() []case1x {
 			platform:    "cloud",
 			airflow:     "3.1",
 			projectName: "orders-pipeline",
-			kept:        []string{"Dockerfile", "requirements.txt", ".astro/config.yaml"},
-			notes:       []string{"saves celestial-gravity-1234 as its deploy target, an Astro Private Cloud release name"},
+			retired:     []string{"Dockerfile", "requirements.txt"},
+			kept:        []string{".astro/config.yaml"},
+			notes: []string{
+				"celestial-gravity-1234 is this project's saved deploy target. If that is an Astro Deployment, " +
+					"give it a name under [tool.astro.deployments]",
+				"This run converted the project for Astro because the current context is Astro (localhost); " +
+					"to convert for Astro Private Cloud instead, pass --deploy-target apc",
+			},
 		},
 		{
 			// A Dockerfile that does more than pin becomes the project's
@@ -623,12 +677,13 @@ func TestInitConvertsA1xProject(t *testing.T) {
 			}
 
 			var res initResult
+			args := append([]string{"init", "--output", "json"}, tc.args...)
 			if tc.platform == "" {
-				p.run("init", "--output", "json").requireSuccess().requireJSON(&res)
+				p.run(args...).requireSuccess().requireJSON(&res)
 			} else {
 				// runIn keeps every request off the network.
 				writeContext(t, p, tc.platform)
-				runIn(t, p, "init", "--output", "json").requireSuccess().requireJSON(&res)
+				runIn(t, p, args...).requireSuccess().requireJSON(&res)
 			}
 
 			if tc.airflow != "" && res.Airflow != tc.airflow {

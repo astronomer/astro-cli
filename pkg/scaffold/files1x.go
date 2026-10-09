@@ -656,11 +656,20 @@ func airflowFromDockerfile(data []byte) (version string, stated bool, notes []st
 		p := runtimeTagRe.FindStringSubmatch(bare)
 		return p[1] + "." + p[2], true, nil
 	case oldRuntimeTagRe.MatchString(bare):
-		return "2", true, []string{prefix + "runtime " + tag + " is an Airflow 2 image whose tag does not name the Airflow minor, " +
+		return "2", true, []string{prefix + "runtime " + tag + minorlessClause +
 			"so the pin is \"2\", meaning the newest Airflow 2. Set it explicitly if this project needs a particular one"}
 	default:
 		return "", true, []string{prefix + "the tag " + tag + " is not an Astro Runtime version, so the Airflow version was not read from it"}
 	}
+}
+
+// minorlessClause is what marks airflowFromDockerfile's note on an Airflow 2
+// tag, so pinAPCBuildSeries can find the note it replaces.
+const minorlessClause = " is an Airflow 2 image whose tag does not name the Airflow minor, "
+
+// isMinorlessNote reports airflowFromDockerfile's note on an Airflow 2 tag.
+func isMinorlessNote(note string) bool {
+	return strings.HasPrefix(note, "Dockerfile: runtime ") && strings.Contains(note, minorlessClause)
 }
 
 // buildInstructionRe finds a Dockerfile instruction that is not FROM.

@@ -39,6 +39,7 @@ const (
 // either platform branch with no ambient config and no network.
 type rootOptions struct {
 	platform      string // cloudPlatform or apcPlatform
+	domain        string // the current context's, empty with none
 	loggedIn      bool
 	houstonClient houston.ClientInterface
 	out           io.Writer
@@ -51,8 +52,13 @@ func detectRootOptions() rootOptions {
 	if !context.IsCloudContext() {
 		platform = apcPlatform
 	}
+	var domain string
+	if c, err := context.GetCurrentContext(); err == nil {
+		domain = c.Domain
+	}
 	return rootOptions{
 		platform:      platform,
+		domain:        domain,
 		loggedIn:      true,
 		houstonClient: houston.NewClient(houston.NewHTTPClient()),
 		out:           os.Stdout,
@@ -155,10 +161,11 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// A single positional argument is Otto's first message in an interactive
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
-	// The deploy this tree mounted is where `astro init` assumes a converted
-	// project deploys when the project does not say: APC's builds its 1.x
+	// The deploy this tree mounted is where `astro init` converts a project
+	// for unless --deploy-target says otherwise: APC's builds its 1.x
 	// Dockerfile, so it is kept, and a saved target is not made an Astro link.
 	coreDeps.DeploysToAPC = !isCloudCtx
+	coreDeps.ContextDomain = o.domain
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)

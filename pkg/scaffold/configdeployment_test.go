@@ -139,7 +139,7 @@ func TestTheDeployTargetNoteDescribesAManifestThatParses(t *testing.T) {
 	_, err = manifest.Parse([]byte(bare))
 	require.Error(t, err, "the shape the old wording described")
 
-	note := deployTargetNote("cm1orders", "cm1ws")
+	note := deployTargetNote("cm1orders", "cm1ws", &deployTarget{})
 	assert.Contains(t, note, "[tool.astro.deployments.prod]",
 		"the note has to name the table, not just the section it sits in")
 	assert.Contains(t, note, "deployment = 'cm1orders'")

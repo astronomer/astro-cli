@@ -67,7 +67,7 @@ func excludes(pm *patternmatcher.PatternMatcher, path string, isDir bool) bool {
 // kept for APC's deploy (apc, see deployTarget), which builds it with the same
 // context.
 func planKeptDockerfileIgnore(dir string, from1x *project1x, apc bool, cs *Changeset) error {
-	if !declaresDockerfile(from1x) && (!apc || !from1x.hasDockerfile()) {
+	if !buildsDockerfile(from1x, apc) {
 		return nil
 	}
 	ignore, err := planDockerignore(dir, fileDockerfile)

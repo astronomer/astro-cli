@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // initDeps pins WorkingDir to one directory (testDeps mints a fresh temp dir
@@ -59,22 +61,95 @@ func TestInitSuggestsDockerForAKeptDockerfile(t *testing.T) {
 	}
 }
 
-// The platform the root mounted reaches the conversion: APC's deploy builds the
-// 1.x Dockerfile, so under an APC context a pin-only one is kept, and under
-// Astro it is retired as before.
-func TestInitKeepsThe1xBuildForAPC(t *testing.T) {
-	for _, apc := range []bool{true, false} {
-		d, dir, _ := initDeps(t)
-		d.DeploysToAPC = apc
-		if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if err := execute(t, d, "init"); err != nil {
-			t.Fatalf("astro init (APC %v): %v", apc, err)
-		}
-		_, err := os.Stat(filepath.Join(dir, "Dockerfile"))
-		if kept := err == nil; kept != apc {
-			t.Errorf("APC %v: Dockerfile kept = %v, want %v", apc, kept, apc)
+// --deploy-target decides the platform a conversion is for when it is given,
+// and the current context when it is not. APC's deploy builds the 1.x
+// Dockerfile, so for APC a pin-only one is kept, and for Astro it is retired.
+// The note on what was kept says what decided and how to choose the other.
+func TestInitDeployTargetDecidesTheBuild(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		apcContext   bool
+		flag         string
+		wantKept     bool
+		wantDecision string
+	}{
+		{
+			name: "an APC context", apcContext: true, wantKept: true,
+			wantDecision: "because the current context is Astro Private Cloud (apc.example.com); " +
+				"to convert for Astro instead, pass --deploy-target astro",
+		},
+		{name: "an Astro context"},
+		{
+			name: "--deploy-target apc under an Astro context", flag: "apc", wantKept: true,
+			wantDecision: "because of --deploy-target apc; to convert for Astro instead, pass --deploy-target astro",
+		},
+		{name: "--deploy-target astro under an APC context", apcContext: true, flag: "astro"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, dir, stdout := initDeps(t)
+			d.DeploysToAPC = tc.apcContext
+			d.ContextDomain = "apc.example.com"
+			if !tc.apcContext {
+				d.ContextDomain = "astronomer.io"
+			}
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"init"}
+			if tc.flag != "" {
+				args = append(args, "--deploy-target", tc.flag)
+			}
+			if err := execute(t, d, args...); err != nil {
+				t.Fatalf("astro init: %v", err)
+			}
+			_, err := os.Stat(filepath.Join(dir, "Dockerfile"))
+			if kept := err == nil; kept != tc.wantKept {
+				t.Errorf("Dockerfile kept = %v, want %v", kept, tc.wantKept)
+			}
+			out := stdout.String()
+			if tc.wantDecision != "" && !strings.Contains(out, "This run converted the project for Astro Private Cloud "+tc.wantDecision) {
+				t.Errorf("want the note to say what decided:\n%s", out)
+			}
+			if tc.wantDecision == "" && strings.Contains(out, "Astro Private Cloud") {
+				t.Errorf("an Astro conversion with nothing kept says nothing of APC:\n%s", out)
+			}
+		})
+	}
+}
+
+// Any other value is refused as a usage error while flags are parsed, before
+// anything is written.
+func TestInitRefusesAnUnknownDeployTarget(t *testing.T) {
+	d, dir, _ := initDeps(t)
+	err := execute(t, d, "init", "--deploy-target", "software")
+	if err == nil || !cliout.IsUsage(err) || !strings.Contains(err.Error(), "must be astro or apc") {
+		t.Fatalf("want a usage error naming the values, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err == nil {
+		t.Error("a refused flag wrote a manifest")
+	}
+}
+
+// The reason each decision gives, including no context at all, which is Astro.
+func TestInitDeployTargetBasis(t *testing.T) {
+	for _, tc := range []struct {
+		flag         deployTargetValue
+		apcCtx       bool
+		domain       string
+		apc          bool
+		why, instead string
+	}{
+		{"", false, "", false, "no context is current", "pass --deploy-target apc"},
+		{"", false, "astronomer.io", false, "the current context is Astro (astronomer.io)", "pass --deploy-target apc"},
+		{"", true, "apc.example.com", true, "the current context is Astro Private Cloud (apc.example.com)", "pass --deploy-target astro"},
+		{"", true, "", true, "the current context is Astro Private Cloud", "pass --deploy-target astro"},
+		{"apc", false, "astronomer.io", true, "of --deploy-target apc", "pass --deploy-target astro"},
+		{"astro", true, "apc.example.com", false, "of --deploy-target astro", "pass --deploy-target apc"},
+	} {
+		apc, basis := initDeployTarget(tc.flag, &Deps{DeploysToAPC: tc.apcCtx, ContextDomain: tc.domain})
+		if apc != tc.apc || basis.Why != tc.why || basis.Instead != tc.instead {
+			t.Errorf("flag %q, APC context %v, domain %q: got %v %+v, want %v %q %q",
+				tc.flag, tc.apcCtx, tc.domain, apc, basis, tc.apc, tc.why, tc.instead)
 		}
 	}
 }

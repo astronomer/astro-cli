@@ -28,6 +28,7 @@ func NewInitCmd(d Deps) *cobra.Command {
 
 func newInitCmd(c *cli) *cobra.Command {
 	var opts scaffold.Options
+	var target deployTargetValue
 	cmd := &cobra.Command{
 		Use:   "init [DIRECTORY]",
 		Short: "Make a directory an Astro project",
@@ -37,19 +38,25 @@ func newInitCmd(c *cli) *cobra.Command {
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
-			"  astro init my-project --airflow-version 3.1",
+			"  astro init my-project --airflow-version 3.1\n\n" +
+			"  # Convert a 1.x project for Astro Private Cloud, whatever the current context\n" +
+			"  astro init --deploy-target apc",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir := "."
 			if len(args) == 1 {
 				dir = args[0]
 			}
+			opts.DeploysToAPC, opts.DeployTargetBasis = initDeployTarget(target, &c.d)
 			return c.runInit(cmd.Context(), dir, opts)
 		},
 	}
 	cmd.Flags().StringVar(&opts.AirflowVersion, "airflow-version", "",
 		"Airflow version to pin in the manifest (default: the pin already in the manifest, else the newest supported Airflow series)")
 	cmd.Flags().StringVar(&opts.Name, "name", "", "Project name (default: the directory name)")
+	cmd.Flags().Var(&target, flagDeployTarget,
+		"Where the project deploys, astro or apc, which decides what converting a 1.x project keeps for its build "+
+			"(default: the current context's platform, Astro when there is none)")
 	return cmd
 }
 
@@ -63,7 +70,12 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
-	opts.DeploysToAPC = c.d.DeploysToAPC
+	// Asked only for a project converted for APC whose Dockerfile names an
+	// Airflow 2 runtime, a tag that does not say which Airflow series it
+	// carries. A cached copy answers offline; none leaves the series unknown.
+	if c.d.RuntimeCatalog != nil {
+		opts.RuntimeCatalog = func() *runtimeversions.Catalog { return c.d.RuntimeCatalog(ctx) }
+	}
 	// Called by scaffold only when nothing in the project states an Airflow,
 	// so converting a pinned project makes no request. The lookup never fails
 	// init: offline, it answers the built-in series.

@@ -28,9 +28,7 @@ var astroIDRe = regexp.MustCompile(`^c[a-z0-9]{24}$`)
 // workspace ids are cuids too, so an APC project that saved both reads exactly
 // as an Astro one does. apc (deployTarget) is what decides: under APC the pair
 // stays a note, and the 1.x build it deploys with stays beside it, rather than
-// becoming an Astro link that `astro deploy` on APC never reads. What the shape
-// does tell is the converse, which deployTarget uses: a saved target that is
-// not a cuid is no Astro Deployment.
+// becoming an Astro link that `astro deploy` on APC never reads.
 func (from1x *project1x) deployLink(apc bool) (Link, bool) {
 	if apc || !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
 		return Link{}, false
