@@ -170,7 +170,7 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 						reached[f] = true
 					}
 					if asJSON && !cliout.HasOutput(target) {
-						t.Skip("no --output here: an `astro api` request prints the API's response, and bundle delete prints nothing")
+						t.Skip("no --output here: an `astro api` request prints the API's response")
 					}
 
 					stdout, stderr, err := executeRoot(root, args...)

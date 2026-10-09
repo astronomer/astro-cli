@@ -51,6 +51,16 @@ type BundleInfo struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
+// BundleRemoval is what `astro deployment bundle delete` did, as it publishes it
+// under --output json: the bundle's id, under the key bundle list gives it,
+// the Deployment it was on, and the action `astro deployment delete` and the
+// token removals publish.
+type BundleRemoval struct {
+	ID           string `json:"id"`
+	DeploymentID string `json:"deployment_id"`
+	Action       string `json:"action"`
+}
+
 func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
 	return BundleInfo{
 		ID:                b.Id,
@@ -108,8 +118,9 @@ func bundleTableConfig() *output.TableConfig {
 
 // CreateBundle registers a bundle on a deployment. A DAG bundle is created with a
 // name; a non-DAG bundle is created with a mount path (and optional bundle type
-// plus the DAG bundles it is served alongside).
-func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+// plus the DAG bundles it is served alongside). It publishes the bundle it
+// created, in the shape bundle list gives each one.
+func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if (name == "") == (mountPath == "") {
 		return errCreateBundleTarget
 	}
@@ -152,14 +163,16 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 		return err
 	}
 
-	fmt.Fprintf(out, "Created bundle %s on deployment %s\n", resp.JSON200.Id, dep.Id)
-	return nil
+	return r.Emit(bundleToInfo(resp.JSON200), func(w io.Writer) error {
+		_, err := fmt.Fprintf(w, "Created bundle %s on deployment %s\n", resp.JSON200.Id, dep.Id)
+		return err
+	})
 }
 
 // UpdateBundle changes a bundle's description and, for non-DAG bundles, the set of
 // DAG bundles it is served alongside. The bundle is identified by id, DAG bundle
-// name, or non-DAG mount path.
-func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+// name, or non-DAG mount path. It publishes the bundle as the update left it.
+func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription string, dagBundleIDs []string, wsID, deploymentID string, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
 		return err
 	}
@@ -194,8 +207,10 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 		return err
 	}
 
-	fmt.Fprintf(out, "Updated bundle %s on deployment %s\n", bundleID, dep.Id)
-	return nil
+	return r.Emit(bundleToInfo(resp.JSON200), func(w io.Writer) error {
+		_, err := fmt.Fprintf(w, "Updated bundle %s on deployment %s\n", bundleID, dep.Id)
+		return err
+	})
 }
 
 // listBundlesData fetches every bundle configured on a deployment, paging through
@@ -299,9 +314,12 @@ func ListBundlesWithFormat(wsID, deploymentID string, r output.Emitter, astroV1C
 	)
 }
 
-// DeleteBundle removes a bundle from a deployment. The bundle is identified by id,
-// DAG bundle name, or non-DAG mount path.
-func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID string, force bool, out io.Writer, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+// DeleteBundle removes a bundle from a deployment, after asking unless force.
+// The bundle is identified by id, DAG bundle name, or non-DAG mount path. It
+// publishes what it deleted through r, and says on out when the question was
+// declined, which under --output json it never is: the question is refused
+// there, so a run passes --yes.
+func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID string, force bool, out io.Writer, r output.Emitter, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
 	if err := validateBundleSelector(bundleID, bundleName, bundleMountPath); err != nil {
 		return err
 	}
@@ -336,6 +354,9 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 		return err
 	}
 
-	fmt.Fprintf(out, "Deleted bundle %s from deployment %s\n", bundleID, dep.Id)
-	return nil
+	removal := BundleRemoval{ID: bundleID, DeploymentID: dep.Id, Action: actionDeleted}
+	return r.Emit(removal, func(w io.Writer) error {
+		_, err := fmt.Fprintf(w, "Deleted bundle %s from deployment %s\n", bundleID, dep.Id)
+		return err
+	})
 }
