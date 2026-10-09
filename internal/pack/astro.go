@@ -48,9 +48,16 @@ type ImageBuilder interface {
 }
 
 // AstroTarget builds the Astro artifact: a container image over Astronomer's
-// runtime base with the project's dependencies and OS packages installed, the
-// image build from section 1 with the shipping steps removed. By default the
-// image lands in the local Docker store; --save also writes it to a tarball so
+// runtime base with the project's dependencies and OS packages installed and
+// its dags/, plugins/ and include/ copied in, the image build from section 1
+// with the shipping steps removed.
+//
+// dags/ goes in whatever the target, because a package cannot know where it
+// will be deployed: a Deployment without DAG deploys runs the image's DAGs,
+// and one with them replaces the image's dags/ with the bundle a deploy
+// uploads.
+//
+// By default the image lands in the local Docker store; --save also writes it to a tarball so
 // another CI job can load it and `astro deploy --image-name` consume it.
 type AstroTarget struct {
 	// builder turns the manifest into the dependency-installed image.
@@ -172,6 +179,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 	declared := breq.Dockerfile
+	shipProjectCode(&breq)
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
 		return Result{}, err
@@ -183,7 +191,10 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, shippedFiles{
+		dir:   req.ProjectDir,
+		paths: breq.ProjectFiles,
+	}, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -304,6 +315,15 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		}
 	}
 	return res, nil
+}
+
+// shipProjectCode asks a generated build to copy the project's dags/, plugins/
+// and include/ in. A declared Dockerfile's context is the project already and
+// its own COPY lines decide, so it is asked for nothing.
+func shipProjectCode(breq *imagebuild.Request) {
+	if !breq.FromDeclaredDockerfile() {
+		breq.ProjectFiles = imagebuild.ProjectCode(true)
+	}
 }
 
 // reachEngine resolves the container engine for the project and probes it up
@@ -440,9 +460,14 @@ func (c engineCLI) save(ctx context.Context, image, path string, cb localrt.Call
 // gave two different images the same content-addressed tag, and editing the
 // Dockerfile republished under the tag the previous image already held.
 //
-// NOT the build CONTEXT, which the Dockerfile can also COPY from, so this
-// address is incomplete and knowingly so. A first attempt hashed the whole
-// project directory and had to be withdrawn: `astro init` wrote no
+// A generated build contributes imagebuild.ProjectFilesDigest of the dags/,
+// plugins/ and include/ it copies in (files), so editing a plugin moves the
+// tag. Only those directories, filtered by .dockerignore and with the
+// per-machine files left out, so the trouble described below does not apply.
+//
+// NOT a declared Dockerfile's build CONTEXT, which the Dockerfile can also COPY
+// from, so that address is incomplete and knowingly so. A first attempt hashed
+// the whole project directory and had to be withdrawn: `astro init` wrote no
 // .dockerignore then, standalone provisions <project>/.venv, and AIRFLOW_HOME is
 // <project>/.astro/standalone — so the walk read a virtualenv full of
 // host-absolute symlinks, a .git directory full of timestamps, and a live SQLite
@@ -484,7 +509,14 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-func contentHash(base, platform string, deps, packages []string, df declaredDockerfile) (string, error) {
+// shippedFiles are the project-relative paths a generated build copies in from
+// the project at dir; none for a declared Dockerfile.
+type shippedFiles struct {
+	dir   string
+	paths []string
+}
+
+func contentHash(base, platform string, deps, packages []string, files shippedFiles, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -496,6 +528,13 @@ func contentHash(base, platform string, deps, packages []string, df declaredDock
 	}
 	for _, p := range sortedCopy(packages) {
 		writeField("pkg", p)
+	}
+	if len(files.paths) > 0 {
+		digest, err := imagebuild.ProjectFilesDigest(files.dir, files.paths)
+		if err != nil {
+			return "", fmt.Errorf("reading the project's files: %w", err)
+		}
+		writeField("files", digest)
 	}
 	if df.abs != "" {
 		writeField("dockerfile", filepath.ToSlash(df.rel))

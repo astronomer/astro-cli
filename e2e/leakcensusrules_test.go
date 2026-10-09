@@ -159,7 +159,7 @@ func TestAnAxisThatCouldNotLookIsSaidSoRatherThanGuessed(t *testing.T) {
 	})
 }
 
-// Every axis carries its own id, so that the two image queries do not pass for
+// Every axis carries its own id, so that the image queries do not pass for
 // each other when one of them fails.
 func TestEveryAxisIsDistinguishable(t *testing.T) {
 	tier(t, 0)
@@ -170,7 +170,7 @@ func TestEveryAxisIsDistinguishable(t *testing.T) {
 		}
 		seen[a.id()] = true
 	}
-	if len(seen) != 5 {
-		t.Errorf("want 5 axes (container, volume, network, and the two image repositories), got %d", len(seen))
+	if len(seen) != 6 {
+		t.Errorf("want 6 axes (container, volume, network, and the three image repositories), got %d", len(seen))
 	}
 }

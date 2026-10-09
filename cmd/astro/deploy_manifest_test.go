@@ -333,6 +333,29 @@ func TestDeployManifestTextUnchanged(t *testing.T) {
 	assert.Equal(t, "→ prod (astro deployment clx-dep)\n", errOut)
 }
 
+// A "both" deploy to a Deployment without DAG deploys uploads no bundle, its
+// DAGs being inside the image, so the summary does not name a bundle version
+// and the json omits one, keeping its type.
+func TestDeployManifestDagsInsideTheImage(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
+		WorkspaceID:    "clw-ws",
+		RuntimeVersion: "3.1-2",
+		ImageTag:       "deploy-2026-07-23T18-40",
+		URL:            "https://cloud.astronomer.io/deployments/clx-dep",
+	}})
+
+	out, _, err := execDeployIO("", "prod")
+	require.NoError(t, err)
+	assert.Contains(t, out, "Deployed image (tag deploy-2026-07-23T18-40), with the DAGs inside it, to prod (deployment clx-dep).\n")
+
+	out, err = execDeployCapture("--deployment", "prod", "--output", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, "image-and-dag", m["type"])
+	_, hasDag := m["dag_bundle_version"]
+	assert.False(t, hasDag, "no bundle was uploaded")
+}
+
 // The announce line lands before the build line and after the target is
 // settled, so the order a reader sees is: what I am about to act on, then what
 // I am doing to it.

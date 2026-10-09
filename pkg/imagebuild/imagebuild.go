@@ -1,8 +1,9 @@
 // Package imagebuild builds a deployable Airflow image from a manifest's
-// fields. It assembles a small build context (requirements.txt, packages.txt)
-// over Astronomer's runtime base image and runs the container build, leaning
-// on the runtime image's ONBUILD triggers to install the project's
-// dependencies and OS packages — the same path `astro dev` builds through.
+// fields. It assembles a small build context (requirements.txt, packages.txt,
+// and the project directories a caller asks it to ship) over Astronomer's
+// runtime base image and runs the container build, leaning on the runtime
+// image's ONBUILD triggers to install the project's dependencies and OS
+// packages and copy its files in — the same path `astro dev` builds through.
 //
 // A project may instead declare its own Dockerfile in the manifest, which the
 // project design calls tier 3: the escape hatch for multi-stage builds and
@@ -174,6 +175,25 @@ type Request struct {
 	// from the src file or the named env var. So these strings are safe in a
 	// command line and in the build log, which is where they end up.
 	Secrets []string
+	// ProjectDir is the project root, which ProjectFiles are read from and
+	// whose .dockerignore applies to them. ForManifest sets it.
+	ProjectDir string
+	// ProjectFiles are project-relative, slash-separated paths (dags,
+	// plugins, include) a generated build copies into its context, so the
+	// runtime image's ONBUILD `COPY . .` puts them under AIRFLOW_HOME. A path
+	// that does not exist is skipped. The project's .dockerignore applies, and
+	// per-machine files (.venv, .env, __pycache__, .astro, the standalone
+	// engine's pickling fix) are always left out.
+	//
+	// Empty by default, which keeps the context to the two dependency files:
+	// local Docker mode mounts these directories into its containers instead,
+	// so an image it builds needs none of them, and a code change does not
+	// rebuild it. A deploy and `astro package astro` set it, since the image
+	// is what runs there. COPY . . is the base's last ONBUILD step, after the
+	// installs, so the files do not invalidate the dependency layers.
+	//
+	// Ignored in Dockerfile mode, whose context is the whole project already.
+	ProjectFiles []string
 	// Dockerfile and Context switch this into Dockerfile mode — the project
 	// supplied a real Dockerfile ("tier 3" in the project design) and it, not
 	// the manifest, is the build. Both are absolute, and set together.
@@ -182,10 +202,10 @@ type Request struct {
 	// packages.txt, because the file owns its own installs; it takes its FROM
 	// from the file rather than BaseImage; and it builds the PROJECT as its
 	// context, because a multi-stage build COPYs from the repo. That last part
-	// is also why the generated mode cannot just add the project to its
-	// context: that context is synthetic and deliberately tiny, and the runtime
-	// image's ONBUILD `COPY . .` would otherwise bake the whole repo into the
-	// dependency layer.
+	// is also why the generated mode does not just add the whole project to
+	// its context: the runtime image's ONBUILD `COPY . .` would bake every
+	// file of the repo into the image. A generated build copies only the
+	// ProjectFiles it is asked for.
 	//
 	// Dependencies and Packages are ignored here rather than rejected. A caller
 	// reading a manifest has them populated whichever tier the project
@@ -241,8 +261,9 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 // is run as-is against the project as context (see the field's doc for why they
 // share so little). Otherwise the request's dependencies and OS packages are
 // installed into a layer over its base image through the runtime image's ONBUILD
-// triggers, and with nothing to install it builds nothing and returns the base
-// image unchanged (the fast path).
+// triggers, with its ProjectFiles copied in after, and with nothing to install
+// or copy it builds nothing and returns the base image unchanged (the fast
+// path).
 //
 // Build output streams to cb.OnLine (component "build"); a failed build returns
 // a named error, never a hang.
@@ -281,13 +302,23 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	deps := runtimeDeps(req.Dependencies)
 	// The base image already provides Airflow, so a project with nothing beyond
 	// Airflow and no OS packages needs no build and runs the base as-is.
-	if fastPath && len(deps) == 0 && len(req.Packages) == 0 {
+	if fastPath && len(deps) == 0 && len(req.Packages) == 0 && len(req.ProjectFiles) == 0 {
 		return req.BaseImage, nil
 	}
 
+	// Emptied first, so nothing an earlier build staged under the same
+	// WorkDir is copied into this image.
 	contextDir := filepath.Join(req.WorkDir, buildContextDir)
+	if err := os.RemoveAll(contextDir); err != nil {
+		return "", fmt.Errorf("clearing %s: %w", contextDir, err)
+	}
 	if err := os.MkdirAll(contextDir, contextDirPerm); err != nil {
 		return "", fmt.Errorf("creating %s: %w", contextDir, err)
+	}
+	if len(req.ProjectFiles) > 0 {
+		if err := stageProjectFiles(req.ProjectDir, contextDir, req.ProjectFiles); err != nil {
+			return "", fmt.Errorf("copying the project's files into the build: %w", err)
+		}
 	}
 	// requirements.txt carries the deps; packages.txt carries the OS packages,
 	// one apt name per line. Both must exist even when empty, or the image's

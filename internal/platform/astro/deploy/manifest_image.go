@@ -30,7 +30,9 @@ import (
 // ManifestImageDeployInput is the resolved input for a project's image deploy. The
 // deployment is already chosen (internal/deploy). The image is either built from
 // the manifest fields or adopted from a prebuilt local image (ImageName); a
-// "both" deploy (IncludeDags) also ships the dags/ tarball.
+// "both" deploy (IncludeDags) also ships the project's DAGs: as the dags/
+// tarball to a Deployment that takes DAG uploads, and inside the image to one
+// that does not.
 type ManifestImageDeployInput struct {
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment and its registry live on; nil is the current context.
@@ -52,7 +54,7 @@ type ManifestImageDeployInput struct {
 	// the image build starts, so a refused deploy says nothing about building.
 	// A prebuilt image is not built and never calls it. nil skips it.
 	OnBuild       func()
-	IncludeDags   bool // also upload dags/ — a "both" deploy
+	IncludeDags   bool // also ship dags/ — a "both" deploy
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -90,7 +92,15 @@ var (
 
 // DeployManifestImage builds (or adopts) a project's image, pushes it to the
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
-// tarball. It reuses the 1.x transport (createDeploy, the registry push in
+// tarball to a Deployment that takes DAG uploads.
+//
+// A generated image carries the project's plugins/ and include/, and its dags/
+// when the Deployment takes no DAG uploads, which is the 1.x path's rule
+// (buildImage builds the project as its context, leaving dags/ out only for a
+// Deployment with DAG deploys or remote execution). A declared Dockerfile's
+// context is the project already, and its own COPY lines decide.
+//
+// It reuses the 1.x transport (createDeploy, the registry push in
 // airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
 // neither prints nor exits — it returns a result for cmd to render, and writes
 // only a --wait's progress, to in.Progress.
@@ -139,6 +149,9 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if err := checkPlannedRuntime(dep.AstroRuntimeVersion, &planned, allowed); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
+	if in.ImageName == "" {
+		req.ProjectFiles = imagebuild.ProjectCode(dagsInImage(&dep))
+	}
 
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
@@ -175,9 +188,11 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		return ManifestImageDeployResult{}, err
 	}
 
-	// A "both" deploy also ships the dags tarball, fitting the image just pushed.
+	// A "both" deploy also ships the dags tarball, fitting the image just
+	// pushed, to a Deployment that takes one. One that does not runs the DAGs
+	// the image carries.
 	var tarballVersion string
-	if in.IncludeDags {
+	if in.IncludeDags && dep.IsDagDeployEnabled {
 		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 		if err != nil {
 			return ManifestImageDeployResult{}, err
@@ -205,9 +220,9 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 }
 
 // checkDeployment fetches the deployment and confirms the deploy is allowed:
-// cicd enforcement and dag-deploy enablement for a "both" deploy. It also
-// returns the runtime versions the deployment offers, which the image's
-// runtime is checked against.
+// cicd enforcement, and an image-only deploy only to a Deployment whose DAGs are
+// not in its image. It also returns the runtime versions the deployment
+// offers, which the image's runtime is checked against.
 func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, []string, error) {
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
@@ -216,14 +231,28 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
 		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}
-	if in.IncludeDags && !dep.IsDagDeployEnabled {
-		return astrov1.Deployment{}, nil, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
+	// --image leaves the running DAGs in place, which only a Deployment that
+	// takes them apart from its image can do. The 1.x path refuses it the same
+	// way; a "both" deploy ships the DAGs inside the image instead.
+	if !in.IncludeDags && dagsInImage(&dep) {
+		return astrov1.Deployment{}, nil, fmt.Errorf(imageOnlyDagsInImageMsg, in.DeploymentID, in.DeploymentID)
 	}
 	allowed, err := offeredRuntimeVersions(ctx, dep.OrganizationId, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
 	return dep, allowed, nil
+}
+
+// imageOnlyDagsInImageMsg refuses --image to a Deployment that runs the DAGs
+// inside its image, where a new image without them would remove them.
+const imageOnlyDagsInImageMsg = "--image deploys only the image and leaves the Deployment's DAGs in place, but Deployment %s takes no DAG deploys, so its DAGs are inside the image. Run 'astro deploy' without --image to ship the image with dags/ inside it, or enable DAG deploys with 'astro deployment update %s --dag-deploy enable'"
+
+// dagsInImage reports whether a Deployment runs the DAGs inside its image:
+// one that takes no DAG deploys, unless it runs them through remote execution.
+// It is the 1.x path's condition for building the image with dags/.
+func dagsInImage(dep *astrov1.Deployment) bool {
+	return !dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(dep)
 }
 
 // uploadDeployDags tars and uploads a project's dags/ directory to the

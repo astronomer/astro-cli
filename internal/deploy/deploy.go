@@ -162,7 +162,8 @@ type DagResult struct {
 // ImageDeploy is the request the transport's image deploy takes. The deployment
 // is already resolved. When ImageName is set the transport deploys that prebuilt
 // local image; otherwise it builds from the manifest fields. IncludeDags marks a
-// "both" deploy, which also ships the dags/ tarball.
+// "both" deploy, which also ships the project's DAGs: as the dags/ tarball to
+// a Deployment that takes DAG uploads, inside the image to one that does not.
 type ImageDeploy struct {
 	DeploymentID string
 	WorkspaceID  string
@@ -215,7 +216,7 @@ type Deployer interface {
 	// directory, and finalizes.
 	DeployDags(*DagDeploy) (DagResult, error)
 	// DeployImage builds (or adopts) the project image, pushes it, and
-	// finalizes; a "both" deploy also uploads the dags. It requires Docker and
+	// finalizes; a "both" deploy also ships the dags. It requires Docker and
 	// returns a plain error when it is unreachable.
 	DeployImage(*ImageDeploy) (ImageResult, error)
 }

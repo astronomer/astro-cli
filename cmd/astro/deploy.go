@@ -643,6 +643,12 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		case "image-only":
 			fmt.Fprintf(b, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
 		default: // image-and-dag
+			if res.DagTarballVersion == "" {
+				// A Deployment without DAG deploys runs the DAGs the image
+				// carries, so no bundle was uploaded.
+				fmt.Fprintf(b, "Deployed image (tag %s), with the DAGs inside it, to %s.\n", res.ImageTag, target)
+				break
+			}
 			fmt.Fprintf(b, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
 		}
 		if res.URL != "" {

@@ -573,3 +573,53 @@ func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, lines)
 }
+
+// A generated build ships the project's dags/, plugins/ and include/: the
+// package cannot know whether the Deployment it is later deployed to takes DAG
+// uploads, and one that does replaces the image's dags/ with the upload.
+func TestAstroBuildShipsTheProjectsCode(t *testing.T) {
+	builder := &fakeBuilder{}
+	req := testRequest(t)
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"dags", "plugins", "include"}, builder.gotReq.ProjectFiles)
+	assert.Equal(t, req.ProjectDir, builder.gotReq.ProjectDir)
+}
+
+// A declared Dockerfile's context is the project already; it is asked for no
+// project files.
+func TestAstroBuildWithADeclaredDockerfileShipsNoProjectFiles(t *testing.T) {
+	builder := &fakeBuilder{}
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\n")
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Empty(t, builder.gotReq.ProjectFiles)
+}
+
+// The content address covers the shipped code, so editing a plugin moves the
+// tag, while a file that does not ship does not.
+func TestAstroBuildContentAddressCoversTheProjectsCode(t *testing.T) {
+	req := testRequest(t)
+	write := func(name, body string) {
+		t.Helper()
+		path := filepath.Join(req.ProjectDir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+	tag := func() string {
+		t.Helper()
+		res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err)
+		return res.Image
+	}
+	write("plugins/x.py", "X = 1\n")
+	first := tag()
+	assert.Equal(t, first, tag(), "the same code gives the same tag")
+
+	write("tests/test_x.py", "# not shipped\n")
+	write("plugins/__pycache__/x.cpython-312.pyc", "cache")
+	assert.Equal(t, first, tag(), "a file that does not ship leaves the tag alone")
+
+	write("plugins/x.py", "X = 2\n")
+	assert.NotEqual(t, first, tag(), "an edited plugin moves the tag")
+}

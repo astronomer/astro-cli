@@ -1,6 +1,8 @@
 // A declared Dockerfile builds with the whole project as its context, so only
 // the ignore file keeps per-machine files out of an image that gets pushed to a
-// registry. A generated build makes its own context and needs none of this.
+// registry. A generated build makes its own context, copying in only dags/,
+// plugins/ and include/, and leaves the per-machine files out itself
+// (pkg/imagebuild's perMachineExcludes), so it needs none of this.
 
 package scaffold
 

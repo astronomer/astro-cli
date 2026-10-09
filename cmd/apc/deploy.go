@@ -57,9 +57,10 @@ const (
 	// warningImageNameDagsInImage: the Deployment runs the DAGs inside its
 	// image, and nothing here put any there. --image-name's image was not
 	// built from the working directory, which need not be a project at all.
-	// The image may well carry DAGs (one built from a Dockerfile that copies
-	// them does); one astro package generated the build for does not.
-	warningImageNameDagsInImage = "this Deployment runs the Dags inside the image %s; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."
+	// astro package copies the project's dags/ into the image it generates
+	// (and a Dockerfile may COPY them), so the DAGs that run are the ones the
+	// image was built with, not the working directory's.
+	warningImageNameDagsInImage = "this Deployment runs the Dags inside the image %s; the dags folder is not uploaded. They are the ones in the project's dags folder when the image was built: astro package copies them in, so package again to change them."
 	// noticeNoDagsDir: there is no dags directory to upload, so
 	// DagsOnlyDeploy uploaded nothing. An empty upload would have deleted
 	// the Deployment's DAGs. The %s after the path is the advice: where to
