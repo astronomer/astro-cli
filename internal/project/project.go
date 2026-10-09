@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -173,14 +174,51 @@ func New(dir string) (*Project, error) {
 // error. A pyproject without [tool.astro] (a plain Python project, or one that
 // only configures tools such as ruff or pytest) and a missing pyproject do not.
 func HasManifest(dir string) bool {
+	present, err := manifestPresent(dir)
+	return present || err != nil
+}
+
+// manifestPresent is HasManifest without the benefit of the doubt: a
+// pyproject.toml that carries [tool.astro], valid or not, is a manifest, and
+// one that cannot be read or parsed is neither one nor not, so the error says
+// so.
+func manifestPresent(dir string) (bool, error) {
 	_, err := manifest.Load(filepath.Join(dir, Marker))
+	var invalid *manifest.ValidationError
+	switch {
+	case err == nil, errors.As(err, &invalid):
+		return true, nil
+	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+// IsAstroProject reports whether dir is an Astro project, as the commands that
+// need one check it and the advice they give names one: a pyproject.toml
+// carrying [tool.astro], valid or not, or a 1.x project's .astro/config.yaml.
+// It is the one definition, so `astro init` warning about a project above it
+// and `astro deploy` naming the project it ran below agree on what that is.
+//
+// The manifest is looked at first, so a project that has one is a project
+// whatever state a .astro beside it is in. An error says dir could not be
+// read well enough to tell; a walk asking about ancestors treats that as no
+// project. It knows nothing of the home directory, which is never a project:
+// its callers rule that out first.
+func IsAstroProject(dir string) (bool, error) {
+	present, manifestErr := manifestPresent(dir)
+	if present {
+		return true, nil
+	}
+	_, err := os.Stat(filepath.Join(dir, ".astro", "config.yaml"))
 	switch {
 	case err == nil:
-		return true
-	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
-		return false
+		return true, nil
+	case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
+		return false, manifestErr
 	default:
-		return true
+		return false, err
 	}
 }
 
@@ -206,22 +244,4 @@ func Is1xProject(dir string) bool {
 // localrt.ProjectID, which owns project identity (docs/architecture.md).
 func ID(dir string) (string, error) {
 	return localrt.ProjectID(dir)
-}
-
-// Enclosing returns the nearest directory above dir, never dir itself, for
-// which isProject reports true, or "" when none does up to the filesystem
-// root. A command refused in a subdirectory of a project names that project,
-// rather than advising the user to make the subdirectory a second one.
-func Enclosing(dir string, isProject func(dir string) bool) string {
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return ""
-	}
-	for d := abs; filepath.Dir(d) != d; {
-		d = filepath.Dir(d)
-		if isProject(d) {
-			return d
-		}
-	}
-	return ""
 }

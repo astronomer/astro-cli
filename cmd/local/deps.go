@@ -62,6 +62,13 @@ type Deps struct {
 	// themselves so tests can pin it.
 	WorkingDir func() (string, error)
 
+	// IsHomeDir reports whether a directory is the home directory, which
+	// `astro init` refuses and never counts as a project above another. The
+	// root wires config.IsHomeDir, the test the project checks under cmd/
+	// make, since this tree never imports config/. nil knows no home
+	// directory.
+	IsHomeDir func(dir string) bool
+
 	// OpenURL opens a URL in the user's browser (`astro local open`).
 	OpenURL func(url string) error
 

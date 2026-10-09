@@ -398,20 +398,63 @@ func TestHasManifest(t *testing.T) {
 	})
 }
 
-func TestEnclosing(t *testing.T) {
-	root := t.TempDir()
-	outer := filepath.Join(root, "outer")
-	mid := filepath.Join(outer, "a")
-	inner := filepath.Join(mid, "b")
-	require.NoError(t, os.MkdirAll(inner, 0o755))
-	isOuter := func(d string) bool { return d == outer }
+func TestIsAstroProject(t *testing.T) {
+	write1x := func(t *testing.T, dir string) {
+		t.Helper()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600))
+	}
+	is := func(t *testing.T, dir string) bool {
+		t.Helper()
+		ok, err := IsAstroProject(dir)
+		require.NoError(t, err)
+		return ok
+	}
 
-	// The nearest match above the start, however deep.
-	assert.Equal(t, outer, Enclosing(inner, isOuter))
-	// Never the start directory itself: a project is not inside itself.
-	assert.Empty(t, Enclosing(outer, isOuter))
-	// Nothing up to the root.
-	assert.Empty(t, Enclosing(inner, func(string) bool { return false }))
-	// The nearer of two.
-	assert.Equal(t, mid, Enclosing(inner, func(d string) bool { return d == outer || d == mid }))
+	t.Run("a manifest", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, validManifest)
+		assert.True(t, is(t, dir))
+	})
+	t.Run("a manifest that fails validation is still one", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+		assert.True(t, is(t, dir))
+	})
+	t.Run("a 1.x project's .astro/config.yaml", func(t *testing.T) {
+		dir := t.TempDir()
+		write1x(t, dir)
+		assert.True(t, is(t, dir))
+	})
+	t.Run("neither", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, toolsOnlyPyproject)
+		assert.False(t, is(t, dir))
+	})
+	t.Run("a Dockerfile and a bare .astro is not, without its config.yaml", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
+		assert.False(t, is(t, dir))
+	})
+	t.Run("a manifest beside a .astro that is a file", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, validManifest)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro"), nil, 0o600))
+		assert.True(t, is(t, dir), "the manifest decides; the .astro beside it is not read")
+	})
+	t.Run("a .astro that is a file, and no manifest", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro"), nil, 0o600))
+		assert.False(t, is(t, dir))
+	})
+	t.Run("a pyproject that does not parse cannot say", func(t *testing.T) {
+		dir := t.TempDir()
+		writeManifest(t, dir, "this is not : valid = toml [[[\n")
+		ok, err := IsAstroProject(dir)
+		assert.False(t, ok)
+		assert.Error(t, err, "HasManifest's benefit of the doubt is not an answer here")
+		write1x(t, dir)
+		assert.True(t, is(t, dir), "a 1.x project whose ruff settings do not parse is still one")
+	})
 }

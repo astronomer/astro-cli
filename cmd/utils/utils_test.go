@@ -108,6 +108,116 @@ func TestEnsureProjectDir(t *testing.T) {
 	})
 }
 
+// A manifest project passes whatever state the .astro beside it is in: the
+// manifest is read first, so a .astro that is a file (ENOTDIR on its
+// config.yaml) does not turn the check into a failure.
+func TestEnsureProjectDirReadsTheManifestFirst(t *testing.T) {
+	dir := t.TempDir()
+	writeManifestProject(t, dir)
+	writeFile(t, filepath.Join(dir, config.ConfigDir), "")
+	inDir(t, dir, t.TempDir())
+	assert.NoError(t, ensure(EnsureProjectDir))
+}
+
+// The home directory is refused before anything in it is read, so neither a
+// manifest there nor one that cannot be read makes it a project.
+func TestEnsureProjectDirRefusesHomeWithAManifest(t *testing.T) {
+	for name, content := range map[string]string{
+		"a manifest":                      "[project]\nname = \"demo\"\n\n[tool.astro]\n",
+		"a pyproject that fails to parse": "this is not : valid = toml [[[\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			home := t.TempDir()
+			writeFile(t, filepath.Join(home, "pyproject.toml"), content)
+			inDir(t, home, home)
+			for _, check := range []func(*cobra.Command, []string) error{EnsureProjectDir, EnsureDockerfileProjectDir} {
+				err := ensure(check)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), HomeDirAdvice)
+			}
+		})
+	}
+}
+
+// The home directory is the same directory however it is reached. HOME
+// through a symlink names the directory the working path names directly.
+func TestEnsureProjectDirKnowsHomeThroughASymlink(t *testing.T) {
+	home := t.TempDir()
+	link := filepath.Join(t.TempDir(), "home")
+	require.NoError(t, os.Symlink(home, link))
+	writeManifestProject(t, home)
+	inDir(t, home, link)
+	err := ensure(EnsureProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), HomeDirAdvice)
+
+	// And a project below it is not told it is inside ~.
+	sub := filepath.Join(home, "elsewhere")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	inDir(t, sub, link)
+	err = ensure(EnsureProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), AstroProjectDirAdvice)
+}
+
+// An ancestor whose pyproject.toml cannot be read or parsed is not named as
+// the project above: nothing says it is one.
+func TestEnsureProjectDirDoesNotNameAMalformedAncestor(t *testing.T) {
+	parent := t.TempDir()
+	writeFile(t, filepath.Join(parent, "pyproject.toml"), "this is not : valid = toml [[[\n")
+	sub := filepath.Join(parent, "sub")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	inDir(t, sub, t.TempDir())
+	err := ensure(EnsureProjectDir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), AstroProjectDirAdvice)
+	assert.NotContains(t, err.Error(), parent)
+}
+
+// Which parent counts as the project above depends on the check, and each
+// check's advice uses its own: Astro's is project.IsAstroProject, the same one
+// astro init's nested warning uses; APC's needs the Dockerfile it builds.
+func TestEnsureAdviceNamesTheChecksOwnProjects(t *testing.T) {
+	home := t.TempDir()
+	below := func(t *testing.T, write func(string)) (parent, sub string) {
+		t.Helper()
+		parent = t.TempDir()
+		write(parent)
+		sub = filepath.Join(parent, "sub")
+		require.NoError(t, os.MkdirAll(sub, 0o755))
+		return parent, sub
+	}
+
+	t.Run("a .astro/config.yaml and no Dockerfile", func(t *testing.T) {
+		parent, sub := below(t, func(d string) { write1xProject(t, d, false) })
+		inDir(t, sub, home)
+		err := ensure(EnsureProjectDir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), fmt.Sprintf(EnclosingProjectAdvice, parent))
+		err = ensure(EnsureDockerfileProjectDir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), APCProjectDirAdvice, "APC cannot build that parent")
+	})
+
+	t.Run("a Dockerfile and a bare .astro", func(t *testing.T) {
+		parent, sub := below(t, func(d string) {
+			writeFile(t, filepath.Join(d, "Dockerfile"), "FROM x\n")
+			require.NoError(t, os.MkdirAll(filepath.Join(d, config.ConfigDir), 0o755))
+		})
+		inDir(t, sub, home)
+		for check, fallback := range map[string]string{"astro": AstroProjectDirAdvice, "apc": APCProjectDirAdvice} {
+			f := EnsureProjectDir
+			if check == "apc" {
+				f = EnsureDockerfileProjectDir
+			}
+			err := ensure(f)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), fallback, check)
+			assert.NotContains(t, err.Error(), parent, check)
+		}
+	})
+}
+
 func TestEnsureDockerfileProjectDir(t *testing.T) {
 	home := t.TempDir()
 

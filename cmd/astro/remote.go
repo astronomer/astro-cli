@@ -56,7 +56,9 @@ func newRemoteDeployCmd() *cobra.Command {
 			// An image built elsewhere is pushed as it is. The project is read
 			// only to build one, and for Dockerfile.client when a Deployment's
 			// runtime is checked, which says so itself when the file is missing.
-			if cmd.Flags().Changed(imageNameFlag) {
+			// The value, not whether the flag was given: an empty
+			// --image-name= names no image, and the deploy builds one here.
+			if remoteImageName != "" {
 				return nil
 			}
 			// It accepts a project with a pyproject.toml as well as a 1.x one.

@@ -13,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
@@ -30,7 +29,7 @@ var (
 	// state of the checkout it runs in.
 	hasUncommittedChanges = git.HasUncommittedChanges
 
-	EnsureDockerfileProjectDir         = utils.EnsureDockerfileProjectDir
+	EnsureProjectDir                   = ensureDeployProjectDir
 	DeployAirflowImage                 = deploy.Airflow
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
 	UpdateDeploymentImage              = deploy.UpdateDeploymentImage
@@ -62,15 +61,12 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 		Long:  "Deploy an Airflow project to an APC Deployment",
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed("image-name") {
+			// The value, not whether the flag was given: an empty
+			// --image-name= deploys no image of its own, and builds one here.
+			if imageName != "" {
 				return nil
 			}
-			// A DAG-only deploy builds nothing: it uploads dags/ from the
-			// working directory, so the project astro init writes can make one.
-			if isDagOnlyDeploy && project.HasManifest(config.WorkingPath) {
-				return nil
-			}
-			return EnsureDockerfileProjectDir(cmd, args)
+			return EnsureProjectDir(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deployAirflow(cmd, args, out)
@@ -94,6 +90,18 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only Dags to your Deployment")
 	}
 	return cmd
+}
+
+// ensureDeployProjectDir is the project check for the deploy asked for. A
+// DAG-only deploy builds nothing: it uploads dags/ from the working directory,
+// so any Astro project can make one, the project astro init writes and a 1.x
+// project without a Dockerfile alike. Every other deploy builds the
+// Dockerfile.
+func ensureDeployProjectDir(cmd *cobra.Command, args []string) error {
+	if isDagOnlyDeploy {
+		return utils.EnsureProjectDir(cmd, args)
+	}
+	return utils.EnsureDockerfileProjectDir(cmd, args)
 }
 
 // The kinds of deploy deployJSON.Type names.

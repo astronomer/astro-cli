@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 )
 
 type RunE func(cmd *cobra.Command, args []string) error
@@ -60,59 +61,60 @@ const (
 
 // EnsureProjectDir fails outside an Astro project directory: one with a
 // pyproject.toml carrying [tool.astro], or a 1.x project's .astro/config.yaml.
-// Accepting both here is what makes its advice to run astro init true: the
-// project astro init writes passes.
+// (project.IsAstroProject). Accepting both here is what makes its advice to
+// run astro init true: the project astro init writes passes.
 func EnsureProjectDir(cmd *cobra.Command, args []string) error {
-	dir := config.WorkingPath
-	// IsProjectDir first: it reports an unreadable path, which HasManifest
-	// counts as a manifest to fix.
-	isProjectDir, err := config.IsProjectDir(dir)
-	if err != nil {
-		return verifyFailed(err, AstroProjectDirAdvice)
-	}
-	if isProjectDir || project.HasManifest(dir) {
-		return nil
-	}
-	return notProjectDir(advice(dir, AstroProjectDirAdvice, isAstroProject))
+	return ensureDir(project.IsAstroProject, AstroProjectDirAdvice, nil)
 }
 
 // EnsureDockerfileProjectDir is EnsureProjectDir for APC deploy, which builds
-// the Dockerfile at the root of a project with a .astro/config.yaml.
+// the Dockerfile at the root of a project with a .astro/config.yaml
+// (isDockerfileProject).
 func EnsureDockerfileProjectDir(cmd *cobra.Command, args []string) error {
+	return ensureDir(isDockerfileProject, APCProjectDirAdvice, func(dir string) error {
+		// A 1.x project short of its Dockerfile would otherwise be told it is
+		// no project at all.
+		if is1x, err := config.IsProjectDir(dir); err == nil && is1x {
+			return errors.New(ansi.Red(fmt.Sprintf(APCNoDockerfileAdvice, dir) + "\n"))
+		}
+		return nil
+	})
+}
+
+// ensureDir is what both checks share: the working directory passes when
+// isProject accepts it, and the home directory never does, whatever is in it.
+// Otherwise nearly, when set, may say what dir is short of; failing that, the
+// advice names the project dir is inside, if there is one, over fallback.
+func ensureDir(isProject func(string) (bool, error), fallback string, nearly func(string) error) error {
 	dir := config.WorkingPath
-	isProjectDir, err := config.IsProjectDir(dir)
+	// Before anything in it is read: a manifest in ~, or one that cannot be
+	// read, does not make the home directory a project.
+	if config.IsHomeDir(dir) {
+		return notProjectDir(HomeDirAdvice)
+	}
+	ok, err := isProject(dir)
+	if ok {
+		return nil
+	}
 	if err != nil {
-		return verifyFailed(err, APCProjectDirAdvice)
+		return verifyFailed(err, fallback)
 	}
-	if !isProjectDir {
-		return notProjectDir(advice(dir, APCProjectDirAdvice, isDockerfileProject))
+	if nearly != nil {
+		if err := nearly(dir); err != nil {
+			return err
+		}
 	}
-	hasDockerfile, err := dockerfileExists(dir)
-	if err != nil {
-		return verifyFailed(err, APCProjectDirAdvice)
-	}
-	if !hasDockerfile {
-		return errors.New(ansi.Red(fmt.Sprintf(APCNoDockerfileAdvice, dir) + "\n"))
-	}
-	return nil
+	return notProjectDir(advice(dir, fallback, isProject))
 }
 
-func isAstroProject(dir string) bool {
-	isProjectDir, err := config.IsProjectDir(dir)
-	return (err == nil && isProjectDir) || project.HasManifest(dir)
-}
-
-func isDockerfileProject(dir string) bool {
+// isDockerfileProject is the project APC deploy builds: a .astro/config.yaml
+// with a Dockerfile beside it.
+func isDockerfileProject(dir string) (bool, error) {
 	isProjectDir, err := config.IsProjectDir(dir)
 	if err != nil || !isProjectDir {
-		return false
+		return false, err
 	}
-	hasDockerfile, err := dockerfileExists(dir)
-	return err == nil && hasDockerfile
-}
-
-func dockerfileExists(dir string) (bool, error) {
-	_, err := os.Stat(filepath.Join(dir, "Dockerfile"))
+	_, err = os.Stat(filepath.Join(dir, "Dockerfile"))
 	if errors.Is(err, fs.ErrNotExist) {
 		return false, nil
 	}
@@ -120,24 +122,23 @@ func dockerfileExists(dir string) (bool, error) {
 }
 
 // advice is what to say in dir, which is not a project: fallback, unless dir
-// is the home directory or inside a project isProject recognizes, where
-// fallback's advice to make dir a project would be wrong.
-func advice(dir, fallback string, isProject func(string) bool) string {
-	if isHome(dir) {
-		return HomeDirAdvice
+// is inside a project isProject recognizes, where fallback's advice to make
+// dir a project would be wrong. The home directory never encloses one, and an
+// ancestor that cannot be read is not one.
+func advice(dir, fallback string, isProject func(string) (bool, error)) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return fallback
 	}
-	// The home directory never encloses a project: its .astro/config.yaml is
-	// the CLI's settings, and a pyproject.toml there is not an invitation to
-	// run everything below it from ~.
-	enclosing := project.Enclosing(dir, func(d string) bool { return !isHome(d) && isProject(d) })
-	if enclosing != "" {
+	readable := func(d string) (bool, error) {
+		ok, err := isProject(d)
+		return ok && err == nil, nil
+	}
+	// readable returns no error, so neither does the walk.
+	if enclosing, _ := fileutil.NearestDir(filepath.Dir(abs), config.IsHomeDir, readable); enclosing != "" { //nolint:errcheck
 		return fmt.Sprintf(EnclosingProjectAdvice, enclosing)
 	}
 	return fallback
-}
-
-func isHome(dir string) bool {
-	return config.HomePath != "" && filepath.Clean(dir) == filepath.Clean(config.HomePath)
 }
 
 func verifyFailed(err error, advice string) error {

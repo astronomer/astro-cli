@@ -14,6 +14,7 @@ import (
 	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -151,6 +152,7 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	// command on a machine that never logged in leaves no config/ state behind
 	// (config.initHome, and TestInitLeavesNoHomeConfigBehind in e2e).
 	coreDeps := local.NewDeps()
+	coreDeps.IsHomeDir = config.IsHomeDir
 	wireLinkPickers(&coreDeps, o.platform, astroV1Client, o.out)
 	// A single positional argument is Otto's first message in an interactive
 	// session.

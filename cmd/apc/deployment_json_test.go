@@ -549,13 +549,13 @@ func TestDeploymentLogsJSON(t *testing.T) {
 // what the image deploy reports; dags is what the DAG deploy returns.
 func deployMocks(t *testing.T, deployed deploy.Deployed, dags error) *deploy.Options {
 	t.Helper()
-	prevImage, prevDags, prevRemote, prevEnsure := DeployAirflowImage, DagsOnlyDeploy, UpdateDeploymentImage, EnsureDockerfileProjectDir
+	prevImage, prevDags, prevRemote, prevEnsure := DeployAirflowImage, DagsOnlyDeploy, UpdateDeploymentImage, EnsureProjectDir
 	t.Cleanup(func() {
-		DeployAirflowImage, DagsOnlyDeploy, UpdateDeploymentImage, EnsureDockerfileProjectDir = prevImage, prevDags, prevRemote, prevEnsure
+		DeployAirflowImage, DagsOnlyDeploy, UpdateDeploymentImage, EnsureProjectDir = prevImage, prevDags, prevRemote, prevEnsure
 	})
 	// seen is the options the last platform call was handed.
 	seen := new(deploy.Options)
-	EnsureDockerfileProjectDir = func(*cobra.Command, []string) error { return nil }
+	EnsureProjectDir = func(*cobra.Command, []string) error { return nil }
 	DeployAirflowImage = func(_ houston.ClientInterface, _, deploymentID, _ string, _, _ bool, _ string, _ bool, _ string, opts deploy.Options) (deploy.Deployed, error) {
 		*seen = opts
 		fmt.Fprintln(opts.Progress, "Deploying: rel-ac")

@@ -26,6 +26,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -874,19 +875,11 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 // refusals in this package unreachable for exactly the projects that have a manifest:
 // a dbt project or a non-DAG bundle nested inside one shipped where the check
 // meant to stop it.
+//
+// The home directory is not a project for this any more than for the others:
+// a pyproject.toml in ~ does not put everything under it inside one.
 func isWithinManifestProject(path string) bool {
-	abs, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return false
-	}
-	for dir := abs; ; {
-		if project.HasManifest(dir) {
-			return true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return false
-		}
-		dir = parent
-	}
+	hasManifest := func(dir string) (bool, error) { return project.HasManifest(dir), nil }
+	dir, _ := fileutil.NearestDir(path, config.IsHomeDir, hasManifest) //nolint:errcheck // hasManifest returns no error, so neither does the walk
+	return dir != ""
 }

@@ -7,7 +7,6 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -256,13 +255,21 @@ func configExists(v *viper.Viper) bool {
 	return v.ConfigFileUsed() != ""
 }
 
+// IsHomeDir reports whether path is the home directory, HomePath: the same
+// directory, however it is spelled, symlinks and case included. It is the one
+// test of "is this ~" the project checks make, so a test that points HomePath
+// elsewhere moves all of them.
+func IsHomeDir(path string) bool {
+	return fileutil.SamePath(path, HomePath)
+}
+
 // IsProjectDir returns a boolean depending on if path is a valid project dir
 func IsProjectDir(path string) (bool, error) {
 	configPath := filepath.Join(path, ConfigDir)
 	configFile := filepath.Join(configPath, ConfigFileNameWithExt)
 
 	// Home directory is not a project directory
-	if HomePath == path {
+	if IsHomeDir(path) {
 		return false, nil
 	}
 
@@ -271,22 +278,8 @@ func IsProjectDir(path string) (bool, error) {
 
 // IsWithinProjectDir returns true if the path is at or within an Astro project directory
 func IsWithinProjectDir(path string) (bool, error) {
-	pathAbs, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return false, err
-	}
-	pathComponents := strings.Split(pathAbs, string(os.PathSeparator))
-	for i := range pathComponents {
-		componentAbs := strings.Join(pathComponents[:i+1], string(os.PathSeparator))
-		isProjectDir, err := IsProjectDir(componentAbs)
-		if err != nil {
-			return false, err
-		}
-		if isProjectDir {
-			return true, nil
-		}
-	}
-	return false, nil
+	dir, err := fileutil.NearestDir(path, IsHomeDir, IsProjectDir)
+	return dir != "", err
 }
 
 // saveConfig serializes config writes under an exclusive OS-level file lock,

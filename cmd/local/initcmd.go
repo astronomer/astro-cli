@@ -59,7 +59,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if err != nil {
 		return err
 	}
-	if err := refuseInitHomeDir(dir); err != nil {
+	if err := c.refuseInitHomeDir(dir); err != nil {
 		return err
 	}
 	// A 1.x airflow_settings.yaml's connection and variable values go to

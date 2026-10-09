@@ -270,6 +270,13 @@ func TestRemoteDeployProjectCheck(t *testing.T) {
 	require.NoError(t, cmd.ParseFlags([]string{"--image-name", "prebuilt:1"}))
 	assert.NoError(t, cmd.PreRunE(cmd, nil), "--image-name needs none")
 
+	// An empty --image-name names no image, so the deploy builds one here.
+	cmd = newRemoteDeployCmd()
+	require.NoError(t, cmd.ParseFlags([]string{"--image-name="}))
+	err = cmd.PreRunE(cmd, nil)
+	require.Error(t, err, "an empty --image-name builds from a directory that has to be a project")
+	assert.Contains(t, err.Error(), utils.AstroProjectDirAdvice)
+
 	// The project astro init writes passes, as the advice promises.
 	require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
 	cmd = newRemoteDeployCmd()

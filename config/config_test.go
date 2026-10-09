@@ -42,6 +42,32 @@ func (s *Suite) TestIsProjectDir() {
 	}
 }
 
+// The home directory is the same directory however it is reached: through a
+// symlink, or spelled with a trailing separator. Neither is a project.
+func (s *Suite) TestIsHomeDir() {
+	prev := HomePath
+	defer func() { HomePath = prev }()
+	home := s.T().TempDir()
+	link := filepath.Join(s.T().TempDir(), "home")
+	s.Require().NoError(os.Symlink(home, link))
+	s.Require().NoError(os.MkdirAll(filepath.Join(home, ConfigDir), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Join(home, ConfigDir, ConfigFileNameWithExt), []byte("{}\n"), 0o600))
+
+	HomePath = link
+	s.True(IsHomeDir(home))
+	s.True(IsHomeDir(home + string(os.PathSeparator)))
+	s.False(IsHomeDir(filepath.Join(home, "project")))
+	isProject, err := IsProjectDir(home)
+	s.NoError(err)
+	s.False(isProject, "the home directory reached through a symlink is still not a project")
+	within, err := IsWithinProjectDir(filepath.Join(home, "project"))
+	s.NoError(err)
+	s.False(within, "nothing under ~ is inside a project because of ~/.astro/config.yaml")
+
+	HomePath = ""
+	s.False(IsHomeDir(home), "no home directory known names none")
+}
+
 func (s *Suite) TestIsWithinProjectDir() {
 	projectDir, cleanupProjectDir, err := CreateTempProject()
 	s.NoError(err)

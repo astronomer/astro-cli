@@ -2,13 +2,13 @@ package apc
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
@@ -28,7 +28,7 @@ func execDeployCmd(args ...string) error {
 // print a note and return nil: exit 0. --force deploys anyway.
 func (s *Suite) TestDeployRefusesUncommittedChanges() {
 	appConfig = &houston.AppConfig{}
-	EnsureDockerfileProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
 	prev := hasUncommittedChanges
 	hasUncommittedChanges = func(string) bool { return true }
 	defer func() { hasUncommittedChanges = prev }()
@@ -67,7 +67,7 @@ func (s *Suite) TestDeploy() {
 			BYORegistryEnabled: true,
 		},
 	}
-	EnsureDockerfileProjectDir = func(cmd *cobra.Command, args []string) error {
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
@@ -227,28 +227,51 @@ func (s *Suite) TestDeploy() {
 	})
 }
 
-// A DAG-only deploy builds nothing, so the project astro init writes, which
-// has no .astro/config.yaml, can make one. Anything else still faces the
-// Dockerfile project check.
-func (s *Suite) TestDeployDagsAcceptsAPyprojectProject() {
-	dir := s.T().TempDir()
-	s.Require().NoError(os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
-	prevWorking, prevEnsure, prevDags := config.WorkingPath, EnsureDockerfileProjectDir, isDagOnlyDeploy
+// A DAG-only deploy builds nothing, so any Astro project can make one: the
+// project astro init writes, and a 1.x project without a Dockerfile. Every
+// other deploy builds the Dockerfile, and faces the Dockerfile project check
+// unless --image-name names an image built elsewhere.
+func (s *Suite) TestDeployProjectCheck() {
+	prevWorking, prevHome, prevEnsure, prevDags := config.WorkingPath, config.HomePath, EnsureProjectDir, isDagOnlyDeploy
 	defer func() {
-		config.WorkingPath, EnsureDockerfileProjectDir, isDagOnlyDeploy = prevWorking, prevEnsure, prevDags
+		config.WorkingPath, config.HomePath, EnsureProjectDir, isDagOnlyDeploy = prevWorking, prevHome, prevEnsure, prevDags
 	}()
-	config.WorkingPath = dir
-	errRefused := errors.New("refused")
-	EnsureDockerfileProjectDir = func(*cobra.Command, []string) error { return errRefused }
+	EnsureProjectDir = ensureDeployProjectDir
+	config.HomePath = s.T().TempDir()
+	write := func(dir, name, content string) {
+		path := filepath.Join(dir, name)
+		s.Require().NoError(os.MkdirAll(filepath.Dir(path), 0o755))
+		s.Require().NoError(os.WriteFile(path, []byte(content), 0o600))
+	}
+	preRun := func(dir string, dags bool, flags ...string) error {
+		config.WorkingPath = dir
+		cmd := NewDeployCmd(new(bytes.Buffer))
+		s.Require().NoError(cmd.ParseFlags(flags))
+		isDagOnlyDeploy = dags
+		return cmd.PreRunE(cmd, nil)
+	}
 
-	cmd := NewDeployCmd(new(bytes.Buffer))
-	isDagOnlyDeploy = true
-	s.NoError(cmd.PreRunE(cmd, nil), "--dags from a pyproject.toml project")
+	manifestProject := s.T().TempDir()
+	write(manifestProject, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+	s.NoError(preRun(manifestProject, true), "--dags from a pyproject.toml project")
+	err := preRun(manifestProject, false)
+	s.Require().Error(err, "an image deploy builds a Dockerfile it does not have")
+	s.Contains(err.Error(), utils.APCProjectDirAdvice)
 
-	isDagOnlyDeploy = false
-	s.ErrorIs(cmd.PreRunE(cmd, nil), errRefused, "an image deploy builds the Dockerfile")
+	project1x := s.T().TempDir()
+	write(project1x, filepath.Join(config.ConfigDir, config.ConfigFileNameWithExt), "project:\n  name: demo\n")
+	s.NoError(preRun(project1x, true), "--dags from a 1.x project without a Dockerfile")
+	err = preRun(project1x, false)
+	s.Require().Error(err)
+	s.Contains(err.Error(), fmt.Sprintf(utils.APCNoDockerfileAdvice, project1x))
 
-	isDagOnlyDeploy = true
-	config.WorkingPath = s.T().TempDir()
-	s.ErrorIs(cmd.PreRunE(cmd, nil), errRefused, "--dags outside any project")
+	elsewhere := s.T().TempDir()
+	err = preRun(elsewhere, true)
+	s.Require().Error(err, "--dags outside any project")
+	s.Contains(err.Error(), utils.AstroProjectDirAdvice)
+
+	s.NoError(preRun(elsewhere, false, "--image-name", "prebuilt:1"), "an image built elsewhere needs no project")
+	err = preRun(elsewhere, false, "--image-name=")
+	s.Require().Error(err, "an empty --image-name builds from here, so here has to be a project")
+	s.Contains(err.Error(), utils.APCProjectDirAdvice)
 }
