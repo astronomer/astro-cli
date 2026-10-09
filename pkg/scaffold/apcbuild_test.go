@@ -62,7 +62,9 @@ func TestRetireKeepsTheAPCBuild(t *testing.T) {
 		"Airflow version, dependencies and OS packages for `astro local` and Astro, so change both together while the "+
 		"project deploys to Astro Private Cloud, and delete them if it deploys to Astro instead. This run converted "+
 		"the project for Astro Private Cloud because the current context is Astro Private Cloud (apc.example.com); "+
-		"to convert for Astro instead, pass --deploy-target astro")
+		"to convert for Astro instead, first restore airflow_settings.yaml from version control and delete the "+
+		"pyproject.toml this run created (`git checkout -- airflow_settings.yaml && rm pyproject.toml`), then convert "+
+		"again and pass --deploy-target astro")
 
 	manifestText, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
@@ -106,8 +108,9 @@ func TestTheAPCNoteSaysWhatEachFileWasKeptFor(t *testing.T) {
 		},
 		{
 			// The Dockerfile survives on its own note (no Astro Runtime base),
-			// so the APC note names only the lists, says the Dockerfile stays
-			// too, and claims no pin agreement it has not checked.
+			// and is still APC's build, so the note names it, claims no pin
+			// agreement it has not checked, and offers to delete only the
+			// lists it kept.
 			name: "a Dockerfile kept for another reason",
 			files: map[string]string{
 				fileDockerfile:   "FROM python:3.12-slim\n",
@@ -115,12 +118,19 @@ func TestTheAPCNoteSaysWhatEachFileWasKeptFor(t *testing.T) {
 				filePackages:     "libpq-dev\n",
 			},
 			want: []string{
-				"packages.txt and requirements.txt: kept for Astro Private Cloud",
-				"from its Dockerfile as it stands, which this run keeps as well",
+				"Dockerfile, packages.txt and requirements.txt: kept for Astro Private Cloud",
 				"that build installs packages.txt and requirements.txt only if the Dockerfile or its base image does",
 				"carries the same dependencies and OS packages for",
+				"delete packages.txt and requirements.txt if",
 			},
-			lacks: []string{"Airflow version", "Dockerfile, "},
+			lacks: []string{"Airflow version"},
+		},
+		{
+			// Kept for its own note alone, it is still named.
+			name:  "only a Dockerfile kept for another reason",
+			files: map[string]string{fileDockerfile: "FROM python:3.12-slim\n"},
+			want:  []string{"Dockerfile: kept for Astro Private Cloud"},
+			lacks: []string{"carries the same", "delete"},
 		},
 	}
 	for _, tc := range cases {
@@ -183,11 +193,12 @@ func TestASavedReleaseNameDoesNotDecide(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(dir, fileDockerfile), "Astro builds from the manifest")
 	assert.NoFileExists(t, filepath.Join(dir, fileRequirements))
 	assert.Empty(t, apcNote(cs.Notes))
-	assert.Contains(t, cs.Notes, ".astro/config.yaml: celestial-gravity-1234 is this project's saved deploy target. "+
-		"If that is an Astro Deployment, give it a name under [tool.astro.deployments], say "+
+	// TestTheOtherPlatformAdviceSaysWhatToRestore has the rest of the sentence.
+	assert.Contains(t, strings.Join(cs.Notes, "\n"), ".astro/config.yaml: celestial-gravity-1234 is this project's "+
+		"saved deploy target. If that is an Astro Deployment, give it a name under [tool.astro.deployments], say "+
 		"[tool.astro.deployments.prod], with deployment = 'celestial-gravity-1234' and the workspace it lives in. "+
 		"This run converted the project for Astro because the current context is Astro (astronomer.io); "+
-		"to convert for Astro Private Cloud instead, pass --deploy-target apc")
+		"to convert for Astro Private Cloud instead, first restore")
 
 	dir = project1xWithConfig(t, config, extra)
 	cs = runIn(t, dir, Options{DeploysToAPC: true, DeployTargetBasis: apcByContext})
@@ -200,7 +211,8 @@ func TestASavedReleaseNameDoesNotDecide(t *testing.T) {
 	assert.Contains(t, cs.Notes, ".astro/config.yaml: celestial-gravity-1234 is this project's saved deploy target, "+
 		"which Astro Private Cloud's `astro deploy` reads from this file, so it stays here rather than becoming a "+
 		"[tool.astro.deployments] link. This run converted the project for Astro Private Cloud because the current "+
-		"context is Astro Private Cloud (apc.example.com); to convert for Astro instead, pass --deploy-target astro")
+		"context is Astro Private Cloud (apc.example.com); to convert for Astro instead, first delete the "+
+		"pyproject.toml this run created (`rm pyproject.toml`), then convert again and pass --deploy-target astro")
 }
 
 // One fact says a Dockerfile will be built, and every decision that turns on
@@ -383,22 +395,17 @@ const airflow2Dockerfile = "FROM quay.io/astronomer/astro-runtime:12.1.0\n"
 
 // An Airflow 2 FROM names a runtime version, not an Airflow one, so on its own
 // it says only "2", which `astro local` resolves to the newest Airflow 2. APC
-// deploys the one that runtime carries, so under APC the catalog is asked, and
-// its series is the pin a conversion reads and the fix a refusal names. Under
-// Astro nothing deploys that Dockerfile, the pin stays "2" and the catalog is
-// never asked.
+// deploys the one that runtime carries, so under APC the catalog the caller
+// read says which, and its series is the pin a conversion reads and the fix a
+// refusal names. Under Astro nothing deploys that Dockerfile, and the pin
+// stays "2" whatever catalog is given.
 func TestAPCPinsTheSeriesAnAirflow2BuildCarries(t *testing.T) {
-	asked := 0
-	catalog := func() *runtimeversions.Catalog {
-		asked++
-		return airflow2Catalog(t)
-	}
+	catalog := airflow2Catalog(t)
 
 	dir := t.TempDir()
 	writeAll(t, dir, map[string]string{fileDockerfile: airflow2Dockerfile})
 	cs := runIn(t, dir, Options{DeploysToAPC: true, RuntimeCatalog: catalog})
 	assert.Equal(t, "2.10", cs.AirflowVersion)
-	assert.Equal(t, 1, asked)
 	assert.FileExists(t, filepath.Join(dir, fileDockerfile), "spent at the series it carries, and kept for APC")
 	for _, n := range cs.Notes {
 		assert.NotContains(t, n, "the newest Airflow 2", "the series is known: %q", n)
@@ -413,35 +420,122 @@ func TestAPCPinsTheSeriesAnAirflow2BuildCarries(t *testing.T) {
 		assert.Contains(t, err.Error(), "Convert with --airflow-version 2.10,", v)
 	}
 
-	asked = 0
 	dir = t.TempDir()
 	writeAll(t, dir, map[string]string{fileDockerfile: airflow2Dockerfile})
 	cs = runIn(t, dir, Options{RuntimeCatalog: catalog})
 	assert.Equal(t, "2", cs.AirflowVersion, "under Astro")
-	assert.Zero(t, asked, "under Astro the catalog is not asked")
 }
 
-// Without a catalog the series an Airflow 2 runtime carries cannot be known,
-// and the conversion says so rather than name a pin it cannot vouch for: the
-// note on "2" says the requirement was not checked, and a refusal of another
-// generation names no major-only fix.
+// Without the series an Airflow 2 runtime carries, the conversion says so
+// rather than name a pin it cannot vouch for, and says which reason it was:
+// no catalog to ask, or a catalog that does not list the runtime. The note
+// names no particular pin, since the pin may be a flag's or a manifest's
+// rather than the "2" the tag reads as, and a refusal of another generation
+// names no major-only fix.
 func TestAPCSaysWhenAnAirflow2SeriesIsUnknown(t *testing.T) {
-	for _, catalog := range []func() *runtimeversions.Catalog{nil, func() *runtimeversions.Catalog { return nil }} {
-		dir := t.TempDir()
-		writeAll(t, dir, map[string]string{fileDockerfile: airflow2Dockerfile})
-		cs := runIn(t, dir, Options{DeploysToAPC: true, RuntimeCatalog: catalog})
-		assert.Equal(t, "2", cs.AirflowVersion)
-		joined := strings.Join(cs.Notes, "\n")
-		assert.Contains(t, joined, "Dockerfile: runtime 12.1.0 is an Airflow 2 image whose tag does not name the "+
-			"Airflow minor, and the runtime catalog, which says which Airflow it carries, could not be read")
-		assert.NotContains(t, joined, "meaning the newest Airflow 2. Set it explicitly")
+	unlisted, err := runtimeversions.Parse([]byte(`{"runtimeVersions": {"13.0.0": {"metadata": {"airflowVersion": "2.11.0", "channel": "stable"}}}}`))
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name    string
+		catalog *runtimeversions.Catalog
+		why     string
+	}{
+		{"no catalog", nil, "the runtime catalog, which says which, could not be read"},
+		{"a catalog without that runtime", unlisted, "the runtime catalog does not list runtime 12.1.0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, pin := range []string{"", "2.10.3"} {
+				dir := t.TempDir()
+				writeAll(t, dir, map[string]string{fileDockerfile: airflow2Dockerfile})
+				cs := runIn(t, dir, Options{DeploysToAPC: true, RuntimeCatalog: tc.catalog, AirflowVersion: pin})
+				joined := strings.Join(cs.Notes, "\n")
+				assert.Contains(t, joined, "Dockerfile: runtime 12.1.0 is an Airflow 2 image whose tag does not name the "+
+					"Airflow minor, and "+tc.why+", so the Airflow requirement in pyproject.toml was not checked against it")
+				assert.NotContains(t, joined, `a pin of "2"`, "pin %q", pin)
+				assert.NotContains(t, joined, "meaning the newest Airflow 2. Set it explicitly")
+			}
 
-		dir = t.TempDir()
-		writeAll(t, dir, map[string]string{fileDockerfile: airflow2Dockerfile})
-		_, err := Plan(dir, Options{DeploysToAPC: true, RuntimeCatalog: catalog, AirflowVersion: "3.1"})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "which is an Airflow 2 runtime whose tag does not name the Airflow series")
-		assert.Contains(t, err.Error(), "Convert with --airflow-version set to the Airflow 2 series runtime 12.1.0 carries")
-		assert.NotContains(t, err.Error(), "--airflow-version 2,")
+			dir := t.TempDir()
+			writeAll(t, dir, map[string]string{fileDockerfile: airflow2Dockerfile})
+			_, err := Plan(dir, Options{DeploysToAPC: true, RuntimeCatalog: tc.catalog, AirflowVersion: "3.1"})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "which is an Airflow 2 runtime whose tag does not name the Airflow series")
+			assert.Contains(t, err.Error(), "Convert with --airflow-version set to the Airflow 2 series runtime 12.1.0 "+
+				"carries ("+tc.why+")")
+			assert.NotContains(t, err.Error(), "--airflow-version 2,")
+		})
 	}
+}
+
+// The floating Airflow 3 tags name their series as the pinned ones do, so
+// under APC they pin and refuse at that series, and the kept Dockerfile is in
+// the note claiming the pin agrees. Read as the old runtime-version format,
+// "3.1" was an Airflow 2 image: kept beside a "2" pin, with a note saying the
+// two agreed.
+func TestAPCReadsFloatingAirflow3Tags(t *testing.T) {
+	for _, tc := range []struct{ tag, series string }{
+		{"3.1", "3.1"},
+		{"3.1-python-3.12", "3.1"},
+		{"3", "3"},
+	} {
+		t.Run(tc.tag, func(t *testing.T) {
+			dockerfile := "FROM astrocrpublic.azurecr.io/runtime:" + tc.tag + "\n"
+			dir := t.TempDir()
+			writeAll(t, dir, map[string]string{fileDockerfile: dockerfile})
+			cs := runIn(t, dir, Options{DeploysToAPC: true})
+			assert.Equal(t, tc.series, cs.AirflowVersion)
+			assert.Contains(t, apcNote(cs.Notes), "Dockerfile: kept for Astro Private Cloud")
+			assert.Contains(t, apcNote(cs.Notes), "carries the same Airflow version")
+
+			dir = t.TempDir()
+			writeAll(t, dir, map[string]string{fileDockerfile: dockerfile})
+			_, err := Plan(dir, Options{DeploysToAPC: true, AirflowVersion: "2.10"})
+			require.Error(t, err)
+			if tc.series == "3" {
+				assert.Contains(t, err.Error(), "which is a floating Airflow 3 tag that names no series")
+				assert.Contains(t, err.Error(), "Convert with --airflow-version 3,")
+			} else {
+				assert.Contains(t, err.Error(), "which is Airflow "+tc.series)
+				assert.Contains(t, err.Error(), "Convert with --airflow-version "+tc.series+",")
+			}
+		})
+	}
+}
+
+// Every Dockerfile a conversion for APC keeps is named in the APC note, since
+// it is the build that deploys: one the pin agrees with but did not take, a
+// release of its series, included.
+func TestAPCNamesAKeptDockerfileThePinDidNotTake(t *testing.T) {
+	dir := t.TempDir()
+	writeAll(t, dir, map[string]string{fileDockerfile: pinOnlyDockerfile})
+	cs := runIn(t, dir, Options{DeploysToAPC: true, AirflowVersion: "3.1.2"})
+	assert.FileExists(t, filepath.Join(dir, fileDockerfile))
+	assert.Contains(t, apcNote(cs.Notes), "Dockerfile: kept for Astro Private Cloud")
+}
+
+// A conversion's advice on converting for the other platform is read after
+// the run, when converting again is refused because pyproject.toml now
+// carries [tool.astro]. So it says what to put back first: the files this run
+// removed, and pyproject.toml, restored if it was there before and deleted if
+// this run created it. A refusal writes nothing, so its advice needs neither.
+func TestTheOtherPlatformAdviceSaysWhatToRestore(t *testing.T) {
+	const config = "project:\n  name: orders\n  deployment: celestial-gravity-1234\n"
+	extra := map[string]string{fileRequirements: "pandas==2.1.0\n"}
+
+	dir := project1xWithConfig(t, config, extra)
+	cs := runIn(t, dir, Options{DeployTargetBasis: astroByContext})
+	assert.Contains(t, strings.Join(cs.Notes, "\n"), "to convert for Astro Private Cloud instead, first restore "+
+		"Dockerfile and requirements.txt from version control and delete the pyproject.toml this run created "+
+		"(`git checkout -- Dockerfile requirements.txt && rm pyproject.toml`), then convert again and pass --deploy-target apc")
+
+	extra[manifest.Marker] = "[project]\nname = 'orders'\nversion = '1.0.0'\ndependencies = []\n"
+	dir = project1xWithConfig(t, config, extra)
+	cs = runIn(t, dir, Options{DeployTargetBasis: astroByContext})
+	assert.Contains(t, strings.Join(cs.Notes, "\n"), "first restore Dockerfile, pyproject.toml and requirements.txt "+
+		"from version control (`git checkout -- Dockerfile requirements.txt pyproject.toml`), then convert again")
+
+	dir = project1xWithConfig(t, config, nil)
+	cs = runIn(t, dir, Options{DeploysToAPC: true, DeployTargetBasis: apcByContext})
+	assert.Contains(t, apcNote(cs.Notes), "to convert for Astro instead, first delete the pyproject.toml this run "+
+		"created (`rm pyproject.toml`), then convert again and pass --deploy-target astro")
 }

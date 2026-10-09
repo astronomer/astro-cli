@@ -220,6 +220,26 @@ func TestAirflowFromDockerfile(t *testing.T) {
 			wantStated:  true,
 		},
 		{
+			// Floating Airflow 3 tags. The old format below matches "3.1" and
+			// read every one of these as Airflow 2.
+			name:        "a floating Airflow 3 series tag names the series",
+			in:          "FROM astrocrpublic.azurecr.io/runtime:3.1\n",
+			wantVersion: "3.1",
+			wantStated:  true,
+		},
+		{
+			name:        "a floating Airflow 3 series tag with a Python flavor",
+			in:          "FROM astrocrpublic.azurecr.io/runtime:3.1-python-3.12\n",
+			wantVersion: "3.1",
+			wantStated:  true,
+		},
+		{
+			name:        "the floating Airflow 3 tag names only the generation",
+			in:          "FROM astrocrpublic.azurecr.io/runtime:3\n",
+			wantVersion: "3",
+			wantStated:  true,
+		},
+		{
 			name: "an old tag names Airflow 2 but not which one",
 			in:   "FROM quay.io/astronomer/astro-runtime:12.1.0\n",
 			// "2" is a legal pin meaning the newest Airflow 2, which is exactly

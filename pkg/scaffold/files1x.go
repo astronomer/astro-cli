@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // A 1.x Astro project states its shape in the files v2 replaces:
@@ -613,7 +614,8 @@ const runtimeImageHint = "runtime"
 // interchangeable:
 //
 //   - "3.1-12" is the format Airflow 3 introduced, where the leading X.Y IS the
-//     Airflow version. Fully derivable, offline.
+//     Airflow version. Fully derivable, offline. Its floating tags, "3.1" and
+//     "3", name the series and only the generation respectively.
 //   - "12.1.0" is the older format, which names the RUNTIME version. The Airflow
 //     minor is not in it. Recovering it means a reverse lookup through the
 //     published release index, which is a network fetch — and Plan is offline by
@@ -623,7 +625,9 @@ const runtimeImageHint = "runtime"
 // Airflow 2" (pkg/imagebuild matches a partial pin by prefix), which is exactly
 // what is known. It is honest rather than approximate, and a caller that wants
 // the exact minor resolves the tag itself and passes Options.AirflowVersion,
-// which wins over anything read here.
+// which wins over anything read here. A conversion for APC, which deploys that
+// one runtime, reads the minor from the catalog the caller passes as
+// Options.RuntimeCatalog (pinAPCBuildSeries).
 func airflowFromDockerfile(data []byte) (version string, stated bool, notes []string) {
 	const prefix = "Dockerfile: "
 
@@ -651,10 +655,20 @@ func airflowFromDockerfile(data []byte) (version string, stated bool, notes []st
 	}
 
 	bare := strings.TrimPrefix(tag, "v")
+	unflavored, _ := airflowrt.ParseRuntimeTagPython(bare)
+	floating, isRuntime := manifest.ParseRuntimeTag(unflavored)
 	switch {
 	case runtimeTagRe.MatchString(bare):
 		p := runtimeTagRe.FindStringSubmatch(bare)
 		return p[1] + "." + p[2], true, nil
+	// The floating Airflow 3 tags ("3.1", "3", "3.1-python-3.12"), which the
+	// old format below would read as Airflow 2. manifest.ParseRuntimeTag is the
+	// grammar every other reader of a FROM line uses, so it decides.
+	case isRuntime && floating.Major == "3":
+		if floating.Series != "" {
+			return floating.Series, true, nil
+		}
+		return floating.Major, true, nil
 	case oldRuntimeTagRe.MatchString(bare):
 		return "2", true, []string{prefix + "runtime " + tag + minorlessClause +
 			"so the pin is \"2\", meaning the newest Airflow 2. Set it explicitly if this project needs a particular one"}

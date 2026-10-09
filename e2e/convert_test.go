@@ -227,7 +227,8 @@ func cases1x() []case1x {
 				"pyproject.toml carries the same Airflow version, dependencies and OS packages for `astro local` and Astro, " +
 				"so change both together while the project deploys to Astro Private Cloud, and delete them if it deploys " +
 				"to Astro instead. This run converted the project for Astro Private Cloud because the current context is " +
-				"Astro Private Cloud (localhost); to convert for Astro instead, pass --deploy-target astro"},
+				"Astro Private Cloud (localhost); to convert for Astro instead, first delete the pyproject.toml this run " +
+				"created (`rm pyproject.toml`), then convert again and pass --deploy-target astro"},
 		},
 		{
 			// The flag outranks the context, in both directions.
@@ -284,7 +285,8 @@ func cases1x() []case1x {
 			notes: []string{
 				"Dockerfile and requirements.txt: kept for Astro Private Cloud",
 				"This run converted the project for Astro Private Cloud because of --deploy-target apc; " +
-					"to convert for Astro instead, pass --deploy-target astro",
+					"to convert for Astro instead, first delete the pyproject.toml this run created " +
+					"(`rm pyproject.toml`), then convert again and pass --deploy-target astro",
 			},
 		},
 		{
@@ -306,7 +308,9 @@ func cases1x() []case1x {
 				"celestial-gravity-1234 is this project's saved deploy target. If that is an Astro Deployment, " +
 					"give it a name under [tool.astro.deployments]",
 				"This run converted the project for Astro because the current context is Astro (localhost); " +
-					"to convert for Astro Private Cloud instead, pass --deploy-target apc",
+					"to convert for Astro Private Cloud instead, first restore Dockerfile and requirements.txt from " +
+					"version control and delete the pyproject.toml this run created (`git checkout -- Dockerfile " +
+					"requirements.txt && rm pyproject.toml`), then convert again and pass --deploy-target apc",
 			},
 		},
 		{

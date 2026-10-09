@@ -48,13 +48,15 @@ type rootOptions struct {
 // detectRootOptions reads the machine. It is the only ambient part of building
 // the root, so newRootCmd below stays a pure function of what this returns.
 func detectRootOptions() rootOptions {
+	// One read of the current context, which IsCloudContext would repeat: no
+	// context is Astro, with no domain to name.
 	platform := cloudPlatform
-	if !context.IsCloudContext() {
-		platform = apcPlatform
-	}
 	var domain string
 	if c, err := context.GetCurrentContext(); err == nil {
 		domain = c.Domain
+		if !context.IsCloudDomain(domain) {
+			platform = apcPlatform
+		}
 	}
 	return rootOptions{
 		platform:      platform,

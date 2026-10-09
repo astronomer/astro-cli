@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // initDeps pins WorkingDir to one directory (testDeps mints a fresh temp dir
@@ -76,12 +78,14 @@ func TestInitDeployTargetDecidesTheBuild(t *testing.T) {
 		{
 			name: "an APC context", apcContext: true, wantKept: true,
 			wantDecision: "because the current context is Astro Private Cloud (apc.example.com); " +
-				"to convert for Astro instead, pass --deploy-target astro",
+				"to convert for Astro instead, first delete the pyproject.toml this run created (`rm pyproject.toml`), " +
+				"then convert again and pass --deploy-target astro",
 		},
 		{name: "an Astro context"},
 		{
 			name: "--deploy-target apc under an Astro context", flag: "apc", wantKept: true,
-			wantDecision: "because of --deploy-target apc; to convert for Astro instead, pass --deploy-target astro",
+			wantDecision: "because of --deploy-target apc; to convert for Astro instead, first delete the pyproject.toml " +
+				"this run created (`rm pyproject.toml`), then convert again and pass --deploy-target astro",
 		},
 		{name: "--deploy-target astro under an APC context", apcContext: true, flag: "astro"},
 	} {
@@ -92,6 +96,10 @@ func TestInitDeployTargetDecidesTheBuild(t *testing.T) {
 			if !tc.apcContext {
 				d.ContextDomain = "astronomer.io"
 			}
+			// Read by the command before scaffold, whose Plan stays offline,
+			// and only for a conversion for APC.
+			read := 0
+			d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { read++; return nil }
 			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-1\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -101,6 +109,9 @@ func TestInitDeployTargetDecidesTheBuild(t *testing.T) {
 			}
 			if err := execute(t, d, args...); err != nil {
 				t.Fatalf("astro init: %v", err)
+			}
+			if want := map[bool]int{false: 0, true: 1}[tc.wantKept]; read != want {
+				t.Errorf("catalog read %d times, want %d", read, want)
 			}
 			_, err := os.Stat(filepath.Join(dir, "Dockerfile"))
 			if kept := err == nil; kept != tc.wantKept {

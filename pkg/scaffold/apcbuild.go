@@ -50,6 +50,11 @@ type deployTarget struct {
 	// build is the FROM of a Dockerfile kept undeclared for APC's build; zero
 	// when there is none.
 	build apcBuild
+	// undo is what to put back before converting again, once this run's
+	// changes are planned (undoAdvice): a rerun is refused once the manifest
+	// carries [tool.astro]. Empty before then, when a refusal has written
+	// nothing and converting again needs nothing undone.
+	undo string
 }
 
 // resolveDeployTarget takes where the project deploys from the caller
@@ -88,9 +93,52 @@ func (t *deployTarget) decided() string {
 		s += " because " + t.basis.Why
 	}
 	if t.basis.Instead != "" {
-		s += "; to convert for " + other + " instead, " + t.basis.Instead
+		s += "; to convert for " + other + " instead, "
+		if t.undo != "" {
+			s += t.undo + ", then convert again and "
+		}
+		s += t.basis.Instead
 	}
 	return s
+}
+
+// adviseUndo sets undo once the run's changes are planned, since the notes'
+// advice on converting for the other platform is read after the run, which a
+// rerun then refuses. The saved deploy target's note, which leftovers wrote
+// before the retirements were known, is the one note already carrying that
+// advice, so it is rewritten in place; notes written later read undo as is.
+func (t *deployTarget) adviseUndo(notes, removed []string, adopted bool) {
+	before := t.decided()
+	if before == "" {
+		return
+	}
+	t.undo = undoAdvice(removed, adopted)
+	for i, n := range notes {
+		if strings.HasSuffix(n, before) {
+			notes[i] = strings.TrimSuffix(n, before) + t.decided()
+		}
+	}
+}
+
+// undoAdvice is how to put back what a conversion changed that stops it
+// running again: pyproject.toml, which it created or added [tool.astro] to,
+// and the files it removes. The rest it writes (.gitignore lines, AGENTS.md,
+// the dags folder) a rerun skips or leaves as it is.
+func undoAdvice(removed []string, adopted bool) string {
+	restore := slices.Sorted(slices.Values(removed))
+	if adopted {
+		restore = append(restore, manifest.Marker)
+	}
+	var said, cmds []string
+	if len(restore) > 0 {
+		said = append(said, "restore "+joinNames(restore)+" from version control")
+		cmds = append(cmds, "git checkout -- "+strings.Join(restore, " "))
+	}
+	if !adopted {
+		said = append(said, "delete the "+manifest.Marker+" this run created")
+		cmds = append(cmds, "rm "+manifest.Marker)
+	}
+	return "first " + strings.Join(said, " and ") + " (`" + strings.Join(cmds, " && ") + "`)"
 }
 
 // hasDockerfile reports a Dockerfile with something in it to build. It is the
@@ -115,86 +163,88 @@ func buildsDockerfile(from1x *project1x, apc bool) bool {
 type apcBuild struct {
 	// base is the FROM read.
 	base airflowrt.DeclaredBase
-	// tag is base's tag as an Astro Runtime tag, when parsed says it is one.
+	// tag is base's tag as manifest.ParseRuntimeTag reads it, when parsed
+	// says it could. An Airflow 2 tag names a runtime version, not an Airflow
+	// series, so its Series is the catalog's for that runtime, when the
+	// catalog lists it.
 	tag    manifest.RuntimeTag
 	parsed bool
-	// series is the exact Airflow series the build carries ("3.1", "2.10"):
-	// the tag's own for Airflow 3, the runtime catalog's for an Airflow 2
-	// runtime version. Empty when the tag names none and no catalog said.
-	series string
+	// catalogRead says a catalog was there to ask, so an Airflow 2 series
+	// still unknown is one the catalog does not list rather than one nobody
+	// could look up.
+	catalogRead bool
 }
 
-// apcBuildOf reads the Dockerfile APC would build. An Airflow 2 tag names a
-// runtime version rather than an Airflow one, so its series comes from the
-// catalog, which is asked only then.
-func apcBuildOf(dir string, catalog func() *runtimeversions.Catalog) apcBuild {
-	b := apcBuild{base: airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile))}
+// apcBuildOf reads the Dockerfile APC would build, with the catalog the caller
+// read, or nil.
+func apcBuildOf(dir string, catalog *runtimeversions.Catalog) apcBuild {
+	b := apcBuild{base: airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)), catalogRead: catalog != nil}
 	b.tag, b.parsed = manifest.ParseRuntimeTag(b.base.RuntimeVersion())
-	switch {
-	case !b.parsed:
-	case b.tag.Series != "":
-		b.series = b.tag.Series
-	case catalog != nil:
-		if c := catalog(); c != nil {
-			if v := versionForTag(b.tag, b.base.RuntimeVersion(), AirflowPinOptions{Catalog: c}); strings.Contains(v, ".") {
-				b.series = v
-			}
+	if b.parsed && b.tag.Series == "" && catalog != nil {
+		if v := versionForTag(b.tag, b.base.RuntimeVersion(), AirflowPinOptions{Catalog: catalog}); v != b.tag.Major {
+			b.tag.Series = v
 		}
 	}
 	return b
 }
 
-// disagrees reports a pin this build would not deploy: another generation, or,
-// where the build's series is known, any other series, a pin naming only the
-// generation included, since "3" against runtime:3.1-12 resolves to the newest
-// 3.x under `astro local` while APC deploys 3.1. A pin to one release of the
-// series ("3.1.2") agrees. Where the series is unknown only the generation is
-// compared, and unknownSeriesNote says so.
+// disagrees reports a pin this build would not deploy: one the tag does not
+// agree with (manifest.RuntimeTag.Agrees), or, where the build's series is
+// known, a pin naming only the generation, since "3" against runtime:3.1-12
+// resolves to the newest 3.x under `astro local` while APC deploys 3.1. A pin
+// to one release of the series ("3.1.2") agrees.
 func (b *apcBuild) disagrees(pin string) bool {
 	if !b.parsed {
 		return false
 	}
-	a := manifest.Airflow{Pin: pin}
-	if a.Major() != b.tag.Major {
-		return true
+	return !b.tag.Agrees(pin) || b.tag.Series != "" && !strings.Contains(pin, ".")
+}
+
+// seriesUnknown says why an Airflow 2 build's series is not known.
+func (b *apcBuild) seriesUnknown() string {
+	if b.catalogRead {
+		return "the runtime catalog does not list runtime " + b.base.RuntimeVersion()
 	}
-	return b.series != "" && a.Series() != b.series
+	return "the runtime catalog, which says which, could not be read"
 }
 
 // carries names the Airflow the build carries, for the refusal, and fix is
 // the pin that agrees with it.
 func (b *apcBuild) carries() (carries, fix string) {
-	if b.series != "" {
-		return "Airflow " + b.series, "Convert with --airflow-version " + b.series
+	switch {
+	case b.tag.Series != "":
+		return "Airflow " + b.tag.Series, "Convert with --airflow-version " + b.tag.Series
+	case b.tag.Major == "3":
+		return "a floating Airflow 3 tag that names no series", "Convert with --airflow-version 3"
 	}
-	return "an Airflow " + b.tag.Major + " runtime whose tag does not name the Airflow series",
-		"Convert with --airflow-version set to the Airflow " + b.tag.Major + " series runtime " +
-			b.base.RuntimeVersion() + " carries (the runtime catalog, which says which, could not be read)"
+	return "an Airflow 2 runtime whose tag does not name the Airflow series",
+		"Convert with --airflow-version set to the Airflow 2 series runtime " + b.base.RuntimeVersion() +
+			" carries (" + b.seriesUnknown() + ")"
 }
 
 // pinAPCBuildSeries makes the series an APC build carries the pin a
 // conversion reads from its Dockerfile. airflowFromDockerfile reads an
 // Airflow 2 tag as "2", the newest Airflow 2, because the tag names no minor;
 // APC deploys one particular series, so where the catalog named it, that is
-// the pin, and where it could not, the note offering "2" as the honest answer
-// is replaced by one saying the requirement was not checked.
+// the pin, and where it did not, the note offering "2" as the honest answer
+// is replaced by one saying the requirement was not checked, and why.
 func pinAPCBuildSeries(from1x *project1x, b *apcBuild) {
-	if !b.parsed || b.tag.Series != "" || from1x.airflow != b.tag.Major {
+	if !b.parsed || from1x.airflow != b.tag.Major {
 		return
 	}
 	i := slices.IndexFunc(from1x.notes, isMinorlessNote)
 	switch {
-	case b.series != "":
-		from1x.airflow = b.series
+	case b.tag.Series != "":
+		from1x.airflow = b.tag.Series
 		if i >= 0 {
 			from1x.notes = slices.Delete(from1x.notes, i, i+1)
 		}
 	case i >= 0:
 		from1x.notes[i] = "Dockerfile: runtime " + b.base.Tag + " is an Airflow 2 image whose tag does not name the " +
-			"Airflow minor, and the runtime catalog, which says which Airflow it carries, could not be read, so the " +
-			"Airflow requirement in " + manifest.Marker + " was not checked against it. Astro Private Cloud's " +
-			"`astro deploy` builds that runtime as it stands, so set the requirement to its Airflow series: a pin of " +
-			"\"2\" means the newest Airflow 2 under `astro local`, which may not be it"
+			"Airflow minor, and " + b.seriesUnknown() + ", so the Airflow requirement in " + manifest.Marker +
+			" was not checked against it. Astro Private Cloud's `astro deploy` builds that runtime as it stands, so " +
+			"pin the requirement to the Airflow series it carries: one naming only the generation follows the newest " +
+			"Airflow 2 under `astro local`"
 	}
 }
 
@@ -222,27 +272,33 @@ func runtimeOnbuild(tag string) onbuildKind {
 	return onbuildInstalls
 }
 
-// apcBuildNotes is the note saying why kept, the files planRetirements kept for
-// APC alone, survive, and what that asks of the user: one note, or none when it
-// kept nothing, so a caller appends it unconditionally.
+// apcBuildNotes is the note naming what survives for APC's build and what
+// that asks of the user: one note for any project converted for APC with an
+// undeclared Dockerfile, since that file is the build APC deploys whatever
+// else kept it, and none otherwise, so a caller appends it unconditionally.
+// kept is what planRetirements kept for APC alone.
 //
-// Each clause is about what it names: the Dockerfile is said to be kept for APC
-// only when it is in kept (one kept for another reason, a version the pin did
-// not take or an instruction past its FROM, has its own note), the lists are
-// said to be installed only by a base that installs them, and pyproject.toml is
-// said to carry the same only for what was kept here, which is exactly what
-// would otherwise have retired because the manifest carries all of it.
+// Each clause is about what it names: pyproject.toml is said to carry the
+// same Airflow version only for a Dockerfile kept here (one kept for another
+// reason, a note of its own or a release of its series the pin named, is
+// named and claims nothing), the lists are said to be installed only by a base
+// that installs them, and deleting is offered only for what was kept here,
+// which is exactly what would otherwise have retired because the manifest
+// carries all of it.
 //
 // It ends by saying what decided the platform and how to choose the other,
 // since that decision is the whole reason the files are still there.
 func apcBuildNotes(target *deployTarget, from1x *project1x, kept []string) []string {
-	if !target.apc || len(kept) == 0 {
+	if !target.apc || !from1x.hasDockerfile() || declaresDockerfile(from1x) {
 		return nil
+	}
+	named := kept
+	if !slices.Contains(kept, fileDockerfile) {
+		named = append([]string{fileDockerfile}, kept...)
 	}
 	// In the order a manifest states them, whatever order kept came in.
 	var lists, same []string
-	keptDockerfile := slices.Contains(kept, fileDockerfile)
-	if keptDockerfile {
+	if slices.Contains(kept, fileDockerfile) {
 		// Kept here only when spent: its tag is the pin that won.
 		same = append(same, "Airflow version")
 	}
@@ -254,11 +310,8 @@ func apcBuildNotes(target *deployTarget, from1x *project1x, kept []string) []str
 	}
 
 	var b strings.Builder
-	b.WriteString(joinNames(kept) + ": kept for Astro Private Cloud, whose `astro deploy` " +
+	b.WriteString(joinNames(named) + ": kept for Astro Private Cloud, whose `astro deploy` " +
 		"builds the project from its Dockerfile as it stands")
-	if !keptDockerfile {
-		b.WriteString(", which this run keeps as well")
-	}
 	if len(lists) > 0 {
 		installs := joinNames(lists)
 		switch from1x.onbuild {
@@ -271,13 +324,19 @@ func apcBuildNotes(target *deployTarget, from1x *project1x, kept []string) []str
 			b.WriteString("; that build installs " + installs + " only if the Dockerfile or its base image does")
 		}
 	}
-	carried := same[len(same)-1]
-	if len(same) > 1 {
-		carried = strings.Join(same[:len(same)-1], ", ") + " and " + carried
+	if len(same) > 0 {
+		carried := same[len(same)-1]
+		if len(same) > 1 {
+			carried = strings.Join(same[:len(same)-1], ", ") + " and " + carried
+		}
+		deletable := pronoun(len(kept))
+		if len(named) != len(kept) {
+			deletable = joinNames(kept)
+		}
+		b.WriteString(". " + manifest.Marker + " carries the same " + carried + " for `astro local` and Astro, " +
+			"so change both together while the project deploys to Astro Private Cloud, and delete " + deletable +
+			" if it deploys to Astro instead")
 	}
-	b.WriteString(". " + manifest.Marker + " carries the same " + carried + " for `astro local` and Astro, " +
-		"so change both together while the project deploys to Astro Private Cloud, and delete " + pronoun(len(kept)) +
-		" if it deploys to Astro instead")
 	if d := target.decided(); d != "" {
 		b.WriteString(". " + d)
 	}

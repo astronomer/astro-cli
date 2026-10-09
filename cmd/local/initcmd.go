@@ -70,11 +70,12 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
 	opts.SecretWriter = &lazyVaultWriter{dir: dir}
-	// Asked only for a project converted for APC whose Dockerfile names an
-	// Airflow 2 runtime, a tag that does not say which Airflow series it
-	// carries. A cached copy answers offline; none leaves the series unknown.
-	if c.d.RuntimeCatalog != nil {
-		opts.RuntimeCatalog = func() *runtimeversions.Catalog { return c.d.RuntimeCatalog(ctx) }
+	// Read here, before scaffold, whose Plan stays offline, and only for a
+	// conversion for APC: it says which Airflow series a kept Dockerfile's
+	// Airflow 2 runtime tag carries. A cached copy answers offline; none
+	// leaves the series unknown, and the conversion says so.
+	if opts.DeploysToAPC && c.d.RuntimeCatalog != nil {
+		opts.RuntimeCatalog = c.d.RuntimeCatalog(ctx)
 	}
 	// Called by scaffold only when nothing in the project states an Airflow,
 	// so converting a pinned project makes no request. The lookup never fails

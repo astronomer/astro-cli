@@ -82,13 +82,14 @@ type Options struct {
 	// other platform, for the notes and the refusal that turn on it. Optional:
 	// the zero value leaves both unsaid.
 	DeployTargetBasis DeployTargetBasis
-	// RuntimeCatalog returns the runtime catalog, or nil when there is none.
-	// It is called at most once, and only for a project that deploys to APC
-	// from a Dockerfile whose FROM is an Airflow 2 runtime version, a tag that
-	// names no Airflow series: the catalog is what says which one that build
-	// carries. nil, like a nil answer, leaves the series unknown, and the
-	// conversion says so rather than pin a series it cannot vouch for.
-	RuntimeCatalog func() *runtimeversions.Catalog
+	// RuntimeCatalog is the runtime catalog the caller read before calling,
+	// or nil when it has none: data, so Plan stays offline. It is read only
+	// for a project that deploys to APC from a Dockerfile whose FROM is an
+	// Airflow 2 runtime version, a tag that names no Airflow series: the
+	// catalog says which one that build carries. Without it, or when it does
+	// not list that runtime, the series is unknown, and the conversion says
+	// which of the two rather than pin a series it cannot vouch for.
+	RuntimeCatalog *runtimeversions.Catalog
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -472,6 +473,7 @@ func Plan(dir string, opts Options) (*Changeset, error) { //nolint:gocritic // b
 	// whose dependencies are intact is the better half of the trade.
 	retire, keptForAPC := planRetirements(from1x,
 		slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs.AirflowVersion, target.apc)
+	target.adviseUndo(cs.Notes, retire, cs.Adopted)
 	cs.Notes = append(cs.Notes, apcBuildNotes(&target, from1x, keptForAPC)...)
 	for _, name := range retire {
 		label := name + " (migrated into " + manifest.Marker + ", removed)"
@@ -640,7 +642,7 @@ func planRetirements(from1x *project1x, notes []string, pinned string, apc bool)
 	// alone would be. `RUN pip install -r requirements.txt` is the common one,
 	// and packages.txt is consumed the same way by the runtime image's ONBUILD
 	// step, from the build context.
-	if !slices.Contains(out, fileDockerfile) && len(from1x.dockerfileBody) > 0 {
+	if !slices.Contains(out, fileDockerfile) && from1x.hasDockerfile() {
 		body := string(from1x.dockerfileBody)
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return strings.Contains(body, name)
@@ -670,7 +672,7 @@ func dockerfileIsSpent(from1x *project1x, pinned string) bool {
 // times, any refinement (a file with only comments and a FROM, an ARG-only one)
 // lands in some of them and the label and the declaration disagree.
 func declaresDockerfile(from1x *project1x) bool {
-	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly
+	return from1x.hasDockerfile() && !from1x.dockerfilePinOnly
 }
 
 // buildPython is the Python this project's image runs when its Dockerfile is
