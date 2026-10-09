@@ -262,11 +262,26 @@ func IsProjectDir(path string) (bool, error) {
 	configFile := filepath.Join(configPath, ConfigFileNameWithExt)
 
 	// Home directory is not a project directory
-	if HomePath == path {
+	if IsHomeDir(path) {
 		return false, nil
 	}
 
 	return fileutil.Exists(configFile, nil)
+}
+
+// IsHomeDir reports whether path is HomePath: the same spelling once cleaned,
+// or, when both can be read, the same directory under another one (a trailing
+// slash, a symlink).
+func IsHomeDir(path string) bool {
+	if path == "" || HomePath == "" {
+		return false
+	}
+	if filepath.Clean(path) == filepath.Clean(HomePath) {
+		return true
+	}
+	a, errA := os.Stat(path)
+	b, errB := os.Stat(HomePath)
+	return errA == nil && errB == nil && os.SameFile(a, b)
 }
 
 // IsWithinProjectDir returns true if the path is at or within an Astro project directory

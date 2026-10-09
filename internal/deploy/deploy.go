@@ -40,8 +40,8 @@ type Request struct {
 	LinkName string
 	// Deployment is --deployment. It names a manifest link, or — when the
 	// project links nothing by that name — an Astro Deployment id, which is
-	// what the flag meant before it learned link names and what the 1.x path spells
-	// --deployment-id. Either way it names the target on the command line,
+	// what the flag meant before it learned link names and what Astro CLI 1.x
+	// spelled --deployment-id. Either way it names the target on the command line,
 	// which is the only thing a deploy will resolve from.
 	Deployment string
 	// Preselect is what the ambient layers point at: ASTRO_DEPLOYMENT, then the

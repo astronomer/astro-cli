@@ -20,7 +20,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -773,84 +772,11 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 	assert.Contains(t, err.Error(), "--deployment")
 }
 
-func TestDeployRoutes1xProject(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	resetDeployFlagVars()
-
-	dir := t.TempDir() // no pyproject.toml, so not a project
-
-	orig := config.WorkingPath
-	config.WorkingPath = dir
-	t.Cleanup(func() { config.WorkingPath = orig })
-
-	origEnsure := EnsureProjectDir
-	origDeploy := DeployImage
-	t.Cleanup(func() {
-		EnsureProjectDir = origEnsure
-		DeployImage = origDeploy
-	})
-
-	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-	called := false
-	DeployImage = func(astrodeploy.InputDeploy, astrov1.APIClient, astrov1alpha1.APIClient) error {
-		called = true
-		return nil
-	}
-
-	err := execDeployCmd("test-deployment-id", "-f", "--workspace-id", "test-ws")
-	require.NoError(t, err)
-	assert.True(t, called, "a 1.x project should run the 1.x deploy path")
-}
-
-// Eight flags reach astro deploy that the manifest path never reads. Accepting them
-// silently means a deploy someone believes ran their tests, shipped from a
-// DAGs path it never looked at, or saved a target it did not save. Each is
-// refused with what to do instead until the ones worth porting are ported.
-//
-// Eight rather than nine: --build-secret is deliberately NOT in this table any
-// more, because the manifest path READS it now. It still needs a project Dockerfile
-// to be mounted into, and that refusal lives with the other build-secret
-// checks in TestDeployManifestBuildSecretRefusals — gated on the flag being given,
-// which is why it cannot be a row here.
-func TestDeployRefusesFlagsTheManifestPathIgnores(t *testing.T) {
-	cases := []struct {
-		args []string
-		want string
-	}{
-		{[]string{"--pytest"}, "uv run pytest"},
-		{[]string{"--parse"}, "astro local check"},
-		{[]string{"--dags-path", "./elsewhere"}, "not supported yet"},
-		{[]string{"--dag-bundle-name", "nightly"}, "not supported here yet"},
-		{[]string{"--test", "tests/test_dags.py"}, "uv run pytest"},
-		{[]string{"--env", ".env.ci"}, "runs no tests"},
-		{[]string{"--save"}, "always asks"},
-		{[]string{"--deployment-name", "prod"}, "--deployment"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.args[0], func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.LocalPlatform)
-			resetDeployFlagVars()
-
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifestForRouting), 0o600))
-			orig := config.WorkingPath
-			config.WorkingPath = dir
-			t.Cleanup(func() { config.WorkingPath = orig })
-
-			out, err := execDeployCapture(append([]string{actionDeploymentID}, tc.args...)...)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
-			assert.Contains(t, err.Error(), tc.want)
-			assert.NotContains(t, out, "Usage:", "a refusal prints the error, not the help")
-		})
-	}
-}
-
-// --force and --prompt are read by neither path but refused by neither either.
-// The manifest path has no uncommitted-changes gate for --force to open, and it always
-// asks, which is what --prompt requested — so both get the outcome the flag
-// asked for and refusing them would break CI that passes them out of habit.
+// --force and --prompt are accepted and read by nothing. The manifest path
+// has no uncommitted-changes gate for --force to open, and it always asks,
+// which is what --prompt requested — so both get the outcome the flag asked
+// for, and refusing them would break CI that passes them out of habit. The
+// run gets as far as asking for --deployment, as one without them does.
 func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
 	for _, flag := range []string{"--force", "--prompt"} {
 		t.Run(flag, func(t *testing.T) {
@@ -864,27 +790,9 @@ func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
 			t.Cleanup(func() { config.WorkingPath = orig })
 
 			err := execDeployCmd(flag)
-			if err != nil {
-				assert.NotContains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
-			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--deployment")
 		})
-	}
-}
-
-// The same flags still work on a 1.x project, where the 1.x deploy path reads
-// them. The refusal is on the manifest branch only.
-func TestDeployAllowsThoseFlagsOnA1xProject(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	resetDeployFlagVars()
-
-	dir := t.TempDir() // no pyproject.toml, so the 1.x path
-	orig := config.WorkingPath
-	config.WorkingPath = dir
-	t.Cleanup(func() { config.WorkingPath = orig })
-
-	err := execDeployCmd("--pytest")
-	if err != nil {
-		assert.NotContains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
 	}
 }
 

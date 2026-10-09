@@ -8,11 +8,31 @@ Terms used below:
 - The **transport** is the set of calls that talk to Astro: create the deploy, push the image to the Deployment's registry, upload the DAG tarball, finalize.
 - The **runtime image** is Astronomer's Airflow base image (`astrocrpublic.azurecr.io/runtime`). Building `FROM` it runs its `ONBUILD` steps, which install the project's `requirements.txt` and `packages.txt`.
 
-## Routing: a project or a 1.x project
+## What deploys: a `pyproject.toml` project, and nothing else
 
-`astro deploy` looks at the working directory. A `pyproject.toml` with a `[tool.astro]` table takes the manifest path, even if the table fails to validate (the deploy then reports the manifest error). Anything else takes the 1.x path, `deploy.Deploy` in `internal/platform/astro/deploy`, which is unchanged: it deploys a project made by Astro CLI 1.x (a 1.x project). A Dockerfile is not evidence of a 1.x project: a project with a manifest may declare one (`[tool.astro] dockerfile`). The check is `HasManifest` in [`internal/project`](../internal/project/project.go), and the fork is in [`cmd/astro/deploy.go`](../cmd/astro/deploy.go).
+v2 deploys only projects with a `pyproject.toml`, on Astro and on Astro Private Cloud. Nobody has to move to v2, and Astro CLI 1.x keeps deploying the projects it made, so v2 has no path for the 1.x layout (a `Dockerfile` and `.astro/config.yaml`).
 
-The manifest path lives beside the 1.x path in the same package (`manifest.go`, `manifest_image.go`) and in [`internal/deploy`](../internal/deploy/deploy.go). It calls the 1.x path's transport pieces directly instead of wrapping its `Deploy()`, which prints, rewrites `.dockerignore` and assumes the 1.x layout.
+`astro deploy` looks at the working directory. A `pyproject.toml` with a `[tool.astro]` table is deployed, even if the table fails to validate (the deploy then reports the manifest error). A Dockerfile is not evidence of a 1.x project: a project with a manifest may declare one (`[tool.astro] dockerfile`). The check is `HasManifest` in [`internal/project`](../internal/project/project.go), and the routing is in [`cmd/astro/deploy.go`](../cmd/astro/deploy.go).
+
+Anything else is refused before anything is read or contacted:
+
+- **A project in the 1.x layout** (a Dockerfile beside a `.astro` directory, or a `.astro/config.yaml`; `utils.Is1xLayout`): `this project uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`. This holds for every mode, `--dags` and `--image-name` included.
+- **No project at all:** `this is not an Astro project directory. Change to an Astro project directory, or run astro init to make this one an Astro project` (in the home directory, only the first sentence and the advice to change directory).
+
+Both are reported under `--output json` as the error object with kind `no_project`, and exit 1.
+
+`--non-dags` is the one mode that is not a project deploy. It ships a separate directory as a non-DAG bundle, which must not be inside any project, so it runs wherever it is asked, before the project decides anything.
+
+The deploy code lives in `internal/platform/astro/deploy` (`manifest.go`, `manifest_image.go`, and the bundle and Remote Execution client paths beside them) and in [`internal/deploy`](../internal/deploy/deploy.go).
+
+### Astro Private Cloud
+
+v2 does not build projects for Astro Private Cloud yet. Support for `pyproject.toml` projects there is planned. Until then, `astro deploy` under an APC context:
+
+- **refuses a deploy that would build the project**, one without `--image-name`: `Astro CLI v2 cannot build and deploy projects to Astro Private Cloud yet: use Astro CLI 1.x for now.` From a `pyproject.toml` project it adds that support is coming, and that `--dags` uploads the project's DAGs and an image built with `astro package` deploys with `--image-name`. Under `--output json` this is a usage error (exit 2);
+- **refuses every deploy from a project in the 1.x layout**, `--image-name` and `--dags` included: `… Astro CLI v2 cannot deploy projects to Astro Private Cloud yet. Deploy it with Astro CLI 1.x for now` (kind `no_project`);
+- **deploys an image you built**, `--image-name <ref>`, from anywhere else. The image is tagged and pushed to the Deployment's registry (`--remote` points the Deployment at an image already in a registry instead). A Deployment that takes DAG uploads then gets the working directory's `dags/`, when there is one;
+- **uploads a `pyproject.toml` project's DAGs**, `--dags`, from the project directory. Outside one it gives the no-project advice.
 
 ## 1. Image deploys
 
@@ -60,7 +80,7 @@ The manifest's `[tool.astro.deployments.<name>]` links name the Deployments a pr
 - **The argument or `--deployment` names a link or an id.** `astro deploy prod` ships to the `prod` link. A value no link declares is used as a Deployment id, so `astro deploy <id>` (what astronomer/deploy-action runs) keeps working. Naming both with different values is an error. There is no `-d` shorthand for `--deployment`: on this command `-d` means `--dags`.
 - **With nothing named, deploy asks.** The prompt (on stderr) is the CLI's numbered picker table of the project's Astro links. `ASTRO_DEPLOYMENT`, then your `astro use` selection, then the `default = true` link preselect the highlighted entry, labelled in its `PRESELECTED BY` column with whichever put it there (`ASTRO_DEPLOYMENT`, `astro use`, `default = true`), and the prompt shows its number (`> [2]`). Enter takes it. None of them can skip the question, and the prompt does not change your `astro use` selection. A project with exactly one link preselects it as its default. An answer is a link name or a number, exactly as listed, names first, so a link called `2` selects itself. Three bad answers give up.
 - **A run that cannot be asked fails.** With no terminal or with `--output json`, a deploy that names nothing stops: `a deploy must name the deployment it ships to: astro deploy <name> or --deployment <name>. …`. Under `--output json` it is the error object with kind `input_required` (see [Prompts](architecture.md#prompts)).
-- **A project that links nothing** needs a workspace (`--workspace`, else the current context), then runs the 1.x path's workspace flow: pick a Deployment, or create one (`deployment.GetDeployment`). A run that cannot be asked must pass `--deployment`.
+- **A project that links nothing** needs a workspace (`--workspace`, else the current context), then runs the workspace flow `astro deployment` commands use: pick a Deployment, or create one (`deployment.GetDeployment`). A run that cannot be asked must pass `--deployment`.
 - **A project whose links are all non-Astro** is refused, naming what it declares, rather than offered an unrelated Deployment.
 
 **Workspace.** `--workspace`, else the link's workspace (its own, or the `[tool.astro]` default it inherits), else the current context's. `--workspace-id`, the older spelling, still works and is hidden from help; given with `--workspace`, the two must agree.
@@ -169,7 +189,7 @@ astro package [TARGET] [flags]    # astro (default), mwaa, composer, oss
   -o, --output text|json
 ```
 
-The 1.x-only flags (`--save`, `--pytest`, `--env`, `--test`, `--parse`, `--deployment-name`, `--dags-path`, `--dag-bundle-name`) are refused on the manifest path with the alternative to use. `--force` and `--prompt` are accepted and do nothing.
+The flags only a 1.x project's deploy read are gone: `--save` (`-s`), `--pytest`, `--env` (`-e`), `--test` (`-t`), `--parse`, `--deployment-name` (`-n`), `--dags-path` and `--dag-bundle-name`, and on Astro Private Cloud `--save` and `--no-cache`. A run passing one fails as a usage error naming what replaced it (run the tests with `uv run pytest` first, check the DAGs with `astro local check`, name the Deployment with `--deployment`, and so on; see [Removed 1.x commands and flags](architecture.md#removed-1x-commands-and-flags)). `--force` and `--prompt` are accepted and do nothing. `--non-dags` and its `--non-dags-*` flags deploy a non-DAG bundle from a separate directory, and take their Deployment as the argument or `--deployment`.
 
 **Git metadata.** With the `deploy.git_metadata` setting on (the default), the deploy records the HEAD commit on Astro, and the commit message becomes the description when `--description` is not given. `commit_url` is set only for a GitHub remote. A project with uncommitted changes to tracked files records no commit and prints `note: the project has uncommitted changes, so this deploy records no git commit` on stderr. `--image-name` records none.
 

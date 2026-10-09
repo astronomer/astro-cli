@@ -86,34 +86,6 @@ func (_m *ImageHandler) Push(remoteImage string, username string, token string, 
 	return r0, r1
 }
 
-// Pytest provides a mock function with given fields: pytestFile, airflowHome, envFile, testHomeDirectory, pytestArgs, htmlReport, config
-func (_m *ImageHandler) Pytest(pytestFile string, airflowHome string, envFile string, testHomeDirectory string, pytestArgs []string, htmlReport bool, config types.ImageBuildConfig) (string, error) {
-	ret := _m.Called(pytestFile, airflowHome, envFile, testHomeDirectory, pytestArgs, htmlReport, config)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Pytest")
-	}
-
-	var r0 string
-	var r1 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, []string, bool, types.ImageBuildConfig) (string, error)); ok {
-		return rf(pytestFile, airflowHome, envFile, testHomeDirectory, pytestArgs, htmlReport, config)
-	}
-	if rf, ok := ret.Get(0).(func(string, string, string, string, []string, bool, types.ImageBuildConfig) string); ok {
-		r0 = rf(pytestFile, airflowHome, envFile, testHomeDirectory, pytestArgs, htmlReport, config)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	if rf, ok := ret.Get(1).(func(string, string, string, string, []string, bool, types.ImageBuildConfig) error); ok {
-		r1 = rf(pytestFile, airflowHome, envFile, testHomeDirectory, pytestArgs, htmlReport, config)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // TagLocalImage provides a mock function with given fields: localImage
 func (_m *ImageHandler) TagLocalImage(localImage string) error {
 	ret := _m.Called(localImage)

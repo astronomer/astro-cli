@@ -2,6 +2,18 @@
 
 This page is for people who use Astro CLI 1.x today. It covers what v2 does differently, then what breaks. Old commands and flags fail with a message that names the v2 replacement, so an old script tells you what to change instead of failing silently.
 
+## v2 requires converting your project
+
+v2 works on projects with a `pyproject.toml`, and only on those. It does not run, start or deploy a project in the 1.x layout (a `Dockerfile` and `.astro/config.yaml`). You don't have to move: Astro CLI 1.x keeps working, and keeps deploying the projects it made. When you do move, convert each project once:
+
+```sh
+astro init
+```
+
+`astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too.
+
+On Astro Private Cloud, v2 does not build and deploy projects yet, converted or not: use Astro CLI 1.x to deploy there for now. v2 deploys an image you built there (`astro deploy --image-name`, from anywhere but a 1.x project), and uploads a converted project's DAGs (`astro deploy --dags`). Support for `pyproject.toml` projects on Astro Private Cloud is coming.
+
 ## What's new
 
 ### A project is a `pyproject.toml`
@@ -43,17 +55,17 @@ A project can link the Deployments it ships to, by name, in `pyproject.toml`. `a
 
 ### Deploying and packaging
 
-`astro deploy` builds from the manifest, and fails fast on a runtime the Deployment can't take, before the build rather than after it. `astro package` builds the same artifact without shipping it, for Astro, MWAA or Cloud Composer. A 1.x project with no `[tool.astro]` still deploys the 1.x way, unchanged. See [deploy.md](deploy.md).
+`astro deploy` builds from the manifest, and fails fast on a runtime the Deployment can't take, before the build rather than after it. `astro package` builds the same artifact without shipping it, for Astro, MWAA or Cloud Composer. A 1.x project is not deployed until it is converted (see [v2 requires converting your project](#v2-requires-converting-your-project)). See [deploy.md](deploy.md).
 
 ### Scripting: `-o json`
 
 Commands that print a result take `-o json` (`--output json`), with a stable shape for scripts, agents and Astro Desktop. Under `-o json`, results go to stdout and progress and prompts go to stderr. The exceptions:
-- `astro deploy` takes only the long `--output json`, and only in a project with a `pyproject.toml`;
+- `astro deploy` on Astro takes only the long `--output json`;
 - `astro login`, `astro logout` and `astro otto` are interactive or print nothing worth parsing, and have no `-o`;
 - requests through `astro api airflow`, `cloud` and `registry` print the API's own response, shaped with `--jq` and `--template` (their `ls` and `describe` take `-o`);
 - `astro completion` prints a shell script.
 
-Commands that ask before deleting or replacing something take `--yes` (`-y`) to answer for you. `astro deploy` has no `--yes`: in a `pyproject.toml` project it asks only which Deployment to deploy to, which naming one (`--deployment`, or a link name as the argument) answers, and in a 1.x project it asks what 1.x asked: a Deployment id as the argument skips the choice of Deployment, and `--force` answers the warnings.
+Commands that ask before deleting or replacing something take `--yes` (`-y`) to answer for you. `astro deploy` on Astro has no `--yes`: it asks only which Deployment to deploy to, which naming one (`--deployment`, or a link name as the argument) answers.
 
 ### Smaller changes
 
@@ -99,7 +111,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 
 | 1.x | v2 | where |
 | --- | --- | --- |
-| `--force`, `-f` | `--yes`, `-y` | the 1.x commands that took it and ask for confirmation now (deployment, bundle, token, team, worker-queue and context commands). `astro deploy --force` is unchanged |
+| `--force`, `-f` | `--yes`, `-y` | the 1.x commands that took it and ask for confirmation now (deployment, bundle, token, team, worker-queue and context commands). `astro deploy` keeps `--force`, which a converted project's deploy does not need |
 | `--json` | `-o json` | `list` commands, `astro api … ls` / `describe` |
 | `--template` | `-o json`, and jq | `list` commands |
 | `-o table`, `-o template`, `-o yaml` | `-o text` (the default) or `-o json` | everywhere `-o` existed, except `astro deployment inspect`, which keeps `-o yaml`. These get the general "unknown output format" error, which lists the formats the command takes |
@@ -110,14 +122,21 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `-o <file>` | `--output-file <file>` (`-o` is the output format now) | `astro organization audit-logs export` |
 | `--api-url` | `--url` | `astro api airflow`, and its `ls` / `describe` |
 | `--deployment-id` | `--deployment`, `-d` | `astro api airflow`, and its `ls` / `describe` |
+| `--pytest`, `--test` (`-t`), `--env` (`-e`) | run your tests first: `uv run pytest && astro deploy` | `astro deploy` |
+| `--parse` | check your DAGs first: `astro local check && astro deploy` | `astro deploy` |
+| `--deployment-name`, `-n` | the argument, or `--deployment`, either taking a link name or a Deployment id | `astro deploy` |
+| `--save`, `-s` | name the Deployment on each deploy; on Astro, link it with `astro link add` and mark it `default = true` to preselect it | `astro deploy` |
+| `--dags-path` | `astro deploy --dags` from the project, which ships its `dags/` | `astro deploy` |
+| `--dag-bundle-name` | no replacement yet: use Astro CLI 1.x | `astro deploy` |
+| `--no-cache` | no replacement: v2 builds no image for Astro Private Cloud | `astro deploy` on Astro Private Cloud |
 
-Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands, `astro env` and `astro dbt deploy` / `delete`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, except `astro deploy`, which shows both. `astro deploy` also still shows `-n`, `--deployment-name`: it works in a 1.x project, and a project with a `pyproject.toml` refuses it in favor of `--deployment`. `astro deploy --dags-path` is hidden, and works only in a 1.x project.
+Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands, `astro env` and `astro dbt deploy` / `delete`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them.
 
 ### Behavior
 
 - **An `astro api airflow` request needs a target.** 1.x defaulted to `localhost:8080`. v2 needs `-d <link or Deployment>` or `--url`. For the Airflow on your machine, use `astro local api`. `ls` and `describe` only read the API spec, so they run without a target.
 - **Local Airflow runs without Docker by default.** Add `--docker` to `astro local start` for containers. uv 0.9.25 or later must be on your PATH. Windows needs `--docker`.
-- **`astro local` needs a converted project.** It reads `pyproject.toml`, not `requirements.txt`, `packages.txt` or `airflow_settings.yaml`, so run `astro init` once in a 1.x project. `astro deploy` still deploys an unconverted 1.x project.
+- **`astro local` needs a converted project.** It reads `pyproject.toml`, not `requirements.txt`, `packages.txt` or `airflow_settings.yaml`, so run `astro init` once in a 1.x project. `astro deploy` needs it converted too.
 - **Login tokens move into the OS keyring** (see above). A 1.x build cannot read them there, so it sees you as signed out and asks you to log in again. Once you do, v2 sees that 1.x uses that login and keeps it in `config.yaml` from then on, so both tools share it and neither signs the other out. `astro login --vault` logs in and moves the login back out of `config.yaml`, after which 1.x asks you to log in again.
 
 ## Installing v2
