@@ -1,0 +1,17 @@
+{
+  "deployment": "x",
+  "deployment_name": "x",
+  "workspace": "x",
+  "deploy_id": "x",
+  "bundle_type": "x",
+  "bundle_path": "x",
+  "mount_path": "x",
+  "bundle_version": "x",
+  "waited": true,
+  "wait_error": "x",
+  "git": {
+    "commit_sha": "x",
+    "branch": "x",
+    "commit_url": "x"
+  }
+}

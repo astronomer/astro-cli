@@ -43,9 +43,6 @@ var (
 	errInvalidDeploymentID       = errors.New("please specify a valid deployment ID")
 	errDeploymentNotFound        = errors.New("no airflow deployments found")
 	errInvalidDeploymentSelected = errors.New("invalid deployment selection\n")
-	// errNoImageName is an image deploy with no image to deploy: the caller
-	// refuses that before it gets here, since v2 builds no image for APC.
-	errNoImageName = errors.New("no image to deploy: pass --image-name")
 	// ErrDagOnlyDeployDisabledInConfigLegacy is returned for Houston before 2.0.0 (flat feature-flag paths).
 	ErrDagOnlyDeployDisabledInConfigLegacy = errors.New("to perform this operation, set both deployments.dagOnlyDeployment and deployments.configureDagDeployment to true in your APC cluster")
 	// ErrDagOnlyDeployDisabledInConfig is returned for Houston 2.0.0+ (deployMechanisms.*.enabled under merged deployments config).
@@ -184,9 +181,6 @@ type progressSetter interface{ ProgressTo(io.Writer) }
 // does not build projects for APC. Its DeploymentID is set on a failure too,
 // once the Deployment is known.
 func Airflow(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, opts Options) (Deployed, error) {
-	if imageName == "" {
-		return Deployed{DeploymentID: deploymentID}, errNoImageName
-	}
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return Deployed{DeploymentID: deploymentID}, err
@@ -507,11 +501,6 @@ func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsI
 	cloudDomain := c.Domain
 	if cloudDomain == "" {
 		return deploymentID, deployments, errNoDomainSet
-	}
-
-	// Use config deployment if provided
-	if deploymentID == "" {
-		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
 	}
 
 	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {

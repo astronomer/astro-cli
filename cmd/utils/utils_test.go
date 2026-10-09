@@ -8,122 +8,142 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
 )
 
-func TestEnsureProjectDir(t *testing.T) {
-	currentWorkingPath := config.WorkingPath
-	fileName := config.ConfigFileNameWithExt
-	dirName := config.ConfigDir
-	defer func() {
-		config.WorkingPath = currentWorkingPath
-		config.ConfigFileNameWithExt = fileName
-		config.ConfigDir = dirName
-	}()
-	// error case when file path is not resolvable
-	config.WorkingPath = "./\000x"
-	err := EnsureProjectDir(&cobra.Command{}, []string{})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to verify that your working directory is an Astro project.\nChange to an Astro project directory, or run astro init to make this one an Astro project")
-
-	// error case when no such file or dir
-	config.WorkingPath = "./test"
-	err = EnsureProjectDir(&cobra.Command{}, []string{})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "this is not an Astro project directory.\nChange to an Astro project directory, or run astro init to make this one an Astro project")
-	// astro dev init does not exist in v2
-	assert.NotContains(t, err.Error(), "dev init")
-
-	// --output json reports it as no_project
-	var notFound *project.NotFoundError
-	assert.ErrorAs(t, err, &notFound)
-
-	// success case
-	config.WorkingPath = currentWorkingPath
-	config.ConfigFileNameWithExt = "utils_test.go"
-	config.ConfigDir = ""
-	err = EnsureProjectDir(&cobra.Command{}, []string{})
-	assert.NoError(t, err)
+func writeFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
 }
 
-// In the home directory the check does not suggest astro init, which would
+// make1x lays out a project the way Astro CLI 1.x made one.
+func make1x(t *testing.T, dir string) {
+	t.Helper()
+	writeFile(t, dir, "Dockerfile", "FROM quay.io/astronomer/astro-runtime:12.0.0\n")
+	writeFile(t, dir, filepath.Join(".astro", "config.yaml"), "project:\n  name: demo\n")
+}
+
+func deployIn(t *testing.T, dir string) {
+	t.Helper()
+	prev := config.WorkingPath
+	config.WorkingPath = dir
+	t.Cleanup(func() { config.WorkingPath = prev })
+}
+
+// isNoProject reports whether err is reported under the kind no_project.
+func isNoProject(err error) bool {
+	var notFound *project.NotFoundError
+	return errors.As(err, &notFound)
+}
+
+// A deploy outside a pyproject.toml project gets one of three answers, all
+// no_project, by project.Discover's rule.
+func TestNoDeployableProject(t *testing.T) {
+	prevHome := config.HomePath
+	t.Cleanup(func() { config.HomePath = prevHome })
+	config.HomePath = t.TempDir()
+
+	t.Run("a 1.x project", func(t *testing.T) {
+		dir := t.TempDir()
+		make1x(t, dir)
+		deployIn(t, dir)
+		err := NoDeployableProject(Deploy1xRefusedAstro)
+		assert.EqualError(t, err, "this project uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x")
+		assert.True(t, isNoProject(err))
+	})
+
+	t.Run("below a 1.x project, which it names", func(t *testing.T) {
+		dir := t.TempDir()
+		make1x(t, dir)
+		sub := filepath.Join(dir, "dags")
+		require.NoError(t, os.MkdirAll(sub, 0o755))
+		deployIn(t, sub)
+		err := NoDeployableProject(Deploy1xRefusedAstro)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "this directory is inside a project at "+dir+" that uses the Astro CLI 1.x layout")
+		assert.Contains(t, err.Error(), "Convert it with astro init in "+dir+",")
+		assert.True(t, isNoProject(err))
+
+		err = NoDeployableProject(Deploy1xRefusedAPC)
+		assert.Contains(t, err.Error(), "which Astro CLI v2 does not deploy to Astro Private Cloud. Deploy it with Astro CLI 1.x")
+		assert.NotContains(t, err.Error(), "astro init")
+	})
+
+	t.Run("a 1.x project keeping a pyproject.toml for its tools", func(t *testing.T) {
+		dir := t.TempDir()
+		make1x(t, dir)
+		writeFile(t, dir, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
+		deployIn(t, dir)
+		err := NoDeployableProject(Deploy1xRefusedAstro)
+		assert.Contains(t, err.Error(), "this project uses the Astro CLI 1.x layout")
+	})
+
+	t.Run("below a pyproject.toml project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, dir, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+		sub := filepath.Join(dir, "dags")
+		require.NoError(t, os.MkdirAll(sub, 0o755))
+		deployIn(t, sub)
+		err := NoDeployableProject(Deploy1xRefusedAstro)
+		assert.EqualError(t, err, "this directory is inside the project at "+dir+". Run the deploy from the project directory, "+dir)
+		assert.True(t, isNoProject(err))
+	})
+
+	t.Run("no project", func(t *testing.T) {
+		deployIn(t, t.TempDir())
+		err := NoDeployableProject(Deploy1xRefusedAstro)
+		assert.EqualError(t, err, notProjectAdvice)
+		assert.True(t, isNoProject(err))
+	})
+
+	t.Run("a .astro/config.yaml alone is no project", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, dir, filepath.Join(".astro", "config.yaml"), "project:\n  name: demo\n")
+		deployIn(t, dir)
+		assert.EqualError(t, NoDeployableProject(Deploy1xRefusedAstro), notProjectAdvice)
+	})
+}
+
+// In the home directory the advice does not suggest astro init, which would
 // make all of ~ a project, and the home directory is recognized under another
-// spelling too.
-func TestEnsureProjectDirInTheHomeDirectory(t *testing.T) {
-	prevPath, prevHome := config.WorkingPath, config.HomePath
-	defer func() { config.WorkingPath, config.HomePath = prevPath, prevHome }()
+// spelling too. A Dockerfile beside ~/.astro, where the global config lives,
+// does not make it a 1.x project.
+func TestNoDeployableProjectInTheHomeDirectory(t *testing.T) {
+	prevHome := config.HomePath
+	t.Cleanup(func() { config.HomePath = prevHome })
 	home := t.TempDir()
 	config.HomePath = home
+	make1x(t, home)
 	for _, dir := range []string{home, home + string(filepath.Separator), filepath.Join(home, ".")} {
-		config.WorkingPath = dir
-		err := EnsureProjectDir(&cobra.Command{}, nil)
-		assert.ErrorContains(t, err, "this is your home directory, not an Astro project directory.\nChange to an Astro project directory")
-		assert.NotContains(t, err.Error(), "astro init")
-		err = NoDeployableProject(Deploy1xRefusedAstro)
-		assert.ErrorContains(t, err, "this is your home directory")
-		assert.NotContains(t, err.Error(), "astro init")
+		deployIn(t, dir)
+		err := NoDeployableProject(Deploy1xRefusedAstro)
+		assert.EqualError(t, err, homeDirRefusal)
+		assert.True(t, isNoProject(err))
+		got, err := Project1xDir(dir)
+		assert.NoError(t, err)
+		assert.Empty(t, got)
 	}
 
 	link := filepath.Join(t.TempDir(), "home")
 	if err := os.Symlink(home, link); err == nil {
-		config.WorkingPath = link
-		assert.ErrorContains(t, EnsureProjectDir(&cobra.Command{}, nil), "this is your home directory")
+		deployIn(t, link)
+		assert.EqualError(t, NoDeployableProject(Deploy1xRefusedAstro), homeDirRefusal)
 	}
-
-	// Anywhere else, the advice still includes astro init.
-	config.WorkingPath = t.TempDir()
-	assert.ErrorContains(t, EnsureProjectDir(&cobra.Command{}, nil), "run astro init")
 }
 
-// A deploy outside a pyproject.toml project tells a 1.x project what to do
-// about its layout, and anywhere else gives the no-project advice. Both are
-// no_project failures.
-func TestNoDeployableProject(t *testing.T) {
-	prev := config.WorkingPath
-	defer func() { config.WorkingPath = prev }()
-	write := func(dir, name, content string) {
-		assert.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
-		assert.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
-	}
-
-	oneX := t.TempDir()
-	write(oneX, "Dockerfile", "FROM quay.io/astronomer/astro-runtime:12.0.0\n")
-	write(oneX, filepath.Join(".astro", "config.yaml"), "project:\n  name: demo\n")
-	configOnly := t.TempDir()
-	write(configOnly, filepath.Join(".astro", "config.yaml"), "project:\n  name: demo\n")
-	dockerfileAndAstroDir := t.TempDir()
-	write(dockerfileAndAstroDir, "Dockerfile", "FROM x\n")
-	assert.NoError(t, os.MkdirAll(filepath.Join(dockerfileAndAstroDir, ".astro"), 0o755))
-
-	for _, dir := range []string{oneX, configOnly, dockerfileAndAstroDir} {
-		config.WorkingPath = dir
-		err := NoDeployableProject(Deploy1xRefusedAstro)
-		assert.EqualError(t, err, Deploy1xRefusedAstro, dir)
-		var notFound *project.NotFoundError
-		assert.ErrorAs(t, err, &notFound)
-	}
-
-	config.WorkingPath = t.TempDir()
-	err := NoDeployableProject(Deploy1xRefusedAPC)
-	assert.ErrorContains(t, err, "this is not an Astro project directory.\nChange to an Astro project directory, or run astro init")
-	assert.NotContains(t, err.Error(), "1.x")
-	var notFound *project.NotFoundError
-	assert.ErrorAs(t, err, &notFound)
-}
-
-// A pyproject.toml project is never the 1.x layout, whatever 1.x files it
-// still has beside it.
-func TestIs1xLayoutIsFalseForAManifestProject(t *testing.T) {
+// A pyproject.toml project is never a 1.x one, whatever 1.x files it still
+// has beside it.
+func TestProject1xDirIsEmptyForAManifestProject(t *testing.T) {
 	dir := t.TempDir()
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
-	assert.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), nil, 0o600))
-	assert.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
-	is1x, err := Is1xLayout(dir)
+	make1x(t, dir)
+	writeFile(t, dir, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+	got, err := Project1xDir(dir)
 	assert.NoError(t, err)
-	assert.False(t, is1x)
+	assert.Empty(t, got)
 }
 
 func TestGetDefaultDeployDescription(t *testing.T) {

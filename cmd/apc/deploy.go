@@ -116,26 +116,32 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 // refuseUndeployable stops a deploy v2 does not make on APC, before anything
 // is asked or sent:
 //
-//   - any deploy from a project in the Astro CLI 1.x layout, which Astro CLI
-//     1.x deploys;
+//   - any deploy in or below a project in the Astro CLI 1.x layout, which
+//     Astro CLI 1.x deploys (kind no_project);
 //   - --dags anywhere but in a pyproject.toml project: it uploads that
-//     project's dags directory;
+//     project's dags directory (kind no_project);
 //   - a deploy with no --image-name, which would build the project: v2 builds
-//     none for APC yet.
+//     none for APC yet. From a pyproject.toml project that is a mode v2 does
+//     not have, a usage error; anywhere else there is no project to build,
+//     kind no_project, as astro deploy on Astro says.
 //
 // --image-name (with or without --remote) needs no project: the image is
 // built already, and the dags directory uploaded after it, where the
 // Deployment takes one, is the working directory's when it has one.
 func refuseUndeployable() error {
-	is1x, err := utils.Is1xLayout(config.WorkingPath)
-	if err != nil {
-		return err
+	inProject := project.HasManifest(config.WorkingPath)
+	if !inProject {
+		dir1x, err := utils.Project1xDir(config.WorkingPath)
+		if err != nil {
+			return err
+		}
+		if dir1x != "" {
+			return utils.NoDeployableProject(utils.Deploy1xRefusedAPC)
+		}
 	}
 	switch {
-	case is1x:
-		return utils.NoDeployableProject(utils.Deploy1xRefusedAPC)
 	case isDagOnlyDeploy:
-		if !project.HasManifest(config.WorkingPath) {
+		if !inProject {
 			return utils.NoDeployableProject(utils.Deploy1xRefusedAPC)
 		}
 	case imagePresentOnRemote && imageName == "":
@@ -143,11 +149,10 @@ func refuseUndeployable() error {
 	case imageName == "":
 		// The value, not whether the flag was given: an empty --image-name=
 		// names no image, so this would be a build.
-		msg := errBuildDeployNoProject
-		if project.HasManifest(config.WorkingPath) {
-			msg = errBuildDeployManifest
+		if inProject {
+			return cliout.Usage(errors.New(errBuildDeployManifest))
 		}
-		return cliout.Usage(errors.New(msg))
+		return utils.NoProject(errBuildDeployNoProject)
 	}
 	return nil
 }

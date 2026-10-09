@@ -28,11 +28,6 @@ func Color() aurora.Aurora {
 	return aurora.NewAurora(shouldUseColors())
 }
 
-// Red returns text colored red
-func Red(text string) string {
-	return color.Sprintf(color.Red(text))
-}
-
 // Green returns text colored green
 func Green(text string) string {
 	return color.Sprintf(color.Green(text))

@@ -409,11 +409,8 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		links = req.Manifest.Astro.Deployments
 	}
 
-	if req.LinkName != "" && req.Deployment != "" && req.LinkName != req.Deployment {
-		return Target{}, fmt.Errorf("this deploy names two targets, %q and --deployment %q: name one", req.LinkName, req.Deployment)
-	}
-	if name := firstNonEmpty(req.LinkName, req.Deployment); name != "" {
-		return namedTarget(req, name, links)
+	if target, named, err := resolveNamed(req, links); named || err != nil {
+		return target, err
 	}
 
 	deployable := DeployableLinks(links)
@@ -452,6 +449,32 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
 	}
 	return astroTarget(req, name, link, links)
+}
+
+// ResolveNamed settles a target named on the command line, as Run does: the
+// argument (linkName) and --deployment, which must agree, each a link of m
+// (nil for no manifest) or a Deployment id. named is false when neither names
+// one. It is for a command that ships something other than the project, such
+// as astro deploy --non-dags, to name its Deployment the way a deploy does.
+func ResolveNamed(m *manifest.Manifest, linkName, deployment, workspaceID, contextWorkspace string) (target Target, named bool, err error) {
+	req := Request{Manifest: m, LinkName: linkName, Deployment: deployment, WorkspaceID: workspaceID, ContextWorkspace: contextWorkspace}
+	var links map[string]manifest.Link
+	if m != nil {
+		links = m.Astro.Deployments
+	}
+	return resolveNamed(req, links)
+}
+
+func resolveNamed(req Request, links map[string]manifest.Link) (Target, bool, error) {
+	if req.LinkName != "" && req.Deployment != "" && req.LinkName != req.Deployment {
+		return Target{}, true, fmt.Errorf("this deploy names two targets, %q and --deployment %q: name one", req.LinkName, req.Deployment)
+	}
+	name := firstNonEmpty(req.LinkName, req.Deployment)
+	if name == "" {
+		return Target{}, false, nil
+	}
+	target, err := namedTarget(req, name, links)
+	return target, true, err
 }
 
 // namedTarget resolves a target named on the command line, by the positional

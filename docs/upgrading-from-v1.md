@@ -10,7 +10,7 @@ v2 works on projects with a `pyproject.toml`, and only on those. It does not run
 astro init
 ```
 
-`astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too.
+`astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too. `astro deploy --image-name` is the exception: it deploys an image you already built, reads nothing from the project, and runs from any directory.
 
 On Astro Private Cloud, v2 does not build and deploy projects yet, converted or not: use Astro CLI 1.x to deploy there for now. v2 deploys an image you built there (`astro deploy --image-name`, from anywhere but a 1.x project), and uploads a converted project's DAGs (`astro deploy --dags`). Support for `pyproject.toml` projects on Astro Private Cloud is coming.
 
@@ -111,7 +111,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 
 | 1.x | v2 | where |
 | --- | --- | --- |
-| `--force`, `-f` | `--yes`, `-y` | the 1.x commands that took it and ask for confirmation now (deployment, bundle, token, team, worker-queue and context commands). `astro deploy` keeps `--force`, which a converted project's deploy does not need |
+| `--force`, `-f` | `--yes`, `-y` | the 1.x commands that took it and ask for confirmation now (deployment, bundle, token, team, worker-queue and context commands). `astro deploy` still accepts `--force`, hidden, and reads nothing from it |
 | `--json` | `-o json` | `list` commands, `astro api … ls` / `describe` |
 | `--template` | `-o json`, and jq | `list` commands |
 | `-o table`, `-o template`, `-o yaml` | `-o text` (the default) or `-o json` | everywhere `-o` existed, except `astro deployment inspect`, which keeps `-o yaml`. These get the general "unknown output format" error, which lists the formats the command takes |
@@ -129,6 +129,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--dags-path` | `astro deploy --dags` from the project, which ships its `dags/` | `astro deploy` |
 | `--dag-bundle-name` | no replacement yet: use Astro CLI 1.x | `astro deploy` |
 | `--no-cache` | no replacement: v2 builds no image for Astro Private Cloud | `astro deploy` on Astro Private Cloud |
+| `--prompt`, `-p` | nothing: `astro deploy` asks which Deployment unless you name one | `astro deploy` on Astro |
 
 Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands, `astro env` and `astro dbt deploy` / `delete`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them.
 

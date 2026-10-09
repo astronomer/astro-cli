@@ -239,11 +239,27 @@ func (s *Suite) TestTagPushDockerImageFailure() {
 	s.ErrorIs(err, errSomeContainerIssue)
 }
 
-// Airflow builds nothing: with no image named, it refuses before asking
-// Houston anything.
-func (s *Suite) TestAirflowRefusesWithoutAnImageName() {
-	_, err := Airflow(s.houstonMock, "dep", "ws", false, false, "", Options{})
-	s.ErrorIs(err, errNoImageName)
+// A deploy that names no Deployment asks which one. The project.deployment a
+// 1.x project's .astro/config.yaml saved (astro deploy --save) is not used:
+// v2 deploys no 1.x project, and a stale one would ship somewhere unasked.
+func (s *Suite) TestDeploymentIDIgnoresTheSaved1xDeployment() {
+	fs := afero.NewMemMapFs()
+	s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig(testUtil.SoftwarePlatform), 0o600))
+	dir := s.T().TempDir()
+	prev := config.WorkingPath
+	config.WorkingPath = dir
+	s.T().Cleanup(func() { config.WorkingPath = prev; testUtil.InitTestConfig(testUtil.SoftwarePlatform) })
+	s.Require().NoError(afero.WriteFile(fs, filepath.Join(dir, config.ConfigDir, config.ConfigFileNameWithExt), []byte("project:\n  deployment: stale-id\n"), 0o600))
+	config.InitConfig(fs)
+	s.Require().Equal("stale-id", config.CFG.ProjectDeployment.GetProjectString(), "the saved deployment is there to be ignored")
+
+	s.houstonMock.On("GetWorkspace", "ws").Return(&houston.Workspace{ID: "ws"}, nil).Once()
+	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "stale-id"}, {ID: "picked"}}, nil).Once()
+	defer testUtil.MockUserInput(s.T(), "2\n")()
+
+	got, _, err := getDeploymentIDForCurrentCommand(s.houstonMock, "ws", "", false)
+	s.NoError(err)
+	s.Equal("picked", got, "the picker decides, not the saved deployment")
 }
 
 func (s *Suite) TestGetAirflowUILink() {

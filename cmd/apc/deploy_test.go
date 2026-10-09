@@ -231,6 +231,7 @@ func in1xProject(t *testing.T) string {
 // project in the 1.x layout makes no deploy at all. --image-name and, from a
 // pyproject.toml project, --dags still deploy.
 func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
+	apc1x := utils.Deploy1xRefusedAPC("this project", "")
 	for _, tc := range []struct {
 		name  string
 		setup func(t *testing.T) string
@@ -241,12 +242,12 @@ func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
 		// noProject is whether it is a no_project failure.
 		noProject bool
 	}{
-		{"a build outside any project", func(t *testing.T) string { return inWorkingDir(t, true) }, nil, errBuildDeployNoProject, true, false},
+		{"a build outside any project", func(t *testing.T) string { return inWorkingDir(t, true) }, nil, errBuildDeployNoProject, false, true},
 		{"a build of a pyproject.toml project", func(t *testing.T) string { return inProject(t, true) }, nil, errBuildDeployManifest, true, false},
 		{"an empty --image-name= is a build", func(t *testing.T) string { return inProject(t, true) }, []string{"--image-name="}, errBuildDeployManifest, true, false},
-		{"a build of a 1.x project", in1xProject, nil, utils.Deploy1xRefusedAPC, false, true},
-		{"--image-name from a 1.x project", in1xProject, []string{"--image-name", "img:1"}, utils.Deploy1xRefusedAPC, false, true},
-		{"--dags from a 1.x project", in1xProject, []string{"--dags"}, utils.Deploy1xRefusedAPC, false, true},
+		{"a build of a 1.x project", in1xProject, nil, apc1x, false, true},
+		{"--image-name from a 1.x project", in1xProject, []string{"--image-name", "img:1"}, apc1x, false, true},
+		{"--dags from a 1.x project", in1xProject, []string{"--dags"}, apc1x, false, true},
 		{"--dags outside any project", func(t *testing.T) string { return inWorkingDir(t, true) }, []string{"--dags"}, "this is not an Astro project directory", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

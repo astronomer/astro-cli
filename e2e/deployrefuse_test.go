@@ -105,7 +105,7 @@ func TestDeployRefusesA1xProject(t *testing.T) {
 	for _, args := range [][]string{
 		{"deploy", "dep-id"},
 		{"deploy", "dep-id", "--dags"},
-		{"deploy", "dep-id", "--image-name", "img:1"},
+		{"deploy", "dep-id", "--image"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			p := parent.forT(t)
@@ -147,6 +147,35 @@ func TestDeployOutsideAProject(t *testing.T) {
 	}
 	if strings.Contains(r.Stderr, "1.x") {
 		t.Errorf("an empty directory is not a 1.x project\n%s", r.output())
+	}
+}
+
+// --image-name deploys an image already built, which reads nothing from the
+// project, so neither an empty directory nor a 1.x project stops it: it gets
+// past the project check, to the container engine an image push needs. With
+// Docker pointed at nothing (offline), that is where it stops, so nothing
+// leaves the machine.
+func TestDeployImageNameNeedsNoProject(t *testing.T) {
+	tier(t, 0)
+
+	for _, tc := range []struct {
+		name  string
+		setup func(t *testing.T, p *project)
+	}{
+		{"outside any project", func(*testing.T, *project) {}},
+		{"in a 1.x project", make1xProject},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newProject(t)
+			tc.setup(t, p)
+			r := runIn(t, p, "deploy", "dep-id", "--image-name", "img:1").requireFailure()
+			if !strings.Contains(r.Stderr, "an image deploy needs") {
+				t.Errorf("want it past the project check, stopped at the container engine\n%s", r.output())
+			}
+			if strings.Contains(r.Stderr, "not an Astro project directory") || strings.Contains(r.Stderr, "1.x layout") {
+				t.Errorf("--image-name reads no project, so none should be asked for\n%s", r.output())
+			}
+		})
 	}
 }
 
@@ -318,10 +347,11 @@ func TestAPCDeployRefusesToBuild(t *testing.T) {
 	}{
 		{"a 1.x project", make1xProject, []string{"deploy", "dep-id"}, []string{"Astro CLI 1.x layout", "Deploy it with Astro CLI 1.x"}, "no_project"},
 		{"--image-name from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--image-name", "img:1"}, []string{"Astro CLI 1.x layout"}, "no_project"},
+		{"--dags from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--dags"}, []string{"Astro CLI 1.x layout", "does not deploy to Astro Private Cloud"}, "no_project"},
 		{"a pyproject.toml project", func(t *testing.T, p *project) {
 			p.forT(t).run("init", "--name", "deployable").requireSuccess()
 		}, []string{"deploy", "dep-id"}, []string{"cannot build and deploy projects to Astro Private Cloud yet", "use Astro CLI 1.x", "pyproject.toml projects on Astro Private Cloud is coming"}, "usage"},
-		{"outside any project", func(*testing.T, *project) {}, []string{"deploy", "dep-id"}, []string{"cannot build and deploy projects to Astro Private Cloud yet", "--image-name"}, "usage"},
+		{"outside any project", func(*testing.T, *project) {}, []string{"deploy", "dep-id"}, []string{"cannot build and deploy projects to Astro Private Cloud yet", "--image-name"}, "no_project"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// With the keyring stamped unavailable, as the json walk's

@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
@@ -41,65 +43,136 @@ func deployIn(t *testing.T, dir string) {
 	t.Cleanup(func() { config.WorkingPath = prev })
 }
 
-// v2 deploys only pyproject.toml projects. A project in the Astro CLI 1.x
-// layout is refused whatever the flags, naming the two ways forward, and
-// neither the manifest path nor anything else runs. Outside any project the
-// deploy gives the no-project advice. Both are no_project failures.
-func TestDeployRefusesA1xProject(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+// make1xProject lays out a project the way Astro CLI 1.x made one.
+func make1xProject(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM quay.io/astronomer/astro-runtime:12.0.0\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "dags"), 0o755))
+	return dir
+}
+
+// noTransport fails the test if the deploy reaches the transport.
+func noTransport(t *testing.T) {
+	t.Helper()
 	prevDeployer := newManifestDeployer
 	t.Cleanup(func() { newManifestDeployer = prevDeployer })
 	newManifestDeployer = func(*deployLogin, io.Reader, io.Writer) manifestdeploy.Deployer {
 		t.Fatal("a refused deploy reaches no transport")
 		return nil
 	}
+}
 
-	oneX := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(oneX, "Dockerfile"), []byte("FROM quay.io/astronomer/astro-runtime:12.0.0\n"), 0o600))
-	require.NoError(t, os.MkdirAll(filepath.Join(oneX, ".astro"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(oneX, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600))
-	require.NoError(t, os.MkdirAll(filepath.Join(oneX, "dags"), 0o755))
+// v2 deploys only pyproject.toml projects. A project in the Astro CLI 1.x
+// layout is refused for every mode that reads the project, naming the two
+// ways forward, and the transport is never reached. Outside any project the
+// deploy gives the no-project advice. Both are no_project failures.
+func TestDeployRefusesA1xProject(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	resetDeployFlagVars()
+	noTransport(t)
+
+	oneX := make1xProject(t)
 	deployIn(t, oneX)
-
 	for _, args := range [][]string{
 		{"test-deployment-id"},
 		{"test-deployment-id", "--dags"},
-		{"test-deployment-id", "--image-name", "img:1"},
 		{"test-deployment-id", "--image"},
 		{"test-deployment-id", "--force", "--output", "json"},
 	} {
 		err := execDeployCmd(args...)
 		require.Error(t, err, "%v", args)
-		assert.EqualError(t, err, utils.Deploy1xRefusedAstro, "%v", args)
-		assert.Contains(t, err.Error(), "astro init")
-		assert.Contains(t, err.Error(), "Astro CLI 1.x")
+		assert.EqualError(t, err, utils.Deploy1xRefusedAstro("this project", ""), "%v", args)
 		var notFound *project.NotFoundError
 		assert.True(t, errors.As(err, &notFound), "%v: reported as no_project", args)
 	}
 
-	empty := t.TempDir()
-	deployIn(t, empty)
-	for _, args := range [][]string{{"test-deployment-id"}, {"test-deployment-id", "--image-name", "img:1"}, {"test-deployment-id", "--dags"}} {
+	// From below the project, the refusal names it.
+	deployIn(t, filepath.Join(oneX, "dags"))
+	err := execDeployCmd("test-deployment-id")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "inside a project at "+oneX)
+
+	deployIn(t, t.TempDir())
+	for _, args := range [][]string{{"test-deployment-id"}, {"test-deployment-id", "--dags"}, {"test-deployment-id", "--image-name="}} {
 		err := execDeployCmd(args...)
 		require.Error(t, err, "%v", args)
-		assert.Contains(t, err.Error(), "this is not an Astro project directory.\nChange to an Astro project directory, or run astro init", "%v", args)
+		assert.Contains(t, err.Error(), "this is not an Astro project directory. Change to an Astro project directory, or run astro init", "%v", args)
 		assert.NotContains(t, err.Error(), "1.x", "%v", args)
 		var notFound *project.NotFoundError
 		assert.True(t, errors.As(err, &notFound), "%v: reported as no_project", args)
 	}
+
+	// A bad --output is the usage error, wherever the deploy runs.
+	_, err = execDeployCapture("test-deployment-id", "--output", "yaml")
+	assert.True(t, cliout.IsUsage(err), "%v", err)
+}
+
+// --image-name deploys an image already built, which reads nothing from the
+// project, so it runs anywhere: outside any project and in a 1.x one alike.
+// There it ships the image alone, never the working directory's dags/, to
+// the Deployment the argument or --deployment names by id.
+func TestDeployImageNameOutsideAProject(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		dir  func(t *testing.T) string
+		args []string
+	}{
+		{"outside any project", func(t *testing.T) string { return t.TempDir() }, []string{actionDeploymentID, "--image-name", "img:1"}},
+		{"in a 1.x project", make1xProject, []string{"--deployment", actionDeploymentID, "--image-name", "img:1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			resetDeployFlagVars()
+			fake := &fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "deploy-1", WorkspaceID: "clw-ws"}}
+			prevDeployer := newManifestDeployer
+			t.Cleanup(func() { newManifestDeployer = prevDeployer })
+			newManifestDeployer = func(*deployLogin, io.Reader, io.Writer) manifestdeploy.Deployer { return fake }
+			deployIn(t, tc.dir(t))
+
+			out, err := execDeployCapture(append(tc.args, "--output", "json")...)
+			require.NoError(t, err, out)
+			require.NotNil(t, fake.imgInput)
+			assert.Equal(t, actionDeploymentID, fake.imgInput.DeploymentID)
+			assert.Equal(t, "img:1", fake.imgInput.ImageName)
+			assert.False(t, fake.imgInput.IncludeDags, "no DAGs ship from outside a project")
+			assert.Contains(t, out, `"type":"image-only"`)
+		})
+	}
+
+	t.Run("--dags with it is refused", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		resetDeployFlagVars()
+		fake := &fakeCmdDeployer{}
+		prevDeployer := newManifestDeployer
+		t.Cleanup(func() { newManifestDeployer = prevDeployer })
+		newManifestDeployer = func(*deployLogin, io.Reader, io.Writer) manifestdeploy.Deployer { return fake }
+		deployIn(t, t.TempDir())
+		err := execDeployCmd(actionDeploymentID, "--image-name", "img:1", "--dags")
+		assert.ErrorContains(t, err, "--dags deploys only your DAGs")
+		assert.Nil(t, fake.imgInput)
+		assert.Nil(t, fake.dagInput)
+	})
 }
 
 // The flags only the 1.x deploy read are gone from the command: a run that
 // passes one fails as an unknown flag here, and the root's removed-flags
 // registry names what replaced it (cmd's TestRemovedFlagsSayWhatReplacedThem).
+// --force stays, hidden and read by nothing, because astronomer/deploy-action
+// passes it.
 func TestDeployDropsThe1xOnlyFlags(t *testing.T) {
 	cmd := NewDeployCmd()
-	for _, name := range []string{"save", "pytest", "parse", "test", "env", "dags-path", "dag-bundle-name", "deployment-name"} {
+	for _, name := range []string{"save", "pytest", "parse", "test", "env", "dags-path", "dag-bundle-name", "deployment-name", "prompt"} {
 		assert.Nil(t, cmd.Flags().Lookup(name), "--%s", name)
 	}
-	for _, letter := range []string{"s", "t", "e", "n"} {
+	for _, letter := range []string{"s", "t", "e", "n", "p"} {
 		assert.Nil(t, cmd.Flags().ShorthandLookup(letter), "-%s", letter)
 	}
+	force := cmd.Flags().Lookup("force")
+	require.NotNil(t, force)
+	assert.True(t, force.Hidden)
 }
 
 type NonDagsDeploySuite struct {
@@ -243,4 +316,45 @@ func (s *NonDagsDeploySuite) TestFromAManifestProject() {
 
 	err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x")
 	assert.ErrorContains(s.T(), err, "within an Astro project")
+}
+
+// --output json publishes the bundle deploy as one object; a bad --output is
+// a usage error before anything is read.
+func (s *NonDagsDeploySuite) TestOutput() {
+	DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+		return astrodeploy.BundleDeploy{DeploymentID: in.DeploymentID, DeployID: "dep-1", MountPath: in.MountPath, BundleVersion: "v1"}, nil
+	}
+	resetDeployFlagVars()
+	out, err := execDeployCapture("test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--output", "json")
+	s.Require().NoError(err, out)
+	var got nonDagsDeployJSON
+	s.Require().NoError(json.Unmarshal([]byte(out), &got), out)
+	s.Equal(nonDagsDeployJSON{Deployment: "test-deployment-id", DeployID: "dep-1", BundleType: "none", BundlePath: s.tmpWorkingDir, MountPath: "/usr/local/airflow/x", BundleVersion: "v1"}, got)
+
+	resetDeployFlagVars()
+	_, err = execDeployCapture("test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--output", "yaml")
+	s.True(cliout.IsUsage(err), "%v", err)
+}
+
+// The target is named as a project deploy names it: the argument and
+// --deployment must agree, and a link name of the project here is its
+// Deployment. --workspace is the workspace whose Deployments are offered.
+func (s *NonDagsDeploySuite) TestTarget() {
+	var captured *astrodeploy.DeployBundleInput
+	DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+		captured = in
+		return astrodeploy.BundleDeploy{}, nil
+	}
+	bundle := s.T().TempDir()
+
+	resetDeployFlagVars()
+	err := testExecCmd(NewDeployCmd(), "dep-a", "--deployment", "dep-b", "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", bundle)
+	s.ErrorContains(err, "name one")
+	s.True(cliout.IsUsage(err))
+
+	s.Require().NoError(os.WriteFile(filepath.Join(s.tmpWorkingDir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n\n[tool.astro.deployments.prod]\ntarget = \"astro\"\nworkspace = \"clw-ws\"\ndeployment = \"clx-prod\"\n"), 0o600))
+	resetDeployFlagVars()
+	err = testExecCmd(NewDeployCmd(), "prod", "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", bundle)
+	s.Require().NoError(err)
+	s.Equal("clx-prod", captured.DeploymentID)
 }

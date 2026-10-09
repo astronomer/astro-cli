@@ -48,8 +48,6 @@ func resetDeployFlagVars() {
 	manifestWorkspace = ""
 	noDagsBaseDir = false
 	waitForDeploy = false
-	forceDeploy = false
-	forcePrompt = false
 	workspaceID = ""
 	deploymentName = ""
 	deployDescription = ""
@@ -772,13 +770,12 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 	assert.Contains(t, err.Error(), "--deployment")
 }
 
-// --force and --prompt are accepted and read by nothing. The manifest path
-// has no uncommitted-changes gate for --force to open, and it always asks,
-// which is what --prompt requested — so both get the outcome the flag asked
-// for, and refusing them would break CI that passes them out of habit. The
-// run gets as far as asking for --deployment, as one without them does.
-func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
-	for _, flag := range []string{"--force", "--prompt"} {
+// --force is accepted and read by nothing: there is no uncommitted-changes
+// gate for it to open, and astronomer/deploy-action passes it on every deploy.
+// The run gets as far as asking for --deployment, as one without it does.
+// (--prompt is gone: deploy always asks; cmd's removed-flag tests cover it.)
+func TestDeployAcceptsForceOnAManifestProject(t *testing.T) {
+	for _, flag := range []string{"--force", "-f"} {
 		t.Run(flag, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
