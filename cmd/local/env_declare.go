@@ -12,6 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/localenv"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -465,6 +466,6 @@ func (c *cli) notePlaintextCopy(dir string, kind localenv.Kind, name string) {
 	if _, ok, err := store.Get(kind, name); err != nil || !ok {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "note: %s is still in %s, a plain file. Run `astro local env %s set %s` to move it into the vault\n",
+	ansi.Fprintf(c.d.Stderr, "note: %s is still in %s, a plain file. Run `astro local env %s set %s` to move it into the vault\n",
 		name, store.Path, localenv.Noun(kind), name)
 }

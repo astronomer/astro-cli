@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
@@ -143,7 +144,7 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 	}
 
 	if err != nil && appConfig.Flags.BYORegistryEnabled {
-		fmt.Fprintf(out, defaultRegistryLoginFailMsg, registryDomain)
+		ansi.Fprintf(out, defaultRegistryLoginFailMsg, registryDomain)
 		return nil
 	}
 

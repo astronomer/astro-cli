@@ -43,7 +43,7 @@ func (s *Suite) TestShouldUseColors() {
 // A question goes to stderr, so its colors follow stderr: colored at a
 // terminal with stdout redirected, and plain on a redirected stderr.
 func (s *Suite) TestForStderrFollowsStderrNotStdout() {
-	for _, v := range []string{cliColorForce, "CLICOLOR"} {
+	for _, v := range []string{cliColorForce, "CLICOLOR", "NO_COLOR"} {
 		s.T().Setenv(v, "")
 		s.Require().NoError(os.Unsetenv(v))
 	}

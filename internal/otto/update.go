@@ -11,6 +11,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 const (
@@ -41,7 +42,7 @@ func hintUpdateAvailable(w io.Writer) {
 		return
 	}
 	if isVersionNewer(state.LatestKnown, installed) {
-		fmt.Fprintf(w, "Otto %s is available. Run `astro otto update` to upgrade.\n", state.LatestKnown)
+		ansi.Fprintf(w, "Otto %s is available. Run `astro otto update` to upgrade.\n", state.LatestKnown)
 	}
 }
 

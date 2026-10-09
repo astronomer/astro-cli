@@ -15,6 +15,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	astrocontext "github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -166,14 +167,14 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 					assert.Zero(t, *preRuns, "a pre-run started before the refusal")
 					if !asJSON {
 						assert.Empty(t, stdout)
-						assert.Contains(t, stderr, "Error: "+c.want)
+						assert.Contains(t, stderr, "Error: "+ansi.StripBackticks(c.want), "the message prints without its backticks to a pipe")
 						return
 					}
 					assert.Empty(t, stderr)
 					require.Equal(t, 1, strings.Count(stdout, "\n"), "stdout is not one line: %q", stdout)
 					var obj map[string]any
 					require.NoError(t, json.Unmarshal([]byte(stdout), &obj), stdout)
-					assert.Equal(t, map[string]any{"error": c.want, "code": float64(cliout.ExitUsage), "kind": string(cliout.KindUsage)}, obj)
+					assert.Equal(t, map[string]any{"error": ansi.StripBackticks(c.want), "code": float64(cliout.ExitUsage), "kind": string(cliout.KindUsage)}, obj)
 				})
 			}
 		}

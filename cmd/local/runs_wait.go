@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/airflowapi"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 // The exit statuses of `runs trigger-wait`, one per way the wait can end.
@@ -224,7 +225,7 @@ func (q *query) awaitRun(ctx context.Context, client *airflowapi.Client, run air
 
 func (q *query) renderWaitedRun(w io.Writer, result waitedRun) error {
 	if result.TimedOut {
-		_, err := fmt.Fprintf(w, "%s run %s is still %s after %s; stopped waiting, and the run carries on\n"+
+		_, err := ansi.Fprintf(w, "%s run %s is still %s after %s; stopped waiting, and the run carries on\n"+
 			"check on it with `%s`\n",
 			result.DAGID, result.RunID, result.State, formatDuration(result.ElapsedSeconds),
 			q.t.suggest("runs get "+result.DAGID+" "+result.RunID))
@@ -314,7 +315,7 @@ func (q *query) renderFailedTasks(w io.Writer, dagID, runID string, failed []tas
 		if row.MapIndex >= 0 {
 			command += " -m " + strconv.Itoa(row.MapIndex)
 		}
-		_, err := fmt.Fprintf(w, "\nread why %s failed with `%s`\n", row.TaskID, q.t.suggest(command))
+		_, err := ansi.Fprintf(w, "\nread why %s failed with `%s`\n", row.TaskID, q.t.suggest(command))
 		return err
 	}
 	return nil

@@ -13,6 +13,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 // The help style guide, enforced. Each rule is a function that names what is
@@ -163,7 +165,7 @@ func checkRootRow(cmd *cobra.Command) string {
 		return ""
 	}
 	name := "  " + commandSpellings(cmd)
-	for _, section := range commandSections(parent, helpMaxWidth) {
+	for _, section := range commandSections(parent, helpMaxWidth, ansi.ForWriter(io.Discard)) {
 		lines := strings.Split(section, "\n")
 		for i, line := range lines {
 			if line != name && !strings.HasPrefix(line, name+" ") {

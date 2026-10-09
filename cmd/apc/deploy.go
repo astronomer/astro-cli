@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
@@ -317,10 +318,11 @@ func warn(result *deployJSON, progress io.Writer, msg string) {
 
 // alwaysWarn prints a deploy warning and records it in the json result, as
 // warn does, whatever show_warnings is: for a part of the deploy that was
-// asked for and did not happen.
+// asked for and did not happen. A command in the message's backticks is
+// rendered for progress, and recorded as plain text.
 func alwaysWarn(result *deployJSON, progress io.Writer, msg string) {
-	fmt.Fprintln(progress, "Warning: "+msg)
-	result.Warnings = append(result.Warnings, msg)
+	ansi.Fprintf(progress, "Warning: %s\n", msg)
+	result.Warnings = append(result.Warnings, ansi.StripBackticks(msg))
 }
 
 // emitDeploy publishes a finished deploy under json. In text the deploy has

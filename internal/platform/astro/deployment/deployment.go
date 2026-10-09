@@ -1016,7 +1016,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 
-		fmt.Fprintf(progressTo(notes), "\nYou enabled Dag-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled."+
+		ansi.Fprintf(progressTo(notes), "\nYou enabled Dag-only deploys for this Deployment. Running tasks are not interrupted but new tasks will not be scheduled."+
 			"\nRun `astro deploy --dags` to complete enabling this feature and resume your Dags. It may take a few minutes for the Airflow UI to update..\n\n")
 		dagDeployEnabled = true
 	case disable:
@@ -1025,7 +1025,7 @@ func Update(deploymentID, name, ws, description, deploymentName, dagDeploy, exec
 			return UpdateResult{Deployment: currentDeployment}, nil
 		}
 		if config.CFG.ShowWarnings.GetBool() {
-			fmt.Fprintf(progressTo(notes), "\nWarning: This command will disable Dag-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled"+
+			ansi.Fprintf(progressTo(notes), "\nWarning: This command will disable Dag-only deploys for this Deployment. Running tasks will not be interrupted, but new tasks will not be scheduled"+
 				"\nRun `astro deploy` after this command to restart your Dags. It may take a few minutes for the Airflow UI to update.")
 			confirmWithUser = true
 		}

@@ -14,6 +14,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
 	sharedtel "github.com/astronomer/astro-cli/pkg/telemetry"
 	"github.com/astronomer/astro-cli/version"
@@ -145,7 +146,7 @@ func showFirstRunNotice() {
 	if config.CFG.TelemetryNoticeShown.GetHomeString() == noticeVersion {
 		return
 	}
-	fmt.Fprintln(os.Stderr,
+	ansi.Fprintf(os.Stderr, "%s\n",
 		"The Astro CLI collects usage data to help us prioritize and invest in CLI features.\n"+
 			"Commands, OS, and CLI version are tracked — never arguments or their values.\n"+
 			"A command or flag the CLI does not have is tracked too, so we can see what to add.\n"+

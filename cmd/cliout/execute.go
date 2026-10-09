@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 )
 
@@ -106,18 +107,20 @@ func Execute(ctx context.Context, root *cobra.Command, args []string, stdout io.
 
 	// Text mode: what cobra itself would have printed, in its order. A root
 	// that silenced errors silences them everywhere; otherwise the failing
-	// command's own setting decides.
+	// command's own setting decides. The message's backticked commands are
+	// rendered for stderr (ansi.Backticks): bold on a terminal, plain text
+	// anywhere else.
 	if quietErrors || (cmd != root && cmd.SilenceErrors) {
 		return err
 	}
 	if cmd.CalledAs() == "" {
 		// Find failed (an unknown command at the root): cobra prints a pointer
 		// to help instead of the usage block.
-		cmd.PrintErrln(cmd.ErrPrefix(), err.Error())
+		cmd.PrintErrln(cmd.ErrPrefix(), ansi.Backticks(cmd.ErrOrStderr(), err.Error()))
 		cmd.PrintErrf("Run '%v --help' for usage.\n", cmd.CommandPath())
 		return err
 	}
-	root.PrintErrln(cmd.ErrPrefix(), err.Error())
+	root.PrintErrln(cmd.ErrPrefix(), ansi.Backticks(root.ErrOrStderr(), err.Error()))
 	// The root's own SilenceUsage is forced on for the run, so for the root
 	// only quietUsage, its setting from before, decides.
 	if !quietUsage && (cmd == root || !cmd.SilenceUsage) {

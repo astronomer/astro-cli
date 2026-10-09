@@ -178,7 +178,10 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 			p.Replacement, p.Notes = devBuildReplacement(args, dc)
 		}
 	}
-	p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
+	// No backticks around the command, unlike the guidance after it: this is
+	// also the json payload's error, which is plain text like every error
+	// object's (cliout.EmitError).
+	p.Error = p.Typed + " was removed in Astro CLI v2"
 	return p
 }
 

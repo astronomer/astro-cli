@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/airflowenv"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/connmodel"
 	"github.com/astronomer/astro-cli/pkg/envschema"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -718,7 +719,7 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	}
 	switch {
 	case created && !everywhere:
-		fmt.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with `%s`, or re-run with --auto-link.\n",
+		ansi.Fprintf(c.d.Stderr, "note: %s reaches no project yet. Link it with `%s`, or re-run with --auto-link.\n",
 			name, localenv.LinkHint(kind, name))
 	case !created && everywhere:
 		fmt.Fprintf(c.d.Stderr, "note: %s already existed, so its links were kept; to auto-link it to every project run: %s --auto-link\n",
@@ -1211,10 +1212,10 @@ func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	case res.Undeclared:
 		_, err = fmt.Fprintf(w, "undeclared %s %s in %s\n", noun, res.Name, res.Manifest)
 	case res.Remainder == envschema.RemainderAbsent:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, so `astro local env list` shows it as absent. Remove the declaration with `%s`.\n",
+		_, err = ansi.Fprintf(w, "%s is still declared in %s, so `astro local env list` shows it as absent. Remove the declaration with `%s`.\n",
 			res.Name, res.Manifest, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderRequired:
-		_, err = fmt.Fprintf(w, "%s is still declared in %s, and required: the next `astro local start` refuses until a value is set with `%s`. Remove the declaration with `%s`.\n",
+		_, err = ansi.Fprintf(w, "%s is still declared in %s, and required: the next `astro local start` refuses until a value is set with `%s`. Remove the declaration with `%s`.\n",
 			res.Name, res.Manifest, res.SetHint, res.UndeclareHint)
 	case res.Remainder == envschema.RemainderSupplied && res.Source == envresolve.SourceDefault:
 		_, err = fmt.Fprintf(w, "%s is still declared in %s, and its declared default now applies.\n", res.Name, res.Manifest)
@@ -1560,5 +1561,5 @@ func (c *cli) warnUnignoredEnv(path string, scope localenv.Scope, projectDir str
 	if err != nil || ignored {
 		return
 	}
-	fmt.Fprintf(c.d.Stderr, "warning: %s is not covered by .gitignore; add a line `.env` to it so the file is never committed\n", path)
+	ansi.Fprintf(c.d.Stderr, "warning: %s is not covered by .gitignore; add a line `.env` to it so the file is never committed\n", path)
 }

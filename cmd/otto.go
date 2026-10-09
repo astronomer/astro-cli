@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/otto"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 )
 
 // hasHelpFlag reports whether args ask for help with a word of their own
@@ -71,14 +72,14 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 				return err
 			}
 			if installed == "" {
-				fmt.Println("Otto is not installed. Run `astro otto` to install.")
+				ansi.Fprintf(os.Stdout, "Otto is not installed. Run `astro otto` to install.\n")
 				return nil
 			}
 			fmt.Printf("Otto %s\n", installed)
 
 			available, latest, err := otto.IsUpdateAvailable()
 			if err == nil && available {
-				fmt.Printf("Update available: %s (run `astro otto update`)\n", latest)
+				ansi.Fprintf(os.Stdout, "Update available: %s (run `astro otto update`)\n", latest)
 			}
 			return nil
 		}

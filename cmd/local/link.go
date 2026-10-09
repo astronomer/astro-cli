@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -582,7 +583,7 @@ func (c *cli) runLinkRemove(name string) error {
 	// Left pointing at a link that is gone, it fails every command until
 	// cleared, which is better said now than at the next one.
 	if state, serr := userstate.Load(dir); serr == nil && state.Instance == name {
-		fmt.Fprintf(c.d.Stderr, "note: `astro use` still names %s for this project. Clear it with `astro use --unset`\n", name)
+		ansi.Fprintf(c.d.Stderr, "note: `astro use` still names %s for this project. Clear it with `astro use --unset`\n", name)
 	}
 	res := linkResult{Name: name, Kind: kind, Status: linkStatusRemoved, Manifest: path}
 	return r.Emit(res, func(w io.Writer) error {

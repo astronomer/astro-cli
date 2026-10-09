@@ -62,6 +62,10 @@ func shouldColor(isTerminal func() bool) bool {
 		if os.Getenv("CLICOLOR") == "0" {
 			return false
 		}
+		// https://no-color.org: present and not empty turns color off.
+		if os.Getenv("NO_COLOR") != "" {
+			return false
+		}
 	}
 
 	return ForceColors || isTerminal()

@@ -16,6 +16,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/plan"
+	"github.com/astronomer/astro-cli/pkg/ansi"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
@@ -851,8 +852,8 @@ type checkBlocked struct {
 // json mode it is a single structured line; in text mode, the guidance.
 func renderCheckBlocked(r cliout.Renderer, err error) error {
 	msg := err.Error()
-	return r.EmitEvent(checkBlocked{Event: "error", Message: msg}, func(w io.Writer) error {
-		_, werr := fmt.Fprintln(w, msg)
+	return r.EmitEvent(checkBlocked{Event: "error", Message: ansi.StripBackticks(msg)}, func(w io.Writer) error {
+		_, werr := ansi.Fprintf(w, "%s\n", msg)
 		return werr
 	})
 }
