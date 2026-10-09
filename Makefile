@@ -181,7 +181,7 @@ test-e2e-tier0:
 	@ASTRO_E2E_MAX_TIER=0 bash scripts/test-e2e.sh
 
 temp-astro:
-	cd $(shell mktemp -d) && ${PWD}/astro dev init
+	cd $(shell mktemp -d) && ${PWD}/astro init
 
 mock:
 	GOWORK=off go tool mockery --version
