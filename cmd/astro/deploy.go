@@ -98,12 +98,9 @@ func NewDeployCmd() *cobra.Command {
 			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
 				return nil
 			}
-			// A project with a pyproject.toml has no .astro/config.yaml, so the 1.x EnsureProjectDir
-			// check would reject it. The manifest path loads and validates the manifest
-			// itself, so skip the 1.x check and let deploy() route.
-			if project.HasManifest(config.WorkingPath) {
-				return nil
-			}
+			// EnsureProjectDir accepts a project with a pyproject.toml too; deploy()
+			// routes it to the manifest path, which validates the manifest itself.
+			//
 			// A DAG-only deploy sourcing its DAGs from --dags-path does not read anything
 			// else from the working directory, unless --pytest/--parse is also used, which
 			// builds and runs a local image to test-parse the DAGs and so still needs the

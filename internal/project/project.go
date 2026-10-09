@@ -207,3 +207,21 @@ func Is1xProject(dir string) bool {
 func ID(dir string) (string, error) {
 	return localrt.ProjectID(dir)
 }
+
+// Enclosing returns the nearest directory above dir, never dir itself, for
+// which isProject reports true, or "" when none does up to the filesystem
+// root. A command refused in a subdirectory of a project names that project,
+// rather than advising the user to make the subdirectory a second one.
+func Enclosing(dir string, isProject func(dir string) bool) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return ""
+	}
+	for d := abs; filepath.Dir(d) != d; {
+		d = filepath.Dir(d)
+		if isProject(d) {
+			return d
+		}
+	}
+	return ""
+}

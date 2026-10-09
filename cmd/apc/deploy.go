@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
@@ -29,7 +30,7 @@ var (
 	// state of the checkout it runs in.
 	hasUncommittedChanges = git.HasUncommittedChanges
 
-	EnsureProjectDir                   = utils.EnsureDockerfileProjectDir
+	EnsureDockerfileProjectDir         = utils.EnsureDockerfileProjectDir
 	DeployAirflowImage                 = deploy.Airflow
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
 	UpdateDeploymentImage              = deploy.UpdateDeploymentImage
@@ -64,7 +65,12 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 			if cmd.Flags().Changed("image-name") {
 				return nil
 			}
-			return EnsureProjectDir(cmd, args)
+			// A DAG-only deploy builds nothing: it uploads dags/ from the
+			// working directory, so the project astro init writes can make one.
+			if isDagOnlyDeploy && project.HasManifest(config.WorkingPath) {
+				return nil
+			}
+			return EnsureDockerfileProjectDir(cmd, args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deployAirflow(cmd, args, out)

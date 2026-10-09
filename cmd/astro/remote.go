@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -54,13 +53,13 @@ func newRemoteDeployCmd() *cobra.Command {
 		Short: "Deploy a client image to the remote registry",
 		Long:  "Build and deploy a client image to the configured remote registry. This command assumes you have already authenticated with the registry.",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// A project with a pyproject.toml has no .astro/config.yaml, so the 1.x check would
-			// reject it. astro deploy grew this bypass and its sibling here
-			// never did, which left remote deploy refusing every such project
-			// with advice to run astro dev init, a command v2 removed.
-			if project.HasManifest(config.WorkingPath) {
+			// An image built elsewhere is pushed as it is. The project is read
+			// only to build one, and for Dockerfile.client when a Deployment's
+			// runtime is checked, which says so itself when the file is missing.
+			if cmd.Flags().Changed(imageNameFlag) {
 				return nil
 			}
+			// It accepts a project with a pyproject.toml as well as a 1.x one.
 			return utils.EnsureProjectDir(cmd, args)
 		},
 		RunE:    remoteDeploy,

@@ -2,10 +2,14 @@ package apc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -24,7 +28,7 @@ func execDeployCmd(args ...string) error {
 // print a note and return nil: exit 0. --force deploys anyway.
 func (s *Suite) TestDeployRefusesUncommittedChanges() {
 	appConfig = &houston.AppConfig{}
-	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	EnsureDockerfileProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
 	prev := hasUncommittedChanges
 	hasUncommittedChanges = func(string) bool { return true }
 	defer func() { hasUncommittedChanges = prev }()
@@ -63,7 +67,7 @@ func (s *Suite) TestDeploy() {
 			BYORegistryEnabled: true,
 		},
 	}
-	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+	EnsureDockerfileProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
@@ -221,4 +225,30 @@ func (s *Suite) TestDeploy() {
 		err := execDeployCmd([]string{"-f"}...)
 		s.ErrorIs(err, deploy.ErrBYORegistryDomainNotSet)
 	})
+}
+
+// A DAG-only deploy builds nothing, so the project astro init writes, which
+// has no .astro/config.yaml, can make one. Anything else still faces the
+// Dockerfile project check.
+func (s *Suite) TestDeployDagsAcceptsAPyprojectProject() {
+	dir := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	prevWorking, prevEnsure, prevDags := config.WorkingPath, EnsureDockerfileProjectDir, isDagOnlyDeploy
+	defer func() {
+		config.WorkingPath, EnsureDockerfileProjectDir, isDagOnlyDeploy = prevWorking, prevEnsure, prevDags
+	}()
+	config.WorkingPath = dir
+	errRefused := errors.New("refused")
+	EnsureDockerfileProjectDir = func(*cobra.Command, []string) error { return errRefused }
+
+	cmd := NewDeployCmd(new(bytes.Buffer))
+	isDagOnlyDeploy = true
+	s.NoError(cmd.PreRunE(cmd, nil), "--dags from a pyproject.toml project")
+
+	isDagOnlyDeploy = false
+	s.ErrorIs(cmd.PreRunE(cmd, nil), errRefused, "an image deploy builds the Dockerfile")
+
+	isDagOnlyDeploy = true
+	config.WorkingPath = s.T().TempDir()
+	s.ErrorIs(cmd.PreRunE(cmd, nil), errRefused, "--dags outside any project")
 }

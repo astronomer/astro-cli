@@ -397,3 +397,21 @@ func TestHasManifest(t *testing.T) {
 		assert.True(t, HasManifest(dir))
 	})
 }
+
+func TestEnclosing(t *testing.T) {
+	root := t.TempDir()
+	outer := filepath.Join(root, "outer")
+	mid := filepath.Join(outer, "a")
+	inner := filepath.Join(mid, "b")
+	require.NoError(t, os.MkdirAll(inner, 0o755))
+	isOuter := func(d string) bool { return d == outer }
+
+	// The nearest match above the start, however deep.
+	assert.Equal(t, outer, Enclosing(inner, isOuter))
+	// Never the start directory itself: a project is not inside itself.
+	assert.Empty(t, Enclosing(outer, isOuter))
+	// Nothing up to the root.
+	assert.Empty(t, Enclosing(inner, func(string) bool { return false }))
+	// The nearer of two.
+	assert.Equal(t, mid, Enclosing(inner, func(d string) bool { return d == outer || d == mid }))
+}

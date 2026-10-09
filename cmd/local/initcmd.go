@@ -59,6 +59,9 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if err != nil {
 		return err
 	}
+	if err := refuseInitHomeDir(dir); err != nil {
+		return err
+	}
 	// A 1.x airflow_settings.yaml's connection and variable values go to
 	// the shared vault at this project's scope rather than into the manifest.
 	// The writer is what knows that scope; see scaffold.SecretWriter.
@@ -76,6 +79,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if err != nil {
 		return err
 	}
+	c.warnInitNested(res.Dir)
 	// After the manifest is written rather than inside scaffold.Plan, which
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what

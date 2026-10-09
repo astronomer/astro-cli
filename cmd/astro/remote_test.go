@@ -2,10 +2,14 @@ package astro
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -247,6 +251,30 @@ func TestRemoteDeployDeploymentValidation(t *testing.T) {
 		assert.Equal(t, "test-image:v1.0", remoteImageName)
 		assert.Equal(t, []string{"id=secret1,src=file1.txt"}, remoteBuildSecrets)
 	})
+}
+
+// The project check runs only when there is a project to read: --image-name
+// pushes an image built elsewhere, from any directory.
+func TestRemoteDeployProjectCheck(t *testing.T) {
+	prev, prevImage := config.WorkingPath, remoteImageName
+	t.Cleanup(func() { config.WorkingPath, remoteImageName = prev, prevImage })
+	config.WorkingPath = t.TempDir() // not a project
+
+	cmd := newRemoteDeployCmd()
+	require.NoError(t, cmd.ParseFlags(nil))
+	err := cmd.PreRunE(cmd, nil)
+	require.Error(t, err, "a build needs a project")
+	assert.Contains(t, err.Error(), utils.AstroProjectDirAdvice)
+
+	cmd = newRemoteDeployCmd()
+	require.NoError(t, cmd.ParseFlags([]string{"--image-name", "prebuilt:1"}))
+	assert.NoError(t, cmd.PreRunE(cmd, nil), "--image-name needs none")
+
+	// The project astro init writes passes, as the advice promises.
+	require.NoError(t, os.WriteFile(filepath.Join(config.WorkingPath, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	cmd = newRemoteDeployCmd()
+	require.NoError(t, cmd.ParseFlags(nil))
+	assert.NoError(t, cmd.PreRunE(cmd, nil))
 }
 
 // Test that ensures the remote command integrates properly with the root command
