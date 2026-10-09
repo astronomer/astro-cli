@@ -134,8 +134,7 @@ func advice(dir, fallback string, isProject func(string) (bool, error)) string {
 		ok, err := isProject(d)
 		return ok && err == nil, nil
 	}
-	// readable returns no error, so neither does the walk.
-	if enclosing, _ := fileutil.NearestDir(filepath.Dir(abs), config.IsHomeDir, readable); enclosing != "" { //nolint:errcheck
+	if enclosing, _ := fileutil.NearestDir(filepath.Dir(abs), config.IsHomeDir, readable); enclosing != "" { //nolint:errcheck // readable returns no error, so neither does the walk
 		return fmt.Sprintf(EnclosingProjectAdvice, enclosing)
 	}
 	return fallback
