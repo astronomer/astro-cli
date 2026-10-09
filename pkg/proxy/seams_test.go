@@ -246,7 +246,7 @@ func TestErrorHandlerReplacesThePlain502(t *testing.T) {
 	}
 }
 
-// And without one, the plain 502 stands.
+// And without one, it is still a 502. What the body says is pages_test.go's.
 func TestWithoutAnErrorHandlerThe502Stands(t *testing.T) {
 	p := NewProxy("0", NewStore(t.TempDir()))
 	rp := p.getOrCreateProxy(refusedPort(t))

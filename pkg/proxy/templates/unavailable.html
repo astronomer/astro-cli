@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+{{template "head" "Preparing for launch"}}
+<style>
+.center { margin-top: -6vh; }
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  font-size: 13px;
+  color: var(--faint);
+  padding: 8px 16px;
+  background: var(--chip);
+  border-radius: 20px;
+}
+.status .dot {
+  width: 6px; height: 6px;
+  background: var(--accent-2);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+</style>
+</head><body>
+{{template "sky"}}
+<main class="page">
+  <div class="center">
+    <div class="orbit" aria-hidden="true">
+      <div class="ring ring-1"></div>
+      <div class="ring ring-2"></div>
+      <div class="ring ring-3"></div>
+      <div class="planet"></div>
+      <div class="moon"></div>
+      <div class="moon moon-2"></div>
+    </div>
+    <h1>Preparing for launch.</h1>
+    <p class="lede">Airflow is starting up. This page will refresh on its own.</p>
+    <div class="status" role="status">
+      <span class="dot" aria-hidden="true"></span>
+      <span>Waiting for Airflow</span>
+    </div>
+  </div>
+</main>
+<script>
+// Probe the same URL until something other than a 5xx answers, then reload once.
+(function () {
+  var delay = 2000, maxDelay = 8000;
+  function probe() {
+    fetch(window.location.href, { method: "HEAD", cache: "no-store" })
+      .then(function (resp) { if (resp.status < 500) { window.location.reload(); } else { retry(); } })
+      .catch(retry);
+  }
+  function retry() {
+    delay = Math.min(delay * 1.3, maxDelay);
+    setTimeout(probe, delay);
+  }
+  setTimeout(probe, delay);
+})();
+</script>
+</body></html>

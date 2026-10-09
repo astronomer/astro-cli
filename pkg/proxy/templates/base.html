@@ -1,0 +1,204 @@
+{{/*
+  The pieces every generated page shares. Everything is inline: the proxy has
+  to render these with no network, so no fonts, scripts or images are fetched.
+*/}}
+
+{{define "head"}}<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>{{.}}</title>
+<style>
+:root {
+  --bg: #131218;
+  --bg-deep: #0e0d13;
+  --card: #1f1e26;
+  --card-hover: #2a2930;
+  --text: #ffffff;
+  --muted: #b8b5c4;
+  --faint: rgba(255, 255, 255, 0.55);
+  --accent: #FFB32D;
+  --accent-ink: #121316;
+  --accent-2: #872DED;
+  --ring: rgba(135, 45, 237, 0.28);
+  --ring-strong: rgba(135, 45, 237, 0.45);
+  --chip: rgba(135, 45, 237, 0.14);
+  --chip-text: #d4b8f7;
+  --star: #ffffff;
+  --glow: rgba(255, 179, 45, 0.55);
+  --planet-glow: rgba(135, 45, 237, 0.6);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f8f8f9;
+    --bg-deep: #eeeef0;
+    --card: #ffffff;
+    --card-hover: #fcfcfd;
+    --text: #161324;
+    --muted: #555261;
+    --faint: rgba(52, 50, 71, 0.7);
+    --accent: #872DED;
+    --accent-ink: #ffffff;
+    --accent-2: #FFB32D;
+    --ring: rgba(135, 45, 237, 0.18);
+    --ring-strong: rgba(135, 45, 237, 0.32);
+    --chip: rgba(135, 45, 237, 0.08);
+    --chip-text: #6B2DB8;
+    --star: #872DED;
+    --glow: rgba(255, 179, 45, 0.45);
+    --planet-glow: rgba(135, 45, 237, 0.3);
+    --shadow: 0 12px 32px rgba(22, 19, 36, 0.08);
+  }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(ellipse at 50% -10%, var(--bg-deep), var(--bg) 70%) fixed;
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+code {
+  font-family: var(--mono);
+  font-size: 0.875em;
+  background: var(--chip);
+  color: var(--chip-text);
+  padding: 2px 8px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.lede { color: var(--muted); font-size: 15px; }
+
+/* A starfield in two layers that twinkle out of step. Painted with gradients,
+   so it costs no script and no request. */
+.sky, .sky::after {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.sky {
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 27% 72%, var(--star), transparent),
+    radial-gradient(2px 2px at 41% 33%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 58% 84%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 66% 12%, var(--star), transparent),
+    radial-gradient(2px 2px at 79% 58%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 91% 27%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 8% 91%, var(--star), transparent);
+  opacity: 0.6;
+  animation: twinkle 5s ease-in-out infinite;
+}
+.sky::after {
+  content: "";
+  background-image:
+    radial-gradient(1.5px 1.5px at 19% 47%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 34% 8%, var(--star), transparent),
+    radial-gradient(2px 2px at 49% 61%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 73% 39%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 86% 81%, var(--star), transparent),
+    radial-gradient(1.5px 1.5px at 96% 6%, var(--star), transparent),
+    radial-gradient(2px 2px at 3% 54%, var(--star), transparent);
+  animation: twinkle 7s ease-in-out -2.5s infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+@media (prefers-color-scheme: light) {
+  .sky { opacity: 0.3; }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.12; }
+    50% { opacity: 0.35; }
+  }
+}
+
+.page {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+}
+.center { text-align: center; max-width: 520px; }
+.center h1 { margin: 10px 0 12px; }
+.center .lede + .lede { margin-top: 8px; }
+
+/* Orbit art: rings around a planet, with a moon or two going round. */
+.orbit {
+  --size: 168px;
+  width: var(--size); height: var(--size);
+  margin: 0 auto 36px;
+  position: relative;
+}
+.orbit .ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid var(--ring);
+}
+.orbit .ring-1 { inset: 0; }
+.orbit .ring-2 { inset: 15%; border-color: var(--ring-strong); }
+.orbit .ring-3 { inset: 30%; border-style: dashed; }
+.orbit .planet {
+  position: absolute;
+  width: 14px; height: 14px;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--accent-2);
+  border-radius: 50%;
+  box-shadow: 0 0 22px var(--planet-glow);
+}
+.orbit .moon {
+  position: absolute;
+  width: 8px; height: 8px;
+  top: 50%; left: 50%;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--glow);
+  /* Where it rests when motion is reduced: on its ring, not on the planet. */
+  transform: rotate(-35deg) translateX(calc(var(--size) / 2)) rotate(35deg);
+  animation: circle 3.2s linear infinite;
+}
+.orbit .moon-2 {
+  width: 6px; height: 6px;
+  margin: -3px 0 0 -3px;
+  background: var(--accent-2);
+  box-shadow: 0 0 10px var(--planet-glow);
+  transform: rotate(145deg) translateX(calc(var(--size) * 0.35)) rotate(-145deg);
+  animation: circle-inner 4.8s linear infinite;
+}
+@keyframes circle {
+  from { transform: rotate(0deg) translateX(calc(var(--size) / 2)) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(calc(var(--size) / 2)) rotate(-360deg); }
+}
+@keyframes circle-inner {
+  from { transform: rotate(180deg) translateX(calc(var(--size) * 0.35)) rotate(-180deg); }
+  to   { transform: rotate(540deg) translateX(calc(var(--size) * 0.35)) rotate(-540deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+{{end}}
+
+{{define "sky"}}<div class="sky" aria-hidden="true"></div>{{end}}
+
+{{define "start-hint"}}{{if .StartHint}}{{.StartHint}}{{else}}Run <code>astro local start</code> in a project to launch one.{{end}}{{end}}
