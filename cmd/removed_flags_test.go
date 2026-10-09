@@ -305,6 +305,8 @@ func TestRemovedFlagsGiveWayToHelp(t *testing.T) {
 		{"deployment", "list", "--help", "--json"},
 		{"deployment", "list", "--json", "-h"},
 		{"deployment", "list", "--json", "-h", "-o", "json"},
+		{"deployment", "list", "--json", "--help=true"},
+		{"deployment", "list", "--json", "-h=true"},
 		{"deployment", "delete", "dep-id", "-f", "-h"},
 		{"deployment", "delete", "dep-id", "-hf"},
 	} {
@@ -327,6 +329,24 @@ func TestRemovedFlagsGiveWayToHelp(t *testing.T) {
 	root, _ := disarmedTree(t, astroTree)
 	_, _, err := executeRoot(root, "deployment", "list", "--json", "--", "-h")
 	require.EqualError(t, err, errJSONFlagRemoved)
+	// --help=false asks for nothing, before the removed flag or after it.
+	for _, args := range [][]string{
+		{"deployment", "list", "--json", "--help=false"},
+		{"deployment", "list", "--help=false", "--json"},
+	} {
+		root, _ := disarmedTree(t, astroTree)
+		_, _, err := executeRoot(root, args...)
+		require.EqualError(t, err, errJSONFlagRemoved, strings.Join(args, " "))
+	}
+}
+
+func TestHasHelpFlag(t *testing.T) {
+	for _, args := range [][]string{{"-h"}, {"--help"}, {"x", "--help=true"}, {"-h=1"}, {"--help=TRUE"}} {
+		assert.True(t, hasHelpFlag(args), args)
+	}
+	for _, args := range [][]string{nil, {"--help=false"}, {"-h=0"}, {"--help=maybe"}, {"--", "-h"}, {"-hf"}, {"--helpful"}} {
+		assert.False(t, hasHelpFlag(args), args)
+	}
 }
 
 // executeRootKeepingOut runs root like executeRoot, but leaves the out writer
@@ -341,50 +361,74 @@ func executeRootKeepingOut(root *cobra.Command, args ...string) (stdout, stderr 
 // A shell asking for completions after a removed flag gets them: cobra
 // parses the flags of the command it completes without the flag error func,
 // and would fail the completion on any flag it does not know.
+//
+// The command completed is the one cobra finds, as for a run. A removed flag
+// before a subcommand's name that cobra takes for a flag with a value (the
+// subcommand's name) leaves the parent to complete, which never had the
+// flag, so it offers nothing, as a run of that line is refused. Neither
+// panics or fails the request.
 func TestRemovedFlagsLeaveCompletionsAlone(t *testing.T) {
 	for _, tc := range []struct {
-		args []string
-		want string // a completion offered, or "" for none at all
+		args    []string
+		want    string
+		offered bool
 	}{
-		{[]string{"__complete", "deployment", "list", "--json", "-"}, "--all"},
-		{[]string{"__complete", "deployment", "list", "--json", "--o"}, "--output"},
-		{[]string{"__completeNoDesc", "deployment", "list", "--template", "{{.}}", "--o"}, "--output"},
-		{[]string{"__complete", "deployment", "delete", "-f", "--y"}, "--yes"},
-		// A removed flag before the subcommand: cobra would take an
-		// unknown flag to have a value, here ls, and complete api airflow.
-		{[]string{"__complete", "api", "airflow", "--json", "ls", "--fi"}, "--filter"},
-		{[]string{"__complete", "api", "airflow", "--json", "ls", "--refresh", "--fi"}, "--filter"},
-		{[]string{"__complete", "api", "airflow", "--api-url", "http://localhost:8080", "ls", "--fi"}, "--filter"},
-		{[]string{"__complete", "api", "airflow", "--api-url=http://localhost:8080", "ls", "--fi"}, "--filter"},
-		{[]string{"__complete", "api", "airflow", "--deployment-id", "dep-id", "describe", "--re"}, "--refresh"},
-		{[]string{"__complete", "deployment", "-f", "delete", "--y"}, "--yes"},
+		{[]string{"__complete", "deployment", "list", "--json", "-"}, "--all", true},
+		{[]string{"__complete", "deployment", "list", "--json", "--o"}, "--output", true},
+		{[]string{"__completeNoDesc", "deployment", "list", "--template", "{{.}}", "--o"}, "--output", true},
+		{[]string{"__complete", "deployment", "delete", "-f", "--y"}, "--yes", true},
+		{[]string{"__complete", "deployment", "token", "delete", "-f", "--y"}, "--yes", true},
+		{[]string{"__complete", "api", "airflow", "ls", "--json", "--fi"}, "--filter", true},
+		{[]string{"__complete", "api", "airflow", "describe", "--api-url", "http://localhost:8080", "--re"}, "--refresh", true},
+		// cobra takes the URL for --api-url's value here, and finds ls.
+		{[]string{"__complete", "api", "airflow", "--api-url", "http://localhost:8080", "ls", "--fi"}, "--filter", true},
+		{[]string{"__complete", "api", "airflow", "--api-url=http://localhost:8080", "ls", "--fi"}, "--filter", true},
+
+		{[]string{"__complete", "api", "airflow", "--json", "ls", "--fi"}, "--filter", false},
+		{[]string{"__complete", "deployment", "-f", "delete", "--y"}, "--yes", false},
+		{[]string{"__complete", "deployment", "token", "-f", "delete", "--y"}, "--yes", false},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			root, _ := disarmedTree(t, astroTree)
 			// cobra's __complete runs under the root's pre-run, which the real
 			// one lets through and the disarmed one would not.
 			root.PersistentPreRunE = nil
+			// cobra writes completions to the completed command's out, which
+			// a command built with a writer of its own does not inherit.
 			var out strings.Builder
-			root.SetOut(&out)
-			_, stderr, err := executeRootKeepingOut(root, tc.args...)
+			var setOut func(*cobra.Command)
+			setOut = func(cmd *cobra.Command) {
+				cmd.SetOut(&out)
+				for _, sub := range cmd.Commands() {
+					setOut(sub)
+				}
+			}
+			setOut(root)
+			var stderr string
+			var err error
+			require.NotPanics(t, func() { _, stderr, err = executeRootKeepingOut(root, tc.args...) })
 			require.NoError(t, err)
-			assert.NotContains(t, stderr, "Error")
 			lines := strings.Split(strings.TrimSpace(out.String()), "\n")
 			require.NotEmpty(t, lines)
-			directive := lines[len(lines)-1]
-			assert.NotEqual(t, ":1", directive, "cobra reported an error: %s", stderr)
-			if tc.want != "" {
-				offered := make([]string, 0, len(lines)-1)
-				for _, l := range lines[:len(lines)-1] {
-					offered = append(offered, strings.SplitN(l, "\t", 2)[0])
-				}
-				assert.Contains(t, offered, tc.want)
+			offered := make([]string, 0, len(lines)-1)
+			for _, l := range lines[:len(lines)-1] {
+				offered = append(offered, strings.SplitN(l, "\t", 2)[0])
 			}
+			if !tc.offered {
+				assert.NotContains(t, offered, tc.want)
+				return
+			}
+			assert.NotContains(t, stderr, "Error")
+			assert.NotEqual(t, ":1", lines[len(lines)-1], "cobra reported an error: %s", stderr)
+			assert.Contains(t, offered, tc.want)
 		})
 	}
-	// Every command 1.x had takes its removed flags for a completion, without
-	// a name or shorthand clashing with one it has (pflag panics on that),
-	// and then parses each of them.
+}
+
+// Every command 1.x had takes its removed flags for a completion, without a
+// name or shorthand clashing with one it has (pflag panics on that), and
+// then parses each of them.
+func TestEveryV1CommandCompletesPastItsRemovedFlags(t *testing.T) {
 	for _, tc := range v1Trees {
 		root := buildTree(t, tc.tree).root
 		for _, f := range v1Flags() {
@@ -469,11 +513,10 @@ func TestV1FlagsMatchAliasedPaths(t *testing.T) {
 		{trees: []string{v1TreeAPC}, path: "deployment airflow-variable", name: "force", isBool: true},
 		{trees: []string{v1TreeAstro}, path: "deployment pool", name: "template"},
 	}
-	on := v1FlagsAt(flags, v1TreeAstro, pathSpellings(renamed), false)
+	on := v1FlagsAt(flags, v1TreeAstro, pathSpellings(renamed))
 	require.Len(t, on, 1)
 	assert.Equal(t, "json", on[0].name)
-	assert.Len(t, v1FlagsAt(flags, v1TreeAstro, pathSpellings(group), true), 2)
-	assert.Empty(t, v1FlagsAt(flags, v1TreeAstro, pathSpellings(group), false))
+	assert.Empty(t, v1FlagsAt(flags, v1TreeAstro, pathSpellings(group)))
 }
 
 // v1_flags.tsv reads the same with CRLF line ends, as a Windows checkout

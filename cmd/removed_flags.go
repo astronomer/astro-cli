@@ -285,20 +285,14 @@ func parseV1Flags(file string) ([]v1Flag, error) {
 // v1FlagsOn is every flag 1.x had on the command at cmd's path, in the tree
 // cmd's root was built for.
 func v1FlagsOn(cmd *cobra.Command) []v1Flag {
-	return v1FlagsAt(v1Flags(), v1TreeOf(cmd.Root()), pathSpellings(cmd), false)
+	return v1FlagsAt(v1Flags(), v1TreeOf(cmd.Root()), pathSpellings(cmd))
 }
 
-// v1FlagsAt is every flag in flags that tree had on a command at one of paths,
-// or, with below, on one of those commands or anything under it.
-func v1FlagsAt(flags []v1Flag, tree string, paths []string, below bool) []v1Flag {
+// v1FlagsAt is every flag in flags that tree had on a command at one of paths.
+func v1FlagsAt(flags []v1Flag, tree string, paths []string) []v1Flag {
 	var on []v1Flag
 	for _, f := range flags {
-		if !slices.Contains(f.trees, tree) {
-			continue
-		}
-		if slices.ContainsFunc(paths, func(p string) bool {
-			return f.path == p || (below && strings.HasPrefix(f.path, p+" "))
-		}) {
+		if slices.Contains(f.trees, tree) && slices.Contains(paths, f.path) {
 			on = append(on, f)
 		}
 	}
@@ -352,12 +346,12 @@ func isRemovedFlagErr(err error) bool {
 // once the flags parse.
 //
 // A run that asks for help gets the help instead of the refusal: one that
-// passes -h or --help as a word of its own before any "--", wherever it
-// stands, or that pflag has already read help from when it reaches the
-// removed flag (`-hf`). It does not matter that such a -h might really be a
-// flag's value (`--name -h`): the worst that does is show help instead of an
-// error. A group that reaches the removed letter first (`-fh`) is refused, as
-// pflag stops there.
+// passes -h or --help (or --help=true) as a word of its own before any "--",
+// wherever it stands (hasHelpFlag), or that pflag has already read help from
+// when it reaches the removed flag (`-hf`). It does not matter that such a -h
+// might really be a flag's value (`--name -h`): the worst that does is show
+// help instead of an error. A group that reaches the removed letter first
+// (`-fh`) is refused, as pflag stops there.
 //
 // A completion request (cobra's __complete) is never refused at all: cobra
 // parses the command's flags itself there, without the flag error func, and
@@ -372,11 +366,15 @@ func acceptRemovedFlags(root *cobra.Command, args []string) {
 		}
 		return
 	}
-	askedForHelp := asksForHelp(args)
+	askedForHelp := hasHelpFlag(args)
 	refuse := root.FlagErrorFunc()
 	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		err = refuse(cmd, err)
-		if isRemovedFlagErr(err) && (askedForHelp || cmd.Flags().Changed("help")) {
+		if !isRemovedFlagErr(err) {
+			return err
+		}
+		// The value, not Changed: --help=false asks for nothing.
+		if help := cmd.Flags().Lookup("help"); askedForHelp || (help != nil && help.Value.String() == "true") {
 			return pflag.ErrHelp
 		}
 		return err
@@ -386,43 +384,20 @@ func acceptRemovedFlags(root *cobra.Command, args []string) {
 // acceptForCompletion readies the tree for a completion request whose words
 // before the one being completed are args.
 //
-// Cobra finds the command to complete as it finds one to run, and there it
-// takes a flag it does not know on the command it has reached so far to have
-// a value: `api airflow --json ls` would hide ls behind 1.x's boolean --json.
-// So the walk here follows cobra's, and a flag the command reached so far does
-// not have, that 1.x had on it or on something under it, is added to that
-// command as a hidden flag of 1.x's arity first, which is what cobra then
-// reads. The command the walk ends on then gets every removed flag 1.x had
-// on it, as cobra parses them all there: but only when a flag typed is one it
-// does not have, so a request that passes no unknown flag (nearly all) never
-// reads the inventory.
+// The command completed is the one cobra finds for args, and only it gets
+// the removed flags 1.x had on it, so a removed flag typed after the
+// command's name completes. One typed before a subcommand's name
+// (`deployment --json list`) is left to cobra, as a run of that line is: the
+// parent never had it, so cobra reads it as an unknown flag there. And only
+// when a flag typed is one the command does not have, so a request that
+// passes no unknown flag (nearly all) never reads the inventory.
 func acceptForCompletion(root *cobra.Command, args []string) {
-	cmd, descend := root, true
-	var typed []string
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		if arg == "--" {
-			break
-		}
-		if strings.HasPrefix(arg, "-") && arg != "-" {
-			typed = append(typed, arg)
-			if descend {
-				hasTypedFlag(cmd, arg, true)
-				if consumesNextValue(mergedFlags(cmd), arg) {
-					i++
-				}
-			}
-			continue
-		}
-		if descend {
-			if sub := subcommandNamed(cmd, arg); sub != nil {
-				cmd = sub
-			} else {
-				descend = false
-			}
-		}
+	find := root.Find
+	if root.TraverseChildren {
+		find = root.Traverse
 	}
-	if cmd.DisableFlagParsing || !slices.ContainsFunc(typed, func(arg string) bool { return !hasTypedFlag(cmd, arg, false) }) {
+	cmd, _, err := find(args)
+	if err != nil || cmd.DisableFlagParsing || !typesUnknownFlag(cmd, args) {
 		return
 	}
 	on := v1FlagsOn(cmd)
@@ -433,66 +408,36 @@ func acceptForCompletion(root *cobra.Command, args []string) {
 	}
 }
 
-// hasTypedFlag reports whether cmd has every flag arg names that pflag would
-// read: a long flag, or each letter of a shorthand group up to one that takes
-// the rest as its value. With accept, a flag cmd lacks that 1.x had on cmd or
-// below it is added to cmd first, hidden (addHiddenFlag).
-func hasTypedFlag(cmd *cobra.Command, arg string, accept bool) bool {
-	v1Below := func(typed string, isShorthand bool) *v1Flag {
-		if !accept {
-			return nil
-		}
-		return v1FlagBelow(cmd, typed, isShorthand)
-	}
-	if name, ok := strings.CutPrefix(arg, "--"); ok {
-		name, _, _ = strings.Cut(name, "=")
-		if cmd.Flag(name) != nil {
-			return true
-		}
-		if f := v1Below(name, false); f != nil {
-			addHiddenFlag(cmd, f)
-		}
-		return cmd.Flag(name) != nil
-	}
-	letters, _, _ := strings.Cut(arg[1:], "=")
-	for i := range len(letters) {
-		letter := letters[i : i+1]
-		flag := shorthandFlag(cmd, letter)
-		if flag == nil {
-			if f := v1Below(letter, true); f != nil {
-				addHiddenFlag(cmd, f)
-				flag = shorthandFlag(cmd, letter)
-			}
-		}
-		if flag == nil {
+// typesUnknownFlag reports whether args, before any "--", pass a flag cmd
+// does not have: a long flag, or a letter of a shorthand group that pflag
+// would read as a flag rather than as the value of the one before it.
+func typesUnknownFlag(cmd *cobra.Command, args []string) bool {
+	for _, arg := range args {
+		if arg == "--" {
 			return false
 		}
-		if flag.NoOptDefVal == "" {
-			return true // the rest of the group is its value
-		}
-	}
-	return true
-}
-
-// v1FlagBelow is the flag 1.x had typed as typed on cmd, or failing that on
-// the commands under it, when those agree on whether it takes a value: -f
-// was --force on some and --raw-field on others, and the arity is all a
-// completion needs of it. nil when there is none, or they disagree.
-func v1FlagBelow(cmd *cobra.Command, typed string, isShorthand bool) *v1Flag {
-	if f := v1FlagOn(cmd, typed, isShorthand); f != nil {
-		return f
-	}
-	var found *v1Flag
-	for _, f := range v1FlagsAt(v1Flags(), v1TreeOf(cmd.Root()), pathSpellings(cmd), true) {
-		if (isShorthand && f.shorthand != typed) || (!isShorthand && f.name != typed) {
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
 			continue
 		}
-		if found != nil && found.isBool != f.isBool {
-			return nil
+		if name, ok := strings.CutPrefix(arg, "--"); ok {
+			name, _, _ = strings.Cut(name, "=")
+			if cmd.Flag(name) == nil {
+				return true
+			}
+			continue
 		}
-		found = &f
+		letters, _, _ := strings.Cut(arg[1:], "=")
+		for i := range len(letters) {
+			flag := shorthandFlag(cmd, letters[i:i+1])
+			if flag == nil {
+				return true
+			}
+			if flag.NoOptDefVal == "" {
+				break // the rest of the group is its value
+			}
+		}
 	}
-	return found
+	return false
 }
 
 // addHiddenFlag gives cmd 1.x's flag f as a hidden flag of the same arity,
@@ -519,37 +464,4 @@ func shorthandFlag(cmd *cobra.Command, letter string) *pflag.Flag {
 		return f
 	}
 	return cmd.InheritedFlags().ShorthandLookup(letter)
-}
-
-// mergedFlags is every flag cmd takes, its own and those it inherits, as
-// cobra merges them before it parses.
-func mergedFlags(cmd *cobra.Command) *pflag.FlagSet {
-	flags := cmd.Flags()
-	flags.AddFlagSet(cmd.InheritedFlags())
-	return flags
-}
-
-// subcommandNamed is cmd's subcommand called name or aliased to it, as cobra
-// matches one, or nil.
-func subcommandNamed(cmd *cobra.Command, name string) *cobra.Command {
-	for _, sub := range cmd.Commands() {
-		if sub.Name() == name || sub.HasAlias(name) {
-			return sub
-		}
-	}
-	return nil
-}
-
-// asksForHelp reports whether args pass -h or --help as a word of their own
-// before the "--" that ends flags.
-func asksForHelp(args []string) bool {
-	for _, a := range args {
-		switch a {
-		case "--":
-			return false
-		case "-h", "--help":
-			return true
-		}
-	}
-	return false
 }
