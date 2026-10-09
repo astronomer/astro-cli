@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
@@ -29,7 +30,7 @@ var (
 	// state of the checkout it runs in.
 	hasUncommittedChanges = git.HasUncommittedChanges
 
-	EnsureProjectDir                   = utils.EnsureDockerfileProjectDir
+	EnsureProjectDir                   = ensureDeployProjectDir
 	DeployAirflowImage                 = deploy.Airflow
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
 	UpdateDeploymentImage              = deploy.UpdateDeploymentImage
@@ -61,7 +62,12 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 		Long:  "Deploy an Airflow project to an APC Deployment",
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed("image-name") {
+			// The value, not whether the flag was given: an empty
+			// --image-name= names no image, and the deploy builds one here.
+			// --remote builds nothing either: it points the Deployment at an
+			// image already in the registry, and RunE says when --image-name
+			// is missing.
+			if imageName != "" || (imagePresentOnRemote && !isDagOnlyDeploy) {
 				return nil
 			}
 			return EnsureProjectDir(cmd, args)
@@ -88,6 +94,36 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only Dags to your Deployment")
 	}
 	return cmd
+}
+
+// ensureDeployProjectDir is the project check for the deploy asked for. A
+// DAG-only deploy builds nothing, it uploads dags/ from the working directory,
+// so a 1.x project without a Dockerfile can make one, and so can the
+// pyproject.toml project astro init writes. Every other deploy builds the
+// Dockerfile.
+func ensureDeployProjectDir(cmd *cobra.Command, args []string) error {
+	if !isDagOnlyDeploy {
+		return utils.EnsureDockerfileProjectDir(cmd, args)
+	}
+	if project.HasManifest(config.WorkingPath) {
+		return nil
+	}
+	return utils.EnsureProjectDir(cmd, args)
+}
+
+// saveDeployment is --save. It writes .astro/config.yaml, which would turn a
+// pyproject.toml project into a 1.x one, so such a project is refused.
+func saveDeployment(deploymentID string) error {
+	if project.HasManifest(config.WorkingPath) {
+		isProjectDir, err := config.IsProjectDir(config.WorkingPath)
+		if err != nil {
+			return err
+		}
+		if !isProjectDir {
+			return cliout.Usage(errors.New("--save stores the deployment in .astro/config.yaml, which a pyproject.toml project does not have; pass the deployment id on each deploy instead"))
+		}
+	}
+	return config.CFG.ProjectDeployment.SetProjectString(deploymentID)
 }
 
 // The kinds of deploy deployJSON.Type names.
@@ -130,8 +166,7 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	// Save release name in config if specified
 	if deploymentID != "" && saveDeployConfig {
-		err = config.CFG.ProjectDeployment.SetProjectString(deploymentID)
-		if err != nil {
+		if err := saveDeployment(deploymentID); err != nil {
 			return err
 		}
 	}

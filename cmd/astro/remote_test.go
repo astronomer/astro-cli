@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -270,4 +271,18 @@ func TestRemoteCommandIntegration(t *testing.T) {
 		assert.Contains(t, deployCmd.Example, "--deployment ")
 		assert.Contains(t, deployCmd.Example, "checking its runtime against a Deployment")
 	})
+}
+
+// --image-name does not skip the project check: remote deploy reads the
+// registry it pushes to from the project's .astro/config.yaml, so outside a
+// project it would push to whichever registry the global config names.
+func TestRemoteDeployImageNameStillChecksTheProject(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prevPath, prevImage := config.WorkingPath, remoteImageName
+	t.Cleanup(func() { config.WorkingPath, remoteImageName = prevPath, prevImage })
+	config.WorkingPath = t.TempDir()
+
+	cmd := newRemoteDeployCmd()
+	assert.NoError(t, cmd.ParseFlags([]string{"--image-name", "img"}))
+	assert.ErrorContains(t, cmd.PreRunE(cmd, nil), "not an Astro project directory")
 }

@@ -188,6 +188,29 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 	// Without --image-name, the project-dir check should still run and propagate.
 	err = execDeployCmd("-f", "test-deployment-id")
 	assert.ErrorIs(t, err, assert.AnError)
+
+	// An empty --image-name= names no image, so the check still runs.
+	err = execDeployCmd("-f", "test-deployment-id", "--image-name=")
+	assert.ErrorIs(t, err, assert.AnError)
+}
+
+// PreRunE and RunE read --image-name the same way: an empty --image-name=
+// names no image, so it does not make the deploy image-only either.
+func TestDeployEmptyImageNameIsNotImageOnly(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	var got astrodeploy.InputDeploy
+	DeployImage = func(in astrodeploy.InputDeploy, _ astrov1.APIClient, _ astrov1alpha1.APIClient) error {
+		got = in
+		return nil
+	}
+
+	assert.NoError(t, execDeployCmd("-f", "test-deployment-id", "--image-name=", "--dags"))
+	assert.True(t, got.Dags)
+	assert.Empty(t, got.ImageName)
+
+	err := execDeployCmd("-f", "test-deployment-id", "--image-name", "img", "--dags")
+	assert.ErrorContains(t, err, "--image-name implies an image-only deploy")
 }
 
 func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {
