@@ -120,17 +120,11 @@ func devTypedSubcommand(args []string) string {
 	return strings.Join(words, " ")
 }
 
-// devWantsJSON honors the v2 --output convention without flag parsing.
+// devWantsJSON honors the v2 --output convention without flag parsing, read
+// as cliout.Execute reads it for any stub's failure, so the two agree on every
+// spelling (-ojson, -o=json) and on a -o json after "--".
 func devWantsJSON(args []string) bool {
-	for i, a := range args {
-		if a == "--output=json" || a == "-o=json" {
-			return true
-		}
-		if (a == "--output" || a == "-o") && i+1 < len(args) && args[i+1] == "json" {
-			return true
-		}
-	}
-	return false
+	return cliout.ArgsAskForJSON(args, "o")
 }
 
 // devReplacementFor finds the `astro local` command for an `astro dev` subcommand. The

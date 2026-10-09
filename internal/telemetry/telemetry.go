@@ -139,10 +139,16 @@ func GetCommandPath(cmd *cobra.Command) string {
 // v1 predates this constant and is stored as "true".
 const noticeVersion = "3"
 
+// noticeShown reports whether this machine has shown the current first-run
+// notice. Reading it writes nothing.
+func noticeShown() bool {
+	return config.CFG.TelemetryNoticeShown.GetHomeString() == noticeVersion
+}
+
 // showFirstRunNotice prints a notice about telemetry on the first CLI invocation,
 // and again whenever noticeVersion changes.
 func showFirstRunNotice() {
-	if config.CFG.TelemetryNoticeShown.GetHomeString() == noticeVersion {
+	if noticeShown() {
 		return
 	}
 	fmt.Fprintln(os.Stderr,
@@ -204,8 +210,13 @@ func TrackCommand(cmd *cobra.Command) {
 // CLI v2 removed, which TrackCommand leaves out because the stub is hidden.
 // The event marks it removed_command: the events are what tell us when nobody
 // types the command any more, and its stub can go.
+//
+// It sends only on a machine that has already shown the first-run notice, and
+// otherwise does nothing: a stub is in the core tree too (`astro dev`, `astro
+// run`), which leaves no config/ state on a machine that has none, and showing
+// the notice is a write (TestRemovedCommandLeavesNoHomeConfigBehind in e2e).
 func TrackRemovedCommand(cmd *cobra.Command) {
-	if GetCommandPath(cmd) == "" || !canTrack(cmd) {
+	if GetCommandPath(cmd) == "" || !noticeShown() || !canTrack(cmd) {
 		return
 	}
 	properties := buildCommandProperties(cmd)

@@ -146,13 +146,16 @@ func newRootCmd(o rootOptions) *cobra.Command {
 	}
 
 	// The core tree (`astro local`, `astro init`, the start/stop/logs aliases,
-	// and the `astro dev` removal stub) mounts outside the cloud/software
-	// branch: local Airflow works offline with no account. Every command
-	// carries the skip-pre-run annotation — cmd/local's TestTreeInvariants
-	// checks that structurally — so PersistentPreRunE above returns before
-	// the logging setup, the platform pre-run and the telemetry hook, which
-	// is where the network calls are. The stub replaces the 1.x `astro dev`
-	// tree in this binary.
+	// and the `astro dev` and `astro run` removal stubs) mounts outside the
+	// cloud/software branch: local Airflow works offline with no account.
+	// Every command but the stubs carries the skip-pre-run annotation —
+	// cmd/local's TestTreeInvariants checks that structurally — so
+	// PersistentPreRunE above returns before the logging setup, the platform
+	// pre-run and the telemetry hook, which is where the network calls are.
+	// A stub carries the removed-command annotation instead
+	// (cliout.RemovedCommand): it gets the logging setup and the removed-command
+	// event, which is sent only where telemetry already holds state
+	// (telemetry.TrackRemovedCommand), and never the platform pre-run.
 	//
 	// The home config is still read, for core commands too: main calls
 	// config.InitConfig before this function runs, and it has to, because

@@ -205,9 +205,6 @@ func astroLinkNames(m *manifest.Manifest) []string {
 	return names
 }
 
-// projectNote is the line that says the project, not the context, chose where
-// the command runs. It is empty when the project chose what the context would
-// have.
 // parentPreRun runs the nearest pre-run above group, which cobra skips once it
 // has run group's.
 func parentPreRun(group, cmd *cobra.Command, args []string) error {
@@ -219,6 +216,9 @@ func parentPreRun(group, cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// projectNote is the line that says the project, not the context, chose where
+// the command runs. It is empty when the project chose what the context would
+// have.
 func projectNote(ctx context.Context, pick projectPick, contextWorkspace string, switched bool) string {
 	if !switched && (pick.workspace == "" || pick.workspace == contextWorkspace) {
 		return ""

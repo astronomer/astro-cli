@@ -103,7 +103,7 @@ func TestDeploymentBundleDeleteCmd(t *testing.T) {
 
 		out, err := execDeploymentCmd("bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--yes")
 		assert.NoError(t, err)
-		assert.Contains(t, out, "Deleted bundle bundle-1")
+		assert.Contains(t, out, "Requested deletion of bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
 	})
 
@@ -124,7 +124,7 @@ func TestDeploymentBundleDeleteCmd(t *testing.T) {
 
 		out, err := execDeploymentCmd("bundle", "delete", "--deployment-id", "test-id-1", "--name", "my-dags", "--yes")
 		assert.NoError(t, err)
-		assert.Contains(t, out, "Deleted bundle bundle-1")
+		assert.Contains(t, out, "Requested deletion of bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
 	})
 }
@@ -209,6 +209,6 @@ func TestDeploymentBundleJSON(t *testing.T) {
 
 		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--yes")
 		require.NoError(t, err, "stderr:\n%s", stderr)
-		assert.Equal(t, "Deleted bundle bundle-1 from deployment test-id-1\n", stdout)
+		assert.Equal(t, "Requested deletion of bundle bundle-1 from deployment test-id-1\n", stdout)
 	})
 }

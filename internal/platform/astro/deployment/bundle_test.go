@@ -255,7 +255,7 @@ func (s *Suite) TestDeleteBundle() {
 
 		err := DeleteBundle("bundle-1", "", "", ws, testBundleDeploymentID, true, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
-		s.Contains(out.String(), "Deleted bundle bundle-1")
+		s.Contains(out.String(), "Requested deletion of bundle bundle-1")
 		mockV1Alpha1Client.AssertExpectations(s.T())
 	})
 
@@ -289,7 +289,7 @@ func (s *Suite) TestDeleteBundle() {
 
 		err := DeleteBundle("", "", mountPath, ws, testBundleDeploymentID, true, testUtil.Renderer{Out: out}, mockV1Client, mockV1Alpha1Client)
 		s.NoError(err)
-		s.Contains(out.String(), "Deleted bundle bundle-7")
+		s.Contains(out.String(), "Requested deletion of bundle bundle-7")
 		mockV1Alpha1Client.AssertExpectations(s.T())
 	})
 

@@ -320,7 +320,7 @@ func TestArgsAskForJSON(t *testing.T) {
 		{"-ojson"},
 	}
 	for _, args := range yes {
-		assert.True(t, argsAskForJSON(args, "o"), "%v", args)
+		assert.True(t, ArgsAskForJSON(args, "o"), "%v", args)
 	}
 	no := [][]string{
 		{"-o", "text"},
@@ -330,11 +330,11 @@ func TestArgsAskForJSON(t *testing.T) {
 		{"--other", "json"},
 	}
 	for _, args := range no {
-		assert.False(t, argsAskForJSON(args, "o"), "%v", args)
+		assert.False(t, ArgsAskForJSON(args, "o"), "%v", args)
 	}
 	// With no shorthand registered, -o is some other flag.
-	assert.False(t, argsAskForJSON([]string{"-o", "json"}, ""))
-	assert.True(t, argsAskForJSON([]string{"--output", "json"}, ""))
+	assert.False(t, ArgsAskForJSON([]string{"-o", "json"}, ""))
+	assert.True(t, ArgsAskForJSON([]string{"--output", "json"}, ""))
 }
 
 // cobra returns some usage errors untyped, and IsUsage recognizes them by

@@ -413,7 +413,7 @@ func DeleteBundle(bundleID, bundleName, bundleMountPath, wsID, deploymentID stri
 
 	removal.Action = bundleDeletionRequested
 	return r.Emit(removal, func(w io.Writer) error {
-		_, err := fmt.Fprintf(w, "Deleted bundle %s from deployment %s\n", bundleID, dep.Id)
+		_, err := fmt.Fprintf(w, "Requested deletion of bundle %s from deployment %s\n", bundleID, dep.Id)
 		return err
 	})
 }

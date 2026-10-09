@@ -413,6 +413,33 @@ func TestDevStubJSONOutput(t *testing.T) {
 	}
 }
 
+// The stub reads --output as cliout.Execute does: -ojson asks for json, and a
+// -o json after "--" is an argument, so the run is text and Execute adds
+// nothing on stdout either.
+func TestDevStubReadsOutputAsExecuteDoes(t *testing.T) {
+	d, out := testDeps(t)
+	err := execute(t, d, "dev", "ps", "-ojson")
+	if code := cliout.ExitCode(context.Background(), err); code != cliout.ExitUsage {
+		t.Fatalf("exit code = %d, want %d: %v", code, cliout.ExitUsage, err)
+	}
+	var payload DevRemoved
+	if jsonErr := json.Unmarshal(out.Bytes(), &payload); jsonErr != nil {
+		t.Fatalf("-ojson: stdout is not one JSON object: %v\n%s", jsonErr, out.String())
+	}
+	if payload.Replacement != "astro local status" {
+		t.Errorf("-ojson: replacement = %q", payload.Replacement)
+	}
+
+	d, out = testDeps(t)
+	err = execute(t, d, "dev", "ps", "--", "-o", "json")
+	if err == nil || !strings.Contains(err.Error(), "Use `astro local status` instead") {
+		t.Errorf("-- -o json: want the text guidance, got %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("-- -o json: stdout = %q, want nothing", out.String())
+	}
+}
+
 func TestDevStubTextMatchesJSONData(t *testing.T) {
 	p := buildDevRemoved("ps", nil, devContext{})
 	text := renderDevRemoved(p)
