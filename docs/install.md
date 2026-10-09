@@ -56,12 +56,25 @@ Check uv with `uv --version`. To install it, see the
 Run:
 
 ```sh
-curl -sSL install.astronomer.io | sudo bash -s
+curl -sSL install.astronomer.io | sudo bash -s -- v2
 ```
 
-*Coming soon: this installer serves the current CLI. Until the new release
-pipeline ships, build from source instead. You need Go (the version in
-`go.mod`):*
+The `v2` matters. Until v2 has a stable release, it is published as GitHub
+pre-releases, and the installer without a version installs Astro CLI 1.x. With
+`v2` it installs the newest v2 release, the newest stable one once there is
+one. It installs into `/usr/local/bin`, replacing a 1.x `astro` there.
+
+To install somewhere else, without `sudo`, run the installer script directly
+and name the directory with `-b`:
+
+```sh
+curl -sSL https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh | bash -s -- -b ~/astro-v2 v2
+```
+
+Then run it as `~/astro-v2/astro`, or put that directory on your PATH.
+
+To build from source instead, for example to contribute, you need Go (the
+version in `go.mod`):
 
 ```sh
 git clone https://github.com/astronomer/astro-cli && cd astro-cli
@@ -73,7 +86,7 @@ searches (`make install INSTALL_DIR=/usr/local/bin` to choose one), then says
 whether typing `astro` runs it. `make build` alone leaves `./astro` in the repo
 root.
 
-**You're done when** `astro version` prints a version.
+**You're done when** `astro version` prints a 2.x version.
 
 ## Step 2: Sign in or sign up
 
