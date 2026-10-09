@@ -250,6 +250,26 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 	})
 }
 
+// Under an Astro Private Cloud context a 1.x project's errors give the one
+// APC account rather than say to run astro init, through any wrapping; other
+// errors, and a directory with no 1.x project, are left as they were.
+func TestAdviseUnderAPC(t *testing.T) {
+	nf := &NotFoundError{Start: "/p", Project1xDir: "/p"}
+	before := nf.Error()
+	require.Contains(t, before, "Run `astro init`")
+	err := AdviseUnderAPC(fmt.Errorf("wrapped: %w", nf))
+	assert.Equal(t, "wrapped: "+Project1xUnderAPC("this directory"), err.Error())
+
+	ns := &NoAstroSectionError{Start: "/p/dags", Dir: "/p", Has1xProject: true}
+	assert.Equal(t, Project1xUnderAPC("/p"), AdviseUnderAPC(ns).Error())
+
+	plain := &NotFoundError{Start: "/q"}
+	want := plain.Error()
+	assert.Equal(t, want, AdviseUnderAPC(plain).Error())
+	assert.NoError(t, AdviseUnderAPC(nil))
+	assert.NotContains(t, Project1xUnderAPC("/p"), "`")
+}
+
 func TestLoadError(t *testing.T) {
 	other := errors.New("other")
 	assert.Same(t, other, LoadError(t.TempDir(), t.TempDir(), other))
@@ -397,24 +417,4 @@ func TestHasManifest(t *testing.T) {
 		writeManifest(t, dir, "this is not : valid = toml [[[\n")
 		assert.True(t, HasManifest(dir))
 	})
-}
-
-// Under an Astro Private Cloud context a 1.x project's errors give the one
-// APC account rather than say to run astro init, through any wrapping; other
-// errors, and a directory with no 1.x project, are left as they were.
-func TestAdviseUnderAPC(t *testing.T) {
-	nf := &NotFoundError{Start: "/p", Project1xDir: "/p"}
-	before := nf.Error()
-	require.Contains(t, before, "Run `astro init`")
-	err := AdviseUnderAPC(fmt.Errorf("wrapped: %w", nf))
-	assert.Equal(t, "wrapped: "+Project1xUnderAPC("this directory"), err.Error())
-
-	ns := &NoAstroSectionError{Start: "/p/dags", Dir: "/p", Has1xProject: true}
-	assert.Equal(t, Project1xUnderAPC("/p"), AdviseUnderAPC(ns).Error())
-
-	plain := &NotFoundError{Start: "/q"}
-	want := plain.Error()
-	assert.Equal(t, want, AdviseUnderAPC(plain).Error())
-	assert.NoError(t, AdviseUnderAPC(nil))
-	assert.NotContains(t, Project1xUnderAPC("/p"), "`")
 }
