@@ -69,6 +69,8 @@ type ManifestImageDeployResult struct {
 	DagTarballVersion string
 	URL               string
 	Git               ManifestDeployGit
+	// DagDeployEnabled is whether the Deployment takes DAG deploys.
+	DagDeployEnabled bool
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -201,6 +203,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		DagTarballVersion: tarballVersion,
 		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
 		Git:               gitInfo,
+		DagDeployEnabled:  dep.IsDagDeployEnabled,
 	}, nil
 }
 

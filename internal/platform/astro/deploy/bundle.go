@@ -30,6 +30,9 @@ type DeployBundleInput struct {
 	BundleType    string
 	Description   string
 	AstroV1Client astrov1.APIClient
+	// Login is the Astro login the deploy runs under, whose host the
+	// Deployment lives on; nil is the current context.
+	Login *config.Context
 }
 
 // BundleGit is the commit a bundle deploy recorded, when the bundle sits in a
@@ -58,7 +61,7 @@ type BundleDeploy struct {
 // finalizes the deploy. It does not report the result: its caller renders the
 // BundleDeploy it returns.
 func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
-	c, err := config.GetCurrentContext()
+	c, err := loginOrCurrent(input.Login)
 	if err != nil {
 		return BundleDeploy{}, err
 	}
@@ -149,6 +152,12 @@ func deploymentFor(orgID, id string, read *astrov1.Deployment, astroV1Client ast
 // stderr).
 func WaitForBundle(progress io.Writer, deploymentID string, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
 	return deployment.HealthPoll(progress, deploymentID, dagOnlyDeploySleepTime, tickNum, int(waitTime.Seconds()), astroV1Client)
+}
+
+// WaitForBundleIn is WaitForBundle under login, for a Deployment on a host
+// other than the current context's.
+func WaitForBundleIn(progress io.Writer, login *config.Context, deploymentID string, waitTime time.Duration, astroV1Client astrov1.APIClient) error {
+	return deployment.HealthPollIn(progress, login.Organization, login.Token, deploymentID, dagOnlyDeploySleepTime, tickNum, int(waitTime.Seconds()), astroV1Client)
 }
 
 type DeleteBundleInput struct {

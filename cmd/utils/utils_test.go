@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -111,21 +112,20 @@ func TestNoDeployableProject(t *testing.T) {
 // In the home directory the advice does not suggest astro init, which would
 // make all of ~ a project, and the home directory is recognized under another
 // spelling too. A Dockerfile beside ~/.astro, where the global config lives,
-// does not make it a 1.x project.
+// does not make it a 1.x project, nor does a tooling-only pyproject.toml.
 func TestNoDeployableProjectInTheHomeDirectory(t *testing.T) {
 	prevHome := config.HomePath
 	t.Cleanup(func() { config.HomePath = prevHome })
 	home := t.TempDir()
 	config.HomePath = home
 	make1x(t, home)
+	writeFile(t, home, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
 	for _, dir := range []string{home, home + string(filepath.Separator), filepath.Join(home, ".")} {
 		deployIn(t, dir)
 		err := NoDeployableProject(Deploy1xRefusedAstro)
 		assert.EqualError(t, err, homeDirRefusal)
 		assert.True(t, isNoProject(err))
-		got, err := Project1xDir(dir)
-		assert.NoError(t, err)
-		assert.Empty(t, got)
+		assert.Equal(t, Where{}, Locate(dir))
 	}
 
 	link := filepath.Join(t.TempDir(), "home")
@@ -135,15 +135,56 @@ func TestNoDeployableProjectInTheHomeDirectory(t *testing.T) {
 	}
 }
 
-// A pyproject.toml project is never a 1.x one, whatever 1.x files it still
-// has beside it.
-func TestProject1xDirIsEmptyForAManifestProject(t *testing.T) {
-	dir := t.TempDir()
-	make1x(t, dir)
-	writeFile(t, dir, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
-	got, err := Project1xDir(dir)
-	assert.NoError(t, err)
-	assert.Empty(t, got)
+// Locate's walk: the nearest pyproject.toml with [tool.astro] or 1.x project,
+// a tooling-only pyproject.toml passed over.
+func TestLocate(t *testing.T) {
+	t.Run("a pyproject.toml project is never a 1.x one", func(t *testing.T) {
+		dir := t.TempDir()
+		make1x(t, dir)
+		writeFile(t, dir, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+		assert.Equal(t, Where{ManifestDir: dir}, Locate(dir))
+	})
+
+	t.Run("a monorepo's tooling pyproject.toml above a 1.x project", func(t *testing.T) {
+		root := t.TempDir()
+		writeFile(t, root, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
+		oneX := filepath.Join(root, "airflow")
+		make1x(t, oneX)
+		assert.Equal(t, Where{Project1xDir: oneX}, Locate(oneX))
+		sub := filepath.Join(oneX, "dags", "team")
+		require.NoError(t, os.MkdirAll(sub, 0o755))
+		assert.Equal(t, Where{Project1xDir: oneX}, Locate(sub))
+		deployIn(t, oneX)
+		assert.Contains(t, NoDeployableProject(Deploy1xRefusedAstro).Error(), "this project uses the Astro CLI 1.x layout")
+	})
+
+	t.Run("directory names that are not ASCII", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "проект-データ")
+		make1x(t, dir)
+		assert.Equal(t, Where{Project1xDir: dir}, Locate(dir))
+		other := filepath.Join(t.TempDir(), "日本")
+		require.NoError(t, os.MkdirAll(other, 0o755))
+		writeFile(t, other, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+		assert.Equal(t, Where{ManifestDir: other}, Locate(other))
+	})
+
+	t.Run("an ancestor that cannot be read is passed over", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("directory modes do not stop this reader")
+		}
+		top := t.TempDir()
+		locked := filepath.Join(top, "locked")
+		writeFile(t, locked, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+		inner := filepath.Join(locked, "inner")
+		require.NoError(t, os.MkdirAll(inner, 0o755))
+		// Searchable but not readable: the walk can stat its way down, and
+		// the pyproject.toml in it cannot be read.
+		require.NoError(t, os.Chmod(filepath.Join(locked, "pyproject.toml"), 0o000))
+		t.Cleanup(func() { _ = os.Chmod(filepath.Join(locked, "pyproject.toml"), 0o600) })
+		assert.Equal(t, Where{}, Locate(inner))
+		deployIn(t, inner)
+		assert.EqualError(t, NoDeployableProject(Deploy1xRefusedAstro), notProjectAdvice)
+	})
 }
 
 func TestGetDefaultDeployDescription(t *testing.T) {

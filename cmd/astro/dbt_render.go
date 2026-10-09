@@ -136,11 +136,19 @@ func renderBundleUploaded(version string) func(io.Writer) error {
 // why, because the upload happened and a script needs its deploy id and
 // version, and then exits 1 (failedAfterResult).
 func publishThenWait(cmd *cobra.Command, format cliout.Format, wait bool, deploymentID string, waitTime time.Duration, publish func(waitErr error) error) error {
+	return publishThenWaitWith(cmd, format, wait, func() error {
+		return waitForBundle(cmd.ErrOrStderr(), deploymentID, waitTime, astroV1Client)
+	}, publish)
+}
+
+// publishThenWaitWith is publishThenWait with the wait its caller's, for a
+// Deployment reached under a login other than the current context's.
+func publishThenWaitWith(cmd *cobra.Command, format cliout.Format, wait bool, waitFor func() error, publish func(waitErr error) error) error {
 	waitDone := func() error {
 		if !wait {
 			return nil
 		}
-		return waitForBundle(cmd.ErrOrStderr(), deploymentID, waitTime, astroV1Client)
+		return waitFor()
 	}
 	if format == cliout.FormatJSON {
 		waitErr := waitDone()

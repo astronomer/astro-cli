@@ -43,6 +43,9 @@ var removedConfigKeys = map[string]string{
 		"without it a free port is chosen.",
 	"webserver.port": "Pick the local Airflow port with `astro local start --port <port>`; " +
 		"without it a free port is chosen.",
+	// astro deploy --save wrote it into a 1.x project's .astro/config.yaml.
+	"project.deployment": "Name the Deployment on each deploy, as the argument or with --deployment. " +
+		"On Astro, link a project's Deployments with astro link add, and mark one default = true to preselect it.",
 }
 
 // refuseRemovedConfigKey fails a set of a removed key the way the removed
@@ -171,9 +174,10 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	// Ahead of the scope checks, so the answer is the same in and out of a
-	// project and with or without -g.
-	if cmd.Name() == "set" {
+	// A removed key is refused by set and get alike. Ahead of the scope
+	// checks, so the answer is the same in and out of a project and with or
+	// without -g.
+	if cmd.Name() == "set" || cmd.Name() == "get" {
 		if err := refuseRemovedConfigKey(args[0]); err != nil {
 			cmd.SilenceUsage = true
 			return err

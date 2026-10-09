@@ -11,5 +11,8 @@
     "commit_sha": "x",
     "branch": "x",
     "commit_url": "x"
-  }
+  },
+  "warnings": [
+    "x"
+  ]
 }

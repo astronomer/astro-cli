@@ -55,11 +55,16 @@ func newRemoteDeployCmd() *cobra.Command {
 		Long:  "Build and deploy a client image to the configured remote registry. This command assumes you have already authenticated with the registry.",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// The rule astro deploy follows: a build needs a pyproject.toml
-			// project, and a project in the Astro CLI 1.x layout is refused
-			// with the same advice. --image-name builds nothing, so it reads
-			// no project and runs anywhere. The value, not whether the flag
-			// was given: an empty --image-name= names no image.
-			if remoteImageName != "" || project.HasManifest(config.WorkingPath) {
+			// project's root, and in or below a project in the Astro CLI 1.x
+			// layout, or below a pyproject.toml project's root, everything is
+			// refused with the same advice. --image-name builds nothing, so
+			// outside any project it pushes the image as it is. The value,
+			// not whether the flag was given: an empty --image-name= names
+			// no image.
+			if project.HasManifest(config.WorkingPath) {
+				return nil
+			}
+			if remoteImageName != "" && utils.Locate(config.WorkingPath) == (utils.Where{}) {
 				return nil
 			}
 			cmd.SilenceUsage = true

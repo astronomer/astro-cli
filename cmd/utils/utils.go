@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -63,8 +64,66 @@ const (
 	notProjectAdvice = "this is not an Astro project directory. Change to an Astro project directory, or run astro init to make this one an Astro project"
 )
 
+// Where is what a deploy finds at and above its working directory: the
+// nearest pyproject.toml project (ManifestDir) or project in the Astro CLI
+// 1.x layout (Project1xDir), whichever comes first; both empty for none.
+type Where struct {
+	ManifestDir  string
+	Project1xDir string
+}
+
+// Locate walks up from dir to the nearest project, the one rule astro
+// deploy, astro remote deploy and APC's deploy decide by. At each directory:
+//
+//   - a pyproject.toml with a [tool.astro] table is a project's root (one
+//     that fails to validate too: it is a project to fix, and the deploy
+//     reports why). A pyproject.toml without one, a monorepo root's tool
+//     settings say, does not stop the walk;
+//   - else a Dockerfile beside a .astro directory is a 1.x project
+//     (project.Is1xProject), except in the home directory, whose .astro
+//     holds the global config;
+//   - else the walk goes on up.
+//
+// A directory it cannot read counts as holding neither, so an unreadable
+// ancestor does not fail a deploy that never needed it.
+func Locate(dir string) Where {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return Where{}
+	}
+	for d := abs; ; {
+		if isManifestRoot(d) {
+			return Where{ManifestDir: d}
+		}
+		if !config.IsHomeDir(d) && project.Is1xProject(d) {
+			return Where{Project1xDir: d}
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return Where{}
+		}
+		d = parent
+	}
+}
+
+// isManifestRoot reports whether dir's pyproject.toml has a [tool.astro]
+// table. Unlike project.HasManifest, a pyproject.toml that cannot be read
+// is not one.
+func isManifestRoot(dir string) bool {
+	_, err := manifest.Load(filepath.Join(dir, project.Marker))
+	var pathErr *fs.PathError
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection), errors.As(err, &pathErr):
+		return false
+	default:
+		return true
+	}
+}
+
 // NoDeployableProject is what a deploy says when the working directory is not
-// the root of a pyproject.toml project, the one kind of project v2 deploys:
+// the root of a pyproject.toml project, by Locate's answer:
 //
 //   - in or below a project in the Astro CLI 1.x layout, refused1x, naming
 //     that project's directory when the deploy ran below it;
@@ -72,77 +131,24 @@ const (
 //   - anywhere else, the no-project advice, which in the home directory does
 //     not suggest astro init.
 //
-// Which directory holds what is project.Discover's answer, the one the
-// local commands give. Every one of these is reported under the kind
-// no_project: it unwraps to a *project.NotFoundError.
+// Every one of these is reported under the kind no_project: it unwraps to a
+// *project.NotFoundError.
 func NoDeployableProject(refused1x Refusal1x) error {
 	wd := config.WorkingPath
-	if config.IsHomeDir(wd) {
+	where := Locate(wd)
+	switch {
+	case where.Project1xDir != "":
+		says, dir := "this project", ""
+		if !sameDir(where.Project1xDir, wd) {
+			says, dir = "this directory is inside a project at "+where.Project1xDir+" that", where.Project1xDir
+		}
+		return &noProjectError{msg: refused1x(says, dir), cause: &project.NotFoundError{Start: wd, Project1xDir: where.Project1xDir}}
+	case where.ManifestDir != "" && !sameDir(where.ManifestDir, wd):
+		return NoProject(fmt.Sprintf("this directory is inside the project at %s. Run the deploy from the project directory, %s", where.ManifestDir, where.ManifestDir))
+	case config.IsHomeDir(wd):
 		return NoProject(homeDirRefusal)
 	}
-	found, err := discover(wd)
-	if err != nil {
-		return err
-	}
-	switch {
-	case found.dir1x != "":
-		where, dir := "this project", ""
-		if !sameDir(found.dir1x, wd) {
-			where, dir = "this directory is inside a project at "+found.dir1x+" that", found.dir1x
-		}
-		return &noProjectError{msg: refused1x(where, dir), cause: &project.NotFoundError{Start: wd, Project1xDir: found.dir1x}}
-	case found.manifestDir != "" && !sameDir(found.manifestDir, wd):
-		return NoProject(fmt.Sprintf("this directory is inside the project at %s. Run the deploy from the project directory, %s", found.manifestDir, found.manifestDir))
-	}
 	return NoProject(notProjectAdvice)
-}
-
-// Project1xDir is the directory of the project in the Astro CLI 1.x layout
-// that dir is in or below, by project.Discover's rule, or "" when there is
-// none: dir is in a pyproject.toml project, or in no project at all.
-func Project1xDir(dir string) (string, error) {
-	found, err := discover(dir)
-	return found.dir1x, err
-}
-
-type discovered struct {
-	// manifestDir is the pyproject.toml project dir is in or below.
-	manifestDir string
-	// dir1x is the 1.x project dir is in or below, when there is no
-	// pyproject.toml project nearer.
-	dir1x string
-}
-
-// discover walks up from dir as project.Discover does. A pyproject.toml with
-// no [tool.astro] is not a project, and is a 1.x one when the 1.x layout is
-// beside it (project.LoadError's rule).
-func discover(dir string) (discovered, error) {
-	if config.IsHomeDir(dir) {
-		// ~/.astro holds the global config, so with a Dockerfile in ~ the
-		// home directory would pass for a 1.x project.
-		return discovered{}, nil
-	}
-	p, err := project.Discover(dir)
-	var notFound *project.NotFoundError
-	switch {
-	case errors.As(err, &notFound):
-		if config.IsHomeDir(notFound.Project1xDir) {
-			return discovered{}, nil
-		}
-		return discovered{dir1x: notFound.Project1xDir}, nil
-	case err != nil:
-		return discovered{}, err
-	}
-	_, err = manifest.Load(filepath.Join(p.Dir, project.Marker))
-	var noSection *project.NoAstroSectionError
-	if lerr := project.LoadError(dir, p.Dir, err); errors.As(lerr, &noSection) {
-		if noSection.Has1xProject {
-			return discovered{dir1x: p.Dir}, nil
-		}
-		return discovered{}, nil
-	}
-	// A manifest that fails to load otherwise is still a project to fix.
-	return discovered{manifestDir: p.Dir}, nil
 }
 
 func sameDir(a, b string) bool {

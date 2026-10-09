@@ -10,9 +10,9 @@ v2 works on projects with a `pyproject.toml`, and only on those. It does not run
 astro init
 ```
 
-`astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too. `astro deploy --image-name` is the exception: it deploys an image you already built, reads nothing from the project, and runs from any directory.
+`astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too. `astro deploy --image-name` too: a prebuilt image deployed from a 1.x checkout would leave its DAGs stale. Outside any project, `--image-name` deploys an image you already built, alone, with no DAGs.
 
-On Astro Private Cloud, v2 does not build and deploy projects yet, converted or not: use Astro CLI 1.x to deploy there for now. v2 deploys an image you built there (`astro deploy --image-name`, from anywhere but a 1.x project), and uploads a converted project's DAGs (`astro deploy --dags`). Support for `pyproject.toml` projects on Astro Private Cloud is coming.
+On Astro Private Cloud, v2 does not build and deploy projects yet, converted or not: use Astro CLI 1.x to deploy there for now. v2 deploys an image you built there (`astro deploy --image-name`, from a converted project or outside any project), and uploads a converted project's DAGs (`astro deploy --dags`). Support for `pyproject.toml` projects on Astro Private Cloud is coming.
 
 ## What's new
 
@@ -135,6 +135,7 @@ Some 1.x flags still work but are hidden from help in favor of a new spelling. O
 
 ### Behavior
 
+- **`project.deployment` is gone.** `astro deploy --save` wrote it into a 1.x project's `.astro/config.yaml`, and nothing in v2 reads it: `astro config set` and `get` of it say it was removed. Name the Deployment on each deploy, as the argument or with `--deployment`, or link it with `astro link add`.
 - **An `astro api airflow` request needs a target.** 1.x defaulted to `localhost:8080`. v2 needs `-d <link or Deployment>` or `--url`. For the Airflow on your machine, use `astro local api`. `ls` and `describe` only read the API spec, so they run without a target.
 - **Local Airflow runs without Docker by default.** Add `--docker` to `astro local start` for containers. uv 0.9.25 or later must be on your PATH. Windows needs `--docker`.
 - **`astro local` needs a converted project.** It reads `pyproject.toml`, not `requirements.txt`, `packages.txt` or `airflow_settings.yaml`, so run `astro init` once in a 1.x project. `astro deploy` needs it converted too.

@@ -251,7 +251,6 @@ func (s *Suite) TestDeploymentIDIgnoresTheSaved1xDeployment() {
 	s.T().Cleanup(func() { config.WorkingPath = prev; testUtil.InitTestConfig(testUtil.SoftwarePlatform) })
 	s.Require().NoError(afero.WriteFile(fs, filepath.Join(dir, config.ConfigDir, config.ConfigFileNameWithExt), []byte("project:\n  deployment: stale-id\n"), 0o600))
 	config.InitConfig(fs)
-	s.Require().Equal("stale-id", config.CFG.ProjectDeployment.GetProjectString(), "the saved deployment is there to be ignored")
 
 	s.houstonMock.On("GetWorkspace", "ws").Return(&houston.Workspace{ID: "ws"}, nil).Once()
 	s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "stale-id"}, {ID: "picked"}}, nil).Once()

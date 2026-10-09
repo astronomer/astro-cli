@@ -298,7 +298,7 @@ func TestRemoteDeployProjectCheck(t *testing.T) {
 
 	oneX := make1xProject(t)
 	assert.ErrorContains(t, check(oneX), "uses the Astro CLI 1.x layout")
-	assert.NoError(t, check(oneX, "--image-name", "img"))
+	assert.ErrorContains(t, check(oneX, "--image-name", "img"), "uses the Astro CLI 1.x layout", "a 1.x checkout is refused, --image-name included")
 
 	manifestProject := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(manifestProject, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))

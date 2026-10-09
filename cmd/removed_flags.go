@@ -53,8 +53,8 @@ const (
 	errDeployBundleNameRemoved = "--dag-bundle-name was removed in Astro CLI v2: deploying to a named DAG bundle is not supported yet. Use Astro CLI 1.x for it"
 	errDeployNameRemoved       = "--deployment-name was removed in Astro CLI v2: name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
 	errDeployPromptRemoved     = "--prompt was removed in Astro CLI v2: astro deploy asks which Deployment to deploy to whenever you name none, as the argument or with --deployment"
-	errAPCDeployNoCache        = "--no-cache was removed in Astro CLI v2: astro deploy builds no image for Astro Private Cloud. " +
-		"Deploy an image you built with --image-name, or build and deploy the project with Astro CLI 1.x"
+	errAPCDeployNoCache        = "--no-cache was removed in Astro CLI v2: Astro CLI v2 builds no image for Astro Private Cloud. " +
+		"Build and deploy the project with Astro CLI 1.x"
 )
 
 // removedFlag is what a run passing a flag Astro CLI 1.x had and v2 dropped

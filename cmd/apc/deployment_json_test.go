@@ -693,14 +693,9 @@ func inImageWarning(image string) string {
 }
 
 // noDagsNotice is the notice for a DAG upload skipped for want of a dags
-// directory in dir: --image-name may run from anywhere, and from a
-// pyproject.toml project the project lacks one.
-func noDagsNotice(dir string, inProject bool) string {
-	advice := "To upload them, run the deploy from the project directory."
-	if inProject {
-		advice = "To upload Dags, create a dags directory in the project."
-	}
-	return "no Dags were uploaded: there is no dags directory in " + dir + ", and the Deployment keeps the Dags it had. " + advice
+// directory in the pyproject.toml project at dir.
+func noDagsNotice(dir string) string {
+	return "no Dags were uploaded: there is no dags directory in " + dir + ", and the Deployment keeps the Dags it had. To upload Dags, create a dags directory in the project."
 }
 
 // deployPushed is what the image deploy reports in these tests.
@@ -710,6 +705,7 @@ func TestDeployJSON(t *testing.T) {
 	pushed := deployPushed
 
 	t.Run("image and dags", func(t *testing.T) {
+		inProject(t, true)
 		deployMocks(t, pushed, nil)
 		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
@@ -720,6 +716,7 @@ func TestDeployJSON(t *testing.T) {
 	})
 
 	t.Run("a Deployment that takes no DAG-only deploy is an image deploy", func(t *testing.T) {
+		inProject(t, true)
 		deployMocks(t, pushed, deploy.ErrDagOnlyDeployNotEnabledForDeployment)
 		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
@@ -816,12 +813,12 @@ func TestDeployJSON(t *testing.T) {
 	toUpload := pushed
 	toUpload.Dags = deploy.DagsFromUpload
 	t.Run("no dags directory skips the DAG upload, and says so", func(t *testing.T) {
-		dir := inWorkingDir(t, false)
+		dir := inProject(t, false)
 		for _, args := range [][]string{
 			{"deploy", "dep-ac", "--image-name", "img:1", "-o", "json"},
 			{"deploy", "dep-ac", "--image-name", "img:1", "--remote", "--runtime-version", "12.1.1", "-o", "json"},
 		} {
-			noDags := noDags(dir, false)
+			noDags := noDags(dir)
 			for _, quiet := range []bool{false, true} {
 				deployMocks(t, toUpload, nil)
 				uploads := realDagsOnlyDeploy(t)
@@ -844,7 +841,7 @@ func TestDeployJSON(t *testing.T) {
 		warningsOff(t)
 		run := runAPC(t, dagsAPI(dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads)), "", "deploy", "dep-ac", "--image-name", "img:1")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		assert.Equal(t, "Deploying: rel-ac\nWarning: "+noDags(dir, false)+"\n", run.stdout, "text: on stdout, once, show_warnings off too")
+		assert.Equal(t, "Deploying: rel-ac\nWarning: "+noDags(dir)+"\n", run.stdout, "text: on stdout, once, show_warnings off too")
 	})
 
 	// A Deployment the image deploy did not place (the zero value) is
@@ -853,7 +850,7 @@ func TestDeployJSON(t *testing.T) {
 	// a Houston before 0.29.0) says nothing, as before; one that takes the
 	// upload says it was skipped, as a placed one does.
 	t.Run("a Deployment not placed is uploaded to as before", func(t *testing.T) {
-		inWorkingDir(t, true)
+		inProject(t, true)
 		seen := deployMocks(t, pushed, nil)
 		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
@@ -888,7 +885,7 @@ func TestDeployJSON(t *testing.T) {
 			}, nil},
 			{"a DAG-only Deployment", func() *mocks.ClientInterface {
 				return dagsAPI(dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads))
-			}, []string{noDags(dir, true)}},
+			}, []string{noDags(dir)}},
 		} {
 			for _, quiet := range []bool{false, true} {
 				deployMocks(t, pushed, nil)
@@ -911,7 +908,7 @@ func TestDeployJSON(t *testing.T) {
 	})
 
 	t.Run("a dags directory is uploaded as before", func(t *testing.T) {
-		inWorkingDir(t, true)
+		inProject(t, true)
 		seen := deployMocks(t, toUpload, nil)
 		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
@@ -968,6 +965,7 @@ func TestDeployJSON(t *testing.T) {
 	})
 
 	t.Run("--image-name --remote", func(t *testing.T) {
+		inProject(t, true)
 		deployMocks(t, pushed, nil)
 		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "my/image:1", "--remote", "--runtime-version", "12.1.1", "-o", "json")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
@@ -978,6 +976,7 @@ func TestDeployJSON(t *testing.T) {
 	})
 
 	t.Run("text prints only the deploy's own progress", func(t *testing.T) {
+		inProject(t, true)
 		deployMocks(t, pushed, nil)
 		run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1")
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
@@ -1051,7 +1050,7 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 		{"git-sync says nothing", dagsDeployment(houston.GitSyncDeploymentType, true), nil, 0, nil, nil},
 		// A cluster config it cannot read leaves a DAG-only Deployment
 		// not placed: DagsOnlyDeploy reads the config again, and decides.
-		{"dag_deploy whose cluster config is read the second time skips the upload, and says so", dagsDeployment(houston.DagOnlyDeploymentType, true), []func() (*houston.AppConfig, error){cfgFails(down), cfgOf(takesDagUploads)}, 1, []string{noDagsNotice("", false)}, []string{noDagsNotice("", false)}},
+		{"dag_deploy whose cluster config is read the second time skips the upload, and says so", dagsDeployment(houston.DagOnlyDeploymentType, true), []func() (*houston.AppConfig, error){cfgFails(down), cfgOf(takesDagUploads)}, 1, []string{noDagsNotice("")}, []string{noDagsNotice("")}},
 		{"dag_deploy whose cluster config is read the second time and refuses says nothing", dagsDeployment(houston.DagOnlyDeploymentType, true), []func() (*houston.AppConfig, error){cfgFails(down), cfgOf(&houston.AppConfig{Version: "2.0.0"})}, 1, nil, nil},
 		// Read neither time: the image update stands, and the deploy says
 		// the DAGs were not updated, whatever show_warnings is.
@@ -1059,7 +1058,7 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 	} {
 		for _, quiet := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s quiet=%v", tc.name, quiet), func(t *testing.T) {
-				dir := inWorkingDir(t, false)
+				dir := inProject(t, false)
 				deployMocks(t, toUpload, nil)
 				uploads := realDagsOnlyDeploy(t)
 				UpdateDeploymentImage = deploy.UpdateDeploymentImage
@@ -1084,8 +1083,8 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 					want = append([]string(nil), tc.quiet...)
 				}
 				for i, w := range want {
-					if w == noDagsNotice("", false) {
-						want[i] = noDagsNotice(dir, false)
+					if w == noDagsNotice("") {
+						want[i] = noDagsNotice(dir)
 					}
 				}
 				assert.Equal(t, want, got.Warnings)

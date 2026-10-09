@@ -64,6 +64,8 @@ func (s *Suite) TestDeployRefusesUncommittedChanges() {
 }
 
 func (s *Suite) TestDeploy() {
+	// From a project, whose DAGs follow the image to a Deployment that takes them.
+	inProject(s.T(), true)
 	appConfig = &houston.AppConfig{
 		BYORegistryDomain: "test.registry.io",
 		Flags: houston.FeatureFlags{

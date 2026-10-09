@@ -54,16 +54,17 @@ const (
 	// The image may well carry DAGs (one built from a Dockerfile that copies
 	// them does); one astro package generated the build for does not.
 	warningImageNameDagsInImage = "this Deployment runs the Dags inside the image %s; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."
-	// noticeNoDagsDir: there is no dags directory to upload, so
+	// noticeNoDagsDir: the project has no dags directory to upload, so
 	// DagsOnlyDeploy uploaded nothing. An empty upload would have deleted
-	// the Deployment's DAGs. The %s after the path is the advice: where to
-	// run the deploy from, or what the project lacks.
-	noticeNoDagsDir = "no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had. %s"
-	// adviceRunFromProject: --image-name needs no project, so the deploy may
-	// not have been run from one.
-	adviceRunFromProject = "To upload them, run the deploy from the project directory."
-	// adviceCreateDagsDir: the deploy ran from a project, which has none.
-	adviceCreateDagsDir = "To upload Dags, create a dags directory in the project."
+	// the Deployment's DAGs.
+	noticeNoDagsDir = "no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had. To upload Dags, create a dags directory in the project."
+	// noticeImageAlone: an --image-name deploy outside a pyproject.toml
+	// project ships the image alone, to a Deployment that takes DAG
+	// uploads, so its DAGs are as they were.
+	noticeImageAlone = "Dags were not updated: this deploy ran outside a pyproject.toml project, so it shipped the image alone, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
+	// noticeImageAloneUnplaced: the same, to a Deployment whose DAG source
+	// could not be read.
+	noticeImageAloneUnplaced = "this deploy ran outside a pyproject.toml project, so it shipped the image alone. If this Deployment takes Dag uploads, it keeps the Dags it had: to upload them, run astro deploy %s --dags from the project directory."
 	// noticeDagsUndecided: the image was deployed, and the cluster config
 	// that says whether the Deployment takes DAG uploads could not be read,
 	// so an upload that may have been due did not happen.
@@ -117,7 +118,8 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 // is asked or sent:
 //
 //   - any deploy in or below a project in the Astro CLI 1.x layout, which
-//     Astro CLI 1.x deploys (kind no_project);
+//     Astro CLI 1.x deploys, or below a pyproject.toml project's root
+//     (kind no_project), --image-name included (utils.Locate's walk);
 //   - --dags anywhere but in a pyproject.toml project: it uploads that
 //     project's dags directory (kind no_project);
 //   - a deploy with no --image-name, which would build the project: v2 builds
@@ -125,19 +127,15 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 //     not have, a usage error; anywhere else there is no project to build,
 //     kind no_project, as astro deploy on Astro says.
 //
-// --image-name (with or without --remote) needs no project: the image is
-// built already, and the dags directory uploaded after it, where the
-// Deployment takes one, is the working directory's when it has one.
+// --image-name (with or without --remote) runs at a pyproject.toml project's
+// root, where the project's DAGs are uploaded after it to a Deployment that
+// takes them, and outside any project, where the image ships alone.
 func refuseUndeployable() error {
 	inProject := project.HasManifest(config.WorkingPath)
-	if !inProject {
-		dir1x, err := utils.Project1xDir(config.WorkingPath)
-		if err != nil {
-			return err
-		}
-		if dir1x != "" {
-			return utils.NoDeployableProject(utils.Deploy1xRefusedAPC)
-		}
+	if !inProject && utils.Locate(config.WorkingPath) != (utils.Where{}) {
+		// In or below a 1.x project, or below a pyproject.toml project's
+		// root: every mode is refused, --image-name included, as on Astro.
+		return utils.NoDeployableProject(utils.Deploy1xRefusedAPC)
 	}
 	switch {
 	case isDagOnlyDeploy:
@@ -308,8 +306,21 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 	case deploy.DagsFromElsewhere:
 		return nil
 	case deploy.DagsFromUpload, deploy.DagsFromUnknown:
-		// Uploaded below. A Deployment the deploy did not place is uploaded
-		// to as a deploy always has, and DagsOnlyDeploy's refusals decide.
+		// Uploaded below, from a pyproject.toml project. A Deployment the
+		// deploy did not place is uploaded to as a deploy always has, and
+		// DagsOnlyDeploy's refusals decide.
+	}
+	if !project.HasManifest(a.path) {
+		// No project here: the working directory's dags/ belongs to no
+		// project this deploy knows, so the image ships alone, and an
+		// upload that a Deployment taking them would want is said not to
+		// have happened, whatever show_warnings is.
+		msg := noticeImageAlone
+		if a.dags == deploy.DagsFromUnknown {
+			msg = noticeImageAloneUnplaced
+		}
+		alwaysWarn(result, opts.Progress, fmt.Sprintf(msg, a.deployment))
+		return nil
 	}
 
 	_, err := DagsOnlyDeploy(a.client, a.workspace, a.deployment, a.path, nil, true, a.description, opts)
@@ -322,11 +333,7 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 		// DagsOnlyDeploy refuses before it looks for the directory, so the
 		// Deployment takes uploads: one was due and did not happen, which is
 		// said whatever show_warnings is.
-		advice := adviceRunFromProject
-		if project.HasManifest(a.path) {
-			advice = adviceCreateDagsDir
-		}
-		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path, advice))
+		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path))
 		return nil
 	case a.dags == deploy.DagsFromUnknown && errors.Is(err, deploy.ErrAppConfigUnread):
 		// Whether the Deployment takes uploads at all could not be read,

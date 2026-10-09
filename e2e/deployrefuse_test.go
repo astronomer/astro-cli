@@ -150,33 +150,38 @@ func TestDeployOutsideAProject(t *testing.T) {
 	}
 }
 
-// --image-name deploys an image already built, which reads nothing from the
-// project, so neither an empty directory nor a 1.x project stops it: it gets
-// past the project check, to the container engine an image push needs. With
-// Docker pointed at nothing (offline), that is where it stops, so nothing
-// leaves the machine.
-func TestDeployImageNameNeedsNoProject(t *testing.T) {
+// --image-name outside any project deploys an image already built, alone: it
+// gets past the project check, to the container engine an image push needs.
+// With Docker pointed at nothing (offline), that is where it stops, so
+// nothing leaves the machine. In a 1.x project, or below a pyproject.toml
+// project's root, it is refused as every deploy there is: a prebuilt image
+// shipped from a 1.x checkout would leave that project's DAGs stale.
+func TestDeployImageNameOutsideAProject(t *testing.T) {
 	tier(t, 0)
 
-	for _, tc := range []struct {
-		name  string
-		setup func(t *testing.T, p *project)
-	}{
-		{"outside any project", func(*testing.T, *project) {}},
-		{"in a 1.x project", make1xProject},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			p := newProject(t)
-			tc.setup(t, p)
-			r := runIn(t, p, "deploy", "dep-id", "--image-name", "img:1").requireFailure()
-			if !strings.Contains(r.Stderr, "an image deploy needs") {
-				t.Errorf("want it past the project check, stopped at the container engine\n%s", r.output())
-			}
-			if strings.Contains(r.Stderr, "not an Astro project directory") || strings.Contains(r.Stderr, "1.x layout") {
-				t.Errorf("--image-name reads no project, so none should be asked for\n%s", r.output())
-			}
-		})
-	}
+	t.Run("outside any project", func(t *testing.T) {
+		p := newProject(t)
+		r := runIn(t, p, "deploy", "dep-id", "--image-name", "img:1").requireFailure()
+		if !strings.Contains(r.Stderr, "an image deploy needs") {
+			t.Errorf("want it past the project check, stopped at the container engine\n%s", r.output())
+		}
+		if strings.Contains(r.Stderr, "not an Astro project directory") {
+			t.Errorf("--image-name outside a project needs none\n%s", r.output())
+		}
+	})
+
+	t.Run("in a 1.x project", func(t *testing.T) {
+		p := newProject(t)
+		make1xProject(t, p)
+		var payload struct {
+			Error string `json:"error"`
+			Kind  string `json:"kind"`
+		}
+		runIn(t, p, "deploy", "dep-id", "--image-name", "img:1", "--force", "--output", "json").requireFailure().requireJSON(&payload)
+		if payload.Kind != "no_project" || !strings.Contains(payload.Error, "Astro CLI 1.x layout") {
+			t.Errorf("want the 1.x refusal of kind no_project, got %+v", payload)
+		}
+	})
 }
 
 // listTree is every path under dir, relative to it, in walk order.
