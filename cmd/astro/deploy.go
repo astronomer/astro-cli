@@ -605,6 +605,9 @@ type deployJSON struct {
 	RuntimeVersion   string         `json:"runtime_version,omitempty"`
 	URL              string         `json:"url,omitempty"`
 	Git              *deployGitJSON `json:"git,omitempty"`
+	// Dags is where an image-and-dag deploy's DAGs went: uploaded, built_in,
+	// empty, from_image or none.
+	Dags string `json:"dags,omitempty"`
 }
 
 type deployGitJSON struct {
@@ -631,6 +634,7 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		DagBundleVersion: res.DagTarballVersion,
 		RuntimeVersion:   res.RuntimeVersion,
 		URL:              res.URL,
+		Dags:             res.Dags,
 	}
 	if c := res.Git.Commit; c != nil {
 		obj.Git = &deployGitJSON{CommitSHA: c.SHA, Branch: c.Branch, CommitURL: c.URL}
@@ -643,12 +647,30 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		case "image-only":
 			fmt.Fprintf(b, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
 		default: // image-and-dag
-			fmt.Fprintf(b, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
+			writeImageAndDags(b, res, target)
 		}
 		if res.URL != "" {
 			fmt.Fprintf(b, "Deployment: %s\n", res.URL)
 		}
 	}))
+}
+
+// writeImageAndDags is the summary of an image-and-dag deploy, which says where
+// the DAGs went: uploaded, built into the image by this deploy, left to an
+// image the CLI did not build, or nowhere, under remote execution.
+func writeImageAndDags(b *bufio.Writer, res *manifestdeploy.Result, target string) {
+	switch res.Dags {
+	case manifestdeploy.DagsBuiltIn:
+		fmt.Fprintf(b, "Deployed image (tag %s), with the project's DAGs inside it, to %s.\n", res.ImageTag, target)
+	case manifestdeploy.DagsFromImage:
+		fmt.Fprintf(b, "Deployed image (tag %s) to %s. The Deployment takes no DAG deploys, so it runs the DAGs the image carries; none were uploaded.\n", res.ImageTag, target)
+	case manifestdeploy.DagsEmpty:
+		fmt.Fprintf(b, "Deployed image (tag %s) to %s. The Deployment takes no DAG deploys and dags/ held no DAG files, so it runs none.\n", res.ImageTag, target)
+	case manifestdeploy.DagsNone:
+		fmt.Fprintf(b, "Deployed image (tag %s) to %s. The Deployment runs remote execution, so no DAGs were deployed with it.\n", res.ImageTag, target)
+	default:
+		fmt.Fprintf(b, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
+	}
 }
 
 // deployTargetName is what the summary line calls where the code went: the link
@@ -848,6 +870,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		DeploymentID:  in.DeploymentID,
 		BuildSecrets:  in.BuildSecrets,
 		ImageName:     in.ImageName,
+		Warn:          in.Warn,
 		OnBuild:       in.OnBuild,
 		IncludeDags:   in.IncludeDags,
 		Description:   in.Description,
@@ -866,6 +889,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
 		Git:               toManifestDeployGit(res.Git),
+		Dags:              res.Dags,
 	}, nil
 }
 

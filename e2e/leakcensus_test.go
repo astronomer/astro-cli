@@ -95,10 +95,12 @@ func censusAxes() []censusAxis {
 		{kind: "container", keep: ours, args: []string{"ps", "-a", "--filter", label, "--format", "{{.Names}}"}},
 		{kind: "volume", keep: ours, args: []string{"volume", "ls", "--filter", label, "--format", "{{.Name}}"}},
 		{kind: "network", keep: ours, args: []string{"network", "ls", "--filter", label, "--format", "{{.Name}}"}},
-		// Both repositories the CLI tags into: the local build's, and the two
-		// tags `astro package astro` writes.
+		// Every repository the CLI tags into: the local build's, the two tags
+		// `astro package astro` writes, and the image a deploy builds before
+		// it pushes.
 		{kind: "image", args: []string{"images", "--format", "{{.Repository}}:{{.Tag}}", "astro-local/*"}},
 		{kind: "image", args: []string{"images", "--format", "{{.Repository}}:{{.Tag}}", "astro-package/*"}},
+		{kind: "image", args: []string{"images", "--format", "{{.Repository}}:{{.Tag}}", "astro-deploy/*"}},
 	}
 }
 

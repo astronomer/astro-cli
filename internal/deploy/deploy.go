@@ -118,7 +118,29 @@ type Result struct {
 	// LinkName is the manifest link the deploy resolved to, "" if unlinked.
 	LinkName string
 	Git      Git
+	// Dags says where an "image-and-dag" deploy's DAGs went, one of the Dags*
+	// constants; "" for the other types.
+	Dags string
 }
+
+// Where an image-and-dag deploy's DAGs went. The values are what `astro
+// deploy --output json` reports as "dags".
+const (
+	// DagsUploaded: the dags/ tarball, to a Deployment that takes DAG deploys.
+	DagsUploaded = "uploaded"
+	// DagsBuiltIn: the CLI built the project's dags/ into the image, for a
+	// Deployment that takes no DAG deploys.
+	DagsBuiltIn = "built_in"
+	// DagsFromImage: the Deployment takes no DAG deploys and runs the DAGs
+	// the image carries, which the CLI did not put there (a prebuilt image, or
+	// a declared Dockerfile's own COPY lines).
+	DagsFromImage = "from_image"
+	// DagsNone: remote execution runs the Deployment's DAGs; none shipped.
+	DagsNone = "none"
+	// DagsEmpty: the CLI built the project into the image for a Deployment
+	// that takes no DAG deploys, and dags/ held no DAG files.
+	DagsEmpty = "empty"
+)
 
 // Git is what a deploy recorded about the commit it shipped.
 type Git struct {
@@ -162,7 +184,8 @@ type DagResult struct {
 // ImageDeploy is the request the transport's image deploy takes. The deployment
 // is already resolved. When ImageName is set the transport deploys that prebuilt
 // local image; otherwise it builds from the manifest fields. IncludeDags marks a
-// "both" deploy, which also ships the dags/ tarball.
+// "both" deploy, which also ships the project's DAGs: as the dags/ tarball to
+// a Deployment that takes DAG uploads, inside the image to one that does not.
 type ImageDeploy struct {
 	DeploymentID string
 	WorkspaceID  string
@@ -174,6 +197,8 @@ type ImageDeploy struct {
 	// RUN of the project's own to consume one; a generated build drops them.
 	BuildSecrets []string
 	ImageName    string
+	// Warn is Request.Warn, for the transport to call.
+	Warn func(string)
 	// OnBuild is Request.OnBuild, for the transport to call.
 	OnBuild       func()
 	IncludeDags   bool
@@ -184,7 +209,8 @@ type ImageDeploy struct {
 }
 
 // ImageResult is what the transport reports after an image deploy. A "both"
-// deploy also carries a DagTarballVersion.
+// deploy also carries where its DAGs went (Dags), and a DagTarballVersion when
+// they were uploaded.
 type ImageResult struct {
 	WorkspaceID       string
 	RuntimeVersion    string
@@ -192,6 +218,7 @@ type ImageResult struct {
 	DagTarballVersion string
 	URL               string
 	Git               Git
+	Dags              string
 }
 
 // Deployer is the seam onto the deploy transport. The CLI wires it to the
@@ -215,7 +242,7 @@ type Deployer interface {
 	// directory, and finalizes.
 	DeployDags(*DagDeploy) (DagResult, error)
 	// DeployImage builds (or adopts) the project image, pushes it, and
-	// finalizes; a "both" deploy also uploads the dags. It requires Docker and
+	// finalizes; a "both" deploy also ships the dags. It requires Docker and
 	// returns a plain error when it is unreachable.
 	DeployImage(*ImageDeploy) (ImageResult, error)
 }
@@ -346,6 +373,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		Build:         imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
 		BuildSecrets:  req.BuildSecrets,
 		ImageName:     req.ImageName,
+		Warn:          req.Warn,
 		OnBuild:       req.OnBuild,
 		IncludeDags:   includeDags,
 		Description:   req.Description,
@@ -370,6 +398,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		URL:               img.URL,
 		LinkName:          target.LinkName,
 		Git:               img.Git,
+		Dags:              img.Dags,
 	}, nil
 }
 

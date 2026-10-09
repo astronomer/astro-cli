@@ -17,6 +17,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/containercfg"
+	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -25,12 +26,15 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/shipcontext"
 )
 
 // ManifestImageDeployInput is the resolved input for a project's image deploy. The
 // deployment is already chosen (internal/deploy). The image is either built from
 // the manifest fields or adopted from a prebuilt local image (ImageName); a
-// "both" deploy (IncludeDags) also ships the dags/ tarball.
+// "both" deploy (IncludeDags) also ships the project's DAGs: as the dags/
+// tarball to a Deployment that takes DAG uploads, and inside the image to one
+// that does not.
 type ManifestImageDeployInput struct {
 	// Login is the Astro login the deploy runs under, whose host the
 	// Deployment and its registry live on; nil is the current context.
@@ -52,13 +56,15 @@ type ManifestImageDeployInput struct {
 	// the image build starts, so a refused deploy says nothing about building.
 	// A prebuilt image is not built and never calls it. nil skips it.
 	OnBuild       func()
-	IncludeDags   bool // also upload dags/ — a "both" deploy
+	IncludeDags   bool // also ship dags/ — a "both" deploy
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
 	// Progress takes the Wait progress; nil is stderr.
 	Progress io.Writer
+	// Warn reports a finding the deploy goes ahead despite; nil drops it.
+	Warn func(string)
 }
 
 // ManifestImageDeployResult reports the outcome for cmd to render.
@@ -69,6 +75,9 @@ type ManifestImageDeployResult struct {
 	DagTarballVersion string
 	URL               string
 	Git               ManifestDeployGit
+	// Dags says where a "both" deploy's DAGs went, one of internal/deploy's
+	// Dags* values; "" for an image-only deploy.
+	Dags string
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -90,7 +99,14 @@ var (
 
 // DeployManifestImage builds (or adopts) a project's image, pushes it to the
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
-// tarball. It reuses the 1.x transport (createDeploy, the registry push in
+// tarball to a Deployment that takes DAG uploads.
+//
+// A generated image carries the project, under its .dockerignore, with dags/
+// left out for a Deployment with DAG deploys or remote execution, which is the
+// 1.x path's rule (see shipProject). A declared Dockerfile's context is the
+// project already, and its own COPY lines decide.
+//
+// It reuses the 1.x transport (createDeploy, the registry push in
 // airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
 // neither prints nor exits — it returns a result for cmd to render, and writes
 // only a --wait's progress, to in.Progress.
@@ -139,6 +155,18 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if err := checkPlannedRuntime(dep.AstroRuntimeVersion, &planned, allowed); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
+	eng := projectEngine{
+		probe: func() (imagebuild.ProjectBuilder, error) {
+			return imagebuild.New(cmd, buildNow).CanShipProject(ctx, imagebuild.Request{Bin: bin, Env: env})
+		},
+		isPodman: func() bool {
+			return imagebuild.New(cmd, buildNow).IsPodman(ctx, imagebuild.Request{Bin: bin, Env: env})
+		},
+	}
+	dags, err := shipProject(&in, &req, &dep, eng)
+	if err != nil {
+		return ManifestImageDeployResult{}, err
+	}
 
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
@@ -174,10 +202,15 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if _, err := airflowImageHandler(localImage).Push(remoteImage, registryUsername, c.Token, false); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
+	if in.ImageName == "" {
+		removePushedImage(ctx, cmd, bin, env, localImage)
+	}
 
-	// A "both" deploy also ships the dags tarball, fitting the image just pushed.
+	// A "both" deploy also ships the dags tarball, fitting the image just
+	// pushed, to a Deployment that takes one. One that does not runs the DAGs
+	// the image carries, and remote execution runs them elsewhere.
 	var tarballVersion string
-	if in.IncludeDags {
+	if dags == manifestdeploy.DagsUploaded {
 		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 		if err != nil {
 			return ManifestImageDeployResult{}, err
@@ -201,13 +234,182 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		DagTarballVersion: tarballVersion,
 		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
 		Git:               gitInfo,
+		Dags:              dags,
 	}, nil
 }
 
+// errDagsIgnored refuses to build a Deployment's DAGs into its image when the
+// ignore rules leave every DAG file out, which would ship an image with no
+// DAGs to a Deployment that runs only the image's. The 1.x path removed a
+// "dags/" line from .dockerignore before every image deploy; this one does not
+// edit the project, and says so instead.
+const errDagsIgnored = "no DAG file in dags/ would reach the image: the project's .dockerignore leaves out every one, or dags/ is a link to outside the project. Deployment %s takes no DAG deploys, so it runs only the DAGs inside the image, and this image would have none. Remove the rule that leaves them out, or move the DAGs into the project, and try again; or enable DAG deploys with 'astro deployment update %s --dag-deploy enable'"
+
+// projectEngine is what shipProject asks the container engine: whether it
+// can copy the project in (imagebuild.Builder.CanShipProject), and whether it
+// is podman, whose ignore file a declared Dockerfile's build reads first.
+type projectEngine struct {
+	probe    func() (imagebuild.ProjectBuilder, error)
+	isPodman func() bool
+}
+
+// shipProject decides what of the project goes into the image the deploy
+// builds, and where a "both" deploy's DAGs go, by the 1.x path's rule (see
+// dagsInImage and dagsUploaded): the whole project, under its ignore rules, is
+// in a generated image, with dags/ left out unless the image is where the
+// Deployment's DAGs run. A declared Dockerfile's context is the project
+// already, and its COPY lines decide; a prebuilt image ships as it is.
+//
+// For a build that copies project files, a generated one with a capable
+// engine (shipWithBuilder) or a declared Dockerfile's, the project is
+// surveyed once (shipcontext.Take) under the ignore rules that build applies,
+// and files that look like credentials, which git ignores or cannot vouch
+// for, refuse the deploy. A generated build looks again just before it copies
+// the project. Then dagsOutcome checks the DAGs.
+func shipProject(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment, eng projectEngine) (string, error) {
+	inImage := dagsInImage(dep)
+	warn := in.Warn
+	if warn == nil {
+		warn = func(string) {}
+	}
+	if in.ImageName != "" {
+		return dagsOutcome(in, req, dep, inImage, &shipcontext.Survey{}, warn)
+	}
+	imagebuild.ShipProject(req, in.Build.ProjectDir, inImage)
+	if req.ProjectContext != "" {
+		if err := shipWithBuilder(in, req, inImage, eng.probe, warn); err != nil {
+			return "", err
+		}
+	}
+	opts, err := surveyOptions(in, req, eng)
+	if err != nil {
+		return "", err
+	}
+	survey, err := shipcontext.Take(in.Build.ProjectDir, opts)
+	if err != nil {
+		return "", err
+	}
+	if opts.Git {
+		if err := survey.SecretsError(); err != nil {
+			return "", err
+		}
+		for _, w := range survey.Warnings() {
+			warn(w)
+		}
+	}
+	if req.ProjectContext != "" {
+		req.BeforeProjectCopy = func() error {
+			again, err := shipcontext.Take(in.Build.ProjectDir, opts)
+			if err != nil {
+				return err
+			}
+			return again.SecretsError()
+		}
+	}
+	return dagsOutcome(in, req, dep, inImage, &survey, warn)
+}
+
+// surveyOptions are the ignore rules the build will apply, and whether git is
+// asked about the files under them: for a build that copies project files (a
+// generated one that kept its project context, or a declared Dockerfile's),
+// not for a dependency-only fallback, which copies none.
+func surveyOptions(in *ManifestImageDeployInput, req *imagebuild.Request, eng projectEngine) (shipcontext.Options, error) {
+	var opts shipcontext.Options
+	var err error
+	switch {
+	case req.FromDeclaredDockerfile():
+		opts.Ignore, err = shipcontext.DeclaredIgnore(in.Build.ProjectDir, in.Build.Dockerfile, eng.isPodman())
+		opts.Git = true
+	case req.ProjectContext != "":
+		opts.Ignore, err = req.Builder.ProjectIgnore(in.Build.ProjectDir, req.ProjectExcludes)
+		opts.Git = true
+	default:
+		opts.Ignore, err = imagebuild.ProjectBuilder{}.ProjectIgnore(in.Build.ProjectDir, nil)
+	}
+	return opts, err
+}
+
+// shipWithBuilder holds a generated build that copies the project to an
+// engine that can, handing it the engine's answer so the build does not ask
+// again.
+//
+// An engine that cannot (no buildx, a builder without the docker driver, one
+// whose check build shows it ignores the ignore file) built only the
+// dependencies before this change, and still does, with a warning that the
+// project's files are not in the image. Except where the DAGs are to be built
+// in: an image without them would leave a Deployment that runs only the
+// image's with none, so that is refused.
+func shipWithBuilder(in *ManifestImageDeployInput, req *imagebuild.Request, inImage bool, probe func() (imagebuild.ProjectBuilder, error), warn func(string)) error {
+	pb, err := probe()
+	if err != nil {
+		if inImage {
+			return fmt.Errorf("%w. Deployment %s takes no DAG deploys, so its DAGs have to be built into the image, and an image built without the project would have none", err, in.DeploymentID)
+		}
+		warn(fmt.Sprintf("this image carries only the project's dependencies: plugins/, include/ and the rest of the project are NOT in it. %s", err))
+		req.ProjectContext, req.ProjectExcludes = "", nil
+		return nil
+	}
+	req.Builder = pb
+	return nil
+}
+
+// dagsOutcome is where a "both" deploy's DAGs go. When they are to be in the
+// image it refuses a generated build none of whose DAG files would reach it
+// (survey.DagsShipped), warns when there are none to ship, and warns that a
+// prebuilt image or a declared Dockerfile is all the Deployment will run,
+// since the CLI did not put DAGs in it. A declared Dockerfile that leaves
+// dags/ out may make its DAGs itself, so that is a warning too.
+func dagsOutcome(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment, inImage bool, survey *shipcontext.Survey, warn func(string)) (string, error) {
+	switch {
+	case !in.IncludeDags:
+		return "", nil
+	case dagsUploaded(dep):
+		return manifestdeploy.DagsUploaded, nil
+	case !inImage:
+		return manifestdeploy.DagsNone, nil
+	case in.ImageName != "":
+		warn(fmt.Sprintf("Deployment %s takes no DAG deploys, so after this deploy it runs only the DAGs inside %s, and none are uploaded", in.DeploymentID, in.ImageName))
+		return manifestdeploy.DagsFromImage, nil
+	}
+	onDisk, shipped := survey.DagsOnDisk, survey.DagsShipped
+	if req.FromDeclaredDockerfile() {
+		msg := fmt.Sprintf("Deployment %s takes no DAG deploys, so after this deploy it runs only the DAGs that %s copies into the image, and none are uploaded", in.DeploymentID, in.Build.Dockerfile)
+		if onDisk > 0 && shipped == 0 {
+			msg += ". Its build context leaves out every DAG file in dags/, so unless the Dockerfile makes them, that is none"
+		}
+		warn(msg)
+		return manifestdeploy.DagsFromImage, nil
+	}
+	switch {
+	case onDisk > 0 && shipped == 0:
+		return "", fmt.Errorf(errDagsIgnored, in.DeploymentID, in.DeploymentID)
+	case shipped == 0:
+		warn(fmt.Sprintf("dags/ holds no DAG files, and Deployment %s takes no DAG deploys, so after this deploy it runs no DAGs", in.DeploymentID))
+		return manifestdeploy.DagsEmpty, nil
+	default:
+		return manifestdeploy.DagsBuiltIn, nil
+	}
+}
+
+// removeTimeout bounds removing the deploy's local image once it is pushed.
+const removeTimeout = 30 * time.Second
+
+// removePushedImage removes the deploy's local image once it is pushed: its
+// tag is this deploy's alone (deployImageTag), and has done its job. Without
+// --no-prune, so the untagged dependency image it was built on goes with it,
+// on Docker and on podman. Best effort, on a context the deploy's cancellation
+// does not reach, and bounded. A failed deploy keeps its image, to look at.
+func removePushedImage(ctx context.Context, cmd imagebuild.Commander, bin string, env []string, image string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
+	defer cancel()
+	//nolint:errcheck // best effort; a leftover image changes nothing
+	cmd.Run(ctx, env, localrt.Stdio{}, bin, "image", "rm", image)
+}
+
 // checkDeployment fetches the deployment and confirms the deploy is allowed:
-// cicd enforcement and dag-deploy enablement for a "both" deploy. It also
-// returns the runtime versions the deployment offers, which the image's
-// runtime is checked against.
+// cicd enforcement, and an image-only deploy only to a Deployment whose DAGs are
+// not in its image. It also returns the runtime versions the deployment
+// offers, which the image's runtime is checked against.
 func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, []string, error) {
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
@@ -216,14 +418,40 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
 		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}
-	if in.IncludeDags && !dep.IsDagDeployEnabled {
-		return astrov1.Deployment{}, nil, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
+	// --image leaves the running DAGs in place, which only a Deployment that
+	// takes them apart from its image can do. The 1.x path refuses it the same
+	// way; a "both" deploy ships the DAGs inside the image instead.
+	if !in.IncludeDags && dagsInImage(&dep) {
+		return astrov1.Deployment{}, nil, fmt.Errorf(imageOnlyDagsInImageMsg, in.DeploymentID, in.DeploymentID)
 	}
 	allowed, err := offeredRuntimeVersions(ctx, dep.OrganizationId, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
 	return dep, allowed, nil
+}
+
+// imageOnlyDagsInImageMsg refuses --image to a Deployment that runs the DAGs
+// inside its image, where a new image without them would remove them.
+const imageOnlyDagsInImageMsg = "--image deploys only the image and leaves the Deployment's DAGs in place, but Deployment %s takes no DAG deploys, so its DAGs are inside the image. Run 'astro deploy' without --image to ship the image with dags/ inside it, or enable DAG deploys with 'astro deployment update %s --dag-deploy enable'"
+
+// dagsInImage reports whether a Deployment runs the DAGs inside its image:
+// one that takes no DAG deploys, unless it runs remote execution. It is the
+// 1.x path's condition for building the image with dags/
+// (internal/platform/astro/deploy/deploy.go buildImage: buildImageWithoutDags
+// when dagDeployEnabled || isRemoteExecutionEnabled), and for refusing --image
+// (Deploy: deployInput.Image && !isRemoteExecutionEnabled && !dagDeployEnabled).
+func dagsInImage(dep *astrov1.Deployment) bool {
+	return !dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(dep)
+}
+
+// dagsUploaded reports whether a "both" deploy uploads the DAG tarball: to a
+// Deployment that takes DAG deploys and does not run remote execution. 1.x
+// uploads when dagDeployEnabled && len(dagFiles) > 0, and leaves dagFiles empty
+// under remote execution (Deploy: `if !deployInfo.isRemoteExecutionEnabled {
+// dagFiles = ... }`), so it uploads nothing there.
+func dagsUploaded(dep *astrov1.Deployment) bool {
+	return dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(dep)
 }
 
 // uploadDeployDags tars and uploads a project's dags/ directory to the
@@ -280,7 +508,7 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 	defer os.RemoveAll(workDir) //nolint:errcheck // best-effort cleanup of a temp dir
 
 	req.WorkDir = workDir
-	req.Tag = deployImageTag(in.Build.ProjectDir)
+	req.Tag = deployImageTag(in.Build.ProjectDir) + ":" + deployBuildID(req)
 	req.Secrets = in.BuildSecrets
 	req.Platform = deployImagePlatformSupport[0]
 	req.Bin = bin
@@ -311,18 +539,55 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 	return built, version, nil
 }
 
-// deployImageTag is the local tag the built deploy image carries. It appends a
+// deployBuildID is the tag part of a deploy's local image: what the image
+// carries of the DAGs (the build depends on the target now), and a random
+// part, so two deploys from one checkout at once, to Deployments of different
+// DAG modes or the same one, never tag, push or untag each other's image.
+func deployBuildID(req *imagebuild.Request) string {
+	mode := "deps"
+	switch {
+	case req.ProjectContext != "" && len(req.ProjectExcludes) == 0:
+		mode = "dags"
+	case req.ProjectContext != "":
+		mode = "nodags"
+	}
+	return mode + "-" + shipcontext.Nonce()
+}
+
+// deployImageTag is the local repository the built deploy image is tagged
+// into (deployBuildID is its tag). It appends a
 // hash of the full project path (same idea as localdocker's composeProjectName),
 // so two same-named projects in different directories never share a tag.
 func deployImageTag(projectDir string) string {
-	label := filepath.Base(projectDir)
-	if label == "" || label == "." || label == string(filepath.Separator) {
-		label = "project"
-	}
+	label := repositoryName(filepath.Base(projectDir))
 	if id, err := localrt.ProjectID(projectDir); err == nil && len(id) >= 6 {
 		return "astro-deploy/" + label + "-" + id[:6]
 	}
 	return "astro-deploy/" + label
+}
+
+// repositoryName makes a directory's name a valid component of an image
+// repository: lowercase letters and digits, runs of anything else collapsed to
+// one "-", no separator at either end, and "project" when nothing is left.
+func repositoryName(name string) string {
+	var b strings.Builder
+	dash := false
+	for _, r := range strings.ToLower(name) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			b.WriteRune(r)
+			dash = false
+			continue
+		}
+		if !dash && b.Len() > 0 {
+			b.WriteByte('-')
+			dash = true
+		}
+	}
+	out := strings.TrimRight(b.String(), "-")
+	if out == "" {
+		return "project"
+	}
+	return out
 }
 
 // offeredRuntimeVersions fetches the runtime versions the organization's

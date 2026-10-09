@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -63,6 +65,9 @@ type fakeDocker struct {
 	failErr    error
 	containerd bool
 	built      map[string]bool
+	// noBuildx makes `buildx version` fail, as on an engine without the
+	// buildx plugin.
+	noBuildx bool
 }
 
 func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name string, args ...string) error {
@@ -86,11 +91,30 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 	switch {
 	case verb == "build" && len(args) > 2 && args[1] == "--tag":
 		f.built[args[2]] = true
+	case verb == "buildx" && len(args) > 6 && args[5] == "--tag":
+		// buildx build --builder <b> --load --tag <ref>: a step on buildx.
+		f.built[args[6]] = true
 	case verb == "tag" && len(args) == 3:
 		f.built[args[2]] = f.built[args[1]]
 	}
 	f.mu.Unlock()
 	switch {
+	case verb == "buildx" && len(args) > 1 && args[1] == "version" && f.noBuildx:
+		return errors.New("docker: 'buildx' is not a docker command")
+	case verb == "context" && len(args) > 1 && args[1] == "show" && s.Out != nil:
+		io.WriteString(s.Out, "default\n")
+	case verb == "buildx" && len(args) > 1 && args[1] == "inspect" && s.Out != nil:
+		io.WriteString(s.Out, "Name: default\nDriver: docker\n")
+	case verb == "buildx" && len(args) > 1 && args[1] == "build" && strings.Contains(strings.Join(args, " "), "type=local,dest="):
+		// The ignore-file check build: export the kept file only.
+		for _, a := range args {
+			if dest, ok := strings.CutPrefix(a, "type=local,dest="); ok {
+				_ = os.MkdirAll(dest, 0o700)
+				_ = os.MkdirAll(filepath.Join(dest, "sub"), 0o700)
+				_ = os.WriteFile(filepath.Join(dest, "keep"), nil, 0o600)
+				_ = os.WriteFile(filepath.Join(dest, "sub", "keep"), nil, 0o600)
+			}
+		}
 	case verb == "image" && len(args) > 1 && args[1] == "inspect":
 		ref := args[len(args)-1]
 		f.mu.Lock()
@@ -234,7 +258,7 @@ func TestAstroBuildWithNothingToInstallPackagesASinglePlatformImage(t *testing.T
 	assert.Equal(t, "3.1-2", res.RuntimeVersion, "the label is read off the built image, got calls %v", calls)
 	build, firstTag := -1, -1
 	for i, c := range calls {
-		if strings.HasPrefix(c, "docker build --tag astro-package/my-project:src-") && build < 0 {
+		if strings.Contains(c, " --tag astro-package/my-project:src-") && build < 0 {
 			build = i
 		}
 		if strings.HasPrefix(c, "docker tag ") && firstTag < 0 {
@@ -572,4 +596,230 @@ func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	_, err = newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
 	require.NoError(t, err)
 	assert.Empty(t, lines)
+}
+
+// A generated build ships the project, dags/ included: the package cannot
+// know whether the Deployment it is later deployed to takes DAG uploads.
+func TestAstroBuildShipsTheProject(t *testing.T) {
+	builder := &fakeBuilder{}
+	req := testRequest(t)
+	res, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, req.ProjectDir, builder.gotReq.ProjectContext)
+	assert.Empty(t, builder.gotReq.ProjectExcludes, "dags/ is not left out")
+	assert.Empty(t, res.Warnings)
+}
+
+// A declared Dockerfile's context is the project already.
+func TestAstroBuildWithADeclaredDockerfileShipsNoProjectContext(t *testing.T) {
+	builder := &fakeBuilder{}
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\n")
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Empty(t, builder.gotReq.ProjectContext)
+}
+
+// An image whose ignore file leaves dags/ out carries no DAGs, which the
+// package says and still builds.
+func TestAstroBuildWarnsWhenTheIgnoreFileLeavesDagsOut(t *testing.T) {
+	for _, rule := range []string{"dags/", "**/*.py", "dags/**"} {
+		t.Run(rule, func(t *testing.T) {
+			req := testRequest(t)
+			require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, "dags"), 0o755))
+			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "dags", "a.py"), []byte("# dag\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte(rule+"\n"), 0o600))
+			res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+			require.NoError(t, err)
+			assert.Equal(t, []string{dagsIgnoredWarning}, res.Warnings)
+		})
+	}
+}
+
+// The content address covers what the build copies from the project, and
+// nothing it leaves out.
+func TestAstroBuildContentAddressCoversTheProject(t *testing.T) {
+	req := testRequest(t)
+	write := func(name, body string, mode os.FileMode) {
+		t.Helper()
+		path := filepath.Join(req.ProjectDir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), mode))
+		require.NoError(t, os.Chmod(path, mode))
+	}
+	tag := func() string {
+		t.Helper()
+		res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err)
+		return res.Image
+	}
+	write("plugins/x.py", "X = 1\n", 0o644)
+	write("utils/u.py", "U = 1\n", 0o644)
+	first := tag()
+	assert.Equal(t, first, tag(), "the same project gives the same tag")
+
+	write("plugins/__pycache__/x.cpython-312.pyc", "cache", 0o644)
+	write(".venv/bin/python", "venv", 0o755)
+	write(".astro/standalone/airflow.db", "db", 0o644)
+	write(".env", "SECRET=1", 0o600)
+	assert.Equal(t, first, tag(), "a file the build leaves out leaves the tag alone")
+
+	write("plugins/x.py", "X = 1\n", 0o664)
+	assert.Equal(t, first, tag(), "a mode change other than the executable bit leaves the tag alone")
+
+	write("plugins/x.py", "X = 1\n", 0o755)
+	executable := tag()
+	assert.NotEqual(t, first, executable, "the executable bit moves the tag")
+
+	write("utils/u.py", "U = 2\n", 0o644)
+	assert.NotEqual(t, executable, tag(), "an edit anywhere the build copies moves the tag")
+
+	write(".dockerignore", "utils/\n", 0o644)
+	assert.NotEqual(t, executable, tag(), "so does what the ignore file leaves in")
+}
+
+// A directory the build leaves out is never read, so one that cannot be read
+// does not fail the package.
+func TestAstroBuildDoesNotReadAnExcludedDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permissions are not enforced the same way on Windows")
+	}
+	req := testRequest(t)
+	locked := filepath.Join(req.ProjectDir, ".venv")
+	require.NoError(t, os.MkdirAll(filepath.Join(locked, "lib"), 0o755))
+	require.NoError(t, os.Chmod(locked, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+
+	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+}
+
+// An engine that cannot copy the project in under the ignore rules (here, no
+// buildx) is refused: a package of the dependencies alone carries no DAGs,
+// and could reach a Deployment that runs only its image's.
+func TestAstroBuildWithoutBuildxIsRefused(t *testing.T) {
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2", noBuildx: true}).Build(context.Background(), testRequest(t), localrt.Callbacks{})
+	require.ErrorIs(t, err, imagebuild.ErrNoProjectBuilder)
+	assert.Contains(t, err.Error(), "buildx")
+	assert.Contains(t, err.Error(), "an image built without the project would have none")
+	assert.Empty(t, builder.gotReq.Tag, "nothing was built")
+}
+
+// The engine is asked once: its answer is handed to the build.
+func TestAstroBuildHandsTheBuilderItFoundToTheBuild(t *testing.T) {
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), testRequest(t), localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.NotEqual(t, imagebuild.ProjectBuilder{}, builder.gotReq.Builder)
+}
+
+// Gitignored files that look like credentials would be baked into an image
+// pushed to a registry, so the package is refused, naming them.
+func TestAstroBuildRefusesGitignoredSecrets(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	req := testRequest(t)
+	for name, body := range map[string]string{".gitignore": "keys/\n", "keys/gcp-key.json": "{}", "dags/a.py": "#"} {
+		path := filepath.Join(req.ProjectDir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+	git := exec.Command("git", "-C", req.ProjectDir, "init", "-q")
+	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	require.NoError(t, git.Run())
+
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keys/gcp-key.json")
+	assert.Contains(t, err.Error(), "pushed to a registry")
+	assert.Empty(t, builder.gotReq.Tag, "nothing was built")
+}
+
+// Files git ignores that the image will carry are named in a warning.
+func TestAstroBuildWarnsAboutGitignoredFilesItWillCarry(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	req := testRequest(t)
+	for name, body := range map[string]string{".gitignore": "notes.txt\n", "notes.txt": "n", "dags/a.py": "#"} {
+		path := filepath.Join(req.ProjectDir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+	git := exec.Command("git", "-C", req.ProjectDir, "init", "-q")
+	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	require.NoError(t, git.Run())
+
+	res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	require.Len(t, res.Warnings, 1)
+	assert.Contains(t, res.Warnings[0], "notes.txt")
+	assert.Contains(t, res.Warnings[0], "Add them to .dockerignore")
+}
+
+// Two packages of one checkout at once build under working tags of their own,
+// so neither builds over, or untags, the other's; the final tag is still the
+// content address.
+func TestAstroBuildWorkingTagsAreUnique(t *testing.T) {
+	req := testRequest(t)
+	first, second := &fakeBuilder{}, &fakeBuilder{}
+	a, err := newAstro(first, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	b, err := newAstro(second, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.NotEqual(t, first.gotReq.Tag, second.gotReq.Tag)
+	assert.Regexp(t, regexp.MustCompile(`^astro-package/my-project:src-[0-9a-f]{7}-[0-9a-f]{8}$`), first.gotReq.Tag)
+	assert.Equal(t, a.Image, b.Image)
+}
+
+func gitInitPack(t *testing.T, dir string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("no git")
+	}
+	git := exec.Command("git", "-C", dir, "init", "-q")
+	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	require.NoError(t, git.Run())
+}
+
+func writeProject(t *testing.T, dir string, files map[string]string) {
+	t.Helper()
+	for name, body := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	}
+}
+
+// A declared Dockerfile's build copies from the project under its own ignore
+// file, so gitignored credentials it would carry refuse the package too.
+func TestAstroBuildWithADeclaredDockerfileRefusesGitignoredSecrets(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nCOPY . .\n")
+	gitInitPack(t, req.ProjectDir)
+	writeProject(t, req.ProjectDir, map[string]string{".gitignore": "*.p12\n", "client.p12": "k"})
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "client.p12")
+	assert.Empty(t, builder.gotReq.Tag, "nothing was built")
+}
+
+// The build looks again just before it copies the project, and a credential
+// that appeared since the survey stops it.
+func TestAstroBuildLooksAgainBeforeCopyingTheProject(t *testing.T) {
+	req := testRequest(t)
+	gitInitPack(t, req.ProjectDir)
+	writeProject(t, req.ProjectDir, map[string]string{".gitignore": "keys/\n", "dags/a.py": "#"})
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	require.NotNil(t, builder.gotReq.BeforeProjectCopy)
+	require.NoError(t, builder.gotReq.BeforeProjectCopy())
+
+	writeProject(t, req.ProjectDir, map[string]string{"keys/late.pem": "k"})
+	err = builder.gotReq.BeforeProjectCopy()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "keys/late.pem")
 }

@@ -26,14 +26,40 @@ import (
 )
 
 // fakeImageCmd is an imagebuild.Commander that records calls and never touches a
-// real daemon.
+// real daemon. It answers the engine probes as Docker with buildx, a current
+// context "desktop" and its docker-driver builder, unless noBuildx.
 type fakeImageCmd struct {
-	calls []string
-	err   error
+	calls    []string
+	err      error
+	noBuildx bool
 }
 
-func (f *fakeImageCmd) Run(_ context.Context, _ []string, _ localrt.Stdio, name string, args ...string) error {
+func (f *fakeImageCmd) Run(_ context.Context, _ []string, s localrt.Stdio, name string, args ...string) error {
 	f.calls = append(f.calls, name+" "+strings.Join(args, " "))
+	switch strings.Join(args, " ") {
+	case "buildx version":
+		if f.noBuildx {
+			return errors.New("docker: 'buildx' is not a docker command")
+		}
+	case "context show":
+		if s.Out != nil {
+			_, _ = io.WriteString(s.Out, "desktop\n")
+		}
+	case "buildx inspect desktop":
+		if s.Out != nil {
+			_, _ = io.WriteString(s.Out, "Name: desktop\nDriver: docker\n")
+		}
+	}
+	// The ignore-file check build: export the kept file only, as a builder
+	// that reads the ignore file does.
+	for _, a := range args {
+		if dest, ok := strings.CutPrefix(a, "type=local,dest="); ok {
+			_ = os.MkdirAll(dest, 0o700)
+			_ = os.MkdirAll(filepath.Join(dest, "sub"), 0o700)
+			_ = os.WriteFile(filepath.Join(dest, "keep"), nil, 0o600)
+			_ = os.WriteFile(filepath.Join(dest, "sub", "keep"), nil, 0o600)
+		}
+	}
 	return f.err
 }
 
@@ -123,7 +149,7 @@ func TestDeployManifestImage_BuildAndImageAndDag(t *testing.T) {
 
 	// Docker was probed, then a linux/amd64 build ran.
 	assert.True(t, hasImageCall(cmd.calls, "docker info"), "expected a docker info probe, got %v", cmd.calls)
-	assert.True(t, hasImageCall(cmd.calls, "build --tag astro-deploy/"), "expected a build, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, "--tag astro-deploy/"), "expected a build, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "expected linux/amd64, got %v", cmd.calls)
 	handler.AssertCalled(t, "Push", mock.Anything, registryUsername, mock.Anything, mock.Anything)
 	client.AssertExpectations(t)
@@ -178,7 +204,7 @@ func TestDeployManifestImage_ImageNameSkipsBuild(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 	// A prebuilt image is adopted: no build command runs.
-	assert.False(t, hasImageCall(cmd.calls, "build --tag"), "prebuilt image must skip the build, got %v", cmd.calls)
+	assert.False(t, hasImageCall(cmd.calls, " --tag "), "prebuilt image must skip the build, got %v", cmd.calls)
 	client.AssertExpectations(t)
 }
 
@@ -200,7 +226,7 @@ func containerdStore(t *testing.T, runtimeVersion string) (cmd *fakeImageCmd, ha
 			return h
 		}
 		label := ""
-		if hasImageCall(cmd.calls, "build --tag "+name+" ") {
+		if hasImageCall(cmd.calls, "--tag "+name+" ") {
 			label = runtimeVersion
 		}
 		h := new(mocks.ImageHandler)
@@ -240,8 +266,7 @@ func TestDeployManifestImage_NothingToInstallBuildsASinglePlatformImage(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 
-	tag := deployImageTag(dir)
-	assert.True(t, hasImageCall(cmd.calls, "build --tag "+tag+" "), "nothing to install still builds, got %v", cmd.calls)
+	tag := builtTag(t, cmd.calls, deployImageTag(dir))
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "at linux/amd64, got %v", cmd.calls)
 	assert.False(t, hasImageCall(cmd.calls, "docker pull"), "a pulled base is not what ships, got %v", cmd.calls)
 	require.Contains(t, handlers, tag, "the built tag is what is inspected and pushed")
@@ -442,7 +467,7 @@ func TestDeployManifestImage_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
 
 			_, err := DeployManifestImage(in, client)
 			require.EqualError(t, err, tt.wantErr)
-			assert.False(t, hasImageCall(cmd.calls, "build --tag"), "nothing should be built, got %v", cmd.calls)
+			assert.False(t, hasImageCall(cmd.calls, " --tag "), "nothing should be built, got %v", cmd.calls)
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		})
 	}
@@ -469,7 +494,7 @@ func TestDeployManifestImage_ASeriesTagBehindTheDeploymentNamesARuntimeBuild(t *
 	}, client)
 	require.EqualError(t, err, "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, set [tool.astro] runtime to 3.3-8 or newer in pyproject.toml")
 	assert.True(t, built, "the build was announced before it ran")
-	assert.True(t, hasImageCall(cmd.calls, "build --tag"), "a same-series pin is built, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, " --tag "), "a same-series pin is built, got %v", cmd.calls)
 	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -593,6 +618,24 @@ func TestDeployManifestImage_RefusesAnUnreadableDeclaration(t *testing.T) {
 	}, client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Dockerfile")
-	assert.False(t, hasImageCall(cmd.calls, "build --tag"),
+	assert.False(t, hasImageCall(cmd.calls, " --tag "),
 		"nothing should be built when the declared file cannot be read, got %v", cmd.calls)
+}
+
+// builtTag is the tag the deploy built its final image under, in repo: the
+// one that is not the intermediate -deps tag.
+func builtTag(t *testing.T, calls []string, repo string) string {
+	t.Helper()
+	for _, c := range calls {
+		_, rest, ok := strings.Cut(c, " --tag "+repo+":")
+		if !ok {
+			continue
+		}
+		tag, _, _ := strings.Cut(rest, " ")
+		if !strings.HasSuffix(tag, "-deps") {
+			return repo + ":" + tag
+		}
+	}
+	t.Fatalf("nothing was built under %s: %v", repo, calls)
+	return ""
 }
