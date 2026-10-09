@@ -96,7 +96,7 @@ DAGs go in `dags/`, Python dependencies in `[project.dependencies]` — the `apa
 
 Because that file is standard Python packaging, the tools you already use — uv, ruff, your editor — understand an Astro project out of the box.
 
-For every key you can set in `pyproject.toml`, see the [manifest reference](docs/manifest-reference.md); for the smallest real project that puts them together, see the [`examples/etl-demo`](examples/etl-demo) example; for the full demo — every shipped feature, terraform for Astro, MWAA, and Composer, and scripted walkthroughs — see [`demo/`](demo).
+For every key you can set in `pyproject.toml`, see the [manifest reference](docs/manifest-reference.md); for the smallest real project that puts them together, see the [`examples/etl-demo`](examples/etl-demo) example.
 
 `astro local start` checks the declared configuration before Airflow boots and, if anything is missing, lists it all at once instead of one error at a time. Supply a value with `astro local env variable set NAME` (or the `connection` or `airflow-variable` form), which stores it encrypted in the vault shared with Astro Desktop. Pass `--plain` to store a value that is not secret unencrypted instead, in the project's `.env`, or with `--global`, in the vault without encryption. A new `--global` value reaches no project until you `link` it, or pass `--auto-link` to reach every project, the term Astro Desktop uses. Your shell environment works too. See [docs/secrets.md](docs/secrets.md).
 
