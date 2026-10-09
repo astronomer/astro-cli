@@ -13,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/git"
 )
 
@@ -130,30 +129,39 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 // --image-name (with or without --remote) runs at a pyproject.toml project's
 // root, where the project's DAGs are uploaded after it to a Deployment that
 // takes them, and outside any project, where the image ships alone.
-func refuseUndeployable() error {
-	inProject := project.HasManifest(config.WorkingPath)
-	if !inProject && utils.Locate(config.WorkingPath) != (utils.Where{}) {
+func refuseUndeployable() (inProject bool, err error) {
+	// One walk routes the deploy and words its refusal.
+	where := utils.Locate(config.WorkingPath)
+	inProject = where.AtRoot(config.WorkingPath)
+	if !inProject && !where.None() {
 		// In or below a 1.x project, or below a pyproject.toml project's
 		// root: every mode is refused, --image-name included, as on Astro.
-		return utils.NoDeployableProject(utils.Deploy1xRefusedAPC)
+		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
 	}
 	switch {
+	case isDagOnlyDeploy && imageName != "":
+		// As astro deploy says it: an image source makes no sense with a
+		// deploy that ships only DAGs.
+		return inProject, cliout.Usage(errDagsWithImageName)
 	case isDagOnlyDeploy:
 		if !inProject {
-			return utils.NoDeployableProject(utils.Deploy1xRefusedAPC)
+			return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
 		}
 	case imagePresentOnRemote && imageName == "":
-		return ErrImageNameNotPassedForRemoteFlag
+		return inProject, ErrImageNameNotPassedForRemoteFlag
 	case imageName == "":
 		// The value, not whether the flag was given: an empty --image-name=
 		// names no image, so this would be a build.
 		if inProject {
-			return cliout.Usage(errors.New(errBuildDeployManifest))
+			return true, cliout.Usage(errors.New(errBuildDeployManifest))
 		}
-		return utils.NoProject(errBuildDeployNoProject)
+		return false, utils.NoProject(errBuildDeployNoProject)
 	}
-	return nil
+	return inProject, nil
 }
+
+// errDagsWithImageName is --dags with --image-name, in astro deploy's words.
+var errDagsWithImageName = errors.New("--dags deploys only your DAGs; drop --image-name")
 
 // The kinds of deploy deployJSON.Type names.
 const (
@@ -188,7 +196,8 @@ type deployJSON struct {
 }
 
 func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
-	if err := refuseUndeployable(); err != nil {
+	inProject, err := refuseUndeployable()
+	if err != nil {
 		// Not a usage mistake to print the usage block under: what is in
 		// the directory decided it.
 		cmd.SilenceUsage = true
@@ -208,8 +217,10 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	// An error, not a printed note: returning nil here made a deploy that never
-	// happened exit 0, so CI reported it as a success.
-	if hasUncommittedChanges("") && !forceDeploy {
+	// happened exit 0, so CI reported it as a success. Only a deploy that
+	// reads the project is held to it: an image deployed alone from outside
+	// one reads nothing from the directory.
+	if inProject && hasUncommittedChanges("") && !forceDeploy {
 		// Not a usage mistake, so no usage block under the error.
 		cmd.SilenceUsage = true
 		return errUncommittedChanges
@@ -269,7 +280,7 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		return emitDeploy(r, &result)
 	}
 
-	after := &dagsAfterImage{client: houstonClient, workspace: ws, deployment: deploymentID, path: config.WorkingPath, imageName: imageName, description: description, dags: dags}
+	after := &dagsAfterImage{client: houstonClient, workspace: ws, deployment: deploymentID, path: config.WorkingPath, imageName: imageName, description: description, dags: dags, inProject: inProject}
 	if err := deployDagsAfterImage(after, opts, &result); err != nil {
 		return err
 	}
@@ -290,6 +301,9 @@ type dagsAfterImage struct {
 	// dags is where the Deployment takes its DAGs from, as the image deploy
 	// found it.
 	dags deploy.DagsFrom
+	// inProject is whether the deploy ran at a pyproject.toml project's
+	// root, whose dags directory follows the image.
+	inProject bool
 }
 
 // deployDagsAfterImage uploads the working directory's DAGs to a Deployment
@@ -310,7 +324,7 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 		// deploy did not place is uploaded to as a deploy always has, and
 		// DagsOnlyDeploy's refusals decide.
 	}
-	if !project.HasManifest(a.path) {
+	if !a.inProject {
 		// No project here: the working directory's dags/ belongs to no
 		// project this deploy knows, so the image ships alone, and an
 		// upload that a Deployment taking them would want is said not to

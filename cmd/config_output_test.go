@@ -137,6 +137,10 @@ func (s *CmdSuite) TestConfigListOutput() {
 		for key := range unlistedConfigs {
 			s.NotContains(keys, key)
 		}
+		// What get and set refuse is not listed either, so list and get agree.
+		for key := range removedConfigKeys {
+			s.NotContains(keys, key)
+		}
 		s.NotContains(stdout, "t0ken-value")
 	})
 

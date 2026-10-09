@@ -31,6 +31,8 @@ func execDeployCmd(args ...string) error {
 // that did not happen exits non-zero, with no usage block under it. It used to
 // print a note and return nil: exit 0. --force deploys anyway.
 func (s *Suite) TestDeployRefusesUncommittedChanges() {
+	// A project deploy: the gate is for what it reads from the checkout.
+	inProject(s.T(), true)
 	appConfig = &houston.AppConfig{}
 	prev := hasUncommittedChanges
 	hasUncommittedChanges = func(string) bool { return true }

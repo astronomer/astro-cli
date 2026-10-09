@@ -52,7 +52,6 @@ const (
 	errDeployDagsPathRemoved   = "--dags-path was removed in Astro CLI v2: astro deploy --dags ships the project's dags directory, so run it from the project"
 	errDeployBundleNameRemoved = "--dag-bundle-name was removed in Astro CLI v2: deploying to a named DAG bundle is not supported yet. Use Astro CLI 1.x for it"
 	errDeployNameRemoved       = "--deployment-name was removed in Astro CLI v2: name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
-	errDeployPromptRemoved     = "--prompt was removed in Astro CLI v2: astro deploy asks which Deployment to deploy to whenever you name none, as the argument or with --deployment"
 	errAPCDeployNoCache        = "--no-cache was removed in Astro CLI v2: Astro CLI v2 builds no image for Astro Private Cloud. " +
 		"Build and deploy the project with Astro CLI 1.x"
 )
@@ -133,8 +132,6 @@ var removedFlags = []removedFlag{
 	{name: "dag-bundle-name", under: []string{"deploy"}, msg: errDeployBundleNameRemoved},
 	{name: "deployment-name", under: []string{"deploy"}, msg: errDeployNameRemoved},
 	{name: "no-cache", under: []string{"deploy"}, msg: errAPCDeployNoCache},
-	// Astro deploy has no use for --prompt now; APC deploy still has it.
-	{name: "prompt", under: []string{"deploy"}, msg: errDeployPromptRemoved},
 }
 
 // removedFlagErr is a run refused for passing a removed 1.x flag.

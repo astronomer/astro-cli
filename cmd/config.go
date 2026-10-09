@@ -285,7 +285,8 @@ func configSet(cmd *cobra.Command, args []string) error {
 func configList(r cliout.Renderer) error {
 	list := configSettings{Settings: []configSetting{}}
 	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
-		if unlistedConfigs[key] {
+		// The removed keys too: get and set refuse them, so list agrees.
+		if _, removed := removedConfigKeys[key]; unlistedConfigs[key] || removed {
 			continue
 		}
 		cfg := config.CFGStrMap[key]

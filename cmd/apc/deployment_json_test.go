@@ -996,7 +996,7 @@ func TestDeployDagsNoDagsDirectoryJSON(t *testing.T) {
 	toUpload.Dags = deploy.DagsFromUpload
 	dir := inProject(t, false)
 	for _, args := range [][]string{
-		{"deploy", "dep-ac", "--dags", "--image-name", "img:1", "-o", "json"},
+		{"deploy", "dep-ac", "--dags", "-o", "json"},
 		{"deploy", "dep-ac", "--dags"},
 	} {
 		deployMocks(t, toUpload, nil)
@@ -1018,7 +1018,7 @@ func TestDeployDagsNoDagsDirectoryJSON(t *testing.T) {
 	} {
 		deployMocks(t, toUpload, nil)
 		realDagsOnlyDeploy(t)
-		run := runAPC(t, tc.api, "", "deploy", "dep-ac", "--dags", "--image-name", "img:1", "-o", "json")
+		run := runAPC(t, tc.api, "", "deploy", "dep-ac", "--dags", "-o", "json")
 		assert.NotEqual(t, 0, run.code, tc.name)
 		require.ErrorIs(t, run.err, tc.want, tc.name)
 		assert.NotErrorIs(t, run.err, deploy.ErrNoDagsDirectory, tc.name)

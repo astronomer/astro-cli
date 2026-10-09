@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -61,14 +60,12 @@ func newRemoteDeployCmd() *cobra.Command {
 			// outside any project it pushes the image as it is. The value,
 			// not whether the flag was given: an empty --image-name= names
 			// no image.
-			if project.HasManifest(config.WorkingPath) {
-				return nil
-			}
-			if remoteImageName != "" && utils.Locate(config.WorkingPath) == (utils.Where{}) {
+			where := utils.Locate(config.WorkingPath)
+			if where.AtRoot(config.WorkingPath) || (remoteImageName != "" && where.None()) {
 				return nil
 			}
 			cmd.SilenceUsage = true
-			return utils.NoDeployableProject(utils.Deploy1xRefusedAstro)
+			return utils.NoDeployableProject(where, utils.Deploy1xRefusedAstro)
 		},
 		RunE:    remoteDeploy,
 		Example: remoteDeployExample,

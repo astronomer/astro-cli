@@ -141,13 +141,14 @@ func TestDeployImageNameOutsideAProject(t *testing.T) {
 			assert.Equal(t, "img:1", fake.imgInput.ImageName)
 			assert.False(t, fake.imgInput.IncludeDags, "no DAGs ship from outside a project")
 			assert.Contains(t, out, `"type":"image-only"`)
-			warning := fmt.Sprintf(warningDagsNotUpdated, actionDeploymentID, actionDeploymentID)
+			// With DAG deploys the Deployment keeps its DAGs; without, it
+			// runs whatever DAGs the image carries.
+			warning := fmt.Sprintf(warningDagsInImage, actionDeploymentID, "img:1")
 			if dagDeploy {
-				assert.Contains(t, out, `"warnings":["`+warning+`"]`)
-				assert.Contains(t, out, "warning: "+warning)
-			} else {
-				assert.NotContains(t, out, "warning")
+				warning = fmt.Sprintf(warningDagsNotUpdated, actionDeploymentID, actionDeploymentID)
 			}
+			assert.Contains(t, out, `"warnings":["`+warning+`"]`)
+			assert.Contains(t, out, "warning: "+warning)
 		})
 	}
 
@@ -227,19 +228,21 @@ func TestDeployRefusesFlagsThatCannotAllApply(t *testing.T) {
 // The flags only the 1.x deploy read are gone from the command: a run that
 // passes one fails as an unknown flag here, and the root's removed-flags
 // registry names what replaced it (cmd's TestRemovedFlagsSayWhatReplacedThem).
-// --force stays, hidden and read by nothing, because astronomer/deploy-action
-// passes it.
+// --force and --prompt stay, hidden and read by nothing: astronomer/deploy-action
+// passes --force, and a pyproject.toml project's deploy always took both.
 func TestDeployDropsThe1xOnlyFlags(t *testing.T) {
 	cmd := NewDeployCmd()
-	for _, name := range []string{"save", "pytest", "parse", "test", "env", "dags-path", "dag-bundle-name", "deployment-name", "prompt"} {
+	for _, name := range []string{"save", "pytest", "parse", "test", "env", "dags-path", "dag-bundle-name", "deployment-name"} {
 		assert.Nil(t, cmd.Flags().Lookup(name), "--%s", name)
 	}
-	for _, letter := range []string{"s", "t", "e", "n", "p"} {
+	for _, letter := range []string{"s", "t", "e", "n"} {
 		assert.Nil(t, cmd.Flags().ShorthandLookup(letter), "-%s", letter)
 	}
-	force := cmd.Flags().Lookup("force")
-	require.NotNil(t, force)
-	assert.True(t, force.Hidden)
+	for _, name := range []string{"force", "prompt"} {
+		f := cmd.Flags().Lookup(name)
+		require.NotNil(t, f, name)
+		assert.True(t, f.Hidden, name)
+	}
 }
 
 type NonDagsDeploySuite struct {
@@ -331,14 +334,23 @@ func (s *NonDagsDeploySuite) TestProvidedDeploymentId() {
 	assert.Equal(s.T(), s.tmpWorkingDir, captured.BundlePath)
 }
 
+// A bundle path in or below a project, by the walk every deploy decides by,
+// is refused: a 1.x project's Dockerfile beside .astro (with no
+// .astro/config.yaml), and a pyproject.toml project.
 func (s *NonDagsDeploySuite) TestWithinAstroProject() {
-	projectDir, cleanup, err := config.CreateTempProject()
-	assert.NoError(s.T(), err)
-	defer cleanup()
+	oneX := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(oneX, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	s.Require().NoError(os.MkdirAll(filepath.Join(oneX, ".astro"), 0o755))
+	manifestDir := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(manifestDir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	s.Require().NoError(os.MkdirAll(filepath.Join(manifestDir, "include", "dbt"), 0o755))
 
-	err = testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt", "--non-dags-local-path", projectDir)
-	assert.Error(s.T(), err)
-	assert.Contains(s.T(), err.Error(), "within an Astro project")
+	for _, bundle := range []string{oneX, filepath.Join(manifestDir, "include", "dbt")} {
+		resetDeployFlagVars()
+		err := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-bundle-type", "dbt", "--non-dags-local-path", bundle)
+		s.Require().Error(err, bundle)
+		s.Contains(err.Error(), "within an Astro project", bundle)
+	}
 }
 
 func (s *NonDagsDeploySuite) TestBundlePathDoesNotExist() {

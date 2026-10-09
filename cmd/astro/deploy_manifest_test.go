@@ -770,12 +770,13 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 	assert.Contains(t, err.Error(), "--deployment")
 }
 
-// --force is accepted and read by nothing: there is no uncommitted-changes
-// gate for it to open, and astronomer/deploy-action passes it on every deploy.
-// The run gets as far as asking for --deployment, as one without it does.
-// (--prompt is gone: deploy always asks; cmd's removed-flag tests cover it.)
-func TestDeployAcceptsForceOnAManifestProject(t *testing.T) {
-	for _, flag := range []string{"--force", "-f"} {
+// --force and --prompt are accepted and read by nothing: there is no
+// uncommitted-changes gate for --force to open (and astronomer/deploy-action
+// passes it on every deploy), and the deploy always asks, which is what
+// --prompt requested. The run gets as far as asking for --deployment, as one
+// without them does.
+func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
+	for _, flag := range []string{"--force", "-f", "--prompt", "-p"} {
 		t.Run(flag, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
@@ -1022,6 +1023,46 @@ func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 			assert.IsType(t, &astrov1.ClientWithResponses{}, picked.client)
 		})
 	}
+}
+
+// --non-dags from a project deploys under the project's host as the project's
+// deploy does, a link and a bare Deployment id alike; outside a project a
+// bare id goes under the current context.
+func TestDeployNonDagsUsesTheManifestDomainsLogin(t *testing.T) {
+	for _, args := range [][]string{{"test"}, {"--deployment", "clx-bare"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			setupDeployOnStage(t, manifestOnProd)
+			logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+			var captured *astrodeploy.DeployBundleInput
+			prev := DeployBundle
+			t.Cleanup(func() { DeployBundle = prev })
+			DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+				captured = in
+				return astrodeploy.BundleDeploy{}, nil
+			}
+
+			_, err := execDeployCapture(append(args, "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", t.TempDir())...)
+			require.NoError(t, err)
+			require.NotNil(t, captured.Login, "deployed under the project's host")
+			assert.Equal(t, "astronomer.io", captured.Login.Domain)
+			assert.Equal(t, "prod-org", captured.Login.Organization)
+		})
+	}
+
+	t.Run("outside a project", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		require.NoError(t, os.Remove(filepath.Join(config.WorkingPath, "pyproject.toml")))
+		var captured *astrodeploy.DeployBundleInput
+		prev := DeployBundle
+		t.Cleanup(func() { DeployBundle = prev })
+		DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+			captured = in
+			return astrodeploy.BundleDeploy{}, nil
+		}
+		_, err := execDeployCapture("--deployment", "clx-bare", "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", t.TempDir())
+		require.NoError(t, err)
+		assert.Nil(t, captured.Login, "the current context")
+	})
 }
 
 // ASTRO_API_TOKEN outranks the stored login, and goes out with its scheme like

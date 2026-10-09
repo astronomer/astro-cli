@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
@@ -72,30 +74,39 @@ type Where struct {
 	Project1xDir string
 }
 
+// AtRoot reports whether the walk from dir found a pyproject.toml project at
+// dir itself: the deploy runs at the project's root.
+func (w Where) AtRoot(dir string) bool {
+	return w.ManifestDir != "" && sameDir(w.ManifestDir, dir)
+}
+
+// None reports whether the walk found no project at all.
+func (w Where) None() bool { return w == Where{} }
+
 // Locate walks up from dir to the nearest project, the one rule astro
-// deploy, astro remote deploy and APC's deploy decide by. At each directory:
+// deploy, astro remote deploy and APC's deploy decide by, their routing
+// included. At each directory:
 //
-//   - a pyproject.toml with a [tool.astro] table is a project's root (one
-//     that fails to validate too: it is a project to fix, and the deploy
-//     reports why). A pyproject.toml without one, a monorepo root's tool
-//     settings say, does not stop the walk;
-//   - else a Dockerfile beside a .astro directory is a 1.x project
-//     (project.Is1xProject), except in the home directory, whose .astro
-//     holds the global config;
+//   - a pyproject.toml project's root (IsManifestRoot) stops the walk. A
+//     pyproject.toml declaring no tool.astro table, a monorepo root's tool
+//     settings say, does not;
+//   - else a Dockerfile beside a .astro directory is a 1.x project, except
+//     in the home directory, whose .astro holds the global config;
 //   - else the walk goes on up.
 //
-// A directory it cannot read counts as holding neither, so an unreadable
-// ancestor does not fail a deploy that never needed it.
+// Each directory's pyproject.toml is read once.
 func Locate(dir string) Where {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return Where{}
 	}
 	for d := abs; ; {
-		if isManifestRoot(d) {
+		if IsManifestRoot(d) {
 			return Where{ManifestDir: d}
 		}
-		if !config.IsHomeDir(d) && project.Is1xProject(d) {
+		// Not a manifest root, so the 1.x layout alone decides: no second
+		// read of the pyproject.toml (project.Is1xProject would make one).
+		if !config.IsHomeDir(d) && has1xLayout(d) {
 			return Where{Project1xDir: d}
 		}
 		parent := filepath.Dir(d)
@@ -106,24 +117,59 @@ func Locate(dir string) Where {
 	}
 }
 
-// isManifestRoot reports whether dir's pyproject.toml has a [tool.astro]
-// table. Unlike project.HasManifest, a pyproject.toml that cannot be read
-// is not one.
-func isManifestRoot(dir string) bool {
-	_, err := manifest.Load(filepath.Join(dir, project.Marker))
-	var pathErr *fs.PathError
+// has1xLayout reports whether dir holds a Dockerfile beside a .astro
+// directory. A directory that cannot be read holds neither.
+func has1xLayout(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, ".astro"))
+	return err == nil && info.IsDir()
+}
+
+// IsManifestRoot reports whether dir is a pyproject.toml project's root, the
+// question every deploy routes on:
+//
+//   - a pyproject.toml whose [tool.astro] loads, or fails to validate: a
+//     project to fix, and the deploy reports why;
+//   - one that fails to parse, only when its text declares a tool.astro
+//     table (a [tool.astro header, or a tool.astro key): otherwise it is
+//     some other tool's file, and not a project;
+//   - one that exists and cannot be read, as project.HasManifest has it: the
+//     deploy then reports the read error rather than walking past it.
+//
+// No pyproject.toml, one with no [tool.astro], and one in a directory that
+// cannot be looked in are not.
+func IsManifestRoot(dir string) bool {
+	path := filepath.Join(dir, project.Marker)
+	if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
+		// Not there, or a directory it cannot even look in: nothing at this
+		// level, and the walk goes on.
+		return false
+	}
+	_, err := manifest.Load(path)
 	switch {
 	case err == nil:
 		return true
-	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection), errors.As(err, &pathErr):
+	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection), errors.Is(err, fs.ErrNotExist):
 		return false
-	default:
-		return true
 	}
+	raw, readErr := os.ReadFile(path)
+	if readErr != nil {
+		// There, and unreadable.
+		return !errors.Is(readErr, fs.ErrNotExist)
+	}
+	return declaresToolAstro.Match(raw)
 }
 
+// declaresToolAstro matches a TOML line declaring the tool.astro table: a
+// [tool.astro] or [tool.astro.<sub>] header, an array-of-tables header under
+// it, or a dotted tool.astro key.
+var declaresToolAstro = regexp.MustCompile(`(?m)^\s*(\[\[?\s*"?tool"?\s*\.\s*"?astro"?\s*[\].]|"?tool"?\s*\.\s*"?astro"?\s*[.=])`)
+
 // NoDeployableProject is what a deploy says when the working directory is not
-// the root of a pyproject.toml project, by Locate's answer:
+// the root of a pyproject.toml project, from Locate's answer where (for the
+// working directory):
 //
 //   - in or below a project in the Astro CLI 1.x layout, refused1x, naming
 //     that project's directory when the deploy ran below it;
@@ -133,9 +179,8 @@ func isManifestRoot(dir string) bool {
 //
 // Every one of these is reported under the kind no_project: it unwraps to a
 // *project.NotFoundError.
-func NoDeployableProject(refused1x Refusal1x) error {
+func NoDeployableProject(where Where, refused1x Refusal1x) error {
 	wd := config.WorkingPath
-	where := Locate(wd)
 	switch {
 	case where.Project1xDir != "":
 		says, dir := "this project", ""
