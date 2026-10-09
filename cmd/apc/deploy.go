@@ -29,7 +29,7 @@ var (
 	// state of the checkout it runs in.
 	hasUncommittedChanges = git.HasUncommittedChanges
 
-	EnsureProjectDir                   = utils.EnsureProjectDir
+	EnsureProjectDir                   = utils.EnsureDockerfileProjectDir
 	DeployAirflowImage                 = deploy.Airflow
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
 	UpdateDeploymentImage              = deploy.UpdateDeploymentImage
