@@ -131,11 +131,11 @@ func assertRefusedFirst(t *testing.T, hits *atomic.Int32, want string, asJSON bo
 	assert.Contains(t, stderr, "Error: "+want)
 }
 
-// --json shipped in 1.x on every family's ls and describe. v2 replaced it with
-// -o json and tombstoned it: passing it is a usage error naming the
-// replacement, before anything is fetched, under -o json as the one error
-// object.
-func TestJSONFlagIsTombstoned(t *testing.T) {
+// A flag ls and describe do not have is refused the same way, under -o json
+// as the one error object. 1.x's --json is one, which the root's flag error
+// func reports by what replaced it (cmd's removedFlags); this package's tree
+// has no root, so it is cobra's message here.
+func TestUnknownFlagIsRefusedFirst(t *testing.T) {
 	url, hits := countingServer(t)
 	for _, family := range familiesAt(t, url) {
 		for _, sub := range [][]string{{"ls"}, {"describe", "listProviders"}} {
@@ -146,7 +146,7 @@ func TestJSONFlagIsTombstoned(t *testing.T) {
 					args = append(args, "-o", "json")
 				}
 				t.Run(strings.Join(args, " "), func(t *testing.T) {
-					assertRefusedFirst(t, hits, cliout.ErrJSONFlagRemoved, asJSON, args...)
+					assertRefusedFirst(t, hits, "unknown flag: --json", asJSON, args...)
 				})
 			}
 		}
@@ -168,8 +168,8 @@ func TestUnknownOutputFormatIsRefusedFirst(t *testing.T) {
 	}
 }
 
-// The tombstone is not offered: help names -o, not --json.
-func TestJSONFlagIsHiddenFromHelp(t *testing.T) {
+// ls and describe offer -o, not 1.x's --json.
+func TestLsAndDescribeOfferOutputNotJSON(t *testing.T) {
 	apiCmd := NewAPICmdWithOutput(new(bytes.Buffer))
 	for _, path := range [][]string{
 		{"airflow", "ls"},
@@ -181,8 +181,7 @@ func TestJSONFlagIsHiddenFromHelp(t *testing.T) {
 	} {
 		cmd, _, err := apiCmd.Find(path)
 		require.NoError(t, err)
-		require.NotNil(t, cmd.Flag("json"), "%v has no --json tombstone", path)
-		assert.True(t, cmd.Flag("json").Hidden, "%v shows --json", path)
+		assert.Nil(t, cmd.Flag("json"), "%v has a --json", path)
 		assert.NotContains(t, cmd.UsageString(), "--json", "%v", path)
 		assert.Contains(t, cmd.UsageString(), "-o, --output", "%v", path)
 	}

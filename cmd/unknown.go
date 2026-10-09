@@ -39,32 +39,51 @@ func trackUnknownCommand(root *cobra.Command, args []string) {
 	telemetry.TrackUnknownCommand(unknown.parent, unknown.word, unknown.suggestion())
 }
 
-// trackUnknownFlag records a flag the CLI does not have, then hands the error
-// back unchanged for cliout to mark as a usage error and report. Cobra parses
-// the flags before it runs the hook that tracks commands, so a wrong flag
-// sends nothing without this. The root sets it once: a command with no error
-// function of its own asks its parent for one, and cliout's (markUsageErrors,
-// AddOutputFlag) consults it.
-func trackUnknownFlag(cmd *cobra.Command, err error) error {
-	if flag := unknownFlag(err); flag != "" {
-		telemetry.TrackUnknownFlag(cmd, flag)
+// flagError is the root's flag error func. The root sets it once: a command
+// with no error function of its own asks its parent for one, and cliout's
+// (markUsageErrors, AddOutputFlag) consults it. It records a flag the CLI does
+// not have, then reports a removed 1.x flag by what replaced it
+// (removedFlagError). Any other error goes back unchanged, for cliout to mark
+// as a usage error and report.
+func flagError(cmd *cobra.Command, err error) error {
+	err = trackUnknownFlag(cmd, err)
+	if removed := removedFlagError(cmd, err); removed != nil {
+		return removed
 	}
 	return err
 }
 
-// unknownFlag returns the flag as it was typed when pflag has no such flag, and
-// "" for every other parse error: a missing value, or a value of the wrong
-// type, is a mistake on a flag we do have. pflag reports the name on its own,
-// so `--api-token=secret` arrives here as `--api-token`.
-func unknownFlag(err error) string {
+// trackUnknownFlag records a flag the CLI does not have, then hands the error
+// back unchanged. Cobra parses the flags before it runs the hook that tracks
+// commands, so a wrong flag sends nothing without this. A removed 1.x flag is
+// recorded the same way: the event is what tells us when nobody passes one
+// any more, and its tombstone can go.
+func trackUnknownFlag(cmd *cobra.Command, err error) error {
+	if _, _, spelling := unknownFlag(err); spelling != "" {
+		recordUnknownFlag(cmd, spelling)
+	}
+	return err
+}
+
+// recordUnknownFlag sends the event; a test swaps it to see what was sent.
+var recordUnknownFlag = telemetry.TrackUnknownFlag
+
+// unknownFlag reports the flag pflag has no such flag for: its name as typed
+// (a shorthand's letter alone), whether it was a shorthand, and its spelling
+// ("--force", "-f"). The spelling is "" for every other parse error: a
+// missing value, or a value of the wrong type, is a mistake on a flag we do
+// have. pflag reports the name on its own, so `--api-token=secret` arrives
+// here as `--api-token`.
+func unknownFlag(err error) (name string, isShorthand bool, spelling string) {
 	var notExist *pflag.NotExistError
 	if !errors.As(err, &notExist) {
-		return ""
+		return "", false, ""
 	}
+	name = notExist.GetSpecifiedName()
 	if notExist.GetSpecifiedShortnames() != "" {
-		return "-" + notExist.GetSpecifiedName()
+		return name, true, "-" + name
 	}
-	return "--" + notExist.GetSpecifiedName()
+	return name, false, "--" + name
 }
 
 // isShellCompletion reports whether the shell is asking cobra for completions.

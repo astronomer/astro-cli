@@ -452,7 +452,6 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	cliout.AddOutputFlag(cmd, &deploymentListOutput)
-	cliout.AddRemovedFlag(cmd, "json", "", true, cliout.ErrJSONFlagRemoved)
 	return cmd
 }
 
@@ -536,7 +535,6 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&clusterID, "cluster-id", "c", "", "Cluster to create the Deployment in. Run \"astro organization cluster list\" to see your Organization's cluster IDs")
 	cmd.Flags().BoolVarP(&forceUpdate, "yes", "y", false, "Don't ask for confirmation, including after a warning about the Deployment's CI/CD enforcement")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
-	cliout.AddRemovedFlag(cmd, "deployment-file", "", false, errDeploymentFileRemoved)
 	return cmd
 }
 
@@ -583,7 +581,6 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
 		cmd.Flags().IntVarP(&updateSchedulerReplicas, "scheduler-replicas", "r", 0, "The number of Scheduler replicas for the Deployment")
 	}
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
-	cliout.AddRemovedFlag(cmd, "deployment-file", "", false, errDeploymentFileRemoved)
 	return cmd
 }
 

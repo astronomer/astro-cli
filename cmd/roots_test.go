@@ -89,6 +89,15 @@ func treesToExecute(t *testing.T) []treeUnderTest {
 	return trees
 }
 
+// treeConfig is one configuration a tree-wide test builds a tree for.
+type treeConfig struct {
+	name       string
+	platform   string
+	hosted     bool
+	apcVersion string
+	execute    bool
+}
+
 // treeConfigs is every configuration the tree-wide tests build, and what sets
 // each one up. Construction decides parts of the tree from the config file and
 // from Houston, not from rootOptions alone, so each configuration says what it
@@ -113,13 +122,7 @@ func treesToExecute(t *testing.T) []treeUnderTest {
 // Astro platform's. Only the trees marked execute match it: APC 1.0.0, built
 // last for that reason, and non-hosted Astro. Executing another would run it
 // against a different version's or context's state than it was built for.
-var treeConfigs = []struct {
-	name       string
-	platform   string
-	hosted     bool
-	apcVersion string
-	execute    bool
-}{
+var treeConfigs = []treeConfig{
 	{name: "astro", platform: cloudPlatform, execute: true},
 	{name: "astro hosted", platform: cloudPlatform, hosted: true},
 	{name: "apc " + newestAPCVersion, platform: apcPlatform, apcVersion: newestAPCVersion},
@@ -141,37 +144,45 @@ func rootsUnderTest(t *testing.T) []treeUnderTest {
 	t.Helper()
 	trees := make([]treeUnderTest, 0, len(treeConfigs))
 	for _, c := range treeConfigs {
-		// An Astro tree builds no APC commands, so its Houston version is
-		// never read; 1.0.0 is what these stubs have always answered.
-		houstonClient := stubHoustonAt(t, cmp.Or(c.apcVersion, "1.0.0"))
-		if c.platform == apcPlatform {
-			testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-		} else {
-			testUtil.InitTestConfig(testUtil.CloudPlatform)
-		}
-		if c.hosted {
-			ctx, err := context.GetCurrentContext()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := ctx.SetContextKey("organization_product", "HOSTED"); err != nil {
-				t.Fatal(err)
-			}
-		}
-		trees = append(trees, treeUnderTest{
-			name:     c.name,
-			platform: c.platform,
-			execute:  c.execute,
-			root: newRootCmd(rootOptions{
-				platform:      c.platform,
-				loggedIn:      true,
-				houstonClient: houstonClient,
-				out:           new(bytes.Buffer),
-			}),
-		})
+		trees = append(trees, buildTree(t, c))
 	}
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	return trees
+}
+
+// buildTree sets up c's config and builds its tree. A test that runs a tree
+// it builds this way can run it against that tree's own state, whichever
+// configuration c is, as long as it builds no other tree in between.
+func buildTree(t *testing.T, c treeConfig) treeUnderTest {
+	t.Helper()
+	// An Astro tree builds no APC commands, so its Houston version is
+	// never read; 1.0.0 is what these stubs have always answered.
+	houstonClient := stubHoustonAt(t, cmp.Or(c.apcVersion, "1.0.0"))
+	if c.platform == apcPlatform {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	} else {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+	}
+	if c.hosted {
+		ctx, err := context.GetCurrentContext()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := ctx.SetContextKey("organization_product", "HOSTED"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return treeUnderTest{
+		name:     c.name,
+		platform: c.platform,
+		execute:  c.execute,
+		root: newRootCmd(rootOptions{
+			platform:      c.platform,
+			loggedIn:      true,
+			houstonClient: houstonClient,
+			out:           new(bytes.Buffer),
+		}),
+	}
 }
 
 // treeNamed is the tree rootsUnderTest built for the configuration called name.

@@ -47,7 +47,6 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "Print only this key of the configuration, such as configuration.cluster_id")
 	cmd.Flags().BoolVarP(&cleanOutput, "clean-output", "c", false, "Print only the Deployment's YAML or JSON, with no other output")
 	cmd.Flags().BoolVarP(&showWorkloadIdentity, "show-workload-identity", "", false, "Include the workload identity configured for the deployment in the output")
-	cliout.AddRemovedFlag(cmd, "template", "t", true, errTemplateRemoved)
 	return cmd
 }
 

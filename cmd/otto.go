@@ -6,15 +6,27 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/otto"
 )
 
+// hasHelpFlag reports whether args ask for help with a word of their own
+// before the "--" that ends flags: -h or --help, bare or set true
+// (`--help=true`, `-h=true`), as pflag reads them.
 func hasHelpFlag(args []string) bool {
 	for _, a := range args {
-		if a == "--help" || a == "-h" {
+		if a == "--" {
+			return false
+		}
+		name, value, hasValue := strings.Cut(a, "=")
+		if name != "--help" && name != "-h" {
+			continue
+		}
+		if on, err := strconv.ParseBool(value); !hasValue || (err == nil && on) {
 			return true
 		}
 	}
