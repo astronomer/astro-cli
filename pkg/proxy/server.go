@@ -96,6 +96,11 @@ type Proxy struct {
 	RenderLanding  func(w io.Writer, routes []LandingRoute)
 	RenderNotFound func(w io.Writer, hostname, port string)
 
+	// Pages is the copy on the built-in pages that differs between hosts: the
+	// proxy's name and how to start a project. The zero value is the CLI's. Set
+	// it before calling Start.
+	Pages Pages
+
 	// FallbackPort is the port Start tries when the configured one is taken,
 	// before it asks the OS for any free port. Empty skips it. Set it before
 	// calling Start.
@@ -463,7 +468,8 @@ func (p *Proxy) landingPage(w http.ResponseWriter) {
 		p.RenderLanding(bodyOnly(w), listed)
 		return
 	}
-	if err := landingTmpl.Execute(w, landingData{Routes: listed}); err != nil {
+	data := landingData{Title: p.Pages.title(), Pages: p.Pages, Routes: listed}
+	if err := pageTmpl.ExecuteTemplate(w, landingPageName, data); err != nil {
 		slog.Debug("landing page template", "error", err)
 	}
 }
@@ -477,7 +483,8 @@ func (p *Proxy) notFoundPage(w http.ResponseWriter, hostname string) {
 		p.RenderNotFound(bodyOnly(w), hostname, p.Port())
 		return
 	}
-	if err := notFoundTmpl.Execute(w, notFoundData{
+	if err := pageTmpl.ExecuteTemplate(w, notFoundPageName, notFoundData{
+		Pages:    p.Pages,
 		Hostname: hostname,
 		Port:     p.Port(),
 	}); err != nil {

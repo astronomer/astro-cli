@@ -1,12 +1,50 @@
 <!DOCTYPE html>
-<html><head><title>Not Found</title>
+<html lang="en"><head>
+{{template "head" "Project not found"}}
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 50px auto; padding: 0 20px; color: #333; }
-h1 { color: #cc3300; }
-code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
-a { color: #0066cc; }
-</style></head><body>
-<h1>Project Not Found</h1>
-<p>No project is registered for hostname <code>{{.Hostname}}</code>.</p>
-<p>Check <a href="http://localhost:{{.Port}}">active projects</a> or start one with <code>astro local start</code>.</p>
+/* One moon has slipped its orbit and is drifting off. */
+.orbit .moon.adrift {
+  animation: drift 6s ease-in infinite;
+}
+@keyframes drift {
+  0%   { transform: rotate(-30deg) translateX(calc(var(--size) / 2)) rotate(30deg); opacity: 1; }
+  35%  { transform: rotate(40deg) translateX(calc(var(--size) / 2)) rotate(-40deg); opacity: 1; }
+  100% { transform: translate(180px, 60px); opacity: 0; }
+}
+.actions { margin-top: 28px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow);
+}
+.btn:hover { text-decoration: none; filter: brightness(1.06); }
+.hint { margin-top: 24px; font-size: 13px; color: var(--faint); }
+</style>
+</head><body>
+{{template "sky"}}
+<main class="page">
+  <div class="center">
+    <div class="orbit" aria-hidden="true">
+      <div class="ring ring-1"></div>
+      <div class="ring ring-2"></div>
+      <div class="ring ring-3"></div>
+      <div class="planet"></div>
+      <div class="moon adrift"></div>
+      <div class="moon moon-2"></div>
+    </div>
+    <p class="eyebrow">404 · Lost in space</p>
+    <h1>Project Not Found</h1>
+    <p class="lede">Nothing is in orbit at <code>{{.Hostname}}</code>.</p>
+    <p class="lede">The project may have stopped, or it may be running under another name.</p>
+    <div class="actions">
+      <a class="btn" href="http://localhost:{{.Port}}">See active projects</a>
+    </div>
+    <p class="hint">{{template "start-hint" .Pages}}</p>
+  </div>
+</main>
 </body></html>
