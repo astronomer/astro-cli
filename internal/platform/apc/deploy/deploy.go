@@ -85,6 +85,51 @@ type Deployed struct {
 	Image string
 	// URL is the Deployment's Airflow UI, "" when Houston gives none.
 	URL string
+	// Dags is where the Deployment takes its DAGs from, read from the
+	// Deployment and the cluster config the deploy fetched.
+	Dags DagsFrom
+}
+
+// DagsFrom is where a Deployment takes its DAGs from, as far as a deploy is
+// concerned: what a DAG upload after the image push would do to it.
+type DagsFrom int
+
+const (
+	// DagsFromElsewhere is a git-sync or volume Deployment, or one this CLI
+	// cannot place: a DAG upload is refused, and the image does not decide
+	// the DAGs either.
+	DagsFromElsewhere DagsFrom = iota
+	// DagsFromImage is a Deployment that runs the DAGs inside its image: DAG
+	// deployment type image, or no type on a cluster that takes no DAG-only
+	// deploys. The image just deployed is all the DAGs it has.
+	DagsFromImage
+	// DagsFromUpload is a Deployment that takes DAG-only deploys: an upload
+	// replaces its DAGs, and an empty one leaves it none.
+	DagsFromUpload
+)
+
+// isImageDagDeployment reports whether the Deployment's DAG deployment type
+// is image. Every check of that type goes through here.
+func isImageDagDeployment(deploymentInfo *houston.Deployment) bool {
+	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType
+}
+
+// dagsFrom places a Deployment's DAGs from the Deployment and its merged
+// cluster config, by the same tests DagsOnlyDeploy refuses on. A Deployment
+// with no type on a cluster that takes no DAG-only deploys runs its image's
+// DAGs; one with no type on a cluster that does is DagsFromElsewhere, as
+// DagsOnlyDeploy's refusal has always left it.
+func dagsFrom(deploymentInfo *houston.Deployment, appConfig *houston.AppConfig) DagsFrom {
+	clusterTakesDagOnly := isDagOnlyDeploymentEnabled(appConfig)
+	switch {
+	case isImageDagDeployment(deploymentInfo):
+		return DagsFromImage
+	case !clusterTakesDagOnly && deploymentInfo != nil && deploymentInfo.DagDeployment.Type == "":
+		return DagsFromImage
+	case clusterTakesDagOnly && isDagOnlyDeploymentEnabledForDeployment(deploymentInfo):
+		return DagsFromUpload
+	}
+	return DagsFromElsewhere
 }
 
 // Options is what a deploy's caller decides about its output and its
@@ -157,7 +202,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	// isImageOnlyDeploy is not valid for image-based deployments since image-based deployments inherently mean that the image itself contains dags.
 	// If we deploy only the image, the deployment will not have any dags for image-based deployments.
 	// Even on astro, image-based deployments are not allowed to be deployed with --image flag.
-	if isImageOnlyDeploy && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType {
+	if isImageOnlyDeploy && isImageDagDeployment(deploymentInfo) {
 		return Deployed{DeploymentID: deploymentID}, ErrDeploymentTypeIncorrectForImageOnly
 	}
 	// We don't need to exclude the dags from the image because the dags present in the image are not respected anyways for non-image based deployments
@@ -173,7 +218,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 	deploymentLink := getAirflowUILink(deploymentID, deploymentInfo.Urls)
 	fmt.Fprintf(opts.progress(), "Successfully pushed Docker image to the APC registry, it can take a few minutes to update the deployment with the new image. Navigate to the APC UI to confirm the state of your deployment (%s).\n", deploymentLink)
 
-	return Deployed{DeploymentID: deploymentID, Image: pushed, URL: deploymentLink}, nil
+	return Deployed{DeploymentID: deploymentID, Image: pushed, URL: deploymentLink, Dags: dagsFrom(deploymentInfo, appConfig)}, nil
 }
 
 // Find deployment ID in deployments slice
@@ -239,29 +284,48 @@ func validateRuntimeVersion(houstonClient houston.ClientInterface, tag string, d
 	return nil
 }
 
-func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, opts Options) (string, error) {
+// UpdateDeploymentImage points a Deployment at an image already in a
+// registry (--image-name --remote) and returns what it deployed. Its
+// DeploymentID is set on a failed update too.
+func UpdateDeploymentImage(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, opts Options) (Deployed, error) {
 	if runtimeVersion == "" {
-		return "", ErrRuntimeVersionNotPassedForRemoteImage
+		return Deployed{}, ErrRuntimeVersionNotPassedForRemoteImage
 	}
-	deploymentID, _, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
+	deploymentID, deployments, err := getDeploymentIDForCurrentCommandVar(houstonClient, wsID, deploymentID, deploymentID == "")
 	if err != nil {
-		return "", err
+		return Deployed{}, err
 	}
 	if deploymentID == "" {
-		return "", errInvalidDeploymentID
+		return Deployed{}, errInvalidDeploymentID
 	}
 	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
-		return "", fmt.Errorf("failed to get deployment info: %w", err)
+		return Deployed{}, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 	fmt.Fprintln(opts.progress(), "Skipping building the image since --image-name flag is used...")
 	req := houston.UpdateDeploymentImageRequest{ReleaseName: deploymentInfo.ReleaseName, Image: imageName, AirflowVersion: "", RuntimeVersion: runtimeVersion}
 	// It used to say the image was updated whether or not it was.
 	if _, err = houston.Call(houstonClient.UpdateDeploymentImage)(req); err != nil {
-		return deploymentID, err
+		return Deployed{DeploymentID: deploymentID}, err
 	}
 	fmt.Fprintln(opts.progress(), "Image successfully updated")
-	return deploymentID, nil
+	return Deployed{DeploymentID: deploymentID, Image: imageName, Dags: remoteDagsFrom(houstonClient, wsID, deploymentID, deployments, deploymentInfo)}, nil
+}
+
+// remoteDagsFrom places the DAGs of a Deployment whose image was just
+// updated. The update has happened, so failing to read the cluster config
+// does not fail it: the Deployment's own type is then all there is to go on.
+func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID string, deployments []houston.Deployment, deploymentInfo *houston.Deployment) DagsFrom {
+	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
+	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
+	if err != nil {
+		logger.Debugf("could not read the cluster config to place the Deployment's DAGs: %s", err.Error())
+		if isImageDagDeployment(deploymentInfo) {
+			return DagsFromImage
+		}
+		return DagsFromElsewhere
+	}
+	return dagsFrom(deploymentInfo, appConfig)
 }
 
 func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string, opts Options) (string, error) {
@@ -524,26 +588,6 @@ func errDagOnlyDeployDisabledAtCluster(appConfig *houston.AppConfig) error {
 	return ErrDagOnlyDeployDisabledInConfigLegacy
 }
 
-// DagsInImageError is DagsOnlyDeploy refusing a Deployment whose DAGs come
-// from its image (DAG deployment type image), rather than from a DAG upload,
-// git-sync or a volume. It reads as the refusal it wraps, which errors.Is
-// still finds, so a caller that only needs to know DAG-only deploy was refused
-// sees no difference. A caller that pushed an image it did not build looks
-// for it: that Deployment now runs only the DAGs the image carries.
-type DagsInImageError struct{ Err error }
-
-func (e DagsInImageError) Error() string { return e.Err.Error() }
-func (e DagsInImageError) Unwrap() error { return e.Err }
-
-// refusedDagOnly marks a DAG-only refusal as a DagsInImageError when the
-// Deployment takes its DAGs from its image.
-func refusedDagOnly(deploymentInfo *houston.Deployment, err error) error {
-	if deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.ImageDeploymentType {
-		return DagsInImageError{Err: err}
-	}
-	return err
-}
-
 func isDagOnlyDeploymentEnabledForDeployment(deploymentInfo *houston.Deployment) bool {
 	return deploymentInfo != nil && deploymentInfo.DagDeployment.Type == houston.DagOnlyDeploymentType
 }
@@ -613,10 +657,10 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 	// Throw error if the feature is disabled at Houston level
 	if !isDagOnlyDeploymentEnabled(appConfig) {
-		return deploymentID, refusedDagOnly(deploymentInfo, errDagOnlyDeployDisabledAtCluster(appConfig))
+		return deploymentID, errDagOnlyDeployDisabledAtCluster(appConfig)
 	}
 	if !isDagOnlyDeploymentEnabledForDeployment(deploymentInfo) {
-		return deploymentID, refusedDagOnly(deploymentInfo, ErrDagOnlyDeployNotEnabledForDeployment)
+		return deploymentID, ErrDagOnlyDeployNotEnabledForDeployment
 	}
 
 	uploadURL := ""

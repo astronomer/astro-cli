@@ -539,6 +539,9 @@ func (s *Suite) TestAirflowSuccess() {
 	s.Equal("test-deployment-id", deployed.DeploymentID)
 	s.Equal("https://deployments.local.astronomer.io/testDeploymentName/airflow", deployed.URL)
 	s.True(strings.HasPrefix(deployed.Image, "registry.local.astronomer.io/"), "the image pushed to the Deployment's registry: %q", deployed.Image)
+	// No DAG deployment type, on a cluster with no DAG-only deploys: the
+	// image carries the DAGs.
+	s.Equal(DagsFromImage, deployed.Dags)
 }
 
 func (s *Suite) TestAirflowSuccessForBYORegistry() {
@@ -839,41 +842,7 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 		s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
 		_, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description, Options{})
 		s.ErrorIs(err, ErrDagOnlyDeployNotEnabledForDeployment)
-		// A volume Deployment gets its DAGs from the volume, not its image.
-		s.False(errors.As(err, new(DagsInImageError)))
 	})
-
-	// An image Deployment's refusal says its DAGs come from its image, whether
-	// the Deployment or the cluster refuses, and still reads as the refusal.
-	for _, tc := range []struct {
-		name    string
-		enabled bool
-		want    error
-	}{
-		{"at the deployment level", true, ErrDagOnlyDeployNotEnabledForDeployment},
-		{"at the cluster level", false, ErrDagOnlyDeployDisabledInConfig},
-	} {
-		s.Run("When DAG-only deploy is refused "+tc.name+" for an image Deployment", func() {
-			getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
-				return deploymentID, nil, nil
-			}
-			appConfig := &houston.AppConfig{
-				Version: "2.0.0",
-				Flags:   houston.FeatureFlags{DagOnlyDeployment: tc.enabled},
-			}
-			deployment := &houston.Deployment{
-				DagDeployment: houston.DagDeploymentConfig{Type: houston.ImageDeploymentType},
-				ClusterID:     "test-cluster-id",
-				ID:            deploymentID,
-			}
-			s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
-			s.houstonMock.On("GetAppConfig", mock.Anything).Return(appConfig, nil).Once()
-			_, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, config.WorkingPath, nil, false, description, Options{})
-			s.ErrorIs(err, tc.want)
-			s.True(errors.As(err, new(DagsInImageError)))
-			s.Equal(tc.want.Error(), err.Error())
-		})
-	}
 
 	s.Run("Valid Houston config, but unable to get context from astro-cli config", func() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
@@ -1311,18 +1280,18 @@ func (s *Suite) TestUpdateDeploymentImage() {
 	releaseName := "releaseName"
 
 	s.Run("When runtimeVersion is empty", func() {
-		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, "", imageName, Options{})
+		deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, "", imageName, Options{})
 		s.ErrorIs(err, ErrRuntimeVersionNotPassedForRemoteImage)
-		s.Equal(returnedDeploymentID, "")
+		s.Equal("", deployed.DeploymentID)
 	})
 
 	s.Run("When getDeploymentIDForCurrentCommandVar gives an error", func() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, errDeploymentNotFound
 		}
-		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
+		deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
 		s.ErrorIs(err, errDeploymentNotFound)
-		s.Equal(returnedDeploymentID, "")
+		s.Equal("", deployed.DeploymentID)
 	})
 
 	s.Run("When an error occurs in the GetDeployment api call", func() {
@@ -1331,9 +1300,9 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		}
 		s.houstonMock.On("GetDeployment", deploymentID).Return(nil, errMockHouston).Once()
 
-		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
+		deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
 		s.ErrorContains(err, "failed to get deployment info: some houston error")
-		s.Equal(returnedDeploymentID, "")
+		s.Equal("", deployed.DeploymentID)
 	})
 
 	s.Run("Houston API call throws error", func() {
@@ -1345,13 +1314,13 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		}
 		s.houstonMock.On("GetDeployment", deploymentID).Return(deployment, nil).Once()
 		s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(nil, errMockHouston).Once()
-		var returnedDeploymentID string
+		var deployed Deployed
 		var err error
 		printed := stdoutOf(s, func() {
-			returnedDeploymentID, err = UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
+			deployed, err = UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
 		})
 		s.ErrorContains(err, "some houston error")
-		s.Equal(returnedDeploymentID, deploymentID)
+		s.Equal(deploymentID, deployed.DeploymentID)
 		s.NotContains(printed, "Image successfully updated", "a failed update is not reported as a success")
 	})
 
@@ -1368,10 +1337,75 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		}
 		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(updateDeploymentImageResp, nil).Once()
-		returnedDeploymentID, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
+		s.houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{DagOnlyDeployment: true}}, nil).Once()
+		deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
 		s.ErrorIs(err, nil)
-		s.Equal(returnedDeploymentID, deploymentID)
+		s.Equal(Deployed{DeploymentID: deploymentID, Image: imageName, Dags: DagsFromElsewhere}, deployed)
 	})
+
+	// The update has happened by the time the cluster config is read, so a
+	// failure to read it does not fail the deploy: the Deployment's own type
+	// places its DAGs.
+	s.Run("A cluster config that cannot be read leaves the Deployment's own type", func() {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		for typ, want := range map[string]DagsFrom{houston.ImageDeploymentType: DagsFromImage, "": DagsFromElsewhere, houston.DagOnlyDeploymentType: DagsFromElsewhere} {
+			deployment := &houston.Deployment{ReleaseName: releaseName, DagDeployment: houston.DagDeploymentConfig{Type: typ}}
+			s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+			s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(&houston.UpdateDeploymentImageResp{}, nil).Once()
+			s.houstonMock.On("GetAppConfig", mock.Anything).Return(nil, errMockHouston).Once()
+			deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
+			s.NoError(err, typ)
+			s.Equal(want, deployed.Dags, "type %q", typ)
+		}
+	})
+
+	s.Run("Places the DAGs of the Deployment it updated", func() {
+		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
+			return deploymentID, nil, nil
+		}
+		deployment := &houston.Deployment{ReleaseName: releaseName, ClusterID: "test-cluster-id", DagDeployment: houston.DagDeploymentConfig{Type: houston.ImageDeploymentType}}
+		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
+		s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(&houston.UpdateDeploymentImageResp{}, nil).Once()
+		s.houstonMock.On("GetAppConfig", houston.GetAppConfigRequest{ClusterID: "test-cluster-id", WorkspaceUUID: wsID, DeploymentUUID: deploymentID}).Return(&houston.AppConfig{}, nil).Once()
+		deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
+		s.NoError(err)
+		s.Equal(DagsFromImage, deployed.Dags)
+	})
+}
+
+// dagsFrom places a Deployment's DAGs by the tests DagsOnlyDeploy refuses on.
+func TestDagsFrom(t *testing.T) {
+	enabled := &houston.AppConfig{Flags: houston.FeatureFlags{DagOnlyDeployment: true}}
+	disabled := &houston.AppConfig{}
+	for _, tc := range []struct {
+		name      string
+		typ       string
+		appConfig *houston.AppConfig
+		want      DagsFrom
+	}{
+		{"an image Deployment", houston.ImageDeploymentType, enabled, DagsFromImage},
+		{"an image Deployment on a cluster without DAG-only deploys", houston.ImageDeploymentType, disabled, DagsFromImage},
+		{"a DAG-only Deployment", houston.DagOnlyDeploymentType, enabled, DagsFromUpload},
+		// The cluster refuses the upload, so it is not one.
+		{"a DAG-only Deployment on a cluster without DAG-only deploys", houston.DagOnlyDeploymentType, disabled, DagsFromElsewhere},
+		{"a git-sync Deployment", houston.GitSyncDeploymentType, enabled, DagsFromElsewhere},
+		{"a volume Deployment", houston.VolumeDeploymentType, disabled, DagsFromElsewhere},
+		// No type where the cluster has no DAG-only deploys: the image is
+		// the only place DAGs can come from.
+		{"no type on a cluster without DAG-only deploys", "", disabled, DagsFromImage},
+		{"no type and no cluster config", "", nil, DagsFromImage},
+		// No type where the cluster has them is a Deployment-level refusal,
+		// which has always been left alone.
+		{"no type on a cluster with DAG-only deploys", "", enabled, DagsFromElsewhere},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			info := &houston.Deployment{DagDeployment: houston.DagDeploymentConfig{Type: tc.typ}}
+			assert.Equal(t, tc.want, dagsFrom(info, tc.appConfig))
+		})
+	}
+	assert.Equal(t, DagsFromElsewhere, dagsFrom(nil, enabled), "no Deployment")
 }
 
 // stdoutOf runs fn and returns what it printed on os.Stdout.
