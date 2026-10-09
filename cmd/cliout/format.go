@@ -147,6 +147,21 @@ func OnBadFormat(cmd *cobra.Command, explain func(value string, refused error) e
 	v.explain = explain
 }
 
+// Formats is what cmd's --output takes, text and json first, or nil when cmd
+// has no --output registered with AddOutputFlag (`astro deploy`'s is a plain
+// string). It reads the flag cmd inherits too, as a run of cmd would.
+func Formats(cmd *cobra.Command) []Format {
+	f := cmd.Flag("output")
+	if f == nil {
+		return nil
+	}
+	v, ok := f.Value.(*formatValue)
+	if !ok {
+		return nil
+	}
+	return append([]Format{FormatText, FormatJSON}, v.extras...)
+}
+
 // refusedFormat is a value an --output flag refused, and why.
 type refusedFormat struct {
 	flag  *formatValue

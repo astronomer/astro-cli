@@ -190,22 +190,6 @@ func TestOrganizationClusterList(t *testing.T) {
 }
 
 func TestOrganizationSwitch(t *testing.T) {
-	// A switch has not re-authenticated since 2023, so --login-link had
-	// nothing to print a link for. It is a tombstone: a usage error (exit 2)
-	// that says why, refused before the API is asked anything, so the client
-	// mocks nothing.
-	t.Run("login-link was removed", func(t *testing.T) {
-		for _, flag := range []string{"--login-link", "-l"} {
-			r := execAstroCmd(t, new(astrov1_mocks.ClientWithResponsesInterface), "", newOrganizationCmd, "organization", "switch", "my-org", flag)
-			require.Error(t, r.err, flag)
-			assert.Equal(t, cliout.ExitUsage, r.code, flag)
-			assert.True(t, strings.HasPrefix(r.err.Error(), "--login-link was removed in Astro CLI v2: switching organizations no longer re-authenticates"), "%s: %s", flag, r.err)
-		}
-		r := execAstroCmd(t, new(astrov1_mocks.ClientWithResponsesInterface), "", newOrganizationCmd, "organization", "switch", "--help")
-		require.NoError(t, r.err)
-		assert.NotContains(t, r.stdout, "login-link")
-	})
-
 	t.Run("workspace flag triggers wsSwitch with provided id", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 

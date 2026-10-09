@@ -194,6 +194,22 @@ The cloud kinds come from the status on the `*httputil.StatusError` that every A
 
 A failure with no kind publishes no `kind` key rather than an `unknown` catch-all. A kind is added only when the CLI can recognise the failure reliably (a sentinel it wraps, a type it can assert, or a status on one), never for a failure nothing emits. Changing a kind breaks whatever reads it.
 
+### Removed 1.x commands and flags
+
+A script written for Astro CLI 1.x is told what replaced what it typed rather than only that it is unknown. Either way the failure is a usage error: exit 2, and the `usage` error object under `--output json`.
+
+A removed command stays in the tree as a hidden stub that fails naming its replacement: `astro dev` ([`cmd/local/dev.go`](../cmd/local/dev.go)), `astro run`, `astro deployment airflow-variable|connection|pool`, and `astro env … create|update`.
+
+A removed flag is not registered on any command. It is an entry in `removedFlags` in [`cmd/removed_flags.go`](../cmd/removed_flags.go), keyed by the flag's name and shorthand, with its message. The root's flag error func (`flagError` in [`cmd/unknown.go`](../cmd/unknown.go)) consults the registry when cobra reports a flag the invoked command does not have. It records the flag in telemetry like any unknown flag, and returns the message of the first entry that applies there. This happens while flags parse, so it fails before any pre-run logs in or asks an API anything. A command that still has a flag of that name never reaches it.
+
+An entry applies to every command where the flag is unknown, not only to those that had it in 1.x, so its message has to be true on each of them:
+
+- `needs` limits it to commands that have the replacement: `--force` maps to `--yes` only where a command has `--yes`;
+- `under` limits it to a command and everything below it: `--api-url` only under `astro api airflow`;
+- where one name had different replacements, the narrower entry comes first.
+
+To remove a flag, delete it and add an entry. `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` fails on any flag in [`cmd/testdata/v1_flags.tsv`](../cmd/testdata/v1_flags.tsv), the 1.x inventory, that v2 neither has nor reports. `TestRemovedFlagsSayWhatReplacedThem` needs a case for every entry. The entries go in v3, once the unknown-flag events show nobody still passes them.
+
 ## Help
 
 Every `--help` page is drawn by one renderer, [`cmd/help.go`](../cmd/help.go), which the root installs with `SetHelpFunc` and `SetUsageFunc` and every command inherits. It wraps prose and flag descriptions to the terminal (at most 100 columns, 80 when piped), lists each command with its aliases, and puts examples after the flags they use. It shows the current context only on commands that run the platform pre-run, so not on the offline core tree. A command does not set a template of its own: the inherited func would ignore it. A section a command needs belongs in the renderer instead, as flag groups do. Annotate a flag with `group` to list it under `<Group> Flags:`, and set `flag-groups` on the command to order those sections (`astro deploy` does both).

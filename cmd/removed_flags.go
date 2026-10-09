@@ -1,132 +1,198 @@
 package cmd
 
 import (
+	"errors"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
+// terraformProviderURL is where Deployments as code live now that the CLI no
+// longer reads deployment files.
+const terraformProviderURL = "https://registry.terraform.io/providers/astronomer/astro/latest"
+
+// What a run passing a removed 1.x flag is told. Each one starts with the
+// flag's own spelling and "was removed in Astro CLI v2", which
+// TestRemovedFlagsSayWhatReplacedThem holds them to.
 const (
-	errForceFlagRemoved    = "--force was removed in Astro CLI v2: use --yes (-y)"
+	errJSONFlagRemoved     = "--json was removed in Astro CLI v2: use -o json"
 	errTemplateFlagRemoved = "--template was removed in Astro CLI v2: use -o json, and a JSON tool such as jq to pick fields"
-	errFormatFlagRemoved   = "--format was removed in Astro CLI v2: use -o (--output)"
 	errAPIURLFlagRemoved   = "--api-url was removed in Astro CLI v2: use --url"
 	errDeploymentIDAPIFlag = "--deployment-id was removed in Astro CLI v2: use --deployment (-d), which takes a Deployment id or a link name from pyproject.toml"
+
+	errDeploymentFileRemoved = "--deployment-file was removed in Astro CLI v2. " +
+		"To manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL + ". " +
+		"To copy a Deployment, use `astro deployment create --clone <deployment> --name <new name>`"
+	errInspectTemplateRemoved = "--template was removed in Astro CLI v2. " +
+		"To copy a Deployment, use `astro deployment create --clone <deployment> --name <new name>`. " +
+		"To manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL
+	// A switch has not logged in again since 2023, so there is no login to
+	// link to.
+	errLoginLinkRemoved = "--login-link was removed in Astro CLI v2: switching organizations no longer re-authenticates. " +
+		"To log in on another device, use `astro login --login-link`"
 )
 
-// removedV1Flag is a 1.x flag that a v2 command dropped, without a hidden
-// alias and without a tombstone of its own next to the command.
-type removedV1Flag struct {
-	path      string // the command, without the leading "astro"
+// removedFlag is a flag Astro CLI 1.x had and v2 dropped, and what a run
+// passing it is told instead of cobra's bare "unknown flag".
+type removedFlag struct {
 	name      string
 	shorthand string
-	isBool    bool
-	msg       string
+	// under limits the entry to these commands and everything below them,
+	// each a command path without the root's name ("api airflow"). Empty
+	// means any command.
+	under []string
+	// needs reports whether what msg tells the user to use exists on cmd, so
+	// that the message is true on every command it reaches, the ones that
+	// never had the flag included. nil means msg is true anywhere under.
+	needs func(cmd *cobra.Command) bool
+	msg   func(cmd *cobra.Command) string
 }
 
-// removedV1Flags lists them in one place so a 1.x script that passes one is
-// told what replaced it instead of cobra's bare "unknown flag". The 1.x `list`
-// commands shared --json, --template and -o table|json|template (pkg/output's
-// AddFlags); --force became --yes everywhere a command asks first; the env
-// commands' --format became -o. A path the current tree does not mount (the
-// cloud tree for an APC context, or the other way around) is skipped, and
-// TestRemovedV1FlagsResolve keeps every entry pointing at a real command.
-// Delete them in v3.
-var removedV1Flags = func() []removedV1Flag {
-	var flags []removedV1Flag
-	for _, path := range []string{
-		"context delete",
-		"deployment create",
-		"deployment delete",
-		"deployment update",
-		"deployment hibernate",
-		"deployment wake-up",
-		"deployment token delete",
-		"deployment token rotate",
-		"deployment worker-queue delete",
-		"deployment worker-queue update",
-		"organization team delete",
-		"organization team update",
-		"organization team user add",
-		"organization team user remove",
-		"organization token delete",
-		"organization token rotate",
-		"workspace token delete",
-		"workspace token rotate",
-	} {
-		flags = append(flags, removedV1Flag{path: path, name: "force", shorthand: "f", isBool: true, msg: errForceFlagRemoved})
-	}
-	lists := []string{
-		"deployment bundle list",
-		"deployment team list",
-		"deployment user list",
-		"organization list",
-		"organization team list",
-		"organization user list",
-		"workspace list",
-		"workspace team list",
-		"workspace user list",
-	}
-	for _, path := range lists {
-		flags = append(flags, removedV1Flag{path: path, name: "json", isBool: true, msg: cliout.ErrJSONFlagRemoved})
-	}
-	// `deployment list` already tombstones --json itself
-	for _, path := range append([]string{"deployment list"}, lists...) {
-		flags = append(flags, removedV1Flag{path: path, name: "template", msg: errTemplateFlagRemoved})
-	}
-	for _, path := range []string{
-		"env airflow-variable get",
-		"env airflow-variable list",
-		"env connection get",
-		"env connection list",
-		"env metrics-export get",
-		"env metrics-export list",
-		"env variable get",
-		"env variable list",
-		"env variable link list",
-	} {
-		flags = append(flags, removedV1Flag{path: path, name: "format", msg: errFormatFlagRemoved})
-	}
-	return append(flags,
-		removedV1Flag{path: "api airflow", name: "api-url", msg: errAPIURLFlagRemoved},
-		removedV1Flag{path: "api airflow", name: "deployment-id", msg: errDeploymentIDAPIFlag},
-	)
-}()
+// removedFlags is every 1.x flag v2 removed without keeping a hidden alias,
+// in one place: the list is defined by 1.x rather than by any one command, so
+// it is reviewed against 1.x's tree (testdata/v1_flags.tsv) and deleted in v3
+// as one.
+//
+// It is consulted only when cobra reports a flag the invoked command does not
+// have (removedFlagError, from the root's flag error func), so a command that
+// still has a flag of the same name (`astro deploy --force`) is untouched, and
+// no command carries a hidden flag for it. An entry is keyed by the flag's
+// name and shorthand, not by the commands that had it: 1.x's --force became
+// --yes on every command that asks first, so the entry says so wherever a
+// command has --yes. Where one name had different replacements on different
+// commands, the narrower entry (with under) comes first, and the first entry
+// that applies wins.
+//
+// A future removal belongs here too: TestEveryV1FlagStillWorksOrSaysWhatReplacedIt
+// fails on a flag in testdata/v1_flags.tsv that the v2 tree neither has nor
+// reports here.
+var removedFlags = []removedFlag{
+	// Deployments as code moved to Terraform.
+	{
+		name: "deployment-file", under: []string{"deployment create", "deployment update"},
+		needs: treeCanClone, msg: says(errDeploymentFileRemoved),
+	},
+	{
+		name: "template", shorthand: "t", under: []string{"deployment inspect"},
+		needs: treeCanClone, msg: says(errInspectTemplateRemoved),
+	},
+	{
+		name: "login-link", shorthand: "l", under: []string{"organization switch"},
+		msg: says(errLoginLinkRemoved),
+	},
+	// `astro api airflow` names a Deployment and an Airflow the way every
+	// other command does. They were persistent flags in 1.x, so ls and
+	// describe took them too, and under covers every subcommand.
+	{name: "api-url", under: []string{"api airflow"}, needs: has("url"), msg: says(errAPIURLFlagRemoved)},
+	{name: "deployment-id", under: []string{"api airflow"}, needs: has("deployment"), msg: says(errDeploymentIDAPIFlag)},
+	// 1.x's list commands shared --json, --template and -o
+	// table|json|template (pkg/output's AddFlags), and api ls and describe
+	// had --json.
+	{name: "json", needs: offers(cliout.FormatJSON), msg: says(errJSONFlagRemoved)},
+	{name: "template", needs: offers(cliout.FormatJSON), msg: says(errTemplateFlagRemoved)},
+	// The env commands' --format took table, json and yaml (and dotenv on
+	// env variable): -o takes json and dotenv where they are offered.
+	{name: "format", needs: offers(cliout.FormatJSON), msg: formatRemoved},
+	// --force skipped the confirmation that --yes skips now.
+	{name: "force", shorthand: "f", needs: has("yes"), msg: forceRemoved},
+}
 
-// tombstoneRemovedV1Flags registers removedV1Flags on the commands of root's
-// tree that have them.
-func tombstoneRemovedV1Flags(root *cobra.Command) {
-	for _, f := range removedV1Flags {
-		c := findCommand(root, f.path)
-		if c == nil || c.Flags().Lookup(f.name) != nil {
+// removedFlagError is what a run is told when it passed a removed 1.x flag
+// that cmd does not have, or nil when err is not about one. It runs from the
+// root's flag error func (flagError), while cobra parses flags, so it fails
+// before any pre-run logs in or asks an API anything, and as a usage error
+// (exit 2), which Execute reports under --output json as the error object.
+func removedFlagError(cmd *cobra.Command, err error) error {
+	var notExist *pflag.NotExistError
+	if !errors.As(err, &notExist) {
+		return nil
+	}
+	isShorthand := notExist.GetSpecifiedShortnames() != ""
+	if f := findRemovedFlag(cmd, notExist.GetSpecifiedName(), isShorthand); f != nil {
+		return cliout.Usage(errors.New(f.msg(cmd)))
+	}
+	return nil
+}
+
+// findRemovedFlag returns the entry for the flag typed as name (a shorthand's
+// letter when isShorthand) that applies on cmd, or nil when none does.
+func findRemovedFlag(cmd *cobra.Command, name string, isShorthand bool) *removedFlag {
+	for i := range removedFlags {
+		f := &removedFlags[i]
+		typed := f.name
+		if isShorthand {
+			typed = f.shorthand
+		}
+		if typed == "" || typed != name {
 			continue
 		}
-		shorthand := f.shorthand
-		if shorthand != "" && (c.Flags().ShorthandLookup(shorthand) != nil || c.InheritedFlags().ShorthandLookup(shorthand) != nil) {
-			shorthand = ""
+		// `astro local stop -f`: stop still has --force, without the -f, so
+		// "--force was removed" would be false there.
+		if cmd.Flag(f.name) != nil {
+			continue
 		}
-		cliout.AddRemovedFlag(c, f.name, shorthand, f.isBool, f.msg)
+		if len(f.under) > 0 && !slices.ContainsFunc(f.under, func(path string) bool { return isUnder(cmd, path) }) {
+			continue
+		}
+		if f.needs != nil && !f.needs(cmd) {
+			continue
+		}
+		return f
 	}
+	return nil
 }
 
-// findCommand returns the command at path under root, or nil when root's
-// tree has none there.
-func findCommand(root *cobra.Command, path string) *cobra.Command {
-	c := root
-	for _, name := range strings.Fields(path) {
-		var next *cobra.Command
-		for _, sub := range c.Commands() {
-			if sub.Name() == name {
-				next = sub
-				break
-			}
-		}
-		if next == nil {
-			return nil
-		}
-		c = next
+// isUnder reports whether cmd is the command at path below its root, or one
+// of that command's subcommands, by cobra's own path for cmd.
+func isUnder(cmd *cobra.Command, path string) bool {
+	own := strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" ")
+	return own == path || strings.HasPrefix(own, path+" ")
+}
+
+func says(msg string) func(*cobra.Command) string {
+	return func(*cobra.Command) string { return msg }
+}
+
+func has(flag string) func(*cobra.Command) bool {
+	return func(cmd *cobra.Command) bool { return cmd.Flag(flag) != nil }
+}
+
+func offers(format cliout.Format) func(*cobra.Command) bool {
+	return func(cmd *cobra.Command) bool { return slices.Contains(cliout.Formats(cmd), format) }
+}
+
+// treeCanClone reports whether cmd's tree has `deployment create --clone`,
+// which the Deployments-as-code messages point to. APC's has none.
+func treeCanClone(cmd *cobra.Command) bool {
+	create, _, err := cmd.Root().Find([]string{"deployment", "create"})
+	return err == nil && create.Name() == "create" && create.Flag("clone") != nil
+}
+
+// forceRemoved names --yes with its shorthand when cmd gives it one.
+func forceRemoved(cmd *cobra.Command) string {
+	yes := "--yes"
+	if s := cmd.Flag("yes").Shorthand; s != "" {
+		yes += " (-" + s + ")"
 	}
-	return c
+	return "--force was removed in Astro CLI v2: use " + yes
+}
+
+// formatRemoved names the formats cmd's -o takes, which differ by command
+// (dotenv on `env variable get` and `list`), and says what became of yaml,
+// which 1.x's --format took everywhere.
+func formatRemoved(cmd *cobra.Command) string {
+	var names []string
+	for _, f := range cliout.Formats(cmd) {
+		names = append(names, string(f))
+	}
+	msg := "--format was removed in Astro CLI v2: use -o (--output), which takes " +
+		strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+	if !slices.Contains(names, "yaml") {
+		msg += "; there is no yaml, so use -o json"
+	}
+	return msg
 }
