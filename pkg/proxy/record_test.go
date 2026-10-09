@@ -15,7 +15,7 @@ func recordPath(t *testing.T) string {
 // bound, another process reads it back.
 func TestARecordSurvivesTheRoundTrip(t *testing.T) {
 	path := recordPath(t)
-	want := Record{PID: 4321, Version: "1.2.3", Port: "51234"}
+	want := Record{PID: 4321, Version: "1.2.3", Port: "51234", Protocol: 2}
 	if err := WriteRecord(path, want); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -63,6 +63,14 @@ func TestAShorterRecordYieldsWhatItHas(t *testing.T) {
 		{"pid only", "99", Record{PID: 99}},
 		{"pid and version", "99 1.0.0", Record{PID: 99, Version: "1.0.0"}},
 		{"trailing newline", "99 1.0.0 6563\n", Record{PID: 99, Version: "1.0.0", Port: "6563"}},
+		// The shape every daemon wrote before protocols: no fourth field, so
+		// protocol 0.
+		{"no protocol", "99 1.0.0 6563", Record{PID: 99, Version: "1.0.0", Port: "6563", Protocol: 0}},
+		{"with a protocol", "99 1.0.0 6563 3", Record{PID: 99, Version: "1.0.0", Port: "6563", Protocol: 3}},
+		// Unreadable reads as the oldest, so the daemon is replaced rather
+		// than trusted.
+		{"garbage protocol", "99 1.0.0 6563 x", Record{PID: 99, Version: "1.0.0", Port: "6563"}},
+		{"negative protocol", "99 1.0.0 6563 -2", Record{PID: 99, Version: "1.0.0", Port: "6563"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := recordPath(t)
@@ -145,6 +153,10 @@ func TestWriteRecordRefusesWhatReadRecordWould(t *testing.T) {
 		{"space in version", Record{PID: 1, Version: "1.0 rc1", Port: "6564"}},
 		{"space in port", Record{PID: 1, Version: "1.0", Port: "65 64"}},
 		{"newline in port", Record{PID: 1, Version: "1.0", Port: "6564\n"}},
+		// With no port, field three collapses and the protocol reads back as
+		// the port.
+		{"protocol without a port", Record{PID: 1, Version: "1.0", Protocol: 1}},
+		{"negative protocol", Record{PID: 1, Version: "1.0", Port: "6564", Protocol: -1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := recordPath(t)

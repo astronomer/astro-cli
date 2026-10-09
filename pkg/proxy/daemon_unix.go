@@ -15,8 +15,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	semver "github.com/Masterminds/semver/v3"
 )
 
 const (
@@ -56,9 +54,10 @@ func (d *Daemon) fallbackPath() string { return filepath.Join(d.Store.Dir(), dae
 // writeRecord publishes this daemon's record. See WriteRecord for the format.
 func (d *Daemon) writeRecord(pid int, port string) error {
 	return WriteRecord(d.RecordPath(), Record{
-		PID:     pid,
-		Version: d.Version,
-		Port:    port,
+		PID:      pid,
+		Version:  d.Version,
+		Port:     port,
+		Protocol: DaemonProtocol,
 	})
 }
 
@@ -133,9 +132,8 @@ func (d *Daemon) startProxy(port string) (*Proxy, error) {
 // EnsureRunning starts the daemon if it's not already running, and returns the
 // port it is actually listening on.
 //
-// If the running daemon was started by an older or unrelated version, it is
-// restarted to avoid incompatibilities with route file formats; one from a
-// newer release is kept, since it reads every field this one writes. Before a
+// A running daemon is reused when it speaks this DaemonProtocol or a newer
+// one, and replaced when it speaks an older one (see reusable). Before a
 // start, BeforeStart runs with the port about to be bound.
 func (d *Daemon) EnsureRunning(port string) (string, error) {
 	if port == "" {
@@ -151,25 +149,20 @@ func (d *Daemon) EnsureRunning(port string) (string, error) {
 	defer ReleaseLock(lockFile)
 
 	rec, err := d.readRecord()
-	pid, ver, bound := rec.PID, rec.Version, rec.Port
-	if err == nil && IsPIDAlive(pid) {
-		switch {
-		case ver == d.Version || d.Version == "" || isNewerVersion(ver, d.Version):
+	if err == nil && IsPIDAlive(rec.PID) {
+		if reusable(rec) {
 			// kill-0 only proves *some* process owns this PID. A SIGKILL'd
 			// daemon can leave a record whose PID an unrelated process later
-			// recycles — most likely on dev builds, where an empty version
-			// can't force the mismatch restart below. Confirm the process is
-			// actually our proxy before trusting the record.
-			if isProxyDaemon(d, pid, bound) {
-				d.logf("proxy daemon already running (PID %d)", pid)
-				if bound != "" {
-					return bound, nil
-				}
-				return port, nil // older daemon didn't record its port
+			// recycles. Confirm the process is actually our proxy before
+			// trusting the record.
+			if isProxyDaemon(d, rec.PID, rec.Port) {
+				d.logf("proxy daemon already running (PID %d, version %q)", rec.PID, rec.Version)
+				return rec.Port, nil
 			}
-			d.logf("PID %d is alive but is not the proxy daemon; treating the record as stale and restarting", pid)
-		default:
-			d.logf("proxy daemon version %q doesn't match %q, restarting", ver, d.Version)
+			d.logf("PID %d is alive but is not the proxy daemon; treating the record as stale and restarting", rec.PID)
+		} else {
+			d.logf("proxy daemon (PID %d, version %q) speaks protocol %d, older than %d; restarting",
+				rec.PID, rec.Version, rec.Protocol, DaemonProtocol)
 			d.Stop() //nolint:errcheck // Stop reports nothing a start could act on
 		}
 	}
@@ -183,24 +176,20 @@ func (d *Daemon) EnsureRunning(port string) (string, error) {
 	return d.Start(port)
 }
 
-// isNewerVersion reports whether recorded is a later release than current in
-// the same major version.
-// A version that is not semver, such as a SNAPSHOT build's, is never newer.
-func isNewerVersion(recorded, current string) bool {
-	r, err := semver.StrictNewVersion(strings.TrimPrefix(recorded, "v"))
-	if err != nil {
-		return false
-	}
-	c, err := semver.StrictNewVersion(strings.TrimPrefix(current, "v"))
-	if err != nil {
-		return false
-	}
-	return r.Major() == c.Major() && r.GreaterThan(c)
+// reusable reports whether a running daemon that wrote rec can serve for this
+// one: it speaks this DaemonProtocol or a newer one.
+//
+// Newer is kept, not replaced, because a newer protocol only ever adds to what
+// an older client relies on. Without that, two tools built at different times
+// (the desktop's bundled astro and an installed CLI) would each replace the
+// other's daemon on every start, dropping whatever it was serving.
+func reusable(rec Record) bool {
+	return rec.Protocol >= DaemonProtocol
 }
 
 // processLooksLikeProxy reports whether pid's command line looks like the
-// daemon, which runs with ServeArgs. It's the fallback for daemons that didn't
-// record a port.
+// daemon, which runs with ServeArgs. It's the fallback for when the recorded
+// port does not answer the signature probe in time.
 var processLooksLikeProxy = func(d *Daemon, pid int) bool {
 	if len(d.ServeArgs) == 0 {
 		return false
@@ -327,8 +316,8 @@ func (d *Daemon) Stop() error {
 	}
 
 	d.logf("stopping proxy daemon (PID %d)", pid)
-	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // waitForExit checks the outcome
-	waitForExit(pid)
+	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // the wait checks the outcome
+	waitForDaemonExit(pid)
 	d.removeFiles()
 	return nil
 }
@@ -372,9 +361,10 @@ func (d *Daemon) StopIfEmpty() {
 	waitForDaemonExit(pid)
 }
 
-// waitForDaemonExit is the seam the stop waits through, so a test can observe
+// waitForDaemonExit is the seam both stops wait through, so a test can observe
 // what is true while the wait is in flight — which for StopIfEmpty is the
-// claim, and is not visible from either side of the call.
+// claim, and is not visible from either side of the call — and so a test that
+// replaces a daemon does not wait out stopTimeout on a pid nothing owns.
 var waitForDaemonExit = waitForExit
 
 // claimForStop decides, under the routes lock, whether the daemon should go;

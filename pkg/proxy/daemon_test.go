@@ -447,31 +447,65 @@ func TestStartProxyRemembersItsFallbackPort(t *testing.T) {
 	assert.Equal(t, fallback, second.Port(), "the second start should reuse the port the first fell back to")
 }
 
-// Two builds side by side, say from two release channels, must not stop each
-// other's daemon: the older one adopts the newer one's.
-func TestEnsureRunningKeepsANewerDaemon(t *testing.T) {
-	d := newTestDaemon(t)
-	d.Version = "2.0.0"
-	require.NoError(t, os.MkdirAll(d.Store.Dir(), 0o755))
-	require.NoError(t, WriteRecord(d.RecordPath(), Record{PID: os.Getpid(), Version: "2.1.0", Port: "16123"}))
+// Whether a running daemon is reused is the protocol's to decide, and nothing
+// else's: not the version of the tool that started it.
+//
+// The record is written raw, the way each generation of daemon leaves it,
+// rather than through writeRecord, which only ever writes this protocol.
+func TestEnsureRunningReusesByProtocol(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		record    string
+		wantReuse bool
+	}{
+		{"the same protocol is reused", fmt.Sprintf("%%d SNAPSHOT-abc 16123 %d", DaemonProtocol), true},
+		{"a newer protocol is reused", fmt.Sprintf("%%d 2.0.0 16123 %d", DaemonProtocol+1), true},
+		{"an older protocol is replaced", fmt.Sprintf("%%d 9.9.9 16123 %d", DaemonProtocol-1), false},
+		// Every daemon from before protocols, whatever its version, including
+		// one newer than the tool asking: the version no longer decides.
+		{"a record from before protocols is replaced", "%d 9.9.9 16123", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newTestDaemon(t)
+			d.Version = "2.0.0"
 
-	swapIsProxy(t, func(*Daemon, int, string) bool { return true })
-	swapStart(t, func(*Daemon, string) (string, error) {
-		t.Fatal("a newer daemon must be adopted, not replaced")
-		return "", nil
-	})
+			// A pid nothing owns, reported alive: replacing the daemon signals
+			// it, and signaling this test's own pid would end the test.
+			const absentPID = 99999999
+			swapAlive(t, func(pid int) bool { return pid == absentPID })
+			writeRawRecord(t, d, fmt.Sprintf(tc.record, absentPID))
+			swapIsProxy(t, func(*Daemon, int, string) bool { return true })
+			orig := waitForDaemonExit
+			waitForDaemonExit = func(int) {}
+			t.Cleanup(func() { waitForDaemonExit = orig })
 
-	port, err := d.EnsureRunning("6563")
-	require.NoError(t, err)
-	assert.Equal(t, "16123", port)
+			var starts atomic.Int32
+			swapStart(t, func(d *Daemon, port string) (string, error) {
+				starts.Add(1)
+				return "17000", nil
+			})
+
+			port, err := d.EnsureRunning("6563")
+			require.NoError(t, err)
+			if tc.wantReuse {
+				assert.Equal(t, int32(0), starts.Load(), "a reusable daemon was replaced")
+				assert.Equal(t, "16123", port, "the reused daemon's own port")
+			} else {
+				assert.Equal(t, int32(1), starts.Load(), "an outdated daemon was kept")
+				assert.Equal(t, "17000", port, "the new daemon's port")
+			}
+		})
+	}
 }
 
-func TestIsNewerVersion(t *testing.T) {
-	assert.True(t, isNewerVersion("2.1.0", "2.0.0"))
-	assert.True(t, isNewerVersion("v2.0.1", "2.0.0"))
-	assert.False(t, isNewerVersion("2.0.0", "2.0.0"))
-	assert.False(t, isNewerVersion("1.45.0", "2.0.0"))
-	assert.False(t, isNewerVersion("3.0.0", "2.0.0"), "another major version is not adopted")
-	assert.False(t, isNewerVersion("SNAPSHOT-1da4950", "2.0.0"))
-	assert.False(t, isNewerVersion("2.1.0", "SNAPSHOT-1da4950"))
+// A daemon this package starts records the protocol it speaks, so the next
+// tool can decide by it.
+func TestAStartedDaemonRecordsItsProtocol(t *testing.T) {
+	d := newTestDaemon(t)
+	require.NoError(t, os.MkdirAll(d.Store.Dir(), 0o755))
+	require.NoError(t, d.writeRecord(os.Getpid(), "16123"))
+
+	rec, err := d.readRecord()
+	require.NoError(t, err)
+	assert.Equal(t, DaemonProtocol, rec.Protocol)
 }

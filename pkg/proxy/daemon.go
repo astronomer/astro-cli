@@ -7,6 +7,24 @@ const (
 	daemonLogName    = "proxy.log"
 )
 
+// DaemonProtocol is the version of the contract between the daemon and the
+// tools that start, adopt and stop it, recorded in the daemon's Record. A
+// running daemon is reused by a tool whose protocol is the same or older, and
+// replaced by one whose protocol is newer.
+//
+// It covers what a client relies on across processes: the routes.json schema,
+// the record's format, and any daemon behavior a client depends on (the
+// signature header, the files it writes, how it stops). Bump it when a change
+// to any of those would leave an older daemon serving a newer client wrongly.
+// Changes a client cannot observe do not bump it — the pages the daemon
+// renders, its logging, a fix that leaves those contracts as they were.
+//
+// It is deliberately not the host's version. Two tools built at different
+// times share one daemon — Astro Desktop's bundled astro and a user's own CLI
+// — and comparing their versions would have each replace the other's daemon
+// on every start. Protocol 0 is any daemon from before this field existed.
+const DaemonProtocol = 1
+
 // Daemon is the proxy run as a background process of its own: one per route
 // store, started by whichever tool needs it first and adopted by the rest.
 //
@@ -27,8 +45,8 @@ type Daemon struct {
 	Exe       string
 	ServeArgs []string
 
-	// Version is the host's version, written into the record for whoever reads
-	// it next. It does not decide reuse; DaemonProtocol does.
+	// Version is the host's version, written into the record for diagnostics.
+	// It does not decide reuse; DaemonProtocol does.
 	Version string
 
 	// BeforeStart runs under the routes lock just before a start, with the
