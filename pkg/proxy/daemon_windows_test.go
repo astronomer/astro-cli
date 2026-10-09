@@ -63,7 +63,7 @@ func TestServeStopsWhenItsEventIsSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the stop event did not exist once the port file did: %v", err)
 	}
-	defer windows.CloseHandle(ev) //nolint:errcheck // a test handle
+	defer windows.CloseHandle(ev)
 	if err := windows.SetEvent(ev); err != nil {
 		t.Fatal(err)
 	}
@@ -88,9 +88,15 @@ const (
 
 func TestMain(m *testing.M) {
 	if dir := os.Getenv(helperServeEnv); dir != "" {
-		// Spawned by Daemon.Start as <exe> serve --port <port>.
+		// Spawned by Daemon.Start as <exe> serve --port <port>. The port is
+		// parsed as the number it is rather than passed through as a raw
+		// argument, which gosec traces into the files Serve writes.
+		port, err := strconv.Atoi(os.Args[len(os.Args)-1])
+		if err != nil {
+			os.Exit(1)
+		}
 		d := &Daemon{Store: NewStore(dir)}
-		if err := d.Serve(os.Args[len(os.Args)-1]); err != nil {
+		if err := d.Serve(strconv.Itoa(port)); err != nil {
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -151,7 +157,7 @@ func TestRequestStopLeavesAProcessWithNoEvent(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { cmd.Process.Kill() }) //nolint:errcheck // test cleanup
+	t.Cleanup(func() { cmd.Process.Kill() })
 	pid := cmd.Process.Pid
 
 	if requestStop(pid) {
@@ -164,6 +170,6 @@ func TestRequestStopLeavesAProcessWithNoEvent(t *testing.T) {
 }
 
 func readLog(d *Daemon) string {
-	b, _ := os.ReadFile(d.LogPath()) //nolint:errcheck // diagnostics only
+	b, _ := os.ReadFile(d.LogPath())
 	return string(b)
 }

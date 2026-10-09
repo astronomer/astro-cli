@@ -44,7 +44,8 @@ func startDetached(build func() *exec.Cmd) (*exec.Cmd, error) {
 	}
 	cmd = build()
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: detachedFlags}
-	return cmd, cmd.Start()
+	err = cmd.Start()
+	return cmd, err
 }
 
 // stopEventName is the named event a daemon with this pid waits on to stop.
@@ -63,7 +64,7 @@ func stopEventName(pid int) string { return fmt.Sprintf(`Local\astro-proxy-stop-
 //
 // The event is created before Serve writes the port file, since a record can
 // name this process from then on and a stop has to have somewhere to land.
-func stopRequests() (<-chan struct{}, func(), error) {
+func stopRequests() (stop <-chan struct{}, release func(), err error) {
 	name, err := windows.UTF16PtrFromString(stopEventName(os.Getpid()))
 	if err != nil {
 		return nil, nil, err
@@ -76,9 +77,9 @@ func stopRequests() (<-chan struct{}, func(), error) {
 		return nil, nil, fmt.Errorf("creating the stop event: %w", err)
 	}
 
-	stop := make(chan struct{})
+	done := make(chan struct{})
 	var once sync.Once
-	fire := func() { once.Do(func() { close(stop) }) }
+	fire := func() { once.Do(func() { close(done) }) }
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
@@ -102,7 +103,7 @@ func stopRequests() (<-chan struct{}, func(), error) {
 		mu.Unlock()
 	}()
 
-	release := func() {
+	release = func() {
 		signal.Stop(sigCh)
 		mu.Lock()
 		if !closed {
@@ -110,7 +111,7 @@ func stopRequests() (<-chan struct{}, func(), error) {
 		}
 		mu.Unlock()
 	}
-	return stop, release, nil
+	return done, release, nil
 }
 
 // requestStop asks the daemon at pid to stop by setting its stop event, and
@@ -136,7 +137,7 @@ var requestStop = func(pid int) bool {
 // killProcess ends pid without asking. It is only reached for a daemon that
 // took its stop event and did not exit within stopTimeout.
 var killProcess = func(pid int) {
-	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, uint32(pid)) //nolint:gosec // a pid from our own record
+	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, uint32(pid))
 	if err != nil {
 		return
 	}

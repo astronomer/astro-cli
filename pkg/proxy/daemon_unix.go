@@ -19,7 +19,8 @@ func startDetached(build func() *exec.Cmd) (*exec.Cmd, error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	return cmd, cmd.Start()
+	err := cmd.Start()
+	return cmd, err
 }
 
 // requestStop asks the daemon at pid to stop by sending it SIGTERM. It always
@@ -38,15 +39,15 @@ var killProcess = func(pid int) {
 // stopRequests returns a channel that is closed when the daemon is asked to
 // stop: SIGTERM from requestStop, or SIGINT from a terminal running it in the
 // foreground. The func it returns stops listening.
-func stopRequests() (<-chan struct{}, func(), error) {
+func stopRequests() (stop <-chan struct{}, release func(), err error) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
-	stop := make(chan struct{})
+	done := make(chan struct{})
 	go func() {
 		<-sigCh
-		close(stop)
+		close(done)
 	}()
-	return stop, func() { signal.Stop(sigCh) }, nil
+	return done, func() { signal.Stop(sigCh) }, nil
 }
 
 // processLooksLikeProxy reports whether pid's command line looks like the
