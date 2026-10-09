@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,8 +73,9 @@ func TestPagesEscapeWhatTheyPrint(t *testing.T) {
 // local projects someone has open.
 func TestPagesAreSelfContained(t *testing.T) {
 	pages := map[string]any{
-		landingPageName:  landingData{Title: "t", Routes: []LandingRoute{{Name: "p", URL: "http://p.localhost:1", Port: "2"}}},
-		notFoundPageName: notFoundData{Hostname: "h.localhost", Port: "1"},
+		landingPageName:     landingData{Title: "t", Routes: []LandingRoute{{Name: "p", URL: "http://p.localhost:1", Port: "2"}}},
+		notFoundPageName:    notFoundData{Hostname: "h.localhost", Port: "1"},
+		unavailablePageName: nil,
 	}
 	for name, data := range pages {
 		var b strings.Builder
@@ -82,4 +84,65 @@ func TestPagesAreSelfContained(t *testing.T) {
 			assert.NotContains(t, b.String(), ref, "%s loads something from outside", name)
 		}
 	}
+}
+
+// With no ErrorHandler, a browser opening a project whose backend is down gets
+// the unavailable page rather than a line of text, still as a 502.
+func TestADeadBackendShowsABrowserTheUnavailablePage(t *testing.T) {
+	p := NewProxy("0", NewStore(t.TempDir()))
+	rp := p.getOrCreateProxy(refusedPort(t))
+
+	req := httptest.NewRequest(http.MethodGet, "http://x.localhost/", http.NoBody)
+	req.Header.Set("Accept", "text/html,application/xhtml+xml")
+	rec := httptest.NewRecorder()
+	rp.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Contains(t, rec.Header().Get("Content-Type"), "text/html")
+	assert.Contains(t, rec.Body.String(), "Preparing for launch")
+}
+
+// An API client gets the plain 502 it always did. af and Airflow's own fetches
+// read the status, and a page of HTML in the body is noise to them.
+func TestADeadBackendGivesAnAPIClientPlainText(t *testing.T) {
+	p := NewProxy("0", NewStore(t.TempDir()))
+	rp := p.getOrCreateProxy(refusedPort(t))
+
+	req := httptest.NewRequest(http.MethodGet, "http://x.localhost/api/v2/dags", http.NoBody)
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	rp.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Equal(t, "Backend unavailable\n", rec.Body.String())
+}
+
+// A failure in the proxy's own handling is not the project starting up, and the
+// page that says so would hide it. A running backend whose response a hook
+// rejects is the case that looks most like a dead one from the error handler.
+func TestAHookFailureIsNotCalledAStartingProject(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	t.Cleanup(backend.Close)
+	_, port, _ := strings.Cut(strings.TrimPrefix(backend.URL, "http://"), ":")
+
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.ModifyResponse = []func(*http.Response) error{func(*http.Response) error { return errors.New("hook failed") }}
+	rp := p.getOrCreateProxy(port)
+
+	req := httptest.NewRequest(http.MethodGet, "http://x.localhost/", http.NoBody)
+	req.Header.Set("Accept", "text/html")
+	rec := httptest.NewRecorder()
+	rp.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.NotContains(t, rec.Body.String(), "Preparing for launch")
+}
+
+func TestRenderUnavailable(t *testing.T) {
+	var b strings.Builder
+	require.NoError(t, RenderUnavailable(&b))
+	assert.Contains(t, b.String(), "Preparing for launch")
+	assert.Contains(t, b.String(), "window.location.reload", "the page brings itself back once the backend answers")
 }

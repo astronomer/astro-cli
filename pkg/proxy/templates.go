@@ -3,6 +3,7 @@ package proxy
 import (
 	"embed"
 	"html/template"
+	"io"
 )
 
 //go:embed templates/*.html
@@ -13,8 +14,9 @@ var templateFS embed.FS
 var pageTmpl = template.Must(template.ParseFS(templateFS, "templates/*.html"))
 
 const (
-	landingPageName  = "landing.html"
-	notFoundPageName = "notfound.html"
+	landingPageName     = "landing.html"
+	notFoundPageName    = "notfound.html"
+	unavailablePageName = "unavailable.html"
 
 	defaultTitle = "Astro Local Proxy"
 )
@@ -52,4 +54,13 @@ type notFoundData struct {
 	Pages    Pages
 	Hostname string
 	Port     string
+}
+
+// RenderUnavailable writes the page shown while a project's backend is not
+// answering. It polls the page's own URL and reloads once the backend is up.
+//
+// Exported for a host that serves Airflow outside this proxy, and so has its own
+// error path to put the page on: the desktop's iframe proxies.
+func RenderUnavailable(w io.Writer) error {
+	return pageTmpl.ExecuteTemplate(w, unavailablePageName, nil)
 }

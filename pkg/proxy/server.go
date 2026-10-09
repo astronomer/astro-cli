@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -66,7 +67,9 @@ type Proxy struct {
 	Transport func(backendPort string) http.RoundTripper
 
 	// ErrorHandler writes the response when a proxied request fails. Nil serves
-	// a plain 502. Set it before calling Start.
+	// a 502: the unavailable page to a browser navigating to a backend that is
+	// not answering, plain text otherwise (see defaultErrorHandler). Set it
+	// before calling Start.
 	//
 	// A host with somewhere better to send people wants this: the desktop
 	// serves a page explaining that the project is not running, which is a more
@@ -295,7 +298,7 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 			p.ErrorHandler(rw, req, proxyErr)
 			return
 		}
-		http.Error(rw, "Backend unavailable", http.StatusBadGateway)
+		defaultErrorHandler(rw, req, proxyErr)
 	}
 
 	p.mu.Lock()
@@ -490,4 +493,44 @@ func (p *Proxy) notFoundPage(w http.ResponseWriter, hostname string) {
 	}); err != nil {
 		slog.Debug("not found page template", "error", err)
 	}
+}
+
+// defaultErrorHandler answers a failed proxied request when the host has not
+// supplied an ErrorHandler. It is always a 502; what varies is the body.
+//
+// The unavailable page goes only to a browser navigation that could not reach
+// the backend, which is what someone opening a stopped or still-booting project
+// sees. An API client (af, curl, Airflow's own fetches) gets plain text, because
+// a page of HTML is noise to a program reading the status. A failure inside the
+// proxy's own handling gets plain text too: telling someone the project is
+// starting up when it is running fine hides the bug.
+func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	if !isBackendUnreachable(err) || !wantsHTML(r) {
+		http.Error(w, "Backend unavailable", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusBadGateway)
+	if renderErr := RenderUnavailable(w); renderErr != nil {
+		slog.Debug("unavailable page template", "error", renderErr)
+	}
+}
+
+// isBackendUnreachable reports whether err is the proxy failing to reach the
+// backend, as opposed to something going wrong in a ModifyResponse hook or in
+// httputil's own setup.
+//
+// A dial that is refused, times out, or finds nothing listening is the project
+// not running. An error a hook returned is not, however much it looks like one
+// from here.
+func isBackendUnreachable(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr)
+}
+
+// wantsHTML reports whether r is a browser navigation rather than an API call.
+// An empty Accept counts, since whoever sent no preference still reads the body.
+func wantsHTML(r *http.Request) bool {
+	accept := r.Header.Get("Accept")
+	return accept == "" || strings.Contains(accept, "text/html")
 }
