@@ -525,7 +525,9 @@ func (s *Suite) TestGetDeployment() {
 
 		deployment, err := api.GetDeployment("deployment-id")
 		s.NoError(err)
-		s.Equal(deployment, &mockDeployment.Data.GetDeployment)
+		want := mockDeployment.Data.GetDeployment
+		want.DagDeploymentRead = true
+		s.Equal(&want, deployment)
 	})
 
 	s.Run("error", func() {
@@ -964,14 +966,30 @@ func (s *Suite) TestGetDeploymentSelectsTheDesiredRuntimeVersionWhereServed() {
 	}
 }
 
-// GetDeployment reads a Deployment's DAG deployment type from 0.29.0 on, and
-// on a version it cannot read, whose query is the newest.
-func (s *Suite) TestDeploymentGetSelectsDagDeployment() {
-	for version, want := range map[string]bool{
+// GetDeployment says whether it read the Deployment's DAG deployment type,
+// by the query it chose on the platform version it holds: from 0.29.0 on,
+// and on a version it does not know, whose query is the newest. The type is
+// read where it was asked for, not where a version says it would be.
+func (s *Suite) TestGetDeploymentSaysWhetherItReadTheType() {
+	testUtil.InitTestConfig("software")
+	prev := version
+	defer func() { version = prev }()
+	for v, want := range map[string]bool{
 		"0.25.0": false, "0.28.9": false,
 		"0.29.0": true, "0.34.1": true, "1.0.0": true, "1.0.43": true, "2.1.0": true,
 		"": true, "not-a-version": true,
 	} {
-		s.Equal(want, DeploymentGetSelectsDagDeployment(version), version)
+		version = v
+		var asked string
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			body, err := io.ReadAll(req.Body)
+			s.NoError(err)
+			asked = string(body)
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewBufferString(`{"data":{"deployment":{"id":"d"}}}`)), Header: make(http.Header)}
+		})
+		deployment, err := NewClient(client).GetDeployment("d")
+		s.Require().NoError(err, v)
+		s.Equal(want, deployment.DagDeploymentRead, v)
+		s.Equal(want, strings.Contains(asked, "dagDeployment"), v)
 	}
 }

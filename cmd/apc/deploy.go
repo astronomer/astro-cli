@@ -70,6 +70,9 @@ const (
 	adviceRunFromProject = "To upload them, run the deploy from the project directory."
 	// adviceCreateDagsDir: the deploy ran from a project, which has none.
 	adviceCreateDagsDir = "To upload Dags, create a dags directory in the project."
+	// warningDagsUndecided: the image was deployed, and the cluster config
+	// that says whether the Deployment takes DAG uploads could not be read.
+	warningDagsUndecided = "no Dags were uploaded: whether this Deployment takes Dag uploads could not be read (%v). The image was deployed."
 )
 
 var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy <deployment-id> --force` to deploy anyway")
@@ -135,9 +138,10 @@ type deployJSON struct {
 	URL string `json:"url,omitempty"`
 	// Warnings are what the deploy warned about without failing, as text
 	// prints them (less the "Warning: " prefix): an --image-name image that
-	// is all an image Deployment's DAGs (not when show_warnings is off), or
-	// a DAG upload skipped for want of a dags directory (always, to a
-	// Deployment that takes DAG uploads).
+	// is all an image Deployment's DAGs, or a Deployment that could not be
+	// told to take DAG uploads (neither when show_warnings is off), or a DAG
+	// upload skipped for want of a dags directory (always, to a Deployment
+	// that takes DAG uploads).
 	Warnings []string `json:"warnings,omitempty"`
 }
 
@@ -184,7 +188,7 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	// The deploy's progress (its notes, the image push, the DAG upload) goes
 	// where it always has in text, and to stderr under json, where stdout
 	// carries the result.
-	opts := deploy.Options{Progress: cliout.NotesTo(cmd, deployOutput, out), Yes: deployYes, PlatformVersion: houstonVersion}
+	opts := deploy.Options{Progress: cliout.NotesTo(cmd, deployOutput, out), Yes: deployYes}
 	r := cliout.Renderer{Format: deployOutput, Out: out}
 	result := deployJSON{Workspace: ws}
 	// dags is where the Deployment takes its DAGs from, as the image deploy
@@ -272,25 +276,24 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 
 	_, err := DagsOnlyDeploy(a.client, a.workspace, a.deployment, a.path, nil, true, a.description, opts)
 	switch {
+	case deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment):
+		// A Deployment not placed, or changed since: it takes no upload, and
+		// the image deploy stands, as it always has.
+		return nil
 	case errors.Is(err, deploy.ErrNoDagsDirectory):
+		// DagsOnlyDeploy refuses before it looks for the directory, so the
+		// Deployment takes uploads: one was due and did not happen, which is
+		// said whatever show_warnings is.
 		advice := adviceCreateDagsDir
 		if a.imageName != "" {
 			advice = adviceRunFromProject
 		}
-		msg := fmt.Sprintf(noticeNoDagsDir, a.path, advice)
-		if a.dags == deploy.DagsFromUpload {
-			// The upload was asked for and did not happen, so this is said
-			// whatever show_warnings is.
-			alwaysWarn(result, opts.Progress, msg)
-		} else {
-			// The Deployment may take no uploads at all.
-			warn(result, opts.Progress, msg)
-		}
+		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path, advice))
 		return nil
-	case deploy.IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, deploy.ErrDagOnlyDeployNotEnabledForDeployment):
-		// A Deployment not placed, placed as an upload without the cluster
-		// config (it could not be read), or changed since: the image deploy
-		// stands, as it always has.
+	case a.dags == deploy.DagsFromUnknown && errors.Is(err, deploy.ErrAppConfigUnread):
+		// Whether the Deployment takes uploads at all could not be read,
+		// after its image was deployed: the deploy stands.
+		warn(result, opts.Progress, fmt.Sprintf(warningDagsUndecided, err))
 		return nil
 	case err != nil:
 		return err

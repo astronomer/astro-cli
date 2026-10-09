@@ -105,7 +105,26 @@ func WriteToFile(filePath string, r io.Reader) error {
 	return err
 }
 
+// Tar writes the directory source to the tarball target, its paths
+// relative to source, or to source's parent with prependBaseDir. A source
+// that is not there makes an empty tarball, not an error.
 func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []string) error {
+	baseDir := ""
+	if prependBaseDir {
+		baseDir = filepath.Base(source)
+	}
+	return writeTar(source, target, baseDir, excludePathPrefixes, false)
+}
+
+// TarDir writes the directory source to the tarball target, each path in it
+// under baseDir: "dags" makes dags/my_dag.py of source/my_dag.py, whatever
+// source is called. Unlike Tar it fails on a source that is not there, or
+// that goes while it is read, rather than writing a tarball short of it.
+func TarDir(source, target, baseDir string) error {
+	return writeTar(source, target, baseDir, nil, true)
+}
+
+func writeTar(source, target, baseDir string, excludePathPrefixes []string, mustExist bool) error {
 	tarfile, err := os.Create(target)
 	if err != nil {
 		return err
@@ -117,6 +136,9 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
+		if mustExist {
+			return err
+		}
 		return nil
 	}
 
@@ -153,11 +175,8 @@ func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []strin
 			// set the tar file path to be relative to the source directory
 			headerName := strings.TrimPrefix(path, filepath.Clean(source))
 			headerName = strings.TrimPrefix(headerName, string(filepath.Separator))
-			if prependBaseDir {
-				// prepend the base of the source directory to the tar file path, e.g. prepend "dags/" to "my_dag.py"
-				baseDir := filepath.Base(source)
-				headerName = filepath.Join(baseDir, headerName)
-			}
+			// prepend the base directory to the tar file path, e.g. "dags/" to "my_dag.py"
+			headerName = filepath.Join(baseDir, headerName)
 			// force use forward slashes in tar files
 			headerName = filepath.ToSlash(headerName)
 

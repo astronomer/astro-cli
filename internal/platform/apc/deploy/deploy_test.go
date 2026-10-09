@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -520,6 +521,7 @@ func (s *Suite) TestAirflowSuccess() {
 			{URL: "https://deployments.local.astronomer.io/testDeploymentName/flower", Type: "flower"},
 			{URL: "registry.local.astronomer.io", Type: "registry"},
 		},
+		DagDeploymentRead: true,
 	}, nil).Once()
 	s.houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{}, nil).Once()
 	s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil).Once()
@@ -766,30 +768,77 @@ func (s *Suite) TestDeployDagsOnlyFailure() {
 	config.WorkingPath = project
 	defer func() { config.WorkingPath = prevWorkingPath }()
 
-	s.Run("No dags directory: refused before Houston is asked anything", func() {
+	s.Run("No dags directory, to a Deployment that takes uploads: refused, and nothing is uploaded", func() {
 		getDeploymentIDForCurrentCommandVar = func(houston.ClientInterface, string, string, bool) (string, []houston.Deployment, error) {
-			s.Fail("the Deployment is looked up for an upload that cannot happen")
-			return "", nil, nil
+			return deploymentID, nil, nil
 		}
-		client := new(houston_mocks.ClientInterface)
-		for _, parent := range []string{s.T().TempDir(), filepath.Join(project, "dags", "missing")} {
-			got, err := DagsOnlyDeploy(client, wsID, deploymentID, parent, nil, false, description, Options{Yes: true})
+		uploads := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			uploads++
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer server.Close()
+		uploadURL := server.URL
+		dagOnly := &houston.Deployment{ID: deploymentID, DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}
+		enabled := &houston.AppConfig{Flags: houston.FeatureFlags{DagOnlyDeployment: true}}
+		// A file named dags is not a dags directory either.
+		withFile := s.T().TempDir()
+		s.Require().NoError(os.WriteFile(filepath.Join(withFile, "dags"), nil, 0o600))
+		for _, parent := range []string{s.T().TempDir(), filepath.Join(project, "dags", "missing"), withFile} {
+			s.houstonMock.On("GetDeployment", deploymentID).Return(dagOnly, nil).Once()
+			s.houstonMock.On("GetAppConfig", mock.Anything).Return(enabled, nil).Once()
+			got, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, parent, &uploadURL, true, description, Options{Yes: true})
 			s.ErrorIs(err, ErrNoDagsDirectory, parent)
 			s.ErrorContains(err, filepath.Join(parent, "dags")+" is not a directory. Nothing was uploaded, and the Deployment keeps the Dags it had")
 			s.Equal(deploymentID, got)
 		}
-		// A file named dags is not a dags directory either.
-		withFile := s.T().TempDir()
-		s.Require().NoError(os.WriteFile(filepath.Join(withFile, "dags"), nil, 0o600))
-		_, err := DagsOnlyDeploy(client, wsID, deploymentID, withFile, nil, false, description, Options{Yes: true})
-		s.ErrorIs(err, ErrNoDagsDirectory)
-		client.AssertExpectations(s.T())
-		s.Empty(client.Calls, "no Houston call")
+		s.Zero(uploads)
 	})
 
-	// The directory is looked at first, and again after Houston is asked and
-	// after the bundle is made: one gone meanwhile is not uploaded as an
-	// empty bundle.
+	// The refusals come before the dags directory is looked for: a
+	// Deployment or cluster that takes no upload says what to change, and a
+	// deploy that goes on past the image does not say an upload was skipped
+	// for want of a directory, when none would have been made with one.
+	s.Run("No dags directory: the refusals still come first", func() {
+		noDags := s.T().TempDir()
+		gitSync := &houston.Deployment{ID: deploymentID, ReleaseName: "rel", DagDeployment: houston.DagDeploymentConfig{Type: houston.GitSyncDeploymentType}}
+		image := &houston.Deployment{ID: deploymentID, ReleaseName: "rel", DagDeployment: houston.DagDeploymentConfig{Type: houston.ImageDeploymentType}}
+		// Before 0.29.0 no Deployment is read with its type.
+		untyped := &houston.Deployment{ID: deploymentID, ReleaseName: "rel"}
+		dagOnly := &houston.Deployment{ID: deploymentID, ReleaseName: "rel", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}
+		enabled := &houston.AppConfig{Version: "1.0.0", Flags: houston.FeatureFlags{DagOnlyDeployment: true}}
+		disabled := &houston.AppConfig{Version: "2.0.0"}
+		legacy := &houston.AppConfig{Version: "0.25.0"}
+		for _, tc := range []struct {
+			name       string
+			deployment *houston.Deployment
+			appConfig  *houston.AppConfig
+			want       error
+		}{
+			{"a git-sync Deployment", gitSync, enabled, ErrDagOnlyDeployNotEnabledForDeployment},
+			{"an image Deployment", image, enabled, ErrDagOnlyDeployNotEnabledForDeployment},
+			{"a Deployment on 0.25.0", untyped, legacy, ErrDagOnlyDeployDisabledInConfigLegacy},
+			{"a cluster without DAG-only deploys", dagOnly, disabled, ErrDagOnlyDeployDisabledInConfig},
+		} {
+			getDeploymentIDForCurrentCommandVar = func(houston.ClientInterface, string, string, bool) (string, []houston.Deployment, error) {
+				return deploymentID, nil, nil
+			}
+			s.houstonMock.On("GetDeployment", deploymentID).Return(tc.deployment, nil).Once()
+			s.houstonMock.On("GetAppConfig", mock.Anything).Return(tc.appConfig, nil).Once()
+			_, err := DagsOnlyDeploy(s.houstonMock, wsID, deploymentID, noDags, nil, true, description, Options{Yes: true})
+			s.ErrorIs(err, tc.want, tc.name)
+			s.NotErrorIs(err, ErrNoDagsDirectory, tc.name)
+		}
+		// No Deployment to deploy to.
+		getDeploymentIDForCurrentCommandVar = func(houston.ClientInterface, string, string, bool) (string, []houston.Deployment, error) {
+			return "", nil, nil
+		}
+		_, err := DagsOnlyDeploy(s.houstonMock, wsID, "", noDags, nil, true, description, Options{Yes: true})
+		s.ErrorIs(err, errInvalidDeploymentID)
+	})
+
+	// The directory is found after Houston is asked, and the bundle is made
+	// from it: one gone meanwhile is not uploaded as an empty bundle.
 	s.Run("A dags directory removed mid-deploy is refused, and nothing is uploaded", func() {
 		uploads := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1434,7 +1483,8 @@ func (s *Suite) TestUpdateDeploymentImage() {
 			RuntimeVersion: runtimeVersion,
 		}
 		deployment := &houston.Deployment{
-			ReleaseName: releaseName,
+			ReleaseName:       releaseName,
+			DagDeploymentRead: true,
 		}
 		s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 		s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(updateDeploymentImageResp, nil).Once()
@@ -1446,28 +1496,30 @@ func (s *Suite) TestUpdateDeploymentImage() {
 
 	// The update has happened by the time the cluster config is read, so a
 	// failure to read it does not fail the deploy: the Deployment's own type
-	// places its DAGs. A DAG-only one is an upload, whose own checks run.
+	// places its DAGs, and a DAG-only one, which the cluster decides, is not
+	// placed.
 	s.Run("A cluster config that cannot be read leaves the Deployment's own type", func() {
 		getDeploymentIDForCurrentCommandVar = func(houstonClient houston.ClientInterface, wsID, deploymentID string, prompt bool) (string, []houston.Deployment, error) {
 			return deploymentID, nil, nil
 		}
 		for _, tc := range []struct {
-			typ, version string
-			want         DagsFrom
+			typ  string
+			read bool
+			want DagsFrom
 		}{
-			{houston.ImageDeploymentType, "", DagsFromImage},
-			{"", "", DagsFromImage},
-			{"", "0.25.0", DagsFromUnknown},
-			{houston.DagOnlyDeploymentType, "", DagsFromUpload},
-			{houston.GitSyncDeploymentType, "", DagsFromElsewhere},
+			{houston.ImageDeploymentType, true, DagsFromImage},
+			{"", true, DagsFromImage},
+			{"", false, DagsFromUnknown},
+			{houston.DagOnlyDeploymentType, true, DagsFromUnknown},
+			{houston.GitSyncDeploymentType, true, DagsFromElsewhere},
 		} {
-			deployment := &houston.Deployment{ReleaseName: releaseName, DagDeployment: houston.DagDeploymentConfig{Type: tc.typ}}
+			deployment := &houston.Deployment{ReleaseName: releaseName, DagDeployment: houston.DagDeploymentConfig{Type: tc.typ}, DagDeploymentRead: tc.read}
 			s.houstonMock.On("GetDeployment", mock.Anything).Return(deployment, nil).Once()
 			s.houstonMock.On("UpdateDeploymentImage", mock.Anything).Return(&houston.UpdateDeploymentImageResp{}, nil).Once()
 			s.houstonMock.On("GetAppConfig", mock.Anything).Return(nil, errMockHouston).Once()
-			deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{PlatformVersion: tc.version})
+			deployed, err := UpdateDeploymentImage(s.houstonMock, deploymentID, wsID, runtimeVersion, imageName, Options{})
 			s.NoError(err, tc.typ)
-			s.Equal(tc.want, deployed.Dags, "type %q on %q", tc.typ, tc.version)
+			s.Equal(tc.want, deployed.Dags, "type %q read %v", tc.typ, tc.read)
 		}
 	})
 
@@ -1489,74 +1541,74 @@ func (s *Suite) TestUpdateDeploymentImage() {
 func TestDagsFrom(t *testing.T) {
 	enabled := &houston.AppConfig{Flags: houston.FeatureFlags{DagOnlyDeployment: true}}
 	disabled := &houston.AppConfig{}
+	// read is whether the query that read the Deployment asked for its type.
+	const read, notRead = true, false
 	for _, tc := range []struct {
 		name      string
 		typ       string
 		appConfig *houston.AppConfig
-		version   string
+		read      bool
 		want      DagsFrom
 	}{
-		{"an image Deployment", houston.ImageDeploymentType, enabled, "1.0.0", DagsFromImage},
-		{"an image Deployment on a cluster without DAG-only deploys", houston.ImageDeploymentType, disabled, "1.0.0", DagsFromImage},
-		{"a DAG-only Deployment", houston.DagOnlyDeploymentType, enabled, "1.0.0", DagsFromUpload},
+		{"an image Deployment", houston.ImageDeploymentType, enabled, read, DagsFromImage},
+		{"an image Deployment on a cluster without DAG-only deploys", houston.ImageDeploymentType, disabled, read, DagsFromImage},
+		{"a DAG-only Deployment", houston.DagOnlyDeploymentType, enabled, read, DagsFromUpload},
 		// The cluster refuses the upload, so it is not one.
-		{"a DAG-only Deployment on a cluster without DAG-only deploys", houston.DagOnlyDeploymentType, disabled, "1.0.0", DagsFromElsewhere},
-		{"a git-sync Deployment", houston.GitSyncDeploymentType, enabled, "1.0.0", DagsFromElsewhere},
-		{"a volume Deployment", houston.VolumeDeploymentType, disabled, "1.0.0", DagsFromElsewhere},
+		{"a DAG-only Deployment on a cluster without DAG-only deploys", houston.DagOnlyDeploymentType, disabled, read, DagsFromElsewhere},
+		// Whether the cluster takes it is not known.
+		{"a DAG-only Deployment and no cluster config", houston.DagOnlyDeploymentType, nil, read, DagsFromUnknown},
+		{"a git-sync Deployment", houston.GitSyncDeploymentType, enabled, read, DagsFromElsewhere},
+		{"a volume Deployment", houston.VolumeDeploymentType, disabled, read, DagsFromElsewhere},
 		// No type is Houston's default, the image, on any cluster:
 		// DagsOnlyDeploy refuses it as it does an image Deployment.
-		{"no type on a cluster without DAG-only deploys", "", disabled, "1.0.0", DagsFromImage},
-		{"no type and no cluster config", "", nil, "1.0.0", DagsFromImage},
-		{"no type on a cluster with DAG-only deploys", "", enabled, "1.0.0", DagsFromImage},
-		{"no type on 0.29.0, the first to read the type", "", enabled, "0.29.0", DagsFromImage},
-		// "" is the newest, as GetDeployment's query is.
-		{"no type, platform version unknown", "", enabled, "", DagsFromImage},
-		// GetDeployment reads no type before 0.29.0, so every Deployment
+		{"no type on a cluster without DAG-only deploys", "", disabled, read, DagsFromImage},
+		{"no type and no cluster config", "", nil, read, DagsFromImage},
+		{"no type on a cluster with DAG-only deploys", "", enabled, read, DagsFromImage},
+		// GetDeployment asks for no type before 0.29.0, so every Deployment
 		// reads as one with none: not placed.
-		{"no type before 0.29.0", "", enabled, "0.25.0", DagsFromUnknown},
-		{"no type on 0.28.0", "", disabled, "0.28.0", DagsFromUnknown},
+		{"no type, not asked for", "", enabled, notRead, DagsFromUnknown},
+		{"no type, not asked for, on a cluster without DAG-only deploys", "", disabled, notRead, DagsFromUnknown},
 		// A type this CLI does not know is not placed either.
-		{"an unknown type", "dag-only", enabled, "1.0.0", DagsFromUnknown},
+		{"an unknown type", "dag-only", enabled, read, DagsFromUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			info := &houston.Deployment{DagDeployment: houston.DagDeploymentConfig{Type: tc.typ}}
-			assert.Equal(t, tc.want, dagsFrom(info, tc.appConfig, tc.version))
+			info := &houston.Deployment{DagDeployment: houston.DagDeploymentConfig{Type: tc.typ}, DagDeploymentRead: tc.read}
+			assert.Equal(t, tc.want, dagsFrom(info, tc.appConfig))
 		})
 	}
-	assert.Equal(t, DagsFromUnknown, dagsFrom(nil, enabled, "1.0.0"), "no Deployment")
+	assert.Equal(t, DagsFromUnknown, dagsFrom(nil, enabled), "no Deployment")
 	assert.Equal(t, DagsFromUnknown, Deployed{}.Dags, "the zero value is not placed")
 }
 
 // --image is refused for exactly the Deployments dagsFrom places as image
-// ones: on a Houston that reads the type, one with none too; before 0.29.0,
-// where none is read, nothing untyped is refused.
+// ones: where the type was read, one with none too; where it was not (before
+// 0.29.0), nothing untyped is refused.
 func (s *Suite) TestAirflowImageOnlyRefusesImageDeployments() {
 	// stop is where a deploy that is not refused stops: tagging the image.
 	stop := errors.New("tagging the image")
 	for _, tc := range []struct {
-		typ, version string
-		refused      bool
+		typ     string
+		read    bool
+		refused bool
 	}{
-		{houston.ImageDeploymentType, "1.0.0", true},
-		{houston.ImageDeploymentType, "0.25.0", true},
-		{"", "1.0.0", true},
-		{"", "0.29.0", true},
-		{"", "", true},
-		{"", "0.25.0", false},
-		{houston.DagOnlyDeploymentType, "1.0.0", false},
-		{houston.GitSyncDeploymentType, "1.0.0", false},
-		{houston.VolumeDeploymentType, "1.0.0", false},
+		{houston.ImageDeploymentType, true, true},
+		{houston.ImageDeploymentType, false, true},
+		{"", true, true},
+		{"", false, false},
+		{houston.DagOnlyDeploymentType, true, false},
+		{houston.GitSyncDeploymentType, true, false},
+		{houston.VolumeDeploymentType, true, false},
 	} {
-		s.Run(tc.typ+" on "+tc.version, func() {
+		s.Run(fmt.Sprintf("%q read %v", tc.typ, tc.read), func() {
 			s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
 			s.houstonMock.On("ListDeployments", mock.Anything).Return([]houston.Deployment{{ID: "test-deployment-id"}}, nil).Once()
-			deployment := &houston.Deployment{ID: "test-deployment-id", ClusterID: "test-cluster-id", DagDeployment: houston.DagDeploymentConfig{Type: tc.typ}}
+			deployment := &houston.Deployment{ID: "test-deployment-id", ClusterID: "test-cluster-id", DagDeployment: houston.DagDeploymentConfig{Type: tc.typ}, DagDeploymentRead: tc.read}
 			s.houstonMock.On("GetDeployment", "test-deployment-id").Return(deployment, nil).Once()
 			s.houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{DagOnlyDeployment: true}}, nil).Once()
 			if !tc.refused {
 				s.mockImageHandler.On("TagLocalImage", "img:1").Return(stop).Once()
 			}
-			_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false, description, true, "img:1", Options{PlatformVersion: tc.version, Progress: io.Discard})
+			_, err := Airflow(s.houstonMock, "./testfiles/", "test-deployment-id", "test-workspace-id", false, false, description, true, "img:1", Options{Progress: io.Discard})
 			if tc.refused {
 				s.ErrorIs(err, ErrDeploymentTypeIncorrectForImageOnly)
 				return

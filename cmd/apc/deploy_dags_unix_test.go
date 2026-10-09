@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
 
 // A dags directory the deploy cannot look at fails the deploy: it is not
@@ -31,12 +32,10 @@ func TestDeployFailsOnADagsDirectoryItCannotRead(t *testing.T) {
 	uploads := realDagsOnlyDeploy(t)
 	require.NoError(t, os.Chmod(project, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(project, 0o755) })
-	api := newAPCClient()
-	run := runAPC(t, api, "", "deploy", "dep-ac", "-o", "json")
+	run := runAPC(t, dagsAPI(dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads)), "", "deploy", "dep-ac", "-o", "json")
 	assert.NotEqual(t, 0, run.code)
 	require.ErrorIs(t, run.err, syscall.EACCES)
 	assert.NotErrorIs(t, run.err, deploy.ErrNoDagsDirectory)
 	assert.Equal(t, 1, *uploads)
 	assert.NotContains(t, run.stdout, `"deployment"`, "no result for a deploy that failed")
-	assertNoHoustonDagsCalls(t, api)
 }
