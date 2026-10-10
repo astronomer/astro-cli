@@ -2,6 +2,7 @@ package project
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,9 +14,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 const windowsOS = "windows"
+
+// write1xConfig writes the .astro/config.yaml a 1.x project has: astro dev
+// init always names the project there, which is what makes a 1.x project.
+func write1xConfig(t *testing.T, dir string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600))
+}
 
 func writeMarker(t *testing.T, dir string) {
 	t.Helper()
@@ -227,7 +237,7 @@ func TestNotFoundErrorPointsAtInit(t *testing.T) {
 func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
-	require.NoError(t, os.Mkdir(filepath.Join(root, ".astro"), 0o700))
+	write1xConfig(t, root)
 	dags := filepath.Join(root, "dags")
 	require.NoError(t, os.Mkdir(dags, 0o700))
 
@@ -236,8 +246,8 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		var nf *NotFoundError
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
-		assert.Contains(t, err.Error(), "this directory holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` here")
+		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 	})
 	t.Run("below the root", func(t *testing.T) {
 		_, err := Discover(dags)
@@ -245,8 +255,141 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
 		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` in "+root)
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 	})
+}
+
+// Where astro init refuses a 1.x project (Convert1xBlocked), a 1.x project's
+// errors give the same account, decided when the error is made, naming the
+// project's directory and saying to run astro init there, however they are
+// wrapped: the APC one under APC, fix-the-context under an unresolved
+// context, and change-ASTRO_DOMAIN where it chose the context. An error about
+// no 1.x project is unchanged. Not parallel: it sets package state.
+func TestBlocked1xAdvice(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	write1xConfig(t, root)
+	dags := filepath.Join(root, "dags")
+	require.NoError(t, os.Mkdir(dags, 0o700))
+	errs := func() (error, error) {
+		_, nf := Discover(dags)
+		return nf, LoadError(root, root, manifest.ErrNoAstroSection)
+	}
+	then := "then run astro init in " + scaffold.ShellQuote(root)
+	for _, tc := range []struct {
+		name         string
+		ctx          Context
+		why          Block
+		want, absent []string
+	}{
+		{"under APC", Context{APC: true}, BlockedUnderAPC, []string{"astro context switch astronomer.io", "astro login astronomer.io", then}, nil},
+		{
+			"under APC from ASTRO_DOMAIN, saved APC",
+			Context{APC: true, FromASTRODomain: true},
+			BlockedUnderAPC,
+			[]string{"set ASTRO_DOMAIN", "(astronomer.io)", then},
+			[]string{"unset", "astro context switch"},
+		},
+		{
+			"under APC from ASTRO_DOMAIN, saved Astro",
+			Context{APC: true, FromASTRODomain: true, UnsetIsAstro: true},
+			BlockedUnderAPC,
+			[]string{"set ASTRO_DOMAIN", "or unset it", then},
+			nil,
+		},
+		{"under an unresolved context", Context{Unresolved: true}, BlockedUnresolved, []string{"astro context switch", then}, []string{"ASTRO_DOMAIN"}},
+		{
+			"under an unresolved ASTRO_DOMAIN",
+			Context{Unresolved: true, FromASTRODomain: true, UnsetIsAstro: true},
+			BlockedUnresolved,
+			[]string{"ASTRO_DOMAIN", "or unset it", then},
+			nil,
+		},
+		{
+			"under an unreadable settings file",
+			Context{Unresolved: true, UnreadableConfig: "/h/.astro/config.yaml"},
+			BlockedUnresolved,
+			[]string{"/h/.astro/config.yaml cannot be read", "Fix or move /h/.astro/config.yaml", then},
+			[]string{"ASTRO_DOMAIN", "astro context", "astro login"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			SetContext(tc.ctx)
+			t.Cleanup(func() { SetContext(Context{}) })
+			why, got := Convert1xBlocked(dags)
+			assert.Equal(t, tc.why, why)
+			assert.Equal(t, root, got)
+			nf, ns := errs()
+			want := Blocked1xMessage(tc.why, root)
+			assert.Equal(t, "wrapped: "+want, fmt.Errorf("wrapped: %w", nf).Error())
+			assert.Equal(t, want, ns.Error())
+			for _, w := range tc.want {
+				assert.Contains(t, want, w)
+			}
+			for _, w := range tc.absent {
+				assert.NotContains(t, want, w)
+			}
+			assert.NotContains(t, want, "`")
+			assert.NotContains(t, want, "again")
+			_, plain := Discover(t.TempDir())
+			assert.NotContains(t, plain.Error(), "Astro CLI 1.x")
+		})
+	}
+	t.Run("under Astro", func(t *testing.T) {
+		why, got := Convert1xBlocked(dags)
+		assert.Equal(t, NotBlocked, why)
+		assert.Empty(t, got, "under Astro the decision walks nothing")
+		nf, _ := errs()
+		assert.Contains(t, nf.Error(), "Run astro init in "+scaffold.ShellQuote(root))
+	})
+}
+
+// In a monorepo whose root pyproject.toml has no [tool.astro], with a 1.x
+// project below it, the root's NoAstroSectionError names the 1.x project, by
+// the same walk in every context, so the Astro hint and the APC refusal name
+// the same directory.
+func TestNoAstroSectionNamesTheSame1xProject(t *testing.T) {
+	repo := t.TempDir()
+	writeManifest(t, repo, toolsOnlyPyproject)
+	proj := filepath.Join(repo, "airflow")
+	require.NoError(t, os.MkdirAll(filepath.Join(proj, "dags"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(proj, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	write1xConfig(t, proj)
+	start := filepath.Join(proj, "dags")
+
+	err := LoadError(start, repo, manifest.ErrNoAstroSection)
+	var ns *NoAstroSectionError
+	require.ErrorAs(t, err, &ns)
+	assert.True(t, ns.Has1xProject)
+	assert.Contains(t, err.Error(), proj+" holds a project made by Astro CLI 1.x")
+	assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(proj))
+
+	SetContext(Context{APC: true})
+	t.Cleanup(func() { SetContext(Context{}) })
+	err = LoadError(start, repo, manifest.ErrNoAstroSection)
+	assert.Equal(t, Blocked1xMessage(BlockedUnderAPC, proj), err.Error())
+}
+
+// A plain package's pyproject.toml inside a 1.x tree, with start at that
+// package, is not the 1.x project's business under Astro: the walk stops at
+// the pyproject's directory, so the hint is to add [tool.astro] there, as
+// v2 said. A path with a space is quoted where a command names it.
+func TestNoAstroSectionInsideA1xTree(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "my project")
+	lib := filepath.Join(root, "include", "mylib")
+	require.NoError(t, os.MkdirAll(lib, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	write1xConfig(t, root)
+	writeManifest(t, lib, toolsOnlyPyproject)
+
+	err := LoadError(lib, lib, manifest.ErrNoAstroSection)
+	var ns *NoAstroSectionError
+	require.ErrorAs(t, err, &ns)
+	assert.False(t, ns.Has1xProject)
+	assert.Contains(t, err.Error(), "has no [tool.astro] section")
+
+	_, nf := Discover(filepath.Join(root, "dags"))
+	assert.Contains(t, nf.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 }
 
 func TestLoadError(t *testing.T) {
@@ -266,7 +409,7 @@ func TestLoadError(t *testing.T) {
 	t.Run("a tools-only pyproject in a 1.x project", func(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
-		require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
+		write1xConfig(t, dir)
 		writeManifest(t, dir, toolsOnlyPyproject)
 		err := LoadError(dir, dir, manifest.ErrNoAstroSection)
 		var ns *NoAstroSectionError
@@ -274,15 +417,14 @@ func TestLoadError(t *testing.T) {
 		assert.True(t, ns.Has1xProject)
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
 		assert.Contains(t, err.Error(), "project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` here")
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(dir))
 
-		// From below the root, `astro init` "here" would scaffold a second
-		// project inside the 1.x one, so the root is named instead.
+		// From below the root too, the root is named: astro init there would
+		// scaffold a second project inside the 1.x one.
 		dags := filepath.Join(dir, "dags")
 		require.NoError(t, os.Mkdir(dags, 0o700))
 		err = LoadError(dags, dir, manifest.ErrNoAstroSection)
-		assert.Contains(t, err.Error(), "Run `astro init` in "+dir)
-		assert.NotContains(t, err.Error(), "here")
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(dir))
 	})
 }
 
@@ -291,50 +433,47 @@ func TestIs1xProject(t *testing.T) {
 		t.Helper()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
 	}
-	writeAstroDir := func(t *testing.T, dir string) {
-		t.Helper()
-		require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
-	}
+	writeAstroDir := write1xConfig
 
 	t.Run("Dockerfile and .astro is 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
-		assert.True(t, Is1xProject(dir))
+		assert.True(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("Dockerfile alone is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("pyproject dir is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMarker(t, dir)
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("empty dir is not 1.x", func(t *testing.T) {
-		assert.False(t, Is1xProject(t.TempDir()))
+		assert.False(t, scaffold.Is1xProject(t.TempDir()))
 	})
 	t.Run("a pyproject that only configures tools leaves a 1.x layout 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
 		writeManifest(t, dir, toolsOnlyPyproject)
-		assert.True(t, Is1xProject(dir))
+		assert.True(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("a manifest beside a 1.x layout is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
 		writeManifest(t, dir, validManifest)
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("an unparseable pyproject beside a 1.x layout is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
 		writeManifest(t, dir, "this is not : valid = toml [[[\n")
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 }
 

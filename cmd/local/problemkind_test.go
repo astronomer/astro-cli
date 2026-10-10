@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // sampleFor is one real error per kind, and the single list every test below
@@ -42,6 +43,7 @@ func sampleFor(kind cliout.ProblemKind) (error, bool) {
 		KindDeploymentDeploying:      &instancelocate.UnavailableError{State: instancelocate.ErrDeploymentDeploying},
 		KindDeploymentUnhealthy:      &instancelocate.UnavailableError{State: instancelocate.ErrDeploymentUnhealthy},
 		KindAirflowUnavailable:       &instancelocate.UnavailableError{State: instancelocate.ErrAirflowUnavailable},
+		KindUnsupportedOnPlatform:    &scaffold.Convert1xUnderAPCError{Dir: "/somewhere"},
 	}
 	s, ok := samples[kind]
 	return s, ok
@@ -90,6 +92,7 @@ func TestProblemKindOrderIsPinned(t *testing.T) {
 		KindDeploymentDeploying,
 		KindDeploymentUnhealthy,
 		KindAirflowUnavailable,
+		KindUnsupportedOnPlatform,
 	}
 	if len(ProblemKinds) != len(want) {
 		t.Fatalf("%d kinds in the table, %d pinned here", len(ProblemKinds), len(want))

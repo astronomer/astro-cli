@@ -51,6 +51,9 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 			// project and became `astro dev` in 2019. An old invocation
 			// arrives here and got told its subcommand was unknown for
 			// `astro af` — a different thing, and no route onward.
+			if err := (&cli{d: d}).blockedInitHint(args[0]); err != nil {
+				return err
+			}
 			if replacement, ok := devReplacementFor(args[0]); ok {
 				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Local Airflow lives under `astro local`: use `%s`",
 					args[0], cmd.CommandPath(), replacement))

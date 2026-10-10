@@ -184,6 +184,28 @@ In a 1.x project, `init` converts what it can read and says what it did. Its
 output ends with **Left to do**: what it found and could not carry. That list
 is the work. Take it one line at a time.
 
+There is one project format, and `init` converts the same way whichever
+platform you deploy to. The exception, for now, is Astro Private Cloud, which
+deploys the 1.x layout and not yet `pyproject.toml` projects. When the
+current context is an Astro Private Cloud one, `init` refuses a 1.x project,
+or any directory inside one, and changes nothing: a project made inside it
+would be deployed with it. A 1.x project is what Astro CLI 1.x itself takes
+for one: a `Dockerfile` and a `.astro/config.yaml`, other than the CLI's own
+settings file in your home directory, so a stray `~/Dockerfile` does not make
+home a 1.x project. Leave the project as it is: Astro CLI 1.x keeps deploying
+it to Astro Private Cloud. Converting will be available once Astro Private
+Cloud deploys `pyproject.toml` projects. To convert anyway, for Astro or for
+local development only, switch to an Astro context first (`astro context
+switch astronomer.io`, or `astro login astronomer.io`; a bare `astro login`
+logs back in to the current context; or change or unset `ASTRO_DOMAIN` if it
+names the context), then run `init` in the 1.x project's directory. `init`
+refuses the same way when a context is named but cannot be resolved (a config
+it cannot read, or `ASTRO_DOMAIN` naming a context that is not saved): fix the
+context or switch to one first. A machine with no context at all converts as
+for Astro. A new project `init` makes under an Astro Private Cloud context, or
+one it cannot resolve, prints a note on stderr saying how to deploy it;
+`--output json` leaves it out.
+
 What `init` converts:
 
 | 1.x file | What `init` does |

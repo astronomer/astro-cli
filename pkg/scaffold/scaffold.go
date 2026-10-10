@@ -61,6 +61,15 @@ type Options struct {
 	// airflow_settings.yaml carries, at the project scope the writer itself
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
+	// DeploysToAPC is set by a caller whose current context or platform is
+	// Astro Private Cloud. APC deploys the 1.x layout, with Astro CLI 1.x,
+	// and not yet pyproject.toml projects, so Plan and Run then refuse a
+	// directory that is a 1.x project (Is1xProject) or lies inside one, with
+	// a *Convert1xUnderAPCError naming that project, before anything is
+	// written: a project scaffolded inside one would be deployed with it.
+	// false, the default, is Astro and refuses nothing. Astro Desktop's
+	// conversions are refused only if it sets this.
+	DeploysToAPC bool
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -291,6 +300,8 @@ type manifestFacts struct {
 // Run is Plan followed by Apply, which is what a command wants: nobody is going
 // to review a change set at a terminal that has already asked for it. A caller
 // that shows the change set to a person first calls the two halves itself.
+//
+//nolint:gocritic // hugeParam: by value on purpose, as Astro Desktop calls it
 func Run(dir string, opts Options) (*Result, error) {
 	cs, err := Plan(dir, opts)
 	if err != nil {
@@ -308,12 +319,26 @@ func Run(dir string, opts Options) (*Result, error) {
 // first — which is impossible if the only way to learn what a run does is to
 // let it happen. Plan reads the project (it has to: an adopted manifest is
 // computed from the one already there) and writes nothing.
+//
+// Under Options.DeploysToAPC it first refuses a directory that is, or is
+// inside, a 1.x project (Convert1xUnderAPCError), having read nothing else.
+//
+//nolint:gocritic // hugeParam: by value on purpose, as Astro Desktop calls it
 func Plan(dir string, opts Options) (*Changeset, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
 	}
+	if opts.DeploysToAPC {
+		if in := Find1xProject(abs); in != "" {
+			return nil, &Convert1xUnderAPCError{Dir: in}
+		}
+	}
+	return plan(abs, &opts)
+}
 
+// plan is Plan for the absolute dir it resolved, once nothing refuses it.
+func plan(abs string, opts *Options) (*Changeset, error) {
 	goos := opts.GOOS
 	if goos == "" {
 		goos = runtime.GOOS
@@ -682,7 +707,7 @@ func namedInAny(notes []string, name string) bool {
 // scaffoldManifest renders the manifest for a directory that has none, and
 // records on the Result what it chose. It returns the manifest rather than
 // writing it, so write puts every file on disk in one place.
-func scaffoldManifest(dir string, opts Options, from1x *project1x, res *Result) ([]byte, manifestFacts, error) {
+func scaffoldManifest(dir string, opts *Options, from1x *project1x, res *Result) ([]byte, manifestFacts, error) {
 	name, nameAdvisory := chooseName(dir, opts, from1x)
 	pick := pickAirflowVersion(opts.AirflowVersion, nil, from1x, opts.Default)
 	if opts.AirflowVersion != "" {
@@ -1023,7 +1048,7 @@ func planFiles(dir string, withSymlink bool, cs *Changeset) error {
 // this key with a fallback to it. A global project.name would otherwise rename
 // every project converted on that machine to the same thing, which is a worse
 // answer than the directory in every case where the two differ.
-func chooseName(dir string, opts Options, from1x *project1x) (name, advisory string) {
+func chooseName(dir string, opts *Options, from1x *project1x) (name, advisory string) {
 	if opts.Name != "" {
 		return opts.Name, ""
 	}
