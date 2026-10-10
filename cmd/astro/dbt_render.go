@@ -98,7 +98,7 @@ type remoteRuntimeCheckJSON struct {
 }
 
 func newDbtDeployJSON(res *astrodeploy.BundleDeploy, project, projectPath string, waited bool, waitErr error) dbtDeployJSON {
-	obj := dbtDeployJSON{
+	return dbtDeployJSON{
 		Deployment:     res.DeploymentID,
 		DeploymentName: res.DeploymentName,
 		Workspace:      res.WorkspaceID,
@@ -109,11 +109,17 @@ func newDbtDeployJSON(res *astrodeploy.BundleDeploy, project, projectPath string
 		BundleVersion:  res.BundleVersion,
 		Waited:         waited,
 		WaitError:      errText(waitErr),
+		Git:            bundleGitJSON(res.Git),
 	}
-	if g := res.Git; g != nil {
-		obj.Git = &deployGitJSON{CommitSHA: g.CommitSHA, Branch: g.Branch, CommitURL: g.CommitURL}
+}
+
+// bundleGitJSON is the commit a bundle deploy recorded, as a deploy result
+// publishes it; nil when it recorded none.
+func bundleGitJSON(g *astrodeploy.BundleGit) *deployGitJSON {
+	if g == nil {
+		return nil
 	}
-	return obj
+	return &deployGitJSON{CommitSHA: g.CommitSHA, Branch: g.Branch, CommitURL: g.CommitURL}
 }
 
 // renderBundleUploaded is the text a finished bundle upload has always

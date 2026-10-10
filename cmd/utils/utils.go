@@ -69,9 +69,15 @@ const (
 // Where is what a deploy finds at and above its working directory: the
 // nearest pyproject.toml project (ManifestDir) or project in the Astro CLI
 // 1.x layout (Project1xDir), whichever comes first; both empty for none.
+//
+// For a pyproject.toml project it carries the manifest the walk loaded, or
+// why it did not load (LoadErr: it fails to parse or validate, or cannot be
+// read), so nothing after the walk reads the file again.
 type Where struct {
 	ManifestDir  string
 	Project1xDir string
+	Manifest     *manifest.Manifest
+	LoadErr      error
 }
 
 // AtRoot reports whether the walk from dir found a pyproject.toml project at
@@ -81,32 +87,43 @@ func (w Where) AtRoot(dir string) bool {
 }
 
 // None reports whether the walk found no project at all.
-func (w Where) None() bool { return w == Where{} }
+func (w Where) None() bool { return w.ManifestDir == "" && w.Project1xDir == "" }
+
+// Loaded is the manifest of a project the deploy runs at the root of, nil
+// when it runs anywhere else or the manifest did not load.
+func (w Where) Loaded(dir string) *manifest.Manifest {
+	if !w.AtRoot(dir) {
+		return nil
+	}
+	return w.Manifest
+}
 
 // Locate walks up from dir to the nearest project, the one rule astro
-// deploy, astro remote deploy and APC's deploy decide by, their routing
-// included. At each directory:
+// deploy, astro remote deploy, APC's deploy and the bundle deploys'
+// containment checks decide by, routing included. At each directory:
 //
-//   - a pyproject.toml project's root (IsManifestRoot) stops the walk. A
+//   - a pyproject.toml project's root (manifestRoot) stops the walk. A
 //     pyproject.toml declaring no tool.astro table, a monorepo root's tool
 //     settings say, does not;
 //   - else a Dockerfile beside a .astro directory is a 1.x project, except
 //     in the home directory, whose .astro holds the global config;
 //   - else the walk goes on up.
 //
-// Each directory's pyproject.toml is read once.
+// Each directory's pyproject.toml is read once, and the home directory is
+// looked up once per walk.
 func Locate(dir string) Where {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return Where{}
 	}
+	isHome := homeMatcher()
 	for d := abs; ; {
-		if IsManifestRoot(d) {
-			return Where{ManifestDir: d}
+		if root, m, loadErr := manifestRoot(d); root {
+			return Where{ManifestDir: d, Manifest: m, LoadErr: loadErr}
 		}
 		// Not a manifest root, so the 1.x layout alone decides: no second
 		// read of the pyproject.toml (project.Is1xProject would make one).
-		if !config.IsHomeDir(d) && has1xLayout(d) {
+		if has1xLayout(d) && !isHome(d) {
 			return Where{Project1xDir: d}
 		}
 		parent := filepath.Dir(d)
@@ -114,6 +131,27 @@ func Locate(dir string) Where {
 			return Where{}
 		}
 		d = parent
+	}
+}
+
+// homeMatcher reports whether a directory is the home directory, with
+// config.HomePath looked up once: the same spelling once cleaned, or the
+// same directory under another one (a symlink), as config.IsHomeDir has it.
+func homeMatcher() func(dir string) bool {
+	if config.HomePath == "" {
+		return func(string) bool { return false }
+	}
+	home := filepath.Clean(config.HomePath)
+	homeInfo, homeErr := os.Stat(home)
+	return func(dir string) bool {
+		if filepath.Clean(dir) == home {
+			return true
+		}
+		if homeErr != nil {
+			return false
+		}
+		info, err := os.Stat(dir)
+		return err == nil && os.SameFile(info, homeInfo)
 	}
 }
 
@@ -127,7 +165,7 @@ func has1xLayout(dir string) bool {
 	return err == nil && info.IsDir()
 }
 
-// IsManifestRoot reports whether dir is a pyproject.toml project's root, the
+// manifestRoot reports whether dir is a pyproject.toml project's root, the
 // question every deploy routes on:
 //
 //   - a pyproject.toml whose [tool.astro] loads, or fails to validate: a
@@ -139,27 +177,31 @@ func has1xLayout(dir string) bool {
 //     deploy then reports the read error rather than walking past it.
 //
 // No pyproject.toml, one with no [tool.astro], and one in a directory that
-// cannot be looked in are not.
-func IsManifestRoot(dir string) bool {
+// cannot be looked in are not. It returns the manifest it loaded, or why a
+// root's manifest did not load.
+func manifestRoot(dir string) (root bool, m *manifest.Manifest, loadErr error) {
 	path := filepath.Join(dir, project.Marker)
 	if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
 		// Not there, or a directory it cannot even look in: nothing at this
 		// level, and the walk goes on.
-		return false
+		return false, nil, nil
 	}
-	_, err := manifest.Load(path)
+	m, err := manifest.Load(path)
 	switch {
 	case err == nil:
-		return true
+		return true, m, nil
 	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection), errors.Is(err, fs.ErrNotExist):
-		return false
+		return false, nil, nil
 	}
 	raw, readErr := os.ReadFile(path)
 	if readErr != nil {
 		// There, and unreadable.
-		return !errors.Is(readErr, fs.ErrNotExist)
+		return !errors.Is(readErr, fs.ErrNotExist), nil, err
 	}
-	return declaresToolAstro.Match(raw)
+	if declaresToolAstro.Match(raw) {
+		return true, nil, err
+	}
+	return false, nil, nil
 }
 
 // declaresToolAstro matches a TOML line declaring the tool.astro table: a

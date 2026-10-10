@@ -7,7 +7,6 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -282,26 +281,6 @@ func IsHomeDir(path string) bool {
 	a, errA := os.Stat(path)
 	b, errB := os.Stat(HomePath)
 	return errA == nil && errB == nil && os.SameFile(a, b)
-}
-
-// IsWithinProjectDir returns true if the path is at or within an Astro project directory
-func IsWithinProjectDir(path string) (bool, error) {
-	pathAbs, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return false, err
-	}
-	pathComponents := strings.Split(pathAbs, string(os.PathSeparator))
-	for i := range pathComponents {
-		componentAbs := strings.Join(pathComponents[:i+1], string(os.PathSeparator))
-		isProjectDir, err := IsProjectDir(componentAbs)
-		if err != nil {
-			return false, err
-		}
-		if isProjectDir {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // saveConfig serializes config writes under an exclusive OS-level file lock,

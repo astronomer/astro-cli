@@ -2,12 +2,12 @@ package astro
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	goerrors "errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -23,7 +23,6 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/httputil"
@@ -153,7 +152,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// One walk routes the deploy and words its refusal.
 	where := utils.Locate(config.WorkingPath)
 	if where.AtRoot(config.WorkingPath) {
-		return deployManifest(cmd, args, true)
+		return deployManifest(cmd, args, &where)
 	}
 	if _, err := cliout.ParseFormat(deployOutput); err != nil {
 		return err
@@ -161,7 +160,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	// The value, not whether the flag was given: an empty --image-name=
 	// names no image, and would be a build.
 	if imageName != "" && where.None() {
-		return deployManifest(cmd, args, false)
+		return deployManifest(cmd, args, nil)
 	}
 	// Not a usage mistake, so no usage block under the error.
 	cmd.SilenceUsage = true
@@ -213,12 +212,18 @@ type nonDagsDeployJSON struct {
 }
 
 func newNonDagsDeployJSON(res *astrodeploy.BundleDeploy, bundleType, bundlePath string, waited bool, waitErr error) nonDagsDeployJSON {
-	// The facts a dbt bundle deploy publishes, less its dbt project.
-	d := newDbtDeployJSON(res, "", bundlePath, waited, waitErr)
 	return nonDagsDeployJSON{
-		Deployment: d.Deployment, DeploymentName: d.DeploymentName, Workspace: d.Workspace, DeployID: d.DeployID,
-		BundleType: bundleType, BundlePath: d.ProjectPath, MountPath: d.MountPath, BundleVersion: d.BundleVersion,
-		Waited: d.Waited, WaitError: d.WaitError, Git: d.Git,
+		Deployment:     res.DeploymentID,
+		DeploymentName: res.DeploymentName,
+		Workspace:      res.WorkspaceID,
+		DeployID:       res.DeployID,
+		BundleType:     bundleType,
+		BundlePath:     bundlePath,
+		MountPath:      res.MountPath,
+		BundleVersion:  res.BundleVersion,
+		Waited:         waited,
+		WaitError:      errText(waitErr),
+		Git:            bundleGitJSON(res.Git),
 	}
 }
 
@@ -228,6 +233,12 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	// The result goes where stdout is now. What the platform code prints on
+	// the way (the git note, the archive's) is the output text mode has always
+	// shown; under json it goes to stderr, as astro dbt deploy's does.
+	out := cmd.OutOrStdout()
+	defer strayStdoutToStderr(format)()
+
 	for _, f := range []string{"dags", "image", imageNameFlag, "build-secret", "no-dags-base-dir"} {
 		if cmd.Flags().Changed(f) {
 			return cliout.Usage(fmt.Errorf("cannot use --%s with --non-dags; --non-dags performs a non-Dag bundle deploy", f))
@@ -294,79 +305,90 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 	}
 	return publishThenWaitWith(cmd, format, waitForDeploy, waitDone, func(waitErr error) error {
 		if format == cliout.FormatJSON {
-			return cliout.Renderer{Format: format, Out: cmd.OutOrStdout()}.Emit(newNonDagsDeployJSON(&res, nonDagsBundleType, nonDagsBundlePath, waitForDeploy, waitErr), nil)
+			return cliout.Renderer{Format: format, Out: out}.Emit(newNonDagsDeployJSON(&res, nonDagsBundleType, nonDagsBundlePath, waitForDeploy, waitErr), nil)
 		}
-		return renderBundleUploaded(res.BundleVersion)(cmd.OutOrStdout())
+		return renderBundleUploaded(res.BundleVersion)(out)
 	})
 }
 
 // nonDagsTarget is the Deployment a non-Dag bundle deploys to, and the login
-// it deploys under, named as a project deploy names them: the argument or
-// --deployment, which must agree. In a pyproject.toml project here that
-// loads, the deploy runs under the login for the project's Astro host, as its
-// deploy does: a link name is that link's Deployment, and any other name a
-// Deployment id. Anywhere else, or when the project does not load, the name
-// is an id under the current context: an id needs no manifest.
-// With no name, the workspace's Deployments are offered: --workspace, else
-// --workspace-id, else the context's.
+// it deploys under, the way astro deploy from the same directory picks them.
+//
+// The login: in a pyproject.toml project here whose manifest loads, the
+// project's (its Astro host's), for everything; anywhere else, or when the
+// manifest does not load, the current context's.
+//
+// The target: the argument or --deployment, which must agree, a link name of
+// the project here or a Deployment id. With neither, the workspace's
+// Deployments are offered (--workspace, else --workspace-id, else the
+// login's): only to a run that can be asked, and only on the current
+// context's host, as astro deploy offers them. A run that cannot be asked,
+// under --output json or without a terminal, is refused as astro deploy's is,
+// with kind input_required.
 func nonDagsTarget(ctx context.Context, args []string, format cliout.Format) (string, *astrov1.Deployment, deployLogin, error) {
-	current, _ := loginForDeploy(ctx, "") //nolint:errcheck // with no domain it is the current context, and never fails
 	linkName := ""
 	if len(args) > 0 {
 		linkName = args[0]
 	}
-	ws := manifestWorkspace
-	if ws == "" {
-		ws = workspaceID
-	}
+	ws := cmp.Or(manifestWorkspace, workspaceID)
 	// Agreement first, before anything is read.
 	if _, _, err := manifestdeploy.ResolveNamed(nil, linkName, manifestDeployment, ws, ""); err != nil {
+		current, _ := loginForDeploy(ctx, "") //nolint:errcheck // with no domain it is the current context, and never fails
 		return "", nil, current, cliout.Usage(err)
 	}
-	if name := firstNonEmptyString(linkName, manifestDeployment); name != "" {
-		m := manifestHere()
-		if m == nil {
-			// No project here, or one that does not load: an id, under the
-			// current context.
-			return name, nil, current, nil
-		}
-		// In a project, link and id alike go to the project's Astro host,
-		// as its deploy does.
-		login, err := loginForDeploy(ctx, m.Astro.LoginDomain())
-		if err != nil {
-			return "", nil, current, err
-		}
-		if !hasLink(m, name) {
+
+	m := manifestHere()
+	domain := ""
+	if m != nil {
+		domain = m.Astro.LoginDomain()
+	}
+	login, err := loginForDeploy(ctx, domain)
+	if err != nil {
+		return "", nil, login, err
+	}
+
+	if name := cmp.Or(linkName, manifestDeployment); name != "" {
+		if m == nil || !hasLink(m, name) {
 			return name, nil, login, nil
 		}
 		named, _, err := manifestdeploy.ResolveNamed(m, name, "", ws, "")
 		if err != nil {
-			return "", nil, current, cliout.Usage(err)
+			return "", nil, login, cliout.Usage(err)
 		}
 		return named.DeploymentID, nil, login, nil
 	}
+
+	if format != cliout.FormatText || !stdinIsTerminal() {
+		return "", nil, login, input.Required(errNonDagsNoTarget)
+	}
+	if !login.current {
+		return "", nil, login, errPickerOtherHost(login.context.Domain)
+	}
 	if ws == "" {
-		var err error
 		ws, err = coalesceWorkspace()
 		if err != nil {
-			return "", nil, current, errors.Wrap(err, "failed to find a valid workspace")
+			return "", nil, login, errors.Wrap(err, "failed to find a valid workspace")
 		}
 	}
 	id, read, err := resolveBundleDeployment(nil, ws, "", noCreateUnderJSON(format, "to deploy to"))
-	return id, read, current, err
+	return id, read, login, err
 }
 
-// manifestHere is the pyproject.toml project's manifest in the working
-// directory, or nil when there is none or it does not load.
+// errNonDagsNoTarget is a --non-dags deploy that names no Deployment and
+// cannot be asked for one, in astro deploy's words for the same refusal.
+var errNonDagsNoTarget = errors.New("this deploy names no Deployment and this run cannot be asked: pass the Deployment id as the argument or with --deployment")
+
+// errPickerOtherHost is the workspace picker refused on a login other than
+// the current context's: it lists only the current context's Deployments.
+func errPickerOtherHost(domain string) error {
+	return fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run astro context switch %[1]s", domain)
+}
+
+// manifestHere is the manifest of the pyproject.toml project the working
+// directory is the root of, as the walk loaded it, or nil when there is none
+// or it did not load.
 func manifestHere() *manifest.Manifest {
-	if !utils.IsManifestRoot(config.WorkingPath) {
-		return nil
-	}
-	m, err := manifest.Load(filepath.Join(config.WorkingPath, project.Marker))
-	if err != nil {
-		return nil
-	}
-	return m
+	return utils.Locate(config.WorkingPath).Loaded(config.WorkingPath)
 }
 
 func hasLink(m *manifest.Manifest, name string) bool {
@@ -374,25 +396,18 @@ func hasLink(m *manifest.Manifest, name string) bool {
 	return ok
 }
 
-func firstNonEmptyString(values ...string) string {
-	for _, v := range values {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
 // deployManifest runs the manifest deploy path: load the manifest, gather flags and
 // context, resolve the deployment, and run the deploy — dags-only, image-only,
 // or both — then render the result. The manifest deploy's logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
 //
-// inProject is false for an --image-name deploy outside a pyproject.toml
-// project: there is no manifest, so the target is a Deployment id (the
+// root is the walk's answer for the project the deploy runs at the root of,
+// carrying its loaded manifest. It is nil for an --image-name deploy outside a
+// pyproject.toml project: there is no manifest, so the target is a Deployment id (the
 // argument or --deployment) or the workspace's pick, the login is the current
 // context's, and the image ships alone, with no DAGs.
-func deployManifest(cmd *cobra.Command, args []string, inProject bool) error {
+func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error {
+	inProject := root != nil
 	// The format is read before the flag refusals, so a bad --output is the
 	// usage error reported rather than whichever refusal came first. Every
 	// failure below, refusals included, reaches a json-mode caller as the one
@@ -410,12 +425,13 @@ func deployManifest(cmd *cobra.Command, args []string, inProject bool) error {
 
 	out := cmd.OutOrStdout()
 
+	// The manifest the walk loaded, or why it did not: it is not read again.
 	var m *manifest.Manifest
 	if inProject {
-		m, err = manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
-		if err != nil {
-			return manifestDeployErr(cmd, err)
+		if root.LoadErr != nil {
+			return manifestDeployErr(cmd, root.LoadErr)
 		}
+		m = root.Manifest
 	}
 
 	// --build-secret is refused HERE, not in internal/deploy, and gated on the
@@ -815,7 +831,7 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 // chosen deployment id.
 func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
 	if !d.login.current {
-		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
+		return "", errPickerOtherHost(d.login.context.Domain)
 	}
 	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
 	if err != nil {
@@ -892,31 +908,6 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		Git:               toManifestDeployGit(res.Git),
 		DagDeployEnabled:  res.DagDeployEnabled,
 	}, nil
-}
-
-// isWithinManifestProject reports whether path sits at or inside a project
-// with a pyproject.toml ([tool.astro]).
-//
-// config.IsWithinProjectDir only knows the 1.x marker, .astro/config.yaml, so it
-// answers false at every level of a project with a pyproject.toml. That left both containment
-// refusals in this package unreachable for exactly the projects that have a manifest:
-// a dbt project or a non-DAG bundle nested inside one shipped where the check
-// meant to stop it.
-func isWithinManifestProject(path string) bool {
-	abs, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return false
-	}
-	for dir := abs; ; {
-		if project.HasManifest(dir) {
-			return true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return false
-		}
-		dir = parent
-	}
 }
 
 // refuseBuildSecret is deployManifest's --build-secret check (see the

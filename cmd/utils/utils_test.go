@@ -142,7 +142,19 @@ func TestLocate(t *testing.T) {
 		dir := t.TempDir()
 		make1x(t, dir)
 		writeFile(t, dir, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
-		assert.Equal(t, Where{ManifestDir: dir}, Locate(dir))
+		assert.Equal(t, dir, Locate(dir).ManifestDir)
+		w := Locate(dir)
+		assert.True(t, w.Manifest != nil || w.LoadErr != nil, "the walk carries what loading the manifest gave")
+	})
+
+	t.Run("the walk carries the manifest it loaded, read once", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, dir, "pyproject.toml", "[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n")
+		w := Locate(dir)
+		require.NoError(t, w.LoadErr)
+		require.NotNil(t, w.Manifest)
+		assert.Same(t, w.Manifest, w.Loaded(dir))
+		assert.Nil(t, w.Loaded(t.TempDir()), "only at the root")
 	})
 
 	t.Run("a monorepo's tooling pyproject.toml above a 1.x project", func(t *testing.T) {
@@ -165,7 +177,7 @@ func TestLocate(t *testing.T) {
 		other := filepath.Join(t.TempDir(), "日本")
 		require.NoError(t, os.MkdirAll(other, 0o755))
 		writeFile(t, other, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
-		assert.Equal(t, Where{ManifestDir: other}, Locate(other))
+		assert.Equal(t, other, Locate(other).ManifestDir)
 	})
 
 	t.Run("an unreadable pyproject.toml is a root, whose deploy reports why", func(t *testing.T) {
@@ -176,11 +188,11 @@ func TestLocate(t *testing.T) {
 		writeFile(t, dir, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
 		require.NoError(t, os.Chmod(filepath.Join(dir, "pyproject.toml"), 0o000))
 		t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "pyproject.toml"), 0o600) })
-		assert.True(t, IsManifestRoot(dir))
-		assert.Equal(t, project.HasManifest(dir), IsManifestRoot(dir), "routing and the walk agree with project.HasManifest")
+		assert.True(t, isRoot(dir))
+		assert.Equal(t, project.HasManifest(dir), isRoot(dir), "routing and the walk agree with project.HasManifest")
 		sub := filepath.Join(dir, "dags")
 		require.NoError(t, os.MkdirAll(sub, 0o755))
-		assert.Equal(t, Where{ManifestDir: dir}, Locate(sub))
+		assert.Equal(t, dir, Locate(sub).ManifestDir)
 	})
 
 	t.Run("a directory that cannot be looked in is passed over", func(t *testing.T) {
@@ -202,20 +214,27 @@ func TestLocate(t *testing.T) {
 		for _, text := range []string{"[tool.astro]\nruntime = [\n", "[tool.astro.env]\nX = {\n", "tool.astro.runtime = [\n"} {
 			dir := t.TempDir()
 			writeFile(t, dir, "pyproject.toml", text)
-			assert.True(t, IsManifestRoot(dir), "%q", text)
-			assert.Equal(t, Where{ManifestDir: dir}, Locate(dir), "%q", text)
+			assert.True(t, isRoot(dir), "%q", text)
+			assert.Equal(t, dir, Locate(dir).ManifestDir, "%q", text)
+			assert.Error(t, Locate(dir).LoadErr, "%q: why it did not load, for the deploy to report", text)
 		}
 		// Some other tool's broken file: not a root, and the walk goes on
 		// to the 1.x project below it.
 		root := t.TempDir()
 		writeFile(t, root, "pyproject.toml", "[tool.ruff\nline-length = 100\n")
-		assert.False(t, IsManifestRoot(root))
+		assert.False(t, isRoot(root))
 		oneX := filepath.Join(root, "airflow")
 		make1x(t, oneX)
 		sub := filepath.Join(oneX, "dags")
 		require.NoError(t, os.MkdirAll(sub, 0o755))
 		assert.Equal(t, Where{Project1xDir: oneX}, Locate(sub))
 	})
+}
+
+// isRoot is manifestRoot's answer alone.
+func isRoot(dir string) bool {
+	root, _, _ := manifestRoot(dir)
+	return root
 }
 
 // refuse is NoDeployableProject for the working directory, as a deploy calls it.

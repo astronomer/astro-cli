@@ -997,7 +997,10 @@ func setupDeployOnStage(t *testing.T, toml string) *deployLogin {
 	return picked
 }
 
-func logInTo(t *testing.T, domain, token, org string) {
+// logInToProd stores a login for astronomer.io, the host manifestOnProd names.
+func logInToProd(t *testing.T) {
+	const token, org = "Bearer prod-token", "prod-org"
+	const domain = "astronomer.io"
 	t.Helper()
 	login := config.Context{Domain: domain}
 	require.NoError(t, login.SetContextKey("token", token))
@@ -1011,7 +1014,7 @@ func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 	for _, args := range [][]string{{"test", "--dags"}, {"--deployment", "clx-bare", "--dags"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			picked := setupDeployOnStage(t, manifestOnProd)
-			logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+			logInToProd(t)
 
 			_, err := execDeployCapture(args...)
 			require.NoError(t, err)
@@ -1032,7 +1035,7 @@ func TestDeployNonDagsUsesTheManifestDomainsLogin(t *testing.T) {
 	for _, args := range [][]string{{"test"}, {"--deployment", "clx-bare"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			setupDeployOnStage(t, manifestOnProd)
-			logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+			logInToProd(t)
 			var captured *astrodeploy.DeployBundleInput
 			prev := DeployBundle
 			t.Cleanup(func() { DeployBundle = prev })
@@ -1065,11 +1068,62 @@ func TestDeployNonDagsUsesTheManifestDomainsLogin(t *testing.T) {
 	})
 }
 
+// --non-dags naming no Deployment: a run that cannot be asked is refused as
+// astro deploy's is, input_required, before any picker; one that can is
+// offered the picker only on the current context's host, so from a project
+// on another host it is refused with the same words astro deploy uses.
+func TestDeployNonDagsWithNoTarget(t *testing.T) {
+	noBundle := func(t *testing.T) {
+		prev := DeployBundle
+		t.Cleanup(func() { DeployBundle = prev })
+		DeployBundle = func(*astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+			t.Fatal("no target, so nothing is deployed")
+			return astrodeploy.BundleDeploy{}, nil
+		}
+	}
+	nonDags := []string{"--non-dags", "--non-dags-mount-path", "/x"}
+
+	t.Run("under --output json", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		logInToProd(t)
+		noBundle(t)
+		out, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir(), "--output", "json")...)
+		require.Error(t, err)
+		var obj struct {
+			Error string `json:"error"`
+			Kind  string `json:"kind"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(out), &obj), out)
+		assert.Equal(t, "input_required", obj.Kind)
+		assert.Contains(t, obj.Error, "pass the Deployment id as the argument or with --deployment")
+	})
+
+	t.Run("without a terminal", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		logInToProd(t)
+		noBundle(t)
+		_, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir())...)
+		require.Error(t, err)
+		assert.True(t, input.IsRequired(err), "%v", err)
+	})
+
+	t.Run("the picker on another host", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		logInToProd(t)
+		interactiveDeploy(t)
+		noBundle(t)
+		_, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir())...)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "the deployment picker lists only the current context's Deployments")
+		assert.Contains(t, err.Error(), "astro context switch astronomer.io")
+	})
+}
+
 // ASTRO_API_TOKEN outranks the stored login, and goes out with its scheme like
 // a stored token, since the deploy's CI/CD check splits it off.
 func TestDeployManifestSendsTheAPITokenToTheManifestDomain(t *testing.T) {
 	picked := setupDeployOnStage(t, manifestOnProd)
-	logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+	logInToProd(t)
 	t.Setenv(astrosession.EnvAPIToken, "ci-token")
 
 	_, err := execDeployCapture("test", "--dags")
