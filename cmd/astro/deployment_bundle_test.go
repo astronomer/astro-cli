@@ -146,7 +146,7 @@ func TestDeploymentBundleJSON(t *testing.T) {
 
 		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "create", "--deployment-id", "test-id-1", "--name", name, "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
-		var got deployment.BundleInfo
+		var got deployment.BundleResult
 		decodeOne(t, stdout, &got)
 		assert.Equal(t, "bundle-1", got.ID)
 		assert.Equal(t, &name, got.Name)
@@ -163,7 +163,7 @@ func TestDeploymentBundleJSON(t *testing.T) {
 
 		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "update", "bundle-1", "--deployment-id", "test-id-1", "--description", "d", "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
-		var got deployment.BundleInfo
+		var got deployment.BundleResult
 		decodeOne(t, stdout, &got)
 		assert.Equal(t, "bundle-1", got.ID)
 		assert.NotContains(t, stderr, "bundle-1", "the result went to stderr")

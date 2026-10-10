@@ -171,9 +171,10 @@ var publishedPayloads = []cliouttest.Case{
 	// astro deployment delete: what it deleted.
 	{Name: "deployment-removal", Value: deployment.Removal{}},
 	// astro deployment bundle create and update: the bundle as the change
-	// left it, as bundle list gives each one. delete: the deletion it
-	// requested, which the API carries out in the background.
-	{Name: "deployment-bundle", Value: deployment.BundleInfo{}},
+	// left it, as bundle list gives each one, with its Deployment and any
+	// warning (a bundle that could not be read back). delete: the deletion
+	// it requested, which the API carries out in the background.
+	{Name: "deployment-bundle", Value: deployment.BundleResult{}},
 	{Name: "deployment-bundle-removal", Value: deployment.BundleRemoval{}},
 	// astro deployment hibernate and wake-up: the override the Deployment now
 	// has, which is null after --remove-override.

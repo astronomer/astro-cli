@@ -27,6 +27,7 @@ var (
 	errUpdateBundleNoOp     = errors.New("specify at least one of --description or --dag-bundle-ids")
 	errBundleSelector       = errors.New("specify exactly one bundle identifier: the BUNDLE-ID argument, --name (Dag bundle), or --mount-path (non-Dag bundle)")
 	errNoBundleInResponse   = errors.New("the API returned no bundle")
+	errNoBundleList         = errors.New("the API returned no bundle list")
 )
 
 // BundleList is the wire shape for `bundle list` output.
@@ -36,20 +37,37 @@ type BundleList struct {
 
 // BundleInfo is one bundle in `bundle list` output: the API's
 // DeploymentBundle field for field, under the CLI's snake_case keys rather
-// than the API's camelCase ones. A field the API left out stays out.
+// than the API's camelCase ones. A field the API left out stays out, as does
+// one a create or update could not read back (BundleResult): the API always
+// gives a listed bundle its id, type and times.
 type BundleInfo struct {
-	ID                string    `json:"id"`
-	Type              string    `json:"type"`
-	IsDagBundle       *bool     `json:"is_dag_bundle,omitempty"`
-	Name              *string   `json:"name,omitempty"`
-	NonDagBundleType  *string   `json:"non_dag_bundle_type,omitempty"`
-	NonDagMountPath   *string   `json:"non_dag_mount_path,omitempty"`
-	DagBundleIDs      *[]string `json:"dag_bundle_ids,omitempty"`
-	CurrentVersion    *string   `json:"current_version,omitempty"`
-	DesiredVersion    *string   `json:"desired_version,omitempty"`
-	DeletionIsPending *bool     `json:"deletion_is_pending,omitempty"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                string     `json:"id,omitempty"`
+	Type              string     `json:"type,omitempty"`
+	IsDagBundle       *bool      `json:"is_dag_bundle,omitempty"`
+	Name              *string    `json:"name,omitempty"`
+	NonDagBundleType  *string    `json:"non_dag_bundle_type,omitempty"`
+	NonDagMountPath   *string    `json:"non_dag_mount_path,omitempty"`
+	DagBundleIDs      *[]string  `json:"dag_bundle_ids,omitempty"`
+	CurrentVersion    *string    `json:"current_version,omitempty"`
+	DesiredVersion    *string    `json:"desired_version,omitempty"`
+	DeletionIsPending *bool      `json:"deletion_is_pending,omitempty"`
+	CreatedAt         *time.Time `json:"created_at,omitempty"`
+	UpdatedAt         *time.Time `json:"updated_at,omitempty"`
+}
+
+// BundleResult is what `astro deployment bundle create` and `update` publish
+// under --output json: the bundle as the change left it, in the shape bundle
+// list gives it, on the Deployment it is on.
+//
+// The API can answer a change that succeeded without the bundle (a 204, or a
+// body that is not one), and the command then reads it back. When that fails
+// too, the change still happened, so the command succeeds, with what it knows
+// (the name or mount path, and the id when the response had one) and a
+// warning saying the rest could not be read.
+type BundleResult struct {
+	BundleInfo
+	DeploymentID string   `json:"deployment_id"`
+	Warnings     []string `json:"warnings,omitempty"`
 }
 
 // BundleRemoval is what `astro deployment bundle delete` did, as it publishes it
@@ -77,6 +95,7 @@ const (
 )
 
 func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
+	created, updated := b.CreatedAt, b.UpdatedAt
 	return BundleInfo{
 		ID:                b.Id,
 		Type:              string(b.Type),
@@ -88,8 +107,8 @@ func bundleToInfo(b *astrov1alpha1.DeploymentBundle) BundleInfo {
 		CurrentVersion:    b.CurrentVersion,
 		DesiredVersion:    b.DesiredVersion,
 		DeletionIsPending: b.DeletionIsPending,
-		CreatedAt:         b.CreatedAt,
-		UpdatedAt:         b.UpdatedAt,
+		CreatedAt:         &created,
+		UpdatedAt:         &updated,
 	}
 }
 
@@ -180,16 +199,18 @@ func CreateBundle(name, mountPath, bundleType, bundleDescription string, dagBund
 
 	// A success with no bundle in the body (a 204, or a body that is not
 	// one) still created it: its name or mount path finds it.
+	result := BundleResult{DeploymentID: dep.Id}
 	bundle := resp.JSON200
 	if bundle == nil {
-		if bundle, err = findBundle(dep.OrganizationId, dep.Id, name, mountPath, astroV1Alpha1Client); err != nil {
-			return fmt.Errorf("created the bundle on deployment %s, but could not read it back: %w", dep.Id, err)
-		}
+		bundle, err = findBundle(dep.OrganizationId, dep.Id, name, mountPath, astroV1Alpha1Client)
 	}
-	return r.Emit(bundleToInfo(bundle), func(w io.Writer) error {
-		_, err := fmt.Fprintf(w, "Created bundle %s on deployment %s\n", bundle.Id, dep.Id)
-		return err
-	})
+	if bundle != nil {
+		result.BundleInfo = bundleToInfo(bundle)
+	} else {
+		result.BundleInfo = BundleInfo{Name: nonEmpty(name), NonDagMountPath: nonEmpty(mountPath)}
+		result.Warnings = []string{fmt.Sprintf("the bundle was created, but it could not be read back: %v", err)}
+	}
+	return emitBundleResult(r, &result, "Created")
 }
 
 // UpdateBundle changes a bundle's description and, for non-DAG bundles, the set of
@@ -231,16 +252,51 @@ func UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription strin
 	}
 
 	// A success with no bundle in the body still updated it; read it back.
+	result := BundleResult{DeploymentID: dep.Id}
 	bundle := resp.JSON200
 	if bundle == nil {
-		if bundle, err = getBundle(dep.OrganizationId, dep.Id, bundleID, astroV1Alpha1Client); err != nil {
-			return fmt.Errorf("updated bundle %s on deployment %s, but could not read it back: %w", bundleID, dep.Id, err)
-		}
+		bundle, err = getBundle(dep.OrganizationId, dep.Id, bundleID, astroV1Alpha1Client)
 	}
-	return r.Emit(bundleToInfo(bundle), func(w io.Writer) error {
-		_, err := fmt.Fprintf(w, "Updated bundle %s on deployment %s\n", bundleID, dep.Id)
-		return err
+	if bundle != nil {
+		result.BundleInfo = bundleToInfo(bundle)
+	} else {
+		result.BundleInfo = BundleInfo{ID: bundleID, Name: nonEmpty(bundleName), NonDagMountPath: nonEmpty(bundleMountPath)}
+		result.Warnings = []string{fmt.Sprintf("the bundle was updated, but it could not be read back: %v", err)}
+	}
+	return emitBundleResult(r, &result, "Updated")
+}
+
+// emitBundleResult publishes what a create or update did. In text, the line
+// it always printed, naming the bundle by its id, or by its name or mount
+// path when the id could not be read back, and then each warning.
+func emitBundleResult(r output.Emitter, result *BundleResult, verb string) error {
+	return r.Emit(result, func(w io.Writer) error {
+		bundle := result.ID
+		switch {
+		case bundle != "":
+		case result.Name != nil:
+			bundle = *result.Name
+		case result.NonDagMountPath != nil:
+			bundle = *result.NonDagMountPath
+		}
+		if _, err := fmt.Fprintf(w, "%s bundle %s on deployment %s\n", verb, bundle, result.DeploymentID); err != nil {
+			return err
+		}
+		for _, warning := range result.Warnings {
+			if _, err := fmt.Fprintln(w, "Warning: "+warning); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
+}
+
+// nonEmpty is s's address, or nil for "", for a field left out when empty.
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // listBundlesData fetches every bundle configured on a deployment, paging through
@@ -279,6 +335,11 @@ func listAllBundles(orgID, deploymentID string, astroV1Alpha1Client astrov1alpha
 			return nil, err
 		}
 
+		// A success with no list in the body (a 204, or a body that is not
+		// one) says nothing about the bundles, so it is not taken for none.
+		if resp.JSON200 == nil {
+			return nil, errNoBundleList
+		}
 		bundles = append(bundles, resp.JSON200.Bundles...)
 		if len(resp.JSON200.Bundles) == 0 || len(bundles) >= resp.JSON200.TotalCount {
 			break
@@ -320,21 +381,33 @@ func resolveBundleID(orgID, deploymentID, bundleID, bundleName, bundleMountPath 
 
 // findBundle finds the Dag bundle named bundleName, or the non-Dag bundle
 // mounted at bundleMountPath, among a deployment's bundles.
+//
+// A bundle whose deletion is pending is passed over: it is on its way out,
+// and a bundle deleted and then created again under the same name lists
+// both until the first is gone. The API keeps names and mount paths unique
+// among the rest, so one is left; were there more, the newest is taken, as
+// the one a create just made.
 func findBundle(orgID, deploymentID, bundleName, bundleMountPath string, astroV1Alpha1Client astrov1alpha1.APIClient) (*astrov1alpha1.DeploymentBundle, error) {
 	bundles, err := listAllBundles(orgID, deploymentID, astroV1Alpha1Client)
 	if err != nil {
 		return nil, err
 	}
 
+	var found *astrov1alpha1.DeploymentBundle
 	for i := range bundles {
 		bundle := &bundles[i]
+		if bundle.DeletionIsPending != nil && *bundle.DeletionIsPending {
+			continue
+		}
 		isDagBundle := bundle.IsDagBundle != nil && *bundle.IsDagBundle
-		if bundleName != "" && isDagBundle && bundle.Name != nil && *bundle.Name == bundleName {
-			return bundle, nil
+		matches := (bundleName != "" && isDagBundle && bundle.Name != nil && *bundle.Name == bundleName) ||
+			(bundleMountPath != "" && !isDagBundle && bundle.NonDagMountPath != nil && *bundle.NonDagMountPath == bundleMountPath)
+		if matches && (found == nil || bundle.CreatedAt.After(found.CreatedAt)) {
+			found = bundle
 		}
-		if bundleMountPath != "" && !isDagBundle && bundle.NonDagMountPath != nil && *bundle.NonDagMountPath == bundleMountPath {
-			return bundle, nil
-		}
+	}
+	if found != nil {
+		return found, nil
 	}
 
 	if bundleName != "" {
