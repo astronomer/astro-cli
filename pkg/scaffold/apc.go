@@ -35,14 +35,20 @@ func (e *Convert1xUnderAPCError) Error() string { return Project1xUnderAPCMessag
 // Is makes errors.Is(err, ErrConvert1xUnderAPC) match.
 func (e *Convert1xUnderAPCError) Is(target error) bool { return target == ErrConvert1xUnderAPC }
 
+// SwitchToAstro is how to make the current context Astro's, the one wording
+// every account of a 1.x project under Astro Private Cloud gives. astro
+// login names the domain: without one it logs back in to the current
+// context, which is APC's.
+const SwitchToAstro = "switch to an Astro context first (astro context switch astronomer.io, or astro login " +
+	"astronomer.io to sign in to Astro)"
+
 // Project1xUnderAPCMessage is the account of the 1.x project in dir under an
 // Astro Private Cloud context, in plain text: why it stays as it is
 // (Project1xUnderAPCReason), and how to convert it anyway. Plan's refusal
 // gives it.
 func Project1xUnderAPCMessage(dir string) string {
 	return Project1xUnderAPCReason(dir) + ". To convert it anyway, for Astro or for local development only, " +
-		"switch to an Astro context first (astro context switch astronomer.io, or astro login to sign in to " +
-		"Astro), then run astro init in " + dir
+		SwitchToAstro + ", then run astro init in " + dir
 }
 
 // Project1xUnderAPCReason is why the 1.x project in dir stays as it is under
@@ -58,17 +64,16 @@ func Project1xUnderAPCReason(dir string) string {
 
 // Find1xProject is the 1.x project dir is in, dir itself included, or "".
 // The walk goes up from the cleaned absolute dir to the filesystem root, and
-// stops at a directory that is an Astro project (hasManifest: one whose
-// [tool.astro] loads, or fails to), whose own business a 1.x project above
-// it is not; Plan then reports that manifest as it always has. dir need not
-// exist yet.
+// stops at a directory that is an Astro project (HasManifest), whose own
+// business a 1.x project above it is not; Plan then reports that manifest as
+// it always has. dir need not exist yet.
 func Find1xProject(dir string) string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return ""
 	}
 	for d := filepath.Clean(abs); ; {
-		if hasManifest(d) {
+		if HasManifest(d) {
 			return ""
 		}
 		if has1xLayout(d) {
@@ -83,49 +88,68 @@ func Find1xProject(dir string) string {
 }
 
 // Is1xProject reports whether dir itself holds a 1.x project: the 1.x layout
-// (has1xLayout: a Dockerfile, and a .astro/config.yaml naming a project), and
-// no pyproject.toml carrying [tool.astro]. It is the one definition: the
-// CLI's discovery and hints use it too (internal/project.Is1xProject). A
-// pyproject.toml that only configures tools (ruff, pytest) does not rule it
-// out, and one that cannot be read or parsed counts as a manifest, as
-// internal/project's HasManifest has it. It looks at dir alone, not above it.
+// (has1xLayout), and no pyproject.toml carrying [tool.astro] (HasManifest).
+// It is the one definition: the CLI's discovery and hints use it too
+// (internal/project.Is1xProject). A pyproject.toml that only configures
+// tools (ruff, pytest) does not rule it out. It looks at dir alone, not above
+// it.
 func Is1xProject(dir string) bool {
-	return has1xLayout(dir) && !hasManifest(dir)
+	return has1xLayout(dir) && !HasManifest(dir)
 }
 
-// has1xLayout reports the 1.x layout: a Dockerfile, and a .astro/config.yaml
-// that parses with a top-level project key. astro dev init always writes
-// project.name there (cmd/airflow.go in Astro CLI 1.x: CreateProjectConfig,
-// then CFG.ProjectName.SetProjectString). The CLI's own settings, in the
-// home directory's .astro/config.yaml, never have that key, so a stray
-// ~/Dockerfile does not make home a 1.x project, while a home directory that
-// holds one (HOME=/usr/local/airflow in a 1.x image) still is. The rule is on
-// content alone, so nothing compares paths.
+// has1xLayout reports the 1.x layout as Astro CLI 1.x itself knows a
+// project: a Dockerfile, and a .astro/config.yaml (1.x's config.IsProjectDir,
+// config/config.go, which its deploy requires through utils.EnsureProjectDir).
+// 1.x tells its home directory apart by path; this tells the CLI's own
+// settings file apart by content instead (isCLISettings), so a stray
+// ~/Dockerfile beside them does not make home a 1.x project, while a home
+// directory that holds one (HOME=/usr/local/airflow in a 1.x image) still is.
+// A config.yaml that is empty or does not parse counts, as it does for 1.x.
 func has1xLayout(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, fileDockerfile)); err != nil {
 		return false
 	}
-	return namesAProject(filepath.Join(dir, ".astro", "config.yaml"))
+	config := filepath.Join(dir, ".astro", "config.yaml")
+	if info, err := os.Stat(config); err != nil || info.IsDir() {
+		return false
+	}
+	return !isCLISettings(config)
 }
 
-// hasManifest reports a pyproject.toml whose [tool.astro] is there, loading
-// or not: anything but no file and no [tool.astro] section.
-func hasManifest(dir string) bool {
+// HasManifest reports a pyproject.toml whose [tool.astro] is there, loading
+// or not: anything but no file and no [tool.astro] section. One that cannot
+// be read or parsed counts, so a caller reports its error rather than
+// treating the directory as no project.
+func HasManifest(dir string) bool {
 	_, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	return !errors.Is(err, manifest.ErrNotFound) && !errors.Is(err, manifest.ErrNoAstroSection)
 }
 
-// namesAProject reports a config.yaml that parses with a top-level project
-// key, as a 1.x project's does.
-func namesAProject(path string) bool {
+// cliSettingsKeys are top-level keys the CLI's own settings file has and a
+// 1.x project's does not: the current context, the saved ones, and telemetry
+// (config.CFG's context, contexts and telemetry.*).
+var cliSettingsKeys = []string{"context", "contexts", "telemetry"}
+
+// isCLISettings reports a config.yaml that is the CLI's own settings: a YAML
+// mapping with no top-level project key (a 1.x project's always has one,
+// astro dev init writes project.name) and at least one of cliSettingsKeys.
+// Anything else, empty or unparseable included, is a project's.
+func isCLISettings(path string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
 	}
 	var top map[string]any
-	if yaml.Unmarshal(data, &top) != nil {
+	if yaml.Unmarshal(data, &top) != nil || top == nil {
 		return false
 	}
-	_, ok := top["project"]
-	return ok
+	if _, ok := top["project"]; ok {
+		return false
+	}
+	for _, k := range cliSettingsKeys {
+		if _, ok := top[k]; ok {
+			return true
+		}
+	}
+	return false
 }

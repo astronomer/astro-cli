@@ -253,7 +253,7 @@ func TestInitStillWorksAtTheRoot(t *testing.T) {
 	}
 }
 
-// write1xProject lays out the 1.x shape project.Is1xProject recognizes: a
+// write1xProject lays out the 1.x shape scaffold.Is1xProject recognizes: a
 // Dockerfile beside .astro/config.yaml, with no manifest.
 func write1xProject(t *testing.T, dir string) map[string]string {
 	t.Helper()
@@ -401,35 +401,53 @@ func TestInitConverts1xProjectUnderAstro(t *testing.T) {
 	}
 }
 
-// A directory in no 1.x project is made a project under APC as anywhere. In
-// text mode a notice on stderr says the project does not deploy there yet;
-// it is not one of the result's notes, which are what is left to do, so
-// json says nothing of APC.
+// A directory in no 1.x project is made a project under APC, or an
+// unresolved context, as anywhere. In text mode a notice on stderr says the
+// project does not deploy there yet, worded for the context and for whether
+// ASTRO_DOMAIN chose it; it is not one of the result's notes, which are what
+// is left to do, so json says nothing of it.
 func TestInitScaffoldsUnderAPC(t *testing.T) {
-	for _, format := range []string{"text", "json"} {
-		t.Run(format, func(t *testing.T) {
-			d, dir, stdout := initDeps(t)
-			stderr := &strings.Builder{}
-			d.Stderr = stderr
-			setUnderAPC(t)
-			args := []string{"init"}
-			if format == "json" {
-				args = append(args, "-o", "json")
-			}
-			if err := execute(t, d, args...); err != nil {
-				t.Fatalf("astro init: %v", err)
-			}
-			if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
-				t.Errorf("missing pyproject.toml: %v", err)
-			}
-			if strings.Contains(stdout.String(), "Astro Private Cloud") {
-				t.Errorf("stdout speaks of APC:\n%s", stdout)
-			}
-			if got := strings.Contains(stderr.String(), apcNotice); got != (format == "text") {
-				t.Errorf("the APC notice on stderr = %v in %s:\n%s", got, format, stderr)
-			}
-		})
+	for _, ctx := range []string{"apc", "apc-env", "unresolved", "unresolved-env"} {
+		for _, format := range []string{"text", "json"} {
+			t.Run(ctx+" "+format, func(t *testing.T) {
+				d, dir, stdout := initDeps(t)
+				stderr := &strings.Builder{}
+				d.Stderr = stderr
+				setContextFor(t, ctx)
+				notice := requireNotice(t, strings.HasSuffix(ctx, "-env"))
+				args := []string{"init"}
+				if format == "json" {
+					args = append(args, "-o", "json")
+				}
+				if err := execute(t, d, args...); err != nil {
+					t.Fatalf("astro init: %v", err)
+				}
+				if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
+					t.Errorf("missing pyproject.toml: %v", err)
+				}
+				if strings.Contains(stdout.String(), "Note:") {
+					t.Errorf("stdout carries the notice:\n%s", stdout)
+				}
+				if got := strings.Contains(stderr.String(), notice); got != (format == "text") {
+					t.Errorf("the notice on stderr = %v in %s:\n%s", got, format, stderr)
+				}
+			})
+		}
 	}
+}
+
+// requireNotice is the new-project notice for the context a case set, which
+// names ASTRO_DOMAIN exactly when it chose the context, in plain text.
+func requireNotice(t *testing.T, env bool) string {
+	t.Helper()
+	notice := project.NewProjectNotice()
+	if notice == "" || strings.Contains(notice, "`") {
+		t.Fatalf("notice = %q", notice)
+	}
+	if strings.Contains(notice, "ASTRO_DOMAIN") != env {
+		t.Errorf("notice names ASTRO_DOMAIN = %v, want %v: %q", !env, env, notice)
+	}
+	return notice
 }
 
 // setUnderAPC records an APC context for one test, as the root does at
@@ -676,6 +694,11 @@ func TestTheDevStubAndInitAgree(t *testing.T) {
 				if where != "fresh" && p.V1Dir != root {
 					t.Errorf("v1_dir = %q, want the root %q", p.V1Dir, root)
 				}
+				// From below the root, the command converts the root, not a
+				// project inside it.
+				if want := replaceInit + " " + root; ctx == "astro" && where == "subdir" && p.Convert != want {
+					t.Errorf("convert = %q, want %q", p.Convert, want)
+				}
 				requireStubMatchesInit(t, p, execute(t, d, "init"))
 			})
 		}
@@ -747,7 +770,7 @@ func requireStubMatchesInit(t *testing.T, p devPayload, err error) {
 	if stubRefuses && !slices.Contains(p.Notes, err.Error()) {
 		t.Errorf("the stub's advice is not init's:\nstub %q\ninit %q", p.Notes, err)
 	}
-	if !stubRefuses && p.Is1xProject && p.Convert != replaceInit {
+	if !stubRefuses && p.Is1xProject && !strings.HasPrefix(p.Convert, replaceInit) {
 		t.Errorf("a 1.x project where init converts is not offered astro init: %+v", p)
 	}
 }

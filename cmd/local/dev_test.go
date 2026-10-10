@@ -133,7 +133,7 @@ func TestDevStub1xNotice(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), notice) {
 			t.Errorf("a 1.x dir with a tools-only pyproject.toml should get the 1.x notice: %v", err)
 		}
-		if err != nil && !strings.Contains(err.Error(), "Run astro init in "+dir+" to convert it in place") {
+		if err != nil && !strings.Contains(err.Error(), dir+" holds a project made by Astro CLI 1.x") || !strings.Contains(err.Error(), "Run astro init to convert it in place") {
 			t.Errorf("the 1.x notice should point at astro init: %v", err)
 		}
 	})

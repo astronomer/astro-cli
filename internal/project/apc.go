@@ -45,9 +45,6 @@ func currentContext() Context {
 	return Context{}
 }
 
-// UnderAPC reports that the current context is Astro Private Cloud.
-func UnderAPC() bool { return currentContext().APC }
-
 // Block is why astro init refuses to convert a 1.x project here, if it does.
 type Block int
 
@@ -61,26 +58,24 @@ const (
 	BlockedUnresolved
 )
 
-// Convert1xBlocked is the one decision of whether astro init refuses dir:
-// under an APC or unresolved context, when dir is a 1.x project or lies
-// inside one (scaffold.Find1xProject, the walk scaffold.Plan makes). It
-// returns why and that project's directory, or NotBlocked and "". Every hint
-// about a 1.x project asks it (this package's errors, when they are made; the
-// astro dev stub), as init does, so none suggests astro init where init
-// refuses.
+// Convert1xBlocked is the one walk and the one decision about the 1.x
+// project dir is in: root is that project's directory, dir itself included
+// (scaffold.Find1xProject, the walk scaffold.Plan makes), or "" for none, in
+// every context; why is whether astro init refuses it, under an APC or
+// unresolved context. Every hint about a 1.x project asks it (this package's
+// errors, when they are made; the astro dev stub), as init does, so they all
+// name the same root and none suggests astro init where init refuses.
 func Convert1xBlocked(dir string) (why Block, root string) {
-	switch c := currentContext(); {
-	case c.APC:
-		why = BlockedUnderAPC
-	case c.Unresolved:
-		why = BlockedUnresolved
-	default:
-		return NotBlocked, ""
-	}
 	if root = scaffold.Find1xProject(dir); root == "" {
 		return NotBlocked, ""
 	}
-	return why, root
+	switch c := currentContext(); {
+	case c.APC:
+		return BlockedUnderAPC, root
+	case c.Unresolved:
+		return BlockedUnresolved, root
+	}
+	return NotBlocked, root
 }
 
 // Blocked1xMessage is the account of the 1.x project in root that astro
@@ -98,10 +93,33 @@ func Blocked1xMessage(why Block, root string) string {
 			"cannot be resolved, so whether the project deploys to Astro Private Cloud, where it is not converted yet, " +
 			"cannot be told. " + change + ", then run " + initCommand + " in " + root
 	}
-	change := "switch to an Astro context first (astro context switch astronomer.io, or astro login to sign in to Astro)"
+	change := scaffold.SwitchToAstro
 	if fromEnv {
 		change = "change ASTRO_DOMAIN, which names this context, to an Astro domain or unset it first"
 	}
 	return scaffold.Project1xUnderAPCReason(root) + ". To convert it anyway, for Astro or for local development " +
 		"only, " + change + ", then run " + initCommand + " in " + root
+}
+
+// NewProjectNotice is what astro init says on stderr, in text mode, after it
+// made a project under a context that does not deploy pyproject.toml
+// projects, or may not: APC's, or one the CLI cannot resolve. "" under Astro.
+func NewProjectNotice() string {
+	c := currentContext()
+	switch {
+	case c.APC && c.FromASTRODomain:
+		return "Note: the current context is Astro Private Cloud, which does not yet deploy pyproject.toml projects. " +
+			"This project runs locally; to deploy it, change ASTRO_DOMAIN, which names this context, to an Astro domain or unset it."
+	case c.APC:
+		return "Note: the current context is Astro Private Cloud, which does not yet deploy pyproject.toml projects. " +
+			"This project runs locally; to deploy it, " + scaffold.SwitchToAstro + "."
+	case c.Unresolved && c.FromASTRODomain:
+		return "Note: ASTRO_DOMAIN names a context the CLI cannot resolve, so whether it deploys pyproject.toml " +
+			"projects cannot be told. This project runs locally; to deploy it, change ASTRO_DOMAIN to a saved context or unset it."
+	case c.Unresolved:
+		return "Note: the current context cannot be resolved, so whether it deploys pyproject.toml projects cannot be " +
+			"told. This project runs locally; to deploy it, fix the context, or switch to one (astro context list, then " +
+			"astro context switch)."
+	}
+	return ""
 }

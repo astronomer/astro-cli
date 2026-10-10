@@ -73,7 +73,7 @@ func (e *NoAstroSectionError) Error() string {
 		return Blocked1xMessage(e.blocked.why, e.blocked.root)
 	}
 	if e.Has1xProject {
-		return project1xMessage(e.Dir)
+		return project1xMessage(e.blocked.root)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
 		"Run `%s` in %s to add one; the rest of the file is left alone",
@@ -112,7 +112,11 @@ func LoadError(start, dir string, err error) error {
 	if abs, absErr := filepath.Abs(start); absErr == nil {
 		start = abs
 	}
-	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: Is1xProject(dir), blocked: blockedAt(start)}
+	// The 1.x project is the one the walk from start finds, as everywhere
+	// else, so a tools-only pyproject.toml above it (a monorepo root) does
+	// not hide it, and every message names the same directory.
+	b := blockedAt(start)
+	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: b.root != "", blocked: b}
 }
 
 // Project is a discovered astro project.
@@ -140,7 +144,6 @@ func Discover(startDir string) (*Project, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", startDir, err)
 	}
-	var project1xDir string
 	for dir := abs; ; {
 		info, err := os.Stat(filepath.Join(dir, Marker))
 		if err == nil && info.Mode().IsRegular() {
@@ -149,12 +152,12 @@ func Discover(startDir string) (*Project, error) {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
-		if project1xDir == "" && Is1xProject(dir) {
-			project1xDir = dir
-		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return nil, &NotFoundError{Start: abs, Project1xDir: project1xDir, blocked: blockedAt(abs)}
+			// The 1.x project, if any, from the one walk every hint makes
+			// (Convert1xBlocked).
+			b := blockedAt(abs)
+			return nil, &NotFoundError{Start: abs, Project1xDir: b.root, blocked: b}
 		}
 		dir = parent
 	}
@@ -194,31 +197,7 @@ func New(dir string) (*Project, error) {
 // error. A pyproject without [tool.astro] (a plain Python project, or one that
 // only configures tools such as ruff or pytest) and a missing pyproject do not.
 func HasManifest(dir string) bool {
-	_, err := manifest.Load(filepath.Join(dir, Marker))
-	switch {
-	case err == nil:
-		return true
-	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
-		return false
-	default:
-		return true
-	}
-}
-
-// Is1xProject reports whether dir holds a 1.x project: a Dockerfile, a
-// .astro/config.yaml naming a project (as astro dev init always writes; the
-// CLI's own settings in a home directory name none), and no manifest. A
-// Dockerfile on its own
-// marks some container project, not necessarily a 1.x one, so it does not
-// qualify — `astro dev` must not claim such a directory is 1.x. A
-// pyproject.toml does not rule 1.x out: plenty of 1.x repositories keep one
-// for ruff or pytest settings, and only one that HasManifest accepts makes the
-// directory a project with a manifest. `astro init` converts a 1.x directory,
-// reporting the 1.x files it could not read rather than refusing them, and
-// refuses one under an Astro Private Cloud context (Convert1xBlocked). It
-// is scaffold.Is1xProject, the one definition, so the two cannot disagree.
-func Is1xProject(dir string) bool {
-	return scaffold.Is1xProject(dir)
+	return scaffold.HasManifest(dir)
 }
 
 // ID returns the identity key for a project directory: the sha256 hex of

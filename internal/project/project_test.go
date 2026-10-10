@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 const windowsOS = "windows"
@@ -307,10 +308,36 @@ func TestBlocked1xAdvice(t *testing.T) {
 	t.Run("under Astro", func(t *testing.T) {
 		why, got := Convert1xBlocked(dags)
 		assert.Equal(t, NotBlocked, why)
-		assert.Empty(t, got)
+		assert.Equal(t, root, got, "the root is named in every context")
 		nf, _ := errs()
 		assert.Contains(t, nf.Error(), "Run astro init in "+root)
 	})
+}
+
+// In a monorepo whose root pyproject.toml has no [tool.astro], with a 1.x
+// project below it, the root's NoAstroSectionError names the 1.x project, by
+// the same walk in every context, so the Astro hint and the APC refusal name
+// the same directory.
+func TestNoAstroSectionNamesTheSame1xProject(t *testing.T) {
+	repo := t.TempDir()
+	writeManifest(t, repo, toolsOnlyPyproject)
+	proj := filepath.Join(repo, "airflow")
+	require.NoError(t, os.MkdirAll(filepath.Join(proj, "dags"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(proj, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	write1xConfig(t, proj)
+	start := filepath.Join(proj, "dags")
+
+	err := LoadError(start, repo, manifest.ErrNoAstroSection)
+	var ns *NoAstroSectionError
+	require.ErrorAs(t, err, &ns)
+	assert.True(t, ns.Has1xProject)
+	assert.Contains(t, err.Error(), proj+" holds a project made by Astro CLI 1.x")
+	assert.Contains(t, err.Error(), "Run astro init in "+proj)
+
+	SetContext(Context{APC: true})
+	t.Cleanup(func() { SetContext(Context{}) })
+	err = LoadError(start, repo, manifest.ErrNoAstroSection)
+	assert.Equal(t, Blocked1xMessage(BlockedUnderAPC, proj), err.Error())
 }
 
 func TestLoadError(t *testing.T) {
@@ -360,41 +387,41 @@ func TestIs1xProject(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
-		assert.True(t, Is1xProject(dir))
+		assert.True(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("Dockerfile alone is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("pyproject dir is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeMarker(t, dir)
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("empty dir is not 1.x", func(t *testing.T) {
-		assert.False(t, Is1xProject(t.TempDir()))
+		assert.False(t, scaffold.Is1xProject(t.TempDir()))
 	})
 	t.Run("a pyproject that only configures tools leaves a 1.x layout 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
 		writeManifest(t, dir, toolsOnlyPyproject)
-		assert.True(t, Is1xProject(dir))
+		assert.True(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("a manifest beside a 1.x layout is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
 		writeManifest(t, dir, validManifest)
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 	t.Run("an unparseable pyproject beside a 1.x layout is not 1.x", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
 		writeAstroDir(t, dir)
 		writeManifest(t, dir, "this is not : valid = toml [[[\n")
-		assert.False(t, Is1xProject(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 }
 

@@ -1,6 +1,7 @@
 package scaffold
 
 import (
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -106,40 +107,36 @@ func TestAPCRefusesInsideA1xProject(t *testing.T) {
 	assert.FileExists(t, filepath.Join(root, "pyproject.toml"))
 }
 
-// A 1.x project is known by content: the CLI's own settings in a home
-// directory's .astro/ name no project, so a stray Dockerfile beside them does
-// not make home a 1.x project, whatever state the settings are in; a home
-// directory that holds a 1.x project (HOME=/usr/local/airflow in a 1.x image)
-// still is one, and is refused from below. HOME and ASTRO_HOME are set only
-// to show that nothing compares paths.
+// A 1.x project is what Astro CLI 1.x itself takes for one: a Dockerfile and
+// a .astro/config.yaml, unless that file is the CLI's own settings, as in a
+// home directory. So a stray Dockerfile beside settings, or beside a .astro/
+// with no config.yaml, does not make home a 1.x project; a config.yaml that
+// is empty or does not parse counts, as it does for 1.x, failing closed; and
+// a home directory that holds a 1.x project (HOME=/usr/local/airflow in a 1.x
+// image) is one, and is refused from below. Nothing compares paths.
 func TestTheCLIHomeIsA1xProjectOnlyWhenItSaysSo(t *testing.T) {
-	for _, env := range []string{"HOME", "ASTRO_HOME"} {
-		for name, settings := range map[string]string{
-			"settings":    "context: astronomer_io\ncontexts:\n  astronomer_io:\n    domain: astronomer.io\n",
-			"empty":       "",
-			"unparseable": "context: [unclosed\n",
-			"missing":     "-",
-		} {
-			t.Run(env+" with "+name+" settings", func(t *testing.T) {
-				home := t.TempDir()
-				files := map[string]string{fileDockerfile: "FROM x\n", ".astro/.keep": ""}
-				if settings != "-" {
-					files[".astro/config.yaml"] = settings
-				}
-				writeTree(t, home, files)
-				t.Setenv(env, home)
-				assert.False(t, Is1xProject(home))
-				_, err := Plan(filepath.Join(home, "work", "new"), Options{DeploysToAPC: true})
-				require.NoError(t, err)
-			})
-		}
-		t.Run(env+" that is a 1.x project", func(t *testing.T) {
+	for _, tc := range []struct {
+		name, config string
+		is1x         bool
+	}{
+		{"settings", "context: astronomer_io\ncontexts:\n  astronomer_io:\n    domain: astronomer.io\n", false},
+		{"settings with only telemetry", "telemetry:\n  anonymous_id: x\n", false},
+		{"no config.yaml", "-", false},
+		{"an empty config.yaml", "", true},
+		{"an unparseable config.yaml", "context: [unclosed\n", true},
+		{"a 1.x project's", "project:\n  name: x\n", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
-			write1x(t, home)
-			t.Setenv(env, home)
-			assert.True(t, Is1xProject(home))
+			files := map[string]string{fileDockerfile: "FROM x\n", ".astro/.keep": ""}
+			if tc.config != "-" {
+				files[".astro/config.yaml"] = tc.config
+			}
+			writeTree(t, home, files)
+			t.Setenv("HOME", home)
+			assert.Equal(t, tc.is1x, Is1xProject(home))
 			_, err := Plan(filepath.Join(home, "dags"), Options{DeploysToAPC: true})
-			require.ErrorIs(t, err, ErrConvert1xUnderAPC)
+			assert.Equal(t, tc.is1x, errors.Is(err, ErrConvert1xUnderAPC), "%v", err)
 		})
 	}
 }
@@ -164,9 +161,10 @@ func TestIs1xProject(t *testing.T) {
 		want  bool
 	}{
 		{"a Dockerfile beside .astro/", map[string]string{fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\n"}, true},
-		{"a 1.x config with no project key", map[string]string{fileDockerfile: df, ".astro/config.yaml": "webserver:\n  port: 8081\n"}, false},
+		{"a 1.x config with no project key", map[string]string{fileDockerfile: df, ".astro/config.yaml": "webserver:\n  port: 8081\n"}, true},
 		{"a .astro/ with no config.yaml", map[string]string{fileDockerfile: df, ".astro/test_dag_integrity_default.py": "\n"}, false},
-		{"a config.yaml that does not parse", map[string]string{fileDockerfile: df, ".astro/config.yaml": "[: nope\n"}, false},
+		{"a config.yaml that does not parse", map[string]string{fileDockerfile: df, ".astro/config.yaml": "[: nope\n"}, true},
+		{"the CLI's settings file", map[string]string{fileDockerfile: df, ".astro/config.yaml": "contexts: {}\n"}, false},
 		{"a project key beside contexts is a project's", map[string]string{
 			fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\ncontexts: {}\n",
 		}, true},

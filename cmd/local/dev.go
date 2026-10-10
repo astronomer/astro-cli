@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -174,7 +175,7 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	stays := dc.in.dir1x != "" && dc.in.blocked != project.NotBlocked
 	if dc.in.dir1x != "" {
 		if !stays {
-			p.Convert = replaceInit
+			p.Convert = dc.in.convert()
 		}
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
@@ -366,8 +367,8 @@ func renderDevRemoved(p devRemoved) string {
 	}
 	if p.Is1xProject {
 		fmt.Fprintf(&b, "\n\n%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
-			"Run %s in %s to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
-			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.V1Dir, p.Convert, p.V1Dir)
+			"Run %s to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
+			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.V1Dir, p.Convert)
 	}
 	return b.String()
 }
@@ -377,19 +378,38 @@ func renderDevRemoved(p devRemoved) string {
 type project1x struct {
 	dir1x   string
 	blocked project.Block
+	// below is set when the working directory is below dir1x rather than
+	// dir1x itself, so the command that converts it names dir1x.
+	below bool
+}
+
+// convert is the command that converts the 1.x project in place: astro init,
+// naming the project's directory when the working directory is below it, so
+// it converts the root rather than making a project inside it.
+func (p project1x) convert() string {
+	if !p.below {
+		return replaceInit
+	}
+	dir := p.dir1x
+	if strings.ContainsAny(dir, " \t'\"") {
+		dir = strconv.Quote(dir)
+	}
+	return replaceInit + " " + dir
 }
 
 // devProject is the 1.x project the stub speaks of: the nearest one the
-// working directory is in or below (scaffold.Find1xProject, the walk astro
-// init's refusal makes), in every context, and why init refuses it there, if
-// it does (project.Convert1xBlocked).
+// working directory is in or below, in every context, and why astro init
+// refuses it there, if it does, from the one walk and decision init makes
+// (project.Convert1xBlocked).
 func (c *cli) devProject() project1x {
 	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return project1x{}
 	}
-	if why, root := project.Convert1xBlocked(wd); why != project.NotBlocked {
-		return project1x{dir1x: root, blocked: why}
+	why, root := project.Convert1xBlocked(wd)
+	abs, err := filepath.Abs(wd)
+	if err != nil {
+		abs = wd
 	}
-	return project1x{dir1x: scaffold.Find1xProject(wd)}
+	return project1x{dir1x: root, blocked: why, below: root != "" && root != filepath.Clean(abs)}
 }
