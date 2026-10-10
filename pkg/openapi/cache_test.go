@@ -601,7 +601,7 @@ func TestResolveLocalPath(t *testing.T) {
 	})
 
 	t.Run("file:// stripped to absolute", func(t *testing.T) {
-		// file:///tmp/spec.json, or file:///C:/Users/.../spec.json on Windows.
+		// Three slashes on every platform: Windows puts one before the drive.
 		fileURL := "file://" + filepath.ToSlash(abs)
 		if !strings.HasPrefix(fileURL, "file:///") {
 			fileURL = "file:///" + filepath.ToSlash(abs)
