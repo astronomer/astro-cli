@@ -518,6 +518,17 @@ func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
 	}
 }
 
+// devPayload is the part of the astro dev stub's json these tests read,
+// decoded by key rather than into the payload's Go type.
+type devPayload struct {
+	Replacement string           `json:"replacement"`
+	Mapping     []devReplacement `json:"mapping"`
+	Is1xProject bool             `json:"v1_project"`
+	Notes       []string         `json:"notes"`
+	Convert     string           `json:"convert"`
+	UnderAPC    bool             `json:"under_apc"`
+}
+
 // Under APC the astro dev stub in a 1.x project says in json what it says in
 // text: under_apc, the advice in notes, and no astro init, neither as the
 // replacement for astro dev init nor in the mapping. A build secret still
@@ -531,7 +542,7 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	var p devRemoved
+	var p devPayload
 	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}
@@ -548,7 +559,11 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	}
 	// The text is the notes and nothing else: no replacement, and no table
 	// of astro local commands, none of which runs in this project.
-	text := renderDevRemoved(p)
+	err = execute(t, d, "dev", "init")
+	if err == nil {
+		t.Fatal("astro dev must fail")
+	}
+	text := err.Error()
 	for _, n := range p.Notes {
 		if !strings.Contains(text, n) {
 			t.Errorf("text lacks the note %q:\n%s", n, text)
@@ -564,7 +579,7 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	p = devRemoved{}
+	p = devPayload{}
 	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}
@@ -583,7 +598,7 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if err := execute(t, d, "dev", "start", "-o", "json"); err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	p = devRemoved{}
+	p = devPayload{}
 	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}

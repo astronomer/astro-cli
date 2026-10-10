@@ -96,10 +96,9 @@ func NewDevCmd(d Deps) *cobra.Command {
 }
 
 func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
-	dir1x := c.project1xDir()
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
-		is1x:               dir1x != "",
-		dir1x:              dir1x,
+		is1x:               c.project1xDir() != "",
+		dir1x:              c.project1xDir(),
 		apc:                project.UnderAPC(),
 		dockerfile:         c.declaresDockerfile(),
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
