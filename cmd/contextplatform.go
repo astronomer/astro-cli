@@ -14,35 +14,43 @@ import (
 //
 //   - ASTRO_DOMAIN naming an Astro domain: Astro, whatever the home config
 //     says or whether it can be read, since ASTRO_DOMAIN decides when set;
+//   - a home config that cannot be read: unresolved, naming the file, since
+//     the advice is then to fix it rather than to change the context;
 //   - no context named, by the home config or ASTRO_DOMAIN: Astro, as on a
 //     fresh machine;
-//   - a context that resolves: APC unless its domain is Astro's
+//   - a named context the config holds: APC unless its domain is Astro's
 //     (context.IsCloudDomain, as context.IsCloudContext decides it);
-//   - a home config that cannot be read, or a named context the config does
-//     not hold for a domain that is not Astro's: unresolved.
+//   - one it does not hold, for a domain that is not Astro's: unresolved.
 //
 // Unresolved is not Astro, which is where context.IsCloudContext sends it:
 // converting a 1.x project that deploys to APC is the mistake astro init
 // refuses, so it refuses until the context is fixed or switched.
 //
-// FromASTRODomain says ASTRO_DOMAIN chose the context, so the advice says to
-// change or unset it rather than to switch contexts.
+// It reads the home config only: which domain is current, and whether a
+// context for it is saved (config.Context.ContextExists). It never reads a
+// login, so it never reaches the keyring or the secrets vault, as
+// context.GetCurrentContext does.
 func contextPlatform() project.Context {
 	env := os.Getenv("ASTRO_DOMAIN")
 	if env != "" && context.IsCloudDomain(env) {
 		return project.Context{}
 	}
-	fromEnv := env != ""
 	if config.HomeConfigUnreadable() {
-		return project.Context{Unresolved: true, FromASTRODomain: fromEnv}
+		return project.Context{Unresolved: true, UnreadableConfig: config.HomeConfigFile}
 	}
 	domain, err := config.GetCurrentDomain()
 	if err != nil {
 		return project.Context{}
 	}
-	c, err := context.GetCurrentContext()
-	if err != nil {
-		return project.Context{Unresolved: !context.IsCloudDomain(domain), FromASTRODomain: fromEnv}
+	c := project.Context{FromASTRODomain: env != ""}
+	if c.FromASTRODomain {
+		saved := config.CFG.Context.GetHomeString()
+		c.UnsetIsAstro = saved == "" || context.IsCloudDomain(saved)
 	}
-	return project.Context{APC: !context.IsCloudDomain(c.Domain), FromASTRODomain: fromEnv}
+	if !(&config.Context{Domain: domain}).ContextExists() {
+		c.Unresolved = !context.IsCloudDomain(domain)
+		return c
+	}
+	c.APC = !context.IsCloudDomain(domain)
+	return c
 }

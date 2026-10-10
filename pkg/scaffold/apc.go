@@ -48,7 +48,7 @@ const SwitchToAstro = "switch to an Astro context first (astro context switch as
 // gives it.
 func Project1xUnderAPCMessage(dir string) string {
 	return Project1xUnderAPCReason(dir) + ". To convert it anyway, for Astro or for local development only, " +
-		SwitchToAstro + ", then run astro init in " + dir
+		SwitchToAstro + ", then run astro init in " + ShellQuote(dir)
 }
 
 // Project1xUnderAPCReason is why the 1.x project in dir stays as it is under
@@ -90,7 +90,7 @@ func Find1xProject(dir string) string {
 // Is1xProject reports whether dir itself holds a 1.x project: the 1.x layout
 // (has1xLayout), and no pyproject.toml carrying [tool.astro] (HasManifest).
 // It is the one definition: the CLI's discovery and hints use it too
-// (internal/project.Is1xProject). A pyproject.toml that only configures
+// (internal/project). A pyproject.toml that only configures
 // tools (ruff, pytest) does not rule it out. It looks at dir alone, not above
 // it.
 func Is1xProject(dir string) bool {

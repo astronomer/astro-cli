@@ -34,18 +34,18 @@ const initCommand = "astro init"
 type NotFoundError struct {
 	Start string
 	// Project1xDir is the nearest directory on the walk up that holds a 1.x project
-	// (see Is1xProject), or empty when there is none. A 1.x project has no
+	// (scaffold.Is1xProject), or empty when there is none. A 1.x project has no
 	// marker, so without this the error would only say what is missing, not
 	// that `astro init` upgrades what is there.
 	Project1xDir string
-	// blocked is why astro init refuses the 1.x project Start is in, and that
-	// project's directory (Convert1xBlocked), decided when the error is made.
-	blocked blocked1x
+	// blocked is why astro init refuses Project1xDir (blockedFor), decided
+	// when the error is made.
+	blocked Block
 }
 
 func (e *NotFoundError) Error() string {
-	if e.blocked.why != NotBlocked {
-		return Blocked1xMessage(e.blocked.why, e.blocked.root)
+	if e.blocked != NotBlocked && e.Project1xDir != "" {
+		return Blocked1xMessage(e.blocked, e.Project1xDir)
 	}
 	if e.Project1xDir != "" {
 		return project1xMessage(e.Project1xDir)
@@ -62,18 +62,26 @@ type NoAstroSectionError struct {
 	// Start is the directory the command ran in, Dir or one below it.
 	Start string
 	Dir   string
-	// Has1xProject is whether Dir also holds a 1.x project (see Is1xProject).
+	// Has1xProject is whether a 1.x project lies between Start and Dir, Dir
+	// included, or, where astro init refuses one (an APC or unresolved
+	// context), anywhere Start is in; Project1xDir names it.
 	Has1xProject bool
-	// blocked is NotFoundError.blocked.
-	blocked blocked1x
+	Project1xDir string
+	// blocked is why astro init refuses Project1xDir, decided when the error
+	// is made.
+	blocked Block
 }
 
 func (e *NoAstroSectionError) Error() string {
-	if e.blocked.why != NotBlocked {
-		return Blocked1xMessage(e.blocked.why, e.blocked.root)
+	root := e.Project1xDir
+	if root == "" {
+		root = e.Dir
+	}
+	if e.blocked != NotBlocked {
+		return Blocked1xMessage(e.blocked, root)
 	}
 	if e.Has1xProject {
-		return project1xMessage(e.blocked.root)
+		return project1xMessage(root)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
 		"Run `%s` in %s to add one; the rest of the file is left alone",
@@ -86,20 +94,7 @@ func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection
 // upgrade it: astro init in that directory, wherever the command ran.
 func project1xMessage(project1xDir string) string {
 	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
-		"Run %s in %s to upgrade it in place", project1xDir, initCommand, project1xDir)
-}
-
-// blocked1x is a Convert1xBlocked answer, kept on an error so its message is
-// the decision made when it was built.
-type blocked1x struct {
-	why  Block
-	root string
-}
-
-// blockedAt is Convert1xBlocked(start), as an error keeps it.
-func blockedAt(start string) blocked1x {
-	why, root := Convert1xBlocked(start)
-	return blocked1x{why: why, root: root}
+		"Run %s in %s to upgrade it in place", project1xDir, initCommand, scaffold.ShellQuote(project1xDir))
 }
 
 // LoadError returns the error to report for a manifest.Load of dir's marker,
@@ -112,11 +107,32 @@ func LoadError(start, dir string, err error) error {
 	if abs, absErr := filepath.Abs(start); absErr == nil {
 		start = abs
 	}
-	// The 1.x project is the one the walk from start finds, as everywhere
-	// else, so a tools-only pyproject.toml above it (a monorepo root) does
-	// not hide it, and every message names the same directory.
-	b := blockedAt(start)
-	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: b.root != "", blocked: b}
+	// Where astro init refuses, the 1.x project is the one its own walk finds
+	// (Convert1xBlocked), so this error says what init would. Elsewhere it is
+	// one between start and dir: a tools-only pyproject.toml above a 1.x
+	// project (a monorepo root) does not hide it, while a plain package's
+	// pyproject.toml inside a 1.x tree gets the add-[tool.astro] hint.
+	if why, root := Convert1xBlocked(start); why != NotBlocked {
+		return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: true, Project1xDir: root, blocked: why}
+	}
+	root := find1xBetween(start, dir)
+	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: root != "", Project1xDir: root}
+}
+
+// find1xBetween is the nearest 1.x project from start up to dir, dir
+// included, or "".
+func find1xBetween(start, dir string) string {
+	dir = filepath.Clean(dir)
+	for d := filepath.Clean(start); ; {
+		if scaffold.Is1xProject(d) {
+			return d
+		}
+		parent := filepath.Dir(d)
+		if d == dir || parent == d {
+			return ""
+		}
+		d = parent
+	}
 }
 
 // Project is a discovered astro project.
@@ -144,6 +160,7 @@ func Discover(startDir string) (*Project, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", startDir, err)
 	}
+	var project1xDir string
 	for dir := abs; ; {
 		info, err := os.Stat(filepath.Join(dir, Marker))
 		if err == nil && info.Mode().IsRegular() {
@@ -152,12 +169,14 @@ func Discover(startDir string) (*Project, error) {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
+		// No pyproject.toml anywhere up to here, so this is the walk
+		// scaffold.Find1xProject makes, kept in step rather than repeated.
+		if project1xDir == "" && scaffold.Is1xProject(dir) {
+			project1xDir = dir
+		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// The 1.x project, if any, from the one walk every hint makes
-			// (Convert1xBlocked).
-			b := blockedAt(abs)
-			return nil, &NotFoundError{Start: abs, Project1xDir: b.root, blocked: b}
+			return nil, &NotFoundError{Start: abs, Project1xDir: project1xDir, blocked: blockedFor(project1xDir)}
 		}
 		dir = parent
 	}

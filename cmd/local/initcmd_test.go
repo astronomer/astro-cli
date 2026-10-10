@@ -774,3 +774,45 @@ func requireStubMatchesInit(t *testing.T, p devPayload, err error) {
 		t.Errorf("a 1.x project where init converts is not offered astro init: %+v", p)
 	}
 }
+
+// From below a 1.x root, the command that converts it names the root, quoted
+// when it holds a space: as astro dev init's replacement, in the mapping, in
+// convert, and in the text's example row alike.
+func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
+	d, base, stdout := initDeps(t)
+	root := filepath.Join(base, "my project")
+	write1xProject(t, root)
+	sub := filepath.Join(root, "dags")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d.WorkingDir = func() (string, error) { return sub, nil }
+	want := replaceInit + " '" + root + "'"
+
+	stdout.Reset()
+	if err := execute(t, d, "dev", "init", "-o", "json"); err == nil {
+		t.Fatal("astro dev must fail")
+	}
+	var p devPayload
+	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
+		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
+	}
+	if p.Replacement != want || p.Convert != want || p.V1Dir != root {
+		t.Errorf("payload = %+v, want replacement and convert %q", p, want)
+	}
+	for _, m := range p.Mapping {
+		if m.Command == "init" && m.Replacement != want {
+			t.Errorf("the mapping's init = %q, want %q", m.Replacement, want)
+		}
+	}
+
+	err := execute(t, d, "dev", "init")
+	if err == nil {
+		t.Fatal("astro dev must fail")
+	}
+	for _, line := range []string{"Use `" + want + "` instead", want + " ", "Run " + want + " to convert it in place"} {
+		if !strings.Contains(err.Error(), line) {
+			t.Errorf("text lacks %q:\n%v", line, err)
+		}
+	}
+}

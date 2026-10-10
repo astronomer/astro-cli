@@ -1,13 +1,13 @@
 package local
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -175,7 +175,11 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	stays := dc.in.dir1x != "" && dc.in.blocked != project.NotBlocked
 	if dc.in.dir1x != "" {
 		if !stays {
+			// From below the root, astro init names the root, and so does
+			// every place the stub offers it: the mapping, the replacement
+			// for astro dev init, and the text's example row.
 			p.Convert = dc.in.convert()
+			p.Mapping = withInit(mapping, p.Convert)
 		}
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
@@ -201,6 +205,10 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	if replacement, ok := devReplacementFor(typed); ok && !stays {
 		p.Replacement = replacement
 		switch replacement {
+		case replaceInit:
+			if p.Convert != "" {
+				p.Replacement = p.Convert
+			}
 		case replaceStart, replaceRestart:
 			p.Replacement, p.Notes = devStartReplacement(replacement, args, dc)
 		case replacePackage:
@@ -351,7 +359,7 @@ func renderDevRemoved(p devRemoved) string {
 	examples := []devReplacement{
 		{Command: nameStart, Replacement: replaceStart},
 		{Command: nameLogs, Replacement: replaceLogs},
-		{Command: nameInit, Replacement: replaceInit},
+		{Command: nameInit, Replacement: cmp.Or(p.Convert, replaceInit)},
 	}
 	if p.Replacement != "" {
 		typed := devReplacement{Command: strings.TrimPrefix(p.Typed, "astro dev "), Replacement: p.Replacement}
@@ -390,11 +398,18 @@ func (p project1x) convert() string {
 	if !p.below {
 		return replaceInit
 	}
-	dir := p.dir1x
-	if strings.ContainsAny(dir, " \t'\"") {
-		dir = strconv.Quote(dir)
+	return replaceInit + " " + scaffold.ShellQuote(p.dir1x)
+}
+
+// withInit is mapping with astro dev init's replacement set to convert.
+func withInit(mapping []devReplacement, convert string) []devReplacement {
+	out := slices.Clone(mapping)
+	for i := range out {
+		if out[i].Replacement == replaceInit {
+			out[i].Replacement = convert
+		}
 	}
-	return replaceInit + " " + dir
+	return out
 }
 
 // devProject is the 1.x project the stub speaks of: the nearest one the

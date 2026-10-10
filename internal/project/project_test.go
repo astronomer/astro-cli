@@ -275,16 +275,43 @@ func TestBlocked1xAdvice(t *testing.T) {
 		_, nf := Discover(dags)
 		return nf, LoadError(root, root, manifest.ErrNoAstroSection)
 	}
+	then := "then run astro init in " + root
 	for _, tc := range []struct {
-		name string
-		ctx  Context
-		why  Block
-		want []string
+		name         string
+		ctx          Context
+		why          Block
+		want, absent []string
 	}{
-		{"under APC", Context{APC: true}, BlockedUnderAPC, []string{"astro context switch astronomer.io", "then run astro init in " + root}},
-		{"under APC from ASTRO_DOMAIN", Context{APC: true, FromASTRODomain: true}, BlockedUnderAPC, []string{"change ASTRO_DOMAIN", "then run astro init in " + root}},
-		{"under an unresolved context", Context{Unresolved: true}, BlockedUnresolved, []string{"astro context switch", "then run astro init in " + root}},
-		{"under an unresolved ASTRO_DOMAIN", Context{Unresolved: true, FromASTRODomain: true}, BlockedUnresolved, []string{"ASTRO_DOMAIN", "unset it", "then run astro init in " + root}},
+		{"under APC", Context{APC: true}, BlockedUnderAPC, []string{"astro context switch astronomer.io", "astro login astronomer.io", then}, nil},
+		{
+			"under APC from ASTRO_DOMAIN, saved APC",
+			Context{APC: true, FromASTRODomain: true},
+			BlockedUnderAPC,
+			[]string{"set ASTRO_DOMAIN", "(astronomer.io)", then},
+			[]string{"unset", "astro context switch"},
+		},
+		{
+			"under APC from ASTRO_DOMAIN, saved Astro",
+			Context{APC: true, FromASTRODomain: true, UnsetIsAstro: true},
+			BlockedUnderAPC,
+			[]string{"set ASTRO_DOMAIN", "or unset it", then},
+			nil,
+		},
+		{"under an unresolved context", Context{Unresolved: true}, BlockedUnresolved, []string{"astro context switch", then}, []string{"ASTRO_DOMAIN"}},
+		{
+			"under an unresolved ASTRO_DOMAIN",
+			Context{Unresolved: true, FromASTRODomain: true, UnsetIsAstro: true},
+			BlockedUnresolved,
+			[]string{"ASTRO_DOMAIN", "or unset it", then},
+			nil,
+		},
+		{
+			"under an unreadable settings file",
+			Context{Unresolved: true, UnreadableConfig: "/h/.astro/config.yaml"},
+			BlockedUnresolved,
+			[]string{"/h/.astro/config.yaml cannot be read", "Fix or move /h/.astro/config.yaml", then},
+			[]string{"ASTRO_DOMAIN", "astro context", "astro login"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			SetContext(tc.ctx)
@@ -298,6 +325,9 @@ func TestBlocked1xAdvice(t *testing.T) {
 			assert.Equal(t, want, ns.Error())
 			for _, w := range tc.want {
 				assert.Contains(t, want, w)
+			}
+			for _, w := range tc.absent {
+				assert.NotContains(t, want, w)
 			}
 			assert.NotContains(t, want, "`")
 			assert.NotContains(t, want, "again")
@@ -338,6 +368,28 @@ func TestNoAstroSectionNamesTheSame1xProject(t *testing.T) {
 	t.Cleanup(func() { SetContext(Context{}) })
 	err = LoadError(start, repo, manifest.ErrNoAstroSection)
 	assert.Equal(t, Blocked1xMessage(BlockedUnderAPC, proj), err.Error())
+}
+
+// A plain package's pyproject.toml inside a 1.x tree, with start at that
+// package, is not the 1.x project's business under Astro: the walk stops at
+// the pyproject's directory, so the hint is to add [tool.astro] there, as
+// v2 said. A path with a space is quoted where a command names it.
+func TestNoAstroSectionInsideA1xTree(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "my project")
+	lib := filepath.Join(root, "include", "mylib")
+	require.NoError(t, os.MkdirAll(lib, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	write1xConfig(t, root)
+	writeManifest(t, lib, toolsOnlyPyproject)
+
+	err := LoadError(lib, lib, manifest.ErrNoAstroSection)
+	var ns *NoAstroSectionError
+	require.ErrorAs(t, err, &ns)
+	assert.False(t, ns.Has1xProject)
+	assert.Contains(t, err.Error(), "has no [tool.astro] section")
+
+	_, nf := Discover(filepath.Join(root, "dags"))
+	assert.Contains(t, nf.Error(), "Run astro init in '"+root+"'")
 }
 
 func TestLoadError(t *testing.T) {
