@@ -44,15 +44,9 @@ func newRemovedVerbCmd(verb, noun string) *cobra.Command {
 	if alias := removedVerbs[verb]; alias != "" {
 		aliases = []string{alias}
 	}
-	return removedVerbStub(verb, aliases, func(args []string) string {
+	return removedCmdStub(verb, aliases, "Removed in v2 — use `set`, which creates or updates", func(args []string) string {
 		return removedVerbGuidance(verb, noun, args)
 	})
-}
-
-// removedVerbStub is the stub for a removed write verb; guidance supplies the
-// words, which differ by verb and, for `link`, by how the object is addressed.
-func removedVerbStub(verb string, aliases []string, guidance func(args []string) string) *cobra.Command {
-	return removedCmdStub(verb, aliases, "Removed in v2 — use `set`, which creates or updates", guidance)
 }
 
 // removedCmdStub is how the env and deployment tombstones are built

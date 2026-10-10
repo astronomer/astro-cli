@@ -83,7 +83,7 @@ func linkVariableIDOrKey() (string, error) {
 // cannot serve here: its guidance names `set <id-or-key>`, and a link is
 // addressed by two flags rather than a positional.
 func newRemovedLinkCreateCmd() *cobra.Command {
-	return removedVerbStub("create", []string{"cr"}, func([]string) string {
+	return removedCmdStub("create", []string{"cr"}, "Removed in v2 — use `set`, which creates or updates", func([]string) string {
 		return "`astro env variable link create` was removed in Astro CLI v2.\n" +
 			"  use:  astro env variable link set --variable-key <key> --deployment <id>\n" +
 			"`set` links the deployment when it is not linked and updates the link when it is. " +

@@ -102,7 +102,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 			// A removed command's stub only says what replaced it: it needs no
 			// login and checks no version, but it is logged and recorded.
 			if cliout.IsRemovedCommand(cmd) {
-				return utils.ChainRunEs(SetupLogging, trackRemovedCommand)(cmd, args)
+				return utils.ChainRunEs(readVerbosity, SetupLogging, trackRemovedCommand)(cmd, args)
 			}
 			// Skip heavy pre-run logic for commands that opt out via annotation
 			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
 // v1CommandsFile is the 1.x command inventory. Unlike v1_flags.tsv, nothing
@@ -273,28 +275,34 @@ func TestRemovedCommandStubsNeedNoLoginAndAreRecorded(t *testing.T) {
 		platformPreRun, recordRemovedCommand, config.WorkingPath = origPlatform, origRecord, origWorking
 	})
 
-	for _, tc := range []struct {
-		tree treeConfig
-		args []string
-		want string // the stub recorded
-	}{
-		{astroTree, []string{"dev", "start"}, "astro dev"},
-		{astroTree, []string{"run", "my_dag"}, "astro run"},
-		{astroTree, []string{"deployment", "pool", "list"}, "astro deployment pool"},
-		{astroTree, []string{"deployment", "connection", "create", "--conn-id", "c"}, "astro deployment connection"},
-		{astroTree, []string{"env", "variable", "create", "--key", "K"}, "astro env variable create"},
-		{astroTree, []string{"env", "variable", "link", "create"}, "astro env variable link create"},
-		{apcTree, []string{"dev", "ps", "-o", "json"}, "astro dev"},
-	} {
-		t.Run(tc.tree.name+": astro "+strings.Join(tc.args, " "), func(t *testing.T) {
-			platformRuns, recorded = nil, nil
+	// Every stub in every tree, found by its annotation, so a new one is
+	// checked here without being listed; each with a 1.x flag after it, in
+	// text and under json.
+	for _, tc := range v1CommandTrees {
+		t.Run(tc.tree.name, func(t *testing.T) {
 			root := buildTree(t, tc.tree).root
-			_, _, err := executeRoot(root, tc.args...)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
-			assert.True(t, cliout.IsUsage(err), "not a usage error: %v", err)
-			assert.Empty(t, platformRuns)
-			assert.Equal(t, []string{tc.want}, recorded)
+			var stubs []string
+			walkCmd(root, func(cmd *cobra.Command) {
+				if cliout.IsRemovedCommand(cmd) {
+					stubs = append(stubs, cmd.CommandPath())
+				}
+			})
+			require.NotEmpty(t, stubs)
+			for _, path := range stubs {
+				for _, extra := range [][]string{{"--deployment-id", "d"}, {"--deployment-id", "d", "-o", "json"}} {
+					args := append(strings.Fields(strings.TrimPrefix(path, "astro ")), extra...)
+					platformRuns, recorded = nil, nil
+					_, _, err := executeRoot(root, args...)
+					label := "astro " + strings.Join(args, " ")
+					if !assert.Error(t, err, label) {
+						continue
+					}
+					assert.Contains(t, err.Error(), "was removed in Astro CLI v2", label)
+					assert.True(t, cliout.IsUsage(err), "%s: not a usage error: %v", label, err)
+					assert.Empty(t, platformRuns, label)
+					assert.Equal(t, []string{path}, recorded, label)
+				}
+			}
 		})
 	}
 
@@ -305,4 +313,34 @@ func TestRemovedCommandStubsNeedNoLoginAndAreRecorded(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "was removed")
 	assert.Empty(t, recorded)
+}
+
+// A stub parses no flags, so the root's --verbosity is read from its raw
+// arguments before logging is set up, in each spelling pflag takes for it,
+// wherever on the line, and not after "--".
+func TestRemovedCommandStubsTakeVerbosity(t *testing.T) {
+	origRecord := recordRemovedCommand
+	recordRemovedCommand = func(*cobra.Command) {}
+	origLevel := logger.GetLevel()
+	t.Cleanup(func() { recordRemovedCommand = origRecord; logger.SetLevel(origLevel) })
+
+	for _, tc := range []struct {
+		args []string
+		want logrus.Level
+	}{
+		{[]string{"dev", "ps", "--verbosity=debug"}, logrus.DebugLevel},
+		{[]string{"dev", "ps", "--verbosity", "debug"}, logrus.DebugLevel},
+		{[]string{"--verbosity", "info", "dev", "ps"}, logrus.InfoLevel},
+		{[]string{"deployment", "pool", "list", "--verbosity=debug"}, logrus.DebugLevel},
+		{[]string{"dev", "ps", "--verbosity=info", "--verbosity=debug"}, logrus.DebugLevel},
+		{[]string{"dev", "ps", "--", "--verbosity", "debug"}, logrus.WarnLevel},
+	} {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			logger.SetLevel(logrus.PanicLevel)
+			root := buildTree(t, astroTree).root
+			_, _, err := executeRoot(root, tc.args...)
+			require.ErrorContains(t, err, "was removed in Astro CLI v2")
+			assert.Equal(t, tc.want, logger.GetLevel())
+		})
+	}
 }

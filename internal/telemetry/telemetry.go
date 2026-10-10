@@ -214,7 +214,10 @@ func TrackCommand(cmd *cobra.Command) {
 // It sends only on a machine that has already shown the first-run notice, and
 // otherwise does nothing: a stub is in the core tree too (`astro dev`, `astro
 // run`), which leaves no config/ state on a machine that has none, and showing
-// the notice is a write (TestRemovedCommandLeavesNoHomeConfigBehind in e2e).
+// the notice is a write (TestARemovedCommandLeavesNoHomeConfigBehindWithTelemetryOn
+// in e2e). So the events undercount: a fresh machine, and a CI runner that
+// starts fresh each time, send none. A count near zero does not by itself say
+// a stub can go.
 func TrackRemovedCommand(cmd *cobra.Command) {
 	if GetCommandPath(cmd) == "" || !noticeShown() || !canTrack(cmd) {
 		return

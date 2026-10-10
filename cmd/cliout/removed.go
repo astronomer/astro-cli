@@ -20,6 +20,7 @@ const RemovedCommandAnnotation = "removedCommand"
 //   - Any arguments, with flag parsing off, so an old invocation's subcommand
 //     and flags reach the guidance instead of dying on an unknown flag.
 //   - Usage silenced: the guidance is the whole message.
+//   - A pre-run of its own, which runs the root's and no group's.
 //   - --output declared, though never parsed: Execute reads it from the raw
 //     arguments for a usage error, so under -o json the failure is the one
 //     error object.
@@ -37,7 +38,16 @@ func RemovedCommand(use string, aliases []string, short string, run func(cmd *co
 		DisableFlagParsing: true,
 		SilenceUsage:       true,
 		Annotations:        map[string]string{RemovedCommandAnnotation: "true"},
-		RunE:               run,
+		// Its own, so cobra never picks a group's on its way up (`astro env`
+		// and `astro deployment` look the project up): only the root's runs,
+		// which reads the annotation.
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if root := cmd.Root(); root != cmd && root.PersistentPreRunE != nil {
+				return root.PersistentPreRunE(cmd, args)
+			}
+			return nil
+		},
+		RunE: run,
 	}
 	AddOutputFlag(cmd, new(Format))
 	return cmd

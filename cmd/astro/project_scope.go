@@ -11,7 +11,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -44,16 +43,10 @@ type projectPick struct {
 // inside a project they act on the project's workspace, on its host, and
 // take a link name wherever they take a Deployment id. group is the command
 // the hook is set on, so the hook can run the one above it, which cobra would
-// otherwise skip.
-//
-// A removed command's stub (cliout.RemovedCommand) acts on nothing, so it
-// skips the project, and gets only the pre-run above it, which logs and
-// records it.
+// otherwise skip. A removed command's stub never gets here: it has a pre-run
+// of its own (cliout.RemovedCommand).
 func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		if cliout.IsRemovedCommand(cmd) {
-			return parentPreRun(group, cmd, args)
-		}
 		before, _ := config.GetCurrentContext() //nolint:errcheck // with no context there is nothing to compare, and the login check below reports it
 		pick, err := followProject(cmd, args)
 		if err != nil {
