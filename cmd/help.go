@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 	"github.com/astronomer/astro-cli/pkg/ansi"
 )
@@ -148,8 +149,11 @@ func firstNonEmpty(values ...string) string {
 // CLI points at. It is every command that runs the platform pre-run: the core
 // tree (`astro local`, `astro init`, `astro af`, ...) skips it, works with no
 // account, and reads the same whichever context is current, so there the line
-// is noise.
+// is noise. Nor does a removed command's stub, which runs none of it either.
 func contextMatters(c *cobra.Command) bool {
+	if cliout.IsRemovedCommand(c) {
+		return false
+	}
 	for p := c; p != nil; p = p.Parent() {
 		if p.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
 			return false

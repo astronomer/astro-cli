@@ -43,7 +43,7 @@ func TestRemovedDeploymentObjectGroupsAreTombstones(t *testing.T) {
 
 			_, err := execDeploymentCmd(tc.args...)
 			assert.Error(t, err, "a removed command must fail, not print help and exit 0")
-			assert.Contains(t, err.Error(), "was removed in v2")
+			assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
 			assert.Contains(t, err.Error(), tc.want)
 			mc.AssertExpectations(t)
 		})
@@ -85,7 +85,7 @@ func TestTombstonesPublishTheJSONErrorObject(t *testing.T) {
 			var obj cliout.ErrorObject
 			assert.NoError(t, json.Unmarshal(out.Bytes(), &obj), out.String())
 			assert.Equal(t, 2, obj.Code)
-			assert.Contains(t, obj.Error, "was removed in v2")
+			assert.Contains(t, obj.Error, "was removed in Astro CLI v2")
 			assert.Contains(t, obj.Error, tc.want)
 		})
 	}

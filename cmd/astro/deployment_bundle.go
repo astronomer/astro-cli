@@ -17,7 +17,8 @@ var (
 	bundleDescription  string
 	bundleDagBundleIDs []string
 	forceBundleDelete  bool
-	bundleListOutput   cliout.Format
+	// bundleOutput is the bundle group's --output, which every subcommand takes.
+	bundleOutput cliout.Format
 )
 
 func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
@@ -28,6 +29,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Manage the bundles registered on an Astro Deployment. Dag bundles carry Dags and are targeted by 'astro deploy --dag-bundle-name'; non-Dag bundles mount other content (e.g. dbt projects) at a path.",
 	}
 	cmd.SetOut(out)
+	cliout.AddOutputFlag(cmd, &bundleOutput)
 	cmd.AddCommand(
 		newDeploymentBundleCreateCmd(out),
 		newDeploymentBundleListCmd(out),
@@ -41,26 +43,26 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentBundleCreateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "create",
-		// Hidden until it gains --output json: 1.x unhid the bundle commands
-		// (#2264), but every visible command here offers one
-		// (TestEveryCommandCanReachOutputJSON), and this one prints only prose.
-		Hidden: true,
-		Short:  "Create a bundle on an Astro Deployment",
-		Long:   "Create a Dag bundle (with --name) or a non-Dag bundle (with --mount-path) on an Astro Deployment.",
+		Use:   "create",
+		Short: "Create a bundle on an Astro Deployment",
+		Long:  "Create a Dag bundle (with --name) or a non-Dag bundle (with --mount-path) on an Astro Deployment.",
 		Example: `  # Create a named Dag bundle
   astro deployment bundle create --deployment <id> --name my-dags
 
   # Create a non-Dag bundle mounted at a path
   astro deployment bundle create --deployment <id> --mount-path /usr/local/airflow/dbt \
-    --bundle-type dbt`,
+    --bundle-type dbt
+
+  # Print the bundle created, as bundle list shows each one
+  astro deployment bundle create --deployment <id> --name my-dags -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defer strayStdoutToStderr(bundleOutput)()
 			ws, err := coalesceWorkspace()
 			if err != nil {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, out, astroV1Client, astroV1Alpha1Client)
+			return deployment.CreateBundle(bundleName, bundleMountPath, bundleNonDagType, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVar(&bundleName, "name", "", "Name of the Dag bundle to create. Mutually exclusive with --mount-path")
@@ -80,27 +82,23 @@ func newDeploymentBundleListCmd(out io.Writer) *cobra.Command {
 		Example: `  astro deployment bundle list --deployment <id>
   astro deployment bundle list --deployment <id> -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defer strayStdoutToStderr(bundleOutput)()
 			ws, err := coalesceWorkspace()
 			if err != nil {
 				return errors.Wrap(err, "failed to find a valid workspace")
 			}
 			cmd.SilenceUsage = true
-			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleListOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
+			return deployment.ListBundlesWithFormat(ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
-	cliout.AddOutputFlag(cmd, &bundleListOutput)
 	return cmd
 }
 
 func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "update [BUNDLE_ID]",
-		// Hidden until it gains --output json: 1.x unhid the bundle commands
-		// (#2264), but every visible command here offers one
-		// (TestEveryCommandCanReachOutputJSON), and this one prints only prose.
-		Hidden: true,
-		Short:  "Update a bundle on an Astro Deployment",
-		Long:   "Update a bundle's description or, for a non-Dag bundle, the Dag bundles it is served alongside. Identify the bundle by its ID argument, its Dag bundle --name, or its non-Dag --mount-path.",
+		Use:   "update [BUNDLE_ID]",
+		Short: "Update a bundle on an Astro Deployment",
+		Long:  "Update a bundle's description or, for a non-Dag bundle, the Dag bundles it is served alongside. Identify the bundle by its ID argument, its Dag bundle --name, or its non-Dag --mount-path.",
 		Example: `  # Update a bundle's description, identified by ID
   astro deployment bundle update <bundle-id> --deployment <id> --description "my bundle"
 
@@ -109,9 +107,13 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 
   # Re-associate a non-Dag bundle (identified by mount path) with a different set of Dag bundles
   astro deployment bundle update --deployment <id> --mount-path /usr/local/airflow/dbt \
-    --dag-bundle-ids <dag-bundle-id>`,
+    --dag-bundle-ids <dag-bundle-id>
+
+  # Print the bundle as the update left it
+  astro deployment bundle update <bundle-id> --deployment <id> --description "my bundle" -o json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defer strayStdoutToStderr(bundleOutput)()
 			ws, err := coalesceWorkspace()
 			if err != nil {
 				return errors.Wrap(err, "failed to find a valid workspace")
@@ -121,7 +123,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bundleID = args[0]
 			}
-			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, out, astroV1Client, astroV1Alpha1Client)
+			return deployment.UpdateBundle(bundleID, bundleName, bundleMountPath, bundleDescription, bundleDagBundleIDs, ws, deploymentID, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the Dag bundle to update by name, instead of by ID")
@@ -133,11 +135,7 @@ func newDeploymentBundleUpdateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "delete [BUNDLE_ID]",
-		// Hidden until it gains --output json: 1.x unhid the bundle commands
-		// (#2264), but every visible command here offers one
-		// (TestEveryCommandCanReachOutputJSON), and this one prints only prose.
-		Hidden:  true,
+		Use:     "delete [BUNDLE_ID]",
 		Aliases: []string{"rm"},
 		Short:   "Delete a bundle from an Astro Deployment",
 		Long:    "Delete a Dag or non-Dag bundle from an Astro Deployment. Identify the bundle by its ID argument, its Dag bundle --name, or its non-Dag --mount-path.",
@@ -148,9 +146,13 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
   astro deployment bundle delete --deployment <id> --name my-dags
 
   # Identify a non-Dag bundle by mount path
-  astro deployment bundle delete --deployment <id> --mount-path /usr/local/airflow/dbt`,
+  astro deployment bundle delete --deployment <id> --mount-path /usr/local/airflow/dbt
+
+  # Print what was deleted; under -o json there is no question, so pass --yes
+  astro deployment bundle delete <bundle-id> --deployment <id> --yes -o json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			defer strayStdoutToStderr(bundleOutput)()
 			ws, err := coalesceWorkspace()
 			if err != nil {
 				return errors.Wrap(err, "failed to find a valid workspace")
@@ -160,7 +162,7 @@ func newDeploymentBundleDeleteCmd(out io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bundleID = args[0]
 			}
-			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, out, astroV1Client, astroV1Alpha1Client)
+			return deployment.DeleteBundle(bundleID, bundleName, bundleMountPath, ws, deploymentID, forceBundleDelete, cliout.Renderer{Format: bundleOutput, Out: out}, astroV1Client, astroV1Alpha1Client)
 		},
 	}
 	cmd.Flags().StringVar(&bundleName, "name", "", "Identify the Dag bundle to delete by name, instead of by ID")

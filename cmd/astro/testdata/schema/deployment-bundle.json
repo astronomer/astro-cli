@@ -1,0 +1,20 @@
+{
+  "id": "x",
+  "type": "x",
+  "is_dag_bundle": true,
+  "name": "x",
+  "non_dag_bundle_type": "x",
+  "non_dag_mount_path": "x",
+  "dag_bundle_ids": [
+    "x"
+  ],
+  "current_version": "x",
+  "desired_version": "x",
+  "deletion_is_pending": true,
+  "created_at": "2026-07-21T10:30:00Z",
+  "updated_at": "2026-07-21T10:30:00Z",
+  "deployment_id": "x",
+  "warnings": [
+    "x"
+  ]
+}

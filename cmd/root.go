@@ -11,6 +11,7 @@ import (
 	apcCmd "github.com/astronomer/astro-cli/cmd/apc"
 	"github.com/astronomer/astro-cli/cmd/api"
 	astroCmd "github.com/astronomer/astro-cli/cmd/astro"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/context"
@@ -26,6 +27,11 @@ var (
 	houstonClient  houston.ClientInterface
 	houstonVersion string
 )
+
+// platformPreRun is the root pre-run's version check and login
+// (CreateRootPersistentPreRunE); a test swaps it to see which commands reach
+// it.
+var platformPreRun = CreateRootPersistentPreRunE
 
 const (
 	apcPlatform   = "APC"
@@ -93,13 +99,18 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		// not kept here, because Long is wrapped and the art is not prose.
 		Long: "Welcome to the Astro CLI, the modern command line interface for data orchestration. You can use it for Astro, APC, or Local Development.",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// A removed command's stub only says what replaced it: it needs no
+			// login and checks no version, but it is logged and recorded.
+			if cliout.IsRemovedCommand(cmd) {
+				return utils.ChainRunEs(readVerbosity, SetupLogging, trackRemovedCommand)(cmd, args)
+			}
 			// Skip heavy pre-run logic for commands that opt out via annotation
 			if cmd.Annotations[telemetry.SkipPreRunAnnotation] == "true" {
 				return nil
 			}
 			return utils.ChainRunEs(
 				SetupLogging,
-				CreateRootPersistentPreRunE(astroV1Client),
+				platformPreRun(astroV1Client),
 				telemetry.CreateTrackingHook(),
 			)(cmd, args)
 		},
@@ -149,13 +160,16 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	}
 
 	// The core tree (`astro local`, `astro init`, the start/stop/logs aliases,
-	// and the `astro dev` removal stub) mounts outside the cloud/software
-	// branch: local Airflow works offline with no account. Every command
-	// carries the skip-pre-run annotation — cmd/local's TestTreeInvariants
-	// checks that structurally — so PersistentPreRunE above returns before
-	// the logging setup, the platform pre-run and the telemetry hook, which
-	// is where the network calls are. The stub replaces the 1.x `astro dev`
-	// tree in this binary.
+	// and the `astro dev` and `astro run` removal stubs) mounts outside the
+	// cloud/software branch: local Airflow works offline with no account.
+	// Every command but the stubs carries the skip-pre-run annotation —
+	// cmd/local's TestTreeInvariants checks that structurally — so
+	// PersistentPreRunE above returns before the logging setup, the platform
+	// pre-run and the telemetry hook, which is where the network calls are.
+	// A stub carries the removed-command annotation instead
+	// (cliout.RemovedCommand): it gets the logging setup and the removed-command
+	// event, which is sent only where telemetry already holds state
+	// (telemetry.TrackRemovedCommand), and never the platform pre-run.
 	//
 	// The home config is still read, for core commands too: main calls
 	// config.InitConfig before this function runs, and it has to, because
@@ -165,6 +179,9 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// command on a machine that never logged in leaves no config/ state behind
 	// (config.initHome, and TestInitLeavesNoHomeConfigBehind in e2e).
 	coreDeps := local.NewDeps()
+	// The root's out, os.Stdout in production, so a test of the assembled
+	// root reads what a core command publishes where it reads the rest.
+	coreDeps.Stdout = o.out
 	wireLinkPickers(&coreDeps, o.platform, astroV1Client, o.out)
 	// A single positional argument is Otto's first message in an interactive
 	// session.

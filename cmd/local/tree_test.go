@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/pflag"
 
 	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -30,6 +31,11 @@ func walk(cmd *cobra.Command, fn func(*cobra.Command)) {
 // to, because cmd/root.go's detectRootOptions asks context.IsCloudContext()
 // which subtree to mount. That read leaves nothing behind — see
 // TestInitLeavesNoHomeConfigBehind in e2e.
+//
+// A removed command's stub (`astro dev`, `astro run`) carries the removed
+// command annotation instead (cliout.RemovedCommand): the root's pre-run sets
+// up logging and records it, which is how we learn nobody types it any more,
+// and runs no platform pre-run either.
 func TestTreeInvariants(t *testing.T) {
 	d, _ := testDeps(t)
 	for _, top := range AddCmds(d) {
@@ -37,12 +43,12 @@ func TestTreeInvariants(t *testing.T) {
 			if cmd.Args == nil {
 				t.Errorf("%s has no Args validator", cmd.CommandPath())
 			}
-			if cmd.Annotations[skipPreRunAnnotation] != "true" {
+			if cmd.Annotations[skipPreRunAnnotation] != "true" && !cliout.IsRemovedCommand(cmd) {
 				t.Errorf("%s is missing the skip-pre-run annotation", cmd.CommandPath())
 			}
-			// The dev stub and the internal supervisor, session-watcher, and
-			// proxy server render no data, so the --output rule does not apply.
-			if cmd.Runnable() && cmd.Name() != "dev" &&
+			// The internal supervisor, session-watcher, and proxy server
+			// render no data, so the --output rule does not apply.
+			if cmd.Runnable() &&
 				cmd.Name() != localrt.SuperviseSubcommand &&
 				cmd.Name() != localrt.SessionWatchSubcommand &&
 				cmd.Name() != proxydaemon.ServeSubcommand {

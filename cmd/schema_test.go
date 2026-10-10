@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/cliout/cliouttest"
+	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/context"
 )
 
@@ -83,6 +84,9 @@ var pinnedElsewhere = map[reflect.Type]string{
 	// The failure object cliout.Execute publishes for every command, whichever
 	// tree it is in.
 	reflect.TypeOf(cliout.ErrorObject{}): "cmd/local/testdata/schema/error.json",
+	// `astro dev`'s stub, which the 1.x command guard runs under -o json
+	// (removed_commands_test.go).
+	reflect.TypeOf(local.DevRemoved{}): "cmd/local/testdata/schema/dev-removed.json",
 }
 
 // emitWatch is this package's configuration of the observer TestMain arms.

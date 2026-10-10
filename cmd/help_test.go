@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/telemetry"
 )
 
@@ -119,6 +120,21 @@ func TestOfflineCommandHasNoContextLine(t *testing.T) {
 	page := renderHelp(t, root, "local")
 	assert.NotContains(t, page, "Current context:", "the core tree reads the same in every context")
 	assert.Contains(t, page, "Aliases:\n  local, lo, locally-running-airflow-instance")
+}
+
+// A removed command's stub runs no platform pre-run, so `astro help dev` has
+// no context line either, while the group it sits in still has one.
+func TestRemovedCommandStubHasNoContextLine(t *testing.T) {
+	root := buildTree(t, astroTree).root
+	for _, path := range []string{"dev", "run", "deployment pool", "env variable create"} {
+		cmd, _, err := root.Find(strings.Fields(path))
+		require.NoError(t, err)
+		require.True(t, cliout.IsRemovedCommand(cmd), path)
+		assert.False(t, contextMatters(cmd), "astro help %s would say which context it acts in", path)
+	}
+	group, _, err := root.Find([]string{"deployment"})
+	require.NoError(t, err)
+	assert.True(t, contextMatters(group))
 }
 
 func TestCommandRowPutsWideSpellingsOnTheirOwnLine(t *testing.T) {

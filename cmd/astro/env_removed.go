@@ -36,51 +36,27 @@ var nounsWithFromFile = map[string]bool{"variable": true, "airflow-variable": tr
 //
 // A tombstone rather than nothing, because cobra answers an unknown
 // subcommand by printing help and exiting 0 — so a stale `astro env variable
-// update FOO` would look like success. Shape follows the `astro dev` removal
-// stub in cmd/local/dev.go: hidden, so help teaches only what exists, and with
-// flag parsing off, so an old invocation's --key or --strict reaches the
-// guidance instead of dying on the flag.
+// update FOO` would look like success. It is a stub like every removed
+// command's (cliout.RemovedCommand), so an old invocation's --key or --strict
+// reaches the guidance instead of dying on the flag.
 func newRemovedVerbCmd(verb, noun string) *cobra.Command {
 	var aliases []string
 	if alias := removedVerbs[verb]; alias != "" {
 		aliases = []string{alias}
 	}
-	return removedVerbStub(verb, aliases, func(args []string) string {
+	return removedCmdStub(verb, aliases, "Removed in v2 — use `set`, which creates or updates", func(args []string) string {
 		return removedVerbGuidance(verb, noun, args)
 	})
 }
 
-// removedVerbStub is the shape every tombstone shares; guidance supplies the
-// words, which differ by verb and, for `link`, by how the object is addressed.
-//
-// Hidden, so help teaches only the surface that exists. Flag parsing off, so
-// an old invocation's --key or --strict reaches the guidance instead of dying
-// on the flag. The failure is a usage error, so under --output json it is the
-// one error object every command publishes (removedCmdError).
-func removedVerbStub(verb string, aliases []string, guidance func(args []string) string) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:                verb,
-		Aliases:            aliases,
-		Short:              "Removed in v2 — use `set`, which creates or updates",
-		Hidden:             true,
-		Args:               cobra.ArbitraryArgs,
-		DisableFlagParsing: true,
-		SilenceUsage:       true,
-		RunE: func(_ *cobra.Command, args []string) error {
-			return removedCmdError(guidance(args))
-		},
-	}
-	cliout.AddOutputFlag(cmd, new(cliout.Format))
-	return cmd
-}
-
-// removedCmdError is how the env and deployment tombstones fail: a usage error, the kind
-// cobra's unknown command is, so it exits 2 and, under --output json, is
-// published as the error object with kind usage. With flag parsing off the
-// stub's own --output is never set; cliout.Execute reads it from the raw
-// arguments for a usage error, which is why the stub still declares one.
-func removedCmdError(guidance string) error {
-	return cliout.Usage(errors.New(guidance))
+// removedCmdStub is how the env and deployment tombstones are built
+// (cliout.RemovedCommand): they fail with a usage error, the kind cobra's
+// unknown command is, so it exits 2 and, under --output json, is published as
+// the error object with kind usage.
+func removedCmdStub(use string, aliases []string, short string, guidance func(args []string) string) *cobra.Command {
+	return cliout.RemovedCommand(use, aliases, short, func(_ *cobra.Command, args []string) error {
+		return cliout.Usage(errors.New(guidance(args)))
+	})
 }
 
 // removedVerbGuidance names the replacement for what was actually typed.
@@ -92,7 +68,7 @@ func removedCmdError(guidance string) error {
 // though: connection and metrics-export never took it, so offering it would
 // trade a dead verb for a dead flag.
 func removedVerbGuidance(verb, noun string, args []string) string {
-	head := fmt.Sprintf("`astro env %s %s` was removed in v2.\n", noun, verb)
+	head := fmt.Sprintf("`astro env %s %s` was removed in Astro CLI v2.\n", noun, verb)
 
 	if hasFromFileArg(args) && nounsWithFromFile[noun] {
 		return head + fmt.Sprintf(

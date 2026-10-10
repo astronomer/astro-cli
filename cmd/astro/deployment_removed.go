@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
-	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // removedDeploymentObject is one of the groups that wrote Airflow objects
@@ -36,37 +34,26 @@ func newRemovedDeploymentObjectCmds() []*cobra.Command {
 	return cmds
 }
 
-// newRemovedDeploymentObjectCmd builds the tombstone for one group. The shape
-// follows the `astro dev` stub in cmd/local/dev.go: one command taking any
-// subcommand, hidden, with flag parsing off so an old invocation's
+// newRemovedDeploymentObjectCmd builds the tombstone for one group: one stub
+// (removedCmdStub) taking any subcommand, so an old invocation's
 // --deployment-id or --conn-id reaches the guidance instead of dying on the
-// flag.
+// flag. Its Short says in brief what the guidance says.
 func newRemovedDeploymentObjectCmd(o removedDeploymentObject) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:                o.noun,
-		Aliases:            o.aliases,
-		Short:              "Removed in v2 — use the Environment Manager",
-		Hidden:             true,
-		Args:               cobra.ArbitraryArgs,
-		DisableFlagParsing: true,
-		SilenceUsage:       true,
-		// Overrides the deployment group's pre-run, which resolves the
-		// project and checks the login: the guidance should not need either.
-		PersistentPreRunE: func(*cobra.Command, []string) error { return nil },
-		RunE: func(_ *cobra.Command, args []string) error {
-			return removedCmdError(removedDeploymentObjectGuidance(o, args))
-		},
+	short := "Removed in v2 — use the Airflow UI or the Airflow REST API"
+	if o.envNoun != "" {
+		short = "Removed in v2 — use `astro env " + o.envNoun + "`"
 	}
-	cliout.AddOutputFlag(cmd, new(cliout.Format))
-	return cmd
+	return removedCmdStub(o.noun, o.aliases, short, func(args []string) string {
+		return removedDeploymentObjectGuidance(o, args)
+	})
 }
 
 // removedDeploymentObjectGuidance names the replacement for the verb typed,
 // which is the first argument when there is one.
 func removedDeploymentObjectGuidance(o removedDeploymentObject, args []string) string {
-	head := fmt.Sprintf("`astro deployment %s` was removed in v2.\n", o.noun)
+	head := fmt.Sprintf("`astro deployment %s` was removed in Astro CLI v2.\n", o.noun)
 	if o.envNoun == "" {
-		return head + fmt.Sprintf("Airflow %ss are not in the Environment Manager yet. "+
+		return head + fmt.Sprintf("It has no replacement in the CLI yet: Airflow %ss are not in the Environment Manager yet. "+
 			"Until they are, manage them in the Airflow UI or through the Airflow REST API.", o.noun)
 	}
 

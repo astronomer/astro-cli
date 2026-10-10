@@ -110,7 +110,7 @@ func TestUpdateIsATombstoneOnEveryNoun(t *testing.T) {
 
 			_, err := execEnvCmd(tc.noun, "update", "FOO", "--value", "bar")
 			assert.Error(t, err, "update must fail, not print help and exit 0")
-			assert.Contains(t, err.Error(), "was removed in v2")
+			assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
 			assert.Contains(t, err.Error(), tc.want)
 			assert.Contains(t, err.Error(), "--no-create",
 				"the guidance has to name the flag that restores the old failure")
@@ -129,7 +129,7 @@ func TestUpShortAliasIsAlsoATombstone(t *testing.T) {
 
 	_, err := execEnvCmd("var", "up", "FOO", "--value", "bar")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "was removed in v2")
+	assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
 	mc.AssertExpectations(t)
 }
 
@@ -206,7 +206,7 @@ func TestEnvCreateIsATombstoneNamingTheNewForm(t *testing.T) {
 
 			_, err := execEnvCmd(tc.noun, "create", "--key", "FOO", "--value", "bar")
 			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "was removed in v2")
+			assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
 			assert.Contains(t, err.Error(), tc.want)
 			mc.AssertExpectations(t)
 		})
@@ -949,7 +949,7 @@ func TestLinkCreateIsATombstoneNamingTheLinkForm(t *testing.T) {
 
 	_, err := execEnvCmd("var", "link", "create", "--variable-key", "K", "--deployment-id", "d")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "was removed in v2")
+	assert.Contains(t, err.Error(), "was removed in Astro CLI v2")
 	assert.Contains(t, err.Error(), "astro env variable link set --variable-key")
 	assert.Contains(t, err.Error(), "CLEARS")
 	mc.AssertExpectations(t)

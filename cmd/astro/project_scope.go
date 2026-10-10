@@ -43,7 +43,8 @@ type projectPick struct {
 // inside a project they act on the project's workspace, on its host, and
 // take a link name wherever they take a Deployment id. group is the command
 // the hook is set on, so the hook can run the one above it, which cobra would
-// otherwise skip.
+// otherwise skip. A removed command's stub never gets here: it has a pre-run
+// of its own (cliout.RemovedCommand).
 func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		before, _ := config.GetCurrentContext() //nolint:errcheck // with no context there is nothing to compare, and the login check below reports it
@@ -61,13 +62,8 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 			}
 		}
 		projectWorkspaceID = pick.workspace
-		for p := group.Parent(); p != nil; p = p.Parent() {
-			if p.PersistentPreRunE != nil {
-				if err := p.PersistentPreRunE(cmd, args); err != nil {
-					return err
-				}
-				break
-			}
+		if err := parentPreRun(group, cmd, args); err != nil {
+			return err
 		}
 		if note := projectNote(cmd.Context(), pick, before.Workspace, switched); note != "" {
 			fmt.Fprintln(cmd.ErrOrStderr(), note)
@@ -200,6 +196,17 @@ func astroLinkNames(m *manifest.Manifest) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// parentPreRun runs the nearest pre-run above group, which cobra skips once it
+// has run group's.
+func parentPreRun(group, cmd *cobra.Command, args []string) error {
+	for p := group.Parent(); p != nil; p = p.Parent() {
+		if p.PersistentPreRunE != nil {
+			return p.PersistentPreRunE(cmd, args)
+		}
+	}
+	return nil
 }
 
 // projectNote is the line that says the project, not the context, chose where

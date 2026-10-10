@@ -216,12 +216,14 @@ func wantsJSON(cmd *cobra.Command, args []string, err error) bool {
 	if f.Changed || !IsUsage(err) {
 		return f.Value.String() == string(FormatJSON)
 	}
-	return argsAskForJSON(args, f.Shorthand)
+	return ArgsAskForJSON(args, f.Shorthand)
 }
 
-// argsAskForJSON finds --output json in raw arguments, in each spelling pflag
-// accepts, stopping at the "--" that ends flags.
-func argsAskForJSON(args []string, shorthand string) bool {
+// ArgsAskForJSON finds --output json in raw arguments, in each spelling pflag
+// accepts, stopping at the "--" that ends flags. A command with flag parsing
+// off (a removed command's stub) reads its --output with it, so it agrees
+// with Execute on every spelling.
+func ArgsAskForJSON(args []string, shorthand string) bool {
 	long := "--output"
 	short := ""
 	if shorthand != "" {
