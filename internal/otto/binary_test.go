@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,11 @@ func (s *BinarySuite) TestBinDir() {
 }
 
 func (s *BinarySuite) TestBinaryPath() {
-	s.Equal(filepath.Join(s.tmpDir, "bin", "otto"), BinaryPath())
+	name := "otto"
+	if runtime.GOOS == windowsGOOS {
+		name += ".exe"
+	}
+	s.Equal(filepath.Join(s.tmpDir, "bin", name), BinaryPath())
 }
 
 func (s *BinarySuite) TestInstalledVersion_NotInstalled() {
@@ -97,8 +102,12 @@ func (s *BinarySuite) TestDownloadURL() {
 	url := downloadURL()
 	s.Contains(url, cdnBaseURL)
 	s.Contains(url, "/"+defaultChannel+"/")
-	s.Contains(url, "otto-")
-	s.Contains(url, ".tar.gz")
+	s.Contains(url, "otto-"+runtime.GOOS+"-")
+	if runtime.GOOS == windowsGOOS {
+		s.True(strings.HasSuffix(url, ".exe.zip"), url)
+	} else {
+		s.True(strings.HasSuffix(url, ".tar.gz"), url)
+	}
 }
 
 func (s *BinarySuite) TestChannel_Default() {
@@ -189,7 +198,7 @@ func (s *BinarySuite) TestRenamePlatformBinary_OverwritesExisting() {
 	binDir := BinDir()
 	s.Require().NoError(os.MkdirAll(binDir, dirPerm))
 
-	binPath := filepath.Join(binDir, "otto")
+	binPath := BinaryPath()
 	platform := filepath.Join(binDir, "otto-"+runtime.GOOS+"-"+runtime.GOARCH)
 	s.Require().NoError(os.WriteFile(binPath, []byte("old"), binPerm))
 	s.Require().NoError(os.WriteFile(platform, []byte("new"), binPerm))

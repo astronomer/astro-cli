@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -236,6 +237,9 @@ func TestRemoveVenvFreesTheKeyEvenWhenTheBytesWillNotGo(t *testing.T) {
 // marker inside it — so applying that rule to a venv whose marker merely could
 // not be read would delete one that was used this morning.
 func TestVenvStaleKeepsAnEntryItCannotRead(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX mode bits: chmod 000 leaves the marker readable")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("running as root, which ignores the directory permission this relies on")
 	}

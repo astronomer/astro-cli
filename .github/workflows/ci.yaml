@@ -329,10 +329,36 @@ jobs:
             go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
             go-test-${{ runner.os }}-
 
+      # bash, not the default pwsh: PowerShell splits a native argument at a
+      # dot, so `-test.v` reached go as `-test .v`. go took the unknown `-test`
+      # as the end of the package list, tested only the root package (which
+      # has no Windows test files) and reported success, and every other
+      # root-module package went untested here.
+      #
+      # The check after it is the guard against that coming back in any form:
+      # it fails the step, naming them, when a package `go list` names has no
+      # result line (ok, FAIL, "no test files" or a bare coverage line).
       - name: Run unit tests
+        shell: bash
         env:
           GORACE: atexit_sleep_ms=0 # see the `test` target in the Makefile
-        run: go test -count=1 -race -shuffle=on -timeout=15m -cover -covermode=atomic -test.v ./...
+        run: |
+          status=0
+          log="${RUNNER_TEMP}/go-test.log"
+          go test -count=1 -race -shuffle=on -timeout=15m -cover -covermode=atomic ./... 2>&1 | tee "${log}" || status=$?
+          mod='github\.com/astronomer/astro-cli(/[^[:space:]]*)?'
+          go list ./... | LC_ALL=C sort -u > "${RUNNER_TEMP}/listed.txt"
+          sed -nE \
+            -e "s#^(ok|FAIL|\?)[[:space:]]+(${mod})([[:space:]].*)?\$#\2#p" \
+            -e "s#^[[:space:]]+(${mod})[[:space:]]+coverage:.*#\1#p" \
+            "${log}" | LC_ALL=C sort -u > "${RUNNER_TEMP}/reported.txt" || true
+          missing=$(LC_ALL=C comm -23 "${RUNNER_TEMP}/listed.txt" "${RUNNER_TEMP}/reported.txt")
+          echo "packages listed: $(wc -l < "${RUNNER_TEMP}/listed.txt"), reported: $(wc -l < "${RUNNER_TEMP}/reported.txt")"
+          if [ -n "${missing}" ]; then
+            echo "::error::go test reported no result for: $(tr '\n' ' ' <<< "${missing}")"
+            exit 1
+          fi
+          exit "${status}"
 
       # The gap this closes: the root module's `./...` does not descend into
       # pkg/*, so every sub-module went untested on Windows — including the

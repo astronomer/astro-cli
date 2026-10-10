@@ -31,3 +31,7 @@ cmd/v1_flags.tsv                text eol=lf
 # Windows checkout and every comparison fails on line endings rather than on
 # content — which is what the first Windows run of these tests actually reported.
 **/testdata/**                  text eol=lf
+
+# Read verbatim into requests that tests compare against LF literals (the
+# git-sync ssh key, for one): the same CRLF problem as the goldens above.
+cmd/apc/testfiles/**            text eol=lf

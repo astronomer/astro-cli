@@ -320,11 +320,12 @@ func (s *ConfigSuite) chdirTempProject(name string) string {
 	s.Require().NoError(err)
 	s.Require().NoError(os.Chdir(dir))
 	s.T().Cleanup(func() { _ = os.Chdir(orig) })
-	// Resolve symlinks so the path matches what os.Getwd() inside DetectAirflow
-	// observes (macOS renders /var/folders via a /private/var symlink).
-	resolved, err := filepath.EvalSymlinks(dir)
+	// What os.Getwd() inside DetectAirflow observes, which is not dir itself:
+	// macOS renders /var/folders via a /private/var symlink, and Windows keeps
+	// the 8.3 short name (RUNNER~1) that filepath.EvalSymlinks would expand.
+	cwd, err := os.Getwd()
 	s.Require().NoError(err)
-	return resolved
+	return cwd
 }
 
 // chdirManifestProject is chdirTempProject plus a project manifest. Discovery keys
