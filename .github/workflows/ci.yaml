@@ -329,10 +329,31 @@ jobs:
             go-test-${{ runner.os }}-${{ hashFiles('**/go.sum') }}-
             go-test-${{ runner.os }}-
 
+      # bash, not the default pwsh: PowerShell splits a native argument at a
+      # dot, so `-test.v` reached go as `-test .v`. go took the unknown `-test`
+      # as the end of the package list, tested only the root package (which
+      # has no Windows test files) and reported success, and every other
+      # root-module package went untested here.
+      #
+      # The count below is the guard against that coming back in any form: it
+      # fails the step unless every package `go list` names reported a result
+      # line (ok, FAIL, "no test files" or a bare coverage line).
       - name: Run unit tests
+        shell: bash
         env:
           GORACE: atexit_sleep_ms=0 # see the `test` target in the Makefile
-        run: go test -count=1 -race -shuffle=on -timeout=15m -cover -covermode=atomic -test.v ./...
+        run: |
+          status=0
+          go test -count=1 -race -shuffle=on -timeout=15m -cover -covermode=atomic ./... 2>&1 | tee "${RUNNER_TEMP}/go-test.log" || status=$?
+          want=$(go list ./... | wc -l)
+          got=$(grep -oE '^(ok|FAIL|\?)[[:space:]]+github\.com/astronomer/astro-cli[^[:space:]]*|^[[:space:]]+github\.com/astronomer/astro-cli[^[:space:]]*[[:space:]]+coverage:' "${RUNNER_TEMP}/go-test.log" \
+            | grep -oE 'github\.com/astronomer/astro-cli[^[:space:]]*' | sort -u | wc -l)
+          echo "packages listed: ${want}, packages reported: ${got}"
+          if [ $((got)) -ne $((want)) ]; then
+            echo "::error::go test reported ${got} of ${want} packages"
+            exit 1
+          fi
+          exit "${status}"
 
       # The gap this closes: the root module's `./...` does not descend into
       # pkg/*, so every sub-module went untested on Windows — including the
