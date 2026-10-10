@@ -74,12 +74,12 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	}
 	// The one decision every 1.x hint makes too (project.Convert1xBlocked):
 	// under an APC context, or one the CLI cannot resolve, a directory in a
-	// 1.x project is refused before anything is read or written. scaffold
-	// makes the APC refusal itself as well, as it does for Astro Desktop.
+	// 1.x project is refused before anything is read or written. So
+	// opts.DeploysToAPC stays unset here: it is how a caller without this
+	// decision, Astro Desktop, has scaffold make the same refusal.
 	if why, root := project.Convert1xBlocked(dir); why != project.NotBlocked {
-		return &convert1xBlockedError{msg: project.Blocked1xMessage(why, root, dir)}
+		return &convert1xBlockedError{msg: project.Blocked1xMessage(why, root)}
 	}
-	opts.DeploysToAPC = project.UnderAPC()
 
 	res, err := scaffold.Run(dir, opts)
 	if err != nil {
@@ -90,8 +90,11 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found.
 	c.writeAstroBuild(ctx, res.Dir)
-	// Said on stderr in text mode only: it is about where the project
-	// deploys, not work left to do, so it is not one of the result's notes.
+	// Every run that gets here wrote a new manifest: a pyproject.toml, or the
+	// [tool.astro] it adopted one with (init refuses a directory that is
+	// already a project). Said on stderr in text mode only: it is about where
+	// the project deploys, not work left to do, so it is not one of the
+	// result's notes.
 	if project.UnderAPC() && r.Format != cliout.FormatJSON {
 		fmt.Fprintln(c.d.Stderr, apcNotice)
 	}
@@ -123,7 +126,7 @@ func (e *convert1xBlockedError) Is(target error) bool { return target == scaffol
 // apcNotice is what a successful init under an APC context says on stderr in
 // text mode: the project it made does not deploy there yet.
 const apcNotice = "Note: the current context is Astro Private Cloud, which does not yet deploy pyproject.toml " +
-	"projects; this project runs locally and deploys to Astro."
+	"projects. This project runs locally; to deploy it, switch to an Astro context."
 
 // nextStart is the start command to suggest once init is done. Standalone
 // mode builds no image, so a project whose manifest declares a Dockerfile or

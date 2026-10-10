@@ -30,9 +30,11 @@ type devRemoved struct {
 	Typed       string           `json:"typed_command,omitempty"`
 	Replacement string           `json:"replacement,omitempty"`
 	Mapping     []devReplacement `json:"mapping"`
-	// Is1xProject is set when the current directory holds a 1.x
-	// project, which the replacements only work in once it is converted.
-	Is1xProject bool `json:"v1_project,omitempty"`
+	// Is1xProject is set when the working directory is inside a 1.x
+	// project, its root included; V1Dir names that root. The replacements
+	// only work there once it is converted.
+	Is1xProject bool   `json:"v1_project,omitempty"`
+	V1Dir       string `json:"v1_dir,omitempty"`
 	// Notes say what became of a flag the typed command carried that has no
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
@@ -165,6 +167,7 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 		Typed:       strings.TrimSpace("astro dev " + typed),
 		Mapping:     mapping,
 		Is1xProject: dc.in.dir1x != "",
+		V1Dir:       dc.in.dir1x,
 	}
 	// Where astro init refuses the 1.x project (project.Convert1xBlocked) it
 	// stays as it is, so nothing offers astro init.
@@ -186,7 +189,7 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 		p.UnderAPC, p.ContextUnresolved = dc.in.blocked == project.BlockedUnderAPC, dc.in.blocked == project.BlockedUnresolved
 		p.Mapping = []devReplacement{}
 		p.Notes = []string{
-			project.Blocked1xMessage(dc.in.blocked, dc.in.dir1x, dc.in.dir1x),
+			project.Blocked1xMessage(dc.in.blocked, dc.in.dir1x),
 			"The astro local commands work only in a converted project",
 		}
 	}
@@ -362,16 +365,13 @@ func renderDevRemoved(p devRemoved) string {
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
 	if p.Is1xProject {
-		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
-			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
-			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
+		fmt.Fprintf(&b, "\n\n%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
+			"Run %s in %s to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
+			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.V1Dir, p.Convert, p.V1Dir)
 	}
 	return b.String()
 }
 
-// project1xDir is the working directory when it holds a 1.x project, per
-// project.Is1xProject, and "" otherwise: the same check astro init's
-// refusal under APC makes, so v1_project means the same in both contexts.
 // project1x is a 1.x project the stub speaks of: its directory, "" for
 // none, and why astro init refuses it here, if it does.
 type project1x struct {
@@ -379,12 +379,10 @@ type project1x struct {
 	blocked project.Block
 }
 
-// devProject is the 1.x project the stub speaks of, and why astro init
-// refuses it, by the one decision init makes (project.Convert1xBlocked): where
-// init refuses, the project the working directory is in or below, so a
-// subdirectory gets the advice its root does; elsewhere the working directory
-// when it holds one (project.Is1xProject), since the convert advice says to
-// run astro init here.
+// devProject is the 1.x project the stub speaks of: the nearest one the
+// working directory is in or below (scaffold.Find1xProject, the walk astro
+// init's refusal makes), in every context, and why init refuses it there, if
+// it does (project.Convert1xBlocked).
 func (c *cli) devProject() project1x {
 	wd, err := c.d.WorkingDir()
 	if err != nil {
@@ -393,8 +391,5 @@ func (c *cli) devProject() project1x {
 	if why, root := project.Convert1xBlocked(wd); why != project.NotBlocked {
 		return project1x{dir1x: root, blocked: why}
 	}
-	if project.Is1xProject(wd) {
-		return project1x{dir1x: wd}
-	}
-	return project1x{}
+	return project1x{dir1x: scaffold.Find1xProject(wd)}
 }

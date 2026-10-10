@@ -88,9 +88,7 @@ func Execute(ctx context.Context) error {
 	// that speaks of a 1.x project says so, and astro init refuses to convert
 	// one; with a context it cannot resolve, it refuses too (contextPlatform).
 	// Not in NewRootCmd, which tests build for several platforms.
-	apc, unresolved := contextPlatform()
-	project.SetUnderAPC(apc)
-	project.SetContextUnresolved(unresolved)
+	project.SetContext(contextPlatform())
 
 	root, args := NewRootCmd(), os.Args[1:]
 	err := cliout.Execute(ctx, root, args, os.Stdout, problemKinds)

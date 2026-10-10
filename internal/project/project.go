@@ -38,14 +38,17 @@ type NotFoundError struct {
 	// marker, so without this the error would only say what is missing, not
 	// that `astro init` upgrades what is there.
 	Project1xDir string
+	// blocked is why astro init refuses the 1.x project Start is in, and that
+	// project's directory (Convert1xBlocked), decided when the error is made.
+	blocked blocked1x
 }
 
 func (e *NotFoundError) Error() string {
-	if msg, ok := blockedMessage(e.Start); ok {
-		return msg
+	if e.blocked.why != NotBlocked {
+		return Blocked1xMessage(e.blocked.why, e.blocked.root)
 	}
 	if e.Project1xDir != "" {
-		return project1xMessage(e.Start, e.Project1xDir)
+		return project1xMessage(e.Project1xDir)
 	}
 	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun `%s` to make this directory one",
 		Marker, e.Start, initCommand)
@@ -61,14 +64,16 @@ type NoAstroSectionError struct {
 	Dir   string
 	// Has1xProject is whether Dir also holds a 1.x project (see Is1xProject).
 	Has1xProject bool
+	// blocked is NotFoundError.blocked.
+	blocked blocked1x
 }
 
 func (e *NoAstroSectionError) Error() string {
-	if msg, ok := blockedMessage(e.Start); ok {
-		return msg
+	if e.blocked.why != NotBlocked {
+		return Blocked1xMessage(e.blocked.why, e.blocked.root)
 	}
 	if e.Has1xProject {
-		return project1xMessage(e.Start, e.Dir)
+		return project1xMessage(e.Dir)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
 		"Run `%s` in %s to add one; the rest of the file is left alone",
@@ -77,26 +82,24 @@ func (e *NoAstroSectionError) Error() string {
 
 func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection }
 
-// project1xMessage says that project1xDir holds a 1.x project and how to upgrade it,
-// naming the directory only when it is not the one the command ran in.
-func project1xMessage(start, project1xDir string) string {
-	where, there := "this directory", "here"
-	if project1xDir != start {
-		where, there = project1xDir, "in "+project1xDir
-	}
+// project1xMessage says that project1xDir holds a 1.x project and how to
+// upgrade it: astro init in that directory, wherever the command ran.
+func project1xMessage(project1xDir string) string {
 	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
-		"Run `%s` %s to upgrade it in place", where, initCommand, there)
+		"Run %s in %s to upgrade it in place", project1xDir, initCommand, project1xDir)
 }
 
-// blockedMessage is what to say instead, where astro init refuses the 1.x
-// project start is in or below (Convert1xBlocked): Blocked1xMessage, naming
-// that project's directory, rather than to run astro init.
-func blockedMessage(start string) (string, bool) {
+// blocked1x is a Convert1xBlocked answer, kept on an error so its message is
+// the decision made when it was built.
+type blocked1x struct {
+	why  Block
+	root string
+}
+
+// blockedAt is Convert1xBlocked(start), as an error keeps it.
+func blockedAt(start string) blocked1x {
 	why, root := Convert1xBlocked(start)
-	if why == NotBlocked {
-		return "", false
-	}
-	return Blocked1xMessage(why, root, root), true
+	return blocked1x{why: why, root: root}
 }
 
 // LoadError returns the error to report for a manifest.Load of dir's marker,
@@ -109,7 +112,7 @@ func LoadError(start, dir string, err error) error {
 	if abs, absErr := filepath.Abs(start); absErr == nil {
 		start = abs
 	}
-	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: Is1xProject(dir)}
+	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: Is1xProject(dir), blocked: blockedAt(start)}
 }
 
 // Project is a discovered astro project.
@@ -151,7 +154,7 @@ func Discover(startDir string) (*Project, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return nil, &NotFoundError{Start: abs, Project1xDir: project1xDir}
+			return nil, &NotFoundError{Start: abs, Project1xDir: project1xDir, blocked: blockedAt(abs)}
 		}
 		dir = parent
 	}
@@ -202,17 +205,18 @@ func HasManifest(dir string) bool {
 	}
 }
 
-// Is1xProject reports whether dir holds a 1.x project: the old Dockerfile
-// layout with a .astro/ directory, and no manifest. A Dockerfile on its own
+// Is1xProject reports whether dir holds a 1.x project: a Dockerfile, a
+// .astro/config.yaml naming a project (as astro dev init always writes; the
+// CLI's own settings in a home directory name none), and no manifest. A
+// Dockerfile on its own
 // marks some container project, not necessarily a 1.x one, so it does not
 // qualify — `astro dev` must not claim such a directory is 1.x. A
 // pyproject.toml does not rule 1.x out: plenty of 1.x repositories keep one
 // for ruff or pytest settings, and only one that HasManifest accepts makes the
 // directory a project with a manifest. `astro init` converts a 1.x directory,
 // reporting the 1.x files it could not read rather than refusing them, and
-// refuses one under an Astro Private Cloud context (Project1xUnderAPC). It
-// is scaffold.Is1xProject, the check scaffold.Plan makes, so the two cannot
-// disagree.
+// refuses one under an Astro Private Cloud context (Convert1xBlocked). It
+// is scaffold.Is1xProject, the one definition, so the two cannot disagree.
 func Is1xProject(dir string) bool {
 	return scaffold.Is1xProject(dir)
 }

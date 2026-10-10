@@ -5,6 +5,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/project"
 )
 
 // contextPlatform says whether the current context is Astro Private Cloud,
@@ -23,20 +24,25 @@ import (
 // Unresolved is not Astro, which is where context.IsCloudContext sends it:
 // converting a 1.x project that deploys to APC is the mistake astro init
 // refuses, so it refuses until the context is fixed or switched.
-func contextPlatform() (apc, unresolved bool) {
-	if d := os.Getenv("ASTRO_DOMAIN"); d != "" && context.IsCloudDomain(d) {
-		return false, false
+//
+// FromASTRODomain says ASTRO_DOMAIN chose the context, so the advice says to
+// change or unset it rather than to switch contexts.
+func contextPlatform() project.Context {
+	env := os.Getenv("ASTRO_DOMAIN")
+	if env != "" && context.IsCloudDomain(env) {
+		return project.Context{}
 	}
+	fromEnv := env != ""
 	if config.HomeConfigUnreadable() {
-		return false, true
+		return project.Context{Unresolved: true, FromASTRODomain: fromEnv}
 	}
 	domain, err := config.GetCurrentDomain()
 	if err != nil {
-		return false, false
+		return project.Context{}
 	}
 	c, err := context.GetCurrentContext()
 	if err != nil {
-		return false, !context.IsCloudDomain(domain)
+		return project.Context{Unresolved: !context.IsCloudDomain(domain), FromASTRODomain: fromEnv}
 	}
-	return !context.IsCloudDomain(c.Domain), false
+	return project.Context{APC: !context.IsCloudDomain(c.Domain), FromASTRODomain: fromEnv}
 }

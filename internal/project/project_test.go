@@ -18,6 +18,14 @@ import (
 
 const windowsOS = "windows"
 
+// write1xConfig writes the .astro/config.yaml a 1.x project has: astro dev
+// init always names the project there, which is what makes a 1.x project.
+func write1xConfig(t *testing.T, dir string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600))
+}
+
 func writeMarker(t *testing.T, dir string) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, Marker), []byte("[project]\nname = \"demo\"\n"), 0o600))
@@ -228,7 +236,7 @@ func TestNotFoundErrorPointsAtInit(t *testing.T) {
 func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
-	require.NoError(t, os.Mkdir(filepath.Join(root, ".astro"), 0o700))
+	write1xConfig(t, root)
 	dags := filepath.Join(root, "dags")
 	require.NoError(t, os.Mkdir(dags, 0o700))
 
@@ -237,8 +245,8 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		var nf *NotFoundError
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
-		assert.Contains(t, err.Error(), "this directory holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` here")
+		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
+		assert.Contains(t, err.Error(), "Run astro init in "+root)
 	})
 	t.Run("below the root", func(t *testing.T) {
 		_, err := Discover(dags)
@@ -246,53 +254,62 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
 		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` in "+root)
+		assert.Contains(t, err.Error(), "Run astro init in "+root)
 	})
 }
 
 // Where astro init refuses a 1.x project (Convert1xBlocked), a 1.x project's
-// errors give the same account, naming the project's directory, rather than
-// say to run astro init, however they are wrapped: the APC one under APC, and
-// fix-the-context under an unresolved context. An error about no 1.x project
-// is unchanged. Not parallel: it flips package state.
+// errors give the same account, decided when the error is made, naming the
+// project's directory and saying to run astro init there, however they are
+// wrapped: the APC one under APC, fix-the-context under an unresolved
+// context, and change-ASTRO_DOMAIN where it chose the context. An error about
+// no 1.x project is unchanged. Not parallel: it sets package state.
 func TestBlocked1xAdvice(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
-	require.NoError(t, os.MkdirAll(filepath.Join(root, ".astro"), 0o700))
-	require.NoError(t, os.WriteFile(filepath.Join(root, ".astro", "config.yaml"), []byte("project:\n  name: x\n"), 0o600))
+	write1xConfig(t, root)
 	dags := filepath.Join(root, "dags")
 	require.NoError(t, os.Mkdir(dags, 0o700))
-	nf := &NotFoundError{Start: dags, Project1xDir: root}
-	ns := &NoAstroSectionError{Start: root, Dir: root, Has1xProject: true}
-	plain := &NotFoundError{Start: t.TempDir()}
-	require.Contains(t, nf.Error(), "Run `astro init`")
-	plainBefore := plain.Error()
-
-	t.Run("under APC", func(t *testing.T) {
-		SetUnderAPC(true)
-		t.Cleanup(func() { SetUnderAPC(false) })
-		why, got := Convert1xBlocked(dags)
-		assert.Equal(t, BlockedUnderAPC, why)
-		assert.Equal(t, root, got)
-		assert.Equal(t, "wrapped: "+Project1xUnderAPC(root), fmt.Errorf("wrapped: %w", nf).Error())
-		assert.Equal(t, Project1xUnderAPC(root), ns.Error())
-		assert.Equal(t, plainBefore, plain.Error())
-		assert.NotContains(t, Project1xUnderAPC(root), "`")
-	})
-	t.Run("under an unresolved context", func(t *testing.T) {
-		SetContextUnresolved(true)
-		t.Cleanup(func() { SetContextUnresolved(false) })
-		why, _ := Convert1xBlocked(dags)
-		assert.Equal(t, BlockedUnresolved, why)
-		assert.Equal(t, Blocked1xMessage(BlockedUnresolved, root, root), nf.Error())
-		assert.Contains(t, nf.Error(), "astro context switch")
-		assert.NotContains(t, nf.Error(), "`")
-	})
+	errs := func() (error, error) {
+		_, nf := Discover(dags)
+		return nf, LoadError(root, root, manifest.ErrNoAstroSection)
+	}
+	for _, tc := range []struct {
+		name string
+		ctx  Context
+		why  Block
+		want []string
+	}{
+		{"under APC", Context{APC: true}, BlockedUnderAPC, []string{"astro context switch astronomer.io", "then run astro init in " + root}},
+		{"under APC from ASTRO_DOMAIN", Context{APC: true, FromASTRODomain: true}, BlockedUnderAPC, []string{"change ASTRO_DOMAIN", "then run astro init in " + root}},
+		{"under an unresolved context", Context{Unresolved: true}, BlockedUnresolved, []string{"astro context switch", "then run astro init in " + root}},
+		{"under an unresolved ASTRO_DOMAIN", Context{Unresolved: true, FromASTRODomain: true}, BlockedUnresolved, []string{"ASTRO_DOMAIN", "unset it", "then run astro init in " + root}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			SetContext(tc.ctx)
+			t.Cleanup(func() { SetContext(Context{}) })
+			why, got := Convert1xBlocked(dags)
+			assert.Equal(t, tc.why, why)
+			assert.Equal(t, root, got)
+			nf, ns := errs()
+			want := Blocked1xMessage(tc.why, root)
+			assert.Equal(t, "wrapped: "+want, fmt.Errorf("wrapped: %w", nf).Error())
+			assert.Equal(t, want, ns.Error())
+			for _, w := range tc.want {
+				assert.Contains(t, want, w)
+			}
+			assert.NotContains(t, want, "`")
+			assert.NotContains(t, want, "again")
+			_, plain := Discover(t.TempDir())
+			assert.NotContains(t, plain.Error(), "Astro CLI 1.x")
+		})
+	}
 	t.Run("under Astro", func(t *testing.T) {
 		why, got := Convert1xBlocked(dags)
 		assert.Equal(t, NotBlocked, why)
 		assert.Empty(t, got)
-		assert.Contains(t, nf.Error(), "Run `astro init`")
+		nf, _ := errs()
+		assert.Contains(t, nf.Error(), "Run astro init in "+root)
 	})
 }
 
@@ -313,7 +330,7 @@ func TestLoadError(t *testing.T) {
 	t.Run("a tools-only pyproject in a 1.x project", func(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
-		require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
+		write1xConfig(t, dir)
 		writeManifest(t, dir, toolsOnlyPyproject)
 		err := LoadError(dir, dir, manifest.ErrNoAstroSection)
 		var ns *NoAstroSectionError
@@ -321,15 +338,14 @@ func TestLoadError(t *testing.T) {
 		assert.True(t, ns.Has1xProject)
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
 		assert.Contains(t, err.Error(), "project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run `astro init` here")
+		assert.Contains(t, err.Error(), "Run astro init in "+dir)
 
-		// From below the root, `astro init` "here" would scaffold a second
-		// project inside the 1.x one, so the root is named instead.
+		// From below the root too, the root is named: astro init there would
+		// scaffold a second project inside the 1.x one.
 		dags := filepath.Join(dir, "dags")
 		require.NoError(t, os.Mkdir(dags, 0o700))
 		err = LoadError(dags, dir, manifest.ErrNoAstroSection)
-		assert.Contains(t, err.Error(), "Run `astro init` in "+dir)
-		assert.NotContains(t, err.Error(), "here")
+		assert.Contains(t, err.Error(), "Run astro init in "+dir)
 	})
 }
 
@@ -338,10 +354,7 @@ func TestIs1xProject(t *testing.T) {
 		t.Helper()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM x\n"), 0o600))
 	}
-	writeAstroDir := func(t *testing.T, dir string) {
-		t.Helper()
-		require.NoError(t, os.Mkdir(filepath.Join(dir, ".astro"), 0o700))
-	}
+	writeAstroDir := write1xConfig
 
 	t.Run("Dockerfile and .astro is 1.x", func(t *testing.T) {
 		dir := t.TempDir()

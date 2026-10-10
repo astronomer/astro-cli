@@ -117,9 +117,7 @@ func TestDevStub1xNotice(t *testing.T) {
 	t.Run("Dockerfile and .astro gets the 1.x notice", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
-		if err := os.Mkdir(filepath.Join(dir, ".astro"), 0o700); err != nil {
-			t.Fatal(err)
-		}
+		write1xConfig(t, dir)
 		d, _ := testDeps(t)
 		d.WorkingDir = func() (string, error) { return dir, nil }
 		err := execute(t, d, "dev")
@@ -129,12 +127,13 @@ func TestDevStub1xNotice(t *testing.T) {
 	})
 	t.Run("a pyproject that only configures tools keeps the 1.x notice", func(t *testing.T) {
 		d, _ := testDeps(t)
-		d.WorkingDir = func() (string, error) { return project1xWithToolsPyproject(t), nil }
+		dir := project1xWithToolsPyproject(t)
+		d.WorkingDir = func() (string, error) { return dir, nil }
 		err := execute(t, d, "dev")
 		if err == nil || !strings.Contains(err.Error(), notice) {
 			t.Errorf("a 1.x dir with a tools-only pyproject.toml should get the 1.x notice: %v", err)
 		}
-		if err != nil && !strings.Contains(err.Error(), "Run `astro init` here to convert it in place") {
+		if err != nil && !strings.Contains(err.Error(), "Run astro init in "+dir+" to convert it in place") {
 			t.Errorf("the 1.x notice should point at astro init: %v", err)
 		}
 	})
@@ -167,10 +166,20 @@ func project1xWithToolsPyproject(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	if err := os.Mkdir(filepath.Join(dir, ".astro"), 0o700); err != nil {
+	write1xConfig(t, dir)
+	return dir
+}
+
+// write1xConfig writes the .astro/config.yaml a 1.x project has: astro dev
+// init always names the project there, which is what makes a 1.x project.
+func write1xConfig(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, ".astro"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	return dir
+	if err := os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDevStubLeadsWithTheConversionInA1xProject(t *testing.T) {

@@ -315,7 +315,7 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 			requireUnchanged(t, dir, before, files)
 			if format == "json" {
 				obj := errorObjectOf(t, stdout.String())
-				if obj.Kind != KindUnsupportedOnPlatform || obj.Code != 1 || obj.Error != project.Project1xUnderAPC(dir) {
+				if obj.Kind != KindUnsupportedOnPlatform || obj.Code != 1 || obj.Error != project.Blocked1xMessage(project.BlockedUnderAPC, dir) {
 					t.Errorf("error object = %+v", obj)
 				}
 			}
@@ -346,11 +346,11 @@ func errorObjectOf(t *testing.T, stdout string) cliout.ErrorObject {
 }
 
 // requireAPCAdvice fails unless err is the one account every hint under APC
-// gives (project.Project1xUnderAPC) of the 1.x project in dir: why it stays,
+// gives (project.Blocked1xMessage) of the 1.x project in dir: why it stays,
 // and how to convert anyway, in plain text.
 func requireAPCAdvice(t *testing.T, err error, dir string) {
 	t.Helper()
-	if want := project.Project1xUnderAPC(dir); err.Error() != want {
+	if want := project.Blocked1xMessage(project.BlockedUnderAPC, dir); err.Error() != want {
 		t.Errorf("error = %q\nwant    %q", err, want)
 	}
 	for _, want := range []string{
@@ -436,8 +436,8 @@ func TestInitScaffoldsUnderAPC(t *testing.T) {
 // startup, and puts it back. Tests that call it do not run in parallel.
 func setUnderAPC(t *testing.T) {
 	t.Helper()
-	project.SetUnderAPC(true)
-	t.Cleanup(func() { project.SetUnderAPC(false) })
+	project.SetContext(project.Context{APC: true})
+	t.Cleanup(func() { project.SetContext(project.Context{}) })
 }
 
 // Under APC, a directory inside a 1.x project is refused too, existing or
@@ -498,8 +498,8 @@ func TestInitUnderAPCRefusesA1xProjectWhereverItIs(t *testing.T) {
 // project is made a project as anywhere.
 func TestInitRefusesA1xProjectUnderAnUnresolvedContext(t *testing.T) {
 	d, dir, stdout := initDeps(t)
-	project.SetContextUnresolved(true)
-	t.Cleanup(func() { project.SetContextUnresolved(false) })
+	project.SetContext(project.Context{Unresolved: true})
+	t.Cleanup(func() { project.SetContext(project.Context{}) })
 	files := write1xProject(t, dir)
 	before := listTree(t, dir)
 
@@ -533,7 +533,7 @@ func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
 				setUnderAPC(t)
 			}
 			write1xProject(t, dir)
-			advice := project.Project1xUnderAPC(dir)
+			advice := project.Blocked1xMessage(project.BlockedUnderAPC, dir)
 
 			err := execute(t, d, "local", "status")
 			if err == nil {
@@ -572,6 +572,7 @@ type devPayload struct {
 	Mapping           []devReplacement `json:"mapping"`
 	Is1xProject       bool             `json:"v1_project"`
 	Notes             []string         `json:"notes"`
+	V1Dir             string           `json:"v1_dir"`
 	Convert           string           `json:"convert"`
 	UnderAPC          bool             `json:"under_apc"`
 	ContextUnresolved bool             `json:"context_unresolved"`
@@ -597,7 +598,7 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if !p.UnderAPC || !p.Is1xProject || p.Convert != "" || p.Replacement != "" {
 		t.Errorf("payload = %+v", p)
 	}
-	if !slices.Contains(p.Notes, project.Project1xUnderAPC(dir)) {
+	if !slices.Contains(p.Notes, project.Blocked1xMessage(project.BlockedUnderAPC, dir)) {
 		t.Errorf("notes lack the APC advice: %q", p.Notes)
 	}
 	if len(p.Mapping) != 0 {
@@ -648,17 +649,18 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}
-	if !p.Is1xProject || !p.UnderAPC || p.Replacement != "" || !slices.Contains(p.Notes, project.Project1xUnderAPC(dir)) {
+	if !p.Is1xProject || !p.UnderAPC || p.Replacement != "" || !slices.Contains(p.Notes, project.Blocked1xMessage(project.BlockedUnderAPC, dir)) {
 		t.Errorf("payload below the project = %+v", p)
 	}
 }
 
 // The astro dev stub and astro init give the same answer, in every context
-// and wherever they run: where init refuses, the stub offers no astro init
-// and names the context's reason; where init goes ahead, the stub suggests it
-// as it always has, or nothing for a directory that is not a 1.x project.
+// (ASTRO_DOMAIN choosing it, or the saved one) and wherever they run: where
+// init refuses, the stub offers no astro init and gives init's own message;
+// where init goes ahead, the stub suggests it for the 1.x root it is in, or
+// nothing for a directory that is not in a 1.x project.
 func TestTheDevStubAndInitAgree(t *testing.T) {
-	for _, ctx := range []string{"apc", "astro", "unresolved"} {
+	for _, ctx := range []string{"apc", "apc-env", "astro", "unresolved", "unresolved-env"} {
 		for _, where := range []string{"root", "subdir", "fresh"} {
 			t.Run(ctx+" "+where, func(t *testing.T) {
 				d, root, stdout := initDeps(t)
@@ -667,8 +669,12 @@ func TestTheDevStubAndInitAgree(t *testing.T) {
 				d.WorkingDir = func() (string, error) { return wd, nil }
 				p := devStubJSON(t, d, stdout)
 				blocked := ctx != "astro" && where != "fresh"
-				if p.UnderAPC != (blocked && ctx == "apc") || p.ContextUnresolved != (blocked && ctx == "unresolved") {
+				apc, unresolved := strings.HasPrefix(ctx, "apc"), strings.HasPrefix(ctx, "unresolved")
+				if p.UnderAPC != (blocked && apc) || p.ContextUnresolved != (blocked && unresolved) {
 					t.Errorf("stub reasons = apc %v, unresolved %v: %+v", p.UnderAPC, p.ContextUnresolved, p)
+				}
+				if where != "fresh" && p.V1Dir != root {
+					t.Errorf("v1_dir = %q, want the root %q", p.V1Dir, root)
 				}
 				requireStubMatchesInit(t, p, execute(t, d, "init"))
 			})
@@ -679,13 +685,15 @@ func TestTheDevStubAndInitAgree(t *testing.T) {
 // setContextFor records the context a case runs under, and puts it back.
 func setContextFor(t *testing.T, ctx string) {
 	t.Helper()
-	switch ctx {
-	case "apc":
-		setUnderAPC(t)
-	case "unresolved":
-		project.SetContextUnresolved(true)
-		t.Cleanup(func() { project.SetContextUnresolved(false) })
+	c := project.Context{FromASTRODomain: strings.HasSuffix(ctx, "-env")}
+	switch {
+	case strings.HasPrefix(ctx, "apc"):
+		c.APC = true
+	case strings.HasPrefix(ctx, "unresolved"):
+		c.Unresolved = true
 	}
+	project.SetContext(c)
+	t.Cleanup(func() { project.SetContext(project.Context{}) })
 }
 
 // layOut1x makes root a 1.x project unless where is fresh, and returns the
@@ -736,7 +744,7 @@ func requireStubMatchesInit(t *testing.T, p devPayload, err error) {
 	if stubRefuses && (p.Convert != "" || p.Replacement != "" || len(p.Mapping) != 0) {
 		t.Errorf("a refusing stub names a command: %+v", p)
 	}
-	if p.UnderAPC && !slices.Contains(p.Notes, err.Error()) {
+	if stubRefuses && !slices.Contains(p.Notes, err.Error()) {
 		t.Errorf("the stub's advice is not init's:\nstub %q\ninit %q", p.Notes, err)
 	}
 	if !stubRefuses && p.Is1xProject && p.Convert != replaceInit {
