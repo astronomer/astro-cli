@@ -75,48 +75,82 @@ func TestPlanAndRunRefuseA1xProjectUnderAPC(t *testing.T) {
 	}
 }
 
-// Only the directory itself counts: one below a 1.x project, existing or new,
-// is converted under APC, leaving the 1.x project's files as they were; and
-// without DeploysToAPC the 1.x project converts as it always has.
-func TestAPCRefusalIsTheDirectoryAlone(t *testing.T) {
+// A directory inside a 1.x project is refused too, existing or new, naming
+// the project: a project scaffolded there would be deployed with it. An
+// Astro project in between stops the walk, and without DeploysToAPC the 1.x
+// project converts as it always has.
+func TestAPCRefusesInsideA1xProject(t *testing.T) {
 	root := t.TempDir()
 	write1x(t, root)
-	require.NoError(t, os.Mkdir(filepath.Join(root, "dags"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "dags", "inner"), 0o755))
 	before := tree(t, root)
+	abs, err := filepath.Abs(root)
+	require.NoError(t, err)
 
-	for _, sub := range []string{"dags", "fresh"} {
+	for _, sub := range []string{"dags", filepath.Join("dags", "inner"), "fresh"} {
 		_, err := Run(filepath.Join(root, sub), Options{DeploysToAPC: true})
-		require.NoError(t, err, sub)
-		assert.FileExists(t, filepath.Join(root, sub, "pyproject.toml"))
+		var refused *Convert1xUnderAPCError
+		require.ErrorAs(t, err, &refused, sub)
+		assert.Equal(t, abs, refused.Dir, sub)
 	}
-	for path, body := range before {
-		got, err := os.ReadFile(path)
-		require.NoError(t, err)
-		assert.Equal(t, body, string(got), path)
-	}
-	assert.NoFileExists(t, filepath.Join(root, "pyproject.toml"))
+	assert.Equal(t, before, tree(t, root), "a refused run writes nothing")
 
-	_, err := Run(root, Options{})
+	// An Astro project inside the 1.x one is its own business.
+	_, err = Run(filepath.Join(root, "dags"), Options{})
+	require.NoError(t, err)
+	_, err = Plan(filepath.Join(root, "dags", "inner"), Options{DeploysToAPC: true})
+	require.NoError(t, err, "a project in between stops the walk")
+
+	_, err = Run(root, Options{})
 	require.NoError(t, err, "under Astro")
 	assert.FileExists(t, filepath.Join(root, "pyproject.toml"))
 }
 
+// The CLI's own settings file in a home directory's .astro/ is not a 1.x
+// project's, so a stray Dockerfile beside it does not make home one; a home
+// directory that holds a 1.x project (HOME=/usr/local/airflow in a 1.x image)
+// still is one.
+func TestTheCLISettingsFileIsNotA1xProject(t *testing.T) {
+	const settings = "context: astronomer_io\ncontexts:\n  astronomer_io:\n    domain: astronomer.io\n" +
+		"telemetry:\n  enabled: \"false\"\n"
+	home := t.TempDir()
+	writeTree(t, home, map[string]string{fileDockerfile: "FROM x\n", ".astro/config.yaml": settings})
+	assert.False(t, Is1xProject(home))
+	_, err := Plan(filepath.Join(home, "work"), Options{DeploysToAPC: true})
+	require.NoError(t, err)
+
+	airflowHome := t.TempDir()
+	write1x(t, airflowHome)
+	assert.True(t, Is1xProject(airflowHome))
+	_, err = Plan(filepath.Join(airflowHome, "dags"), Options{DeploysToAPC: true})
+	require.ErrorIs(t, err, ErrConvert1xUnderAPC)
+}
+
 func TestIs1xProject(t *testing.T) {
+	const df = "FROM x\n"
 	for _, tc := range []struct {
 		name  string
 		files map[string]string
 		want  bool
 	}{
-		{"a Dockerfile beside .astro/", map[string]string{fileDockerfile: "FROM x\n", ".astro/config.yaml": "x: 1\n"}, true},
+		{"a Dockerfile beside .astro/", map[string]string{fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\n"}, true},
+		{"a 1.x config with no project key", map[string]string{fileDockerfile: df, ".astro/config.yaml": "webserver:\n  port: 8081\n"}, true},
+		{"a .astro/ with no config.yaml", map[string]string{fileDockerfile: df, ".astro/test_dag_integrity_default.py": "\n"}, true},
+		{"a config.yaml that does not parse", map[string]string{fileDockerfile: df, ".astro/config.yaml": "[: nope\n"}, true},
+		{"a project key beside contexts is a project's", map[string]string{
+			fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\ncontexts: {}\n",
+		}, true},
+		{"the CLI's settings file", map[string]string{fileDockerfile: df, ".astro/config.yaml": "contexts: {}\n"}, false},
+		{"settings with only telemetry", map[string]string{fileDockerfile: df, ".astro/config.yaml": "telemetry:\n  anonymous_id: x\n"}, false},
 		{"with a pyproject.toml that only configures tools", map[string]string{
-			fileDockerfile: "FROM x\n", ".astro/config.yaml": "x: 1\n", "pyproject.toml": "[tool.ruff]\nline-length = 100\n",
+			fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\n", "pyproject.toml": "[tool.ruff]\nline-length = 100\n",
 		}, true},
 		{"with a manifest", map[string]string{
-			fileDockerfile: "FROM x\n", ".astro/config.yaml": "x: 1\n",
+			fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\n",
 			"pyproject.toml": "[project]\nname = 'x'\nversion = '1.0'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n",
 		}, false},
-		{"a Dockerfile alone", map[string]string{fileDockerfile: "FROM x\n"}, false},
-		{".astro/ alone", map[string]string{".astro/config.yaml": "x: 1\n"}, false},
+		{"a Dockerfile alone", map[string]string{fileDockerfile: df}, false},
+		{".astro/ alone", map[string]string{".astro/config.yaml": "project:\n  name: x\n"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()

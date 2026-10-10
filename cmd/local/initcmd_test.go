@@ -2,6 +2,7 @@ package local
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // initDeps pins WorkingDir to one directory (testDeps mints a fresh temp dir
@@ -291,8 +293,10 @@ func listTree(t *testing.T, dir string) []string {
 }
 
 // APC deploys the 1.x layout (with Astro CLI 1.x), so under an APC context init
-// refuses to convert a 1.x project, as a usage error, and writes nothing: the
-// project keeps deploying with Astro CLI 1.x until APC deploys pyproject.toml projects.
+// refuses to convert a 1.x project and writes nothing: the project keeps
+// deploying with Astro CLI 1.x until APC deploys pyproject.toml projects. The
+// refusal is no mistake in the command line, so it is not usage: kind
+// unsupported_on_platform, exit 1.
 func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 	for _, format := range []string{"text", "json"} {
 		t.Run(format, func(t *testing.T) {
@@ -306,22 +310,39 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 				args = append(args, "-o", "json")
 			}
 			err := execute(t, d, args...)
-			if err == nil || !cliout.IsUsage(err) {
-				t.Fatalf("want a usage error, got %v", err)
-			}
+			requireRefused(t, err)
 			requireAPCAdvice(t, err, dir)
 			requireUnchanged(t, dir, before, files)
 			if format == "json" {
-				var obj cliout.ErrorObject
-				if err := json.Unmarshal([]byte(stdout.String()), &obj); err != nil {
-					t.Fatalf("stdout is not one error object: %v\n%s", err, stdout)
-				}
-				if obj.Kind != cliout.KindUsage || obj.Code != 2 || !strings.Contains(obj.Error, "Astro Private Cloud") {
+				obj := errorObjectOf(t, stdout.String())
+				if obj.Kind != KindUnsupportedOnPlatform || obj.Code != 1 || obj.Error != project.Project1xUnderAPC(dir) {
 					t.Errorf("error object = %+v", obj)
 				}
 			}
 		})
 	}
+}
+
+// requireRefused fails unless err is init's refusal of a 1.x project for the
+// platform: unsupported_on_platform, exit 1, not usage.
+func requireRefused(t *testing.T, err error) {
+	t.Helper()
+	if err == nil || !errors.Is(err, scaffold.ErrConvert1xUnderAPC) {
+		t.Fatalf("want the 1.x refusal, got %v", err)
+	}
+	if cliout.IsUsage(err) || ProblemKinds.Of(err) != KindUnsupportedOnPlatform {
+		t.Errorf("kind = %q, usage = %v", ProblemKinds.Of(err), cliout.IsUsage(err))
+	}
+}
+
+// errorObjectOf decodes the one error object stdout holds.
+func errorObjectOf(t *testing.T, stdout string) cliout.ErrorObject {
+	t.Helper()
+	var obj cliout.ErrorObject
+	if err := json.Unmarshal([]byte(stdout), &obj); err != nil {
+		t.Fatalf("stdout is not one error object: %v\n%s", err, stdout)
+	}
+	return obj
 }
 
 // requireAPCAdvice fails unless err is the one account every hint under APC
@@ -380,30 +401,19 @@ func TestInitConverts1xProjectUnderAstro(t *testing.T) {
 	}
 }
 
-// A directory that is not a 1.x project is made a project under APC too, with
-// a note that APC does not deploy it yet. The note comes with the run that
-// made the project, and only that run: init again is refused, as anywhere,
-// and says nothing of APC.
-func TestInitScaffoldsUnderAPCWithANote(t *testing.T) {
+// A directory in no 1.x project is made a project under APC as anywhere, and
+// the result says nothing of APC: its notes are what is left to do.
+func TestInitScaffoldsUnderAPC(t *testing.T) {
 	d, dir, stdout := initDeps(t)
 	setUnderAPC(t)
-	if err := execute(t, d, "init"); err != nil {
+	if err := execute(t, d, "init", "-o", "json"); err != nil {
 		t.Fatalf("astro init: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
 		t.Errorf("missing pyproject.toml: %v", err)
 	}
-	if !strings.Contains(stdout.String(), apcDeployNote) {
-		t.Errorf("want the APC note:\n%s", stdout)
-	}
-
-	stdout.Reset()
-	err := execute(t, d, "init")
-	if err == nil || !strings.Contains(err.Error(), "is already an Astro project") {
-		t.Fatalf("want init again refused, got %v", err)
-	}
-	if strings.Contains(stdout.String()+err.Error(), "Astro Private Cloud") {
-		t.Errorf("a rerun repeats the APC note:\n%s\n%v", stdout, err)
+	if strings.Contains(stdout.String(), "Astro Private Cloud") {
+		t.Errorf("the result's notes speak of APC:\n%s", stdout)
 	}
 }
 
@@ -415,10 +425,10 @@ func setUnderAPC(t *testing.T) {
 	t.Cleanup(func() { project.SetUnderAPC(false) })
 }
 
-// Under APC, init checks only the directory it was given. One below a 1.x
-// project is made a project of its own, leaving the 1.x project's Dockerfile
-// and .astro/ as they were, so Astro CLI 1.x keeps deploying it.
-func TestInitUnderAPCAllowsADirectoryBelowA1xProject(t *testing.T) {
+// Under APC, a directory inside a 1.x project is refused too, existing or
+// new, naming the project: a project scaffolded there would be deployed with
+// it by Astro CLI 1.x.
+func TestInitUnderAPCRefusesInsideA1xProject(t *testing.T) {
 	d, root, _ := initDeps(t)
 	setUnderAPC(t)
 	files := write1xProject(t, root)
@@ -427,24 +437,18 @@ func TestInitUnderAPCAllowsADirectoryBelowA1xProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	d.WorkingDir = func() (string, error) { return sub, nil }
+	before := listTree(t, root)
 	for _, args := range [][]string{{"init"}, {"init", "fresh"}} {
-		if err := execute(t, d, args...); err != nil {
-			t.Errorf("astro %s: %v", strings.Join(args, " "), err)
-		}
+		err := execute(t, d, args...)
+		requireRefused(t, err)
+		requireAPCAdvice(t, err, root)
 	}
-	for name, body := range files {
-		if got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name))); err != nil || string(got) != body {
-			t.Errorf("%s changed: %q, %v", name, got, err)
-		}
-	}
-	if _, err := os.Stat(filepath.Join(root, "pyproject.toml")); err == nil {
-		t.Error("the 1.x project's root gained a manifest")
-	}
+	requireUnchanged(t, root, before, files)
 }
 
-// The check is on the directory itself, whatever is above or around it: a
-// 1.x project in a monorepo whose root pyproject.toml only configures tools is
-// refused, and so is one that is the home directory.
+// The check reads the directories themselves, whatever is around them: a
+// 1.x project in a monorepo whose root pyproject.toml only configures tools
+// is refused, and so is one that is the home directory, as in a 1.x image.
 func TestInitUnderAPCRefusesA1xProjectWhereverItIs(t *testing.T) {
 	t.Run("in a monorepo", func(t *testing.T) {
 		d, repo, _ := initDeps(t)
@@ -456,9 +460,7 @@ func TestInitUnderAPCRefusesA1xProjectWhereverItIs(t *testing.T) {
 		files := write1xProject(t, proj)
 		before := listTree(t, proj)
 		err := execute(t, d, "init", "airflow")
-		if err == nil || !cliout.IsUsage(err) {
-			t.Fatalf("want a usage error, got %v", err)
-		}
+		requireRefused(t, err)
 		requireAPCAdvice(t, err, proj)
 		requireUnchanged(t, proj, before, files)
 	})
@@ -470,12 +472,38 @@ func TestInitUnderAPCRefusesA1xProjectWhereverItIs(t *testing.T) {
 		files := write1xProject(t, home)
 		before := listTree(t, home)
 		err := execute(t, d, "init")
-		if err == nil || !cliout.IsUsage(err) {
-			t.Fatalf("want a usage error, got %v", err)
-		}
+		requireRefused(t, err)
 		requireAPCAdvice(t, err, home)
 		requireUnchanged(t, home, before, files)
 	})
+}
+
+// A context the CLI cannot resolve may be APC's, so init refuses a 1.x
+// project there as well, saying to fix the context; a directory in no 1.x
+// project is made a project as anywhere.
+func TestInitRefusesA1xProjectUnderAnUnresolvedContext(t *testing.T) {
+	d, dir, stdout := initDeps(t)
+	project.SetContextUnresolved(true)
+	t.Cleanup(func() { project.SetContextUnresolved(false) })
+	files := write1xProject(t, dir)
+	before := listTree(t, dir)
+
+	err := execute(t, d, "init", "-o", "json")
+	requireRefused(t, err)
+	for _, want := range []string{"the current context cannot be resolved", "astro context switch", "run astro init in " + dir} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error missing %q:\n%v", want, err)
+		}
+	}
+	if obj := errorObjectOf(t, stdout.String()); obj.Kind != KindUnsupportedOnPlatform {
+		t.Errorf("error object = %+v", obj)
+	}
+	requireUnchanged(t, dir, before, files)
+
+	fresh := filepath.Join(t.TempDir(), "fresh")
+	if err := execute(t, d, "init", fresh); err != nil {
+		t.Errorf("astro init %s: %v", fresh, err)
+	}
 }
 
 // Under APC, every other hint about a 1.x project says what init's refusal
@@ -499,9 +527,13 @@ func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
 			if got := strings.Contains(err.Error(), advice); got != apc {
 				t.Errorf("discovery error carries the APC advice = %v, want %v:\n%v", got, apc, err)
 			}
-			if err := execute(t, d, "local", "status", "-o", "json"); err == nil ||
-				strings.Contains(stdout.String(), "astro init` here") == apc {
-				t.Errorf("json discovery error under apc = %v:\n%s", apc, stdout)
+			stdout.Reset()
+			if err := execute(t, d, "local", "status", "-o", "json"); err == nil {
+				t.Fatal("astro local status in a 1.x project must fail")
+			}
+			obj := errorObjectOf(t, stdout.String())
+			if got := obj.Error == advice; got != apc {
+				t.Errorf("json error is the APC advice = %v, want %v: %+v", got, apc, obj)
 			}
 
 			err = execute(t, d, "dev", "start")
@@ -552,10 +584,8 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if !slices.Contains(p.Notes, project.Project1xUnderAPC(dir)) {
 		t.Errorf("notes lack the APC advice: %q", p.Notes)
 	}
-	for _, m := range p.Mapping {
-		if m.Replacement == replaceInit {
-			t.Errorf("the mapping offers %s under APC", replaceInit)
-		}
+	if len(p.Mapping) != 0 {
+		t.Errorf("the mapping names astro local commands under APC: %v", p.Mapping)
 	}
 	// The text is the notes and nothing else: no replacement, and no table
 	// of astro local commands, none of which runs in this project.

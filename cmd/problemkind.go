@@ -9,7 +9,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/config"
-	astrocontext "github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	"github.com/astronomer/astro-cli/internal/project"
@@ -85,10 +84,13 @@ var problemKinds = append(append(cliout.Kinds{}, local.ProblemKinds...), cloudKi
 // have, which is recorded once the refusal is out (trackUnknownCommand).
 func Execute(ctx context.Context) error {
 	// Once, on the real CLI path only, before any command runs: under an APC
-	// context, which deploys the 1.x layout (with Astro CLI 1.x), everything that
-	// speaks of a 1.x project says so (project.SetUnderAPC). Not in
-	// NewRootCmd, which tests build for several platforms.
-	project.SetUnderAPC(!astrocontext.IsCloudContext())
+	// context, which deploys the 1.x layout (with Astro CLI 1.x), everything
+	// that speaks of a 1.x project says so, and astro init refuses to convert
+	// one; with a context it cannot resolve, it refuses too (contextPlatform).
+	// Not in NewRootCmd, which tests build for several platforms.
+	apc, unresolved := contextPlatform()
+	project.SetUnderAPC(apc)
+	project.SetContextUnresolved(unresolved)
 
 	root, args := NewRootCmd(), os.Args[1:]
 	err := cliout.Execute(ctx, root, args, os.Stdout, problemKinds)

@@ -73,13 +73,15 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 			return c.d.AirflowDefault(ctx)
 		}
 	}
-	// Under an APC context scaffold refuses a 1.x project before writing
-	// anything, and nothing ran, so the refusal is a usage error.
-	opts.DeploysToAPC = project.UnderAPC()
+	// Under an APC context scaffold refuses a directory in a 1.x project
+	// before writing anything, and under a context the CLI cannot resolve it
+	// refuses the same directories, since that context may be APC's.
+	opts.DeploysToAPC = project.UnderAPC() || project.ContextUnresolved()
 
 	res, err := scaffold.Run(dir, opts)
-	if errors.Is(err, scaffold.ErrConvert1xUnderAPC) {
-		return cliout.Usage(err)
+	var refused *scaffold.Convert1xUnderAPCError
+	if errors.As(err, &refused) && !project.UnderAPC() {
+		return &convert1xUnresolvedError{dir: refused.Dir}
 	}
 	if err != nil {
 		return err
@@ -89,12 +91,6 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found.
 	c.writeAstroBuild(ctx, res.Dir)
-	// Only a run that made the directory a project gets here: init refuses one
-	// that already is (scaffold.ErrAlreadyAstroProject), so the note is said
-	// once, when the project is new.
-	if project.UnderAPC() {
-		res.Notes = append(res.Notes, apcDeployNote)
-	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
@@ -103,20 +99,31 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // There is one project format, and `astro init` converts a 1.x project to it
 // the same way on every platform. Astro Private Cloud deploys only the 1.x
 // layout (a Dockerfile and .astro/config.yaml), with Astro CLI 1.x, so a
-// project converted under an APC context would stop deploying there. Until APC
-// deploys pyproject.toml projects, scaffold refuses to convert one under an
-// APC context (scaffold.Options.DeploysToAPC) and changes nothing; its
-// message says why, and how to convert anyway. Any other directory is made a
-// project as anywhere, with a note that APC cannot deploy it yet: one below a
-// 1.x project, since that leaves the 1.x project's Dockerfile and .astro/ as
-// they were and Astro CLI 1.x keeps deploying it, and a Dockerfile with no
-// .astro/, which no APC deploy takes as it stands (Astro CLI 1.x's requires
-// .astro/config.yaml).
+// project converted under an APC context, or scaffolded inside a 1.x project
+// there, would change what deploys. Until APC deploys pyproject.toml
+// projects, scaffold refuses both (scaffold.Options.DeploysToAPC) and changes
+// nothing; its message says why, and how to convert anyway. A Dockerfile with
+// no .astro/ is converted as anywhere: no APC deploy takes it as it stands
+// (Astro CLI 1.x's requires .astro/config.yaml).
+//
+// A context the CLI cannot resolve may be APC's, so init refuses the same
+// directories there too, saying to fix the context (convert1xUnresolvedError).
 
-// apcDeployNote says that a project init just made does not deploy to the
-// Astro Private Cloud the current context names, yet.
-const apcDeployNote = "The current context is Astro Private Cloud, which does not deploy pyproject.toml " +
-	"projects yet, so astro deploy there will not deploy this project until it does"
+// convert1xUnresolvedError is init's refusal of a directory in the 1.x
+// project in dir under a context it cannot resolve. It matches
+// scaffold.ErrConvert1xUnderAPC, so it publishes as the same kind.
+type convert1xUnresolvedError struct{ dir string }
+
+func (e *convert1xUnresolvedError) Error() string {
+	return e.dir + " holds a project made by Astro CLI 1.x (Dockerfile and .astro/), and the current context " +
+		"cannot be resolved, so whether the project deploys to Astro Private Cloud, where it is not converted yet, " +
+		"cannot be told. Fix the context, or switch to one (astro context list, then astro context switch), and " +
+		"run astro init in " + e.dir + " again"
+}
+
+func (e *convert1xUnresolvedError) Is(target error) bool {
+	return target == scaffold.ErrConvert1xUnderAPC
+}
 
 // nextStart is the start command to suggest once init is done. Standalone
 // mode builds no image, so a project whose manifest declares a Dockerfile or

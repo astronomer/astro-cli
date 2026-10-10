@@ -41,9 +41,9 @@ type devRemoved struct {
 	Convert string `json:"convert,omitempty"`
 	// UnderAPC is set with Is1xProject when the current context is Astro
 	// Private Cloud, where astro init refuses a 1.x project: Notes then say
-	// why it stays as it is and how to convert it anyway, the mapping leaves
-	// out astro init, and there is no Replacement or Convert, since no
-	// astro local command runs in that project.
+	// why it stays as it is and how to convert it anyway, and the mapping is
+	// empty and there is no Replacement or Convert, as the text names no
+	// astro local command: none runs in that project.
 	UnderAPC bool `json:"under_apc,omitempty"`
 }
 
@@ -51,7 +51,7 @@ type devRemoved struct {
 // command tree it points into.
 type devContext struct {
 	is1x bool
-	// dir1x is the 1.x project's directory, set with is1x.
+	// dir1x is the 1.x project's directory, which sets is1x.
 	dir1x string
 	// apc is set under an Astro Private Cloud context, where astro init
 	// refuses a 1.x project, so the stub gives project.Project1xUnderAPC's
@@ -97,7 +97,6 @@ func NewDevCmd(d Deps) *cobra.Command {
 
 func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
-		is1x:               c.project1xDir() != "",
 		dir1x:              c.project1xDir(),
 		apc:                project.UnderAPC(),
 		dockerfile:         c.declaresDockerfile(),
@@ -172,6 +171,8 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	}
 	// Under APC a 1.x project stays as it is (project.Project1xUnderAPC), so
 	// nothing offers astro init, which refuses it there.
+	dc.is1x = dc.is1x || dc.dir1x != ""
+	p.Is1xProject = dc.is1x
 	stays := dc.is1x && dc.apc
 	if dc.is1x {
 		if !stays {
@@ -188,7 +189,7 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 		// No astro local command runs in this project, so none is named as
 		// the replacement; the notes say why and what to do instead.
 		p.UnderAPC = true
-		p.Mapping = slices.DeleteFunc(slices.Clone(mapping), func(m devReplacement) bool { return m.Replacement == replaceInit })
+		p.Mapping = []devReplacement{}
 		p.Notes = []string{
 			project.Project1xUnderAPC(dc.dir1x),
 			"The astro local commands work only in a converted project, which Astro Private Cloud cannot deploy yet",

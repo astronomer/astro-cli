@@ -61,13 +61,14 @@ type Options struct {
 	// airflow_settings.yaml carries, at the project scope the writer itself
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
-	// DeploysToAPC is set when the current context or platform is Astro
-	// Private Cloud. It deploys the 1.x layout, with Astro CLI 1.x, and not
-	// yet pyproject.toml projects, so Plan and Run
-	// then refuse a directory that is itself a 1.x project (Is1xProject) with
-	// a *Convert1xUnderAPCError, before anything is written. A directory below
-	// one is converted as usual: it leaves the 1.x project's Dockerfile and
-	// .astro/ as they are. false, the default, is Astro and refuses nothing.
+	// DeploysToAPC is set by a caller whose current context or platform is
+	// Astro Private Cloud. APC deploys the 1.x layout, with Astro CLI 1.x,
+	// and not yet pyproject.toml projects, so Plan and Run then refuse a
+	// directory that is a 1.x project (Is1xProject) or lies inside one, with
+	// a *Convert1xUnderAPCError naming that project, before anything is
+	// written: a project scaffolded inside one would be deployed with it.
+	// false, the default, is Astro and refuses nothing. Astro Desktop's
+	// conversions are refused only if it sets this.
 	DeploysToAPC bool
 }
 
@@ -319,8 +320,8 @@ func Run(dir string, opts Options) (*Result, error) {
 // let it happen. Plan reads the project (it has to: an adopted manifest is
 // computed from the one already there) and writes nothing.
 //
-// Under Options.DeploysToAPC it first refuses a directory that is itself a
-// 1.x project (Convert1xUnderAPCError), having read nothing else.
+// Under Options.DeploysToAPC it first refuses a directory that is, or is
+// inside, a 1.x project (Convert1xUnderAPCError), having read nothing else.
 //
 //nolint:gocritic // hugeParam: by value on purpose, as Astro Desktop calls it
 func Plan(dir string, opts Options) (*Changeset, error) {
@@ -328,8 +329,10 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
 	}
-	if opts.DeploysToAPC && Is1xProject(abs) {
-		return nil, &Convert1xUnderAPCError{Dir: abs}
+	if opts.DeploysToAPC {
+		if in := enclosing1xProject(abs); in != "" {
+			return nil, &Convert1xUnderAPCError{Dir: in}
+		}
 	}
 	return plan(abs, &opts)
 }

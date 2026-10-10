@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // The kinds a core command can fail with. The mechanism they plug into — the
@@ -62,6 +63,13 @@ const (
 	// KindAirflowUnavailable: Astro reports the Deployment healthy, but its
 	// Airflow is not answering yet, as after a wake-up or deploy. Transient.
 	KindAirflowUnavailable cliout.ProblemKind = "airflow_unavailable"
+	// KindUnsupportedOnPlatform: what was asked is not done on the platform
+	// the current context names, or on one the CLI cannot determine: astro
+	// init refuses to convert a 1.x project under Astro Private Cloud, which
+	// deploys that layout and not yet pyproject.toml projects, and under a
+	// context it cannot resolve. Not a mistake in the command line, so not
+	// usage: the project or the context has to change.
+	KindUnsupportedOnPlatform cliout.ProblemKind = "unsupported_on_platform"
 )
 
 // ProblemKinds maps a core command's failure to the name it publishes under. The root
@@ -104,4 +112,5 @@ var ProblemKinds = cliout.Kinds{
 	{Kind: KindDeploymentDeploying, Match: cliout.Sentinel(instancelocate.ErrDeploymentDeploying)},
 	{Kind: KindDeploymentUnhealthy, Match: cliout.Sentinel(instancelocate.ErrDeploymentUnhealthy)},
 	{Kind: KindAirflowUnavailable, Match: cliout.Sentinel(instancelocate.ErrAirflowUnavailable)},
+	{Kind: KindUnsupportedOnPlatform, Match: cliout.Sentinel(scaffold.ErrConvert1xUnderAPC)},
 }

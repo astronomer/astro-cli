@@ -720,9 +720,9 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 
 // Under an Astro Private Cloud context, which deploys the 1.x layout (with
 // Astro CLI 1.x), init refuses to convert a 1.x project and leaves every file as
-// it was: a usage error, published as the one error object under json. A
-// directory that is not a 1.x project is still made a project there, with a
-// note that APC does not deploy it yet.
+// it was, as does a directory inside one: kind unsupported_on_platform, exit
+// 1, published as the one error object under json. A directory in no 1.x
+// project is still made a project there.
 func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 	tier(t, 0)
 
@@ -738,15 +738,8 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 		write(t, filepath.Join(p.Dir, name), body)
 	}
 
-	r := p.run("init", "--output", "json").requireFailure()
-	if r.ExitCode != 2 {
-		t.Errorf("exit code %d, want 2 (usage)\n%s", r.ExitCode, r.output())
-	}
-	e := lastErrorObject(r.Stdout)
-	if e == nil || e.Kind != "usage" || !strings.Contains(e.Error, "Astro Private Cloud") ||
-		!strings.Contains(e.Error, "Leave the project as it is for now") ||
-		!strings.Contains(e.Error, "astro context switch astronomer.io") {
-		t.Errorf("want one usage error object naming APC on stdout:\n%s", r.output())
+	for _, args := range [][]string{{"init", "--output", "json"}, {"init", "dags", "--output", "json"}} {
+		requireAPCRefusal(t, p.run(args...).requireFailure())
 	}
 	for name, body := range files {
 		got, err := os.ReadFile(filepath.Join(p.Dir, name))
@@ -764,8 +757,23 @@ func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 	writeContext(t, fresh, "software")
 	var res initResult
 	fresh.run("init", "--output", "json").requireSuccess().requireJSON(&res)
-	if !reports(res.Notes, "is Astro Private Cloud, which does not deploy pyproject.toml projects yet") {
-		t.Errorf("want the APC note on a new project, got %q", res.Notes)
+	if reports(res.Notes, "Astro Private Cloud") {
+		t.Errorf("a new project's notes speak of APC: %q", res.Notes)
+	}
+}
+
+// requireAPCRefusal fails unless r is init's refusal of a 1.x project under
+// APC: exit 1 and one unsupported_on_platform error object naming APC.
+func requireAPCRefusal(t *testing.T, r *result) {
+	t.Helper()
+	if r.ExitCode != 1 {
+		t.Errorf("exit code %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	e := lastErrorObject(r.Stdout)
+	if e == nil || e.Kind != "unsupported_on_platform" || !strings.Contains(e.Error, "Astro Private Cloud") ||
+		!strings.Contains(e.Error, "Leave the project as it is for now") ||
+		!strings.Contains(e.Error, "astro context switch astronomer.io") {
+		t.Errorf("want one unsupported_on_platform error object naming APC on stdout:\n%s", r.output())
 	}
 }
 
