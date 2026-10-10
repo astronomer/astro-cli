@@ -37,26 +37,24 @@ type devRemoved struct {
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
 	// Convert is the command that converts a 1.x project in place, set with
-	// Is1xProject unless UnderAPC.
+	// Is1xProject unless astro init refuses that project here.
 	Convert string `json:"convert,omitempty"`
-	// UnderAPC is set with Is1xProject when the current context is Astro
-	// Private Cloud, where astro init refuses a 1.x project: Notes then say
-	// why it stays as it is and how to convert it anyway, and the mapping is
-	// empty and there is no Replacement or Convert, as the text names no
-	// astro local command: none runs in that project.
-	UnderAPC bool `json:"under_apc,omitempty"`
+	// UnderAPC and ContextUnresolved say astro init refuses the 1.x project
+	// the working directory is in or below (project.Convert1xBlocked): the
+	// current context is Astro Private Cloud, or one the CLI cannot resolve.
+	// Notes then say why and what to do instead, and the mapping is empty and
+	// there is no Replacement or Convert, as the text names no astro local
+	// command: none runs in that project.
+	UnderAPC          bool `json:"under_apc,omitempty"`
+	ContextUnresolved bool `json:"context_unresolved,omitempty"`
 }
 
 // devContext is what the stub reads about the directory it runs in and the
 // command tree it points into.
 type devContext struct {
-	is1x bool
-	// dir1x is the 1.x project's directory, which sets is1x.
-	dir1x string
-	// apc is set under an Astro Private Cloud context, where astro init
-	// refuses a 1.x project, so the stub gives project.Project1xUnderAPC's
-	// account of one rather than say to convert it.
-	apc bool
+	// in is the 1.x project the stub speaks of, if any, and why astro
+	// init refuses it here, if it does (devProject).
+	in project1x
 	// dockerfile is set when the current project declares [tool.astro]
 	// dockerfile, which only Docker mode builds.
 	dockerfile bool
@@ -97,8 +95,7 @@ func NewDevCmd(d Deps) *cobra.Command {
 
 func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
-		dir1x:              c.project1xDir(),
-		apc:                project.UnderAPC(),
+		in:                 c.devProject(),
 		dockerfile:         c.declaresDockerfile(),
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
@@ -167,14 +164,12 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	p := devRemoved{
 		Typed:       strings.TrimSpace("astro dev " + typed),
 		Mapping:     mapping,
-		Is1xProject: dc.is1x,
+		Is1xProject: dc.in.dir1x != "",
 	}
-	// Under APC a 1.x project stays as it is (project.Project1xUnderAPC), so
-	// nothing offers astro init, which refuses it there.
-	dc.is1x = dc.is1x || dc.dir1x != ""
-	p.Is1xProject = dc.is1x
-	stays := dc.is1x && dc.apc
-	if dc.is1x {
+	// Where astro init refuses the 1.x project (project.Convert1xBlocked) it
+	// stays as it is, so nothing offers astro init.
+	stays := dc.in.dir1x != "" && dc.in.blocked != project.NotBlocked
+	if dc.in.dir1x != "" {
 		if !stays {
 			p.Convert = replaceInit
 		}
@@ -188,11 +183,11 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	if stays {
 		// No astro local command runs in this project, so none is named as
 		// the replacement; the notes say why and what to do instead.
-		p.UnderAPC = true
+		p.UnderAPC, p.ContextUnresolved = dc.in.blocked == project.BlockedUnderAPC, dc.in.blocked == project.BlockedUnresolved
 		p.Mapping = []devReplacement{}
 		p.Notes = []string{
-			project.Project1xUnderAPC(dc.dir1x),
-			"The astro local commands work only in a converted project, which Astro Private Cloud cannot deploy yet",
+			project.Blocked1xMessage(dc.in.blocked, dc.in.dir1x, dc.in.dir1x),
+			"The astro local commands work only in a converted project",
 		}
 	}
 	if typed == "" {
@@ -334,7 +329,7 @@ func renderDevRemoved(p devRemoved) string {
 		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
 	case p.Replacement != "":
 		fmt.Fprintf(&b, ". Use `%s` instead", p.Replacement)
-	case p.UnderAPC:
+	case p.UnderAPC || p.ContextUnresolved:
 		// The notes below say what to do instead.
 	case p.Typed != "astro dev":
 		b.WriteString(" and has no direct replacement")
@@ -345,7 +340,7 @@ func renderDevRemoved(p devRemoved) string {
 	}
 	// Under APC, in a 1.x project no astro local command runs, so the notes
 	// are the whole answer.
-	if p.UnderAPC {
+	if p.UnderAPC || p.ContextUnresolved {
 		return b.String()
 	}
 	b.WriteString("\nLocal Airflow now lives under `astro local`:\n\n")
@@ -377,10 +372,29 @@ func renderDevRemoved(p devRemoved) string {
 // project1xDir is the working directory when it holds a 1.x project, per
 // project.Is1xProject, and "" otherwise: the same check astro init's
 // refusal under APC makes, so v1_project means the same in both contexts.
-func (c *cli) project1xDir() string {
+// project1x is a 1.x project the stub speaks of: its directory, "" for
+// none, and why astro init refuses it here, if it does.
+type project1x struct {
+	dir1x   string
+	blocked project.Block
+}
+
+// devProject is the 1.x project the stub speaks of, and why astro init
+// refuses it, by the one decision init makes (project.Convert1xBlocked): where
+// init refuses, the project the working directory is in or below, so a
+// subdirectory gets the advice its root does; elsewhere the working directory
+// when it holds one (project.Is1xProject), since the convert advice says to
+// run astro init here.
+func (c *cli) devProject() project1x {
 	wd, err := c.d.WorkingDir()
-	if err != nil || !project.Is1xProject(wd) {
-		return ""
+	if err != nil {
+		return project1x{}
 	}
-	return wd
+	if why, root := project.Convert1xBlocked(wd); why != project.NotBlocked {
+		return project1x{dir1x: root, blocked: why}
+	}
+	if project.Is1xProject(wd) {
+		return project1x{dir1x: wd}
+	}
+	return project1x{}
 }

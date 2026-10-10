@@ -48,62 +48,92 @@ func Project1xUnderAPCMessage(dir string) string {
 		"to sign in to Astro) and run astro init in " + dir
 }
 
-// enclosing1xProject is the 1.x project abs is in, abs itself included, or
-// "". The walk goes up to the filesystem root and stops at a directory that
-// is an Astro project (its manifest loads), whose own business a 1.x project
-// above it is not.
-func enclosing1xProject(abs string) string {
-	for dir := filepath.Clean(abs); ; {
-		if Is1xProject(dir) {
-			return dir
-		}
-		if _, err := manifest.Load(filepath.Join(dir, manifest.Marker)); err == nil {
+// Find1xProject is the 1.x project dir is in, dir itself included, or "".
+// The walk goes up from the cleaned absolute dir to the filesystem root, and
+// stops at a directory that is an Astro project (hasManifest: one whose
+// [tool.astro] loads, or fails to), whose own business a 1.x project above
+// it is not; Plan then reports that manifest as it always has. dir need not
+// exist yet.
+func Find1xProject(dir string) string {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return ""
+	}
+	for d := filepath.Clean(abs); ; {
+		if hasManifest(d) {
 			return ""
 		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
+		if has1xLayout(d) {
+			return d
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
 			return ""
 		}
-		dir = parent
+		d = parent
 	}
 }
 
-// Is1xProject reports whether dir itself holds a 1.x project: a Dockerfile
-// beside a .astro/ directory, and no pyproject.toml carrying [tool.astro]. A
+// Is1xProject reports whether dir itself holds a 1.x project: the 1.x layout
+// (has1xLayout), and no pyproject.toml carrying [tool.astro]. A
 // pyproject.toml that only configures tools (ruff, pytest) does not rule it
 // out, and one that cannot be read or parsed counts as a manifest, as
 // internal/project's HasManifest has it. It looks at dir alone, not above it.
-//
-// A .astro/config.yaml that is the CLI's own settings file, as the one in a
-// home directory is, does not make dir one (isCLISettings), so a stray
-// ~/Dockerfile does not turn home into a 1.x project, while a home directory
-// that does hold one (HOME=/usr/local/airflow in a 1.x image) still is.
 func Is1xProject(dir string) bool {
+	return has1xLayout(dir) && !hasManifest(dir)
+}
+
+// has1xLayout reports a Dockerfile beside a .astro/ directory. In the home
+// directory, and in ASTRO_HOME when it is set, .astro/ holds the CLI's own
+// settings, so there it is a 1.x project's only when .astro/config.yaml
+// parses with a top-level project key, which astro dev init always writes:
+// a stray ~/Dockerfile beside the settings, missing, empty or corrupt, does
+// not make home a 1.x project, and a home directory that holds one
+// (HOME=/usr/local/airflow in a 1.x image) still is one.
+func has1xLayout(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, fileDockerfile)); err != nil {
 		return false
 	}
 	if info, err := os.Stat(filepath.Join(dir, ".astro")); err != nil || !info.IsDir() {
 		return false
 	}
-	if isCLISettings(filepath.Join(dir, ".astro", "config.yaml")) {
-		return false
-	}
-	_, err := manifest.Load(filepath.Join(dir, manifest.Marker))
-	return errors.Is(err, manifest.ErrNotFound) || errors.Is(err, manifest.ErrNoAstroSection)
+	return !isCLIHome(dir) || namesAProject(filepath.Join(dir, ".astro", "config.yaml"))
 }
 
-// cliSettingsKeys are top-level keys only the CLI's own settings file
-// carries: the current context and the saved ones (config.CFG's context and
-// contexts), and telemetry, which the first run writes.
-var cliSettingsKeys = []string{"context", "contexts", "telemetry"}
+// hasManifest reports a pyproject.toml whose [tool.astro] is there, loading
+// or not: anything but no file and no [tool.astro] section.
+func hasManifest(dir string) bool {
+	_, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	return !errors.Is(err, manifest.ErrNotFound) && !errors.Is(err, manifest.ErrNoAstroSection)
+}
 
-// isCLISettings reports a config.yaml that is the CLI's own settings rather
-// than a 1.x project's. A 1.x project's has a top-level project key (its
-// name, as astro dev init writes it); the settings file has none, and has at
-// least one of cliSettingsKeys. A file that is missing, unreadable or not a
-// YAML mapping is not the settings file, so the directory stays a 1.x
-// project: refusing a conversion wrongly costs less than allowing one.
-func isCLISettings(path string) bool {
+// isCLIHome reports the directory whose .astro/ holds the CLI's settings: the
+// home directory, as the config package finds it (HOME, else the OS's), and
+// ASTRO_HOME when set. Compared as cleaned paths, with the home resolved
+// through symlinks once, so the walk resolves nothing per directory.
+func isCLIHome(dir string) bool {
+	home := os.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir() //nolint:errcheck // no home is no match
+	}
+	dir = filepath.Clean(dir)
+	for _, h := range []string{home, os.Getenv("ASTRO_HOME")} {
+		if h == "" {
+			continue
+		}
+		if dir == filepath.Clean(h) {
+			return true
+		}
+		if resolved, err := filepath.EvalSymlinks(h); err == nil && dir == resolved {
+			return true
+		}
+	}
+	return false
+}
+
+// namesAProject reports a config.yaml that parses with a top-level project
+// key, as a 1.x project's does.
+func namesAProject(path string) bool {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return false
@@ -112,13 +142,6 @@ func isCLISettings(path string) bool {
 	if yaml.Unmarshal(data, &top) != nil {
 		return false
 	}
-	if _, ok := top["project"]; ok {
-		return false
-	}
-	for _, k := range cliSettingsKeys {
-		if _, ok := top[k]; ok {
-			return true
-		}
-	}
-	return false
+	_, ok := top["project"]
+	return ok
 }

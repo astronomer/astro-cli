@@ -250,23 +250,50 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 	})
 }
 
-// Under an Astro Private Cloud context (SetUnderAPC) a 1.x project's errors
-// give the one APC account, naming the project's directory, rather than say
-// to run astro init, however they are wrapped; an error about no 1.x project
+// Where astro init refuses a 1.x project (Convert1xBlocked), a 1.x project's
+// errors give the same account, naming the project's directory, rather than
+// say to run astro init, however they are wrapped: the APC one under APC, and
+// fix-the-context under an unresolved context. An error about no 1.x project
 // is unchanged. Not parallel: it flips package state.
-func TestUnderAPCAdvice(t *testing.T) {
-	nf := &NotFoundError{Start: "/p/dags", Project1xDir: "/p"}
-	ns := &NoAstroSectionError{Start: "/p", Dir: "/p", Has1xProject: true}
-	plain := &NotFoundError{Start: "/q"}
+func TestBlocked1xAdvice(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(root, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".astro"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".astro", "config.yaml"), []byte("project:\n  name: x\n"), 0o600))
+	dags := filepath.Join(root, "dags")
+	require.NoError(t, os.Mkdir(dags, 0o700))
+	nf := &NotFoundError{Start: dags, Project1xDir: root}
+	ns := &NoAstroSectionError{Start: root, Dir: root, Has1xProject: true}
+	plain := &NotFoundError{Start: t.TempDir()}
 	require.Contains(t, nf.Error(), "Run `astro init`")
 	plainBefore := plain.Error()
 
-	SetUnderAPC(true)
-	t.Cleanup(func() { SetUnderAPC(false) })
-	assert.Equal(t, "wrapped: "+Project1xUnderAPC("/p"), fmt.Errorf("wrapped: %w", nf).Error())
-	assert.Equal(t, Project1xUnderAPC("/p"), ns.Error())
-	assert.Equal(t, plainBefore, plain.Error())
-	assert.NotContains(t, Project1xUnderAPC("/p"), "`")
+	t.Run("under APC", func(t *testing.T) {
+		SetUnderAPC(true)
+		t.Cleanup(func() { SetUnderAPC(false) })
+		why, got := Convert1xBlocked(dags)
+		assert.Equal(t, BlockedUnderAPC, why)
+		assert.Equal(t, root, got)
+		assert.Equal(t, "wrapped: "+Project1xUnderAPC(root), fmt.Errorf("wrapped: %w", nf).Error())
+		assert.Equal(t, Project1xUnderAPC(root), ns.Error())
+		assert.Equal(t, plainBefore, plain.Error())
+		assert.NotContains(t, Project1xUnderAPC(root), "`")
+	})
+	t.Run("under an unresolved context", func(t *testing.T) {
+		SetContextUnresolved(true)
+		t.Cleanup(func() { SetContextUnresolved(false) })
+		why, _ := Convert1xBlocked(dags)
+		assert.Equal(t, BlockedUnresolved, why)
+		assert.Equal(t, Blocked1xMessage(BlockedUnresolved, root, root), nf.Error())
+		assert.Contains(t, nf.Error(), "astro context switch")
+		assert.NotContains(t, nf.Error(), "`")
+	})
+	t.Run("under Astro", func(t *testing.T) {
+		why, got := Convert1xBlocked(dags)
+		assert.Equal(t, NotBlocked, why)
+		assert.Empty(t, got)
+		assert.Contains(t, nf.Error(), "Run `astro init`")
+	})
 }
 
 func TestLoadError(t *testing.T) {

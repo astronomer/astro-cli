@@ -106,24 +106,53 @@ func TestAPCRefusesInsideA1xProject(t *testing.T) {
 	assert.FileExists(t, filepath.Join(root, "pyproject.toml"))
 }
 
-// The CLI's own settings file in a home directory's .astro/ is not a 1.x
-// project's, so a stray Dockerfile beside it does not make home one; a home
-// directory that holds a 1.x project (HOME=/usr/local/airflow in a 1.x image)
-// still is one.
-func TestTheCLISettingsFileIsNotA1xProject(t *testing.T) {
-	const settings = "context: astronomer_io\ncontexts:\n  astronomer_io:\n    domain: astronomer.io\n" +
-		"telemetry:\n  enabled: \"false\"\n"
-	home := t.TempDir()
-	writeTree(t, home, map[string]string{fileDockerfile: "FROM x\n", ".astro/config.yaml": settings})
-	assert.False(t, Is1xProject(home))
-	_, err := Plan(filepath.Join(home, "work"), Options{DeploysToAPC: true})
-	require.NoError(t, err)
+// In the home directory, and in ASTRO_HOME, .astro/ holds the CLI's own
+// settings, so a stray Dockerfile beside it does not make home a 1.x project,
+// whatever state the settings file is in; a home directory that holds a 1.x
+// project (HOME=/usr/local/airflow in a 1.x image) still is one, and is
+// refused from below.
+func TestTheCLIHomeIsA1xProjectOnlyWhenItSaysSo(t *testing.T) {
+	for _, env := range []string{"HOME", "ASTRO_HOME"} {
+		for name, settings := range map[string]string{
+			"settings":    "context: astronomer_io\ncontexts:\n  astronomer_io:\n    domain: astronomer.io\n",
+			"empty":       "",
+			"unparseable": "context: [unclosed\n",
+			"missing":     "-",
+		} {
+			t.Run(env+" with "+name+" settings", func(t *testing.T) {
+				home := t.TempDir()
+				files := map[string]string{fileDockerfile: "FROM x\n", ".astro/.keep": ""}
+				if settings != "-" {
+					files[".astro/config.yaml"] = settings
+				}
+				writeTree(t, home, files)
+				t.Setenv(env, home)
+				assert.False(t, Is1xProject(home))
+				_, err := Plan(filepath.Join(home, "work", "new"), Options{DeploysToAPC: true})
+				require.NoError(t, err)
+			})
+		}
+		t.Run(env+" that is a 1.x project", func(t *testing.T) {
+			home := t.TempDir()
+			write1x(t, home)
+			t.Setenv(env, home)
+			assert.True(t, Is1xProject(home))
+			_, err := Plan(filepath.Join(home, "dags"), Options{DeploysToAPC: true})
+			require.ErrorIs(t, err, ErrConvert1xUnderAPC)
+		})
+	}
+}
 
-	airflowHome := t.TempDir()
-	write1x(t, airflowHome)
-	assert.True(t, Is1xProject(airflowHome))
-	_, err = Plan(filepath.Join(airflowHome, "dags"), Options{DeploysToAPC: true})
-	require.ErrorIs(t, err, ErrConvert1xUnderAPC)
+// The walk stops at a directory that has a manifest, loading or not: Plan
+// then reports that manifest rather than the 1.x project above it.
+func TestTheWalkStopsAtAnyManifest(t *testing.T) {
+	root := t.TempDir()
+	write1x(t, root)
+	writeTree(t, root, map[string]string{"sub/pyproject.toml": "[project]\nname = 'x'\n\n[tool.astro]\nnot-a-key = 1\n"})
+	assert.Empty(t, Find1xProject(filepath.Join(root, "sub", "dags")))
+	_, err := Plan(filepath.Join(root, "sub"), Options{DeploysToAPC: true})
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrConvert1xUnderAPC)
 }
 
 func TestIs1xProject(t *testing.T) {
@@ -140,8 +169,6 @@ func TestIs1xProject(t *testing.T) {
 		{"a project key beside contexts is a project's", map[string]string{
 			fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\ncontexts: {}\n",
 		}, true},
-		{"the CLI's settings file", map[string]string{fileDockerfile: df, ".astro/config.yaml": "contexts: {}\n"}, false},
-		{"settings with only telemetry", map[string]string{fileDockerfile: df, ".astro/config.yaml": "telemetry:\n  anonymous_id: x\n"}, false},
 		{"with a pyproject.toml that only configures tools", map[string]string{
 			fileDockerfile: df, ".astro/config.yaml": "project:\n  name: x\n", "pyproject.toml": "[tool.ruff]\nline-length = 100\n",
 		}, true},

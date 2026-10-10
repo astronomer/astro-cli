@@ -41,6 +41,9 @@ type NotFoundError struct {
 }
 
 func (e *NotFoundError) Error() string {
+	if msg, ok := blockedMessage(e.Start); ok {
+		return msg
+	}
 	if e.Project1xDir != "" {
 		return project1xMessage(e.Start, e.Project1xDir)
 	}
@@ -61,6 +64,9 @@ type NoAstroSectionError struct {
 }
 
 func (e *NoAstroSectionError) Error() string {
+	if msg, ok := blockedMessage(e.Start); ok {
+		return msg
+	}
 	if e.Has1xProject {
 		return project1xMessage(e.Start, e.Dir)
 	}
@@ -73,19 +79,24 @@ func (e *NoAstroSectionError) Unwrap() error { return manifest.ErrNoAstroSection
 
 // project1xMessage says that project1xDir holds a 1.x project and how to upgrade it,
 // naming the directory only when it is not the one the command ran in.
-//
-// Under an Astro Private Cloud context (UnderAPC) it is Project1xUnderAPC
-// instead, which names the project's directory whatever the start.
 func project1xMessage(start, project1xDir string) string {
-	if UnderAPC() {
-		return Project1xUnderAPC(project1xDir)
-	}
 	where, there := "this directory", "here"
 	if project1xDir != start {
 		where, there = project1xDir, "in "+project1xDir
 	}
 	return fmt.Sprintf("%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/), which this CLI cannot run until it is upgraded.\n"+
 		"Run `%s` %s to upgrade it in place", where, initCommand, there)
+}
+
+// blockedMessage is what to say instead, where astro init refuses the 1.x
+// project start is in or below (Convert1xBlocked): Blocked1xMessage, naming
+// that project's directory, rather than to run astro init.
+func blockedMessage(start string) (string, bool) {
+	why, root := Convert1xBlocked(start)
+	if why == NotBlocked {
+		return "", false
+	}
+	return Blocked1xMessage(why, root, root), true
 }
 
 // LoadError returns the error to report for a manifest.Load of dir's marker,

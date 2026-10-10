@@ -185,8 +185,12 @@ login`) and run `init` in the 1.x project's directory. `init` refuses the same
 way when a context is named but cannot be resolved (a config it cannot read,
 or `ASTRO_DOMAIN` naming a context that is not saved): fix the context or
 switch to one first. A machine with no context at all converts as for Astro.
-A `.astro/config.yaml` that is the CLI's own settings, as in your home
-directory, does not count as a 1.x project.
+In your home directory (or `ASTRO_HOME`), where `.astro/` holds the CLI's own
+settings, a `Dockerfile` makes it a 1.x project only when
+`.astro/config.yaml` names a `project:`, as `astro dev init` writes. A new
+project `init` makes under an Astro Private Cloud context prints a note on
+stderr that it runs locally and deploys to Astro; `--output json` leaves it
+out.
 
 What `init` converts:
 

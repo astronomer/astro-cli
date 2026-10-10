@@ -43,5 +43,10 @@ func TestContextPlatform(t *testing.T) {
 		if apc, unresolved := contextPlatform(); apc || !unresolved {
 			t.Errorf("contextPlatform() = %v, %v; want false, true", apc, unresolved)
 		}
+		// ASTRO_DOMAIN naming Astro decides, unreadable config or not.
+		t.Setenv("ASTRO_DOMAIN", "astronomer.io")
+		if apc, unresolved := contextPlatform(); apc || unresolved {
+			t.Errorf("with ASTRO_DOMAIN=astronomer.io: contextPlatform() = %v, %v; want false, false", apc, unresolved)
+		}
 	})
 }

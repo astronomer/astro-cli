@@ -401,19 +401,34 @@ func TestInitConverts1xProjectUnderAstro(t *testing.T) {
 	}
 }
 
-// A directory in no 1.x project is made a project under APC as anywhere, and
-// the result says nothing of APC: its notes are what is left to do.
+// A directory in no 1.x project is made a project under APC as anywhere. In
+// text mode a notice on stderr says the project does not deploy there yet;
+// it is not one of the result's notes, which are what is left to do, so
+// json says nothing of APC.
 func TestInitScaffoldsUnderAPC(t *testing.T) {
-	d, dir, stdout := initDeps(t)
-	setUnderAPC(t)
-	if err := execute(t, d, "init", "-o", "json"); err != nil {
-		t.Fatalf("astro init: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
-		t.Errorf("missing pyproject.toml: %v", err)
-	}
-	if strings.Contains(stdout.String(), "Astro Private Cloud") {
-		t.Errorf("the result's notes speak of APC:\n%s", stdout)
+	for _, format := range []string{"text", "json"} {
+		t.Run(format, func(t *testing.T) {
+			d, dir, stdout := initDeps(t)
+			stderr := &strings.Builder{}
+			d.Stderr = stderr
+			setUnderAPC(t)
+			args := []string{"init"}
+			if format == "json" {
+				args = append(args, "-o", "json")
+			}
+			if err := execute(t, d, args...); err != nil {
+				t.Fatalf("astro init: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
+				t.Errorf("missing pyproject.toml: %v", err)
+			}
+			if strings.Contains(stdout.String(), "Astro Private Cloud") {
+				t.Errorf("stdout speaks of APC:\n%s", stdout)
+			}
+			if got := strings.Contains(stderr.String(), apcNotice); got != (format == "text") {
+				t.Errorf("the APC notice on stderr = %v in %s:\n%s", got, format, stderr)
+			}
+		})
 	}
 }
 
@@ -553,12 +568,13 @@ func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
 // devPayload is the part of the astro dev stub's json these tests read,
 // decoded by key rather than into the payload's Go type.
 type devPayload struct {
-	Replacement string           `json:"replacement"`
-	Mapping     []devReplacement `json:"mapping"`
-	Is1xProject bool             `json:"v1_project"`
-	Notes       []string         `json:"notes"`
-	Convert     string           `json:"convert"`
-	UnderAPC    bool             `json:"under_apc"`
+	Replacement       string           `json:"replacement"`
+	Mapping           []devReplacement `json:"mapping"`
+	Is1xProject       bool             `json:"v1_project"`
+	Notes             []string         `json:"notes"`
+	Convert           string           `json:"convert"`
+	UnderAPC          bool             `json:"under_apc"`
+	ContextUnresolved bool             `json:"context_unresolved"`
 }
 
 // Under APC the astro dev stub in a 1.x project says in json what it says in
@@ -617,8 +633,8 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 		t.Errorf("payload with a build secret = %+v", p)
 	}
 
-	// v1_project means what it means under Astro: the working directory
-	// itself. Below the 1.x project the stub is the ordinary one.
+	// Below the 1.x project the stub gives the advice it gives at the root,
+	// since init refuses there too.
 	sub := filepath.Join(dir, "dags")
 	if err := os.Mkdir(sub, 0o755); err != nil {
 		t.Fatal(err)
@@ -632,7 +648,98 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}
-	if p.Is1xProject || p.UnderAPC || p.Replacement != replaceStart {
+	if !p.Is1xProject || !p.UnderAPC || p.Replacement != "" || !slices.Contains(p.Notes, project.Project1xUnderAPC(dir)) {
 		t.Errorf("payload below the project = %+v", p)
+	}
+}
+
+// The astro dev stub and astro init give the same answer, in every context
+// and wherever they run: where init refuses, the stub offers no astro init
+// and names the context's reason; where init goes ahead, the stub suggests it
+// as it always has, or nothing for a directory that is not a 1.x project.
+func TestTheDevStubAndInitAgree(t *testing.T) {
+	for _, ctx := range []string{"apc", "astro", "unresolved"} {
+		for _, where := range []string{"root", "subdir", "fresh"} {
+			t.Run(ctx+" "+where, func(t *testing.T) {
+				d, root, stdout := initDeps(t)
+				setContextFor(t, ctx)
+				wd := layOut1x(t, root, where)
+				d.WorkingDir = func() (string, error) { return wd, nil }
+				p := devStubJSON(t, d, stdout)
+				blocked := ctx != "astro" && where != "fresh"
+				if p.UnderAPC != (blocked && ctx == "apc") || p.ContextUnresolved != (blocked && ctx == "unresolved") {
+					t.Errorf("stub reasons = apc %v, unresolved %v: %+v", p.UnderAPC, p.ContextUnresolved, p)
+				}
+				requireStubMatchesInit(t, p, execute(t, d, "init"))
+			})
+		}
+	}
+}
+
+// setContextFor records the context a case runs under, and puts it back.
+func setContextFor(t *testing.T, ctx string) {
+	t.Helper()
+	switch ctx {
+	case "apc":
+		setUnderAPC(t)
+	case "unresolved":
+		project.SetContextUnresolved(true)
+		t.Cleanup(func() { project.SetContextUnresolved(false) })
+	}
+}
+
+// layOut1x makes root a 1.x project unless where is fresh, and returns the
+// directory a case runs in: root, or a subdirectory of it.
+func layOut1x(t *testing.T, root, where string) string {
+	t.Helper()
+	if where == "fresh" {
+		return root
+	}
+	write1xProject(t, root)
+	if where == "root" {
+		return root
+	}
+	sub := filepath.Join(root, "dags")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return sub
+}
+
+// devStubJSON runs astro dev start under json and decodes what it published.
+func devStubJSON(t *testing.T, d Deps, stdout *strings.Builder) devPayload {
+	t.Helper()
+	stdout.Reset()
+	if err := execute(t, d, "dev", "start", "-o", "json"); err == nil {
+		t.Fatal("astro dev must fail")
+	}
+	var p devPayload
+	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
+		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
+	}
+	return p
+}
+
+// requireStubMatchesInit fails unless the stub refuses exactly where init
+// does (err), names no command where it does, and offers astro init for a
+// 1.x project where init converts it.
+func requireStubMatchesInit(t *testing.T, p devPayload, err error) {
+	t.Helper()
+	initRefuses := errors.Is(err, scaffold.ErrConvert1xUnderAPC)
+	if !initRefuses && err != nil {
+		t.Fatalf("astro init: %v", err)
+	}
+	stubRefuses := p.UnderAPC || p.ContextUnresolved
+	if stubRefuses != initRefuses {
+		t.Errorf("the stub refuses = %v, init refuses = %v", stubRefuses, initRefuses)
+	}
+	if stubRefuses && (p.Convert != "" || p.Replacement != "" || len(p.Mapping) != 0) {
+		t.Errorf("a refusing stub names a command: %+v", p)
+	}
+	if p.UnderAPC && !slices.Contains(p.Notes, err.Error()) {
+		t.Errorf("the stub's advice is not init's:\nstub %q\ninit %q", p.Notes, err)
+	}
+	if !stubRefuses && p.Is1xProject && p.Convert != replaceInit {
+		t.Errorf("a 1.x project where init converts is not offered astro init: %+v", p)
 	}
 }

@@ -330,7 +330,7 @@ func Plan(dir string, opts Options) (*Changeset, error) {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
 	}
 	if opts.DeploysToAPC {
-		if in := enclosing1xProject(abs); in != "" {
+		if in := Find1xProject(abs); in != "" {
 			return nil, &Convert1xUnderAPCError{Dir: in}
 		}
 	}

@@ -314,7 +314,7 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 		{
 			name: "a 1.x project with a build secret converts to a Docker-mode build",
 			args: []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
-			dc:   devContext{is1x: true, buildSecret: true},
+			dc:   devContext{in: project1x{dir1x: "/p"}, buildSecret: true},
 			want: "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
 		},
 		{
