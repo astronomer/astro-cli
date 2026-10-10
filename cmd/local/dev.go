@@ -42,8 +42,9 @@ type devRemoved struct {
 	// Is1xProject unless astro init refuses that project here.
 	Convert string `json:"convert,omitempty"`
 	// UnderAPC and ContextUnresolved say astro init refuses the 1.x project
-	// the working directory is in or below (project.Convert1xBlocked): the
-	// current context is Astro Private Cloud, or one the CLI cannot resolve.
+	// the working directory is in or below: the current context is Astro
+	// Private Cloud, or one the CLI cannot resolve (project.Convert1xBlocked,
+	// which names the project only then).
 	// Notes then say why and what to do instead, and the mapping is empty and
 	// there is no Replacement or Convert, as the text names no astro local
 	// command: none runs in that project.
@@ -331,6 +332,11 @@ func renderDevRemoved(p devRemoved) string {
 	var b strings.Builder
 	b.WriteString(p.Error)
 	switch {
+	case p.Replacement == replaceInit && p.Convert != "" && p.Convert != replaceInit:
+		// astro dev init below a 1.x root: a new project here, or the 1.x
+		// project converted at its root.
+		fmt.Fprintf(&b, ". Use %s to make a new project here, or %s to convert the 1.x project at %s in place",
+			replaceInit, p.Convert, p.V1Dir)
 	case p.Replacement != "" && p.Convert != "" && p.Replacement != p.Convert:
 		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
 	case p.Replacement != "":
@@ -396,18 +402,17 @@ func (p project1x) convert() string {
 }
 
 // devProject is the 1.x project the stub speaks of: the nearest one the
-// working directory is in or below, in every context, and why astro init
-// refuses it there, if it does, from the one walk and decision init makes
-// (project.Convert1xBlocked).
+// working directory is in or below, and why astro init refuses it there, if
+// it does. Under an APC or unresolved context both come from init's own
+// decision (project.Convert1xBlocked); elsewhere, where that decision walks
+// nothing, the stub walks once for the root it names (scaffold.Find1xProject).
 func (c *cli) devProject() project1x {
 	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return project1x{}
 	}
 	why, root := project.Convert1xBlocked(wd)
-	if why == project.NotBlocked {
-		// Under Astro the decision walks nothing; the stub still names the
-		// root it would convert.
+	if why == project.NotBlocked && !project.BlockingContext() {
 		root = scaffold.Find1xProject(wd)
 	}
 	abs, err := filepath.Abs(wd)

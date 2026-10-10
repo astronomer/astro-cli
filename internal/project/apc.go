@@ -67,20 +67,27 @@ const (
 )
 
 // Convert1xBlocked is the one decision of whether astro init refuses dir:
-// under an APC or unresolved context, when dir is a 1.x project or lies
-// inside one (scaffold.Find1xProject, the walk scaffold.Plan makes). It
-// returns why and that project's directory, or NotBlocked and "". The context
-// is checked first, so under Astro nothing is walked; a hint that names the
-// root under Astro walks for itself. Every hint about a 1.x project gets its
+// under an APC or unresolved context (BlockingContext), when dir is a 1.x
+// project or lies inside one (scaffold.Find1xProject, the walk scaffold.Plan
+// makes). It returns why and that project's directory only when it refuses,
+// else NotBlocked and "". The context is checked first, so under Astro
+// nothing is walked; a hint that names the root under Astro walks for itself. Every hint about a 1.x project gets its
 // answer from here or from blockedFor (this package's errors, when they are
 // made; the astro dev stub), as init does, so none suggests astro init where
 // init refuses.
 func Convert1xBlocked(dir string) (why Block, root string) {
-	if c := currentContext(); !c.APC && !c.Unresolved {
+	if !BlockingContext() {
 		return NotBlocked, ""
 	}
 	root = scaffold.Find1xProject(dir)
 	return blockedFor(root), root
+}
+
+// BlockingContext reports a context under which astro init refuses a 1.x
+// project: Astro Private Cloud's, or one the CLI cannot resolve.
+func BlockingContext() bool {
+	c := currentContext()
+	return c.APC || c.Unresolved
 }
 
 // blockedFor is why astro init refuses the 1.x project in root, if it does:
