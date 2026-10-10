@@ -145,6 +145,11 @@ func ResolveLocalPath(specURL string) (string, error) {
 	// Strip file:// scheme
 	if strings.HasPrefix(strings.ToLower(path), "file://") {
 		path = path[len("file://"):]
+		// file:///C:/spec.json names C:/spec.json. VolumeName is always ""
+		// off Windows, where /C:/spec.json is an ordinary absolute path.
+		if len(path) > 1 && path[0] == '/' && filepath.VolumeName(path[1:]) != "" {
+			path = path[1:]
+		}
 	}
 
 	// Expand ~ to home directory

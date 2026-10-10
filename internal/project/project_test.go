@@ -168,7 +168,8 @@ func TestNewFallsBackToIDHostnameForUnusableName(t *testing.T) {
 	root := t.TempDir()
 	dirs := map[string]string{
 		"nonascii":    "日本語",
-		"punctuation": "...",
+		// Not "...": Windows strips a name's trailing dots, leaving "".
+		"punctuation": "_._",
 		"normal":      "my-project",
 	}
 	hostnames := map[string]string{}

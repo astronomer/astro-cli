@@ -3,6 +3,7 @@ package localenv
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -47,6 +48,9 @@ func TestMergeSetPreservesHandEdits(t *testing.T) {
 }
 
 func TestFilePermIs0600(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX mode bits: every file reports 0666 or 0444")
+	}
 	dir := t.TempDir()
 	s := &Store{Path: filepath.Join(dir, ".env"), Scope: ScopeProject}
 	if _, err := s.Set(KindEnv, "TOKEN", "x"); err != nil {
