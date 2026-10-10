@@ -85,7 +85,7 @@ var problemKinds = append(append(cliout.Kinds{}, local.ProblemKinds...), cloudKi
 // have, which is recorded once the refusal is out (trackUnknownCommand).
 func Execute(ctx context.Context) error {
 	// Once, on the real CLI path only, before any command runs: under an APC
-	// context, whose deploy still builds the 1.x layout, everything that
+	// context, which deploys the 1.x layout (with Astro CLI 1.x), everything that
 	// speaks of a 1.x project says so (project.SetUnderAPC). Not in
 	// NewRootCmd, which tests build for several platforms.
 	project.SetUnderAPC(!astrocontext.IsCloudContext())

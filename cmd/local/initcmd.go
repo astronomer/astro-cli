@@ -101,16 +101,16 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 }
 
 // There is one project format, and `astro init` converts a 1.x project to it
-// the same way on every platform. Astro Private Cloud's deploy still builds
-// only the 1.x layout (a Dockerfile and .astro/config.yaml), so a project
-// converted under an APC context would stop deploying there. Until APC
+// the same way on every platform. Astro Private Cloud deploys only the 1.x
+// layout (a Dockerfile and .astro/config.yaml), with Astro CLI 1.x, so a
+// project converted under an APC context would stop deploying there. Until APC
 // deploys pyproject.toml projects, scaffold refuses to convert one under an
 // APC context (scaffold.Options.DeploysToAPC) and changes nothing; its
 // message says why, and how to convert anyway. Any other directory is made a
 // project as anywhere, with a note that APC cannot deploy it yet: one below a
 // 1.x project, since that leaves the 1.x project's Dockerfile and .astro/ as
-// they were and APC's deploy of it keeps working, and a Dockerfile with no
-// .astro/, which APC's deploy refuses as it stands (it requires
+// they were and Astro CLI 1.x keeps deploying it, and a Dockerfile with no
+// .astro/, which no APC deploy takes as it stands (Astro CLI 1.x's requires
 // .astro/config.yaml).
 
 // apcDeployNote says that a project init just made does not deploy to the

@@ -62,7 +62,8 @@ type Options struct {
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
 	// DeploysToAPC is set when the current context or platform is Astro
-	// Private Cloud. Its deploy still builds the 1.x layout, so Plan and Run
+	// Private Cloud. It deploys the 1.x layout, with Astro CLI 1.x, and not
+	// yet pyproject.toml projects, so Plan and Run
 	// then refuse a directory that is itself a 1.x project (Is1xProject) with
 	// a *Convert1xUnderAPCError, before anything is written. A directory below
 	// one is converted as usual: it leaves the 1.x project's Dockerfile and

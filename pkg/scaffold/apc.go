@@ -8,9 +8,10 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
-// Astro Private Cloud's deploy still builds the 1.x layout (a Dockerfile and
-// .astro/config.yaml), so a 1.x project converted under an APC context would
-// stop deploying there. Until APC deploys pyproject.toml projects, Plan
+// Astro Private Cloud deploys the 1.x layout (a Dockerfile and
+// .astro/config.yaml), with Astro CLI 1.x, and not yet pyproject.toml
+// projects, so a 1.x project converted under an APC context would stop
+// deploying there. Until APC deploys pyproject.toml projects, Plan
 // refuses one when Options.DeploysToAPC is set, for every caller: astro init
 // and Astro Desktop alike.
 
@@ -36,9 +37,9 @@ func (e *Convert1xUnderAPCError) Is(target error) bool { return target == ErrCon
 // the CLI gives about a 1.x project under APC (internal/project).
 func Project1xUnderAPCMessage(dir string) string {
 	return dir + " holds a project made by Astro CLI 1.x (Dockerfile and .astro/), and the current context is " +
-		"Astro Private Cloud, whose astro deploy still builds that layout. Leave the project as it is for now: " +
-		"astro deploy keeps working with it on Astro Private Cloud, and converting it will be available once " +
-		"Astro Private Cloud deploys pyproject.toml projects. To convert it anyway, for Astro or for local " +
+		"Astro Private Cloud, which deploys that layout and not yet pyproject.toml projects. Leave the project as " +
+		"it is for now: Astro CLI 1.x keeps deploying it to Astro Private Cloud, and converting it will be " +
+		"available once Astro Private Cloud deploys pyproject.toml projects. To convert it anyway, for Astro or for local " +
 		"development only, switch to an Astro context first (astro context switch astronomer.io, or astro login " +
 		"to sign in to Astro) and run astro init in " + dir
 }

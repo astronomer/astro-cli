@@ -68,6 +68,8 @@ func TestPlanAndRunRefuseA1xProjectUnderAPC(t *testing.T) {
 			assert.Equal(t, Project1xUnderAPCMessage(abs), err.Error())
 			assert.NotContains(t, err.Error(), "`")
 			assert.Contains(t, err.Error(), "run astro init in "+abs)
+			assert.Contains(t, err.Error(), "Astro CLI 1.x keeps deploying it to Astro Private Cloud")
+			assert.NotContains(t, err.Error(), "astro deploy keeps")
 			assert.Equal(t, before, tree(t, dir), "a refused run writes nothing")
 		})
 	}

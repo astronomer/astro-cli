@@ -290,9 +290,9 @@ func listTree(t *testing.T, dir string) []string {
 	return out
 }
 
-// APC's deploy still builds the 1.x layout, so under an APC context init
+// APC deploys the 1.x layout (with Astro CLI 1.x), so under an APC context init
 // refuses to convert a 1.x project, as a usage error, and writes nothing: the
-// project keeps deploying as it is until APC deploys pyproject.toml projects.
+// project keeps deploying with Astro CLI 1.x until APC deploys pyproject.toml projects.
 func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
 	for _, format := range []string{"text", "json"} {
 		t.Run(format, func(t *testing.T) {
@@ -334,7 +334,7 @@ func requireAPCAdvice(t *testing.T, err error, dir string) {
 	}
 	for _, want := range []string{
 		"the current context is Astro Private Cloud",
-		"Leave the project as it is for now",
+		"Leave the project as it is for now: Astro CLI 1.x keeps deploying it to Astro Private Cloud",
 		"once Astro Private Cloud deploys pyproject.toml projects",
 		"switch to an Astro context first (astro context switch astronomer.io",
 	} {
@@ -417,7 +417,7 @@ func setUnderAPC(t *testing.T) {
 
 // Under APC, init checks only the directory it was given. One below a 1.x
 // project is made a project of its own, leaving the 1.x project's Dockerfile
-// and .astro/ as they were, so APC's deploy of it keeps working.
+// and .astro/ as they were, so Astro CLI 1.x keeps deploying it.
 func TestInitUnderAPCAllowsADirectoryBelowA1xProject(t *testing.T) {
 	d, root, _ := initDeps(t)
 	setUnderAPC(t)

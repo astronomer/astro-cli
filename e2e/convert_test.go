@@ -718,8 +718,8 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 	}
 }
 
-// Under an Astro Private Cloud context, whose `astro deploy` still builds the
-// 1.x layout, init refuses to convert a 1.x project and leaves every file as
+// Under an Astro Private Cloud context, which deploys the 1.x layout (with
+// Astro CLI 1.x), init refuses to convert a 1.x project and leaves every file as
 // it was: a usage error, published as the one error object under json. A
 // directory that is not a 1.x project is still made a project there, with a
 // note that APC does not deploy it yet.

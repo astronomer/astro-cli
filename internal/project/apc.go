@@ -6,8 +6,8 @@ import (
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
-// underAPC is whether the current context is Astro Private Cloud, whose
-// deploy still builds the 1.x layout, so a 1.x project there is not to be
+// underAPC is whether the current context is Astro Private Cloud, which
+// deploys the 1.x layout (with Astro CLI 1.x), so a 1.x project there is not to be
 // converted yet. Package state, set once at startup (SetUnderAPC), because
 // the advice about a 1.x project is built in many places — this package's
 // errors, astro init, the astro dev stub, and whatever reports them — and
