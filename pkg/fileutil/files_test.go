@@ -347,7 +347,8 @@ func (s *Suite) TestReadFileToString() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			actualResp, actualErr := ReadFileToString(tt.args.path)
-			if tt.errResp != "" && actualErr != nil {
+			if tt.errResp != "" {
+				s.Require().Error(actualErr)
 				s.Contains(actualErr.Error(), tt.errResp)
 				s.ErrorIs(actualErr, os.ErrNotExist)
 			} else {

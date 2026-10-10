@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -1558,4 +1559,15 @@ func (s *Suite) picked(out string) (rows [][]string, rest string) {
 		rows = append(rows, strings.Fields(line))
 	}
 	return rows, rest
+}
+
+// Written here rather than checked in, so a checkout's line endings cannot
+// decide what the test reads.
+func (s *Suite) TestReadSSHKeyFileNormalizesCRLF() {
+	path := filepath.Join(s.T().TempDir(), "ssh_key")
+	s.Require().NoError(os.WriteFile(path, []byte("-----BEGIN KEY-----\r\nabc\r\n-----END KEY-----\r\n"), 0o600))
+
+	got, err := readSSHKeyFile(path)
+	s.Require().NoError(err)
+	s.Equal("-----BEGIN KEY-----\nabc\n-----END KEY-----\n", got)
 }

@@ -2,11 +2,13 @@ package otto
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/zalando/go-keyring"
@@ -19,6 +21,11 @@ import (
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
+
+// errPrivilegeNotHeld is Windows' ERROR_PRIVILEGE_NOT_HELD, what os.Symlink
+// returns there for an account without the symlink privilege. A plain Errno so
+// the test compiles everywhere; the check is gated on GOOS besides.
+const errPrivilegeNotHeld = syscall.Errno(1314)
 
 func init() {
 	// The vault's master key is keyed by service name, not path: without the
@@ -247,7 +254,12 @@ func (s *ConfigSuite) TestStartPutsOnlyTheLauncherFirstOnPath() {
 	s.Require().NoError(os.WriteFile(filepath.Join(realDir, "python"), []byte("#!/bin/sh\n"), 0o755))
 	linkDir := s.T().TempDir()
 	link := filepath.Join(linkDir, "astro")
-	s.Require().NoError(os.Symlink(realExe, link))
+	if err := os.Symlink(realExe, link); err != nil {
+		if runtime.GOOS == windowsGOOS && errors.Is(err, errPrivilegeNotHeld) {
+			s.T().Skip("creating a symlink needs a privilege this Windows account lacks")
+		}
+		s.Require().NoError(err)
+	}
 	origExe := executable
 	executable = func() (string, error) { return link, nil }
 	s.T().Cleanup(func() { executable = origExe })

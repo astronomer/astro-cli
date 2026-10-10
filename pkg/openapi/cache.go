@@ -144,7 +144,13 @@ func ResolveLocalPath(specURL string) (string, error) {
 
 	// Strip file:// scheme
 	if strings.HasPrefix(strings.ToLower(path), "file://") {
-		path = path[len("file://"):]
+		// Unescaped by hand rather than through url.Parse, which would read
+		// the "." of the relative file://./spec.json as a host.
+		unescaped, err := url.PathUnescape(path[len("file://"):])
+		if err != nil {
+			return "", fmt.Errorf("parsing %s: %w", specURL, err)
+		}
+		path = unescaped
 		// file:///C:/spec.json names C:/spec.json. VolumeName is always ""
 		// off Windows, where /C:/spec.json is an ordinary absolute path.
 		if len(path) > 1 && path[0] == '/' && filepath.VolumeName(path[1:]) != "" {
@@ -152,8 +158,8 @@ func ResolveLocalPath(specURL string) (string, error) {
 		}
 	}
 
-	// Expand ~ to home directory
-	if strings.HasPrefix(path, "~/") || path == "~" {
+	// Expand ~ to home directory: ~/ everywhere, and ~\ on Windows too.
+	if path == "~" || (len(path) > 1 && path[0] == '~' && os.IsPathSeparator(path[1])) {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("expanding home directory: %w", err)

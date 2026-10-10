@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -600,21 +601,52 @@ func TestResolveLocalPath(t *testing.T) {
 		assert.Equal(t, abs, got)
 	})
 
-	t.Run("file:// stripped to absolute", func(t *testing.T) {
-		// Three slashes on every platform: Windows puts one before the drive.
-		fileURL := "file://" + filepath.ToSlash(abs)
-		if !strings.HasPrefix(fileURL, "file:///") {
-			fileURL = "file:///" + filepath.ToSlash(abs)
+	// Three slashes on every platform: Windows puts one before the drive.
+	fileURL := func(p string) string {
+		slashed := filepath.ToSlash(p)
+		if !strings.HasPrefix(slashed, "/") {
+			slashed = "/" + slashed
 		}
-		got, err := ResolveLocalPath(fileURL)
+		return "file://" + slashed
+	}
+
+	t.Run("file:// stripped to absolute", func(t *testing.T) {
+		got, err := ResolveLocalPath(fileURL(abs))
 		require.NoError(t, err)
 		assert.Equal(t, abs, got)
+	})
+
+	t.Run("file:// is percent-decoded", func(t *testing.T) {
+		spaced := filepath.Join(filepath.Dir(abs), "my spec.json")
+		got, err := ResolveLocalPath(strings.ReplaceAll(fileURL(spaced), " ", "%20"))
+		require.NoError(t, err)
+		assert.Equal(t, spaced, got)
+	})
+
+	t.Run("a drive letter is only a drive on Windows", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("covered by the file:// case above, whose path has a drive")
+		}
+		got, err := ResolveLocalPath("file:///C:/spec.json")
+		require.NoError(t, err)
+		assert.Equal(t, "/C:/spec.json", got)
 	})
 
 	t.Run("tilde expands to home", func(t *testing.T) {
 		home, err := os.UserHomeDir()
 		require.NoError(t, err)
 		got, err := ResolveLocalPath("~/spec.json")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(home, "spec.json"), got)
+	})
+
+	t.Run("tilde with a backslash expands on Windows", func(t *testing.T) {
+		if runtime.GOOS != "windows" {
+			t.Skip(`a backslash is not a separator here, so ~\ names a file`)
+		}
+		home, err := os.UserHomeDir()
+		require.NoError(t, err)
+		got, err := ResolveLocalPath(`~\spec.json`)
 		require.NoError(t, err)
 		assert.Equal(t, filepath.Join(home, "spec.json"), got)
 	})
