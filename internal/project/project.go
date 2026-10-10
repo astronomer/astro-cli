@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/proxy"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // Marker is the file whose presence makes a directory a project root.
@@ -198,14 +199,11 @@ func HasManifest(dir string) bool {
 // for ruff or pytest settings, and only one that HasManifest accepts makes the
 // directory a project with a manifest. `astro init` converts a 1.x directory,
 // reporting the 1.x files it could not read rather than refusing them, and
-// consults this only under an Astro Private Cloud context, where it refuses
-// one (Project1xUnderAPC).
+// refuses one under an Astro Private Cloud context (Project1xUnderAPC). It
+// is scaffold.Is1xProject, the check scaffold.Plan makes, so the two cannot
+// disagree.
 func Is1xProject(dir string) bool {
-	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
-		return false
-	}
-	info, err := os.Stat(filepath.Join(dir, ".astro"))
-	return err == nil && info.IsDir() && !HasManifest(dir)
+	return scaffold.Is1xProject(dir)
 }
 
 // ID returns the identity key for a project directory: the sha256 hex of

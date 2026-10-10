@@ -73,12 +73,14 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 			return c.d.AirflowDefault(ctx)
 		}
 	}
-	// Before anything is planned or written, so a refusal changes nothing.
-	if err := c.refuse1xUnderAPC(dir); err != nil {
-		return err
-	}
+	// Under an APC context scaffold refuses a 1.x project before writing
+	// anything, and nothing ran, so the refusal is a usage error.
+	opts.DeploysToAPC = project.UnderAPC()
 
 	res, err := scaffold.Run(dir, opts)
+	if errors.Is(err, scaffold.ErrConvert1xUnderAPC) {
+		return cliout.Usage(err)
+	}
 	if err != nil {
 		return err
 	}
@@ -102,23 +104,14 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 // the same way on every platform. Astro Private Cloud's deploy still builds
 // only the 1.x layout (a Dockerfile and .astro/config.yaml), so a project
 // converted under an APC context would stop deploying there. Until APC
-// deploys pyproject.toml projects, init refuses to convert one under an APC
-// context and changes nothing (project.Project1xUnderAPC says why, and how to
-// convert anyway). Any other directory is made a project as anywhere, with a
-// note that APC cannot deploy it yet: one below a 1.x project, since that
-// leaves the 1.x project's Dockerfile and .astro/ as they were and APC's
-// deploy of it keeps working, and a Dockerfile with no .astro/, which APC's
-// deploy refuses as it stands (it requires .astro/config.yaml).
-
-// refuse1xUnderAPC refuses, under an APC context, a dir that is itself a 1.x
-// project (project.Is1xProject), as a usage error: nothing ran, and nothing
-// was written.
-func (c *cli) refuse1xUnderAPC(dir string) error {
-	if !project.UnderAPC() || !project.Is1xProject(dir) {
-		return nil
-	}
-	return cliout.Usage(errors.New(project.Project1xUnderAPC(dir)))
-}
+// deploys pyproject.toml projects, scaffold refuses to convert one under an
+// APC context (scaffold.Options.DeploysToAPC) and changes nothing; its
+// message says why, and how to convert anyway. Any other directory is made a
+// project as anywhere, with a note that APC cannot deploy it yet: one below a
+// 1.x project, since that leaves the 1.x project's Dockerfile and .astro/ as
+// they were and APC's deploy of it keeps working, and a Dockerfile with no
+// .astro/, which APC's deploy refuses as it stands (it requires
+// .astro/config.yaml).
 
 // apcDeployNote says that a project init just made does not deploy to the
 // Astro Private Cloud the current context names, yet.

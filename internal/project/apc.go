@@ -1,6 +1,10 @@
 package project
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+
+	"github.com/astronomer/astro-cli/pkg/scaffold"
+)
 
 // underAPC is whether the current context is Astro Private Cloud, whose
 // deploy still builds the 1.x layout, so a 1.x project there is not to be
@@ -21,18 +25,8 @@ func SetUnderAPC(apc bool) { underAPC.Store(apc) }
 func UnderAPC() bool { return underAPC.Load() }
 
 // Project1xUnderAPC is the one account of the 1.x project in dir under an
-// Astro Private Cloud context. APC's deploy still builds the 1.x layout, so
-// astro init refuses to convert one there, and every hint that would
-// otherwise say to run it says this instead: astro init's refusal, the
-// errors of a command run in or below such a project (project1xMessage), and
-// the astro dev stub. The refusal checks only the directory init was given
-// (Is1xProject): init in a directory below one never touches its Dockerfile
-// or .astro/, so APC's deploy of it keeps working.
-func Project1xUnderAPC(dir string) string {
-	return dir + " holds a project made by Astro CLI 1.x (Dockerfile and .astro/), and the current context is " +
-		"Astro Private Cloud, whose astro deploy still builds that layout. Leave the project as it is for now: " +
-		"astro deploy keeps working with it on Astro Private Cloud, and converting it will be available once " +
-		"Astro Private Cloud deploys pyproject.toml projects. To convert it anyway, for Astro or for local " +
-		"development only, switch to an Astro context first (astro context switch astronomer.io, or astro login " +
-		"to sign in to Astro) and run " + initCommand + " in " + dir
-}
+// Astro Private Cloud context, scaffold.Project1xUnderAPCMessage: astro init's
+// refusal (scaffold.Plan's, under Options.DeploysToAPC), the errors of a
+// command run in or below such a project (project1xMessage), and the astro
+// dev stub all give it.
+func Project1xUnderAPC(dir string) string { return scaffold.Project1xUnderAPCMessage(dir) }
