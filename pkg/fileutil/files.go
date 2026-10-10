@@ -245,22 +245,13 @@ func ReadFileToString(filename string) (string, error) {
 	return string(data), nil
 }
 
-// This function finds all files of a specific extension
-func GetFilesWithSpecificExtension(folderPath, ext string) []string {
-	files, _ := filesWithExtension(folderPath, ext, false) //nolint:errcheck // a path it cannot read is skipped
-	return files
-}
-
-// FilesWithExtension is GetFilesWithSpecificExtension failing on a path
-// under folderPath it cannot read, rather than counting it as having none.
+// FilesWithExtension finds the names of the files under folderPath whose
+// names match ext. It fails on a path under folderPath it cannot read, rather
+// than counting it as having none.
 func FilesWithExtension(folderPath, ext string) ([]string, error) {
-	return filesWithExtension(folderPath, ext, true)
-}
-
-func filesWithExtension(folderPath, ext string, strict bool) ([]string, error) {
 	var files []string
 	err := filepath.Walk(folderPath, func(path string, f os.FileInfo, walkErr error) error {
-		if walkErr != nil && strict {
+		if walkErr != nil {
 			return walkErr
 		}
 		if f != nil && !f.IsDir() {

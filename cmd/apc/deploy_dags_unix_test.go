@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
@@ -22,17 +21,14 @@ func TestDeployFailsOnADagsDirectoryItCannotRead(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores the directory modes this failure is injected with")
 	}
-	project := filepath.Join(t.TempDir(), "project")
-	require.NoError(t, os.MkdirAll(filepath.Join(project, "dags"), 0o755))
-	prev := config.WorkingPath
-	config.WorkingPath = project
-	t.Cleanup(func() { config.WorkingPath = prev })
+	project := inProject(t, true)
 
 	deployMocks(t, deploy.Deployed{DeploymentID: "dep-ac", Dags: deploy.DagsFromUpload}, nil)
 	uploads := realDagsOnlyDeploy(t)
-	require.NoError(t, os.Chmod(project, 0o000))
-	t.Cleanup(func() { _ = os.Chmod(project, 0o755) })
-	run := runAPC(t, dagsAPI(dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads)), "", "deploy", "dep-ac", "-o", "json")
+	dags := filepath.Join(project, "dags")
+	require.NoError(t, os.Chmod(dags, 0o000))
+	t.Cleanup(func() { _ = os.Chmod(dags, 0o755) })
+	run := runAPC(t, dagsAPI(dagsDeployment(houston.DagOnlyDeploymentType, true), cfgOf(takesDagUploads)), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
 	assert.NotEqual(t, 0, run.code)
 	require.ErrorIs(t, run.err, syscall.EACCES)
 	assert.NotErrorIs(t, run.err, deploy.ErrNoDagsDirectory)

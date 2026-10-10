@@ -12,7 +12,6 @@ import (
 const (
 	deployGroupImage  = "Image"
 	deployGroupDAG    = "Dag"
-	deployGroupTest   = "Test"
 	deployGroupNonDAG = "Non-Dag Bundle"
 )
 
@@ -30,12 +29,12 @@ func annotateDeployFlag(cmd *cobra.Command, name, group string) {
 }
 
 // orderDeployFlagGroups lists deploy's sections in the order a deploy narrows:
-// what image ships, which DAGs, what must pass first, and what rides beside.
+// what image ships, which DAGs, and what rides beside.
 func orderDeployFlagGroups(cmd *cobra.Command) {
 	if cmd.Annotations == nil {
 		cmd.Annotations = map[string]string{}
 	}
 	cmd.Annotations[flagGroupOrderAnnotation] = strings.Join([]string{
-		deployGroupImage, deployGroupDAG, deployGroupTest, deployGroupNonDAG,
+		deployGroupImage, deployGroupDAG, deployGroupNonDAG,
 	}, ",")
 }

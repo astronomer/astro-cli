@@ -98,7 +98,7 @@ type remoteRuntimeCheckJSON struct {
 }
 
 func newDbtDeployJSON(res *astrodeploy.BundleDeploy, project, projectPath string, waited bool, waitErr error) dbtDeployJSON {
-	obj := dbtDeployJSON{
+	return dbtDeployJSON{
 		Deployment:     res.DeploymentID,
 		DeploymentName: res.DeploymentName,
 		Workspace:      res.WorkspaceID,
@@ -109,11 +109,17 @@ func newDbtDeployJSON(res *astrodeploy.BundleDeploy, project, projectPath string
 		BundleVersion:  res.BundleVersion,
 		Waited:         waited,
 		WaitError:      errText(waitErr),
+		Git:            bundleGitJSON(res.Git),
 	}
-	if g := res.Git; g != nil {
-		obj.Git = &deployGitJSON{CommitSHA: g.CommitSHA, Branch: g.Branch, CommitURL: g.CommitURL}
+}
+
+// bundleGitJSON is the commit a bundle deploy recorded, as a deploy result
+// publishes it; nil when it recorded none.
+func bundleGitJSON(g *astrodeploy.BundleGit) *deployGitJSON {
+	if g == nil {
+		return nil
 	}
-	return obj
+	return &deployGitJSON{CommitSHA: g.CommitSHA, Branch: g.Branch, CommitURL: g.CommitURL}
 }
 
 // renderBundleUploaded is the text a finished bundle upload has always
@@ -136,11 +142,19 @@ func renderBundleUploaded(version string) func(io.Writer) error {
 // why, because the upload happened and a script needs its deploy id and
 // version, and then exits 1 (failedAfterResult).
 func publishThenWait(cmd *cobra.Command, format cliout.Format, wait bool, deploymentID string, waitTime time.Duration, publish func(waitErr error) error) error {
+	return publishThenWaitWith(cmd, format, wait, func() error {
+		return waitForBundle(cmd.ErrOrStderr(), deploymentID, waitTime, astroV1Client)
+	}, publish)
+}
+
+// publishThenWaitWith is publishThenWait with the wait its caller's, for a
+// Deployment reached under a login other than the current context's.
+func publishThenWaitWith(cmd *cobra.Command, format cliout.Format, wait bool, waitFor func() error, publish func(waitErr error) error) error {
 	waitDone := func() error {
 		if !wait {
 			return nil
 		}
-		return waitForBundle(cmd.ErrOrStderr(), deploymentID, waitTime, astroV1Client)
+		return waitFor()
 	}
 	if format == cliout.FormatJSON {
 		waitErr := waitDone()

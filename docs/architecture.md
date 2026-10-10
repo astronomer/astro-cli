@@ -160,7 +160,7 @@ A command that already refuses to ask when it has no terminal marks that refusal
 | status | meaning |
 | --- | --- |
 | 0 | success |
-| 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started (a 1.x project's DAG deploy asks about an empty `dags/` after it has created the deploy record), so the "nothing ran" that 2 promises would not hold. The same refusal without a terminal has always exited 1. A script that needs to tell it from other failures reads `kind` |
+| 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started, so the "nothing ran" that 2 promises would not hold. The same refusal without a terminal has always exited 1. A script that needs to tell it from other failures reads `kind` |
 | 2 | usage error: an unknown flag or subcommand, a flag value the command does not accept (`--output yaml` included), the wrong number of arguments, a missing required flag, a group run with no subcommand under `--output json`, whether it has a RunE of its own (`cliout.GroupHelp`) or not (`cliout.Execute` answers it); in text mode it prints its help and exits 0, as before. Nothing ran |
 | 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started |
 | the command's own | `astro local check`: 1 when a check failed, 2 when it could not reach a verdict (no environment, no project). `astro af runs trigger-wait` (and `astro local af runs trigger-wait`): 1 when the run failed, 2 when the wait timed out. `astro local run`: the child's status |

@@ -39,7 +39,7 @@ func (s *Suite) TestCustomImageToTheAPCRegistryTakesTheNextTag() {
 			return s.mockImageHandler
 		}
 
-		got, err := buildPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "my-release", "./testfiles/", c.nextTag, "example.com", "", false, false, description, c.image, Options{})
+		got, err := tagPushDockerImage(s.houstonMock, &config.Context{}, mockDeployment, "my-release", c.nextTag, "example.com", "", false, c.image, Options{})
 		s.NoError(err, c.image)
 		s.Equal(c.want, pushedTo, c.image)
 		s.Equal(c.want, got)

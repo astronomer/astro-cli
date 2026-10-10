@@ -7,7 +7,6 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -262,31 +261,26 @@ func IsProjectDir(path string) (bool, error) {
 	configFile := filepath.Join(configPath, ConfigFileNameWithExt)
 
 	// Home directory is not a project directory
-	if HomePath == path {
+	if IsHomeDir(path) {
 		return false, nil
 	}
 
 	return fileutil.Exists(configFile, nil)
 }
 
-// IsWithinProjectDir returns true if the path is at or within an Astro project directory
-func IsWithinProjectDir(path string) (bool, error) {
-	pathAbs, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return false, err
+// IsHomeDir reports whether path is HomePath: the same spelling once cleaned,
+// or, when both can be read, the same directory under another one (a trailing
+// slash, a symlink).
+func IsHomeDir(path string) bool {
+	if path == "" || HomePath == "" {
+		return false
 	}
-	pathComponents := strings.Split(pathAbs, string(os.PathSeparator))
-	for i := range pathComponents {
-		componentAbs := strings.Join(pathComponents[:i+1], string(os.PathSeparator))
-		isProjectDir, err := IsProjectDir(componentAbs)
-		if err != nil {
-			return false, err
-		}
-		if isProjectDir {
-			return true, nil
-		}
+	if filepath.Clean(path) == filepath.Clean(HomePath) {
+		return true
 	}
-	return false, nil
+	a, errA := os.Stat(path)
+	b, errB := os.Stat(HomePath)
+	return errA == nil && errB == nil && os.SameFile(a, b)
 }
 
 // saveConfig serializes config writes under an exclusive OS-level file lock,

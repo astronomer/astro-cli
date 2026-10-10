@@ -17,19 +17,15 @@ import (
 )
 
 var (
-	forceDeploy      bool
-	forcePrompt      bool
-	saveDeployConfig bool
-	deployOutput     cliout.Format
-	deployYes        bool
-
-	ignoreCacheDeploy = false
+	forceDeploy  bool
+	forcePrompt  bool
+	deployOutput cliout.Format
+	deployYes    bool
 
 	// hasUncommittedChanges is a variable so a test does not depend on the
 	// state of the checkout it runs in.
 	hasUncommittedChanges = git.HasUncommittedChanges
 
-	EnsureProjectDir                   = utils.EnsureDockerfileProjectDir
 	DeployAirflowImage                 = deploy.Airflow
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
 	UpdateDeploymentImage              = deploy.UpdateDeploymentImage
@@ -43,13 +39,10 @@ var (
 	ErrImageNameNotPassedForRemoteFlag = errors.New("--image-name is mandatory when --remote flag is passed")
 )
 
-var deployExample = `  # Deploy this project, picking the Deployment from a list
-  astro deploy
+var deployExample = `  # Deploy an image built on this machine, picking the Deployment from a list
+  astro deploy --image-name <IMAGE_NAME>
 
-  # Deploy to a given Deployment
-  astro deploy <DEPLOYMENT_ID>
-
-  # Deploy a custom image built on this machine
+  # Deploy an image built on this machine to a given Deployment
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>`
 
 // The warnings a deploy can give about its DAGs.
@@ -60,36 +53,44 @@ const (
 	// The image may well carry DAGs (one built from a Dockerfile that copies
 	// them does); one astro package generated the build for does not.
 	warningImageNameDagsInImage = "this Deployment runs the Dags inside the image %s; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."
-	// noticeNoDagsDir: there is no dags directory to upload, so
+	// noticeNoDagsDir: the project has no dags directory to upload, so
 	// DagsOnlyDeploy uploaded nothing. An empty upload would have deleted
-	// the Deployment's DAGs. The %s after the path is the advice: where to
-	// run the deploy from, or what the project lacks.
-	noticeNoDagsDir = "no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had. %s"
-	// adviceRunFromProject: --image-name skips the project check, so the
-	// deploy may not have been run from one.
-	adviceRunFromProject = "To upload them, run the deploy from the project directory."
-	// adviceCreateDagsDir: the deploy ran from a project, which has none.
-	adviceCreateDagsDir = "To upload Dags, create a dags directory in the project."
+	// the Deployment's DAGs.
+	noticeNoDagsDir = "no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had. To upload Dags, create a dags directory in the project."
+	// noticeImageAlone: an --image-name deploy outside a pyproject.toml
+	// project ships the image alone, to a Deployment that takes DAG
+	// uploads, so its DAGs are as they were.
+	noticeImageAlone = "Dags were not updated: this deploy ran outside a pyproject.toml project, so it shipped the image alone, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
+	// noticeImageAloneUnplaced: the same, to a Deployment whose DAG source
+	// could not be read.
+	noticeImageAloneUnplaced = "this deploy ran outside a pyproject.toml project, so it shipped the image alone. If this Deployment takes Dag uploads, it keeps the Dags it had: to upload them, run astro deploy %s --dags from the project directory."
 	// noticeDagsUndecided: the image was deployed, and the cluster config
 	// that says whether the Deployment takes DAG uploads could not be read,
 	// so an upload that may have been due did not happen.
 	noticeDagsUndecided = "Dags were NOT updated: whether this Deployment takes Dag uploads could not be read (%v). The image was deployed, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
 )
 
-var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy <deployment-id> --force` to deploy anyway")
+// What a deploy that would build the project is told: v2 builds no project
+// for APC. Astro CLI 1.x keeps deploying projects there, and a pyproject.toml
+// project gets an APC deploy of its own later.
+const (
+	errBuildDeployNoProject = "Astro CLI v2 cannot build and deploy projects to Astro Private Cloud yet: use Astro CLI 1.x for now. " +
+		"To deploy an image you built yourself, pass --image-name"
+	errBuildDeployManifest = "Astro CLI v2 cannot build and deploy projects to Astro Private Cloud yet: use Astro CLI 1.x for now. " +
+		"Support for pyproject.toml projects on Astro Private Cloud is coming. Until then, --dags uploads this project's DAGs, " +
+		"and a project that declares dockerfile under [tool.astro] (a Dockerfile FROM an Astro Runtime image) " +
+		"builds an image with astro package --tag <image> that astro deploy <deployment-id> --image-name <image> deploys"
+)
+
+var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use astro deploy <deployment-id> --force to deploy anyway")
 
 func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy [DEPLOYMENT_ID]",
-		Short: "Deploy an Airflow project",
-		Long:  "Deploy an Airflow project to an APC Deployment",
-		Args:  cobra.MaximumNArgs(1),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed("image-name") {
-				return nil
-			}
-			return EnsureProjectDir(cmd, args)
-		},
+		Short: "Deploy an image or Dags to a Deployment",
+		Long: "Deploy an image you built, or a project's Dags, to an APC Deployment. Astro CLI v2 does not build projects for Astro Private Cloud yet: " +
+			"to build and deploy a project there, use Astro CLI 1.x. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) deploys with Astro CLI 1.x only.",
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deployAirflow(cmd, args, out)
 		},
@@ -97,22 +98,70 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
 	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
-	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
-	cmd.Flags().BoolVarP(&ignoreCacheDeploy, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace assigned to the Deployment")
 	cmd.Flags().StringVar(&description, "description", "", "Description to attach to the deploy, for traceability (default: one based on the deploy type)")
 	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
-	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of the custom image(should be present locally unless --remote is specified) to deploy")
+	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of the custom image (present locally unless --remote is specified) to deploy")
 	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Runtime version of the image to deploy. Example - 12.1.1. Mandatory if --image-name --remote is provided")
 	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Custom image which is present on the remote registry. Can only be used with --image-name flag")
 	cmd.Flags().BoolVarP(&deployYes, "yes", "y", false, "Answer the deploy's confirmations yes: an image tag that is not recommended, and a DAGs folder with no DAGs")
 	cliout.AddOutputFlag(cmd, &deployOutput)
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
-		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only Dags to your Deployment")
+		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only the Dags of the pyproject.toml project here to your Deployment")
 	}
 	return cmd
 }
+
+// refuseUndeployable stops a deploy v2 does not make on APC, before anything
+// is asked or sent:
+//
+//   - any deploy in or below a project in the Astro CLI 1.x layout, which
+//     Astro CLI 1.x deploys, or below a pyproject.toml project's root
+//     (kind no_project), --image-name included (utils.Locate's walk);
+//   - --dags anywhere but in a pyproject.toml project: it uploads that
+//     project's dags directory (kind no_project);
+//   - a deploy with no --image-name, which would build the project: v2 builds
+//     none for APC yet. From a pyproject.toml project that is a mode v2 does
+//     not have, a usage error; anywhere else there is no project to build,
+//     kind no_project, as astro deploy on Astro says.
+//
+// --image-name (with or without --remote) runs at a pyproject.toml project's
+// root, where the project's DAGs are uploaded after it to a Deployment that
+// takes them, and outside any project, where the image ships alone.
+func refuseUndeployable() (inProject bool, err error) {
+	// One walk routes the deploy and words its refusal.
+	where := utils.Locate(config.WorkingPath)
+	inProject = where.AtRoot(config.WorkingPath)
+	if !inProject && !where.None() {
+		// In or below a 1.x project, or below a pyproject.toml project's
+		// root: every mode is refused, --image-name included, as on Astro.
+		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+	}
+	switch {
+	case isDagOnlyDeploy && imageName != "":
+		// As astro deploy says it: an image source makes no sense with a
+		// deploy that ships only DAGs.
+		return inProject, cliout.Usage(errDagsWithImageName)
+	case isDagOnlyDeploy:
+		if !inProject {
+			return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+		}
+	case imagePresentOnRemote && imageName == "":
+		return inProject, ErrImageNameNotPassedForRemoteFlag
+	case imageName == "":
+		// The value, not whether the flag was given: an empty --image-name=
+		// names no image, so this would be a build.
+		if inProject {
+			return true, cliout.Usage(errors.New(errBuildDeployManifest))
+		}
+		return false, utils.NoProject(errBuildDeployNoProject)
+	}
+	return inProject, nil
+}
+
+// errDagsWithImageName is --dags with --image-name, in astro deploy's words.
+var errDagsWithImageName = errors.New("--dags deploys only your DAGs; drop --image-name")
 
 // The kinds of deploy deployJSON.Type names.
 const (
@@ -147,6 +196,14 @@ type deployJSON struct {
 }
 
 func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
+	inProject, err := refuseUndeployable()
+	if err != nil {
+		// Not a usage mistake to print the usage block under: what is in
+		// the directory decided it.
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	ws, err := coalesceWorkspace()
 	if err != nil {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
@@ -159,17 +216,11 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	// Save release name in config if specified
-	if deploymentID != "" && saveDeployConfig {
-		err = config.CFG.ProjectDeployment.SetProjectString(deploymentID)
-		if err != nil {
-			return err
-		}
-	}
-
 	// An error, not a printed note: returning nil here made a deploy that never
-	// happened exit 0, so CI reported it as a success.
-	if hasUncommittedChanges("") && !forceDeploy {
+	// happened exit 0, so CI reported it as a success. Only a deploy that
+	// reads the project is held to it: an image deployed alone from outside
+	// one reads nothing from the directory.
+	if inProject && hasUncommittedChanges("") && !forceDeploy {
 		// Not a usage mistake, so no usage block under the error.
 		cmd.SilenceUsage = true
 		return errUncommittedChanges
@@ -206,9 +257,6 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	}
 
 	if imagePresentOnRemote {
-		if imageName == "" {
-			return ErrImageNameNotPassedForRemoteFlag
-		}
 		deployed, err := UpdateDeploymentImage(houstonClient, deploymentID, ws, runtimeVersionForImageName, imageName, opts)
 		if err != nil {
 			return err
@@ -217,7 +265,7 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		result.Image, result.RuntimeVersion = imageName, runtimeVersionForImageName
 	} else {
 		// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-		deployed, err := DeployAirflowImage(houstonClient, config.WorkingPath, deploymentID, ws, ignoreCacheDeploy, forcePrompt, description, isImageOnlyDeploy, imageName, opts)
+		deployed, err := DeployAirflowImage(houstonClient, deploymentID, ws, forcePrompt, isImageOnlyDeploy, imageName, opts)
 		if err != nil {
 			return err
 		}
@@ -232,7 +280,7 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		return emitDeploy(r, &result)
 	}
 
-	after := &dagsAfterImage{client: houstonClient, workspace: ws, deployment: deploymentID, path: config.WorkingPath, imageName: imageName, description: description, dags: dags}
+	after := &dagsAfterImage{client: houstonClient, workspace: ws, deployment: deploymentID, path: config.WorkingPath, imageName: imageName, description: description, dags: dags, inProject: inProject}
 	if err := deployDagsAfterImage(after, opts, &result); err != nil {
 		return err
 	}
@@ -253,6 +301,9 @@ type dagsAfterImage struct {
 	// dags is where the Deployment takes its DAGs from, as the image deploy
 	// found it.
 	dags deploy.DagsFrom
+	// inProject is whether the deploy ran at a pyproject.toml project's
+	// root, whose dags directory follows the image.
+	inProject bool
 }
 
 // deployDagsAfterImage uploads the working directory's DAGs to a Deployment
@@ -261,18 +312,29 @@ type dagsAfterImage struct {
 func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deployJSON) error {
 	switch a.dags {
 	case deploy.DagsFromImage:
-		// The Deployment got its DAGs from the image just pushed. A build
-		// from this project baked them in; an image built elsewhere carries
-		// whatever it carries, possibly none, and nothing else would say so.
-		if a.imageName != "" {
-			warn(result, opts.Progress, fmt.Sprintf(warningImageNameDagsInImage, a.imageName))
-		}
+		// The Deployment got its DAGs from the image just pushed, which was
+		// built elsewhere and carries whatever it carries, possibly none, and
+		// nothing else would say so.
+		warn(result, opts.Progress, fmt.Sprintf(warningImageNameDagsInImage, a.imageName))
 		return nil
 	case deploy.DagsFromElsewhere:
 		return nil
 	case deploy.DagsFromUpload, deploy.DagsFromUnknown:
-		// Uploaded below. A Deployment the deploy did not place is uploaded
-		// to as a deploy always has, and DagsOnlyDeploy's refusals decide.
+		// Uploaded below, from a pyproject.toml project. A Deployment the
+		// deploy did not place is uploaded to as a deploy always has, and
+		// DagsOnlyDeploy's refusals decide.
+	}
+	if !a.inProject {
+		// No project here: the working directory's dags/ belongs to no
+		// project this deploy knows, so the image ships alone, and an
+		// upload that a Deployment taking them would want is said not to
+		// have happened, whatever show_warnings is.
+		msg := noticeImageAlone
+		if a.dags == deploy.DagsFromUnknown {
+			msg = noticeImageAloneUnplaced
+		}
+		alwaysWarn(result, opts.Progress, fmt.Sprintf(msg, a.deployment))
+		return nil
 	}
 
 	_, err := DagsOnlyDeploy(a.client, a.workspace, a.deployment, a.path, nil, true, a.description, opts)
@@ -285,11 +347,7 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 		// DagsOnlyDeploy refuses before it looks for the directory, so the
 		// Deployment takes uploads: one was due and did not happen, which is
 		// said whatever show_warnings is.
-		advice := adviceCreateDagsDir
-		if a.imageName != "" {
-			advice = adviceRunFromProject
-		}
-		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path, advice))
+		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path))
 		return nil
 	case a.dags == deploy.DagsFromUnknown && errors.Is(err, deploy.ErrAppConfigUnread):
 		// Whether the Deployment takes uploads at all could not be read,

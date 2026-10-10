@@ -2,10 +2,13 @@ package astro
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/config"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -270,4 +273,34 @@ func TestRemoteCommandIntegration(t *testing.T) {
 		assert.Contains(t, deployCmd.Example, "--deployment ")
 		assert.Contains(t, deployCmd.Example, "checking its runtime against a Deployment")
 	})
+}
+
+// remote deploy follows astro deploy's rule: building needs a pyproject.toml
+// project, a project in the Astro CLI 1.x layout is refused with the same
+// advice, and --image-name, which builds nothing, runs anywhere.
+func TestRemoteDeployProjectCheck(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prevPath, prevImage := config.WorkingPath, remoteImageName
+	t.Cleanup(func() { config.WorkingPath, remoteImageName = prevPath, prevImage })
+
+	check := func(dir string, args ...string) error {
+		config.WorkingPath = dir
+		remoteImageName = ""
+		cmd := newRemoteDeployCmd()
+		require.NoError(t, cmd.ParseFlags(args))
+		return cmd.PreRunE(cmd, nil)
+	}
+
+	empty := t.TempDir()
+	assert.ErrorContains(t, check(empty), "not an Astro project directory")
+	assert.NoError(t, check(empty, "--image-name", "img"))
+	assert.Error(t, check(empty, "--image-name="), "an empty --image-name= names no image")
+
+	oneX := make1xProject(t)
+	assert.ErrorContains(t, check(oneX), "uses the Astro CLI 1.x layout")
+	assert.ErrorContains(t, check(oneX, "--image-name", "img"), "uses the Astro CLI 1.x layout", "a 1.x checkout is refused, --image-name included")
+
+	manifestProject := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(manifestProject, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	assert.NoError(t, check(manifestProject))
 }

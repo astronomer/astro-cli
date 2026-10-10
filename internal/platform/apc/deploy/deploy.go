@@ -16,9 +16,7 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/astronomer/astro-cli/airflow"
-	"github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/docker"
 	"github.com/astronomer/astro-cli/internal/platform/apc/auth"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
@@ -30,10 +28,6 @@ import (
 var (
 	// this is used to monkey patch the function in order to write unit test cases
 	imageHandlerInit = airflow.ImageHandlerInit
-
-	dockerfile = "Dockerfile"
-
-	deployImagePlatformSupport = []string{"linux/amd64"}
 
 	gzipFile = fileutil.GzipFile
 
@@ -70,7 +64,6 @@ var (
 	// under astronomer.houston.config in the platform's values.
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
 	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
-	WarningInvalidImageNameMsg               = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label io.astronomer.docker.runtime.version")
 	ErrRuntimeVersionNotPassedForRemoteImage = errors.New("if --image-name and --remote is passed, it's mandatory to pass --runtime-version")
 )
@@ -80,9 +73,6 @@ const (
 	houstonSelectDeploymentPrompt = "Select which airflow deployment you want to deploy to:"
 	houstonDeploymentPrompt       = "Deploying: %s\n"
 
-	imageBuildingPrompt = "Building image..."
-
-	warningInvalidImageName                   = "WARNING! The image in your Dockerfile is pulling from '%s', which is not supported. We strongly recommend that you use Astronomer Certified or Runtime images that pull from 'astronomerinc/ap-airflow', 'quay.io/astronomer/ap-airflow' or 'quay.io/astronomer/astro-runtime'. If you're running a custom image, you can override this. Are you sure you want to continue?\n"
 	warningInvalidNameTag                     = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nPlease use one of the following tags: %s.\nAre you sure you want to continue?"
 	warningInvalidNameTagEmptyRecommendations = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nAre you sure you want to continue?"
 
@@ -186,10 +176,11 @@ func (o Options) progress() io.Writer {
 // other than stdout (airflow.DockerImage).
 type progressSetter interface{ ProgressTo(io.Writer) }
 
-// Airflow builds the project's image, or tags the one named, pushes it to
-// the Deployment's registry and returns what it pushed. Its DeploymentID is
-// set on a failure too, once the Deployment is known.
-func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string, opts Options) (Deployed, error) {
+// Airflow tags the local image named (--image-name), pushes it to the
+// Deployment's registry and returns what it pushed. It builds nothing: v2
+// does not build projects for APC. Its DeploymentID is set on a failure too,
+// once the Deployment is known.
+func Airflow(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, opts Options) (Deployed, error) {
 	deploymentID, deployments, err := getDeploymentIDForCurrentCommand(houstonClient, wsID, deploymentID, prompt)
 	if err != nil {
 		return Deployed{DeploymentID: deploymentID}, err
@@ -240,8 +231,7 @@ func Airflow(houstonClient houston.ClientInterface, path, deploymentID, wsID str
 
 	fmt.Fprintf(opts.progress(), houstonDeploymentPrompt, releaseName)
 
-	// Build the image to deploy
-	pushed, err := buildPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, path, nextTag, cloudDomain, byoRegistryDomain, ignoreCacheDeploy, byoRegistryEnabled, description, imageName, opts)
+	pushed, err := tagPushDockerImage(houstonClient, &c, deploymentInfo, releaseName, nextTag, cloudDomain, byoRegistryDomain, byoRegistryEnabled, imageName, opts)
 	if err != nil {
 		return Deployed{DeploymentID: deploymentID}, err
 	}
@@ -420,7 +410,9 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	return remoteImage, nil
 }
 
-func buildDockerImageForCustomImage(imageHandler airflow.ImageHandler, customImageName string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface, opts Options) error {
+// tagCustomImage tags the local image customImageName as the Deployment's
+// and checks the runtime its label names against the platform's.
+func tagCustomImage(imageHandler airflow.ImageHandler, customImageName string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface, opts Options) error {
 	fmt.Fprintln(opts.progress(), composeSkipImageBuildingPromptMsg)
 	err := imageHandler.TagLocalImage(customImageName)
 	if err != nil {
@@ -438,45 +430,6 @@ func buildDockerImageForCustomImage(imageHandler airflow.ImageHandler, customIma
 	return err
 }
 
-func buildDockerImageFromWorkingDir(path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, deploymentInfo *houston.Deployment, ignoreCacheDeploy bool, description string, opts Options) error {
-	// all these checks inside Dockerfile should happen only when no image-name is provided
-	// parse dockerfile
-	cmds, err := docker.ParseFile(filepath.Join(path, dockerfile))
-	if err != nil {
-		return fmt.Errorf("failed to parse dockerfile: %s: %w", filepath.Join(path, dockerfile), err)
-	}
-
-	_, tag := docker.GetImageTagFromParsedFile(cmds)
-
-	// Get valid image tags for platform using Deployment Info request
-	err = validateRuntimeVersion(houstonClient, tag, deploymentInfo, opts)
-	if err != nil {
-		return err
-	}
-	// Build our image
-	fmt.Fprintln(opts.progress(), imageBuildingPrompt)
-	deployLabels := []string{"io.astronomer.skip.revision=true"}
-	if description != "" {
-		deployLabels = append(deployLabels, "io.astronomer.deploy.revision.description="+description)
-	}
-	buildConfig := types.ImageBuildConfig{
-		Path:            config.WorkingPath,
-		NoCache:         ignoreCacheDeploy,
-		TargetPlatforms: deployImagePlatformSupport,
-		Labels:          deployLabels,
-	}
-
-	err = imageHandler.Build("", nil, buildConfig)
-	return err
-}
-
-func buildDockerImage(ignoreCacheDeploy bool, deploymentInfo *houston.Deployment, customImageName, path string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, description string, opts Options) error {
-	if customImageName == "" {
-		return buildDockerImageFromWorkingDir(path, imageHandler, houstonClient, deploymentInfo, ignoreCacheDeploy, description, opts)
-	}
-	return buildDockerImageForCustomImage(imageHandler, customImageName, deploymentInfo, houstonClient, opts)
-}
-
 func getGetTagFromImageName(imageName string) string {
 	parts := strings.Split(imageName, ":")
 	if len(parts) == 2 {
@@ -485,13 +438,13 @@ func getGetTagFromImageName(imageName string) string {
 	return ""
 }
 
-func buildPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, path, nextTag, cloudDomain, byoRegistryDomain string, ignoreCacheDeploy, byoRegistryEnabled bool, description, customImageName string, opts Options) (string, error) {
+func tagPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, nextTag, cloudDomain, byoRegistryDomain string, byoRegistryEnabled bool, customImageName string, opts Options) (string, error) {
 	imageName := airflow.ImageName(name, "latest")
 	imageHandler := imageHandlerInit(imageName)
 	if p, ok := imageHandler.(progressSetter); ok {
 		p.ProgressTo(opts.progress())
 	}
-	err := buildDockerImage(ignoreCacheDeploy, deploymentInfo, customImageName, path, imageHandler, houstonClient, description, opts)
+	err := tagCustomImage(imageHandler, customImageName, deploymentInfo, houstonClient, opts)
 	if err != nil {
 		return "", err
 	}
@@ -548,11 +501,6 @@ func getDeploymentIDForCurrentCommand(houstonClient houston.ClientInterface, wsI
 	cloudDomain := c.Domain
 	if cloudDomain == "" {
 		return deploymentID, deployments, errNoDomainSet
-	}
-
-	// Use config deployment if provided
-	if deploymentID == "" {
-		deploymentID = config.CFG.ProjectDeployment.GetProjectString()
 	}
 
 	if deploymentID != "" && !deploymentExists(deploymentID, deployments) {

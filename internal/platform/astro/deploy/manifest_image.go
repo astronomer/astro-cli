@@ -69,6 +69,8 @@ type ManifestImageDeployResult struct {
 	DagTarballVersion string
 	URL               string
 	Git               ManifestDeployGit
+	// DagDeployEnabled is whether the Deployment takes DAG deploys.
+	DagDeployEnabled bool
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -90,8 +92,8 @@ var (
 
 // DeployManifestImage builds (or adopts) a project's image, pushes it to the
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
-// tarball. It reuses the 1.x transport (createDeploy, the registry push in
-// airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
+// tarball. It uses the shared transport (createDeploy, the registry push in
+// airflow.DockerImage.Push, uploadDags, finalize) and, like DeployManifestDags,
 // neither prints nor exits — it returns a result for cmd to render, and writes
 // only a --wait's progress, to in.Progress.
 //
@@ -201,6 +203,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		DagTarballVersion: tarballVersion,
 		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
 		Git:               gitInfo,
+		DagDeployEnabled:  dep.IsDagDeployEnabled,
 	}, nil
 }
 
@@ -441,7 +444,7 @@ func downgradeError(tag, currentVersion string, raise func(string) string) error
 	return errors.New(msg)
 }
 
-// checkRuntimeVersion is the 1.x path's ValidRuntimeVersion without the prints: it returns
+// checkRuntimeVersion is Astro CLI 1.x's runtime check without the prints: it returns
 // a descriptive error instead of printing the reason (and leaving the caller to
 // exit), so the manifest path stays print-free below cmd — the same move
 // finalizeManifestDeploy makes for finalize. The rules are identical: no downgrade,
@@ -480,8 +483,8 @@ func checkAirflow3Floor(currentVersion, tag string) error {
 
 // finalizeManifestDeploy marks a manifest deploy final. It carries the dag tarball version
 // only when one exists (a "both" or dags-only deploy), so an image-only deploy
-// finalizes with an empty request. It is the 1.x path's finalizeDeploy without the
-// prints, so the manifest path renders in cmd and stays ready for --output json.
+// finalizes with an empty request. It prints nothing, so the deploy renders in
+// cmd and stays ready for --output json.
 func finalizeManifestDeploy(organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
 	req := astrov1.FinalizeDeployRequest{}
 	if dagTarballVersion != "" {

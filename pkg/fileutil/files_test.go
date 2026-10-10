@@ -356,7 +356,7 @@ func (s *Suite) TestReadFileToString() {
 	}
 }
 
-func (s *Suite) TestGetFilesWithSpecificExtension() {
+func (s *Suite) TestFilesWithExtension() {
 	filePath := "./test.py"
 	content := "testing"
 	WriteStringToFile(filePath, content)
@@ -378,7 +378,8 @@ func (s *Suite) TestGetFilesWithSpecificExtension() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			files := GetFilesWithSpecificExtension(tt.args.folderPath, tt.args.ext)
+			files, err := FilesWithExtension(tt.args.folderPath, tt.args.ext)
+			s.NoError(err)
 			s.Equal(expectedFiles, files)
 		})
 	}

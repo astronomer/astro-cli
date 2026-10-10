@@ -20,7 +20,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -49,8 +48,6 @@ func resetDeployFlagVars() {
 	manifestWorkspace = ""
 	noDagsBaseDir = false
 	waitForDeploy = false
-	forceDeploy = false
-	forcePrompt = false
 	workspaceID = ""
 	deploymentName = ""
 	deployDescription = ""
@@ -773,86 +770,13 @@ func TestDeployRoutesManifestProject(t *testing.T) {
 	assert.Contains(t, err.Error(), "--deployment")
 }
 
-func TestDeployRoutes1xProject(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	resetDeployFlagVars()
-
-	dir := t.TempDir() // no pyproject.toml, so not a project
-
-	orig := config.WorkingPath
-	config.WorkingPath = dir
-	t.Cleanup(func() { config.WorkingPath = orig })
-
-	origEnsure := EnsureProjectDir
-	origDeploy := DeployImage
-	t.Cleanup(func() {
-		EnsureProjectDir = origEnsure
-		DeployImage = origDeploy
-	})
-
-	EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
-	called := false
-	DeployImage = func(astrodeploy.InputDeploy, astrov1.APIClient, astrov1alpha1.APIClient) error {
-		called = true
-		return nil
-	}
-
-	err := execDeployCmd("test-deployment-id", "-f", "--workspace-id", "test-ws")
-	require.NoError(t, err)
-	assert.True(t, called, "a 1.x project should run the 1.x deploy path")
-}
-
-// Eight flags reach astro deploy that the manifest path never reads. Accepting them
-// silently means a deploy someone believes ran their tests, shipped from a
-// DAGs path it never looked at, or saved a target it did not save. Each is
-// refused with what to do instead until the ones worth porting are ported.
-//
-// Eight rather than nine: --build-secret is deliberately NOT in this table any
-// more, because the manifest path READS it now. It still needs a project Dockerfile
-// to be mounted into, and that refusal lives with the other build-secret
-// checks in TestDeployManifestBuildSecretRefusals — gated on the flag being given,
-// which is why it cannot be a row here.
-func TestDeployRefusesFlagsTheManifestPathIgnores(t *testing.T) {
-	cases := []struct {
-		args []string
-		want string
-	}{
-		{[]string{"--pytest"}, "uv run pytest"},
-		{[]string{"--parse"}, "astro local check"},
-		{[]string{"--dags-path", "./elsewhere"}, "not supported yet"},
-		{[]string{"--dag-bundle-name", "nightly"}, "not supported here yet"},
-		{[]string{"--test", "tests/test_dags.py"}, "uv run pytest"},
-		{[]string{"--env", ".env.ci"}, "runs no tests"},
-		{[]string{"--save"}, "always asks"},
-		{[]string{"--deployment-name", "prod"}, "--deployment"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.args[0], func(t *testing.T) {
-			testUtil.InitTestConfig(testUtil.LocalPlatform)
-			resetDeployFlagVars()
-
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifestForRouting), 0o600))
-			orig := config.WorkingPath
-			config.WorkingPath = dir
-			t.Cleanup(func() { config.WorkingPath = orig })
-
-			out, err := execDeployCapture(append([]string{actionDeploymentID}, tc.args...)...)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
-			assert.Contains(t, err.Error(), tc.want)
-			assert.NotContains(t, out, "Usage:", "a refusal prints the error, not the help")
-		})
-	}
-}
-
-// --force and --prompt are read by neither path but refused by neither either.
-// The manifest path has no uncommitted-changes gate for --force to open, and it always
-// asks, which is what --prompt requested — so both get the outcome the flag
-// asked for and refusing them would break CI that passes them out of habit.
+// --force and --prompt are accepted and read by nothing: there is no
+// uncommitted-changes gate for --force to open (and astronomer/deploy-action
+// passes it on every deploy), and the deploy always asks, which is what
+// --prompt requested. The run gets as far as asking for --deployment, as one
+// without them does.
 func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
-	for _, flag := range []string{"--force", "--prompt"} {
+	for _, flag := range []string{"--force", "-f", "--prompt", "-p"} {
 		t.Run(flag, func(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			resetDeployFlagVars()
@@ -864,27 +788,9 @@ func TestDeployAcceptsForceAndPromptOnAManifestProject(t *testing.T) {
 			t.Cleanup(func() { config.WorkingPath = orig })
 
 			err := execDeployCmd(flag)
-			if err != nil {
-				assert.NotContains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
-			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--deployment")
 		})
-	}
-}
-
-// The same flags still work on a 1.x project, where the 1.x deploy path reads
-// them. The refusal is on the manifest branch only.
-func TestDeployAllowsThoseFlagsOnA1xProject(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	resetDeployFlagVars()
-
-	dir := t.TempDir() // no pyproject.toml, so the 1.x path
-	orig := config.WorkingPath
-	config.WorkingPath = dir
-	t.Cleanup(func() { config.WorkingPath = orig })
-
-	err := execDeployCmd("--pytest")
-	if err != nil {
-		assert.NotContains(t, err.Error(), "has no effect when deploying a project with a pyproject.toml")
 	}
 }
 
@@ -1091,7 +997,10 @@ func setupDeployOnStage(t *testing.T, toml string) *deployLogin {
 	return picked
 }
 
-func logInTo(t *testing.T, domain, token, org string) {
+// logInToProd stores a login for astronomer.io, the host manifestOnProd names.
+func logInToProd(t *testing.T) {
+	const token, org = "Bearer prod-token", "prod-org"
+	const domain = "astronomer.io"
 	t.Helper()
 	login := config.Context{Domain: domain}
 	require.NoError(t, login.SetContextKey("token", token))
@@ -1105,7 +1014,7 @@ func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 	for _, args := range [][]string{{"test", "--dags"}, {"--deployment", "clx-bare", "--dags"}} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			picked := setupDeployOnStage(t, manifestOnProd)
-			logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+			logInToProd(t)
 
 			_, err := execDeployCapture(args...)
 			require.NoError(t, err)
@@ -1119,11 +1028,102 @@ func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 	}
 }
 
+// --non-dags from a project deploys under the project's host as the project's
+// deploy does, a link and a bare Deployment id alike; outside a project a
+// bare id goes under the current context.
+func TestDeployNonDagsUsesTheManifestDomainsLogin(t *testing.T) {
+	for _, args := range [][]string{{"test"}, {"--deployment", "clx-bare"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			setupDeployOnStage(t, manifestOnProd)
+			logInToProd(t)
+			var captured *astrodeploy.DeployBundleInput
+			prev := DeployBundle
+			t.Cleanup(func() { DeployBundle = prev })
+			DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+				captured = in
+				return astrodeploy.BundleDeploy{}, nil
+			}
+
+			_, err := execDeployCapture(append(args, "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", t.TempDir())...)
+			require.NoError(t, err)
+			require.NotNil(t, captured.Login, "deployed under the project's host")
+			assert.Equal(t, "astronomer.io", captured.Login.Domain)
+			assert.Equal(t, "prod-org", captured.Login.Organization)
+		})
+	}
+
+	t.Run("outside a project", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		require.NoError(t, os.Remove(filepath.Join(config.WorkingPath, "pyproject.toml")))
+		var captured *astrodeploy.DeployBundleInput
+		prev := DeployBundle
+		t.Cleanup(func() { DeployBundle = prev })
+		DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+			captured = in
+			return astrodeploy.BundleDeploy{}, nil
+		}
+		_, err := execDeployCapture("--deployment", "clx-bare", "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", t.TempDir())
+		require.NoError(t, err)
+		assert.Nil(t, captured.Login, "the current context")
+	})
+}
+
+// --non-dags naming no Deployment: a run that cannot be asked is refused as
+// astro deploy's is, input_required, before any picker; one that can is
+// offered the picker only on the current context's host, so from a project
+// on another host it is refused with the same words astro deploy uses.
+func TestDeployNonDagsWithNoTarget(t *testing.T) {
+	noBundle := func(t *testing.T) {
+		prev := DeployBundle
+		t.Cleanup(func() { DeployBundle = prev })
+		DeployBundle = func(*astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
+			t.Fatal("no target, so nothing is deployed")
+			return astrodeploy.BundleDeploy{}, nil
+		}
+	}
+	nonDags := []string{"--non-dags", "--non-dags-mount-path", "/x"}
+
+	t.Run("under --output json", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		logInToProd(t)
+		noBundle(t)
+		out, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir(), "--output", "json")...)
+		require.Error(t, err)
+		var obj struct {
+			Error string `json:"error"`
+			Kind  string `json:"kind"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(out), &obj), out)
+		assert.Equal(t, "input_required", obj.Kind)
+		assert.Contains(t, obj.Error, "pass the Deployment id as the argument or with --deployment")
+	})
+
+	t.Run("without a terminal", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		logInToProd(t)
+		noBundle(t)
+		_, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir())...)
+		require.Error(t, err)
+		assert.True(t, input.IsRequired(err), "%v", err)
+	})
+
+	t.Run("the picker on another host", func(t *testing.T) {
+		setupDeployOnStage(t, manifestOnProd)
+		logInToProd(t)
+		interactiveDeploy(t)
+		noBundle(t)
+		_, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir())...)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "the deployment picker lists only the current context's Deployments")
+		assert.Contains(t, err.Error(), "astro context switch astronomer.io")
+	})
+}
+
 // ASTRO_API_TOKEN outranks the stored login, and goes out with its scheme like
 // a stored token, since the deploy's CI/CD check splits it off.
 func TestDeployManifestSendsTheAPITokenToTheManifestDomain(t *testing.T) {
 	picked := setupDeployOnStage(t, manifestOnProd)
-	logInTo(t, "astronomer.io", "Bearer prod-token", "prod-org")
+	logInToProd(t)
 	t.Setenv(astrosession.EnvAPIToken, "ci-token")
 
 	_, err := execDeployCapture("test", "--dags")

@@ -138,14 +138,26 @@ func (s *DbtSuite) TestDbtDeploy_CustomMountPath() {
 	assert.NoError(s.T(), err)
 }
 
+// A dbt project in or below a 1.x project, by the walk every deploy decides
+// by (a Dockerfile beside .astro, with or without .astro/config.yaml), is
+// refused, as astro deploy --non-dags refuses the same bundle path.
 func (s *DbtSuite) TestDbtDeploy_WithinAstroProject() {
-	projectDir, cleanup, err := config.CreateTempProject()
-	assert.NoError(s.T(), err)
-	defer cleanup()
+	projectDir := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(projectDir, "Dockerfile"), []byte("FROM x\n"), 0o600))
+	s.Require().NoError(os.MkdirAll(filepath.Join(projectDir, ".astro"), 0o755))
+	dbtDir := filepath.Join(projectDir, "include", "dbt")
+	s.Require().NoError(os.MkdirAll(dbtDir, 0o755))
 
-	err = testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--project-path", projectDir)
-	assert.Error(s.T(), err)
-	assert.Contains(s.T(), err.Error(), "dbt project is within an Astro project")
+	for _, path := range []string{projectDir, dbtDir} {
+		err := testExecCmd(newDbtDeployCmd(), "test-deployment-id", "--project-path", path)
+		s.Require().Error(err, path)
+		s.Contains(err.Error(), "dbt project is within an Astro project", path)
+
+		resetDeployFlagVars()
+		nonDags := testExecCmd(NewDeployCmd(), "test-deployment-id", "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", path)
+		s.Require().Error(nonDags, path)
+		s.Contains(nonDags.Error(), "within an Astro project", "dbt deploy and --non-dags agree: %s", path)
+	}
 }
 
 // A project with a pyproject.toml carries no .astro/config.yaml, so the 1.x walk answers false at

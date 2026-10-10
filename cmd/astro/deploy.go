@@ -2,12 +2,12 @@ package astro
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	goerrors "errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -23,10 +23,8 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/internal/userstate"
-	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
@@ -37,23 +35,13 @@ import (
 )
 
 var (
-	forceDeploy        bool
-	forcePrompt        bool
-	saveDeployConfig   bool
-	pytest             bool
-	parse              bool
 	dags               bool
 	waitForDeploy      bool
 	waitTime           time.Duration
 	image              bool
-	dagsPath           string
-	pytestFile         string
-	envFile            string
 	imageName          string
-	deploymentName     string
 	deployDescription  string
 	noDagsBaseDir      bool
-	dagBundleName      string
 	nonDags            bool
 	nonDagsMountPath   string
 	nonDagsBundleType  string
@@ -68,16 +56,12 @@ var (
   astro deploy <DEPLOYMENT_ID>
 
   # Deploy only the DAGs
-  astro deploy <DEPLOYMENT_ID> --dags`
+  astro deploy <DEPLOYMENT_ID> --dags
 
-	DeployImage      = astrodeploy.Deploy
-	EnsureProjectDir = utils.EnsureProjectDir
-	buildSecrets     = []string{}
-	// hasUncommittedChanges is a variable so a test does not depend on the
-	// state of the checkout it runs in.
-	hasUncommittedChanges = git.HasUncommittedChanges
+  # Deploy an image built on this machine, from any directory
+  astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>`
 
-	errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use `astro deploy [deployment-id] --force` to deploy anyway")
+	buildSecrets = []string{}
 )
 
 const (
@@ -85,62 +69,42 @@ const (
 
 	imageNameFlag = "image-name"
 	nonDagsFlag   = "non-dags"
-	dagsPathFlag  = "dags-path"
 )
 
 func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "deploy [DEPLOYMENT_ID]",
-		Short: "Ship this project's code to a Deployment",
-		Long:  "Deploy your project to a Deployment on Astro. This command bundles your project files into a Docker image and pushes that Docker image to Astronomer. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use `astro remote deploy` instead. It does not include any metadata associated with your local Airflow environment.",
-		Args:  cobra.MaximumNArgs(1),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
-				return nil
-			}
-			// A project with a pyproject.toml has no .astro/config.yaml, so the 1.x EnsureProjectDir
-			// check would reject it. The manifest path loads and validates the manifest
-			// itself, so skip the 1.x check and let deploy() route.
-			if project.HasManifest(config.WorkingPath) {
-				return nil
-			}
-			// A DAG-only deploy sourcing its DAGs from --dags-path does not read anything
-			// else from the working directory, unless --pytest/--parse is also used, which
-			// builds and runs a local image to test-parse the DAGs and so still needs the
-			// project root. Check the bound values (not cmd.Flags().Changed) so --dags=false
-			// or an explicit empty --dags-path cannot be misread as enabling the bypass.
-			if dags && dagsPath != "" && !pytest && !parse {
-				return nil
-			}
-			return EnsureProjectDir(cmd, args)
-		},
+		Use:     "deploy [DEPLOYMENT_ID]",
+		Short:   "Ship this project's code to a Deployment",
+		Long:    "Deploy your project to a Deployment on Astro. Run it in a project with a pyproject.toml ([tool.astro]): it builds the project into a Docker image and pushes that image, with the project's DAGs, to Astronomer. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) is converted with astro init, or deployed with Astro CLI 1.x. With --image-name it deploys an image built on this machine, from any directory. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use astro remote deploy instead. It does not include any metadata associated with your local Airflow environment.",
+		Args:    cobra.MaximumNArgs(1),
 		RunE:    deploy,
 		Example: deployExample,
 	}
-	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy even if project contains errors or uncommitted changes")
-	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
-	cmd.Flags().BoolVarP(&saveDeployConfig, "save", "s", false, "Save deployment in config for future deploys")
+	// --force answered 1.x's checks (uncommitted changes, an empty dags
+	// directory), which v2's deploy does not make. It stays, accepted and
+	// read by nothing, because astronomer/deploy-action passes it on every
+	// deploy (TestDeployManifestDeployActionInvocations); hidden, as there is
+	// nothing for anyone to choose.
+	cmd.Flags().BoolP("force", "f", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
+	// --prompt asked 1.x to offer the Deployment list even with one named. A
+	// deploy here asks whenever none is named, so it is accepted, hidden and
+	// read by nothing, as a pyproject.toml project's deploy always took it.
+	cmd.Flags().BoolP("prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
-	cmd.Flags().BoolVar(&pytest, "pytest", false, "Deploy code to Astro only if the specified Pytests are passed")
-	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
-	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
-	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
+	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
-	cmd.Flags().StringVar(&dagBundleName, "dag-bundle-name", "", "Deploy Dags to a named Dag bundle on the Deployment instead of the default bundle. Requires Airflow 3, and the bundle must already exist on the Deployment")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
-	cmd.Flags().StringVar(&dagsPath, dagsPathFlag, "", "If set deploy dags from this path instead of the dags from working directory")
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
-	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all Dags in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
-	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	// No -d shorthand: on this command -d has meant --dags since v1, and moving
 	// it would turn `astro deploy -d` from a DAG-only deploy into a target
 	// selector. -d/--deployment is the spelling everywhere the letter is free.
-	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id. In a project with a pyproject.toml ([tool.astro])")
+	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	cmd.Flags().StringVar(&manifestWorkspace, "workspace", "", "Workspace for the deploy, overriding the context")
-	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format in a project with a pyproject.toml ([tool.astro]): text or json")
+	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-Dag bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
@@ -153,12 +117,6 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "build-secret", deployGroupImage)
 	annotateDeployFlag(cmd, "dags", deployGroupDAG)
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
-	annotateDeployFlag(cmd, "dag-bundle-name", deployGroupDAG)
-	annotateDeployFlag(cmd, dagsPathFlag, deployGroupDAG)
-	annotateDeployFlag(cmd, "pytest", deployGroupTest)
-	annotateDeployFlag(cmd, "test", deployGroupTest)
-	annotateDeployFlag(cmd, "env", deployGroupTest)
-	annotateDeployFlag(cmd, "parse", deployGroupTest)
 	annotateDeployFlag(cmd, nonDagsFlag, deployGroupNonDAG)
 	annotateDeployFlag(cmd, "non-dags-mount-path", deployGroupNonDAG)
 	annotateDeployFlag(cmd, "non-dags-bundle-type", deployGroupNonDAG)
@@ -169,176 +127,130 @@ func NewDeployCmd() *cobra.Command {
 	return cmd
 }
 
-func deployTests(parse, pytest, forceDeploy bool, pytestFile string) string {
-	if pytest && pytestFile == "" {
-		pytestFile = "all-tests"
+// deploy ships a project with a pyproject.toml ([tool.astro]), the one kind
+// of project v2 deploys (deployManifest), run from the project's root.
+//
+// --non-dags deploys a directory that must not be inside a project at all, so
+// where it runs from says nothing about the project. It is checked first.
+//
+// Everywhere else the project decides, by utils.Locate's walk. In or below a
+// project in the Astro CLI 1.x layout every mode is refused, naming the two
+// ways forward: convert it with astro init, or deploy it with Astro CLI 1.x,
+// which keeps deploying that layout. --image-name is refused there too: a
+// prebuilt image deployed from a 1.x checkout would leave that project's
+// DAGs stale with nothing said. Below a pyproject.toml project's root, every
+// mode is told to run from the root.
+//
+// Outside any project, --image-name is the one deploy: the image alone, with
+// no DAGs, as there is no project to take them from, and no git commit. A
+// Deployment that takes DAG deploys keeps the DAGs it had, and the deploy
+// says so.
+func deploy(cmd *cobra.Command, args []string) error {
+	if nonDags {
+		return deployNonDagsBundle(cmd, args)
 	}
-
-	if !parse && !pytest && !forceDeploy || parse && !pytest && !forceDeploy || parse && !pytest && forceDeploy {
-		pytestFile = "parse"
+	// One walk routes the deploy and words its refusal.
+	where := utils.Locate(config.WorkingPath)
+	if where.AtRoot(config.WorkingPath) {
+		return deployManifest(cmd, args, &where)
 	}
-
-	if parse && pytest {
-		pytestFile = "parse-and-all-tests"
+	if _, err := cliout.ParseFormat(deployOutput); err != nil {
+		return err
 	}
-
-	return pytestFile
+	// The value, not whether the flag was given: an empty --image-name=
+	// names no image, and would be a build.
+	if imageName != "" && where.None() {
+		return deployManifest(cmd, args, nil)
+	}
+	// Not a usage mistake, so no usage block under the error.
+	cmd.SilenceUsage = true
+	return utils.NoDeployableProject(where, utils.Deploy1xRefusedAstro)
 }
 
-// manifestDeployIgnores are the flags astro deploy accepts that the manifest path never
-// reads, mapped to what to do instead. Each was built for the 1.x deploy, and
-// on the manifest path nothing carries it: not the Request built below, and not
-// internal/deploy, which contains no reference to any of them.
+// refuseFlagCombinations stops a deploy given flags that cannot all apply,
+// before anything is read or asked, the way 1.x's deploy did:
 //
-// Refusing beats ignoring. A deploy that quietly skipped --pytest is a deploy
-// someone believes ran their tests, and the flag having no effect is exactly
-// the thing they cannot see. Porting them is not done yet.
+//   - --wait-time sets how long --wait waits, so it needs --wait;
+//   - --no-dags-base-dir lays out the DAGs a deploy ships, so it needs a
+//     deploy that ships some: not --image, and not an --image-name deploy
+//     outside a project, which ships the image alone.
 //
-// --force and --prompt are deliberately absent: the manifest path reads neither, but
-// neither leaves a false belief behind. There is no uncommitted-changes gate on
-// this path for --force to open, and a manifest deploy always asks, which is what
-// --prompt was for. Both get the outcome the flag asked for.
-//
-// --build-secret has LEFT this list, which is the one entry that went the other
-// way. It was blocked on tier 3, then on imagebuild passing a
-// --secret; both have landed, so the flag is READ now. It still needs a project
-// Dockerfile to be mounted into, and deployManifest refuses it without one — a refusal
-// about what the project declares rather than about which version it is, gated on
-// the flag being given rather than on a resolved value, since
-// util.ResolveBuildSecrets also reads BUILD_SECRET_INPUT from the environment.
-var manifestDeployIgnores = []struct {
-	flag string
-	do   string
-}{
-	{"pytest", "run your tests before deploying: `uv run pytest && astro deploy`"},
-	{"parse", "check your DAGs before deploying: `astro local check && astro deploy`"},
-	{"dags-path", "deploy from the project directory; a DAGs path other than dags/ is not supported yet"},
-	{"dag-bundle-name", "named DAG bundles are not supported here yet"},
-	{"test", "run your tests before deploying: `uv run pytest <path> && astro deploy`"},
-	{"env", "this deploy runs no tests, so it reads no test env file; run `uv run pytest` yourself"},
-	{"save", "this deploy always asks; mark a link `default = true` in [tool.astro.deployments] to move the cursor"},
-	{"deployment-name", "name the target with --deployment, which takes a link name or a Deployment id"},
-}
-
-// refuseFlagsManifestDeployIgnores stops a manifest deploy that was given a flag it would
-// silently drop.
-func refuseFlagsManifestDeployIgnores(cmd *cobra.Command) error {
-	for _, ignored := range manifestDeployIgnores {
-		if cmd.Flags().Changed(ignored.flag) {
-			return fmt.Errorf("--%s has no effect when deploying a project with a pyproject.toml ([tool.astro]): %s", ignored.flag, ignored.do)
+// inProject is whether the deploy runs at a pyproject.toml project's root.
+func refuseFlagCombinations(cmd *cobra.Command, inProject bool) error {
+	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
+		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
+	}
+	if cmd.Flags().Changed("no-dags-base-dir") {
+		switch {
+		case image:
+			return cliout.Usage(errors.New("cannot use --no-dags-base-dir with --image: an image-only deploy ships no DAGs"))
+		case imageName != "" && !inProject:
+			return cliout.Usage(errors.New("cannot use --no-dags-base-dir with --image-name outside a pyproject.toml project: the image ships alone, with no DAGs"))
 		}
 	}
 	return nil
 }
 
-func deploy(cmd *cobra.Command, args []string) error {
-	// Route by project type. A project with a pyproject.toml ([tool.astro])
-	// takes the manifest deploy path; everything else runs the 1.x path below,
-	// unchanged. project detection lives in internal/project.
-	if project.HasManifest(config.WorkingPath) {
-		return deployManifest(cmd, args)
+// nonDagsDeployJSON is what `astro deploy --non-dags --output json`
+// publishes: the bundle deployed and where. Its keys are the ones
+// `astro dbt deploy`'s result uses for the same facts.
+type nonDagsDeployJSON struct {
+	Deployment     string `json:"deployment"`
+	DeploymentName string `json:"deployment_name"`
+	Workspace      string `json:"workspace"`
+	DeployID       string `json:"deploy_id"`
+	// BundleType is --non-dags-bundle-type, BundlePath the directory bundled.
+	BundleType    string `json:"bundle_type"`
+	BundlePath    string `json:"bundle_path"`
+	MountPath     string `json:"mount_path"`
+	BundleVersion string `json:"bundle_version"`
+	// Waited is true when the run waited for the Deployment to become
+	// healthy (--wait), and WaitError says why that wait failed.
+	Waited    bool           `json:"waited"`
+	WaitError string         `json:"wait_error,omitempty"`
+	Git       *deployGitJSON `json:"git,omitempty"`
+}
+
+func newNonDagsDeployJSON(res *astrodeploy.BundleDeploy, bundleType, bundlePath string, waited bool, waitErr error) nonDagsDeployJSON {
+	return nonDagsDeployJSON{
+		Deployment:     res.DeploymentID,
+		DeploymentName: res.DeploymentName,
+		Workspace:      res.WorkspaceID,
+		DeployID:       res.DeployID,
+		BundleType:     bundleType,
+		BundlePath:     bundlePath,
+		MountPath:      res.MountPath,
+		BundleVersion:  res.BundleVersion,
+		Waited:         waited,
+		WaitError:      errText(waitErr),
+		Git:            bundleGitJSON(res.Git),
 	}
-
-	deploymentID = ""
-
-	// Get deploymentId from args, if passed
-	if len(args) > 0 {
-		deploymentID = args[0]
-	}
-
-	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
-		return errors.New("cannot use --wait-time with --wait=false")
-	}
-
-	if deploymentID == "" || forcePrompt || workspaceID == "" {
-		var err error
-		workspaceID, err = coalesceWorkspace()
-		if err != nil {
-			return errors.Wrap(err, "failed to find a valid workspace")
-		}
-	}
-
-	if dags && image {
-		return errors.New("cannot use both --dags and --image together. Run 'astro deploy' to update both your image and dags")
-	}
-
-	if dagBundleName != "" && image {
-		return errors.New("cannot use --dag-bundle-name with --image; named Dag bundles apply only to deploys that include Dags")
-	}
-
-	if cmd.Flags().Changed(imageNameFlag) {
-		for _, f := range []string{"dags", "dags-path", "no-dags-base-dir", "pytest", "parse", "build-secret", "dag-bundle-name"} {
-			if cmd.Flags().Changed(f) {
-				return fmt.Errorf("cannot use --%s with --image-name; --image-name implies an image-only deploy", f)
-			}
-		}
-	}
-
-	if nonDags {
-		return deployNonDagsBundle(cmd, args)
-	}
-
-	// Save deploymentId in config if specified
-	if deploymentID != "" && saveDeployConfig {
-		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
-		if err != nil {
-			return errors.Wrap(err, "failed to save deployment id in config")
-		}
-	}
-
-	// An error, not a printed note: returning nil here made a deploy that never
-	// happened exit 0, so CI reported it as a success.
-	if hasUncommittedChanges("") && !forceDeploy {
-		// Not a usage mistake, so no usage block under the error.
-		cmd.SilenceUsage = true
-		return errUncommittedChanges
-	}
-
-	// case for astro deploy --dags whose default operation should be not running any tests
-	if dags && !parse && !pytest {
-		pytestFile = ""
-	} else {
-		pytestFile = deployTests(parse, pytest, forceDeploy, pytestFile)
-	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
-
-	deployInput := astrodeploy.InputDeploy{
-		Path:           config.WorkingPath,
-		RuntimeID:      deploymentID,
-		WsID:           workspaceID,
-		WsIDFromFlag:   cmd.Flags().Changed("workspace-id"),
-		Pytest:         pytestFile,
-		EnvFile:        envFile,
-		ImageName:      imageName,
-		DeploymentName: deploymentName,
-		Prompt:         forcePrompt,
-		Dags:           dags,
-		NoDagsBaseDir:  noDagsBaseDir,
-		Image:          image,
-		WaitForStatus:  waitForDeploy,
-		WaitTime:       waitTime,
-		Progress:       cmd.ErrOrStderr(),
-		DagsPath:       dagsPath,
-		Description:    deployDescription,
-		BuildSecrets:   util.ResolveBuildSecrets(buildSecrets, os.Getenv(util.BuildSecretInputEnv)),
-		Force:          forceDeploy,
-		DagBundleName:  dagBundleName,
-	}
-
-	return DeployImage(deployInput, astroV1Client, astroV1Alpha1Client)
 }
 
 func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
-	for _, f := range []string{"dags", "image", imageNameFlag, "dag-bundle-name", "pytest", "parse", "build-secret", "dags-path", "no-dags-base-dir"} {
+	// Read first, so a bad --output is the usage error reported.
+	format, err := cliout.ParseFormat(deployOutput)
+	if err != nil {
+		return err
+	}
+	// The result goes where stdout is now. What the platform code prints on
+	// the way (the git note, the archive's) is the output text mode has always
+	// shown; under json it goes to stderr, as astro dbt deploy's does.
+	out := cmd.OutOrStdout()
+	defer strayStdoutToStderr(format)()
+
+	for _, f := range []string{"dags", "image", imageNameFlag, "build-secret", "no-dags-base-dir"} {
 		if cmd.Flags().Changed(f) {
-			return fmt.Errorf("cannot use --%s with --non-dags; --non-dags performs a non-Dag bundle deploy", f)
+			return cliout.Usage(fmt.Errorf("cannot use --%s with --non-dags; --non-dags performs a non-Dag bundle deploy", f))
 		}
 	}
 
+	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
+		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
+	}
+
 	if nonDagsMountPath == "" {
-		return errors.New("--non-dags-mount-path is required with --non-dags")
+		return cliout.Usage(errors.New("--non-dags-mount-path is required with --non-dags"))
 	}
 
 	if nonDagsBundlePath == "" {
@@ -356,18 +268,13 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("bundle path %s is not a directory", nonDagsBundlePath)
 	}
 
-	withinAstroProject, err := config.IsWithinProjectDir(nonDagsBundlePath)
-	if err != nil {
-		return fmt.Errorf("failed to verify bundle path is not within an Astro project: %w", err)
-	}
-	if !withinAstroProject {
-		withinAstroProject = isWithinManifestProject(nonDagsBundlePath)
-	}
-	if withinAstroProject {
+	// The walk every deploy decides by: a pyproject.toml project or a 1.x
+	// one at or above the bundle path.
+	if !utils.Locate(nonDagsBundlePath).None() {
 		return errors.New("bundle path is within an Astro project. Non-Dag bundles must be a separate directory")
 	}
 
-	targetID, target, err := resolveBundleDeployment(args, workspaceID, deploymentName, "")
+	targetID, target, login, err := nonDagsTarget(cmd.Context(), args, format)
 	if err != nil {
 		return err
 	}
@@ -381,24 +288,126 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 		Deployment:    target,
 		BundleType:    nonDagsBundleType,
 		Description:   deployDescription,
-		AstroV1Client: astroV1Client,
+		AstroV1Client: login.client,
+	}
+	if !login.current {
+		deployBundleInput.Login = &login.context
 	}
 	res, err := DeployBundle(deployBundleInput)
 	if err != nil {
 		return err
 	}
-	// A 1.x project's deploy has no --output, so this is text: the line it has
-	// always printed, then the wait.
-	return publishThenWait(cmd, cliout.FormatText, waitForDeploy, res.DeploymentID, waitTime, func(error) error {
-		return renderBundleUploaded(res.BundleVersion)(cmd.OutOrStdout())
+	waitDone := func() error {
+		if login.current {
+			return waitForBundle(cmd.ErrOrStderr(), res.DeploymentID, waitTime, login.client)
+		}
+		return astrodeploy.WaitForBundleIn(cmd.ErrOrStderr(), &login.context, res.DeploymentID, waitTime, login.client)
+	}
+	return publishThenWaitWith(cmd, format, waitForDeploy, waitDone, func(waitErr error) error {
+		if format == cliout.FormatJSON {
+			return cliout.Renderer{Format: format, Out: out}.Emit(newNonDagsDeployJSON(&res, nonDagsBundleType, nonDagsBundlePath, waitForDeploy, waitErr), nil)
+		}
+		return renderBundleUploaded(res.BundleVersion)(out)
 	})
+}
+
+// nonDagsTarget is the Deployment a non-Dag bundle deploys to, and the login
+// it deploys under, the way astro deploy from the same directory picks them.
+//
+// The login: in a pyproject.toml project here whose manifest loads, the
+// project's (its Astro host's), for everything; anywhere else, or when the
+// manifest does not load, the current context's.
+//
+// The target: the argument or --deployment, which must agree, a link name of
+// the project here or a Deployment id. With neither, the workspace's
+// Deployments are offered (--workspace, else --workspace-id, else the
+// login's): only to a run that can be asked, and only on the current
+// context's host, as astro deploy offers them. A run that cannot be asked,
+// under --output json or without a terminal, is refused as astro deploy's is,
+// with kind input_required.
+func nonDagsTarget(ctx context.Context, args []string, format cliout.Format) (string, *astrov1.Deployment, deployLogin, error) {
+	linkName := ""
+	if len(args) > 0 {
+		linkName = args[0]
+	}
+	ws := cmp.Or(manifestWorkspace, workspaceID)
+	// Agreement first, before anything is read.
+	if _, _, err := manifestdeploy.ResolveNamed(nil, linkName, manifestDeployment, ws, ""); err != nil {
+		current, _ := loginForDeploy(ctx, "") //nolint:errcheck // with no domain it is the current context, and never fails
+		return "", nil, current, cliout.Usage(err)
+	}
+
+	m := manifestHere()
+	domain := ""
+	if m != nil {
+		domain = m.Astro.LoginDomain()
+	}
+	login, err := loginForDeploy(ctx, domain)
+	if err != nil {
+		return "", nil, login, err
+	}
+
+	if name := cmp.Or(linkName, manifestDeployment); name != "" {
+		if m == nil || !hasLink(m, name) {
+			return name, nil, login, nil
+		}
+		named, _, err := manifestdeploy.ResolveNamed(m, name, "", ws, "")
+		if err != nil {
+			return "", nil, login, cliout.Usage(err)
+		}
+		return named.DeploymentID, nil, login, nil
+	}
+
+	if format != cliout.FormatText || !stdinIsTerminal() {
+		return "", nil, login, input.Required(errNonDagsNoTarget)
+	}
+	if !login.current {
+		return "", nil, login, errPickerOtherHost(login.context.Domain)
+	}
+	if ws == "" {
+		ws, err = coalesceWorkspace()
+		if err != nil {
+			return "", nil, login, errors.Wrap(err, "failed to find a valid workspace")
+		}
+	}
+	id, read, err := resolveBundleDeployment(nil, ws, "", noCreateUnderJSON(format, "to deploy to"))
+	return id, read, login, err
+}
+
+// errNonDagsNoTarget is a --non-dags deploy that names no Deployment and
+// cannot be asked for one, in astro deploy's words for the same refusal.
+var errNonDagsNoTarget = errors.New("this deploy names no Deployment and this run cannot be asked: pass the Deployment id as the argument or with --deployment")
+
+// errPickerOtherHost is the workspace picker refused on a login other than
+// the current context's: it lists only the current context's Deployments.
+func errPickerOtherHost(domain string) error {
+	return fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run astro context switch %[1]s", domain)
+}
+
+// manifestHere is the manifest of the pyproject.toml project the working
+// directory is the root of, as the walk loaded it, or nil when there is none
+// or it did not load.
+func manifestHere() *manifest.Manifest {
+	return utils.Locate(config.WorkingPath).Loaded(config.WorkingPath)
+}
+
+func hasLink(m *manifest.Manifest, name string) bool {
+	_, ok := m.Astro.Deployments[name]
+	return ok
 }
 
 // deployManifest runs the manifest deploy path: load the manifest, gather flags and
 // context, resolve the deployment, and run the deploy — dags-only, image-only,
 // or both — then render the result. The manifest deploy's logic lives in internal/deploy; this
 // is the cmd shim that parses, wires the transport, and prints.
-func deployManifest(cmd *cobra.Command, args []string) error {
+//
+// root is the walk's answer for the project the deploy runs at the root of,
+// carrying its loaded manifest. It is nil for an --image-name deploy outside a
+// pyproject.toml project: there is no manifest, so the target is a Deployment id (the
+// argument or --deployment) or the workspace's pick, the login is the current
+// context's, and the image ships alone, with no DAGs.
+func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error {
+	inProject := root != nil
 	// The format is read before the flag refusals, so a bad --output is the
 	// usage error reported rather than whichever refusal came first. Every
 	// failure below, refusals included, reaches a json-mode caller as the one
@@ -409,16 +418,20 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	cmd.SilenceUsage = true
-	if rerr := refuseFlagsManifestDeployIgnores(cmd); rerr != nil {
-		return manifestDeployErr(cmd, rerr)
+	if err := refuseFlagCombinations(cmd, inProject); err != nil {
+		return err
 	}
+	cmd.SilenceUsage = true
 
 	out := cmd.OutOrStdout()
 
-	m, err := manifest.Load(filepath.Join(config.WorkingPath, "pyproject.toml"))
-	if err != nil {
-		return manifestDeployErr(cmd, err)
+	// The manifest the walk loaded, or why it did not: it is not read again.
+	var m *manifest.Manifest
+	if inProject {
+		if root.LoadErr != nil {
+			return manifestDeployErr(cmd, root.LoadErr)
+		}
+		m = root.Manifest
 	}
 
 	// --build-secret is refused HERE, not in internal/deploy, and gated on the
@@ -433,22 +446,11 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	//   - --dags never reaches runImage, so a refusal there let
 	//     `--dags --build-secret` succeed with the flag silently dropped.
 	//   - --image-name returns before any build, so the same silent drop applied
-	//     whenever the project happened to declare a Dockerfile. The 1.x body has a
-	//     cross-flag guard listing build-secret, but a manifest deploy branches away
-	//     before reaching it.
+	//     whenever the project happened to declare a Dockerfile.
 	//
 	// One place, before anything is resolved or prompted for.
-	if cmd.Flags().Changed("build-secret") {
-		switch {
-		case dags:
-			return manifestDeployErr(cmd, errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image"))
-		case imageName != "":
-			return manifestDeployErr(cmd, errors.New("--build-secret has no effect with --image-name: the image is already built"))
-		case m.Astro.Dockerfile == "":
-			if err := util.CheckGeneratedBuildSecrets(buildSecrets); err != nil {
-				return manifestDeployErr(cmd, err)
-			}
-		}
+	if err := refuseBuildSecret(cmd, m); err != nil {
+		return manifestDeployErr(cmd, err)
 	}
 
 	linkName := ""
@@ -456,7 +458,13 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 		linkName = args[0]
 	}
 
-	login, err := loginForDeploy(cmd.Context(), m.Astro.LoginDomain())
+	// Without a project there is no host of its own, and no build to
+	// declare secrets for.
+	domain, secretSpecs := "", []string(nil)
+	if m != nil {
+		domain, secretSpecs = m.Astro.LoginDomain(), m.Astro.BuildSecretSpecs()
+	}
+	login, err := loginForDeploy(cmd.Context(), domain)
 	if err != nil {
 		return manifestDeployErr(cmd, err)
 	}
@@ -475,7 +483,7 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 
 	// Only a run that is going to ask has any use for the ambient layers, and
 	// reading the pin is not free — it creates the project's state directory.
-	willPrompt := interactive && linkName == "" && manifestDeployment == ""
+	willPrompt := interactive && inProject && linkName == "" && manifestDeployment == ""
 	preselect, preselectFrom := deployPreselect(config.WorkingPath, willPrompt)
 
 	errOut := cmd.ErrOrStderr()
@@ -489,18 +497,20 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 		WorkspaceID:      overrideWorkspace,
 		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
-		Image:            image,
-		ImageName:        imageName,
-		Description:      deployDescription,
-		Wait:             waitForDeploy,
-		WaitTime:         waitTime,
-		NoDagsBaseDir:    noDagsBaseDir,
-		Interactive:      interactive,
-		// The 1.x path's resolution, so a CI job setting BUILD_SECRET_INPUT
+		// Outside a project the image ships alone: there are no DAGs here.
+		Image:         image,
+		ImageAlone:    !inProject,
+		ImageName:     imageName,
+		Description:   deployDescription,
+		Wait:          waitForDeploy,
+		WaitTime:      waitTime,
+		NoDagsBaseDir: noDagsBaseDir,
+		Interactive:   interactive,
+		// Astro CLI 1.x's resolution, so a CI job setting BUILD_SECRET_INPUT
 		// keeps working across the version boundary rather than silently
 		// losing its secrets on the day the project converts. With neither the
 		// flag nor the variable, the manifest's build-secrets apply.
-		BuildSecrets: util.ResolveProjectBuildSecrets(buildSecrets, m.Astro.BuildSecretSpecs()),
+		BuildSecrets: util.ResolveProjectBuildSecrets(buildSecrets, secretSpecs),
 		// The runtime build is checked against the catalog where the image is
 		// about to be built from it. Its warnings go to stderr, so a json run's
 		// stdout stays the one result object.
@@ -541,7 +551,19 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	if res.Git.Uncommitted {
 		fmt.Fprintln(errOut, "note: the project has uncommitted changes, so this deploy records no git commit")
 	}
-	return renderManifestDeploy(out, format, &res)
+	var warnings []string
+	if !inProject {
+		// The image shipped alone. A Deployment that takes DAG deploys
+		// keeps the DAGs it had; one that does not runs whatever DAGs the
+		// image carries, which may be none.
+		w := fmt.Sprintf(warningDagsInImage, res.DeploymentID, imageName)
+		if res.DagDeployEnabled {
+			w = fmt.Sprintf(warningDagsNotUpdated, res.DeploymentID, res.DeploymentID)
+		}
+		warnings = append(warnings, w)
+		fmt.Fprintf(errOut, "warning: %s\n", w)
+	}
+	return renderManifestDeploy(out, format, &res, warnings)
 }
 
 // announceDeployTarget prints the one line every resolving command puts on
@@ -605,7 +627,24 @@ type deployJSON struct {
 	RuntimeVersion   string         `json:"runtime_version,omitempty"`
 	URL              string         `json:"url,omitempty"`
 	Git              *deployGitJSON `json:"git,omitempty"`
+	// Warnings are what the deploy warned about without failing, as text
+	// prints them on stderr (less the "warning: " prefix): an image shipped
+	// alone to a Deployment that takes DAG deploys, whose DAGs it left as
+	// they were.
+	Warnings []string `json:"warnings,omitempty"`
 }
+
+// warningDagsNotUpdated is the warning for an --image-name deploy outside a
+// project to a Deployment that takes DAG deploys: the image changed, its DAGs
+// did not.
+const warningDagsNotUpdated = "this deploy shipped the image alone, so Deployment %s keeps the DAGs it had. " +
+	"To update them, run astro deploy %s --dags from the project directory"
+
+// warningDagsInImage is the same deploy to a Deployment that takes no DAG
+// deploys: it runs the DAGs inside the image, which no project here put
+// there. APC's deploy warns the same (warningImageNameDagsInImage).
+const warningDagsInImage = "Deployment %s runs the DAGs inside the image %s; no dags folder was deployed. " +
+	"An image astro package built without a dockerfile declared under [tool.astro] contains none"
 
 type deployGitJSON struct {
 	CommitSHA string `json:"commit_sha"`
@@ -621,8 +660,9 @@ type deployGitJSON struct {
 // stream record before it (build progress and warnings go to stderr, and json
 // mode drops the announce and progress lines), so it is laid out the way
 // every result is, pretty on a terminal and one line when piped.
-func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy.Result) error {
+func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy.Result, warnings []string) error {
 	obj := deployJSON{
+		Warnings:         warnings,
 		Deployment:       res.DeploymentID,
 		Link:             res.LinkName,
 		Workspace:        res.WorkspaceID,
@@ -680,8 +720,8 @@ func manifestDeployErr(cmd *cobra.Command, err error) error {
 type deployLogin struct {
 	context config.Context
 	client  astrov1.APIClient
-	// current reports the login is the current context's, which the 1.x path's
-	// deployment picker assumes.
+	// current reports the login is the current context's, which the
+	// workspace-level deployment picker assumes.
 	current bool
 }
 
@@ -726,8 +766,8 @@ var newManifestDeployer = func(login *deployLogin, in io.Reader, errOut io.Write
 	return manifestDeployer{login: login, in: in, errOut: errOut}
 }
 
-// manifestDeployer wires internal/deploy's transport seam to the 1.x path's cloud/deploy
-// transport and the deployment selection flow.
+// manifestDeployer wires internal/deploy's transport seam to the Astro deploy
+// transport (internal/platform/astro/deploy) and the deployment selection flow.
 type manifestDeployer struct {
 	login *deployLogin
 	// in and errOut carry the deploy prompt. It asks on stderr and reads stdin,
@@ -787,11 +827,11 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 	return choices[i].Name, nil
 }
 
-// ResolveUnlinked runs the 1.x path's workspace-level pick/create flow and returns the
+// ResolveUnlinked runs the workspace-level pick/create flow and returns the
 // chosen deployment id.
 func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
 	if !d.login.current {
-		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
+		return "", errPickerOtherHost(d.login.context.Domain)
 	}
 	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
 	if err != nil {
@@ -800,7 +840,7 @@ func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
 	return dep.Id, nil
 }
 
-// DeployDags reuses the 1.x dags-only transport for the project's dags/.
+// DeployDags ships the project's dags/ through the dags-only transport.
 func (d manifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	res, err := astrodeploy.DeployManifestDags(astrodeploy.ManifestDagDeployInput{
 		Login:         &d.login.context,
@@ -866,30 +906,25 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		DagTarballVersion: res.DagTarballVersion,
 		URL:               res.URL,
 		Git:               toManifestDeployGit(res.Git),
+		DagDeployEnabled:  res.DagDeployEnabled,
 	}, nil
 }
 
-// isWithinManifestProject reports whether path sits at or inside a project
-// with a pyproject.toml ([tool.astro]).
-//
-// config.IsWithinProjectDir only knows the 1.x marker, .astro/config.yaml, so it
-// answers false at every level of a project with a pyproject.toml. That left both containment
-// refusals in this package unreachable for exactly the projects that have a manifest:
-// a dbt project or a non-DAG bundle nested inside one shipped where the check
-// meant to stop it.
-func isWithinManifestProject(path string) bool {
-	abs, err := filepath.Abs(filepath.Clean(path))
-	if err != nil {
-		return false
+// refuseBuildSecret is deployManifest's --build-secret check (see the
+// comment where it is called): the flag where nothing is built, or a secret
+// a generated build cannot mount. m is nil only for an --image-name deploy
+// outside a project, which the second case stops first.
+func refuseBuildSecret(cmd *cobra.Command, m *manifest.Manifest) error {
+	if !cmd.Flags().Changed("build-secret") {
+		return nil
 	}
-	for dir := abs; ; {
-		if project.HasManifest(dir) {
-			return true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return false
-		}
-		dir = parent
+	switch {
+	case dags:
+		return errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image")
+	case imageName != "":
+		return errors.New("--build-secret has no effect with --image-name: the image is already built")
+	case m.Astro.Dockerfile == "":
+		return util.CheckGeneratedBuildSecrets(buildSecrets)
 	}
+	return nil
 }

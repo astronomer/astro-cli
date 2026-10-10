@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -83,6 +84,33 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		decodeOne(t, stdout, &got)
 		assert.Equal(t, "removed", got.Action)
 		assert.Empty(t, stderr)
+	})
+	// The bundle sits in a git checkout with uncommitted changes, so the
+	// platform code prints its note on the way: under json that goes to
+	// stderr, and stdout is the one result object.
+	t.Run("deploy --non-dags from a dirty checkout", func(t *testing.T) {
+		if _, err := exec.LookPath("git"); err != nil {
+			t.Skip("needs git")
+		}
+		bundle := dbtProject(t)
+		gitIn := func(args ...string) {
+			t.Helper()
+			full := append([]string{"-C", bundle, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"}, args...)
+			out, err := exec.Command("git", full...).CombinedOutput()
+			require.NoError(t, err, string(out))
+		}
+		gitIn("init", "-q")
+		gitIn("add", ".")
+		gitIn("commit", "-q", "-m", "first")
+		require.NoError(t, os.WriteFile(filepath.Join(bundle, "dbt_project.yml"), []byte("name: changed\n"), 0o600))
+		resetDeployFlagVars()
+
+		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "deploy", dbtTestDeploymentID, "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-local-path", bundle, "--output", "json")
+		require.NoError(t, err, "stderr:\n%s", stderr)
+		var got nonDagsDeployJSON
+		decodeOne(t, stdout, &got)
+		assert.Equal(t, dbtTestVersion, got.BundleVersion)
+		assert.Contains(t, stderr, "uncommitted changes", "the platform's note goes to stderr")
 	})
 	t.Run("remote deploy", func(t *testing.T) {
 		stubClientDeploy(t, &astrodeploy.ClientDeploy{Image: "r/c:deploy-x", Registry: "r/c", Tag: "deploy-x"}, nil)

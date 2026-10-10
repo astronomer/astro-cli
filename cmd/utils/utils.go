@@ -1,11 +1,18 @@
 package utils
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/ansi"
+	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 type RunE func(cmd *cobra.Command, args []string) error
@@ -22,34 +29,235 @@ func ChainRunEs(runEs ...RunE) RunE {
 	}
 }
 
-// EnsureProjectDir fails outside a project directory, with advice to run astro
-// init. Its callers on Astro accept the pyproject.toml project astro init writes
-// before they get here, so the advice leads somewhere.
-func EnsureProjectDir(cmd *cobra.Command, args []string) error {
-	return ensureProjectDir("Change to an Astro project directory, or run astro init to make this one an Astro project")
+// Refusal1x is what a deploy says when the working directory is in a
+// project in the Astro CLI 1.x layout, at dir: where is "this project" when
+// the deploy ran in it, and names dir when it ran below it.
+type Refusal1x func(where, dir string) string
+
+// What a deploy from a project in the Astro CLI 1.x layout is told. v2
+// deploys only pyproject.toml projects, and Astro CLI 1.x keeps deploying the
+// 1.x layout, so nobody has to convert a project to keep shipping it.
+//
+// On Astro Private Cloud the advice is Astro CLI 1.x alone: v2 builds no
+// project there yet, and astro init refuses to convert a project under an
+// APC context, to keep its 1.x deploys working.
+var (
+	Deploy1xRefusedAstro Refusal1x = func(where, dir string) string {
+		return where + " uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), and Astro CLI v2 deploys only pyproject.toml projects. " +
+			"Convert it with astro init" + in(dir) + ", or deploy it with Astro CLI 1.x"
+	}
+	Deploy1xRefusedAPC Refusal1x = func(where, _ string) string {
+		return where + " uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), which Astro CLI v2 does not deploy to Astro Private Cloud. " +
+			"Deploy it with Astro CLI 1.x"
+	}
+)
+
+func in(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	return " in " + dir
 }
 
-// EnsureDockerfileProjectDir is EnsureProjectDir for APC deploy, which builds a
-// Dockerfile project and has no path for the pyproject.toml project astro init
-// writes, so advice to run astro init would only lead back here. Such a project
-// reaches APC through its image instead: with a declared Dockerfile, astro
-// package builds the whole project (the runtime base's ONBUILD COPY bakes the
-// DAGs in) and tags an image carrying the runtime label --image-name requires.
-func EnsureDockerfileProjectDir(cmd *cobra.Command, args []string) error {
-	return ensureProjectDir("Deploying to APC needs a Dockerfile-based project, one with a .astro/config.yaml, such as a project made with Astro CLI 1.x. From a pyproject.toml project, declare dockerfile = \"Dockerfile\" under [tool.astro] (a Dockerfile FROM an Astro Runtime image), run astro package, and deploy the image it tags with --image-name")
+// The no-project advice: the home directory, where astro init would make
+// every file under ~ part of a project, and anywhere else.
+const (
+	homeDirRefusal   = "this is your home directory, not an Astro project directory. Change to an Astro project directory"
+	notProjectAdvice = "this is not an Astro project directory. Change to an Astro project directory, or run astro init to make this one an Astro project"
+)
+
+// Where is what a deploy finds at and above its working directory: the
+// nearest pyproject.toml project (ManifestDir) or project in the Astro CLI
+// 1.x layout (Project1xDir), whichever comes first; both empty for none.
+//
+// For a pyproject.toml project it carries the manifest the walk loaded, or
+// why it did not load (LoadErr: it fails to parse or validate, or cannot be
+// read), so nothing after the walk reads the file again.
+type Where struct {
+	ManifestDir  string
+	Project1xDir string
+	Manifest     *manifest.Manifest
+	LoadErr      error
 }
 
-func ensureProjectDir(advice string) error {
-	isProjectDir, err := config.IsProjectDir(config.WorkingPath)
+// AtRoot reports whether the walk from dir found a pyproject.toml project at
+// dir itself: the deploy runs at the project's root.
+func (w Where) AtRoot(dir string) bool {
+	return w.ManifestDir != "" && sameDir(w.ManifestDir, dir)
+}
+
+// None reports whether the walk found no project at all.
+func (w Where) None() bool { return w.ManifestDir == "" && w.Project1xDir == "" }
+
+// Loaded is the manifest of a project the deploy runs at the root of, nil
+// when it runs anywhere else or the manifest did not load.
+func (w Where) Loaded(dir string) *manifest.Manifest {
+	if !w.AtRoot(dir) {
+		return nil
+	}
+	return w.Manifest
+}
+
+// Locate walks up from dir to the nearest project, the one rule astro
+// deploy, astro remote deploy, APC's deploy and the bundle deploys'
+// containment checks decide by, routing included. At each directory:
+//
+//   - a pyproject.toml project's root (manifestRoot) stops the walk. A
+//     pyproject.toml declaring no tool.astro table, a monorepo root's tool
+//     settings say, does not;
+//   - else a Dockerfile beside a .astro directory is a 1.x project, except
+//     in the home directory, whose .astro holds the global config;
+//   - else the walk goes on up.
+//
+// Each directory's pyproject.toml is read once, and the home directory is
+// looked up once per walk.
+func Locate(dir string) Where {
+	abs, err := filepath.Abs(dir)
 	if err != nil {
-		return errors.Wrap(err, ansi.Red("failed to verify that your working directory is an Astro project.\n"+advice))
+		return Where{}
 	}
-
-	if !isProjectDir {
-		return errors.New(ansi.Red("this is not an Astro project directory.\n" + advice + "\n"))
+	isHome := homeMatcher()
+	for d := abs; ; {
+		if root, m, loadErr := manifestRoot(d); root {
+			return Where{ManifestDir: d, Manifest: m, LoadErr: loadErr}
+		}
+		// Not a manifest root, so the 1.x layout alone decides: no second
+		// read of the pyproject.toml (project.Is1xProject would make one).
+		if has1xLayout(d) && !isHome(d) {
+			return Where{Project1xDir: d}
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return Where{}
+		}
+		d = parent
 	}
+}
 
-	return nil
+// homeMatcher reports whether a directory is the home directory, with
+// config.HomePath looked up once: the same spelling once cleaned, or the
+// same directory under another one (a symlink), as config.IsHomeDir has it.
+func homeMatcher() func(dir string) bool {
+	if config.HomePath == "" {
+		return func(string) bool { return false }
+	}
+	home := filepath.Clean(config.HomePath)
+	homeInfo, homeErr := os.Stat(home)
+	return func(dir string) bool {
+		if filepath.Clean(dir) == home {
+			return true
+		}
+		if homeErr != nil {
+			return false
+		}
+		info, err := os.Stat(dir)
+		return err == nil && os.SameFile(info, homeInfo)
+	}
+}
+
+// has1xLayout reports whether dir holds a Dockerfile beside a .astro
+// directory. A directory that cannot be read holds neither.
+func has1xLayout(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, ".astro"))
+	return err == nil && info.IsDir()
+}
+
+// manifestRoot reports whether dir is a pyproject.toml project's root, the
+// question every deploy routes on:
+//
+//   - a pyproject.toml whose [tool.astro] loads, or fails to validate: a
+//     project to fix, and the deploy reports why;
+//   - one that fails to parse, only when its text declares a tool.astro
+//     table (a [tool.astro header, or a tool.astro key): otherwise it is
+//     some other tool's file, and not a project;
+//   - one that exists and cannot be read, as project.HasManifest has it: the
+//     deploy then reports the read error rather than walking past it.
+//
+// No pyproject.toml, one with no [tool.astro], and one in a directory that
+// cannot be looked in are not. It returns the manifest it loaded, or why a
+// root's manifest did not load.
+func manifestRoot(dir string) (root bool, m *manifest.Manifest, loadErr error) {
+	path := filepath.Join(dir, project.Marker)
+	if info, err := os.Stat(path); err != nil || !info.Mode().IsRegular() {
+		// Not there, or a directory it cannot even look in: nothing at this
+		// level, and the walk goes on.
+		return false, nil, nil
+	}
+	m, err := manifest.Load(path)
+	switch {
+	case err == nil:
+		return true, m, nil
+	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection), errors.Is(err, fs.ErrNotExist):
+		return false, nil, nil
+	}
+	raw, readErr := os.ReadFile(path)
+	if readErr != nil {
+		// There, and unreadable.
+		return !errors.Is(readErr, fs.ErrNotExist), nil, err
+	}
+	if declaresToolAstro.Match(raw) {
+		return true, nil, err
+	}
+	return false, nil, nil
+}
+
+// declaresToolAstro matches a TOML line declaring the tool.astro table: a
+// [tool.astro] or [tool.astro.<sub>] header, an array-of-tables header under
+// it, or a dotted tool.astro key.
+var declaresToolAstro = regexp.MustCompile(`(?m)^\s*(\[\[?\s*"?tool"?\s*\.\s*"?astro"?\s*[\].]|"?tool"?\s*\.\s*"?astro"?\s*[.=])`)
+
+// NoDeployableProject is what a deploy says when the working directory is not
+// the root of a pyproject.toml project, from Locate's answer where (for the
+// working directory):
+//
+//   - in or below a project in the Astro CLI 1.x layout, refused1x, naming
+//     that project's directory when the deploy ran below it;
+//   - below a pyproject.toml project, to run the deploy from its root;
+//   - anywhere else, the no-project advice, which in the home directory does
+//     not suggest astro init.
+//
+// Every one of these is reported under the kind no_project: it unwraps to a
+// *project.NotFoundError.
+func NoDeployableProject(where Where, refused1x Refusal1x) error {
+	wd := config.WorkingPath
+	switch {
+	case where.Project1xDir != "":
+		says, dir := "this project", ""
+		if !sameDir(where.Project1xDir, wd) {
+			says, dir = "this directory is inside a project at "+where.Project1xDir+" that", where.Project1xDir
+		}
+		return &noProjectError{msg: refused1x(says, dir), cause: &project.NotFoundError{Start: wd, Project1xDir: where.Project1xDir}}
+	case where.ManifestDir != "" && !sameDir(where.ManifestDir, wd):
+		return NoProject(fmt.Sprintf("this directory is inside the project at %s. Run the deploy from the project directory, %s", where.ManifestDir, where.ManifestDir))
+	case config.IsHomeDir(wd):
+		return NoProject(homeDirRefusal)
+	}
+	return NoProject(notProjectAdvice)
+}
+
+func sameDir(a, b string) bool {
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+	return errA == nil && errB == nil && filepath.Clean(absA) == filepath.Clean(absB)
+}
+
+// noProjectError carries its own words, and unwraps to the
+// *project.NotFoundError that cmd/local's ProblemKinds reports as no_project.
+type noProjectError struct {
+	msg   string
+	cause error
+}
+
+func (e *noProjectError) Error() string { return e.msg }
+func (e *noProjectError) Unwrap() error { return e.cause }
+
+// NoProject is a refusal for want of a project here, saying msg, reported
+// under the kind no_project.
+func NoProject(msg string) error {
+	return &noProjectError{msg: msg, cause: &project.NotFoundError{Start: config.WorkingPath}}
 }
 
 func GetDefaultDeployDescription(isDagOnlyDeploy bool) string {
