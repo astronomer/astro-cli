@@ -523,7 +523,7 @@ func TestInitRefusesA1xProjectUnderAnUnresolvedContext(t *testing.T) {
 
 	err := execute(t, d, "init", "-o", "json")
 	requireRefused(t, err)
-	for _, want := range []string{"the current context cannot be resolved", "astro context switch", "run astro init in " + dir} {
+	for _, want := range []string{"the current context cannot be resolved", "astro context switch", "run astro init in " + scaffold.ShellQuote(dir)} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error missing %q:\n%v", want, err)
 		}
@@ -696,7 +696,7 @@ func TestTheDevStubAndInitAgree(t *testing.T) {
 				}
 				// From below the root, the command converts the root, not a
 				// project inside it.
-				if want := replaceInit + " " + root; ctx == "astro" && where == "subdir" && p.Convert != want {
+				if want := replaceInit + " " + scaffold.ShellQuote(root); ctx == "astro" && where == "subdir" && p.Convert != want {
 					t.Errorf("convert = %q, want %q", p.Convert, want)
 				}
 				requireStubMatchesInit(t, p, execute(t, d, "init"))
@@ -787,7 +787,10 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 		t.Fatal(err)
 	}
 	d.WorkingDir = func() (string, error) { return sub, nil }
-	want := replaceInit + " '" + root + "'"
+	want := replaceInit + " " + scaffold.ShellQuote(root)
+	if !strings.HasPrefix(scaffold.ShellQuote(root), "'") {
+		t.Fatalf("a path with a space is quoted: %s", scaffold.ShellQuote(root))
+	}
 
 	stdout.Reset()
 	if err := execute(t, d, "dev", "init", "-o", "json"); err == nil {

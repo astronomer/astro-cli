@@ -247,7 +247,7 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
 		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run astro init in "+root)
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 	})
 	t.Run("below the root", func(t *testing.T) {
 		_, err := Discover(dags)
@@ -255,7 +255,7 @@ func TestDiscoverIn1xProjectNamesIt(t *testing.T) {
 		require.ErrorAs(t, err, &nf)
 		assert.Equal(t, root, nf.Project1xDir)
 		assert.Contains(t, err.Error(), root+" holds a project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run astro init in "+root)
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 	})
 }
 
@@ -275,7 +275,7 @@ func TestBlocked1xAdvice(t *testing.T) {
 		_, nf := Discover(dags)
 		return nf, LoadError(root, root, manifest.ErrNoAstroSection)
 	}
-	then := "then run astro init in " + root
+	then := "then run astro init in " + scaffold.ShellQuote(root)
 	for _, tc := range []struct {
 		name         string
 		ctx          Context
@@ -340,7 +340,7 @@ func TestBlocked1xAdvice(t *testing.T) {
 		assert.Equal(t, NotBlocked, why)
 		assert.Equal(t, root, got, "the root is named in every context")
 		nf, _ := errs()
-		assert.Contains(t, nf.Error(), "Run astro init in "+root)
+		assert.Contains(t, nf.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 	})
 }
 
@@ -362,7 +362,7 @@ func TestNoAstroSectionNamesTheSame1xProject(t *testing.T) {
 	require.ErrorAs(t, err, &ns)
 	assert.True(t, ns.Has1xProject)
 	assert.Contains(t, err.Error(), proj+" holds a project made by Astro CLI 1.x")
-	assert.Contains(t, err.Error(), "Run astro init in "+proj)
+	assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(proj))
 
 	SetContext(Context{APC: true})
 	t.Cleanup(func() { SetContext(Context{}) })
@@ -389,7 +389,7 @@ func TestNoAstroSectionInsideA1xTree(t *testing.T) {
 	assert.Contains(t, err.Error(), "has no [tool.astro] section")
 
 	_, nf := Discover(filepath.Join(root, "dags"))
-	assert.Contains(t, nf.Error(), "Run astro init in '"+root+"'")
+	assert.Contains(t, nf.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 }
 
 func TestLoadError(t *testing.T) {
@@ -417,14 +417,14 @@ func TestLoadError(t *testing.T) {
 		assert.True(t, ns.Has1xProject)
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
 		assert.Contains(t, err.Error(), "project made by Astro CLI 1.x")
-		assert.Contains(t, err.Error(), "Run astro init in "+dir)
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(dir))
 
 		// From below the root too, the root is named: astro init there would
 		// scaffold a second project inside the 1.x one.
 		dags := filepath.Join(dir, "dags")
 		require.NoError(t, os.Mkdir(dags, 0o700))
 		err = LoadError(dags, dir, manifest.ErrNoAstroSection)
-		assert.Contains(t, err.Error(), "Run astro init in "+dir)
+		assert.Contains(t, err.Error(), "Run astro init in "+scaffold.ShellQuote(dir))
 	})
 }
 
