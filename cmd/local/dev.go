@@ -1,7 +1,6 @@
 package local
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -175,11 +174,10 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	stays := dc.in.dir1x != "" && dc.in.blocked != project.NotBlocked
 	if dc.in.dir1x != "" {
 		if !stays {
-			// From below the root, astro init names the root, and so does
-			// every place the stub offers it: the mapping, the replacement
-			// for astro dev init, and the text's example row.
+			// From below the root, the convert command names the root. astro
+			// dev init's replacement stays astro init, which makes a project
+			// in the working directory, as 1.x's did.
 			p.Convert = dc.in.convert()
-			p.Mapping = withInit(mapping, p.Convert)
 		}
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
@@ -205,10 +203,6 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 	if replacement, ok := devReplacementFor(typed); ok && !stays {
 		p.Replacement = replacement
 		switch replacement {
-		case replaceInit:
-			if p.Convert != "" {
-				p.Replacement = p.Convert
-			}
 		case replaceStart, replaceRestart:
 			p.Replacement, p.Notes = devStartReplacement(replacement, args, dc)
 		case replacePackage:
@@ -359,7 +353,7 @@ func renderDevRemoved(p devRemoved) string {
 	examples := []devReplacement{
 		{Command: nameStart, Replacement: replaceStart},
 		{Command: nameLogs, Replacement: replaceLogs},
-		{Command: nameInit, Replacement: cmp.Or(p.Convert, replaceInit)},
+		{Command: nameInit, Replacement: replaceInit},
 	}
 	if p.Replacement != "" {
 		typed := devReplacement{Command: strings.TrimPrefix(p.Typed, "astro dev "), Replacement: p.Replacement}
@@ -401,17 +395,6 @@ func (p project1x) convert() string {
 	return replaceInit + " " + scaffold.ShellQuote(p.dir1x)
 }
 
-// withInit is mapping with astro dev init's replacement set to convert.
-func withInit(mapping []devReplacement, convert string) []devReplacement {
-	out := slices.Clone(mapping)
-	for i := range out {
-		if out[i].Replacement == replaceInit {
-			out[i].Replacement = convert
-		}
-	}
-	return out
-}
-
 // devProject is the 1.x project the stub speaks of: the nearest one the
 // working directory is in or below, in every context, and why astro init
 // refuses it there, if it does, from the one walk and decision init makes
@@ -422,6 +405,11 @@ func (c *cli) devProject() project1x {
 		return project1x{}
 	}
 	why, root := project.Convert1xBlocked(wd)
+	if why == project.NotBlocked {
+		// Under Astro the decision walks nothing; the stub still names the
+		// root it would convert.
+		root = scaffold.Find1xProject(wd)
+	}
 	abs, err := filepath.Abs(wd)
 	if err != nil {
 		abs = wd

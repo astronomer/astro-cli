@@ -301,3 +301,22 @@ func (l *lazyVaultWriter) writer() (*vaultenv.Writer, error) {
 	}
 	return l.w, nil
 }
+
+// blockedInitHint is the refusal astro init would give in the working
+// directory, for a spelling of init that redirects to it (astro local init,
+// astro af init), so the redirect does not suggest astro init where init
+// refuses: the dev stub's account, from the same decision. nil when sub is
+// not init or init would not refuse.
+func (c *cli) blockedInitHint(sub string) error {
+	if r, ok := devReplacementFor(sub); !ok || r != replaceInit {
+		return nil
+	}
+	wd, err := c.d.WorkingDir()
+	if err != nil {
+		return nil
+	}
+	if why, root := project.Convert1xBlocked(wd); why != project.NotBlocked {
+		return &convert1xBlockedError{msg: project.Blocked1xMessage(why, root)}
+	}
+	return nil
+}

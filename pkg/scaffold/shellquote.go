@@ -1,18 +1,27 @@
 package scaffold
 
-import "strings"
+import (
+	"runtime"
+	"strings"
+)
 
 // ShellQuote is s as one shell word, for a path or argument the CLI prints in
-// a command to run: unchanged when every rune is safe unquoted, else wrapped
-// in single quotes, with an embedded single quote closed, escaped and
-// reopened. POSIX shells and PowerShell both read a single-quoted word
-// literally (PowerShell spells an embedded single quote differently, which a
-// path rarely holds); a Windows path, with its backslashes, is always quoted.
-// The one quoting every printed command uses, astro config's suggestions
-// included.
-func ShellQuote(s string) string {
+// a command to run: unchanged when every rune is safe unquoted, else quoted
+// for the shell of the platform the CLI runs on (shellQuote). The one
+// quoting every printed command uses, astro config's suggestions included.
+func ShellQuote(s string) string { return shellQuote(s, runtime.GOOS) }
+
+// shellQuote is ShellQuote for goos. On Windows it wraps s in double quotes,
+// which cmd.exe and PowerShell both read as one word ("C:\a b"); a Windows
+// path cannot hold a double quote. Elsewhere it wraps s in single quotes, with
+// an embedded single quote closed, escaped and reopened, as POSIX shells read
+// it.
+func shellQuote(s, goos string) string {
 	if s != "" && !strings.ContainsFunc(s, func(r rune) bool { return !isShellSafe(r) }) {
 		return s
+	}
+	if goos == "windows" {
+		return `"` + s + `"`
 	}
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

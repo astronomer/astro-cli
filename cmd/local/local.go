@@ -132,6 +132,9 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			// Spellings that used to work here, or that someone reaches for
 			// out of v1 habit, get named rather than refused: `init` moved up
 			// to `astro init`, and `ps` was always `status`.
+			if err := c.blockedInitHint(args[0]); err != nil {
+				return err
+			}
 			if replacement, ok := devReplacementFor(args[0]); ok {
 				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use `%s`", args[0], cmd.CommandPath(), replacement))
 			}

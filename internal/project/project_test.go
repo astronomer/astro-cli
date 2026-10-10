@@ -338,7 +338,7 @@ func TestBlocked1xAdvice(t *testing.T) {
 	t.Run("under Astro", func(t *testing.T) {
 		why, got := Convert1xBlocked(dags)
 		assert.Equal(t, NotBlocked, why)
-		assert.Equal(t, root, got, "the root is named in every context")
+		assert.Empty(t, got, "under Astro the decision walks nothing")
 		nf, _ := errs()
 		assert.Contains(t, nf.Error(), "Run astro init in "+scaffold.ShellQuote(root))
 	})

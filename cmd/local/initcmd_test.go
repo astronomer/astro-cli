@@ -776,8 +776,9 @@ func requireStubMatchesInit(t *testing.T, p devPayload, err error) {
 }
 
 // From below a 1.x root, the command that converts it names the root, quoted
-// when it holds a space: as astro dev init's replacement, in the mapping, in
-// convert, and in the text's example row alike.
+// when it holds a space, in json and text alike; astro dev init's replacement
+// stays astro init, which makes a project in the working directory, as 1.x's
+// did, in the mapping and the example row too.
 func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	d, base, stdout := initDeps(t)
 	root := filepath.Join(base, "my project")
@@ -788,7 +789,7 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	}
 	d.WorkingDir = func() (string, error) { return sub, nil }
 	want := replaceInit + " " + scaffold.ShellQuote(root)
-	if !strings.HasPrefix(scaffold.ShellQuote(root), "'") {
+	if scaffold.ShellQuote(root) == root {
 		t.Fatalf("a path with a space is quoted: %s", scaffold.ShellQuote(root))
 	}
 
@@ -800,12 +801,12 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}
-	if p.Replacement != want || p.Convert != want || p.V1Dir != root {
-		t.Errorf("payload = %+v, want replacement and convert %q", p, want)
+	if p.Replacement != replaceInit || p.Convert != want || p.V1Dir != root {
+		t.Errorf("payload = %+v, want replacement %q and convert %q", p, replaceInit, want)
 	}
 	for _, m := range p.Mapping {
-		if m.Command == "init" && m.Replacement != want {
-			t.Errorf("the mapping's init = %q, want %q", m.Replacement, want)
+		if m.Command == "init" && m.Replacement != replaceInit {
+			t.Errorf("the mapping's init = %q, want %q", m.Replacement, replaceInit)
 		}
 	}
 
@@ -813,9 +814,30 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	if err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	for _, line := range []string{"Use `" + want + "` instead", want + " ", "Run " + want + " to convert it in place"} {
+	for _, line := range []string{"Convert with `" + want + "`, then use `" + replaceInit + "`", "Run " + want + " to convert it in place"} {
 		if !strings.Contains(err.Error(), line) {
 			t.Errorf("text lacks %q:\n%v", line, err)
 		}
+	}
+}
+
+// astro local init and astro af init (and its airflow spelling) redirect to
+// astro init; where init refuses, they give init's refusal instead of
+// suggesting it, and elsewhere still name astro init.
+func TestInitRedirectsGiveTheRefusal(t *testing.T) {
+	for _, args := range [][]string{{"local", "init"}, {"af", "init"}, {"airflow", "init"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			d, dir, _ := initDeps(t)
+			write1xProject(t, dir)
+			err := execute(t, d, args...)
+			if err == nil || !strings.Contains(err.Error(), "`"+replaceInit+"`") {
+				t.Errorf("under Astro: %v", err)
+			}
+
+			setUnderAPC(t)
+			err = execute(t, d, args...)
+			requireRefused(t, err)
+			requireAPCAdvice(t, err, dir)
+		})
 	}
 }
