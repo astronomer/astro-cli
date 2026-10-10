@@ -2,19 +2,21 @@ package scaffold
 
 import "testing"
 
-// A word every shell reads as is stays bare; anything else is single quoted,
-// on every platform.
+// A word every shell reads as is stays bare, an ordinary Windows path
+// included on Windows; anything else is single quoted.
 func TestShellQuote(t *testing.T) {
-	for _, tc := range []struct{ in, want string }{
-		{"/opt/airflow", "/opt/airflow"},
-		{"/my project", "'/my project'"},
-		{"/it's", `'/it'\''s'`},
-		{"", "''"},
-		{`C:\a b`, `'C:\a b'`},
-		{"astronomer.io", "astronomer.io"},
+	for _, tc := range []struct{ in, goos, want string }{
+		{"/opt/airflow", "linux", "/opt/airflow"},
+		{"/my project", "linux", "'/my project'"},
+		{"/it's", "darwin", `'/it'\''s'`},
+		{"", "linux", "''"},
+		{`C:\proj`, "linux", `'C:\proj'`},
+		{`C:\proj`, "windows", `C:\proj`},
+		{`C:\my proj`, "windows", `'C:\my proj'`},
+		{"astronomer.io", "windows", "astronomer.io"},
 	} {
-		if got := ShellQuote(tc.in); got != tc.want {
-			t.Errorf("ShellQuote(%q) = %s, want %s", tc.in, got, tc.want)
+		if got := shellQuote(tc.in, tc.goos); got != tc.want {
+			t.Errorf("shellQuote(%q, %s) = %s, want %s", tc.in, tc.goos, got, tc.want)
 		}
 	}
 }

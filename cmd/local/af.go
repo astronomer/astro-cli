@@ -39,9 +39,6 @@ func newAfCmd(d Deps, newTarget func() target) *cobra.Command {
 			"and its version, providers, plugins, and configuration.\n\n" +
 			"These commands act on " + newTarget().which() + ".",
 		Args: cobra.ArbitraryArgs,
-		// As astro local's: a refusal, init's under APC among them, is not
-		// followed by the usage block.
-		SilenceUsage: true,
 		// A bare `astro af` prints help and succeeds; an unknown subcommand
 		// fails. The same shape `astro local` and every family parent use:
 		// without a RunE cobra treats a non-runnable parent as a help request

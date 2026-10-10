@@ -331,11 +331,12 @@ func (c *cli) declaresDockerfile() bool {
 func renderDevRemoved(p devRemoved) string {
 	var b strings.Builder
 	b.WriteString(p.Error)
+	// astro dev init below a 1.x root: a new project here, or the 1.x project
+	// converted at its root, named here once.
+	initBelowRoot := p.Replacement == replaceInit && p.Convert != "" && p.Convert != replaceInit
 	switch {
-	case p.Replacement == replaceInit && p.Convert != "" && p.Convert != replaceInit:
-		// astro dev init below a 1.x root: a new project here, or the 1.x
-		// project converted at its root.
-		fmt.Fprintf(&b, ". Use %s to make a new project here, or %s to convert the 1.x project at %s in place",
+	case initBelowRoot:
+		fmt.Fprintf(&b, ". Use `%s` to make a new project here, or `%s` to convert the 1.x project at %s in place",
 			replaceInit, p.Convert, p.V1Dir)
 	case p.Replacement != "" && p.Convert != "" && p.Replacement != p.Convert:
 		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
@@ -374,9 +375,13 @@ func renderDevRemoved(p devRemoved) string {
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
 	if p.Is1xProject {
+		run := "Run " + p.Convert + " to convert it in place: it"
+		if initBelowRoot {
+			run = "Converting it"
+		}
 		fmt.Fprintf(&b, "\n\n%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
-			"Run %s to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
-			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.V1Dir, p.Convert)
+			"%s moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
+			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.V1Dir, run)
 	}
 	return b.String()
 }
@@ -411,8 +416,11 @@ func (c *cli) devProject() project1x {
 	if err != nil {
 		return project1x{}
 	}
-	why, root := project.Convert1xBlocked(wd)
-	if why == project.NotBlocked && !project.BlockingContext() {
+	var why project.Block
+	var root string
+	if project.BlockingContext() {
+		why, root = project.Convert1xBlocked(wd)
+	} else {
 		root = scaffold.Find1xProject(wd)
 	}
 	abs, err := filepath.Abs(wd)

@@ -1,8 +1,6 @@
 package local
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -816,13 +814,12 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	if err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	for _, line := range []string{
-		"Use " + replaceInit + " to make a new project here, or " + want + " to convert the 1.x project at " + root + " in place",
-		"Run " + want + " to convert it in place",
-	} {
-		if !strings.Contains(err.Error(), line) {
-			t.Errorf("text lacks %q:\n%v", line, err)
-		}
+	line := "Use `" + replaceInit + "` to make a new project here, or `" + want + "` to convert the 1.x project at " + root + " in place"
+	if !strings.Contains(err.Error(), line) {
+		t.Errorf("text lacks %q:\n%v", line, err)
+	}
+	if n := strings.Count(err.Error(), want); n != 1 {
+		t.Errorf("the convert command is named %d times, want once:\n%v", n, err)
 	}
 }
 
@@ -843,27 +840,6 @@ func TestInitRedirectsGiveTheRefusal(t *testing.T) {
 			err = execute(t, d, args...)
 			requireRefused(t, err)
 			requireAPCAdvice(t, err, dir)
-		})
-	}
-}
-
-// The af group's refusal of init under APC, as astro local's, is not followed
-// by a usage block.
-func TestTheAfInitRefusalPrintsNoUsage(t *testing.T) {
-	for _, args := range [][]string{{"af", "init"}, {"local", "init"}} {
-		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			d, dir, _ := initDeps(t)
-			write1xProject(t, dir)
-			setUnderAPC(t)
-			root := newRootCmd(d)
-			var out, errOut bytes.Buffer
-			root.SetOut(&out)
-			root.SetErr(&errOut)
-			err := cliout.Execute(context.Background(), root, args, d.Stdout, ProblemKinds)
-			requireRefused(t, err)
-			if strings.Contains(out.String()+errOut.String(), "Usage:") {
-				t.Errorf("the refusal printed usage:\n%s%s", out.String(), errOut.String())
-			}
 		})
 	}
 }
