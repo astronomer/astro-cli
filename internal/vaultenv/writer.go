@@ -81,14 +81,16 @@ func (w *Writer) ScopeName() localenv.Scope { return localenv.Scope(w.label) }
 // plaintext file for a gitignore advisory to be about.
 func (w *Writer) DotenvPath() string { return "" }
 
-// Location is where the value lives, for the same message. Not a file path: the
-// vault holds one file per key under a name derived from a hash, and pointing a
-// user at it would invite hand-editing something only the master key can read.
+// Location qualifies the scope name in the same message, or is empty when
+// there is nothing to add: an encrypted value is the default, and "vault
+// (the encrypted vault)" only repeated it. Not a file path: the vault holds one
+// file per key under a name derived from a hash, and pointing a user at it
+// would invite hand-editing something only the master key can read.
 func (w *Writer) Location() string {
 	if w.Plain {
-		return "the vault, unencrypted"
+		return "unencrypted"
 	}
-	return "the encrypted vault"
+	return ""
 }
 
 // Set stores value for the (kind, name) pair and returns the Airflow env-var

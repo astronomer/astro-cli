@@ -100,7 +100,8 @@ type valueStore interface {
 	Delete(kind localenv.Kind, name string) (bool, error)
 	// ScopeName is the tier, for the confirmation message.
 	ScopeName() localenv.Scope
-	// Location is where the value went, for the same message.
+	// Location is where the value went, for the same message, or empty when
+	// ScopeName says it all. Messages print the two through storeWhere.
 	Location() string
 	// DotenvPath is the plaintext file a write landed in, or empty when the
 	// store keeps nothing in the project. It exists so the gitignore advisory
@@ -117,6 +118,15 @@ type fileStore struct{ *localenv.Store }
 func (f fileStore) ScopeName() localenv.Scope { return f.Scope }
 func (f fileStore) Location() string          { return f.Path }
 func (f fileStore) DotenvPath() string        { return f.Path }
+
+// storeWhere names a store for a message: its scope, then its location in
+// parentheses when it has one.
+func storeWhere(s valueStore) string {
+	if loc := s.Location(); loc != "" {
+		return fmt.Sprintf("%s (%s)", s.ScopeName(), loc)
+	}
+	return string(s.ScopeName())
+}
 
 func (f fileStore) Has(kind localenv.Kind, name string) (bool, error) {
 	_, ok, err := f.Get(kind, name)
@@ -726,7 +736,7 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	}
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "set %s %s in %s (%s)\n", localenv.Noun(kind), name, store.ScopeName(), store.Location())
+		_, werr := fmt.Fprintf(w, "set %s %s in %s\n", localenv.Noun(kind), name, storeWhere(store))
 		return werr
 	})
 }
@@ -794,10 +804,10 @@ func (c *cli) removeOtherCopy(scope *scopeFlags, kind localenv.Kind, name string
 	removed, err := c.deleteKeepingRow(other, kind, name)
 	if err != nil {
 		return fmt.Errorf("%s %s was set, but its other copy in %s could not be removed: %w",
-			localenv.Noun(kind), name, other.Location(), err)
+			localenv.Noun(kind), name, storeWhere(other), err)
 	}
 	if removed {
-		fmt.Fprintf(c.d.Stderr, "note: removed the other copy of %s from %s (%s)\n", name, other.ScopeName(), other.Location())
+		fmt.Fprintf(c.d.Stderr, "note: removed the other copy of %s from %s\n", name, storeWhere(other))
 	}
 	return nil
 }
@@ -824,9 +834,9 @@ func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name str
 			continue
 		}
 		fmt.Fprintf(c.d.Stderr,
-			"warning: %s is also set in %s (%s), which outranks the global value for this project, so start uses that copy. "+
+			"warning: %s is also set in %s, which outranks the global value for this project, so start uses that copy. "+
 				"Remove it with: astro local env %s delete %s --project\n",
-			name, st.ScopeName(), st.Location(), localenv.Noun(kind), name)
+			name, storeWhere(st), localenv.Noun(kind), name)
 		warned = true
 	}
 	return warned
@@ -890,8 +900,8 @@ func (c *cli) getScoped(r cliout.Renderer, scope *scopeFlags, kind localenv.Kind
 		case winner == nil:
 			winner = st
 		default:
-			fmt.Fprintf(c.d.Stderr, "note: %s is also set in %s (%s); showing the %s copy, which is the one Airflow gets\n",
-				name, st.ScopeName(), st.Location(), winner.ScopeName())
+			fmt.Fprintf(c.d.Stderr, "note: %s is also set in %s; showing the %s copy, which is the one Airflow gets\n",
+				name, storeWhere(st), winner.ScopeName())
 		}
 	}
 	if winner == nil {
@@ -1088,8 +1098,8 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string, u
 	case undeclare:
 		decl, changed, err := c.undeclareIn(projectDir, kind, name)
 		if err != nil {
-			return fmt.Errorf("deleted %s %s from %s (%s), but its declaration was not removed: %w",
-				localenv.Noun(kind), name, store.ScopeName(), store.Location(), err)
+			return fmt.Errorf("deleted %s %s from %s, but its declaration was not removed: %w",
+				localenv.Noun(kind), name, storeWhere(store), err)
 		}
 		res.Undeclared, res.Manifest = changed, decl.Manifest
 	case perr == nil:
@@ -1138,8 +1148,8 @@ func (c *cli) deleteValue(scope *scopeFlags, kind localenv.Kind, name string) (v
 	removedFile, err := store.Delete(kind, name)
 	if err != nil {
 		if removedVault {
-			return nil, fmt.Errorf("deleted %s %s from %s (%s), but its plaintext copy in %s could not be removed: %w",
-				localenv.Noun(kind), name, vaulted.ScopeName(), vaulted.Location(), store.Location(), err)
+			return nil, fmt.Errorf("deleted %s %s from %s, but its plaintext copy in %s could not be removed: %w",
+				localenv.Noun(kind), name, storeWhere(vaulted), store.Location(), err)
 		}
 		return nil, err
 	}
@@ -1203,7 +1213,7 @@ func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string
 // declaration leaves, or what --undeclare did to it.
 func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	noun := localenv.Noun(res.Kind)
-	if _, err := fmt.Fprintf(w, "deleted %s %s from %s (%s)\n", noun, res.Name, store.ScopeName(), store.Location()); err != nil {
+	if _, err := fmt.Fprintf(w, "deleted %s %s from %s\n", noun, res.Name, storeWhere(store)); err != nil {
 		return err
 	}
 	var err error
