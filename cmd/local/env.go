@@ -120,12 +120,19 @@ func (f fileStore) Location() string          { return f.Path }
 func (f fileStore) DotenvPath() string        { return f.Path }
 
 // storeWhere names a store for a message: its scope, then its location in
-// parentheses when it has one.
+// parentheses when it has one. A scope already ending in a parenthetical
+// ("vault (global)") takes the location inside it, so a plain global set reads
+// "vault (global, unencrypted)" rather than stacking two.
 func storeWhere(s valueStore) string {
-	if loc := s.Location(); loc != "" {
-		return fmt.Sprintf("%s (%s)", s.ScopeName(), loc)
+	scope, loc := string(s.ScopeName()), s.Location()
+	switch {
+	case loc == "":
+		return scope
+	case strings.HasSuffix(scope, ")"):
+		return strings.TrimSuffix(scope, ")") + ", " + loc + ")"
+	default:
+		return scope + " (" + loc + ")"
 	}
-	return string(s.ScopeName())
 }
 
 func (f fileStore) Has(kind localenv.Kind, name string) (bool, error) {
