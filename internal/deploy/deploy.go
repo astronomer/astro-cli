@@ -102,6 +102,11 @@ type Request struct {
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
+	// Link saves a link to a Deployment the prompt offered from the workspace
+	// rather than from the manifest, once it is picked, so the next deploy
+	// offers it by name. cmd wires it to scaffold.SaveLink. nil links nothing:
+	// the deploy still ships to the picked Deployment, by id.
+	Link func(scaffold.Link) error
 }
 
 // Result is what a finished manifest deploy reports back to cmd for rendering. Text
@@ -199,18 +204,22 @@ type ImageResult struct {
 // dag tarball, finalize); tests supply a fake. The interface keeps the manifest deploy's logic
 // free of config, Docker, and the network so it stays unit-testable.
 type Deployer interface {
-	// ConfirmTarget presents the project's deployable links and returns the
-	// name of the one to ship to. It is called on every interactive deploy that
-	// did not name its target, and an answer of "no" comes back as an error.
+	// ConfirmTarget presents the choices — the project's deployable links, then
+	// the workspace's Deployments it does not link yet — and returns the name
+	// of the one to ship to. It is called on every interactive deploy that did
+	// not name its target, and an answer of "no" comes back as an error.
 	//
 	// It sits on the transport rather than on the Request because asking is a
 	// cmd job — this package never prints — and ResolveUnlinked already asks
 	// through the same seam.
 	ConfirmTarget(choices []Choice, preselect Preselect) (name string, err error)
+	// ListDeployments lists the Astro Deployments in a workspace, for the
+	// prompt to offer the ones the project does not link yet.
+	ListDeployments(workspaceID string) ([]Deployment, error)
 	// ResolveUnlinked runs the workspace-level pick/create flow and returns the
-	// chosen deployment id. It is called only for a project that links nothing
+	// chosen Deployment. It is called only for a project that links nothing
 	// at all, and only in an interactive run.
-	ResolveUnlinked(workspaceID string) (deploymentID string, err error)
+	ResolveUnlinked(workspaceID string) (Deployment, error)
 	// DeployDags creates a DAG-only deploy, uploads the project's dags/
 	// directory, and finalizes.
 	DeployDags(*DagDeploy) (DagResult, error)
@@ -382,12 +391,26 @@ type Target struct {
 	LinkName string
 }
 
-// Choice is one deployable link as the prompt offers it.
+// Choice is one entry the prompt offers: a deployable link, or a workspace
+// Deployment the project does not link yet.
 type Choice struct {
+	// Name is the link's name. For a Deployment not linked yet it is the name
+	// the link will be saved under if it is picked, so every entry answers to
+	// its name the same way.
 	Name string
 	// Where is the coordinate as the manifest writes it, so two links are told
 	// apart by where they point and not only by what they are called.
 	Where string
+	// Unlinked marks a Deployment the project does not link yet: picking it
+	// links it.
+	Unlinked bool
+}
+
+// Deployment is an Astro Deployment as a workspace lists it.
+type Deployment struct {
+	ID          string
+	Name        string
+	WorkspaceID string
 }
 
 // ErrAborted reports a deploy prompt the user declined. It is exported so cmd
@@ -436,22 +459,147 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 			deploymentEnvVar, strings.Join(deployable, ", ")))
 	}
 
+	pre := preselect(req, links, deployable)
 	choices := make([]Choice, 0, len(deployable))
-	for _, name := range deployable {
+	for _, name := range linksFirst(deployable, pre.Name) {
 		choices = append(choices, Choice{Name: name, Where: "astro deployment " + links[name].Deployment})
 	}
-	name, err := d.ConfirmTarget(choices, preselect(req, links, deployable))
+	unlinked := unlinkedDeployments(req, d, links)
+	for _, name := range unlinked.names {
+		choices = append(choices, Choice{Name: name, Where: "astro deployment " + unlinked.byName[name].ID, Unlinked: true})
+	}
+	name, err := d.ConfirmTarget(choices, pre)
 	if err != nil {
 		return Target{}, err
 	}
 	if name == "" {
 		return Target{}, ErrAborted
 	}
-	link, ok := links[name]
-	if !ok {
-		return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
+	if link, ok := links[name]; ok {
+		return astroTarget(req, name, link, links)
 	}
-	return astroTarget(req, name, link, links)
+	if dep, ok := unlinked.byName[name]; ok {
+		return linkedTarget(req, name, dep), nil
+	}
+	return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
+}
+
+// linksFirst orders the project's links for the prompt: the preselected one on
+// top, then the rest by name.
+func linksFirst(deployable []string, preselected string) []string {
+	if preselected == "" || !slices.Contains(deployable, preselected) {
+		return deployable
+	}
+	ordered := []string{preselected}
+	for _, name := range deployable {
+		if name != preselected {
+			ordered = append(ordered, name)
+		}
+	}
+	return ordered
+}
+
+// unlinked is the workspace's Deployments the project links no link to, keyed
+// by the link name each would be saved under.
+type unlinked struct {
+	names  []string
+	byName map[string]Deployment
+}
+
+// unlinkedDeployments lists the Deployments in the deploy's workspace that no
+// link points at, so the prompt can offer them after the links. The workspace
+// is --workspace, else [tool.astro] workspace, else the login's. A list that
+// fails costs only those entries: the links are still offered, with a warning.
+func unlinkedDeployments(req Request, d Deployer, links map[string]manifest.Link) unlinked {
+	out := unlinked{byName: map[string]Deployment{}}
+	workspaceID := req.WorkspaceID
+	if workspaceID == "" && req.Manifest != nil {
+		workspaceID = req.Manifest.Astro.Workspace
+	}
+	workspaceID = firstNonEmpty(workspaceID, req.ContextWorkspace)
+	if workspaceID == "" {
+		return out
+	}
+	deps, err := d.ListDeployments(workspaceID)
+	if err != nil {
+		if req.Warn != nil {
+			req.Warn(fmt.Sprintf("could not list the Deployments in workspace %s, so only the project's links are offered: %v", workspaceID, err))
+		}
+		return out
+	}
+	linked := map[string]bool{}
+	for name := range links {
+		if l := links[name]; isAstroLink(l) {
+			linked[l.Deployment] = true
+		}
+	}
+	sort.SliceStable(deps, func(i, j int) bool {
+		if deps[i].Name != deps[j].Name {
+			return deps[i].Name < deps[j].Name
+		}
+		return deps[i].ID < deps[j].ID
+	})
+	taken := map[string]bool{manifest.ReservedLinkName: true}
+	for name := range links {
+		taken[name] = true
+	}
+	for _, dep := range deps {
+		if linked[dep.ID] {
+			continue
+		}
+		if dep.WorkspaceID == "" {
+			dep.WorkspaceID = workspaceID
+		}
+		name := newLinkName(dep, taken)
+		taken[name] = true
+		out.names = append(out.names, name)
+		out.byName[name] = dep
+	}
+	return out
+}
+
+// newLinkName is the name a link to dep is saved under: the Deployment's name
+// as `astro link add` spells it (scaffold.LinkNameFor), else its id, with -2,
+// -3 and so on appended until it names no link already taken.
+func newLinkName(dep Deployment, taken map[string]bool) string {
+	base := scaffold.LinkNameFor(dep.Name)
+	if base == "" || base == manifest.ReservedLinkName {
+		base = dep.ID
+	}
+	name := base
+	for n := 2; taken[name]; n++ {
+		name = fmt.Sprintf("%s-%d", base, n)
+	}
+	return name
+}
+
+// linkedTarget is the target for a Deployment picked from the workspace rather
+// than from the manifest. It saves the link first (Request.Link), so the next
+// deploy offers the Deployment by name. A link that cannot be saved is warned
+// about and does not stop the deploy: the Deployment was picked, and shipping
+// to it does not need the link.
+func linkedTarget(req Request, name string, dep Deployment) Target {
+	target := Target{
+		DeploymentID: dep.ID,
+		WorkspaceID:  firstNonEmpty(req.WorkspaceID, dep.WorkspaceID, req.ContextWorkspace),
+	}
+	if req.Link == nil {
+		return target
+	}
+	err := req.Link(scaffold.Link{
+		Name:       name,
+		Kind:       manifest.KindAstro,
+		Workspace:  dep.WorkspaceID,
+		Deployment: dep.ID,
+	})
+	if err != nil {
+		if req.Warn != nil {
+			req.Warn(fmt.Sprintf("deploying without saving a link to astro deployment %s: %v", dep.ID, err))
+		}
+		return target
+	}
+	target.LinkName = name
+	return target
 }
 
 // namedTarget resolves a target named on the command line, by the positional
@@ -470,7 +618,7 @@ func namedTarget(req Request, name string, links map[string]manifest.Link) (Targ
 }
 
 // unlinkedTarget runs the workspace-level pick/create flow, for a project whose
-// manifest declares no deployment links at all.
+// manifest declares no deployment links at all, and links what it picks.
 func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	workspaceID := firstNonEmpty(req.WorkspaceID, req.ContextWorkspace)
 	if workspaceID == "" {
@@ -479,14 +627,17 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	if !req.Interactive {
 		return Target{}, input.Required(errors.New("this project links no deployment and this run cannot be asked: pass --deployment <name or id>"))
 	}
-	id, err := d.ResolveUnlinked(workspaceID)
+	dep, err := d.ResolveUnlinked(workspaceID)
 	if err != nil {
 		return Target{}, err
 	}
-	if id == "" {
+	if dep.ID == "" {
 		return Target{}, ErrAborted
 	}
-	return Target{DeploymentID: id, WorkspaceID: workspaceID}, nil
+	if dep.WorkspaceID == "" {
+		dep.WorkspaceID = workspaceID
+	}
+	return linkedTarget(req, newLinkName(dep, map[string]bool{manifest.ReservedLinkName: true}), dep), nil
 }
 
 // Preselect is the entry the prompt highlights, and why.

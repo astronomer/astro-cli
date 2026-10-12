@@ -33,6 +33,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -508,6 +509,16 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
+		// A Deployment picked from the workspace rather than from the links is
+		// linked as `astro link add` would link it, so the next deploy offers
+		// it by name. Only an interactive run picks one, so this is text mode.
+		Link: func(l scaffold.Link) error {
+			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
+				return err
+			}
+			fmt.Fprintf(errOut, "linked %s to astro deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
+			return nil
+		},
 		// Two lines. The first is the → line every resolving command prints,
 		// once the target is settled, so a deploy says what it is about to act
 		// on the way `astro af dags list` does. The second says an image build
@@ -769,7 +780,11 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")),
 	}
 	for i, choice := range choices {
-		cells := []string{choice.Name, choice.Where}
+		where := choice.Where
+		if choice.Unlinked {
+			where += " (not linked yet)"
+		}
+		cells := []string{choice.Name, where}
 		chosen := preselect.Name != "" && choice.Name == preselect.Name
 		switch {
 		case chosen:
@@ -787,17 +802,31 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 	return choices[i].Name, nil
 }
 
+// ListDeployments lists a workspace's Deployments under the deploy's login, for
+// the prompt to offer the ones the project does not link yet.
+func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.Deployment, error) {
+	deps, err := deployment.ListDeployments(workspaceID, d.login.context.Organization, d.login.client)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]manifestdeploy.Deployment, 0, len(deps))
+	for i := range deps {
+		out = append(out, manifestdeploy.Deployment{ID: deps[i].Id, Name: deps[i].Name, WorkspaceID: deps[i].WorkspaceId})
+	}
+	return out, nil
+}
+
 // ResolveUnlinked runs the 1.x path's workspace-level pick/create flow and returns the
-// chosen deployment id.
-func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
+// chosen Deployment.
+func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.Deployment, error) {
 	if !d.login.current {
-		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
+		return manifestdeploy.Deployment{}, fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
 	}
 	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
 	if err != nil {
-		return "", err
+		return manifestdeploy.Deployment{}, err
 	}
-	return dep.Id, nil
+	return manifestdeploy.Deployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
 }
 
 // DeployDags reuses the 1.x dags-only transport for the project's dags/.

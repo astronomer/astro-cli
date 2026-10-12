@@ -96,7 +96,13 @@ func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, manifestdeploy.
 	return "", errors.New("the transport should not be asked when the target is named")
 }
 
-func (f *fakeCmdDeployer) ResolveUnlinked(string) (string, error) { return "", nil }
+func (f *fakeCmdDeployer) ListDeployments(string) ([]manifestdeploy.Deployment, error) {
+	return nil, nil
+}
+
+func (f *fakeCmdDeployer) ResolveUnlinked(string) (manifestdeploy.Deployment, error) {
+	return manifestdeploy.Deployment{}, nil
+}
 
 func (f *fakeCmdDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	f.dagInput = in
@@ -548,16 +554,17 @@ func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	interactiveDeploy(t)
 	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 
-	// The manifest marks prod default, so the prompt highlights it — and still
-	// asks. An empty answer takes the highlighted entry.
+	// The manifest marks prod default, so the prompt puts it on top and
+	// highlights it — and still asks. An empty answer takes the highlighted
+	// entry.
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
 
 	assert.Contains(t, errOut, "Deploy to which deployment?")
 	assert.Equal(t, []string{"#", "NAME", "WHERE", "PRESELECTED", "BY"}, strings.Fields(strings.Split(errOut, "\n")[1]))
-	assert.Equal(t, []string{"2", "prod", "astro", "deployment", "clx-dep", "default", "=", "true"}, pickerRow(t, errOut, "prod"))
-	assert.Equal(t, []string{"1", "dev", "astro", "deployment", "clx-dev"}, pickerRow(t, errOut, "dev"))
-	assert.Contains(t, errOut, "\n> [2] ")
+	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "default", "=", "true"}, pickerRow(t, errOut, "prod"))
+	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev"}, pickerRow(t, errOut, "dev"))
+	assert.Contains(t, errOut, "\n> [1] ")
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
 }
 
@@ -661,6 +668,43 @@ func TestDeployManifestPromptWithOneLinkOffersOneNumber(t *testing.T) {
 
 	assert.Equal(t, "test", name)
 	assert.True(t, strings.HasSuffix(errOut.String(), "\n> [1] "), "%q", errOut.String())
+}
+
+// listingPromptDeployer is promptDeployer over a workspace holding one
+// Deployment the project does not link yet.
+type listingPromptDeployer struct {
+	promptDeployer
+}
+
+func (p *listingPromptDeployer) ListDeployments(string) ([]manifestdeploy.Deployment, error) {
+	return []manifestdeploy.Deployment{{ID: "clx-new", Name: "Orders Staging", WorkspaceID: "clw-ws"}}, nil
+}
+
+// The prompt offers the workspace's unlinked Deployments after the links, and
+// picking one writes its link before the deploy ships to it.
+func TestDeployManifestPromptLinksAnUnlinkedDeployment(t *testing.T) {
+	interactiveDeploy(t)
+	fake := &listingPromptDeployer{promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}}}}
+	setupManifestDeploy(t, fake)
+	orig := newManifestDeployer
+	newManifestDeployer = func(login *deployLogin, in io.Reader, errOut io.Writer) manifestdeploy.Deployer {
+		fake.prompt = manifestDeployer{login: login, in: in, errOut: errOut}
+		return fake
+	}
+	t.Cleanup(func() { newManifestDeployer = orig })
+
+	out, errOut, err := execDeployIO("3\n", "--workspace", "clw-ws")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"3", "orders-staging", "astro", "deployment", "clx-new", "(not", "linked", "yet)"}, pickerRow(t, errOut, "orders-staging"))
+	assert.Contains(t, errOut, "linked orders-staging to astro deployment clx-new in pyproject.toml")
+	assert.Contains(t, errOut, "→ orders-staging (astro deployment clx-new)")
+	assert.Equal(t, "clx-new", fake.imgInput.DeploymentID)
+	assert.Contains(t, out, "to orders-staging (deployment clx-new).")
+
+	saved, err := os.ReadFile(filepath.Join(config.WorkingPath, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(saved), `orders-staging = {deployment = 'clx-new'}`)
 }
 
 func TestDeployManifestPromptTakesTheOtherLink(t *testing.T) {

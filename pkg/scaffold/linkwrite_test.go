@@ -866,3 +866,14 @@ func TestSetWorkspaceLinkNeverCreatesAManifest(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(dir, manifest.Marker))
 	assert.True(t, os.IsNotExist(statErr))
 }
+
+func TestLinkNameFor(t *testing.T) {
+	for in, want := range map[string]string{
+		"Orders Prod (EU)": "orders-prod-eu",
+		"  dev  ":          "dev",
+		"a__b--c":          "a-b-c",
+		"ÉTL 2":            "tl-2",
+	} {
+		assert.Equal(t, want, LinkNameFor(in), in)
+	}
+}
