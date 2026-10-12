@@ -100,9 +100,9 @@ type valueStore interface {
 	Delete(kind localenv.Kind, name string) (bool, error)
 	// ScopeName is the tier, for the confirmation message.
 	ScopeName() localenv.Scope
-	// Location is where the value went, for the same message, or empty when
-	// ScopeName says it all. Messages print the two through storeWhere.
-	Location() string
+	// Where names the store for a message: its scope, and where in it the
+	// value went when the scope alone does not say.
+	Where() string
 	// DotenvPath is the plaintext file a write landed in, or empty when the
 	// store keeps nothing in the project. It exists so the gitignore advisory
 	// can be decided by the store that knows the answer: a type switch here
@@ -116,24 +116,8 @@ type valueStore interface {
 type fileStore struct{ *localenv.Store }
 
 func (f fileStore) ScopeName() localenv.Scope { return f.Scope }
-func (f fileStore) Location() string          { return f.Path }
+func (f fileStore) Where() string             { return fmt.Sprintf("%s (%s)", f.Scope, f.Path) }
 func (f fileStore) DotenvPath() string        { return f.Path }
-
-// storeWhere names a store for a message: its scope, then its location in
-// parentheses when it has one. A scope already ending in a parenthetical
-// ("vault (global)") takes the location inside it, so a plain global set reads
-// "vault (global, unencrypted)" rather than stacking two.
-func storeWhere(s valueStore) string {
-	scope, loc := string(s.ScopeName()), s.Location()
-	switch {
-	case loc == "":
-		return scope
-	case strings.HasSuffix(scope, ")"):
-		return strings.TrimSuffix(scope, ")") + ", " + loc + ")"
-	default:
-		return scope + " (" + loc + ")"
-	}
-}
 
 func (f fileStore) Has(kind localenv.Kind, name string) (bool, error) {
 	_, ok, err := f.Get(kind, name)
@@ -743,7 +727,7 @@ func (c *cli) runEnvSet(route *scopeFlags, kind localenv.Kind, name, value strin
 	}
 	res := envResult{Kind: kind, Name: name, Scope: store.ScopeName(), Status: "set"}
 	return r.Emit(res, func(w io.Writer) error {
-		_, werr := fmt.Fprintf(w, "set %s %s in %s\n", localenv.Noun(kind), name, storeWhere(store))
+		_, werr := fmt.Fprintf(w, "set %s %s in %s\n", localenv.Noun(kind), name, store.Where())
 		return werr
 	})
 }
@@ -811,10 +795,10 @@ func (c *cli) removeOtherCopy(scope *scopeFlags, kind localenv.Kind, name string
 	removed, err := c.deleteKeepingRow(other, kind, name)
 	if err != nil {
 		return fmt.Errorf("%s %s was set, but its other copy in %s could not be removed: %w",
-			localenv.Noun(kind), name, storeWhere(other), err)
+			localenv.Noun(kind), name, other.Where(), err)
 	}
 	if removed {
-		fmt.Fprintf(c.d.Stderr, "note: removed the other copy of %s from %s\n", name, storeWhere(other))
+		fmt.Fprintf(c.d.Stderr, "note: removed the other copy of %s from %s\n", name, other.Where())
 	}
 	return nil
 }
@@ -843,7 +827,7 @@ func (c *cli) warnProjectShadows(scope *scopeFlags, kind localenv.Kind, name str
 		fmt.Fprintf(c.d.Stderr,
 			"warning: %s is also set in %s, which outranks the global value for this project, so start uses that copy. "+
 				"Remove it with: astro local env %s delete %s --project\n",
-			name, storeWhere(st), localenv.Noun(kind), name)
+			name, st.Where(), localenv.Noun(kind), name)
 		warned = true
 	}
 	return warned
@@ -908,7 +892,7 @@ func (c *cli) getScoped(r cliout.Renderer, scope *scopeFlags, kind localenv.Kind
 			winner = st
 		default:
 			fmt.Fprintf(c.d.Stderr, "note: %s is also set in %s; showing the %s copy, which is the one Airflow gets\n",
-				name, storeWhere(st), winner.ScopeName())
+				name, st.Where(), winner.ScopeName())
 		}
 	}
 	if winner == nil {
@@ -1106,7 +1090,7 @@ func (c *cli) runEnvDelete(scope *scopeFlags, kind localenv.Kind, name string, u
 		decl, changed, err := c.undeclareIn(projectDir, kind, name)
 		if err != nil {
 			return fmt.Errorf("deleted %s %s from %s, but its declaration was not removed: %w",
-				localenv.Noun(kind), name, storeWhere(store), err)
+				localenv.Noun(kind), name, store.Where(), err)
 		}
 		res.Undeclared, res.Manifest = changed, decl.Manifest
 	case perr == nil:
@@ -1156,7 +1140,7 @@ func (c *cli) deleteValue(scope *scopeFlags, kind localenv.Kind, name string) (v
 	if err != nil {
 		if removedVault {
 			return nil, fmt.Errorf("deleted %s %s from %s, but its plaintext copy in %s could not be removed: %w",
-				localenv.Noun(kind), name, storeWhere(vaulted), store.Location(), err)
+				localenv.Noun(kind), name, vaulted.Where(), store.DotenvPath(), err)
 		}
 		return nil, err
 	}
@@ -1220,7 +1204,7 @@ func (c *cli) deleteKeepingRow(store valueStore, kind localenv.Kind, name string
 // declaration leaves, or what --undeclare did to it.
 func renderDeleted(w io.Writer, res *envResult, store valueStore) error {
 	noun := localenv.Noun(res.Kind)
-	if _, err := fmt.Fprintf(w, "deleted %s %s from %s\n", noun, res.Name, storeWhere(store)); err != nil {
+	if _, err := fmt.Fprintf(w, "deleted %s %s from %s\n", noun, res.Name, store.Where()); err != nil {
 		return err
 	}
 	var err error

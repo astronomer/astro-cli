@@ -37,6 +37,11 @@ type Writer struct {
 	// how a --plain global is kept: in the vault's layout and link state like
 	// every other global, but not encrypted.
 	Plain bool
+	// wrotePlain records that a Set stored a value unencrypted, so Where says
+	// so. It follows the write rather than Plain: Plain is the --plain flag,
+	// which a delete also carries, and a delete never knows how the value it
+	// removed had been stored.
+	wrotePlain bool
 }
 
 // NewWriter opens the shared vault for writing. An empty projectDir writes the
@@ -81,16 +86,21 @@ func (w *Writer) ScopeName() localenv.Scope { return localenv.Scope(w.label) }
 // plaintext file for a gitignore advisory to be about.
 func (w *Writer) DotenvPath() string { return "" }
 
-// Location qualifies the scope name in the same message, or is empty when
-// there is nothing to add: an encrypted value is the default, and "vault
-// (the encrypted vault)" only repeated it. Not a file path: the vault holds one
-// file per key under a name derived from a hash, and pointing a user at it
-// would invite hand-editing something only the master key can read.
-func (w *Writer) Location() string {
-	if w.Plain {
-		return "unencrypted"
+// Where names the scope for a message: the scope name, marked unencrypted
+// after this writer stored a value plain. Encryption is the default, so an
+// encrypted value carries no mark — "vault (the encrypted vault)" only
+// repeated itself. Not a file path: the vault holds one file per key under a
+// name derived from a hash, and pointing a user at it would invite
+// hand-editing something only the master key can read.
+func (w *Writer) Where() string {
+	switch {
+	case !w.wrotePlain:
+		return w.label
+	case w.label == SourceGlobal:
+		return "vault (global, unencrypted)"
+	default:
+		return "vault (unencrypted)"
 	}
-	return ""
 }
 
 // Set stores value for the (kind, name) pair and returns the Airflow env-var
@@ -156,7 +166,11 @@ func (w *Writer) Set(kind localenv.Kind, name, value string) (envKey string, err
 // put writes one value, marked plain when the writer is.
 func (w *Writer) put(vaultKey, value string) error {
 	if w.Plain {
-		return secrets.SetPlain(w.store, vaultKey, value)
+		if err := secrets.SetPlain(w.store, vaultKey, value); err != nil {
+			return err
+		}
+		w.wrotePlain = true
+		return nil
 	}
 	return w.setSecret(vaultKey, value)
 }
