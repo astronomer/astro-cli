@@ -119,6 +119,32 @@ func TestBuildEmptyPackagesWritesEmptyFile(t *testing.T) {
 	assert.Empty(t, got)
 }
 
+// The runtime image ships no git, so a git direct reference (what a
+// [tool.uv.sources] git source becomes) brings git in through packages.txt,
+// which the image installs before requirements.txt.
+func TestBuildAddsGitForAGitReference(t *testing.T) {
+	for name, tc := range map[string]struct {
+		deps, packages []string
+		want           string
+	}{
+		"a git source adds git":        {deps: []string{"airflow-blueprint @ git+https://github.com/astronomer/blueprint@6f06313"}, packages: []string{"libpq-dev"}, want: "libpq-dev\ngit\n"},
+		"git already listed":           {deps: []string{"x @ git+ssh://git@example.com/x.git"}, packages: []string{"git"}, want: "git\n"},
+		"a plain url source adds none": {deps: []string{"x @ https://example.com/x-1.0.tar.gz"}, want: ""},
+		"a version pin adds none":      {deps: []string{"pandas>=2"}, want: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := testRequest(t)
+			req.Dependencies, req.Packages = tc.deps, tc.packages
+			_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+			require.NoError(t, err)
+			got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, packagesName))
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, string(got))
+			assert.Equal(t, tc.packages, req.Packages, "the caller's list is not modified")
+		})
+	}
+}
+
 func TestBuildSkipsWhenNothingToInstall(t *testing.T) {
 	cmd := &fakeCmd{}
 	req := testRequest(t) // no deps, no packages

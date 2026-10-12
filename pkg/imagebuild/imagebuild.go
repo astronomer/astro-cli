@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -296,8 +297,8 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 		return "", fmt.Errorf("writing the generated requirements file: %w", err)
 	}
 	var packagesData []byte
-	if len(req.Packages) > 0 {
-		packagesData = []byte(strings.Join(req.Packages, "\n") + "\n")
+	if packages := withGitForVCSDeps(deps, req.Packages); len(packages) > 0 {
+		packagesData = []byte(strings.Join(packages, "\n") + "\n")
 	}
 	if err := os.WriteFile(filepath.Join(contextDir, packagesName), packagesData, filePermRW); err != nil {
 		return "", fmt.Errorf("writing the generated packages file: %w", err)
@@ -483,4 +484,26 @@ const (
 // other dependency — providers, pandas, and the rest — installs normally.
 func runtimeDeps(deps []string) []string {
 	return manifest.WithoutAirflow(deps)
+}
+
+// gitPackage is the apt package uv needs to install a git direct reference.
+const gitPackage = "git"
+
+// withGitForVCSDeps adds git to the OS packages when a dependency is a git
+// direct reference (`name @ git+https://…`, which is what a [tool.uv.sources]
+// git source becomes in requirements.txt). The runtime image ships no git, so
+// uv fails such an install with "Git executable not found"; the image's
+// ONBUILD steps install packages.txt before requirements.txt, so listing git
+// there is enough. packages is never modified.
+func withGitForVCSDeps(deps, packages []string) []string {
+	if slices.Contains(packages, gitPackage) || !slices.ContainsFunc(deps, isGitReference) {
+		return packages
+	}
+	return append(slices.Clone(packages), gitPackage)
+}
+
+// isGitReference reports a PEP 508 direct reference fetched with git.
+func isGitReference(dep string) bool {
+	_, ref, ok := strings.Cut(dep, "@")
+	return ok && strings.HasPrefix(strings.TrimSpace(ref), "git+")
 }
