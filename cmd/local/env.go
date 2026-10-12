@@ -1492,12 +1492,12 @@ func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, fields *connFields,
 		return "", err
 	}
 	fmt.Fprint(c.d.Stderr, prompt) //nolint:errcheck // a failed write to the terminal still reads the answer
-	b, err := term.ReadPassword(int(f.Fd()))
+	v, err := input.HiddenValue(f)
 	fmt.Fprintln(c.d.Stderr)
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+	return v, nil
 }
 
 // connFieldPassword resolves the password for a field-wise connection set.
