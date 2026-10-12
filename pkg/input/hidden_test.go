@@ -9,22 +9,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// paste wraps s the way a terminal with bracketed paste turned on sends it.
+func paste(s string) string { return "\x1b[200~" + s + "\x1b[201~" }
+
 func TestReadHidden(t *testing.T) {
 	long := `{"conn_type":"google_cloud_platform","extra":{"keyfile_dict":"` + strings.Repeat("x", 4000) + `"}}`
+	pem := "-----BEGIN PRIVATE KEY-----\nMIIEvQ\nIBADAN\n-----END PRIVATE KEY-----"
 	cases := []struct {
 		name, in, want string
 	}{
-		{"enter ends a plain value", "s3cret\rignored", "s3cret"},
-		{"newline ends a plain value", "s3cret\n", "s3cret"},
+		{"enter ends a typed value", "s3cret\rignored", "s3cret"},
+		{"a typed newline ends it too", "s3cret\n", "s3cret"},
+		{"an unbalanced brace is just a character", "{p@ss\r", "{p@ss"},
 		{"a long line is not truncated", long + "\r", long},
-		{"enter inside open json is a newline", "{\r  \"conn_type\": \"http\"\r}\r", "{\n  \"conn_type\": \"http\"\n}"},
-		{"a pasted crlf object", "{\r\n  \"a\": [1,\r\n 2]\r\n}\r\n", "{\n  \"a\": [1,\n 2]\n}"},
-		{"brackets inside strings do not count", "{\"a\": \"}{\"\r}\r", "{\"a\": \"}{\"\n}"},
-		{"an escaped quote stays in the string", "{\"a\": \"\\\"}\"\r}\r", "{\"a\": \"\\\"}\"\n}"},
-		{"ctrl-d ends json that never closes", "{\"a\": 1\r\x04", "{\"a\": 1\n"},
+		{"a paste keeps its newlines until enter", paste("{\r  \"conn_type\": \"http\"\r}") + "\r", "{\n  \"conn_type\": \"http\"\n}"},
+		{"a paste ending in a newline ends the value", paste(pem+"\n") + "left for the shell", pem},
+		{"a pasted crlf is one line break", paste("a\r\nb\r\n\r\nc") + "\r", "a\nb\n\nc"},
+		{"typing continues after a paste", paste("abc") + "def\r", "abcdef"},
+		{"ctrl-d ends the value", "abc\x04rest", "abc"},
 		{"backspace removes a whole rune", "aé\x7f\x08b\r", "b"},
 		{"ctrl-u clears the line", "wrong\x15right\r", "right"},
-		{"arrow keys are dropped", "ab\x1b[Dc\r", "abc"},
+		{"csi arrow keys are dropped", "ab\x1b[Dc\r", "abc"},
+		{"ss3 keys are dropped", "a\x1bOPb\x1bOAc\r", "abc"},
+		{"a bare esc drops only itself", "\x1bs3cret\r", "s3cret"},
 		{"other control bytes are dropped", "a\x01b\tc\r", "ab\tc"},
 		{"eof returns what was typed", "partial", "partial"},
 	}
@@ -37,9 +44,23 @@ func TestReadHidden(t *testing.T) {
 	}
 }
 
+// Nothing past the end of the value is taken off the terminal: what follows
+// Enter is still there for whoever reads next.
+func TestReadHiddenLeavesTheRestUnread(t *testing.T) {
+	r := strings.NewReader("value\rnext")
+	got, err := readHidden(r)
+	require.NoError(t, err)
+	assert.Equal(t, "value", got)
+	rest, err := io.ReadAll(r)
+	require.NoError(t, err)
+	assert.Equal(t, "next", string(rest))
+}
+
 func TestReadHiddenCtrlC(t *testing.T) {
 	_, err := readHidden(strings.NewReader("half\x03rest\r"))
 	require.ErrorIs(t, err, ErrInterrupted)
+	_, err = readHidden(strings.NewReader(paste("half") + "\x03"))
+	require.ErrorIs(t, err, ErrInterrupted, "Ctrl-C after a paste")
 }
 
 func TestReadHiddenEmptyEOF(t *testing.T) {

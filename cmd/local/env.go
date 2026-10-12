@@ -1492,7 +1492,8 @@ func (c *cli) readSetValue(cmd *cobra.Command, in *setInput, fields *connFields,
 		return "", err
 	}
 	fmt.Fprint(c.d.Stderr, prompt) //nolint:errcheck // a failed write to the terminal still reads the answer
-	v, err := input.HiddenValue(f)
+	tty, _ := c.d.Stderr.(*os.File)
+	v, err := input.HiddenValue(f, tty)
 	fmt.Fprintln(c.d.Stderr)
 	if err != nil {
 		return "", err
