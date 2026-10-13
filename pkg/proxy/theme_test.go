@@ -257,6 +257,30 @@ func TestTheProxyThemesEveryAirflowPage(t *testing.T) {
 	}
 }
 
+// The snippet goes exactly before the marker whatever bytes come first. Lower-
+// casing the body to search it changes its length when it holds invalid UTF-8
+// (a Latin-1 é becomes a three-byte replacement character) or a rune whose
+// lower case is a different size (the Kelvin sign becomes a one-byte k), and an
+// index found in the lowered copy then lands somewhere else in the original.
+func TestInjectIntoHTMLPlacesTheSnippetAfterBytesThatChangeSizeWhenLowered(t *testing.T) {
+	for name, head := range map[string]string{
+		"invalid UTF-8": "<title>caf\xe9 \xe9t\xe9 \xe9</title>",
+		"Kelvin sign":   "<title>KKKK</title>",
+	} {
+		t.Run(name, func(t *testing.T) {
+			page := "<html><head>" + head + "</head><body>airflow</body></html>"
+			resp := newHTMLResponse(t, page, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+			if err := InjectIntoHTML(resp, "<style>x</style>", "</head>"); err != nil {
+				t.Fatal(err)
+			}
+			want := "<html><head>" + head + "<style>x</style></head><body>airflow</body></html>"
+			if got := readBody(t, resp); got != want {
+				t.Errorf("snippet misplaced:\n got: %q\nwant: %q", got, want)
+			}
+		})
+	}
+}
+
 // A HEAD response carries the headers of the page it describes and no body.
 // Reading it gives zero bytes, and rewriting Content-Length from that tells the
 // client the page is empty.

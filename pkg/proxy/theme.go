@@ -132,6 +132,39 @@ func InjectIntoHTML(resp *http.Response, snippet, beforeTag string) error {
 	return injectIntoHTML(resp, snippet, beforeTag, "")
 }
 
+// lastIndexFoldASCII returns the index of the last occurrence of marker in body,
+// ignoring ASCII case, or -1.
+//
+// Byte by byte, not by searching a lowered copy: bytes.ToLower changes the
+// length of invalid UTF-8 (one byte becomes a three-byte replacement character)
+// and of runes whose lower case is a different size (the Kelvin sign), so an
+// index found in the copy can point anywhere in the original. HTML tag names
+// are ASCII, so folding A-Z is all the match needs.
+func lastIndexFoldASCII(body []byte, marker string) int {
+	for i := len(body) - len(marker); i >= 0; i-- {
+		if equalFoldASCII(body[i:i+len(marker)], marker) {
+			return i
+		}
+	}
+	return -1
+}
+
+func equalFoldASCII(b []byte, s string) bool {
+	for i := range b {
+		if lowerASCII(b[i]) != lowerASCII(s[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func lowerASCII(c byte) byte {
+	if 'A' <= c && c <= 'Z' {
+		return c + ('a' - 'A')
+	}
+	return c
+}
+
 // rewritable reports whether resp is an HTML page the injector can safely read
 // and rewrite. Everything else passes through as it came:
 //
@@ -186,8 +219,7 @@ func injectIntoHTML(resp *http.Response, snippet, beforeTag, unlessPresent strin
 	}
 
 	if unlessPresent == "" || !bytes.Contains(body, []byte(unlessPresent)) {
-		marker := []byte(strings.ToLower(beforeTag))
-		if idx := bytes.LastIndex(bytes.ToLower(body), marker); idx >= 0 {
+		if idx := lastIndexFoldASCII(body, beforeTag); idx >= 0 {
 			body = append(body[:idx], append([]byte(snippet), body[idx:]...)...)
 		}
 	}
