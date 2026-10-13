@@ -181,12 +181,68 @@ func TestBuildKeepsTheFastPathBuildLocalSkips(t *testing.T) {
 	req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.1"}, nil)
 	require.NoError(t, err)
 	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-local/p", "docker"
+	// Local Docker mode runs the project mounted, so its request carries no
+	// project files (ForLocalManifest never sets them).
+	req.ProjectFiles = ""
 
 	cmd := &fakeCmd{}
 	built, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.Equal(t, req.BaseImage, built)
 	assert.Empty(t, cmd.calls)
+}
+
+// A shipped image carries the project's files: a DAG importing include/ fails
+// on Astro without them, since a deploy sends dags/ alone beside the image.
+func TestForManifestBuildCarriesTheProject(t *testing.T) {
+	project := t.TempDir()
+	for path, body := range map[string]string{
+		"include/agents/__init__.py": "x = 1\n",
+		"dags/blueprints.py":         "import include.agents\n",
+		"pyproject.toml":             "[project]\n",
+		"requirements.txt":           "stale-pin==1\n",
+		".venv/lib/site.py":          "never\n",
+		".git/HEAD":                  "never\n",
+		"include/__pycache__/a.pyc":  "never\n",
+		".astro/state.json":          "never\n",
+		".dockerignore":              "requirements.txt\ntests/\n",
+	} {
+		full := filepath.Join(project, filepath.FromSlash(path))
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(t, os.WriteFile(full, []byte(body), 0o600))
+	}
+	req, err := ForManifest(ManifestBuild{ProjectDir: project, AirflowVersion: "3.1", Dependencies: []string{"pandas"}}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, project, req.ProjectFiles)
+	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-deploy/p", "docker"
+	// A file left over from an earlier build in the same WorkDir is not carried.
+	stale := filepath.Join(req.WorkDir, buildContextDir, "include", "deleted.py")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0o755))
+	require.NoError(t, os.WriteFile(stale, nil, 0o600))
+
+	_, err = testBuilder(&fakeCmd{}).BuildLocal(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+
+	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
+	for _, carried := range []string{"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml"} {
+		assert.FileExists(t, filepath.Join(ctxDir, filepath.FromSlash(carried)))
+	}
+	for _, left := range []string{".venv", ".git", "include/__pycache__", ".astro", "include/deleted.py"} {
+		assert.NoFileExists(t, filepath.Join(ctxDir, filepath.FromSlash(left)))
+	}
+	reqs, err := os.ReadFile(filepath.Join(ctxDir, requirementsName))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas\n", string(reqs), "the generated requirements, not the project's")
+	ignore, err := os.ReadFile(filepath.Join(ctxDir, ".dockerignore"))
+	require.NoError(t, err)
+	assert.Equal(t, "requirements.txt\ntests/\n\n!requirements.txt\n!packages.txt\n", string(ignore))
+}
+
+// A declared Dockerfile builds the project as its context already.
+func TestForManifestDeclaredCarriesNoProjectFiles(t *testing.T) {
+	req, err := ForManifest(ManifestBuild{ProjectDir: declaredProject(t), Dockerfile: "docker/Dockerfile"}, nil)
+	require.NoError(t, err)
+	assert.Empty(t, req.ProjectFiles)
 }
 
 func TestBuildLocalReturnsTheTagForEveryMode(t *testing.T) {

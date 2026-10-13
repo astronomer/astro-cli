@@ -50,6 +50,12 @@ func TestForLocalManifestPicksWhatForManifestPicksForAirflow3(t *testing.T) {
 
 		deploy, err := ForManifest(tc.m, nil)
 		require.NoError(t, err, name)
+		// The one difference: a shipped image carries the project's files,
+		// where local start runs the project mounted.
+		if !deploy.FromDeclaredDockerfile() {
+			assert.Equal(t, tc.m.ProjectDir, deploy.ProjectFiles, "%s: deploy carries the project", name)
+			deploy.ProjectFiles = ""
+		}
 		assert.Equal(t, tc.want, deploy, "%s: deploy", name)
 
 		local, err := ForLocalManifest(context.Background(), tc.m, noCatalog)

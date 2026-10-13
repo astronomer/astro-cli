@@ -65,9 +65,14 @@ type baseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
-	return forManifestWith(context.Background(), m, func(_ context.Context, m ManifestBuild) (string, error) {
+	req, err := forManifestWith(context.Background(), m, func(_ context.Context, m ManifestBuild) (string, error) {
 		return RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
 	})
+	// The image ships, so a generated one carries the project's files too.
+	if err == nil && !req.FromDeclaredDockerfile() {
+		req.ProjectFiles = m.ProjectDir
+	}
+	return req, err
 }
 
 // ForLocalManifest is ForManifest for local Docker mode. The one difference is
