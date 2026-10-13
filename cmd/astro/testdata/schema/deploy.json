@@ -5,6 +5,7 @@
   "type": "x",
   "image_tag": "x",
   "dag_bundle_version": "x",
+  "dags_in_image": true,
   "runtime_version": "x",
   "url": "x",
   "git": {

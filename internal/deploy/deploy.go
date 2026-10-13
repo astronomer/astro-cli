@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -111,7 +112,11 @@ type Result struct {
 	RuntimeVersion    string
 	ImageTag          string
 	DagTarballVersion string
-	URL               string
+	// DagsInImage reports an image-and-dag deploy to a Deployment with DAG
+	// deploys off: no DAGs were uploaded, and the Deployment runs those
+	// inside the image.
+	DagsInImage bool
+	URL         string
 	// LinkName is the manifest link the deploy resolved to, "" if unlinked.
 	LinkName string
 	Git      Git
@@ -172,8 +177,12 @@ type ImageDeploy struct {
 	BuildSecrets []string
 	ImageName    string
 	// OnBuild is Request.OnBuild, for the transport to call.
-	OnBuild       func()
-	IncludeDags   bool
+	OnBuild func()
+	// IncludeDags marks a "both" deploy. To a Deployment with DAG deploys
+	// off, the transport ships the image alone, with the DAGs inside it.
+	IncludeDags bool
+	// Warn is Request.Warn, for the transport to report with.
+	Warn          func(string)
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -181,12 +190,14 @@ type ImageDeploy struct {
 }
 
 // ImageResult is what the transport reports after an image deploy. A "both"
-// deploy also carries a DagTarballVersion.
+// deploy also carries a DagTarballVersion, or DagsInImage when the
+// Deployment's DAG deploys are off and the DAGs went inside the image.
 type ImageResult struct {
 	WorkspaceID       string
 	RuntimeVersion    string
 	ImageTag          string
 	DagTarballVersion string
+	DagsInImage       bool
 	URL               string
 	Git               Git
 }
@@ -287,7 +298,9 @@ func saveNewLink(req Request, target Target, res *Result) {
 // Dockerfile's FROM line (scaffold.CheckDockerfileAirflow), and a
 // [tool.astro] runtime build (Request.CheckRuntime). It also warns about the
 // per-machine files a declared Dockerfile's build would copy into the image
-// (scaffold.LocalFilesWarning). A dags-only deploy and one
+// (scaffold.LocalFilesWarning), warns about the files it would carry that git
+// ignores, and refuses one carrying such a file that looks like a credential
+// (shipcheck.Run). A dags-only deploy and one
 // adopting a prebuilt --image-name build nothing from the manifest, and are not
 // held to it. It returns the build secrets the declared Dockerfile mounts and
 // nobody gave, for a failed build to name again.
@@ -313,6 +326,9 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, error) {
 	}
 	if w := scaffold.LocalFilesWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
 		warn(w)
+	}
+	if err := shipcheck.Run(req.ProjectDir, req.Manifest.Astro.Dockerfile, warn); err != nil {
+		return missing, err
 	}
 	airflow := req.Manifest.Airflow()
 	if airflow.Runtime == "" || req.CheckRuntime == nil {
@@ -374,6 +390,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		ImageName:     req.ImageName,
 		OnBuild:       req.OnBuild,
 		IncludeDags:   includeDags,
+		Warn:          req.Warn,
 		Description:   req.Description,
 		NoDagsBaseDir: req.NoDagsBaseDir,
 		Wait:          req.Wait,
@@ -393,6 +410,7 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		RuntimeVersion:    img.RuntimeVersion,
 		ImageTag:          img.ImageTag,
 		DagTarballVersion: img.DagTarballVersion,
+		DagsInImage:       img.DagsInImage,
 		URL:               img.URL,
 		LinkName:          target.LinkName,
 		Git:               img.Git,

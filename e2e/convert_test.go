@@ -224,8 +224,9 @@ func cases1x() []case1x {
 		},
 		{
 			// A kept Dockerfile builds with the project as its context, so the
-			// .dockerignore the 1.x CLI wrote keeps its lines and gains the per-machine
-			// paths it lacks.
+			// .dockerignore the 1.x CLI wrote keeps its lines and gains the
+			// rules it lacks: the nested .env files its root-only .env misses,
+			// and the per-machine paths.
 			name: "a kept Dockerfile beside a 1.x .dockerignore",
 			files: map[string]string{
 				"Dockerfile":    runtime3 + "RUN echo hi\n",
@@ -235,7 +236,7 @@ func cases1x() []case1x {
 			manifestHas: []string{"dockerfile = 'Dockerfile'"},
 			kept:        []string{"Dockerfile", ".dockerignore"},
 			keptHas: map[string]string{
-				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Per-machine files Astro tools write into the project. Keep them out of the image.\n.astro/standalone/\n",
+				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Local secrets and per-machine files. Keep them out of the image.\n**/.env\n**/.env.*\n",
 			},
 			reportedUpdated: []string{".dockerignore (added the per-machine rules)"},
 			notes:           []string{"its RUN instructions were not read here"},

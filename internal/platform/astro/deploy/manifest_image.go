@@ -51,8 +51,16 @@ type ManifestImageDeployInput struct {
 	// OnBuild runs once the deployment has cleared the deploy and just before
 	// the image build starts, so a refused deploy says nothing about building.
 	// A prebuilt image is not built and never calls it. nil skips it.
-	OnBuild       func()
-	IncludeDags   bool // also upload dags/ — a "both" deploy
+	OnBuild func()
+	// IncludeDags marks a "both" deploy: the image and the project's DAGs.
+	// To a Deployment with DAG deploys on, the DAGs are uploaded beside the
+	// image. To one with them off, the image is the only way DAGs reach it,
+	// so the deploy ships the image alone and its DAGs are those inside it,
+	// as the 1.x CLI deployed there.
+	IncludeDags bool
+	// Warn reports a finding the deploy goes ahead despite, as a sentence.
+	// nil drops it.
+	Warn          func(string)
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -68,8 +76,12 @@ type ManifestImageDeployResult struct {
 	RuntimeVersion    string
 	ImageTag          string
 	DagTarballVersion string
-	URL               string
-	Git               ManifestDeployGit
+	// DagsInImage reports a "both" deploy to a Deployment with DAG deploys
+	// off: no DAGs were uploaded, and the Deployment runs those the image
+	// carries.
+	DagsInImage bool
+	URL         string
+	Git         ManifestDeployGit
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -140,6 +152,10 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if err := checkPlannedRuntime(dep.AstroRuntimeVersion, &planned, allowed); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
+	dags, err := planDags(&in, &req, &dep)
+	if err != nil {
+		return ManifestImageDeployResult{}, err
+	}
 
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
@@ -176,9 +192,10 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		return ManifestImageDeployResult{}, err
 	}
 
-	// A "both" deploy also ships the dags tarball, fitting the image just pushed.
+	// A "both" deploy also ships the dags tarball, fitting the image just
+	// pushed, unless the DAGs are inside the image.
 	var tarballVersion string
-	if in.IncludeDags {
+	if dags.upload {
 		tarballVersion, err = uploadDeployDags(&c, in.Build.ProjectDir, in.DeploymentID, &dep, created, in.NoDagsBaseDir)
 		if err != nil {
 			return ManifestImageDeployResult{}, err
@@ -200,15 +217,17 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		RuntimeVersion:    runtimeVersion,
 		ImageTag:          created.ImageTag,
 		DagTarballVersion: tarballVersion,
+		DagsInImage:       dags.inImage,
 		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
 		Git:               gitInfo,
 	}, nil
 }
 
 // checkDeployment fetches the deployment and confirms the deploy is allowed:
-// cicd enforcement and dag-deploy enablement for a "both" deploy. It also
-// returns the runtime versions the deployment offers, which the image's
-// runtime is checked against.
+// cicd enforcement, and DAG deploys enabled for an image-only (--image)
+// deploy, which leaves the running DAGs in place and so needs them to live
+// outside the image. It also returns the runtime versions the deployment
+// offers, which the image's runtime is checked against.
 func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, []string, error) {
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
@@ -217,14 +236,73 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
 		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}
-	if in.IncludeDags && !dep.IsDagDeployEnabled {
-		return astrov1.Deployment{}, nil, fmt.Errorf(enableDagDeployMsg, in.DeploymentID)
+	if !in.IncludeDags && !dep.IsDagDeployEnabled {
+		// As the 1.x CLI refused it: with DAG deploys off the DAGs live in
+		// the image, so there are no running DAGs for --image to leave alone.
+		return astrov1.Deployment{}, nil, fmt.Errorf(imageOnlyNeedsDagDeployMsg, in.DeploymentID)
 	}
 	allowed, err := offeredRuntimeVersions(ctx, dep.OrganizationId, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
 	return dep, allowed, nil
+}
+
+// imageOnlyNeedsDagDeployMsg refuses --image to a Deployment with DAG deploys
+// off.
+const imageOnlyNeedsDagDeployMsg = "--image deploys the image and leaves the running DAGs in place, but astro deployment %[1]s has DAG deploys off, so its DAGs are the ones inside the image. Run 'astro deploy' without --image to deploy the image with the project's DAGs inside it, or enable DAG deploys with 'astro deployment update %[1]s --dag-deploy enable'"
+
+// dagsPlan is how a deploy's DAGs reach the Deployment.
+type dagsPlan struct {
+	// upload sends the dags/ tarball beside the image: a "both" deploy to a
+	// Deployment with DAG deploys on.
+	upload bool
+	// inImage leaves the DAGs to the image: a "both" deploy to one with them
+	// off.
+	inImage bool
+}
+
+// planDags works out how a deploy's DAGs reach the Deployment dep, and holds a
+// deploy whose DAGs go inside the image to an image that carries them
+// (checkDagsInImage).
+func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment) (dagsPlan, error) {
+	if !in.IncludeDags {
+		return dagsPlan{}, nil
+	}
+	if dep.IsDagDeployEnabled {
+		return dagsPlan{upload: true}, nil
+	}
+	return dagsPlan{inImage: true}, checkDagsInImage(in, req)
+}
+
+// checkDagsInImage holds a "both" deploy to a Deployment with DAG deploys off,
+// where the image is the only way DAGs reach it, to an image that carries
+// them. A generated image whose .dockerignore leaves out every DAG file under
+// dags/ is refused: it would replace the running DAGs with none. A declared
+// Dockerfile's is warned about instead, since its own steps may put DAGs in
+// the image, and so is a prebuilt image, which cannot be looked into here.
+func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request) error {
+	warn := in.Warn
+	if warn == nil {
+		warn = func(string) {}
+	}
+	if in.ImageName != "" {
+		warn(fmt.Sprintf("astro deployment %s has DAG deploys off, so it will run the DAGs inside %s; no DAGs are uploaded", in.DeploymentID, in.ImageName))
+		return nil
+	}
+	survey, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile)
+	if err != nil {
+		return err
+	}
+	if survey.DagsOnDisk == 0 || survey.DagsCarried > 0 {
+		return nil
+	}
+	if req.FromDeclaredDockerfile() {
+		warn(fmt.Sprintf("astro deployment %s has DAG deploys off, so it will run only the DAGs inside the image, and the ignore file %s's build reads leaves out every DAG file under dags/. The Deployment will run whatever DAGs %s itself puts in the image",
+			in.DeploymentID, in.Build.Dockerfile, in.Build.Dockerfile))
+		return nil
+	}
+	return fmt.Errorf("astro deployment %[1]s has DAG deploys off, so its DAGs have to be inside the image, but the project's .dockerignore leaves out every DAG file under dags/. Remove the rule that drops them, or enable DAG deploys with 'astro deployment update %[1]s --dag-deploy enable'", in.DeploymentID)
 }
 
 // uploadDeployDags tars and uploads a project's dags/ directory to the

@@ -3,6 +3,7 @@ package scaffold
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -15,7 +16,13 @@ import (
 // an entry.
 var wantDockerignoreRules = []string{
 	".venv/",
-	".env",
+	"**/.env",
+	"**/.env.*",
+	"**/.envrc",
+	"**/airflow_settings.yaml",
+	"airflow.db",
+	"airflow.cfg",
+	"logs/",
 	".astro/standalone/",
 	".astro/worktrees/",
 	".astro/*.local.yaml",
@@ -68,9 +75,12 @@ func TestPlanDockerignore(t *testing.T) {
 		require.NotNil(t, c)
 		assert.Equal(t, UpdateFile, c.Kind)
 		assert.Equal(t, []string{".dockerignore (added the per-machine rules)"}, c.Labels)
-		assert.Equal(t, dockerignore1x+"\n"+dockerignoreHeader+strings.Join(wantDockerignoreRules[2:], "\n")+"\n",
-			readDockerignoreFile(t, dir),
-			".venv and .env are already excluded, however they are spelled")
+		// 1.x's root-only .env and airflow_settings.yaml do not cover the
+		// nested ones; its .venv, airflow.db, airflow.cfg and logs/ are
+		// already there, however they are spelled.
+		want := slices.Concat(wantDockerignoreRules[1:5], wantDockerignoreRules[8:])
+		assert.Equal(t, dockerignore1x+"\n"+dockerignoreHeader+strings.Join(want, "\n")+"\n",
+			readDockerignoreFile(t, dir))
 	})
 
 	t.Run("a file with no trailing newline", func(t *testing.T) {
@@ -82,7 +92,7 @@ func TestPlanDockerignore(t *testing.T) {
 
 	t.Run("broader patterns count", func(t *testing.T) {
 		dir := t.TempDir()
-		writeProjectFile(t, dir, ".dockerignore", "**/.venv\n.env*\n.astro\nplugins/fix_*.py\n")
+		writeProjectFile(t, dir, ".dockerignore", "**/.venv\n**/.env*\n**/airflow_settings.yaml\nairflow.*\nlogs\n.astro\nplugins/fix_*.py\n")
 		assert.Nil(t, applyDockerignore(t, dir))
 	})
 
@@ -140,7 +150,7 @@ func TestLocalFilesWarning(t *testing.T) {
 	t.Run("no ignore file names every per-machine file there", func(t *testing.T) {
 		dir := localStateProject(t)
 		assert.Equal(t, []string{".venv", ".astro/standalone", ".astro/config.local.yaml"}, unignoredLocalFiles(dir, ".dockerignore"))
-		assert.Equal(t, "the image built from Dockerfile would copy in these per-machine files: "+
+		assert.Equal(t, "the image built from Dockerfile would copy in these local or per-machine files: "+
 			".venv, .astro/standalone, .astro/config.local.yaml. To keep them out, add them to .dockerignore",
 			LocalFilesWarning(dir, "Dockerfile"))
 	})
@@ -155,7 +165,7 @@ func TestLocalFilesWarning(t *testing.T) {
 		dir := t.TempDir()
 		writeProjectFile(t, dir, ".astro/standalone/airflow.db", "")
 		writeProjectFile(t, dir, "docker/Dockerfile", "")
-		assert.Equal(t, "the image built from docker/Dockerfile would copy in these per-machine files: "+
+		assert.Equal(t, "the image built from docker/Dockerfile would copy in these local or per-machine files: "+
 			".astro/standalone. To keep them out, add it to .dockerignore",
 			LocalFilesWarning(dir, "docker/Dockerfile"))
 	})
@@ -180,6 +190,20 @@ func TestLocalFilesWarning(t *testing.T) {
 		dir := filepath.Join(t.TempDir(), "proj[1]")
 		writeProjectFile(t, dir, ".astro/standalone/airflow.db", "")
 		assert.Contains(t, LocalFilesWarning(dir, "Dockerfile"), ": .astro/standalone.")
+	})
+
+	t.Run("a rule for any depth finds nested files, and not what the ignore file drops", func(t *testing.T) {
+		dir := t.TempDir()
+		writeProjectFile(t, dir, ".dockerignore", "build/\n")
+		for _, rel := range []string{
+			".env", "include/.env", "include/sub/.env.prod", "include/airflow_settings.yaml",
+			"include/logs/x", "include/airflow.cfg", "build/.env", ".git/.env",
+		} {
+			writeProjectFile(t, dir, rel, "")
+		}
+		assert.Equal(t, []string{".env", "include/.env", "include/sub/.env.prod", "include/airflow_settings.yaml"},
+			unignoredLocalFiles(dir, ".dockerignore"),
+			"a nested logs/ or airflow.cfg is the project's own")
 	})
 
 	t.Run("silent without a declared Dockerfile", func(t *testing.T) {

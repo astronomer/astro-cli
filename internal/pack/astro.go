@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -127,8 +128,21 @@ func runtimeCatalog(ctx context.Context, req Request) func() *runtimeversions.Ca
 // variable is unset, and warns about each secret a declared Dockerfile mounts
 // that no build secret supplies, returning those for a failed build to name
 // again. It also warns about the per-machine files a declared Dockerfile's
-// build context would carry into the image.
+// build context would carry into the image, and, since the packaged image is
+// pushed to a registry as a deploy's is, warns about the gitignored files the
+// image would carry and refuses one that looks like a credential
+// (shipcheck.Run).
 func checkSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets, error) {
+	missing, err := checkBuildSecrets(req, cb)
+	if err != nil {
+		return missing, err
+	}
+	return missing, shipcheck.Run(req.ProjectDir, req.Manifest.Astro.Dockerfile, func(w string) { emit(cb, "warning: "+w) })
+}
+
+// checkBuildSecrets is checkSecrets' half about build secrets and a declared
+// Dockerfile's per-machine files.
+func checkBuildSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets, error) {
 	if req.Manifest.Astro.Dockerfile == "" {
 		missing, err := imagebuild.CheckBuildSecrets(req.ProjectDir, "", req.BuildSecrets)
 		for _, w := range missing.Warnings() {

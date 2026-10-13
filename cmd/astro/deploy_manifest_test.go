@@ -342,6 +342,30 @@ func TestDeployManifestTextUnchanged(t *testing.T) {
 	assert.Equal(t, "→ prod (astro deployment clx-dep)\n", errOut)
 }
 
+// A deploy to a Deployment with DAG deploys off uploads no DAGs: they are
+// inside the image, and the summary and the json say so.
+func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
+	img := manifestdeploy.ImageResult{
+		WorkspaceID: "clw-ws",
+		ImageTag:    "deploy-2026-07-23T18-40",
+		DagsInImage: true,
+		URL:         "https://cloud.astronomer.io/deployments/clx-dep",
+	}
+	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
+	out, _, err := execDeployIO("", "prod")
+	require.NoError(t, err)
+	assert.Contains(t, out, "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep), with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.\n")
+	assert.NotContains(t, out, "DAGs (version")
+
+	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
+	out, err = execDeployCapture("prod", "--output", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, "image-and-dag", m["type"])
+	assert.Equal(t, true, m["dags_in_image"])
+	assert.NotContains(t, m, "dag_bundle_version")
+}
+
 // The announce line lands before the build line and after the target is
 // settled, so the order a reader sees is: what I am about to act on, then what
 // I am doing to it.
