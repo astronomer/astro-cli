@@ -23,19 +23,32 @@ func TestEnsureProjectDir(t *testing.T) {
 	config.WorkingPath = "./\000x"
 	err := EnsureProjectDir(&cobra.Command{}, []string{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to verify that your working directory is an Astro project.\nTry running astro dev init to turn your working directory into an Astro project")
+	assert.Contains(t, err.Error(), "failed to verify that your working directory is an Astro project.\nChange to an Astro project directory, or run astro init to make this one an Astro project")
 
 	// error case when no such file or dir
 	config.WorkingPath = "./test"
 	err = EnsureProjectDir(&cobra.Command{}, []string{})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "this is not an Astro project directory.\nChange to another directory or run astro dev init to turn your working directory into an Astro project")
+	assert.Contains(t, err.Error(), "this is not an Astro project directory.\nChange to an Astro project directory, or run astro init to make this one an Astro project")
+	// astro dev init does not exist in v2
+	assert.NotContains(t, err.Error(), "dev init")
+
+	// APC deploy cannot use the project astro init writes, so it is not told to run it
+	err = EnsureDockerfileProjectDir(&cobra.Command{}, []string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "this is not an Astro project directory.\nDeploying to APC needs a Dockerfile-based project, one with a .astro/config.yaml")
+	assert.NotContains(t, err.Error(), "astro init")
+	// it points a pyproject.toml project at the path that does reach APC
+	assert.Contains(t, err.Error(), `declare dockerfile = "Dockerfile" under [tool.astro]`)
+	assert.Contains(t, err.Error(), "run astro package, and deploy the image it tags with --image-name")
 
 	// success case
 	config.WorkingPath = currentWorkingPath
 	config.ConfigFileNameWithExt = "utils_test.go"
 	config.ConfigDir = ""
 	err = EnsureProjectDir(&cobra.Command{}, []string{})
+	assert.NoError(t, err)
+	err = EnsureDockerfileProjectDir(&cobra.Command{}, []string{})
 	assert.NoError(t, err)
 }
 

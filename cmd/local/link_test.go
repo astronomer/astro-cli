@@ -123,6 +123,27 @@ func TestLinkAddAnAstroLink(t *testing.T) {
 	assert.Equal(t, "ws_Z", loadManifest(t, path).Astro.Deployments["other"].Workspace)
 }
 
+// A second link marks the project's only link default = true, and the add says
+// so in both outputs, since it changed a line nobody named.
+func TestLinkAddReportsTheDefaultItKept(t *testing.T) {
+	const oneLink = "[project]\nname = 'orders'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\nworkspace = 'ws_A'\n\n[tool.astro.deployments.dev]\ndeployment = 'dep-dev'\n"
+	dir, path := linkTestProject(t, oneLink)
+	var res linkResult
+	linkJSON(t, dir, &res, "add", "prod", "--deployment", "dep-prod")
+	assert.Equal(t, "dev", res.KeptDefault)
+	assert.True(t, loadManifest(t, path).Astro.Deployments["dev"].Default)
+
+	dir, _ = linkTestProject(t, oneLink)
+	out, _, err := runLink(t, dir, "add", "prod", "--deployment", "dep-prod")
+	require.NoError(t, err)
+	assert.Contains(t, out, "marked dev default = true")
+
+	// Nothing to report when the project already had a default.
+	dir, _ = linkTestProject(t, linkManifest)
+	linkJSON(t, dir, &res, "add", "prod", "--deployment", "dep-prod")
+	assert.Empty(t, res.KeptDefault)
+}
+
 // A name already linked is refused unless --replace, and a replace keeps the
 // default mark.
 func TestLinkAddRefusesAnExistingNameUnlessReplacing(t *testing.T) {

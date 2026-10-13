@@ -2,9 +2,7 @@
 
 > This is the **minimal** example: the smallest real project that shows what a
 > manifest looks like, and the one [`docs/manifest-reference.md`](../../docs/manifest-reference.md)
-> quotes from. For the full demo — an environment schema, all four kinds of
-> deployment link, terraform for Astro, MWAA, and Composer, and seven scripted
-> walkthroughs — see [`demo/`](../../demo).
+> quotes from.
 
 A small, runnable Astro project (Airflow 3, CLI v2). It shows what an Astro project looks like: one `pyproject.toml` that is both the Astro manifest and a normal Python project, three DAGs in different shapes, and a parse test.
 

@@ -1251,6 +1251,7 @@ func (h ClientImplementation) GetDeployment(deploymentID string) (*Deployment, e
 		return nil, handleAPIErr(err)
 	}
 
+	res.Data.GetDeployment.DagDeploymentRead = strings.Contains(reqQuery, "dagDeployment")
 	return &res.Data.GetDeployment, nil
 }
 

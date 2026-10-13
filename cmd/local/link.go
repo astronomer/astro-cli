@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -71,6 +71,9 @@ type linkResult struct {
 	Kind     string `json:"kind,omitempty"`
 	Status   string `json:"status"`
 	Manifest string `json:"manifest"`
+	// KeptDefault names the link an add marked default = true, because it was
+	// the project's only link and so its default; omitted when none was.
+	KeptDefault string `json:"kept_default,omitempty"`
 }
 
 // NewLinkCmd builds `astro link` for the root, wired with its own deps.
@@ -241,7 +244,12 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 	}
 	// The mark column exists only when some row carries one; otherwise every
 	// row would end in blank padding.
-	marked := mark != "" && slices.Contains(names, current)
+	defaultName, _, _ := manifest.DefaultLink(m.Astro.Deployments)
+	if !slices.Contains(names, current) {
+		mark = ""
+	}
+	marks := linkMarks(defaultName, current, mark)
+	marked := len(marks) > 0
 	if marked {
 		list.Header = append(list.Header, "")
 	}
@@ -254,8 +262,8 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 	for _, name := range names {
 		l := m.Astro.Deployments[name]
 		cells := row(name, string(l.Kind()), linkWhere(&l))
-		if marked && name == current {
-			cells[len(cells)-1] = mark
+		if marked {
+			cells[len(cells)-1] = marks[name]
 		}
 		list.AddRow(name == current, cells...)
 	}
@@ -270,6 +278,26 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 		return "", nil
 	}
 	return names[i], nil
+}
+
+// linkMarks is each link's mark in a list of the project's links, by name, in
+// the words the deploy prompt uses: "default" (deploy.DefaultMark) on the
+// project's default link, and the caller's currentMark on the current row.
+// When both fall on one row they are joined — "default, from ASTRO_DEPLOYMENT"
+// — so neither fact hides the other. The `astro link` pickers, the `astro use`
+// picker and its listing all mark through here.
+func linkMarks(defaultName, current, currentMark string) map[string]string {
+	marks := map[string]string{}
+	if defaultName != "" {
+		marks[defaultName] = deploy.DefaultMark
+	}
+	if current != "" && currentMark != "" {
+		if prev := marks[current]; prev != "" {
+			currentMark = prev + ", " + currentMark
+		}
+		marks[current] = currentMark
+	}
+	return marks
 }
 
 // errInvalidLinkSelection is the link pickers' answer to a choice that is not a
@@ -341,14 +369,31 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 	if exists {
 		res.Status = linkStatusReplaced
 	}
+	// A save beside a project's only link marks that one default = true. Read
+	// back rather than predicted, so what is reported is what was written.
+	if after, err := manifest.Load(path); err == nil {
+		res.KeptDefault = scaffold.NewlyDefault(m, after)
+	}
 	return r.Emit(res, func(w io.Writer) error {
 		verb := "added link %s to %s\n"
 		if exists {
 			verb = "replaced link %s in %s\n"
 		}
-		_, werr := fmt.Fprintf(w, verb, name, path)
-		return werr
+		if _, werr := fmt.Fprintf(w, verb, name, path); werr != nil {
+			return werr
+		}
+		return keptDefaultNote(w, res.KeptDefault)
 	})
+}
+
+// keptDefaultNote says a save marked the project's former only link default =
+// true, so the change to a line the user did not touch is never silent.
+func keptDefaultNote(w io.Writer, kept string) error {
+	if kept == "" {
+		return nil
+	}
+	_, err := fmt.Fprintf(w, "marked %s default = true: it was the project's only link, so its default, and stays so now there are two (change it with astro link default)\n", kept)
+	return err
 }
 
 // refuseExisting refuses name when the project already links it and the run
@@ -364,7 +409,7 @@ func refuseExisting(m *manifest.Manifest, name string, replace bool) error {
 // picker `astro deploy` uses, and fills link with it. The Deployments listed are
 // the workspace's: --workspace, else the project's, else the current login's,
 // else one picked from the login's list. It returns the link's name: the one
-// given, or else the Deployment's name as linkNameFor spells it.
+// given, or else the Deployment's name as scaffold.LinkNameFor spells it.
 func (c *cli) pickAstroDeployment(link *scaffold.Link, m *manifest.Manifest, name string) (string, error) {
 	ws := firstNonEmpty(link.Workspace, m.Astro.Workspace)
 	if ws == "" && c.d.CurrentWorkspace != nil {
@@ -402,7 +447,7 @@ func (c *cli) pickAstroDeployment(link *scaffold.Link, m *manifest.Manifest, nam
 	if name != "" {
 		return name, nil
 	}
-	name = linkNameFor(dep.Name)
+	name = scaffold.LinkNameFor(dep.Name)
 	if name == "" || name == manifest.ReservedLinkName {
 		return "", fmt.Errorf("the Deployment's name does not make a link name: pass one, astro link add NAME --%s %s", flagLinkDeployment, dep.ID)
 	}
@@ -421,16 +466,6 @@ func allLinked(m *manifest.Manifest, ws string) error {
 	slices.Sort(names)
 	return fmt.Errorf("every Deployment in workspace %s is already linked, as %s. To relink one, run astro link add NAME --%s <id> --%s",
 		ws, strings.Join(names, ", "), flagLinkDeployment, flagLinkReplace)
-}
-
-// nonAlnum is every run linkNameFor turns into one dash.
-var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
-
-// linkNameFor is the link name a picked Deployment gets: its name lowercased,
-// each run of anything but letters and digits turned into one dash, and dashes
-// trimmed from the ends. "Orders Prod (EU)" is orders-prod-eu.
-func linkNameFor(deploymentName string) string {
-	return strings.Trim(nonAlnum.ReplaceAllString(strings.ToLower(deploymentName), "-"), "-")
 }
 
 // link turns add's flags into the link the writer saves, refusing a flag that
