@@ -182,11 +182,11 @@ type Request struct {
 	// The two modes share little. This one writes no requirements.txt or
 	// packages.txt, because the file owns its own installs; it takes its FROM
 	// from the file rather than BaseImage; and it builds the PROJECT as its
-	// context, because a multi-stage build COPYs from the repo. That last part
-	// is also why the generated mode cannot just add the project to its
-	// context: that context is synthetic and deliberately tiny, and the runtime
-	// image's ONBUILD `COPY . .` would otherwise bake the whole repo into the
-	// dependency layer.
+	// context, because a multi-stage build COPYs from the repo. The generated
+	// mode's context is synthetic: the generated requirements.txt and
+	// packages.txt, plus, for an image that ships, a filtered copy of the
+	// project (ProjectFiles), which the runtime image's ONBUILD `COPY . .`
+	// lays down after both installs.
 	//
 	// Dependencies and Packages are ignored here rather than rejected. A caller
 	// reading a manifest has them populated whichever tier the project
@@ -200,6 +200,14 @@ type Request struct {
 	Dependencies []string
 	// Packages are the manifest's OS (apt) package names.
 	Packages []string
+	// ProjectFiles is the project directory whose files a generated build
+	// carries into the image (/usr/local/airflow), for an image that is
+	// shipped: include/, plugins/ and the rest of the project's code, which a
+	// deploy does not otherwise send. ForManifest sets it; local Docker mode
+	// runs the project mounted and leaves it empty, so its image holds only
+	// the dependencies. Ignored in Dockerfile mode, whose context is already
+	// the project. See copyProjectFiles for what is left out.
+	ProjectFiles string
 	// Platform is the build platform (e.g. "linux/amd64"). Empty builds for the
 	// host — what local Docker mode wants; the deploy path pins linux/amd64.
 	Platform string
@@ -242,8 +250,9 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 // is run as-is against the project as context (see the field's doc for why they
 // share so little). Otherwise the request's dependencies and OS packages are
 // installed into a layer over its base image through the runtime image's ONBUILD
-// triggers, and with nothing to install it builds nothing and returns the base
-// image unchanged (the fast path).
+// triggers, with the project's files over them when the request carries
+// ProjectFiles. With nothing to install and no project files it builds nothing
+// and returns the base image unchanged (the fast path).
 //
 // Build output streams to cb.OnLine (component "build"); a failed build returns
 // a named error, never a hang.
@@ -282,13 +291,26 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	deps := runtimeDeps(req.Dependencies)
 	// The base image already provides Airflow, so a project with nothing beyond
 	// Airflow and no OS packages needs no build and runs the base as-is.
-	if fastPath && len(deps) == 0 && len(req.Packages) == 0 {
+	// An image carrying the project's files is never the bare base.
+	if fastPath && len(deps) == 0 && len(req.Packages) == 0 && req.ProjectFiles == "" {
 		return req.BaseImage, nil
 	}
 
 	contextDir := filepath.Join(req.WorkDir, buildContextDir)
+	if req.ProjectFiles != "" {
+		// Started empty, so a file deleted from the project since an earlier
+		// build in the same WorkDir is not carried into this one.
+		if err := os.RemoveAll(contextDir); err != nil {
+			return "", fmt.Errorf("clearing %s: %w", contextDir, err)
+		}
+	}
 	if err := os.MkdirAll(contextDir, contextDirPerm); err != nil {
 		return "", fmt.Errorf("creating %s: %w", contextDir, err)
+	}
+	if req.ProjectFiles != "" {
+		if err := copyProjectFiles(req.ProjectFiles, contextDir); err != nil {
+			return "", err
+		}
 	}
 	// requirements.txt carries the deps; packages.txt carries the OS packages,
 	// one apt name per line. Both must exist even when empty, or the image's
