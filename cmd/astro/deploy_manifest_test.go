@@ -474,8 +474,8 @@ func TestDeployManifestPromptNamesWhatMovedTheCursor(t *testing.T) {
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
 	// The committed default keeps the top row; the variable only highlights.
-	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "from", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
-	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep"}, pickerRow(t, errOut, "prod"))
+	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "linked,", "from", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
+	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "linked"}, pickerRow(t, errOut, "prod"))
 	assert.NotContains(t, errOut, "default")
 	assert.Contains(t, errOut, "\n> [2] ")
 	// And Enter took the highlighted entry, which is the one it named.
@@ -566,8 +566,8 @@ func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 
 	assert.Contains(t, errOut, "Deploy to which deployment?")
 	assert.Equal(t, []string{"#", "NAME", "WHERE"}, strings.Fields(strings.Split(errOut, "\n")[1]), "the marker has no header of its own")
-	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "default"}, pickerRow(t, errOut, "prod"))
-	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev"}, pickerRow(t, errOut, "dev"))
+	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "linked,", "default"}, pickerRow(t, errOut, "prod"))
+	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "linked"}, pickerRow(t, errOut, "dev"))
 	assert.Contains(t, errOut, "\n> [1] ")
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
 }
@@ -700,7 +700,7 @@ func TestDeployManifestPromptLinksAnUnlinkedDeployment(t *testing.T) {
 	out, errOut, err := execDeployIO("3\n", "--workspace", "clw-ws")
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"3", "orders-staging", "astro", "deployment", "clx-new", "not", "linked", "yet"}, pickerRow(t, errOut, "orders-staging"))
+	assert.Equal(t, []string{"3", "orders-staging", "astro", "deployment", "clx-new"}, pickerRow(t, errOut, "orders-staging"), "an unlinked row is unmarked")
 	assert.Contains(t, errOut, "linked orders-staging to astro deployment clx-new in pyproject.toml")
 	assert.Contains(t, errOut, "→ orders-staging (astro deployment clx-new)")
 	assert.Equal(t, "clx-new", fake.imgInput.DeploymentID)

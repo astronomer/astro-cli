@@ -757,7 +757,8 @@ type manifestDeployer struct {
 // word for all three (preselectNote): a cursor sitting on an entry because a
 // variable is exported in this shell is a different fact from one sitting there
 // because the committed manifest says so, and only the reader can tell which
-// they meant. A Deployment not linked yet is marked in the same place.
+// they meant. The project's links are marked "linked" in the same place, and a
+// Deployment not linked yet is left unmarked.
 //
 // It takes a name or a number, names first: a link may legally be called "2",
 // and what the user typed is what they meant. Enter takes the highlighted entry
@@ -765,21 +766,24 @@ type manifestDeployer struct {
 // safe answer to "where should I ship this code" is never one the CLI picked by
 // itself. It asks on stderr, so stdout stays the deploy's own output.
 func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
+	// A trailing marker rather than a column of its own: "linked" on the
+	// project's links, nothing on a Deployment picking would link, and the
+	// highlighted row also says what put it there.
 	notes := make([]string, len(choices))
 	anyNote := false
 	for i, choice := range choices {
 		switch {
-		case preselect.Name != "" && choice.Name == preselect.Name:
-			notes[i] = preselectNote(preselect.From)
 		case choice.Unlinked:
-			notes[i] = "not linked yet"
+		case preselect.Name != "" && choice.Name == preselect.Name:
+			// Only a link is ever preselected.
+			notes[i] = "linked, " + preselectNote(preselect.From)
+		default:
+			notes[i] = "linked"
 		}
 		anyNote = anyNote || notes[i] != ""
 	}
 	header := []string{"NAME", "WHERE"}
 	if anyNote {
-		// A trailing marker rather than a column of its own: it is blank on
-		// all but a row or a few.
 		header = append(header, "")
 	}
 	l := picker.List{
