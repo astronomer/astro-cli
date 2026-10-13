@@ -520,12 +520,25 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 // backend, as opposed to something going wrong in a ModifyResponse hook or in
 // httputil's own setup.
 //
-// A dial that is refused, times out, or finds nothing listening is the project
-// not running. An error a hook returned is not, however much it looks like one
-// from here.
+// Two shapes mean the project is not running:
+//
+//   - A connection that fails at the socket: refused, reset, timed out, or
+//     nothing listening. The transport reports these as a *net.OpError.
+//   - A connection that is accepted and closed before any response, which the
+//     transport reports as a bare EOF. Docker holds a project's published port
+//     while the Airflow container behind it restarts, so this is what a
+//     restarting or crash-looping container looks like.
+//
+// Matching those rather than anything that implements net.Error matters,
+// because a hook's own failures implement it too: a *url.Error from a hook's
+// HTTP call, context.DeadlineExceeded, a response-header timeout. Calling those
+// "starting up" would describe a running project as down and hide the bug.
 func isBackendUnreachable(err error) bool {
-	var netErr net.Error
-	return errors.As(err, &netErr)
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var opErr *net.OpError
+	return errors.As(err, &opErr)
 }
 
 // wantsHTML reports whether r is a browser navigation rather than an API call.
