@@ -543,7 +543,13 @@ func isBackendUnreachable(err error) bool {
 
 // wantsHTML reports whether r is a browser navigation rather than an API call.
 // An empty Accept counts, since whoever sent no preference still reads the body.
+//
+// Only a GET or HEAD qualifies. The page recovers by navigating to its own URL,
+// and a form submitted while the backend was down would be submitted again.
 func wantsHTML(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
 	accept := r.Header.Get("Accept")
 	return accept == "" || strings.Contains(accept, "text/html")
 }

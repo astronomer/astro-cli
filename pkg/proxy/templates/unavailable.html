@@ -47,6 +47,9 @@
 </main>
 <script>
 // Probe the same URL until something other than a 5xx answers, then reload once.
+// reload, not a navigation to location.href: a URL with a #fragment navigates
+// within the document and would never come back. The proxy only serves this
+// page to a GET, so a reload re-submits nothing.
 (function () {
   var delay = 2000, maxDelay = 8000;
   function probe() {

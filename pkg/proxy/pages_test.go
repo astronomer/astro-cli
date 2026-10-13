@@ -187,9 +187,29 @@ func TestABackendThatHangsUpShowsABrowserTheUnavailablePage(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "Preparing for launch")
 }
 
+// A form submitted while the backend is down gets plain text, not the page. The
+// page brings itself back by reloading once the backend answers, and reloading
+// a POST would re-submit the form behind the browser's "confirm resubmission"
+// prompt.
+func TestADeadBackendGivesAFormSubmissionPlainText(t *testing.T) {
+	p := NewProxy("0", NewStore(t.TempDir()))
+	rp := p.getOrCreateProxy(refusedPort(t))
+
+	req := httptest.NewRequest(http.MethodPost, "http://x.localhost/connections/add", strings.NewReader("conn_id=x"))
+	req.Header.Set("Accept", "text/html")
+	rec := httptest.NewRecorder()
+	rp.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Equal(t, "Backend unavailable\n", rec.Body.String())
+}
+
 func TestRenderUnavailable(t *testing.T) {
 	var b strings.Builder
 	require.NoError(t, RenderUnavailable(&b))
 	assert.Contains(t, b.String(), "Preparing for launch")
-	assert.Contains(t, b.String(), "window.location.reload", "the page brings itself back once the backend answers")
+	// reload rather than location.replace(location.href): the desktop's panel
+	// URLs carry a #fragment, and navigating to one of those stays in the
+	// document, so the page would never come back.
+	assert.Contains(t, b.String(), "window.location.reload()", "the page brings itself back once the backend answers")
 }
