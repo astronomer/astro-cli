@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -25,7 +26,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
-	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -474,19 +474,13 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	// must name its target like any other script.
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
-	// Only a run that is going to ask has any use for the ambient layers, and
-	// reading the pin is not free — it creates the project's state directory.
-	willPrompt := interactive && linkName == "" && manifestDeployment == ""
-	preselect, preselectFrom := deployPreselect(config.WorkingPath, willPrompt)
-
 	errOut := cmd.ErrOrStderr()
+	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
 		Deployment:       manifestDeployment,
-		Preselect:        preselect,
-		PreselectFrom:    preselectFrom,
 		WorkspaceID:      overrideWorkspace,
 		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
@@ -575,37 +569,32 @@ func announceDeployTarget(w io.Writer, target manifestdeploy.Target) {
 	fmt.Fprintf(w, "→ %s (astro deployment %s)\n", target.LinkName, target.DeploymentID)
 }
 
+// noteIgnoredDeploymentEnv says, before the prompt, that an exported
+// ASTRO_DEPLOYMENT does not steer it. The variable once moved the prompt's
+// cursor, and someone who answers by habit should not find Enter now lands on
+// another Deployment unannounced. Nothing is said when it names the project's
+// default anyway, the row the prompt highlights, or when no prompt is coming:
+// a run that cannot be asked, or one that names its target.
+func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive bool, named ...string) {
+	env := os.Getenv(instances.EnvVar)
+	if env == "" || !interactive || slices.ContainsFunc(named, func(n string) bool { return n != "" }) {
+		return
+	}
+	def, _, ok := manifest.DefaultLink(m.Astro.Deployments)
+	switch {
+	case ok && def == env:
+		return
+	case ok:
+		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, with the project's default, %s, preselected\n", instances.EnvVar, env, def)
+	default:
+		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, and preselects nothing without a default link\n", instances.EnvVar, env)
+	}
+}
+
 // stdinIsTerminal reports whether this run can be asked which deployment to
 // ship to. It is a var rather than the call itself so a test can drive the
 // prompt without a pty.
 var stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
-
-// deployPreselect is what the ambient layers point at, for the prompt's cursor
-// and nothing else: ASTRO_DEPLOYMENT, then this project's `astro use` pin, in
-// the order the query commands rank them. It reports which one answered, so the
-// prompt can label the highlight with the thing that actually caused it.
-//
-// A pin that cannot be read is not worth failing a deploy over — the worst it
-// costs is a cursor on the first entry — so the error is dropped. And a run with
-// no prompt coming never reads the pin at all: userstate.Load creates the
-// project's state directory on the way past, and a `astro deploy prod` in CI
-// should not leave a cache directory behind for a question nobody asked.
-func deployPreselect(projectDir string, willPrompt bool) (name, from string) {
-	if name := os.Getenv(instances.EnvVar); name != "" {
-		return name, instances.EnvVar
-	}
-	if !willPrompt {
-		return "", ""
-	}
-	state, err := userstate.Load(projectDir)
-	if err != nil {
-		return "", ""
-	}
-	if state.Instance == "" {
-		return "", ""
-	}
-	return state.Instance, manifestdeploy.PinnedBy
-}
 
 // deployJSON is the single object `astro deploy --output json` emits when a manifest
 // deploy finishes. Fields that do not apply to a deploy kind are omitted: a
@@ -756,34 +745,29 @@ type manifestDeployer struct {
 }
 
 // ConfirmTarget asks which deployment to ship to. Every interactive deploy that
-// did not name its target comes through here — a pin, ASTRO_DEPLOYMENT, or a
-// `default = true` marker moves the cursor and never skips the question
-// (docs/instances.md, "Deploy always asks").
+// did not name its target comes through here — the project's default link
+// moves the cursor and never skips the question (docs/instances.md, "Deploy
+// always asks").
 //
-// The highlighted row is marked at its end with what put it there, not with one
-// word for all three (preselectNote): a cursor sitting on an entry because a
-// variable is exported in this shell is a different fact from one sitting there
-// because the committed manifest says so, and only the reader can tell which
-// they meant. The project's links are marked "linked" in the same place, and a
-// Deployment not linked yet is left unmarked.
+// Each row ends in a marker rather than a column of its own: "linked" on the
+// project's links, "linked, default" on the default, nothing on a Deployment
+// picking would link. The words are the ones `astro use` and the `astro link`
+// pickers mark the default with.
 //
 // It takes a name or a number, names first: a link may legally be called "2",
 // and what the user typed is what they meant. Enter takes the highlighted entry
 // when there is one. With nothing highlighted there is no default on Enter: the
 // safe answer to "where should I ship this code" is never one the CLI picked by
 // itself. It asks on stderr, so stdout stays the deploy's own output.
-func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
-	// A trailing marker rather than a column of its own: "linked" on the
-	// project's links, nothing on a Deployment picking would link, and the
-	// highlighted row also says what put it there.
+func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, defaultLink string) (string, error) {
 	notes := make([]string, len(choices))
 	anyNote := false
 	for i, choice := range choices {
 		switch {
 		case choice.Unlinked:
-		case preselect.Name != "" && choice.Name == preselect.Name:
-			// Only a link is ever preselected.
-			notes[i] = "linked, " + preselectNote(preselect.From)
+		case defaultLink != "" && choice.Name == defaultLink:
+			// Only a link is ever the default.
+			notes[i] = "linked, " + manifestdeploy.DefaultMark
 		default:
 			notes[i] = "linked"
 		}
@@ -810,7 +794,7 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 		if anyNote {
 			cells = append(cells, notes[i])
 		}
-		chosen := preselect.Name != "" && choice.Name == preselect.Name
+		chosen := defaultLink != "" && choice.Name == defaultLink
 		if chosen {
 			l.Default = i + 1
 		}
@@ -821,17 +805,6 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 		return "", err
 	}
 	return choices[i].Name, nil
-}
-
-// preselectNote marks the highlighted row with what put it there: "default"
-// for the manifest's own marker, the common case, and the source named for the
-// other two, so a row a shell variable chose never reads as the project's
-// default.
-func preselectNote(from string) string {
-	if from == manifestdeploy.DefaultMarker {
-		return "default"
-	}
-	return "from " + from
 }
 
 // ListDeployments lists a workspace's Deployments under the deploy's login, for

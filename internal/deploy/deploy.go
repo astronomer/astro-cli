@@ -44,14 +44,6 @@ type Request struct {
 	// --deployment-id. Either way it names the target on the command line,
 	// which is the only thing a deploy will resolve from.
 	Deployment string
-	// Preselect is what the ambient layers point at: ASTRO_DEPLOYMENT, then the
-	// project's `astro use` pin. It moves the cursor in the prompt and does
-	// nothing else — a deploy is never decided by state the user cannot see on
-	// the command line (docs/instances.md, "Deploy always asks").
-	Preselect string
-	// PreselectFrom names where Preselect came from, for the prompt's label:
-	// the env var's name, or "pinned". Ignored when Preselect is empty.
-	PreselectFrom string
 	// WorkspaceID is the --workspace override, "" if unset.
 	WorkspaceID string
 	// ContextWorkspace is the workspace of the login the deploy runs under,
@@ -206,13 +198,15 @@ type ImageResult struct {
 type Deployer interface {
 	// ConfirmTarget presents the choices — the project's deployable links, then
 	// the workspace's Deployments it does not link yet — and returns the name
-	// of the one to ship to. It is called on every interactive deploy that did
-	// not name its target, and an answer of "no" comes back as an error.
+	// of the one to ship to. defaultLink, when not "", is the project's default
+	// link, which the prompt highlights. It is called on every interactive
+	// deploy that did not name its target, and an answer of "no" comes back as
+	// an error.
 	//
 	// It sits on the transport rather than on the Request because asking is a
 	// cmd job — this package never prints — and ResolveUnlinked already asks
 	// through the same seam.
-	ConfirmTarget(choices []Choice, preselect Preselect) (name string, err error)
+	ConfirmTarget(choices []Choice, defaultLink string) (name string, err error)
 	// ListDeployments lists the Astro Deployments in a workspace, for the
 	// prompt to offer the ones the project does not link yet.
 	ListDeployments(workspaceID string) ([]Deployment, error)
@@ -482,11 +476,11 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		// The question an interactive run asks, refused: input_required under
 		// --output json, in deploy's own words.
 		return Target{}, input.Required(fmt.Errorf("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>. "+
-			"Deploy never picks for you — `astro use`, %s, or `default = true` only preselect the prompt. Deployable links: %s",
+			"Deploy never picks for you — `default = true` only preselects the prompt, and `astro use` and %s are for the query commands. Deployable links: %s",
 			deploymentEnvVar, strings.Join(deployable, ", ")))
 	}
 
-	pre := preselect(req, links, deployable)
+	pre := defaultLink(links, deployable)
 	choices := make([]Choice, 0, len(deployable))
 	for _, name := range linksFirst(deployable, links) {
 		choices = append(choices, Choice{Name: name, Where: "astro deployment " + links[name].Deployment})
@@ -512,12 +506,8 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 }
 
 // linksFirst orders the project's links for the prompt: the manifest's default
-// link on top, then the rest by name.
-//
-// Only the default moves a row, because it is committed with the project.
-// ASTRO_DEPLOYMENT and the `astro use` pin are per shell; letting them reorder
-// the rows would make "1" mean a different Deployment from one terminal to the
-// next, for someone who answers by habit. They highlight their row instead.
+// link on top, then the rest by name. The default is committed with the
+// project, so "1" means the same Deployment in every terminal.
 func linksFirst(deployable []string, links map[string]manifest.Link) []string {
 	top, _, ok := manifest.DefaultLink(links)
 	if !ok || !slices.Contains(deployable, top) {
@@ -682,56 +672,32 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	return linkedTarget(req, newLinkName(dep, map[string]bool{manifest.ReservedLinkName: true}), dep), nil
 }
 
-// Preselect is the entry the prompt highlights, and why.
-//
-// The reason travels with the name because the label is a claim about where the
-// highlight came from, and only one of the three sources is the manifest's
-// marker. A prompt that says "← default" over an entry ASTRO_DEPLOYMENT put
-// there is telling the reader their file says something it does not — which is
-// the invisible-state surprise "deploy always asks" exists to prevent, reintroduced as a
-// caption.
-type Preselect struct {
-	// Name is the deployment to highlight, "" when nothing points anywhere.
-	Name string
-	// From is what put it there, for the label: an env var's name, "pinned",
-	// or "default = true".
-	From string
-}
+// DefaultMark is the word that marks a project's default link in a list of
+// links: the deploy prompt's "linked, default", and the `astro use` and `astro
+// link` pickers. One word in every place, never the manifest's own
+// `default = true`, which reads as an instruction to edit the file.
+const DefaultMark = "default"
 
-// The three things that can move the prompt's cursor. DefaultMarker is spelled
-// as the manifest spells it, so the label and the file agree.
-const (
-	PinnedBy      = "astro use"
-	DefaultMarker = "default = true"
-	// deploymentEnvVar is the ephemeral layer of the query commands' rule,
-	// named here so the non-interactive refusal tells the reader what deploy is
-	// deliberately ignoring. It is spelled out rather than imported because
-	// pkg/instances is the resolver deploy does not use.
-	deploymentEnvVar = "ASTRO_DEPLOYMENT"
-)
+// deploymentEnvVar is the ephemeral layer of the query commands' rule, named
+// so the non-interactive refusal tells the reader what deploy deliberately
+// ignores. It is spelled out rather than imported because pkg/instances is the
+// resolver deploy does not use.
+const deploymentEnvVar = "ASTRO_DEPLOYMENT"
 
-// preselect works out which entry to highlight: whatever the ambient layers
-// point at, else the manifest's default link. A value that names nothing this
-// command can ship to highlights nothing — it must not silently move the cursor
-// onto a neighbor.
+// defaultLink is the entry the prompt highlights: the project's default link
+// (manifest.DefaultLink), "" when there is none or it is not one this command
+// can ship to — a default that is an MWAA link must not move the cursor onto a
+// neighbor.
 //
-// The order — env, then pin, then marker — is the query commands' resolution
-// chain, so the cursor lands where `astro af dags list` would have gone. Only the
-// deciding is different here; the ranking is the same one rule.
-func preselect(req Request, links map[string]manifest.Link, deployable []string) Preselect {
-	if req.Preselect != "" && slices.Contains(deployable, req.Preselect) {
-		from := req.PreselectFrom
-		if from == "" {
-			// A caller that named no source still gets a label, because a bare
-			// arrow tells the reader less than nothing.
-			from = "selected"
-		}
-		return Preselect{Name: req.Preselect, From: from}
-	}
+// Only the committed default, never ASTRO_DEPLOYMENT or the `astro use`
+// selection. Those are a person's choice of which Airflow to query; where code
+// ships is the project's, and Astro Desktop reads the same marker, so the two
+// apps highlight the same entry.
+func defaultLink(links map[string]manifest.Link, deployable []string) string {
 	if name, _, ok := manifest.DefaultLink(links); ok && slices.Contains(deployable, name) {
-		return Preselect{Name: name, From: DefaultMarker}
+		return name
 	}
-	return Preselect{}
+	return ""
 }
 
 // astroTarget turns a resolved link into a target. Only an astro link can be

@@ -218,7 +218,11 @@ func TestLinkDefaultPicksALinkOrNone(t *testing.T) {
 	dir, path := linkTestProject(t, linkManifest)
 	d, run := pickDeps(t, dir, "2\n", PickedDeployment{}, "")
 	require.NoError(t, execute(t, d, "link", "default"))
-	assertPickerTable(t, run.out.String(), "Select the default link", `1\s+dev\s+astro`, `2\s+stage\s+astro`, `3\s+none\s+clear the default`)
+	// The current default is marked as `astro use` and the deploy prompt mark
+	// it: one word, never the manifest's `default = true`.
+	assertPickerTable(t, run.out.String(), "Select the default link", `1\s+dev\s+astro\s+dep-dev\s+default`, `2\s+stage\s+astro`, `3\s+none\s+clear the default`)
+	assert.NotRegexp(t, `stage\s+astro\s+dep-stage\s+default`, run.out.String())
+	assert.NotContains(t, run.out.String(), "default = true")
 	assert.Contains(t, run.out.String(), "set link stage as the default in ")
 	m := loadManifest(t, path)
 	assert.True(t, m.Astro.Deployments["stage"].Default)

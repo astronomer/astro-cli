@@ -32,10 +32,10 @@ type stubDeployer struct {
 	answerErr error
 	asked     int
 	offered   []Choice
-	preselect Preselect
+	preselect string
 }
 
-func (s *stubDeployer) ConfirmTarget(choices []Choice, preselect Preselect) (string, error) {
+func (s *stubDeployer) ConfirmTarget(choices []Choice, preselect string) (string, error) {
 	s.asked++
 	s.offered, s.preselect = choices, preselect
 	return s.answer, s.answerErr
@@ -156,7 +156,7 @@ func TestResolveTarget(t *testing.T) {
 		target, err := resolveTarget(Request{Manifest: manifestWith(markedDefault), Interactive: true}, d)
 		require.NoError(t, err)
 		assert.Equal(t, 1, d.asked)
-		assert.Equal(t, Preselect{Name: "dev", From: DefaultMarker}, d.preselect)
+		assert.Equal(t, "dev", d.preselect)
 		assert.Equal(t, []string{"dev", "prod"}, choiceNames(d.offered))
 		assert.Equal(t, "astro deployment dep-dev", d.offered[0].Where)
 		assert.Equal(t, "dep-prod", target.DeploymentID, "the answer decides, not the marker")
@@ -168,49 +168,26 @@ func TestResolveTarget(t *testing.T) {
 		target, err := resolveTarget(Request{Manifest: manifestWith(oneLink), Interactive: true}, d)
 		require.NoError(t, err)
 		assert.Equal(t, 1, d.asked)
-		assert.Equal(t, Preselect{Name: "prod", From: DefaultMarker}, d.preselect)
+		assert.Equal(t, "prod", d.preselect)
 		assert.Equal(t, "dep-prod", target.DeploymentID)
 	})
 
-	// ASTRO_DEPLOYMENT and the pin arrive as Preselect. They outrank the marker
-	// for the cursor and decide nothing.
-	// The ambient layers outrank the marker for the cursor, and the label has to
-	// say so: a highlight an exported variable put there is not the file's
-	// default, and calling it one tells the reader their manifest says something
-	// it does not.
-	t.Run("the ambient layers only preselect, and say so", func(t *testing.T) {
+	// Only the committed default moves the cursor. ASTRO_DEPLOYMENT and the
+	// `astro use` selection pick which Airflow the query commands read; where
+	// code ships is the project's, so they never reach the prompt.
+	t.Run("only the default preselects, whatever the shell says", func(t *testing.T) {
+		t.Setenv(deploymentEnvVar, "prod")
 		d := &stubDeployer{answer: "dev"}
-		_, err := resolveTarget(Request{
-			Manifest:      manifestWith(markedDefault),
-			Preselect:     "prod",
-			PreselectFrom: "ASTRO_DEPLOYMENT",
-			Interactive:   true,
-		}, d)
+		_, err := resolveTarget(Request{Manifest: manifestWith(markedDefault), Interactive: true}, d)
 		require.NoError(t, err)
-		assert.Equal(t, Preselect{Name: "prod", From: "ASTRO_DEPLOYMENT"}, d.preselect)
+		assert.Equal(t, "dev", d.preselect)
 	})
 
-	t.Run("a pin is labeled as a pin", func(t *testing.T) {
+	t.Run("several links and no default highlight nothing", func(t *testing.T) {
 		d := &stubDeployer{answer: "dev"}
-		_, err := resolveTarget(Request{
-			Manifest:      manifestWith(markedDefault),
-			Preselect:     "prod",
-			PreselectFrom: PinnedBy,
-			Interactive:   true,
-		}, d)
+		_, err := resolveTarget(Request{Manifest: manifestWith(twoLinks), Interactive: true}, d)
 		require.NoError(t, err)
-		assert.Equal(t, Preselect{Name: "prod", From: PinnedBy}, d.preselect)
-	})
-
-	t.Run("a preselect naming nothing deployable highlights nothing", func(t *testing.T) {
-		d := &stubDeployer{answer: "dev"}
-		_, err := resolveTarget(Request{
-			Manifest:    manifestWith(twoLinks),
-			Preselect:   "gone",
-			Interactive: true,
-		}, d)
-		require.NoError(t, err)
-		assert.Equal(t, Preselect{}, d.preselect)
+		assert.Empty(t, d.preselect)
 	})
 
 	t.Run("an aborted prompt deploys nothing", func(t *testing.T) {
@@ -228,7 +205,7 @@ func TestResolveTarget(t *testing.T) {
 
 	t.Run("non-interactive with nothing named names the fix", func(t *testing.T) {
 		d := &stubDeployer{}
-		_, err := resolveTarget(Request{Manifest: manifestWith(markedDefault), Preselect: "prod"}, d)
+		_, err := resolveTarget(Request{Manifest: manifestWith(markedDefault)}, d)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must name the deployment")
 		assert.Contains(t, err.Error(), "--deployment <name>")
@@ -294,7 +271,7 @@ type fakeDeployer struct {
 	answerErr   error
 	confirms    int
 	offered     []Choice
-	preselected Preselect
+	preselected string
 
 	unlinkedID  string
 	unlinkedErr error
@@ -318,7 +295,7 @@ type fakeDeployer struct {
 	imgDeploys int
 }
 
-func (f *fakeDeployer) ConfirmTarget(choices []Choice, preselect Preselect) (string, error) {
+func (f *fakeDeployer) ConfirmTarget(choices []Choice, preselect string) (string, error) {
 	f.confirms++
 	f.offered, f.preselected = choices, preselect
 	return f.answer, f.answerErr
@@ -552,19 +529,7 @@ func TestResolveTarget_OffersTheWorkspacesUnlinkedDeployments(t *testing.T) {
 		for _, c := range d.offered {
 			assert.Equal(t, !slices.Contains([]string{"dev", "prod", "staging"}, c.Name), c.Unlinked, c.Name)
 		}
-		assert.Equal(t, Preselect{Name: "dev", From: DefaultMarker}, d.preselect)
-	})
-
-	// ASTRO_DEPLOYMENT and the pin are per shell. Letting them reorder the rows
-	// would make "1" a different Deployment from one terminal to the next.
-	t.Run("an env preselect highlights without reordering", func(t *testing.T) {
-		d := &stubDeployer{answer: "prod"}
-		r := req
-		r.Preselect, r.PreselectFrom = "staging", "ASTRO_DEPLOYMENT"
-		_, err := resolveTarget(r, d)
-		require.NoError(t, err)
-		assert.Equal(t, []string{"dev", "prod", "staging"}, choiceNames(d.offered))
-		assert.Equal(t, Preselect{Name: "staging", From: "ASTRO_DEPLOYMENT"}, d.preselect)
+		assert.Equal(t, "dev", d.preselect)
 	})
 
 	t.Run("a Deployment named like a row number is listed by id", func(t *testing.T) {
