@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,7 +28,7 @@ func newTestDaemon(t *testing.T) *Daemon {
 	return &Daemon{
 		Store:     NewStore(t.TempDir()),
 		Exe:       "/nonexistent/astro",
-		ServeArgs: []string{"__proxy-serve"},
+		ServeArgs: []string{ServeSubcommand},
 	}
 }
 
@@ -508,4 +509,49 @@ func TestAStartedDaemonRecordsItsProtocol(t *testing.T) {
 	rec, err := d.readRecord()
 	require.NoError(t, err)
 	assert.Equal(t, DaemonProtocol, rec.Protocol)
+}
+
+// An older record whose PID now belongs to someone else is stale, not a daemon
+// to stop. A record left behind by a crash or a reboot can name a PID the OS
+// has since handed to an unrelated process, and replacing an outdated daemon
+// signals the PID it names, so without the identity check the first start
+// after an upgrade would terminate that process.
+func TestEnsureRunningLeavesAStrangerNamedByAnOldRecordAlone(t *testing.T) {
+	d := newTestDaemon(t)
+
+	stranger := exec.Command("sleep", "30")
+	require.NoError(t, stranger.Start())
+	exited := make(chan struct{})
+	go func() {
+		_ = stranger.Wait()
+		close(exited)
+	}()
+	t.Cleanup(func() {
+		_ = stranger.Process.Kill()
+		<-exited
+	})
+
+	// A record from before protocols, naming the stranger and a port nothing
+	// answers on, so only the identity check stands between it and a signal.
+	writeRawRecord(t, d, fmt.Sprintf("%d 1.0.0 %s", stranger.Process.Pid, refusedPort(t)))
+	orig := waitForDaemonExit
+	waitForDaemonExit = func(int) {}
+	t.Cleanup(func() { waitForDaemonExit = orig })
+
+	var starts atomic.Int32
+	swapStart(t, func(*Daemon, string) (string, error) {
+		starts.Add(1)
+		return "17000", nil
+	})
+
+	port, err := d.EnsureRunning("6563")
+	require.NoError(t, err)
+	assert.Equal(t, "17000", port, "a fresh daemon should start in the stale record's place")
+	assert.Equal(t, int32(1), starts.Load())
+
+	select {
+	case <-exited:
+		t.Fatal("EnsureRunning signaled an unrelated process named by an old record")
+	case <-time.After(300 * time.Millisecond):
+	}
 }
