@@ -57,7 +57,8 @@ type ManifestImageDeployInput struct {
 	NoDagsBaseDir bool
 	Wait          bool
 	WaitTime      time.Duration
-	// Progress takes the Wait progress; nil is stderr.
+	// Progress takes the image build's output and the Wait progress; nil is
+	// stderr.
 	Progress io.Writer
 }
 
@@ -93,7 +94,7 @@ var (
 // tarball. It reuses the 1.x transport (createDeploy, the registry push in
 // airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
 // neither prints nor exits — it returns a result for cmd to render, and writes
-// only a --wait's progress, to in.Progress.
+// only the image build's output and a --wait's progress, to in.Progress.
 //
 // Docker is required and checked before any transport work (docs/deploy.md, section 5).
 //
@@ -288,7 +289,16 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 	// BuildLocal, not Build: the image is inspected, tagged and pushed next, so
 	// it has to be a single-platform image in the local store even when there
 	// is nothing to install. See BuildLocal for why a pulled base is not.
-	built, err := imagebuild.New(cmd, buildNow).BuildLocal(ctx, *req, localrt.Callbacks{})
+	// The build's own output goes to Progress, as `astro local start` and
+	// `astro package` show theirs: a failed dependency install says "see the
+	// build output above", so there has to be some.
+	progress := in.Progress
+	if progress == nil {
+		progress = os.Stderr
+	}
+	built, err := imagebuild.New(cmd, buildNow).BuildLocal(ctx, *req, localrt.Callbacks{
+		OnLine: func(l localrt.LogLine) { fmt.Fprintf(progress, "[%s] %s\n", l.Component, l.Text) },
+	})
 	if err != nil {
 		return "", "", err
 	}

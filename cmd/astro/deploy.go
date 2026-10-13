@@ -511,8 +511,8 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 		// Two lines. The first is the → line every resolving command prints,
 		// once the target is settled, so a deploy says what it is about to act
 		// on the way `astro af dags list` does. The second says an image build
-		// can run for minutes with no transport output yet; the transport
-		// itself stays silent (the core's layer rules). It prints only once the
+		// is starting and can run for minutes; the build's own lines follow it
+		// on stderr, through the transport's progress writer. It prints only once the
 		// deployment has cleared the deploy, so a deploy refused before the
 		// build claims no build.
 		//
