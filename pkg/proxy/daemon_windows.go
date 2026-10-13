@@ -88,28 +88,27 @@ func stopRequests() (stop <-chan struct{}, release func(), err error) {
 		fire()
 	}()
 
-	// The waiter owns the handle and closes it once the wait returns. Closing
-	// it from release while the wait is pending is undefined behavior, so
-	// release wakes the waiter by setting the event instead, and the mutex
-	// keeps that set from landing on a handle the waiter has already closed.
-	var mu sync.Mutex
-	closed := false
+	// The handle stays open until release, which Serve defers, rather than
+	// closing when the wait returns: the event is how another tool tells this
+	// daemon is ours and whether a stop reached it, and that has to stay true
+	// through the graceful shutdown a stop starts. A second stop in that
+	// window sets it again, which on a manual-reset event changes nothing.
+	//
+	// Closing a handle while a wait on it is pending is undefined behavior, so
+	// release sets the event to end the wait, waits for the waiter to finish,
+	// and only then closes it.
+	waited := make(chan struct{})
 	go func() {
+		defer close(waited)
 		windows.WaitForSingleObject(ev, windows.INFINITE) //nolint:errcheck // any return ends the wait
 		fire()
-		mu.Lock()
-		closed = true
-		windows.CloseHandle(ev) //nolint:errcheck // nothing to do if it fails
-		mu.Unlock()
 	}()
 
 	release = func() {
 		signal.Stop(sigCh)
-		mu.Lock()
-		if !closed {
-			windows.SetEvent(ev) //nolint:errcheck // only wakes the waiter
-		}
-		mu.Unlock()
+		windows.SetEvent(ev) //nolint:errcheck // only wakes the waiter
+		<-waited
+		windows.CloseHandle(ev) //nolint:errcheck // nothing to do if it fails
 	}
 	return done, release, nil
 }

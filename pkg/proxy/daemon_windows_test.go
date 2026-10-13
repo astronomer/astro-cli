@@ -78,6 +78,32 @@ func TestServeStopsWhenItsEventIsSet(t *testing.T) {
 	}
 }
 
+// The stop event outlives the stop it delivers: it stays until release, which
+// Serve defers, so a second stopper or an identity check during the graceful
+// shutdown still finds it. Then it goes, so it never outlives the daemon.
+func TestTheStopEventLastsUntilRelease(t *testing.T) {
+	stop, release, err := stopRequests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !requestStop(os.Getpid()) {
+		t.Fatal("requestStop found no stop event for a process listening for one")
+	}
+	select {
+	case <-stop:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the stop channel did not close after the event was set")
+	}
+
+	if !processLooksLikeProxy(nil, os.Getpid()) {
+		t.Error("the stop event was gone during shutdown, before release")
+	}
+	release()
+	if processLooksLikeProxy(nil, os.Getpid()) {
+		t.Error("the stop event outlived release")
+	}
+}
+
 // The test binary doubles as the daemon and as a bystander process, picked by
 // environment variable, so these tests spawn real detached processes without
 // needing an astro build.
