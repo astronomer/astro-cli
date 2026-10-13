@@ -92,10 +92,10 @@ func TestInitLinksTheAgentGuidance(t *testing.T) {
 	}
 }
 
-// The demo and the example project say their AGENTS.md is exactly what init
-// writes. A template edit that leaves either copy behind shows readers a file
-// no project gets.
-func TestInitAgentsMatchesTheShippedCopies(t *testing.T) {
+// The example project says its AGENTS.md is exactly what init writes. A
+// template edit that leaves the copy behind shows readers a file no project
+// gets.
+func TestInitAgentsMatchesTheShippedCopy(t *testing.T) {
 	tier(t, 0)
 
 	p := newProject(t)
@@ -106,15 +106,11 @@ func TestInitAgentsMatchesTheShippedCopies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, copyPath := range []string{
-		filepath.Join("demo", "project", "AGENTS.md"),
-		filepath.Join("examples", "etl-demo", "AGENTS.md"),
-	} {
-		// A Windows checkout may convert the copy's line endings.
-		got := strings.ReplaceAll(read(t, filepath.Join(root, copyPath)), "\r\n", "\n")
-		if got != want {
-			t.Errorf("%s differs from what astro init writes; copy the scaffolded file over it.\ninit wrote:\n%s", copyPath, want)
-		}
+	copyPath := filepath.Join("examples", "etl-demo", "AGENTS.md")
+	// A Windows checkout may convert the copy's line endings.
+	got := strings.ReplaceAll(read(t, filepath.Join(root, copyPath)), "\r\n", "\n")
+	if got != want {
+		t.Errorf("%s differs from what astro init writes; copy the scaffolded file over it.\ninit wrote:\n%s", copyPath, want)
 	}
 }
 

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"golang.org/x/term"
 )
 
 // Every prompt here is written to stderr: stdout carries a command's results
@@ -48,10 +46,10 @@ func Password(promptText string, opts ...Option) (string, error) {
 		return "", err
 	}
 	fmt.Fprint(os.Stderr, promptText)
-	bytePassword, err := term.ReadPassword(stdinFD())
+	password, err := HiddenValue(os.Stdin, os.Stderr)
+	fmt.Fprint(os.Stderr, "\n")
 	if err != nil {
 		return "", err
 	}
-	fmt.Fprint(os.Stderr, "\n")
-	return string(bytePassword), nil
+	return password, nil
 }

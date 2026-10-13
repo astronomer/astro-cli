@@ -178,12 +178,23 @@ func TestUnknownFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, unknownFlag(parseError(t, tt.args...)))
+			_, _, spelling := unknownFlag(parseError(t, tt.args...))
+			assert.Equal(t, tt.want, spelling)
 		})
 	}
 
-	assert.Empty(t, unknownFlag(nil))
-	assert.Empty(t, unknownFlag(errors.New("something else")))
+	for _, err := range []error{nil, errors.New("something else")} {
+		name, isShorthand, spelling := unknownFlag(err)
+		assert.Empty(t, name)
+		assert.False(t, isShorthand)
+		assert.Empty(t, spelling)
+	}
+	name, isShorthand, _ := unknownFlag(parseError(t, "-aZ"))
+	assert.Equal(t, "Z", name)
+	assert.True(t, isShorthand)
+	name, isShorthand, _ = unknownFlag(parseError(t, "--api-token=sekret-123"))
+	assert.Equal(t, "api-token", name)
+	assert.False(t, isShorthand)
 }
 
 // TestTrackUnknownFlagPassesTheErrorThrough checks that the hook only listens.

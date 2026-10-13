@@ -65,10 +65,17 @@ type baseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
-	return forManifestWith(context.Background(), m, func(_ context.Context, m ManifestBuild) (string, error) {
+	return forManifestWith(context.Background(), m, shipped, func(_ context.Context, m ManifestBuild) (string, error) {
 		return RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
 	})
 }
+
+// Whether the image a manifest builds is shipped, which decides whether a
+// generated one carries the project's files (Request.ProjectFiles).
+const (
+	shipped = true
+	mounted = false
+)
 
 // ForLocalManifest is ForManifest for local Docker mode. The one difference is
 // the base a generated build starts FROM: LocalRuntimeImageWith, which resolves
@@ -78,15 +85,18 @@ func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Requ
 // starts from the image it deploys, and an Airflow 2 one, which deploy refuses,
 // still starts.
 func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Options) (Request, error) {
-	return forManifestWith(ctx, m, func(ctx context.Context, m ManifestBuild) (string, error) {
+	// Local start runs the project mounted, so its image holds the
+	// dependencies alone.
+	return forManifestWith(ctx, m, mounted, func(ctx context.Context, m ManifestBuild) (string, error) {
 		return LocalRuntimeImageWith(ctx, m.AirflowVersion, m.Runtime, m.RequiresPython, o)
 	})
 }
 
 // forManifestWith is the rule ForManifest and ForLocalManifest share, with a
 // generated build's base resolved by base. base is not called for a declared
-// Dockerfile.
-func forManifestWith(ctx context.Context, m ManifestBuild, base baseImageFunc) (Request, error) {
+// Dockerfile. A generated build of an image that ships carries the project's
+// files; a declared Dockerfile's context is the project already.
+func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base baseImageFunc) (Request, error) {
 	req := Request{
 		Dependencies: m.Dependencies,
 		Packages:     m.Packages,
@@ -104,6 +114,9 @@ func forManifestWith(ctx context.Context, m ManifestBuild, base baseImageFunc) (
 		return Request{}, err
 	}
 	req.BaseImage = image
+	if ships {
+		req.ProjectFiles = m.ProjectDir
+	}
 	return req, nil
 }
 

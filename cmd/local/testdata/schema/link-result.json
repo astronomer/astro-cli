@@ -2,5 +2,6 @@
   "name": "x",
   "kind": "x",
   "status": "x",
-  "manifest": "x"
+  "manifest": "x",
+  "kept_default": "x"
 }

@@ -22,7 +22,7 @@ The fetch goes through `gh`, so it reads with your own GitHub account and needs 
 
 You don't have to read the rest of this page. It's the same setup, by hand.
 
-*Coming soon: the install script that guide calls, and a public copy of the guide fetched over plain HTTPS, once the v2 release pipeline ships.*
+*Coming soon: a public copy of the guide fetched over plain HTTPS, once the v2 release pipeline ships.*
 
 ## Quickstart
 
@@ -34,7 +34,7 @@ $ astro init
 $ astro local start
 ```
 
-That's it. `init` scaffolds an Astro project, `start` installs the right Airflow into a managed virtualenv (via uv) and brings it up. Your Airflow gets a stable, named URL — `http://hello-astro.localhost:6563` — so two projects never claim the same port. Start as many as you like; `astro local list` shows them all. On Windows, add `--docker` (see [Two ways to run](#two-ways-to-run)).
+That's it. `init` scaffolds an Astro project, `start` installs the right Airflow into a managed virtualenv (via uv) and brings it up. On macOS and Linux your Airflow gets a stable, named URL — `http://hello-astro.localhost:6563` — so two projects never claim the same port. The proxy behind it listens on 6563, or on another free port when 6563 is taken, and `astro local start` prints the address. Start as many as you like; `astro local list` shows them all. On Windows, add `--docker` (see [Two ways to run](#two-ways-to-run)); there is no proxy there, so Airflow is on its own `localhost` port.
 
 Airflow keeps running after you close the terminal. Stop it with `astro local stop`, or pass `--stop-with-session` at start to tie it to your terminal session instead.
 
@@ -96,7 +96,7 @@ DAGs go in `dags/`, Python dependencies in `[project.dependencies]` — the `apa
 
 Because that file is standard Python packaging, the tools you already use — uv, ruff, your editor — understand an Astro project out of the box.
 
-For every key you can set in `pyproject.toml`, see the [manifest reference](docs/manifest-reference.md); for the smallest real project that puts them together, see the [`examples/etl-demo`](examples/etl-demo) example; for the full demo — every shipped feature, terraform for Astro, MWAA, and Composer, and scripted walkthroughs — see [`demo/`](demo).
+For every key you can set in `pyproject.toml`, see the [manifest reference](docs/manifest-reference.md); for the smallest real project that puts them together, see the [`examples/etl-demo`](examples/etl-demo) example.
 
 `astro local start` checks the declared configuration before Airflow boots and, if anything is missing, lists it all at once instead of one error at a time. Supply a value with `astro local env variable set NAME` (or the `connection` or `airflow-variable` form), which stores it encrypted in the vault shared with Astro Desktop. Pass `--plain` to store a value that is not secret unencrypted instead, in the project's `.env`, or with `--global`, in the vault without encryption. A new `--global` value reaches no project until you `link` it, or pass `--auto-link` to reach every project, the term Astro Desktop uses. Your shell environment works too. See [docs/secrets.md](docs/secrets.md).
 
@@ -134,14 +134,24 @@ Already have an account? Log in from the same page, or run `astro login --signin
 
 ## Install
 
-*Coming soon: Homebrew, winget, and the install script, once the v2 release pipeline ships.* Until then, build from source:
+```sh
+curl -sSL install.astronomer.io | sudo bash -s -- v2
+```
+
+Until v2 has a stable release, it is published as GitHub pre-releases, and the installer without a version installs Astro CLI 1.x. With `v2` it installs the newest v2 release, the newest stable one once there is one, into `/usr/local/bin`, replacing a 1.x `astro` there. To install somewhere else, without `sudo`, run the installer script directly with `-b`:
+
+```sh
+curl -sSL https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh | bash -s -- -b ~/astro-v2 v2
+```
+
+For standalone mode you also need [uv](https://docs.astral.sh/uv/) 0.9.25 or later on your PATH. *Coming soon: Homebrew and winget.* Step by step, including converting a 1.x project: [docs/install.md](docs/install.md).
+
+To build from source instead, for example to contribute, you need Go (version in `go.mod`):
 
 ```sh
 git clone https://github.com/astronomer/astro-cli && cd astro-cli
 make build
 ```
-
-You'll need Go (version in `go.mod`) and, for standalone mode, [uv](https://docs.astral.sh/uv/) 0.9.25 or later on your PATH.
 
 That leaves the binary in the repo root. `make install` puts it in a directory your shell already searches, and `make uninstall` takes it back out. It checks afterwards and tells you whether typing `astro` now runs the build it just made. Choose the directory yourself with `make install INSTALL_DIR=/usr/local/bin`.
 

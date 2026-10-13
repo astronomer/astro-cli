@@ -183,7 +183,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectFiles, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -433,6 +433,14 @@ func (c engineCLI) save(ctx context.Context, image, path string, cb localrt.Call
 // tag.
 // contentHash is the content address of the image this request would build.
 //
+// A generated image carries the project's files (imagebuild's ProjectFiles),
+// so the digest of the files under projectFiles is part of the address: editing include/
+// changes the image, and has to change the tag. The digest covers exactly the
+// files the image carries — the project's .dockerignore applied, and .venv,
+// .git and .astro/standalone never among them — so it does not hit the
+// problems the declared-Dockerfile context below did. "" for a declared
+// Dockerfile.
+//
 // A declared Dockerfile contributes the DECLARED path and the file's BYTES.
 //
 // Its bytes, because in Dockerfile mode the file is the whole build and
@@ -484,13 +492,20 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-func contentHash(base, platform string, deps, packages []string, df declaredDockerfile) (string, error) {
+func contentHash(base, platform string, deps, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
 	}
 	writeField("base", base)
 	writeField("platform", platform)
+	if projectFiles != "" {
+		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
+		if err != nil {
+			return "", err
+		}
+		writeField("project-files", digest)
+	}
 	for _, d := range sortedCopy(deps) {
 		writeField("dep", d)
 	}

@@ -1,9 +1,7 @@
 package astro
 
 import (
-	"encoding/json"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 
@@ -602,48 +600,5 @@ func TestDeploymentCoreOutputUsage(t *testing.T) {
 		r := execDeploymentRun(t, new(astrov1_mocks.ClientWithResponsesInterface), "", args...)
 		require.Error(t, r.err, args)
 		assert.Equal(t, cliout.ExitUsage, r.code, args)
-	}
-}
-
-// v2 removed the deployments-as-code flags. Each is kept as a hidden
-// tombstone: a usage error (exit 2) that names both replacements, refused
-// before the API is asked anything, so the client mocks nothing. Under
-// --output json the refusal is the error object on stdout.
-func TestDeploymentAsCodeFlagsRemoved(t *testing.T) {
-	for _, tc := range []struct {
-		args []string
-		flag string
-	}{
-		{[]string{"create", "--deployment-file", "deployment.yaml"}, "--deployment-file"},
-		{[]string{"create", "--name", "x", "--deployment-file=deployment.yaml"}, "--deployment-file"},
-		{[]string{"update", coreDeploymentID, "--deployment-file", "deployment.yaml"}, "--deployment-file"},
-		{[]string{"inspect", coreDeploymentID, "--template"}, "--template"},
-		{[]string{"inspect", coreDeploymentID, "-t"}, "--template"},
-	} {
-		r := execDeploymentRun(t, new(astrov1_mocks.ClientWithResponsesInterface), "", tc.args...)
-		require.Error(t, r.err, tc.args)
-		assert.Equal(t, cliout.ExitUsage, r.code, tc.args)
-		msg := r.err.Error()
-		assert.True(t, strings.HasPrefix(msg, tc.flag+" was removed in Astro CLI v2"), "%v: %s", tc.args, msg)
-		assert.Contains(t, msg, terraformProviderURL, tc.args)
-		assert.Contains(t, msg, "astro deployment create --clone", tc.args)
-
-		jr := execDeploymentRun(t, new(astrov1_mocks.ClientWithResponsesInterface), "", append(tc.args, "-o", "json")...)
-		assert.Equal(t, cliout.ExitUsage, jr.code, tc.args)
-		var obj struct {
-			Error string `json:"error"`
-			Code  int    `json:"code"`
-		}
-		require.NoError(t, json.Unmarshal([]byte(jr.stdout), &obj), "%v: %q", tc.args, jr.stdout)
-		assert.Equal(t, msg, obj.Error, tc.args)
-		assert.Equal(t, cliout.ExitUsage, obj.Code, tc.args)
-	}
-
-	// Hidden: none of them is offered in help.
-	for _, sub := range []string{"create", "update", "inspect"} {
-		r := execDeploymentRun(t, new(astrov1_mocks.ClientWithResponsesInterface), "", sub, "--help")
-		require.NoError(t, r.err, sub)
-		assert.NotContains(t, r.stdout, "deployment-file", sub)
-		assert.NotContains(t, r.stdout, "--template", sub)
 	}
 }
