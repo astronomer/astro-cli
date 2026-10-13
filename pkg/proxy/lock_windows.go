@@ -3,6 +3,7 @@
 package proxy
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -37,12 +38,26 @@ func (s *Store) AcquireLock() (*os.File, error) {
 		if err == nil {
 			return f, nil
 		}
+		if !isLockContention(err) {
+			// Waiting out lockTimeout would only report "timed out" in place
+			// of what actually went wrong (a filesystem without byte-range
+			// locks, a bad handle).
+			f.Close()
+			return nil, fmt.Errorf("locking the routes file: %w", err)
+		}
 		if time.Now().After(deadline) {
 			f.Close()
 			return nil, fmt.Errorf("timed out waiting for routes lock")
 		}
 		time.Sleep(lockPollInterval)
 	}
+}
+
+// isLockContention reports whether a LockFileEx failure means another holder
+// has the lock, which is worth waiting out, rather than anything else.
+// LOCKFILE_FAIL_IMMEDIATELY reports a held lock as ERROR_LOCK_VIOLATION.
+func isLockContention(err error) bool {
+	return errors.Is(err, windows.ERROR_LOCK_VIOLATION)
 }
 
 // lockPollInterval is how often a waiter retries the lock. Short enough that a

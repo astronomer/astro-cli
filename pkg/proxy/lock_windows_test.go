@@ -5,6 +5,8 @@ package proxy
 import (
 	"testing"
 	"time"
+
+	"golang.org/x/sys/windows"
 )
 
 // A second holder waits for the first, across handles, the way flock makes it
@@ -40,5 +42,21 @@ func TestAcquireLockExcludesASecondHolder(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the second holder never got the lock after the first let go")
+	}
+}
+
+// Only another holder is worth waiting out. Anything else LockFileEx reports
+// fails the lock at once, rather than spinning for lockTimeout and then calling
+// it a timeout. (The test above is what pins that a held lock really comes back
+// as ERROR_LOCK_VIOLATION: if it came back as anything else, the second holder
+// would now fail instead of waiting.)
+func TestOnlyAHeldLockIsWaitedOut(t *testing.T) {
+	if !isLockContention(windows.ERROR_LOCK_VIOLATION) {
+		t.Error("a held lock was not treated as contention")
+	}
+	for _, err := range []error{windows.ERROR_INVALID_HANDLE, windows.ERROR_NOT_SUPPORTED, windows.ERROR_ACCESS_DENIED} {
+		if isLockContention(err) {
+			t.Errorf("%v was treated as contention and would be polled for lockTimeout", err)
+		}
 	}
 }
