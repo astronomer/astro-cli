@@ -211,8 +211,9 @@ func rewritable(resp *http.Response) bool {
 	}
 }
 
-// injectIntoHTML is InjectIntoHTML that also leaves the body alone when it
-// already contains unlessPresent (empty means always inject).
+// injectIntoHTML is InjectIntoHTML that also leaves the body alone when the
+// part before the marker already contains unlessPresent (empty means always
+// inject).
 func injectIntoHTML(resp *http.Response, snippet, beforeTag, unlessPresent string) error {
 	if !rewritable(resp) {
 		return nil
@@ -240,8 +241,11 @@ func injectIntoHTML(resp *http.Response, snippet, beforeTag, unlessPresent strin
 		return fmt.Errorf("reading the page: %w", err)
 	}
 
-	if unlessPresent == "" || !bytes.Contains(body, []byte(unlessPresent)) {
-		if idx := markerIndex(body, beforeTag); idx >= 0 {
+	// unlessPresent is looked for only before the marker: for the theme that is
+	// the head, and a body that mentions the theme's id (a Dag doc, a log line)
+	// is still an unthemed page.
+	if idx := markerIndex(body, beforeTag); idx >= 0 {
+		if unlessPresent == "" || !bytes.Contains(body[:idx], []byte(unlessPresent)) {
 			body = append(body[:idx], append([]byte(snippet), body[idx:]...)...)
 		}
 	}

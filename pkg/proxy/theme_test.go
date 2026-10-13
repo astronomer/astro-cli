@@ -253,6 +253,21 @@ func TestInjectAirflowThemeLeavesAThemedPageAlone(t *testing.T) {
 	}
 }
 
+// Only the head says whether a page is already themed. A body that happens to
+// mention the theme's id, say a Dag doc or a log line quoting it, is still an
+// unthemed page.
+func TestInjectAirflowThemeLooksOnlyAtTheHeadForAnEarlierTheme(t *testing.T) {
+	page := `<html><head></head><body><pre>&lt;style id="astro-theme"&gt;</pre><code>id="astro-theme"</code></body></html>`
+	resp := newHTMLResponse(t, page, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+	if err := InjectAirflowTheme(resp); err != nil {
+		t.Fatal(err)
+	}
+	got := readBody(t, resp)
+	if i := strings.Index(got, themeTag); i < 0 || i > strings.Index(got, "</head>") {
+		t.Error("a mention of the theme's id in the body kept the theme out of the head")
+	}
+}
+
 // The theme is the proxy's own, on every page it relays, and a host's hooks see
 // the themed page after it.
 func TestTheProxyThemesEveryAirflowPage(t *testing.T) {
