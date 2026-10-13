@@ -28,7 +28,7 @@ func newTestDaemon(t *testing.T) *Daemon {
 	return &Daemon{
 		Store:     NewStore(t.TempDir()),
 		Exe:       "/nonexistent/astro",
-		ServeArgs: []string{"__proxy-serve"},
+		ServeArgs: []string{ServeSubcommand},
 	}
 }
 

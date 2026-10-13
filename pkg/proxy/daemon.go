@@ -25,6 +25,14 @@ const (
 // on every start. Protocol 0 is any daemon from before this field existed.
 const DaemonProtocol = 1
 
+// ServeSubcommand is the astro CLI's hidden subcommand that runs the daemon's
+// server loop: a host spawns `astro ServeSubcommand --port <port>`. Every host
+// names it from here, because it is part of how one tool recognizes another's
+// daemon (see processLooksLikeProxy): a host spelling it differently would
+// spawn a binary that refuses the command, and stop recognizing the daemons
+// the others started.
+const ServeSubcommand = "__proxy-serve"
+
 // Daemon is the proxy run as a background process of its own: one per route
 // store, started by whichever tool needs it first and adopted by the rest.
 //
