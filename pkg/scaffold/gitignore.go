@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
 // EnvIgnored reports whether the project's .gitignore covers the .env file.
@@ -30,49 +32,16 @@ func EnvIgnored(projectDir string) (bool, error) {
 	return coversEnv(string(data)), nil
 }
 
-// localIgnoreRules are the per-machine files Astro tools write into a project,
-// all but one under .astro/. gitignoreTemplate lists them for a new project, and
-// planIgnoreRules adds whichever are missing to a .gitignore the project already
-// had. Each holds something true of one machine and wrong, or secret, on any
-// other:
-//
-//   - .astro/standalone/ is a standalone Airflow's AIRFLOW_HOME
-//     (airflowrt.StandaloneDir): its SQLite database, its logs, and the
-//     generated admin password.
-//   - .astro/worktrees/ holds the git worktrees Astro Desktop nests inside a
-//     project, each pointing back at this clone by absolute path.
-//   - .astro/*.local.yaml and .astro/*.local.yml cover the standalone af CLI's
-//     instance file, config.local.yaml: a local URL derived from this machine's
-//     directory name and proxy port, the local admin credentials, and the
-//     current instance.
-//   - .astro/otto/*.local.json covers Otto's per-machine permissions scope,
-//     permissions.local.json. Its sibling permissions.json is meant to be
-//     committed, and so is extensions.json, which is why .astro/otto/ is not
-//     ignored as a whole.
-//   - .astro/otto/mcp.json carries Astro Desktop's loopback MCP address and a
-//     bearer token for it. Otto's MCP loader fixes the name, so the *.local.json
-//     rule cannot cover it.
-//   - plugins/fix_local_executor_pickle.py is the LocalExecutor pickling fix the
-//     standalone engine drops into plugins/ for Airflow 2 on macOS
-//     (airflowrt.AF2PickleFixPlugin). It is machine-specific and recreated on
-//     the next start whenever it is missing, so it has no business in the repo.
-//     Only that file: the rest of plugins/ is the project's own code.
-//
-// Nothing ignores .astro/ itself: .astro/config.yaml holds deployment links and
-// .astro/memory/ is Otto's shared project memory, and both are committed.
-var localIgnoreRules = []string{
-	".astro/standalone/",
-	".astro/worktrees/",
-	".astro/*.local.yaml",
-	".astro/*.local.yml",
-	".astro/otto/*.local.json",
-	".astro/otto/mcp.json",
-	pickleFixRule,
-}
+// localIgnoreRules are the per-machine files Astro tools write into a project
+// (airflowrt.LocalFileRules, which says what each one is). gitignoreTemplate
+// lists them for a new project, and planIgnoreRules adds whichever are missing
+// to a .gitignore the project already had. The list lives in airflowrt so the
+// image a deploy generates (pkg/imagebuild) leaves out the same files.
+var localIgnoreRules = airflowrt.LocalFileRules()
 
 // pickleFixRule is the one per-machine rule outside .astro/, and the one that
 // carries a comment of its own, because nothing in its path says a tool wrote it.
-const pickleFixRule = "plugins/fix_local_executor_pickle.py"
+const pickleFixRule = airflowrt.PickleFixRule
 
 // localIgnoreNotes are comment lines written directly above a rule, in the
 // template and when the rule is appended, keyed by the rule.
