@@ -259,8 +259,8 @@ func keepTheOnlyLinkDefault(before *manifest.Manifest, ed tomledit.Editor, name 
 	if len(links) != 1 {
 		return nil
 	}
-	for only, l := range links {
-		if only == name || l.Default {
+	for only := range links {
+		if only == name || links[only].Default {
 			return nil
 		}
 		return ed.Set(append(linkKey(only), "default"), true)
