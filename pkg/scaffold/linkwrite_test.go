@@ -366,6 +366,42 @@ func TestSaveLinkKeepsTheOnlyLinkTheDefault(t *testing.T) {
 		assert.False(t, m.Astro.Deployments["dev"].Default)
 	})
 
+	t.Run("an explicit default = false is not flipped", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\ndefault = false\n")
+		before := loadLinks(t, path)
+		saveLink(t, dir, second)
+		after := loadLinks(t, path)
+		assert.False(t, after.Astro.Deployments["prod"].Default)
+		assert.Empty(t, NewlyDefault(before, after))
+	})
+
+	// --unset on a one-link project records the opt-out, so the next link
+	// does not undo it.
+	t.Run("an unset default stays unset when a link is added", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n")
+		require.NoError(t, SetDefaultLink(dir, nil, ""))
+		assert.Contains(t, readFile(t, path), "default = false")
+		saveLink(t, dir, second)
+		_, _, ok := manifest.DefaultLink(loadLinks(t, path).Astro.Deployments)
+		assert.False(t, ok, "the project was left without a default on purpose")
+	})
+
+	t.Run("unsetting a marked default writes it false", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\ndefault = true\n\n[tool.astro.deployments.stage]\nworkspace = 'W'\ndeployment = 'clx3'\n")
+		require.NoError(t, SetDefaultLink(dir, nil, ""))
+		m := loadLinks(t, path)
+		assert.False(t, m.Astro.Deployments["prod"].Default)
+		_, _, ok := manifest.DefaultLink(m.Astro.Deployments)
+		assert.False(t, ok)
+	})
+
+	t.Run("NewlyDefault names the link a save marked", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n")
+		before := loadLinks(t, path)
+		saveLink(t, dir, second)
+		assert.Equal(t, "prod", NewlyDefault(before, loadLinks(t, path)))
+	})
+
 	t.Run("several unmarked links stay without a default", func(t *testing.T) {
 		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n\n[tool.astro.deployments.stage]\nworkspace = 'W'\ndeployment = 'clx3'\n")
 		saveLink(t, dir, second)

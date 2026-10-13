@@ -518,6 +518,13 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 				return err
 			}
 			fmt.Fprintf(errOut, "linked %s to astro deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
+			// The save marks the project's former only link default = true;
+			// say so, since it is a line the user did not ask to change.
+			if after, err := manifest.Load(filepath.Join(config.WorkingPath, project.Marker)); err == nil {
+				if kept := scaffold.NewlyDefault(m, after); kept != "" {
+					fmt.Fprintf(errOut, "marked %s default = true: it was the project's only link, so its default, and stays so now there are two\n", kept)
+				}
+			}
 			return nil
 		},
 		// Two lines. The first is the → line every resolving command prints,
