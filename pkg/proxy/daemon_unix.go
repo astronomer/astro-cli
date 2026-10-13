@@ -150,17 +150,18 @@ func (d *Daemon) EnsureRunning(port string) (string, error) {
 
 	rec, err := d.readRecord()
 	if err == nil && IsPIDAlive(rec.PID) {
-		if reusable(rec) {
-			// kill-0 only proves *some* process owns this PID. A SIGKILL'd
-			// daemon can leave a record whose PID an unrelated process later
-			// recycles. Confirm the process is actually our proxy before
-			// trusting the record.
-			if isProxyDaemon(d, rec.PID, rec.Port) {
-				d.logf("proxy daemon already running (PID %d, version %q)", rec.PID, rec.Version)
-				return rec.Port, nil
-			}
+		// kill-0 only proves *some* process owns this PID. A SIGKILL'd daemon,
+		// a crash or a reboot can leave a record whose PID an unrelated process
+		// later recycles. Confirm the process is actually our proxy before
+		// trusting the record, and before replacing it too: replacing signals
+		// the PID, and an unconfirmed one may be anybody's.
+		switch {
+		case !isProxyDaemon(d, rec.PID, rec.Port):
 			d.logf("PID %d is alive but is not the proxy daemon; treating the record as stale and restarting", rec.PID)
-		} else {
+		case reusable(rec):
+			d.logf("proxy daemon already running (PID %d, version %q)", rec.PID, rec.Version)
+			return rec.Port, nil
+		default:
 			d.logf("proxy daemon (PID %d, version %q) speaks protocol %d, older than %d; restarting",
 				rec.PID, rec.Version, rec.Protocol, DaemonProtocol)
 			d.Stop() //nolint:errcheck // Stop reports nothing a start could act on
