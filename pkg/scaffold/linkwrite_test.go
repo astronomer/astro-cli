@@ -326,6 +326,91 @@ func TestSaveLinkKeepsTheDefault(t *testing.T) {
 	}
 }
 
+// A project's only link is its default (manifest.DefaultLink). Adding a second
+// marks the first, so the project keeps pointing where it did instead of
+// losing its default to an addition. Nothing else picks a default: a re-save
+// of the only link, an explicit default elsewhere, and a project that already
+// had several unmarked links are left as they were.
+func TestSaveLinkKeepsTheOnlyLinkTheDefault(t *testing.T) {
+	second := Link{Name: "dev", Kind: manifest.KindAstro, Workspace: "W", Deployment: "clx2"}
+	for name, body := range map[string]string{
+		"header": linkFixture + "\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n",
+		"inline": linkFixture + "\n[tool.astro.deployments]\nprod = { workspace = 'W', deployment = 'clx1' }\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir, path := linkProject(t, body)
+			saveLink(t, dir, second)
+			m := loadLinks(t, path)
+			require.Len(t, m.Astro.Deployments, 2)
+			assert.True(t, m.Astro.Deployments["prod"].Default, "the first link was the default and still is")
+			assert.False(t, m.Astro.Deployments["dev"].Default)
+			got, _, ok := manifest.DefaultLink(m.Astro.Deployments)
+			assert.True(t, ok)
+			assert.Equal(t, "prod", got)
+			assert.Contains(t, readFile(t, path), userComment)
+		})
+	}
+
+	t.Run("a re-save of the only link marks nothing", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n")
+		saveLink(t, dir, Link{Name: "prod", Kind: manifest.KindAstro, Workspace: "W", Deployment: "clx9"})
+		_, got := onlyLink(t, path)
+		assert.False(t, got.Default)
+	})
+
+	t.Run("an explicit default is left where it is", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\ndefault = true\n")
+		saveLink(t, dir, second)
+		m := loadLinks(t, path)
+		assert.True(t, m.Astro.Deployments["prod"].Default)
+		assert.False(t, m.Astro.Deployments["dev"].Default)
+	})
+
+	t.Run("an explicit default = false is not flipped", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\ndefault = false\n")
+		before := loadLinks(t, path)
+		saveLink(t, dir, second)
+		after := loadLinks(t, path)
+		assert.False(t, after.Astro.Deployments["prod"].Default)
+		assert.Empty(t, NewlyDefault(before, after))
+	})
+
+	// --unset on a one-link project records the opt-out, so the next link
+	// does not undo it.
+	t.Run("an unset default stays unset when a link is added", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n")
+		require.NoError(t, SetDefaultLink(dir, nil, ""))
+		assert.Contains(t, readFile(t, path), "default = false")
+		saveLink(t, dir, second)
+		_, _, ok := manifest.DefaultLink(loadLinks(t, path).Astro.Deployments)
+		assert.False(t, ok, "the project was left without a default on purpose")
+	})
+
+	t.Run("unsetting a marked default writes it false", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\ndefault = true\n\n[tool.astro.deployments.stage]\nworkspace = 'W'\ndeployment = 'clx3'\n")
+		require.NoError(t, SetDefaultLink(dir, nil, ""))
+		m := loadLinks(t, path)
+		assert.False(t, m.Astro.Deployments["prod"].Default)
+		_, _, ok := manifest.DefaultLink(m.Astro.Deployments)
+		assert.False(t, ok)
+	})
+
+	t.Run("NewlyDefault names the link a save marked", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n")
+		before := loadLinks(t, path)
+		saveLink(t, dir, second)
+		assert.Equal(t, "prod", NewlyDefault(before, loadLinks(t, path)))
+	})
+
+	t.Run("several unmarked links stay without a default", func(t *testing.T) {
+		dir, path := linkProject(t, linkFixture+"\n[tool.astro.deployments.prod]\nworkspace = 'W'\ndeployment = 'clx1'\n\n[tool.astro.deployments.stage]\nworkspace = 'W'\ndeployment = 'clx3'\n")
+		saveLink(t, dir, second)
+		for name, l := range loadLinks(t, path).Astro.Deployments {
+			assert.False(t, l.Default, name)
+		}
+	})
+}
+
 // The name is trimmed before it becomes a key.
 func TestSaveLinkTrimsTheName(t *testing.T) {
 	dir, path := linkProject(t, linkFixture)
@@ -865,4 +950,15 @@ func TestSetWorkspaceLinkNeverCreatesAManifest(t *testing.T) {
 	require.True(t, errors.Is(err, manifest.ErrNotFound), "err = %v", err)
 	_, statErr := os.Stat(filepath.Join(dir, manifest.Marker))
 	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestLinkNameFor(t *testing.T) {
+	for in, want := range map[string]string{
+		"Orders Prod (EU)": "orders-prod-eu",
+		"  dev  ":          "dev",
+		"a__b--c":          "a-b-c",
+		"ÉTL 2":            "tl-2",
+	} {
+		assert.Equal(t, want, LinkNameFor(in), in)
+	}
 }

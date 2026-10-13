@@ -194,6 +194,23 @@ The cloud kinds come from the status on the `*httputil.StatusError` that every A
 
 A failure with no kind publishes no `kind` key rather than an `unknown` catch-all. A kind is added only when the CLI can recognise the failure reliably (a sentinel it wraps, a type it can assert, or a status on one), never for a failure nothing emits. Changing a kind breaks whatever reads it.
 
+### Removed 1.x commands and flags
+
+A script written for Astro CLI 1.x is told what replaced what it typed rather than only that it is unknown. Either way the failure is a usage error: exit 2, and the `usage` error object under `--output json`.
+
+A removed command stays in the tree as a hidden stub that fails naming its replacement: `astro dev` ([`cmd/local/dev.go`](../cmd/local/dev.go)), `astro run`, `astro deployment airflow-variable|connection|pool`, and `astro env … create|update`.
+
+A removed flag is not registered on any command. Two files in `cmd/` describe it:
+
+- [`cmd/v1_flags.tsv`](../cmd/v1_flags.tsv) is the 1.x inventory, embedded in the binary: every visible flag on every runnable 1.x command, its own and those it inherited, with its shorthand and whether it took a value. It records three 1.x trees: Astro for a non-hosted organization (`astro`), Astro for a hosted one (`astro-hosted`, whose `deployment create` and `update` had flags of their own), and APC (`apc`). It records 1.x, so nothing in v2 changes it.
+- `removedFlags` in [`cmd/removed_flags.go`](../cmd/removed_flags.go) is the registry of messages, keyed by flag name.
+
+The root's flag error func (`flagError` in [`cmd/unknown.go`](../cmd/unknown.go)) runs when cobra reports a flag the invoked command does not have. It records the flag in telemetry like any unknown flag. Then, if the inventory says 1.x had that flag (or that shorthand) on that command (at its v2 path, or at a 1.x name it keeps as an alias) in the tree this machine's scripts were written against (`v1TreeOf`: APC, or Astro hosted or not, read from the context only then), it returns the message of the first registry entry that applies there, as a usage error. This happens while flags parse, so it fails before any pre-run logs in or asks an API anything. A command that still has a flag of that name never gets there. Neither does one 1.x did not have, or had without the flag: `astro local reset -f` gets cobra's own error, because 1.x had no `local reset`. A registry entry can narrow itself further. `needs` limits it to commands that have the replacement (`--json` maps to `-o json` only where there is an `-o`), and `under` limits it to a command and everything below it, for a name whose replacement differs by command (`--template` on `deployment inspect`). Where names overlap, the narrower entry comes first.
+
+A run that asks for help (`-h`, `--help` or `--help=true`) gets the help, not the refusal. A shell asking for completions (`__complete`) gets them: cobra parses flags itself there, without the flag error func, so when a flag typed is one the command being completed does not have, `acceptRemovedFlags` gives that command each removed flag 1.x had on it as a hidden flag, for that run only. The command completed is the one cobra's own `Find` resolves, so a removed flag typed before a subcommand's name (`astro api airflow --json ls`) completes as cobra would complete it without the tombstones: a run of that line fails too, since the parent never had the flag.
+
+To remove a flag, delete it and add an entry for its name if none applies yet. `TestEveryV1FlagStillWorksOrSaysWhatReplacedIt` runs every inventory flag against its v2 tree. It fails on any flag v2 neither has nor reports, checks that each refusal is the message its entry gives there, and fails on an entry that no flag in the inventory reaches. `TestRemovedFlagsSayWhatReplacedThem` needs a case for every entry. The entries go in v3, once the unknown-flag events show nobody still passes them.
+
 ## Help
 
 Every `--help` page is drawn by one renderer, [`cmd/help.go`](../cmd/help.go), which the root installs with `SetHelpFunc` and `SetUsageFunc` and every command inherits. It wraps prose and flag descriptions to the terminal (at most 100 columns, 80 when piped), lists each command with its aliases, and puts examples after the flags they use. It shows the current context only on commands that run the platform pre-run, so not on the offline core tree. A command does not set a template of its own: the inherited func would ignore it. A section a command needs belongs in the renderer instead, as flag groups do. Annotate a flag with `group` to list it under `<Group> Flags:`, and set `flag-groups` on the command to order those sections (`astro deploy` does both).

@@ -156,6 +156,10 @@ var linkEnvNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 //     method, and carries only the fields its method takes.
 //   - default = true is carried over when the link had it. The flag belongs to
 //     SetDefaultLink, so a re-save does not hand the default to nobody.
+//   - a project's only link, unmarked and so its default by
+//     manifest.DefaultLink, is marked default = true when a second link is
+//     added beside it, so the project keeps pointing where it did
+//     (keepTheOnlyLinkDefault).
 //
 // An empty Workspace keeps a workspace the link already sets itself;
 // ClearWorkspace removes it. Removing the link and saving it again does too.
@@ -231,11 +235,52 @@ func (l Link) edit() ManifestEdit {
 		if existing, ok := before.Astro.Deployments[l.Name]; ok && existing.Default {
 			table["default"] = true
 		}
+		if err := keepTheOnlyLinkDefault(before, ed, l.Name); err != nil {
+			return err
+		}
 		if err := setLinkTargets(ed, &l); err != nil {
 			return err
 		}
 		return ReplaceTable(ed, key, table)
 	}
+}
+
+// keepTheOnlyLinkDefault marks a project's only link default = true when a
+// second one, named name, is about to be added beside it.
+//
+// manifest.DefaultLink counts a lone unmarked link as the default, so a
+// one-link project points at it from every command and both apps. A second
+// link would end that silently: two unmarked links have no default, and the
+// project would stop pointing anywhere because something was added. Marking
+// the first link keeps what the project already meant, and picks nothing new.
+// A project with a marked link, or with several unmarked ones, is left alone.
+//
+// The lone-link rule is manifest.DefaultLink's own, read rather than restated.
+// A link that says `default = false` is left as it is: someone opted it out,
+// by hand or with `astro link default --unset`, and the parsed flag cannot
+// tell that from a link that never said anything, so the raw key decides.
+func keepTheOnlyLinkDefault(before *manifest.Manifest, ed tomledit.Editor, name string) error {
+	only, l, ok := manifest.DefaultLink(before.Astro.Deployments)
+	if !ok || l.Default || only == name {
+		return nil
+	}
+	if _, set := ed.Get(append(linkKey(only), "default")); set {
+		return nil
+	}
+	return ed.Set(append(linkKey(only), "default"), true)
+}
+
+// NewlyDefault names the link that is marked default = true in after but was
+// not in before, "" when there is none: the link a save marked to keep the
+// project's default (keepTheOnlyLinkDefault), for a caller to say so.
+func NewlyDefault(before, after *manifest.Manifest) string {
+	for name := range after.Astro.Deployments {
+		was, existed := before.Astro.Deployments[name]
+		if existed && !was.Default && after.Astro.Deployments[name].Default {
+			return name
+		}
+	}
+	return ""
 }
 
 // RemoveLink removes the link called name from the pyproject.toml in dir,
@@ -269,7 +314,9 @@ func RemoveLink(dir string, wrap func(run func() error) error, name string) (rem
 
 // SetDefaultLink marks the link called name as the default in the
 // pyproject.toml in dir, and clears the flag from every other link, through
-// EditManifest. An empty name clears it from all of them.
+// EditManifest. An empty name clears it: the link that was the default, marked
+// or a project's only one, is written `default = false`, which records the
+// opt-out so a later save does not mark it again (keepTheOnlyLinkDefault).
 //
 // Both halves, because the manifest allows at most one default: setting the
 // flag without clearing the previous holder writes a file the parser refuses.
@@ -277,17 +324,22 @@ func RemoveLink(dir string, wrap func(run func() error) error, name string) (rem
 func SetDefaultLink(dir string, wrap func(run func() error) error, name string) error {
 	name = strings.TrimSpace(name)
 	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		if name != "" {
-			if _, ok := before.Astro.Deployments[name]; !ok {
-				return fmt.Errorf("%w: %s", ErrNoSuchLink, name)
+		if name == "" {
+			was, _, ok := manifest.DefaultLink(before.Astro.Deployments)
+			if !ok {
+				return nil
 			}
+			return ed.Set(append(linkKey(was), "default"), false)
+		}
+		if _, ok := before.Astro.Deployments[name]; !ok {
+			return fmt.Errorf("%w: %s", ErrNoSuchLink, name)
 		}
 		for other := range before.Astro.Deployments {
 			if other != name && before.Astro.Deployments[other].Default {
 				ed.Delete(append(linkKey(other), "default"))
 			}
 		}
-		if name == "" || before.Astro.Deployments[name].Default {
+		if before.Astro.Deployments[name].Default {
 			return nil
 		}
 		return ed.Set(append(linkKey(name), "default"), true)
@@ -536,6 +588,18 @@ func urlHasUserinfo(raw string) bool {
 	authority, _, _ = strings.Cut(authority, "?")
 	authority, _, _ = strings.Cut(authority, "#")
 	return strings.Contains(authority, "@")
+}
+
+// nonAlnum is every run LinkNameFor turns into one dash.
+var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+
+// LinkNameFor is the link name a picked Astro Deployment gets: its name
+// lowercased, each run of anything but letters and digits turned into one
+// dash, and dashes trimmed from the ends. "Orders Prod (EU)" is
+// orders-prod-eu. `astro link add` and `astro deploy` both name the links they
+// write this way, so one Deployment gets the same name from either.
+func LinkNameFor(deploymentName string) string {
+	return strings.Trim(nonAlnum.ReplaceAllString(strings.ToLower(deploymentName), "-"), "-")
 }
 
 func invalidLink(format string, args ...any) error {

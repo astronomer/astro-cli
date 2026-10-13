@@ -250,7 +250,7 @@ You can optionally provide a filter to search for specific endpoints. The filter
 
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show additional details like summaries and tags")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
-	addOutputFlags(cmd, &format)
+	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd
 }
@@ -295,7 +295,7 @@ The endpoint can be specified as a path or as an operation ID.`,
 	cmd.Flags().StringVarP(&method, "method", "X", "", "HTTP method (GET)")
 	cmd.Flags().BoolVar(&refresh, "refresh", false, "Force refresh of the OpenAPI specification cache")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show spec URL and additional details")
-	addOutputFlags(cmd, &format)
+	cliout.AddOutputFlag(cmd, &format)
 
 	return cmd
 }

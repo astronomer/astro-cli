@@ -9,7 +9,8 @@
       "where": "x",
       "url": "x",
       "auth_method": "x",
-      "current": true
+      "current": true,
+      "default": true
     }
   ]
 }
