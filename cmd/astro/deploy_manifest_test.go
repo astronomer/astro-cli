@@ -462,10 +462,10 @@ func TestDeployManifestNotesUncommittedChanges(t *testing.T) {
 	}
 }
 
-// The highlight is labeled with what put it there. ASTRO_DEPLOYMENT outranks
+// The highlight is marked with what put it there. ASTRO_DEPLOYMENT outranks
 // the manifest's marker for the cursor, and saying "default" over an entry an
 // exported variable chose tells the reader their committed file says something
-// it does not.
+// it does not, so that row says "from ASTRO_DEPLOYMENT".
 func TestDeployManifestPromptNamesWhatMovedTheCursor(t *testing.T) {
 	interactiveDeploy(t)
 	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
@@ -474,9 +474,9 @@ func TestDeployManifestPromptNamesWhatMovedTheCursor(t *testing.T) {
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
 	// The committed default keeps the top row; the variable only highlights.
-	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
+	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "from", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
 	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep"}, pickerRow(t, errOut, "prod"))
-	assert.NotContains(t, errOut, "default = true")
+	assert.NotContains(t, errOut, "default")
 	assert.Contains(t, errOut, "\n> [2] ")
 	// And Enter took the highlighted entry, which is the one it named.
 	assert.Contains(t, out, "to dev (deployment clx-dev).")
@@ -565,8 +565,8 @@ func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, errOut, "Deploy to which deployment?")
-	assert.Equal(t, []string{"#", "NAME", "WHERE", "PRESELECTED", "BY"}, strings.Fields(strings.Split(errOut, "\n")[1]))
-	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "default", "=", "true"}, pickerRow(t, errOut, "prod"))
+	assert.Equal(t, []string{"#", "NAME", "WHERE"}, strings.Fields(strings.Split(errOut, "\n")[1]), "the marker has no header of its own")
+	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "default"}, pickerRow(t, errOut, "prod"))
 	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev"}, pickerRow(t, errOut, "dev"))
 	assert.Contains(t, errOut, "\n> [1] ")
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
@@ -599,7 +599,7 @@ func TestDeployManifestPromptWithNoPreselectNeedsAnAnswer(t *testing.T) {
 	}, manifestdeploy.Preselect{})
 	require.ErrorIs(t, err, manifestdeploy.ErrAborted)
 
-	assert.NotContains(t, errOut.String(), "PRESELECTED BY")
+	assert.NotContains(t, errOut.String(), "default")
 	assert.NotContains(t, errOut.String(), "[", "no default shown in the prompt")
 	assert.NotContains(t, errOut.String(), "\033[", "nothing highlighted")
 	assert.Equal(t, 2, strings.Count(errOut.String(), "Not one of the choices.\n> "),
@@ -700,7 +700,7 @@ func TestDeployManifestPromptLinksAnUnlinkedDeployment(t *testing.T) {
 	out, errOut, err := execDeployIO("3\n", "--workspace", "clw-ws")
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"3", "orders-staging", "astro", "deployment", "clx-new", "(not", "linked", "yet)"}, pickerRow(t, errOut, "orders-staging"))
+	assert.Equal(t, []string{"3", "orders-staging", "astro", "deployment", "clx-new", "not", "linked", "yet"}, pickerRow(t, errOut, "orders-staging"))
 	assert.Contains(t, errOut, "linked orders-staging to astro deployment clx-new in pyproject.toml")
 	assert.Contains(t, errOut, "→ orders-staging (astro deployment clx-new)")
 	assert.Equal(t, "clx-new", fake.imgInput.DeploymentID)

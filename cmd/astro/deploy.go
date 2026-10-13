@@ -753,10 +753,11 @@ type manifestDeployer struct {
 // `default = true` marker moves the cursor and never skips the question
 // (docs/instances.md, "Deploy always asks").
 //
-// The highlight is labeled with what put it there, not with one word for all
-// three: a cursor sitting on an entry because a variable is exported in this
-// shell is a different fact from one sitting there because the committed
-// manifest says so, and only the reader can tell which they meant.
+// The highlighted row is marked at its end with what put it there, not with one
+// word for all three (preselectNote): a cursor sitting on an entry because a
+// variable is exported in this shell is a different fact from one sitting there
+// because the committed manifest says so, and only the reader can tell which
+// they meant. A Deployment not linked yet is marked in the same place.
 //
 // It takes a name or a number, names first: a link may legally be called "2",
 // and what the user typed is what they meant. Enter takes the highlighted entry
@@ -764,9 +765,22 @@ type manifestDeployer struct {
 // safe answer to "where should I ship this code" is never one the CLI picked by
 // itself. It asks on stderr, so stdout stays the deploy's own output.
 func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
+	notes := make([]string, len(choices))
+	anyNote := false
+	for i, choice := range choices {
+		switch {
+		case preselect.Name != "" && choice.Name == preselect.Name:
+			notes[i] = preselectNote(preselect.From)
+		case choice.Unlinked:
+			notes[i] = "not linked yet"
+		}
+		anyNote = anyNote || notes[i] != ""
+	}
 	header := []string{"NAME", "WHERE"}
-	if preselect.Name != "" {
-		header = append(header, "PRESELECTED BY")
+	if anyNote {
+		// A trailing marker rather than a column of its own: it is blank on
+		// all but a row or a few.
+		header = append(header, "")
 	}
 	l := picker.List{
 		Title:  "Deploy to which deployment?",
@@ -781,18 +795,13 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")),
 	}
 	for i, choice := range choices {
-		where := choice.Where
-		if choice.Unlinked {
-			where += " (not linked yet)"
+		cells := []string{choice.Name, choice.Where}
+		if anyNote {
+			cells = append(cells, notes[i])
 		}
-		cells := []string{choice.Name, where}
 		chosen := preselect.Name != "" && choice.Name == preselect.Name
-		switch {
-		case chosen:
+		if chosen {
 			l.Default = i + 1
-			cells = append(cells, preselect.From)
-		case preselect.Name != "":
-			cells = append(cells, "")
 		}
 		l.AddRow(chosen, cells...)
 	}
@@ -801,6 +810,17 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 		return "", err
 	}
 	return choices[i].Name, nil
+}
+
+// preselectNote marks the highlighted row with what put it there: "default"
+// for the manifest's own marker, the common case, and the source named for the
+// other two, so a row a shell variable chose never reads as the project's
+// default.
+func preselectNote(from string) string {
+	if from == manifestdeploy.DefaultMarker {
+		return "default"
+	}
+	return "from " + from
 }
 
 // ListDeployments lists a workspace's Deployments under the deploy's login, for
