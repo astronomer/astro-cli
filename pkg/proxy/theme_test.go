@@ -101,22 +101,32 @@ func TestInjectIntoHTMLNoMarkerIsNoOpOnContent(t *testing.T) {
 	}
 }
 
-// Two </head> tags: the snippet goes before the LAST one, so an inline script
-// that mentions "</head>" in a string doesn't catch the injection mid-document.
-func TestInjectIntoHTMLUsesLastMarker(t *testing.T) {
-	body := "<html>fake </head> in script<head><title>t</title></head><body></body></html>"
-	resp := newHTMLResponse(t, body, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+// </head> anchors on its first occurrence. The real one closes the head near the
+// top of the page; a later "</head>" is body content, an inline script's
+// string or a rendered Dag doc, and the snippet must not land in it.
+func TestInjectIntoHTMLAnchorsTheHeadOnItsFirstClose(t *testing.T) {
+	page := `<html><head><title>t</title></head><body><script>var s = "</head>";</script></body></html>`
+	resp := newHTMLResponse(t, page, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
 	if err := InjectIntoHTML(resp, "<style>x</style>", "</head>"); err != nil {
 		t.Fatalf("inject: %v", err)
 	}
-	got := readBody(t, resp)
-	last := strings.LastIndex(got, "</head>")
-	style := strings.LastIndex(got, "<style>x</style>")
-	if style < 0 || last < 0 || style >= last {
-		t.Errorf("snippet not placed before last </head>: got %q", got)
+	want := `<html><head><title>t</title><style>x</style></head><body><script>var s = "</head>";</script></body></html>`
+	if got := readBody(t, resp); got != want {
+		t.Errorf("snippet not before the first </head>:\n got: %q\nwant: %q", got, want)
 	}
-	if n := strings.Count(got, "<style>x</style>"); n != 1 {
-		t.Errorf("snippet appeared %d times, want 1: %q", n, got)
+}
+
+// Any other marker anchors on its last occurrence: </body> closes the page at
+// the end, and an earlier "</body>" is a string in an inline script.
+func TestInjectIntoHTMLAnchorsOtherMarkersOnTheirLast(t *testing.T) {
+	page := `<html><head></head><body><script>var s = "</body>";</script></body></html>`
+	resp := newHTMLResponse(t, page, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+	if err := InjectIntoHTML(resp, "<i>x</i>", "</body>"); err != nil {
+		t.Fatalf("inject: %v", err)
+	}
+	want := `<html><head></head><body><script>var s = "</body>";</script><i>x</i></body></html>`
+	if got := readBody(t, resp); got != want {
+		t.Errorf("snippet not before the last </body>:\n got: %q\nwant: %q", got, want)
 	}
 }
 
@@ -297,6 +307,33 @@ func TestInjectIntoHTMLPlacesTheSnippetAfterBytesThatChangeSizeWhenLowered(t *te
 				t.Errorf("snippet misplaced:\n got: %q\nwant: %q", got, want)
 			}
 		})
+	}
+}
+
+// Strings of different lengths never match, including one that is a prefix or
+// an extension of the other, which would otherwise read past the shorter.
+func TestEqualFoldASCIIComparesLengths(t *testing.T) {
+	for _, b := range []string{"</hea", "</head>x", "</HEAD>>"} {
+		if equalFoldASCII([]byte(b), "</head>") {
+			t.Errorf("%q matched </head>", b)
+		}
+	}
+	if !equalFoldASCII([]byte("</HeAd>"), "</head>") {
+		t.Error("</HeAd> did not match </head> ignoring case")
+	}
+}
+
+// A marker of any length works, not only ones the size of </head>.
+func TestInjectIntoHTMLTakesAMarkerOfAnyLength(t *testing.T) {
+	for _, marker := range []string{"</p>", "</noscript>", "</header>"} {
+		page := "<html><head></head><body>" + marker + "</body></html>"
+		resp := newHTMLResponse(t, page, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+		if err := InjectIntoHTML(resp, "<i>x</i>", marker); err != nil {
+			t.Fatal(err)
+		}
+		if got := readBody(t, resp); !strings.Contains(got, "<i>x</i>"+marker) {
+			t.Errorf("snippet not before %s: %q", marker, got)
+		}
 	}
 }
 

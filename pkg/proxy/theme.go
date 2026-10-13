@@ -123,9 +123,10 @@ func InjectAirflowTheme(resp *http.Response) error {
 	return injectIntoHTML(resp, airflowThemeSnippet, "</head>", `id="`+themeTagID+`"`)
 }
 
-// InjectIntoHTML inserts snippet into an HTML response immediately before the
-// last occurrence of beforeTag (matched case-insensitively, e.g. "</head>" or
-// "</body>"). It reads through gzip and writes the same encoding back.
+// InjectIntoHTML inserts snippet into an HTML response immediately before
+// beforeTag, matched ignoring case: the first "</head>", or the last occurrence
+// of any other tag such as "</body>". It reads through gzip and writes the same
+// encoding back.
 //
 // Responses it should not rewrite pass through untouched: anything not HTML, a
 // HEAD or bodyless response, and an encoding other than none, identity or gzip.
@@ -135,16 +136,27 @@ func InjectIntoHTML(resp *http.Response, snippet, beforeTag string) error {
 	return injectIntoHTML(resp, snippet, beforeTag, "")
 }
 
-// lastIndexFoldASCII returns the index of the last occurrence of marker in body,
-// ignoring ASCII case, or -1.
+// markerIndex is where a snippet anchored on marker goes in body, or -1.
 //
-// Byte by byte, not by searching a lowered copy: bytes.ToLower changes the
-// length of invalid UTF-8 (one byte becomes a three-byte replacement character)
-// and of runes whose lower case is a different size (the Kelvin sign), so an
-// index found in the copy can point anywhere in the original. HTML tag names
-// are ASCII, so folding A-Z is all the match needs.
-func lastIndexFoldASCII(body []byte, marker string) int {
-	for i := len(body) - len(marker); i >= 0; i-- {
+// </head> anchors on its first occurrence: the real one closes the head near
+// the top, and a later "</head>" is body content (an inline script's string, a
+// rendered Dag doc). Any other marker anchors on its last, which for </body> is
+// the real close at the end, past any earlier mention in a script.
+//
+// Matched ignoring ASCII case, byte by byte, not by searching a lowered copy:
+// bytes.ToLower changes the length of invalid UTF-8 (one byte becomes a
+// three-byte replacement character) and of runes whose lower case is a
+// different size (the Kelvin sign), so an index found in the copy can point
+// anywhere in the original. HTML tag names are ASCII, so folding A-Z is all the
+// match needs.
+func markerIndex(body []byte, marker string) int {
+	first := equalFoldASCII([]byte(marker), "</head>")
+	n := len(body) - len(marker)
+	for k := 0; k <= n; k++ {
+		i := n - k
+		if first {
+			i = k
+		}
 		if equalFoldASCII(body[i:i+len(marker)], marker) {
 			return i
 		}
@@ -153,6 +165,9 @@ func lastIndexFoldASCII(body []byte, marker string) int {
 }
 
 func equalFoldASCII(b []byte, s string) bool {
+	if len(b) != len(s) {
+		return false
+	}
 	for i := range b {
 		if lowerASCII(b[i]) != lowerASCII(s[i]) {
 			return false
@@ -226,7 +241,7 @@ func injectIntoHTML(resp *http.Response, snippet, beforeTag, unlessPresent strin
 	}
 
 	if unlessPresent == "" || !bytes.Contains(body, []byte(unlessPresent)) {
-		if idx := lastIndexFoldASCII(body, beforeTag); idx >= 0 {
+		if idx := markerIndex(body, beforeTag); idx >= 0 {
 			body = append(body[:idx], append([]byte(snippet), body[idx:]...)...)
 		}
 	}
