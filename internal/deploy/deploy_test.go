@@ -516,6 +516,17 @@ func TestRun_UnlinkedPickIsLinked(t *testing.T) {
 	assert.Equal(t, "picked-one", res.LinkName)
 }
 
+// A project that links nothing lists the workspace it declares, as the prompt
+// with links does, before the login's.
+func TestRun_UnlinkedUsesTheProjectsWorkspace(t *testing.T) {
+	d := &fakeDeployer{unlinkedID: "dep-picked"}
+	m := manifestWith(nil)
+	m.Astro.Workspace = "ws-project"
+	_, err := Run(Request{DagsOnly: true, Interactive: true, ContextWorkspace: "ws-ctx", Manifest: m}, d)
+	require.NoError(t, err)
+	assert.Equal(t, "ws-project", d.unlinkedWS)
+}
+
 func TestResolveTarget_OffersTheWorkspacesUnlinkedDeployments(t *testing.T) {
 	links := map[string]manifest.Link{
 		"prod":    {Target: "astro", Workspace: "ws-1", Deployment: "dep-prod"},
@@ -531,7 +542,7 @@ func TestResolveTarget_OffersTheWorkspacesUnlinkedDeployments(t *testing.T) {
 	}
 	req := Request{Interactive: true, Manifest: manifestWith(links), ContextWorkspace: "ws-1"}
 
-	t.Run("links first, the preselected one on top, then the rest", func(t *testing.T) {
+	t.Run("links first, the default on top, then the rest", func(t *testing.T) {
 		d := &stubDeployer{answer: "dev"}
 		d.listed = listed
 		_, err := resolveTarget(req, d)
@@ -544,29 +555,68 @@ func TestResolveTarget_OffersTheWorkspacesUnlinkedDeployments(t *testing.T) {
 		assert.Equal(t, Preselect{Name: "dev", From: DefaultMarker}, d.preselect)
 	})
 
-	t.Run("picking an unlinked Deployment links it", func(t *testing.T) {
+	// ASTRO_DEPLOYMENT and the pin are per shell. Letting them reorder the rows
+	// would make "1" a different Deployment from one terminal to the next.
+	t.Run("an env preselect highlights without reordering", func(t *testing.T) {
+		d := &stubDeployer{answer: "prod"}
+		r := req
+		r.Preselect, r.PreselectFrom = "staging", "ASTRO_DEPLOYMENT"
+		_, err := resolveTarget(r, d)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"dev", "prod", "staging"}, choiceNames(d.offered))
+		assert.Equal(t, Preselect{Name: "staging", From: "ASTRO_DEPLOYMENT"}, d.preselect)
+	})
+
+	t.Run("a Deployment named like a row number is listed by id", func(t *testing.T) {
+		d := &stubDeployer{answer: "prod"}
+		d.listed = []Deployment{{ID: "dep-one", Name: "1"}}
+		_, err := resolveTarget(req, d)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"dev", "prod", "staging", "dep-one"}, choiceNames(d.offered))
+	})
+
+	t.Run("picking an unlinked Deployment links it once the deploy succeeds", func(t *testing.T) {
 		d := &stubDeployer{answer: "orders-eu"}
 		d.listed = listed
 		var saved []scaffold.Link
 		r := req
-		r.Link = func(l scaffold.Link) error { saved = append(saved, l); return nil }
-		target, err := resolveTarget(r, d)
+		r.DagsOnly = true
+		r.Link = func(l scaffold.Link) error {
+			assert.Equal(t, 1, d.deploys, "saved only after the deploy")
+			saved = append(saved, l)
+			return nil
+		}
+		res, err := Run(r, d)
 		require.NoError(t, err)
-		assert.Equal(t, Target{DeploymentID: "dep-new", WorkspaceID: "ws-1", LinkName: "orders-eu"}, target)
+		assert.Equal(t, "dep-new", d.dagInput.DeploymentID)
+		assert.Equal(t, "orders-eu", res.LinkName)
 		require.Len(t, saved, 1)
 		assert.Equal(t, scaffold.Link{Name: "orders-eu", Kind: manifest.KindAstro, Workspace: "ws-1", Deployment: "dep-new"}, saved[0])
 	})
 
-	t.Run("a link that cannot be saved warns and still deploys", func(t *testing.T) {
+	t.Run("a deploy that fails saves no link", func(t *testing.T) {
+		d := &stubDeployer{answer: "orders-eu"}
+		d.listed = listed
+		d.dagErr = errors.New("upload failed")
+		r := req
+		r.DagsOnly = true
+		r.Link = func(scaffold.Link) error { t.Fatal("a failed deploy saved a link"); return nil }
+		_, err := Run(r, d)
+		require.Error(t, err)
+	})
+
+	t.Run("a link that cannot be saved warns, and the deploy still succeeds", func(t *testing.T) {
 		d := &stubDeployer{answer: "staging-2"}
 		d.listed = listed
 		var warned []string
 		r := req
+		r.DagsOnly = true
 		r.Warn = func(s string) { warned = append(warned, s) }
 		r.Link = func(scaffold.Link) error { return errors.New("read-only") }
-		target, err := resolveTarget(r, d)
+		res, err := Run(r, d)
 		require.NoError(t, err)
-		assert.Equal(t, Target{DeploymentID: "dep-clash", WorkspaceID: "ws-1"}, target)
+		assert.Equal(t, "dep-clash", res.DeploymentID)
+		assert.Empty(t, res.LinkName)
 		require.Len(t, warned, 1)
 		assert.Contains(t, warned[0], "read-only")
 	})

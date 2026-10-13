@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +23,7 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -471,9 +473,11 @@ func TestDeployManifestPromptNamesWhatMovedTheCursor(t *testing.T) {
 
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"1", "dev", "astro", "deployment", "clx-dev", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
+	// The committed default keeps the top row; the variable only highlights.
+	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
+	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep"}, pickerRow(t, errOut, "prod"))
 	assert.NotContains(t, errOut, "default = true")
-	assert.Contains(t, errOut, "\n> [1] ")
+	assert.Contains(t, errOut, "\n> [2] ")
 	// And Enter took the highlighted entry, which is the one it named.
 	assert.Contains(t, out, "to dev (deployment clx-dev).")
 }
@@ -1205,4 +1209,23 @@ func TestDeployManifestPickerRefusesAnotherHost(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--deployment <id>")
 	assert.Contains(t, err.Error(), "astro context switch astronomer.io")
+}
+
+// The prompt waits on the workspace's list, so a list that does not answer is
+// given up on, and the prompt goes on with the links alone.
+func TestDeployManifestListDeploymentsGivesUp(t *testing.T) {
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	origList, origTimeout := deployment.ListDeployments, listDeploymentsTimeout
+	deployment.ListDeployments = func(string, string, astrov1.APIClient) ([]astrov1.Deployment, error) {
+		<-release
+		return nil, nil
+	}
+	listDeploymentsTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { deployment.ListDeployments, listDeploymentsTimeout = origList, origTimeout })
+
+	d := manifestDeployer{login: &deployLogin{}}
+	_, err := d.ListDeployments("clw-ws")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no answer after")
 }

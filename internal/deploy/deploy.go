@@ -258,11 +258,34 @@ func Run(req Request, d Deployer) (Result, error) {
 		req.Announce(target)
 	}
 
+	var res Result
 	if req.DagsOnly {
-		return runDagsOnly(req, target, d)
+		res, err = runDagsOnly(req, target, d)
+	} else {
+		res, err = runImage(req, target, d)
+		err = missingSecrets.Explain(err)
 	}
-	res, err := runImage(req, target, d)
-	return res, missingSecrets.Explain(err)
+	if err != nil {
+		return res, err
+	}
+	saveNewLink(req, target, &res)
+	return res, nil
+}
+
+// saveNewLink writes the link to a Deployment picked from the workspace rather
+// than from the manifest, once the deploy to it has succeeded, so a deploy
+// that fails or is canceled leaves no link to a Deployment it never reached.
+// A link that cannot be saved is warned about: the deploy itself succeeded.
+func saveNewLink(req Request, target Target, res *Result) {
+	if target.newLink == nil {
+		return
+	}
+	if err := req.Link(*target.newLink); err != nil {
+		res.LinkName = ""
+		if req.Warn != nil {
+			req.Warn(fmt.Sprintf("deployed, but could not save a link to astro deployment %s: %v", target.DeploymentID, err))
+		}
+	}
 }
 
 // checkImageSource holds what an image deploy would build from to the Airflow
@@ -386,9 +409,13 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 type Target struct {
 	DeploymentID string
 	WorkspaceID  string
-	// LinkName is the manifest link the deploy resolved to, "" when the target
-	// was named by id or picked through the workspace-level flow.
+	// LinkName is the manifest link the deploy resolved to, or the one it
+	// saves for a Deployment picked from the workspace; "" when the target was
+	// named by id, or the run has no Request.Link to save one with.
 	LinkName string
+	// newLink is the link Run saves once the deploy succeeds, for a Deployment
+	// picked from the workspace rather than from the manifest. nil otherwise.
+	newLink *scaffold.Link
 }
 
 // Choice is one entry the prompt offers: a deployable link, or a workspace
@@ -461,7 +488,7 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 
 	pre := preselect(req, links, deployable)
 	choices := make([]Choice, 0, len(deployable))
-	for _, name := range linksFirst(deployable, pre.Name) {
+	for _, name := range linksFirst(deployable, links) {
 		choices = append(choices, Choice{Name: name, Where: "astro deployment " + links[name].Deployment})
 	}
 	unlinked := unlinkedDeployments(req, d, links)
@@ -484,15 +511,21 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 	return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
 }
 
-// linksFirst orders the project's links for the prompt: the preselected one on
-// top, then the rest by name.
-func linksFirst(deployable []string, preselected string) []string {
-	if preselected == "" || !slices.Contains(deployable, preselected) {
+// linksFirst orders the project's links for the prompt: the manifest's default
+// link on top, then the rest by name.
+//
+// Only the default moves a row, because it is committed with the project.
+// ASTRO_DEPLOYMENT and the `astro use` pin are per shell; letting them reorder
+// the rows would make "1" mean a different Deployment from one terminal to the
+// next, for someone who answers by habit. They highlight their row instead.
+func linksFirst(deployable []string, links map[string]manifest.Link) []string {
+	top, _, ok := manifest.DefaultLink(links)
+	if !ok || !slices.Contains(deployable, top) {
 		return deployable
 	}
-	ordered := []string{preselected}
+	ordered := []string{top}
 	for _, name := range deployable {
-		if name != preselected {
+		if name != top {
 			ordered = append(ordered, name)
 		}
 	}
@@ -512,11 +545,7 @@ type unlinked struct {
 // fails costs only those entries: the links are still offered, with a warning.
 func unlinkedDeployments(req Request, d Deployer, links map[string]manifest.Link) unlinked {
 	out := unlinked{byName: map[string]Deployment{}}
-	workspaceID := req.WorkspaceID
-	if workspaceID == "" && req.Manifest != nil {
-		workspaceID = req.Manifest.Astro.Workspace
-	}
-	workspaceID = firstNonEmpty(workspaceID, req.ContextWorkspace)
+	workspaceID := listWorkspace(req)
 	if workspaceID == "" {
 		return out
 	}
@@ -555,6 +584,9 @@ func unlinkedDeployments(req Request, d Deployer, links map[string]manifest.Link
 		out.names = append(out.names, name)
 		out.byName[name] = dep
 	}
+	// Names are given in the Deployments' order, so a collision's -2 goes to
+	// the same one every run; the rows are then listed by the name they show.
+	sort.Strings(out.names)
 	return out
 }
 
@@ -563,7 +595,10 @@ func unlinkedDeployments(req Request, d Deployer, links map[string]manifest.Link
 // -3 and so on appended until it names no link already taken.
 func newLinkName(dep Deployment, taken map[string]bool) string {
 	base := scaffold.LinkNameFor(dep.Name)
-	if base == "" || base == manifest.ReservedLinkName {
+	// A name of digits alone would shadow a row number: the prompt matches
+	// names first, so a Deployment called "1" would take the answer "1" from
+	// whatever row 1 is.
+	if base == "" || base == manifest.ReservedLinkName || isDigits(base) {
 		base = dep.ID
 	}
 	name := base
@@ -573,11 +608,13 @@ func newLinkName(dep Deployment, taken map[string]bool) string {
 	return name
 }
 
+func isDigits(s string) bool {
+	return s != "" && strings.Trim(s, "0123456789") == ""
+}
+
 // linkedTarget is the target for a Deployment picked from the workspace rather
-// than from the manifest. It saves the link first (Request.Link), so the next
-// deploy offers the Deployment by name. A link that cannot be saved is warned
-// about and does not stop the deploy: the Deployment was picked, and shipping
-// to it does not need the link.
+// than from the manifest, carrying the link Run saves once the deploy to it
+// succeeds (saveNewLink), so the next deploy offers the Deployment by name.
 func linkedTarget(req Request, name string, dep Deployment) Target {
 	target := Target{
 		DeploymentID: dep.ID,
@@ -586,20 +623,25 @@ func linkedTarget(req Request, name string, dep Deployment) Target {
 	if req.Link == nil {
 		return target
 	}
-	err := req.Link(scaffold.Link{
+	target.LinkName = name
+	target.newLink = &scaffold.Link{
 		Name:       name,
 		Kind:       manifest.KindAstro,
 		Workspace:  dep.WorkspaceID,
 		Deployment: dep.ID,
-	})
-	if err != nil {
-		if req.Warn != nil {
-			req.Warn(fmt.Sprintf("deploying without saving a link to astro deployment %s: %v", dep.ID, err))
-		}
-		return target
 	}
-	target.LinkName = name
 	return target
+}
+
+// listWorkspace is the workspace a deploy lists Deployments from, for the
+// prompt's unlinked entries and for a project that links nothing alike:
+// --workspace, else [tool.astro] workspace, else the login's.
+func listWorkspace(req Request) string {
+	project := ""
+	if req.Manifest != nil {
+		project = req.Manifest.Astro.Workspace
+	}
+	return firstNonEmpty(req.WorkspaceID, project, req.ContextWorkspace)
 }
 
 // namedTarget resolves a target named on the command line, by the positional
@@ -620,7 +662,7 @@ func namedTarget(req Request, name string, links map[string]manifest.Link) (Targ
 // unlinkedTarget runs the workspace-level pick/create flow, for a project whose
 // manifest declares no deployment links at all, and links what it picks.
 func unlinkedTarget(req Request, d Deployer) (Target, error) {
-	workspaceID := firstNonEmpty(req.WorkspaceID, req.ContextWorkspace)
+	workspaceID := listWorkspace(req)
 	if workspaceID == "" {
 		return Target{}, errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
 	}

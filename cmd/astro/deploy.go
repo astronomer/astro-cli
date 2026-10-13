@@ -510,8 +510,9 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 		},
 		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
 		// A Deployment picked from the workspace rather than from the links is
-		// linked as `astro link add` would link it, so the next deploy offers
-		// it by name. Only an interactive run picks one, so this is text mode.
+		// linked as `astro link add` would link it, once the deploy to it has
+		// succeeded, so the next deploy offers it by name. Only an interactive
+		// run picks one, so this is text mode.
 		Link: func(l scaffold.Link) error {
 			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
 				return err
@@ -804,17 +805,40 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 
 // ListDeployments lists a workspace's Deployments under the deploy's login, for
 // the prompt to offer the ones the project does not link yet.
+//
+// The prompt waits on it, so it gives up after listDeploymentsTimeout and the
+// prompt offers the links alone. The list takes no context to cancel, so a
+// call that times out finishes in the background and is dropped.
 func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.Deployment, error) {
-	deps, err := deployment.ListDeployments(workspaceID, d.login.context.Organization, d.login.client)
-	if err != nil {
-		return nil, err
+	type listed struct {
+		deps []astrov1.Deployment
+		err  error
 	}
-	out := make([]manifestdeploy.Deployment, 0, len(deps))
-	for i := range deps {
-		out = append(out, manifestdeploy.Deployment{ID: deps[i].Id, Name: deps[i].Name, WorkspaceID: deps[i].WorkspaceId})
+	done := make(chan listed, 1)
+	list, org, client := deployment.ListDeployments, d.login.context.Organization, d.login.client
+	go func() {
+		deps, err := list(workspaceID, org, client)
+		done <- listed{deps, err}
+	}()
+	var res listed
+	select {
+	case res = <-done:
+	case <-time.After(listDeploymentsTimeout):
+		return nil, fmt.Errorf("no answer after %s", listDeploymentsTimeout)
+	}
+	if res.err != nil {
+		return nil, res.err
+	}
+	out := make([]manifestdeploy.Deployment, 0, len(res.deps))
+	for i := range res.deps {
+		out = append(out, manifestdeploy.Deployment{ID: res.deps[i].Id, Name: res.deps[i].Name, WorkspaceID: res.deps[i].WorkspaceId})
 	}
 	return out, nil
 }
+
+// listDeploymentsTimeout bounds how long the deploy prompt waits for the
+// workspace's Deployments. A var so a test can shorten it.
+var listDeploymentsTimeout = 15 * time.Second
 
 // ResolveUnlinked runs the 1.x path's workspace-level pick/create flow and returns the
 // chosen Deployment.
