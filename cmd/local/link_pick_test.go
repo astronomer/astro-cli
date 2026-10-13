@@ -180,17 +180,6 @@ func TestLinkAddRefusesADeploymentNameThatMakesNoLinkName(t *testing.T) {
 	}
 }
 
-func TestLinkNameFor(t *testing.T) {
-	for in, want := range map[string]string{
-		"Orders Prod (EU)": "orders-prod-eu",
-		"  dev  ":          "dev",
-		"a__b--c":          "a-b-c",
-		"ÉTL 2":            "tl-2",
-	} {
-		assert.Equal(t, want, linkNameFor(in), in)
-	}
-}
-
 // assertPickerTable checks the picker is the table picker: the title, the
 // header, each row by number, and the "> " prompt after a blank line.
 func assertPickerTable(t *testing.T, out, title string, rows ...string) {

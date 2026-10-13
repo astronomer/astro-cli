@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -364,7 +363,7 @@ func refuseExisting(m *manifest.Manifest, name string, replace bool) error {
 // picker `astro deploy` uses, and fills link with it. The Deployments listed are
 // the workspace's: --workspace, else the project's, else the current login's,
 // else one picked from the login's list. It returns the link's name: the one
-// given, or else the Deployment's name as linkNameFor spells it.
+// given, or else the Deployment's name as scaffold.LinkNameFor spells it.
 func (c *cli) pickAstroDeployment(link *scaffold.Link, m *manifest.Manifest, name string) (string, error) {
 	ws := firstNonEmpty(link.Workspace, m.Astro.Workspace)
 	if ws == "" && c.d.CurrentWorkspace != nil {
@@ -402,7 +401,7 @@ func (c *cli) pickAstroDeployment(link *scaffold.Link, m *manifest.Manifest, nam
 	if name != "" {
 		return name, nil
 	}
-	name = linkNameFor(dep.Name)
+	name = scaffold.LinkNameFor(dep.Name)
 	if name == "" || name == manifest.ReservedLinkName {
 		return "", fmt.Errorf("the Deployment's name does not make a link name: pass one, astro link add NAME --%s %s", flagLinkDeployment, dep.ID)
 	}
@@ -421,16 +420,6 @@ func allLinked(m *manifest.Manifest, ws string) error {
 	slices.Sort(names)
 	return fmt.Errorf("every Deployment in workspace %s is already linked, as %s. To relink one, run astro link add NAME --%s <id> --%s",
 		ws, strings.Join(names, ", "), flagLinkDeployment, flagLinkReplace)
-}
-
-// nonAlnum is every run linkNameFor turns into one dash.
-var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
-
-// linkNameFor is the link name a picked Deployment gets: its name lowercased,
-// each run of anything but letters and digits turned into one dash, and dashes
-// trimmed from the ends. "Orders Prod (EU)" is orders-prod-eu.
-func linkNameFor(deploymentName string) string {
-	return strings.Trim(nonAlnum.ReplaceAllString(strings.ToLower(deploymentName), "-"), "-")
 }
 
 // link turns add's flags into the link the writer saves, refusing a flag that

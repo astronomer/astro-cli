@@ -538,6 +538,18 @@ func urlHasUserinfo(raw string) bool {
 	return strings.Contains(authority, "@")
 }
 
+// nonAlnum is every run LinkNameFor turns into one dash.
+var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+
+// LinkNameFor is the link name a picked Astro Deployment gets: its name
+// lowercased, each run of anything but letters and digits turned into one
+// dash, and dashes trimmed from the ends. "Orders Prod (EU)" is
+// orders-prod-eu. `astro link add` and `astro deploy` both name the links they
+// write this way, so one Deployment gets the same name from either.
+func LinkNameFor(deploymentName string) string {
+	return strings.Trim(nonAlnum.ReplaceAllString(strings.ToLower(deploymentName), "-"), "-")
+}
+
 func invalidLink(format string, args ...any) error {
 	return fmt.Errorf("%w: %s", ErrInvalidLink, fmt.Sprintf(format, args...))
 }

@@ -33,6 +33,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -508,6 +509,17 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
+		// A Deployment picked from the workspace rather than from the links is
+		// linked as `astro link add` would link it, once the deploy to it has
+		// succeeded, so the next deploy offers it by name. Only an interactive
+		// run picks one, so this is text mode.
+		Link: func(l scaffold.Link) error {
+			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
+				return err
+			}
+			fmt.Fprintf(errOut, "linked %s to astro deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
+			return nil
+		},
 		// Two lines. The first is the → line every resolving command prints,
 		// once the target is settled, so a deploy says what it is about to act
 		// on the way `astro af dags list` does. The second says an image build
@@ -741,10 +753,12 @@ type manifestDeployer struct {
 // `default = true` marker moves the cursor and never skips the question
 // (docs/instances.md, "Deploy always asks").
 //
-// The highlight is labeled with what put it there, not with one word for all
-// three: a cursor sitting on an entry because a variable is exported in this
-// shell is a different fact from one sitting there because the committed
-// manifest says so, and only the reader can tell which they meant.
+// The highlighted row is marked at its end with what put it there, not with one
+// word for all three (preselectNote): a cursor sitting on an entry because a
+// variable is exported in this shell is a different fact from one sitting there
+// because the committed manifest says so, and only the reader can tell which
+// they meant. The project's links are marked "linked" in the same place, and a
+// Deployment not linked yet is left unmarked.
 //
 // It takes a name or a number, names first: a link may legally be called "2",
 // and what the user typed is what they meant. Enter takes the highlighted entry
@@ -752,9 +766,25 @@ type manifestDeployer struct {
 // safe answer to "where should I ship this code" is never one the CLI picked by
 // itself. It asks on stderr, so stdout stays the deploy's own output.
 func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
+	// A trailing marker rather than a column of its own: "linked" on the
+	// project's links, nothing on a Deployment picking would link, and the
+	// highlighted row also says what put it there.
+	notes := make([]string, len(choices))
+	anyNote := false
+	for i, choice := range choices {
+		switch {
+		case choice.Unlinked:
+		case preselect.Name != "" && choice.Name == preselect.Name:
+			// Only a link is ever preselected.
+			notes[i] = "linked, " + preselectNote(preselect.From)
+		default:
+			notes[i] = "linked"
+		}
+		anyNote = anyNote || notes[i] != ""
+	}
 	header := []string{"NAME", "WHERE"}
-	if preselect.Name != "" {
-		header = append(header, "PRESELECTED BY")
+	if anyNote {
+		header = append(header, "")
 	}
 	l := picker.List{
 		Title:  "Deploy to which deployment?",
@@ -770,13 +800,12 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 	}
 	for i, choice := range choices {
 		cells := []string{choice.Name, choice.Where}
+		if anyNote {
+			cells = append(cells, notes[i])
+		}
 		chosen := preselect.Name != "" && choice.Name == preselect.Name
-		switch {
-		case chosen:
+		if chosen {
 			l.Default = i + 1
-			cells = append(cells, preselect.From)
-		case preselect.Name != "":
-			cells = append(cells, "")
 		}
 		l.AddRow(chosen, cells...)
 	}
@@ -787,17 +816,65 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 	return choices[i].Name, nil
 }
 
+// preselectNote marks the highlighted row with what put it there: "default"
+// for the manifest's own marker, the common case, and the source named for the
+// other two, so a row a shell variable chose never reads as the project's
+// default.
+func preselectNote(from string) string {
+	if from == manifestdeploy.DefaultMarker {
+		return "default"
+	}
+	return "from " + from
+}
+
+// ListDeployments lists a workspace's Deployments under the deploy's login, for
+// the prompt to offer the ones the project does not link yet.
+//
+// The prompt waits on it, so it gives up after listDeploymentsTimeout and the
+// prompt offers the links alone. The list takes no context to cancel, so a
+// call that times out finishes in the background and is dropped.
+func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.Deployment, error) {
+	type listed struct {
+		deps []astrov1.Deployment
+		err  error
+	}
+	done := make(chan listed, 1)
+	list, org, client := deployment.ListDeployments, d.login.context.Organization, d.login.client
+	go func() {
+		deps, err := list(workspaceID, org, client)
+		done <- listed{deps, err}
+	}()
+	var res listed
+	select {
+	case res = <-done:
+	case <-time.After(listDeploymentsTimeout):
+		return nil, fmt.Errorf("no answer after %s", listDeploymentsTimeout)
+	}
+	if res.err != nil {
+		return nil, res.err
+	}
+	out := make([]manifestdeploy.Deployment, 0, len(res.deps))
+	for i := range res.deps {
+		out = append(out, manifestdeploy.Deployment{ID: res.deps[i].Id, Name: res.deps[i].Name, WorkspaceID: res.deps[i].WorkspaceId})
+	}
+	return out, nil
+}
+
+// listDeploymentsTimeout bounds how long the deploy prompt waits for the
+// workspace's Deployments. A var so a test can shorten it.
+var listDeploymentsTimeout = 15 * time.Second
+
 // ResolveUnlinked runs the 1.x path's workspace-level pick/create flow and returns the
-// chosen deployment id.
-func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
+// chosen Deployment.
+func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.Deployment, error) {
 	if !d.login.current {
-		return "", fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
+		return manifestdeploy.Deployment{}, fmt.Errorf("this project deploys to %[1]s, and the deployment picker lists only the current context's Deployments. Pass --deployment <id>, or run `astro context switch %[1]s`", d.login.context.Domain)
 	}
 	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
 	if err != nil {
-		return "", err
+		return manifestdeploy.Deployment{}, err
 	}
-	return dep.Id, nil
+	return manifestdeploy.Deployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
 }
 
 // DeployDags reuses the 1.x dags-only transport for the project's dags/.
