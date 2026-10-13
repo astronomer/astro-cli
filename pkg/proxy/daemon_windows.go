@@ -145,9 +145,25 @@ var killProcess = func(pid int) {
 	windows.TerminateProcess(h, 1) //nolint:errcheck // nothing left to try
 }
 
-// processLooksLikeProxy never matches on Windows. The unix fallback reads the
-// command line with ps, which Windows has no equivalent of short of reading
-// another process's memory. So a live PID whose recorded port does not answer
-// with the proxy's signature is treated as not the daemon, which is the same
-// verdict unix reaches when the command line does not match either.
-var processLooksLikeProxy = func(*Daemon, int) bool { return false }
+// processLooksLikeProxy reports whether pid has a stop event: the identity check
+// for when the recorded port does not answer the signature probe in time.
+//
+// Unix reads the command line with ps instead; Windows has no equivalent short
+// of reading another process's memory. The event is the stronger answer anyway:
+// only a daemon creates it, under its own pid, and it lasts until Serve
+// returns. Without a fallback at all, one probe that failed — a landing page
+// that could not read routes.json, a read retried past the probe's timeout —
+// would read a live daemon as stale, drop its record, and start a second one
+// beside it that nothing could ever stop.
+var processLooksLikeProxy = func(_ *Daemon, pid int) bool {
+	name, err := windows.UTF16PtrFromString(stopEventName(pid))
+	if err != nil {
+		return false
+	}
+	ev, err := windows.OpenEvent(windows.SYNCHRONIZE, false, name)
+	if err != nil {
+		return false
+	}
+	windows.CloseHandle(ev) //nolint:errcheck // only asked whether it exists
+	return true
+}

@@ -140,6 +140,25 @@ func TestDaemonStartsAdoptsAndStopsOnWindows(t *testing.T) {
 		t.Errorf("second EnsureRunning replaced the daemon (pid %d, was %d)", p2, pid)
 	}
 
+	// A routes file the landing page cannot read makes the signature probe
+	// fail. The daemon is still the daemon, known by its stop event, so it is
+	// adopted rather than orphaned beside a second one.
+	if err := os.WriteFile(d.Store.routesFilePath(), []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if probeProxySignature(port) {
+		t.Fatal("the probe still passes with an unreadable routes file; this case tests nothing")
+	}
+	if _, err := d.EnsureRunning(port); err != nil {
+		t.Fatal(err)
+	}
+	if p3, _ := d.IsRunning(); p3 != pid {
+		t.Errorf("a failed probe replaced the daemon (pid %d, was %d)", p3, pid)
+	}
+	if err := os.Remove(d.Store.routesFilePath()); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := d.Stop(); err != nil {
 		t.Fatal(err)
 	}
@@ -160,6 +179,9 @@ func TestRequestStopLeavesAProcessWithNoEvent(t *testing.T) {
 	t.Cleanup(func() { cmd.Process.Kill() })
 	pid := cmd.Process.Pid
 
+	if processLooksLikeProxy(nil, pid) {
+		t.Error("a process with no stop event was taken for the daemon")
+	}
 	if requestStop(pid) {
 		t.Error("requestStop reported a stop for a process with no stop event")
 	}
