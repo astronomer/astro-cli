@@ -20,6 +20,14 @@ import (
 // dockerignoreRules add the virtualenv and the local .env to localIgnoreRules.
 var dockerignoreRules = slices.Concat([]string{".venv/", ".env"}, localIgnoreRules)
 
+// DockerignoreRules are the rules this package keeps out of a declared
+// Dockerfile's image. A generated image applies its own copy
+// (imagebuild.ShippedImageIgnores), which a root-module test holds to cover
+// these.
+func DockerignoreRules() []string {
+	return slices.Clone(dockerignoreRules)
+}
+
 const dockerignoreHeader = "# Per-machine files Astro tools write into the project. Keep them out of the image.\n"
 
 // dockerignorePath is the ignore file a build of dockerfile reads, relative to

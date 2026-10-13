@@ -182,11 +182,11 @@ type Request struct {
 	// The two modes share little. This one writes no requirements.txt or
 	// packages.txt, because the file owns its own installs; it takes its FROM
 	// from the file rather than BaseImage; and it builds the PROJECT as its
-	// context, because a multi-stage build COPYs from the repo. That last part
-	// is also why the generated mode cannot just add the project to its
-	// context: that context is synthetic and deliberately tiny, and the runtime
-	// image's ONBUILD `COPY . .` would otherwise bake the whole repo into the
-	// dependency layer.
+	// context, because a multi-stage build COPYs from the repo. The generated
+	// mode's context is synthetic: the generated requirements.txt and
+	// packages.txt, plus, for an image that ships, a filtered copy of the
+	// project (ProjectFiles), which the runtime image's ONBUILD `COPY . .`
+	// lays down after both installs.
 	//
 	// Dependencies and Packages are ignored here rather than rejected. A caller
 	// reading a manifest has them populated whichever tier the project
@@ -250,8 +250,9 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 // is run as-is against the project as context (see the field's doc for why they
 // share so little). Otherwise the request's dependencies and OS packages are
 // installed into a layer over its base image through the runtime image's ONBUILD
-// triggers, and with nothing to install it builds nothing and returns the base
-// image unchanged (the fast path).
+// triggers, with the project's files over them when the request carries
+// ProjectFiles. With nothing to install and no project files it builds nothing
+// and returns the base image unchanged (the fast path).
 //
 // Build output streams to cb.OnLine (component "build"); a failed build returns
 // a named error, never a hang.
