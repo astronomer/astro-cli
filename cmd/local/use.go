@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/instances"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // NewUseCmd builds `astro use` for the root, wired with its own deps.
@@ -150,18 +151,17 @@ func (c *cli) runUsePick() error {
 }
 
 // currentMark labels the picker's current row with what made it current, in
-// the words the `astro deploy` prompt labels its highlight with, so one fact
-// reads the same in both places. A row ASTRO_DEPLOYMENT chose is not one
-// picking here will change, and one the manifest's default chose is not one
-// the user ever selected, so both say where they came from. The user's own
-// selection needs no label: the highlight already says it, and inside `astro
-// use` there is nothing more to explain.
+// the words the `astro deploy` prompt and the `astro link` pickers mark a link
+// with, so one fact reads the same everywhere: "default" for the project's
+// default link (deploy.DefaultMark), and "from ASTRO_DEPLOYMENT" for a row the
+// variable chose, which picking here will not change. The user's own selection
+// needs no label: the highlight already says it.
 func currentMark(from instances.Layer) string {
 	switch from {
 	case instances.LayerEnv:
-		return "← " + instances.EnvVar
+		return "from " + instances.EnvVar
 	case instances.LayerDefault:
-		return "← " + deploy.DefaultMarker
+		return deploy.DefaultMark
 	case instances.LayerPin, instances.LayerFlag, instances.LayerURL:
 	}
 	return ""
@@ -195,6 +195,9 @@ type useLinkRow struct {
 	URL        string `json:"url,omitempty"`
 	AuthMethod string `json:"auth_method,omitempty"`
 	Current    bool   `json:"current"`
+	// Default reports the project's default link (manifest.DefaultLink): the
+	// one marked default = true, or a project's only link.
+	Default bool `json:"default"`
 }
 
 // layerFrom names a resolution layer for the report's "from" field: the
@@ -228,6 +231,11 @@ func (c *cli) runUseShow() error {
 		res.Current, res.From, mark = sel.Instance.Name, layerFrom[sel.From], currentMark(sel.From)
 	}
 	links := set.All()
+	byName := make(map[string]manifest.Link, len(links))
+	for i := range links {
+		byName[links[i].Name] = links[i].Link
+	}
+	defaultName, _, _ := manifest.DefaultLink(byName)
 	for i := range links {
 		l := &links[i]
 		res.Deployments = append(res.Deployments, useLinkRow{
@@ -237,6 +245,7 @@ func (c *cli) runUseShow() error {
 			URL:        l.URL,
 			AuthMethod: string(l.Link.Auth.Method),
 			Current:    l.Name == res.Current,
+			Default:    l.Name == defaultName,
 		})
 	}
 	return r.Emit(res, func(w io.Writer) error { return renderUseListing(w, res, mark) })
@@ -244,8 +253,8 @@ func (c *cli) runUseShow() error {
 
 // renderUseListing prints the links as the picker lists them, with a `*` on
 // the current row in place of the picker's color — this output is often a pipe
-// — and the same label when something other than your selection made it
-// current.
+// — and the same labels: the current row's when something other than your
+// selection made it current, and "default" on the project's default link.
 func renderUseListing(w io.Writer, res useListing, mark string) error {
 	if len(res.Deployments) == 0 {
 		_, err := fmt.Fprintln(w, noLinks)
@@ -260,6 +269,9 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 		marker, label := "", ""
 		if row.Current {
 			marker, label = "*", mark
+		}
+		if label == "" && row.Default {
+			label = deploy.DefaultMark
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", marker, row.Name, row.Kind, dash(row.Where), label)
 	}

@@ -147,7 +147,7 @@ func TestBareUseListsTheLinksAndMarksTheCurrentOne(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := out.String()
-	if prod := lineOf(text, "prod"); !strings.HasPrefix(prod, "*") || strings.Contains(prod, "←") {
+	if prod := lineOf(text, "prod"); !strings.HasPrefix(prod, "*") || strings.Contains(prod, "default") || strings.Contains(prod, "from ") {
 		t.Errorf("prod, your own selection, should carry the * and no label: %q\n%s", prod, text)
 	}
 	if dev := lineOf(text, "dev"); dev == "" || strings.HasPrefix(dev, "*") {
@@ -168,7 +168,7 @@ func TestBareUseLabelsARowItDidNotSelect(t *testing.T) {
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	if dev := lineOf(out.String(), "dev"); !strings.HasPrefix(dev, "*") || !strings.Contains(dev, "← default = true") {
+	if dev := lineOf(out.String(), "dev"); !strings.HasPrefix(dev, "*") || !strings.Contains(dev, "default") {
 		t.Errorf("dev, current by the manifest default, should say so: %q\n%s", dev, out)
 	}
 
@@ -177,7 +177,7 @@ func TestBareUseLabelsARowItDidNotSelect(t *testing.T) {
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	if prod := lineOf(out.String(), "prod"); !strings.HasPrefix(prod, "*") || !strings.Contains(prod, "← "+instances.EnvVar) {
+	if prod := lineOf(out.String(), "prod"); !strings.HasPrefix(prod, "*") || !strings.Contains(prod, "from "+instances.EnvVar) {
 		t.Errorf("prod, current by the env var, should say so: %q\n%s", prod, out)
 	}
 }
@@ -358,7 +358,7 @@ func TestBareUseAtATerminalPicksAndPins(t *testing.T) {
 		t.Errorf("output:\n%s", out)
 	}
 	// Before any selection, the manifest's default is current, and says so.
-	if !lineWith(out, "dev", "← default = true") || !lineWith(out, "dev", "\033[1;32m") {
+	if !lineWith(out, "dev", "default") || !lineWith(out, "dev", "\033[1;32m") {
 		t.Errorf("dev not marked as the default-chosen current row:\n%s", out)
 	}
 	if got := pin(); got != "prod" {
@@ -369,7 +369,7 @@ func TestBareUseAtATerminalPicksAndPins(t *testing.T) {
 	}
 	// Now the user's own selection is current: highlighted, once, with no label.
 	if !lineWith(out, "prod", "\033[1;32m") || !lineWith(out, "prod", "clm2xk9dq000108l7a2b3c4d6") ||
-		strings.Contains(out, "←") || strings.Count(out, "\033[1;32m") != 1 {
+		!lineWith(out, "dev", "default") || lineWith(out, "prod", "default") || strings.Count(out, "\033[1;32m") != 1 {
 		t.Errorf("prod not marked as the selected current row:\n%s", out)
 	}
 	if !strings.Contains(out, "clear your selection") || pin() != "" {
@@ -385,7 +385,7 @@ func TestBareUseReportsWhenThePickerCannotHelp(t *testing.T) {
 		links, want string
 		stdoutTTY   bool
 	}{
-		"stdout piped": {twoLinkManifest, "← default = true", false},
+		"stdout piped": {twoLinkManifest, "default", false},
 		"no links":     {"", noLinks, true},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -448,7 +448,7 @@ func TestBareUseMarksAnEnvChosenRow(t *testing.T) {
 	if err := execute(t, d, "use"); err != nil {
 		t.Fatal(err)
 	}
-	if !lineWith(out.String(), "prod", "← "+instances.EnvVar) {
+	if !lineWith(out.String(), "prod", "from "+instances.EnvVar) {
 		t.Errorf("prod not marked as env-chosen:\n%s", out)
 	}
 }

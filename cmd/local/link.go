@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -241,9 +242,19 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 		Ask:     []input.Option{input.About("a link")},
 		Invalid: errInvalidLinkSelection,
 	}
-	// The mark column exists only when some row carries one; otherwise every
-	// row would end in blank padding.
-	marked := mark != "" && slices.Contains(names, current)
+	// Each row's mark: the caller's on the current row, and "default" on the
+	// project's default link, in the words the deploy prompt uses. The mark
+	// column exists only when some row carries one; otherwise every row would
+	// end in blank padding.
+	defaultName, _, _ := manifest.DefaultLink(m.Astro.Deployments)
+	marks := map[string]string{}
+	if defaultName != "" {
+		marks[defaultName] = deploy.DefaultMark
+	}
+	if mark != "" && slices.Contains(names, current) {
+		marks[current] = mark
+	}
+	marked := len(marks) > 0
 	if marked {
 		list.Header = append(list.Header, "")
 	}
@@ -256,8 +267,8 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 	for _, name := range names {
 		l := m.Astro.Deployments[name]
 		cells := row(name, string(l.Kind()), linkWhere(&l))
-		if marked && name == current {
-			cells[len(cells)-1] = mark
+		if marked {
+			cells[len(cells)-1] = marks[name]
 		}
 		list.AddRow(name == current, cells...)
 	}

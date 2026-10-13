@@ -37,13 +37,13 @@ Both errors add `For this machine: astro local af <family>`. Every run prints th
 
 ## `astro use`
 
-`astro use NAME` makes a link your selection for this project. It checks the name against the manifest's links, and warns when `ASTRO_DEPLOYMENT` is set and will override it. `astro use --unset` clears it. Bare `astro use` opens a picker at a terminal (with an option to clear the selection). Off a terminal, or with `--output json`, it lists the links with `current`, `from` (`env`, `selection` or `default`) and each link's `name`, `kind`, `where`, `url` and `auth_method`.
+`astro use NAME` makes a link your selection for this project. It checks the name against the manifest's links, and warns when `ASTRO_DEPLOYMENT` is set and will override it. `astro use --unset` clears it. Bare `astro use` opens a picker at a terminal (with an option to clear the selection). Off a terminal, or with `--output json`, it lists the links with `current`, `from` (`env`, `selection` or `default`) and each link's `name`, `kind`, `where`, `url`, `auth_method`, `current` and `default`. Both mark rows in the words the `astro link` pickers and the deploy prompt use: `default` on the project's default link, and `from ASTRO_DEPLOYMENT` on a row the variable made current. Your own selection carries no label; the highlight (or `*`) says it.
 
 The selection is per user and per project, never committed: `state.json` in the project's cache directory (`$XDG_CACHE_HOME/astro/projects/<project id>/`, else `~/.cache/astro/…`), mode `0600`. The field is `instance`; `deployment` is also read and written, for compatibility with pre-release builds.
 
 ## Deploy always asks
 
-`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or an interactive run asks. `ASTRO_DEPLOYMENT`, your selection and `default = true` only preselect the entry in that prompt, and the prompt does not change your selection. A run that cannot be asked and names nothing fails. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
+`astro deploy` never resolves from ambient state. Shipping code is too consequential to decide from a selection, an exported variable or a marker in a file nobody looked at. The target is named on the command line, or an interactive run asks. Only `default = true` (or a project's only link) preselects the entry in that prompt. `ASTRO_DEPLOYMENT` and your selection play no part in it: they choose which Airflow the query commands read, and where code ships is the project's, so the CLI and Astro Desktop highlight the same entry. A run that cannot be asked and names nothing fails. Details are in [deploy.md](deploy.md#3-selecting-the-deployment).
 
 ## Link kinds and authentication
 
