@@ -30,7 +30,7 @@ const (
 	maxLoggedHost = 253
 
 	// SignatureHeader and SignatureValue mark responses the proxy generates
-	// itself (its landing and not-found pages). A caller can probe the proxy's
+	// itself (its landing, not-found and unavailable pages). A caller can probe the proxy's
 	// port and check for this header to confirm it's really the astro proxy on
 	// the other end, not an unrelated process that recycled its PID/port.
 	SignatureHeader = "X-Astro-Proxy"
@@ -516,6 +516,7 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(SignatureHeader, SignatureValue)
 	w.WriteHeader(http.StatusBadGateway)
 	if renderErr := RenderUnavailable(w); renderErr != nil {
 		slog.Debug("unavailable page template", "error", renderErr)
@@ -526,17 +527,36 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 // backend, as opposed to something going wrong in a ModifyResponse hook or in
 // httputil's own setup.
 //
-// A dial that is refused, times out, or finds nothing listening is the project
-// not running. An error a hook returned is not, however much it looks like one
-// from here.
+// Two shapes mean the project is not running:
+//
+//   - A connection that fails at the socket: refused, reset, timed out, or
+//     nothing listening. The transport reports these as a *net.OpError.
+//   - A connection that is accepted and closed before any response, which the
+//     transport reports as a bare EOF. Docker holds a project's published port
+//     while the Airflow container behind it restarts, so this is what a
+//     restarting or crash-looping container looks like.
+//
+// Matching those rather than anything that implements net.Error matters,
+// because a hook's own failures implement it too: a *url.Error from a hook's
+// HTTP call, context.DeadlineExceeded, a response-header timeout. Calling those
+// "starting up" would describe a running project as down and hide the bug.
 func isBackendUnreachable(err error) bool {
-	var netErr net.Error
-	return errors.As(err, &netErr)
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var opErr *net.OpError
+	return errors.As(err, &opErr)
 }
 
 // wantsHTML reports whether r is a browser navigation rather than an API call.
 // An empty Accept counts, since whoever sent no preference still reads the body.
+//
+// Only a GET or HEAD qualifies. The page recovers by navigating to its own URL,
+// and a form submitted while the backend was down would be submitted again.
 func wantsHTML(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
 	accept := r.Header.Get("Accept")
 	return accept == "" || strings.Contains(accept, "text/html")
 }

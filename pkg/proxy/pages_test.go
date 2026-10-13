@@ -1,9 +1,13 @@
 package proxy
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -100,6 +104,9 @@ func TestADeadBackendShowsABrowserTheUnavailablePage(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
 	assert.Contains(t, rec.Header().Get("Content-Type"), "text/html")
 	assert.Contains(t, rec.Body.String(), "Preparing for launch")
+	// The proxy wrote this page, not Airflow, and says so the way its other
+	// pages do.
+	assert.Equal(t, SignatureValue, rec.Header().Get(SignatureHeader))
 }
 
 // An API client gets the plain 502 it always did. af and Airflow's own fetches
@@ -119,7 +126,9 @@ func TestADeadBackendGivesAnAPIClientPlainText(t *testing.T) {
 
 // A failure in the proxy's own handling is not the project starting up, and the
 // page that says so would hide it. A running backend whose response a hook
-// rejects is the case that looks most like a dead one from the error handler.
+// rejects is the case that looks most like a dead one from the error handler,
+// and a hook that makes its own HTTP call (a token refresh) can fail with
+// errors that look like network trouble without the backend being down.
 func TestAHookFailureIsNotCalledAStartingProject(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
@@ -127,8 +136,49 @@ func TestAHookFailureIsNotCalledAStartingProject(t *testing.T) {
 	t.Cleanup(backend.Close)
 	_, port, _ := strings.Cut(strings.TrimPrefix(backend.URL, "http://"), ":")
 
+	for name, hookErr := range map[string]error{
+		"plain":            errors.New("hook failed"),
+		"its own request":  &url.Error{Op: "Post", URL: "http://auth.invalid/token", Err: errors.New("refresh failed")},
+		"its own deadline": fmt.Errorf("refreshing a token: %w", context.DeadlineExceeded),
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := NewProxy("0", NewStore(t.TempDir()))
+			p.ModifyResponse = []func(*http.Response) error{func(*http.Response) error { return hookErr }}
+			rp := p.getOrCreateProxy(port)
+
+			req := httptest.NewRequest(http.MethodGet, "http://x.localhost/", http.NoBody)
+			req.Header.Set("Accept", "text/html")
+			rec := httptest.NewRecorder()
+			rp.ServeHTTP(rec, req)
+
+			assert.Equal(t, http.StatusBadGateway, rec.Code)
+			assert.False(t, strings.Contains(rec.Body.String(), "Preparing for launch"),
+				"a hook's own failure was described as the project starting up")
+		})
+	}
+}
+
+// A Docker project's published port can be held by Docker while the Airflow
+// container behind it restarts. The connect succeeds and the connection is
+// closed at once, which reaches the error handler as a bare EOF rather than a
+// network error. That is the project not running, so a browser gets the page.
+func TestABackendThatHangsUpShowsABrowserTheUnavailablePage(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			_ = c.Close()
+		}
+	}()
+	_, port, err := net.SplitHostPort(l.Addr().String())
+	require.NoError(t, err)
+
 	p := NewProxy("0", NewStore(t.TempDir()))
-	p.ModifyResponse = []func(*http.Response) error{func(*http.Response) error { return errors.New("hook failed") }}
 	rp := p.getOrCreateProxy(port)
 
 	req := httptest.NewRequest(http.MethodGet, "http://x.localhost/", http.NoBody)
@@ -137,12 +187,32 @@ func TestAHookFailureIsNotCalledAStartingProject(t *testing.T) {
 	rp.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
-	assert.NotContains(t, rec.Body.String(), "Preparing for launch")
+	assert.Contains(t, rec.Body.String(), "Preparing for launch")
+}
+
+// A form submitted while the backend is down gets plain text, not the page. The
+// page brings itself back by reloading once the backend answers, and reloading
+// a POST would re-submit the form behind the browser's "confirm resubmission"
+// prompt.
+func TestADeadBackendGivesAFormSubmissionPlainText(t *testing.T) {
+	p := NewProxy("0", NewStore(t.TempDir()))
+	rp := p.getOrCreateProxy(refusedPort(t))
+
+	req := httptest.NewRequest(http.MethodPost, "http://x.localhost/connections/add", strings.NewReader("conn_id=x"))
+	req.Header.Set("Accept", "text/html")
+	rec := httptest.NewRecorder()
+	rp.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
+	assert.Equal(t, "Backend unavailable\n", rec.Body.String())
 }
 
 func TestRenderUnavailable(t *testing.T) {
 	var b strings.Builder
 	require.NoError(t, RenderUnavailable(&b))
 	assert.Contains(t, b.String(), "Preparing for launch")
-	assert.Contains(t, b.String(), "window.location.reload", "the page brings itself back once the backend answers")
+	// reload rather than location.replace(location.href): the desktop's panel
+	// URLs carry a #fragment, and navigating to one of those stays in the
+	// document, so the page would never come back.
+	assert.Contains(t, b.String(), "window.location.reload()", "the page brings itself back once the backend answers")
 }
