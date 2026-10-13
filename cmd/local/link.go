@@ -70,6 +70,9 @@ type linkResult struct {
 	Kind     string `json:"kind,omitempty"`
 	Status   string `json:"status"`
 	Manifest string `json:"manifest"`
+	// KeptDefault names the link an add marked default = true, because it was
+	// the project's only link and so its default; omitted when none was.
+	KeptDefault string `json:"kept_default,omitempty"`
 }
 
 // NewLinkCmd builds `astro link` for the root, wired with its own deps.
@@ -340,14 +343,31 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 	if exists {
 		res.Status = linkStatusReplaced
 	}
+	// A save beside a project's only link marks that one default = true. Read
+	// back rather than predicted, so what is reported is what was written.
+	if after, err := manifest.Load(path); err == nil {
+		res.KeptDefault = scaffold.NewlyDefault(m, after)
+	}
 	return r.Emit(res, func(w io.Writer) error {
 		verb := "added link %s to %s\n"
 		if exists {
 			verb = "replaced link %s in %s\n"
 		}
-		_, werr := fmt.Fprintf(w, verb, name, path)
-		return werr
+		if _, werr := fmt.Fprintf(w, verb, name, path); werr != nil {
+			return werr
+		}
+		return keptDefaultNote(w, res.KeptDefault)
 	})
+}
+
+// keptDefaultNote says a save marked the project's former only link default =
+// true, so the change to a line the user did not touch is never silent.
+func keptDefaultNote(w io.Writer, kept string) error {
+	if kept == "" {
+		return nil
+	}
+	_, err := fmt.Fprintf(w, "marked %s default = true: it was the project's only link, so its default, and stays so now there are two (change it with astro link default)\n", kept)
+	return err
 }
 
 // refuseExisting refuses name when the project already links it and the run

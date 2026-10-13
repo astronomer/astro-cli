@@ -24,7 +24,7 @@ The first of these that names something wins:
 2. **`-d/--deployment <name>`**: a link name, or an Astro Deployment id when no link has that name.
 3. **`ASTRO_DEPLOYMENT`**: the same, from the environment.
 4. **Your selection**, set with `astro use` (below).
-5. **The default link**: the link marked `default = true`, or a project's only link.
+5. **The default link**: the link marked `default = true`, or a project's only link. Adding a second link to a project whose only link is unmarked (`astro link add`, a deploy that links what it picked, Astro Desktop) marks that first link `default = true`, so the project keeps pointing where it did, and says so. A link written `default = false` (by hand, or by `astro link default --unset`) is never marked. Nothing else picks a default: a project that already has several unmarked links stays without one until you run `astro link default NAME`.
 
 With nothing resolved:
 
