@@ -186,6 +186,14 @@ func Build(m *manifest.Manifest) Set {
 	return Set{items: items, defaultLink: defaultLink}
 }
 
+// DefaultName is the manifest's default link by name (manifest.DefaultLink:
+// the one marked default = true, or a project's only link), "" when there is
+// none. It is the same default Select falls through to, for a caller that
+// marks it in a list.
+func (s Set) DefaultName() string {
+	return s.defaultLink
+}
+
 // All returns every deployment in the set, sorted by name.
 func (s Set) All() []Instance {
 	return append([]Instance(nil), s.items...)

@@ -7,8 +7,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-
-	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
 // NewAPICmd creates the parent 'astro api' command.
@@ -73,18 +71,4 @@ Use "astro api [command] --help" for more information about a command.`,
 	cmd.AddCommand(NewRegistryCmd(out))
 
 	return cmd
-}
-
-// addOutputFlags gives ls or describe the CLI's shared -o text|json, written
-// into format, and a tombstone for the --json it replaced. The requests
-// themselves have no -o: they print the API's own response, and shape it with
-// --jq and --template.
-//
-// Neither needs checking here. The -o flag refuses a format it does not offer
-// while cobra parses flags, so format only ever holds text or json; the
-// tombstone refuses --json in Args. Both fail before any pre-run refreshes a
-// token or records telemetry, and before a spec is fetched.
-func addOutputFlags(cmd *cobra.Command, format *cliout.Format) {
-	cliout.AddOutputFlag(cmd, format)
-	cliout.AddRemovedFlag(cmd, "json", "", true, cliout.ErrJSONFlagRemoved)
 }

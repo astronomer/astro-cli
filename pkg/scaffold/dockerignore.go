@@ -18,6 +18,8 @@ import (
 )
 
 // dockerignoreRules add the virtualenv and the local .env to localIgnoreRules.
+// A generated image applies its own copy (imagebuild.ShippedImageIgnores),
+// which a test here holds to cover these.
 var dockerignoreRules = slices.Concat([]string{".venv/", ".env"}, localIgnoreRules)
 
 const dockerignoreHeader = "# Per-machine files Astro tools write into the project. Keep them out of the image.\n"

@@ -19,6 +19,7 @@ import (
 	astroAuth "github.com/astronomer/astro-cli/internal/platform/astro/auth"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/domainutil"
+	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -104,6 +105,30 @@ func resumeLoginVault(args []string) error {
 	return c.ResumeLoginVault()
 }
 
+// apcPlatformVersion is the version of the APC platform at domain, as far as
+// the CLI can ask. A login to APC reads it to decide whether to page the
+// workspace list, and it is asked for here rather than when the root is built
+// (cmd/root.go), so no other command waits on Houston for it.
+//
+// The Houston client talks to the current context, so only a login to the
+// current context's own domain has a platform to ask. A login to another
+// domain gets "", which reads as the newest version, rather than the version
+// of a host it is not logging in to, and does not wait on that host to get it.
+func apcPlatformVersion(domain string) string {
+	if houstonVersion != "" {
+		return houstonVersion
+	}
+	ctx, err := context.GetCurrentContext()
+	if err != nil || ctx.Domain != domain || context.IsCloudDomain(domain) {
+		return ""
+	}
+	houstonVersion, err = houstonClient.GetPlatformVersion(nil)
+	if err != nil {
+		logger.Debugf("Unable to get Houston version: %s", err)
+	}
+	return houstonVersion
+}
+
 func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, out io.Writer) error {
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
@@ -120,7 +145,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 			if context.IsCloudDomain(ctx.Domain) {
 				fmt.Fprintf(out, "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
-			return apcLogin(domain, oAuth, "", "", houstonVersion, houstonClient, out)
+			return apcLogin(domain, oAuth, "", "", apcPlatformVersion(domain), houstonClient, out)
 		}
 		return cloudLogin(domain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(domain), forceLogin)
 	}
@@ -132,7 +157,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(ctx.Domain), forceLogin)
 	}
-	return apcLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
+	return apcLogin(ctx.Domain, oAuth, "", "", apcPlatformVersion(ctx.Domain), houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {

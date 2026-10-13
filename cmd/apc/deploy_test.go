@@ -187,8 +187,8 @@ func (s *Suite) TestDeploy() {
 			deployAirflowImageCalled = true // Set the flag if this function is called
 			return deploy.Deployed{DeploymentID: deploymentID}, nil
 		}
-		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (string, error) {
-			return "", nil
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (deploy.Deployed, error) {
+			return deploy.Deployed{}, nil
 		}
 		testImageName := "test-image-name" // Set the expected image name
 		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
@@ -198,8 +198,8 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("Test for the flag --image-name with --remote. Dags should not be deployed if UpdateDeploymentImage throws an error", func() {
-		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (string, error) {
-			return "", errNoWorkspaceFound
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (deploy.Deployed, error) {
+			return deploy.Deployed{}, errNoWorkspaceFound
 		}
 		testImageName := "test-image-name" // Set the expected image name
 		err := execDeployCmd([]string{"test-deployment-id", "--image-name=" + testImageName, "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
@@ -207,8 +207,8 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("Test for the flag --remote without --image-name. It should throw an error", func() {
-		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (string, error) {
-			return "", errNoWorkspaceFound
+		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (deploy.Deployed, error) {
+			return deploy.Deployed{}, errNoWorkspaceFound
 		}
 		err := execDeployCmd([]string{"test-deployment-id", "--force", "--remote", "--workspace-id=" + mockWorkspace.ID}...)
 		s.ErrorIs(err, ErrImageNameNotPassedForRemoteFlag)

@@ -1,0 +1,962 @@
+# Every visible flag on every visible, runnable command of Astro CLI 1.x
+# (main at 7aa23cdc), its own and those it inherits, the root's (--verbosity)
+# and --help left out. One line per flag: the trees that had it, the command
+# path without "astro", the flag, its shorthand, and bool when it took no
+# value (string otherwise). The trees are 1.x's Astro tree for a non-hosted
+# organization (astro) and a hosted one (astro-hosted), whose deployment
+# create and update had flags of their own, and its APC tree (apc).
+#
+# It records 1.x, so nothing in v2 changes it. The CLI embeds it: a flag v2
+# does not have is reported by what replaced it (removedFlags) only on a
+# command this says had it. See removed_flags.go.
+astro,astro-hosted,apc	api	no-color		bool
+astro,astro-hosted,apc	api airflow	airflow-version		string
+astro,astro-hosted,apc	api airflow	api-url		string
+astro,astro-hosted,apc	api airflow	deployment-id	d	string
+astro,astro-hosted,apc	api airflow	field	F	string
+astro,astro-hosted,apc	api airflow	generate		bool
+astro,astro-hosted,apc	api airflow	header	H	string
+astro,astro-hosted,apc	api airflow	include	i	bool
+astro,astro-hosted,apc	api airflow	input		string
+astro,astro-hosted,apc	api airflow	jq	q	string
+astro,astro-hosted,apc	api airflow	method	X	string
+astro,astro-hosted,apc	api airflow	no-color		bool
+astro,astro-hosted,apc	api airflow	organization-id	O	string
+astro,astro-hosted,apc	api airflow	paginate		bool
+astro,astro-hosted,apc	api airflow	password		string
+astro,astro-hosted,apc	api airflow	path-param	p	string
+astro,astro-hosted,apc	api airflow	raw-field	f	string
+astro,astro-hosted,apc	api airflow	silent		bool
+astro,astro-hosted,apc	api airflow	slurp		bool
+astro,astro-hosted,apc	api airflow	template	t	string
+astro,astro-hosted,apc	api airflow	username	u	string
+astro,astro-hosted,apc	api airflow	verbose		bool
+astro,astro-hosted,apc	api airflow	workspace-id	W	string
+astro,astro-hosted,apc	api airflow describe	airflow-version		string
+astro,astro-hosted,apc	api airflow describe	api-url		string
+astro,astro-hosted,apc	api airflow describe	deployment-id	d	string
+astro,astro-hosted,apc	api airflow describe	json		bool
+astro,astro-hosted,apc	api airflow describe	method	X	string
+astro,astro-hosted,apc	api airflow describe	no-color		bool
+astro,astro-hosted,apc	api airflow describe	organization-id	O	string
+astro,astro-hosted,apc	api airflow describe	password		string
+astro,astro-hosted,apc	api airflow describe	refresh		bool
+astro,astro-hosted,apc	api airflow describe	username	u	string
+astro,astro-hosted,apc	api airflow describe	verbose	v	bool
+astro,astro-hosted,apc	api airflow describe	workspace-id	W	string
+astro,astro-hosted,apc	api airflow ls	airflow-version		string
+astro,astro-hosted,apc	api airflow ls	api-url		string
+astro,astro-hosted,apc	api airflow ls	deployment-id	d	string
+astro,astro-hosted,apc	api airflow ls	json		bool
+astro,astro-hosted,apc	api airflow ls	no-color		bool
+astro,astro-hosted,apc	api airflow ls	organization-id	O	string
+astro,astro-hosted,apc	api airflow ls	password		string
+astro,astro-hosted,apc	api airflow ls	refresh		bool
+astro,astro-hosted,apc	api airflow ls	username	u	string
+astro,astro-hosted,apc	api airflow ls	verbose	v	bool
+astro,astro-hosted,apc	api airflow ls	workspace-id	W	string
+astro,astro-hosted,apc	api cloud	field	F	string
+astro,astro-hosted,apc	api cloud	generate		bool
+astro,astro-hosted,apc	api cloud	header	H	string
+astro,astro-hosted,apc	api cloud	include	i	bool
+astro,astro-hosted,apc	api cloud	input		string
+astro,astro-hosted,apc	api cloud	jq	q	string
+astro,astro-hosted,apc	api cloud	method	X	string
+astro,astro-hosted,apc	api cloud	no-color		bool
+astro,astro-hosted,apc	api cloud	paginate		bool
+astro,astro-hosted,apc	api cloud	path-param	p	string
+astro,astro-hosted,apc	api cloud	raw-field	f	string
+astro,astro-hosted,apc	api cloud	silent		bool
+astro,astro-hosted,apc	api cloud	slurp		bool
+astro,astro-hosted,apc	api cloud	template	t	string
+astro,astro-hosted,apc	api cloud	verbose		bool
+astro,astro-hosted,apc	api cloud describe	json		bool
+astro,astro-hosted,apc	api cloud describe	method	X	string
+astro,astro-hosted,apc	api cloud describe	no-color		bool
+astro,astro-hosted,apc	api cloud describe	refresh		bool
+astro,astro-hosted,apc	api cloud describe	verbose	v	bool
+astro,astro-hosted,apc	api cloud ls	json		bool
+astro,astro-hosted,apc	api cloud ls	no-color		bool
+astro,astro-hosted,apc	api cloud ls	refresh		bool
+astro,astro-hosted,apc	api cloud ls	verbose	v	bool
+astro,astro-hosted,apc	api registry	field	F	string
+astro,astro-hosted,apc	api registry	generate		bool
+astro,astro-hosted,apc	api registry	header	H	string
+astro,astro-hosted,apc	api registry	include	i	bool
+astro,astro-hosted,apc	api registry	input		string
+astro,astro-hosted,apc	api registry	jq	q	string
+astro,astro-hosted,apc	api registry	method	X	string
+astro,astro-hosted,apc	api registry	no-color		bool
+astro,astro-hosted,apc	api registry	path-param	p	string
+astro,astro-hosted,apc	api registry	raw-field	f	string
+astro,astro-hosted,apc	api registry	registry-url		string
+astro,astro-hosted,apc	api registry	silent		bool
+astro,astro-hosted,apc	api registry	template	t	string
+astro,astro-hosted,apc	api registry	verbose		bool
+astro,astro-hosted,apc	api registry describe	json		bool
+astro,astro-hosted,apc	api registry describe	method	X	string
+astro,astro-hosted,apc	api registry describe	no-color		bool
+astro,astro-hosted,apc	api registry describe	refresh		bool
+astro,astro-hosted,apc	api registry describe	registry-url		string
+astro,astro-hosted,apc	api registry describe	verbose	v	bool
+astro,astro-hosted,apc	api registry ls	json		bool
+astro,astro-hosted,apc	api registry ls	no-color		bool
+astro,astro-hosted,apc	api registry ls	refresh		bool
+astro,astro-hosted,apc	api registry ls	registry-url		string
+astro,astro-hosted,apc	api registry ls	verbose	v	bool
+astro,astro-hosted,apc	auth login	login-link	l	bool
+astro,astro-hosted,apc	auth login	oauth	o	bool
+astro,astro-hosted,apc	auth login	token-login	t	string
+astro,astro-hosted,apc	auth token	domain	d	string
+astro,astro-hosted,apc	config get	global	g	bool
+astro,astro-hosted,apc	config set	global	g	bool
+astro,astro-hosted,apc	context delete	force	f	bool
+astro,astro-hosted	dbt delete	deployment-name	n	string
+astro,astro-hosted	dbt delete	description		string
+astro,astro-hosted	dbt delete	mount-path	m	string
+astro,astro-hosted	dbt delete	project-path	p	string
+astro,astro-hosted	dbt delete	wait	w	bool
+astro,astro-hosted	dbt delete	wait-time	t	string
+astro,astro-hosted	dbt delete	workspace-id		string
+astro,astro-hosted	dbt deploy	deployment-name	n	string
+astro,astro-hosted	dbt deploy	description		string
+astro,astro-hosted	dbt deploy	mount-path	m	string
+astro,astro-hosted	dbt deploy	project-path	p	string
+astro,astro-hosted	dbt deploy	wait	w	bool
+astro,astro-hosted	dbt deploy	wait-time	t	string
+astro,astro-hosted	dbt deploy	workspace-id		string
+astro,astro-hosted	deploy	build-secret		string
+astro,astro-hosted	deploy	dag-bundle-name		string
+astro,astro-hosted,apc	deploy	dags	d	bool
+astro,astro-hosted	deploy	dags-path		string
+astro,astro-hosted	deploy	deployment-name	n	string
+astro,astro-hosted,apc	deploy	description		string
+astro,astro-hosted	deploy	env	e	string
+astro,astro-hosted,apc	deploy	force	f	bool
+astro,astro-hosted,apc	deploy	image		bool
+astro,astro-hosted,apc	deploy	image-name	i	string
+apc	deploy	no-cache		bool
+astro,astro-hosted	deploy	no-dags-base-dir		bool
+astro,astro-hosted	deploy	non-dags		bool
+astro,astro-hosted	deploy	non-dags-bundle-type		string
+astro,astro-hosted	deploy	non-dags-local-path		string
+astro,astro-hosted	deploy	non-dags-mount-path		string
+astro,astro-hosted	deploy	parse		bool
+astro,astro-hosted,apc	deploy	prompt	p	bool
+astro,astro-hosted	deploy	pytest		bool
+apc	deploy	remote		bool
+apc	deploy	runtime-version		string
+astro,astro-hosted,apc	deploy	save	s	bool
+astro,astro-hosted	deploy	test	t	string
+astro,astro-hosted	deploy	wait	w	bool
+astro,astro-hosted	deploy	wait-time		string
+astro,astro-hosted,apc	deploy	workspace-id		string
+apc	deployment airflow upgrade	cancel	c	bool
+apc	deployment airflow upgrade	deployment-id	d	string
+apc	deployment airflow upgrade	desired-airflow-version	v	string
+apc	deployment airflow upgrade	workspace-id		string
+astro,astro-hosted	deployment airflow-variable copy	source-id	s	string
+astro,astro-hosted	deployment airflow-variable copy	source-name	n	string
+astro,astro-hosted	deployment airflow-variable copy	target-id	t	string
+astro,astro-hosted	deployment airflow-variable copy	target-name		string
+astro,astro-hosted	deployment airflow-variable copy	workspace-id		string
+astro,astro-hosted	deployment airflow-variable create	deployment-id	d	string
+astro,astro-hosted	deployment airflow-variable create	deployment-name	n	string
+astro,astro-hosted	deployment airflow-variable create	description		string
+astro,astro-hosted	deployment airflow-variable create	key	k	string
+astro,astro-hosted	deployment airflow-variable create	value	v	string
+astro,astro-hosted	deployment airflow-variable create	workspace-id		string
+astro,astro-hosted	deployment airflow-variable list	deployment-id	d	string
+astro,astro-hosted	deployment airflow-variable list	deployment-name	n	string
+astro,astro-hosted	deployment airflow-variable list	workspace-id		string
+astro,astro-hosted	deployment airflow-variable update	deployment-id	d	string
+astro,astro-hosted	deployment airflow-variable update	deployment-name	n	string
+astro,astro-hosted	deployment airflow-variable update	description		string
+astro,astro-hosted	deployment airflow-variable update	key	k	string
+astro,astro-hosted	deployment airflow-variable update	value	v	string
+astro,astro-hosted	deployment airflow-variable update	workspace-id		string
+astro,astro-hosted	deployment bundle create	bundle-type		string
+astro,astro-hosted	deployment bundle create	dag-bundle-ids		string
+astro,astro-hosted	deployment bundle create	deployment-id		string
+astro,astro-hosted	deployment bundle create	description		string
+astro,astro-hosted	deployment bundle create	mount-path		string
+astro,astro-hosted	deployment bundle create	name		string
+astro,astro-hosted	deployment bundle create	workspace-id		string
+astro,astro-hosted	deployment bundle delete	deployment-id		string
+astro,astro-hosted	deployment bundle delete	force	f	bool
+astro,astro-hosted	deployment bundle delete	mount-path		string
+astro,astro-hosted	deployment bundle delete	name		string
+astro,astro-hosted	deployment bundle delete	workspace-id		string
+astro,astro-hosted	deployment bundle list	deployment-id		string
+astro,astro-hosted	deployment bundle list	json		bool
+astro,astro-hosted	deployment bundle list	output	o	string
+astro,astro-hosted	deployment bundle list	template		string
+astro,astro-hosted	deployment bundle list	workspace-id		string
+astro,astro-hosted	deployment bundle update	dag-bundle-ids		string
+astro,astro-hosted	deployment bundle update	deployment-id		string
+astro,astro-hosted	deployment bundle update	description		string
+astro,astro-hosted	deployment bundle update	mount-path		string
+astro,astro-hosted	deployment bundle update	name		string
+astro,astro-hosted	deployment bundle update	workspace-id		string
+astro,astro-hosted	deployment connection copy	source-id	s	string
+astro,astro-hosted	deployment connection copy	source-name	n	string
+astro,astro-hosted	deployment connection copy	target-id	t	string
+astro,astro-hosted	deployment connection copy	target-name		string
+astro,astro-hosted	deployment connection copy	workspace-id		string
+astro,astro-hosted	deployment connection create	conn-id	i	string
+astro,astro-hosted	deployment connection create	conn-type	t	string
+astro,astro-hosted	deployment connection create	deployment-id	d	string
+astro,astro-hosted	deployment connection create	deployment-name	n	string
+astro,astro-hosted	deployment connection create	description		string
+astro,astro-hosted	deployment connection create	extra	e	string
+astro,astro-hosted	deployment connection create	host		string
+astro,astro-hosted	deployment connection create	login	l	string
+astro,astro-hosted	deployment connection create	password	p	string
+astro,astro-hosted	deployment connection create	port	o	string
+astro,astro-hosted	deployment connection create	schema	s	string
+astro,astro-hosted	deployment connection create	workspace-id		string
+astro,astro-hosted	deployment connection list	deployment-id	d	string
+astro,astro-hosted	deployment connection list	deployment-name	n	string
+astro,astro-hosted	deployment connection list	workspace-id		string
+astro,astro-hosted	deployment connection update	conn-id	i	string
+astro,astro-hosted	deployment connection update	conn-type	t	string
+astro,astro-hosted	deployment connection update	deployment-id	d	string
+astro,astro-hosted	deployment connection update	deployment-name	n	string
+astro,astro-hosted	deployment connection update	description		string
+astro,astro-hosted	deployment connection update	extra	e	string
+astro,astro-hosted	deployment connection update	host		string
+astro,astro-hosted	deployment connection update	login	l	string
+astro,astro-hosted	deployment connection update	password	p	string
+astro,astro-hosted	deployment connection update	port	o	string
+astro,astro-hosted	deployment connection update	schema	s	string
+astro,astro-hosted	deployment connection update	workspace-id		string
+apc	deployment create	airflow-version	a	string
+astro-hosted	deployment create	allowed-ip-address-ranges		string
+astro,astro-hosted	deployment create	cicd-enforcement		string
+astro,astro-hosted	deployment create	clean-output		bool
+astro-hosted	deployment create	cloud-provider	p	string
+apc	deployment create	cloud-role	c	string
+apc	deployment create	cluster-id		string
+astro,astro-hosted	deployment create	cluster-id	c	string
+astro,astro-hosted	deployment create	dag-deploy		string
+astro-hosted	deployment create	default-task-pod-cpu		string
+astro-hosted	deployment create	default-task-pod-memory		string
+astro,astro-hosted	deployment create	deployment-file		string
+astro,astro-hosted	deployment create	description	d	string
+astro-hosted	deployment create	development-mode	m	string
+astro,astro-hosted,apc	deployment create	executor	e	string
+astro,astro-hosted,apc	deployment create	force	f	bool
+astro-hosted	deployment create	high-availability	a	string
+apc	deployment create	label	l	string
+astro,astro-hosted	deployment create	name	n	string
+astro-hosted	deployment create	region		string
+apc	deployment create	release-name	r	string
+astro-hosted	deployment create	remote-execution-enabled		bool
+astro-hosted	deployment create	resource-quota-cpu		string
+astro-hosted	deployment create	resource-quota-memory		string
+astro,astro-hosted	deployment create	runtime-version	v	string
+astro	deployment create	scheduler-au	s	string
+astro	deployment create	scheduler-replicas	r	string
+astro-hosted	deployment create	scheduler-size		string
+astro-hosted	deployment create	task-log-bucket		string
+astro-hosted	deployment create	task-log-url-pattern		string
+astro-hosted	deployment create	type		string
+astro,astro-hosted	deployment create	wait	i	bool
+astro,astro-hosted	deployment create	wait-time		string
+astro,astro-hosted	deployment create	workload-identity		string
+apc	deployment create	workspace-id		string
+astro,astro-hosted	deployment create	workspace-id	w	string
+astro,astro-hosted	deployment delete	deployment-name	n	string
+astro,astro-hosted	deployment delete	force	f	bool
+astro,astro-hosted,apc	deployment delete	workspace-id		string
+astro,astro-hosted	deployment hibernate	deployment-name	n	string
+astro,astro-hosted	deployment hibernate	for	d	string
+astro,astro-hosted	deployment hibernate	force	f	bool
+astro,astro-hosted	deployment hibernate	remove-override	r	bool
+astro,astro-hosted	deployment hibernate	until	u	string
+astro,astro-hosted	deployment hibernate	workspace-id		string
+astro,astro-hosted	deployment inspect	clean-output	c	bool
+astro,astro-hosted	deployment inspect	deployment-name	n	string
+astro,astro-hosted	deployment inspect	key	k	string
+astro,astro-hosted	deployment inspect	output	o	string
+astro,astro-hosted	deployment inspect	show-workload-identity		bool
+astro,astro-hosted	deployment inspect	template	t	bool
+astro,astro-hosted	deployment inspect	workspace-id		string
+astro,astro-hosted,apc	deployment list	all	a	bool
+apc	deployment list	cluster-id		string
+astro,astro-hosted	deployment list	json		bool
+astro,astro-hosted	deployment list	output	o	string
+astro,astro-hosted	deployment list	template		string
+astro,astro-hosted,apc	deployment list	workspace-id		string
+astro,astro-hosted	deployment logs	apiserver		bool
+astro,astro-hosted	deployment logs	component		string
+astro,astro-hosted	deployment logs	dag-processor		bool
+astro,astro-hosted	deployment logs	deployment-name	n	string
+astro,astro-hosted	deployment logs	error	e	bool
+astro,astro-hosted	deployment logs	info	i	bool
+astro,astro-hosted	deployment logs	keyword	k	string
+astro,astro-hosted	deployment logs	log-count	c	string
+astro,astro-hosted	deployment logs	scheduler		bool
+astro,astro-hosted	deployment logs	triggerer		bool
+astro,astro-hosted	deployment logs	warn	w	bool
+astro,astro-hosted	deployment logs	webserver		bool
+astro,astro-hosted	deployment logs	workers		bool
+astro,astro-hosted	deployment logs	workspace-id		string
+apc	deployment logs scheduler	follow	f	bool
+apc	deployment logs scheduler	search	s	string
+apc	deployment logs scheduler	since	t	string
+apc	deployment logs scheduler	workspace-id		string
+apc	deployment logs webserver	follow	f	bool
+apc	deployment logs webserver	search	s	string
+apc	deployment logs webserver	since	t	string
+apc	deployment logs webserver	workspace-id		string
+apc	deployment logs workers	follow	f	bool
+apc	deployment logs workers	search	s	string
+apc	deployment logs workers	since	t	string
+apc	deployment logs workers	workspace-id		string
+astro,astro-hosted	deployment pool copy	source-id	s	string
+astro,astro-hosted	deployment pool copy	source-name	n	string
+astro,astro-hosted	deployment pool copy	target-id	t	string
+astro,astro-hosted	deployment pool copy	target-name		string
+astro,astro-hosted	deployment pool copy	workspace-id		string
+astro,astro-hosted	deployment pool create	deployment-id	d	string
+astro,astro-hosted	deployment pool create	deployment-name	n	string
+astro,astro-hosted	deployment pool create	description		string
+astro,astro-hosted	deployment pool create	include-deferred		string
+astro,astro-hosted	deployment pool create	name		string
+astro,astro-hosted	deployment pool create	slots	s	string
+astro,astro-hosted	deployment pool create	workspace-id		string
+astro,astro-hosted	deployment pool list	deployment-id	d	string
+astro,astro-hosted	deployment pool list	deployment-name	n	string
+astro,astro-hosted	deployment pool list	workspace-id		string
+astro,astro-hosted	deployment pool update	deployment-id	d	string
+astro,astro-hosted	deployment pool update	deployment-name	n	string
+astro,astro-hosted	deployment pool update	description		string
+astro,astro-hosted	deployment pool update	include-deferred		string
+astro,astro-hosted	deployment pool update	name		string
+astro,astro-hosted	deployment pool update	slots	s	string
+astro,astro-hosted	deployment pool update	workspace-id		string
+apc	deployment service-account create	category	c	string
+apc	deployment service-account create	deployment-id	d	string
+apc	deployment service-account create	label	l	string
+apc	deployment service-account create	role	r	string
+apc	deployment service-account create	workspace-id		string
+apc	deployment service-account delete	deployment-id	d	string
+apc	deployment service-account delete	workspace-id		string
+apc	deployment service-account list	deployment-id	d	string
+apc	deployment service-account list	workspace-id		string
+apc	deployment team add	deployment-id		string
+astro,astro-hosted	deployment team add	deployment-id	w	string
+apc	deployment team add	role		string
+astro,astro-hosted	deployment team add	role	r	string
+apc	deployment team add	team-id		string
+astro,astro-hosted,apc	deployment team add	workspace-id		string
+astro,astro-hosted,apc	deployment team list	deployment-id		string
+astro,astro-hosted	deployment team list	json		bool
+astro,astro-hosted	deployment team list	output	o	string
+astro,astro-hosted	deployment team list	template		string
+astro,astro-hosted,apc	deployment team list	workspace-id		string
+astro,astro-hosted,apc	deployment team remove	deployment-id		string
+astro,astro-hosted,apc	deployment team remove	workspace-id		string
+astro,astro-hosted,apc	deployment team update	deployment-id		string
+apc	deployment team update	role		string
+astro,astro-hosted	deployment team update	role	r	string
+astro,astro-hosted,apc	deployment team update	workspace-id		string
+astro,astro-hosted	deployment token create	clean-output	c	bool
+astro,astro-hosted	deployment token create	deployment-id		string
+astro,astro-hosted	deployment token create	description	d	string
+astro,astro-hosted	deployment token create	expiration	e	string
+astro,astro-hosted	deployment token create	name	n	string
+astro,astro-hosted	deployment token create	role	r	string
+astro,astro-hosted	deployment token create	workspace-id		string
+astro,astro-hosted	deployment token delete	deployment-id		string
+astro,astro-hosted	deployment token delete	force	f	bool
+astro,astro-hosted	deployment token delete	name	t	string
+astro,astro-hosted	deployment token delete	workspace-id		string
+astro,astro-hosted	deployment token list	deployment-id		string
+astro,astro-hosted	deployment token list	workspace-id		string
+astro,astro-hosted	deployment token organization-token add	deployment-id		string
+astro,astro-hosted	deployment token organization-token add	org-token-name	n	string
+astro,astro-hosted	deployment token organization-token add	role	r	string
+astro,astro-hosted	deployment token organization-token add	workspace-id		string
+astro,astro-hosted	deployment token organization-token list	deployment-id		string
+astro,astro-hosted	deployment token organization-token list	workspace-id		string
+astro,astro-hosted	deployment token organization-token remove	deployment-id		string
+astro,astro-hosted	deployment token organization-token remove	org-token-name	n	string
+astro,astro-hosted	deployment token organization-token remove	workspace-id		string
+astro,astro-hosted	deployment token organization-token update	deployment-id		string
+astro,astro-hosted	deployment token organization-token update	org-token-name	n	string
+astro,astro-hosted	deployment token organization-token update	role	r	string
+astro,astro-hosted	deployment token organization-token update	workspace-id		string
+astro,astro-hosted	deployment token rotate	clean-output	c	bool
+astro,astro-hosted	deployment token rotate	deployment-id		string
+astro,astro-hosted	deployment token rotate	force	f	bool
+astro,astro-hosted	deployment token rotate	name	t	string
+astro,astro-hosted	deployment token rotate	workspace-id		string
+astro,astro-hosted	deployment token update	deployment-id		string
+astro,astro-hosted	deployment token update	description	d	string
+astro,astro-hosted	deployment token update	name	t	string
+astro,astro-hosted	deployment token update	new-name	n	string
+astro,astro-hosted	deployment token update	role	r	string
+astro,astro-hosted	deployment token update	workspace-id		string
+astro,astro-hosted	deployment token workspace-token add	deployment-id		string
+astro,astro-hosted	deployment token workspace-token add	role	r	string
+astro,astro-hosted	deployment token workspace-token add	workspace-id		string
+astro,astro-hosted	deployment token workspace-token add	workspace-token-name	n	string
+astro,astro-hosted	deployment token workspace-token list	deployment-id		string
+astro,astro-hosted	deployment token workspace-token list	workspace-id		string
+astro,astro-hosted	deployment token workspace-token remove	deployment-id		string
+astro,astro-hosted	deployment token workspace-token remove	workspace-id		string
+astro,astro-hosted	deployment token workspace-token remove	workspace-token-name	n	string
+astro,astro-hosted	deployment token workspace-token update	deployment-id		string
+astro,astro-hosted	deployment token workspace-token update	role	r	string
+astro,astro-hosted	deployment token workspace-token update	workspace-id		string
+astro,astro-hosted	deployment token workspace-token update	workspace-token-name	n	string
+astro-hosted	deployment update	allowed-ip-address-ranges		string
+astro,astro-hosted	deployment update	cicd-enforcement		string
+astro,astro-hosted	deployment update	clean-output	c	bool
+apc	deployment update	cloud-role	c	string
+astro,astro-hosted	deployment update	dag-deploy		string
+astro-hosted	deployment update	default-task-pod-cpu		string
+astro-hosted	deployment update	default-task-pod-memory		string
+astro,astro-hosted	deployment update	deployment-file		string
+astro,astro-hosted	deployment update	deployment-name		string
+astro,astro-hosted,apc	deployment update	description	d	string
+astro-hosted	deployment update	development-mode	m	string
+astro,astro-hosted,apc	deployment update	executor	e	string
+astro,astro-hosted,apc	deployment update	force	f	bool
+astro-hosted	deployment update	high-availability	a	string
+apc	deployment update	label	l	string
+astro,astro-hosted	deployment update	name	n	string
+astro-hosted	deployment update	resource-quota-cpu		string
+astro-hosted	deployment update	resource-quota-memory		string
+astro	deployment update	scheduler-au	s	string
+astro	deployment update	scheduler-replicas	r	string
+astro-hosted	deployment update	scheduler-size		string
+astro-hosted	deployment update	task-log-bucket		string
+astro-hosted	deployment update	task-log-url-pattern		string
+astro,astro-hosted	deployment update	workload-identity		string
+apc	deployment update	workspace-id		string
+astro,astro-hosted	deployment update	workspace-id	w	string
+astro,astro-hosted,apc	deployment user add	deployment-id		string
+apc	deployment user add	email	e	string
+apc	deployment user add	role		string
+astro,astro-hosted	deployment user add	role	r	string
+astro,astro-hosted,apc	deployment user add	workspace-id		string
+astro,astro-hosted,apc	deployment user list	deployment-id		string
+apc	deployment user list	email	e	string
+astro,astro-hosted	deployment user list	json		bool
+apc	deployment user list	name	n	string
+astro,astro-hosted	deployment user list	output	o	string
+astro,astro-hosted	deployment user list	template		string
+apc	deployment user list	user-id	u	string
+astro,astro-hosted,apc	deployment user list	workspace-id		string
+astro,astro-hosted,apc	deployment user remove	deployment-id		string
+astro,astro-hosted,apc	deployment user remove	workspace-id		string
+astro,astro-hosted,apc	deployment user update	deployment-id		string
+apc	deployment user update	role		string
+astro,astro-hosted	deployment user update	role	r	string
+astro,astro-hosted,apc	deployment user update	workspace-id		string
+astro,astro-hosted	deployment variable create	deployment-id	d	string
+astro,astro-hosted	deployment variable create	deployment-name	n	string
+astro,astro-hosted	deployment variable create	env	e	string
+astro,astro-hosted	deployment variable create	load	l	bool
+astro,astro-hosted	deployment variable create	secret	s	bool
+astro,astro-hosted	deployment variable create	workspace-id		string
+astro,astro-hosted	deployment variable list	deployment-id	d	string
+astro,astro-hosted	deployment variable list	deployment-name	n	string
+astro,astro-hosted	deployment variable list	env	e	string
+astro,astro-hosted	deployment variable list	key	k	string
+astro,astro-hosted	deployment variable list	save	s	bool
+astro,astro-hosted	deployment variable list	workspace-id		string
+astro,astro-hosted	deployment variable update	deployment-id	d	string
+astro,astro-hosted	deployment variable update	deployment-name	n	string
+astro,astro-hosted	deployment variable update	env	e	string
+astro,astro-hosted	deployment variable update	load	l	bool
+astro,astro-hosted	deployment variable update	secret	s	bool
+astro,astro-hosted	deployment variable update	workspace-id		string
+astro,astro-hosted	deployment wake-up	deployment-name	n	string
+astro,astro-hosted	deployment wake-up	for	d	string
+astro,astro-hosted	deployment wake-up	force	f	bool
+astro,astro-hosted	deployment wake-up	remove-override	r	bool
+astro,astro-hosted	deployment wake-up	until	u	string
+astro,astro-hosted	deployment wake-up	workspace-id		string
+astro,astro-hosted	deployment worker-queue create	concurrency		string
+astro,astro-hosted	deployment worker-queue create	deployment-id	d	string
+astro,astro-hosted	deployment worker-queue create	deployment-name		string
+astro,astro-hosted	deployment worker-queue create	max-count		string
+astro,astro-hosted	deployment worker-queue create	min-count		string
+astro,astro-hosted	deployment worker-queue create	name	n	string
+astro,astro-hosted	deployment worker-queue create	worker-type	t	string
+astro,astro-hosted	deployment worker-queue create	workspace-id		string
+astro,astro-hosted	deployment worker-queue delete	deployment-id	d	string
+astro,astro-hosted	deployment worker-queue delete	deployment-name		string
+astro,astro-hosted	deployment worker-queue delete	force	f	bool
+astro,astro-hosted	deployment worker-queue delete	name	n	string
+astro,astro-hosted	deployment worker-queue delete	workspace-id		string
+astro,astro-hosted	deployment worker-queue update	concurrency		string
+astro,astro-hosted	deployment worker-queue update	deployment-id	d	string
+astro,astro-hosted	deployment worker-queue update	deployment-name		string
+astro,astro-hosted	deployment worker-queue update	force	f	bool
+astro,astro-hosted	deployment worker-queue update	max-count		string
+astro,astro-hosted	deployment worker-queue update	min-count		string
+astro,astro-hosted	deployment worker-queue update	name	n	string
+astro,astro-hosted	deployment worker-queue update	worker-type	t	string
+astro,astro-hosted	deployment worker-queue update	workspace-id		string
+astro,astro-hosted,apc	dev bash	api-server	a	bool
+astro,astro-hosted,apc	dev bash	dag-processor	d	bool
+astro,astro-hosted,apc	dev bash	docker		bool
+astro,astro-hosted,apc	dev bash	postgres	p	bool
+astro,astro-hosted,apc	dev bash	scheduler	s	bool
+astro,astro-hosted,apc	dev bash	standalone		bool
+astro,astro-hosted,apc	dev bash	triggerer	t	bool
+astro,astro-hosted,apc	dev bash	webserver	w	bool
+astro,astro-hosted,apc	dev build	build-secret		string
+astro,astro-hosted,apc	dev build	docker		bool
+astro,astro-hosted,apc	dev build	image-name	i	string
+astro,astro-hosted,apc	dev build	no-cache		bool
+astro,astro-hosted,apc	dev build	standalone		bool
+astro,astro-hosted,apc	dev init	airflow-version	a	string
+astro,astro-hosted,apc	dev init	docker		bool
+astro,astro-hosted,apc	dev init	force	f	bool
+astro,astro-hosted,apc	dev init	from-template	t	bool
+astro,astro-hosted,apc	dev init	name	n	string
+astro,astro-hosted	dev init	remote-execution-enabled		bool
+astro,astro-hosted	dev init	remote-image-repository		string
+astro,astro-hosted,apc	dev init	runtime-version	v	string
+astro,astro-hosted,apc	dev init	standalone		bool
+apc	dev init	use-astronomer-certified		bool
+astro,astro-hosted,apc	dev kill	docker		bool
+astro,astro-hosted,apc	dev kill	standalone		bool
+astro,astro-hosted,apc	dev logs	api-server	a	bool
+astro,astro-hosted,apc	dev logs	dag-processor	d	bool
+astro,astro-hosted,apc	dev logs	docker		bool
+astro,astro-hosted,apc	dev logs	follow	f	bool
+astro,astro-hosted,apc	dev logs	scheduler	s	bool
+astro,astro-hosted,apc	dev logs	standalone		bool
+astro,astro-hosted,apc	dev logs	triggerer	t	bool
+astro,astro-hosted,apc	dev logs	webserver	w	bool
+astro,astro-hosted,apc	dev object export	compose		bool
+astro,astro-hosted,apc	dev object export	compose-file		string
+astro,astro-hosted,apc	dev object export	connections	c	bool
+astro,astro-hosted,apc	dev object export	docker		bool
+astro,astro-hosted,apc	dev object export	env	e	string
+astro,astro-hosted,apc	dev object export	env-export	n	bool
+astro,astro-hosted,apc	dev object export	pools	p	bool
+astro,astro-hosted,apc	dev object export	settings-file	s	string
+astro,astro-hosted,apc	dev object export	standalone		bool
+astro,astro-hosted,apc	dev object export	variables	v	bool
+astro,astro-hosted,apc	dev object import	connections	c	bool
+astro,astro-hosted,apc	dev object import	docker		bool
+astro,astro-hosted,apc	dev object import	pools	p	bool
+astro,astro-hosted,apc	dev object import	settings-file	s	string
+astro,astro-hosted,apc	dev object import	standalone		bool
+astro,astro-hosted,apc	dev object import	variables	v	bool
+astro,astro-hosted,apc	dev parse	build-secret		string
+astro,astro-hosted,apc	dev parse	docker		bool
+astro,astro-hosted,apc	dev parse	env	e	string
+astro,astro-hosted,apc	dev parse	image-name	i	string
+astro,astro-hosted,apc	dev parse	standalone		bool
+astro,astro-hosted,apc	dev proxy status	docker		bool
+astro,astro-hosted,apc	dev proxy status	standalone		bool
+astro,astro-hosted,apc	dev proxy stop	docker		bool
+astro,astro-hosted,apc	dev proxy stop	standalone		bool
+astro,astro-hosted,apc	dev ps	docker		bool
+astro,astro-hosted,apc	dev ps	json		bool
+astro,astro-hosted,apc	dev ps	output	o	string
+astro,astro-hosted,apc	dev ps	standalone		bool
+astro,astro-hosted,apc	dev ps	template		string
+astro,astro-hosted,apc	dev pytest	args	a	string
+astro,astro-hosted,apc	dev pytest	build-secret		string
+astro,astro-hosted,apc	dev pytest	docker		bool
+astro,astro-hosted,apc	dev pytest	env	e	string
+astro,astro-hosted,apc	dev pytest	image-name	i	string
+astro,astro-hosted,apc	dev pytest	standalone		bool
+astro,astro-hosted,apc	dev restart	build-secret		string
+astro,astro-hosted,apc	dev restart	deployment-id	d	string
+astro,astro-hosted,apc	dev restart	docker		bool
+astro,astro-hosted,apc	dev restart	env	e	string
+astro,astro-hosted,apc	dev restart	foreground	f	bool
+astro,astro-hosted,apc	dev restart	image-name	i	string
+astro,astro-hosted,apc	dev restart	kill	k	bool
+astro,astro-hosted,apc	dev restart	no-cache		bool
+astro,astro-hosted,apc	dev restart	no-proxy		bool
+astro,astro-hosted,apc	dev restart	port	p	string
+astro,astro-hosted,apc	dev restart	settings-file	s	string
+astro,astro-hosted,apc	dev restart	standalone		bool
+astro,astro-hosted,apc	dev restart	wait		string
+astro,astro-hosted,apc	dev restart	workspace-id	w	string
+astro,astro-hosted,apc	dev run	docker		bool
+astro,astro-hosted,apc	dev run	standalone		bool
+astro,astro-hosted,apc	dev start	build-secret		string
+astro,astro-hosted,apc	dev start	compose-file		string
+astro,astro-hosted,apc	dev start	deployment-id	d	string
+astro,astro-hosted,apc	dev start	docker		bool
+astro,astro-hosted,apc	dev start	env	e	string
+astro,astro-hosted,apc	dev start	foreground	f	bool
+astro,astro-hosted,apc	dev start	image-name	i	string
+astro,astro-hosted,apc	dev start	no-browser	n	bool
+astro,astro-hosted,apc	dev start	no-cache		bool
+astro,astro-hosted,apc	dev start	no-proxy		bool
+astro,astro-hosted,apc	dev start	port	p	string
+astro,astro-hosted,apc	dev start	settings-file	s	string
+astro,astro-hosted,apc	dev start	standalone		bool
+astro,astro-hosted,apc	dev start	wait		string
+astro,astro-hosted,apc	dev start	workspace-id	w	string
+astro,astro-hosted,apc	dev stop	docker		bool
+astro,astro-hosted,apc	dev stop	standalone		bool
+astro,astro-hosted,apc	dev upgrade-test	airflow-version	a	string
+astro,astro-hosted,apc	dev upgrade-test	build-secret		string
+astro,astro-hosted,apc	dev upgrade-test	dag-test	d	bool
+astro,astro-hosted,apc	dev upgrade-test	deployment-id	i	string
+astro,astro-hosted,apc	dev upgrade-test	docker		bool
+astro,astro-hosted,apc	dev upgrade-test	fix		bool
+astro,astro-hosted,apc	dev upgrade-test	image-name	n	string
+astro,astro-hosted,apc	dev upgrade-test	lint-config-file		string
+astro,astro-hosted,apc	dev upgrade-test	lint-deprecations		bool
+astro,astro-hosted,apc	dev upgrade-test	lint-test	l	bool
+astro,astro-hosted,apc	dev upgrade-test	runtime-version	v	string
+astro,astro-hosted,apc	dev upgrade-test	standalone		bool
+apc	dev upgrade-test	use-astronomer-certified		bool
+astro,astro-hosted,apc	dev upgrade-test	version-test		bool
+astro,astro-hosted	env airflow-variable create	auto-link		bool
+astro,astro-hosted	env airflow-variable create	deployment-id		string
+astro,astro-hosted	env airflow-variable create	from-file		string
+astro,astro-hosted	env airflow-variable create	include-secrets		bool
+astro,astro-hosted	env airflow-variable create	key	k	string
+astro,astro-hosted	env airflow-variable create	resolve-linked		bool
+astro,astro-hosted	env airflow-variable create	secret	s	bool
+astro,astro-hosted	env airflow-variable create	value	v	string
+astro,astro-hosted	env airflow-variable create	workspace-id		string
+astro,astro-hosted	env airflow-variable delete	deployment-id		string
+astro,astro-hosted	env airflow-variable delete	include-secrets		bool
+astro,astro-hosted	env airflow-variable delete	resolve-linked		bool
+astro,astro-hosted	env airflow-variable delete	workspace-id		string
+astro,astro-hosted	env airflow-variable delete	yes	y	bool
+astro,astro-hosted	env airflow-variable get	deployment-id		string
+astro,astro-hosted	env airflow-variable get	format		string
+astro,astro-hosted	env airflow-variable get	include-secrets		bool
+astro,astro-hosted	env airflow-variable get	resolve-linked		bool
+astro,astro-hosted	env airflow-variable get	workspace-id		string
+astro,astro-hosted	env airflow-variable list	deployment-id		string
+astro,astro-hosted	env airflow-variable list	format		string
+astro,astro-hosted	env airflow-variable list	include-secrets		bool
+astro,astro-hosted	env airflow-variable list	output		string
+astro,astro-hosted	env airflow-variable list	resolve-linked		bool
+astro,astro-hosted	env airflow-variable list	workspace-id		string
+astro,astro-hosted	env airflow-variable update	auto-link		bool
+astro,astro-hosted	env airflow-variable update	deployment-id		string
+astro,astro-hosted	env airflow-variable update	from-file		string
+astro,astro-hosted	env airflow-variable update	include-secrets		bool
+astro,astro-hosted	env airflow-variable update	resolve-linked		bool
+astro,astro-hosted	env airflow-variable update	secret	s	bool
+astro,astro-hosted	env airflow-variable update	strict		bool
+astro,astro-hosted	env airflow-variable update	value	v	string
+astro,astro-hosted	env airflow-variable update	workspace-id		string
+astro,astro-hosted	env connection create	auto-link		bool
+astro,astro-hosted	env connection create	deployment-id		string
+astro,astro-hosted	env connection create	extra		string
+astro,astro-hosted	env connection create	host		string
+astro,astro-hosted	env connection create	include-secrets		bool
+astro,astro-hosted	env connection create	key	k	string
+astro,astro-hosted	env connection create	login	l	string
+astro,astro-hosted	env connection create	password	p	string
+astro,astro-hosted	env connection create	port		string
+astro,astro-hosted	env connection create	resolve-linked		bool
+astro,astro-hosted	env connection create	schema		string
+astro,astro-hosted	env connection create	type	t	string
+astro,astro-hosted	env connection create	workspace-id		string
+astro,astro-hosted	env connection delete	deployment-id		string
+astro,astro-hosted	env connection delete	include-secrets		bool
+astro,astro-hosted	env connection delete	resolve-linked		bool
+astro,astro-hosted	env connection delete	workspace-id		string
+astro,astro-hosted	env connection delete	yes	y	bool
+astro,astro-hosted	env connection get	deployment-id		string
+astro,astro-hosted	env connection get	format		string
+astro,astro-hosted	env connection get	include-secrets		bool
+astro,astro-hosted	env connection get	resolve-linked		bool
+astro,astro-hosted	env connection get	workspace-id		string
+astro,astro-hosted	env connection list	deployment-id		string
+astro,astro-hosted	env connection list	format		string
+astro,astro-hosted	env connection list	include-secrets		bool
+astro,astro-hosted	env connection list	output		string
+astro,astro-hosted	env connection list	resolve-linked		bool
+astro,astro-hosted	env connection list	workspace-id		string
+astro,astro-hosted	env connection update	auto-link		bool
+astro,astro-hosted	env connection update	deployment-id		string
+astro,astro-hosted	env connection update	extra		string
+astro,astro-hosted	env connection update	host		string
+astro,astro-hosted	env connection update	include-secrets		bool
+astro,astro-hosted	env connection update	login	l	string
+astro,astro-hosted	env connection update	password	p	string
+astro,astro-hosted	env connection update	port		string
+astro,astro-hosted	env connection update	resolve-linked		bool
+astro,astro-hosted	env connection update	schema		string
+astro,astro-hosted	env connection update	type	t	string
+astro,astro-hosted	env connection update	workspace-id		string
+astro,astro-hosted	env metrics-export create	auth-type		string
+astro,astro-hosted	env metrics-export create	auto-link		bool
+astro,astro-hosted	env metrics-export create	basic-token		string
+astro,astro-hosted	env metrics-export create	deployment-id		string
+astro,astro-hosted	env metrics-export create	endpoint		string
+astro,astro-hosted	env metrics-export create	exporter-type		string
+astro,astro-hosted	env metrics-export create	header		string
+astro,astro-hosted	env metrics-export create	include-secrets		bool
+astro,astro-hosted	env metrics-export create	key	k	string
+astro,astro-hosted	env metrics-export create	label		string
+astro,astro-hosted	env metrics-export create	password		string
+astro,astro-hosted	env metrics-export create	resolve-linked		bool
+astro,astro-hosted	env metrics-export create	sigv4-assume-arn		string
+astro,astro-hosted	env metrics-export create	sigv4-sts-region		string
+astro,astro-hosted	env metrics-export create	username		string
+astro,astro-hosted	env metrics-export create	workspace-id		string
+astro,astro-hosted	env metrics-export delete	deployment-id		string
+astro,astro-hosted	env metrics-export delete	include-secrets		bool
+astro,astro-hosted	env metrics-export delete	resolve-linked		bool
+astro,astro-hosted	env metrics-export delete	workspace-id		string
+astro,astro-hosted	env metrics-export delete	yes	y	bool
+astro,astro-hosted	env metrics-export get	deployment-id		string
+astro,astro-hosted	env metrics-export get	format		string
+astro,astro-hosted	env metrics-export get	include-secrets		bool
+astro,astro-hosted	env metrics-export get	resolve-linked		bool
+astro,astro-hosted	env metrics-export get	workspace-id		string
+astro,astro-hosted	env metrics-export list	deployment-id		string
+astro,astro-hosted	env metrics-export list	format		string
+astro,astro-hosted	env metrics-export list	include-secrets		bool
+astro,astro-hosted	env metrics-export list	output		string
+astro,astro-hosted	env metrics-export list	resolve-linked		bool
+astro,astro-hosted	env metrics-export list	workspace-id		string
+astro,astro-hosted	env metrics-export update	auth-type		string
+astro,astro-hosted	env metrics-export update	auto-link		bool
+astro,astro-hosted	env metrics-export update	basic-token		string
+astro,astro-hosted	env metrics-export update	deployment-id		string
+astro,astro-hosted	env metrics-export update	endpoint		string
+astro,astro-hosted	env metrics-export update	exporter-type		string
+astro,astro-hosted	env metrics-export update	header		string
+astro,astro-hosted	env metrics-export update	include-secrets		bool
+astro,astro-hosted	env metrics-export update	label		string
+astro,astro-hosted	env metrics-export update	password		string
+astro,astro-hosted	env metrics-export update	resolve-linked		bool
+astro,astro-hosted	env metrics-export update	sigv4-assume-arn		string
+astro,astro-hosted	env metrics-export update	sigv4-sts-region		string
+astro,astro-hosted	env metrics-export update	username		string
+astro,astro-hosted	env metrics-export update	workspace-id		string
+astro,astro-hosted	env variable create	auto-link		bool
+astro,astro-hosted	env variable create	deployment-id		string
+astro,astro-hosted	env variable create	from-file		string
+astro,astro-hosted	env variable create	include-secrets		bool
+astro,astro-hosted	env variable create	key	k	string
+astro,astro-hosted	env variable create	resolve-linked		bool
+astro,astro-hosted	env variable create	secret	s	bool
+astro,astro-hosted	env variable create	value	v	string
+astro,astro-hosted	env variable create	workspace-id		string
+astro,astro-hosted	env variable delete	deployment-id		string
+astro,astro-hosted	env variable delete	include-secrets		bool
+astro,astro-hosted	env variable delete	resolve-linked		bool
+astro,astro-hosted	env variable delete	workspace-id		string
+astro,astro-hosted	env variable delete	yes	y	bool
+astro,astro-hosted	env variable export	deployment-id		string
+astro,astro-hosted	env variable export	include-secrets		bool
+astro,astro-hosted	env variable export	output		string
+astro,astro-hosted	env variable export	resolve-linked		bool
+astro,astro-hosted	env variable export	workspace-id		string
+astro,astro-hosted	env variable get	deployment-id		string
+astro,astro-hosted	env variable get	format		string
+astro,astro-hosted	env variable get	include-secrets		bool
+astro,astro-hosted	env variable get	resolve-linked		bool
+astro,astro-hosted	env variable get	workspace-id		string
+astro,astro-hosted	env variable link create	deployment-id		string
+astro,astro-hosted	env variable link create	exclude		bool
+astro,astro-hosted	env variable link create	include-secrets		bool
+astro,astro-hosted	env variable link create	resolve-linked		bool
+astro,astro-hosted	env variable link create	value		string
+astro,astro-hosted	env variable link create	variable-id		string
+astro,astro-hosted	env variable link create	variable-key		string
+astro,astro-hosted	env variable link create	workspace-id		string
+astro,astro-hosted	env variable link delete	deployment-id		string
+astro,astro-hosted	env variable link delete	exclude		bool
+astro,astro-hosted	env variable link delete	include-secrets		bool
+astro,astro-hosted	env variable link delete	resolve-linked		bool
+astro,astro-hosted	env variable link delete	variable-id		string
+astro,astro-hosted	env variable link delete	variable-key		string
+astro,astro-hosted	env variable link delete	workspace-id		string
+astro,astro-hosted	env variable link list	deployment-id		string
+astro,astro-hosted	env variable link list	format		string
+astro,astro-hosted	env variable link list	include-secrets		bool
+astro,astro-hosted	env variable link list	resolve-linked		bool
+astro,astro-hosted	env variable link list	variable-id		string
+astro,astro-hosted	env variable link list	variable-key		string
+astro,astro-hosted	env variable link list	workspace-id		string
+astro,astro-hosted	env variable list	deployment-id		string
+astro,astro-hosted	env variable list	format		string
+astro,astro-hosted	env variable list	include-secrets		bool
+astro,astro-hosted	env variable list	output		string
+astro,astro-hosted	env variable list	resolve-linked		bool
+astro,astro-hosted	env variable list	workspace-id		string
+astro,astro-hosted	env variable update	auto-link		bool
+astro,astro-hosted	env variable update	deployment-id		string
+astro,astro-hosted	env variable update	from-file		string
+astro,astro-hosted	env variable update	include-secrets		bool
+astro,astro-hosted	env variable update	resolve-linked		bool
+astro,astro-hosted	env variable update	secret	s	bool
+astro,astro-hosted	env variable update	strict		bool
+astro,astro-hosted	env variable update	value	v	string
+astro,astro-hosted	env variable update	workspace-id		string
+astro,astro-hosted	ide project export	force	f	bool
+astro,astro-hosted	ide project export	project-id	p	string
+astro,astro-hosted	ide project import	project-id	p	string
+astro,astro-hosted	ide project import	session-id	s	string
+astro,astro-hosted,apc	login	login-link	l	bool
+astro,astro-hosted,apc	login	oauth	o	bool
+astro,astro-hosted,apc	login	token-login	t	string
+astro,astro-hosted	organization audit-logs export	include	i	string
+astro,astro-hosted	organization audit-logs export	organization-name	n	string
+astro,astro-hosted	organization audit-logs export	output-file	o	string
+astro,astro-hosted	organization list	json		bool
+astro,astro-hosted	organization list	output	o	string
+astro,astro-hosted	organization list	template		string
+astro,astro-hosted	organization role list	include-default-roles	i	bool
+astro,astro-hosted	organization switch	login-link	l	bool
+astro,astro-hosted	organization switch	workspace-id	w	string
+astro,astro-hosted	organization team create	description	d	string
+astro,astro-hosted	organization team create	name	n	string
+astro,astro-hosted	organization team create	role	r	string
+astro,astro-hosted	organization team delete	force	f	bool
+astro,astro-hosted	organization team list	json		bool
+astro,astro-hosted	organization team list	output	o	string
+astro,astro-hosted	organization team list	template		string
+astro,astro-hosted	organization team update	description	d	string
+astro,astro-hosted	organization team update	force	f	bool
+astro,astro-hosted	organization team update	name	n	string
+astro,astro-hosted	organization team update	role	r	string
+astro,astro-hosted	organization team user add	force	f	bool
+astro,astro-hosted	organization team user add	team-id	t	string
+astro,astro-hosted	organization team user add	user-id	u	string
+astro,astro-hosted	organization team user list	team-id	t	string
+astro,astro-hosted	organization team user remove	force	f	bool
+astro,astro-hosted	organization team user remove	team-id	t	string
+astro,astro-hosted	organization team user remove	user-id	u	string
+astro,astro-hosted	organization token create	clean-output	c	bool
+astro,astro-hosted	organization token create	description	d	string
+astro,astro-hosted	organization token create	expiration	e	string
+astro,astro-hosted	organization token create	name	n	string
+astro,astro-hosted	organization token create	organization-id		string
+astro,astro-hosted	organization token create	role	r	string
+astro,astro-hosted	organization token delete	force	f	bool
+astro,astro-hosted	organization token delete	name	t	string
+astro,astro-hosted	organization token delete	organization-id		string
+astro,astro-hosted	organization token list	organization-id		string
+astro,astro-hosted	organization token roles	organization-id		string
+astro,astro-hosted	organization token rotate	clean-output	c	bool
+astro,astro-hosted	organization token rotate	force	f	bool
+astro,astro-hosted	organization token rotate	name	t	string
+astro,astro-hosted	organization token rotate	organization-id		string
+astro,astro-hosted	organization token update	description	d	string
+astro,astro-hosted	organization token update	name	t	string
+astro,astro-hosted	organization token update	new-name	n	string
+astro,astro-hosted	organization token update	organization-id		string
+astro,astro-hosted	organization token update	role	r	string
+astro,astro-hosted	organization user invite	role	r	string
+astro,astro-hosted	organization user list	json		bool
+astro,astro-hosted	organization user list	output	o	string
+astro,astro-hosted	organization user list	template		string
+astro,astro-hosted	organization user update	role	r	string
+astro,astro-hosted	remote deploy	build-secret		string
+astro,astro-hosted	remote deploy	deployment-id		string
+astro,astro-hosted	remote deploy	image-name	i	string
+astro,astro-hosted	remote deploy	platform		string
+astro,astro-hosted,apc	run	dag-file	d	string
+astro,astro-hosted,apc	run	env	e	string
+astro,astro-hosted,apc	run	execution-date		string
+astro,astro-hosted,apc	run	no-cache		bool
+astro,astro-hosted,apc	run	settings-file	s	string
+astro,astro-hosted,apc	run	verbose		bool
+apc	team get	all	a	bool
+apc	team get	roles	r	bool
+apc	team get	users	u	bool
+apc	team list	page-size	s	string
+apc	team list	paginated	p	bool
+apc	team update	role	r	string
+apc	user create	email	e	string
+apc	user create	password	p	string
+astro,astro-hosted,apc	workspace create	description	d	string
+astro,astro-hosted	workspace create	enforce-cicd	e	string
+apc	workspace create	label	l	string
+astro,astro-hosted	workspace create	name	n	string
+astro,astro-hosted	workspace list	json		bool
+astro,astro-hosted	workspace list	output	o	string
+astro,astro-hosted	workspace list	template		string
+apc	workspace service-account create	category	c	string
+apc	workspace service-account create	label	l	string
+apc	workspace service-account create	role	r	string
+apc	workspace service-account create	user-id	u	string
+apc	workspace service-account create	workspace-id	w	string
+apc	workspace service-account delete	workspace-id	w	string
+apc	workspace service-account list	workspace-id	w	string
+apc	workspace switch	page-size	s	string
+apc	workspace switch	paginated	p	bool
+apc	workspace team add	role		string
+astro,astro-hosted	workspace team add	role	r	string
+apc	workspace team add	team-id		string
+apc	workspace team add	workspace-id		string
+astro,astro-hosted	workspace team add	workspace-id	w	string
+astro,astro-hosted	workspace team list	json		bool
+astro,astro-hosted	workspace team list	output	o	string
+astro,astro-hosted	workspace team list	template		string
+apc	workspace team list	workspace-id		string
+apc	workspace team remove	workspace-id		string
+apc	workspace team update	role		string
+astro,astro-hosted	workspace team update	role	r	string
+apc	workspace team update	workspace-id		string
+astro,astro-hosted	workspace token add	org-token-name	n	string
+astro,astro-hosted	workspace token add	role	r	string
+astro,astro-hosted	workspace token add	workspace-id		string
+astro,astro-hosted	workspace token create	clean-output	c	bool
+astro,astro-hosted	workspace token create	description	d	string
+astro,astro-hosted	workspace token create	expiration	e	string
+astro,astro-hosted	workspace token create	name	n	string
+astro,astro-hosted	workspace token create	role	r	string
+astro,astro-hosted	workspace token create	workspace-id		string
+astro,astro-hosted	workspace token delete	force	f	bool
+astro,astro-hosted	workspace token delete	name	t	string
+astro,astro-hosted	workspace token delete	workspace-id		string
+astro,astro-hosted	workspace token list	workspace-id		string
+astro,astro-hosted	workspace token organization-token add	org-token-name	n	string
+astro,astro-hosted	workspace token organization-token add	role	r	string
+astro,astro-hosted	workspace token organization-token add	workspace-id		string
+astro,astro-hosted	workspace token organization-token list	workspace-id		string
+astro,astro-hosted	workspace token organization-token remove	org-token-name	n	string
+astro,astro-hosted	workspace token organization-token remove	workspace-id		string
+astro,astro-hosted	workspace token organization-token update	org-token-name	n	string
+astro,astro-hosted	workspace token organization-token update	role	r	string
+astro,astro-hosted	workspace token organization-token update	workspace-id		string
+astro,astro-hosted	workspace token rotate	clean-output	c	bool
+astro,astro-hosted	workspace token rotate	force	f	bool
+astro,astro-hosted	workspace token rotate	name	t	string
+astro,astro-hosted	workspace token rotate	workspace-id		string
+astro,astro-hosted	workspace token update	description	d	string
+astro,astro-hosted	workspace token update	name	t	string
+astro,astro-hosted	workspace token update	new-name	n	string
+astro,astro-hosted	workspace token update	role	r	string
+astro,astro-hosted	workspace token update	workspace-id		string
+astro,astro-hosted,apc	workspace update	description	d	string
+astro,astro-hosted	workspace update	enforce-cicd	e	string
+apc	workspace update	label	l	string
+astro,astro-hosted	workspace update	name	n	string
+apc	workspace user add	email	e	string
+astro,astro-hosted,apc	workspace user add	role	r	string
+astro,astro-hosted	workspace user add	workspace-id		string
+apc	workspace user add	workspace-id	w	string
+astro,astro-hosted	workspace user list	json		bool
+astro,astro-hosted	workspace user list	output	o	string
+apc	workspace user list	page-size	s	string
+apc	workspace user list	paginated	p	bool
+astro,astro-hosted	workspace user list	template		string
+astro,astro-hosted	workspace user list	workspace-id		string
+apc	workspace user list	workspace-id	w	string
+astro,astro-hosted	workspace user remove	workspace-id		string
+apc	workspace user remove	workspace-id	w	string
+apc	workspace user update	role		string
+astro,astro-hosted	workspace user update	role	r	string
+astro,astro-hosted	workspace user update	workspace-id		string
+apc	workspace user update	workspace-id	w	string

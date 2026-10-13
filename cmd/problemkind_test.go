@@ -100,7 +100,7 @@ func executeRoot(root *cobra.Command, args ...string) (stdout, stderr string, er
 	var out, errOut bytes.Buffer
 	root.SetOut(&errOut)
 	root.SetErr(&errOut)
-	err = cliout.Execute(context.Background(), root, args, &out, problemKinds)
+	err = execute(context.Background(), root, args, &out)
 	return out.String(), errOut.String(), err
 }
 

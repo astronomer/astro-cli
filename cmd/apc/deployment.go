@@ -168,16 +168,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
-	// Try to get Houston version, but use global variable if client is not available
-	localHoustonVersion := houstonVersion
-	if houstonClient != nil {
-		if version, err := houstonClient.GetPlatformVersion(nil); err == nil {
-			localHoustonVersion = version
-		}
-	}
-
 	example := deploymentCreateExample
-	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		example = deploymentCreateExampleAPCV1
 	}
 	cmd := &cobra.Command{
@@ -208,7 +200,7 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	}
 
 	if nfsMountDAGDeploymentEnabled {
-		if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
+		if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 			cmd.Example += createExampleDagDeploymentAPCV1
 		} else {
 			cmd.Example += createExampleDagDeployment
@@ -235,12 +227,12 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&cloudRole, "cloud-role", "c", "", "Set cloud role to annotate service accounts in deployment")
 	cmd.Flags().StringVar(&createNamespace, "namespace", "", "Kubernetes namespace for the Deployment, where the platform asks for one: one of the namespaces it offers, or a name of your own (lower-case letters, digits and '-', at most 63) where it takes one")
 
-	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Set cluster ID to create deployment in ")
 		_ = cmd.MarkFlagRequired("cluster-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	}
 
-	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "2.1.0"}) {
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "2.1.0"}) {
 		cmd.Flags().StringVarP(&deploymentMode, "mode", "", "", "Deployment mode, one of: helm (default), operator")
 		cmd.Example += createExampleOperatorMode
 	}
@@ -313,13 +305,6 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 }
 
 func newDeploymentListCmd(out io.Writer) *cobra.Command {
-	// Try to get Houston version, but use global variable if client is not available
-	localHoustonVersion := houstonVersion
-	if houstonClient != nil {
-		if version, err := houstonClient.GetPlatformVersion(nil); err == nil {
-			localHoustonVersion = version
-		}
-	}
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -335,7 +320,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show Deployments across all Workspaces")
-	if houston.VerifyVersionMatch(localHoustonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
+	if houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "1.0.0"}) {
 		cmd.Flags().StringVarP(&clusterID, "cluster-id", "", "", "Show Deployments from the specified cluster")
 	}
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
