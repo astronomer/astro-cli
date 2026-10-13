@@ -330,7 +330,7 @@ Anything else is an error: an unknown method, a field the method does not take, 
 
 ### `default`
 
-Marks the project's default link. At most one link in the file may set it; two or more is an error. A project with a single link treats it as the default without the mark.
+Marks the project's default link. At most one link in the file may set it; two or more is an error. A project with a single link treats it as the default without the mark, and adding a second link writes the mark onto that first one, so the default does not vanish because a link was added. `astro link default NAME` moves it.
 
 - `astro af` and the other commands that query an Airflow use it when nothing else names a link: no `-d`, no `ASTRO_DEPLOYMENT`, no `astro use` selection (see [instances.md](instances.md#resolution-order-for-astro-af)).
 - `astro deploy` never ships to it on its own. An interactive deploy that names no link asks, with the default preselected; a run that cannot be asked must name one (see [deploy.md](deploy.md#3-selecting-the-deployment)).

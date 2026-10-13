@@ -156,6 +156,10 @@ var linkEnvNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 //     method, and carries only the fields its method takes.
 //   - default = true is carried over when the link had it. The flag belongs to
 //     SetDefaultLink, so a re-save does not hand the default to nobody.
+//   - a project's only link, unmarked and so its default by
+//     manifest.DefaultLink, is marked default = true when a second link is
+//     added beside it, so the project keeps pointing where it did
+//     (keepTheOnlyLinkDefault).
 //
 // An empty Workspace keeps a workspace the link already sets itself;
 // ClearWorkspace removes it. Removing the link and saving it again does too.
@@ -231,11 +235,37 @@ func (l Link) edit() ManifestEdit {
 		if existing, ok := before.Astro.Deployments[l.Name]; ok && existing.Default {
 			table["default"] = true
 		}
+		if err := keepTheOnlyLinkDefault(before, ed, l.Name); err != nil {
+			return err
+		}
 		if err := setLinkTargets(ed, &l); err != nil {
 			return err
 		}
 		return ReplaceTable(ed, key, table)
 	}
+}
+
+// keepTheOnlyLinkDefault marks a project's only link default = true when a
+// second one, named name, is about to be added beside it.
+//
+// manifest.DefaultLink counts a lone unmarked link as the default, so a
+// one-link project points at it from every command and both apps. A second
+// link would end that silently: two unmarked links have no default, and the
+// project would stop pointing anywhere because something was added. Marking
+// the first link keeps what the project already meant, and picks nothing new.
+// A project with a marked link, or with several unmarked ones, is left alone.
+func keepTheOnlyLinkDefault(before *manifest.Manifest, ed tomledit.Editor, name string) error {
+	links := before.Astro.Deployments
+	if len(links) != 1 {
+		return nil
+	}
+	for only, l := range links {
+		if only == name || l.Default {
+			return nil
+		}
+		return ed.Set(append(linkKey(only), "default"), true)
+	}
+	return nil
 }
 
 // RemoveLink removes the link called name from the pyproject.toml in dir,
