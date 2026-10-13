@@ -15,19 +15,17 @@ require (
 )
 
 require (
-	github.com/astronomer/astro-cli/pkg/localrt v0.0.0-00010101000000-000000000000 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/zalando/go-keyring v0.2.8 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sys v0.27.0 // indirect
 )
 
 require (
 	github.com/astronomer/astro-cli/pkg/envschema v0.0.0-00010101000000-000000000000
-	github.com/astronomer/astro-cli/pkg/imagebuild v0.0.0-00010101000000-000000000000
 	github.com/astronomer/astro-cli/pkg/secrets v0.0.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758
+	github.com/pelletier/go-toml/v2 v2.4.4-0.20260718201843-686c980c4758 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -49,7 +47,3 @@ replace github.com/astronomer/astro-cli/pkg/connmodel => ../connmodel
 replace github.com/astronomer/astro-cli/pkg/secrets => ../secrets
 
 replace github.com/astronomer/astro-cli/pkg/airflowrt => ../airflowrt
-
-replace github.com/astronomer/astro-cli/pkg/imagebuild => ../imagebuild
-
-replace github.com/astronomer/astro-cli/pkg/localrt => ../localrt

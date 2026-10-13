@@ -13,6 +13,8 @@ import (
 
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
 // A generated build for an image that is shipped — a deploy, `astro package
@@ -45,23 +47,13 @@ var skippedProjectNames = map[string]bool{
 // top of the project's own .dockerignore, and after it, so no `!` line of the
 // project's can bring one back: the plaintext local .env (where `astro local
 // env set --plain` writes), and the per-machine files Astro tools write into a
-// project. They hold something true of one machine and wrong, or secret, on
-// any other, and an image is pushed to a registry.
+// project (airflowrt.LocalFileRules). They hold something true of one machine
+// and wrong, or secret, on any other, and an image is pushed to a registry.
 //
-// pkg/scaffold writes the same rules into the .dockerignore a declared
-// Dockerfile's build reads. Neither module imports the other, so a test in
-// pkg/scaffold, where imagebuild is a test-only dependency, holds this list to
-// cover scaffold's.
-var ShippedImageIgnores = []string{
-	".env",
-	".astro/standalone/",
-	".astro/worktrees/",
-	".astro/*.local.yaml",
-	".astro/*.local.yml",
-	".astro/otto/*.local.json",
-	".astro/otto/mcp.json",
-	"plugins/fix_local_executor_pickle.py",
-}
+// The per-machine list is airflowrt's, the same one pkg/scaffold writes into
+// the .dockerignore a declared Dockerfile's build reads, so the two kinds of
+// image leave out the same files without a second copy to keep in step.
+var ShippedImageIgnores = append([]string{".env"}, airflowrt.LocalFileRules()...)
 
 // generatedNames are the files a generated build writes at the context root.
 // The project's own copies, in any case, are not carried, so they cannot
