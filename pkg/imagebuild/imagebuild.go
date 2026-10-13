@@ -495,15 +495,27 @@ const gitPackage = "git"
 // uv fails such an install with "Git executable not found"; the image's
 // ONBUILD steps install packages.txt before requirements.txt, so listing git
 // there is enough. packages is never modified.
+//
+// Only https sources are served by this: an ssh one also needs an ssh client
+// and a key, which the build has neither of.
 func withGitForVCSDeps(deps, packages []string) []string {
-	if slices.Contains(packages, gitPackage) || !slices.ContainsFunc(deps, isGitReference) {
+	if slices.ContainsFunc(packages, isGitPackage) || !slices.ContainsFunc(deps, isGitReference) {
 		return packages
 	}
 	return append(slices.Clone(packages), gitPackage)
 }
 
-// isGitReference reports a PEP 508 direct reference fetched with git.
+// isGitPackage reports an apt entry naming git, pinned (git=1:2.39…) or with
+// an architecture (git:amd64) or not.
+func isGitPackage(pkg string) bool {
+	name, _, _ := strings.Cut(strings.TrimSpace(pkg), "=")
+	name, _, _ = strings.Cut(name, ":")
+	return name == gitPackage
+}
+
+// isGitReference reports a PEP 508 direct reference fetched with git. The
+// scheme is matched as uv matches it, without regard to case.
 func isGitReference(dep string) bool {
 	_, ref, ok := strings.Cut(dep, "@")
-	return ok && strings.HasPrefix(strings.TrimSpace(ref), "git+")
+	return ok && strings.HasPrefix(strings.ToLower(strings.TrimSpace(ref)), "git+")
 }

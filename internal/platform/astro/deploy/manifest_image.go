@@ -94,7 +94,7 @@ var (
 // tarball. It reuses the 1.x transport (createDeploy, the registry push in
 // airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
 // neither prints nor exits — it returns a result for cmd to render, and writes
-// only a --wait's progress, to in.Progress.
+// only the image build's output and a --wait's progress, to in.Progress.
 //
 // Docker is required and checked before any transport work (docs/deploy.md, section 5).
 //
@@ -297,7 +297,7 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 		progress = os.Stderr
 	}
 	built, err := imagebuild.New(cmd, buildNow).BuildLocal(ctx, *req, localrt.Callbacks{
-		OnLine: func(l localrt.LogLine) { fmt.Fprintln(progress, l.Text) },
+		OnLine: func(l localrt.LogLine) { fmt.Fprintf(progress, "[%s] %s\n", l.Component, l.Text) },
 	})
 	if err != nil {
 		return "", "", err

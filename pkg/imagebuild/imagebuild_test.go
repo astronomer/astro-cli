@@ -128,7 +128,9 @@ func TestBuildAddsGitForAGitReference(t *testing.T) {
 		want           string
 	}{
 		"a git source adds git":        {deps: []string{"airflow-blueprint @ git+https://github.com/astronomer/blueprint@6f06313"}, packages: []string{"libpq-dev"}, want: "libpq-dev\ngit\n"},
-		"git already listed":           {deps: []string{"x @ git+ssh://git@example.com/x.git"}, packages: []string{"git"}, want: "git\n"},
+		"git already listed":           {deps: []string{"x @ git+https://example.com/x.git"}, packages: []string{"git"}, want: "git\n"},
+		"git already pinned":           {deps: []string{"x @ git+https://example.com/x.git"}, packages: []string{"git=1:2.39.5-0+deb12u2"}, want: "git=1:2.39.5-0+deb12u2\n"},
+		"the scheme in capitals":       {deps: []string{"x @ GIT+https://example.com/x.git"}, want: "git\n"},
 		"a plain url source adds none": {deps: []string{"x @ https://example.com/x-1.0.tar.gz"}, want: ""},
 		"a version pin adds none":      {deps: []string{"pandas>=2"}, want: ""},
 	} {
