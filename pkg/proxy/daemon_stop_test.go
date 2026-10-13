@@ -13,17 +13,20 @@ import (
 // stopSeams replaces the hooks the stop sequence goes through and records what
 // was called.
 type stopSeams struct {
-	asked, waited, killed []int
+	asked, waited, killed, forgot []int
 }
 
 func withStopSeams(t *testing.T, canAsk bool) *stopSeams {
 	t.Helper()
 	s := &stopSeams{}
-	origAsk, origWait, origKill := requestStop, waitForDaemonExit, killProcess
+	origAsk, origWait, origKill, origForget := requestStop, waitForDaemonExit, killProcess, forgetStop
 	requestStop = func(pid int) bool { s.asked = append(s.asked, pid); return canAsk }
 	waitForDaemonExit = func(pid int) { s.waited = append(s.waited, pid) }
 	killProcess = func(pid int) { s.killed = append(s.killed, pid) }
-	t.Cleanup(func() { requestStop, waitForDaemonExit, killProcess = origAsk, origWait, origKill })
+	forgetStop = func(pid int) { s.forgot = append(s.forgot, pid) }
+	t.Cleanup(func() {
+		requestStop, waitForDaemonExit, killProcess, forgetStop = origAsk, origWait, origKill, origForget
+	})
 	return s
 }
 
@@ -48,6 +51,11 @@ func TestStopWaitsForADaemonItCouldAsk(t *testing.T) {
 	if len(s.asked) != 1 || len(s.waited) != 1 || s.waited[0] != os.Getpid() {
 		t.Errorf("asked %v, waited %v; want one ask and one wait for the recorded pid", s.asked, s.waited)
 	}
+	// What the ask kept to reach the daemon (a process handle, on Windows) is
+	// let go once the wait is over, and not before.
+	if len(s.forgot) != 1 || s.forgot[0] != os.Getpid() {
+		t.Errorf("forgot %v; want the stop let go of once it was over", s.forgot)
+	}
 	if _, err := os.Stat(d.RecordPath()); !os.IsNotExist(err) {
 		t.Error("the record survived the stop")
 	}
@@ -63,8 +71,9 @@ func TestStopLeavesAProcessItCouldNotAsk(t *testing.T) {
 	if err := d.Stop(); err != nil {
 		t.Fatal(err)
 	}
-	if len(s.waited) != 0 || len(s.killed) != 0 {
-		t.Errorf("waited %v, killed %v; want neither for a process that could not be asked", s.waited, s.killed)
+	if len(s.waited) != 0 || len(s.killed) != 0 || len(s.forgot) != 0 {
+		t.Errorf("waited %v, killed %v, forgot %v; want none for a process that could not be asked",
+			s.waited, s.killed, s.forgot)
 	}
 	if _, err := os.Stat(d.RecordPath()); !os.IsNotExist(err) {
 		t.Error("the record survived the stop")
@@ -82,6 +91,9 @@ func TestStopIfEmptyWaitsOnlyForADaemonItCouldAsk(t *testing.T) {
 		}
 		if got := len(s.waited) == 1; got != canAsk {
 			t.Errorf("canAsk=%v: waited %v", canAsk, s.waited)
+		}
+		if got := len(s.forgot) == 1; got != canAsk {
+			t.Errorf("canAsk=%v: forgot %v", canAsk, s.forgot)
 		}
 	}
 }

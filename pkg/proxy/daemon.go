@@ -338,13 +338,15 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 
 	bound, err := d.waitForPortFile()
 	if err != nil {
-		killProcess(pid)
+		cmd.Process.Kill()    //nolint:errcheck // the start has already failed
 		cmd.Process.Release() //nolint:errcheck // the start has already failed
 		return "", fmt.Errorf("proxy daemon did not start: %w (see %s)", err, d.LogPath())
 	}
 
 	if err := d.writeRecord(pid, bound); err != nil {
-		requestStop(pid)
+		if requestStop(pid) {
+			forgetStop(pid)
+		}
 		cmd.Process.Release() //nolint:errcheck // the start has already failed
 		return "", fmt.Errorf("error writing proxy PID file: %w", err)
 	}
@@ -419,6 +421,7 @@ func (d *Daemon) Stop() error {
 	d.logf("stopping proxy daemon (PID %d)", pid)
 	if requestStop(pid) {
 		waitForDaemonExit(pid)
+		forgetStop(pid)
 	}
 	d.removeFiles()
 	return nil
@@ -461,6 +464,7 @@ func (d *Daemon) StopIfEmpty() {
 		return
 	}
 	waitForDaemonExit(pid)
+	forgetStop(pid)
 }
 
 // waitForDaemonExit is the seam both stops wait through, so a test can observe

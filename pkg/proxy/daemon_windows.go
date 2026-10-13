@@ -113,35 +113,78 @@ func stopRequests() (stop <-chan struct{}, release func(), err error) {
 	return done, release, nil
 }
 
+// stopping holds a handle to each daemon a stop has reached, from requestStop
+// until forgetStop.
+//
+// While a handle to a process is open, Windows does not hand its pid to
+// another process. So the wait that follows a stop, and the force if the wait
+// runs out, reach the daemon the event was found for and not whatever took its
+// pid after it exited: the forced kill goes through this handle, never through
+// the pid again.
+var (
+	stoppingMu sync.Mutex
+	stopping   = map[int]windows.Handle{}
+)
+
 // requestStop asks the daemon at pid to stop by setting its stop event, and
-// reports whether it could.
+// reports whether it could. When it could, it keeps a handle to the process
+// until forgetStop (see stopping).
 //
 // False means there is no such event: pid is not a daemon that ever listened
 // for one, most likely a process that recycled a stale record's PID, or one in
 // another session. The caller then neither waits nor forces it, because forcing
 // would end a process that is not ours.
 var requestStop = func(pid int) bool {
+	// The handle first, so the pid is pinned before the event says whose it is.
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE, false, uint32(pid))
+	if err != nil {
+		return false
+	}
 	name, err := windows.UTF16PtrFromString(stopEventName(pid))
 	if err != nil {
+		windows.CloseHandle(h) //nolint:errcheck // nothing to do if it fails
 		return false
 	}
 	ev, err := windows.OpenEvent(windows.EVENT_MODIFY_STATE, false, name)
 	if err != nil {
+		windows.CloseHandle(h) //nolint:errcheck // nothing to do if it fails
 		return false
 	}
 	defer windows.CloseHandle(ev) //nolint:errcheck // nothing to do if it fails
-	return windows.SetEvent(ev) == nil
+	if err := windows.SetEvent(ev); err != nil {
+		windows.CloseHandle(h) //nolint:errcheck // nothing to do if it fails
+		return false
+	}
+
+	stoppingMu.Lock()
+	defer stoppingMu.Unlock()
+	if old, ok := stopping[pid]; ok {
+		windows.CloseHandle(old) //nolint:errcheck // replaced by the handle just opened
+	}
+	stopping[pid] = h
+	return true
 }
 
-// killProcess ends pid without asking. It is only reached for a daemon that
-// took its stop event and did not exit within stopTimeout.
+// killProcess ends a daemon a stop reached and that did not exit within
+// stopTimeout, through the handle requestStop kept. A pid no stop reached is
+// left alone: forcing it by number could end a process that took the pid.
 var killProcess = func(pid int) {
-	h, err := windows.OpenProcess(windows.PROCESS_TERMINATE, false, uint32(pid))
-	if err != nil {
-		return
+	stoppingMu.Lock()
+	h, ok := stopping[pid]
+	stoppingMu.Unlock()
+	if ok {
+		windows.TerminateProcess(h, 1) //nolint:errcheck // nothing left to try
 	}
-	defer windows.CloseHandle(h)   //nolint:errcheck // nothing to do if it fails
-	windows.TerminateProcess(h, 1) //nolint:errcheck // nothing left to try
+}
+
+// forgetStop closes the handle requestStop kept for pid, once the stop is over.
+var forgetStop = func(pid int) {
+	stoppingMu.Lock()
+	defer stoppingMu.Unlock()
+	if h, ok := stopping[pid]; ok {
+		windows.CloseHandle(h) //nolint:errcheck // nothing to do if it fails
+		delete(stopping, pid)
+	}
 }
 
 // processLooksLikeProxy reports whether pid has a stop event: the identity check

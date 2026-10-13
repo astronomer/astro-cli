@@ -89,6 +89,7 @@ func TestTheStopEventLastsUntilRelease(t *testing.T) {
 	if !requestStop(os.Getpid()) {
 		t.Fatal("requestStop found no stop event for a process listening for one")
 	}
+	t.Cleanup(func() { forgetStop(os.Getpid()) })
 	select {
 	case <-stop:
 	case <-time.After(10 * time.Second):
@@ -150,7 +151,18 @@ func TestDaemonStartsAdoptsAndStopsOnWindows(t *testing.T) {
 	if !alive {
 		t.Fatal("no live daemon after EnsureRunning")
 	}
-	t.Cleanup(func() { killProcess(pid) })
+	// Held for the test's life, so the cleanup can only ever end this daemon,
+	// and only if the test failed before Stop did.
+	h, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE, false, uint32(pid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if ev, _ := windows.WaitForSingleObject(h, 0); ev == uint32(waitTimeout) {
+			windows.TerminateProcess(h, 1) //nolint:errcheck // a failed test's leftover
+		}
+		windows.CloseHandle(h) //nolint:errcheck // nothing to do if it fails
+	})
 	if !probeProxySignature(port) {
 		t.Fatalf("port %s does not answer as the proxy", port)
 	}
@@ -211,6 +223,8 @@ func TestRequestStopLeavesAProcessWithNoEvent(t *testing.T) {
 	if requestStop(pid) {
 		t.Error("requestStop reported a stop for a process with no stop event")
 	}
+	// No stop reached it, so nothing forces it either.
+	killProcess(pid)
 	time.Sleep(200 * time.Millisecond)
 	if !IsPIDAlive(pid) {
 		t.Error("the bystander died")

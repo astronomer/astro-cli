@@ -31,10 +31,14 @@ var requestStop = func(pid int) bool {
 	return true
 }
 
-// killProcess ends pid without asking.
+// killProcess ends pid without asking, once a stop has not ended it.
 var killProcess = func(pid int) {
 	syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // nothing left to try
 }
+
+// forgetStop lets go of what requestStop kept to reach pid. Unix keeps nothing:
+// a signal names a pid, and there is no handle that pins one.
+var forgetStop = func(int) {}
 
 // stopRequests returns a channel that is closed when the daemon is asked to
 // stop: SIGTERM from requestStop, or SIGINT from a terminal running it in the
