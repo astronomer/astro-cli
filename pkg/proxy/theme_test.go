@@ -256,3 +256,66 @@ func TestTheProxyThemesEveryAirflowPage(t *testing.T) {
 		t.Error("the host's hook ran before the theme, so it cannot build on the themed page")
 	}
 }
+
+// A HEAD response carries the headers of the page it describes and no body.
+// Reading it gives zero bytes, and rewriting Content-Length from that tells the
+// client the page is empty.
+func TestInjectIntoHTMLLeavesAHeadResponseAlone(t *testing.T) {
+	resp := &http.Response{
+		StatusCode:    http.StatusOK,
+		Header:        http.Header{},
+		Body:          http.NoBody,
+		ContentLength: 5000,
+		Request:       httptest.NewRequest(http.MethodHead, "http://x.localhost/", http.NoBody),
+	}
+	resp.Header.Set("Content-Type", "text/html; charset=utf-8")
+	resp.Header.Set("Content-Length", "5000")
+
+	if err := InjectAirflowTheme(resp); err != nil {
+		t.Fatal(err)
+	}
+	if got := resp.Header.Get("Content-Length"); got != "5000" {
+		t.Errorf("Content-Length = %q, want the page's own 5000", got)
+	}
+	if resp.ContentLength != 5000 {
+		t.Errorf("ContentLength = %d, want 5000", resp.ContentLength)
+	}
+}
+
+// A status that carries no body is passed through as it came.
+func TestInjectIntoHTMLLeavesABodylessStatusAlone(t *testing.T) {
+	for _, status := range []int{http.StatusNoContent, http.StatusNotModified} {
+		resp := newHTMLResponse(t, "<html><head></head></html>", false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+		resp.StatusCode = status
+		if err := InjectAirflowTheme(resp); err != nil {
+			t.Fatal(err)
+		}
+		if got := readBody(t, resp); strings.Contains(got, themeTag) {
+			t.Errorf("status %d was rewritten", status)
+		}
+	}
+}
+
+// An encoding the injector can't read is left exactly as it came, body and
+// header both. Stripping Content-Encoding from a brotli body tells the browser
+// to render compressed bytes as text.
+func TestInjectIntoHTMLLeavesAnEncodingItCannotReadAlone(t *testing.T) {
+	for _, enc := range []string{"br", "deflate", "zstd"} {
+		const raw = "\x8b\x0b\x80<html><head></head></html>\x03"
+		resp := newHTMLResponse(t, raw, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+		resp.Header.Set("Content-Encoding", enc)
+		if err := InjectAirflowTheme(resp); err != nil {
+			t.Fatal(err)
+		}
+		if got := resp.Header.Get("Content-Encoding"); got != enc {
+			t.Errorf("Content-Encoding = %q, want %q kept", got, enc)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(body) != raw {
+			t.Errorf("%s body was rewritten", enc)
+		}
+	}
+}

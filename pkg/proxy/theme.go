@@ -132,10 +132,38 @@ func InjectIntoHTML(resp *http.Response, snippet, beforeTag string) error {
 	return injectIntoHTML(resp, snippet, beforeTag, "")
 }
 
+// rewritable reports whether resp is an HTML page the injector can safely read
+// and rewrite. Everything else passes through as it came:
+//
+//   - Anything not HTML.
+//   - A HEAD response or a status that carries no body (1xx, 204, 304). Their
+//     headers describe a page that isn't there to read, and rewriting
+//     Content-Length from an empty read would tell the client the page is empty.
+//   - An encoding other than none, identity or gzip. The injector can't read
+//     brotli, deflate or zstd, and stripping their Content-Encoding would have
+//     the browser render compressed bytes as text.
+func rewritable(resp *http.Response) bool {
+	if !strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+		return false
+	}
+	if resp.Request != nil && resp.Request.Method == http.MethodHead {
+		return false
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotModified {
+		return false
+	}
+	switch resp.Header.Get("Content-Encoding") {
+	case "", "identity", "gzip":
+		return true
+	default:
+		return false
+	}
+}
+
 // injectIntoHTML is InjectIntoHTML that also leaves the body alone when it
 // already contains unlessPresent (empty means always inject).
 func injectIntoHTML(resp *http.Response, snippet, beforeTag, unlessPresent string) error {
-	if !strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+	if !rewritable(resp) {
 		return nil
 	}
 
