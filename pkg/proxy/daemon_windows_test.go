@@ -159,9 +159,9 @@ func TestDaemonStartsAdoptsAndStopsOnWindows(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		if ev, _ := windows.WaitForSingleObject(h, 0); ev == uint32(waitTimeout) {
-			windows.TerminateProcess(h, 1) //nolint:errcheck // a failed test's leftover
+			windows.TerminateProcess(h, 1)
 		}
-		windows.CloseHandle(h) //nolint:errcheck // nothing to do if it fails
+		windows.CloseHandle(h)
 	})
 	if !probeProxySignature(port) {
 		t.Fatalf("port %s does not answer as the proxy", port)
