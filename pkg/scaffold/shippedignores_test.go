@@ -1,4 +1,4 @@
-package pack
+package scaffold
 
 import (
 	"os"
@@ -10,15 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
-	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // A generated image and a declared Dockerfile's image keep the same
-// per-machine files out of the registry. The rules live in two modules that do
-// not import each other (imagebuild.ShippedImageIgnores, and the .dockerignore
-// pkg/scaffold writes), so this holds the first to cover the second: each of
-// scaffold's rules, made into a file, leaves a generated image's files as they
-// were.
+// per-machine files out of the registry. The rules live in two modules
+// (imagebuild.ShippedImageIgnores, and the dockerignoreRules this package
+// writes), so this holds the first to cover the second: each of these rules,
+// made into a file, leaves a generated image's files as they were. imagebuild
+// is a test-only dependency here, as uv is.
 func TestShippedImagesLeaveOutWhatScaffoldIgnores(t *testing.T) {
 	project := t.TempDir()
 	write := func(rel, body string) {
@@ -30,7 +29,7 @@ func TestShippedImagesLeaveOutWhatScaffoldIgnores(t *testing.T) {
 	before, err := imagebuild.ProjectFilesDigest(project)
 	require.NoError(t, err)
 
-	for _, rule := range scaffold.DockerignoreRules() {
+	for _, rule := range dockerignoreRules {
 		rel := strings.ReplaceAll(rule, "*", "machine")
 		if strings.HasSuffix(rel, "/") {
 			rel += "state"
@@ -39,5 +38,5 @@ func TestShippedImagesLeaveOutWhatScaffoldIgnores(t *testing.T) {
 	}
 	after, err := imagebuild.ProjectFilesDigest(project)
 	require.NoError(t, err)
-	assert.Equal(t, before, after, "a generated image carried a file pkg/scaffold keeps out of a declared one: add its rule to imagebuild.ShippedImageIgnores")
+	assert.Equal(t, before, after, "a generated image carried a file this package keeps out of a declared one: add its rule to imagebuild.ShippedImageIgnores")
 }

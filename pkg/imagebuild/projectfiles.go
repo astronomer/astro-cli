@@ -49,8 +49,9 @@ var skippedProjectNames = map[string]bool{
 // any other, and an image is pushed to a registry.
 //
 // pkg/scaffold writes the same rules into the .dockerignore a declared
-// Dockerfile's build reads. The two modules do not import each other, so a
-// root-module test holds this list to cover scaffold's.
+// Dockerfile's build reads. Neither module imports the other, so a test in
+// pkg/scaffold, where imagebuild is a test-only dependency, holds this list to
+// cover scaffold's.
 var ShippedImageIgnores = []string{
 	".env",
 	".astro/standalone/",
