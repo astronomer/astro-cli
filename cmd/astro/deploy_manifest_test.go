@@ -476,9 +476,24 @@ func TestDeployManifestPromptIgnoresTheShellsSelection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "linked,", "default"}, pickerRow(t, errOut, "prod"))
 	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "linked"}, pickerRow(t, errOut, "dev"))
-	assert.NotContains(t, errOut, "ASTRO_DEPLOYMENT")
 	assert.Contains(t, errOut, "\n> [1] ")
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
+	// The variable once moved the cursor, so its being ignored is said once,
+	// before the prompt, and never as a row's mark.
+	assert.Contains(t, errOut, "note: ASTRO_DEPLOYMENT=dev chooses what the query commands read; astro deploy asks, with the project's default, prod, preselected")
+	assert.NotContains(t, pickerRow(t, errOut, "dev"), "ASTRO_DEPLOYMENT")
+}
+
+// Naming the default, the variable agrees with the prompt, and there is
+// nothing to say.
+func TestDeployManifestSaysNothingWhenTheEnvNamesTheDefault(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	t.Setenv(instances.EnvVar, "prod")
+
+	_, errOut, err := execDeployIO("\n")
+	require.NoError(t, err)
+	assert.NotContains(t, errOut, "note: ASTRO_DEPLOYMENT")
 }
 
 // savePinForTest writes an `astro use` selection for the project under test.

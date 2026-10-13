@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -28,6 +29,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -473,6 +475,7 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	errOut := cmd.ErrOrStderr()
+	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
@@ -564,6 +567,28 @@ func announceDeployTarget(w io.Writer, target manifestdeploy.Target) {
 		return
 	}
 	fmt.Fprintf(w, "→ %s (astro deployment %s)\n", target.LinkName, target.DeploymentID)
+}
+
+// noteIgnoredDeploymentEnv says, before the prompt, that an exported
+// ASTRO_DEPLOYMENT does not steer it. The variable once moved the prompt's
+// cursor, and someone who answers by habit should not find Enter now lands on
+// another Deployment unannounced. Nothing is said when it names the project's
+// default anyway, the row the prompt highlights, or when no prompt is coming:
+// a run that cannot be asked, or one that names its target.
+func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive bool, named ...string) {
+	env := os.Getenv(instances.EnvVar)
+	if env == "" || !interactive || slices.ContainsFunc(named, func(n string) bool { return n != "" }) {
+		return
+	}
+	def, _, ok := manifest.DefaultLink(m.Astro.Deployments)
+	switch {
+	case ok && def == env:
+		return
+	case ok:
+		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, with the project's default, %s, preselected\n", instances.EnvVar, env, def)
+	default:
+		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, and preselects nothing without a default link\n", instances.EnvVar, env)
+	}
 }
 
 // stdinIsTerminal reports whether this run can be asked which deployment to

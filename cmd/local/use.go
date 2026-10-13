@@ -12,10 +12,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/instances"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // NewUseCmd builds `astro use` for the root, wired with its own deps.
@@ -150,19 +148,14 @@ func (c *cli) runUsePick() error {
 	return c.runUse(name)
 }
 
-// currentMark labels the picker's current row with what made it current, in
-// the words the `astro deploy` prompt and the `astro link` pickers mark a link
-// with, so one fact reads the same everywhere: "default" for the project's
-// default link (deploy.DefaultMark), and "from ASTRO_DEPLOYMENT" for a row the
-// variable chose, which picking here will not change. The user's own selection
-// needs no label: the highlight already says it.
+// currentMark labels the current row with what made it current, when that is
+// not the user's own choice here: "from ASTRO_DEPLOYMENT" for a row the
+// variable chose, which picking here will not change. The default link is
+// marked "default" whether or not it is current (linkMarks), and the user's
+// own selection needs no label: the highlight already says it.
 func currentMark(from instances.Layer) string {
-	switch from {
-	case instances.LayerEnv:
+	if from == instances.LayerEnv {
 		return "from " + instances.EnvVar
-	case instances.LayerDefault:
-		return deploy.DefaultMark
-	case instances.LayerPin, instances.LayerFlag, instances.LayerURL:
 	}
 	return ""
 }
@@ -231,11 +224,7 @@ func (c *cli) runUseShow() error {
 		res.Current, res.From, mark = sel.Instance.Name, layerFrom[sel.From], currentMark(sel.From)
 	}
 	links := set.All()
-	byName := make(map[string]manifest.Link, len(links))
-	for i := range links {
-		byName[links[i].Name] = links[i].Link
-	}
-	defaultName, _, _ := manifest.DefaultLink(byName)
+	defaultName := set.DefaultName()
 	for i := range links {
 		l := &links[i]
 		res.Deployments = append(res.Deployments, useLinkRow{
@@ -262,17 +251,22 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 	}
 	// The label column is blank on every row but one, so tabwriter's padding
 	// leaves the rest ending in spaces; the table is built first and trimmed.
+	defaultName := ""
+	for _, row := range res.Deployments {
+		if row.Default {
+			defaultName = row.Name
+		}
+	}
+	marks := linkMarks(defaultName, res.Current, mark)
 	var table bytes.Buffer
 	tw := tabwriter.NewWriter(&table, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "\tNAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\t")
 	for _, row := range res.Deployments {
-		marker, label := "", ""
+		marker := ""
 		if row.Current {
-			marker, label = "*", mark
+			marker = "*"
 		}
-		if label == "" && row.Default {
-			label = deploy.DefaultMark
-		}
+		label := marks[row.Name]
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", marker, row.Name, row.Kind, dash(row.Where), label)
 	}
 	if err := tw.Flush(); err != nil {

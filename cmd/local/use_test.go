@@ -453,6 +453,34 @@ func TestBareUseMarksAnEnvChosenRow(t *testing.T) {
 	}
 }
 
+// When ASTRO_DEPLOYMENT names the default link, its row says both: the
+// variable's mark must not hide that it is the default, in the picker or in
+// the listing, which would then disagree with its own JSON.
+func TestBareUseKeepsTheDefaultMarkOnAnEnvChosenDefault(t *testing.T) {
+	dir := instanceProject(t, twoLinkManifest) // dev is the default
+	t.Setenv(instances.EnvVar, "dev")
+	const both = "default, from " + instances.EnvVar
+
+	d, out, _ := instanceDeps(t, dir)
+	if err := execute(t, d, "use"); err != nil {
+		t.Fatal(err)
+	}
+	if !lineWith(out.String(), "dev", both) {
+		t.Errorf("listing: dev should read %q:\n%s", both, out)
+	}
+
+	d, out, _ = instanceDeps(t, dir)
+	d.Interactive = func() bool { return true }
+	d.OutputTerminal = func() bool { return true }
+	d.Stdin = strings.NewReader("2\n")
+	if err := execute(t, d, "use"); err != nil {
+		t.Fatal(err)
+	}
+	if !lineWith(out.String(), "dev", both) {
+		t.Errorf("picker: dev should read %q:\n%s", both, out)
+	}
+}
+
 // --output json never prompts, terminal or not: it is the report, as before.
 func TestBareUseWithJSONAtATerminalReports(t *testing.T) {
 	dir := instanceProject(t, twoLinkManifest)

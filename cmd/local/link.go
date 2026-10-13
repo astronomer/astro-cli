@@ -242,18 +242,13 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 		Ask:     []input.Option{input.About("a link")},
 		Invalid: errInvalidLinkSelection,
 	}
-	// Each row's mark: the caller's on the current row, and "default" on the
-	// project's default link, in the words the deploy prompt uses. The mark
-	// column exists only when some row carries one; otherwise every row would
-	// end in blank padding.
+	// The mark column exists only when some row carries one; otherwise every
+	// row would end in blank padding.
 	defaultName, _, _ := manifest.DefaultLink(m.Astro.Deployments)
-	marks := map[string]string{}
-	if defaultName != "" {
-		marks[defaultName] = deploy.DefaultMark
+	if !slices.Contains(names, current) {
+		mark = ""
 	}
-	if mark != "" && slices.Contains(names, current) {
-		marks[current] = mark
-	}
+	marks := linkMarks(defaultName, current, mark)
 	marked := len(marks) > 0
 	if marked {
 		list.Header = append(list.Header, "")
@@ -283,6 +278,26 @@ func (c *cli) pickLink(title, none, current, mark, missing string) (string, erro
 		return "", nil
 	}
 	return names[i], nil
+}
+
+// linkMarks is each link's mark in a list of the project's links, by name, in
+// the words the deploy prompt uses: "default" (deploy.DefaultMark) on the
+// project's default link, and the caller's currentMark on the current row.
+// When both fall on one row they are joined — "default, from ASTRO_DEPLOYMENT"
+// — so neither fact hides the other. The `astro link` pickers, the `astro use`
+// picker and its listing all mark through here.
+func linkMarks(defaultName, current, currentMark string) map[string]string {
+	marks := map[string]string{}
+	if defaultName != "" {
+		marks[defaultName] = deploy.DefaultMark
+	}
+	if current != "" && currentMark != "" {
+		if prev := marks[current]; prev != "" {
+			currentMark = prev + ", " + currentMark
+		}
+		marks[current] = currentMark
+	}
+	return marks
 }
 
 // errInvalidLinkSelection is the link pickers' answer to a choice that is not a
