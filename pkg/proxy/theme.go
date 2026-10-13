@@ -125,9 +125,12 @@ func InjectAirflowTheme(resp *http.Response) error {
 
 // InjectIntoHTML inserts snippet into an HTML response immediately before the
 // last occurrence of beforeTag (matched case-insensitively, e.g. "</head>" or
-// "</body>"). It reads through gzip and writes the same encoding back. Non-HTML
-// responses, and bodies that cannot be read or decoded, pass through without
-// the snippet.
+// "</body>"). It reads through gzip and writes the same encoding back.
+//
+// Responses it should not rewrite pass through untouched: anything not HTML, a
+// HEAD or bodyless response, and an encoding other than none, identity or gzip.
+// A body that fails to read or decode is an error, since part of it is already
+// consumed and cannot be passed on as the page.
 func InjectIntoHTML(resp *http.Response, snippet, beforeTag string) error {
 	return injectIntoHTML(resp, snippet, beforeTag, "")
 }
@@ -202,10 +205,14 @@ func injectIntoHTML(resp *http.Response, snippet, beforeTag, unlessPresent strin
 
 	var reader io.ReadCloser
 	wasGzipped := resp.Header.Get("Content-Encoding") == "gzip"
+	// A read that fails has already consumed part of the body, so there is no
+	// passing the page on unchanged: the error goes back to the proxy, which
+	// answers with its error handler rather than a truncated page under the
+	// original Content-Length.
 	if wasGzipped {
 		gr, err := gzip.NewReader(resp.Body)
 		if err != nil {
-			return nil
+			return fmt.Errorf("reading a gzip page: %w", err)
 		}
 		reader = gr
 	} else {
@@ -215,7 +222,7 @@ func injectIntoHTML(resp *http.Response, snippet, beforeTag, unlessPresent strin
 	body, err := io.ReadAll(reader)
 	_ = reader.Close()
 	if err != nil {
-		return nil
+		return fmt.Errorf("reading the page: %w", err)
 	}
 
 	if unlessPresent == "" || !bytes.Contains(body, []byte(unlessPresent)) {

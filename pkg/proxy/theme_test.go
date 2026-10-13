@@ -3,6 +3,7 @@ package proxy
 import (
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -157,20 +158,38 @@ func TestInjectIntoHTMLPlaintextStripsContentEncoding(t *testing.T) {
 	}
 }
 
-// A body that claims gzip but isn't: no error, so the response still reaches
-// the client.
-func TestInjectIntoHTMLBadGzipPassesThrough(t *testing.T) {
-	resp := &http.Response{
-		StatusCode: http.StatusOK,
-		Header:     http.Header{},
-		Body:       io.NopCloser(strings.NewReader("not gzip data")),
-	}
-	resp.Header.Set("Content-Type", "text/html")
-	resp.Header.Set("Content-Encoding", "gzip")
-	if err := InjectIntoHTML(resp, "<style>x</style>", "</head>"); err != nil {
-		t.Errorf("expected no error on bad gzip, got %v", err)
+// A body that can't be read is an error, not a silent pass-through. By the time
+// reading fails some of the body is gone, and passing on what's left under the
+// original Content-Length hands the client an empty or truncated page with a
+// 200. Returning the error lets the proxy answer with its error handler.
+func TestInjectIntoHTMLReportsABodyItCannotRead(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body     io.Reader
+		encoding string
+	}{
+		"claims gzip but isn't": {body: strings.NewReader("not gzip data"), encoding: "gzip"},
+		"fails mid-read":        {body: io.MultiReader(strings.NewReader("<html><head>"), errReader{}), encoding: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{},
+				Body:       io.NopCloser(tc.body),
+			}
+			resp.Header.Set("Content-Type", "text/html")
+			if tc.encoding != "" {
+				resp.Header.Set("Content-Encoding", tc.encoding)
+			}
+			if err := InjectIntoHTML(resp, "<style>x</style>", "</head>"); err == nil {
+				t.Error("an unreadable body was passed on as if it were the page")
+			}
+		})
 	}
 }
+
+type errReader struct{}
+
+func (errReader) Read([]byte) (int, error) { return 0, errors.New("connection reset mid-body") }
 
 func TestInjectAirflowThemeCarriesThePrePaintBackground(t *testing.T) {
 	resp := newHTMLResponse(t, `<html><head><title>Airflow</title></head><body><div id="root"></div></body></html>`, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
