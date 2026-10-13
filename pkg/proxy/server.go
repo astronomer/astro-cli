@@ -30,7 +30,7 @@ const (
 	maxLoggedHost = 253
 
 	// SignatureHeader and SignatureValue mark responses the proxy generates
-	// itself (its landing and not-found pages). A caller can probe the proxy's
+	// itself (its landing, not-found and unavailable pages). A caller can probe the proxy's
 	// port and check for this header to confirm it's really the astro proxy on
 	// the other end, not an unrelated process that recycled its PID/port.
 	SignatureHeader = "X-Astro-Proxy"
@@ -510,6 +510,7 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(SignatureHeader, SignatureValue)
 	w.WriteHeader(http.StatusBadGateway)
 	if renderErr := RenderUnavailable(w); renderErr != nil {
 		slog.Debug("unavailable page template", "error", renderErr)

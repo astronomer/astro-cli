@@ -104,6 +104,9 @@ func TestADeadBackendShowsABrowserTheUnavailablePage(t *testing.T) {
 	assert.Equal(t, http.StatusBadGateway, rec.Code)
 	assert.Contains(t, rec.Header().Get("Content-Type"), "text/html")
 	assert.Contains(t, rec.Body.String(), "Preparing for launch")
+	// The proxy wrote this page, not Airflow, and says so the way its other
+	// pages do.
+	assert.Equal(t, SignatureValue, rec.Header().Get(SignatureHeader))
 }
 
 // An API client gets the plain 502 it always did. af and Airflow's own fetches
