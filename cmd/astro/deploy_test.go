@@ -341,6 +341,7 @@ func (s *NonDagsDeploySuite) TestWithinAstroProject() {
 	oneX := s.T().TempDir()
 	s.Require().NoError(os.WriteFile(filepath.Join(oneX, "Dockerfile"), []byte("FROM x\n"), 0o600))
 	s.Require().NoError(os.MkdirAll(filepath.Join(oneX, ".astro"), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Join(oneX, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600))
 	manifestDir := s.T().TempDir()
 	s.Require().NoError(os.WriteFile(filepath.Join(manifestDir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
 	s.Require().NoError(os.MkdirAll(filepath.Join(manifestDir, "include", "dbt"), 0o755))

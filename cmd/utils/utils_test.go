@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 func writeFile(t *testing.T, dir, name, content string) {
@@ -111,14 +112,17 @@ func TestNoDeployableProject(t *testing.T) {
 
 // In the home directory the advice does not suggest astro init, which would
 // make all of ~ a project, and the home directory is recognized under another
-// spelling too. A Dockerfile beside ~/.astro, where the global config lives,
-// does not make it a 1.x project, nor does a tooling-only pyproject.toml.
+// spelling too. A stray Dockerfile beside ~/.astro/config.yaml, the CLI's own
+// settings file, does not make it a 1.x project, nor does a tooling-only
+// pyproject.toml: scaffold.Is1xProject tells the settings file apart by its
+// content, as astro init does.
 func TestNoDeployableProjectInTheHomeDirectory(t *testing.T) {
 	prevHome := config.HomePath
 	t.Cleanup(func() { config.HomePath = prevHome })
 	home := t.TempDir()
 	config.HomePath = home
-	make1x(t, home)
+	writeFile(t, home, "Dockerfile", "FROM quay.io/astronomer/astro-runtime:12.0.0\n")
+	writeFile(t, home, filepath.Join(".astro", "config.yaml"), "context: astronomer_io\ncontexts:\n  astronomer_io:\n    domain: astronomer.io\n")
 	writeFile(t, home, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
 	for _, dir := range []string{home, home + string(filepath.Separator), filepath.Join(home, ".")} {
 		deployIn(t, dir)
@@ -133,6 +137,24 @@ func TestNoDeployableProjectInTheHomeDirectory(t *testing.T) {
 		deployIn(t, link)
 		assert.EqualError(t, refuse(Deploy1xRefusedAstro), homeDirRefusal)
 	}
+}
+
+// A home directory that is a 1.x project (HOME=/usr/local/airflow in a 1.x
+// image: its .astro/config.yaml is the project's, with a project key) is one,
+// for the deploy as for astro init: refused as 1.x, here and from below.
+func TestAHomeDirectoryThatIsA1xProject(t *testing.T) {
+	prevHome := config.HomePath
+	t.Cleanup(func() { config.HomePath = prevHome })
+	home := t.TempDir()
+	config.HomePath = home
+	make1x(t, home)
+	assert.Equal(t, Where{Project1xDir: home}, Locate(home))
+	assert.True(t, scaffold.Is1xProject(home), "the deploy and astro init agree")
+	deployIn(t, home)
+	assert.Contains(t, refuse(Deploy1xRefusedAstro).Error(), "this project uses the Astro CLI 1.x layout")
+	sub := filepath.Join(home, "dags")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	assert.Equal(t, Where{Project1xDir: home}, Locate(sub))
 }
 
 // Locate's walk: the nearest pyproject.toml with [tool.astro] or 1.x project,
@@ -168,6 +190,15 @@ func TestLocate(t *testing.T) {
 		assert.Equal(t, Where{Project1xDir: oneX}, Locate(sub))
 		deployIn(t, oneX)
 		assert.Contains(t, refuse(Deploy1xRefusedAstro).Error(), "this project uses the Astro CLI 1.x layout")
+	})
+
+	t.Run("a Dockerfile beside a .astro with no config.yaml is no 1.x project", func(t *testing.T) {
+		// As Astro CLI 1.x itself knows a project, and astro init with it.
+		dir := t.TempDir()
+		writeFile(t, dir, "Dockerfile", "FROM quay.io/astronomer/astro-runtime:12.0.0\n")
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".astro"), 0o755))
+		assert.Equal(t, Where{}, Locate(dir))
+		assert.False(t, scaffold.Is1xProject(dir))
 	})
 
 	t.Run("directory names that are not ASCII", func(t *testing.T) {
@@ -229,6 +260,57 @@ func TestLocate(t *testing.T) {
 		require.NoError(t, os.MkdirAll(sub, 0o755))
 		assert.Equal(t, Where{Project1xDir: oneX}, Locate(sub))
 	})
+}
+
+// The deploy's walk and astro init's (scaffold.Find1xProject, which the local
+// commands' advice and the dev stub use too) find the same 1.x project, so the
+// deploy refuses as 1.x exactly where init and the hints say it is one.
+func TestLocateAndInitAgreeOn1xProjects(t *testing.T) {
+	prevHome := config.HomePath
+	t.Cleanup(func() { config.HomePath = prevHome })
+
+	oneX := t.TempDir()
+	make1x(t, oneX)
+	below := filepath.Join(oneX, "dags", "team")
+	require.NoError(t, os.MkdirAll(below, 0o755))
+
+	monorepo := t.TempDir()
+	writeFile(t, monorepo, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
+	inMonorepo := filepath.Join(monorepo, "airflow")
+	make1x(t, inMonorepo)
+
+	nested := filepath.Join(t.TempDir(), "legacy")
+	make1x(t, nested)
+	newProject := filepath.Join(nested, "new")
+	writeFile(t, newProject, "pyproject.toml", "[project]\nname = \"demo\"\n\n[tool.astro]\n")
+
+	settingsHome := t.TempDir()
+	writeFile(t, settingsHome, "Dockerfile", "FROM x\n")
+	writeFile(t, settingsHome, filepath.Join(".astro", "config.yaml"), "contexts: {}\n")
+
+	projectHome := t.TempDir()
+	make1x(t, projectHome)
+
+	noConfig := t.TempDir()
+	writeFile(t, noConfig, "Dockerfile", "FROM x\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(noConfig, ".astro"), 0o755))
+
+	for name, c := range map[string]struct{ home, dir, want string }{
+		"a 1.x root":                            {dir: oneX, want: oneX},
+		"below a 1.x root":                      {dir: below, want: oneX},
+		"below a monorepo's tooling file":       {dir: inMonorepo, want: inMonorepo},
+		"a pyproject project inside a 1.x":      {dir: newProject, want: ""},
+		"a home with the CLI settings":          {home: settingsHome, dir: settingsHome, want: ""},
+		"a home that is a 1.x project":          {home: projectHome, dir: projectHome, want: projectHome},
+		"a .astro with no config.yaml":          {dir: noConfig, want: ""},
+		"a fresh directory outside any project": {dir: t.TempDir(), want: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			config.HomePath = c.home
+			assert.Equal(t, c.want, Locate(c.dir).Project1xDir, "the deploy's walk")
+			assert.Equal(t, c.want, scaffold.Find1xProject(c.dir), "astro init's walk")
+		})
+	}
 }
 
 // isRoot is manifestRoot's answer alone.

@@ -145,6 +145,7 @@ func (s *DbtSuite) TestDbtDeploy_WithinAstroProject() {
 	projectDir := s.T().TempDir()
 	s.Require().NoError(os.WriteFile(filepath.Join(projectDir, "Dockerfile"), []byte("FROM x\n"), 0o600))
 	s.Require().NoError(os.MkdirAll(filepath.Join(projectDir, ".astro"), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Join(projectDir, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600))
 	dbtDir := filepath.Join(projectDir, "include", "dbt")
 	s.Require().NoError(os.MkdirAll(dbtDir, 0o755))
 

@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 type RunE func(cmd *cobra.Command, args []string) error
@@ -105,25 +106,20 @@ func (w Where) Loaded(dir string) *manifest.Manifest {
 //   - a pyproject.toml project's root (manifestRoot) stops the walk. A
 //     pyproject.toml declaring no tool.astro table, a monorepo root's tool
 //     settings say, does not;
-//   - else a Dockerfile beside a .astro directory is a 1.x project, except
-//     in the home directory, whose .astro holds the global config;
+//   - else a 1.x project (scaffold.Is1xProject, the one definition astro
+//     init and the local commands' advice use too: a Dockerfile and a
+//     .astro/config.yaml that is not the CLI's own settings file) stops it;
 //   - else the walk goes on up.
-//
-// Each directory's pyproject.toml is read once, and the home directory is
-// looked up once per walk.
 func Locate(dir string) Where {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return Where{}
 	}
-	isHome := homeMatcher()
 	for d := abs; ; {
 		if root, m, loadErr := manifestRoot(d); root {
 			return Where{ManifestDir: d, Manifest: m, LoadErr: loadErr}
 		}
-		// Not a manifest root, so the 1.x layout alone decides: no second
-		// read of the pyproject.toml (project.Is1xProject would make one).
-		if has1xLayout(d) && !isHome(d) {
+		if scaffold.Is1xProject(d) {
 			return Where{Project1xDir: d}
 		}
 		parent := filepath.Dir(d)
@@ -132,37 +128,6 @@ func Locate(dir string) Where {
 		}
 		d = parent
 	}
-}
-
-// homeMatcher reports whether a directory is the home directory, with
-// config.HomePath looked up once: the same spelling once cleaned, or the
-// same directory under another one (a symlink), as config.IsHomeDir has it.
-func homeMatcher() func(dir string) bool {
-	if config.HomePath == "" {
-		return func(string) bool { return false }
-	}
-	home := filepath.Clean(config.HomePath)
-	homeInfo, homeErr := os.Stat(home)
-	return func(dir string) bool {
-		if filepath.Clean(dir) == home {
-			return true
-		}
-		if homeErr != nil {
-			return false
-		}
-		info, err := os.Stat(dir)
-		return err == nil && os.SameFile(info, homeInfo)
-	}
-}
-
-// has1xLayout reports whether dir holds a Dockerfile beside a .astro
-// directory. A directory that cannot be read holds neither.
-func has1xLayout(dir string) bool {
-	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err != nil {
-		return false
-	}
-	info, err := os.Stat(filepath.Join(dir, ".astro"))
-	return err == nil && info.IsDir()
 }
 
 // manifestRoot reports whether dir is a pyproject.toml project's root, the
