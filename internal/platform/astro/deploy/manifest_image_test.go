@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -30,10 +31,22 @@ import (
 type fakeImageCmd struct {
 	calls []string
 	err   error
+	// buildOut is what a build writes to its stdout, and buildErr how it
+	// ends.
+	buildOut string
+	buildErr error
 }
 
-func (f *fakeImageCmd) Run(_ context.Context, _ []string, _ localrt.Stdio, name string, args ...string) error {
+func (f *fakeImageCmd) Run(_ context.Context, _ []string, stdio localrt.Stdio, name string, args ...string) error {
 	f.calls = append(f.calls, name+" "+strings.Join(args, " "))
+	if len(args) > 0 && args[0] == "build" {
+		if f.buildOut != "" && stdio.Out != nil {
+			fmt.Fprint(stdio.Out, f.buildOut)
+		}
+		if f.buildErr != nil {
+			return f.buildErr
+		}
+	}
 	return f.err
 }
 
@@ -127,6 +140,32 @@ func TestDeployManifestImage_BuildAndImageAndDag(t *testing.T) {
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "expected linux/amd64, got %v", cmd.calls)
 	handler.AssertCalled(t, "Push", mock.Anything, registryUsername, mock.Anything, mock.Anything)
 	client.AssertExpectations(t)
+}
+
+// A failed install says "see the build output above", so the build's lines
+// reach Progress, labeled as astro local labels them.
+func TestDeployManifestImage_StreamsTheBuildOutput(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
+
+	cmd, _ := withImageSeams(t, "3.1-2")
+	cmd.buildOut = "#9 error: Git executable not found\n"
+	cmd.buildErr = errors.New("exit status 1")
+
+	var progress bytes.Buffer
+	_, err := DeployManifestImage(ManifestImageDeployInput{
+		Build: imagebuild.ManifestBuild{
+			ProjectDir:     manifestProjectDir(t),
+			AirflowVersion: "3.1",
+			Dependencies:   []string{"x @ git+https://example.com/x.git"},
+		},
+		DeploymentID: "test-deployment-id",
+		Progress:     &progress,
+	}, client)
+	require.Error(t, err)
+	assert.Contains(t, progress.String(), "[build] #9 error: Git executable not found\n")
 }
 
 func TestDeployManifestImage_ImageOnlySkipsDags(t *testing.T) {

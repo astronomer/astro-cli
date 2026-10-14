@@ -198,7 +198,8 @@ func (s *Suite) TestTar() {
 				symlinkFileName,
 				airflowIgnoreName,
 				sourcelessPycName,
-				filepath.Join(testSubDirName, testSubDirFileName),
+				// Tar entries are slash-separated whatever the platform.
+				testSubDirName + "/" + testSubDirFileName,
 			},
 		},
 		{
@@ -210,11 +211,11 @@ func (s *Suite) TestTar() {
 			},
 			errAssertion: assert.NoError,
 			expectPaths: []string{
-				filepath.Join(testSourceDirName, testFileName),
-				filepath.Join(testSourceDirName, symlinkFileName),
-				filepath.Join(testSourceDirName, airflowIgnoreName),
-				filepath.Join(testSourceDirName, sourcelessPycName),
-				filepath.Join(testSourceDirName, testSubDirName, testSubDirFileName),
+				testSourceDirName + "/" + testFileName,
+				testSourceDirName + "/" + symlinkFileName,
+				testSourceDirName + "/" + airflowIgnoreName,
+				testSourceDirName + "/" + sourcelessPycName,
+				testSourceDirName + "/" + testSubDirName + "/" + testSubDirFileName,
 			},
 		},
 		{
@@ -340,14 +341,16 @@ func (s *Suite) TestReadFileToString() {
 			name:         "error on read file content",
 			args:         args{path: "incorrect-file"},
 			expectedResp: "",
-			errResp:      "no such file or directory",
+			errResp:      "open incorrect-file",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			actualResp, actualErr := ReadFileToString(tt.args.path)
-			if tt.errResp != "" && actualErr != nil {
+			if tt.errResp != "" {
+				s.Require().Error(actualErr)
 				s.Contains(actualErr.Error(), tt.errResp)
+				s.ErrorIs(actualErr, os.ErrNotExist)
 			} else {
 				s.NoError(actualErr)
 			}
@@ -387,7 +390,8 @@ func (s *Suite) TestGetFilesWithSpecificExtension() {
 func (s *Suite) TestGzipFile() {
 	s.Run("source file not found", func() {
 		err := GzipFile("non-existent-file.txt", "./zipped.txt.gz")
-		s.EqualError(err, "open non-existent-file.txt: no such file or directory")
+		s.ErrorContains(err, "open non-existent-file.txt: ")
+		s.ErrorIs(err, os.ErrNotExist)
 	})
 
 	s.Run("destination file error", func() {
@@ -399,7 +403,8 @@ func (s *Suite) TestGzipFile() {
 		defer os.Remove(srcFilePath)
 
 		err = GzipFile(srcFilePath, "/invalidPath/zipped.txt.gz")
-		s.EqualError(err, "open /invalidPath/zipped.txt.gz: no such file or directory")
+		s.ErrorContains(err, "open /invalidPath/zipped.txt.gz: ")
+		s.ErrorIs(err, os.ErrNotExist)
 	})
 
 	s.Run("successful gzip", func() {
@@ -520,7 +525,8 @@ func (s *Suite) TestUploadFile() {
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
 		err := UploadFile(&uploadFileArgs)
-		s.EqualError(err, "error opening file: open non-existent-file.txt: no such file or directory")
+		s.ErrorContains(err, "error opening file: open non-existent-file.txt: ")
+		s.ErrorIs(err, os.ErrNotExist)
 	})
 
 	s.Run("io copy throws an error", func() {

@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/input"
 )
 
 var errBoom = errors.New("boom")
@@ -139,6 +141,8 @@ func TestExitCode(t *testing.T) {
 	// An interrupt wins over whatever the unwinding command returned.
 	assert.Equal(t, ExitInterrupted, ExitCode(canceled, &ExitError{Code: 7}))
 	assert.Equal(t, ExitInterrupted, ExitCode(canceled, Usage(errBoom)))
+	// Ctrl-C at a raw-mode prompt is a keypress, not a signal, and still an interrupt.
+	assert.Equal(t, ExitInterrupted, ExitCode(bg, fmt.Errorf("reading the value: %w", input.ErrInterrupted)))
 }
 
 func TestAJSONFailureIsOneObjectOnStdout(t *testing.T) {

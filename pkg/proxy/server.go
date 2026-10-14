@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -29,7 +30,7 @@ const (
 	maxLoggedHost = 253
 
 	// SignatureHeader and SignatureValue mark responses the proxy generates
-	// itself (its landing and not-found pages). A caller can probe the proxy's
+	// itself (its landing, not-found and unavailable pages). A caller can probe the proxy's
 	// port and check for this header to confirm it's really the astro proxy on
 	// the other end, not an unrelated process that recycled its PID/port.
 	SignatureHeader = "X-Astro-Proxy"
@@ -39,8 +40,9 @@ const (
 // Proxy is an HTTP reverse proxy that routes requests based on the Host
 // header, using a Store to resolve hostnames to backend ports.
 type Proxy struct {
-	// ModifyResponse hooks run in order on every proxied response.
-	// Set them before calling Start.
+	// ModifyResponse hooks run in order on every proxied response, after the
+	// proxy has put the Astronomer theme into it (InjectAirflowTheme). Set them
+	// before calling Start.
 	ModifyResponse []func(*http.Response) error
 
 	// ModifyRequest hooks run in order on every proxied request, after the
@@ -65,8 +67,22 @@ type Proxy struct {
 	// reverse proxy, so a burst of first requests yields one transport.
 	Transport func(backendPort string) http.RoundTripper
 
+	// Sessions logs the proxy into the Airflow behind each route, so a project
+	// opens in a browser without Airflow's login page; see injectSession for
+	// what that means and why it is acceptable. NewProxy sets a fresh cache. A
+	// host that relays the same backends through other proxies of its own
+	// replaces it with one instance shared by all of them before calling Start.
+	// Nil turns the login off.
+	//
+	// The session wraps whatever Transport supplies, so a host's transport
+	// settings (keep-alives, timeouts) carry the original request and the
+	// replay alike.
+	Sessions *AirflowSessions
+
 	// ErrorHandler writes the response when a proxied request fails. Nil serves
-	// a plain 502. Set it before calling Start.
+	// a 502: the unavailable page to a browser navigating to a backend that is
+	// not answering, plain text otherwise (see defaultErrorHandler). Set it
+	// before calling Start.
 	//
 	// A host with somewhere better to send people wants this: the desktop
 	// serves a page explaining that the project is not running, which is a more
@@ -96,6 +112,11 @@ type Proxy struct {
 	RenderLanding  func(w io.Writer, routes []LandingRoute)
 	RenderNotFound func(w io.Writer, hostname, port string)
 
+	// Pages is the copy on the built-in pages that differs between hosts: the
+	// proxy's name and how to start a project. The zero value is the CLI's. Set
+	// it before calling Start.
+	Pages Pages
+
 	// FallbackPort is the port Start tries when the configured one is taken,
 	// before it asks the OS for any free port. Empty skips it. Set it before
 	// calling Start.
@@ -111,12 +132,11 @@ type Proxy struct {
 	transport *http.Transport
 	srv       *http.Server
 
-	// portMu guards port/running: Start rewrites port at bind time (the
-	// configured port is not necessarily the one bound — see the fallback
-	// in Start), and Port/Running read from other goroutines.
-	portMu  sync.RWMutex
-	port    string
-	running bool
+	// portMu guards port: Start rewrites it at bind time (the configured
+	// port is not necessarily the one bound — see the fallback in Start), and
+	// Port reads it from other goroutines.
+	portMu sync.RWMutex
+	port   string
 }
 
 // NewProxy creates a Proxy that listens on port and resolves routes via store.
@@ -128,8 +148,25 @@ func NewProxy(port string, store *Store) *Proxy {
 		store:     store,
 		port:      port,
 		proxies:   make(map[string]*httputil.ReverseProxy),
-		transport: &http.Transport{},
+		transport: newBackendTransport(),
+		Sessions:  NewAirflowSessions(),
 	}
+}
+
+// newBackendTransport is the default transport to a project's Airflow, with
+// keep-alives off.
+//
+// A project restart brings its Airflow back on the same port, and a connection
+// pooled from before it reaches a process that is gone. A request sent on it in
+// the moment before the transport notices the close fails. Go replays a GET or
+// HEAD on a fresh connection, but not a POST, PATCH or DELETE, so a form or an
+// API write sent just after a restart got a spurious "Backend unavailable". A
+// pooled connection the backend drops also makes the transport log
+// "Unsolicited response received on idle HTTP channel", which is why Astro
+// Desktop's own proxy turned keep-alives off. These are loopback connections,
+// so opening one per request costs next to nothing.
+func newBackendTransport() *http.Transport {
+	return &http.Transport{DisableKeepAlives: true}
 }
 
 // Port returns the proxy's listening port. Before a successful Start it
@@ -138,13 +175,6 @@ func (p *Proxy) Port() string {
 	p.portMu.RLock()
 	defer p.portMu.RUnlock()
 	return p.port
-}
-
-// Running reports whether Start has completed a successful bind.
-func (p *Proxy) Running() bool {
-	p.portMu.RLock()
-	defer p.portMu.RUnlock()
-	return p.running
 }
 
 // Start binds the listeners and serves in the background. Call Stop to shut
@@ -173,7 +203,6 @@ func (p *Proxy) Start() error {
 
 	p.portMu.Lock()
 	p.port = boundPort
-	p.running = true
 	p.portMu.Unlock()
 
 	errCh := make(chan error, 2)
@@ -269,11 +298,17 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 		// registered project hostname and nothing a client can pick freely.
 		pr.Out.Host = pr.In.Host
 		pr.SetXForwarded()
+		p.injectSession(pr.Out, backendPort)
 		for _, hook := range p.ModifyRequest {
 			hook(pr)
 		}
 	}
 	rp.ModifyResponse = func(resp *http.Response) error {
+		// Every tool serving these routes themes Airflow the same way, so the
+		// theme is the proxy's rather than a hook each host has to remember.
+		if err := InjectAirflowTheme(resp); err != nil {
+			return err
+		}
 		for _, hook := range p.ModifyResponse {
 			if err := hook(resp); err != nil {
 				return err
@@ -290,7 +325,7 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 			p.ErrorHandler(rw, req, proxyErr)
 			return
 		}
-		http.Error(rw, "Backend unavailable", http.StatusBadGateway)
+		defaultErrorHandler(rw, req, proxyErr)
 	}
 
 	p.mu.Lock()
@@ -318,8 +353,50 @@ type LandingRoute struct {
 	ProjectDir string
 }
 
+// injectSession puts the proxy's Airflow session for backendPort on an
+// outbound request, logging in first if there is none yet.
+//
+// What this does, plainly: every request that reaches the proxy for a
+// registered *.localhost route to an Airflow 2 leaves it carrying the local
+// admin account's session, added here on the server side. Whoever can send a
+// request to the proxy acts as Airflow's admin, without logging in. For an
+// Airflow 3 it adds nothing (see AirflowSessions).
+//
+// Why that is acceptable for a local development proxy:
+//
+//   - It is where Airflow 3 already is. Every local engine runs it with
+//     simple_auth_manager_all_admins, so it treats every request as an
+//     admin's, logged in or not. This brings Airflow 2 to the same footing,
+//     which is what a person opening their own project expects.
+//   - The hostname routing is the gate. Only a Host that names a registered
+//     route reaches a backend at all (handler), so a request can't be steered
+//     to an arbitrary port to collect a credential.
+//   - A web page from another origin can't drive Airflow's API through this
+//     with a browser's help. The REST API takes JSON, which needs a CORS
+//     preflight such a page fails, and Airflow 2's form posts carry a CSRF
+//     token it can't read.
+//   - A process on this machine could already reach the Airflow port
+//     directly, and log in with the same fixed local credentials.
+func (p *Proxy) injectSession(out *http.Request, backendPort string) {
+	if p.Sessions == nil {
+		return
+	}
+	p.Sessions.Inject(out, backendPort)
+}
+
 // transportFor is the RoundTripper for one backend: the host's, when it supplies
-// one, and the shared default otherwise.
+// one, and the shared default otherwise, wrapped by the session's recovery pass
+// when Sessions is set.
+func (p *Proxy) transportFor(backendPort string) http.RoundTripper {
+	rt := p.hostTransportFor(backendPort)
+	if p.Sessions == nil {
+		return rt
+	}
+	return p.Sessions.Transport(backendPort, rt)
+}
+
+// hostTransportFor is the host's RoundTripper for one backend, or the shared
+// default when it supplies none.
 //
 // A typed nil counts as "none". A factory that returns a nil *T boxed in the
 // interface produces a value that is not == nil, so a plain check would install
@@ -329,7 +406,7 @@ type LandingRoute struct {
 //	var t *authTransport
 //	if hasSession(port) { t = newAuth(port) }
 //	return t
-func (p *Proxy) transportFor(backendPort string) http.RoundTripper {
+func (p *Proxy) hostTransportFor(backendPort string) http.RoundTripper {
 	if p.Transport == nil {
 		return p.transport
 	}
@@ -463,7 +540,8 @@ func (p *Proxy) landingPage(w http.ResponseWriter) {
 		p.RenderLanding(bodyOnly(w), listed)
 		return
 	}
-	if err := landingTmpl.Execute(w, landingData{Routes: listed}); err != nil {
+	data := landingData{Title: p.Pages.title(), Pages: p.Pages, Routes: listed}
+	if err := pageTmpl.ExecuteTemplate(w, landingPageName, data); err != nil {
 		slog.Debug("landing page template", "error", err)
 	}
 }
@@ -477,10 +555,82 @@ func (p *Proxy) notFoundPage(w http.ResponseWriter, hostname string) {
 		p.RenderNotFound(bodyOnly(w), hostname, p.Port())
 		return
 	}
-	if err := notFoundTmpl.Execute(w, notFoundData{
+	if err := pageTmpl.ExecuteTemplate(w, notFoundPageName, notFoundData{
+		Pages:    p.Pages,
 		Hostname: hostname,
 		Port:     p.Port(),
 	}); err != nil {
 		slog.Debug("not found page template", "error", err)
 	}
+}
+
+// defaultErrorHandler answers a failed proxied request when the host has not
+// supplied an ErrorHandler. It is always a 502; what varies is the body.
+//
+// The unavailable page goes only to a browser navigation that could not reach
+// the backend, which is what someone opening a stopped or still-booting project
+// sees. An API client (af, curl, Airflow's own fetches) gets plain text, because
+// a page of HTML is noise to a program reading the status. A failure inside the
+// proxy's own handling gets plain text too: telling someone the project is
+// starting up when it is running fine hides the bug.
+func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	if !isBackendUnreachable(err) || !wantsHTML(r) {
+		http.Error(w, "Backend unavailable", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(SignatureHeader, SignatureValue)
+	w.WriteHeader(http.StatusBadGateway)
+	if renderErr := RenderUnavailable(w); renderErr != nil {
+		slog.Debug("unavailable page template", "error", renderErr)
+	}
+}
+
+// isBackendUnreachable reports whether err is the proxy failing to reach the
+// backend, as opposed to something going wrong in a ModifyResponse hook or in
+// httputil's own setup.
+//
+// Two shapes mean the project is not running:
+//
+//   - A connection that fails at the socket: refused, reset, timed out, or
+//     nothing listening. The transport reports these as a *net.OpError.
+//   - A connection that is accepted and closed before any response. Docker
+//     holds a project's published port while the Airflow container behind it
+//     restarts, so this is what a restarting or crash-looping container looks
+//     like. The transport reports it as a bare EOF, or, when it sees the close
+//     before it has written the request, as net/http's unexported
+//     errServerClosedIdle ("http: server closed idle connection") — on Linux
+//     about a third of the time, on a brand-new connection as much as a pooled
+//     one. That error has no type or sentinel to match, so its text is the
+//     only handle on it.
+//
+// Matching those rather than anything that implements net.Error matters,
+// because a hook's own failures implement it too: a *url.Error from a hook's
+// HTTP call, context.DeadlineExceeded, a response-header timeout. Calling those
+// "starting up" would describe a running project as down and hide the bug.
+func isBackendUnreachable(err error) bool {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	if err != nil && strings.Contains(err.Error(), serverClosedIdle) {
+		return true
+	}
+	var opErr *net.OpError
+	return errors.As(err, &opErr)
+}
+
+// serverClosedIdle is the text of net/http's errServerClosedIdle.
+const serverClosedIdle = "http: server closed idle connection"
+
+// wantsHTML reports whether r is a browser navigation rather than an API call.
+// An empty Accept counts, since whoever sent no preference still reads the body.
+//
+// Only a GET or HEAD qualifies. The page recovers by navigating to its own URL,
+// and a form submitted while the backend was down would be submitted again.
+func wantsHTML(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	accept := r.Header.Get("Accept")
+	return accept == "" || strings.Contains(accept, "text/html")
 }

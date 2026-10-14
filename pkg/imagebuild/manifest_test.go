@@ -3,6 +3,7 @@ package imagebuild
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -178,8 +179,9 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 // Build keeps its fast path: local docker mode runs the base as-is at the host
 // platform when there is nothing to install.
 func TestBuildKeepsTheFastPathBuildLocalSkips(t *testing.T) {
-	req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.1"}, nil)
+	req, err := ForLocalManifest(context.Background(), ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.1"}, noCatalog)
 	require.NoError(t, err)
+	require.Empty(t, req.ProjectFiles, "local start runs the project mounted")
 	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-local/p", "docker"
 
 	cmd := &fakeCmd{}
@@ -187,6 +189,127 @@ func TestBuildKeepsTheFastPathBuildLocalSkips(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, req.BaseImage, built)
 	assert.Empty(t, cmd.calls)
+}
+
+// A shipped image carries the project's files: a DAG importing include/ fails
+// on Astro without them, since a deploy sends dags/ alone beside the image.
+func TestForManifestBuildCarriesTheProject(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"include/agents/__init__.py":           "x = 1\n",
+		"dags/blueprints.py":                   "import include.agents\n",
+		"pyproject.toml":                       "[project]\n",
+		".astro/config.yaml":                   "committed\n",
+		"Requirements.txt":                     "stale-pin==1\n", // any case: never the generated one
+		".venv/lib/site.py":                    "never\n",
+		".git/HEAD":                            "never\n",
+		"include/__pycache__/a.pyc":            "never\n",
+		".env":                                 "SECRET=never\n",
+		".astro/standalone/airflow.db":         "never\n",
+		"plugins/fix_local_executor_pickle.py": "never\n",
+		"tests/test_dags.py":                   "ignored by the project\n",
+		// The project's own rules apply, but cannot bring a built-in back.
+		".dockerignore": "tests/\n!.env\n",
+	})
+	req, err := ForManifest(ManifestBuild{ProjectDir: project, AirflowVersion: "3.1", Dependencies: []string{"pandas"}}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, project, req.ProjectFiles)
+	req.WorkDir, req.Tag, req.Bin = t.TempDir(), "astro-deploy/p", "docker"
+	// A file left over from an earlier build in the same WorkDir is not carried.
+	stale := filepath.Join(req.WorkDir, buildContextDir, "include", "deleted.py")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0o755))
+	require.NoError(t, os.WriteFile(stale, nil, 0o600))
+
+	_, err = testBuilder(&fakeCmd{}).BuildLocal(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+
+	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
+	assert.ElementsMatch(t, []string{
+		"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml", ".astro/config.yaml",
+		requirementsName, packagesName,
+	}, contextFiles(t, ctxDir))
+	reqs, err := os.ReadFile(filepath.Join(ctxDir, requirementsName))
+	require.NoError(t, err)
+	assert.Equal(t, "pandas\n", string(reqs), "the generated requirements, not the project's")
+}
+
+// Symlinks are carried as what they point at: a link out of the project would
+// dangle in the image, and Windows users mostly cannot create one. A link back
+// up the tree is not followed forever, a dangling one is left out, and a
+// project directory that is itself a symlink is walked.
+func TestProjectFilesFollowSymlinks(t *testing.T) {
+	outside := t.TempDir()
+	writeTree(t, outside, map[string]string{"lib/shared.py": "shared = 1\n"})
+	projectDir := t.TempDir()
+	writeTree(t, projectDir, map[string]string{"include/own.py": "own = 1\n"})
+	for link, target := range map[string]string{
+		"include/shared":  filepath.Join(outside, "lib"),
+		"include/loop":    filepath.Join(projectDir, "include"),
+		"include/missing": filepath.Join(outside, "gone"),
+	} {
+		if err := os.Symlink(target, filepath.Join(projectDir, filepath.FromSlash(link))); err != nil {
+			t.Skipf("symlinks unavailable here: %v", err)
+		}
+	}
+	project := filepath.Join(t.TempDir(), "project")
+	require.NoError(t, os.Symlink(projectDir, project))
+
+	dst := t.TempDir()
+	require.NoError(t, copyProjectFiles(project, dst))
+	assert.ElementsMatch(t, []string{"include/own.py", "include/shared/shared.py"}, contextFiles(t, dst))
+	info, err := os.Lstat(filepath.Join(dst, "include", "shared", "shared.py"))
+	require.NoError(t, err)
+	assert.True(t, info.Mode().IsRegular(), "carried as a file, not a link")
+}
+
+// The digest a package tag includes moves with what the image carries, and
+// only with that.
+func TestProjectFilesDigest(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{"include/a.py": "a = 1\n", ".dockerignore": "scratch/\n"})
+	first, err := ProjectFilesDigest(project)
+	require.NoError(t, err)
+
+	writeTree(t, project, map[string]string{"scratch/notes.txt": "ignored\n", ".env": "SECRET=x\n", ".venv/x": "y\n"})
+	same, err := ProjectFilesDigest(project)
+	require.NoError(t, err)
+	assert.Equal(t, first, same, "nothing the image carries changed")
+
+	writeTree(t, project, map[string]string{"include/a.py": "a = 2\n"})
+	edited, err := ProjectFilesDigest(project)
+	require.NoError(t, err)
+	assert.NotEqual(t, first, edited)
+}
+
+func writeTree(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for path, body := range files {
+		full := filepath.Join(root, filepath.FromSlash(path))
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o755))
+		require.NoError(t, os.WriteFile(full, []byte(body), 0o600))
+	}
+}
+
+// contextFiles lists the regular files under dir, slash-separated.
+func contextFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	var files []string
+	require.NoError(t, filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(dir, path)
+		files = append(files, filepath.ToSlash(rel))
+		return err
+	}))
+	return files
+}
+
+// A declared Dockerfile builds the project as its context already.
+func TestForManifestDeclaredCarriesNoProjectFiles(t *testing.T) {
+	req, err := ForManifest(ManifestBuild{ProjectDir: declaredProject(t), Dockerfile: "docker/Dockerfile"}, nil)
+	require.NoError(t, err)
+	assert.Empty(t, req.ProjectFiles)
 }
 
 func TestBuildLocalReturnsTheTagForEveryMode(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +23,8 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -92,11 +95,17 @@ type fakeCmdDeployer struct {
 	imgInput          *manifestdeploy.ImageDeploy
 }
 
-func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, manifestdeploy.Preselect) (string, error) {
+func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, string) (string, error) {
 	return "", errors.New("the transport should not be asked when the target is named")
 }
 
-func (f *fakeCmdDeployer) ResolveUnlinked(string) (string, error) { return "", nil }
+func (f *fakeCmdDeployer) ListDeployments(string) ([]manifestdeploy.Deployment, error) {
+	return nil, nil
+}
+
+func (f *fakeCmdDeployer) ResolveUnlinked(string) (manifestdeploy.Deployment, error) {
+	return manifestdeploy.Deployment{}, nil
+}
 
 func (f *fakeCmdDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifestdeploy.DagResult, error) {
 	f.dagInput = in
@@ -454,22 +463,49 @@ func TestDeployManifestNotesUncommittedChanges(t *testing.T) {
 	}
 }
 
-// The highlight is labeled with what put it there. ASTRO_DEPLOYMENT outranks
-// the manifest's marker for the cursor, and saying "default" over an entry an
-// exported variable chose tells the reader their committed file says something
-// it does not.
-func TestDeployManifestPromptNamesWhatMovedTheCursor(t *testing.T) {
+// ASTRO_DEPLOYMENT and the `astro use` selection choose which Airflow the query
+// commands read. Where code ships is the project's, so the prompt highlights
+// the committed default whatever the shell says, as Astro Desktop does.
+func TestDeployManifestPromptIgnoresTheShellsSelection(t *testing.T) {
 	interactiveDeploy(t)
 	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 	t.Setenv(instances.EnvVar, "dev")
+	require.NoError(t, savePinForTest(t, "dev"))
 
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
-	assert.Equal(t, []string{"1", "dev", "astro", "deployment", "clx-dev", "ASTRO_DEPLOYMENT"}, pickerRow(t, errOut, "dev"))
-	assert.NotContains(t, errOut, "default = true")
+	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "linked,", "default"}, pickerRow(t, errOut, "prod"))
+	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "linked"}, pickerRow(t, errOut, "dev"))
 	assert.Contains(t, errOut, "\n> [1] ")
-	// And Enter took the highlighted entry, which is the one it named.
-	assert.Contains(t, out, "to dev (deployment clx-dev).")
+	assert.Contains(t, out, "to prod (deployment clx-dep).")
+	// The variable once moved the cursor, so its being ignored is said once,
+	// before the prompt, and never as a row's mark.
+	assert.Contains(t, errOut, "note: ASTRO_DEPLOYMENT=dev chooses what the query commands read; astro deploy asks, with the project's default, prod, preselected")
+	assert.NotContains(t, pickerRow(t, errOut, "dev"), "ASTRO_DEPLOYMENT")
+}
+
+// Naming the default, the variable agrees with the prompt, and there is
+// nothing to say.
+func TestDeployManifestSaysNothingWhenTheEnvNamesTheDefault(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	t.Setenv(instances.EnvVar, "prod")
+
+	_, errOut, err := execDeployIO("\n")
+	require.NoError(t, err)
+	assert.NotContains(t, errOut, "note: ASTRO_DEPLOYMENT")
+}
+
+// savePinForTest writes an `astro use` selection for the project under test.
+func savePinForTest(t *testing.T, name string) error {
+	t.Helper()
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	state, err := userstate.Load(config.WorkingPath)
+	if err != nil {
+		return err
+	}
+	state.Instance = name
+	return userstate.Save(config.WorkingPath, state)
 }
 
 // A link may legally be called "2". Typing its name must select it, not the
@@ -504,21 +540,6 @@ deployment = "clx-prod"
 	assert.Contains(t, out, "to 2 (deployment clx-two).")
 }
 
-// Nothing to prompt about means nothing to read the pin for, and reading it
-// creates the project's state directory on the way past.
-func TestDeployPreselectSkipsTheDiskWhenNoQuestionIsComing(t *testing.T) {
-	dir := t.TempDir()
-	name, from := deployPreselect(dir, false)
-	assert.Empty(t, name)
-	assert.Empty(t, from)
-
-	// The env var is free to read and outranks the pin, so it still answers.
-	t.Setenv(instances.EnvVar, "prod")
-	name, from = deployPreselect(dir, false)
-	assert.Equal(t, "prod", name)
-	assert.Equal(t, instances.EnvVar, from)
-}
-
 // promptDeployer answers nothing itself; the prompt under test is the real
 // manifestDeployer.ConfirmTarget, wired to the streams execDeployIO controls.
 type promptDeployer struct {
@@ -526,7 +547,7 @@ type promptDeployer struct {
 	prompt manifestdeploy.Deployer
 }
 
-func (p *promptDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
+func (p *promptDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect string) (string, error) {
 	return p.prompt.ConfirmTarget(choices, preselect)
 }
 
@@ -548,16 +569,17 @@ func TestDeployManifestPromptPreselectsDefaultAndAsksAnyway(t *testing.T) {
 	interactiveDeploy(t)
 	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
 
-	// The manifest marks prod default, so the prompt highlights it — and still
-	// asks. An empty answer takes the highlighted entry.
+	// The manifest marks prod default, so the prompt puts it on top and
+	// highlights it — and still asks. An empty answer takes the highlighted
+	// entry.
 	out, errOut, err := execDeployIO("\n")
 	require.NoError(t, err)
 
 	assert.Contains(t, errOut, "Deploy to which deployment?")
-	assert.Equal(t, []string{"#", "NAME", "WHERE", "PRESELECTED", "BY"}, strings.Fields(strings.Split(errOut, "\n")[1]))
-	assert.Equal(t, []string{"2", "prod", "astro", "deployment", "clx-dep", "default", "=", "true"}, pickerRow(t, errOut, "prod"))
-	assert.Equal(t, []string{"1", "dev", "astro", "deployment", "clx-dev"}, pickerRow(t, errOut, "dev"))
-	assert.Contains(t, errOut, "\n> [2] ")
+	assert.Equal(t, []string{"#", "NAME", "WHERE"}, strings.Fields(strings.Split(errOut, "\n")[1]), "the marker has no header of its own")
+	assert.Equal(t, []string{"1", "prod", "astro", "deployment", "clx-dep", "linked,", "default"}, pickerRow(t, errOut, "prod"))
+	assert.Equal(t, []string{"2", "dev", "astro", "deployment", "clx-dev", "linked"}, pickerRow(t, errOut, "dev"))
+	assert.Contains(t, errOut, "\n> [1] ")
 	assert.Contains(t, out, "to prod (deployment clx-dep).")
 }
 
@@ -585,10 +607,10 @@ func TestDeployManifestPromptWithNoPreselectNeedsAnAnswer(t *testing.T) {
 	_, err := prompt.ConfirmTarget([]manifestdeploy.Choice{
 		{Name: "dev", Where: "astro deployment clx-dev"},
 		{Name: "prod", Where: "astro deployment clx-dep"},
-	}, manifestdeploy.Preselect{})
+	}, "")
 	require.ErrorIs(t, err, manifestdeploy.ErrAborted)
 
-	assert.NotContains(t, errOut.String(), "PRESELECTED BY")
+	assert.NotContains(t, errOut.String(), "default")
 	assert.NotContains(t, errOut.String(), "[", "no default shown in the prompt")
 	assert.NotContains(t, errOut.String(), "\033[", "nothing highlighted")
 	assert.Equal(t, 2, strings.Count(errOut.String(), "Not one of the choices.\n> "),
@@ -605,11 +627,11 @@ func TestDeployManifestPromptReadsAnAnswerCutShort(t *testing.T) {
 		{Name: "dev", Where: "astro deployment clx-dev"},
 		{Name: "prod", Where: "astro deployment clx-dep"},
 	}
-	name, err := manifestDeployer{in: strings.NewReader("1"), errOut: &bytes.Buffer{}}.ConfirmTarget(choices, manifestdeploy.Preselect{})
+	name, err := manifestDeployer{in: strings.NewReader("1"), errOut: &bytes.Buffer{}}.ConfirmTarget(choices, "")
 	require.NoError(t, err)
 	assert.Equal(t, "dev", name)
 
-	_, err = manifestDeployer{in: strings.NewReader("prd"), errOut: &bytes.Buffer{}}.ConfirmTarget(choices, manifestdeploy.Preselect{})
+	_, err = manifestDeployer{in: strings.NewReader("prd"), errOut: &bytes.Buffer{}}.ConfirmTarget(choices, "")
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, manifestdeploy.ErrAborted)
 	assert.True(t, input.IsRequired(err), "%v", err)
@@ -627,7 +649,7 @@ func TestDeployManifestPromptRefusesWithoutPrintingWhenItMayNotAsk(t *testing.T)
 
 	_, err := prompt.ConfirmTarget(
 		[]manifestdeploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
-		manifestdeploy.Preselect{Name: "test", From: "default = true"},
+		"test",
 	)
 	require.Error(t, err)
 	assert.True(t, input.IsRequired(err), "%v", err)
@@ -642,7 +664,7 @@ func TestDeployManifestPromptEndedInputTakesNoDefault(t *testing.T) {
 
 	_, err := prompt.ConfirmTarget(
 		[]manifestdeploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
-		manifestdeploy.Preselect{Name: "test", From: "default = true"},
+		"test",
 	)
 	require.Error(t, err)
 	assert.True(t, input.IsRequired(err), "%v", err)
@@ -655,12 +677,49 @@ func TestDeployManifestPromptWithOneLinkOffersOneNumber(t *testing.T) {
 
 	name, err := prompt.ConfirmTarget(
 		[]manifestdeploy.Choice{{Name: "test", Where: "astro deployment clx-dep"}},
-		manifestdeploy.Preselect{Name: "test", From: "default = true"},
+		"test",
 	)
 	require.NoError(t, err)
 
 	assert.Equal(t, "test", name)
 	assert.True(t, strings.HasSuffix(errOut.String(), "\n> [1] "), "%q", errOut.String())
+}
+
+// listingPromptDeployer is promptDeployer over a workspace holding one
+// Deployment the project does not link yet.
+type listingPromptDeployer struct {
+	promptDeployer
+}
+
+func (p *listingPromptDeployer) ListDeployments(string) ([]manifestdeploy.Deployment, error) {
+	return []manifestdeploy.Deployment{{ID: "clx-new", Name: "Orders Staging", WorkspaceID: "clw-ws"}}, nil
+}
+
+// The prompt offers the workspace's unlinked Deployments after the links, and
+// picking one writes its link before the deploy ships to it.
+func TestDeployManifestPromptLinksAnUnlinkedDeployment(t *testing.T) {
+	interactiveDeploy(t)
+	fake := &listingPromptDeployer{promptDeployer{fakeCmdDeployer: fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"}}}}
+	setupManifestDeploy(t, fake)
+	orig := newManifestDeployer
+	newManifestDeployer = func(login *deployLogin, in io.Reader, errOut io.Writer) manifestdeploy.Deployer {
+		fake.prompt = manifestDeployer{login: login, in: in, errOut: errOut}
+		return fake
+	}
+	t.Cleanup(func() { newManifestDeployer = orig })
+
+	out, errOut, err := execDeployIO("3\n", "--workspace", "clw-ws")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"3", "orders-staging", "astro", "deployment", "clx-new"}, pickerRow(t, errOut, "orders-staging"), "an unlinked row is unmarked")
+	assert.Contains(t, errOut, "linked orders-staging to astro deployment clx-new in pyproject.toml")
+	assert.Contains(t, errOut, "→ orders-staging (astro deployment clx-new)")
+	assert.Equal(t, "clx-new", fake.imgInput.DeploymentID)
+	assert.Contains(t, out, "to orders-staging (deployment clx-new).")
+
+	saved, err := os.ReadFile(filepath.Join(config.WorkingPath, "pyproject.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(saved), `orders-staging = {deployment = 'clx-new'}`)
 }
 
 func TestDeployManifestPromptTakesTheOtherLink(t *testing.T) {
@@ -1161,4 +1220,23 @@ func TestDeployManifestPickerRefusesAnotherHost(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--deployment <id>")
 	assert.Contains(t, err.Error(), "astro context switch astronomer.io")
+}
+
+// The prompt waits on the workspace's list, so a list that does not answer is
+// given up on, and the prompt goes on with the links alone.
+func TestDeployManifestListDeploymentsGivesUp(t *testing.T) {
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	origList, origTimeout := deployment.ListDeployments, listDeploymentsTimeout
+	deployment.ListDeployments = func(string, string, astrov1.APIClient) ([]astrov1.Deployment, error) {
+		<-release
+		return nil, nil
+	}
+	listDeploymentsTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { deployment.ListDeployments, listDeploymentsTimeout = origList, origTimeout })
+
+	d := manifestDeployer{login: &deployLogin{}}
+	_, err := d.ListDeployments("clw-ws")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no answer after")
 }

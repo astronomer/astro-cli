@@ -35,7 +35,9 @@ func ExitCode(ctx context.Context, err error) int {
 	if err == nil {
 		return 0
 	}
-	if ctx.Err() != nil {
+	// A prompt reads Ctrl-C from a raw terminal as a keypress, not a signal,
+	// so it cancels nothing; it says so with input.ErrInterrupted instead.
+	if ctx.Err() != nil || errors.Is(err, input.ErrInterrupted) {
 		return ExitInterrupted
 	}
 	var exit *ExitError
