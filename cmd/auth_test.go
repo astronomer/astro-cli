@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -244,8 +245,13 @@ func (s *CmdSuite) TestLogout() {
 	localDomain := "localhost"
 	apcDomain := "astronomer_dev.com"
 
-	cloudLogout = func(domain string, out io.Writer) {
+	origCloudLogout, origAPCLogout := cloudLogout, apcLogout
+	defer func() { cloudLogout, apcLogout = origCloudLogout, origAPCLogout }()
+
+	var cloudLogoutErr error
+	cloudLogout = func(domain string, out io.Writer) error {
 		s.Equal(localDomain, domain)
+		return cloudLogoutErr
 	}
 	apcLogout = func(domain string) {
 		s.Equal(apcDomain, domain)
@@ -254,6 +260,12 @@ func (s *CmdSuite) TestLogout() {
 	// cloud logout success
 	err := logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
 	s.NoError(err)
+
+	// a cloud logout that fails fails the command, so it exits non-zero
+	cloudLogoutErr = errors.New("failed to clear the credentials")
+	err = logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
+	s.ErrorIs(err, cloudLogoutErr)
+	cloudLogoutErr = nil
 
 	// software logout success
 	err = logout(&cobra.Command{}, []string{apcDomain}, os.Stdout)
@@ -277,7 +289,10 @@ func (s *CmdSuite) TestLogout() {
 
 func (s *CmdSuite) TestLogoutExpandsShortNames() {
 	var loggedOut string
-	cloudLogout = func(domain string, out io.Writer) { loggedOut = domain }
+	cloudLogout = func(domain string, out io.Writer) error {
+		loggedOut = domain
+		return nil
+	}
 	apcLogout = func(domain string) { s.Fail("a short name must not reach the APC logout", domain) }
 
 	for short, host := range map[string]string{"prod": "astronomer.io", "dev": "astronomer-dev.io", "pr41523": "pr41523.astronomer-dev.io"} {

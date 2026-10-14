@@ -1892,36 +1892,29 @@ func TestSwitch(t *testing.T) {
 func TestLogout(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	t.Run("success", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		buf := new(bytes.Buffer)
-		Logout("astronomer.io", buf)
+		assert.NoError(t, Logout("localhost", buf))
 		assert.Equal(t, "Successfully logged out of Astronomer\n", buf.String())
 	})
 
-	t.Run("success_with_email", func(t *testing.T) {
-		assertions := func(expUserEmail string, expToken string) {
-			context, err := (&config.Context{Domain: "localhost"}).GetContext()
-
-			assert.NoError(t, err)
-			assert.Equal(t, expUserEmail, context.UserEmail)
-			assert.Equal(t, expToken, context.Token)
-		}
+	t.Run("clears every credential, the expiry included", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		err = c.SetContextKey("user_email", "test.user@astronomer.io")
-		assert.NoError(t, err)
-		err = c.SetContextKey("token", "Bearer some-token")
-		assert.NoError(t, err)
-		// test before
-		assertions("test.user@astronomer.io", "Bearer some-token")
+		assert.NoError(t, c.SetContextKey("user_email", "test.user@astronomer.io"))
+		assert.NoError(t, c.SetContextKey("token", "Bearer some-token"))
+		assert.NoError(t, c.SetExpiresIn(3600))
 
-		// log out
-		c, err = config.GetCurrentContext()
-		assert.NoError(t, err)
-		Logout(c.Domain, os.Stdout)
+		assert.NoError(t, Logout(c.Domain, io.Discard))
 
-		// test after logout
-		assertions("", "")
+		after, err := (&config.Context{Domain: "localhost"}).GetContext()
+		assert.NoError(t, err)
+		assert.Empty(t, after.UserEmail)
+		assert.Empty(t, after.Token)
+		expiresIn, err := after.GetExpiresIn()
+		assert.NoError(t, err)
+		assert.True(t, expiresIn.IsZero(), "expiry left behind: %v", expiresIn)
 	})
 
 	t.Run("clears the refresh token so the next login cannot reuse it", func(t *testing.T) {
@@ -1930,7 +1923,7 @@ func TestLogout(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, c.SetContextKey("refreshtoken", "saved-refresh"))
 
-		Logout(c.Domain, io.Discard)
+		assert.NoError(t, Logout(c.Domain, io.Discard))
 
 		c, err = context.GetContext(c.Domain)
 		assert.NoError(t, err)
@@ -1939,14 +1932,23 @@ func TestLogout(t *testing.T) {
 
 	t.Run("keeps the current context when logging out of another domain", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		current, err := config.GetCurrentDomain()
+		current, err := config.GetCurrentContext()
 		assert.NoError(t, err)
+		assert.NoError(t, current.SetContextKey("refreshtoken", "current-refresh"))
+		assert.NoError(t, context.SetContext("astronomer-dev.io"))
+		saveLogin(t, "astronomer-dev.io", "Bearer other", "other-refresh", 3600)
 
-		Logout("astronomer-dev.io", io.Discard)
+		assert.NoError(t, Logout("astronomer-dev.io", io.Discard))
 
+		other, err := context.GetContext("astronomer-dev.io")
+		assert.NoError(t, err)
+		assert.Empty(t, other.RefreshToken)
 		after, err := config.GetCurrentDomain()
 		assert.NoError(t, err)
-		assert.Equal(t, current, after)
+		assert.Equal(t, current.Domain, after)
+		kept, err := context.GetContext(current.Domain)
+		assert.NoError(t, err)
+		assert.Equal(t, "current-refresh", kept.RefreshToken)
 	})
 
 	t.Run("resets the current context when logging out of it", func(t *testing.T) {
@@ -1954,10 +1956,30 @@ func TestLogout(t *testing.T) {
 		current, err := config.GetCurrentDomain()
 		assert.NoError(t, err)
 
-		Logout(current, io.Discard)
+		assert.NoError(t, Logout(current, io.Discard))
 
 		_, err = config.GetCurrentDomain()
 		assert.ErrorIs(t, err, config.ErrGetHomeString)
+	})
+
+	t.Run("an unknown domain fails without reporting success", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		current, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.NoError(t, current.SetContextKey("refreshtoken", "current-refresh"))
+
+		buf := new(bytes.Buffer)
+		err = Logout("never-logged-in.io", buf)
+		assert.ErrorContains(t, err, "never-logged-in.io")
+		assert.Empty(t, buf.String())
+		// no stub context is written, and the real login is untouched
+		assert.False(t, (&config.Context{Domain: "never-logged-in.io"}).ContextExists())
+		kept, err := context.GetContext(current.Domain)
+		assert.NoError(t, err)
+		assert.Equal(t, "current-refresh", kept.RefreshToken)
+		domain, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+		assert.Equal(t, current.Domain, domain)
 	})
 
 	t.Run("logs out of every host on the same tenant", func(t *testing.T) {
@@ -1970,7 +1992,7 @@ func TestLogout(t *testing.T) {
 			saveLogin(t, host, "Bearer shared", "shared-refresh", 3600)
 		}
 
-		Logout("pr1111.astronomer-dev.io", io.Discard)
+		assert.NoError(t, Logout("pr1111.astronomer-dev.io", io.Discard))
 
 		c, err := context.GetContext("pr2222.astronomer-dev.io")
 		assert.NoError(t, err)

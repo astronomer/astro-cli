@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/fatih/camelcase"
 
@@ -357,4 +358,65 @@ func emitLogEntry(r cliout.Renderer, component string, l houston.DeploymentLog, 
 		_, err := fmt.Fprintln(w, l.Log)
 		return err
 	})
+}
+
+// deploymentHibernationJSON is what astro deployment hibernate and wake-up
+// left: the override now on the Deployment's hibernation schedule, or null
+// after --remove-override. The override's keys are the ones the Astro tree's
+// hibernate and wake-up publish.
+type deploymentHibernationJSON struct {
+	DeploymentID        string                   `json:"deployment_id"`
+	Label               string                   `json:"label"`
+	ReleaseName         string                   `json:"release_name"`
+	HibernationOverride *hibernationOverrideJSON `json:"hibernation_override"`
+}
+
+// hibernationOverrideJSON holds a Deployment hibernating (is_hibernating) or
+// awake. override_until is null for an override that lasts until it is
+// removed.
+type hibernationOverrideJSON struct {
+	IsHibernating bool       `json:"is_hibernating"`
+	OverrideUntil *time.Time `json:"override_until"`
+}
+
+// newHibernationJSON is d as hibernate or wake-up left it. id stands in for
+// a Deployment Houston did not return.
+func newHibernationJSON(id string, d *houston.Deployment) deploymentHibernationJSON {
+	out := deploymentHibernationJSON{DeploymentID: id}
+	if d == nil {
+		return out
+	}
+	if d.ID != "" {
+		out.DeploymentID = d.ID
+	}
+	out.Label, out.ReleaseName = d.Label, d.ReleaseName
+	if o := d.HibernationOverride; o != nil {
+		out.HibernationOverride = &hibernationOverrideJSON{IsHibernating: o.IsHibernating, OverrideUntil: o.OverrideUntil}
+	}
+	return out
+}
+
+// emitHibernation publishes the override hibernate or wake-up set, or its
+// removal. verb is the command's, "hibernate" or "wake up".
+func emitHibernation(r cliout.Renderer, h deploymentHibernationJSON, verb string) error {
+	return r.Emit(h, cliout.Text(func(b *bufio.Writer) {
+		name := h.ReleaseName
+		if name == "" {
+			name = h.DeploymentID
+		}
+		o := h.HibernationOverride
+		if o == nil {
+			fmt.Fprintf(b, "\nSuccessfully removed the hibernation override on deployment %s. Its hibernation schedule, if it has one, resumes now.\n", name)
+			return
+		}
+		state := "Successfully woke up deployment " + name
+		if verb == "hibernate" {
+			state = "Successfully set deployment " + name + " to hibernate"
+		}
+		if o.OverrideUntil == nil {
+			fmt.Fprintf(b, "\n%s until you remove the override.\n", state)
+			return
+		}
+		fmt.Fprintf(b, "\n%s until %s.\n", state, o.OverrideUntil.Format(time.RFC3339))
+	}))
 }

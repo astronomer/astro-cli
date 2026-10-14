@@ -45,6 +45,10 @@ var publishedPayloads = []cliouttest.Case{
 	// astro deployment airflow upgrade, runtime upgrade and runtime migrate,
 	// and their --cancel: what changed.
 	{Name: "deployment-version-change", Value: versionChangeJSON{}},
+	// astro deployment hibernate and wake-up: the override they set.
+	{Name: "deployment-hibernation", Value: deploymentHibernationJSON{}},
+	// What --remove-override left: no override.
+	{Name: "deployment-hibernation-removed", Value: deploymentHibernationJSON{DeploymentID: "x", Label: "x", ReleaseName: "x"}, AsGiven: true},
 	// astro deployment logs -o json: one of these per line, a stream.
 	{Name: "deployment-log-entry", Value: logEntryJSON{}},
 	// astro deploy: what it deployed.
@@ -131,13 +135,13 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Twenty-four shapes reach Emit in this package's tests today:
-// the deployment family's Deployment, list, removal, version change and log
-// entry, deploy's result, the workspace family's Workspace, list and
-// removal, the user, team and service-account results, and the error
-// object.
+// would be silent. Twenty-five shapes reach Emit in this package's tests
+// today: the deployment family's Deployment, list, removal, version change,
+// log entry and hibernation override, deploy's result, the workspace
+// family's Workspace, list and removal, the user, team and service-account
+// results, and the error object.
 // Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 24
+const minWatchedPayloads = 25
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would

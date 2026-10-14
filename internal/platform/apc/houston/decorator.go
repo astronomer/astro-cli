@@ -42,6 +42,9 @@ var houstonAPIAvailabilityByVersion = map[string]VersionRestrictions{
 	"UpdateDeploymentRuntime":       {GTE: "0.29.0", LT: "1.0.43"},
 	"CancelUpdateDeploymentRuntime": {GTE: "0.29.0", LT: "1.0.43"},
 	"GetRuntimeReleases":            {GTE: "0.29.0"},
+	// upsertDeployment takes hibernationOverride from 2.2.0 (houston-api
+	// ded69507, APC-1653).
+	"HibernateOverrideDeployment": {GTE: "2.2.0"},
 	// From 0.37.0 updateDeploymentAirflow is a stub that changes nothing and
 	// returns {} (the Astronomer Certified deprecation), and 1.0.43 removed
 	// it; calling it would report an upgrade that never started.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -67,6 +68,10 @@ var (
 	// errNoAppConfig is a create with no platform settings to read: the
 	// lookup when the tree was built failed, and none was asked for since.
 	errNoAppConfig = errors.New("could not read this platform's settings for a new Deployment; check your login and try again")
+
+	hibernateUntil       string
+	hibernateForDuration string
+	hibernateRemove      bool
 
 	adoptName                    string
 	adoptNamespace               string
@@ -151,6 +156,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentListCmd(out),
 		newDeploymentUpdateCmd(out),
 		newDeploymentDeleteCmd(out),
+		newDeploymentHibernateCmd(out),
+		newDeploymentWakeUpCmd(out),
 		newDeploymentAdoptCmd(out),
 		newDeploymentUnadoptCmd(out),
 		newLogsCmd(out),
@@ -260,6 +267,67 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Delete without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
+}
+
+func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "hibernate <DEPLOYMENT_ID>",
+		Aliases: []string{"hb"},
+		Short:   "Hibernate an APC Deployment",
+		Long: "Hibernate an APC Deployment. Overrides its hibernation schedule, if it has one, and holds it hibernating until you wake it up, " +
+			"for a duration, or until a time. Use --remove-override to remove the override and resume the regular hibernation schedule. " +
+			"Needs Astro Private Cloud " + deployment.HibernationSince + " or later, with hibernation enabled for the Deployment.",
+		Example: `  # Hibernate a Deployment until you wake it up
+  astro deployment hibernate <DEPLOYMENT_ID>
+
+  # Hibernate it for two and a half hours
+  astro deployment hibernate <DEPLOYMENT_ID> --for 2h30m
+
+  # Go back to its regular hibernation schedule
+  astro deployment hibernate <DEPLOYMENT_ID> --remove-override`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentHibernate(cmd, args, true, out)
+		},
+	}
+	addHibernationFlags(cmd, "hibernation", "hibernating")
+	return cmd
+}
+
+func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "wake-up <DEPLOYMENT_ID>",
+		Aliases: []string{"wu"},
+		Short:   "Wake up an APC Deployment",
+		Long: "Wake up an APC Deployment from hibernation. Overrides its hibernation schedule, if it has one, and holds it awake until you hibernate it, " +
+			"for a duration, or until a time. Use --remove-override to remove the override and resume the regular hibernation schedule. " +
+			"Needs Astro Private Cloud " + deployment.HibernationSince + " or later, with hibernation enabled for the Deployment.",
+		Example: `  # Wake up a hibernating Deployment until you hibernate it
+  astro deployment wake-up <DEPLOYMENT_ID>
+
+  # Keep it awake for four hours
+  astro deployment wake-up <DEPLOYMENT_ID> --for 4h
+
+  # Go back to its regular hibernation schedule
+  astro deployment wake-up <DEPLOYMENT_ID> --remove-override`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentHibernate(cmd, args, false, out)
+		},
+	}
+	addHibernationFlags(cmd, "awake period", "waking up")
+	return cmd
+}
+
+// addHibernationFlags gives hibernate or wake-up its flags: period names
+// what --until and --for end, and doing what --yes skips the question for.
+func addHibernationFlags(cmd *cobra.Command, period, doing string) {
+	cmd.Flags().StringVarP(&hibernateUntil, "until", "u", "", "End the "+period+" at this date and time, in RFC 3339. Example value: 2026-01-01T00:00:00Z")
+	cmd.Flags().StringVarP(&hibernateForDuration, "for", "d", "", "End the "+period+" after this long. Example value: 1h30m")
+	cmd.Flags().BoolVarP(&hibernateRemove, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule")
+	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Don't ask for confirmation before "+doing+" the Deployment")
+	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
+	cliout.AddOutputFlag(cmd, &deploymentOutput)
 }
 
 func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
@@ -583,6 +651,74 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		return err
 	}
 	return emitCreated(r, d, executorType)
+}
+
+// deploymentHibernate sets, or with --remove-override removes, the override
+// of a Deployment's hibernation schedule: hibernate holds it hibernating, and
+// wake-up (hibernate false) awake.
+func deploymentHibernate(cmd *cobra.Command, args []string, hibernate bool, out io.Writer) error {
+	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	until, err := hibernationEnd(hibernateUntil, hibernateForDuration)
+	if err != nil {
+		return err
+	}
+	// Silence Usage as we have now validated command input
+	cmd.SilenceUsage = true
+
+	id := args[0]
+	if err := deployment.CheckHibernation(id, houstonClient); err != nil {
+		return err
+	}
+	verb := "wake up"
+	if hibernate {
+		verb = "hibernate"
+	}
+	if !skipPrompt {
+		question := fmt.Sprintf("\nAre you sure you want to %s this Deployment?", verb)
+		if hibernateRemove {
+			question = "\nAre you sure you want to remove the hibernation override on this Deployment?"
+		}
+		ok, err := input.Confirm(question, input.AnsweredBy("--yes"))
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Fprintln(out, "Exit: This command was not executed and your Deployment was not changed.")
+			return nil
+		}
+	}
+
+	var d *houston.Deployment
+	if hibernateRemove {
+		d, err = deployment.RemoveHibernationOverride(id, houstonClient)
+	} else {
+		d, err = deployment.SetHibernationOverride(id, hibernate, until, houstonClient)
+	}
+	if err != nil {
+		return err
+	}
+	return emitHibernation(r, newHibernationJSON(id, d), verb)
+}
+
+// hibernationEnd is when an override set with --until or --for ends, or nil
+// for one that lasts until it is removed.
+func hibernationEnd(until, forDuration string) (*time.Time, error) {
+	switch {
+	case until != "":
+		t, err := time.Parse(time.RFC3339, until)
+		if err != nil {
+			return nil, fmt.Errorf("--until takes a date and time in RFC 3339, such as 2026-01-01T00:00:00Z: %w", err)
+		}
+		return &t, nil
+	case forDuration != "":
+		d, err := time.ParseDuration(forDuration)
+		if err != nil {
+			return nil, fmt.Errorf("--for takes a duration, such as 1h30m: %w", err)
+		}
+		t := time.Now().Add(d)
+		return &t, nil
+	}
+	return nil, nil
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
