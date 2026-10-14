@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -29,7 +30,7 @@ const (
 	maxLoggedHost = 253
 
 	// SignatureHeader and SignatureValue mark responses the proxy generates
-	// itself (its landing and not-found pages). A caller can probe the proxy's
+	// itself (its landing, not-found and unavailable pages). A caller can probe the proxy's
 	// port and check for this header to confirm it's really the astro proxy on
 	// the other end, not an unrelated process that recycled its PID/port.
 	SignatureHeader = "X-Astro-Proxy"
@@ -66,7 +67,9 @@ type Proxy struct {
 	Transport func(backendPort string) http.RoundTripper
 
 	// ErrorHandler writes the response when a proxied request fails. Nil serves
-	// a plain 502. Set it before calling Start.
+	// a 502: the unavailable page to a browser navigating to a backend that is
+	// not answering, plain text otherwise (see defaultErrorHandler). Set it
+	// before calling Start.
 	//
 	// A host with somewhere better to send people wants this: the desktop
 	// serves a page explaining that the project is not running, which is a more
@@ -95,6 +98,11 @@ type Proxy struct {
 	// and starting a second one.
 	RenderLanding  func(w io.Writer, routes []LandingRoute)
 	RenderNotFound func(w io.Writer, hostname, port string)
+
+	// Pages is the copy on the built-in pages that differs between hosts: the
+	// proxy's name and how to start a project. The zero value is the CLI's. Set
+	// it before calling Start.
+	Pages Pages
 
 	// FallbackPort is the port Start tries when the configured one is taken,
 	// before it asks the OS for any free port. Empty skips it. Set it before
@@ -290,7 +298,7 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 			p.ErrorHandler(rw, req, proxyErr)
 			return
 		}
-		http.Error(rw, "Backend unavailable", http.StatusBadGateway)
+		defaultErrorHandler(rw, req, proxyErr)
 	}
 
 	p.mu.Lock()
@@ -463,7 +471,8 @@ func (p *Proxy) landingPage(w http.ResponseWriter) {
 		p.RenderLanding(bodyOnly(w), listed)
 		return
 	}
-	if err := landingTmpl.Execute(w, landingData{Routes: listed}); err != nil {
+	data := landingData{Title: p.Pages.title(), Pages: p.Pages, Routes: listed}
+	if err := pageTmpl.ExecuteTemplate(w, landingPageName, data); err != nil {
 		slog.Debug("landing page template", "error", err)
 	}
 }
@@ -477,10 +486,71 @@ func (p *Proxy) notFoundPage(w http.ResponseWriter, hostname string) {
 		p.RenderNotFound(bodyOnly(w), hostname, p.Port())
 		return
 	}
-	if err := notFoundTmpl.Execute(w, notFoundData{
+	if err := pageTmpl.ExecuteTemplate(w, notFoundPageName, notFoundData{
+		Pages:    p.Pages,
 		Hostname: hostname,
 		Port:     p.Port(),
 	}); err != nil {
 		slog.Debug("not found page template", "error", err)
 	}
+}
+
+// defaultErrorHandler answers a failed proxied request when the host has not
+// supplied an ErrorHandler. It is always a 502; what varies is the body.
+//
+// The unavailable page goes only to a browser navigation that could not reach
+// the backend, which is what someone opening a stopped or still-booting project
+// sees. An API client (af, curl, Airflow's own fetches) gets plain text, because
+// a page of HTML is noise to a program reading the status. A failure inside the
+// proxy's own handling gets plain text too: telling someone the project is
+// starting up when it is running fine hides the bug.
+func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	if !isBackendUnreachable(err) || !wantsHTML(r) {
+		http.Error(w, "Backend unavailable", http.StatusBadGateway)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(SignatureHeader, SignatureValue)
+	w.WriteHeader(http.StatusBadGateway)
+	if renderErr := RenderUnavailable(w); renderErr != nil {
+		slog.Debug("unavailable page template", "error", renderErr)
+	}
+}
+
+// isBackendUnreachable reports whether err is the proxy failing to reach the
+// backend, as opposed to something going wrong in a ModifyResponse hook or in
+// httputil's own setup.
+//
+// Two shapes mean the project is not running:
+//
+//   - A connection that fails at the socket: refused, reset, timed out, or
+//     nothing listening. The transport reports these as a *net.OpError.
+//   - A connection that is accepted and closed before any response, which the
+//     transport reports as a bare EOF. Docker holds a project's published port
+//     while the Airflow container behind it restarts, so this is what a
+//     restarting or crash-looping container looks like.
+//
+// Matching those rather than anything that implements net.Error matters,
+// because a hook's own failures implement it too: a *url.Error from a hook's
+// HTTP call, context.DeadlineExceeded, a response-header timeout. Calling those
+// "starting up" would describe a running project as down and hide the bug.
+func isBackendUnreachable(err error) bool {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var opErr *net.OpError
+	return errors.As(err, &opErr)
+}
+
+// wantsHTML reports whether r is a browser navigation rather than an API call.
+// An empty Accept counts, since whoever sent no preference still reads the body.
+//
+// Only a GET or HEAD qualifies. The page recovers by navigating to its own URL,
+// and a form submitted while the backend was down would be submitted again.
+func wantsHTML(r *http.Request) bool {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		return false
+	}
+	accept := r.Header.Get("Accept")
+	return accept == "" || strings.Contains(accept, "text/html")
 }
