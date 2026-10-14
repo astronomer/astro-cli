@@ -224,7 +224,7 @@ func TestRunWithWorkspaceFailsWhenAValueCannotBeFetched(t *testing.T) {
 	if len(missing.Missing) != 1 || missing.Missing[0].Name != "DATA_WAREHOUSE_URI" {
 		t.Errorf("missing = %+v, want DATA_WAREHOUSE_URI alone", missing.Missing)
 	}
-	if !strings.Contains(err.Error(), "leave off `--with-workspace`") {
+	if !strings.Contains(err.Error(), "leave off --with-workspace") {
 		t.Errorf("error does not name the way out:\n%v", err)
 	}
 	if calls.stopped.ProjectPath != "" {

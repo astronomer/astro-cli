@@ -227,7 +227,7 @@ func Run(ctx context.Context, opts Options, parser Parser) (Result, error) {
 // scanned as a condition on the advice as a whole, and the first question it
 // drew was whether any of this applied outside Docker. It applies to every
 // project; only the choice between the two commands depends on the mode.
-const buildRemedy = " — `astro local start` rebuilds it, or `uv sync` if this project builds in Docker"
+const buildRemedy = " — astro local start rebuilds it, or uv sync if this project builds in Docker"
 
 // run is Run with the remedy chosen by the caller, so that the one path where
 // it would be wrong can say so.

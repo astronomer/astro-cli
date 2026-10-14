@@ -123,7 +123,7 @@ func (e *UnavailableError) Unwrap() error { return e.State }
 func (e *UnavailableError) Error() string {
 	switch e.State {
 	case ErrDeploymentHibernating:
-		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering — wake it with `astro deployment wake-up %s`, which takes about a minute",
+		return fmt.Sprintf("Astro Deployment %s (%q) is hibernating, so its Airflow is not answering — wake it with astro deployment wake-up %s, which takes about a minute",
 			e.DeploymentID, e.Name, e.DeploymentID)
 	case ErrDeploymentDeploying:
 		return fmt.Sprintf("Astro Deployment %s (%q) is still deploying, so its Airflow is not answering yet — try again in a minute or two",
@@ -132,7 +132,7 @@ func (e *UnavailableError) Error() string {
 		return fmt.Sprintf("Astro Deployment %s (%q) reports healthy, but its Airflow is not answering yet — it may still be starting after a wake-up or deploy, so try again in a minute",
 			e.DeploymentID, e.Name)
 	}
-	return fmt.Sprintf("Astro reports Deployment %s (%q) as unhealthy, so its Airflow is not answering — see `astro deployment inspect %s`",
+	return fmt.Sprintf("Astro reports Deployment %s (%q) as unhealthy, so its Airflow is not answering — see astro deployment inspect %s",
 		e.DeploymentID, e.Name, e.DeploymentID)
 }
 
@@ -169,7 +169,7 @@ func deploymentOutage(domain string, i instances.Instance, deploymentID string, 
 		if i.Source == instances.SourceDeploymentID {
 			return fmt.Errorf("Astro Deployment %s does not exist", deploymentID)
 		}
-		return fmt.Errorf("Astro Deployment %s (%q) does not exist — check the `deployment` on this link in pyproject.toml", deploymentID, name)
+		return fmt.Errorf("Astro Deployment %s (%q) does not exist — check the deployment on this link in pyproject.toml", deploymentID, name)
 	}
 	detail := ""
 	if resp.HTTPResponse != nil {

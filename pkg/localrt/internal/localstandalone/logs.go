@@ -155,7 +155,7 @@ func (a *airflow) Logs(ctx context.Context, opts rt.LogOptions) error {
 	f, err := os.Open(logPath)
 	if errors.Is(err, os.ErrNotExist) {
 		if !opts.Follow {
-			return errors.New("this project has no local Airflow logs yet; `astro local start` creates them")
+			return errors.New("this project has no local Airflow logs yet; astro local start creates them")
 		}
 		if f, err = a.waitForLogFile(ctx, logPath); err != nil || f == nil {
 			// A nil file without error is a canceled wait — the normal way

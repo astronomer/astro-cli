@@ -50,7 +50,7 @@ func (e *NotFoundError) Error() string {
 	if e.Project1xDir != "" {
 		return project1xMessage(e.Project1xDir)
 	}
-	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun `%s` to make this directory one",
+	return fmt.Sprintf("no Astro project found: no %s in %s or any parent directory.\nRun %s to make this directory one",
 		Marker, e.Start, initCommand)
 }
 
@@ -84,7 +84,7 @@ func (e *NoAstroSectionError) Error() string {
 		return project1xMessage(root)
 	}
 	return fmt.Sprintf("%s has no [tool.astro] section, so this is not an Astro project yet.\n"+
-		"Run `%s` in %s to add one; the rest of the file is left alone",
+		"Run %s in %s to add one; the rest of the file is left alone",
 		filepath.Join(e.Dir, Marker), initCommand, e.Dir)
 }
 

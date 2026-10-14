@@ -112,7 +112,7 @@ func TestNormalizeAPIErrorUnlinkedPRPreview(t *testing.T) {
 			name: "a PR preview with no user for the login yet",
 			url:  "https://pr41517.api.astronomer-dev.io/v1/organizations",
 			body: forbidden,
-			want: "you're logged in to PR previews, but pr41517 has no user for you yet. Run `astro login pr41517` to create it, then run the command again",
+			want: "you're logged in to PR previews, but pr41517 has no user for you yet. Run astro login pr41517 to create it, then run the command again",
 		},
 		{
 			name: "the same refusal from dev",

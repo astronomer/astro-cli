@@ -29,7 +29,7 @@ func (q *query) envSourcedNote(kind localenv.Kind) string {
 	if list == "" {
 		return note
 	}
-	return note + " To see the ones this CLI manages, run `" + list + "`"
+	return note + " To see the ones this CLI manages, run " + list
 }
 
 // noteEnvSourced closes a text listing with envSourcedNote on stderr.
@@ -60,7 +60,7 @@ func newConnectionsCmd(d Deps, t target) *cobra.Command {
 		Long: "Read the connections on " + t.which() + ": which systems it can reach, " +
 			"and how.\n\nNo password is ever shown. The client this runs on does not decode the field at all, " +
 			"so a password cannot reach a table, a log, or a json stream by accident — not with --output json, " +
-			"not on `get`. Read one with `" + rawAPIForm(t) + "` if you genuinely need it.",
+			"not with get. Read one with " + rawAPIForm(t) + " if you genuinely need it.",
 	},
 		newConnectionsListCmd,
 		newConnectionsGetCmd,
@@ -189,9 +189,9 @@ func newVariablesCmd(d Deps, t target) *cobra.Command {
 		Use:   "variables",
 		Short: "List and read the Airflow Variables on an Airflow",
 		Long: "Read the Airflow Variables on " + t.which() + ".\n\n" +
-			"`list` shows keys and descriptions but no values: a Variable holds whatever someone put in it, " +
+			"The list command shows keys and descriptions but no values: a Variable holds whatever someone put in it, " +
 			"and printing every value to answer \"what variables are there\" is how a secret ends up in a " +
-			"terminal scrollback. Read one deliberately with `variables get <KEY>`.",
+			"terminal scrollback. Read one deliberately with variables get <KEY>.",
 	},
 		newVariablesListCmd,
 		newVariablesGetCmd,

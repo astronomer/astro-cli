@@ -36,7 +36,7 @@ var cloudSamples = map[cliout.ProblemKind][]error{
 		pkgerrors.Wrap(config.ErrGetHomeString, "failed to get current Workspace"),
 		astrosession.ErrLoggedOut,
 		// A login a run under --output json may not start, as Login words it.
-		fmt.Errorf("%w; with --output json it cannot — run `astro login` first", astroAuth.ErrLoginNeeded),
+		fmt.Errorf("%w; with --output json it cannot — run astro login first", astroAuth.ErrLoginNeeded),
 	},
 	KindForbidden:      {apiFailure(http.StatusForbidden)},
 	KindNotFound:       {apiFailure(http.StatusNotFound)},

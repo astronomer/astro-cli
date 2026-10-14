@@ -964,7 +964,7 @@ func TestCheckEnvNotReadyExitsCode2(t *testing.T) {
 }
 
 func wrapNotReady() error {
-	return errWrap{msg: "no Python found at .venv/bin/python — run `astro local start` first", err: checks.ErrEnvNotReady}
+	return errWrap{msg: "no Python found at .venv/bin/python — run astro local start first", err: checks.ErrEnvNotReady}
 }
 
 type errWrap struct {

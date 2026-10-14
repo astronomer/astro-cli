@@ -891,7 +891,7 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, default
 		// sentinel is for. Input that ends instead fails with Ended.
 		Invalid: manifestdeploy.ErrAborted,
 		ByName:  true,
-		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: `astro deploy <name>` or --deployment <name>")),
+		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: astro deploy <name> or --deployment <name>")),
 	}
 	for i, choice := range choices {
 		cells := []string{choice.Name, choice.Where}

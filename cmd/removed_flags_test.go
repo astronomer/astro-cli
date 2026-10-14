@@ -195,7 +195,7 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 						reached[f] = true
 					}
 					if asJSON && !cliout.HasOutput(target) {
-						t.Skip("no --output here: an `astro api` request prints the API's response")
+						t.Skip("no --output here: an astro api request prints the API's response")
 					}
 
 					stdout, stderr, err := executeRoot(root, args...)
@@ -267,7 +267,7 @@ func TestRemovedFlagsNameRealCommands(t *testing.T) {
 					found = true
 				}
 			}
-			assert.True(t, found, "--%s: no tree has `astro %s`", f.name, path)
+			assert.True(t, found, "--%s: no tree has astro %s", f.name, path)
 		}
 	}
 }

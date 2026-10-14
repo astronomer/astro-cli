@@ -176,11 +176,11 @@ func checkSupportedAirflow(version string) error {
 func pickAirflowTarget(catalog *runtimeversions.Catalog, pin string) (target, available string, err error) {
 	if catalog == nil {
 		return "", "", errors.New("could not read the runtime catalog to pick the newest Airflow. " +
-			"Pass a version instead, like `astro local upgrade airflow 3.1`")
+			"Pass a version instead, like astro local upgrade airflow 3.1")
 	}
 	if pin == "" {
 		return "", "", fmt.Errorf("could not read the Airflow version %s pins, so there is nothing to upgrade from. "+
-			"Pass a version instead, like `astro local upgrade airflow 3.1`", manifest.Marker)
+			"Pass a version instead, like astro local upgrade airflow 3.1", manifest.Marker)
 	}
 	sameGen, crossGen := catalog.AirflowUpgradeTargets(pin)
 	if sameGen == "" {
@@ -268,7 +268,7 @@ func renderAirflowUpgrade(w io.Writer, res airflowUpgrade) error {
 		lines = append(lines, availableHint(res.Available))
 	}
 	if res.RestartNeeded {
-		lines = append(lines, fmt.Sprintf("Airflow is still running the old version. Run `%s` when the project is ready.", replaceRestart))
+		lines = append(lines, fmt.Sprintf("Airflow is still running the old version. Run %s when the project is ready.", replaceRestart))
 	}
 	_, err := io.WriteString(w, strings.Join(lines, "\n")+"\n")
 	return err

@@ -125,7 +125,7 @@ func checkAirflow2Floor(version string) error {
 	if err != nil || minor >= minAirflow2Minor {
 		return nil
 	}
-	return fmt.Errorf("Docker mode needs Airflow 2.%d or later, and this project pins %s: the metadata database is migrated with `airflow db migrate`, which does not exist before Airflow 2.%d%s",
+	return fmt.Errorf("Docker mode needs Airflow 2.%d or later, and this project pins %s: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d%s",
 		minAirflow2Minor, version, minAirflow2Minor, seriesHint(version))
 }
 

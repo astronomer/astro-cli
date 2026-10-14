@@ -50,7 +50,7 @@ type interrupted struct{ err error }
 
 func (e *interrupted) Error() string {
 	return "interrupted: the containers keep starting in the background — " +
-		"`astro local logs` shows their progress, `astro local stop` ends them"
+		"astro local logs shows their progress, astro local stop ends them"
 }
 
 func (e *interrupted) Unwrap() error { return e.err }
@@ -80,7 +80,7 @@ func waitHealthy(ctx context.Context, urls []string, timeout time.Duration) erro
 				// for why the name of one belongs to the CLI and not to a
 				// module Astro Desktop also builds on.
 				return fmt.Errorf("%w after %s; the containers keep starting in the background — "+
-					"`astro local logs` shows their progress", ErrHealthTimeout, timeout)
+					"astro local logs shows their progress", ErrHealthTimeout, timeout)
 			}
 			// The same thing the deadline branch above says, for the same
 			// reason, because the same thing is true: Start published the

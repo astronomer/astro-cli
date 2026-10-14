@@ -176,7 +176,7 @@ dependencies = ['apache-airflow==3.1.*']
 				t.Fatal("the runtime refused to start; the command must fail")
 			}
 			if !strings.Contains(err.Error(), healthTimeoutEnv) {
-				t.Errorf("`astro %s` reported %q, which never names %s",
+				t.Errorf("astro %s reported %q, which never names %s",
 					strings.Join(tc.args, " "), err, healthTimeoutEnv)
 			}
 		})

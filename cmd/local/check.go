@@ -212,7 +212,7 @@ func (c *cli) checkAstroTarget(ctx context.Context, project string, env []string
 	rep := checks.TargetReport{
 		Target:         checks.TargetAstro,
 		AirflowChecked: m.Airflow().Pin,
-		Notes:          []string{"astro runs your project's own Airflow; this is the default `astro local check`"},
+		Notes:          []string{"astro runs your project's own Airflow; this is the default astro local check"},
 	}
 	res, provisioned, err := c.check(ctx, r, checks.Options{ProjectPath: project, Strict: strict, Env: env}, m)
 	if err != nil {

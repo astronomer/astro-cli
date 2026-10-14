@@ -26,7 +26,7 @@ var dagIDRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 // own unknown command is: it exits 2, as `astro run` did before this stub
 // existed.
 func newRunRemovedCmd() *cobra.Command {
-	return cliout.RemovedCommand(nameRun, nil, "Removed in v2 — use `"+replaceRunDag+"`", func(_ *cobra.Command, args []string) error {
+	return cliout.RemovedCommand(nameRun, nil, "Removed in v2 — use "+replaceRunDag, func(_ *cobra.Command, args []string) error {
 		return cliout.Usage(errors.New(runRemovedGuidance(args)))
 	})
 }
@@ -39,7 +39,7 @@ func runRemovedGuidance(args []string) string {
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") && dagIDRe.MatchString(args[0]) {
 		dagID = args[0]
 	}
-	return fmt.Sprintf("`astro run` was removed in Astro CLI v2. Use `%s %s` instead.\n"+
+	return fmt.Sprintf("astro run was removed in Astro CLI v2. Use %s %s instead.\n"+
 		"It runs the Dag in this project's Airflow environment and needs no running Airflow in a standalone project. "+
 		"Pass a logical date as the argument after the Dag id, in place of --execution-date.", replaceRunDag, dagID)
 }

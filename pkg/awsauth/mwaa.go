@@ -68,7 +68,7 @@ type mwaaAPI interface {
 // nothing. Every way of having no AWS identity — no profile, an SSO session
 // that lapsed, an expired assumed role — ends here, because the fixes are the
 // two named.
-var errNoAWSCredentials = errors.New("no AWS credentials found — run `aws sso login`, or set AWS_PROFILE")
+var errNoAWSCredentials = errors.New("no AWS credentials found — run aws sso login, or set AWS_PROFILE")
 
 // awsCredentialTimeout bounds the up-front walk of the credential chain. A
 // var, not a const, so the slow-chain test can cut it to milliseconds instead
@@ -83,7 +83,7 @@ var awsCredentialTimeout = 15 * time.Second
 // again would be advice to abandon the login they are in the middle of.
 func awsCredentialFailure(err error, environment, region string) error {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("your AWS credentials did not arrive within %s (reaching %s in %s) — an `aws sso login` or a credential_process helper may still be waiting on you; finish it and run this again",
+		return fmt.Errorf("your AWS credentials did not arrive within %s (reaching %s in %s) — an aws sso login or a credential_process helper may still be waiting on you; finish it and run this again",
 			awsCredentialTimeout, environment, region)
 	}
 	return fmt.Errorf("%w (reaching %s in %s): %w", errNoAWSCredentials, environment, region, err)
@@ -217,7 +217,7 @@ func (t *awsTransport) Do(ctx context.Context, req airflowapi.Request) (airflowa
 func (t *awsTransport) callFailure(err error) error {
 	var missing *mwaatypes.ResourceNotFoundException
 	if errors.As(err, &missing) {
-		return fmt.Errorf("no MWAA environment named %s in %s — check `environment` on this link and `region` under [tool.astro.targets.mwaa] in pyproject.toml (an environment in another region reads the same way)",
+		return fmt.Errorf("no MWAA environment named %s in %s — check this link's environment and the region under [tool.astro.targets.mwaa] in pyproject.toml (an environment in another region reads the same way)",
 			t.environment, t.region)
 	}
 	return fmt.Errorf("call the MWAA API for %s in %s: %w", t.environment, t.region, err)

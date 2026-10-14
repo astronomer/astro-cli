@@ -34,7 +34,7 @@ const (
 // The astro artifact is an image, and building one needs Docker; the message
 // says so plainly and points at the Docker-free path (docs/deploy.md,
 // section 5).
-var ErrNoDocker = errors.New("building the astro package image needs Docker, but no engine is reachable; start Docker and try again (a dags-only `astro deploy --dags` needs no Docker, and remote builds are coming)")
+var ErrNoDocker = errors.New("building the astro package image needs Docker, but no engine is reachable; start Docker and try again (a dags-only astro deploy --dags needs no Docker, and remote builds are coming)")
 
 // ImageBuilder builds a deployable image from a manifest's fields. It is the
 // seam onto pkg/imagebuild; *imagebuild.Builder satisfies it, and a test

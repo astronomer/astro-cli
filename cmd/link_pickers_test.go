@@ -146,7 +146,7 @@ func TestLinkPickersRefreshAfterA401(t *testing.T) {
 func TestLinkPickersNameAnExpiredSession(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	t.Setenv("ASTRO_API_TOKEN", "")
-	const want = "your astronomer.io session expired. Log in again with `astro login astronomer.io`"
+	const want = "your astronomer.io session expired. Log in again with astro login astronomer.io"
 	refused := httputil.NormalizeAPIError(&http.Response{StatusCode: http.StatusUnauthorized}, []byte(unauthorizedBody))
 	for name, tc := range map[string]struct {
 		ensureErr, refreshErr error

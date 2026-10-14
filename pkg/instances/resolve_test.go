@@ -97,7 +97,7 @@ func TestUnknownNamesPointAtTheLayerThatHoldsThem(t *testing.T) {
 		want string
 	}{
 		{Request{Env: "nope"}, `no deployment named "nope" (from ASTRO_DEPLOYMENT); known deployments: dev, prod`},
-		{Request{Pin: "nope"}, `no deployment named "nope" (selected with ` + "`astro use`" + `; clear it with ` + "`astro use --unset`" + `); known deployments: dev, prod`},
+		{Request{Pin: "nope"}, `no deployment named "nope" (selected with ` + "astro use" + `; clear it with ` + "astro use --unset" + `); known deployments: dev, prod`},
 	}
 	for _, tc := range cases {
 		_, err := set.Select(tc.req)

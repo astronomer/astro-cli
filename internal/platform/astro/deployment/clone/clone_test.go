@@ -239,7 +239,7 @@ func TestRequest(t *testing.T) {
 			},
 			want: `{"type":"STANDARD","executor":"CELERY",` + commonJSON + `,
 				"cloudProvider":"AWS","region":"us-east-1",` + hostedResourcesJSON + `,` + queuesJSON + `}`,
-			notes: []string{"Not copied: secret environment variables API_KEY, DB_PASSWORD. The API does not return their values; set them on the new Deployment with `astro deployment variable create --secret`."},
+			notes: []string{"Not copied: secret environment variables API_KEY, DB_PASSWORD. The API does not return their values; set them on the new Deployment with astro deployment variable create --secret."},
 		},
 		{
 			name: "a custom-looking workload identity is named, not sent",
@@ -250,7 +250,7 @@ func TestRequest(t *testing.T) {
 			},
 			want: `{"type":"STANDARD","executor":"CELERY",` + commonJSON + `,
 				"cloudProvider":"AWS","region":"us-east-1",` + hostedResourcesJSON + `,` + queuesJSON + `}`,
-			notes: []string{"Not copied: the workload identity arn:aws:iam::123456789012:role/my-etl-role, which looks custom. The new Deployment has Astro's default; set it with `astro deployment update --workload-identity` if it should match."},
+			notes: []string{"Not copied: the workload identity arn:aws:iam::123456789012:role/my-etl-role, which looks custom. The new Deployment has Astro's default; set it with astro deployment update --workload-identity if it should match."},
 		},
 		{
 			name: "a dedicated Deployment on its cluster's role has a custom identity",
@@ -261,7 +261,7 @@ func TestRequest(t *testing.T) {
 			},
 			want: `{"type":"DEDICATED","executor":"ASTRO",` + commonJSON + `,
 				"clusterId":"clcluster0000000000000001",` + hostedResourcesJSON + `,` + queuesJSON + `}`,
-			notes: []string{"Not copied: the workload identity arn:aws:iam::123456789012:role/AirflowS3Logs-clcluster0000000000000001, which looks custom. The new Deployment has Astro's default; set it with `astro deployment update --workload-identity` if it should match."},
+			notes: []string{"Not copied: the workload identity arn:aws:iam::123456789012:role/AirflowS3Logs-clcluster0000000000000001, which looks custom. The new Deployment has Astro's default; set it with astro deployment update --workload-identity if it should match."},
 		},
 		{
 			name: "a hybrid Deployment on a per-Deployment role has a custom identity",
@@ -272,7 +272,7 @@ func TestRequest(t *testing.T) {
 			},
 			want: `{"type":"HYBRID","executor":"KUBERNETES",` + commonJSON + `,
 				"clusterId":"clhybrid00000000000000001","scheduler":{"au":10,"replicas":2}}`,
-			notes: []string{"Not copied: the workload identity arn:aws:iam::123456789012:role/astro-fiery-nebula-1234, which looks custom. The new Deployment has Astro's default; set it with `astro deployment update --workload-identity` if it should match."},
+			notes: []string{"Not copied: the workload identity arn:aws:iam::123456789012:role/astro-fiery-nebula-1234, which looks custom. The new Deployment has Astro's default; set it with astro deployment update --workload-identity if it should match."},
 		},
 		{
 			name: "a custom disaster recovery identity is named, with no CLI flag offered",

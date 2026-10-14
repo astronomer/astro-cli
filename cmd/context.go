@@ -174,7 +174,7 @@ var errInvalidContextSelection = errors.New("invalid context selected")
 // CLI look as though it flips between hosts.
 func pickContext(in io.Reader, out io.Writer) (string, error) {
 	if !contextPickerMayPrompt() {
-		return "", input.Required(errors.New("name the context to switch to: `astro context switch <domain>`"))
+		return "", input.Required(errors.New("name the context to switch to: astro context switch <domain>"))
 	}
 	contexts, err := config.ListContexts()
 	if err != nil {
@@ -191,7 +191,7 @@ func pickContext(in io.Reader, out io.Writer) (string, error) {
 		emails[domain] = contexts.Contexts[key].UserEmail
 	}
 	if len(domains) == 0 {
-		return "", errors.New("no contexts are saved on this machine. Run `astro login <domain>` to add one")
+		return "", errors.New("no contexts are saved on this machine. Run astro login <domain> to add one")
 	}
 	slices.Sort(domains)
 

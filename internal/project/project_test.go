@@ -232,7 +232,7 @@ func TestNotFoundErrorPointsAtInit(t *testing.T) {
 	var nf *NotFoundError
 	require.ErrorAs(t, err, &nf)
 	assert.Empty(t, nf.Project1xDir)
-	assert.Contains(t, err.Error(), "`astro init`")
+	assert.Contains(t, err.Error(), "astro init")
 	assert.NotContains(t, err.Error(), "v1")
 }
 
@@ -408,7 +408,7 @@ func TestLoadError(t *testing.T) {
 		assert.False(t, ns.Has1xProject)
 		require.ErrorIs(t, err, manifest.ErrNoAstroSection)
 		assert.Contains(t, err.Error(), "no [tool.astro] section")
-		assert.Contains(t, err.Error(), "`astro init`")
+		assert.Contains(t, err.Error(), "astro init")
 	})
 	t.Run("a tools-only pyproject in a 1.x project", func(t *testing.T) {
 		dir := t.TempDir()

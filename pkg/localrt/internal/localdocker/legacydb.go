@@ -277,7 +277,7 @@ func (e *Engine) noteLegacyDatabase(ctx context.Context, conn engineConn, projec
 	cb.OnLine(rt.LogLine{
 		Component: "system",
 		Time:      e.now(),
-		Text: fmt.Sprintf("starting with a new local Airflow database. The one `astro dev` used is left untouched in the %s volume %s, "+
+		Text: fmt.Sprintf("starting with a new local Airflow database. The one astro dev used is left untouched in the %s volume %s, "+
 			"and Astro CLI 1.x can still start it", legacyConn.bin, legacy),
 	})
 }
