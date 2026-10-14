@@ -166,9 +166,13 @@ func TestNewFallsBackToIDHostnameForUnusableName(t *testing.T) {
 	// or all punctuation — must not break the project. Identity is the path
 	// hash, so the hostname falls back to an ID-derived label.
 	root := t.TempDir()
+	punctuation := "..."
+	if runtime.GOOS == windowsOS {
+		punctuation = "_._" // Windows strips a name's trailing dots, leaving ""
+	}
 	dirs := map[string]string{
 		"nonascii":    "日本語",
-		"punctuation": "...",
+		"punctuation": punctuation,
 		"normal":      "my-project",
 	}
 	hostnames := map[string]string{}

@@ -305,7 +305,7 @@ func (s *Suite) TestBuildPushDockerImageFailure() {
 	// invalid dockerfile test
 	dockerfile = "Dockerfile.invalid"
 	_, err := buildPushDockerImage(nil, &config.Context{}, mockDeployment, "test", "./testfiles/", "test", "test", "", false, false, description, "", Options{})
-	s.EqualError(err, "failed to parse dockerfile: testfiles/Dockerfile.invalid: when using JSON array syntax, arrays must be comprised of strings only")
+	s.EqualError(err, "failed to parse dockerfile: "+filepath.Join("testfiles", "Dockerfile.invalid")+": when using JSON array syntax, arrays must be comprised of strings only")
 	dockerfile = "Dockerfile"
 
 	config.InitConfig(s.fsForDockerConfig)
