@@ -350,14 +350,15 @@ type LandingRoute struct {
 // outbound request, logging in first if there is none yet.
 //
 // What this does, plainly: every request that reaches the proxy for a
-// registered *.localhost route leaves it carrying the local admin account's
-// credential, added here on the server side. Whoever can send a request to
-// the proxy acts as Airflow's admin, without logging in.
+// registered *.localhost route to an Airflow 2 leaves it carrying the local
+// admin account's session, added here on the server side. Whoever can send a
+// request to the proxy acts as Airflow's admin, without logging in. For an
+// Airflow 3 it adds nothing (see AirflowSessions).
 //
 // Why that is acceptable for a local development proxy:
 //
-//   - It changes nothing for Airflow 3. Every local engine runs it with
-//     simple_auth_manager_all_admins, so it already treats every request as an
+//   - It is where Airflow 3 already is. Every local engine runs it with
+//     simple_auth_manager_all_admins, so it treats every request as an
 //     admin's, logged in or not. This brings Airflow 2 to the same footing,
 //     which is what a person opening their own project expects.
 //   - The hostname routing is the gate. Only a Host that names a registered

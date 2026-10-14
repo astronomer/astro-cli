@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -21,6 +20,10 @@ import (
 // attempted and failed, preventing repeated retries on every request.
 const airflowAuthNone = "-"
 
+// airflowAuthServer is a sentinel stored in the session cache for an Airflow 3:
+// the server authenticates every request itself, so there is nothing to add.
+const airflowAuthServer = "server"
+
 // airflowSessionCookie is the name of Airflow 2's FAB session cookie — the one
 // fetchAirflowAuth captures and injectAirflowAuth (re)injects.
 const airflowSessionCookie = "session"
@@ -33,25 +36,28 @@ const airflowSessionCookie = "session"
 const authRetryTTL = 2 * time.Second
 
 const (
-	// authTokenTimeout bounds Airflow 3's token request, and authLoginTimeout
-	// each request of Airflow 2's login flow. Both run on the request path of
-	// the first request to a backend, so a wedged backend costs at most this.
-	authTokenTimeout = 5 * time.Second
+	// authProbeTimeout bounds the request that tells Airflow 3 from Airflow 2,
+	// and authLoginTimeout each request of Airflow 2's login flow. Both run on
+	// the request path of the first request to a backend, so a wedged backend
+	// costs at most this.
+	authProbeTimeout = 5 * time.Second
 	authLoginTimeout = 10 * time.Second
 )
 
 // AirflowSessions logs a proxy into the local Airflows behind it, so a person
 // opening a project in a browser lands in Airflow rather than at its login page.
 //
-// One session per backend port, fetched on first use with the local admin
-// account every engine creates (pkg/airflowrt's Airflow2AdminUser and
-// Airflow2AdminPassword):
+// One entry per backend port, settled on first use:
 //
-//   - Airflow 3: a bearer token from /auth/token. Under
-//     simple_auth_manager_all_admins, which every local engine sets, that
-//     endpoint hands out an admin token without checking the credentials, so
-//     this is one fast round trip and changes nothing about who may do what.
-//   - Airflow 2: the session cookie from Flask-AppBuilder's login form.
+//   - Airflow 2: the session cookie from Flask-AppBuilder's login form, logged
+//     in with the local admin account every engine creates (pkg/airflowrt's
+//     Airflow2AdminUser and Airflow2AdminPassword).
+//   - Airflow 3: nothing. Every local engine runs it with
+//     simple_auth_manager_all_admins, whose middleware puts its own admin
+//     credential on every request. A bearer of ours would be read in its place
+//     (the first Authorization header wins), so it could only hurt: it expires
+//     after a day, and goes stale for good when the project's signing key
+//     changes or another project takes the port.
 //
 // The zero value is not usable; use NewAirflowSessions. Safe for concurrent
 // use, and meant to be shared: a host that relays the same backends through
@@ -60,7 +66,7 @@ const (
 // once per process.
 type AirflowSessions struct {
 	mu       sync.RWMutex
-	sessions map[string]string    // backend port → "Bearer …" / "Cookie session=…" / airflowAuthNone
+	sessions map[string]string    // backend port → "Cookie session=…" / airflowAuthServer / airflowAuthNone
 	tried    map[string]time.Time // backend port → when the cached value was fetched
 	// In-flight fetches keyed by backend port. A page load fires many parallel
 	// requests, so a restart rejects them all at once; without this every one
@@ -154,9 +160,10 @@ func (s *AirflowSessions) Inject(req *http.Request, backendPort string) {
 
 // Transport wraps inner with one recovery pass for backendPort: when Airflow
 // rejects a request's credential, drop it from the cache, log in again, and
-// replay the request once with the fresh one. Covers both stale credentials (an
-// Airflow restart mints a new signing key, so old bearers stop working) and the
-// boot race (the first login failed because the api-server wasn't up yet).
+// replay the request once with the fresh one. Covers stale sessions (an Airflow
+// 2 restart forgets the sessions it issued), the boot race (the first login
+// failed because the webserver wasn't up yet), and a port that an Airflow 2
+// project took over from an Airflow 3 one.
 //
 // inner does the actual round trips, replay included, so a host's transport
 // settings (keep-alives, timeouts) apply to both.
@@ -176,10 +183,22 @@ func (s *AirflowSessions) get(backendPort string) string {
 // drop only happens while the cache still holds the rejected credential; if a
 // concurrent rejection already refreshed it, the caller should reuse that
 // instead of forcing another login flow.
+//
+// A port cached as an Airflow 3 put nothing on the request, so there is no
+// credential to match. A login rejection from it means another project now
+// holds the port (an Airflow 3 under all-admins never asks for one), so it is
+// dropped to be looked at again, at most once per authRetryTTL in case it is an
+// Airflow 3 that really does want a login, which this cannot supply.
 func (s *AirflowSessions) invalidateIf(backendPort, rejected string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.sessions[backendPort] != rejected {
+	cached := s.sessions[backendPort]
+	switch {
+	case cached == airflowAuthServer:
+		if time.Since(s.tried[backendPort]) < authRetryTTL {
+			return
+		}
+	case cached != rejected:
 		return
 	}
 	delete(s.sessions, backendPort)
@@ -219,7 +238,7 @@ func (t *authRetryTransport) RoundTrip(req *http.Request) (*http.Response, error
 
 	t.s.Ensure(t.backendPort)
 	fresh := t.s.get(t.backendPort)
-	if fresh == "" || fresh == airflowAuthNone || fresh == rejected {
+	if fresh == "" || fresh == airflowAuthNone || fresh == airflowAuthServer || fresh == rejected {
 		return resp, nil
 	}
 
@@ -231,10 +250,8 @@ func (t *authRetryTransport) RoundTrip(req *http.Request) (*http.Response, error
 		}
 		retry.Body = body
 	}
-	// Drop the rejected bearer before re-injecting; injectAirflowAuth Sets the
-	// Authorization header so this is belt-and-braces, and it replaces the
-	// Airflow 2 session cookie itself.
-	retry.Header.Del("Authorization")
+	// injectAirflowAuth replaces the rejected session cookie rather than adding
+	// to it.
 	injectAirflowAuth(retry, fresh)
 
 	_ = resp.Body.Close()
@@ -243,8 +260,10 @@ func (t *authRetryTransport) RoundTrip(req *http.Request) (*http.Response, error
 }
 
 // injectAirflowAuth applies a cached auth value to an outbound request. auth is
-// "Bearer <token>" for Airflow 3, "Cookie session=<value>" for Airflow 2,
-// airflowAuthNone or "" when auth is unavailable.
+// "Cookie session=<value>" for Airflow 2; anything else (airflowAuthServer for
+// an Airflow 3, airflowAuthNone or "" when there is no session) adds nothing,
+// and the request's own headers, Authorization included, go through as they
+// came.
 //
 // The Airflow 2 session cookie REPLACES any the caller already carried.
 // Airflow 2's Set-Cookie responses pass through the proxy untouched, so the
@@ -259,28 +278,23 @@ func (t *authRetryTransport) RoundTrip(req *http.Request) (*http.Response, error
 // Nothing is stripped when auth is unavailable ("" / airflowAuthNone): we have
 // nothing better to offer, so the caller's own cookie gets its chance.
 func injectAirflowAuth(req *http.Request, auth string) {
-	switch {
-	case strings.HasPrefix(auth, "Bearer "):
-		req.Header.Set("Authorization", auth)
-	case strings.HasPrefix(auth, "Cookie "):
-		cookie := strings.TrimPrefix(auth, "Cookie ")
-		stripCookie(req, airflowSessionCookie)
-		if existing := req.Header.Get("Cookie"); existing != "" {
-			req.Header.Set("Cookie", existing+"; "+cookie)
-		} else {
-			req.Header.Set("Cookie", cookie)
-		}
+	if !strings.HasPrefix(auth, "Cookie ") {
+		return
+	}
+	cookie := strings.TrimPrefix(auth, "Cookie ")
+	stripCookie(req, airflowSessionCookie)
+	if existing := req.Header.Get("Cookie"); existing != "" {
+		req.Header.Set("Cookie", existing+"; "+cookie)
+	} else {
+		req.Header.Set("Cookie", cookie)
 	}
 }
 
 // requestAirflowAuth reconstructs the cache-format auth string
-// ("Bearer <tok>" / "Cookie session=<v>") that injectAirflowAuth applied to
-// req, so the retry path can tell whether the cache still holds the credential
-// the backend just rejected.
+// ("Cookie session=<v>") that injectAirflowAuth applied to req, so the retry
+// path can tell whether the cache still holds the credential the backend just
+// rejected.
 func requestAirflowAuth(req *http.Request) string {
-	if auth := req.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
-		return auth
-	}
 	if c, err := req.Cookie(airflowSessionCookie); err == nil {
 		return "Cookie " + airflowSessionCookie + "=" + c.Value
 	}
@@ -326,7 +340,7 @@ func isAirflowAuthRejection(resp *http.Response) bool {
 }
 
 // adminLoginForm is the local admin account as a login form body, the shape
-// both Airflow 3's /auth/token and Airflow 2's FAB login accept.
+// Airflow 2's FAB login accepts.
 func adminLoginForm() url.Values {
 	return url.Values{
 		"username": {airflowrt.Airflow2AdminUser},
@@ -334,16 +348,20 @@ func adminLoginForm() url.Values {
 	}
 }
 
-// fetchAirflowAuth logs in to the local Airflow on backendPort with the local
-// admin account. It tries Airflow 3's /auth/token first, then falls back to
-// Airflow 2's FAB session login flow, and returns "Bearer <token>" or
-// "Cookie session=<value>" for whichever worked.
+// fetchAirflowAuth settles what the proxy should add for the local Airflow on
+// backendPort: airflowAuthServer for an Airflow 3, which authenticates every
+// request itself, or "Cookie session=<value>" from logging in to an Airflow 2's
+// FAB form with the local admin account.
 func fetchAirflowAuth(backendPort string) (string, error) {
 	baseURL := "http://127.0.0.1:" + backendPort
 
-	// --- Airflow 3: POST /auth/token ---
-	if bearer, ok := fetchAirflow3Token(baseURL); ok {
-		return bearer, nil
+	// --- Airflow 3: nothing to add ---
+	isAirflow3, err := probeAirflow3(baseURL)
+	if err != nil {
+		return "", err
+	}
+	if isAirflow3 {
+		return airflowAuthServer, nil
 	}
 
 	// --- Airflow 2: FAB session login flow ---
@@ -414,32 +432,32 @@ func isLoggedInRedirect(resp *http.Response) bool {
 	return !isAirflowAuthRejection(resp)
 }
 
-// fetchAirflow3Token asks Airflow 3's /auth/token for a bearer. False means try
-// Airflow 2's login instead: anything but a token — a 404 from an Airflow 2, a
-// refused connection, a body without one — lands there.
-func fetchAirflow3Token(baseURL string) (string, bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), authTokenTimeout)
+// probeAirflow3 tells an Airflow 3 from an Airflow 2 by its /auth/token
+// endpoint, which only Airflow 3 has. A GET, with no credentials: under
+// all-admins it answers with a token (201) and otherwise refuses (403), and
+// either answer means Airflow 3. An Airflow 2 has no such route (404). Anything
+// else — a refused connection, a 5xx from a server still booting — is an error,
+// cached as a failure and looked at again after authRetryTTL.
+func probeAirflow3(baseURL string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), authProbeTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/auth/token", strings.NewReader(adminLoginForm().Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/auth/token", http.NoBody)
 	if err != nil {
-		return "", false
+		return false, err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", false
+		return false, fmt.Errorf("probing for Airflow 3: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return "", false
+	_ = resp.Body.Close()
+	switch {
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed:
+		return false, nil
+	case resp.StatusCode < http.StatusMultipleChoices, resp.StatusCode == http.StatusUnauthorized, resp.StatusCode == http.StatusForbidden:
+		return true, nil
+	default:
+		return false, fmt.Errorf("probing for Airflow 3: status %d", resp.StatusCode)
 	}
-	var tok struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&tok); err != nil || tok.AccessToken == "" {
-		return "", false
-	}
-	return "Bearer " + tok.AccessToken, true
 }
 
 // csrfRe pulls the CSRF token value out of a FAB / Flask-WTF login form, with
