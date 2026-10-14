@@ -4,5 +4,8 @@
   "type": "x",
   "image": "x",
   "runtime_version": "x",
-  "url": "x"
+  "url": "x",
+  "warnings": [
+    "x"
+  ]
 }

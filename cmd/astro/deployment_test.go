@@ -526,30 +526,6 @@ func TestDeploymentListRejectsRemovedOutputDialect(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 }
 
-// 1.x's --json is tombstoned, not aliased: alone or beside -o, it is a usage
-// error naming -o json, refused before any API call, and hidden from help.
-func TestDeploymentListJSONFlagIsTombstoned(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	for _, args := range [][]string{
-		{"list", "-a", "--json"},
-		{"list", "-a", "--json", "-o", "json"},
-		{"list", "--json", "-o", "text"},
-	} {
-		// No call is mocked: a refused run asks the API nothing.
-		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
-		astroV1Client = mockV1Client
-
-		resp, err := execDeploymentCmd(args...)
-		require.EqualError(t, err, cliout.ErrJSONFlagRemoved, args)
-		assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(t.Context(), err), args)
-		assert.NotContains(t, resp, `"deployments"`, args)
-		mockV1Client.AssertExpectations(t)
-	}
-
-	cmd := newDeploymentListCmd(io.Discard)
-	assert.True(t, cmd.Flags().Lookup("json").Hidden, "help shows --output, not --json")
-}
-
 func TestDeploymentLogs(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 

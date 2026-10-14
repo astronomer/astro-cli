@@ -4,12 +4,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 func writeFile(t *testing.T, path, content string) {
@@ -30,10 +32,10 @@ type stubDeployer struct {
 	answerErr error
 	asked     int
 	offered   []Choice
-	preselect Preselect
+	preselect string
 }
 
-func (s *stubDeployer) ConfirmTarget(choices []Choice, preselect Preselect) (string, error) {
+func (s *stubDeployer) ConfirmTarget(choices []Choice, preselect string) (string, error) {
 	s.asked++
 	s.offered, s.preselect = choices, preselect
 	return s.answer, s.answerErr
@@ -154,7 +156,7 @@ func TestResolveTarget(t *testing.T) {
 		target, err := resolveTarget(Request{Manifest: manifestWith(markedDefault), Interactive: true}, d)
 		require.NoError(t, err)
 		assert.Equal(t, 1, d.asked)
-		assert.Equal(t, Preselect{Name: "dev", From: DefaultMarker}, d.preselect)
+		assert.Equal(t, "dev", d.preselect)
 		assert.Equal(t, []string{"dev", "prod"}, choiceNames(d.offered))
 		assert.Equal(t, "astro deployment dep-dev", d.offered[0].Where)
 		assert.Equal(t, "dep-prod", target.DeploymentID, "the answer decides, not the marker")
@@ -166,49 +168,26 @@ func TestResolveTarget(t *testing.T) {
 		target, err := resolveTarget(Request{Manifest: manifestWith(oneLink), Interactive: true}, d)
 		require.NoError(t, err)
 		assert.Equal(t, 1, d.asked)
-		assert.Equal(t, Preselect{Name: "prod", From: DefaultMarker}, d.preselect)
+		assert.Equal(t, "prod", d.preselect)
 		assert.Equal(t, "dep-prod", target.DeploymentID)
 	})
 
-	// ASTRO_DEPLOYMENT and the pin arrive as Preselect. They outrank the marker
-	// for the cursor and decide nothing.
-	// The ambient layers outrank the marker for the cursor, and the label has to
-	// say so: a highlight an exported variable put there is not the file's
-	// default, and calling it one tells the reader their manifest says something
-	// it does not.
-	t.Run("the ambient layers only preselect, and say so", func(t *testing.T) {
+	// Only the committed default moves the cursor. ASTRO_DEPLOYMENT and the
+	// `astro use` selection pick which Airflow the query commands read; where
+	// code ships is the project's, so they never reach the prompt.
+	t.Run("only the default preselects, whatever the shell says", func(t *testing.T) {
+		t.Setenv(deploymentEnvVar, "prod")
 		d := &stubDeployer{answer: "dev"}
-		_, err := resolveTarget(Request{
-			Manifest:      manifestWith(markedDefault),
-			Preselect:     "prod",
-			PreselectFrom: "ASTRO_DEPLOYMENT",
-			Interactive:   true,
-		}, d)
+		_, err := resolveTarget(Request{Manifest: manifestWith(markedDefault), Interactive: true}, d)
 		require.NoError(t, err)
-		assert.Equal(t, Preselect{Name: "prod", From: "ASTRO_DEPLOYMENT"}, d.preselect)
+		assert.Equal(t, "dev", d.preselect)
 	})
 
-	t.Run("a pin is labeled as a pin", func(t *testing.T) {
+	t.Run("several links and no default highlight nothing", func(t *testing.T) {
 		d := &stubDeployer{answer: "dev"}
-		_, err := resolveTarget(Request{
-			Manifest:      manifestWith(markedDefault),
-			Preselect:     "prod",
-			PreselectFrom: PinnedBy,
-			Interactive:   true,
-		}, d)
+		_, err := resolveTarget(Request{Manifest: manifestWith(twoLinks), Interactive: true}, d)
 		require.NoError(t, err)
-		assert.Equal(t, Preselect{Name: "prod", From: PinnedBy}, d.preselect)
-	})
-
-	t.Run("a preselect naming nothing deployable highlights nothing", func(t *testing.T) {
-		d := &stubDeployer{answer: "dev"}
-		_, err := resolveTarget(Request{
-			Manifest:    manifestWith(twoLinks),
-			Preselect:   "gone",
-			Interactive: true,
-		}, d)
-		require.NoError(t, err)
-		assert.Equal(t, Preselect{}, d.preselect)
+		assert.Empty(t, d.preselect)
 	})
 
 	t.Run("an aborted prompt deploys nothing", func(t *testing.T) {
@@ -226,7 +205,7 @@ func TestResolveTarget(t *testing.T) {
 
 	t.Run("non-interactive with nothing named names the fix", func(t *testing.T) {
 		d := &stubDeployer{}
-		_, err := resolveTarget(Request{Manifest: manifestWith(markedDefault), Preselect: "prod"}, d)
+		_, err := resolveTarget(Request{Manifest: manifestWith(markedDefault)}, d)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must name the deployment")
 		assert.Contains(t, err.Error(), "--deployment <name>")
@@ -292,12 +271,18 @@ type fakeDeployer struct {
 	answerErr   error
 	confirms    int
 	offered     []Choice
-	preselected Preselect
+	preselected string
 
 	unlinkedID  string
 	unlinkedErr error
 	unlinkedWS  string
 	resolves    int
+
+	// listed is what ListDeployments returns for any workspace.
+	listed    []Deployment
+	listErr   error
+	listedWS  string
+	listCalls int
 
 	dag      DagResult
 	dagErr   error
@@ -310,16 +295,22 @@ type fakeDeployer struct {
 	imgDeploys int
 }
 
-func (f *fakeDeployer) ConfirmTarget(choices []Choice, preselect Preselect) (string, error) {
+func (f *fakeDeployer) ConfirmTarget(choices []Choice, preselect string) (string, error) {
 	f.confirms++
 	f.offered, f.preselected = choices, preselect
 	return f.answer, f.answerErr
 }
 
-func (f *fakeDeployer) ResolveUnlinked(ws string) (string, error) {
+func (f *fakeDeployer) ListDeployments(ws string) ([]Deployment, error) {
+	f.listCalls++
+	f.listedWS = ws
+	return f.listed, f.listErr
+}
+
+func (f *fakeDeployer) ResolveUnlinked(ws string) (Deployment, error) {
 	f.resolves++
 	f.unlinkedWS = ws
-	return f.unlinkedID, f.unlinkedErr
+	return Deployment{ID: f.unlinkedID, Name: "Picked One"}, f.unlinkedErr
 }
 
 func (f *fakeDeployer) DeployDags(in *DagDeploy) (DagResult, error) {
@@ -481,7 +472,151 @@ func TestRun_UnlinkedInteractiveSelects(t *testing.T) {
 	assert.Equal(t, "ws-ctx", d.unlinkedWS)
 	assert.Equal(t, "dep-picked", d.dagInput.DeploymentID)
 	assert.Equal(t, "dep-picked", res.DeploymentID)
-	assert.Empty(t, res.LinkName)
+	assert.Empty(t, res.LinkName, "with no Link hook, nothing is linked")
+}
+
+// A project that links nothing links what the workspace-level flow picks, named
+// after the Deployment.
+func TestRun_UnlinkedPickIsLinked(t *testing.T) {
+	d := &fakeDeployer{unlinkedID: "dep-picked"}
+	var saved []scaffold.Link
+	res, err := Run(Request{
+		DagsOnly:         true,
+		Interactive:      true,
+		ContextWorkspace: "ws-ctx",
+		Manifest:         manifestWith(nil),
+		Link:             func(l scaffold.Link) error { saved = append(saved, l); return nil },
+	}, d)
+	require.NoError(t, err)
+	require.Len(t, saved, 1)
+	assert.Equal(t, scaffold.Link{Name: "picked-one", Kind: manifest.KindAstro, Workspace: "ws-ctx", Deployment: "dep-picked"}, saved[0])
+	assert.Equal(t, "picked-one", res.LinkName)
+}
+
+// A project that links nothing lists the workspace it declares, as the prompt
+// with links does, before the login's.
+func TestRun_UnlinkedUsesTheProjectsWorkspace(t *testing.T) {
+	d := &fakeDeployer{unlinkedID: "dep-picked"}
+	m := manifestWith(nil)
+	m.Astro.Workspace = "ws-project"
+	_, err := Run(Request{DagsOnly: true, Interactive: true, ContextWorkspace: "ws-ctx", Manifest: m}, d)
+	require.NoError(t, err)
+	assert.Equal(t, "ws-project", d.unlinkedWS)
+}
+
+func TestResolveTarget_OffersTheWorkspacesUnlinkedDeployments(t *testing.T) {
+	links := map[string]manifest.Link{
+		"prod":    {Target: "astro", Workspace: "ws-1", Deployment: "dep-prod"},
+		"dev":     {Target: "astro", Workspace: "ws-1", Deployment: "dep-dev", Default: true},
+		"staging": {Target: "astro", Workspace: "ws-1", Deployment: "dep-staging"},
+	}
+	listed := []Deployment{
+		{ID: "dep-prod", Name: "Prod"},                              // linked: not offered again
+		{ID: "dep-new", Name: "Orders (EU)"},                        // offered as orders-eu
+		{ID: "dep-clash", Name: "Staging"},                          // "staging" is a link already
+		{ID: "dep-local", Name: "Local"},                            // "local" is reserved
+		{ID: "dep-other", Name: "Orders (EU)", WorkspaceID: "ws-1"}, // same name twice
+	}
+	req := Request{Interactive: true, Manifest: manifestWith(links), ContextWorkspace: "ws-1"}
+
+	t.Run("links first, the default on top, then the rest", func(t *testing.T) {
+		d := &stubDeployer{answer: "dev"}
+		d.listed = listed
+		_, err := resolveTarget(req, d)
+		require.NoError(t, err)
+		assert.Equal(t, "ws-1", d.listedWS)
+		assert.Equal(t, []string{"dev", "prod", "staging", "dep-local", "orders-eu", "orders-eu-2", "staging-2"}, choiceNames(d.offered))
+		for _, c := range d.offered {
+			assert.Equal(t, !slices.Contains([]string{"dev", "prod", "staging"}, c.Name), c.Unlinked, c.Name)
+		}
+		assert.Equal(t, "dev", d.preselect)
+	})
+
+	t.Run("a Deployment named like a row number is listed by id", func(t *testing.T) {
+		d := &stubDeployer{answer: "prod"}
+		d.listed = []Deployment{{ID: "dep-one", Name: "1"}}
+		_, err := resolveTarget(req, d)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"dev", "prod", "staging", "dep-one"}, choiceNames(d.offered))
+	})
+
+	t.Run("picking an unlinked Deployment links it once the deploy succeeds", func(t *testing.T) {
+		d := &stubDeployer{answer: "orders-eu"}
+		d.listed = listed
+		var saved []scaffold.Link
+		r := req
+		r.DagsOnly = true
+		r.Link = func(l scaffold.Link) error {
+			assert.Equal(t, 1, d.deploys, "saved only after the deploy")
+			saved = append(saved, l)
+			return nil
+		}
+		res, err := Run(r, d)
+		require.NoError(t, err)
+		assert.Equal(t, "dep-new", d.dagInput.DeploymentID)
+		assert.Equal(t, "orders-eu", res.LinkName)
+		require.Len(t, saved, 1)
+		assert.Equal(t, scaffold.Link{Name: "orders-eu", Kind: manifest.KindAstro, Workspace: "ws-1", Deployment: "dep-new"}, saved[0])
+	})
+
+	t.Run("a deploy that fails saves no link", func(t *testing.T) {
+		d := &stubDeployer{answer: "orders-eu"}
+		d.listed = listed
+		d.dagErr = errors.New("upload failed")
+		r := req
+		r.DagsOnly = true
+		r.Link = func(scaffold.Link) error { t.Fatal("a failed deploy saved a link"); return nil }
+		_, err := Run(r, d)
+		require.Error(t, err)
+	})
+
+	t.Run("a link that cannot be saved warns, and the deploy still succeeds", func(t *testing.T) {
+		d := &stubDeployer{answer: "staging-2"}
+		d.listed = listed
+		var warned []string
+		r := req
+		r.DagsOnly = true
+		r.Warn = func(s string) { warned = append(warned, s) }
+		r.Link = func(scaffold.Link) error { return errors.New("read-only") }
+		res, err := Run(r, d)
+		require.NoError(t, err)
+		assert.Equal(t, "dep-clash", res.DeploymentID)
+		assert.Empty(t, res.LinkName)
+		require.Len(t, warned, 1)
+		assert.Contains(t, warned[0], "read-only")
+	})
+
+	t.Run("a list that fails still offers the links", func(t *testing.T) {
+		d := &stubDeployer{answer: "prod"}
+		d.listErr = errors.New("offline")
+		var warned []string
+		r := req
+		r.Warn = func(s string) { warned = append(warned, s) }
+		target, err := resolveTarget(r, d)
+		require.NoError(t, err)
+		assert.Equal(t, "prod", target.LinkName)
+		assert.Equal(t, []string{"dev", "prod", "staging"}, choiceNames(d.offered))
+		require.Len(t, warned, 1)
+		assert.Contains(t, warned[0], "offline")
+	})
+
+	t.Run("--workspace picks the workspace listed", func(t *testing.T) {
+		d := &stubDeployer{answer: "prod"}
+		r := req
+		r.WorkspaceID = "ws-flag"
+		_, err := resolveTarget(r, d)
+		require.NoError(t, err)
+		assert.Equal(t, "ws-flag", d.listedWS)
+	})
+
+	t.Run("a run that cannot be asked lists nothing", func(t *testing.T) {
+		d := &stubDeployer{}
+		r := req
+		r.Interactive = false
+		_, err := resolveTarget(r, d)
+		require.Error(t, err)
+		assert.Zero(t, d.listCalls)
+	})
 }
 
 func TestRun_UnlinkedNonInteractiveRequiresDeployment(t *testing.T) {

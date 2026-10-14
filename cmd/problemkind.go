@@ -3,8 +3,11 @@ package cmd
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"os"
+
+	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/cmd/local"
@@ -91,9 +94,17 @@ func Execute(ctx context.Context) error {
 	project.SetContext(contextPlatform())
 
 	root, args := NewRootCmd(), os.Args[1:]
-	err := cliout.Execute(ctx, root, args, os.Stdout, problemKinds)
+	err := execute(ctx, root, args, os.Stdout)
 	if cliout.IsUsage(err) {
 		trackUnknownCommand(root, args)
 	}
 	return err
+}
+
+// execute runs root against args under the output contract, first letting a
+// run that asks for help or completions past a removed 1.x flag
+// (acceptRemovedFlags).
+func execute(ctx context.Context, root *cobra.Command, args []string, stdout io.Writer) error {
+	acceptRemovedFlags(root, args)
+	return cliout.Execute(ctx, root, args, stdout, problemKinds)
 }

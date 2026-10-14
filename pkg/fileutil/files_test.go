@@ -198,7 +198,8 @@ func (s *Suite) TestTar() {
 				symlinkFileName,
 				airflowIgnoreName,
 				sourcelessPycName,
-				filepath.Join(testSubDirName, testSubDirFileName),
+				// Tar entries are slash-separated whatever the platform.
+				testSubDirName + "/" + testSubDirFileName,
 			},
 		},
 		{
@@ -210,11 +211,11 @@ func (s *Suite) TestTar() {
 			},
 			errAssertion: assert.NoError,
 			expectPaths: []string{
-				filepath.Join(testSourceDirName, testFileName),
-				filepath.Join(testSourceDirName, symlinkFileName),
-				filepath.Join(testSourceDirName, airflowIgnoreName),
-				filepath.Join(testSourceDirName, sourcelessPycName),
-				filepath.Join(testSourceDirName, testSubDirName, testSubDirFileName),
+				testSourceDirName + "/" + testFileName,
+				testSourceDirName + "/" + symlinkFileName,
+				testSourceDirName + "/" + airflowIgnoreName,
+				testSourceDirName + "/" + sourcelessPycName,
+				testSourceDirName + "/" + testSubDirName + "/" + testSubDirFileName,
 			},
 		},
 		{
@@ -263,6 +264,59 @@ func (s *Suite) TestTar() {
 	}
 }
 
+// TarDir names the base directory itself, whatever the source is called,
+// and fails on a source that is not there, where Tar makes an empty tarball.
+func (s *Suite) TestTarDir() {
+	dir := s.T().TempDir()
+	source := filepath.Join(dir, "shared_dags")
+	s.Require().NoError(os.MkdirAll(filepath.Join(source, "sub"), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.py"), nil, 0o600))
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "sub", "b.py"), nil, 0o600))
+
+	target := filepath.Join(dir, "dags.tar")
+	s.Require().NoError(TarDir(source, target, "dags"))
+	file, err := os.Open(target)
+	s.Require().NoError(err)
+	defer file.Close()
+	names := []string{}
+	tr := tar.NewReader(file)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		s.Require().NoError(err)
+		names = append(names, header.Name)
+	}
+	s.ElementsMatch([]string{"dags/a.py", "dags/sub/b.py"}, names)
+
+	missing := filepath.Join(dir, "missing")
+	s.ErrorIs(TarDir(missing, filepath.Join(dir, "missing.tar"), "dags"), os.ErrNotExist)
+	s.NoError(Tar(missing, filepath.Join(dir, "missing-tar.tar"), true, nil), "Tar is unchanged")
+}
+
+// failingClose is a tarball file whose writes land and whose Close fails.
+type failingClose struct{ bytes.Buffer }
+
+func (*failingClose) Close() error { return errors.New("close failed") }
+
+// A tarball that did not close is not one: TarDir and Tar both fail on it.
+func (s *Suite) TestTarFailsOnAFailedClose() {
+	prev := createTarFile
+	defer func() { createTarFile = prev }()
+	var written *failingClose
+	createTarFile = func(string) (io.WriteCloser, error) {
+		written = &failingClose{}
+		return written, nil
+	}
+	source := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.py"), []byte("a"), 0o600))
+
+	s.EqualError(TarDir(source, "dags.tar", "dags"), "close failed")
+	s.Positive(written.Len(), "the footer was flushed before the file was closed")
+	s.EqualError(Tar(source, "dags.tar", true, nil), "close failed")
+}
+
 func (s *Suite) TestReadFileToString() {
 	filePath := "./test.out"
 	content := "testing"
@@ -287,14 +341,16 @@ func (s *Suite) TestReadFileToString() {
 			name:         "error on read file content",
 			args:         args{path: "incorrect-file"},
 			expectedResp: "",
-			errResp:      "no such file or directory",
+			errResp:      "open incorrect-file",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			actualResp, actualErr := ReadFileToString(tt.args.path)
-			if tt.errResp != "" && actualErr != nil {
+			if tt.errResp != "" {
+				s.Require().Error(actualErr)
 				s.Contains(actualErr.Error(), tt.errResp)
+				s.ErrorIs(actualErr, os.ErrNotExist)
 			} else {
 				s.NoError(actualErr)
 			}
@@ -334,7 +390,8 @@ func (s *Suite) TestGetFilesWithSpecificExtension() {
 func (s *Suite) TestGzipFile() {
 	s.Run("source file not found", func() {
 		err := GzipFile("non-existent-file.txt", "./zipped.txt.gz")
-		s.EqualError(err, "open non-existent-file.txt: no such file or directory")
+		s.ErrorContains(err, "open non-existent-file.txt: ")
+		s.ErrorIs(err, os.ErrNotExist)
 	})
 
 	s.Run("destination file error", func() {
@@ -346,7 +403,8 @@ func (s *Suite) TestGzipFile() {
 		defer os.Remove(srcFilePath)
 
 		err = GzipFile(srcFilePath, "/invalidPath/zipped.txt.gz")
-		s.EqualError(err, "open /invalidPath/zipped.txt.gz: no such file or directory")
+		s.ErrorContains(err, "open /invalidPath/zipped.txt.gz: ")
+		s.ErrorIs(err, os.ErrNotExist)
 	})
 
 	s.Run("successful gzip", func() {
@@ -467,7 +525,8 @@ func (s *Suite) TestUploadFile() {
 			RetryDisplayMessage: "please wait, attempting to upload the dags",
 		}
 		err := UploadFile(&uploadFileArgs)
-		s.EqualError(err, "error opening file: open non-existent-file.txt: no such file or directory")
+		s.ErrorContains(err, "error opening file: open non-existent-file.txt: ")
+		s.ErrorIs(err, os.ErrNotExist)
 	})
 
 	s.Run("io copy throws an error", func() {

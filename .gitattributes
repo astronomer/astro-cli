@@ -18,6 +18,9 @@ pkg/airflowrt/include/**        text eol=lf
 pkg/airflowrt/standalone_scripts/** text eol=lf
 pkg/localrt/internal/localdocker/*.tmpl text eol=lf
 pkg/proxy/**.tmpl               text eol=lf
+# The 1.x flag inventory is embedded and read line by line; with CRLF every
+# line ended in "\r" and the CLI could not read it on a Windows build.
+cmd/v1_flags.tsv                text eol=lf
 
 # Shell scripts are executed as-is by CI and by the git hooks; CRLF makes them
 # fail with an unreadable "bad interpreter" error.
@@ -28,3 +31,7 @@ pkg/proxy/**.tmpl               text eol=lf
 # Windows checkout and every comparison fails on line endings rather than on
 # content — which is what the first Windows run of these tests actually reported.
 **/testdata/**                  text eol=lf
+
+# Read verbatim into requests that tests compare against LF literals (the
+# git-sync ssh key, for one): the same CRLF problem as the goldens above.
+cmd/apc/testfiles/**            text eol=lf

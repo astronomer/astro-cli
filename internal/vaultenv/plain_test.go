@@ -47,3 +47,27 @@ func TestPlainWriterNeedsNoKeyring(t *testing.T) {
 		t.Fatalf("secret Set with no keyring = %v, want ErrKeyringUnavailable", err)
 	}
 }
+
+// Where marks a scope unencrypted only after a plain write. --plain also rides
+// on a delete, which cannot know how the value it removed was stored, so the
+// flag alone must not claim a value was unencrypted.
+func TestWhereFollowsThePlainWrite(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "secrets")
+	store, err := secrets.NewKeyringStore(secrets.Config{Service: secrets.DefaultService, Dir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := (&Writer{label: SourceProject}).Where(); got != "vault" {
+		t.Errorf("project Where = %q, want %q", got, "vault")
+	}
+	w := &Writer{store: store, scope: secrets.GlobalScope, label: SourceGlobal, dir: dir, Plain: true}
+	if got := w.Where(); got != "vault (global)" {
+		t.Errorf("plain Where before any write = %q, want %q", got, "vault (global)")
+	}
+	if _, err := w.Set(localenv.KindEnv, "REGION", "us-east-1"); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.Where(); got != "vault (global, unencrypted)" {
+		t.Errorf("plain Where after a set = %q, want %q", got, "vault (global, unencrypted)")
+	}
+}

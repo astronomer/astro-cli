@@ -48,6 +48,7 @@ func execUnboundRoot(t *testing.T, api houston.ClientInterface, args ...string) 
 	gotOut, gotErr := read(outR), read(errR)
 
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
+	LoadPlatform(api) // as the root does for a line that runs one of these commands
 	root.AddCommand(AddCmds(api, os.Stdout)...)
 	err = cliout.Execute(context.Background(), root, args, os.Stdout, nil)
 
