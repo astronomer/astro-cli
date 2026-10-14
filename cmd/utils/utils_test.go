@@ -13,6 +13,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
@@ -226,7 +227,7 @@ func TestLocate(t *testing.T) {
 		assert.Equal(t, dir, Locate(sub).ManifestDir)
 	})
 
-	t.Run("a directory that cannot be looked in is passed over", func(t *testing.T) {
+	t.Run("below a directory that cannot be looked in, the walk stops with why", func(t *testing.T) {
 		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 			t.Skip("directory modes do not stop this reader")
 		}
@@ -237,7 +238,13 @@ func TestLocate(t *testing.T) {
 		require.NoError(t, os.MkdirAll(inner, 0o755))
 		require.NoError(t, os.Chmod(locked, 0o000))
 		t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
-		assert.Equal(t, Where{}, Locate(inner))
+		// As scaffold.HasManifest has it, and so astro init: a pyproject.toml
+		// that cannot be read is not known to be absent, so the deploy
+		// reports the read error rather than guessing past it.
+		w := Locate(inner)
+		assert.Equal(t, inner, w.ManifestDir)
+		assert.ErrorIs(t, w.LoadErr, os.ErrPermission)
+		assert.Equal(t, "", scaffold.Find1xProject(inner), "init's walk stops there too")
 	})
 
 	t.Run("a pyproject.toml that fails to parse", func(t *testing.T) {
@@ -249,16 +256,30 @@ func TestLocate(t *testing.T) {
 			assert.Equal(t, dir, Locate(dir).ManifestDir, "%q", text)
 			assert.Error(t, Locate(dir).LoadErr, "%q: why it did not load, for the deploy to report", text)
 		}
-		// Some other tool's broken file: not a root, and the walk goes on
-		// to the 1.x project below it.
+		// Some other tool's broken file is a root too, as astro init has it
+		// (scaffold.HasManifest): whose file it is cannot be told from a
+		// file that does not parse, so the deploy reports the parse error.
 		root := t.TempDir()
 		writeFile(t, root, "pyproject.toml", "[tool.ruff\nline-length = 100\n")
-		assert.False(t, isRoot(root))
+		assert.True(t, isRoot(root))
+		assert.Error(t, Locate(root).LoadErr)
+		// A 1.x project below it is found first.
 		oneX := filepath.Join(root, "airflow")
 		make1x(t, oneX)
 		sub := filepath.Join(oneX, "dags")
 		require.NoError(t, os.MkdirAll(sub, 0o755))
 		assert.Equal(t, Where{Project1xDir: oneX}, Locate(sub))
+	})
+
+	t.Run("a broken pyproject.toml in a 1.x checkout stops the walk there", func(t *testing.T) {
+		oneX := t.TempDir()
+		make1x(t, oneX)
+		writeFile(t, oneX, "pyproject.toml", "[tool.ruff\nline-length = 100\n")
+		w := Locate(oneX)
+		assert.Equal(t, oneX, w.ManifestDir)
+		assert.Empty(t, w.Project1xDir)
+		var parseErr *manifest.ParseError
+		assert.ErrorAs(t, w.LoadErr, &parseErr, "the deploy reports the manifest's error")
 	})
 }
 
@@ -291,24 +312,35 @@ func TestLocateAndInitAgreeOn1xProjects(t *testing.T) {
 	projectHome := t.TempDir()
 	make1x(t, projectHome)
 
+	broken := t.TempDir()
+	make1x(t, broken)
+	writeFile(t, broken, "pyproject.toml", "[tool.ruff\nline-length = 100\n")
+	brokenBelow := filepath.Join(broken, "dags")
+	require.NoError(t, os.MkdirAll(brokenBelow, 0o755))
+
 	noConfig := t.TempDir()
 	writeFile(t, noConfig, "Dockerfile", "FROM x\n")
 	require.NoError(t, os.MkdirAll(filepath.Join(noConfig, ".astro"), 0o755))
 
 	for name, c := range map[string]struct{ home, dir, want string }{
-		"a 1.x root":                            {dir: oneX, want: oneX},
-		"below a 1.x root":                      {dir: below, want: oneX},
-		"below a monorepo's tooling file":       {dir: inMonorepo, want: inMonorepo},
-		"a pyproject project inside a 1.x":      {dir: newProject, want: ""},
-		"a home with the CLI settings":          {home: settingsHome, dir: settingsHome, want: ""},
-		"a home that is a 1.x project":          {home: projectHome, dir: projectHome, want: projectHome},
-		"a .astro with no config.yaml":          {dir: noConfig, want: ""},
-		"a fresh directory outside any project": {dir: t.TempDir(), want: ""},
+		"a 1.x root":                                      {dir: oneX, want: oneX},
+		"below a 1.x root":                                {dir: below, want: oneX},
+		"below a monorepo's tooling file":                 {dir: inMonorepo, want: inMonorepo},
+		"a pyproject project inside a 1.x":                {dir: newProject, want: ""},
+		"a home with the CLI settings":                    {home: settingsHome, dir: settingsHome, want: ""},
+		"a home that is a 1.x project":                    {home: projectHome, dir: projectHome, want: projectHome},
+		"a broken pyproject.toml in a 1.x checkout":       {dir: broken, want: ""},
+		"below a broken pyproject.toml in a 1.x checkout": {dir: brokenBelow, want: ""},
+		"a .astro with no config.yaml":                    {dir: noConfig, want: ""},
+		"a fresh directory outside any project":           {dir: t.TempDir(), want: ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			config.HomePath = c.home
 			assert.Equal(t, c.want, Locate(c.dir).Project1xDir, "the deploy's walk")
 			assert.Equal(t, c.want, scaffold.Find1xProject(c.dir), "astro init's walk")
+			if c.want == "" && scaffold.HasManifest(c.dir) {
+				assert.Equal(t, c.dir, Locate(c.dir).ManifestDir, "where init stops at a manifest, the deploy reports it")
+			}
 		})
 	}
 }

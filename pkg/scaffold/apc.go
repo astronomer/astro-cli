@@ -76,7 +76,7 @@ func Find1xProject(dir string) string {
 		if HasManifest(d) {
 			return ""
 		}
-		if has1xLayout(d) {
+		if Has1xLayout(d) {
 			return d
 		}
 		parent := filepath.Dir(d)
@@ -88,16 +88,16 @@ func Find1xProject(dir string) string {
 }
 
 // Is1xProject reports whether dir itself holds a 1.x project: the 1.x layout
-// (has1xLayout), and no pyproject.toml carrying [tool.astro] (HasManifest).
+// (Has1xLayout), and no pyproject.toml carrying [tool.astro] (HasManifest).
 // It is the one definition: the CLI's discovery and hints use it too
 // (internal/project). A pyproject.toml that only configures
 // tools (ruff, pytest) does not rule it out. It looks at dir alone, not above
 // it.
 func Is1xProject(dir string) bool {
-	return has1xLayout(dir) && !HasManifest(dir)
+	return Has1xLayout(dir) && !HasManifest(dir)
 }
 
-// has1xLayout reports the 1.x layout as Astro CLI 1.x itself knows a
+// Has1xLayout reports the 1.x layout as Astro CLI 1.x itself knows a
 // project: a Dockerfile, and a .astro/config.yaml (1.x's config.IsProjectDir,
 // config/config.go, which its deploy requires through utils.EnsureProjectDir).
 // 1.x tells its home directory apart by path; this tells the CLI's own
@@ -105,7 +105,11 @@ func Is1xProject(dir string) bool {
 // ~/Dockerfile beside them does not make home a 1.x project, while a home
 // directory that holds one (HOME=/usr/local/airflow in a 1.x image) still is.
 // A config.yaml that is empty or does not parse counts, as it does for 1.x.
-func has1xLayout(dir string) bool {
+//
+// It is Is1xProject's other half, for a walk that has already loaded dir's
+// pyproject.toml and found no manifest there (ManifestPresent), so it need
+// not load it again.
+func Has1xLayout(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, fileDockerfile)); err != nil {
 		return false
 	}
@@ -122,7 +126,14 @@ func has1xLayout(dir string) bool {
 // treating the directory as no project.
 func HasManifest(dir string) bool {
 	_, err := manifest.Load(filepath.Join(dir, manifest.Marker))
-	return !errors.Is(err, manifest.ErrNotFound) && !errors.Is(err, manifest.ErrNoAstroSection)
+	return ManifestPresent(err)
+}
+
+// ManifestPresent is HasManifest's answer from what manifest.Load returned
+// for a directory's pyproject.toml, for a caller that keeps the manifest it
+// loaded: anything but no file and no [tool.astro] section.
+func ManifestPresent(loadErr error) bool {
+	return !errors.Is(loadErr, manifest.ErrNotFound) && !errors.Is(loadErr, manifest.ErrNoAstroSection)
 }
 
 // cliSettingsKeys are top-level keys the CLI's own settings file has and a
