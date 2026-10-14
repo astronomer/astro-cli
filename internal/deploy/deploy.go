@@ -42,8 +42,8 @@ type Request struct {
 	LinkName string
 	// Deployment is --deployment. It names a manifest link, or — when the
 	// project links nothing by that name — an Astro Deployment id, which is
-	// what the flag meant before it learned link names and what the 1.x path spells
-	// --deployment-id. Either way it names the target on the command line,
+	// what the flag meant before it learned link names and what Astro CLI 1.x
+	// spelled --deployment-id. Either way it names the target on the command line,
 	// which is the only thing a deploy will resolve from.
 	Deployment string
 	// WorkspaceID is the --workspace override, "" if unset.
@@ -55,6 +55,9 @@ type Request struct {
 	DagsOnly bool
 	// Image is --image: an image-only deploy, leaving the running dags in place.
 	Image bool
+	// ImageAlone ships the image with no DAGs whatever the flags say: an
+	// --image-name deploy outside a project, which has no dags/ to take.
+	ImageAlone bool
 	// ImageName is --image-name: a prebuilt local image to deploy instead of
 	// building from the manifest. "" means build.
 	ImageName string
@@ -132,6 +135,12 @@ type Result struct {
 	// LinkName is the manifest link the deploy resolved to, "" if unlinked.
 	LinkName string
 	Git      Git
+	// DagDeployEnabled is whether the Deployment takes DAG deploys, as an
+	// image deploy read it; false for a dags-only deploy.
+	DagDeployEnabled bool
+	// RemoteExecutionEnabled is whether the Deployment runs remote
+	// execution, as an image deploy read it, whatever the deploy shipped.
+	RemoteExecutionEnabled bool
 }
 
 // Git is what a deploy recorded about the commit it shipped.
@@ -193,6 +202,10 @@ type ImageDeploy struct {
 	// IncludeDags marks a "both" deploy. To a Deployment with DAG deploys
 	// off, the transport ships the image alone, with the DAGs inside it.
 	IncludeDags bool
+	// ImageAlone is Request.ImageAlone: a prebuilt image deployed from
+	// outside any project, which a Deployment with DAG deploys off takes too
+	// (it runs whatever DAGs the image carries, which the caller warns of).
+	ImageAlone bool
 	// Warn is Request.Warn, for the transport to report with.
 	Warn func(string)
 	// Survey is what the image built from the manifest would carry, as the
@@ -218,6 +231,12 @@ type ImageResult struct {
 	RemoteExecution   bool
 	URL               string
 	Git               Git
+	// DagDeployEnabled is whether the Deployment takes DAG deploys, read
+	// while the image deploy checked it.
+	DagDeployEnabled bool
+	// RemoteExecutionEnabled is whether the Deployment runs remote
+	// execution, read alongside it.
+	RemoteExecutionEnabled bool
 }
 
 // Deployer is the seam onto the deploy transport. The CLI wires it to the
@@ -264,7 +283,14 @@ func Run(req Request, d Deployer) (Result, error) {
 	// with it. Checked before anything else, so an impossible combination fails
 	// rather than asking a question whose answer it will throw away.
 	if req.DagsOnly && (req.Image || req.ImageName != "") {
-		return Result{}, errors.New("--dags deploys only your DAGs; drop --image and --image-name")
+		var passed []string
+		if req.Image {
+			passed = append(passed, "--image")
+		}
+		if req.ImageName != "" {
+			passed = append(passed, "--image-name")
+		}
+		return Result{}, fmt.Errorf("--dags deploys only your DAGs; drop %s", strings.Join(passed, " and "))
 	}
 	// Also before anything is asked: a project whose image source is refused
 	// should not first make someone pick where to ship it.
@@ -409,7 +435,7 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 	// == ""`, which turned an exported BUILD_SECRET_INPUT into a hard failure for
 	// every project that generates its image. imagebuild passes a generated build
 	// only the netrc secret, and checkImageSource has warned about the rest.
-	includeDags := !req.Image
+	includeDags := !req.Image && !req.ImageAlone
 	img, err := d.DeployImage(&ImageDeploy{
 		DeploymentID:  target.DeploymentID,
 		WorkspaceID:   target.WorkspaceID,
@@ -418,6 +444,7 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		ImageName:     req.ImageName,
 		OnBuild:       req.OnBuild,
 		IncludeDags:   includeDags,
+		ImageAlone:    req.ImageAlone,
 		Warn:          req.Warn,
 		Survey:        survey,
 		Engine:        req.Engine,
@@ -434,17 +461,19 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		kind = "image-and-dag"
 	}
 	return Result{
-		DeploymentID:      target.DeploymentID,
-		WorkspaceID:       firstNonEmpty(img.WorkspaceID, target.WorkspaceID),
-		Type:              kind,
-		RuntimeVersion:    img.RuntimeVersion,
-		ImageTag:          img.ImageTag,
-		DagTarballVersion: img.DagTarballVersion,
-		DagsInImage:       img.DagsInImage,
-		RemoteExecution:   img.RemoteExecution,
-		URL:               img.URL,
-		LinkName:          target.LinkName,
-		Git:               img.Git,
+		DeploymentID:           target.DeploymentID,
+		WorkspaceID:            firstNonEmpty(img.WorkspaceID, target.WorkspaceID),
+		Type:                   kind,
+		RuntimeVersion:         img.RuntimeVersion,
+		ImageTag:               img.ImageTag,
+		DagTarballVersion:      img.DagTarballVersion,
+		DagsInImage:            img.DagsInImage,
+		RemoteExecution:        img.RemoteExecution,
+		URL:                    img.URL,
+		LinkName:               target.LinkName,
+		Git:                    img.Git,
+		DagDeployEnabled:       img.DagDeployEnabled,
+		RemoteExecutionEnabled: img.RemoteExecutionEnabled,
 	}, nil
 }
 
@@ -502,11 +531,8 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		links = req.Manifest.Astro.Deployments
 	}
 
-	if req.LinkName != "" && req.Deployment != "" && req.LinkName != req.Deployment {
-		return Target{}, fmt.Errorf("this deploy names two targets, %q and --deployment %q: name one", req.LinkName, req.Deployment)
-	}
-	if name := firstNonEmpty(req.LinkName, req.Deployment); name != "" {
-		return namedTarget(req, name, links)
+	if target, named, err := resolveNamed(req, links); named || err != nil {
+		return target, err
 	}
 
 	deployable := DeployableLinks(links)
@@ -659,7 +685,9 @@ func linkedTarget(req Request, name string, dep Deployment) Target {
 		DeploymentID: dep.ID,
 		WorkspaceID:  firstNonEmpty(req.WorkspaceID, dep.WorkspaceID, req.ContextWorkspace),
 	}
-	if req.Link == nil {
+	// Outside a project (an --image-name deploy with no manifest) there is
+	// no pyproject.toml to save a link into.
+	if req.Link == nil || req.Manifest == nil {
 		return target
 	}
 	target.LinkName = name
@@ -681,6 +709,32 @@ func listWorkspace(req Request) string {
 		project = req.Manifest.Astro.Workspace
 	}
 	return firstNonEmpty(req.WorkspaceID, project, req.ContextWorkspace)
+}
+
+// ResolveNamed settles a target named on the command line, as Run does: the
+// argument (linkName) and --deployment, which must agree, each a link of m
+// (nil for no manifest) or a Deployment id. named is false when neither names
+// one. It is for a command that ships something other than the project, such
+// as astro deploy --non-dags, to name its Deployment the way a deploy does.
+func ResolveNamed(m *manifest.Manifest, linkName, deployment, workspaceID, contextWorkspace string) (target Target, named bool, err error) {
+	req := Request{Manifest: m, LinkName: linkName, Deployment: deployment, WorkspaceID: workspaceID, ContextWorkspace: contextWorkspace}
+	var links map[string]manifest.Link
+	if m != nil {
+		links = m.Astro.Deployments
+	}
+	return resolveNamed(req, links)
+}
+
+func resolveNamed(req Request, links map[string]manifest.Link) (Target, bool, error) {
+	if req.LinkName != "" && req.Deployment != "" && req.LinkName != req.Deployment {
+		return Target{}, true, fmt.Errorf("this deploy names two targets, %q and --deployment %q: name one", req.LinkName, req.Deployment)
+	}
+	name := firstNonEmpty(req.LinkName, req.Deployment)
+	if name == "" {
+		return Target{}, false, nil
+	}
+	target, err := namedTarget(req, name, links)
+	return target, true, err
 }
 
 // namedTarget resolves a target named on the command line, by the positional
@@ -706,6 +760,10 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 		return Target{}, errors.New("a workspace is required for a deploy: pass --workspace or set a current workspace")
 	}
 	if !req.Interactive {
+		if req.Manifest == nil {
+			// No project: there is no link to name, only an id.
+			return Target{}, input.Required(errors.New("this deploy names no Deployment and this run cannot be asked: pass the Deployment id as the argument or with --deployment"))
+		}
 		return Target{}, input.Required(errors.New("this project links no deployment and this run cannot be asked: pass --deployment <name or id>"))
 	}
 	dep, err := d.ResolveUnlinked(workspaceID)

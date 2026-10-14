@@ -22,6 +22,10 @@ removes only the files of a project made by Astro CLI 1.x (a 1.x project)
 whose contents it carried across, saying so. So
 everything below shows up as a `git diff` you can read before you commit it.
 
+Astro CLI v2 deploys only a converted project. A 1.x project you have not
+converted keeps deploying with Astro CLI 1.x, and so does any project on Astro
+Private Cloud for now: v2 does not build and deploy projects there yet.
+
 ## Two things to ask about first
 
 If you are an agent following this page, stop and ask the person before you do

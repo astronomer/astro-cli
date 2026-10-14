@@ -87,6 +87,31 @@ func TestDeployManifestImage_DagDeployOffRefusesImageOnly(t *testing.T) {
 	}
 }
 
+// A prebuilt image deployed from outside any project (ImageAlone) is not
+// --image: there is no project whose DAGs it would leave stale, so a
+// Deployment with DAG deploys off takes it as an image-only deploy, and runs
+// the DAGs the image carries (cmd/astro warns of that).
+func TestDeployManifestImage_DagDeployOffTakesAnImageFromOutsideAProject(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := dagDeployOffClient()
+	mockCreateImageDeploy(client, "")
+	mockFinalizeDeploy(client)
+	withImageSeams(t, "3.1-2")
+
+	res, err := DeployManifestImage(ManifestImageDeployInput{
+		Build:        imagebuild.ManifestBuild{ProjectDir: t.TempDir()},
+		DeploymentID: "test-deployment-id",
+		ImageName:    "astro-package/demo:3.1-2-abc",
+		ImageAlone:   true,
+	}, client)
+	require.NoError(t, err)
+	assert.False(t, res.DagsInImage)
+	assert.False(t, res.DagDeployEnabled)
+	assert.False(t, res.RemoteExecutionEnabled)
+	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, "test-org-id", "test-deployment-id",
+		mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool { return r.Type == astrov1.CreateDeployRequestTypeIMAGEONLY }))
+}
+
 // A generated image whose .dockerignore leaves out every DAG would replace
 // the Deployment's DAGs with none: refused before the build. A rule that
 // leaves some DAGs in is the project's choice.
@@ -245,6 +270,7 @@ func TestDeployManifestImage_RemoteExecutionDagDeployOff(t *testing.T) {
 	}, client)
 	require.NoError(t, err, "--image is not refused")
 	assert.False(t, res.RemoteExecution, "an image-only deploy says nothing of DAGs")
+	assert.True(t, res.RemoteExecutionEnabled, "but says the Deployment runs remote execution")
 	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, "test-org-id", "test-deployment-id",
 		mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool { return r.Type == astrov1.CreateDeployRequestTypeIMAGEONLY }))
 }

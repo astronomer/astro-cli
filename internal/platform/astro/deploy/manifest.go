@@ -13,7 +13,7 @@ import (
 )
 
 // ManifestDagDeployInput is the resolved input for a project's dags-only deploy.
-// The deployment is already chosen; this reuses the 1.x path's dags transport (create
+// The deployment is already chosen; this uses the dags transport (create
 // deploy, upload the tarball, finalize) against the project's dags/ directory.
 type ManifestDagDeployInput struct {
 	// Login is the Astro login the deploy runs under, whose host the
@@ -46,7 +46,7 @@ type ManifestDeployGit struct {
 	Uncommitted bool
 }
 
-// readManifestDeployGit reads the git metadata a manifest deploy records, under the 1.x path's
+// readManifestDeployGit reads the git metadata a manifest deploy records, under Astro CLI 1.x's
 // rules: none when deploy.git_metadata is off, and none when the tree has
 // uncommitted changes, since HEAD would not describe the files deployed. The
 // commit message comes back as the description fallback.
@@ -71,13 +71,13 @@ func descriptionOrCommitMessage(description, commitMessage string) string {
 // DeployManifestDags deploys only the dags/ directory of a project to an already
 // resolved deployment. It reads the runtime version and type from the
 // server-side deployment — a project ships no image, so a dags-only deploy
-// must fit the image already running — then reuses the 1.x path's dags transport.
+// must fit the image already running — then uses the dags transport.
 //
-// Unlike the 1.x path's Deploy(), it neither prints nor exits: it returns a result for
-// cmd to render, so the path stays cancellable and ready for --output json. It
-// reuses createDeploy and deployDags as they are, and finalizes through a
-// print-free helper rather than the 1.x path's finalizeDeploy, which prints. A
-// --wait's progress is the one thing it writes, and only to in.Progress.
+// It neither prints nor exits: it returns a result for cmd to render, so the
+// path stays cancellable and ready for --output json. It uses createDeploy and
+// uploadDags as they are, and finalizes through the print-free
+// finalizeManifestDeploy. A --wait's progress is the one thing it writes, and
+// only to in.Progress.
 //
 //nolint:gocritic // value input keeps this seam symmetric with DeployManifestImage
 func DeployManifestDags(in ManifestDagDeployInput, astroV1Client astrov1.APIClient) (ManifestDagDeployResult, error) {

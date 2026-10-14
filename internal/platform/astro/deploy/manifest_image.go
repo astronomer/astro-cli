@@ -58,6 +58,11 @@ type ManifestImageDeployInput struct {
 	// so the deploy ships the image alone and its DAGs are those inside it,
 	// as the 1.x CLI deployed there.
 	IncludeDags bool
+	// ImageAlone marks a prebuilt image deployed from outside any project.
+	// It ships no DAGs, and unlike --image it is not refused by a Deployment
+	// with DAG deploys off: there is no project whose DAGs it would leave
+	// stale, and the caller warns that the Deployment runs the image's.
+	ImageAlone bool
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
@@ -94,6 +99,12 @@ type ManifestImageDeployResult struct {
 	RemoteExecution bool
 	URL             string
 	Git             ManifestDeployGit
+	// DagDeployEnabled is whether the Deployment takes DAG deploys.
+	DagDeployEnabled bool
+	// RemoteExecutionEnabled is whether the Deployment runs remote
+	// execution, whatever this deploy shipped (RemoteExecution is the narrower
+	// "both" deploy that uploaded no DAGs because of it).
+	RemoteExecutionEnabled bool
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -115,8 +126,8 @@ var (
 
 // DeployManifestImage builds (or adopts) a project's image, pushes it to the
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
-// tarball. It reuses the 1.x transport (createDeploy, the registry push in
-// airflow.DockerImage.Push, deployDags, finalize) and, like DeployManifestDags,
+// tarball. It uses the shared transport (createDeploy, the registry push in
+// airflow.DockerImage.Push, uploadDags, finalize) and, like DeployManifestDags,
 // neither prints nor exits — it returns a result for cmd to render, and writes
 // only the image build's output and a --wait's progress, to in.Progress.
 //
@@ -225,14 +236,16 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	}
 
 	return ManifestImageDeployResult{
-		WorkspaceID:       dep.WorkspaceId,
-		RuntimeVersion:    runtimeVersion,
-		ImageTag:          created.ImageTag,
-		DagTarballVersion: tarballVersion,
-		DagsInImage:       dags.inImage,
-		RemoteExecution:   dags.remote,
-		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
-		Git:               gitInfo,
+		WorkspaceID:            dep.WorkspaceId,
+		RuntimeVersion:         runtimeVersion,
+		ImageTag:               created.ImageTag,
+		DagTarballVersion:      tarballVersion,
+		DagsInImage:            dags.inImage,
+		RemoteExecution:        dags.remote,
+		URL:                    dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
+		Git:                    gitInfo,
+		DagDeployEnabled:       dep.IsDagDeployEnabled,
+		RemoteExecutionEnabled: deployment.IsRemoteExecutionEnabled(&dep),
 	}, nil
 }
 
@@ -249,7 +262,7 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
 		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}
-	if !in.IncludeDags && !dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(&dep) {
+	if !in.IncludeDags && !in.ImageAlone && !dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(&dep) {
 		// As the 1.x CLI refused it: with DAG deploys off the DAGs live in
 		// the image, so there are no running DAGs for --image to leave alone.
 		// Under remote execution they live with the remote agents instead.
@@ -554,7 +567,7 @@ func downgradeError(tag, currentVersion string, raise func(string) string) error
 	return errors.New(msg)
 }
 
-// checkRuntimeVersion is the 1.x path's ValidRuntimeVersion without the prints: it returns
+// checkRuntimeVersion is Astro CLI 1.x's runtime check without the prints: it returns
 // a descriptive error instead of printing the reason (and leaving the caller to
 // exit), so the manifest path stays print-free below cmd — the same move
 // finalizeManifestDeploy makes for finalize. The rules are identical: no downgrade,
@@ -593,8 +606,8 @@ func checkAirflow3Floor(currentVersion, tag string) error {
 
 // finalizeManifestDeploy marks a manifest deploy final. It carries the dag tarball version
 // only when one exists (a "both" or dags-only deploy), so an image-only deploy
-// finalizes with an empty request. It is the 1.x path's finalizeDeploy without the
-// prints, so the manifest path renders in cmd and stays ready for --output json.
+// finalizes with an empty request. It prints nothing, so the deploy renders in
+// cmd and stays ready for --output json.
 func finalizeManifestDeploy(organizationID, deploymentID, deployID, dagTarballVersion string, astroV1Client astrov1.APIClient) error {
 	req := astrov1.FinalizeDeployRequest{}
 	if dagTarballVersion != "" {

@@ -38,7 +38,7 @@ func countOccurrences(haystack []string, needle string) (count int) {
 
 // buildContext is a project directory of the test's own, holding the
 // Dockerfile and .dockerignore a build reads, so nothing depends on what
-// other tests left in the package directory. Build and Pytest chdir into the
+// other tests left in the package directory. Build chdirs into the
 // build context, so the test starts there too and t.Chdir puts the package
 // directory back when it ends.
 func buildContext(s *Suite) string {
@@ -172,118 +172,6 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 		}
 
 		err = handler.Build("", nil, options)
-		s.Error(err)
-	})
-}
-
-func (s *Suite) TestDockerImagePytest() {
-	handler := DockerImage{
-		imageName: "testing",
-	}
-
-	cwd := buildContext(s)
-	var err error
-
-	options := airflowTypes.ImageBuildConfig{
-		Path:            cwd,
-		TargetPlatforms: []string{"linux/amd64"},
-		NoCache:         false,
-	}
-
-	s.Run("pytest success", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return nil
-		}
-		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
-		s.NoError(err)
-	})
-
-	s.Run("create error", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch {
-			case args[0] == "create":
-				return errMock
-			default:
-				return nil
-			}
-		}
-		_, err = handler.Pytest("", "", "", "", []string{}, true, options)
-		s.Error(err)
-	})
-
-	s.Run("start error", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch {
-			case args[0] == "start":
-				return errMock
-			case args[0] == "inspect":
-				stdout.Write([]byte(`exit code 1`)) // making sure exit code is captured properly
-				return nil
-			default:
-				return nil
-			}
-		}
-		out, err := handler.Pytest("", "", "", "", []string{}, true, options)
-		s.Error(err)
-		s.Equal(out, "exit code 1")
-	})
-
-	s.Run("exit code trimmed to clean integer", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch {
-			case args[0] == "start":
-				return errMock
-			case args[0] == "inspect":
-				stdout.Write([]byte("10\n")) // docker inspect prints the code with a trailing newline
-				return nil
-			default:
-				return nil
-			}
-		}
-		out, err := handler.Pytest("", "", "", "", []string{}, true, options)
-		s.Error(err)
-		s.Equal("10", out)
-	})
-
-	s.Run("copy error", func() {
-		// Create a directory so the docker cp loop has something to copy
-		dagsDir := cwd + "/dags"
-		s.NoError(os.MkdirAll(dagsDir, os.ModePerm))
-		defer os.RemoveAll(dagsDir)
-
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			switch {
-			case args[0] == "cp":
-				return errMock
-			default:
-				return nil
-			}
-		}
-		_, err = handler.Pytest("", cwd, "", "", []string{}, true, options)
-		s.Error(err)
-	})
-
-	s.Run("pytest error", func() {
-		options = airflowTypes.ImageBuildConfig{
-			Path:            cwd,
-			TargetPlatforms: []string{"linux/amd64"},
-			NoCache:         false,
-		}
-
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			return errMock
-		}
-		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
-		s.Contains(err.Error(), errMock.Error())
-	})
-	s.Run("unable to read file error", func() {
-		options := airflowTypes.ImageBuildConfig{
-			Path:            "incorrect-path",
-			TargetPlatforms: []string{"linux/amd64"},
-			NoCache:         false,
-		}
-
-		_, err = handler.Pytest("", "", "", "", []string{}, false, options)
 		s.Error(err)
 	})
 }

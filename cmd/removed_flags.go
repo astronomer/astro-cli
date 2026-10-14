@@ -38,6 +38,22 @@ const (
 	// link to.
 	errLoginLinkRemoved = "--login-link was removed in Astro CLI v2: switching organizations no longer re-authenticates. " +
 		"To log in on another device, use `astro login --login-link`"
+
+	// astro deploy ships only pyproject.toml projects in v2, so the flags only
+	// the 1.x project's deploy read went with it. A 1.x project deploys with
+	// Astro CLI 1.x, flags and all.
+	errDeploySaveRemoved = "--save was removed in Astro CLI v2: astro deploy asks which Deployment to deploy to unless you name one, as the argument or with --deployment. " +
+		"To preselect one in that list, link it with astro link add and mark it default = true under [tool.astro.deployments]"
+	errAPCDeploySaveRemoved    = "--save was removed in Astro CLI v2: name the Deployment on each deploy, as the argument"
+	errDeployPytestRemoved     = "--pytest was removed in Astro CLI v2: run your tests before deploying, with uv run pytest && astro deploy"
+	errDeployTestRemoved       = "--test was removed in Astro CLI v2: run your tests before deploying, with uv run pytest <path> && astro deploy"
+	errDeployEnvRemoved        = "--env was removed in Astro CLI v2: astro deploy runs no tests, so it reads no test env file. Run your tests with uv run pytest before deploying"
+	errDeployParseRemoved      = "--parse was removed in Astro CLI v2: check your DAGs before deploying, with astro local check && astro deploy"
+	errDeployDagsPathRemoved   = "--dags-path was removed in Astro CLI v2: astro deploy --dags ships the project's dags directory, so run it from the project"
+	errDeployBundleNameRemoved = "--dag-bundle-name was removed in Astro CLI v2: deploying to a named DAG bundle is not supported yet. Use Astro CLI 1.x for it"
+	errDeployNameRemoved       = "--deployment-name was removed in Astro CLI v2: name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
+	errAPCDeployNoCache        = "--no-cache was removed in Astro CLI v2: Astro CLI v2 builds no image for Astro Private Cloud. " +
+		"Build and deploy the project with Astro CLI 1.x"
 )
 
 // removedFlag is what a run passing a flag Astro CLI 1.x had and v2 dropped
@@ -104,6 +120,18 @@ var removedFlags = []removedFlag{
 	{name: "format", needs: cliout.HasOutput, msgFor: formatRemoved},
 	// --force skipped the confirmation that --yes skips now.
 	{name: "force", needs: has("yes"), msgFor: forceRemoved},
+	// astro deploy's 1.x-project flags. Astro's deploy has --deployment for
+	// --save to point at; APC's names its Deployment by the argument alone.
+	{name: "save", under: []string{"deploy"}, needs: has("deployment"), msg: errDeploySaveRemoved},
+	{name: "save", under: []string{"deploy"}, msg: errAPCDeploySaveRemoved},
+	{name: "pytest", under: []string{"deploy"}, msg: errDeployPytestRemoved},
+	{name: "test", under: []string{"deploy"}, msg: errDeployTestRemoved},
+	{name: "env", under: []string{"deploy"}, msg: errDeployEnvRemoved},
+	{name: "parse", under: []string{"deploy"}, msg: errDeployParseRemoved},
+	{name: "dags-path", under: []string{"deploy"}, msg: errDeployDagsPathRemoved},
+	{name: "dag-bundle-name", under: []string{"deploy"}, msg: errDeployBundleNameRemoved},
+	{name: "deployment-name", under: []string{"deploy"}, msg: errDeployNameRemoved},
+	{name: "no-cache", under: []string{"deploy"}, msg: errAPCDeployNoCache},
 }
 
 // removedFlagErr is a run refused for passing a removed 1.x flag.

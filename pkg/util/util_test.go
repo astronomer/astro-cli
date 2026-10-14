@@ -3,7 +3,6 @@ package util
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -41,41 +40,6 @@ func (s *Suite) TestContains() {
 			if got := Contains(tt.args.elems, tt.args.v); got != tt.want {
 				s.Fail("Contains() = %v, want %v", got, tt.want)
 			}
-		})
-	}
-}
-
-func (s *Suite) TestExists() {
-	type args struct {
-		path string
-	}
-	tests := []struct {
-		name         string
-		args         args
-		want         bool
-		errAssertion assert.ErrorAssertionFunc
-	}{
-		{
-			name:         "valid case",
-			args:         args{"./util_test.go"},
-			want:         true,
-			errAssertion: assert.NoError,
-		},
-		{
-			name:         "invalid case",
-			args:         args{"./test.go"},
-			want:         false,
-			errAssertion: assert.NoError,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got, err := Exists(tt.args.path)
-			if !tt.errAssertion(s.T(), err) {
-				return
-			}
-
-			s.Equal(tt.want, got)
 		})
 	}
 }

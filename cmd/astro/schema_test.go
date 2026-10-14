@@ -153,6 +153,7 @@ var publishedPayloads = []cliouttest.Case{
 	// astro deploy --output json, in a project with a manifest: the one
 	// object a finished deploy prints.
 	{Name: "deploy", Value: deployJSON{}},
+	{Name: "deploy-non-dags", Value: nonDagsDeployJSON{}},
 	// astro dbt deploy: what it deployed where. delete: the bundle it
 	// removed. cleanup: the artifacts it removed and kept.
 	{Name: "dbt-deploy", Value: dbtDeployJSON{}},

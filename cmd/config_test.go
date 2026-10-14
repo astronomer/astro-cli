@@ -191,6 +191,7 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		{"proxy.port", "6599", "listens on 6563"},
 		{"api-server.port", "8099", "astro local start --port <port>"},
 		{"webserver.port", "8099", "astro local start --port <port>"},
+		{"project.deployment", "clx-old", "as the argument or with --deployment"},
 	} {
 		for _, scope := range []string{"outside a project", "global", "manifest project"} {
 			s.Run(tc.key+" "+scope, func() {
@@ -215,6 +216,17 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 			})
 		}
 	}
+}
+
+// get refuses a removed key as set does, rather than show a value nothing
+// reads.
+func (s *CmdSuite) TestConfigGetRefusesRemovedKeys() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	s.useWorkingPath(s.T().TempDir())
+	_, err := executeCommand("config", "get", "project.deployment")
+	s.Require().Error(err)
+	s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
+	s.ErrorContains(err, "`project.deployment` was removed in Astro CLI v2")
 }
 
 // configSet guards the write on its own, for a caller that skips the pre-run.
