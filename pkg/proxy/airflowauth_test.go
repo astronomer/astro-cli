@@ -50,12 +50,14 @@ func airflowAuthBackend(t *testing.T, token *string) (ts *httptest.Server, port 
 // when duplicates arrive — the semantics that make an appended fresh cookie
 // useless while the stale one still rides in front. Rejections redirect with an
 // absolute-URL Location, as FAB emits. pageCookies records the cookies each
-// /page request carried, in order.
-func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port string, pageCookies *[][]*http.Cookie) {
+// /page request carried, in order; logins counts successful POST /login.
+func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port string, pageCookies *[][]*http.Cookie, logins *int) {
 	t.Helper()
 	var mu sync.Mutex
 	var seen [][]*http.Cookie
+	var posts int
 	pageCookies = &seen
+	logins = &posts
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/login":
@@ -64,6 +66,9 @@ func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port str
 					http.Error(w, "bad login", http.StatusBadRequest)
 					return
 				}
+				mu.Lock()
+				posts++
+				mu.Unlock()
 				http.SetCookie(w, &http.Cookie{Name: airflowSessionCookie, Value: session, Path: "/"})
 				_, _ = w.Write([]byte("logged in"))
 				return
@@ -91,7 +96,7 @@ func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port str
 		}
 	}))
 	t.Cleanup(ts.Close)
-	return ts, backendPortOf(t, ts), pageCookies
+	return ts, backendPortOf(t, ts), pageCookies, logins
 }
 
 func backendPortOf(t *testing.T, ts *httptest.Server) string {
@@ -101,6 +106,15 @@ func backendPortOf(t *testing.T, ts *httptest.Server) string {
 		t.Fatal(err)
 	}
 	return u.Port()
+}
+
+// proxiedGet sends GET path through p's reverse proxy for backendPort, as a
+// browser would through a project's hostname, and returns the response.
+func proxiedGet(t *testing.T, p *Proxy, backendPort, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	p.getOrCreateProxy(backendPort).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://project.localhost"+path, http.NoBody))
+	return rec
 }
 
 func TestAuthRetryTransportRefreshesStaleSession(t *testing.T) {
@@ -185,7 +199,7 @@ func TestAuthRetryTransportRecoversFromPlain401(t *testing.T) {
 // avoid. Also exercises the absolute-URL Location form of the login redirect
 // and preservation of an unrelated cookie across the rebuild.
 func TestAuthRetryTransportRefreshesStaleAF2Cookie(t *testing.T) {
-	ts, port, pageCookies := af2AuthBackend(t, "fresh")
+	ts, port, pageCookies, _ := af2AuthBackend(t, "fresh")
 
 	s := NewAirflowSessions()
 	s.sessions[port] = "Cookie session=stale" // as if cached before a restart
@@ -288,7 +302,7 @@ func TestAuthRetryTransportNeverReplaysBodiedRequests(t *testing.T) {
 // have no TTL, so the recovery this transport exists to provide would silently
 // never fire.
 func TestAuthRetryTransportRecoversWithBrowserHeldSessionCookie(t *testing.T) {
-	ts, port, pageCookies := af2AuthBackend(t, "fresh")
+	ts, port, pageCookies, _ := af2AuthBackend(t, "fresh")
 
 	s := NewAirflowSessions()
 	s.sessions[port] = "Cookie session=stale-cached" // as if cached before a restart
@@ -485,5 +499,162 @@ func TestAuthRetryTransportInvalidatesOnBodiedRejection(t *testing.T) {
 	defer mu.Unlock()
 	if hits != 1 {
 		t.Errorf("backend hits = %d, want 1 — invalidation must not replay or re-authenticate", hits)
+	}
+}
+
+// The point of the move: a page opened through the proxy for an Airflow 2
+// project arrives logged in, the proxy having run FAB's login form itself.
+func TestAProxiedRequestArrivesLoggedInToAirflow2(t *testing.T) {
+	_, port, pageCookies, _ := af2AuthBackend(t, "minted")
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	rec := proxiedGet(t, p, port, "/page")
+	if rec.Code != http.StatusOK || rec.Body.String() != "ok" {
+		t.Fatalf("status %d, body %q: want Airflow 2's page, not its login", rec.Code, rec.Body.String())
+	}
+	if seen := *pageCookies; len(seen) != 1 || len(cookieValues(seen[0], airflowSessionCookie)) != 1 {
+		t.Fatalf("page requests %v, want one, carrying the minted session", seen)
+	}
+}
+
+// An Airflow restart invalidates the cached session; the next page through the
+// proxy still arrives, because the proxy's transport carries the recovery pass.
+func TestAProxiedRequestRecoversFromAStaleSession(t *testing.T) {
+	_, port, pageCookies, _ := af2AuthBackend(t, "after-restart")
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.Sessions.sessions[port] = "Cookie session=before-restart"
+	p.Sessions.tried[port] = time.Now()
+
+	rec := proxiedGet(t, p, port, "/page")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, want the page after a refresh-and-replay", rec.Code)
+	}
+	if n := len(*pageCookies); n != 2 {
+		t.Fatalf("page requests = %d, want the rejected one and its replay", n)
+	}
+}
+
+// A local Airflow 3 runs with every user an admin, so the proxy's login is a
+// formality: its token request answers at once and every page goes through as
+// it would without the proxy. Once per backend, not per request.
+func TestAnAirflow3WithAllAdminsIsUnaffected(t *testing.T) {
+	var mu sync.Mutex
+	tokens := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/token":
+			mu.Lock()
+			tokens++
+			mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"access_token":"anyone-is-admin"}`))
+		default:
+			_, _ = w.Write([]byte("page " + r.URL.Path))
+		}
+	}))
+	t.Cleanup(ts.Close)
+	port := backendPortOf(t, ts)
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	for _, path := range []string{"/", "/dags", "/api/v2/dags"} {
+		if rec := proxiedGet(t, p, port, path); rec.Code != http.StatusOK || rec.Body.String() != "page "+path {
+			t.Errorf("%s: status %d, body %q, want the page unchanged", path, rec.Code, rec.Body.String())
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if tokens != 1 {
+		t.Errorf("token requests = %d, want 1 for the backend, not one per page", tokens)
+	}
+}
+
+// A backend that offers no login at all still answers every page. The failed
+// login is cached, so it costs one attempt per authRetryTTL rather than one per
+// request.
+func TestABackendWithNoLoginIsLeftAlone(t *testing.T) {
+	var mu sync.Mutex
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/token", "/login":
+			mu.Lock()
+			attempts++
+			mu.Unlock()
+			http.NotFound(w, r)
+		default:
+			_, _ = w.Write([]byte("open"))
+		}
+	}))
+	t.Cleanup(ts.Close)
+	port := backendPortOf(t, ts)
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	for range 3 {
+		if rec := proxiedGet(t, p, port, "/page"); rec.Code != http.StatusOK || rec.Body.String() != "open" {
+			t.Fatalf("status %d, body %q, want the page", rec.Code, rec.Body.String())
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if attempts != 2 { // one /auth/token, one GET /login, then the cached failure
+		t.Errorf("login requests = %d, want 2 — one attempt, then the failure cached", attempts)
+	}
+}
+
+// Sessions nil turns the login off: the backend sees no login attempt and the
+// page answers as Airflow would to anyone.
+func TestNilSessionsTurnsTheLoginOff(t *testing.T) {
+	_, port, _, logins := af2AuthBackend(t, "minted")
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.Sessions = nil
+
+	if rec := proxiedGet(t, p, port, "/page"); rec.Code != http.StatusFound {
+		t.Errorf("status %d, want Airflow 2's redirect to its login page", rec.Code)
+	}
+	if *logins != 0 {
+		t.Errorf("logins = %d, want none", *logins)
+	}
+}
+
+// One cache shared by a host's proxies logs each backend in once, however many
+// of them relay it. The desktop's hostname proxy and its iframe proxies are
+// the case this exists for.
+func TestASharedSessionLogsInOnce(t *testing.T) {
+	_, port, _, logins := af2AuthBackend(t, "minted")
+	shared := NewAirflowSessions()
+	a := NewProxy("0", NewStore(t.TempDir()))
+	b := NewProxy("0", NewStore(t.TempDir()))
+	a.Sessions, b.Sessions = shared, shared
+
+	for _, p := range []*Proxy{a, b} {
+		if rec := proxiedGet(t, p, port, "/page"); rec.Code != http.StatusOK {
+			t.Fatalf("status %d, want the page", rec.Code)
+		}
+	}
+	if *logins != 1 {
+		t.Errorf("logins = %d, want 1 across both proxies", *logins)
+	}
+}
+
+// The session's recovery pass wraps the host's transport rather than replacing
+// it, so a host's settings (the desktop turns keep-alives off) carry every
+// round trip, the replay included.
+func TestTheSessionWrapsTheHostsTransport(t *testing.T) {
+	host := &http.Transport{DisableKeepAlives: true}
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.Transport = func(string) http.RoundTripper { return host }
+
+	retry, ok := p.transportFor("15001").(*authRetryTransport)
+	if !ok {
+		t.Fatalf("transport = %T, want the session's recovery pass", p.transportFor("15001"))
+	}
+	if retry.inner != host {
+		t.Errorf("the recovery pass wraps %T, want the host's transport", retry.inner)
+	}
+
+	p.Sessions = nil
+	if got := p.transportFor("15001"); got != host {
+		t.Errorf("with no Sessions, transport = %T, want the host's own", got)
 	}
 }

@@ -67,6 +67,18 @@ type Proxy struct {
 	// reverse proxy, so a burst of first requests yields one transport.
 	Transport func(backendPort string) http.RoundTripper
 
+	// Sessions logs the proxy into the Airflow behind each route, so a project
+	// opens in a browser without Airflow's login page; see injectSession for
+	// what that means and why it is acceptable. NewProxy sets a fresh cache. A
+	// host that relays the same backends through other proxies of its own
+	// replaces it with one instance shared by all of them before calling Start.
+	// Nil turns the login off.
+	//
+	// The session wraps whatever Transport supplies, so a host's transport
+	// settings (keep-alives, timeouts) carry the original request and the
+	// replay alike.
+	Sessions *AirflowSessions
+
 	// ErrorHandler writes the response when a proxied request fails. Nil serves
 	// a 502: the unavailable page to a browser navigating to a backend that is
 	// not answering, plain text otherwise (see defaultErrorHandler). Set it
@@ -138,6 +150,7 @@ func NewProxy(port string, store *Store) *Proxy {
 		port:      port,
 		proxies:   make(map[string]*httputil.ReverseProxy),
 		transport: &http.Transport{},
+		Sessions:  NewAirflowSessions(),
 	}
 }
 
@@ -278,6 +291,7 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 		// registered project hostname and nothing a client can pick freely.
 		pr.Out.Host = pr.In.Host
 		pr.SetXForwarded()
+		p.injectSession(pr.Out, backendPort)
 		for _, hook := range p.ModifyRequest {
 			hook(pr)
 		}
@@ -332,8 +346,49 @@ type LandingRoute struct {
 	ProjectDir string
 }
 
+// injectSession puts the proxy's Airflow session for backendPort on an
+// outbound request, logging in first if there is none yet.
+//
+// What this does, plainly: every request that reaches the proxy for a
+// registered *.localhost route leaves it carrying the local admin account's
+// credential, added here on the server side. Whoever can send a request to
+// the proxy acts as Airflow's admin, without logging in.
+//
+// Why that is acceptable for a local development proxy:
+//
+//   - It changes nothing for Airflow 3. Every local engine runs it with
+//     simple_auth_manager_all_admins, so it already treats every request as an
+//     admin's, logged in or not. This brings Airflow 2 to the same footing,
+//     which is what a person opening their own project expects.
+//   - The hostname routing is the gate. Only a Host that names a registered
+//     route reaches a backend at all (handler), so a request can't be steered
+//     to an arbitrary port to collect a credential.
+//   - A web page from another origin can't drive Airflow's API through this
+//     with a browser's help. The REST API takes JSON, which needs a CORS
+//     preflight such a page fails, and Airflow 2's form posts carry a CSRF
+//     token it can't read.
+//   - A process on this machine could already reach the Airflow port
+//     directly, and log in with the same fixed local credentials.
+func (p *Proxy) injectSession(out *http.Request, backendPort string) {
+	if p.Sessions == nil {
+		return
+	}
+	p.Sessions.Inject(out, backendPort)
+}
+
 // transportFor is the RoundTripper for one backend: the host's, when it supplies
-// one, and the shared default otherwise.
+// one, and the shared default otherwise, wrapped by the session's recovery pass
+// when Sessions is set.
+func (p *Proxy) transportFor(backendPort string) http.RoundTripper {
+	rt := p.hostTransportFor(backendPort)
+	if p.Sessions == nil {
+		return rt
+	}
+	return p.Sessions.Transport(backendPort, rt)
+}
+
+// hostTransportFor is the host's RoundTripper for one backend, or the shared
+// default when it supplies none.
 //
 // A typed nil counts as "none". A factory that returns a nil *T boxed in the
 // interface produces a value that is not == nil, so a plain check would install
@@ -343,7 +398,7 @@ type LandingRoute struct {
 //	var t *authTransport
 //	if hasSession(port) { t = newAuth(port) }
 //	return t
-func (p *Proxy) transportFor(backendPort string) http.RoundTripper {
+func (p *Proxy) hostTransportFor(backendPort string) http.RoundTripper {
 	if p.Transport == nil {
 		return p.transport
 	}
