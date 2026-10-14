@@ -132,12 +132,11 @@ type Proxy struct {
 	transport *http.Transport
 	srv       *http.Server
 
-	// portMu guards port/running: Start rewrites port at bind time (the
-	// configured port is not necessarily the one bound — see the fallback
-	// in Start), and Port/Running read from other goroutines.
-	portMu  sync.RWMutex
-	port    string
-	running bool
+	// portMu guards port: Start rewrites it at bind time (the configured
+	// port is not necessarily the one bound — see the fallback in Start), and
+	// Port reads it from other goroutines.
+	portMu sync.RWMutex
+	port   string
 }
 
 // NewProxy creates a Proxy that listens on port and resolves routes via store.
@@ -178,13 +177,6 @@ func (p *Proxy) Port() string {
 	return p.port
 }
 
-// Running reports whether Start has completed a successful bind.
-func (p *Proxy) Running() bool {
-	p.portMu.RLock()
-	defer p.portMu.RUnlock()
-	return p.running
-}
-
 // Start binds the listeners and serves in the background. Call Stop to shut
 // down. If the configured port is taken, Start falls back to FallbackPort and
 // then to an OS-assigned ephemeral port; read the bound port back with Port().
@@ -211,7 +203,6 @@ func (p *Proxy) Start() error {
 
 	p.portMu.Lock()
 	p.port = boundPort
-	p.running = true
 	p.portMu.Unlock()
 
 	errCh := make(chan error, 2)
