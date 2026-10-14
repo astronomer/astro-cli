@@ -4,7 +4,7 @@ run-name: "${{ inputs.type || 'nightly' }} release${{ inputs.version && format('
 
 on:
   schedule:
-    # Nightly, from main. Manual dispatch below still covers on-demand nightly/rc/ga.
+    # Nightly, from main and every vN branch. Manual dispatch below still covers on-demand nightly/rc/ga.
     - cron: '0 7 * * *'
   workflow_dispatch:
     inputs:
@@ -22,12 +22,33 @@ on:
         required: false
         type: string
 
+env:
+  STABLE_MAJOR: 1
+
 permissions:
   actions: read
   contents: write
   id-token: write  # Required for Octo STS OIDC token exchange
 
 jobs:
+  dispatch-major-branch-nightlies:
+    name: Start nightlies for vN branches
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch a nightly for each vN branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCHES=$(gh api "/repos/${{ github.repository }}/git/matching-refs/heads/v" --jq '.[].ref | sub("^refs/heads/"; "") | select(test("^v[0-9]+$"))')
+          for BRANCH in $BRANCHES; do
+            echo "Dispatching nightly for $BRANCH"
+            gh workflow run create-release.yaml --repo "${{ github.repository }}" --ref "$BRANCH" -f type=nightly
+          done
+
   preflight:
     name: Pre-flight summary (review before approving)
     runs-on: ubuntu-latest
@@ -66,8 +87,8 @@ jobs:
           BRANCH="${GITHUB_REF_NAME}"
 
           if [ "$TYPE" = "nightly" ]; then
-            if [ "$BRANCH" != "main" ]; then
-              echo "::error::Nightly tags must be created from the main branch. Current branch: $BRANCH"
+            if [[ "$BRANCH" != "main" && ! "$BRANCH" =~ ^v[0-9]+$ ]]; then
+              echo "::error::Nightly tags must be created from main or a vN branch. Current branch: $BRANCH"
               exit 1
             fi
           else
@@ -124,20 +145,22 @@ jobs:
           VERSION: ${{ steps.release-inputs.outputs.version }}
         run: |
           set -e
+          if [ "$TYPE" != "nightly" ]; then
+            MAJOR="${VERSION%%.*}"
+          elif [ "$GITHUB_REF_NAME" = "main" ]; then
+            MAJOR="$STABLE_MAJOR"
+          else
+            MAJOR="${GITHUB_REF_NAME#v}"
+          fi
           case "$TYPE" in
-            nightly) TAG=$(make nightly-tag) ;;
+            nightly) TAG=$(make nightly-tag MAJOR="$MAJOR") ;;
             rc)      TAG=$(make rc-tag VERSION="$VERSION") ;;
             ga)      TAG=$(make release-tag VERSION="$VERSION") ;;
           esac
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Computed tag: $TAG"
 
-          PREV_GA=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" \
-            | grep -v -- '-' \
-            | sed 's/^v//' \
-            | sort -t. -k1,1n -k2,2n -k3,3n \
-            | tail -1 \
-            | sed 's/^/v/')
+          PREV_GA=$(make prev-ga-tag MAJOR="$MAJOR")
           echo "prev_ga=$PREV_GA" >> "$GITHUB_OUTPUT"
           echo "Previous GA tag: $PREV_GA"
 
