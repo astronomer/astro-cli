@@ -107,7 +107,7 @@ func DeployBundle(input *DeployBundleInput) (BundleDeploy, error) {
 	}
 
 	// upload the bundle
-	tarballVersion, err := UploadBundle(config.WorkingPath, input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.AstroRuntimeVersion)
+	tarballVersion, err := UploadBundle(input.BundlePath, *deploy.BundleUploadUrl, false, currentDeployment.AstroRuntimeVersion)
 	if err != nil {
 		return BundleDeploy{}, err
 	}
@@ -271,7 +271,10 @@ func ValidateBundleSymlinks(bundlePath string) error {
 	return nil
 }
 
-func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string) (string, error) {
+// UploadBundle tars and gzips the directory bundlePath and uploads it to
+// uploadURL. The tarball is written to a temporary directory of its own, never
+// under bundlePath, so it cannot end up inside itself.
+func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRuntimeVersion string) (string, error) {
 	// If Airflow 3.x, check for symlinks pointing outside the bundle directory
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) == "3" {
 		err := ValidateBundleSymlinks(bundlePath)
@@ -280,34 +283,31 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}
 
-	tarFilePath := filepath.Join(tarDirPath, "bundle.tar")
-	tarGzFilePath := tarFilePath + ".gz"
+	tarDir, err := os.MkdirTemp("", "astro-bundle-")
+	if err != nil {
+		return "", err
+	}
 	defer func() {
-		tarFiles := []string{tarFilePath, tarGzFilePath}
-		for _, file := range tarFiles {
-			err := os.Remove(file)
-			if err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
-				fmt.Println("\nFailed to delete archived file: ", err.Error())
-				fmt.Println("\nPlease delete the archived file manually from path: " + file)
-			}
+		if err := os.RemoveAll(tarDir); err != nil {
+			fmt.Println("\nFailed to delete archived file: ", err.Error())
+			fmt.Println("\nPlease delete the archived file manually from path: " + tarDir)
 		}
 	}()
+	tarFilePath := filepath.Join(tarDir, "bundle.tar")
+	tarGzFilePath := tarFilePath + ".gz"
 
 	// Cosmos Boost: its sidecars go into the tarball only, never into the
 	// tree. Ones an earlier CLI wrote into the tree are always left out (a
 	// stale one must not ship), and with cosmos_boost.pre_deploy on, fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
-	cosmosBoost := cosmosboost.NewBundle(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool())
-
-	// Generate the bundle tar
-	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"}, cosmosBoost.Overlay)
+	overlay, err := cosmosboost.BundleOverlay(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool())
 	if err != nil {
 		return "", err
 	}
-	if err := cosmosBoost.Err(); err != nil {
+
+	// Generate the bundle tar
+	err = fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"}, overlay)
+	if err != nil {
 		return "", err
 	}
 

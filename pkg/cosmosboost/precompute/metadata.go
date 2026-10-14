@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
 // application is the producer name recorded in the sidecar. (The version is owned
-// by the caller and passed in to Run.)
-const application = "astro"
+// by the caller and passed in to Run.) It, and where the artifacts go, are
+// airflowrt's: the bundle and the generated image judge what an Astro CLI
+// wrote by the same definition.
+const application = airflowrt.CosmosBoostProducer
 
 const (
 	// schemaVersion lets the read-side cope with future format changes.
@@ -29,8 +33,8 @@ const (
 	// manifest it came from (that is version.hash's job).
 	algoFilteredManifest = "sha256-filtered-manifest-v1"
 
-	sidecarDir  = ".astro"
-	sidecarName = "dbt_metadata.json"
+	sidecarDir  = airflowrt.CosmosBoostDir
+	sidecarName = airflowrt.CosmosBoostSidecar
 )
 
 // Metadata is the content of the .astro/dbt_metadata.json sidecar. The Cosmos
@@ -88,19 +92,19 @@ func sidecarArtifact(dir, algo, hash, version string, filtered *FilteredManifest
 	return Artifact{Path: filepath.Join(dir, sidecarDir, sidecarName), Data: data}
 }
 
-// checkArtifactPaths fails when the tree holds something the artifacts could
-// not replace in a bundle: a .astro under dir that is not a directory (a file,
-// or a link), or anything but a regular file where an artifact goes (a
-// directory, a link). Unpacked beside the artifact, either would collide with
-// it. A regular file there is fine: the bundle carries the artifact instead.
+// checkArtifactPaths fails when the tree holds something an artifact could
+// not cleanly replace in a bundle: a .astro under dir that is not a directory
+// (a file, or a link), or a directory where an artifact goes, whose contents
+// would be unpacked beside it. Anything else there - an old sidecar, a link -
+// the bundle leaves out and carries the artifact in its place.
 func checkArtifactPaths(dir string, artifacts []Artifact) error {
 	astroDir := filepath.Join(dir, sidecarDir)
 	if info, err := os.Lstat(astroDir); err == nil && !info.IsDir() {
 		return fmt.Errorf("%s is not a directory, so its Cosmos Boost files cannot sit under it", astroDir)
 	}
 	for _, a := range artifacts {
-		if info, err := os.Lstat(a.Path); err == nil && !info.Mode().IsRegular() {
-			return fmt.Errorf("%s is not a regular file, so the Cosmos Boost file cannot take its place", a.Path)
+		if info, err := os.Lstat(a.Path); err == nil && info.IsDir() {
+			return fmt.Errorf("%s is a directory, so the Cosmos Boost file cannot take its place", a.Path)
 		}
 	}
 	return nil

@@ -106,7 +106,7 @@ func TestUploadBundleGeneratesSidecarsIntoTheBundle(t *testing.T) {
 	uploaded := captureUploads(t)
 	before := treeSnapshot(t, bundleDir)
 
-	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+	_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0")
 	require.NoError(t, err)
 
 	assert.Equal(t, before, treeSnapshot(t, bundleDir), "the deploy must not write into the project")
@@ -134,7 +134,7 @@ func TestUploadBundleSidecarPathsUnderTheDagsBaseDir(t *testing.T) {
 	writeTreeFile(t, dagsDir, "dbt/shop/dbt_project.yml", "name: shop\n")
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(t.TempDir(), dagsDir, "http://upload-url", true, "0.0.0")
+	_, err := UploadBundle(dagsDir, "http://upload-url", true, "0.0.0")
 	require.NoError(t, err)
 
 	assert.Contains(t, uploaded(), "dags/dbt/shop/"+cosmosBoostArtifact)
@@ -165,7 +165,7 @@ func TestUploadBundleSlimManifest(t *testing.T) {
 			writeTreeFile(t, bundleDir, "target/manifest.json", `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`)
 			uploaded := captureUploads(t)
 
-			_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+			_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0")
 			require.NoError(t, err)
 
 			assert.Contains(t, uploaded(), "target/.astro/dbt_metadata.json", "the manifest must still be stamped")
@@ -185,7 +185,7 @@ func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 	bundleDir := writeDbtBundle(t)
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+	_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0")
 	require.NoError(t, err)
 
 	assert.NotContains(t, uploaded(), cosmosBoostArtifact, "opt-in gate is off by default")
@@ -236,7 +236,7 @@ func TestUploadBundleLeavesOutStaleSidecars(t *testing.T) {
 		uploaded := captureUploads(t)
 		before := treeSnapshot(t, bundleDir)
 
-		_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+		_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0")
 		require.NoError(t, err)
 
 		assert.Equal(t, before, treeSnapshot(t, bundleDir), "enabled=%v: the tree must not change", enabled)
@@ -261,7 +261,7 @@ func TestUploadBundleForeignSidecar(t *testing.T) {
 		writeTreeFile(t, bundleDir, cosmosBoostArtifact, foreignSidecar)
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+		_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0")
 		require.NoError(t, err)
 		assert.Equal(t, foreignSidecar, uploaded()[cosmosBoostArtifact])
 	})
@@ -272,7 +272,7 @@ func TestUploadBundleForeignSidecar(t *testing.T) {
 		foreign := writeTreeFile(t, bundleDir, cosmosBoostArtifact, foreignSidecar)
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(t.TempDir(), bundleDir, "http://upload-url", false, "0.0.0")
+		_, err := UploadBundle(bundleDir, "http://upload-url", false, "0.0.0")
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "unrecognized producer")
@@ -293,7 +293,7 @@ func TestUploadBundleMissingDirIsUnchanged(t *testing.T) {
 		dagsDir := filepath.Join(t.TempDir(), "dags")
 		uploaded := captureUploads(t)
 
-		_, err := UploadBundle(t.TempDir(), dagsDir, "http://upload-url", true, "0.0.0")
+		_, err := UploadBundle(dagsDir, "http://upload-url", true, "0.0.0")
 		require.NoError(t, err, "enabled=%v", enabled)
 		assert.Empty(t, uploaded(), "enabled=%v", enabled)
 		assert.NoDirExists(t, dagsDir)
@@ -301,8 +301,10 @@ func TestUploadBundleMissingDirIsUnchanged(t *testing.T) {
 }
 
 // TestUploadBundleFromTheWorkingDirectory: astro dbt deploy --project-path .
-// bundles ".", and an old sidecar there is still replaced by the fresh one,
-// at the same path, with no second copy under another name.
+// bundles ".", from the working directory, and an old sidecar there is still
+// replaced by the fresh one, at the same path, with no second copy under
+// another name. Nor does the tarball carry itself: it is written outside the
+// directory it bundles, where it used to land in the working directory.
 func TestUploadBundleFromTheWorkingDirectory(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	enableCosmosBoost(t)
@@ -311,7 +313,7 @@ func TestUploadBundleFromTheWorkingDirectory(t *testing.T) {
 	t.Chdir(bundleDir)
 	uploaded := captureUploads(t)
 
-	_, err := UploadBundle(t.TempDir(), ".", "http://upload-url", false, "0.0.0")
+	_, err := UploadBundle(".", "http://upload-url", false, "0.0.0")
 	require.NoError(t, err)
 
 	names := make([]string, 0, len(uploaded()))

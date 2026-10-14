@@ -84,6 +84,36 @@ func TestSurveyProjectDeclaredNamesStaleCosmosBoostFiles(t *testing.T) {
 	assert.Equal(t, []string{"dbt/.astro/dbt_metadata.json"}, s.CosmosBoost)
 }
 
+// A link or a directory at a sidecar's path is not a sidecar this CLI wrote,
+// but the plugin would read whatever it leads to as one: a generated image
+// leaves it out, and a declared context's survey names it.
+func TestNonRegularEntriesAtSidecarPaths(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"Dockerfile":                              "FROM x\n",
+		"dags/dbt/shop/dbt_project.yml":           "name: shop\n",
+		"include/stale.json":                      `{"generated_by":{"application":"someone-else"}}`,
+		"dags/dbt/dir/.astro/dbt_metadata.json/x": "x",
+	})
+	link := filepath.Join(project, "dags", "dbt", "shop", ".astro", "dbt_metadata.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(link), 0o755))
+	if err := os.Symlink(filepath.Join(project, "include", "stale.json"), link); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+
+	s, err := SurveyProject(project, "", false)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"Dockerfile", "dags/dbt/shop/dbt_project.yml", "include/stale.json"}, s.Files)
+	assert.Empty(t, s.CosmosBoost)
+	dst := t.TempDir()
+	require.NoError(t, copyProjectFiles(project, dst))
+	assert.ElementsMatch(t, s.Files, contextFiles(t, dst), "the survey and the copy agree")
+
+	s, err = SurveyProject(project, "Dockerfile", false)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"dags/dbt/shop/.astro/dbt_metadata.json", "dags/dbt/dir/.astro/dbt_metadata.json"}, s.CosmosBoost)
+}
+
 // A .dockerignore that drops every DAG leaves none carried, which a deploy
 // that bakes DAGs into the image refuses.
 func TestSurveyProjectDagsDropped(t *testing.T) {

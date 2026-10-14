@@ -305,11 +305,13 @@ func (s *Suite) TestTarOverlay() {
 	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.sql"), []byte("a"), 0o600))
 	s.Require().NoError(os.WriteFile(filepath.Join(source, ".astro", "stale.json"), []byte("stale"), 0o600))
 	s.Require().NoError(os.WriteFile(filepath.Join(source, ".astro", "replaced.json"), []byte("old"), 0o600))
+	s.Require().NoError(os.MkdirAll(filepath.Join(source, "gone", "deeper"), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "gone", "deeper", "x"), []byte("x"), 0o600))
 	var asked []string
 	overlay := TarOverlay{
-		Skip: func(rel, file string) (bool, error) {
+		Skip: func(rel, file string, info os.FileInfo) (bool, error) {
 			asked = append(asked, rel)
-			return rel == ".astro/stale.json", nil
+			return rel == ".astro/stale.json" || rel == "gone", nil
 		},
 		Extra: map[string][]byte{
 			".astro/replaced.json":  []byte("new"),
@@ -350,9 +352,9 @@ func (s *Suite) TestTarOverlay() {
 	}
 
 	s.ElementsMatch([]string{
-		"a.sql", ".astro/stale.json", ".astro/replaced.json",
-		"a.sql", ".astro/stale.json", ".astro/replaced.json",
-	}, asked, "Skip is asked about every regular file, once per tarball")
+		"a.sql", ".astro", ".astro/stale.json", ".astro/replaced.json", "gone",
+		"a.sql", ".astro", ".astro/stale.json", ".astro/replaced.json", "gone",
+	}, asked, "Skip is asked about every entry below the source, once per tarball, and not below one it skips")
 
 	s.Run("source is the working directory", func() {
 		s.T().Chdir(source)
@@ -363,7 +365,7 @@ func (s *Suite) TestTarOverlay() {
 
 	s.Run("a Skip error fails the tarball", func() {
 		boom := errors.New("boom")
-		err := Tar(source, filepath.Join(dir, "boom.tar"), false, nil, TarOverlay{Skip: func(string, string) (bool, error) { return false, boom }})
+		err := Tar(source, filepath.Join(dir, "boom.tar"), false, nil, TarOverlay{Skip: func(string, string, os.FileInfo) (bool, error) { return false, boom }})
 		s.ErrorIs(err, boom)
 	})
 

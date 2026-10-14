@@ -1,6 +1,8 @@
 package precompute
 
-const slimManifestName = "manifest.slim.json"
+import "github.com/astronomer/astro-cli/pkg/airflowrt"
+
+const slimManifestName = airflowrt.CosmosBoostSlimManifest
 
 // slimSchemaVersion identifies the allowlist that produced a slim manifest, so
 // a reader that doesn't recognize it can fall back to the full manifest.

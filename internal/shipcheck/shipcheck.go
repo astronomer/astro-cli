@@ -119,9 +119,10 @@ func (r *Report) Err() error {
 	return nil
 }
 
-// CosmosBoostWarning is the warning for the Cosmos Boost files an earlier
-// Astro CLI wrote into the project that a declared Dockerfile's context
-// carries (imagebuild.ProjectSurvey.CosmosBoost), or "" when there are none.
+// CosmosBoostWarning is the warning for the entries at Cosmos Boost sidecar
+// paths a declared Dockerfile's context carries - old sidecars an earlier
+// Astro CLI wrote, links, directories (imagebuild.ProjectSurvey.CosmosBoost) -
+// or "" when there are none.
 // A generated image leaves them out; a declared Dockerfile decides for itself
 // what it copies, so the build goes ahead, but the plugin would read any it
 // copies as current.
@@ -129,7 +130,7 @@ func CosmosBoostWarning(survey *imagebuild.ProjectSurvey) string {
 	if len(survey.CosmosBoost) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("the build context carries Cosmos Boost files an earlier Astro CLI wrote into the project: %s. The Cosmos Boost plugin would read them as current if the Dockerfile copies them into the image. This CLI no longer writes them; delete them",
+	return fmt.Sprintf("the build context carries old Cosmos Boost sidecars, written into the project by an earlier Astro CLI or linked there: %s. The Cosmos Boost plugin would read them as current if the Dockerfile copies them into the image. This CLI no longer writes them; delete them",
 		cappedList(survey.CosmosBoost))
 }
 

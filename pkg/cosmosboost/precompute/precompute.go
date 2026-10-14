@@ -59,30 +59,23 @@ type Options struct {
 	SlimManifest bool
 }
 
-// Run finds every dbt project (a directory with dbt_project.yml) and standalone
-// dbt manifest.json under the given roots, and produces a .astro/dbt_metadata.json
-// hash sidecar for each, in memory (Result.Artifacts): nothing under the roots
-// is written. Units are processed concurrently — one worker each,
-// bounded by GOMAXPROCS — and each is hashed over sorted input, so results are
-// deterministic with no cross-worker coordination.
-//
-// Per-unit failures are best-effort: a unit that fails is recorded in its Result
-// and does not stop the others. Run only returns a non-nil error for a top-level
-// problem, such as a root that cannot be walked. version is recorded in each
-// sidecar's generated_by.
-//
-// With opts.SlimManifest set, every dbt manifest.json also gets a slim,
-// field-filtered copy (see buildSlimManifest) for the .astro/ beside it, for the Cosmos Boost plugin to load in place of the full manifest at
-// DAG-parse time. That includes one in a project's own root, which is not a
-// discovery unit of its own and is handled by processProject.
-func Run(roots []string, version string, opts Options) (Summary, error) {
-	start := time.Now()
+// Units are what a run processes: every dbt project (a directory with
+// dbt_project.yml) and standalone manifest.json under its roots, in a fixed
+// order. Discover finds them; Units.Run processes them.
+type Units struct {
+	units []unit
+}
 
+type unit struct{ kind, path string }
+
+// Discover finds the units under roots. It fails only when a root cannot be
+// walked.
+func Discover(roots []string) (Units, error) {
 	projectDirs := map[string]bool{}
 	for _, root := range roots {
 		found, err := findProjects(root)
 		if err != nil {
-			return Summary{}, fmt.Errorf("scanning %q for dbt projects: %w", root, err)
+			return Units{}, fmt.Errorf("scanning %q for dbt projects: %w", root, err)
 		}
 		for _, d := range found {
 			projectDirs[d] = true
@@ -93,14 +86,13 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 	for _, root := range roots {
 		found, err := findManifests(root, projectDirs)
 		if err != nil {
-			return Summary{}, fmt.Errorf("scanning %q for manifests: %w", root, err)
+			return Units{}, fmt.Errorf("scanning %q for manifests: %w", root, err)
 		}
 		for _, m := range found {
 			manifests[m] = true
 		}
 	}
 
-	type unit struct{ kind, path string }
 	var units []unit
 	for d := range projectDirs {
 		units = append(units, unit{kindProject, d})
@@ -113,7 +105,42 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 	sort.Slice(units, func(i, j int) bool {
 		return units[i].path+"\x00"+units[i].kind < units[j].path+"\x00"+units[j].kind
 	})
+	return Units{units: units}, nil
+}
 
+// SidecarDirs are the .astro directories a run of u produces its artifacts
+// in, one per unit, without reading any unit: a manifest.json that turns out
+// not to be a dbt manifest is listed too, though nothing is produced for it.
+func (u Units) SidecarDirs() []string {
+	dirs := make([]string, 0, len(u.units))
+	for _, un := range u.units {
+		dir := un.path
+		if un.kind == kindManifest {
+			dir = filepath.Dir(un.path)
+		}
+		dirs = append(dirs, filepath.Join(dir, sidecarDir))
+	}
+	return dirs
+}
+
+// Run produces a .astro/dbt_metadata.json hash sidecar for each of u's units,
+// in memory (Result.Artifacts): nothing is written. Units are processed
+// concurrently — one worker each, bounded by GOMAXPROCS — and each is hashed
+// over sorted input, so results are deterministic with no cross-worker
+// coordination.
+//
+// Per-unit failures are best-effort: a unit that fails is recorded in its
+// Result and does not stop the others. version is recorded in each sidecar's
+// generated_by.
+//
+// With opts.SlimManifest set, every dbt manifest.json also gets a slim,
+// field-filtered copy (see buildSlimManifest) for the .astro/ beside it, for
+// the Cosmos Boost plugin to load in place of the full manifest at DAG-parse
+// time. That includes one in a project's own root, which is not a discovery
+// unit of its own and is handled by processProject.
+func (u Units) Run(version string, opts Options) Summary {
+	start := time.Now()
+	units := u.units
 	results := make([]Result, len(units))
 	sem := make(chan struct{}, max(1, runtime.GOMAXPROCS(0)))
 	var wg sync.WaitGroup
@@ -132,7 +159,7 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 	}
 	wg.Wait()
 
-	return Summary{Duration: time.Since(start), Results: results}, nil
+	return Summary{Duration: time.Since(start), Results: results}
 }
 
 // processProject hashes one dbt project directory and produces its sidecar. It reads

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -757,6 +758,52 @@ func TestRunFailsUnitWhenArtifactPathIsNotAFile(t *testing.T) {
 	}
 	mustNotProduce(t, summary, filepath.Join(root, "blocked", sidecarDir, sidecarName))
 	mustProduce(t, summary, filepath.Join(root, "fine", sidecarDir, sidecarName))
+}
+
+// TestRunReplacesALinkAtAnArtifactPath: a link where a sidecar goes is left
+// out of the bundle, so the fresh sidecar takes its place and the unit
+// succeeds.
+func TestRunReplacesALinkAtAnArtifactPath(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{"proj/dbt_project.yml": "name: p\n", "elsewhere.json": "{}"})
+	if err := os.MkdirAll(filepath.Join(root, "proj", sidecarDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "elsewhere.json"), filepath.Join(root, "proj", sidecarDir, sidecarName)); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CountFailed() != 0 {
+		t.Fatalf("want no failures, got %+v", summary.Results)
+	}
+	mustProduce(t, summary, filepath.Join(root, "proj", sidecarDir, sidecarName))
+}
+
+// TestUnitsSidecarDirs: one .astro per unit, beside a project or a manifest,
+// known before any unit is read.
+func TestUnitsSidecarDirs(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":      "name: p\n",
+		"proj/target/manifest.json": "not even json",
+		"shipped/manifest.json":     "{}",
+	})
+	units, err := Discover([]string{root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		filepath.Join(root, "proj", sidecarDir),
+		filepath.Join(root, "proj", "target", sidecarDir),
+		filepath.Join(root, "shipped", sidecarDir),
+	}
+	if got := units.SidecarDirs(); !slices.Equal(got, want) {
+		t.Fatalf("SidecarDirs = %v, want %v", got, want)
+	}
 }
 
 // treeSnapshot maps every file under root to its contents.
