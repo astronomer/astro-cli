@@ -17,7 +17,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
-	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 )
 
 var (
@@ -47,36 +46,29 @@ func newDbtCmd(out io.Writer) *cobra.Command {
 	cmd.AddCommand(
 		newDbtDeployCmd(),
 		newDbtDeleteCmd(),
-		newDbtCleanupCmd(),
+		newDbtCleanupRemovedCmd(),
 	)
 	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
-func newDbtCleanupCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "cleanup [PATH]...",
-		Args:  cobra.ArbitraryArgs,
-		Short: "Remove the Cosmos Boost artifacts under each path",
-		Long:  "Remove the artifacts the Cosmos Boost pre-deploy step wrote under each path (default: the current directory). Run it after disabling cosmos_boost.pre_deploy, because a disabled deploy leaves earlier deploys' artifacts in place.",
-		RunE:  cleanupDbt,
-		Example: `  # Remove the artifacts under the current directory
-  astro dbt cleanup
+// errDbtCleanupRemoved is what astro dbt cleanup says now. It removed the
+// Cosmos Boost sidecars earlier deploys wrote into the project; deploys now
+// generate them into the bundle they upload and leave out any an earlier
+// version wrote, so there is nothing left for it to do.
+const errDbtCleanupRemoved = "astro dbt cleanup was removed in Astro CLI v2, with no replacement: " +
+	"Cosmos Boost no longer writes into the project, so there is nothing to clean up. " +
+	"A deploy generates its sidecars into the bundle it uploads, and never ships the " +
+	".astro/dbt_metadata.json or .astro/manifest.slim.json files an earlier version wrote into the project; " +
+	"delete those by hand whenever you like"
 
-  # Remove them under two dbt projects
-  astro dbt cleanup <PATH> <PATH>`,
-	}
-	cliout.AddOutputFlag(cmd, &dbtOutput)
-	return cmd
-}
-
-func cleanupDbt(cmd *cobra.Command, args []string) error {
-	cmd.SilenceUsage = true
-	report, err := cosmosboost.Cleanup(args...)
-	if err != nil {
-		return err
-	}
-	return cliout.Renderer{Format: dbtOutput, Out: cmd.OutOrStdout()}.Emit(newDbtCleanupJSON(&report), cliout.Text(renderDbtCleanup))
+// newDbtCleanupRemovedCmd builds the astro dbt cleanup tombstone
+// (cliout.RemovedCommand), so a script that still runs it is told why rather
+// than shown the dbt group's help.
+func newDbtCleanupRemovedCmd() *cobra.Command {
+	return removedCmdStub("cleanup", nil, "Removed in v2 — Cosmos Boost no longer writes into the project", func([]string) string {
+		return errDbtCleanupRemoved
+	})
 }
 
 //nolint:dupl // the duplication is acceptable here

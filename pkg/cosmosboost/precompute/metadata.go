@@ -2,6 +2,7 @@ package precompute
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -30,11 +31,6 @@ const (
 
 	sidecarDir  = ".astro"
 	sidecarName = "dbt_metadata.json"
-
-	sidecarDirPerm = 0o755
-	// sidecarPerm is deliberately world-readable: the sidecar ships inside the
-	// deploy bundle or image and the Airflow runtime user must be able to read it.
-	sidecarPerm = 0o644
 )
 
 // Metadata is the content of the .astro/dbt_metadata.json sidecar. The Cosmos
@@ -45,7 +41,7 @@ type Metadata struct {
 	Version     ProjectVersion `json:"version"`
 	GeneratedBy GeneratedBy    `json:"generated_by"`
 	// FilteredManifest points at the slim manifest beside this sidecar, absent
-	// when none was written. The sidecar is the consumer's entry point: it
+	// when none was produced. The sidecar is the consumer's entry point: it
 	// already reads and schema-gates this file, so it discovers the slim
 	// manifest here and falls back to the full one when the section is missing.
 	FilteredManifest *FilteredManifest `json:"filtered_manifest,omitempty"`
@@ -74,10 +70,10 @@ type GeneratedBy struct {
 	Version     string `json:"version"`
 }
 
-// writeSidecar writes .astro/dbt_metadata.json inside dir. version is the
+// sidecarArtifact is the .astro/dbt_metadata.json for dir. version is the
 // producer's version, recorded in generated_by. filtered describes a slim
-// manifest written beside it, or is nil when none was.
-func writeSidecar(dir, algo, hash, version string, filtered *FilteredManifest) error {
+// manifest produced beside it, or is nil when none was.
+func sidecarArtifact(dir, algo, hash, version string, filtered *FilteredManifest) Artifact {
 	meta := Metadata{
 		Schema:           schemaVersion,
 		Version:          ProjectVersion{Algo: algo, Hash: hash},
@@ -89,15 +85,15 @@ func writeSidecar(dir, algo, hash, version string, filtered *FilteredManifest) e
 	data, _ := json.MarshalIndent(meta, "", "  ") //nolint:errcheck // see above: Metadata holds only strings and ints, so this cannot fail
 	data = append(data, '\n')
 
-	return writeArtifact(dir, sidecarName, data)
+	return Artifact{Path: filepath.Join(dir, sidecarDir, sidecarName), Data: data}
 }
 
-// writeArtifact writes data to dir/.astro/name, creating the directory if
-// needed.
-func writeArtifact(dir, name string, data []byte) error {
-	out := filepath.Join(dir, sidecarDir)
-	if err := os.MkdirAll(out, sidecarDirPerm); err != nil {
-		return err
+// checkSidecarDir fails when something other than a directory holds dir's
+// .astro: an artifact under it could not be unpacked from the bundle.
+func checkSidecarDir(dir string) error {
+	info, err := os.Lstat(filepath.Join(dir, sidecarDir))
+	if err != nil || info.IsDir() {
+		return nil //nolint:nilerr // absent is fine: the bundle creates it
 	}
-	return os.WriteFile(filepath.Join(out, name), data, sidecarPerm)
+	return fmt.Errorf("%s is not a directory, so its Cosmos Boost files cannot sit under it", filepath.Join(dir, sidecarDir))
 }

@@ -27,9 +27,21 @@ type Result struct {
 	Files    int           // files hashed (1 for a manifest)
 	Bytes    int64         // total bytes hashed
 	Duration time.Duration // time spent on this unit
-	Skipped  bool          // a manifest.json that isn't a dbt manifest (no sidecar written)
-	Warning  string        // non-fatal note (sidecar still written), e.g. an unresolved template
-	Err      error         // non-nil if hashing, writing the sidecar, or writing the slim manifest failed
+	Skipped  bool          // a manifest.json that isn't a dbt manifest (no sidecar produced)
+	Warning  string        // non-fatal note (sidecar still produced), e.g. an unresolved template
+	Err      error         // non-nil if reading or hashing the unit failed (no artifacts then)
+	// Artifacts are the files this unit produced: its sidecar, and the slim
+	// manifest beside it when one was asked for. Empty when Err or Skipped.
+	Artifacts []Artifact
+}
+
+// Artifact is one file a run produced, held in memory: Run writes nothing to
+// disk. Path is where it belongs in the walked tree, <unit dir>/.astro/<name>,
+// which is where the Cosmos Boost plugin looks for it in a deployed bundle; the
+// caller decides how the bytes get there.
+type Artifact struct {
+	Path string
+	Data []byte
 }
 
 // Summary is the structured outcome of a precompute run. It backs both the
@@ -39,17 +51,18 @@ type Summary struct {
 	Results  []Result
 }
 
-// Options selects which artifacts a run writes; the zero value writes only the
-// hash sidecars.
+// Options selects which artifacts a run produces; the zero value produces only
+// the hash sidecars.
 type Options struct {
-	// SlimManifest also writes a slim, field-filtered copy of each discovered
+	// SlimManifest also produces a slim, field-filtered copy of each discovered
 	// manifest.json (see buildSlimManifest) next to its sidecar.
 	SlimManifest bool
 }
 
 // Run finds every dbt project (a directory with dbt_project.yml) and standalone
-// dbt manifest.json under the given roots, and writes a .astro/dbt_metadata.json
-// hash sidecar next to each. Units are processed concurrently — one worker each,
+// dbt manifest.json under the given roots, and produces a .astro/dbt_metadata.json
+// hash sidecar for each, in memory (Result.Artifacts): nothing under the roots
+// is written. Units are processed concurrently — one worker each,
 // bounded by GOMAXPROCS — and each is hashed over sorted input, so results are
 // deterministic with no cross-worker coordination.
 //
@@ -59,8 +72,7 @@ type Options struct {
 // sidecar's generated_by.
 //
 // With opts.SlimManifest set, every dbt manifest.json also gets a slim,
-// field-filtered copy (see buildSlimManifest) written into the .astro/ beside
-// it, for the Cosmos Boost plugin to load in place of the full manifest at
+// field-filtered copy (see buildSlimManifest) for the .astro/ beside it, for the Cosmos Boost plugin to load in place of the full manifest at
 // DAG-parse time. That includes one in a project's own root, which is not a
 // discovery unit of its own and is handled by processProject.
 func Run(roots []string, version string, opts Options) (Summary, error) {
@@ -123,16 +135,20 @@ func Run(roots []string, version string, opts Options) (Summary, error) {
 	return Summary{Duration: time.Since(start), Results: results}, nil
 }
 
-// processProject hashes one dbt project directory and writes its sidecar. It reads
+// processProject hashes one dbt project directory and produces its sidecar. It reads
 // dbt_project.yml once (readDbtConfig) and threads the result through hashing and the
 // templated-packages warning, so the file isn't parsed more than once per project.
 func processProject(dir, version string, opts Options) Result {
 	start := time.Now()
 	cfg := readDbtConfig(dir)
 	hash, files, totalBytes, err := hashProject(dir, cfg)
-	r := Result{Kind: kindProject, Path: dir, Hash: hash, Files: files, Bytes: totalBytes, Duration: time.Since(start)}
+	r := Result{Kind: kindProject, Path: dir, Hash: hash, Files: files, Bytes: totalBytes}
+	if err == nil {
+		err = checkSidecarDir(dir)
+	}
 	if err != nil {
 		r.Err = err
+		r.Duration = time.Since(start)
 		return r
 	}
 	if len(cfg.templatedSettings) > 0 {
@@ -141,30 +157,29 @@ func processProject(dir, version string, opts Options) Result {
 	}
 
 	// A manifest.json in the project root is not a unit of its own - its .astro/
-	// is this project's, so it would collide with the sidecar written below - and
-	// findManifests skips it for that reason. Slim it here instead, leaving the
-	// project's own hash as the anchor the pointer hangs off.
+	// is this project's, so it would collide with the sidecar produced below -
+	// and findManifests skips it for that reason. Slim it here instead, leaving
+	// the project's own hash as the anchor the pointer hangs off.
 	var filtered *FilteredManifest
 	if opts.SlimManifest {
 		if doc, _, isDbt, readErr := readManifestDoc(filepath.Join(dir, manifestFile)); readErr == nil && isDbt {
 			// Nothing mutates doc afterward here, unlike processManifest.
 			data, _ := json.Marshal(buildSlimManifest(doc, version)) //nolint:errcheck // JSON-native types only, so this cannot fail
-			if filtered, r.Err = writeSlimManifest(dir, data); r.Err != nil {
-				r.Duration = time.Since(start)
-				return r
-			}
+			var slim Artifact
+			slim, filtered = slimManifestArtifact(dir, data)
+			r.Artifacts = append(r.Artifacts, slim)
 		}
 	}
 
-	r.Err = writeSidecar(dir, algoProjectTree, hash, version, filtered)
+	r.Artifacts = append(r.Artifacts, sidecarArtifact(dir, algoProjectTree, hash, version, filtered))
 	r.Duration = time.Since(start)
 	return r
 }
 
-// processManifest hashes one manifest.json and writes a sidecar next to it,
-// plus a slim, field-filtered copy of the manifest when opts asks for one (see
+// processManifest hashes one manifest.json and produces a sidecar for it, plus
+// a slim, field-filtered copy of the manifest when opts asks for one (see
 // buildSlimManifest). A file that isn't a dbt manifest is skipped (nothing is
-// written) so unrelated manifest.json files in the project aren't stamped.
+// produced) so unrelated manifest.json files in the project aren't stamped.
 func processManifest(path, version string, opts Options) Result {
 	start := time.Now()
 	doc, bytes, isDbt, err := readManifestDoc(path)
@@ -179,47 +194,58 @@ func processManifest(path, version string, opts Options) Result {
 		}
 		hash = hashDocument(doc)
 	}
-	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes, Duration: time.Since(start)}
+	r := Result{Kind: kindManifest, Path: path, Hash: hash, Files: 1, Bytes: bytes}
+	dir := filepath.Dir(path)
 	switch {
 	case err != nil:
 		r.Err = err
 	case !isDbt:
 		r.Skipped = true
 	default:
-		dir := filepath.Dir(path)
-		// The sidecar goes last: it carries the filtered_manifest pointer, so it
-		// must never exist before the file it points at. Stopping short of it
-		// looks like "nothing was stamped", which BestEffortPreDeploy treats as
-		// safe.
+		if r.Err = checkSidecarDir(dir); r.Err != nil {
+			break
+		}
 		var filtered *FilteredManifest
 		if slimData != nil {
-			filtered, r.Err = writeSlimManifest(dir, slimData)
+			var slim Artifact
+			slim, filtered = slimManifestArtifact(dir, slimData)
+			r.Artifacts = append(r.Artifacts, slim)
 		}
-		if r.Err == nil {
-			r.Err = writeSidecar(dir, algoManifestJSON, hash, version, filtered)
-		}
+		r.Artifacts = append(r.Artifacts, sidecarArtifact(dir, algoManifestJSON, hash, version, filtered))
 	}
+	r.Duration = time.Since(start)
 	return r
 }
 
-// writeSlimManifest writes data as dir's slim manifest and returns the sidecar
-// pointer describing it. data must already be marshaled, so a caller that later
-// mutates the source doc cannot leak into it (see processManifest).
-func writeSlimManifest(dir string, data []byte) (*FilteredManifest, error) {
-	if err := writeArtifact(dir, slimManifestName, data); err != nil {
-		return nil, err
-	}
-	return &FilteredManifest{
+// slimManifestArtifact is dir's slim manifest holding data, and the sidecar
+// pointer describing it. data must already be marshaled, so a caller that
+// later mutates the source doc cannot leak into it (see processManifest).
+func slimManifestArtifact(dir string, data []byte) (Artifact, *FilteredManifest) {
+	return Artifact{Path: filepath.Join(dir, sidecarDir, slimManifestName), Data: data}, &FilteredManifest{
 		Schema:  slimSchemaVersion,
 		Path:    slimManifestName,
 		Version: ProjectVersion{Algo: algoFilteredManifest, Hash: sha256Hex(data)},
-	}, nil
+	}
+}
+
+// Artifacts returns every artifact the run produced, from the units that did
+// not fail, in the order of Results.
+func (s Summary) Artifacts() []Artifact {
+	var out []Artifact
+	for i := range s.Results {
+		r := &s.Results[i]
+		if r.Err == nil {
+			out = append(out, r.Artifacts...)
+		}
+	}
+	return out
 }
 
 // CountFailed returns the number of units that errored.
 func (s Summary) CountFailed() int {
 	n := 0
-	for _, r := range s.Results {
+	for i := range s.Results {
+		r := &s.Results[i]
 		if r.Err != nil {
 			n++
 		}
@@ -231,7 +257,8 @@ func (s Summary) CountFailed() int {
 // dbt manifests).
 func (s Summary) CountSkipped() int {
 	n := 0
-	for _, r := range s.Results {
+	for i := range s.Results {
+		r := &s.Results[i]
 		if r.Skipped {
 			n++
 		}
@@ -240,10 +267,8 @@ func (s Summary) CountSkipped() int {
 }
 
 // WriteReport prints a short, human-readable report of the run.
-// Per-entry glyphs, shared by every command's WriteReport (see also
-// CleanupSummary.WriteReport in cleanup.go) so the two reports keep one
-// convention: acted on, deliberately left alone, failed, and a note attached to
-// an entry that otherwise succeeded.
+// Per-entry glyphs: acted on, deliberately left alone, failed, and a note
+// attached to an entry that otherwise succeeded.
 const (
 	glyphDone = "✓"
 	glyphLeft = "⊘"
@@ -255,7 +280,8 @@ func (s Summary) WriteReport(w io.Writer) {
 	stamped := len(s.Results) - s.CountFailed() - s.CountSkipped()
 	fmt.Fprintf(w, "cosmos boost pre-deploy: %d stamped, %d skipped, %d failed in %s total (incl. discovery)\n",
 		stamped, s.CountSkipped(), s.CountFailed(), s.Duration.Round(time.Microsecond))
-	for _, r := range s.Results {
+	for i := range s.Results {
+		r := &s.Results[i]
 		switch {
 		case r.Err != nil:
 			fmt.Fprintf(w, "  %s %-8s %s  (%v)\n", glyphFail, r.Kind, r.Path, r.Err)

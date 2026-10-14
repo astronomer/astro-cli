@@ -155,10 +155,9 @@ var publishedPayloads = []cliouttest.Case{
 	{Name: "deploy", Value: deployJSON{}},
 	{Name: "deploy-non-dags", Value: nonDagsDeployJSON{}},
 	// astro dbt deploy: what it deployed where. delete: the bundle it
-	// removed. cleanup: the artifacts it removed and kept.
+	// removed.
 	{Name: "dbt-deploy", Value: dbtDeployJSON{}},
 	{Name: "dbt-delete", Value: dbtDeleteJSON{}},
-	{Name: "dbt-cleanup", Value: dbtCleanupJSON{}},
 	// astro remote deploy: the client image it pushed.
 	{Name: "remote-deploy", Value: remoteDeployJSON{}},
 

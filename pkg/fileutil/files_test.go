@@ -240,7 +240,7 @@ func (s *Suite) TestTar() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			// check that the tar operation was successful
-			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths)))
+			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths, TarOverlay{})))
 
 			// check that all the files are in the tar at the correct paths
 			file, err := os.Open(tt.args.target)
@@ -292,7 +292,62 @@ func (s *Suite) TestTarDir() {
 
 	missing := filepath.Join(dir, "missing")
 	s.ErrorIs(TarDir(missing, filepath.Join(dir, "missing.tar"), "dags"), os.ErrNotExist)
-	s.NoError(Tar(missing, filepath.Join(dir, "missing-tar.tar"), true, nil), "Tar is unchanged")
+	s.NoError(Tar(missing, filepath.Join(dir, "missing-tar.tar"), true, nil, TarOverlay{}), "Tar is unchanged")
+}
+
+// TarOverlay leaves Skip's files out, adds Extra's under the base directory
+// (replacing a file at the same path), and never touches the source.
+func (s *Suite) TestTarOverlay() {
+	dir := s.T().TempDir()
+	source := filepath.Join(dir, "proj")
+	s.Require().NoError(os.MkdirAll(filepath.Join(source, ".astro"), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.sql"), []byte("a"), 0o600))
+	s.Require().NoError(os.WriteFile(filepath.Join(source, ".astro", "stale.json"), []byte("stale"), 0o600))
+	s.Require().NoError(os.WriteFile(filepath.Join(source, ".astro", "replaced.json"), []byte("old"), 0o600))
+	overlay := TarOverlay{
+		Skip: map[string]bool{".astro/stale.json": true},
+		Extra: map[string][]byte{
+			".astro/replaced.json":  []byte("new"),
+			"sub/.astro/added.json": []byte("added"),
+		},
+	}
+
+	for _, tc := range []struct {
+		prepend bool
+		prefix  string
+	}{{false, ""}, {true, "proj/"}} {
+		target := filepath.Join(dir, fmt.Sprintf("overlay-%v.tar", tc.prepend))
+		s.Require().NoError(Tar(source, target, tc.prepend, nil, overlay))
+
+		file, err := os.Open(target)
+		s.Require().NoError(err)
+		got := map[string]string{}
+		tr := tar.NewReader(file)
+		for {
+			header, err := tr.Next()
+			if err == io.EOF {
+				break
+			}
+			s.Require().NoError(err)
+			data, err := io.ReadAll(tr)
+			s.Require().NoError(err)
+			got[header.Name] = string(data)
+			if header.Name == tc.prefix+"sub/.astro/added.json" {
+				s.Equal(int64(0o644), header.Mode)
+			}
+		}
+		file.Close()
+		s.Equal(map[string]string{
+			tc.prefix + "a.sql":                 "a",
+			tc.prefix + ".astro/replaced.json":  "new",
+			tc.prefix + "sub/.astro/added.json": "added",
+		}, got)
+	}
+
+	stale, err := os.ReadFile(filepath.Join(source, ".astro", "replaced.json"))
+	s.Require().NoError(err)
+	s.Equal("old", string(stale), "the source is never written")
+	s.NoDirExists(filepath.Join(source, "sub"))
 }
 
 // failingClose is a tarball file whose writes land and whose Close fails.
@@ -314,7 +369,7 @@ func (s *Suite) TestTarFailsOnAFailedClose() {
 
 	s.EqualError(TarDir(source, "dags.tar", "dags"), "close failed")
 	s.Positive(written.Len(), "the footer was flushed before the file was closed")
-	s.EqualError(Tar(source, "dags.tar", true, nil), "close failed")
+	s.EqualError(Tar(source, "dags.tar", true, nil, TarOverlay{}), "close failed")
 }
 
 func (s *Suite) TestReadFileToString() {

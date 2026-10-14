@@ -296,21 +296,17 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 		}
 	}()
 
-	// Cosmos Boost pre-deploy step, opt-in via cosmos_boost.pre_deploy; with
-	// the setting off the deploy does not touch the tree at all. Cleanup runs
-	// first and is fatal on failure (a stale artifact must not ship inside the
-	// bundle), while stamping is best-effort (a missing artifact is safe).
-	// Artifacts left by earlier enabled deploys are removed with
-	// `astro dbt cleanup`.
-	if config.CFG.CosmosBoostPreDeploy.GetBool() {
-		if err := cosmosboost.EnsureClean(bundlePath); err != nil {
-			return "", err
-		}
-		cosmosboost.BestEffortPreDeploy(bundlePath)
+	// Cosmos Boost: its sidecars go into the tarball only, never into the
+	// tree. Ones an earlier CLI wrote into the tree are always left out (a
+	// stale one must not ship), and with cosmos_boost.pre_deploy on, fresh
+	// ones are generated into the bundle, best-effort (a missing one is safe).
+	overlay, err := cosmosboost.BundleOverlay(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool())
+	if err != nil {
+		return "", err
 	}
 
 	// Generate the bundle tar
-	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"})
+	err = fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"}, overlay)
 	if err != nil {
 		return "", err
 	}

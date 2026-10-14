@@ -1,6 +1,6 @@
 package astro
 
-// Rendering for `astro dbt deploy|delete|cleanup`, `astro deploy --non-dags`
+// Rendering for `astro dbt deploy|delete`, `astro deploy --non-dags`
 // and `astro remote deploy`. The platform packages return what happened; this
 // file decides how it looks, in text and in json.
 
@@ -16,7 +16,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/pkg/ansi"
-	"github.com/astronomer/astro-cli/pkg/cosmosboost"
 )
 
 // dbtOutput is --output for the `dbt` family.
@@ -63,16 +62,6 @@ type dbtDeleteJSON struct {
 	MountPath  string `json:"mount_path"`
 	Waited     bool   `json:"waited"`
 	WaitError  string `json:"wait_error,omitempty"`
-}
-
-// dbtCleanupJSON is what `astro dbt cleanup --output json` publishes: the
-// paths it scanned, the artifacts it removed, and the ones it kept because
-// something other than the CLI wrote them, each an absolute path.
-type dbtCleanupJSON struct {
-	Action  string   `json:"action"`
-	Paths   []string `json:"paths"`
-	Removed []string `json:"removed"`
-	Kept    []string `json:"kept"`
 }
 
 // remoteDeployJSON is what `astro remote deploy --output json` publishes: the
@@ -198,19 +187,6 @@ func renderDbtDeleted(mountPath string) func(io.Writer) error {
 	return cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintf(b, "Successfully requested bundle delete for mount path %s from Astro.\n", mountPath)
 	})
-}
-
-func newDbtCleanupJSON(report *cosmosboost.CleanupReport) dbtCleanupJSON {
-	return dbtCleanupJSON{
-		Action:  "removed",
-		Paths:   nonNil(report.Roots),
-		Removed: nonNil(report.Removed),
-		Kept:    nonNil(report.Kept),
-	}
-}
-
-func renderDbtCleanup(b *bufio.Writer) {
-	fmt.Fprintln(b, "Removed the Cosmos Boost artifacts")
 }
 
 func newRemoteDeployJSON(res *astrodeploy.ClientDeploy) remoteDeployJSON {

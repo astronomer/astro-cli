@@ -85,14 +85,6 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		assert.NotContains(t, stderr, dbtTestVersion, "the result went to stderr")
 		assert.Contains(t, stderr, "Initiating dbt deploy", "the notes go to stderr")
 	})
-	t.Run("dbt cleanup", func(t *testing.T) {
-		stdout, stderr, err := execUnboundRoot(t, nil, "dbt", "cleanup", t.TempDir(), "-o", "json")
-		require.NoError(t, err, "stderr:\n%s", stderr)
-		var got dbtCleanupJSON
-		decodeOne(t, stdout, &got)
-		assert.Equal(t, "removed", got.Action)
-		assert.Empty(t, stderr)
-	})
 	// The bundle sits in a git checkout with uncommitted changes, so the
 	// platform code prints its note on the way: under json that goes to
 	// stderr, and stdout is the one result object.
