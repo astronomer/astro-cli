@@ -1,24 +1,82 @@
 <!DOCTYPE html>
-<html><head><title>Astro Local Proxy</title>
+<html lang="en"><head>
+{{template "head" .Title}}
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 50px auto; padding: 0 20px; color: #333; }
-h1 { color: #1a1a2e; }
-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid #eee; }
-th { background: #f8f9fa; font-weight: 600; }
-code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
-a { color: #0066cc; text-decoration: none; }
-a:hover { text-decoration: underline; }
-.empty { color: #666; font-style: italic; padding: 40px 0; text-align: center; }
-</style></head><body>
-<h1>Astro Local Proxy</h1>
+.page { align-items: flex-start; }
+.wrap { width: 100%; max-width: 760px; }
+header { display: flex; align-items: center; gap: 18px; margin-bottom: 32px; }
+header .orbit { --size: 56px; margin: 0; flex-shrink: 0; }
+header .orbit .planet { width: 8px; height: 8px; }
+header .orbit .moon { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; }
+header h1 { margin-top: 2px; }
+.count { color: var(--faint); font-size: 14px; margin-bottom: 14px; }
+ul { list-style: none; display: grid; gap: 10px; }
+li a.card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+  padding: 16px 20px;
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  transition: background 0.15s, transform 0.15s;
+}
+li a.card:hover { background: var(--card-hover); text-decoration: none; transform: translateY(-1px); }
+.name { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
+.name::before {
+  content: "";
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--glow);
+  flex-shrink: 0;
+}
+.url { color: var(--accent); font-size: 14px; overflow-wrap: anywhere; }
+.port { grid-row: 1; grid-column: 2; align-self: center; }
+.dir { grid-column: 1 / -1; font-family: var(--mono); font-size: 12px; color: var(--faint); overflow-wrap: anywhere; }
+.empty { text-align: center; padding: 56px 0 24px; }
+.empty .orbit { margin-bottom: 28px; }
+.empty h2 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+</style>
+</head><body>
+{{template "sky"}}
+<main class="page">
+  <div class="wrap">
+    <header>
+      <div class="orbit" aria-hidden="true">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-3"></div>
+        <div class="planet"></div>
+        <div class="moon"></div>
+      </div>
+      <div>
+        <p class="eyebrow">Mission control</p>
+        <h1>{{.Title}}</h1>
+      </div>
+    </header>
 {{- if not .Routes}}
-<p class="empty">No active projects. Run <code>astro local start</code> in a project to get going.</p>
+    <section class="empty">
+      <div class="orbit" aria-hidden="true">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+        <div class="planet"></div>
+      </div>
+      <h2>No active projects.</h2>
+      <p class="lede">{{template "start-hint" .Pages}}</p>
+    </section>
 {{- else}}
-<table><tr><th>Project</th><th>URL</th><th>Backend Port</th><th>Project Dir</th></tr>
+    <p class="count">{{len .Routes}} in orbit</p>
+    <ul>
 {{- range .Routes}}
-<tr><td>{{.Name}}</td><td><a href="{{.URL}}">{{.URL}}</a></td><td>{{.Port}}</td><td>{{.ProjectDir}}</td></tr>
+      <li><a class="card" href="{{.URL}}">
+        <span class="name">{{.Name}}</span>
+        <span class="port"><code>:{{.Port}}</code></span>
+        <span class="url">{{.URL}}</span>
+        <span class="dir">{{.ProjectDir}}</span>
+      </a></li>
 {{- end}}
-</table>
+    </ul>
 {{- end}}
+  </div>
+</main>
 </body></html>

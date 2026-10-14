@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
@@ -119,20 +120,14 @@ func deployDbt(cmd *cobra.Command, args []string) error {
 		dbtProjectPath = config.WorkingPath
 	}
 
-	// check that the dbt project path is not within an Astro project
-	withinAstroProject, err := config.IsWithinProjectDir(dbtProjectPath)
-	if err != nil {
-		return fmt.Errorf("failed to verify dbt project path is not within an Astro project: %w", err)
-	}
-	if !withinAstroProject {
-		withinAstroProject = isWithinManifestProject(dbtProjectPath)
-	}
-	if withinAstroProject {
+	// check that the dbt project path is not within an Astro project, by the
+	// walk every deploy decides by (astro deploy --non-dags checks the same)
+	if !utils.Locate(dbtProjectPath).None() {
 		return fmt.Errorf("dbt project is within an Astro project. Use 'astro deploy' to deploy your Astro project")
 	}
 
 	// check that there is a valid dbt project at the dbt project path
-	err = validateDbtProjectExists(dbtProjectPath)
+	err := validateDbtProjectExists(dbtProjectPath)
 	if err != nil {
 		return err
 	}

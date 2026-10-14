@@ -42,32 +42,32 @@ func (s *Suite) TestIsProjectDir() {
 	}
 }
 
-func (s *Suite) TestIsWithinProjectDir() {
+// The home directory is never a project directory, under any spelling of it,
+// even with a .astro/config.yaml in it (the global config lives there).
+func (s *Suite) TestIsProjectDirRefusesHomeUnderAnySpelling() {
+	prev := HomePath
+	defer func() { HomePath = prev }()
+	HomePath = s.T().TempDir()
+	s.Require().NoError(os.MkdirAll(filepath.Join(HomePath, ConfigDir), 0o755))
+	s.Require().NoError(os.WriteFile(filepath.Join(HomePath, ConfigDir, ConfigFileNameWithExt), nil, 0o600))
+	paths := []string{HomePath, HomePath + string(os.PathSeparator)}
+	// Windows makes a symlink only with a privilege CI may not grant.
+	if link := filepath.Join(s.T().TempDir(), "home-link"); os.Symlink(HomePath, link) == nil {
+		paths = append(paths, link)
+	}
+
+	for _, path := range paths {
+		got, err := IsProjectDir(path)
+		s.NoError(err)
+		s.False(got, path)
+	}
+
 	projectDir, cleanupProjectDir, err := CreateTempProject()
-	s.NoError(err)
+	s.Require().NoError(err)
 	defer cleanupProjectDir()
-
-	anotherDir, err := os.MkdirTemp("", "")
+	got, err := IsProjectDir(projectDir)
 	s.NoError(err)
-
-	tests := []struct {
-		name string
-		in   string
-		out  bool
-	}{
-		{"not in", anotherDir, false},
-		{"at", projectDir, true},
-		{"just in", filepath.Join(projectDir, "test"), true},
-		{"deep in", filepath.Join(projectDir, "test", "test", "test"), true},
-		{"root", string(os.PathSeparator), false},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got, err := IsWithinProjectDir(tt.in)
-			s.NoError(err)
-			s.Equal(got, tt.out)
-		})
-	}
+	s.True(got)
 }
 
 func (s *Suite) TestInitHomeDefaultCase() {

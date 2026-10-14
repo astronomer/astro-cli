@@ -72,7 +72,7 @@ astro local check     Validate this project's DAGs without starting Airflow (--s
 astro local upgrade airflow [version]  Move the project to a new Airflow, the newest of its generation if none is given (--with-otto hands the rest to Otto)
 ```
 
-`astro start`, `astro stop`, and `astro logs` work as shorthand for the `local` versions. The cloud commands — `astro login`, `astro deploy`, `astro deployment`, `astro workspace` — are unchanged from v1.
+`astro start`, `astro stop`, and `astro logs` work as shorthand for the `local` versions. The cloud commands — `astro login`, `astro deployment`, `astro workspace` — work as they did in v1. `astro deploy` ships a project with a `pyproject.toml`: a project made by Astro CLI 1.x is converted with `astro init` first, or keeps deploying with Astro CLI 1.x.
 
 Every command takes `--output json` for scripting; streaming commands like `logs` emit one JSON object per line.
 

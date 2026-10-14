@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -46,14 +47,42 @@ var errRan = errors.New("the command got past flag parsing")
 // asks an API anything. preRuns counts the pre-runs that started.
 func disarmedTree(t *testing.T, c treeConfig) (root *cobra.Command, preRuns *int) {
 	t.Helper()
-	root = buildTree(t, c).root
+	root, _, preRuns = disarmedTreeKeeping(t, c, func(*cobra.Command) bool { return false })
+	return root, preRuns
+}
+
+// disarmedTreeKeeping is disarmedTree leaving a command keep reports to run as
+// it does in production: its own hooks and run, those of everything below it,
+// and the pre-runs above it, which run for it as they would. Any other
+// command they run is still disarmed. out is the writer the root was built
+// with, where a command publishes its result.
+func disarmedTreeKeeping(t *testing.T, c treeConfig, keep func(*cobra.Command) bool) (root *cobra.Command, out *bytes.Buffer, preRuns *int) {
+	t.Helper()
+	tree := buildTree(t, c)
+	root, out = tree.root, tree.out
 	root.SetOut(io.Discard)
 	root.SetErr(io.Discard)
 	preRuns = new(int)
+	// The pre-runs as built, which a kept command gets from the nearest
+	// command that has one, as cobra gives it.
+	original := map[*cobra.Command]func(*cobra.Command, []string) error{}
 	var disarm func(*cobra.Command)
 	disarm = func(cmd *cobra.Command) {
+		if keep(cmd) {
+			return
+		}
+		original[cmd] = cmd.PersistentPreRunE
+		self := cmd
 		cmd.PersistentPreRun, cmd.PreRun, cmd.PreRunE = nil, nil, nil
-		cmd.PersistentPreRunE = func(*cobra.Command, []string) error {
+		cmd.PersistentPreRunE = func(run *cobra.Command, args []string) error {
+			if keep(run) {
+				for p := self; p != nil; p = p.Parent() {
+					if pre := original[p]; pre != nil {
+						return pre(run, args)
+					}
+				}
+				return nil
+			}
 			*preRuns++
 			return errRan
 		}
@@ -66,7 +95,7 @@ func disarmedTree(t *testing.T, c treeConfig) (root *cobra.Command, preRuns *int
 		}
 	}
 	disarm(root)
-	return root, preRuns
+	return root, out, preRuns
 }
 
 // removedFlagCase is a run passing a removed flag on a command that had it
@@ -111,6 +140,16 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"deployment", "delete", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
 	{tree: astroHostedTree, args: []string{"deployment", "bundle", "delete"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
 	{tree: apcTree, args: []string{"deployment", "update", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
+	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "save", shorthand: "s", want: errDeploySaveRemoved},
+	{tree: apcTree, args: []string{"deploy", "dep-id"}, flag: "save", shorthand: "s", want: errAPCDeploySaveRemoved},
+	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "pytest", want: errDeployPytestRemoved},
+	{tree: astroHostedTree, args: []string{"deploy", "dep-id"}, flag: "test", value: "tests/test_dags.py", shorthand: "t", want: errDeployTestRemoved},
+	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "env", value: ".env.ci", shorthand: "e", want: errDeployEnvRemoved},
+	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "parse", want: errDeployParseRemoved},
+	{tree: astroTree, args: []string{"deploy", "dep-id", "--dags"}, flag: "dags-path", value: "./elsewhere", want: errDeployDagsPathRemoved},
+	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "dag-bundle-name", value: "nightly", want: errDeployBundleNameRemoved},
+	{tree: astroTree, args: []string{"deploy"}, flag: "deployment-name", value: "prod", shorthand: "n", want: errDeployNameRemoved},
+	{tree: apcTree, args: []string{"deploy", "dep-id"}, flag: "no-cache", want: errAPCDeployNoCache},
 }
 
 // spellings is every way the case's flag can be typed: --name, --name=value
@@ -156,7 +195,7 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 						reached[f] = true
 					}
 					if asJSON && !cliout.HasOutput(target) {
-						t.Skip("no --output here: an astro api request prints the API's response, and bundle delete prints nothing")
+						t.Skip("no --output here: an astro api request prints the API's response")
 					}
 
 					stdout, stderr, err := executeRoot(root, args...)

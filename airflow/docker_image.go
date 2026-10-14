@@ -27,7 +27,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/spinner"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 const (
@@ -180,103 +179,6 @@ func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildC
 
 	spinner.StopWithCheckmark(s, "Project image has been updated")
 	return nil
-}
-
-func (d *DockerImage) Pytest(pytestFile, airflowHome, envFile, testHomeDirectory string, pytestArgs []string, htmlReport bool, buildConfig airflowTypes.ImageBuildConfig) (string, error) {
-	// delete container
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
-	if err != nil {
-		return "", err
-	}
-	err = cmdExec(containerRuntime, nil, nil, "rm", "astro-pytest")
-	if err != nil {
-		logger.Debug(err)
-	}
-	// Change to location of Dockerfile
-	err = os.Chdir(buildConfig.Path)
-	if err != nil {
-		return "", err
-	}
-	args := []string{
-		"create",
-		"-i",
-		"--name",
-		"astro-pytest",
-	}
-	fileExist, err := util.Exists(airflowHome + "/" + envFile)
-	if err != nil {
-		return "", err
-	}
-	if fileExist {
-		args = append(args, []string{"--env-file", envFile}...)
-	}
-	args = append(args, []string{d.imageName, "pytest", pytestFile}...)
-	args = append(args, pytestArgs...)
-	// run pytest image
-	var stdout, stderr io.Writer
-	if logger.IsLevelEnabled(logrus.WarnLevel) {
-		stdout = os.Stdout
-		stderr = os.Stderr
-	} else {
-		stdout = nil
-		stderr = nil
-	}
-
-	// create pytest container
-	err = cmdExec(containerRuntime, stdout, stderr, args...)
-	if err != nil {
-		return "", err
-	}
-
-	// Copy host directories into the container using docker cp.
-	// This ensures fresh files from the host are used (not stale from
-	// image build cache) and works with remote Docker daemons (CI).
-	copyDirs := []string{"dags", "tests", "plugins", "include", ".astro"}
-	for _, dir := range copyDirs {
-		srcPath := airflowHome + "/" + dir
-		if exists, _ := util.Exists(srcPath); !exists { //nolint:errcheck // treated as absent on error
-			continue
-		}
-		docErr := cmdExec(containerRuntime, stdout, stderr, "cp", srcPath, "astro-pytest:/usr/local/airflow/")
-		if docErr != nil {
-			return "", docErr
-		}
-	}
-
-	// start pytest container
-	err = cmdExec(containerRuntime, stdout, stderr, []string{"start", "astro-pytest", "-a"}...)
-	if err != nil {
-		logger.Debugf("Error starting pytest container: %s", err.Error())
-	}
-
-	// get exit code
-	args = []string{
-		"inspect",
-		"astro-pytest",
-		"--format={{.State.ExitCode}}",
-	}
-	var outb bytes.Buffer
-	inspectErr := cmdExec(containerRuntime, &outb, stderr, args...)
-	if inspectErr != nil {
-		logger.Debug(inspectErr)
-	}
-
-	if htmlReport {
-		// Copy the dag-test-report.html file from the container to the destination folder
-		cpErr := cmdExec(containerRuntime, nil, stderr, "cp", "astro-pytest:/usr/local/airflow/dag-test-report.html", "./"+testHomeDirectory)
-		if cpErr != nil {
-			logger.Debugf("Error copying dag-test-report.html file from the pytest container: %s", cpErr.Error())
-		}
-	}
-
-	// delete container
-	rmErr := cmdExec(containerRuntime, nil, stderr, "rm", "astro-pytest")
-	if rmErr != nil {
-		logger.Debugf("Error removing the astro-pytest container: %s", rmErr.Error())
-	}
-
-	// trim the trailing newline so consumers get a clean integer string to parse
-	return strings.TrimSpace(outb.String()), err
 }
 
 func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha bool) (string, error) {

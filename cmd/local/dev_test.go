@@ -117,9 +117,7 @@ func TestDevStub1xNotice(t *testing.T) {
 	t.Run("Dockerfile and .astro gets the 1.x notice", func(t *testing.T) {
 		dir := t.TempDir()
 		writeDockerfile(t, dir)
-		if err := os.Mkdir(filepath.Join(dir, ".astro"), 0o700); err != nil {
-			t.Fatal(err)
-		}
+		write1xConfig(t, dir)
 		d, _ := testDeps(t)
 		d.WorkingDir = func() (string, error) { return dir, nil }
 		err := execute(t, d, "dev")
@@ -129,12 +127,13 @@ func TestDevStub1xNotice(t *testing.T) {
 	})
 	t.Run("a pyproject that only configures tools keeps the 1.x notice", func(t *testing.T) {
 		d, _ := testDeps(t)
-		d.WorkingDir = func() (string, error) { return project1xWithToolsPyproject(t), nil }
+		dir := project1xWithToolsPyproject(t)
+		d.WorkingDir = func() (string, error) { return dir, nil }
 		err := execute(t, d, "dev")
 		if err == nil || !strings.Contains(err.Error(), notice) {
 			t.Errorf("a 1.x dir with a tools-only pyproject.toml should get the 1.x notice: %v", err)
 		}
-		if err != nil && !strings.Contains(err.Error(), "Run astro init here to convert it in place") {
+		if err != nil && !strings.Contains(err.Error(), dir+" holds a project made by Astro CLI 1.x") || !strings.Contains(err.Error(), "Run astro init to convert it in place") {
 			t.Errorf("the 1.x notice should point at astro init: %v", err)
 		}
 	})
@@ -167,10 +166,20 @@ func project1xWithToolsPyproject(t *testing.T) string {
 			t.Fatal(err)
 		}
 	}
-	if err := os.Mkdir(filepath.Join(dir, ".astro"), 0o700); err != nil {
+	write1xConfig(t, dir)
+	return dir
+}
+
+// write1xConfig writes the .astro/config.yaml a 1.x project has: astro dev
+// init always names the project there, which is what makes a 1.x project.
+func write1xConfig(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(dir, ".astro"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	return dir
+	if err := os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte("project:\n  name: demo\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDevStubLeadsWithTheConversionInA1xProject(t *testing.T) {
@@ -314,7 +323,7 @@ func TestDevStartFitsTheProjectAndTheFlags(t *testing.T) {
 		{
 			name: "a 1.x project with a build secret converts to a Docker-mode build",
 			args: []string{"start", "--build-secret", "id=netrc,env=NETRC_CONTENT"},
-			dc:   devContext{is1x: true, buildSecret: true},
+			dc:   devContext{in: project1x{dir1x: "/p"}, buildSecret: true},
 			want: "astro local start --docker --build-secret id=netrc,env=NETRC_CONTENT",
 		},
 		{
@@ -352,7 +361,7 @@ func TestDevStartReadsTheProjectAndTheTree(t *testing.T) {
 	if err := execute(t, d, "dev", "start", "--build-secret", "id=netrc,env=NETRC_CONTENT", "--output", "json"); err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	var payload devRemoved
+	var payload DevRemoved
 	if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
 		t.Fatalf("stdout is not one JSON object: %v\n%s", err, out.String())
 	}
@@ -380,8 +389,15 @@ func TestDevStubJSONOutput(t *testing.T) {
 	if err == nil {
 		t.Fatal("json mode must still fail")
 	}
+	// A usage error, as cobra's unknown command is, and the error object's
+	// keys lead the payload.
+	if code := cliout.ExitCode(context.Background(), err); code != cliout.ExitUsage {
+		t.Errorf("exit code = %d, want %d", code, cliout.ExitUsage)
+	}
 	var payload struct {
 		Error       string `json:"error"`
+		Code        int    `json:"code"`
+		Kind        string `json:"kind"`
 		Typed       string `json:"typed_command"`
 		Replacement string `json:"replacement"`
 		Mapping     []struct {
@@ -392,6 +408,9 @@ func TestDevStubJSONOutput(t *testing.T) {
 	if jsonErr := json.Unmarshal(out.Bytes(), &payload); jsonErr != nil {
 		t.Fatalf("stdout is not one JSON object: %v\n%s", jsonErr, out.String())
 	}
+	if payload.Code != cliout.ExitUsage || payload.Kind != string(cliout.KindUsage) || payload.Error != err.Error() {
+		t.Errorf("error object = %q, %d, %q; want %q, %d, %q", payload.Error, payload.Code, payload.Kind, err.Error(), cliout.ExitUsage, cliout.KindUsage)
+	}
 	if payload.Replacement != "astro local status" {
 		t.Errorf("replacement = %q, want astro local status", payload.Replacement)
 	}
@@ -400,6 +419,33 @@ func TestDevStubJSONOutput(t *testing.T) {
 	}
 	if len(payload.Mapping) == 0 {
 		t.Errorf("payload missing mapping: %+v", payload)
+	}
+}
+
+// The stub reads --output as cliout.Execute does: -ojson asks for json, and a
+// -o json after "--" is an argument, so the run is text and Execute adds
+// nothing on stdout either.
+func TestDevStubReadsOutputAsExecuteDoes(t *testing.T) {
+	d, out := testDeps(t)
+	err := execute(t, d, "dev", "ps", "-ojson")
+	if code := cliout.ExitCode(context.Background(), err); code != cliout.ExitUsage {
+		t.Fatalf("exit code = %d, want %d: %v", code, cliout.ExitUsage, err)
+	}
+	var payload DevRemoved
+	if jsonErr := json.Unmarshal(out.Bytes(), &payload); jsonErr != nil {
+		t.Fatalf("-ojson: stdout is not one JSON object: %v\n%s", jsonErr, out.String())
+	}
+	if payload.Replacement != "astro local status" {
+		t.Errorf("-ojson: replacement = %q", payload.Replacement)
+	}
+
+	d, out = testDeps(t)
+	err = execute(t, d, "dev", "ps", "--", "-o", "json")
+	if err == nil || !strings.Contains(err.Error(), "Use astro local status instead") {
+		t.Errorf("-- -o json: want the text guidance, got %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("-- -o json: stdout = %q, want nothing", out.String())
 	}
 }
 

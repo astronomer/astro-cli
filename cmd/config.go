@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 const (
@@ -43,6 +44,9 @@ var removedConfigKeys = map[string]string{
 		"without it a free port is chosen.",
 	"webserver.port": "Pick the local Airflow port with astro local start --port <port>; " +
 		"without it a free port is chosen.",
+	// astro deploy --save wrote it into a 1.x project's .astro/config.yaml.
+	"project.deployment": "Name the Deployment on each deploy, as the argument or with --deployment. " +
+		"On Astro, link a project's Deployments with astro link add, and mark one default = true to preselect it.",
 }
 
 // refuseRemovedConfigKey fails a set of a removed key the way the removed
@@ -171,9 +175,10 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return nil
 	}
-	// Ahead of the scope checks, so the answer is the same in and out of a
-	// project and with or without -g.
-	if cmd.Name() == "set" {
+	// A removed key is refused by set and get alike. Ahead of the scope
+	// checks, so the answer is the same in and out of a project and with or
+	// without -g.
+	if cmd.Name() == "set" || cmd.Name() == "get" {
 		if err := refuseRemovedConfigKey(args[0]); err != nil {
 			cmd.SilenceUsage = true
 			return err
@@ -190,7 +195,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	// -g", which nobody can run.
 	quoted := make([]string, len(args))
 	for i, a := range args {
-		quoted[i] = shellQuoteIfNeeded(a)
+		quoted[i] = scaffold.ShellQuote(a)
 	}
 	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " -g"
 	cmd.SilenceUsage = true
@@ -198,17 +203,6 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(configUseWithManifestMsg, args[0], cmd.Name(), c)
 	}
 	return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)
-}
-
-func shellQuoteIfNeeded(s string) string {
-	if s != "" && !strings.ContainsFunc(s, func(r rune) bool { return !isShellSafe(r) }) {
-		return s
-	}
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-func isShellSafe(r rune) bool {
-	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("-_.,:/=@+%", r)
 }
 
 // configGet publishes one setting from the scope asked for, as its text has
@@ -281,7 +275,8 @@ func configSet(cmd *cobra.Command, args []string) error {
 func configList(r cliout.Renderer) error {
 	list := configSettings{Settings: []configSetting{}}
 	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
-		if unlistedConfigs[key] {
+		// The removed keys too: get and set refuse them, so list agrees.
+		if _, removed := removedConfigKeys[key]; unlistedConfigs[key] || removed {
 			continue
 		}
 		cfg := config.CFGStrMap[key]

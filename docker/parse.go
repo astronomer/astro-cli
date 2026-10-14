@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
@@ -98,36 +97,4 @@ func GetImageFromParsedFile(cmds []Command) (image string) {
 		}
 	}
 	return ""
-}
-
-// Parse tag from parsed dockerfile:
-// e.g. FROM ubuntu:xenial returns "ubuntu", "xenial"
-func GetImageTagFromParsedFile(cmds []Command) (baseImage, tag string) {
-	for _, cmd := range cmds {
-		if strings.EqualFold(cmd.Cmd, command.From) {
-			if len(cmd.Value) > 0 {
-				from := cmd.Value[0]
-				baseImage, tag := parseImageName(from)
-				return baseImage, tag
-			}
-		}
-	}
-	return "", ""
-}
-
-func parseImageName(imageName string) (baseImage, tag string) {
-	ref, err := reference.Parse(imageName)
-	if err != nil {
-		return baseImage, tag
-	}
-	parsedName, ok := ref.(reference.Named)
-	if ok {
-		baseImage = parsedName.Name()
-	}
-	tag = "latest"
-	parsedTag, ok := ref.(reference.Tagged)
-	if ok {
-		tag = parsedTag.Tag()
-	}
-	return baseImage, tag
 }

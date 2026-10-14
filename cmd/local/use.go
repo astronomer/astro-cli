@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/instances"
 )
@@ -149,20 +148,14 @@ func (c *cli) runUsePick() error {
 	return c.runUse(name)
 }
 
-// currentMark labels the picker's current row with what made it current, in
-// the words the `astro deploy` prompt labels its highlight with, so one fact
-// reads the same in both places. A row ASTRO_DEPLOYMENT chose is not one
-// picking here will change, and one the manifest's default chose is not one
-// the user ever selected, so both say where they came from. The user's own
-// selection needs no label: the highlight already says it, and inside `astro
-// use` there is nothing more to explain.
+// currentMark labels the current row with what made it current, when that is
+// not the user's own choice here: "from ASTRO_DEPLOYMENT" for a row the
+// variable chose, which picking here will not change. The default link is
+// marked "default" whether or not it is current (linkMarks), and the user's
+// own selection needs no label: the highlight already says it.
 func currentMark(from instances.Layer) string {
-	switch from {
-	case instances.LayerEnv:
-		return "← " + instances.EnvVar
-	case instances.LayerDefault:
-		return "← " + deploy.DefaultMarker
-	case instances.LayerPin, instances.LayerFlag, instances.LayerURL:
+	if from == instances.LayerEnv {
+		return "from " + instances.EnvVar
 	}
 	return ""
 }
@@ -195,6 +188,9 @@ type useLinkRow struct {
 	URL        string `json:"url,omitempty"`
 	AuthMethod string `json:"auth_method,omitempty"`
 	Current    bool   `json:"current"`
+	// Default reports the project's default link (manifest.DefaultLink): the
+	// one marked default = true, or a project's only link.
+	Default bool `json:"default"`
 }
 
 // layerFrom names a resolution layer for the report's "from" field: the
@@ -228,6 +224,7 @@ func (c *cli) runUseShow() error {
 		res.Current, res.From, mark = sel.Instance.Name, layerFrom[sel.From], currentMark(sel.From)
 	}
 	links := set.All()
+	defaultName := set.DefaultName()
 	for i := range links {
 		l := &links[i]
 		res.Deployments = append(res.Deployments, useLinkRow{
@@ -237,6 +234,7 @@ func (c *cli) runUseShow() error {
 			URL:        l.URL,
 			AuthMethod: string(l.Link.Auth.Method),
 			Current:    l.Name == res.Current,
+			Default:    l.Name == defaultName,
 		})
 	}
 	return r.Emit(res, func(w io.Writer) error { return renderUseListing(w, res, mark) })
@@ -244,8 +242,8 @@ func (c *cli) runUseShow() error {
 
 // renderUseListing prints the links as the picker lists them, with a `*` on
 // the current row in place of the picker's color — this output is often a pipe
-// — and the same label when something other than your selection made it
-// current.
+// — and the same labels: the current row's when something other than your
+// selection made it current, and "default" on the project's default link.
 func renderUseListing(w io.Writer, res useListing, mark string) error {
 	if len(res.Deployments) == 0 {
 		_, err := fmt.Fprintln(w, noLinks)
@@ -253,14 +251,22 @@ func renderUseListing(w io.Writer, res useListing, mark string) error {
 	}
 	// The label column is blank on every row but one, so tabwriter's padding
 	// leaves the rest ending in spaces; the table is built first and trimmed.
+	defaultName := ""
+	for _, row := range res.Deployments {
+		if row.Default {
+			defaultName = row.Name
+		}
+	}
+	marks := linkMarks(defaultName, res.Current, mark)
 	var table bytes.Buffer
 	tw := tabwriter.NewWriter(&table, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "\tNAME\tKIND\tDEPLOYMENT, ENVIRONMENT OR URL\t")
 	for _, row := range res.Deployments {
-		marker, label := "", ""
+		marker := ""
 		if row.Current {
-			marker, label = "*", mark
+			marker = "*"
 		}
+		label := marks[row.Name]
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", marker, row.Name, row.Kind, dash(row.Where), label)
 	}
 	if err := tw.Flush(); err != nil {

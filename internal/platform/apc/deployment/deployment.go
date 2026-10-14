@@ -754,7 +754,9 @@ func readSSHKeyFile(sshFilePath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(data), nil
+	// A key saved on Windows can carry CRLF line endings, which the OpenSSH
+	// inside the Linux git-sync container can refuse as an invalid key format.
+	return strings.ReplaceAll(string(data), "\r\n", "\n"), nil
 }
 
 func readKnownHostsFile(filePath, repoHost string) (string, error) {

@@ -34,18 +34,6 @@ func Contains(elems []string, v string) bool {
 	return false
 }
 
-// exists returns whether the given file or directory exists
-func Exists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
-}
-
 // Base64URLEncode delegates to astroauth.Base64URLEncode.
 // See https://datatracker.ietf.org/doc/html/rfc4648#section-5
 func Base64URLEncode(arg []byte) string {

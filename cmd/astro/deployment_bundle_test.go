@@ -6,10 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrov1alpha1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1/mocks"
+	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -100,7 +103,7 @@ func TestDeploymentBundleDeleteCmd(t *testing.T) {
 
 		out, err := execDeploymentCmd("bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--yes")
 		assert.NoError(t, err)
-		assert.Contains(t, out, "Deleted bundle bundle-1")
+		assert.Contains(t, out, "Requested deletion of bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
 	})
 
@@ -121,7 +124,91 @@ func TestDeploymentBundleDeleteCmd(t *testing.T) {
 
 		out, err := execDeploymentCmd("bundle", "delete", "--deployment-id", "test-id-1", "--name", "my-dags", "--yes")
 		assert.NoError(t, err)
-		assert.Contains(t, out, "Deleted bundle bundle-1")
+		assert.Contains(t, out, "Requested deletion of bundle bundle-1")
 		mockAlpha.AssertExpectations(t)
+	})
+}
+
+// Under --output json, create and update publish the bundle as bundle list
+// gives each one, and delete what it deleted, on stdout and in the tree
+// production builds, where nothing binds the root's out.
+func TestDeploymentBundleJSON(t *testing.T) {
+	name := "my-dags"
+	isDag := true
+	bundle := &astrov1alpha1.DeploymentBundle{Id: "bundle-1", Name: &name, IsDagBundle: &isDag, Type: "DEPLOY"}
+
+	t.Run("create", func(t *testing.T) {
+		alpha := setupBundleCmdMocks(t)
+		alpha.On("CreateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&astrov1alpha1.CreateBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      bundle,
+		}, nil).Once()
+
+		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "create", "--deployment-id", "test-id-1", "--name", name, "-o", "json")
+		require.NoError(t, err, "stderr:\n%s", stderr)
+		var got deployment.BundleResult
+		decodeOne(t, stdout, &got)
+		assert.Equal(t, "bundle-1", got.ID)
+		assert.Equal(t, &name, got.Name)
+		assert.NotContains(t, stderr, "bundle-1", "the result went to stderr")
+		alpha.AssertExpectations(t)
+	})
+
+	t.Run("update", func(t *testing.T) {
+		alpha := setupBundleCmdMocks(t)
+		alpha.On("UpdateBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1", mock.Anything).Return(&astrov1alpha1.UpdateBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+			JSON200:      bundle,
+		}, nil).Once()
+
+		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "update", "bundle-1", "--deployment-id", "test-id-1", "--description", "d", "-o", "json")
+		require.NoError(t, err, "stderr:\n%s", stderr)
+		var got deployment.BundleResult
+		decodeOne(t, stdout, &got)
+		assert.Equal(t, "bundle-1", got.ID)
+		assert.NotContains(t, stderr, "bundle-1", "the result went to stderr")
+		alpha.AssertExpectations(t)
+	})
+
+	t.Run("delete", func(t *testing.T) {
+		alpha := setupBundleCmdMocks(t)
+		alpha.On("DeleteBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1").Return(&astrov1alpha1.DeleteBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		}, nil).Once()
+
+		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--yes", "-o", "json")
+		require.NoError(t, err, "stderr:\n%s", stderr)
+		var got deployment.BundleRemoval
+		decodeOne(t, stdout, &got)
+		assert.Equal(t, deployment.BundleRemoval{ID: "bundle-1", DeploymentID: "test-id-1", Action: "deletion_requested"}, got)
+		assert.NotContains(t, stderr, "bundle-1", "the result went to stderr")
+		alpha.AssertExpectations(t)
+	})
+
+	// Without --yes there is nobody to answer under json: the question is
+	// refused rather than asked, and stdout holds only the error object.
+	t.Run("delete without --yes", func(t *testing.T) {
+		alpha := setupBundleCmdMocks(t)
+
+		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "-o", "json")
+		require.Error(t, err)
+		var got cliout.ErrorObject
+		decodeOne(t, stdout, &got)
+		assert.Contains(t, got.Error, "pass --yes")
+		assert.Equal(t, "input_required", string(got.Kind))
+		assert.NotContains(t, stderr, "Are you sure", "the question was asked")
+		alpha.AssertNotCalled(t, "DeleteBundleWithResponse")
+	})
+
+	// Text is what it always was.
+	t.Run("text", func(t *testing.T) {
+		alpha := setupBundleCmdMocks(t)
+		alpha.On("DeleteBundleWithResponse", mock.Anything, mock.Anything, mock.Anything, "bundle-1").Return(&astrov1alpha1.DeleteBundleResponse{
+			HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		}, nil).Once()
+
+		stdout, stderr, err := execUnboundRootWith(t, astroV1Client, alpha, "deployment", "bundle", "delete", "bundle-1", "--deployment-id", "test-id-1", "--yes")
+		require.NoError(t, err, "stderr:\n%s", stderr)
+		assert.Equal(t, "Requested deletion of bundle bundle-1 from deployment test-id-1\n", stdout)
 	})
 }

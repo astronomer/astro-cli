@@ -39,6 +39,8 @@ var (
 	label                      string
 	runtimeVersion             string
 	deploymentID               string
+	deploymentName             string
+	envFile                    string
 	logsKeyword                string
 	forceDelete                bool
 	description                string

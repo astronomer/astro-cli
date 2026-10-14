@@ -16,7 +16,6 @@ packages:
     interfaces:
       RegistryHandler:
       ImageHandler:
-      DAGCheck:
       DockerRegistryAPI:
   github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1:
     config:

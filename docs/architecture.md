@@ -78,7 +78,7 @@ A sub-module may import a sibling only when a second implementation of what the 
 | `envschema` | `airflowenv` | declared names are validated with `ValidEnvKey`, `ValidVarKey` and `ValidConnID`, and encoded as `AIRFLOW_VAR_`/`AIRFLOW_CONN_` keys by the same rules |
 | `connwarehouse` | `connmodel`, `fsatomic` | it maps a connection into an entry of `~/.astro/agents/warehouse.yml`, written atomically |
 | `secrets` | `fsatomic` | atomic value writes, the link index, and its lock |
-| `proxy` | `fsatomic` | atomic writes of `routes.json` and the daemon record |
+| `proxy` | `fsatomic`, `airflowrt` | atomic writes of `routes.json` and the daemon record; and `airflowrt` owns the local Airflow's provisioned account, which the proxy logs in with so a project opens without Airflow 2's login page |
 | `localrt` | `airflowrt`, `container`, `fsatomic`, `manifest`, `proxy`, `uv` | it orchestrates the runtime primitives (PID files, env, health), routes, the container engine, venvs and atomic state. It reads two manifest fields: `[tool.uv] environments`, to stop before uv on a platform the project leaves out, and `[tool.uv] constraint-dependencies`, passed to `uv pip install` on a hot install, because an embedder that sets `UVOptions.NoConfig` makes `uv pip` skip them |
 | `imagebuild` | `localrt/rt`, `manifest`, `runtimeversions`, `airflowrt` | it reports progress in the runtime's vocabulary (`Callbacks`, `LogLine`), through the dependency-free `rt` leaf rather than `localrt`; drops the Airflow requirements with `manifest.WithoutAirflow`; names an Airflow 2 base from the runtime catalog; and reads build-secret mounts with `airflowrt.SecretMounts` |
 | `checks` | `manifest`, `platformversions` | `manifest.WithoutAirflow`, and the table of Airflow versions MWAA and Composer offer |
@@ -166,7 +166,7 @@ A command that already refuses to ask when it has no terminal marks that refusal
 | status | meaning |
 | --- | --- |
 | 0 | success |
-| 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started (a 1.x project's DAG deploy asks about an empty `dags/` after it has created the deploy record), so the "nothing ran" that 2 promises would not hold. The same refusal without a terminal has always exited 1. A script that needs to tell it from other failures reads `kind` |
+| 1 | the command failed, including `input_required`: a question it could not ask. Not 2, because a question can come after work has started, so the "nothing ran" that 2 promises would not hold. The same refusal without a terminal has always exited 1. A script that needs to tell it from other failures reads `kind` |
 | 2 | usage error: an unknown flag or subcommand, a flag value the command does not accept (`--output yaml` included), the wrong number of arguments, a missing required flag, a group run with no subcommand under `--output json`, whether it has a RunE of its own (`cliout.GroupHelp`) or not (`cliout.Execute` answers it); in text mode it prints its help and exits 0, as before. Nothing ran |
 | 130 | interrupted (Ctrl-C or SIGTERM); the command unwound what it had started |
 | the command's own | `astro local check`: 1 when a check failed, 2 when it could not reach a verdict (no environment, no project). `astro af runs trigger-wait` (and `astro local af runs trigger-wait`): 1 when the run failed, 2 when the wait timed out. `astro local run`: the child's status |
@@ -189,6 +189,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `unsupported_base` | the image base is not one this mode can run |
 | `database_newer_than_airflow` | the metadata database was migrated by a newer Airflow (Docker mode) |
 | `not_running` | nothing is running for this project |
+| `unsupported_on_platform` | not done on the platform the current context names, or on one the CLI cannot determine: `astro init` converting a 1.x project under Astro Private Cloud, or under a context it cannot resolve |
 | `deployment_hibernating`, `deployment_deploying`, `deployment_unhealthy`, `airflow_unavailable` | an Astro Deployment's Airflow did not answer (see [instances.md](instances.md#when-a-deployments-airflow-does-not-answer)); `deployment_deploying` and `airflow_unavailable` mean try again |
 | `unauthenticated` | no usable Astro login: none was made, the API refused the token (401), or one was needed and a run under `--output json` may not start a browser login |
 | `forbidden` | the login lacks the permission this needs (403) |
@@ -204,7 +205,9 @@ A failure with no kind publishes no `kind` key rather than an `unknown` catch-al
 
 A script written for Astro CLI 1.x is told what replaced what it typed rather than only that it is unknown. Either way the failure is a usage error: exit 2, and the `usage` error object under `--output json`.
 
-A removed command stays in the tree as a hidden stub that fails naming its replacement: `astro dev` ([`cmd/local/dev.go`](../cmd/local/dev.go)), `astro run`, `astro deployment airflow-variable|connection|pool`, and `astro env … create|update`.
+A removed command stays in the tree as a hidden stub that fails naming its replacement: `astro dev` ([`cmd/local/dev.go`](../cmd/local/dev.go)), `astro run`, `astro deployment airflow-variable|connection|pool`, and `astro env … create|update`. Every stub is built by `cliout.RemovedCommand` ([`cmd/cliout/removed.go`](../cmd/cliout/removed.go)): hidden, with flag parsing off so an old invocation's flags reach it, a `Short` starting `Removed in v2`, and the `removedCommand` annotation. A stub has a pre-run of its own that runs the root's and no group's, so it never reaches the project lookup of `astro deployment` or `astro env`. The root's pre-run reads the annotation. It reads `--verbosity` from the raw arguments, sets up logging and records the command (`telemetry.TrackRemovedCommand`), and runs no login or version check. So a machine that is logged out, or a project that does not parse, is still told what to run. The event is sent only once telemetry is set up, meaning the first-run notice was shown on that machine. A stub never shows the notice itself, because the core tree leaves no state behind. So the counts miss fresh machines and CI runners that start fresh: a count near zero is not on its own a reason to remove a stub. A stub fails with a usage error whose message says `` `astro …` was removed in Astro CLI v2 `` and names the command to use instead, or says there is none. `astro dev` publishes the error object (`cliout.ErrorObject`, embedded) under `--output json`, with its whole mapping of 1.x `dev` commands besides.
+
+[`cmd/testdata/v1_commands.tsv`](../cmd/testdata/v1_commands.tsv) is the inventory of 1.x commands, in the same three trees as the flag inventory below. Only the tests read it, since a stub needs no inventory to be found. `TestEveryV1CommandStillRunsOrSaysWhatReplacedIt` resolves every path in it against its v2 trees, APC at both ends of its version gates. It passes a path that names a command v2 has, at its own name or a 1.x name kept as an alias, or that reaches a stub, which it then runs, in text and under `--output json`, with every other hook disarmed. Below APC's version gates a path may also reach the stand-in for a command the platform is too old for; in any other tree that fails. It fails on a path that stops at a command with words left over, which is a command dropped without a stub or renamed without an alias. To remove a command, replace it with a stub; to rename one, keep its 1.x name as an alias. `TestEveryRemovedCommandStubIsA1xCommand` fails on a stub that no 1.x path reaches, and `TestRemovedCommandStubsNeedNoLoginAndAreRecorded` runs stubs on the real tree to check that none reaches the login or the project lookup and that each is recorded.
 
 A removed flag is not registered on any command. Two files in `cmd/` describe it:
 
@@ -280,7 +283,7 @@ Docker mode reads a project's `docker-compose.override.yml` (not the `.yaml` spe
 
 ## Platform support
 
-Windows runs Docker mode only. Standalone mode and the proxy daemon are macOS and Linux.
+Windows runs Docker mode only. Standalone mode is macOS and Linux. The proxy daemon in `pkg/proxy` runs on all three, but `astro local` starts it only on macOS and Linux for now, so on Windows a project is reached on its direct localhost port.
 
 ## Dev-mode Airflow defaults
 
