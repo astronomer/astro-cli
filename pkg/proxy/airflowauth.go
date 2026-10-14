@@ -121,9 +121,10 @@ func (s *AirflowSessions) Ensure(backendPort string) {
 		// Debug, not Error: the common causes are racing Airflow's boot, which
 		// clears within authRetryTTL, and an Airflow 2 whose admin password is
 		// not the local default (a non-macOS standalone generates one), which
-		// never clears and would otherwise log on every retry for as long as
-		// someone browses it. Either way the request goes through without our
-		// credential and Airflow answers it as it would anyone.
+		// FAB refuses for as long as the project runs and would otherwise log on
+		// every retry while someone browses it. Either way the request goes
+		// through with nothing of ours on it, the person's own session cookie
+		// included, and Airflow answers it as it would anyone.
 		slog.Debug("proxy: could not log in to Airflow", "backendPort", backendPort, "error", err)
 		fetched = airflowAuthNone // cache the failure; retried after authRetryTTL
 	}
@@ -372,6 +373,16 @@ func fetchAirflowAuth(backendPort string) (string, error) {
 	// Step 2: POST /login with the credentials and the CSRF token. Airflow 2's
 	// login checks a real user row, seeded by whichever engine started this
 	// Airflow from the same airflowrt constants.
+	//
+	// Not followed, because the redirect is the verdict. FAB answers a good
+	// login with a redirect into the app and a bad one with a redirect back to
+	// /login (a rejected form re-renders the page with a 200). The jar can't
+	// tell them apart: Flask-WTF already put a session cookie in it on the GET
+	// above, to hold the CSRF token, so "a session cookie is there" is true of
+	// an anonymous session too. Caching that one as the login would replace a
+	// person's own logged-in cookie with it on every request, and send each
+	// request through a fresh login and a replay that fails the same way.
+	af2Client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	form := adminLoginForm()
 	form.Set("csrf_token", csrfToken)
 	resp2, err := af2Client.PostForm(loginURL, form) //nolint:noctx // af2Client's timeout bounds it
@@ -379,15 +390,28 @@ func fetchAirflowAuth(backendPort string) (string, error) {
 		return "", fmt.Errorf("airflow 2 POST /login: %w", err)
 	}
 	_ = resp2.Body.Close()
+	if !isLoggedInRedirect(resp2) {
+		return "", fmt.Errorf("airflow 2: the local admin login was refused (status %d)", resp2.StatusCode)
+	}
 
 	// Step 3: Extract the session cookie from the jar, which keys cookies by
-	// the URL they were set for.
+	// the URL they were set for. The jar takes the redirect's Set-Cookie even
+	// though the redirect itself is not followed.
 	for _, c := range jar.Cookies(&url.URL{Scheme: "http", Host: "127.0.0.1:" + backendPort}) {
 		if c.Name == airflowSessionCookie {
 			return "Cookie " + airflowSessionCookie + "=" + c.Value, nil
 		}
 	}
 	return "", fmt.Errorf("airflow 2: no session cookie after login")
+}
+
+// isLoggedInRedirect reports whether FAB's answer to a login POST is a
+// successful login: a redirect anywhere but back into the login flow.
+func isLoggedInRedirect(resp *http.Response) bool {
+	if resp.StatusCode < 300 || resp.StatusCode >= 400 {
+		return false
+	}
+	return !isAirflowAuthRejection(resp)
 }
 
 // fetchAirflow3Token asks Airflow 3's /auth/token for a bearer. False means try

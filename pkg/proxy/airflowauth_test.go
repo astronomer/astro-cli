@@ -43,41 +43,76 @@ func airflowAuthBackend(t *testing.T, token *string) (ts *httptest.Server, port 
 	return ts, backendPortOf(t, ts)
 }
 
-// af2AuthBackend simulates an Airflow 2 webserver: there is no /auth/token
-// (404 → fetchAirflowAuth falls through to the FAB login flow), GET /login
-// serves a CSRF form, POST /login mints the current session cookie, and /page
-// requires it. Mirroring Flask/Werkzeug, /page reads the FIRST `session` cookie
-// when duplicates arrive — the semantics that make an appended fresh cookie
-// useless while the stale one still rides in front. Rejections redirect with an
-// absolute-URL Location, as FAB emits. pageCookies records the cookies each
-// /page request carried, in order; logins counts successful POST /login.
+// af2AuthBackend is af2LoginBackend with the local default admin password, so
+// the proxy's login succeeds.
 func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port string, pageCookies *[][]*http.Cookie, logins *int) {
 	t.Helper()
-	var mu sync.Mutex
-	var seen [][]*http.Cookie
-	var posts int
-	pageCookies = &seen
-	logins = &posts
-	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	b := af2LoginBackend(t, session, "admin")
+	return b.ts, b.port, &b.pageCookies, &b.logins
+}
+
+// af2Backend is a simulated Airflow 2 webserver and what it saw.
+type af2Backend struct {
+	ts   *httptest.Server
+	port string
+
+	mu          sync.Mutex
+	pageCookies [][]*http.Cookie // the cookies each /page request carried, in order
+	logins      int              // successful POST /login
+	loginPages  int              // GET /login, one per login attempt
+	valid       map[string]bool  // session values /page accepts
+}
+
+// af2LoginBackend simulates an Airflow 2 webserver whose admin password is
+// adminPassword, as Flask-AppBuilder and Flask-WTF behave:
+//
+//   - There is no /auth/token (404), so fetchAirflowAuth falls through to the
+//     FAB login flow.
+//   - GET /login serves a CSRF form and, as Flask-WTF does to hold the token,
+//     sets an anonymous session cookie.
+//   - POST /login with the right credentials sets the logged-in session cookie
+//     (session) and redirects into the app. With the wrong ones it flashes and
+//     redirects back to /login, the anonymous session still set.
+//   - /page requires a logged-in session and, mirroring Flask/Werkzeug, reads
+//     the FIRST `session` cookie when duplicates arrive — the semantics that make
+//     an appended fresh cookie useless while a stale one rides in front.
+//     Rejections redirect with an absolute-URL Location, as FAB emits.
+//
+// Further values in alsoValid are logged-in sessions the backend accepts too,
+// such as one a person's browser got by logging in by hand.
+func af2LoginBackend(t *testing.T, session, adminPassword string, alsoValid ...string) *af2Backend {
+	t.Helper()
+	b := &af2Backend{valid: map[string]bool{session: true}}
+	for _, v := range alsoValid {
+		b.valid[v] = true
+	}
+	anon := 0
+	b.ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b.mu.Lock()
+		defer b.mu.Unlock()
 		switch r.URL.Path {
 		case "/login":
 			if r.Method == http.MethodPost {
-				if r.FormValue("csrf_token") != "csrf-123" || r.FormValue("username") != "admin" {
-					http.Error(w, "bad login", http.StatusBadRequest)
+				if r.FormValue("csrf_token") != "csrf-123" {
+					// A rejected form re-renders the login page.
+					_, _ = w.Write([]byte(`<input name="csrf_token" value="csrf-123">`))
 					return
 				}
-				mu.Lock()
-				posts++
-				mu.Unlock()
+				if r.FormValue("username") != "admin" || r.FormValue("password") != adminPassword {
+					http.Redirect(w, r, b.ts.URL+"/login/", http.StatusFound)
+					return
+				}
+				b.logins++
 				http.SetCookie(w, &http.Cookie{Name: airflowSessionCookie, Value: session, Path: "/"})
-				_, _ = w.Write([]byte("logged in"))
+				http.Redirect(w, r, b.ts.URL+"/home", http.StatusFound)
 				return
 			}
+			b.loginPages++
+			anon++
+			http.SetCookie(w, &http.Cookie{Name: airflowSessionCookie, Value: "anon-" + strconv.Itoa(anon), Path: "/"})
 			_, _ = w.Write([]byte(`<input name="csrf_token" value="csrf-123">`))
 		case "/page":
-			mu.Lock()
-			seen = append(seen, r.Cookies())
-			mu.Unlock()
+			b.pageCookies = append(b.pageCookies, r.Cookies())
 			var first string
 			for _, c := range r.Cookies() {
 				if c.Name == airflowSessionCookie {
@@ -85,8 +120,8 @@ func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port str
 					break
 				}
 			}
-			if first != session {
-				w.Header().Set("Location", ts.URL+"/login/?next="+url.QueryEscape(ts.URL+"/page"))
+			if !b.valid[first] {
+				w.Header().Set("Location", b.ts.URL+"/login/?next="+url.QueryEscape(b.ts.URL+"/page"))
 				w.WriteHeader(http.StatusFound)
 				return
 			}
@@ -95,8 +130,9 @@ func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port str
 			http.NotFound(w, r)
 		}
 	}))
-	t.Cleanup(ts.Close)
-	return ts, backendPortOf(t, ts), pageCookies, logins
+	t.Cleanup(b.ts.Close)
+	b.port = backendPortOf(t, b.ts)
+	return b
 }
 
 func backendPortOf(t *testing.T, ts *httptest.Server) string {
@@ -599,6 +635,49 @@ func TestABackendWithNoLoginIsLeftAlone(t *testing.T) {
 	defer mu.Unlock()
 	if attempts != 2 { // one /auth/token, one GET /login, then the cached failure
 		t.Errorf("login requests = %d, want 2 — one attempt, then the failure cached", attempts)
+	}
+}
+
+// A refused login is a failure, not a session. Flask-WTF has already set an
+// anonymous session cookie by the time the form is posted, so a login that
+// only checks for "a session cookie" takes that one for success.
+func TestARefusedAirflow2LoginIsReportedAsAFailure(t *testing.T) {
+	b := af2LoginBackend(t, "minted", "generated-elsewhere")
+
+	auth, err := fetchAirflowAuth(b.port)
+	if err == nil {
+		t.Fatalf("fetchAirflowAuth = %q, nil; want an error for a refused login", auth)
+	}
+}
+
+// An Airflow 2 whose admin password isn't the local default (a non-macOS
+// standalone generates its own) refuses the proxy's login. A person who logged
+// in by hand still gets through: their own session cookie reaches Airflow
+// untouched on every request, and the refused login is tried once and cached
+// rather than run again on each page.
+func TestARefusedLoginLeavesThePersonsOwnSessionAlone(t *testing.T) {
+	b := af2LoginBackend(t, "minted", "generated-elsewhere", "logged-in-by-hand")
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	for i := range 3 {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://project.localhost/page", http.NoBody)
+		req.AddCookie(&http.Cookie{Name: airflowSessionCookie, Value: "logged-in-by-hand"})
+		p.getOrCreateProxy(b.port).ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("request %d: status %d, want the page for the person's own session", i, rec.Code)
+		}
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for i, cookies := range b.pageCookies {
+		if got := cookieValues(cookies, airflowSessionCookie); len(got) != 1 || got[0] != "logged-in-by-hand" {
+			t.Errorf("page request %d carried session cookies %v, want only the person's own", i, got)
+		}
+	}
+	if b.loginPages != 1 {
+		t.Errorf("login attempts = %d, want 1: a refused login is cached, not retried on every page", b.loginPages)
 	}
 }
 
