@@ -57,6 +57,15 @@ func TestThePackagedImageCarriesTheProjectAndNoSecrets(t *testing.T) {
 		t.Skipf("git is needed for the gitignored-credential half: %v\n%s", err, out)
 	}
 	write(t, filepath.Join(p.Dir, ".gitignore"), read(t, filepath.Join(p.Dir, ".gitignore"))+"certs/\ntarget/\n")
+	// A linked directory: the image carries what it points at, and git, which
+	// refuses a path beyond a link, must still answer for the rest.
+	if err := os.MkdirAll(filepath.Join(p.Dir, "libs", "shared"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(p.Dir, "libs", "shared", "util.py"), "UTIL = 1\n")
+	if err := os.Symlink(filepath.Join("..", "libs", "shared"), filepath.Join(p.Dir, "include", "shared")); err != nil {
+		t.Fatal(err)
+	}
 
 	refused := p.runSlow("package", "astro").requireFailure()
 	if !strings.Contains(refused.Stderr, "certs/prod.pem look like credentials") {
@@ -90,7 +99,7 @@ func TestThePackagedImageCarriesTheProjectAndNoSecrets(t *testing.T) {
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		carried = append(carried, strings.TrimPrefix(line, "./"))
 	}
-	for _, want := range []string{"include/helpers.py", "include/airflow.cfg", "include/logs/fixture.json", "target/manifest.json", "pyproject.toml"} {
+	for _, want := range []string{"include/helpers.py", "include/shared/util.py", "include/airflow.cfg", "include/logs/fixture.json", "target/manifest.json", "pyproject.toml"} {
 		if !slices.Contains(carried, want) {
 			t.Errorf("the image lacks the project's %s\n%s", want, out)
 		}

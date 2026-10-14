@@ -30,22 +30,38 @@ func InWorkTree(dir string) bool {
 	}
 }
 
+// TopLevel is the root of the work tree holding dir, as git reports it, with
+// symlinks resolved. An error means git could not answer, with what it said.
+func TopLevel(dir string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		var stderr []byte
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			stderr = exit.Stderr
+		}
+		return "", gitError(err, stderr)
+	}
+	top := strings.TrimSpace(string(out))
+	if resolved, err := filepath.EvalSymlinks(filepath.FromSlash(top)); err == nil {
+		top = resolved
+	}
+	return top, nil
+}
+
 // CheckIgnored returns those of paths (relative to dir) that the .gitignore
 // rules of the repository holding dir ignore, in the order git reports them.
 // Tracked files are never reported, since git does not apply ignore rules to
-// them.
+// them. Every path has to be one git can answer for: inside the work tree,
+// not beyond a symbolic link, and not inside a submodule.
 //
 // An error means git could not answer: it is not installed, refuses the
-// repository (an unsafe owner, outside safe.directory), or fails on a path
-// (one inside a submodule, say), with what git said. The caller decides what
-// an unanswered question means; outside a git work tree there is no question,
-// which InWorkTree tells first.
+// repository (an unsafe owner, outside safe.directory), or fails on a path,
+// with what git said. The caller decides what an unanswered question means;
+// outside a git work tree there is no question, which InWorkTree tells first.
 func CheckIgnored(dir string, paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
-	}
-	if out, err := exec.Command("git", "-C", dir, "rev-parse", "--is-inside-work-tree").CombinedOutput(); err != nil {
-		return nil, gitError(err, out)
 	}
 	// NUL-separated both ways, so no file name can split or join an entry.
 	cmd := exec.Command("git", "-C", dir, "check-ignore", "-z", "--stdin")
@@ -53,20 +69,65 @@ func CheckIgnored(dir string, paths []string) ([]string, error) {
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {
-		// Exit 1 is an answer: nothing is ignored.
+		// Exit 1 is an answer: nothing is ignored. Git can write warnings
+		// beside it, which do not change the answer; a failure exits 128.
 		var exit *exec.ExitError
-		if errors.As(err, &exit) && exit.ExitCode() == 1 && stderr.Len() == 0 {
+		if errors.As(err, &exit) && exit.ExitCode() == 1 {
 			return nil, nil
 		}
 		return nil, gitError(err, stderr.Bytes())
 	}
-	var ignored []string
-	for _, p := range strings.Split(out.String(), "\x00") {
-		if p != "" {
-			ignored = append(ignored, p)
+	return splitNUL(out.String()), nil
+}
+
+// Tracked returns those of paths (relative to dir, slash-separated) that the
+// repository holding dir tracks, spelled as given. A path may climb out of
+// dir with .. as long as it stays in the work tree. An error means git could
+// not answer.
+//
+// It reads the repository's whole index once rather than passing the paths
+// as pathspecs, which would be read as globs and could outgrow a command
+// line.
+func Tracked(dir string, paths []string) ([]string, error) {
+	if len(paths) == 0 {
+		return nil, nil
+	}
+	top, err := TopLevel(dir)
+	if err != nil {
+		return nil, err
+	}
+	base, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command("git", "-C", top, "ls-files", "-z")
+	var out, stderr bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, gitError(err, stderr.Bytes())
+	}
+	index := map[string]bool{}
+	for _, p := range splitNUL(out.String()) {
+		index[p] = true
+	}
+	var tracked []string
+	for _, p := range paths {
+		rel, err := filepath.Rel(top, filepath.Join(base, filepath.FromSlash(p)))
+		if err == nil && index[filepath.ToSlash(rel)] {
+			tracked = append(tracked, p)
 		}
 	}
-	return ignored, nil
+	return tracked, nil
+}
+
+func splitNUL(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, "\x00") {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // gitError is err with the first line git wrote, which names the reason.

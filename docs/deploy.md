@@ -57,28 +57,38 @@ This is the one limit on a declared Dockerfile. It builds and runs locally on an
 
 A Deployment with DAG deploys off takes no DAG upload, so the image is the only way DAGs reach it. A default deploy there ships the image alone, with the DAGs inside it, as the 1.x CLI did: the generated image carries `dags/` with the rest of the project, the deploy is created as `IMAGE_AND_DAG` and finalized without a tarball, and nothing is uploaded. The summary says so (`Deployed image (tag …) to …, with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.`), and `-o json` adds `"dags_in_image": true`.
 
+A remote-execution Deployment runs its DAGs on its remote agents. With DAG deploys off, a default deploy uploads nothing and holds the image to nothing about DAGs, as the 1.x CLI uploaded none there; the summary says `It runs remote execution with DAG deploys off, so no DAGs were uploaded.`, and `-o json` adds `"remote_execution": true`. With DAG deploys on, it uploads them like any other Deployment.
+
 | Deployment / flags | what ships |
 | --- | --- |
-| DAG deploys on, default | the image (which carries `dags/` too), and the DAGs uploaded beside it |
+| DAG deploys on (remote execution or not), default | the image (which carries `dags/` too), and the DAGs uploaded beside it |
 | DAG deploys off, default, generated build | the image with the DAGs inside; refused when the project's `.dockerignore` leaves out every `.py` file under `dags/`, since the Deployment would run none |
 | DAG deploys off, default, declared Dockerfile | the image as the Dockerfile builds it; a warning when its ignore file leaves out every DAG, since its own steps may put DAGs in the image |
 | DAG deploys off, default, `--image-name` | the prebuilt image, with a warning that the Deployment runs the DAGs inside it |
 | DAG deploys off, `--image` (with or without `--image-name`) | refused, as in 1.x: `--image` leaves the running DAGs in place, and there they are the image's |
+| remote execution, DAG deploys off, default | the image; no DAGs uploaded, and a `.dockerignore` dropping them is not refused |
+| remote execution, DAG deploys off, `--image` | the image, as an image-only deploy |
 | DAG deploys off, `--dags` | refused |
-
-Remote execution is not consulted: a deploy to a remote-execution Deployment follows its DAG deploy setting like any other. 1.x uploaded no DAGs to one at all.
 
 ### Gitignored files and credentials
 
-An image a deploy or `astro package astro` builds is pushed to a registry, so before either builds, `internal/shipcheck` asks git about the files the image would carry (`imagebuild.SurveyProject`: what a generated build copies, or a declared Dockerfile's context under its ignore file). It runs for a generated build and a declared Dockerfile alike, and not for `--dags` or `--image-name`, which build nothing.
+An image a deploy or `astro package astro` builds is pushed to a registry, so before either builds, `shipcheck.Survey` lists what the image would carry, once per command (`imagebuild.SurveyProject`: what a generated build copies, or a declared Dockerfile's context under its ignore file), and asks git about it. The same listing feeds the declared Dockerfile's local-files warning and, through the transport, the DAG check above. It runs for a generated build and a declared Dockerfile alike, and not for `--dags` or `--image-name`, which build nothing.
 
-- Files git ignores that the image would carry are warned about, ten named and the rest counted, with `.dockerignore` as the fix. Generated output such as a dbt `target/` ships on purpose often enough that this is a warning.
-- If any of them looks like a credential, the build is refused, naming them. The patterns are one table, `shipcheck.LooksSecret`: `*.pem`, `*.key`, `*.p12`, `*.p8`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `*credentials*`, `*-key.json`, `*_key.json`, `service-account*.json`, `sa-*.json`, `.netrc`, `.npmrc`, `.pypirc`, `*.kubeconfig`, `kubeconfig`, `*.tfvars`, `*.tfstate`, `.env*`, `*.env`, `*.env.*`, and anything under `.aws/` or `.ssh/`. A committed file is the project's choice and is never refused.
+| what the image would carry | outcome |
+| --- | --- |
+| a file git ignores | warned about: ten named, the rest counted, with the ignore file as the fix. Generated output such as a dbt `target/` ships on purpose often enough that this is a warning |
+| a file that looks like a credential and that git ignores, or that was never added | **refused**, naming it |
+| a file that looks like a credential and that git tracks (committed or staged) | goes ahead: the project's choice |
+| anything, where git cannot answer (not installed, an unsafe owner, another failure) | warned about, with git's reason and the files that look like credentials; the build goes ahead, so a CI deploy does not break on committed files |
+| a declared Dockerfile's context carrying `.git` | warned about, with `**/.git` as the fix; **refused** when its `config` holds an `extraheader` or a `user:password@` URL |
+| any of the above in a declared Dockerfile's context, when the Dockerfile does not copy the whole context | warned about instead of refused |
+
+- A declared Dockerfile copies the whole context when a `COPY` or `ADD` (not `--from` another stage) takes `.`, `./`, `*` or `./*` as a source, or a `FROM` names an Astro Runtime image, whose ONBUILD `COPY . .` copies it. A generated build always does.
+- The patterns are one table, `shipcheck.LooksSecret`: `*.pem`, `*.key`, `*.p12`, `*.p8`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `*credentials*`, `*-key.json`, `*_key.json`, `service-account*.json`, `sa-*.json`, `client_secret*.json`, `token.json`, `.netrc`, `.npmrc`, `.pypirc`, `.pgpass`, `*.kubeconfig`, `kubeconfig`, `*.tfvars`, `*.tfstate`, `.env*`, `*.env`, `*.env.*`, `config.json` under `.docker/`, and anything under `.aws/` or `.ssh/`. A bare `*secret*` is not one: too many modules are named for it.
 - Git is asked once per repository: the project's, and each submodule or nested clone, about its own files. A nested repository its parent ignores whole counts as ignored.
-- Where git cannot answer (not installed, an unsafe owner, another failure), the deploy warns with git's reason and fails closed: every carried file there that looks like a credential is refused, tracked or not.
+- Git refuses a path beyond a symbolic link, so a file a generated build carries through a linked directory is asked about where the link leads, when that is inside the work tree (`include/shared -> ../shared-lib` is asked about as `../shared-lib/…`), and otherwise judged by the link itself.
 - Outside a git work tree there is nothing to ask, and nothing is said.
-
-Podman reads a `.containerignore` before `.dockerignore`; the survey reads only the files BuildKit reads.
+- A declared build's survey reads the ignore file its builder reads: a `.containerignore` first, as podman and buildah do, else `<Dockerfile>.dockerignore`, else `.dockerignore`.
 
 ## 2. Dags-only deploys
 

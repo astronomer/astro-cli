@@ -194,3 +194,72 @@ func TestDeployManifestImage_DagDeployOffWarnsForADeclaredDockerfileWithoutDags(
 	require.NoError(t, err)
 	assert.Empty(t, warned)
 }
+
+// remoteExecutionDagDeployOffClient is a client for a remote-execution
+// Deployment with DAG deploys off.
+func remoteExecutionDagDeployOffClient() *astrov1_mocks.ClientWithResponsesInterface {
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	standard := astrov1.DeploymentTypeSTANDARD
+	client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&astrov1.GetDeploymentResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astrov1.Deployment{
+			Id:                  "test-deployment-id",
+			Name:                "test-deployment",
+			OrganizationId:      "test-org-id",
+			WorkspaceId:         "test-ws-id",
+			AstroRuntimeVersion: "3.1-2",
+			Type:                &standard,
+			RemoteExecution:     &astrov1.DeploymentRemoteExecution{Enabled: true},
+		},
+	}, nil)
+	mockDeploymentOptions(client, "3.1-2")
+	mockCreateImageDeploy(client, "")
+	mockFinalizeDeploy(client)
+	return client
+}
+
+// Under remote execution the DAGs live with the remote agents, so with DAG
+// deploys off neither --image nor a .dockerignore that drops the DAGs is
+// refused, and nothing is uploaded: the 1.x CLI uploaded no DAGs there.
+func TestDeployManifestImage_RemoteExecutionDagDeployOff(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	withImageSeams(t, "3.1-2")
+
+	dir := manifestProjectDir(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("dags/\n"), 0o600))
+	res, err := DeployManifestImage(ManifestImageDeployInput{
+		Build:        imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1"},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  true,
+	}, remoteExecutionDagDeployOffClient())
+	require.NoError(t, err, "a .dockerignore dropping the DAGs is not refused")
+	assert.True(t, res.RemoteExecution)
+	assert.False(t, res.DagsInImage)
+	assert.Empty(t, res.DagTarballVersion)
+
+	client := remoteExecutionDagDeployOffClient()
+	res, err = DeployManifestImage(ManifestImageDeployInput{
+		Build:        imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1"},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  false,
+	}, client)
+	require.NoError(t, err, "--image is not refused")
+	assert.False(t, res.RemoteExecution, "an image-only deploy says nothing of DAGs")
+	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, "test-org-id", "test-deployment-id",
+		mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool { return r.Type == astrov1.CreateDeployRequestTypeIMAGEONLY }))
+}
+
+// A survey the checks before the deploy already made is read, not made again.
+func TestDeployManifestImage_DagDeployOffReadsTheGivenSurvey(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := dagDeployOffClient()
+	withImageSeams(t, "3.1-2")
+
+	_, err := DeployManifestImage(ManifestImageDeployInput{
+		Build:        imagebuild.ManifestBuild{ProjectDir: manifestProjectDir(t), AirflowVersion: "3.1"},
+		DeploymentID: "test-deployment-id",
+		IncludeDags:  true,
+		Survey:       &imagebuild.ProjectSurvey{DagsOnDisk: 1},
+	}, client)
+	require.ErrorContains(t, err, "leaves out every DAG file under dags/", "the given survey, which carries no DAGs, was read")
+}

@@ -60,9 +60,10 @@ func TestRun_RefusesGitignoredCredentials(t *testing.T) {
 func TestRun_CarriesWarnAndDagsInImage(t *testing.T) {
 	d := &fakeDeployer{img: ImageResult{ImageTag: "deploy-2026", DagsInImage: true}}
 	warn := func(string) {}
-	res, err := Run(Request{ProjectDir: "/proj", LinkName: "prod", Manifest: linkedManifest(), Warn: warn}, d)
+	res, err := Run(Request{ProjectDir: t.TempDir(), LinkName: "prod", Manifest: linkedManifest(), Warn: warn}, d)
 	require.NoError(t, err)
 	assert.NotNil(t, d.imgInput.Warn)
+	assert.NotNil(t, d.imgInput.Survey, "the survey the checks made is handed on, not made again")
 	assert.Equal(t, "image-and-dag", res.Type)
 	assert.True(t, res.DagsInImage)
 	assert.Empty(t, res.DagTarballVersion)

@@ -566,6 +566,7 @@ func TestAstroBuildRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
 func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nCOPY . .\n")
 	require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, ".astro", "standalone"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".astro", "standalone", "airflow.db"), nil, 0o600))
 	var lines []string
 	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
 

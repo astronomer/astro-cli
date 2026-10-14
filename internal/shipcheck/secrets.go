@@ -3,6 +3,7 @@ package shipcheck
 import (
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 )
 
@@ -31,6 +32,9 @@ var secretNames = []string{
 	".netrc",
 	".npmrc",
 	".pypirc",
+	".pgpass",
+	"token.json",
+	"client_secret*.json",
 	"*.kubeconfig",
 	"kubeconfig",
 	"*.tfvars",
@@ -55,6 +59,9 @@ func LooksSecret(p string) bool {
 		}
 	}
 	base := segs[len(segs)-1]
+	if base == "config.json" && slices.Contains(segs, ".docker") {
+		return true // docker registry auth
+	}
 	for _, pat := range secretNames {
 		// The patterns are this file's own and all well formed, so Match
 		// cannot fail on them.

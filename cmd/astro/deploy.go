@@ -613,10 +613,14 @@ type deployJSON struct {
 	// DagsInImage is set on an image-and-dag deploy to a Deployment with DAG
 	// deploys off, which uploads no DAGs: the Deployment runs those inside
 	// the image.
-	DagsInImage    bool           `json:"dags_in_image,omitempty"`
-	RuntimeVersion string         `json:"runtime_version,omitempty"`
-	URL            string         `json:"url,omitempty"`
-	Git            *deployGitJSON `json:"git,omitempty"`
+	DagsInImage bool `json:"dags_in_image,omitempty"`
+	// RemoteExecution is set on an image-and-dag deploy to a
+	// remote-execution Deployment with DAG deploys off, which uploads no
+	// DAGs.
+	RemoteExecution bool           `json:"remote_execution,omitempty"`
+	RuntimeVersion  string         `json:"runtime_version,omitempty"`
+	URL             string         `json:"url,omitempty"`
+	Git             *deployGitJSON `json:"git,omitempty"`
 }
 
 type deployGitJSON struct {
@@ -642,6 +646,7 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		ImageTag:         res.ImageTag,
 		DagBundleVersion: res.DagTarballVersion,
 		DagsInImage:      res.DagsInImage,
+		RemoteExecution:  res.RemoteExecution,
 		RuntimeVersion:   res.RuntimeVersion,
 		URL:              res.URL,
 	}
@@ -658,6 +663,10 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		case "image-and-dag":
 			if res.DagsInImage {
 				fmt.Fprintf(b, "Deployed image (tag %s) to %s, with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.\n", res.ImageTag, target)
+				break
+			}
+			if res.RemoteExecution {
+				fmt.Fprintf(b, "Deployed image (tag %s) to %s. It runs remote execution with DAG deploys off, so no DAGs were uploaded.\n", res.ImageTag, target)
 				break
 			}
 			fallthrough
@@ -919,6 +928,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		OnBuild:       in.OnBuild,
 		IncludeDags:   in.IncludeDags,
 		Warn:          in.Warn,
+		Survey:        in.Survey,
 		Description:   in.Description,
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
@@ -934,6 +944,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		ImageTag:          res.ImageTag,
 		DagTarballVersion: res.DagTarballVersion,
 		DagsInImage:       res.DagsInImage,
+		RemoteExecution:   res.RemoteExecution,
 		URL:               res.URL,
 		Git:               toManifestDeployGit(res.Git),
 	}, nil

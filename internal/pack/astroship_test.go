@@ -49,7 +49,7 @@ func TestAstroBuildRefusesGitignoredCredentials(t *testing.T) {
 			require.ErrorContains(t, err, "certs/prod.pem look like credentials")
 			assert.Empty(t, builder.gotReq.Tag, "nothing was built")
 
-			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte("certs/\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".dockerignore"), []byte("certs/\n**/.git\n"), 0o600))
 			lines = nil
 			_, err = newAstro(builder, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, cb)
 			require.NoError(t, err)

@@ -60,7 +60,11 @@ type ManifestImageDeployInput struct {
 	IncludeDags bool
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
-	Warn          func(string)
+	Warn func(string)
+	// Survey is what the image built from the manifest would carry, as the
+	// checks before the deploy listed it (imagebuild.SurveyProject). nil
+	// surveys the project here when it is needed.
+	Survey        *imagebuild.ProjectSurvey
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -80,8 +84,12 @@ type ManifestImageDeployResult struct {
 	// off: no DAGs were uploaded, and the Deployment runs those the image
 	// carries.
 	DagsInImage bool
-	URL         string
-	Git         ManifestDeployGit
+	// RemoteExecution reports a "both" deploy to a remote-execution
+	// Deployment with DAG deploys off: no DAGs were uploaded, as the 1.x CLI
+	// uploaded none there.
+	RemoteExecution bool
+	URL             string
+	Git             ManifestDeployGit
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -218,6 +226,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		ImageTag:          created.ImageTag,
 		DagTarballVersion: tarballVersion,
 		DagsInImage:       dags.inImage,
+		RemoteExecution:   dags.remote,
 		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
 		Git:               gitInfo,
 	}, nil
@@ -236,9 +245,10 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 	if dep.IsCicdEnforced && !canCiCdDeploy(c.Token) {
 		return astrov1.Deployment{}, nil, fmt.Errorf(errCiCdEnforcementUpdate, dep.Name)
 	}
-	if !in.IncludeDags && !dep.IsDagDeployEnabled {
+	if !in.IncludeDags && !dep.IsDagDeployEnabled && !deployment.IsRemoteExecutionEnabled(&dep) {
 		// As the 1.x CLI refused it: with DAG deploys off the DAGs live in
 		// the image, so there are no running DAGs for --image to leave alone.
+		// Under remote execution they live with the remote agents instead.
 		return astrov1.Deployment{}, nil, fmt.Errorf(imageOnlyNeedsDagDeployMsg, in.DeploymentID)
 	}
 	allowed, err := offeredRuntimeVersions(ctx, dep.OrganizationId, astroV1Client)
@@ -260,6 +270,10 @@ type dagsPlan struct {
 	// inImage leaves the DAGs to the image: a "both" deploy to one with them
 	// off.
 	inImage bool
+	// remote uploads nothing and asks nothing of the image: a "both" deploy
+	// to a remote-execution Deployment with DAG deploys off, whose DAGs live
+	// with its remote agents.
+	remote bool
 }
 
 // planDags works out how a deploy's DAGs reach the Deployment dep, and holds a
@@ -271,6 +285,9 @@ func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov
 	}
 	if dep.IsDagDeployEnabled {
 		return dagsPlan{upload: true}, nil
+	}
+	if deployment.IsRemoteExecutionEnabled(dep) {
+		return dagsPlan{remote: true}, nil
 	}
 	return dagsPlan{inImage: true}, checkDagsInImage(in, req)
 }
@@ -290,9 +307,13 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request) err
 		warn(fmt.Sprintf("astro deployment %s has DAG deploys off, so it will run the DAGs inside %s; no DAGs are uploaded", in.DeploymentID, in.ImageName))
 		return nil
 	}
-	survey, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile)
-	if err != nil {
-		return err
+	survey := in.Survey
+	if survey == nil {
+		s, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile)
+		if err != nil {
+			return err
+		}
+		survey = &s
 	}
 	if survey.DagsOnDisk == 0 || survey.DagsCarried > 0 {
 		return nil

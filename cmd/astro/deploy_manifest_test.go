@@ -366,6 +366,20 @@ func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
 	assert.NotContains(t, m, "dag_bundle_version")
 }
 
+// A remote-execution Deployment with DAG deploys off takes no DAGs at all.
+func TestDeployManifestSaysNoDagsWentToARemoteExecutionDeployment(t *testing.T) {
+	img := manifestdeploy.ImageResult{ImageTag: "deploy-2026", RemoteExecution: true}
+	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
+	out, _, err := execDeployIO("", "prod")
+	require.NoError(t, err)
+	assert.Contains(t, out, "Deployed image (tag deploy-2026) to prod (deployment clx-dep). It runs remote execution with DAG deploys off, so no DAGs were uploaded.\n")
+
+	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
+	out, err = execDeployCapture("prod", "--output", "json")
+	require.NoError(t, err)
+	assert.Equal(t, true, decodeOneJSON(t, out)["remote_execution"])
+}
+
 // The announce line lands before the build line and after the target is
 // settled, so the order a reader sees is: what I am about to act on, then what
 // I am doing to it.

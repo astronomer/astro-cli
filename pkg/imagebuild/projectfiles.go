@@ -91,23 +91,38 @@ func newProjectFilter(root string) (projectFilter, error) {
 	return projectFilter{pm: pm, generated: true}, nil
 }
 
-// newDeclaredFilter reads the ignore file a build of the project's own
-// Dockerfile reads, which is all that build leaves out: BuildKit reads
-// <Dockerfile>.dockerignore beside the Dockerfile when there is one, else the
-// context's .dockerignore. dockerfile is the manifest's value, relative to the
-// project and slash-separated.
-func newDeclaredFilter(root, dockerfile string) (projectFilter, error) {
-	name := dockerIgnoreName
-	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(dockerfile)+dockerIgnoreName)); err == nil {
-		name = filepath.FromSlash(dockerfile) + dockerIgnoreName
+// containerIgnoreName is podman's and buildah's own ignore file, which they
+// read before .dockerignore.
+const containerIgnoreName = ".containerignore"
+
+// declaredIgnoreFile is the ignore file a build of the project's own
+// Dockerfile reads, relative to the project and slash-separated, or "" when
+// there is none: a .containerignore first, as podman and buildah read it;
+// else <Dockerfile>.dockerignore beside the Dockerfile, which BuildKit reads
+// in place of the context's; else .dockerignore. dockerfile is the manifest's
+// value, relative to the project and slash-separated.
+func declaredIgnoreFile(root, dockerfile string) string {
+	for _, name := range []string{containerIgnoreName, dockerfile + dockerIgnoreName, dockerIgnoreName} {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(name))); err == nil {
+			return name
+		}
 	}
-	patterns, err := readIgnoreFile(root, name)
-	if err != nil {
-		return projectFilter{}, err
+	return ""
+}
+
+// newDeclaredFilter reads the ignore file a build of the project's own
+// Dockerfile reads (declaredIgnoreFile), which is all that build leaves out.
+func newDeclaredFilter(root, ignoreFile string) (projectFilter, error) {
+	var patterns []string
+	if ignoreFile != "" {
+		var err error
+		if patterns, err = readIgnoreFile(root, filepath.FromSlash(ignoreFile)); err != nil {
+			return projectFilter{}, err
+		}
 	}
 	pm, err := patternmatcher.New(patterns)
 	if err != nil {
-		return projectFilter{}, fmt.Errorf("reading the project's %s: %w", filepath.ToSlash(name), err)
+		return projectFilter{}, fmt.Errorf("reading the project's %s: %w", ignoreFile, err)
 	}
 	return projectFilter{pm: pm}, nil
 }
@@ -160,9 +175,11 @@ type walker struct {
 	// copies it. Without it a link is visited as itself and never entered, as
 	// docker copies a declared Dockerfile's context.
 	follow bool
-	// skipVCS leaves out version-control metadata, which a generated build's
-	// filter already does.
-	skipVCS bool
+	// vcs, when set, takes version-control metadata (.git, a directory or a
+	// submodule's file, and the like) that the filter leaves in, which is
+	// then neither entered nor visited. A generated build's filter leaves all
+	// of it out.
+	vcs func(rel string)
 	// visit is called for each file carried, with its path relative to the
 	// project (slash-separated), its source path and its mode: a regular
 	// file's, or a symlink's when links are not followed.
@@ -210,26 +227,19 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 		if err != nil {
 			return err
 		}
-		if w.skipVCS && info.IsDir() && vcsNames[e.Name()] {
+		skip, descend := w.filter.skip(childRel, info.IsDir())
+		if w.vcs != nil && vcsNames[e.Name()] {
+			if !skip {
+				w.vcs(childRel)
+			}
 			continue
 		}
-		skip, descend := w.filter.skip(childRel, info.IsDir())
 		if skip && !descend {
 			continue
 		}
 		switch {
 		case info.IsDir():
-			realDir, err := filepath.EvalSymlinks(src)
-			if err != nil {
-				return err
-			}
-			if onPath[realDir] {
-				continue // a link back up the tree
-			}
-			onPath[realDir] = true
-			err = w.walkDir(src, childRel, onPath)
-			delete(onPath, realDir)
-			if err != nil {
+			if err := w.enter(src, childRel, onPath); err != nil {
 				return err
 			}
 		case skip:
@@ -247,7 +257,22 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 	return nil
 }
 
-// vcsNames are version-control metadata directories.
+// enter walks the directory at src, unless it is one already being walked
+// (a link back up the tree).
+func (w walker) enter(src, rel string, onPath map[string]bool) error {
+	realDir, err := filepath.EvalSymlinks(src)
+	if err != nil {
+		return err
+	}
+	if onPath[realDir] {
+		return nil
+	}
+	onPath[realDir] = true
+	defer delete(onPath, realDir)
+	return w.walkDir(src, rel, onPath)
+}
+
+// vcsNames are version-control metadata.
 var vcsNames = map[string]bool{".git": true, ".hg": true, ".svn": true}
 
 // dagsDir is where a project's DAGs live, relative to its root.
@@ -257,8 +282,15 @@ const dagsDir = "dags"
 type ProjectSurvey struct {
 	// Files are the project's files the image carries, slash-separated and
 	// relative to the project, in walk order. Version-control metadata is not
-	// listed, even where a declared Dockerfile's context carries it.
+	// listed here.
 	Files []string
+	// VCS is the version-control metadata (.git and the like) a declared
+	// Dockerfile's context carries, which its ignore file leaves in: each
+	// one's path, not what is in it. A generated build carries none.
+	VCS []string
+	// IgnoreFile is the ignore file a declared Dockerfile's build reads
+	// (declaredIgnoreFile), "" for none or for a generated build.
+	IgnoreFile string
 	// DagsOnDisk counts the DAG files (.py, as the 1.x CLI counted them)
 	// under dags/, links followed and no rule applied. DagsCarried counts
 	// those of them the image carries.
@@ -286,11 +318,12 @@ func SurveyProject(dir, dockerfile string) (ProjectSurvey, error) {
 	if dockerfile == "" {
 		err = walkProject(resolved, collect)
 	} else {
+		s.IgnoreFile = declaredIgnoreFile(resolved, dockerfile)
 		var filter projectFilter
-		if filter, err = newDeclaredFilter(resolved, dockerfile); err != nil {
+		if filter, err = newDeclaredFilter(resolved, s.IgnoreFile); err != nil {
 			return ProjectSurvey{}, err
 		}
-		w := walker{filter: filter, skipVCS: true, visit: collect}
+		w := walker{filter: filter, vcs: func(rel string) { s.VCS = append(s.VCS, rel) }, visit: collect}
 		err = w.walkDir(resolved, "", map[string]bool{resolved: true})
 	}
 	if err != nil {

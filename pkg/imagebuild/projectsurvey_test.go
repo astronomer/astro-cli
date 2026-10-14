@@ -91,6 +91,49 @@ func TestSurveyProjectDeclared(t *testing.T) {
 	assert.Equal(t, 1, s.DagsCarried)
 }
 
+// A declared Dockerfile's context carries .git unless its ignore file drops
+// it: each one is named, a submodule's .git file too, and none is entered.
+func TestSurveyProjectDeclaredNamesVCSMetadata(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"Dockerfile":        "FROM x\n",
+		".git/config":       "[core]\n",
+		"vendor/lib/.git":   "gitdir: ../../.git/modules/lib\n",
+		"vendor/lib/lib.py": "",
+	})
+	s, err := SurveyProject(project, "Dockerfile")
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{".git", "vendor/lib/.git"}, s.VCS)
+	assert.ElementsMatch(t, []string{"Dockerfile", "vendor/lib/lib.py"}, s.Files)
+
+	writeTree(t, project, map[string]string{".dockerignore": "**/.git\n"})
+	s, err = SurveyProject(project, "Dockerfile")
+	require.NoError(t, err)
+	assert.Empty(t, s.VCS)
+	assert.Equal(t, ".dockerignore", s.IgnoreFile)
+
+	generated, err := SurveyProject(project, "")
+	require.NoError(t, err)
+	assert.Empty(t, generated.VCS, "a generated build never carries VCS metadata")
+}
+
+// Podman and buildah read a .containerignore before any .dockerignore.
+func TestSurveyProjectDeclaredReadsContainerignoreFirst(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"Dockerfile":              "FROM x\n",
+		"Dockerfile.dockerignore": "a/\n",
+		".containerignore":        "b/\n",
+		"a/x":                     "",
+		"b/y":                     "",
+	})
+	s, err := SurveyProject(project, "Dockerfile")
+	require.NoError(t, err)
+	assert.Equal(t, ".containerignore", s.IgnoreFile)
+	assert.Contains(t, s.Files, "a/x")
+	assert.NotContains(t, s.Files, "b/y")
+}
+
 // A declared build's context carries a link as a link, so it is listed and
 // not entered; a generated build carries what it points at.
 func TestSurveyProjectLinks(t *testing.T) {

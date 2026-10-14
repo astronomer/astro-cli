@@ -16,6 +16,7 @@ import (
 // an entry.
 var wantDockerignoreRules = []string{
 	".venv/",
+	"**/.git",
 	"**/.env",
 	"**/.env.*",
 	"**/.envrc",
@@ -78,7 +79,7 @@ func TestPlanDockerignore(t *testing.T) {
 		// 1.x's root-only .env and airflow_settings.yaml do not cover the
 		// nested ones; its .venv, airflow.db, airflow.cfg and logs/ are
 		// already there, however they are spelled.
-		want := slices.Concat(wantDockerignoreRules[1:5], wantDockerignoreRules[8:])
+		want := slices.Concat(wantDockerignoreRules[1:6], wantDockerignoreRules[9:])
 		assert.Equal(t, dockerignore1x+"\n"+dockerignoreHeader+strings.Join(want, "\n")+"\n",
 			readDockerignoreFile(t, dir))
 	})
@@ -92,7 +93,7 @@ func TestPlanDockerignore(t *testing.T) {
 
 	t.Run("broader patterns count", func(t *testing.T) {
 		dir := t.TempDir()
-		writeProjectFile(t, dir, ".dockerignore", "**/.venv\n**/.env*\n**/airflow_settings.yaml\nairflow.*\nlogs\n.astro\nplugins/fix_*.py\n")
+		writeProjectFile(t, dir, ".dockerignore", "**/.venv\n**/.git\n**/.env*\n**/airflow_settings.yaml\nairflow.*\nlogs\n.astro\nplugins/fix_*.py\n")
 		assert.Nil(t, applyDockerignore(t, dir))
 	})
 
@@ -201,9 +202,19 @@ func TestLocalFilesWarning(t *testing.T) {
 		} {
 			writeProjectFile(t, dir, rel, "")
 		}
-		assert.Equal(t, []string{".env", "include/.env", "include/sub/.env.prod", "include/airflow_settings.yaml"},
+		assert.Equal(t, []string{".git", ".env", "include/.env", "include/sub/.env.prod", "include/airflow_settings.yaml"},
 			unignoredLocalFiles(dir, ".dockerignore"),
 			"a nested logs/ or airflow.cfg is the project's own")
+	})
+
+	t.Run("over a listing already made", func(t *testing.T) {
+		carried := []string{"dags/a.py", ".venv/bin/python", ".venv/lib/x.py", ".git", "include/.env", ".astro/config.yaml"}
+		assert.Equal(t, "the image built from Dockerfile would copy in these local or per-machine files: "+
+			".venv, .git, include/.env. To keep them out, add them to .containerignore",
+			LocalFilesWarningFor("Dockerfile", ".containerignore", carried))
+		assert.Contains(t, LocalFilesWarningFor("Dockerfile", "", carried), "add them to .dockerignore")
+		assert.Empty(t, LocalFilesWarningFor("", "", carried))
+		assert.Empty(t, LocalFilesWarningFor("Dockerfile", "", []string{"dags/a.py"}))
 	})
 
 	t.Run("silent without a declared Dockerfile", func(t *testing.T) {

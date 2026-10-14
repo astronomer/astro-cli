@@ -236,7 +236,7 @@ func cases1x() []case1x {
 			manifestHas: []string{"dockerfile = 'Dockerfile'"},
 			kept:        []string{"Dockerfile", ".dockerignore"},
 			keptHas: map[string]string{
-				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Local secrets and per-machine files. Keep them out of the image.\n**/.env\n**/.env.*\n",
+				".dockerignore": "astro\n.git\n.env\n.venv\n\n# Local secrets and per-machine files. Keep them out of the image.\n**/.git\n**/.env\n",
 			},
 			reportedUpdated: []string{".dockerignore (added the per-machine rules)"},
 			notes:           []string{"its RUN instructions were not read here"},
