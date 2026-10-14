@@ -718,6 +718,65 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 	}
 }
 
+// Under an Astro Private Cloud context, which deploys the 1.x layout (with
+// Astro CLI 1.x), init refuses to convert a 1.x project and leaves every file as
+// it was, as does a directory inside one: kind unsupported_on_platform, exit
+// 1, published as the one error object under json. A directory in no 1.x
+// project is still made a project there.
+func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+	writeContext(t, p, "software")
+	files := map[string]string{
+		filepath.Join(".astro", "config.yaml"): "project:\n  name: orders-pipeline\n",
+		"Dockerfile":                           "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
+		"requirements.txt":                     "pandas==2.1.0\n",
+	}
+	mkdir(t, filepath.Join(p.Dir, ".astro"))
+	for name, body := range files {
+		write(t, filepath.Join(p.Dir, name), body)
+	}
+
+	for _, args := range [][]string{{"init", "--output", "json"}, {"init", "dags", "--output", "json"}} {
+		requireAPCRefusal(t, p.run(args...).requireFailure())
+	}
+	for name, body := range files {
+		got, err := os.ReadFile(filepath.Join(p.Dir, name))
+		if err != nil || string(got) != body {
+			t.Errorf("%s changed: %q, %v", name, got, err)
+		}
+	}
+	for _, name := range []string{"pyproject.toml", ".gitignore", "AGENTS.md", "dags"} {
+		if _, err := os.Lstat(filepath.Join(p.Dir, name)); err == nil {
+			t.Errorf("a refused run wrote %s", name)
+		}
+	}
+
+	fresh := newProject(t)
+	writeContext(t, fresh, "software")
+	var res initResult
+	fresh.run("init", "--output", "json").requireSuccess().requireJSON(&res)
+	if reports(res.Notes, "Astro Private Cloud") {
+		t.Errorf("a new project's notes speak of APC: %q", res.Notes)
+	}
+}
+
+// requireAPCRefusal fails unless r is init's refusal of a 1.x project under
+// APC: exit 1 and one unsupported_on_platform error object naming APC.
+func requireAPCRefusal(t *testing.T, r *result) {
+	t.Helper()
+	if r.ExitCode != 1 {
+		t.Errorf("exit code %d, want 1\n%s", r.ExitCode, r.output())
+	}
+	e := lastErrorObject(r.Stdout)
+	if e == nil || e.Kind != "unsupported_on_platform" || !strings.Contains(e.Error, "Astro Private Cloud") ||
+		!strings.Contains(e.Error, "Leave the project as it is for now") ||
+		!strings.Contains(e.Error, "astro context switch astronomer.io") {
+		t.Errorf("want one unsupported_on_platform error object naming APC on stdout:\n%s", r.output())
+	}
+}
+
 // reports is true when any entry contains want.
 //
 // Entries are "<file> (<why>)" or "<file>: <what>", so a substring is the

@@ -15,6 +15,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/printutil"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 const (
@@ -190,7 +191,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 	// -g", which nobody can run.
 	quoted := make([]string, len(args))
 	for i, a := range args {
-		quoted[i] = shellQuoteIfNeeded(a)
+		quoted[i] = scaffold.ShellQuote(a)
 	}
 	c := "astro config " + cmd.Name() + " " + strings.Join(quoted, " ") + " -g"
 	cmd.SilenceUsage = true
@@ -198,17 +199,6 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(configUseWithManifestMsg, args[0], cmd.Name(), c)
 	}
 	return fmt.Errorf(configUseOutsideProjectDirMsg, cmd.Name(), cmd.Name(), c)
-}
-
-func shellQuoteIfNeeded(s string) string {
-	if s != "" && !strings.ContainsFunc(s, func(r rune) bool { return !isShellSafe(r) }) {
-		return s
-	}
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-func isShellSafe(r rune) bool {
-	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("-_.,:/=@+%", r)
 }
 
 // configGet publishes one setting from the scope asked for, as its text has

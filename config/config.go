@@ -251,6 +251,12 @@ func initProject(fs afero.Fs) {
 	}
 }
 
+// HomeConfigUnreadable reports that the home config file exists and could not
+// be parsed, so which context is current cannot be known from it.
+func HomeConfigUnreadable() bool {
+	return unreadableConfigs[HomeConfigFile]
+}
+
 // configExists returns a boolean indicating if the config is backed by a file
 func configExists(v *viper.Viper) bool {
 	return v.ConfigFileUsed() != ""

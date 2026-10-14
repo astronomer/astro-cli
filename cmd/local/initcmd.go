@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
@@ -71,6 +72,14 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 			return c.d.AirflowDefault(ctx)
 		}
 	}
+	// The one decision every 1.x hint makes too (project.Convert1xBlocked):
+	// under an APC context, or one the CLI cannot resolve, a directory in a
+	// 1.x project is refused before anything is read or written. So
+	// opts.DeploysToAPC stays unset here: it is how a caller without this
+	// decision, Astro Desktop, has scaffold make the same refusal.
+	if why, root := project.Convert1xBlocked(dir); why != project.NotBlocked {
+		return &convert1xBlockedError{msg: project.Blocked1xMessage(why, root)}
+	}
 
 	res, err := scaffold.Run(dir, opts)
 	if err != nil {
@@ -81,10 +90,38 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found.
 	c.writeAstroBuild(ctx, res.Dir)
+	// Every run that gets here wrote a new manifest: a pyproject.toml, or the
+	// [tool.astro] it adopted one with (init refuses a directory that is
+	// already a project). Said on stderr in text mode only: it is about where
+	// the project deploys, not work left to do, so it is not one of the
+	// result's notes.
+	if notice := project.NewProjectNotice(); notice != "" && r.Format != cliout.FormatJSON {
+		fmt.Fprintln(c.d.Stderr, notice)
+	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
 }
+
+// There is one project format, and `astro init` converts a 1.x project to it
+// the same way on every platform. Astro Private Cloud deploys only the 1.x
+// layout (a Dockerfile and .astro/config.yaml), with Astro CLI 1.x, so a
+// project converted under an APC context, or scaffolded inside a 1.x project
+// there, would change what Astro CLI 1.x deploys. Until APC deploys
+// pyproject.toml projects, init refuses both and changes nothing; a context
+// the CLI cannot resolve may be APC's, so it refuses there too
+// (project.Convert1xBlocked, project.Blocked1xMessage). Anywhere else, a new
+// project and the conversion of a Dockerfile with no .astro/ (which no APC
+// deploy takes as it stands) go ahead, with project.NewProjectNotice on stderr.
+
+// convert1xBlockedError is init's refusal of a directory in a 1.x project
+// under an APC or unresolved context. It matches scaffold.ErrConvert1xUnderAPC,
+// as scaffold's own refusal does, so both publish as unsupported_on_platform.
+type convert1xBlockedError struct{ msg string }
+
+func (e *convert1xBlockedError) Error() string { return e.msg }
+
+func (e *convert1xBlockedError) Is(target error) bool { return target == scaffold.ErrConvert1xUnderAPC }
 
 // nextStart is the start command to suggest once init is done. Standalone
 // mode builds no image, so a project whose manifest declares a Dockerfile or
@@ -263,4 +300,23 @@ func (l *lazyVaultWriter) writer() (*vaultenv.Writer, error) {
 		l.w = w
 	}
 	return l.w, nil
+}
+
+// blockedInitHint is the refusal astro init would give in the working
+// directory, for a spelling of init that redirects to it (astro local init,
+// astro af init), so the redirect does not suggest astro init where init
+// refuses: the dev stub's account, from the same decision. nil when sub is
+// not init or init would not refuse.
+func (c *cli) blockedInitHint(sub string) error {
+	if r, ok := devReplacementFor(sub); !ok || r != replaceInit {
+		return nil
+	}
+	wd, err := c.d.WorkingDir()
+	if err != nil {
+		return nil
+	}
+	if why, root := project.Convert1xBlocked(wd); why != project.NotBlocked {
+		return &convert1xBlockedError{msg: project.Blocked1xMessage(why, root)}
+	}
+	return nil
 }
