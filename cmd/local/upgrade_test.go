@@ -199,7 +199,7 @@ func TestUpgradeAirflowWithOttoHandsOttoThePrompt(t *testing.T) {
 	}, cliUpgradePrompt)
 	assert.Equal(t, want, *launched)
 	assert.Contains(t, *launched, "The Astro CLI has already made the mechanical edit")
-	assert.Contains(t, *launched, "bring Airflow up on 3.41: astro local restart if it is running, astro local start if it is stopped.")
+	assert.Contains(t, *launched, "bring Airflow up on 3.41: `astro local restart` if it is running, `astro local start` if it is stopped.")
 }
 
 func TestUpgradeAirflowWithOttoReportsOttosFailure(t *testing.T) {

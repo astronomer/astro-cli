@@ -70,7 +70,7 @@ func (q *query) runRunsDiagnose(ctx context.Context, dagID, runID string) error 
 		TaskInstances: []taskInstanceRow{},
 		Summary:       runSummary{StateCounts: map[string]int{}, FailedTasks: []taskInstanceRow{}},
 	}
-	instances, err := allTaskInstances(ctx, client, dagID, runID)
+	instances, err := allTaskInstances(ctx, client, dagID, runID, q.t.suggest("runs tasks "+dagID+" "+runID))
 	if err != nil {
 		diagnosis.TaskInstancesError = errorText(err)
 	} else {

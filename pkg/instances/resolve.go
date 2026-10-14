@@ -64,8 +64,8 @@ var ErrNone = errors.New("no deployment to act on: this project links none ([too
 // a flag, the env var, or a pin left by an older release. The name is reserved
 // rather than unknown, so the message says where the machine went instead of
 // listing deployments it is not one of.
-var ErrLocalNotADeployment = errors.New(LocalName + " is not a deployment: it is this machine, and it has its own commands — " +
-	"astro local start runs it, astro local af dags list and astro local af health read it. " +
+var ErrLocalNotADeployment = errors.New("the name " + LocalName + " is reserved for this machine and is not a deployment: " +
+	"this machine has its own commands — astro local start runs it, astro local af dags list and astro local af health read it. " +
 	"astro use selects among deployments only")
 
 // UnknownError reports a name no link declares.

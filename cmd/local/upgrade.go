@@ -29,7 +29,7 @@ var errUnsupportedAirflow = errors.New("unsupported Airflow version")
 // terminal is the CLI's commands rather than the desktop's tools.
 var cliUpgradePrompt = scaffold.UpgradePromptOptions{
 	Editor:  "The Astro CLI",
-	BringUp: replaceRestart + " if it is running, " + replaceStart + " if it is stopped",
+	BringUp: "`" + replaceRestart + "` if it is running, `" + replaceStart + "` if it is stopped",
 }
 
 // airflowUpgrade is `astro local upgrade airflow --output json`: what the pin

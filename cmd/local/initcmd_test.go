@@ -634,7 +634,7 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 			t.Errorf("text lacks the note %q:\n%s", n, text)
 		}
 	}
-	if strings.Contains(text, "Use astro local") || strings.Contains(text, "# was: astro dev") {
+	if strings.Contains(text, "Use ") || strings.Contains(text, "Convert with ") || strings.Contains(text, "# was: astro dev") {
 		t.Errorf("text names astro local commands under APC:\n%s", text)
 	}
 

@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -18,13 +19,19 @@ import (
 // it lands. docs/*.md is markdown and keeps its backticks.
 //
 // backtickAllowed is what may hold a backtick anyway, because it is markdown
-// or code where the backtick means something. A key is a file, for one that
-// writes such text throughout, or a file and one literal as written in it,
-// for a single string. Each says why.
+// or code where the backtick means something. A key is one of:
+//   - a file, for one that writes such text throughout;
+//   - a file and a declared name ("file: name"), for the literals that make up
+//     one const or var;
+//   - a file and one literal as written in it, for a single string.
+//
+// Each says why.
 var backtickAllowed = map[string]string{
-	"pkg/scaffold/templates.go": "the README and AGENTS.md astro init writes into a project are markdown",
+	"pkg/scaffold/templates.go: agentsContent": "the AGENTS.md astro init writes into a project is markdown",
 	"pkg/scaffold/airflowupgradeprompt.go": "the prompt that hands an Airflow upgrade to Otto is markdown for a model, " +
 		"and is never printed",
+	"cmd/local/upgrade.go: cliUpgradePrompt": "the CLI's own words in the Otto upgrade prompt, which is markdown for a " +
+		"model and is never printed",
 	"pkg/scaffold/files1x.go: \"$*?`\\\\\"": "the shell metacharacters that make an argument unsafe to repeat unquoted",
 }
 
@@ -34,34 +41,32 @@ func TestMessagesWriteCommandsAsPlainText(t *testing.T) {
 	root := repoRoot(t)
 	var problems []string
 	used := map[string]bool{}
-	goFiles(t, root, ".", func(rel string) {
-		file := filepath.ToSlash(rel)
+	for _, file := range trackedGoFiles(t, root) {
 		if !heldToPlainText(file) {
-			return
+			continue
 		}
-		f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, rel), nil, parser.SkipObjectResolution)
+		f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, filepath.FromSlash(file)), nil, parser.SkipObjectResolution)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			lit, ok := n.(*ast.BasicLit)
-			if !ok || lit.Kind != token.STRING {
-				return true
-			}
+		stringLiterals(f, "", func(lit *ast.BasicLit, decl string) {
 			s, err := strconv.Unquote(lit.Value)
 			if err != nil || !strings.Contains(s, "`") {
-				return true
+				return
 			}
-			for _, key := range []string{file, file + ": " + lit.Value} {
+			keys := []string{file, file + ": " + lit.Value}
+			if decl != "" {
+				keys = append(keys, file+": "+decl)
+			}
+			for _, key := range keys {
 				if _, ok := backtickAllowed[key]; ok {
 					used[key] = true
-					return true
+					return
 				}
 			}
 			problems = append(problems, file+": "+lit.Value)
-			return true
 		})
-	})
+	}
 	sort.Strings(problems)
 	if len(problems) > 0 {
 		t.Errorf("%d string literals hold a backtick:\n\t%s\n\n"+
@@ -78,6 +83,23 @@ func TestMessagesWriteCommandsAsPlainText(t *testing.T) {
 	}
 }
 
+// stringLiterals calls fn with every string literal under n and the name of
+// the const or var it belongs to ("" outside one).
+func stringLiterals(n ast.Node, decl string, fn func(lit *ast.BasicLit, decl string)) {
+	ast.Inspect(n, func(n ast.Node) bool {
+		if spec, ok := n.(*ast.ValueSpec); ok && len(spec.Names) > 0 {
+			for _, v := range spec.Values {
+				stringLiterals(v, spec.Names[0].Name, fn)
+			}
+			return false
+		}
+		if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+			fn(lit, decl)
+		}
+		return true
+	})
+}
+
 // heldToPlainText reports whether the rule covers a file: non-test Go code,
 // outside the e2e module, the test-helper packages, generated API clients and
 // test data.
@@ -89,4 +111,27 @@ func heldToPlainText(file string) bool {
 		!strings.Contains(file, "/testdata/") &&
 		!strings.Contains(file, "cliouttest/") &&
 		!strings.Contains(file, "instancestest/")
+}
+
+// trackedGoFiles lists the .go files git tracks under root, slash-separated
+// and relative to it, so a worktree under .claude/, .git itself or an
+// untracked scratch file is never read as the repo's code.
+func trackedGoFiles(t *testing.T, root string) []string {
+	t.Helper()
+	cmd := exec.CommandContext(t.Context(), "git", "ls-files", "-z", "--", "*.go")
+	cmd.Dir = root
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git ls-files: %v", err)
+	}
+	var files []string
+	for _, f := range strings.Split(string(out), "\x00") {
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+	if len(files) == 0 {
+		t.Fatal("git ls-files found no .go files")
+	}
+	return files
 }
