@@ -1099,6 +1099,19 @@ var (
 			runtimeAirflowVersion
 		}
 	}`
+
+	HibernateOverrideDeploymentRequest = `
+	mutation upsertDeployment($deploymentId: Uuid!, $hibernationOverride: HibernationOverrideInput) {
+		upsertDeployment(deploymentUuid: $deploymentId, hibernationOverride: $hibernationOverride) {
+			id
+			label
+			releaseName
+			hibernationOverride {
+				hibernate
+				overrideUntil
+			}
+		}
+	}`
 )
 
 // CreateDeployment - create a deployment
@@ -1347,4 +1360,22 @@ func (h ClientImplementation) CancelUpdateDeploymentRuntime(variables map[string
 	}
 
 	return res.Data.CancelUpdateDeploymentRuntime, nil
+}
+
+// HibernateOverrideDeployment sets or, with a nil hibernationOverride, clears
+// the override of a Deployment's hibernation schedule. Houston serves the
+// hibernationOverride argument from 2.2.0 on; Call refuses it before then
+// (houstonAPIAvailabilityByVersion).
+func (h ClientImplementation) HibernateOverrideDeployment(variables map[string]interface{}) (*Deployment, error) {
+	req := Request{
+		Query:     HibernateOverrideDeploymentRequest,
+		Variables: variables,
+	}
+
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	return res.Data.UpsertDeployment, nil
 }

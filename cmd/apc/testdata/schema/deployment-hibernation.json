@@ -1,0 +1,9 @@
+{
+  "deployment_id": "x",
+  "label": "x",
+  "release_name": "x",
+  "hibernation_override": {
+    "is_hibernating": true,
+    "override_until": "2026-07-21T10:30:00Z"
+  }
+}

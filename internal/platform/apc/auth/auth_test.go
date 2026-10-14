@@ -539,32 +539,68 @@ func (s *Suite) TestLoginFailure() {
 }
 
 func (s *Suite) TestLogout() {
-	fs := afero.NewMemMapFs()
-	configYaml := testUtil.NewTestConfig("localhost")
-	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
-	config.InitConfig(fs)
+	const current, other = "astronomer_dev.com", "other.example.com"
+	stored := func(domain string) config.Context {
+		c, err := (&config.Context{Domain: domain}).GetContext()
+		s.Require().NoError(err)
+		return c
+	}
+	loggedIn := func(domain string) {
+		c := config.Context{Domain: domain}
+		s.Require().NoError(c.SetContext())
+		s.Require().NoError(c.SetContextKey("token", "Bearer token-"+domain))
+	}
 
-	type args struct {
-		domain string
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{
-			name: "logout domain, not present in contexts",
-			args: args{domain: "test.astro.io"},
-		},
-		{
-			name: "logout localhost",
-			args: args{domain: "localhost"},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			Logout(tt.args.domain)
-		})
-	}
+	s.Run("clears the login and the current context", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		loggedIn(current)
+
+		s.NoError(Logout(current))
+
+		s.Empty(stored(current).Token)
+		_, err := config.GetCurrentDomain()
+		s.ErrorIs(err, config.ErrGetHomeString)
+	})
+
+	s.Run("logging out of another domain keeps the current one", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		loggedIn(current)
+		loggedIn(other)
+
+		s.NoError(Logout(other))
+
+		s.Empty(stored(other).Token)
+		s.Equal("Bearer token-"+current, stored(current).Token)
+		domain, err := config.GetCurrentDomain()
+		s.NoError(err)
+		s.Equal(current, domain)
+	})
+
+	// ASTRO_DOMAIN chooses the domain a command talks to, not the saved
+	// selection a logout clears.
+	s.Run("the saved current context is the one compared", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		loggedIn(current)
+		loggedIn(other)
+		s.T().Setenv("ASTRO_DOMAIN", other)
+
+		s.NoError(Logout(other))
+		s.Equal(current, config.CFG.Context.GetHomeString())
+
+		s.NoError(Logout(current))
+		s.Empty(config.CFG.Context.GetHomeString())
+	})
+
+	s.Run("a domain with no login fails", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		loggedIn(current)
+
+		err := Logout("test.astro.io")
+		s.ErrorContains(err, "test.astro.io")
+		s.False((&config.Context{Domain: "test.astro.io"}).ContextExists())
+		s.Equal("Bearer token-"+current, stored(current).Token)
+		s.Equal(current, config.CFG.Context.GetHomeString())
+	})
 }
 
 func (s *Suite) TestCheckClusterDomain() {

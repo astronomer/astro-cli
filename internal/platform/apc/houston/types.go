@@ -129,10 +129,22 @@ type Deployment struct {
 	// query it chose; before that, and from any other query, an empty
 	// DagDeployment.Type says nothing about the Deployment.
 	DagDeploymentRead bool `json:"-"`
+	// HibernationOverride is the override of the Deployment's hibernation
+	// schedule, nil when it has none or the query did not ask for it. Only
+	// HibernateOverrideDeployment asks, on Houston 2.2.0 and later.
+	HibernationOverride *HibernationOverride `json:"hibernationOverride,omitempty"`
 }
 
 type DagDeploymentConfig struct {
 	Type string `json:"type"`
+}
+
+// HibernationOverride holds a Deployment hibernating, or awake, against its
+// hibernation schedule: until OverrideUntil, or until it is removed when that
+// is nil.
+type HibernationOverride struct {
+	IsHibernating bool       `json:"hibernate"`
+	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
 }
 
 // DeploymentURL defines structure of a houston response DeploymentURL object
@@ -381,6 +393,11 @@ type FeatureFlags struct {
 	BYORegistryEnabled     bool `json:"byoUpdateRegistryEnabled"`
 	AstroRuntimeEnabled    bool `json:"astroRuntimeEnabled"`
 	DagOnlyDeployment      bool `json:"dagOnlyDeployment"`
+	// HibernationEnabled is whether hibernation is on under the settings
+	// that apply to the scope asked about. nil when Houston does not say:
+	// it reports it after 2.2.0 (houston-api 4e7f7722, APC-1839), while
+	// upsertDeployment takes an override from 2.2.0.
+	HibernationEnabled *bool `json:"hibernationEnabled"`
 }
 
 // coerce a string into SemVer if possible

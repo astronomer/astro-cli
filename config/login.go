@@ -267,8 +267,11 @@ func saveContextLogin(cKey string, login secrets.Login) secrets.Login {
 }
 
 // SignOut removes the login of this context and of every other context on its
-// identity provider tenant: their vault entries go, and their token fields are
-// left empty, which reads as signed out to this and every earlier build.
+// identity provider tenant: their vault entries go, their token fields are left
+// empty, which reads as signed out to this and every earlier build, and the
+// user's email and the token's expiry go with them. It is one write, so a
+// sign-out that fails to save leaves every context as it was rather than with
+// the long-lived refresh token still in place.
 func (c *Context) SignOut() error {
 	cKey, err := c.GetContextKey()
 	if err != nil {
@@ -278,6 +281,11 @@ func (c *Context) SignOut() error {
 		logins().Save(HomeConfigFile, key, secrets.Login{})
 		putContextField(key, tokenField, "")
 		putContextField(key, refreshTokenField, "")
+		storeContextField(key, "user_email", "")
+		// Emptied rather than deleted: a key deleted from the map Set back
+		// falls through to the file's layer, which still holds it. An empty
+		// expiry reads as the zero time, as a missing one does.
+		storeContextField(key, "expiresin", "")
 	}
 	return saveConfig(viperHome, HomeConfigFile)
 }

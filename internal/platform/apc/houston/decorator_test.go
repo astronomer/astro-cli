@@ -178,7 +178,8 @@ func (s *Suite) TestCall() {
 
 // The upgrade mutations exist only where Houston still serves them:
 // updateDeploymentAirflow is a no-op stub from 0.37.0, and
-// updateDeploymentRuntime and cancelRuntimeUpdate are gone from 1.0.43.
+// updateDeploymentRuntime and cancelRuntimeUpdate are gone from 1.0.43. A
+// hibernation override exists only from 2.2.0.
 func (s *Suite) TestUpgradeMutationsAreGatedToTheHoustonsThatServeThem() {
 	for _, c := range []struct {
 		api, version string
@@ -193,6 +194,8 @@ func (s *Suite) TestUpgradeMutationsAreGatedToTheHoustonsThatServeThem() {
 		{"UpdateDeploymentRuntime", "2.1.0", false},
 		{"CancelUpdateDeploymentRuntime", "1.0.42", true},
 		{"CancelUpdateDeploymentRuntime", "1.0.43", false},
+		{"HibernateOverrideDeployment", "2.1.27", false},
+		{"HibernateOverrideDeployment", "2.2.0", true},
 	} {
 		s.Equal(c.served, VerifyVersionMatch(c.version, houstonAPIAvailabilityByVersion[c.api]), "%s on %s", c.api, c.version)
 	}
