@@ -102,7 +102,7 @@ func TestInWorkTree(t *testing.T) {
 	assert.True(t, InWorkTree(file), "a .git file, as a submodule or worktree has, counts")
 }
 
-func TestTrackedAndTopLevel(t *testing.T) {
+func TestTracked(t *testing.T) {
 	needsGit(t)
 	root := t.TempDir()
 	gitIn(t, root, "init", "-q")
@@ -115,17 +115,11 @@ func TestTrackedAndTopLevel(t *testing.T) {
 	gitIn(t, root, "add", "project/dags/a.py", "project/[glob].txt", "shared/committed.py")
 
 	project := filepath.Join(root, "project")
-	got, err := Tracked(project, []string{"dags/a.py", "new.pem", "[glob].txt", "../shared/committed.py"})
+	got, err := Tracked(project, []string{"dags/a.py", "new.pem", "[glob].txt"})
 	require.NoError(t, err)
-	assert.ElementsMatch(t, []string{"dags/a.py", "[glob].txt", "../shared/committed.py"}, got,
+	assert.ElementsMatch(t, []string{"dags/a.py", "[glob].txt"}, got,
 		"untracked files are not listed, and a name is never read as a glob")
 
-	top, err := TopLevel(project)
-	require.NoError(t, err)
-	want, err := filepath.EvalSymlinks(root)
-	require.NoError(t, err)
-	assert.Equal(t, want, top)
-
-	_, err = TopLevel(t.TempDir())
+	_, err = Tracked(t.TempDir(), []string{"x"})
 	assert.Error(t, err, "not a repository")
 }

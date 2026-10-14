@@ -25,7 +25,7 @@ func TestSurveyProjectGenerated(t *testing.T) {
 		".dockerignore":       "dags/sub/\n",
 		"include/.env.sample": "",
 	})
-	s, err := SurveyProject(project, "")
+	s, err := SurveyProject(project, "", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"dags/a.py", "dags/README.md", "include/x.py", "certs/prod.pem"}, s.Files)
 	assert.Equal(t, 2, s.DagsOnDisk)
@@ -52,7 +52,7 @@ func TestSurveyProjectDagsDropped(t *testing.T) {
 			files["dags/a.py"] = ""
 		}
 		writeTree(t, project, files)
-		s, err := SurveyProject(project, "")
+		s, err := SurveyProject(project, "", false)
 		require.NoError(t, err, name)
 		assert.Equal(t, 0, s.DagsCarried, name)
 		if rules != "" {
@@ -77,14 +77,14 @@ func TestSurveyProjectDeclared(t *testing.T) {
 		".dockerignore":     "dags/\n",
 		"tmp/scratch":       "",
 	})
-	s, err := SurveyProject(project, "docker/Dockerfile")
+	s, err := SurveyProject(project, "docker/Dockerfile", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"docker/Dockerfile", ".env", "requirements.txt", ".dockerignore", "tmp/scratch"}, s.Files)
 	assert.Equal(t, 1, s.DagsOnDisk)
 	assert.Equal(t, 0, s.DagsCarried)
 
 	writeTree(t, project, map[string]string{"docker/Dockerfile.dockerignore": "tmp/\n"})
-	s, err = SurveyProject(project, "docker/Dockerfile")
+	s, err = SurveyProject(project, "docker/Dockerfile", false)
 	require.NoError(t, err)
 	assert.Contains(t, s.Files, "dags/a.py", "the Dockerfile's own ignore file replaces .dockerignore")
 	assert.NotContains(t, s.Files, "tmp/scratch")
@@ -101,24 +101,25 @@ func TestSurveyProjectDeclaredNamesVCSMetadata(t *testing.T) {
 		"vendor/lib/.git":   "gitdir: ../../.git/modules/lib\n",
 		"vendor/lib/lib.py": "",
 	})
-	s, err := SurveyProject(project, "Dockerfile")
+	s, err := SurveyProject(project, "Dockerfile", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{".git", "vendor/lib/.git"}, s.VCS)
 	assert.ElementsMatch(t, []string{"Dockerfile", "vendor/lib/lib.py"}, s.Files)
 
 	writeTree(t, project, map[string]string{".dockerignore": "**/.git\n"})
-	s, err = SurveyProject(project, "Dockerfile")
+	s, err = SurveyProject(project, "Dockerfile", false)
 	require.NoError(t, err)
 	assert.Empty(t, s.VCS)
 	assert.Equal(t, ".dockerignore", s.IgnoreFile)
 
-	generated, err := SurveyProject(project, "")
+	generated, err := SurveyProject(project, "", false)
 	require.NoError(t, err)
 	assert.Empty(t, generated.VCS, "a generated build never carries VCS metadata")
 }
 
-// Podman and buildah read a .containerignore before any .dockerignore.
-func TestSurveyProjectDeclaredReadsContainerignoreFirst(t *testing.T) {
+// Podman and buildah read a .containerignore before any .dockerignore;
+// docker never reads one.
+func TestSurveyProjectDeclaredReadsContainerignoreUnderPodmanOnly(t *testing.T) {
 	project := t.TempDir()
 	writeTree(t, project, map[string]string{
 		"Dockerfile":              "FROM x\n",
@@ -127,11 +128,17 @@ func TestSurveyProjectDeclaredReadsContainerignoreFirst(t *testing.T) {
 		"a/x":                     "",
 		"b/y":                     "",
 	})
-	s, err := SurveyProject(project, "Dockerfile")
+	s, err := SurveyProject(project, "Dockerfile", true)
 	require.NoError(t, err)
 	assert.Equal(t, ".containerignore", s.IgnoreFile)
 	assert.Contains(t, s.Files, "a/x")
 	assert.NotContains(t, s.Files, "b/y")
+
+	s, err = SurveyProject(project, "Dockerfile", false)
+	require.NoError(t, err)
+	assert.Equal(t, "Dockerfile.dockerignore", s.IgnoreFile, "docker never reads a .containerignore")
+	assert.NotContains(t, s.Files, "a/x")
+	assert.Contains(t, s.Files, "b/y")
 }
 
 // A declared build's context carries a link as a link, so it is listed and
@@ -146,13 +153,13 @@ func TestSurveyProjectLinks(t *testing.T) {
 	}
 	require.NoError(t, os.Symlink(filepath.Join(outside, "keys"), filepath.Join(project, "keys")))
 
-	generated, err := SurveyProject(project, "")
+	generated, err := SurveyProject(project, "", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"docker/Dockerfile", "dags/far.py", "keys/sa-prod.json"}, generated.Files)
 	assert.Equal(t, 1, generated.DagsOnDisk)
 	assert.Equal(t, 1, generated.DagsCarried)
 
-	declared, err := SurveyProject(project, "docker/Dockerfile")
+	declared, err := SurveyProject(project, "docker/Dockerfile", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"docker/Dockerfile", "dags", "keys"}, declared.Files)
 	assert.Equal(t, 1, declared.DagsOnDisk)

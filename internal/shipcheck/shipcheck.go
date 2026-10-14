@@ -1,16 +1,22 @@
 // Package shipcheck holds an image that is pushed to a registry (a deploy's,
 // `astro package astro`'s) to what git says about the files it carries. A
-// file the project's .gitignore keeps out of the repository but no
-// .dockerignore keeps out of the image is warned about; a carried file that
-// looks like a credential and that git does not track stops the build, and so
-// does git metadata whose config holds a credential.
+// file the project's .gitignore keeps out of the repository but no ignore file
+// keeps out of the image is warned about; a carried file that looks like a
+// credential and that git does not track stops the build, and so does git
+// metadata whose config holds a credential.
+//
+// A declared Dockerfile is held to the same rule as a generated build:
+// everything in its build context counts as shipped, whatever the Dockerfile
+// copies.
 package shipcheck
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -25,48 +31,34 @@ type Report struct {
 	// relative to the project.
 	Gitignored []string
 	// Secrets are the carried files that look like credentials
-	// (LooksSecret) and that git does not track: ignored, or never added.
-	// A committed file is the project's choice and is never here.
+	// (LooksSecret) and that git does not track: ignored, never added, or
+	// reached through a link that leaves the project. A committed file is
+	// the project's choice and is never here.
 	Secrets []string
 	// Unanswered says, per repository git could not answer for, which and
 	// why. Unchecked are the carried files there that look like
 	// credentials, which are warned about rather than refused.
 	Unanswered, Unchecked []string
-	// VCS is the git metadata a declared Dockerfile's context carries
-	// (imagebuild.ProjectSurvey.VCS), and VCSSecrets those of it whose
-	// config holds a credential: an extraheader, or a user:password URL.
-	VCS, VCSSecrets []string
+	// VCSSecrets is the git metadata a declared Dockerfile's context carries
+	// (imagebuild.ProjectSurvey.VCS) whose config holds a credential.
+	VCSSecrets []string
 	// IgnoreFile is the ignore file the build reads, for the messages.
 	IgnoreFile string
-	// CopiesContext reports that the build puts the whole context in the
-	// image: a generated build always does; a declared Dockerfile does when
-	// it COPYs or ADDs the context's root, or builds on an Astro Runtime
-	// image, whose ONBUILD `COPY . .` does. Only then does a credential stop
-	// the build; otherwise it is warned about.
-	CopiesContext bool
-	// dockerfile is the manifest's [tool.astro] dockerfile, "" for a
-	// generated build.
-	dockerfile string
 }
 
 // Check asks git about the files an image built from the project at dir
-// would carry, as survey lists them (imagebuild.SurveyProject; dockerfile is
-// the manifest's [tool.astro] dockerfile, "" for a generated build). Outside a
-// git work tree there is nothing to ask, and only the git metadata a declared
-// build would carry is reported.
-func Check(dir, dockerfile string, survey *imagebuild.ProjectSurvey) Report {
-	r := Report{dockerfile: dockerfile, IgnoreFile: survey.IgnoreFile, CopiesContext: true}
+// would carry, as survey lists them (imagebuild.SurveyProject). Outside a git
+// work tree there is nothing to ask, and only git metadata a declared build
+// would carry is looked at.
+func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
+	r := Report{IgnoreFile: cmp.Or(survey.IgnoreFile, ".dockerignore")}
 	root, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		root = dir
 	}
-	if dockerfile != "" {
-		r.CopiesContext = copiesContext(filepath.Join(root, filepath.FromSlash(dockerfile)))
-		r.VCS = survey.VCS
-		for _, v := range survey.VCS {
-			if vcsConfigHoldsCredential(filepath.Join(root, filepath.FromSlash(v))) {
-				r.VCSSecrets = append(r.VCSSecrets, v)
-			}
+	for _, v := range survey.VCS {
+		if vcsConfigHoldsCredential(filepath.Join(root, filepath.FromSlash(v))) {
+			r.VCSSecrets = append(r.VCSSecrets, v)
 		}
 	}
 	if git.InWorkTree(root) {
@@ -78,47 +70,31 @@ func Check(dir, dockerfile string, survey *imagebuild.ProjectSurvey) Report {
 // Warnings are what a build goes ahead despite.
 func (r *Report) Warnings() []string {
 	var out []string
-	ignoreFile := cmpOr(r.IgnoreFile, ".dockerignore")
 	if len(r.Gitignored) > 0 {
 		out = append(out, fmt.Sprintf("the image will carry %d file(s) that .gitignore ignores and %s does not: %s. If they do not belong in the image, add them to %s",
-			len(r.Gitignored), ignoreFile, cappedList(r.Gitignored), ignoreFile))
+			len(r.Gitignored), r.IgnoreFile, cappedList(r.Gitignored), r.IgnoreFile))
 	}
 	for _, u := range r.Unanswered {
 		out = append(out, fmt.Sprintf("could not ask git which files it tracks in %s, so files there that look like credentials were not checked", u))
 	}
 	if len(r.Unchecked) > 0 {
 		out = append(out, fmt.Sprintf("the image will carry these files that look like credentials, which git could not say are committed: %s. If they do not belong in the image, add them to %s",
-			cappedList(r.Unchecked), ignoreFile))
-	}
-	// Git metadata in the context is named by scaffold.LocalFilesWarningFor,
-	// whose rules include **/.git; a credential in it is said here.
-	if len(r.VCSSecrets) > 0 && !r.CopiesContext {
-		out = append(out, fmt.Sprintf("the build context of %s carries git metadata whose config holds a credential (%s). %s does not copy the whole context, so the build goes ahead; add **/.git to %s to keep it out of the context",
-			r.dockerfile, cappedList(r.VCSSecrets), r.dockerfile, ignoreFile))
-	}
-	if !r.CopiesContext && len(r.Secrets) > 0 {
-		out = append(out, fmt.Sprintf("the build context of %s carries files that look like credentials and that git does not track: %s. %s does not copy the whole context, so the build goes ahead; add them to %s to keep them out of the context",
-			r.dockerfile, cappedList(r.Secrets), r.dockerfile, ignoreFile))
+			cappedList(r.Unchecked), r.IgnoreFile))
 	}
 	return out
 }
 
 // Err refuses a build that would put credentials in an image bound for a
 // registry: carried files that look like credentials and that git does not
-// track, and git metadata whose config holds one. nil when there are none, or
-// when the build does not copy the whole context (Warnings says so then).
+// track, and git metadata whose config holds one. nil when there are none.
 func (r *Report) Err() error {
-	if !r.CopiesContext {
-		return nil
-	}
-	ignoreFile := cmpOr(r.IgnoreFile, ".dockerignore")
 	if len(r.Secrets) > 0 {
 		return fmt.Errorf("refusing to build: %s look like credentials, are not committed to git, and the image would carry them to a registry. Add them to %s, or remove them from the project, and try again",
-			cappedList(r.Secrets), ignoreFile)
+			cappedList(r.Secrets), r.IgnoreFile)
 	}
 	if len(r.VCSSecrets) > 0 {
-		return fmt.Errorf("refusing to build: the git config under %s holds a credential (an extraheader, or a password in a remote URL), and the image would carry it to a registry. Add **/.git to %s and try again",
-			cappedList(r.VCSSecrets), ignoreFile)
+		return fmt.Errorf("refusing to build: the git config under %s holds a credential (an extraheader, or a URL with a user or token in it), and the image would carry it to a registry. Add **/.git to %s and try again",
+			cappedList(r.VCSSecrets), r.IgnoreFile)
 	}
 	return nil
 }
@@ -126,37 +102,49 @@ func (r *Report) Err() error {
 // Survey is the check a command runs before it builds an image to push. It
 // surveys what the image built from the project at dir would carry
 // (imagebuild.SurveyProject; dockerfile is the manifest's [tool.astro]
-// dockerfile), warns about the local and per-machine files a declared
-// Dockerfile's context carries (scaffold.LocalFilesWarningFor), and holds the
-// image to what git says of its files (Check), handing each warning to warn.
-// It returns the survey, for the rest of the command to read rather than walk
-// the project again, and the refusal.
-func Survey(dir, dockerfile string, warn func(string)) (*imagebuild.ProjectSurvey, error) {
-	survey, err := imagebuild.SurveyProject(dir, dockerfile)
+// dockerfile, podman whether podman builds it), warns about the local and
+// per-machine files a declared Dockerfile's context carries
+// (scaffold.LocalFilesWarningFor), and holds the image to what git says of its
+// files (Check), handing each warning to warn. It returns the survey, for the
+// rest of the command to read rather than walk the project again, and the
+// refusal.
+func Survey(dir, dockerfile string, podman bool, warn func(string)) (*imagebuild.ProjectSurvey, error) {
+	survey, err := imagebuild.SurveyProject(dir, dockerfile, podman)
 	if err != nil {
 		return nil, err
 	}
 	if w := scaffold.LocalFilesWarningFor(dockerfile, survey.IgnoreFile, slices.Concat(survey.Files, survey.VCS)); w != "" {
 		warn(w)
 	}
-	r := Check(dir, dockerfile, &survey)
+	r := Check(dir, &survey)
 	for _, w := range r.Warnings() {
 		warn(w)
 	}
 	return &survey, r.Err()
 }
 
-func cmpOr(a, b string) string {
-	if a != "" {
-		return a
+// credentialURL matches a URL carrying userinfo: a user, a password, or a
+// token alone (https://ghp_x@github.com/), as a remote or an insteadOf can.
+var credentialURL = regexp.MustCompile(`://[^/@\s]+@`)
+
+// vcsConfigHoldsCredential reports whether the git metadata at dir (a .git
+// directory) has a config holding a credential: an http extraheader, which
+// CI checkouts use for a token, or a URL with userinfo. A .git file (a
+// submodule's, a worktree's) points elsewhere and holds no config.
+func vcsConfigHoldsCredential(dir string) bool {
+	data, err := os.ReadFile(filepath.Join(dir, "config"))
+	if err != nil {
+		return false
 	}
-	return b
+	text := string(data)
+	return strings.Contains(strings.ToLower(text), "extraheader") || credentialURL.MatchString(text)
 }
 
 // checkGit asks git about the carried files, once per repository: the
 // project's own, and each one nested in it, for the files under it. A nested
 // repository the enclosing one ignores as a whole has every one of its files
-// counted as ignored.
+// counted as ignored. A file whose real location is outside the project
+// (through a link) is not git's to answer for, and counts as untracked.
 func (r *Report) checkGit(root string, files []string) {
 	queries := queryPaths(root, files)
 	repos := nestedRepos(root, queries)
@@ -191,9 +179,14 @@ func (r *Report) checkGit(root string, files []string) {
 		}
 	}
 	for _, f := range files {
-		q := queries[f]
-		owner := ownerOf(q, repos)
-		if unanswered[owner] {
+		q, inProject := queries[f]
+		if !inProject {
+			if LooksSecret(f) {
+				r.Secrets = append(r.Secrets, f)
+			}
+			continue
+		}
+		if unanswered[ownerOf(q, repos)] {
 			if LooksSecret(f) {
 				r.Unchecked = append(r.Unchecked, f)
 			}
@@ -209,45 +202,24 @@ func (r *Report) checkGit(root string, files []string) {
 	}
 }
 
-// queryPaths maps each carried file to the path git is asked about for it.
-// Git refuses a path beyond a symbolic link, and one such path would fail the
-// whole query, so a file under a linked directory is asked about at the path
-// the link resolves to when that is in the project's work tree (which may
-// climb out of the project with ..), and otherwise as the link itself.
+// queryPaths maps each carried file whose real location is inside the
+// project to the path git is asked about for it: that real location, relative
+// to the project, so a file reached through a link is never a path beyond
+// one, which git refuses. A file whose real location is outside the project
+// has no entry.
 func queryPaths(root string, files []string) map[string]string {
-	top, topErr := git.TopLevel(root)
 	queries := make(map[string]string, len(files))
-	linkCache := map[string]bool{}
-	isLink := func(rel string) bool {
-		if v, ok := linkCache[rel]; ok {
-			return v
-		}
-		info, err := os.Lstat(filepath.Join(root, filepath.FromSlash(rel)))
-		v := err == nil && info.Mode()&os.ModeSymlink != 0
-		linkCache[rel] = v
-		return v
-	}
 	for _, f := range files {
-		queries[f] = f
-		parts := strings.Split(f, "/")
-		for n := 1; n < len(parts); n++ {
-			link := strings.Join(parts[:n], "/")
-			if !isLink(link) {
-				continue
-			}
-			queries[f] = link
-			resolved, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(f)))
-			if err != nil || topErr != nil {
-				break
-			}
-			if inTop, err := filepath.Rel(top, resolved); err != nil || inTop == ".." || strings.HasPrefix(inTop, ".."+string(filepath.Separator)) {
-				break
-			}
-			if rel, err := filepath.Rel(root, resolved); err == nil {
-				queries[f] = filepath.ToSlash(rel)
-			}
-			break
+		resolved, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(f)))
+		if err != nil {
+			queries[f] = f // gone since the survey: ask about it as listed
+			continue
 		}
+		rel, err := filepath.Rel(root, resolved)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		queries[f] = filepath.ToSlash(rel)
 	}
 	return queries
 }
@@ -259,9 +231,6 @@ func nestedRepos(root string, queries map[string]string) []string {
 	seen := map[string]bool{}
 	var repos []string
 	for _, q := range queries {
-		if strings.HasPrefix(q, "../") {
-			continue
-		}
 		for d := path.Dir(q); d != "."; d = path.Dir(d) {
 			if seen[d] {
 				break

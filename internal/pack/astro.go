@@ -126,11 +126,7 @@ func runtimeCatalog(ctx context.Context, req Request) func() *runtimeversions.Ca
 // checkSecrets runs before the image build. It refuses a build secret whose
 // variable is unset, and warns about each secret a declared Dockerfile mounts
 // that no build secret supplies, returning those for a failed build to name
-// again. It also warns about the per-machine files a declared Dockerfile's
-// build context would carry into the image, and, since the packaged image is
-// pushed to a registry as a deploy's is, warns about the gitignored files the
-// image would carry and refuses one that looks like a credential
-// (shipcheck.Run).
+// again.
 func checkSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets, error) {
 	dockerfile := req.Manifest.Astro.Dockerfile
 	missing, err := imagebuild.CheckBuildSecrets(req.ProjectDir, dockerfile, req.BuildSecrets)
@@ -140,11 +136,22 @@ func checkSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets,
 	for _, w := range missing.Warnings() {
 		emit(cb, "warning: "+w)
 	}
-	if err != nil {
-		return missing, err
-	}
-	_, err = shipcheck.Survey(req.ProjectDir, dockerfile, func(w string) { emit(cb, "warning: "+w) })
 	return missing, err
+}
+
+// reachEngineAndCheck reaches the engine (reachEngine), then holds the
+// packaged image, which is pushed to a registry as a deploy's is, to the same
+// check of what it carries (shipcheck.Survey). The check waits for the engine
+// because its kind decides the ignore file a declared Dockerfile's build
+// reads.
+func (t *AstroTarget) reachEngineAndCheck(ctx context.Context, req Request, cb localrt.Callbacks) (engineCLI, error) {
+	cli, err := t.reachEngine(ctx, req.ProjectDir)
+	if err != nil {
+		return engineCLI{}, err
+	}
+	warn := func(w string) { emit(cb, "warning: "+w) }
+	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, container.IsPodman(cli.bin), warn)
+	return cli, err
 }
 
 // Build resolves the runtime base, builds the image, reads its runtime-version
@@ -178,7 +185,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	}
 
 	// The astro artifact is an image, so a container engine is required.
-	cli, err := t.reachEngine(ctx, req.ProjectDir)
+	cli, err := t.reachEngineAndCheck(ctx, req, cb)
 	if err != nil {
 		return Result{}, err
 	}

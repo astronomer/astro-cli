@@ -95,6 +95,9 @@ type Request struct {
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
+	// Podman says the engine that will build the image is podman, whose
+	// builds of a declared Dockerfile read a .containerignore first.
+	Podman bool
 	// Link saves a link to a Deployment the prompt offered from the workspace
 	// rather than from the manifest, once it is picked, so the next deploy
 	// offers it by name. cmd wires it to scaffold.SaveLink. nil links nothing:
@@ -332,7 +335,7 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 	for _, w := range missing.Warnings() {
 		warn(w)
 	}
-	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, warn)
+	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.Podman, warn)
 	if err != nil {
 		return missing, nil, err
 	}

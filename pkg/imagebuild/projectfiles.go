@@ -97,12 +97,17 @@ const containerIgnoreName = ".containerignore"
 
 // declaredIgnoreFile is the ignore file a build of the project's own
 // Dockerfile reads, relative to the project and slash-separated, or "" when
-// there is none: a .containerignore first, as podman and buildah read it;
-// else <Dockerfile>.dockerignore beside the Dockerfile, which BuildKit reads
-// in place of the context's; else .dockerignore. dockerfile is the manifest's
-// value, relative to the project and slash-separated.
-func declaredIgnoreFile(root, dockerfile string) string {
-	for _, name := range []string{containerIgnoreName, dockerfile + dockerIgnoreName, dockerIgnoreName} {
+// there is none. Under podman a .containerignore comes first, as podman and
+// buildah read it; docker never reads one. Then <Dockerfile>.dockerignore
+// beside the Dockerfile, which BuildKit reads in place of the context's, else
+// .dockerignore. dockerfile is the manifest's value, relative to the project
+// and slash-separated.
+func declaredIgnoreFile(root, dockerfile string, podman bool) string {
+	names := []string{dockerfile + dockerIgnoreName, dockerIgnoreName}
+	if podman {
+		names = append([]string{containerIgnoreName}, names...)
+	}
+	for _, name := range names {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(name))); err == nil {
 			return name
 		}
@@ -302,7 +307,9 @@ type ProjectSurvey struct {
 // [tool.astro] dockerfile: "" for a generated build, which carries what
 // copyProjectFiles copies; otherwise the declared Dockerfile's build, whose
 // context is the project under its ignore file alone, links carried as links.
-func SurveyProject(dir, dockerfile string) (ProjectSurvey, error) {
+// podman says the engine building it is podman, which reads a
+// .containerignore (declaredIgnoreFile).
+func SurveyProject(dir, dockerfile string, podman bool) (ProjectSurvey, error) {
 	resolved, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return ProjectSurvey{}, fmt.Errorf("reading the project's files: %w", err)
@@ -318,7 +325,7 @@ func SurveyProject(dir, dockerfile string) (ProjectSurvey, error) {
 	if dockerfile == "" {
 		err = walkProject(resolved, collect)
 	} else {
-		s.IgnoreFile = declaredIgnoreFile(resolved, dockerfile)
+		s.IgnoreFile = declaredIgnoreFile(resolved, dockerfile, podman)
 		var filter projectFilter
 		if filter, err = newDeclaredFilter(resolved, s.IgnoreFile); err != nil {
 			return ProjectSurvey{}, err

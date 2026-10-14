@@ -160,7 +160,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if err := checkPlannedRuntime(dep.AstroRuntimeVersion, &planned, allowed); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
-	dags, err := planDags(&in, &req, &dep)
+	dags, err := planDags(&in, &req, &dep, container.IsPodman(bin))
 	if err != nil {
 		return ManifestImageDeployResult{}, err
 	}
@@ -279,7 +279,7 @@ type dagsPlan struct {
 // planDags works out how a deploy's DAGs reach the Deployment dep, and holds a
 // deploy whose DAGs go inside the image to an image that carries them
 // (checkDagsInImage).
-func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment) (dagsPlan, error) {
+func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment, podman bool) (dagsPlan, error) {
 	if !in.IncludeDags {
 		return dagsPlan{}, nil
 	}
@@ -289,7 +289,7 @@ func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov
 	if deployment.IsRemoteExecutionEnabled(dep) {
 		return dagsPlan{remote: true}, nil
 	}
-	return dagsPlan{inImage: true}, checkDagsInImage(in, req)
+	return dagsPlan{inImage: true}, checkDagsInImage(in, req, podman)
 }
 
 // checkDagsInImage holds a "both" deploy to a Deployment with DAG deploys off,
@@ -298,7 +298,7 @@ func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov
 // dags/ is refused: it would replace the running DAGs with none. A declared
 // Dockerfile's is warned about instead, since its own steps may put DAGs in
 // the image, and so is a prebuilt image, which cannot be looked into here.
-func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request) error {
+func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, podman bool) error {
 	warn := in.Warn
 	if warn == nil {
 		warn = func(string) {}
@@ -309,7 +309,7 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request) err
 	}
 	survey := in.Survey
 	if survey == nil {
-		s, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile)
+		s, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile, podman)
 		if err != nil {
 			return err
 		}

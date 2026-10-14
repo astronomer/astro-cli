@@ -30,25 +30,6 @@ func InWorkTree(dir string) bool {
 	}
 }
 
-// TopLevel is the root of the work tree holding dir, as git reports it, with
-// symlinks resolved. An error means git could not answer, with what it said.
-func TopLevel(dir string) (string, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		var stderr []byte
-		var exit *exec.ExitError
-		if errors.As(err, &exit) {
-			stderr = exit.Stderr
-		}
-		return "", gitError(err, stderr)
-	}
-	top := strings.TrimSpace(string(out))
-	if resolved, err := filepath.EvalSymlinks(filepath.FromSlash(top)); err == nil {
-		top = resolved
-	}
-	return top, nil
-}
-
 // CheckIgnored returns those of paths (relative to dir) that the .gitignore
 // rules of the repository holding dir ignore, in the order git reports them.
 // Tracked files are never reported, since git does not apply ignore rules to
@@ -80,27 +61,18 @@ func CheckIgnored(dir string, paths []string) ([]string, error) {
 	return splitNUL(out.String()), nil
 }
 
-// Tracked returns those of paths (relative to dir, slash-separated) that the
-// repository holding dir tracks, spelled as given. A path may climb out of
-// dir with .. as long as it stays in the work tree. An error means git could
-// not answer.
+// Tracked returns those of paths (relative to dir, slash-separated, inside
+// it) that the repository holding dir tracks, spelled as given. An error
+// means git could not answer.
 //
-// It reads the repository's whole index once rather than passing the paths
-// as pathspecs, which would be read as globs and could outgrow a command
-// line.
+// It lists the index under dir once (`git ls-files` run from dir lists only
+// the entries below it, relative to it) rather than passing the paths as
+// pathspecs, which would be read as globs and could outgrow a command line.
 func Tracked(dir string, paths []string) ([]string, error) {
 	if len(paths) == 0 {
 		return nil, nil
 	}
-	top, err := TopLevel(dir)
-	if err != nil {
-		return nil, err
-	}
-	base, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		return nil, err
-	}
-	cmd := exec.Command("git", "-C", top, "ls-files", "-z")
+	cmd := exec.Command("git", "-C", dir, "ls-files", "-z")
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	if err := cmd.Run(); err != nil {
@@ -112,8 +84,7 @@ func Tracked(dir string, paths []string) ([]string, error) {
 	}
 	var tracked []string
 	for _, p := range paths {
-		rel, err := filepath.Rel(top, filepath.Join(base, filepath.FromSlash(p)))
-		if err == nil && index[filepath.ToSlash(rel)] {
+		if index[p] {
 			tracked = append(tracked, p)
 		}
 	}

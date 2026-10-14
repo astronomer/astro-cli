@@ -72,7 +72,7 @@ A remote-execution Deployment runs its DAGs on its remote agents. With DAG deplo
 
 ### Gitignored files and credentials
 
-An image a deploy or `astro package astro` builds is pushed to a registry, so before either builds, `shipcheck.Survey` lists what the image would carry, once per command (`imagebuild.SurveyProject`: what a generated build copies, or a declared Dockerfile's context under its ignore file), and asks git about it. The same listing feeds the declared Dockerfile's local-files warning and, through the transport, the DAG check above. It runs for a generated build and a declared Dockerfile alike, and not for `--dags` or `--image-name`, which build nothing.
+An image a deploy or `astro package astro` builds is pushed to a registry, so before either builds, `shipcheck.Survey` lists what the image would carry, once per command (`imagebuild.SurveyProject`: what a generated build copies, or a declared Dockerfile's context under its ignore file), and asks git about it. The same listing feeds the declared Dockerfile's local-files warning and, through the transport, the DAG check above. It runs for a generated build and a declared Dockerfile alike, and not for `--dags` or `--image-name`, which build nothing. A declared Dockerfile is held to a generated build's rule: everything in its build context counts as shipped, whatever the Dockerfile copies.
 
 | what the image would carry | outcome |
 | --- | --- |
@@ -80,15 +80,14 @@ An image a deploy or `astro package astro` builds is pushed to a registry, so be
 | a file that looks like a credential and that git ignores, or that was never added | **refused**, naming it |
 | a file that looks like a credential and that git tracks (committed or staged) | goes ahead: the project's choice |
 | anything, where git cannot answer (not installed, an unsafe owner, another failure) | warned about, with git's reason and the files that look like credentials; the build goes ahead, so a CI deploy does not break on committed files |
-| a declared Dockerfile's context carrying `.git` | warned about, with `**/.git` as the fix; **refused** when its `config` holds an `extraheader` or a `user:password@` URL |
-| any of the above in a declared Dockerfile's context, when the Dockerfile does not copy the whole context | warned about instead of refused |
+| a declared Dockerfile's context carrying `.git` | warned about, with `**/.git` as the fix; **refused** when its `config` holds an `extraheader` or a URL with userinfo (a user, a password, or a token alone, in a remote or an `insteadOf`) |
+| a file whose real location is outside the project, reached through a link | not asked of git: counted as untracked, so one that looks like a credential is **refused** |
 
-- A declared Dockerfile copies the whole context when a `COPY` or `ADD` (not `--from` another stage) takes `.`, `./`, `*` or `./*` as a source, or a `FROM` names an Astro Runtime image, whose ONBUILD `COPY . .` copies it. A generated build always does.
 - The patterns are one table, `shipcheck.LooksSecret`: `*.pem`, `*.key`, `*.p12`, `*.p8`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `*credentials*`, `*-key.json`, `*_key.json`, `service-account*.json`, `sa-*.json`, `client_secret*.json`, `token.json`, `.netrc`, `.npmrc`, `.pypirc`, `.pgpass`, `*.kubeconfig`, `kubeconfig`, `*.tfvars`, `*.tfstate`, `.env*`, `*.env`, `*.env.*`, `config.json` under `.docker/`, and anything under `.aws/` or `.ssh/`. A bare `*secret*` is not one: too many modules are named for it.
 - Git is asked once per repository: the project's, and each submodule or nested clone, about its own files. A nested repository its parent ignores whole counts as ignored.
-- Git refuses a path beyond a symbolic link, so a file a generated build carries through a linked directory is asked about where the link leads, when that is inside the work tree (`include/shared -> ../shared-lib` is asked about as `../shared-lib/…`), and otherwise judged by the link itself.
+- Git refuses a path beyond a symbolic link, so a file reached through a link that stays inside the project is asked about at its real path (`include/shared -> ../libs/shared` is asked about as `libs/shared/…`).
 - Outside a git work tree there is nothing to ask, and nothing is said.
-- A declared build's survey reads the ignore file its builder reads: a `.containerignore` first, as podman and buildah do, else `<Dockerfile>.dockerignore`, else `.dockerignore`.
+- A declared build's survey reads the ignore file its engine reads: under podman a `.containerignore` first, as podman and buildah do (docker never reads one); then `<Dockerfile>.dockerignore`, else `.dockerignore`. The refusal names that file as the fix.
 
 ## 2. Dags-only deploys
 

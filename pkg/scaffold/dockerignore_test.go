@@ -202,9 +202,9 @@ func TestLocalFilesWarning(t *testing.T) {
 		} {
 			writeProjectFile(t, dir, rel, "")
 		}
-		assert.Equal(t, []string{".git", ".env", "include/.env", "include/sub/.env.prod", "include/airflow_settings.yaml"},
+		assert.Equal(t, []string{".env", "include/.env", "include/sub/.env.prod", "include/airflow_settings.yaml"},
 			unignoredLocalFiles(dir, ".dockerignore"),
-			"a nested logs/ or airflow.cfg is the project's own")
+			"a nested logs/ or airflow.cfg is the project's own, and local start does not name .git")
 	})
 
 	t.Run("over a listing already made", func(t *testing.T) {

@@ -38,12 +38,13 @@ func gitRun(t *testing.T, dir string, args ...string) {
 	require.NoError(t, err, "%s", out)
 }
 
-// check surveys the project and checks it, as Survey does.
+// check surveys the project for a docker build and checks it, as Survey
+// does.
 func check(t *testing.T, dir, dockerfile string) Report {
 	t.Helper()
-	s, err := imagebuild.SurveyProject(dir, dockerfile)
+	s, err := imagebuild.SurveyProject(dir, dockerfile, false)
 	require.NoError(t, err)
-	return Check(dir, dockerfile, &s)
+	return Check(dir, &s)
 }
 
 func TestCheckFindsGitignoredFilesAndSecretsAmongThem(t *testing.T) {
@@ -87,7 +88,7 @@ func TestCheckFindsGitignoredFilesAndSecretsAmongThem(t *testing.T) {
 }
 
 // A file that looks like a credential and was never added is refused as a
-// gitignored one is; a committed one is the project's choice.
+// gitignored one is; a committed or staged one is the project's choice.
 func TestCheckRefusesUntrackedCredentialsAndLeavesCommittedOnesAlone(t *testing.T) {
 	needsGit(t)
 	dir := t.TempDir()
@@ -101,43 +102,30 @@ func TestCheckRefusesUntrackedCredentialsAndLeavesCommittedOnesAlone(t *testing.
 	assert.ErrorContains(t, r.Err(), "include/token.json")
 }
 
-// A declared Dockerfile's context is surveyed under its own ignore file, with
-// none of a generated build's rules. A credential there stops the build only
-// when the Dockerfile copies the whole context; otherwise it is warned about.
+// A declared Dockerfile is held to a generated build's rule: everything in its
+// build context counts as shipped, whatever the Dockerfile copies. The way out
+// it names is the ignore file the build reads.
 func TestCheckDeclaredDockerfile(t *testing.T) {
 	needsGit(t)
-	for name, tc := range map[string]struct {
-		dockerfile string
-		refused    bool
-	}{
-		"COPY . .":              {"FROM python:3.12\nCOPY . /app\n", true},
-		"an Astro Runtime base": {"FROM astrocrpublic.azurecr.io/runtime:3.1-2\n", true},
-		"only named files":      {"FROM python:3.12\nCOPY requirements.txt /app/\nCOPY --from=build . /app\n", false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			gitRun(t, dir, "init", "-q")
-			writeFiles(t, dir, map[string]string{
-				"Dockerfile":     tc.dockerfile,
-				".gitignore":     ".env\ncerts/\n",
-				".env":           "SECRET=x\n",
-				"certs/prod.pem": "k",
-			})
-			r := check(t, dir, "Dockerfile")
-			assert.ElementsMatch(t, []string{".env", "certs/prod.pem"}, r.Secrets)
-			if tc.refused {
-				require.Error(t, r.Err())
-				return
-			}
-			require.NoError(t, r.Err())
-			assert.Contains(t, r.Warnings()[len(r.Warnings())-1], "does not copy the whole context")
-		})
-	}
-
 	dir := t.TempDir()
 	gitRun(t, dir, "init", "-q")
-	writeFiles(t, dir, map[string]string{".gitignore": "certs/\n", ".env": "x", "certs/prod.pem": "k"})
-	r := check(t, dir, "")
+	writeFiles(t, dir, map[string]string{
+		"Dockerfile":     "FROM python:3.12\nCOPY requirements.txt /app/\n",
+		".gitignore":     ".env\ncerts/\n",
+		".env":           "SECRET=x\n",
+		"certs/prod.pem": "k",
+	})
+	r := check(t, dir, "Dockerfile")
+	assert.ElementsMatch(t, []string{".env", "certs/prod.pem"}, r.Secrets)
+	assert.ErrorContains(t, r.Err(), "Add them to .dockerignore")
+
+	writeFiles(t, dir, map[string]string{".containerignore": "nothing\n"})
+	s, err := imagebuild.SurveyProject(dir, "Dockerfile", true)
+	require.NoError(t, err)
+	podman := Check(dir, &s)
+	assert.ErrorContains(t, podman.Err(), "Add them to .containerignore", "podman reads its own ignore file")
+
+	r = check(t, dir, "")
 	assert.Equal(t, []string{"certs/prod.pem"}, r.Secrets, "a generated build never carries .env")
 }
 
@@ -185,55 +173,69 @@ func TestCheckAsksEachRepositoryAboutItsOwnFiles(t *testing.T) {
 	assert.Equal(t, []string{"vendor/lib/local.key"}, r.Secrets)
 }
 
-// A generated build carries a linked directory's files, and git refuses a
-// path beyond a symbolic link. One link must not fail the repository's query:
-// a file is asked about where the link leads when that is in the work tree,
-// and otherwise judged by the link itself.
-func TestCheckAsksAboutFilesBehindALink(t *testing.T) {
+// A link that stays inside the project is asked about at its real path, which
+// git can answer for where it refuses a path beyond a link.
+func TestCheckAsksAboutAnInProjectLinkAtItsRealPath(t *testing.T) {
+	needsGit(t)
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	writeFiles(t, dir, map[string]string{
+		".gitignore":          "*.pem\n",
+		"libs/shared/util.py": "",
+		"libs/shared/ca.pem":  "committed",
+		"libs/shared/new.pem": "k",
+	})
+	gitRun(t, dir, "add", ".gitignore", "libs/shared/util.py")
+	gitRun(t, dir, "add", "-f", "libs/shared/ca.pem")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "include"), 0o755))
+	if err := os.Symlink(filepath.Join("..", "libs", "shared"), filepath.Join(dir, "include", "shared")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+
+	r := check(t, dir, "")
+	assert.Empty(t, r.Unanswered, "the link did not fail the query")
+	assert.ElementsMatch(t, []string{"libs/shared/new.pem", "include/shared/new.pem"}, r.Secrets,
+		"judged by the real path: the committed ca.pem is not refused through the link either")
+}
+
+// A file whose real location is outside the project is not git's to answer
+// for here, and counts as untracked: one that looks like a credential is
+// refused, whatever repository it sits in.
+func TestCheckCountsFilesBehindALinkOutOfTheProjectAsUntracked(t *testing.T) {
 	needsGit(t)
 	repo := t.TempDir()
 	gitRun(t, repo, "init", "-q")
-	writeFiles(t, repo, map[string]string{
-		".gitignore":          "*.pem\n",
-		"shared-lib/util.py":  "",
-		"shared-lib/prod.pem": "k",
-		"project/dags/a.py":   "",
-	})
-	gitRun(t, repo, "add", ".gitignore", "shared-lib/util.py", "project/dags/a.py")
+	writeFiles(t, repo, map[string]string{"shared-lib/util.py": "", "shared-lib/sa-prod.json": "{}", "project/dags/a.py": ""})
+	gitRun(t, repo, "add", "shared-lib/util.py", "shared-lib/sa-prod.json", "project/dags/a.py")
 	project := filepath.Join(repo, "project")
-	if err := os.Symlink(filepath.Join("..", "..", "shared-lib"), filepath.Join(project, "include-shared")); err != nil {
+	require.NoError(t, os.MkdirAll(filepath.Join(project, "include"), 0o755))
+	if err := os.Symlink(filepath.Join("..", "..", "shared-lib"), filepath.Join(project, "include", "shared")); err != nil {
 		t.Skipf("symlinks unavailable here: %v", err)
 	}
-	require.NoError(t, os.MkdirAll(filepath.Join(project, "include"), 0o755))
-	require.NoError(t, os.Rename(filepath.Join(project, "include-shared"), filepath.Join(project, "include", "shared")))
-	outside := t.TempDir()
-	writeFiles(t, outside, map[string]string{"sa-prod.json": "{}", "helper.py": ""})
-	require.NoError(t, os.Symlink(outside, filepath.Join(project, "include", "ext")))
 
 	r := check(t, project, "")
-	assert.Empty(t, r.Unanswered, "the link did not fail the query")
-	assert.Equal(t, []string{"include/shared/prod.pem"}, r.Gitignored)
-	assert.ElementsMatch(t, []string{"include/shared/prod.pem", "include/ext/sa-prod.json"}, r.Secrets,
-		"behind a link out of the work tree, an untracked link stands for its files")
+	assert.Empty(t, r.Unanswered)
+	assert.Equal(t, []string{"include/shared/sa-prod.json"}, r.Secrets, "committed in its own place, but outside the project")
+	assert.Empty(t, r.Gitignored)
 }
 
 // A declared Dockerfile's context carries .git unless its ignore file drops
-// it. That is warned about; a config holding a credential stops a build that
-// copies the context.
+// it. A config holding a credential stops the build.
 func TestCheckDeclaredGitMetadata(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
-		"Dockerfile":  "FROM python:3.12\nCOPY . /app\n",
+		"Dockerfile":  "FROM python:3.12\n",
 		".git/config": "[remote \"origin\"]\n\turl = https://github.com/acme/repo.git\n",
 	})
 	r := check(t, dir, "Dockerfile")
-	assert.Equal(t, []string{".git"}, r.VCS)
 	require.NoError(t, r.Err())
 	assert.Empty(t, r.VCSSecrets)
 
 	for _, config := range []string{
 		"[http \"https://github.com/\"]\n\textraheader = AUTHORIZATION: basic eDp0b2tlbg==\n",
 		"[remote \"origin\"]\n\turl = https://bot:ghp_secret@github.com/acme/repo.git\n",
+		"[remote \"origin\"]\n\turl = https://ghp_0123456789abcdef@github.com/acme/repo.git\n",
+		"[url \"https://x-access-token:ghs_abc@github.com/\"]\n\tinsteadOf = https://github.com/\n",
 	} {
 		writeFiles(t, dir, map[string]string{".git/config": config})
 		r = check(t, dir, "Dockerfile")
@@ -242,28 +244,7 @@ func TestCheckDeclaredGitMetadata(t *testing.T) {
 
 	writeFiles(t, dir, map[string]string{".dockerignore": "**/.git\n"})
 	r = check(t, dir, "Dockerfile")
-	assert.Empty(t, r.VCS)
 	assert.NoError(t, r.Err())
-}
-
-func TestCopiesContext(t *testing.T) {
-	for dockerfile, want := range map[string]bool{
-		"FROM python:3.12\nCOPY . .\n":                                         true,
-		"FROM python:3.12\nCOPY ./ /app/\n":                                    true,
-		"FROM python:3.12\nADD --chown=1:1 . /app\n":                           true,
-		"FROM python:3.12\nCOPY [\".\", \"/app\"]\n":                           true,
-		"FROM python:3.12\nCOPY requirements.txt \\\n  . /app/\n":              true,
-		"FROM quay.io/astronomer/astro-runtime:12.1.0\n":                       true,
-		"FROM --platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-2\n": true,
-		"FROM python:3.12\nCOPY dags/ /app/dags/\n":                            false,
-		"FROM python:3.12 AS b\nFROM python:3.12\nCOPY --from=b . /app\n":      false,
-		"FROM python:3.12\n# COPY . .\nRUN true\n":                             false,
-	} {
-		path := filepath.Join(t.TempDir(), "Dockerfile")
-		require.NoError(t, os.WriteFile(path, []byte(dockerfile), 0o600))
-		assert.Equal(t, want, copiesContext(path), dockerfile)
-	}
-	assert.True(t, copiesContext(filepath.Join(t.TempDir(), "missing")), "an unreadable file is held to the stricter rule")
 }
 
 func TestSurvey(t *testing.T) {
@@ -272,23 +253,23 @@ func TestSurvey(t *testing.T) {
 	gitRun(t, dir, "init", "-q")
 	writeFiles(t, dir, map[string]string{".gitignore": "target/\n", "target/out.json": "{}", "dags/a.py": ""})
 	var warned []string
-	survey, err := Survey(dir, "", func(w string) { warned = append(warned, w) })
+	survey, err := Survey(dir, "", false, func(w string) { warned = append(warned, w) })
 	require.NoError(t, err)
 	assert.Equal(t, 1, survey.DagsCarried)
 	require.Len(t, warned, 1)
 	assert.Contains(t, warned[0], "target/out.json")
 
 	writeFiles(t, dir, map[string]string{".gitignore": "target/\nid_rsa\n", "id_rsa": "k"})
-	_, err = Survey(dir, "", func(string) {})
+	_, err = Survey(dir, "", false, func(string) {})
 	assert.ErrorContains(t, err, "id_rsa look like credentials")
 
-	// A declared Dockerfile's local files are warned about from the same survey.
-	writeFiles(t, dir, map[string]string{"Dockerfile": "FROM python:3.12\n", ".astro/standalone/airflow.db": ""})
+	// A declared Dockerfile's local files, .git among them, are warned about
+	// from the same survey.
+	writeFiles(t, dir, map[string]string{"Dockerfile": "FROM python:3.12\n", ".astro/standalone/airflow.db": "", ".dockerignore": "id_rsa\n"})
 	warned = nil
-	_, err = Survey(dir, "Dockerfile", func(w string) { warned = append(warned, w) })
-	require.NoError(t, err, "the Dockerfile copies nothing, so the key is warned about")
-	assert.Contains(t, fmt.Sprint(warned), ".astro/standalone")
-	assert.Contains(t, fmt.Sprint(warned), "local or per-machine files: .git, ")
+	_, err = Survey(dir, "Dockerfile", false, func(w string) { warned = append(warned, w) })
+	require.NoError(t, err)
+	assert.Contains(t, fmt.Sprint(warned), "local or per-machine files: .git, .astro/standalone")
 }
 
 func TestLooksSecret(t *testing.T) {

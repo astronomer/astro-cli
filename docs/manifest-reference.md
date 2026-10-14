@@ -170,7 +170,7 @@ logs/
 plugins/fix_local_executor_pickle.py
 ```
 
-If you added `dockerfile` to the manifest by hand, add the lines yourself. Until you do, every `astro` build from the Dockerfile warns and names the files it would copy in. `astro deploy` and `astro package astro` also refuse a build that copies the whole context when it carries an uncommitted file that looks like a credential (see [deploy.md](deploy.md#gitignored-files-and-credentials)).
+If you added `dockerfile` to the manifest by hand, add the lines yourself. Until you do, every `astro` build from the Dockerfile warns and names the files it would copy in (`astro local start` leaves `.git` out of that warning: a local image is not pushed). `astro deploy` and `astro package astro` also refuse a build whose context carries an uncommitted file that looks like a credential, whatever the Dockerfile copies (see [deploy.md](deploy.md#gitignored-files-and-credentials)).
 
 Use forward slashes, on every platform. The path has to stay inside the project: an absolute path, or one climbing out with `..`, is refused when the manifest is read.
 
