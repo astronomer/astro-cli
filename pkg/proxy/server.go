@@ -136,8 +136,24 @@ func NewProxy(port string, store *Store) *Proxy {
 		store:     store,
 		port:      port,
 		proxies:   make(map[string]*httputil.ReverseProxy),
-		transport: &http.Transport{},
+		transport: newBackendTransport(),
 	}
+}
+
+// newBackendTransport is the default transport to a project's Airflow, with
+// keep-alives off.
+//
+// A project restart brings its Airflow back on the same port, and a connection
+// pooled from before it reaches a process that is gone. A request sent on it in
+// the moment before the transport notices the close fails. Go replays a GET or
+// HEAD on a fresh connection, but not a POST, PATCH or DELETE, so a form or an
+// API write sent just after a restart got a spurious "Backend unavailable". A
+// pooled connection the backend drops also makes the transport log
+// "Unsolicited response received on idle HTTP channel", which is why Astro
+// Desktop's own proxy turned keep-alives off. These are loopback connections,
+// so opening one per request costs next to nothing.
+func newBackendTransport() *http.Transport {
+	return &http.Transport{DisableKeepAlives: true}
 }
 
 // Port returns the proxy's listening port. Before a successful Start it
@@ -522,10 +538,15 @@ func defaultErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 //
 //   - A connection that fails at the socket: refused, reset, timed out, or
 //     nothing listening. The transport reports these as a *net.OpError.
-//   - A connection that is accepted and closed before any response, which the
-//     transport reports as a bare EOF. Docker holds a project's published port
-//     while the Airflow container behind it restarts, so this is what a
-//     restarting or crash-looping container looks like.
+//   - A connection that is accepted and closed before any response. Docker
+//     holds a project's published port while the Airflow container behind it
+//     restarts, so this is what a restarting or crash-looping container looks
+//     like. The transport reports it as a bare EOF, or, when it sees the close
+//     before it has written the request, as net/http's unexported
+//     errServerClosedIdle ("http: server closed idle connection") — on Linux
+//     about a third of the time, on a brand-new connection as much as a pooled
+//     one. That error has no type or sentinel to match, so its text is the
+//     only handle on it.
 //
 // Matching those rather than anything that implements net.Error matters,
 // because a hook's own failures implement it too: a *url.Error from a hook's
@@ -535,9 +556,15 @@ func isBackendUnreachable(err error) bool {
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return true
 	}
+	if err != nil && strings.Contains(err.Error(), serverClosedIdle) {
+		return true
+	}
 	var opErr *net.OpError
 	return errors.As(err, &opErr)
 }
+
+// serverClosedIdle is the text of net/http's errServerClosedIdle.
+const serverClosedIdle = "http: server closed idle connection"
 
 // wantsHTML reports whether r is a browser navigation rather than an API call.
 // An empty Accept counts, since whoever sent no preference still reads the body.
