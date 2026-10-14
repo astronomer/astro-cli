@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -159,6 +160,17 @@ func TestLinkAddRefusesAnExistingNameUnlessReplacing(t *testing.T) {
 	dev := loadManifest(t, path).Astro.Deployments["dev"]
 	assert.Equal(t, "dep-new", dev.Deployment)
 	assert.True(t, dev.Default, "the replace dropped the default")
+}
+
+// bundle names astro deploy bundle, so astro deploy could never reach a link
+// by that name: it is refused, before anything is asked or written.
+func TestLinkAddRefusesBundleAsAName(t *testing.T) {
+	dir, _ := linkTestProject(t, linkManifest)
+	_, _, err := runLink(t, dir, "add", "bundle", "--deployment", "dep-new")
+	require.Error(t, err)
+	assert.True(t, cliout.IsUsage(err), "%v", err)
+	assert.Contains(t, err.Error(), "bundle cannot name a link: astro deploy bundle deploys a non-DAG bundle")
+	assert.Equal(t, linkManifest, readManifest(t, dir))
 }
 
 // An MWAA link writes the shared region when given one, and an empty --region

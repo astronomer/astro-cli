@@ -633,7 +633,7 @@ func unlinkedDeployments(req Request, d Deployer, links map[string]manifest.Link
 		}
 		return deps[i].ID < deps[j].ID
 	})
-	taken := map[string]bool{manifest.ReservedLinkName: true}
+	taken := map[string]bool{manifest.ReservedLinkName: true, BundleCommand: true}
 	for name := range links {
 		taken[name] = true
 	}
@@ -663,7 +663,7 @@ func newLinkName(dep Deployment, taken map[string]bool) string {
 	// A name of digits alone would shadow a row number: the prompt matches
 	// names first, so a Deployment called "1" would take the answer "1" from
 	// whatever row 1 is.
-	if base == "" || base == manifest.ReservedLinkName || isDigits(base) {
+	if base == "" || base == manifest.ReservedLinkName || base == BundleCommand || isDigits(base) {
 		base = dep.ID
 	}
 	name := base
@@ -715,7 +715,7 @@ func listWorkspace(req Request) string {
 // argument (linkName) and --deployment, which must agree, each a link of m
 // (nil for no manifest) or a Deployment id. named is false when neither names
 // one. It is for a command that ships something other than the project, such
-// as astro deploy --non-dags, to name its Deployment the way a deploy does.
+// as astro deploy bundle, to name its Deployment the way a deploy does.
 func ResolveNamed(m *manifest.Manifest, linkName, deployment, workspaceID, contextWorkspace string) (target Target, named bool, err error) {
 	req := Request{Manifest: m, LinkName: linkName, Deployment: deployment, WorkspaceID: workspaceID, ContextWorkspace: contextWorkspace}
 	var links map[string]manifest.Link
@@ -776,8 +776,18 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 	if dep.WorkspaceID == "" {
 		dep.WorkspaceID = workspaceID
 	}
-	return linkedTarget(req, newLinkName(dep, map[string]bool{manifest.ReservedLinkName: true}), dep), nil
+	return linkedTarget(req, newLinkName(dep, map[string]bool{manifest.ReservedLinkName: true, BundleCommand: true}), dep), nil
 }
+
+// BundleCommand is the word astro deploy bundle is spelled with. astro
+// deploy reads it as that subcommand, never as a link name, so no link is
+// saved under it: astro link add refuses it, and a link a deploy saves for a
+// picked Deployment is named otherwise. A link by that name already in a
+// manifest is still reached with --deployment.
+const BundleCommand = "bundle"
+
+// ErrBundleLinkName is astro link add refusing BundleCommand as a link name.
+var ErrBundleLinkName = fmt.Errorf("%[1]s cannot name a link: astro deploy %[1]s deploys a non-DAG bundle, so astro deploy %[1]s would never reach the link. Name the link something else", BundleCommand)
 
 // DefaultMark is the word that marks a project's default link in a list of
 // links: the deploy prompt's "linked, default", and the `astro use` and `astro

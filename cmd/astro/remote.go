@@ -38,7 +38,9 @@ func newRemoteRootCmd(out io.Writer) *cobra.Command {
 		Short: "Manage remote deploys and images",
 		Long:  "Commands for interacting with remote registries and deploying client images",
 	}
-	// Bound for the same reason as dbt: see newDbtCmd.
+	// The results leave by cmd.OutOrStdout(), which must be the stdout the
+	// tree was built with: under json strayStdoutToStderr points os.Stdout
+	// at stderr, and an unbound command would follow it there.
 	cmd.SetOut(out)
 
 	cmd.AddCommand(newRemoteDeployCmd())

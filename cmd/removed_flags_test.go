@@ -150,6 +150,10 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "dag-bundle-name", value: "nightly", want: errDeployBundleNameRemoved},
 	{tree: astroTree, args: []string{"deploy"}, flag: "deployment-name", value: "prod", shorthand: "n", want: errDeployNameRemoved},
 	{tree: apcTree, args: []string{"deploy", "dep-id"}, flag: "no-cache", want: errAPCDeployNoCache},
+	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "non-dags", want: errDeployNonDagsRemoved},
+	{tree: astroHostedTree, args: []string{"deploy"}, flag: "non-dags-mount-path", value: "/usr/local/airflow/x", want: errDeployNonDagsMountPathRemoved},
+	{tree: astroTree, args: []string{"deploy"}, flag: "non-dags-local-path", value: "./analytics", want: errDeployNonDagsLocalPathRemoved},
+	{tree: astroTree, args: []string{"deploy"}, flag: "non-dags-bundle-type", value: "dbt", want: errDeployNonDagsBundleTypeRemoved},
 }
 
 // spellings is every way the case's flag can be typed: --name, --name=value

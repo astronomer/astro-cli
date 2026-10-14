@@ -230,7 +230,7 @@ var commandGroups = []struct {
 }{
 	{groupDevelop, "Develop locally:", []string{"init", "local", "start", "stop", "logs"}},
 	{groupInspect, "Inspect Airflow:", []string{"af", "use", "link", "api"}},
-	{groupShip, "Ship:", []string{"package", "deploy", "remote", "dbt"}},
+	{groupShip, "Ship:", []string{"package", "deploy", "remote"}},
 	{groupManage, "Manage Astro:", []string{
 		"login", "logout", "auth", "context",
 		"organization", "workspace", "deployment", "env",

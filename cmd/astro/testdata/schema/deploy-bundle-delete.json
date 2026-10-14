@@ -3,6 +3,7 @@
   "deployment": "x",
   "workspace": "x",
   "deploy_id": "x",
+  "bundle_type": "x",
   "mount_path": "x",
   "waited": true,
   "wait_error": "x"
