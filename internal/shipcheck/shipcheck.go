@@ -2,7 +2,8 @@
 // `astro package astro`'s) to what git says about the files it carries. A
 // file the project's .gitignore keeps out of the repository but no ignore file
 // keeps out of the image is warned about; a carried file that looks like a
-// credential and that git does not track stops the build, and so does git
+// credential and that git does not track stops the build, and so does one a
+// generated build reaches through a link out of the project, and git
 // metadata whose config holds a credential.
 //
 // A declared Dockerfile is held to the same rule as a generated build:
@@ -25,7 +26,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
-// Report is what git says about the files an image would carry.
+// Report is what the check found in the files an image would carry.
 type Report struct {
 	// Gitignored are the carried files git ignores, slash-separated and
 	// relative to the project.
@@ -34,9 +35,10 @@ type Report struct {
 	// (LooksSecret) and that git does not track: ignored, or never added.
 	// A committed file is the project's choice and is never here.
 	Secrets []string
-	// Outside are the carried files that look like credentials and whose
-	// real location, reached through a link, is in no git repository, so
-	// nothing says they were meant to be shared.
+	// Outside are the carried files a generated build reaches through a link
+	// out of the project that look like credentials, by their path in the
+	// project or where the link leads, each as "path → target". Git is not
+	// asked about them.
 	Outside []string
 	// Unanswered says, per repository git could not answer for, which and
 	// why. Unchecked are the carried files there that look like
@@ -49,10 +51,11 @@ type Report struct {
 	IgnoreFile string
 }
 
-// Check asks git about the files an image built from the project at dir
-// would carry, as survey lists them (imagebuild.SurveyProject). Outside a git
-// work tree there is nothing to ask, and only git metadata a declared build
-// would carry is looked at.
+// Check looks at the files an image built from the project at dir would
+// carry, as survey lists them (imagebuild.SurveyProject). Files reached
+// through a link out of the project, and git metadata a declared build
+// carries, are looked at always; the rest are asked of git, and outside a git
+// work tree there is nothing to ask.
 func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
 	r := Report{IgnoreFile: cmp.Or(survey.IgnoreFile, ".dockerignore")}
 	root, err := filepath.EvalSymlinks(dir)
@@ -64,8 +67,14 @@ func Check(dir string, survey *imagebuild.ProjectSurvey) Report {
 			r.VCSSecrets = append(r.VCSSecrets, v)
 		}
 	}
+	inProject, outside := locate(root, survey.Files, survey.Links)
+	for _, f := range survey.Files {
+		if target, ok := outside[f]; ok && (LooksSecret(f) || LooksSecret(filepath.ToSlash(target))) {
+			r.Outside = append(r.Outside, f+" → "+target)
+		}
+	}
 	if git.InWorkTree(root) {
-		r.checkGit(root, survey.Files, survey.Links)
+		r.checkGit(root, survey.Files, inProject)
 	}
 	return r
 }
@@ -89,22 +98,22 @@ func (r *Report) Warnings() []string {
 
 // Err refuses a build that would put credentials in an image bound for a
 // registry: carried files that look like credentials and that git does not
-// track or that sit outside any git repository, and git metadata whose
-// config holds one. nil when there are none.
+// track, ones reached through a link out of the project, and git metadata
+// whose config holds one. nil when there are none.
 func (r *Report) Err() error {
 	var why []string
 	if len(r.Secrets) > 0 {
 		why = append(why, fmt.Sprintf("%s look like credentials and are not tracked by git", cappedList(r.Secrets)))
 	}
 	if len(r.Outside) > 0 {
-		why = append(why, fmt.Sprintf("%s look like credentials and are reached through a link to a place outside any git repository", cappedList(r.Outside)))
+		why = append(why, fmt.Sprintf("%s look like credentials and are reached through a link out of the project", cappedList(r.Outside)))
 	}
 	if len(why) > 0 {
 		return fmt.Errorf("refusing to build: %s, and the image would carry them to a registry. Add them to %s, or remove them from the project, and try again",
 			strings.Join(why, "; "), r.IgnoreFile)
 	}
 	if len(r.VCSSecrets) > 0 {
-		return fmt.Errorf("refusing to build: the git config under %s holds a credential (an extraheader, or a URL with a password or token in it), and the image would carry it to a registry. Add **/.git to %s and try again",
+		return fmt.Errorf("refusing to build: the git config under %s holds a credential (an extraheader, or a URL with a password or a known token in it), and the image would carry it to a registry. Add **/.git to %s and try again",
 			cappedList(r.VCSSecrets), r.IgnoreFile)
 	}
 	return nil
@@ -135,10 +144,11 @@ func Survey(dir, dockerfile string, podman bool, warn func(string)) (*imagebuild
 }
 
 // credentialURL matches a URL whose userinfo carries a credential: a
-// password (user:pass@), or a user that is a token, by a known token prefix
-// or by being a long run of token characters. A plain user, as in
-// ssh://git@github.com or https://user@bitbucket.org, is not one.
-var credentialURL = regexp.MustCompile(`://(?:[^/@\s:]*:[^/@\s]+|(?:ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|x-access-token|oauth2)[^/@\s]*|[A-Za-z0-9_-]{30,})@`)
+// password (user:pass@), or a user that starts with a known token prefix. A
+// plain user, as in ssh://git@github.com or https://user@bitbucket.org, is
+// not one; neither is an opaque token of an unknown kind used as a bare
+// username, which this cannot tell from a user name and does not detect.
+var credentialURL = regexp.MustCompile(`://(?:[^/@\s:]*:[^/@\s]+|(?:ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|glpat-|x-access-token|oauth2)[^/@\s]*)@`)
 
 // vcsConfigHoldsCredential reports whether the git metadata at dir (a .git
 // directory) has a config holding a credential: an http extraheader, which
@@ -155,30 +165,23 @@ func vcsConfigHoldsCredential(dir string) bool {
 
 // verdict is what git said of one carried file.
 type verdict struct {
-	ignored, tracked, unanswered, outside bool
+	ignored, tracked, unanswered bool
 }
 
-// checkGit asks git about the carried files. A file in the project (or
-// reached through a link that stays in it) is asked of the project's
-// repository, or of a repository nested in it, at its real path. A file
-// reached through a link out of the project is asked of the repository that
-// holds where the link leads, and one that no repository holds is outside.
-func (r *Report) checkGit(root string, files, links []string) {
-	inProject, outside := locate(root, files, links)
+// checkGit asks git about the carried files in the project, inProject
+// mapping each to the project path git is asked about (locate). A symlink
+// listed as itself, which only a declared build carries, ships as a link and
+// is never a credential.
+func (r *Report) checkGit(root string, files []string, inProject map[string]string) {
 	verdicts := askProject(root, inProject, &r.Unanswered)
-	for f, v := range askOutside(outside, &r.Unanswered) {
-		verdicts[f] = v
-	}
 	for _, f := range files {
-		v := verdicts[f]
-		switch {
-		case v.outside:
-			if LooksSecret(f) {
-				r.Outside = append(r.Outside, f)
-			}
-			continue
-		case v.unanswered:
-			if LooksSecret(f) {
+		v, ok := verdicts[f]
+		if !ok {
+			continue // outside the project, looked at in Check
+		}
+		secret := LooksSecret(f) && !isLink(root, f, inProject[f])
+		if v.unanswered {
+			if secret {
 				r.Unchecked = append(r.Unchecked, f)
 			}
 			continue
@@ -186,29 +189,34 @@ func (r *Report) checkGit(root string, files, links []string) {
 		if v.ignored {
 			r.Gitignored = append(r.Gitignored, f)
 		}
-		if LooksSecret(f) && (v.ignored || !v.tracked) {
+		if secret && (v.ignored || !v.tracked) {
 			r.Secrets = append(r.Secrets, f)
 		}
 	}
 }
 
-// outsideFile is a carried file whose real location is outside the project:
-// the directory git is asked from, and its path there.
-type outsideFile struct{ dir, rel string }
+// isLink reports whether f, asked about as itself (q == f), is a symlink: a
+// declared build carries it as a link, not as what it points at.
+func isLink(root, f, q string) bool {
+	if q != f {
+		return false
+	}
+	info, err := os.Lstat(filepath.Join(root, filepath.FromSlash(f)))
+	return err == nil && info.Mode()&os.ModeSymlink != 0
+}
 
-// locate maps each carried file to where git is asked about it. Only a file
-// that is, or sits under, one of links (the symlinks a generated build went
-// through) can be anywhere but its listed path; the rest are asked about as
-// listed. A linked one is asked about at its real path when that is in the
-// project; when it is not, from the directory the link leads to (or the
-// file's own, when a further link leads elsewhere). A path that cannot be
-// resolved is asked about as its link, never as a path beyond one.
-func locate(root string, files, links []string) (inProject map[string]string, outside map[string]outsideFile) {
+// locate maps each carried file to where it really is. Only a file that is,
+// or sits under, one of links (the symlinks a generated build went through)
+// can be anywhere but its listed path; the rest are in the project as
+// listed. A linked file whose real path is in the project maps to that path
+// in inProject, and one whose real path is outside it maps to that real path
+// in outside. A linked file that cannot be resolved maps to its outermost
+// link, so git is never asked about a path beyond one.
+func locate(root string, files, links []string) (inProject, outside map[string]string) {
 	inProject = make(map[string]string, len(files))
-	outside = map[string]outsideFile{}
-	linkTargets := map[string]string{}
+	outside = map[string]string{}
 	for _, f := range files {
-		link := linkOf(f, links)
+		link := outermostLink(f, links)
 		if link == "" {
 			inProject[f] = f
 			continue
@@ -222,29 +230,17 @@ func locate(root string, files, links []string) (inProject map[string]string, ou
 			inProject[f] = rel
 			continue
 		}
-		target, ok := linkTargets[link]
-		if !ok {
-			resolvedLink, err := filepath.EvalSymlinks(filepath.Join(root, filepath.FromSlash(link)))
-			if err != nil {
-				resolvedLink = "" // asked from the file's own directory instead
-			}
-			target = resolvedLink
-			linkTargets[link] = target
-		}
-		if rel, ok := within(target, resolved); ok && target != "" && rel != "." {
-			outside[f] = outsideFile{dir: target, rel: rel}
-		} else {
-			outside[f] = outsideFile{dir: filepath.Dir(resolved), rel: filepath.Base(resolved)}
-		}
+		outside[f] = resolved
 	}
 	return inProject, outside
 }
 
-// linkOf is the longest of links that is f or a parent of it, "" for none.
-func linkOf(f string, links []string) string {
+// outermostLink is the shortest of links that is f or a parent of it, "" for
+// none.
+func outermostLink(f string, links []string) string {
 	best := ""
 	for _, l := range links {
-		if (f == l || strings.HasPrefix(f, l+"/")) && len(l) > len(best) {
+		if (f == l || strings.HasPrefix(f, l+"/")) && (best == "" || len(l) < len(best)) {
 			best = l
 		}
 	}
@@ -300,43 +296,6 @@ func askProject(root string, queries map[string]string, unanswered *[]string) ma
 			ignored:    ignored[q] || underAny(q, ignoredRepos),
 			tracked:    tracked[q],
 			unanswered: failed[ownerOf(q, repos)],
-		}
-	}
-	return out
-}
-
-// askOutside asks about the files reached through links out of the project,
-// from the directories they lead to: once per directory, of the repository
-// holding it. A directory no repository holds makes its files outside.
-func askOutside(files map[string]outsideFile, unanswered *[]string) map[string]verdict {
-	byDir := map[string][]string{}
-	for f, o := range files {
-		byDir[o.dir] = append(byDir[o.dir], f)
-	}
-	out := make(map[string]verdict, len(files))
-	for dir, fs := range byDir {
-		if !git.InWorkTree(dir) {
-			for _, f := range fs {
-				out[f] = verdict{outside: true}
-			}
-			continue
-		}
-		paths := make([]string, len(fs))
-		for i, f := range fs {
-			paths[i] = files[f].rel
-		}
-		ign, trk, err := ask(dir, "", paths)
-		if err != nil {
-			*unanswered = append(*unanswered, fmt.Sprintf("the repository holding %s (%v)", dir, err))
-			for _, f := range fs {
-				out[f] = verdict{unanswered: true}
-			}
-			continue
-		}
-		ignored, tracked := setOf(ign), setOf(trk)
-		for _, f := range fs {
-			rel := files[f].rel
-			out[f] = verdict{ignored: ignored[rel], tracked: tracked[rel]}
 		}
 	}
 	return out
@@ -430,14 +389,6 @@ func ask(dir, prefix string, paths []string) (ignored, tracked []string, err err
 		return out
 	}
 	return back(ign), back(trk), nil
-}
-
-func setOf(ps []string) map[string]bool {
-	set := make(map[string]bool, len(ps))
-	for _, p := range ps {
-		set[p] = true
-	}
-	return set
 }
 
 // underAny reports whether p is below any of dirs.

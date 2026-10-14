@@ -3,6 +3,7 @@ package imagebuild
 import (
 	"bytes"
 	"context"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -12,8 +13,8 @@ import (
 // IsPodman reports whether the engine CLI bin is podman, by asking it through
 // cmd: `<bin> --version` names podman whatever the binary is called, so the
 // podman-docker shim and a docker alias for podman count too. env is the
-// connection env to run it with. An engine that does not answer is not podman
-// here; the caller's own probe reports it.
+// connection env to run it with. An engine that does not answer is podman
+// when its binary is named podman; the caller's own probe reports it.
 //
 // It decides which ignore file a declared Dockerfile's build reads
 // (SurveyProject): podman and buildah read a .containerignore first.
@@ -25,7 +26,8 @@ func IsPodman(ctx context.Context, cmd Commander, bin string, env []string) bool
 	defer cancel()
 	var out bytes.Buffer
 	if err := cmd.Run(ctx, env, rt.Stdio{Out: &out}, bin, "--version"); err != nil {
-		return false
+		name := strings.TrimSuffix(strings.ToLower(filepath.Base(bin)), ".exe")
+		return name == "podman"
 	}
 	return strings.Contains(strings.ToLower(out.String()), "podman")
 }

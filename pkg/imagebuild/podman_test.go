@@ -30,5 +30,6 @@ func TestIsPodman(t *testing.T) {
 	assert.True(t, IsPodman(ctx, cmd, fakeEngine(t, "podman", "podman version 5.2.0"), nil))
 	assert.False(t, IsPodman(ctx, cmd, fakeEngine(t, "docker", "Docker version 27.3.1, build ce12230"), nil))
 	assert.False(t, IsPodman(ctx, cmd, filepath.Join(t.TempDir(), "missing"), nil), "an engine that does not answer")
+	assert.True(t, IsPodman(ctx, cmd, filepath.Join(t.TempDir(), "podman"), nil), "a podman that does not answer is still podman by name")
 	assert.False(t, IsPodman(ctx, cmd, "", nil))
 }

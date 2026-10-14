@@ -198,18 +198,18 @@ func TestCheckAsksAboutAnInProjectLinkAtItsRealPath(t *testing.T) {
 		"judged by the real path: the committed ca.pem is not refused through the link either")
 }
 
-// A file a generated build carries through a link out of the project is asked
-// of the repository that holds where the link leads: in a monorepo, a
-// committed shared library is not refused, and an uncommitted key in it is.
-func TestCheckAsksTheRepositoryALinkLeadsTo(t *testing.T) {
+// A file a generated build reaches through a link out of the project is not
+// asked of git: one that looks like a credential, by its path in the project
+// or where the link leads, is refused. That includes a credential committed in
+// a monorepo's shared library, by intent: the fix is one .dockerignore line.
+func TestCheckRefusesCredentialsBehindALinkOutOfTheProject(t *testing.T) {
 	needsGit(t)
 	repo := t.TempDir()
 	gitRun(t, repo, "init", "-q")
 	writeFiles(t, repo, map[string]string{
-		"shared-lib/util.py":       "",
-		"shared-lib/sa-prod.json":  "{}",
-		"shared-lib/sa-local.json": "{}",
-		"project/dags/a.py":        "",
+		"shared-lib/util.py":      "",
+		"shared-lib/sa-prod.json": "{}",
+		"project/dags/a.py":       "",
 	})
 	gitRun(t, repo, "add", "shared-lib/util.py", "shared-lib/sa-prod.json", "project/dags/a.py")
 	project := filepath.Join(repo, "project")
@@ -219,67 +219,67 @@ func TestCheckAsksTheRepositoryALinkLeadsTo(t *testing.T) {
 	}
 
 	r := check(t, project, "")
-	assert.Empty(t, r.Unanswered)
-	assert.Equal(t, []string{"include/shared/sa-local.json"}, r.Secrets, "the committed sa-prod.json is the monorepo's choice")
-	assert.Empty(t, r.Outside)
+	require.Len(t, r.Outside, 1)
+	assert.Contains(t, r.Outside[0], "include/shared/sa-prod.json → ")
+	assert.Contains(t, r.Outside[0], filepath.Join("shared-lib", "sa-prod.json"))
+	assert.Empty(t, r.Secrets)
+	err := r.Err()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "reached through a link out of the project")
+	assert.NotContains(t, err.Error(), "not tracked by git")
+
+	writeFiles(t, project, map[string]string{".dockerignore": "include/shared/sa-prod.json\n"})
+	r = check(t, project, "")
+	assert.NoError(t, r.Err(), "one .dockerignore line is the way out")
 }
 
-// A link to a place no git repository holds leaves nothing to say the file
-// was meant to be shared: one that looks like a credential is refused, and
-// the message says why without claiming git judged it.
-func TestCheckRefusesCredentialsBehindALinkOutOfAnyRepository(t *testing.T) {
-	needsGit(t)
+// Where the link leads counts as much as the name in the project, and the
+// check runs whether or not the project is a git repository.
+func TestCheckRefusesALinkToACredentialOutsideAnyRepository(t *testing.T) {
 	project := t.TempDir()
-	gitRun(t, project, "init", "-q")
 	writeFiles(t, project, map[string]string{"dags/a.py": ""})
-	outside := t.TempDir()
-	writeFiles(t, outside, map[string]string{"keys/sa-prod.json": "{}", "keys/helper.py": ""})
-	if err := os.Symlink(filepath.Join(outside, "keys"), filepath.Join(project, "keys")); err != nil {
+	home := t.TempDir()
+	writeFiles(t, home, map[string]string{".docker/config.json": "{\"auths\":{}}"})
+	if err := os.Symlink(filepath.Join(home, ".docker"), filepath.Join(project, "dockercfg")); err != nil {
 		t.Skipf("symlinks unavailable here: %v", err)
 	}
 
 	r := check(t, project, "")
-	assert.Equal(t, []string{"keys/sa-prod.json"}, r.Outside)
-	assert.Empty(t, r.Secrets)
-	err := r.Err()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "outside any git repository")
-	assert.NotContains(t, err.Error(), "not tracked by git")
+	require.Len(t, r.Outside, 1, "dockercfg/config.json looks like nothing; ~/.docker/config.json does")
+	assert.Contains(t, r.Outside[0], "dockercfg/config.json → ")
+	assert.Error(t, r.Err())
 }
 
 // A linked file that cannot be resolved (gone since the survey) is asked
-// about as its link, never as a path beyond one; a file under no link is
-// asked about as listed, without resolving anything.
+// about as its outermost link, never as a path beyond any link; a file under
+// no link is asked about as listed, without resolving anything.
 func TestLocate(t *testing.T) {
 	root := t.TempDir()
-	in, out := locate(root, []string{"gone/x.py", "dags/a.py"}, []string{"gone"})
-	assert.Equal(t, map[string]string{"gone/x.py": "gone", "dags/a.py": "dags/a.py"}, in)
+	in, out := locate(root, []string{"gone/inner/x.py", "dags/a.py"}, []string{"gone", "gone/inner"})
+	assert.Equal(t, map[string]string{"gone/inner/x.py": "gone", "dags/a.py": "dags/a.py"}, in)
 	assert.Empty(t, out)
 }
 
-// A declared build carries a link as a link, so git is asked about the link
-// itself: a committed link is fine wherever it points, an untracked one that
-// looks like a credential is refused.
-func TestCheckAsksAboutADeclaredBuildsLinkItself(t *testing.T) {
+// A declared build carries a link as a link, not what it points at, so a
+// symlink there is never refused, wherever it points and whatever git says.
+func TestCheckNeverRefusesADeclaredBuildsLink(t *testing.T) {
 	needsGit(t)
 	project := t.TempDir()
 	gitRun(t, project, "init", "-q")
-	writeFiles(t, project, map[string]string{"Dockerfile": "FROM python:3.12\n"})
+	writeFiles(t, project, map[string]string{"Dockerfile": "FROM python:3.12\n", "real.pem": "k"})
 	outside := t.TempDir()
-	writeFiles(t, outside, map[string]string{"real.pem": "k"})
-	if err := os.Symlink(filepath.Join(outside, "real.pem"), filepath.Join(project, "ca.pem")); err != nil {
+	writeFiles(t, outside, map[string]string{"far.pem": "k"})
+	if err := os.Symlink(filepath.Join(outside, "far.pem"), filepath.Join(project, "new.pem")); err != nil {
 		t.Skipf("symlinks unavailable here: %v", err)
 	}
-	require.NoError(t, os.Symlink(filepath.Join(outside, "real.pem"), filepath.Join(project, "new.pem")))
-	gitRun(t, project, "add", "ca.pem")
 
 	r := check(t, project, "Dockerfile")
-	assert.Equal(t, []string{"new.pem"}, r.Secrets)
+	assert.Equal(t, []string{"real.pem"}, r.Secrets, "the regular file is refused; the link is not")
 	assert.Empty(t, r.Outside)
 }
 
 // A declared Dockerfile's context carries .git unless its ignore file drops
-// it. A config holding a credential stops the build.
+// it. A config holding a credential stops the build; a plain user does not.
 func TestCheckDeclaredGitMetadata(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
@@ -297,7 +297,6 @@ func TestCheckDeclaredGitMetadata(t *testing.T) {
 		"[url \"https://x-access-token:ghs_abc@github.com/\"]\n\tinsteadOf = https://github.com/\n",
 		"[url \"https://oauth2:glpat-abcdef@gitlab.com/\"]\n\tinsteadOf = https://gitlab.com/\n",
 		"[remote \"origin\"]\n\turl = https://glpat-abcdefghij@gitlab.com/acme/repo.git\n",
-		"[remote \"origin\"]\n\turl = https://0123456789abcdef0123456789abcdef@example.com/acme/repo.git\n",
 	} {
 		writeFiles(t, dir, map[string]string{".git/config": config})
 		r = check(t, dir, "Dockerfile")
@@ -308,6 +307,9 @@ func TestCheckDeclaredGitMetadata(t *testing.T) {
 		"[remote \"origin\"]\n\turl = ssh://git@github.com/acme/repo.git\n",
 		"[remote \"origin\"]\n\turl = https://user@bitbucket.org/acme/repo.git\n",
 		"[remote \"origin\"]\n\turl = git@github.com:acme/repo.git\n",
+		// An opaque token of an unknown kind as a bare user is not detected:
+		// it cannot be told from a user name.
+		"[remote \"origin\"]\n\turl = https://0123456789abcdef0123456789abcdef@example.com/acme/repo.git\n",
 	} {
 		writeFiles(t, dir, map[string]string{".git/config": config})
 		r = check(t, dir, "Dockerfile")
