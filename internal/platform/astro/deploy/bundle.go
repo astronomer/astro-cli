@@ -300,14 +300,14 @@ func UploadBundle(tarDirPath, bundlePath, uploadURL string, prependBaseDir bool,
 	// tree. Ones an earlier CLI wrote into the tree are always left out (a
 	// stale one must not ship), and with cosmos_boost.pre_deploy on, fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
-	overlay, err := cosmosboost.BundleOverlay(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool())
+	cosmosBoost := cosmosboost.NewBundle(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool())
+
+	// Generate the bundle tar
+	err := fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"}, cosmosBoost.Overlay)
 	if err != nil {
 		return "", err
 	}
-
-	// Generate the bundle tar
-	err = fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"}, overlay)
-	if err != nil {
+	if err := cosmosBoost.Err(); err != nil {
 		return "", err
 	}
 

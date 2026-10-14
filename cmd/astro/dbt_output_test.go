@@ -334,7 +334,7 @@ func TestDbtCleanupRemoved(t *testing.T) {
 	require.Error(t, r.err)
 	assert.Equal(t, cliout.ExitUsage, r.code)
 	assert.Equal(t, errDbtCleanupRemoved, r.err.Error())
-	assert.Contains(t, r.err.Error(), "nothing to clean up")
+	assert.Contains(t, r.err.Error(), "no longer writes Cosmos Boost files")
 	assert.NotContains(t, r.err.Error(), "`", "command names are plain text")
 	assert.Empty(t, r.stdout)
 	assert.FileExists(t, artifact, "the tombstone removes nothing")

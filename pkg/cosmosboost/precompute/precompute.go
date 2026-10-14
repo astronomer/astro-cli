@@ -143,9 +143,6 @@ func processProject(dir, version string, opts Options) Result {
 	cfg := readDbtConfig(dir)
 	hash, files, totalBytes, err := hashProject(dir, cfg)
 	r := Result{Kind: kindProject, Path: dir, Hash: hash, Files: files, Bytes: totalBytes}
-	if err == nil {
-		err = checkSidecarDir(dir)
-	}
 	if err != nil {
 		r.Err = err
 		r.Duration = time.Since(start)
@@ -172,6 +169,9 @@ func processProject(dir, version string, opts Options) Result {
 	}
 
 	r.Artifacts = append(r.Artifacts, sidecarArtifact(dir, algoProjectTree, hash, version, filtered))
+	if r.Err = checkArtifactPaths(dir, r.Artifacts); r.Err != nil {
+		r.Artifacts = nil
+	}
 	r.Duration = time.Since(start)
 	return r
 }
@@ -202,9 +202,6 @@ func processManifest(path, version string, opts Options) Result {
 	case !isDbt:
 		r.Skipped = true
 	default:
-		if r.Err = checkSidecarDir(dir); r.Err != nil {
-			break
-		}
 		var filtered *FilteredManifest
 		if slimData != nil {
 			var slim Artifact
@@ -212,6 +209,9 @@ func processManifest(path, version string, opts Options) Result {
 			r.Artifacts = append(r.Artifacts, slim)
 		}
 		r.Artifacts = append(r.Artifacts, sidecarArtifact(dir, algoManifestJSON, hash, version, filtered))
+		if r.Err = checkArtifactPaths(dir, r.Artifacts); r.Err != nil {
+			r.Artifacts = nil
+		}
 	}
 	r.Duration = time.Since(start)
 	return r

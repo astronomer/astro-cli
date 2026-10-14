@@ -2,12 +2,14 @@ package cosmosboost
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -30,71 +32,93 @@ func slimManifestEnabled() bool {
 	return value == "" || util.CheckEnvBool(value)
 }
 
-// BundleOverlay is what a deploy bundle of root must change for Cosmos Boost,
-// as an overlay on the tarball: root itself is never written.
+// Bundle is what a deploy bundle of a directory changes for Cosmos Boost, as
+// an overlay on the tarball (Overlay): the directory itself is never written.
 //
-// Whatever enabled says, every .astro/dbt_metadata.json and
-// .astro/manifest.slim.json under root that an earlier astro-cli wrote into
-// the project (its producer marker names this tool) is left out. The plugin
-// cannot tell a fresh sidecar from a stale one, and this one never writes
-// there, so nothing a deploy ships comes from the tree.
+// Whatever the setting says, every .astro/dbt_metadata.json and
+// .astro/manifest.slim.json that an earlier Astro CLI wrote into the tree (its
+// own producer marker says so, airflowrt.CosmosBoostFileWrittenByAstro) is
+// left out, judged inside the tarball's own walk so the files left out are
+// exactly the ones it would have carried. The plugin cannot tell a fresh
+// sidecar from a stale one, and this CLI never writes there.
 //
-// With enabled set (cosmos_boost.pre_deploy), the pre-deploy step then runs
-// over root and its sidecars are added to the bundle at the same paths, with
-// the same contents, the plugin has always read: every dbt project
-// (dbt_project.yml) gets a .astro/dbt_metadata.json carrying its content hash,
-// which the plugin uses as a cache version key at parse time instead of
-// hashing the project tree itself, and every standalone dbt manifest.json gets
-// a hash sidecar too, plus a slim, field-filtered copy for the plugin to load
-// in place of the full manifest. That step is best-effort - a failure is a
-// warning, never an error - because without a sidecar the plugin simply falls
-// back to hashing at parse time.
+// With the setting on (cosmos_boost.pre_deploy), the pre-deploy step runs over
+// the directory and its sidecars are added at the same paths, with the same
+// contents, the plugin has always read: every dbt project (dbt_project.yml)
+// gets a .astro/dbt_metadata.json carrying its content hash, which the plugin
+// uses as a cache version key at parse time instead of hashing the project
+// tree itself, and every standalone dbt manifest.json gets a hash sidecar too,
+// plus a slim, field-filtered copy for the plugin to load in place of the full
+// manifest. That step is best-effort - a failure is a warning, never an error
+// - because without a sidecar the plugin simply falls back to hashing at parse
+// time.
 //
 // A file from an unrecognized producer is the user's, and ships untouched
-// when the step is off. With it on, the deploy fails instead: the plugin would
-// consume that file's version.hash all the same, and this tool will not judge
+// when the step is off. With it on, Err refuses the deploy: the plugin would
+// consume that file's version.hash all the same, and this CLI will not judge
 // a file it did not write fresh.
-func BundleOverlay(root string, enabled bool) (fileutil.TarOverlay, error) {
-	overlay := fileutil.TarOverlay{Skip: map[string]bool{}, Extra: map[string][]byte{}}
+type Bundle struct {
+	Overlay fileutil.TarOverlay
+	enabled bool
+	foreign []string
+}
 
-	existing, err := precompute.FindExisting(root)
-	if err != nil {
-		return overlay, err
-	}
-	var foreign []string
-	for _, e := range existing {
-		if !e.Ours {
-			foreign = append(foreign, e.Path)
-			continue
-		}
-		rel, err := relSlash(root, e.Path)
-		if err != nil {
-			return overlay, err
-		}
-		logger.Debugf("leaving out a Cosmos Boost file an earlier Astro CLI wrote into the project: %s", e.Path)
-		overlay.Skip[rel] = true
-	}
+// NewBundle prepares the overlay for a bundle of root, generating the
+// sidecars into it when enabled. A root that cannot be read generates none,
+// and is left for the tarball to deal with as it always has.
+func NewBundle(root string, enabled bool) *Bundle {
+	b := &Bundle{enabled: enabled}
+	b.Overlay = fileutil.TarOverlay{Skip: b.skip, Extra: map[string][]byte{}}
 	if !enabled {
-		return overlay, nil
+		return b
 	}
-	if len(foreign) > 0 {
-		return overlay, fmt.Errorf("found Cosmos Boost file(s) from an unrecognized producer: %s; the deploy cannot prove they are fresh and will not ship them for the Cosmos Boost plugin to read. Remove them and retry", strings.Join(foreign, ", "))
+	if _, err := os.Stat(root); err != nil {
+		return b
 	}
-
 	artifacts, err := preDeploy(root)
 	for _, a := range artifacts {
-		rel, relErr := relSlash(root, a.Path)
+		rel, relErr := filepath.Rel(root, a.Path)
 		if relErr != nil {
-			return overlay, relErr
+			err = errors.Join(err, relErr)
+			continue
 		}
-		overlay.Extra[rel] = a.Data
+		b.Overlay.Extra[filepath.ToSlash(rel)] = a.Data
 	}
 	if err != nil {
 		fmt.Printf("Warning: the Cosmos Boost pre-deploy step failed, continuing deploy: %s\n", err)
-		return overlay, nil
+		return b
 	}
 	fmt.Println("Cosmos Boost pre-deploy step complete")
-	return overlay, nil
+	return b
+}
+
+// skip is Overlay.Skip: it leaves out each Cosmos Boost file an Astro CLI
+// wrote into the tree, and notes every other one for Err. Only files at a
+// sidecar's path are read.
+func (b *Bundle) skip(rel, file string) (bool, error) {
+	if !airflowrt.IsCosmosBoostFile(rel) {
+		return false, nil
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return false, err
+	}
+	if airflowrt.CosmosBoostFileWrittenByAstro(rel, data) {
+		logger.Debugf("leaving out a Cosmos Boost file an earlier Astro CLI wrote into the project: %s", file)
+		return true, nil
+	}
+	b.foreign = append(b.foreign, file)
+	return false, nil
+}
+
+// Err, once the tarball is written, refuses an enabled deploy that found a
+// Cosmos Boost file from an unrecognized producer, which the plugin would read
+// as current. nil otherwise.
+func (b *Bundle) Err() error {
+	if !b.enabled || len(b.foreign) == 0 {
+		return nil
+	}
+	return fmt.Errorf("found Cosmos Boost file(s) from an unrecognized producer: %s; the deploy cannot prove they are fresh and will not ship them for the Cosmos Boost plugin to read. Remove them and retry", strings.Join(b.foreign, ", "))
 }
 
 // preDeploy runs the Cosmos Boost pre-deploy step over path and returns the
@@ -111,15 +135,6 @@ func preDeploy(path string) ([]precompute.Artifact, error) {
 		return summary.Artifacts(), fmt.Errorf("the Cosmos Boost pre-deploy step failed for %d unit(s) (re-run with --verbosity debug for details)", failed)
 	}
 	return summary.Artifacts(), nil
-}
-
-// relSlash is path relative to root, slash-separated, as TarOverlay keys it.
-func relSlash(root, path string) (string, error) {
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		return "", err
-	}
-	return filepath.ToSlash(rel), nil
 }
 
 // reporter is the shape of the precompute summary.

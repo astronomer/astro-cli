@@ -1,7 +1,10 @@
 package cosmosboost
 
 import (
+	"archive/tar"
 	"encoding/json"
+	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -10,13 +13,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/cosmosboost/precompute"
+	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/version"
 )
 
 const (
 	sidecarRel  = ".astro/dbt_metadata.json"
+	slimRel     = ".astro/manifest.slim.json"
 	oursSidecar = `{"schema":1,"version":{"algo":"sha256-tree-v2","hash":"stale"},"generated_by":{"application":"astro","version":"1.0.0"}}`
+	oursSlim    = `{"_schema":1,"_generated_by":{"application":"astro","version":"1.0.0"}}`
 	foreignFile = `{"schema":1,"version":{"hash":"abc"},"generated_by":{"application":"someone-else"}}`
 	dbtManifest = `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
 )
@@ -36,18 +43,21 @@ func writeDbtProject(t *testing.T, dir string) {
 }
 
 // snapshot maps every file under root to its contents, to prove a call left
-// the tree exactly as it found it.
+// the tree exactly as it found it. A root that is not there is empty.
 func snapshot(t *testing.T, root string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
-	require.NoError(t, filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
 		data, err := os.ReadFile(path)
 		out[path] = string(data)
 		return err
-	}))
+	})
+	if !errors.Is(err, fs.ErrNotExist) {
+		require.NoError(t, err)
+	}
 	return out
 }
 
@@ -58,22 +68,48 @@ func setVersion(t *testing.T, v string) {
 	t.Cleanup(func() { version.CurrVersion = orig })
 }
 
-// TestBundleOverlayEnabledAddsSidecars pins the plugin contract: the same
-// files at the same paths with the same contents earlier versions wrote into
-// the project, now only in the bundle - the tree is untouched.
-func TestBundleOverlayEnabledAddsSidecars(t *testing.T) {
+// bundle tars dir as a deploy does, through NewBundle's overlay, and returns
+// the tarball's entries by name, and the error the deploy would stop on.
+func bundle(t *testing.T, dir string, enabled bool) (map[string]string, error) {
+	t.Helper()
+	b := NewBundle(dir, enabled)
+	target := filepath.Join(t.TempDir(), "bundle.tar")
+	if err := fileutil.Tar(dir, target, false, []string{".git/"}, b.Overlay); err != nil {
+		return nil, err
+	}
+	file, err := os.Open(target)
+	require.NoError(t, err)
+	defer file.Close()
+	entries := map[string]string{}
+	tr := tar.NewReader(file)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		data, err := io.ReadAll(tr)
+		require.NoError(t, err)
+		entries[header.Name] = string(data)
+	}
+	return entries, b.Err()
+}
+
+// TestBundleEnabledAddsSidecars pins the plugin contract: the same files at
+// the same paths with the same contents earlier versions wrote into the
+// project, now only in the bundle - the tree is untouched.
+func TestBundleEnabledAddsSidecars(t *testing.T) {
 	setVersion(t, "1.2.3")
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
 	writeFiles(t, dir, map[string]string{"target/manifest.json": dbtManifest})
 	before := snapshot(t, dir)
 
-	overlay, err := BundleOverlay(dir, true)
+	entries, err := bundle(t, dir, true)
 	require.NoError(t, err)
 
 	require.Equal(t, before, snapshot(t, dir), "the tree must not be written")
-	require.Empty(t, overlay.Skip)
-	require.ElementsMatch(t, []string{sidecarRel, "target/" + sidecarRel, "target/.astro/manifest.slim.json"}, keys(overlay.Extra))
+	require.ElementsMatch(t, []string{"dbt_project.yml", "models/a.sql", "target/manifest.json", sidecarRel, "target/" + sidecarRel, "target/" + slimRel}, keys(entries))
 
 	// The contents are exactly what the pre-deploy step produces for the tree.
 	summary, err := precompute.Run([]string{dir}, "1.2.3", precompute.Options{SlimManifest: true})
@@ -81,7 +117,9 @@ func TestBundleOverlayEnabledAddsSidecars(t *testing.T) {
 	for _, a := range summary.Artifacts() {
 		rel, err := filepath.Rel(dir, a.Path)
 		require.NoError(t, err)
-		require.Equal(t, string(a.Data), string(overlay.Extra[filepath.ToSlash(rel)]), rel)
+		require.Equal(t, string(a.Data), entries[filepath.ToSlash(rel)], rel)
+		// What it generates is what every later deploy recognizes as its own.
+		require.True(t, airflowrt.CosmosBoostFileWrittenByAstro(filepath.ToSlash(rel), a.Data), rel)
 	}
 
 	var meta struct {
@@ -95,7 +133,7 @@ func TestBundleOverlayEnabledAddsSidecars(t *testing.T) {
 			Version     string `json:"version"`
 		} `json:"generated_by"`
 	}
-	require.NoError(t, json.Unmarshal(overlay.Extra[sidecarRel], &meta))
+	require.NoError(t, json.Unmarshal([]byte(entries[sidecarRel]), &meta))
 	require.Equal(t, 1, meta.Schema, "schema is the plugin's compatibility gate and must stay 1")
 	require.Equal(t, "sha256-tree-v2", meta.Version.Algo)
 	for _, r := range summary.Results {
@@ -107,16 +145,16 @@ func TestBundleOverlayEnabledAddsSidecars(t *testing.T) {
 	require.Equal(t, "1.2.3", meta.GeneratedBy.Version)
 }
 
-// TestBundleOverlayRespectsSlimManifestEnvVar: the env var disables this one
+// TestBundleRespectsSlimManifestEnvVar: the env var disables this one
 // optimization without disabling the step, so the hash sidecar still ships.
-func TestBundleOverlayRespectsSlimManifestEnvVar(t *testing.T) {
+func TestBundleRespectsSlimManifestEnvVar(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{"manifest.json": dbtManifest})
 	t.Setenv(slimManifestEnvVar, "false")
 
-	overlay, err := BundleOverlay(dir, true)
+	entries, err := bundle(t, dir, true)
 	require.NoError(t, err)
-	require.Equal(t, []string{sidecarRel}, keys(overlay.Extra))
+	require.ElementsMatch(t, []string{"manifest.json", sidecarRel}, keys(entries))
 }
 
 // TestSlimManifestEnabled: unset leaves the optimization on; otherwise only a
@@ -140,93 +178,106 @@ func TestSlimManifestEnabled(t *testing.T) {
 	}
 }
 
-// TestBundleOverlayLeavesOutStaleSidecars: whether the step is on or off, a
-// sidecar an earlier astro-cli wrote into the project never ships - including
-// one whose project no longer exists - and the tree keeps it.
-func TestBundleOverlayLeavesOutStaleSidecars(t *testing.T) {
+// TestBundleLeavesOutStaleSidecars: whether the step is on or off, a sidecar
+// an earlier CLI wrote into the project never ships - including one whose
+// project no longer exists, and one under logs/, which discovery never visits
+// but the tarball would carry - and the tree keeps it.
+func TestBundleLeavesOutStaleSidecars(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
 		dir := t.TempDir()
 		writeDbtProject(t, dir)
 		writeFiles(t, dir, map[string]string{
-			sidecarRel:                                  oursSidecar,
-			"removed-project/" + sidecarRel:             oursSidecar,
-			"removed-project/.astro/manifest.slim.json": `{"_generated_by":{"application":"astro"}}`,
+			sidecarRel:                      oursSidecar,
+			"removed-project/" + sidecarRel: oursSidecar,
+			"removed-project/" + slimRel:    oursSlim,
+			"logs/" + sidecarRel:            oursSidecar,
 		})
 		before := snapshot(t, dir)
 
-		overlay, err := BundleOverlay(dir, enabled)
+		entries, err := bundle(t, dir, enabled)
 		require.NoError(t, err)
 
 		require.Equal(t, before, snapshot(t, dir), "enabled=%v: the tree must not be written", enabled)
-		require.ElementsMatch(t, []string{sidecarRel, "removed-project/" + sidecarRel, "removed-project/.astro/manifest.slim.json"}, keys(overlay.Skip), "enabled=%v", enabled)
+		for _, gone := range []string{"removed-project/" + sidecarRel, "removed-project/" + slimRel, "logs/" + sidecarRel} {
+			require.NotContains(t, entries, gone, "enabled=%v", enabled)
+		}
 		if enabled {
-			require.Equal(t, []string{sidecarRel}, keys(overlay.Extra), "the current project gets a fresh sidecar")
-			require.NotContains(t, string(overlay.Extra[sidecarRel]), "stale")
+			require.Contains(t, entries, sidecarRel, "the current project gets a fresh sidecar")
+			require.NotContains(t, entries[sidecarRel], "stale")
 		} else {
-			require.Empty(t, overlay.Extra, "a disabled deploy adds nothing")
+			require.NotContains(t, entries, sidecarRel, "a disabled deploy ships no sidecar, stale or fresh")
 		}
 	}
 }
 
-// TestBundleOverlayForeignSidecar: a file from an unrecognized producer is
-// the user's. Disabled, it ships untouched; enabled, the deploy stops and asks
-// for its removal, because the plugin would consume its version.hash.
-func TestBundleOverlayForeignSidecar(t *testing.T) {
-	dir := t.TempDir()
-	writeDbtProject(t, dir)
-	writeFiles(t, dir, map[string]string{"other/" + sidecarRel: foreignFile})
-	foreign := filepath.Join(dir, "other", ".astro", "dbt_metadata.json")
+// TestBundleForeignSidecar: a file from an unrecognized producer is the
+// user's. Disabled, it ships untouched; enabled, the deploy stops and asks for
+// its removal, because the plugin would consume its version.hash - even when
+// it sits where a fresh sidecar would replace it.
+func TestBundleForeignSidecar(t *testing.T) {
+	for _, rel := range []string{"other/" + sidecarRel, sidecarRel} {
+		dir := t.TempDir()
+		writeDbtProject(t, dir)
+		writeFiles(t, dir, map[string]string{rel: foreignFile})
+		foreign := filepath.Join(dir, filepath.FromSlash(rel))
 
-	overlay, err := BundleOverlay(dir, false)
-	require.NoError(t, err)
-	require.Empty(t, overlay.Skip, "disabled: a foreign file ships")
-	require.Empty(t, overlay.Extra)
+		entries, err := bundle(t, dir, false)
+		require.NoError(t, err)
+		require.Equal(t, foreignFile, entries[rel], "disabled: a foreign file ships")
 
-	_, err = BundleOverlay(dir, true)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "unrecognized producer")
-	require.ErrorContains(t, err, foreign)
-	require.ErrorContains(t, err, "Remove them and retry")
-	require.FileExists(t, foreign, "a file another tool wrote must never be deleted")
+		_, err = bundle(t, dir, true)
+		require.Error(t, err, rel)
+		require.ErrorContains(t, err, "unrecognized producer")
+		require.ErrorContains(t, err, foreign)
+		require.ErrorContains(t, err, "Remove them and retry")
+		require.FileExists(t, foreign, "a file another tool wrote must never be deleted")
+	}
 }
 
-func TestBundleOverlayNoDbtContentIsEmpty(t *testing.T) {
+func TestBundleNoDbtContentAddsNothing(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{"app.py": "print('hi')"})
 
-	overlay, err := BundleOverlay(dir, true)
+	entries, err := bundle(t, dir, true)
 	require.NoError(t, err)
-	require.Empty(t, overlay.Skip)
-	require.Empty(t, overlay.Extra)
+	require.Equal(t, []string{"app.py"}, keys(entries))
 }
 
-// TestBundleOverlayMissingRoot: a root that is not there cannot be checked
-// for stale files, so the deploy fails rather than guessing.
-func TestBundleOverlayMissingRoot(t *testing.T) {
-	_, err := BundleOverlay(filepath.Join(t.TempDir(), "does-not-exist"), false)
-	require.Error(t, err)
+// TestBundleMissingRoot: a directory that is not there (a project with no
+// dags/) makes the empty tarball it always did, with the step on or off, and
+// nothing is created.
+func TestBundleMissingRoot(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		dir := filepath.Join(t.TempDir(), "dags")
+		entries, err := bundle(t, dir, enabled)
+		require.NoError(t, err, "enabled=%v", enabled)
+		require.Empty(t, entries)
+		require.NoDirExists(t, dir)
+	}
 }
 
-// TestBundleOverlayStepFailureIsAWarning: stamping is best-effort - a unit
-// that cannot be hashed ships no sidecar, the others still do, and the
-// deploy goes on.
-func TestBundleOverlayStepFailureIsAWarning(t *testing.T) {
+// TestBundleStepFailureIsAWarning: stamping is best-effort - a unit that
+// cannot be hashed ships no sidecar, the others still do, and the deploy
+// goes on.
+func TestBundleStepFailureIsAWarning(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("file permission semantics differ on windows")
 	}
 	dir := t.TempDir()
 	writeDbtProject(t, filepath.Join(dir, "broken"))
 	writeDbtProject(t, filepath.Join(dir, "fine"))
+	writeFiles(t, dir, map[string]string{"blocked/dbt_project.yml": "name: blocked\n", "blocked/.astro/dbt_metadata.json/x": "x"})
 	model := filepath.Join(dir, "broken", "models", "a.sql")
 	require.NoError(t, os.Chmod(model, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(model, 0o644) })
 
-	overlay, err := BundleOverlay(dir, true)
-	require.NoError(t, err)
-	require.Equal(t, []string{"fine/" + sidecarRel}, keys(overlay.Extra))
+	b := NewBundle(dir, true)
+	require.NoError(t, b.Err())
+	require.Equal(t, []string{"fine/" + sidecarRel}, keys(b.Overlay.Extra),
+		"neither the unreadable project nor the one with a directory where its sidecar goes gets one")
 
-	_, err = preDeploy(dir)
-	require.ErrorContains(t, err, "failed for 1 unit(s)")
+	_, err := preDeploy(dir)
+	require.ErrorContains(t, err, "failed for 2 unit(s)")
 }
 
 func keys[V any](m map[string]V) []string {

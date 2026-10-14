@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -304,8 +305,12 @@ func (s *Suite) TestTarOverlay() {
 	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.sql"), []byte("a"), 0o600))
 	s.Require().NoError(os.WriteFile(filepath.Join(source, ".astro", "stale.json"), []byte("stale"), 0o600))
 	s.Require().NoError(os.WriteFile(filepath.Join(source, ".astro", "replaced.json"), []byte("old"), 0o600))
+	var asked []string
 	overlay := TarOverlay{
-		Skip: map[string]bool{".astro/stale.json": true},
+		Skip: func(rel, file string) (bool, error) {
+			asked = append(asked, rel)
+			return rel == ".astro/stale.json", nil
+		},
 		Extra: map[string][]byte{
 			".astro/replaced.json":  []byte("new"),
 			"sub/.astro/added.json": []byte("added"),
@@ -343,6 +348,24 @@ func (s *Suite) TestTarOverlay() {
 			tc.prefix + "sub/.astro/added.json": "added",
 		}, got)
 	}
+
+	s.ElementsMatch([]string{
+		"a.sql", ".astro/stale.json", ".astro/replaced.json",
+		"a.sql", ".astro/stale.json", ".astro/replaced.json",
+	}, asked, "Skip is asked about every regular file, once per tarball")
+
+	s.Run("source is the working directory", func() {
+		s.T().Chdir(source)
+		target := filepath.Join(dir, "dot.tar")
+		s.Require().NoError(Tar(".", target, false, nil, overlay))
+		s.Equal([]string{".astro/replaced.json", "a.sql", "sub/.astro/added.json"}, tarNames(s.T(), target))
+	})
+
+	s.Run("a Skip error fails the tarball", func() {
+		boom := errors.New("boom")
+		err := Tar(source, filepath.Join(dir, "boom.tar"), false, nil, TarOverlay{Skip: func(string, string) (bool, error) { return false, boom }})
+		s.ErrorIs(err, boom)
+	})
 
 	stale, err := os.ReadFile(filepath.Join(source, ".astro", "replaced.json"))
 	s.Require().NoError(err)
@@ -960,4 +983,24 @@ func (s *Suite) TestDefaultPermissions() {
 	// world-writable paths.
 	s.Equal(os.FileMode(0o755), perm)
 	s.Equal(0o755, openPermissions)
+}
+
+// tarNames lists the entries of the tarball at target, sorted.
+func tarNames(t *testing.T, target string) []string {
+	t.Helper()
+	file, err := os.Open(target)
+	require.NoError(t, err)
+	defer file.Close()
+	var names []string
+	tr := tar.NewReader(file)
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		names = append(names, header.Name)
+	}
+	sort.Strings(names)
+	return names
 }

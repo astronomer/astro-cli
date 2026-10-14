@@ -88,12 +88,20 @@ func sidecarArtifact(dir, algo, hash, version string, filtered *FilteredManifest
 	return Artifact{Path: filepath.Join(dir, sidecarDir, sidecarName), Data: data}
 }
 
-// checkSidecarDir fails when something other than a directory holds dir's
-// .astro: an artifact under it could not be unpacked from the bundle.
-func checkSidecarDir(dir string) error {
-	info, err := os.Lstat(filepath.Join(dir, sidecarDir))
-	if err != nil || info.IsDir() {
-		return nil //nolint:nilerr // absent is fine: the bundle creates it
+// checkArtifactPaths fails when the tree holds something the artifacts could
+// not replace in a bundle: a .astro under dir that is not a directory (a file,
+// or a link), or anything but a regular file where an artifact goes (a
+// directory, a link). Unpacked beside the artifact, either would collide with
+// it. A regular file there is fine: the bundle carries the artifact instead.
+func checkArtifactPaths(dir string, artifacts []Artifact) error {
+	astroDir := filepath.Join(dir, sidecarDir)
+	if info, err := os.Lstat(astroDir); err == nil && !info.IsDir() {
+		return fmt.Errorf("%s is not a directory, so its Cosmos Boost files cannot sit under it", astroDir)
 	}
-	return fmt.Errorf("%s is not a directory, so its Cosmos Boost files cannot sit under it", filepath.Join(dir, sidecarDir))
+	for _, a := range artifacts {
+		if info, err := os.Lstat(a.Path); err == nil && !info.Mode().IsRegular() {
+			return fmt.Errorf("%s is not a regular file, so the Cosmos Boost file cannot take its place", a.Path)
+		}
+	}
+	return nil
 }

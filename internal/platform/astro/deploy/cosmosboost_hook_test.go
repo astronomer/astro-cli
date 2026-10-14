@@ -280,3 +280,44 @@ func TestUploadBundleForeignSidecar(t *testing.T) {
 		assert.FileExists(t, foreign, "the foreign file must be preserved")
 	})
 }
+
+// TestUploadBundleMissingDirIsUnchanged: a DAG deploy of a project with no
+// dags/ uploads the empty tarball it always did, with Cosmos Boost on or off:
+// the step never fails a deploy that had nothing for it.
+func TestUploadBundleMissingDirIsUnchanged(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		setupCosmosBoostEnv(t)
+		if enabled {
+			enableCosmosBoost(t)
+		}
+		dagsDir := filepath.Join(t.TempDir(), "dags")
+		uploaded := captureUploads(t)
+
+		_, err := UploadBundle(t.TempDir(), dagsDir, "http://upload-url", true, "0.0.0")
+		require.NoError(t, err, "enabled=%v", enabled)
+		assert.Empty(t, uploaded(), "enabled=%v", enabled)
+		assert.NoDirExists(t, dagsDir)
+	}
+}
+
+// TestUploadBundleFromTheWorkingDirectory: astro dbt deploy --project-path .
+// bundles ".", and an old sidecar there is still replaced by the fresh one,
+// at the same path, with no second copy under another name.
+func TestUploadBundleFromTheWorkingDirectory(t *testing.T) {
+	setupCosmosBoostEnv(t)
+	enableCosmosBoost(t)
+	bundleDir := writeDbtBundle(t)
+	writeTreeFile(t, bundleDir, cosmosBoostArtifact, staleOursSidecar)
+	t.Chdir(bundleDir)
+	uploaded := captureUploads(t)
+
+	_, err := UploadBundle(t.TempDir(), ".", "http://upload-url", false, "0.0.0")
+	require.NoError(t, err)
+
+	names := make([]string, 0, len(uploaded()))
+	for name := range uploaded() {
+		names = append(names, name)
+	}
+	assert.ElementsMatch(t, []string{"dbt_project.yml", cosmosBoostArtifact}, names)
+	assert.NotContains(t, uploaded()[cosmosBoostArtifact], `"stale"`)
+}

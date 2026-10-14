@@ -346,6 +346,31 @@ func TestSurvey(t *testing.T) {
 	assert.Contains(t, fmt.Sprint(warned), "local or per-machine files: .git, .astro/standalone")
 }
 
+// A declared Dockerfile's context carrying Cosmos Boost files an earlier CLI
+// wrote is warned about, naming them, and the build goes ahead; a file from
+// another producer, and a generated build, which leaves them out, are not.
+func TestSurveyWarnsAboutStaleCosmosBoostFilesInADeclaredContext(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"Dockerfile":                         "FROM python:3.12\n",
+		"dbt/shop/.astro/dbt_metadata.json":  `{"generated_by":{"application":"astro"}}`,
+		"dbt/shop/.astro/manifest.slim.json": `{"_generated_by":{"application":"astro"}}`,
+		"dbt/other/.astro/dbt_metadata.json": `{"generated_by":{"application":"someone-else"}}`,
+	})
+	var warned []string
+	_, err := Survey(dir, "Dockerfile", false, func(w string) { warned = append(warned, w) })
+	require.NoError(t, err)
+	all := fmt.Sprint(warned)
+	assert.Contains(t, all, "Cosmos Boost files an earlier Astro CLI wrote into the project: dbt/shop/.astro/dbt_metadata.json, dbt/shop/.astro/manifest.slim.json.")
+	assert.Contains(t, all, "delete them")
+	assert.NotContains(t, all, "dbt/other")
+
+	warned = nil
+	_, err = Survey(dir, "", false, func(w string) { warned = append(warned, w) })
+	require.NoError(t, err)
+	assert.NotContains(t, fmt.Sprint(warned), "Cosmos Boost")
+}
+
 func TestLooksSecret(t *testing.T) {
 	for _, p := range []string{
 		"certs/server.pem", "tls.KEY", "client.p12", "client.pfx", "id_rsa", "id_rsa.pub",

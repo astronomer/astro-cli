@@ -53,14 +53,13 @@ func newDbtCmd(out io.Writer) *cobra.Command {
 }
 
 // errDbtCleanupRemoved is what astro dbt cleanup says now. It removed the
-// Cosmos Boost sidecars earlier deploys wrote into the project; deploys now
-// generate them into the bundle they upload and leave out any an earlier
-// version wrote, so there is nothing left for it to do.
+// Cosmos Boost sidecars earlier deploys wrote into the project; v2 writes
+// none there, and leaves out the old ones from what it ships.
 const errDbtCleanupRemoved = "astro dbt cleanup was removed in Astro CLI v2, with no replacement: " +
-	"Cosmos Boost no longer writes into the project, so there is nothing to clean up. " +
-	"A deploy generates its sidecars into the bundle it uploads, and never ships the " +
-	".astro/dbt_metadata.json or .astro/manifest.slim.json files an earlier version wrote into the project; " +
-	"delete those by hand whenever you like"
+	"Astro CLI v2 no longer writes Cosmos Boost files into the project, and leaves out the ones earlier versions wrote " +
+	"from every bundle it deploys and every image it generates. " +
+	"Delete any old .astro/dbt_metadata.json and .astro/manifest.slim.json files by hand: " +
+	"a local Airflow running the Cosmos Boost plugin, or the build of a declared Dockerfile, may still read them"
 
 // newDbtCleanupRemovedCmd builds the astro dbt cleanup tombstone
 // (cliout.RemovedCommand), so a script that still runs it is told why rather

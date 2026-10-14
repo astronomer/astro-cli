@@ -106,12 +106,16 @@ func WriteToFile(filePath string, r io.Reader) error {
 	return err
 }
 
-// TarOverlay changes what Tar writes without touching source. Both maps are
-// keyed by slash-separated paths relative to source (before any base
-// directory is prepended): Skip leaves those files out, and Extra adds a
-// regular file with those bytes, in place of any file at the same path.
+// TarOverlay changes what Tar writes without touching source. Paths are
+// slash-separated and relative to source, before any base directory is
+// prepended.
 type TarOverlay struct {
-	Skip  map[string]bool
+	// Skip, when set, is asked about each regular file the walk would add, by
+	// rel and by its path on disk, and leaves it out on true. An error fails
+	// the tarball.
+	Skip func(rel, file string) (bool, error)
+	// Extra adds a regular file with these bytes at each path, in place of
+	// anything the walk finds there.
 	Extra map[string][]byte
 }
 
@@ -204,9 +208,9 @@ func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPr
 				return err
 			}
 
-			headerName, ok := tarEntryName(path, source, baseDir, excludePathPrefixes, overlay)
-			if !ok {
-				return nil
+			headerName, ok, err := tarEntryName(path, source, baseDir, excludePathPrefixes, overlay, info.Mode().IsRegular())
+			if err != nil || !ok {
+				return err
 			}
 			header.Name = headerName
 			logger.Debugf("Adding to tarball: %s", header.Name)
@@ -233,16 +237,15 @@ func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPr
 	return addExtrasToTar(tarball, baseDir, overlay.Extra)
 }
 
-// tarEntryName is the name file goes into the tarball under, or
-// false when it stays out: one the overlay replaces or skips, or one under an
-// excluded prefix.
-func tarEntryName(file, source, baseDir string, excludePathPrefixes []string, overlay TarOverlay) (string, bool) {
-	// set the tar file path to be relative to the source directory
-	relName := strings.TrimPrefix(file, filepath.Clean(source))
-	relName = strings.TrimPrefix(relName, string(filepath.Separator))
-	if rel := filepath.ToSlash(relName); overlay.Skip[rel] || overlay.Extra[rel] != nil {
-		logger.Debugf("Leaving out of the tarball: %s", rel)
-		return "", false
+// tarEntryName is the name file goes into the tarball under, or false when
+// it stays out: one under an excluded prefix, or one the overlay skips or
+// replaces. regular says file is a regular file, the only kind Skip is asked
+// about.
+func tarEntryName(file, source, baseDir string, excludePathPrefixes []string, overlay TarOverlay, regular bool) (name string, ok bool, err error) {
+	// the tar file path is relative to the source directory, which may be "."
+	relName, err := filepath.Rel(source, file)
+	if err != nil {
+		return "", false, err
 	}
 	// prepend the base directory to the tar file path, e.g. "dags/" to "my_dag.py",
 	// with forward slashes whatever the platform
@@ -252,10 +255,26 @@ func tarEntryName(file, source, baseDir string, excludePathPrefixes []string, ov
 	for _, excludePathPrefix := range excludePathPrefixes {
 		if strings.HasPrefix(headerName, excludePathPrefix) {
 			logger.Debugf("Excluding tarball path: %s", headerName)
-			return "", false
+			return "", false, nil
 		}
 	}
-	return headerName, true
+
+	rel := filepath.ToSlash(relName)
+	if regular && overlay.Skip != nil {
+		skip, err := overlay.Skip(rel, file)
+		if err != nil {
+			return "", false, err
+		}
+		if skip {
+			logger.Debugf("Leaving out of the tarball: %s", rel)
+			return "", false, nil
+		}
+	}
+	if overlay.Extra[rel] != nil {
+		logger.Debugf("Replacing in the tarball: %s", rel)
+		return "", false, nil
+	}
+	return headerName, true, nil
 }
 
 // addExtrasToTar writes each of extra into tarball under baseDir, in path

@@ -36,6 +36,54 @@ func TestSurveyProjectGenerated(t *testing.T) {
 	assert.ElementsMatch(t, s.Files, contextFiles(t, dst), "the survey and the copy agree")
 }
 
+// A generated image leaves out the Cosmos Boost files an earlier Astro CLI
+// wrote into the project, at any depth and dags/ included, judged by each
+// file's own marker: the plugin would read them as current. One from another
+// producer is the user's and is carried. The survey, the copy and the digest
+// agree.
+func TestGeneratedImageLeavesOutStaleCosmosBoostFiles(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"dags/dbt/shop/dbt_project.yml":                  "name: shop\n",
+		"dags/dbt/shop/.astro/dbt_metadata.json":         `{"generated_by":{"application":"astro"}}`,
+		"dags/dbt/shop/target/.astro/manifest.slim.json": `{"_generated_by":{"application":"astro"}}`,
+		"include/dbt/.astro/dbt_metadata.json":           `{"generated_by":{"application":"someone-else"}}`,
+		"include/dbt/.astro/notes.json":                  `{"generated_by":{"application":"astro"}}`,
+	})
+	want := []string{"dags/dbt/shop/dbt_project.yml", "include/dbt/.astro/dbt_metadata.json", "include/dbt/.astro/notes.json"}
+
+	s, err := SurveyProject(project, "", false)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, want, s.Files)
+	assert.Empty(t, s.CosmosBoost, "a generated build lists none: it carries none")
+
+	dst := t.TempDir()
+	require.NoError(t, copyProjectFiles(project, dst))
+	assert.ElementsMatch(t, want, contextFiles(t, dst))
+
+	before, err := ProjectFilesDigest(project)
+	require.NoError(t, err)
+	writeTree(t, project, map[string]string{"dags/dbt/shop/.astro/dbt_metadata.json": `{"generated_by":{"application":"astro"},"version":{"hash":"changed"}}`})
+	after, err := ProjectFilesDigest(project)
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "a file the image leaves out does not move its tag")
+}
+
+// A declared Dockerfile's context carries them, and the survey names them for
+// the warning.
+func TestSurveyProjectDeclaredNamesStaleCosmosBoostFiles(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"Dockerfile":                         "FROM x\n",
+		"dbt/.astro/dbt_metadata.json":       `{"generated_by":{"application":"astro"}}`,
+		"dbt/other/.astro/dbt_metadata.json": `{"generated_by":{"application":"someone-else"}}`,
+	})
+	s, err := SurveyProject(project, "Dockerfile", false)
+	require.NoError(t, err)
+	assert.Contains(t, s.Files, "dbt/.astro/dbt_metadata.json", "the declared context carries it")
+	assert.Equal(t, []string{"dbt/.astro/dbt_metadata.json"}, s.CosmosBoost)
+}
+
 // A .dockerignore that drops every DAG leaves none carried, which a deploy
 // that bakes DAGs into the image refuses.
 func TestSurveyProjectDagsDropped(t *testing.T) {

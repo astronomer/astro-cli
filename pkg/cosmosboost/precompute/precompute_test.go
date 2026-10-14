@@ -289,7 +289,7 @@ func TestRunProjectHashStableWithNestedManifestSidecar(t *testing.T) {
 	first := projectHash()
 	// Put the nested sidecar on disk, as a stale one from an earlier astro-cli
 	// (or the unpacked bundle) would be.
-	writeFiles(t, root, map[string]string{"proj/docs/.astro/dbt_metadata.json": oursSidecar})
+	writeFiles(t, root, map[string]string{"proj/docs/.astro/dbt_metadata.json": `{"generated_by":{"application":"astro"}}`})
 	second := projectHash()
 	if first != second {
 		t.Fatalf("project hash changed once the nested docs/.astro sidecar existed:\n first  %s\n second %s", first, second)
@@ -734,6 +734,29 @@ func TestRunFailsUnitWhenAstroIsAFile(t *testing.T) {
 	if summary.CountFailed() != 1 || len(summary.Artifacts()) != 0 {
 		t.Fatalf("want one failed unit and no artifacts, got %+v", summary.Results)
 	}
+}
+
+// TestRunFailsUnitWhenArtifactPathIsNotAFile: a directory where a sidecar
+// goes would collide with it in the bundle, so that unit fails and produces
+// nothing, while a regular file there (an old sidecar) is fine.
+func TestRunFailsUnitWhenArtifactPathIsNotAFile(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"blocked/dbt_project.yml":                     "name: blocked\n",
+		"blocked/.astro/dbt_metadata.json/inside.txt": "x",
+		"fine/dbt_project.yml":                        "name: fine\n",
+		"fine/.astro/dbt_metadata.json":               "old",
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CountFailed() != 1 {
+		t.Fatalf("want one failed unit, got %+v", summary.Results)
+	}
+	mustNotProduce(t, summary, filepath.Join(root, "blocked", sidecarDir, sidecarName))
+	mustProduce(t, summary, filepath.Join(root, "fine", sidecarDir, sidecarName))
 }
 
 // treeSnapshot maps every file under root to its contents.
