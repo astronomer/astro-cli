@@ -23,28 +23,47 @@ type devReplacement = scaffold.DevReplacement
 
 func devReplacements() []devReplacement { return scaffold.DevReplacements() }
 
-// devRemoved is the data behind the stub's output: the JSON payload in json
-// mode, and the source the human message is rendered from.
-type devRemoved struct {
-	Error       string           `json:"error"`
+// DevRemoved is the data behind the stub's output: the JSON payload in json
+// mode, and the source the human message is rendered from. It is the error
+// object every failure publishes (cliout.ErrorObject, whose keys lead it),
+// with the mapping besides, so a consumer reading only those keys reads it as
+// it reads any other failure. Error is the message's first sentence; code and
+// kind are filled in json mode, from the error the run returns. Exported for
+// the assembled root's tests, which see it published and name its golden
+// (cmd/schema_test.go).
+type DevRemoved struct {
+	cliout.ErrorObject
 	Typed       string           `json:"typed_command,omitempty"`
 	Replacement string           `json:"replacement,omitempty"`
 	Mapping     []devReplacement `json:"mapping"`
-	// Is1xProject is set when the current directory holds a 1.x
-	// project, which the replacements only work in once it is converted.
-	Is1xProject bool `json:"v1_project,omitempty"`
+	// Is1xProject is set when the working directory is inside a 1.x
+	// project, its root included; V1Dir names that root. The replacements
+	// only work there once it is converted.
+	Is1xProject bool   `json:"v1_project,omitempty"`
+	V1Dir       string `json:"v1_dir,omitempty"`
 	// Notes say what became of a flag the typed command carried that has no
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
 	// Convert is the command that converts a 1.x project in place, set with
-	// Is1xProject.
+	// Is1xProject unless astro init refuses that project here.
 	Convert string `json:"convert,omitempty"`
+	// UnderAPC and ContextUnresolved say astro init refuses the 1.x project
+	// the working directory is in or below: the current context is Astro
+	// Private Cloud, or one the CLI cannot resolve (project.Convert1xBlocked,
+	// which names the project only then).
+	// Notes then say why and what to do instead, and the mapping is empty and
+	// there is no Replacement or Convert, as the text names no astro local
+	// command: none runs in that project.
+	UnderAPC          bool `json:"under_apc,omitempty"`
+	ContextUnresolved bool `json:"context_unresolved,omitempty"`
 }
 
 // devContext is what the stub reads about the directory it runs in and the
 // command tree it points into.
 type devContext struct {
-	is1x bool
+	// in is the 1.x project the stub speaks of, if any, and why astro
+	// init refuses it here, if it does (devProject).
+	in project1x
 	// dockerfile is set when the current project declares [tool.astro]
 	// dockerfile, which only Docker mode builds.
 	dockerfile bool
@@ -59,38 +78,30 @@ type devContext struct {
 // one command that accepts any subcommand, names the exact replacement for
 // what was typed, and fails — so scripts and CI break loudly, and both
 // humans and coding agents learn the new surface from the error text.
+//
+// It is a stub like every removed command's (cliout.RemovedCommand), whose
+// guidance is a usage error, the kind cobra's own unknown command is: it
+// exits 2.
 func NewDevCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
-	cmd := &cobra.Command{
-		Use:     nameDev,
-		Aliases: []string{"d"},
-		Short:   "Removed in v2 — local Airflow lives under `astro local`",
-		// Listed nowhere: the guidance is for someone who typed the old
-		// command, not a menu entry teaching a command that is gone.
-		Hidden: true,
-		Args:   cobra.ArbitraryArgs,
-		// Old invocations carry flags this stub does not know; parsing
-		// them would fail before the guidance prints.
-		DisableFlagParsing: true,
-		// Usage is silenced (the guidance is the whole point); the error is
-		// not, so the runner prints the tombstone message.
-		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return c.runDevRemoved(cmd.Root(), args)
-		},
-	}
-	markSkipPreRun(cmd)
-	return cmd
+	return cliout.RemovedCommand(nameDev, []string{"d"}, "Removed in v2 — local Airflow lives under `astro local`", func(cmd *cobra.Command, args []string) error {
+		return c.runDevRemoved(cmd, args)
+	})
 }
 
-func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
+func (c *cli) runDevRemoved(cmd *cobra.Command, args []string) error {
+	root := cmd.Root()
 	payload := buildDevRemoved(devTypedSubcommand(args), args, devContext{
-		is1x:               c.is1xProject(),
+		in:                 c.devProject(),
 		dockerfile:         c.declaresDockerfile(),
 		buildSecret:        takesFlag(root, []string{"local", nameStart}, "build-secret"),
 		packageBuildSecret: takesFlag(root, []string{"package"}, "build-secret"),
 	})
 	if devWantsJSON(args) {
+		// The error object Execute would publish for this failure, as it
+		// would derive it, with the mapping besides.
+		err := cliout.Usage(errors.New(payload.Error))
+		payload.Code, payload.Kind = cliout.ExitCode(cmd.Context(), err), ProblemKinds.Of(err)
 		r := cliout.Renderer{Format: cliout.FormatJSON, Out: c.d.Stdout, Style: c.d.JSONStyle}
 		if err := r.Emit(payload, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, renderDevRemoved(payload))
@@ -98,9 +109,10 @@ func (c *cli) runDevRemoved(root *cobra.Command, args []string) error {
 		}); err != nil {
 			return err
 		}
-		return errors.New(payload.Error)
+		// The payload is the error object, so nothing is added on top of it.
+		return cliout.JSONShown(err)
 	}
-	return errors.New(renderDevRemoved(payload))
+	return cliout.Usage(errors.New(renderDevRemoved(payload)))
 }
 
 // devTypedSubcommand extracts what the user typed after `astro dev`: the
@@ -121,17 +133,11 @@ func devTypedSubcommand(args []string) string {
 	return strings.Join(words, " ")
 }
 
-// devWantsJSON honors the v2 --output convention without flag parsing.
+// devWantsJSON honors the v2 --output convention without flag parsing, read
+// as cliout.Execute reads it for any stub's failure, so the two agree on every
+// spelling (-ojson, -o=json) and on a -o json after "--".
 func devWantsJSON(args []string) bool {
-	for i, a := range args {
-		if a == "--output=json" || a == "-o=json" {
-			return true
-		}
-		if (a == "--output" || a == "-o") && i+1 < len(args) && args[i+1] == "json" {
-			return true
-		}
-	}
-	return false
+	return cliout.ArgsAskForJSON(args, "o")
 }
 
 // devReplacementFor finds the `astro local` command for an `astro dev` subcommand. The
@@ -149,15 +155,24 @@ func devReplacementFor(typed string) (string, bool) {
 	return "", false
 }
 
-func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
+func buildDevRemoved(typed string, args []string, dc devContext) DevRemoved {
 	mapping := devReplacements()
-	p := devRemoved{
+	p := DevRemoved{
 		Typed:       strings.TrimSpace("astro dev " + typed),
 		Mapping:     mapping,
-		Is1xProject: dc.is1x,
+		Is1xProject: dc.in.dir1x != "",
+		V1Dir:       dc.in.dir1x,
 	}
-	if dc.is1x {
-		p.Convert = replaceInit
+	// Where astro init refuses the 1.x project (project.Convert1xBlocked) it
+	// stays as it is, so nothing offers astro init.
+	stays := dc.in.dir1x != "" && dc.in.blocked != project.NotBlocked
+	if dc.in.dir1x != "" {
+		if !stays {
+			// From below the root, the convert command names the root. astro
+			// dev init's replacement stays astro init, which makes a project
+			// in the working directory, as 1.x's did.
+			p.Convert = dc.in.convert()
+		}
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
 		// project builds it in Docker mode.
@@ -165,11 +180,21 @@ func buildDevRemoved(typed string, args []string, dc devContext) devRemoved {
 			dc.dockerfile = true
 		}
 	}
+	if stays {
+		// No astro local command runs in this project, so none is named as
+		// the replacement; the notes say why and what to do instead.
+		p.UnderAPC, p.ContextUnresolved = dc.in.blocked == project.BlockedUnderAPC, dc.in.blocked == project.BlockedUnresolved
+		p.Mapping = []devReplacement{}
+		p.Notes = []string{
+			project.Blocked1xMessage(dc.in.blocked, dc.in.dir1x),
+			"The astro local commands work only in a converted project",
+		}
+	}
 	if typed == "" {
 		p.Error = "astro dev was removed in Astro CLI v2"
 		return p
 	}
-	if replacement, ok := devReplacementFor(typed); ok {
+	if replacement, ok := devReplacementFor(typed); ok && !stays {
 		p.Replacement = replacement
 		switch replacement {
 		case replaceStart, replaceRestart:
@@ -296,20 +321,33 @@ func (c *cli) declaresDockerfile() bool {
 
 // renderDevRemoved is the human rendering of the same payload json mode
 // emits.
-func renderDevRemoved(p devRemoved) string {
+func renderDevRemoved(p DevRemoved) string {
 	var b strings.Builder
 	b.WriteString(p.Error)
+	// astro dev init below a 1.x root: a new project here, or the 1.x project
+	// converted at its root, named here once.
+	initBelowRoot := p.Replacement == replaceInit && p.Convert != "" && p.Convert != replaceInit
 	switch {
+	case initBelowRoot:
+		fmt.Fprintf(&b, ". Use `%s` to make a new project here, or `%s` to convert the 1.x project at %s in place",
+			replaceInit, p.Convert, p.V1Dir)
 	case p.Replacement != "" && p.Convert != "" && p.Replacement != p.Convert:
 		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
 	case p.Replacement != "":
 		fmt.Fprintf(&b, ". Use `%s` instead", p.Replacement)
+	case p.UnderAPC || p.ContextUnresolved:
+		// The notes below say what to do instead.
 	case p.Typed != "astro dev":
 		b.WriteString(" and has no direct replacement")
 	}
 	b.WriteString(".")
 	for _, n := range p.Notes {
 		b.WriteString("\n" + n)
+	}
+	// Under APC, in a 1.x project no astro local command runs, so the notes
+	// are the whole answer.
+	if p.UnderAPC || p.ContextUnresolved {
+		return b.String()
 	}
 	b.WriteString("\nLocal Airflow now lives under `astro local`:\n\n")
 	examples := []devReplacement{
@@ -330,19 +368,57 @@ func renderDevRemoved(p devRemoved) string {
 		fmt.Fprintf(&b, "  %-24s # was: astro dev %s\n", e.Replacement, e.Command)
 	}
 	if p.Is1xProject {
-		fmt.Fprintf(&b, "\n\nThis directory holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
-			"Run `%s` here to convert it in place: it moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
-			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.Convert)
+		run := "Run " + p.Convert + " to convert it in place: it"
+		if initBelowRoot {
+			run = "Converting it"
+		}
+		fmt.Fprintf(&b, "\n\n%s holds a project made by Astro CLI 1.x (Dockerfile and .astro/). "+
+			"%s moves requirements.txt and packages.txt into pyproject.toml, carries what airflow_settings.yaml declares, "+
+			"and keeps the Dockerfile when it does more than pick a base image. The other commands above work once it is converted.", p.V1Dir, run)
 	}
 	return b.String()
 }
 
-// is1xProject reports whether the working directory holds a 1.x project,
-// per project.Is1xProject.
-func (c *cli) is1xProject() bool {
+// project1x is a 1.x project the stub speaks of: its directory, "" for
+// none, and why astro init refuses it here, if it does.
+type project1x struct {
+	dir1x   string
+	blocked project.Block
+	// below is set when the working directory is below dir1x rather than
+	// dir1x itself, so the command that converts it names dir1x.
+	below bool
+}
+
+// convert is the command that converts the 1.x project in place: astro init,
+// naming the project's directory when the working directory is below it, so
+// it converts the root rather than making a project inside it.
+func (p project1x) convert() string {
+	if !p.below {
+		return replaceInit
+	}
+	return replaceInit + " " + scaffold.ShellQuote(p.dir1x)
+}
+
+// devProject is the 1.x project the stub speaks of: the nearest one the
+// working directory is in or below, and why astro init refuses it there, if
+// it does. Under an APC or unresolved context both come from init's own
+// decision (project.Convert1xBlocked); elsewhere, where that decision walks
+// nothing, the stub walks once for the root it names (scaffold.Find1xProject).
+func (c *cli) devProject() project1x {
 	wd, err := c.d.WorkingDir()
 	if err != nil {
-		return false
+		return project1x{}
 	}
-	return project.Is1xProject(wd)
+	var why project.Block
+	var root string
+	if project.BlockingContext() {
+		why, root = project.Convert1xBlocked(wd)
+	} else {
+		root = scaffold.Find1xProject(wd)
+	}
+	abs, err := filepath.Abs(wd)
+	if err != nil {
+		abs = wd
+	}
+	return project1x{dir1x: root, blocked: why, below: root != "" && root != filepath.Clean(abs)}
 }

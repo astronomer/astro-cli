@@ -140,12 +140,17 @@ func TestUseTextMarksTheCurrentDeployment(t *testing.T) {
 	// an empty listing. The marked row is what proves rows reached the writer.
 	marked := false
 	for _, line := range strings.Split(out, "\n") {
-		if strings.HasPrefix(line, "*") && strings.Contains(line, "prod") && strings.Contains(line, "← default = true") {
+		// The default's mark is the one word every list of links uses: no
+		// arrow, and not the manifest's own `default = true`.
+		if strings.HasPrefix(line, "*") && strings.Contains(line, "prod") && strings.HasSuffix(strings.TrimSpace(line), "default") {
 			marked = true
 		}
 	}
 	if !marked {
 		t.Errorf("the listing should mark prod as current by the manifest default\n%s", out)
+	}
+	if strings.Contains(out, "←") || strings.Contains(out, "default = true") {
+		t.Errorf("the listing still marks the default the old way\n%s", out)
 	}
 	if strings.Contains(out, "LAYER") {
 		t.Errorf("the listing still prints the resolution rule\n%s", out)

@@ -83,12 +83,12 @@ func TestTransportIsBuiltOncePerBackend(t *testing.T) {
 // RoundTrip. It is easy to write by accident.
 func TestTransportFallsBackToTheDefault(t *testing.T) {
 	p := NewProxy("0", NewStore(t.TempDir()))
-	if got := p.transportFor("15001"); got != p.transport {
+	if got := p.hostTransportFor("15001"); got != p.transport {
 		t.Errorf("no supplier: got %v, want the shared transport", got)
 	}
 
 	p.Transport = func(string) http.RoundTripper { return nil }
-	if got := p.transportFor("15001"); got != p.transport {
+	if got := p.hostTransportFor("15001"); got != p.transport {
 		t.Errorf("supplier returned nil: got %v, want the shared transport", got)
 	}
 
@@ -96,7 +96,7 @@ func TestTransportFallsBackToTheDefault(t *testing.T) {
 		var typed *roundTripperStruct
 		return typed
 	}
-	if got := p.transportFor("15001"); got != p.transport {
+	if got := p.hostTransportFor("15001"); got != p.transport {
 		t.Errorf("supplier returned a typed nil: got %#v, want the shared transport", got)
 	}
 }
@@ -246,7 +246,7 @@ func TestErrorHandlerReplacesThePlain502(t *testing.T) {
 	}
 }
 
-// And without one, the plain 502 stands.
+// And without one, it is still a 502. What the body says is pages_test.go's.
 func TestWithoutAnErrorHandlerThe502Stands(t *testing.T) {
 	p := NewProxy("0", NewStore(t.TempDir()))
 	rp := p.getOrCreateProxy(refusedPort(t))

@@ -15,12 +15,32 @@ import (
 
 	"github.com/moby/patternmatcher"
 	"github.com/moby/patternmatcher/ignorefile"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
-// dockerignoreRules add the virtualenv and the local .env to localIgnoreRules.
-var dockerignoreRules = slices.Concat([]string{".venv/", ".env"}, localIgnoreRules)
+// dockerignoreRules are the virtualenv, git's metadata at any depth (a
+// repository's config can hold a token in a remote URL or an extraheader),
+// the files no shipped image carries (airflowrt.ShippedImageRules: the .env
+// family, airflow_settings.yaml, and a root airflow.db, airflow.cfg and
+// logs/), and localIgnoreRules. A generated image applies the same two
+// airflowrt lists (imagebuild.ShippedImageIgnores) and leaves out a
+// virtualenv and .git on its own.
+var dockerignoreRules = slices.Concat([]string{".venv/", gitRule}, airflowrt.ShippedImageRules(), localIgnoreRules)
 
-const dockerignoreHeader = "# Per-machine files Astro tools write into the project. Keep them out of the image.\n"
+// gitRule leaves git's metadata out of a declared Dockerfile's context. init
+// writes it, and a deploy or package names a .git its context carries
+// (LocalFilesWarningFor), since that image is pushed. LocalFilesWarning, which
+// `astro local start` runs, leaves it out of what it warns about: a local
+// image goes nowhere, and a project converted before the rule existed should
+// not start warning about it.
+const gitRule = "**/.git"
+
+// localWarnRules are dockerignoreRules without gitRule, the rules
+// LocalFilesWarning warns about.
+var localWarnRules = slices.DeleteFunc(slices.Clone(dockerignoreRules), func(r string) bool { return r == gitRule })
+
+const dockerignoreHeader = "# Local secrets and per-machine files. Keep them out of the image.\n"
 
 // dockerignorePath is the ignore file a build of dockerfile reads, relative to
 // the context. BuildKit reads <Dockerfile>.dockerignore instead of the
@@ -122,45 +142,124 @@ func planDockerignore(dir, dockerfile string) (*Change, error) {
 	}, nil
 }
 
-// LocalFilesWarning names the per-machine files a build of the project's own
-// Dockerfile would copy into its image, and the ignore file to add them to. dir
-// is the project root and dockerfile the manifest's [tool.astro] dockerfile. It
-// returns "" when there is nothing to say, and also when the ignore file cannot
-// be read or parsed, since the build reports that itself.
+// LocalFilesWarning names the local and per-machine files a build of the
+// project's own Dockerfile would copy into its image, and the ignore file to
+// add them to, for `astro local start`: it does not name .git (see gitRule).
+// dir is the project root and dockerfile the manifest's [tool.astro]
+// dockerfile. It returns "" when there is nothing to say, and also when the
+// ignore file cannot be read or parsed, since the build reports that itself.
 func LocalFilesWarning(dir, dockerfile string) string {
 	if dockerfile == "" {
 		return ""
 	}
 	rel := dockerignorePath(dir, dockerfile)
-	found := unignoredLocalFiles(dir, rel)
+	return localFilesMessage(dockerfile, filepath.ToSlash(rel), unignoredLocalFiles(dir, rel))
+}
+
+// LocalFilesWarningFor is the warning for an image that is pushed (a deploy's,
+// a package's), over a listing already made of what the build's context
+// carries: carried holds its paths, slash-separated and relative to the
+// project (files, and version-control metadata as a path of its own), and
+// ignoreFile is the ignore file the build reads, "" for none. It names .git
+// too.
+func LocalFilesWarningFor(dockerfile, ignoreFile string, carried []string) string {
+	if dockerfile == "" {
+		return ""
+	}
+	if ignoreFile == "" {
+		ignoreFile = fileDockerignore
+	}
+	return localFilesMessage(dockerfile, ignoreFile, localFilesAmong(carried, dockerignoreRules))
+}
+
+func localFilesMessage(dockerfile, ignoreFile string, found []string) string {
 	if len(found) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("the image built from %s would copy in these per-machine files: %s. To keep them out, add %s to %s",
-		dockerfile, strings.Join(found, ", "), pronoun(len(found)), filepath.ToSlash(rel))
+	return fmt.Sprintf("the image built from %s would copy in these local or per-machine files: %s. To keep them out, add %s to %s",
+		dockerfile, strings.Join(found, ", "), pronoun(len(found)), ignoreFile)
 }
 
-// unignoredLocalFiles lists the paths under dir that match dockerignoreRules
-// and that the ignore file at rel does not exclude, slash-separated, in rule
+// ruleMatchers are rules, one matcher each, so a match can be put in rule
 // order.
+func ruleMatchers(rules []string) []*patternmatcher.PatternMatcher {
+	out := make([]*patternmatcher.PatternMatcher, len(rules))
+	for i, rule := range rules {
+		pm, err := patternmatcher.New([]string{rule})
+		if err != nil {
+			panic(fmt.Sprintf("dockerignoreRules: %q: %v", rule, err)) // this package's own constants
+		}
+		out[i] = pm
+	}
+	return out
+}
+
+// localFilesAmong names, in rule order, the paths among carried that rules
+// match: for each, the shallowest of it and its parents a rule matches, so a
+// directory such as .venv is named rather than its files.
+func localFilesAmong(carried, rules []string) []string {
+	matchers := ruleMatchers(rules)
+	found := make([][]string, len(matchers))
+	seen := map[string]bool{}
+	for _, p := range carried {
+		parts := strings.Split(p, "/")
+	prefixes:
+		for n := 1; n <= len(parts); n++ {
+			prefix := strings.Join(parts[:n], "/")
+			for i, rule := range matchers {
+				if ok, err := rule.MatchesOrParentMatches(prefix); err == nil && ok {
+					if !seen[prefix] {
+						seen[prefix] = true
+						found[i] = append(found[i], prefix)
+					}
+					break prefixes
+				}
+			}
+		}
+	}
+	return slices.Concat(found...)
+}
+
+// unignoredLocalFiles lists the paths under dir that match localWarnRules
+// and that the ignore file at rel does not exclude (localFilesAmong). It walks
+// the project, since some rules (**/.env) match at any depth, but does not
+// enter a directory the ignore file excludes, one a rule names, or .git.
 func unignoredLocalFiles(dir, rel string) []string {
 	pm, _, err := readDockerignore(dir, rel)
 	if err != nil {
 		return nil
 	}
-	root := os.DirFS(dir)
-	var found []string
-	for _, rule := range dockerignoreRules {
-		matches, err := fs.Glob(root, strings.TrimSuffix(rule, "/"))
+	matchers := ruleMatchers(localWarnRules)
+	var carried []string
+	err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			continue
+			return nil //nolint:nilerr // an unreadable path is the build's to report
 		}
-		for _, m := range matches {
-			info, err := fs.Stat(root, m)
-			if err == nil && !excludes(pm, m, info.IsDir()) {
-				found = append(found, m)
+		r, err := filepath.Rel(dir, p)
+		if err != nil || r == "." {
+			return nil //nolint:nilerr // the root, or a path outside it
+		}
+		r = filepath.ToSlash(r)
+		if d.Name() == ".git" || excludes(pm, r, d.IsDir()) {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !d.IsDir() {
+			carried = append(carried, r)
+			return nil
+		}
+		for _, rule := range matchers {
+			if ok, err := rule.MatchesOrParentMatches(r); err == nil && ok {
+				carried = append(carried, r)
+				return fs.SkipDir
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		return nil
 	}
-	return found
+	return localFilesAmong(carried, localWarnRules)
 }

@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -23,14 +26,15 @@ import (
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
-	"github.com/astronomer/astro-cli/internal/userstate"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -481,19 +485,13 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	// must name its target like any other script.
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
-	// Only a run that is going to ask has any use for the ambient layers, and
-	// reading the pin is not free — it creates the project's state directory.
-	willPrompt := interactive && inProject && linkName == "" && manifestDeployment == ""
-	preselect, preselectFrom := deployPreselect(config.WorkingPath, willPrompt)
-
 	errOut := cmd.ErrOrStderr()
+	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
 		Manifest:         m,
 		LinkName:         linkName,
 		Deployment:       manifestDeployment,
-		Preselect:        preselect,
-		PreselectFrom:    preselectFrom,
 		WorkspaceID:      overrideWorkspace,
 		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
@@ -518,11 +516,32 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
+		// Resolved once, when a deploy that builds first needs it, and
+		// shared by the checks and the transport.
+		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
+		// A Deployment picked from the workspace rather than from the links is
+		// linked as `astro link add` would link it, once the deploy to it has
+		// succeeded, so the next deploy offers it by name. Only an interactive
+		// run picks one, so this is text mode.
+		Link: func(l scaffold.Link) error {
+			if err := scaffold.SaveLink(config.WorkingPath, nil, l); err != nil {
+				return err
+			}
+			fmt.Fprintf(errOut, "linked %s to astro deployment %s in %s\n", l.Name, l.Deployment, project.Marker)
+			// The save marks the project's former only link default = true;
+			// say so, since it is a line the user did not ask to change.
+			if after, err := manifest.Load(filepath.Join(config.WorkingPath, project.Marker)); err == nil {
+				if kept := scaffold.NewlyDefault(m, after); kept != "" {
+					fmt.Fprintf(errOut, "marked %s default = true: it was the project's only link, so its default, and stays so now there are two\n", kept)
+				}
+			}
+			return nil
+		},
 		// Two lines. The first is the → line every resolving command prints,
 		// once the target is settled, so a deploy says what it is about to act
 		// on the way `astro af dags list` does. The second says an image build
-		// can run for minutes with no transport output yet; the transport
-		// itself stays silent (the core's layer rules). It prints only once the
+		// is starting and can run for minutes; the build's own lines follow it
+		// on stderr, through the transport's progress writer. It prints only once the
 		// deployment has cleared the deploy, so a deploy refused before the
 		// build claims no build.
 		//
@@ -566,6 +585,23 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	return renderManifestDeploy(out, format, &res, warnings)
 }
 
+// onceEngine memoizes an engine resolver, so a deploy resolves its engine
+// once however many steps ask.
+func onceEngine(resolve func() (string, []string, error)) func() (string, []string, error) {
+	type engine struct {
+		bin string
+		env []string
+	}
+	once := sync.OnceValues(func() (engine, error) {
+		bin, env, err := resolve()
+		return engine{bin, env}, err
+	})
+	return func() (string, []string, error) {
+		e, err := once()
+		return e.bin, e.env, err
+	}
+}
+
 // announceDeployTarget prints the one line every resolving command puts on
 // stderr before it acts, so a deploy's target is never invisible either. It
 // matches cmd/local's announceInstance: the name, then what the name does not
@@ -578,37 +614,34 @@ func announceDeployTarget(w io.Writer, target manifestdeploy.Target) {
 	fmt.Fprintf(w, "→ %s (astro deployment %s)\n", target.LinkName, target.DeploymentID)
 }
 
+// noteIgnoredDeploymentEnv says, before the prompt, that an exported
+// ASTRO_DEPLOYMENT does not steer it. The variable once moved the prompt's
+// cursor, and someone who answers by habit should not find Enter now lands on
+// another Deployment unannounced. Nothing is said when it names the project's
+// default anyway, the row the prompt highlights, or when no prompt is coming:
+// a run that cannot be asked, or one that names its target.
+func noteIgnoredDeploymentEnv(w io.Writer, m *manifest.Manifest, interactive bool, named ...string) {
+	env := os.Getenv(instances.EnvVar)
+	// Outside a project (an --image-name deploy) there are no links for the
+	// variable to have chosen among.
+	if m == nil || env == "" || !interactive || slices.ContainsFunc(named, func(n string) bool { return n != "" }) {
+		return
+	}
+	def, _, ok := manifest.DefaultLink(m.Astro.Deployments)
+	switch {
+	case ok && def == env:
+		return
+	case ok:
+		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, with the project's default, %s, preselected\n", instances.EnvVar, env, def)
+	default:
+		fmt.Fprintf(w, "note: %s=%s chooses what the query commands read; astro deploy asks, and preselects nothing without a default link\n", instances.EnvVar, env)
+	}
+}
+
 // stdinIsTerminal reports whether this run can be asked which deployment to
 // ship to. It is a var rather than the call itself so a test can drive the
 // prompt without a pty.
 var stdinIsTerminal = func() bool { return term.IsTerminal(int(os.Stdin.Fd())) }
-
-// deployPreselect is what the ambient layers point at, for the prompt's cursor
-// and nothing else: ASTRO_DEPLOYMENT, then this project's `astro use` pin, in
-// the order the query commands rank them. It reports which one answered, so the
-// prompt can label the highlight with the thing that actually caused it.
-//
-// A pin that cannot be read is not worth failing a deploy over — the worst it
-// costs is a cursor on the first entry — so the error is dropped. And a run with
-// no prompt coming never reads the pin at all: userstate.Load creates the
-// project's state directory on the way past, and a `astro deploy prod` in CI
-// should not leave a cache directory behind for a question nobody asked.
-func deployPreselect(projectDir string, willPrompt bool) (name, from string) {
-	if name := os.Getenv(instances.EnvVar); name != "" {
-		return name, instances.EnvVar
-	}
-	if !willPrompt {
-		return "", ""
-	}
-	state, err := userstate.Load(projectDir)
-	if err != nil {
-		return "", ""
-	}
-	if state.Instance == "" {
-		return "", ""
-	}
-	return state.Instance, manifestdeploy.PinnedBy
-}
 
 // deployJSON is the single object `astro deploy --output json` emits when a manifest
 // deploy finishes. Fields that do not apply to a deploy kind are omitted: a
@@ -619,14 +652,22 @@ type deployJSON struct {
 	// Link is the manifest link the deploy resolved to, omitted when the target
 	// was named by id. It is what the person typed and what their teammates
 	// call it; the id alone makes a consumer look it up again.
-	Link             string         `json:"link,omitempty"`
-	Workspace        string         `json:"workspace"`
-	Type             string         `json:"type"`
-	ImageTag         string         `json:"image_tag,omitempty"`
-	DagBundleVersion string         `json:"dag_bundle_version,omitempty"`
-	RuntimeVersion   string         `json:"runtime_version,omitempty"`
-	URL              string         `json:"url,omitempty"`
-	Git              *deployGitJSON `json:"git,omitempty"`
+	Link             string `json:"link,omitempty"`
+	Workspace        string `json:"workspace"`
+	Type             string `json:"type"`
+	ImageTag         string `json:"image_tag,omitempty"`
+	DagBundleVersion string `json:"dag_bundle_version,omitempty"`
+	// DagsInImage is set on an image-and-dag deploy to a Deployment with DAG
+	// deploys off, which uploads no DAGs: the Deployment runs those inside
+	// the image.
+	DagsInImage bool `json:"dags_in_image,omitempty"`
+	// RemoteExecution is set on an image-and-dag deploy to a
+	// remote-execution Deployment with DAG deploys off, which uploads no
+	// DAGs.
+	RemoteExecution bool           `json:"remote_execution,omitempty"`
+	RuntimeVersion  string         `json:"runtime_version,omitempty"`
+	URL             string         `json:"url,omitempty"`
+	Git             *deployGitJSON `json:"git,omitempty"`
 	// Warnings are what the deploy warned about without failing, as text
 	// prints them on stderr (less the "warning: " prefix): an image shipped
 	// alone to a Deployment that takes DAG deploys, whose DAGs it left as
@@ -669,6 +710,8 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		Type:             res.Type,
 		ImageTag:         res.ImageTag,
 		DagBundleVersion: res.DagTarballVersion,
+		DagsInImage:      res.DagsInImage,
+		RemoteExecution:  res.RemoteExecution,
 		RuntimeVersion:   res.RuntimeVersion,
 		URL:              res.URL,
 	}
@@ -682,7 +725,17 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 			fmt.Fprintf(b, "Deployed DAGs (version %s) to %s.\n", res.DagTarballVersion, target)
 		case "image-only":
 			fmt.Fprintf(b, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
-		default: // image-and-dag
+		case "image-and-dag":
+			if res.DagsInImage {
+				fmt.Fprintf(b, "Deployed image (tag %s) to %s, with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.\n", res.ImageTag, target)
+				break
+			}
+			if res.RemoteExecution {
+				fmt.Fprintf(b, "Deployed image (tag %s) to %s. It runs remote execution with DAG deploys off, so no DAGs were uploaded.\n", res.ImageTag, target)
+				break
+			}
+			fallthrough
+		default:
 			fmt.Fprintf(b, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
 		}
 		if res.URL != "" {
@@ -777,24 +830,37 @@ type manifestDeployer struct {
 }
 
 // ConfirmTarget asks which deployment to ship to. Every interactive deploy that
-// did not name its target comes through here — a pin, ASTRO_DEPLOYMENT, or a
-// `default = true` marker moves the cursor and never skips the question
-// (docs/instances.md, "Deploy always asks").
+// did not name its target comes through here — the project's default link
+// moves the cursor and never skips the question (docs/instances.md, "Deploy
+// always asks").
 //
-// The highlight is labeled with what put it there, not with one word for all
-// three: a cursor sitting on an entry because a variable is exported in this
-// shell is a different fact from one sitting there because the committed
-// manifest says so, and only the reader can tell which they meant.
+// Each row ends in a marker rather than a column of its own: "linked" on the
+// project's links, "linked, default" on the default, nothing on a Deployment
+// picking would link. The words are the ones `astro use` and the `astro link`
+// pickers mark the default with.
 //
 // It takes a name or a number, names first: a link may legally be called "2",
 // and what the user typed is what they meant. Enter takes the highlighted entry
 // when there is one. With nothing highlighted there is no default on Enter: the
 // safe answer to "where should I ship this code" is never one the CLI picked by
 // itself. It asks on stderr, so stdout stays the deploy's own output.
-func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, preselect manifestdeploy.Preselect) (string, error) {
+func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, defaultLink string) (string, error) {
+	notes := make([]string, len(choices))
+	anyNote := false
+	for i, choice := range choices {
+		switch {
+		case choice.Unlinked:
+		case defaultLink != "" && choice.Name == defaultLink:
+			// Only a link is ever the default.
+			notes[i] = "linked, " + manifestdeploy.DefaultMark
+		default:
+			notes[i] = "linked"
+		}
+		anyNote = anyNote || notes[i] != ""
+	}
 	header := []string{"NAME", "WHERE"}
-	if preselect.Name != "" {
-		header = append(header, "PRESELECTED BY")
+	if anyNote {
+		header = append(header, "")
 	}
 	l := picker.List{
 		Title:  "Deploy to which deployment?",
@@ -810,13 +876,12 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 	}
 	for i, choice := range choices {
 		cells := []string{choice.Name, choice.Where}
-		chosen := preselect.Name != "" && choice.Name == preselect.Name
-		switch {
-		case chosen:
+		if anyNote {
+			cells = append(cells, notes[i])
+		}
+		chosen := defaultLink != "" && choice.Name == defaultLink
+		if chosen {
 			l.Default = i + 1
-			cells = append(cells, preselect.From)
-		case preselect.Name != "":
-			cells = append(cells, "")
 		}
 		l.AddRow(chosen, cells...)
 	}
@@ -827,17 +892,54 @@ func (d manifestDeployer) ConfirmTarget(choices []manifestdeploy.Choice, presele
 	return choices[i].Name, nil
 }
 
+// ListDeployments lists a workspace's Deployments under the deploy's login, for
+// the prompt to offer the ones the project does not link yet.
+//
+// The prompt waits on it, so it gives up after listDeploymentsTimeout and the
+// prompt offers the links alone. The list takes no context to cancel, so a
+// call that times out finishes in the background and is dropped.
+func (d manifestDeployer) ListDeployments(workspaceID string) ([]manifestdeploy.Deployment, error) {
+	type listed struct {
+		deps []astrov1.Deployment
+		err  error
+	}
+	done := make(chan listed, 1)
+	list, org, client := deployment.ListDeployments, d.login.context.Organization, d.login.client
+	go func() {
+		deps, err := list(workspaceID, org, client)
+		done <- listed{deps, err}
+	}()
+	var res listed
+	select {
+	case res = <-done:
+	case <-time.After(listDeploymentsTimeout):
+		return nil, fmt.Errorf("no answer after %s", listDeploymentsTimeout)
+	}
+	if res.err != nil {
+		return nil, res.err
+	}
+	out := make([]manifestdeploy.Deployment, 0, len(res.deps))
+	for i := range res.deps {
+		out = append(out, manifestdeploy.Deployment{ID: res.deps[i].Id, Name: res.deps[i].Name, WorkspaceID: res.deps[i].WorkspaceId})
+	}
+	return out, nil
+}
+
+// listDeploymentsTimeout bounds how long the deploy prompt waits for the
+// workspace's Deployments. A var so a test can shorten it.
+var listDeploymentsTimeout = 15 * time.Second
+
 // ResolveUnlinked runs the workspace-level pick/create flow and returns the
-// chosen deployment id.
-func (d manifestDeployer) ResolveUnlinked(workspaceID string) (string, error) {
+// chosen Deployment.
+func (d manifestDeployer) ResolveUnlinked(workspaceID string) (manifestdeploy.Deployment, error) {
 	if !d.login.current {
-		return "", errPickerOtherHost(d.login.context.Domain)
+		return manifestdeploy.Deployment{}, errPickerOtherHost(d.login.context.Domain)
 	}
 	dep, err := deployment.GetDeployment(workspaceID, "", "", false, nil, d.login.client)
 	if err != nil {
-		return "", err
+		return manifestdeploy.Deployment{}, err
 	}
-	return dep.Id, nil
+	return manifestdeploy.Deployment{ID: dep.Id, Name: dep.Name, WorkspaceID: dep.WorkspaceId}, nil
 }
 
 // DeployDags ships the project's dags/ through the dags-only transport.
@@ -890,6 +992,10 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		ImageName:     in.ImageName,
 		OnBuild:       in.OnBuild,
 		IncludeDags:   in.IncludeDags,
+		ImageAlone:    in.ImageAlone,
+		Warn:          in.Warn,
+		Survey:        in.Survey,
+		Engine:        in.Engine,
 		Description:   in.Description,
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
@@ -904,6 +1010,8 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		RuntimeVersion:    res.RuntimeVersion,
 		ImageTag:          res.ImageTag,
 		DagTarballVersion: res.DagTarballVersion,
+		DagsInImage:       res.DagsInImage,
+		RemoteExecution:   res.RemoteExecution,
 		URL:               res.URL,
 		Git:               toManifestDeployGit(res.Git),
 		DagDeployEnabled:  res.DagDeployEnabled,

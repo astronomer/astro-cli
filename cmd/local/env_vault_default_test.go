@@ -161,6 +161,36 @@ func TestPlainGlobalSetGoesToTheVaultMarkedPlain(t *testing.T) {
 	}
 }
 
+// The text a set or delete prints names the store once: an encrypted vault
+// value needs no mark, a plain global says unencrypted inside its one
+// parenthetical, a .env names its path, and a --plain delete does not call a
+// value it never saw stored unencrypted.
+func TestSetAndDeleteNameTheStore(t *testing.T) {
+	dir := secretEnvProject(t, "")
+	run := func(args ...string) string {
+		t.Helper()
+		d, out, _ := envDeps(t, dir, "")
+		if err := execute(t, d, append([]string{"local", "env", "variable"}, args...)...); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
+	}
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"set", "A", "--value", "x", "--project"}, "set variable A in vault\n"},
+		{[]string{"set", "B", "--value", "x", "--global"}, "set variable B in vault (global)\n"},
+		{[]string{"set", "C", "--value", "x", "--global", "--plain"}, "set variable C in vault (global, unencrypted)\n"},
+		{[]string{"set", "D", "--value", "x", "--plain"}, "set variable D in project (" + filepath.Join(dir, ".env") + ")\n"},
+		{[]string{"delete", "B", "--global", "--plain"}, "deleted variable B from vault (global)\n"},
+	} {
+		if got := run(tc.args...); !strings.HasPrefix(got, tc.want) {
+			t.Errorf("%v printed %q, want it to start %q", tc.args, got, tc.want)
+		}
+	}
+}
+
 // --secret is a deprecated no-op: it stores in the vault, as no flag does.
 // --secret=false still means plain, and --plain with --secret is refused.
 func TestTheSecretFlagIsADeprecatedAlias(t *testing.T) {

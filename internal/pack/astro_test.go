@@ -263,6 +263,14 @@ func TestAstroBuildTagIsContentAddressed(t *testing.T) {
 	changed, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.NotEqual(t, first.Image, changed.Image, "a changed input moves the tag")
+
+	// The image carries the project's files, so editing one moves the tag too.
+	req = testRequest(t)
+	require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, "include"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, "include", "helpers.py"), []byte("x = 2\n"), 0o600))
+	edited, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.NotEqual(t, first.Image, edited.Image, "an edited project file moves the tag")
 }
 
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {
@@ -558,6 +566,7 @@ func TestAstroBuildRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
 func TestAstroBuildWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	req := declaringRequest(t, "Dockerfile", "FROM my-own-base\nCOPY . .\n")
 	require.NoError(t, os.MkdirAll(filepath.Join(req.ProjectDir, ".astro", "standalone"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(req.ProjectDir, ".astro", "standalone", "airflow.db"), nil, 0o600))
 	var lines []string
 	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
 

@@ -47,6 +47,7 @@ var coreBelowCmd = []string{
 	"internal/platform/astro/deployment/clone",
 	"internal/project",
 	"internal/runtimecatalog",
+	"internal/shipcheck",
 	"internal/userstate",
 	"internal/vaultenv",
 	"pkg/airflowapi",

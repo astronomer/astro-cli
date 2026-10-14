@@ -1,0 +1,791 @@
+package proxy
+
+import (
+	"context"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+// af2AuthBackend is af2LoginBackend with the local default admin password, so
+// the proxy's login succeeds.
+func af2AuthBackend(t *testing.T, session string) (ts *httptest.Server, port string, pageCookies *[][]*http.Cookie, logins *int) {
+	t.Helper()
+	b := af2LoginBackend(t, session, "admin")
+	return b.ts, b.port, &b.pageCookies, &b.logins
+}
+
+// af2Backend is a simulated Airflow 2 webserver and what it saw.
+type af2Backend struct {
+	ts   *httptest.Server
+	port string
+
+	mu          sync.Mutex
+	pageCookies [][]*http.Cookie // the cookies each /page request carried, in order
+	logins      int              // successful POST /login
+	loginPages  int              // GET /login, one per login attempt
+	valid       map[string]bool  // session values /page accepts
+}
+
+// af2LoginBackend simulates an Airflow 2 webserver whose admin password is
+// adminPassword, as Flask-AppBuilder and Flask-WTF behave:
+//
+//   - There is no /auth/token (404), so fetchAirflowAuth falls through to the
+//     FAB login flow.
+//   - GET /login serves a CSRF form and, as Flask-WTF does to hold the token,
+//     sets an anonymous session cookie.
+//   - POST /login with the right credentials sets the logged-in session cookie
+//     (session) and redirects into the app. With the wrong ones it flashes and
+//     redirects back to /login, the anonymous session still set.
+//   - /page requires a logged-in session and, mirroring Flask/Werkzeug, reads
+//     the FIRST `session` cookie when duplicates arrive — the semantics that make
+//     an appended fresh cookie useless while a stale one rides in front.
+//     Rejections redirect with an absolute-URL Location, as FAB emits.
+//
+// Further values in alsoValid are logged-in sessions the backend accepts too,
+// such as one a person's browser got by logging in by hand.
+func af2LoginBackend(t *testing.T, session, adminPassword string, alsoValid ...string) *af2Backend {
+	t.Helper()
+	b := &af2Backend{valid: map[string]bool{session: true}}
+	for _, v := range alsoValid {
+		b.valid[v] = true
+	}
+	anon := 0
+	b.ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		switch r.URL.Path {
+		case "/login":
+			if r.Method == http.MethodPost {
+				if r.FormValue("csrf_token") != "csrf-123" {
+					// A rejected form re-renders the login page.
+					_, _ = w.Write([]byte(`<input name="csrf_token" value="csrf-123">`))
+					return
+				}
+				if r.FormValue("username") != "admin" || r.FormValue("password") != adminPassword {
+					http.Redirect(w, r, b.ts.URL+"/login/", http.StatusFound)
+					return
+				}
+				b.logins++
+				http.SetCookie(w, &http.Cookie{Name: airflowSessionCookie, Value: session, Path: "/"})
+				http.Redirect(w, r, b.ts.URL+"/home", http.StatusFound)
+				return
+			}
+			b.loginPages++
+			anon++
+			http.SetCookie(w, &http.Cookie{Name: airflowSessionCookie, Value: "anon-" + strconv.Itoa(anon), Path: "/"})
+			_, _ = w.Write([]byte(`<input name="csrf_token" value="csrf-123">`))
+		case "/api":
+			if c, err := r.Cookie(airflowSessionCookie); err != nil || !b.valid[c.Value] {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_, _ = w.Write([]byte("ok"))
+		case "/page":
+			b.pageCookies = append(b.pageCookies, r.Cookies())
+			var first string
+			for _, c := range r.Cookies() {
+				if c.Name == airflowSessionCookie {
+					first = c.Value
+					break
+				}
+			}
+			if !b.valid[first] {
+				w.Header().Set("Location", b.ts.URL+"/login/?next="+url.QueryEscape(b.ts.URL+"/page"))
+				w.WriteHeader(http.StatusFound)
+				return
+			}
+			_, _ = w.Write([]byte("ok"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(b.ts.Close)
+	b.port = backendPortOf(t, b.ts)
+	return b
+}
+
+func backendPortOf(t *testing.T, ts *httptest.Server) string {
+	t.Helper()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u.Port()
+}
+
+// proxiedGet sends GET path through p's reverse proxy for backendPort, as a
+// browser would through a project's hostname, and returns the response.
+func proxiedGet(t *testing.T, p *Proxy, backendPort, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	p.getOrCreateProxy(backendPort).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "http://project.localhost"+path, http.NoBody))
+	return rec
+}
+
+func TestEnsureRetriesFailuresAfterTTL(t *testing.T) {
+	port := af2LoginBackend(t, "boot", "admin").port
+
+	s := NewAirflowSessions()
+	// As if the first fetch raced Airflow's boot and failed.
+	s.sessions[port] = airflowAuthNone
+	s.tried[port] = time.Now()
+
+	s.Ensure(port)
+	if got := s.get(port); got != airflowAuthNone {
+		t.Fatalf("session = %q, want failure kept within TTL", got)
+	}
+
+	s.tried[port] = time.Now().Add(-2 * authRetryTTL)
+	s.Ensure(port)
+	if got := s.get(port); got != "Cookie session=boot" {
+		t.Fatalf("session = %q, want the re-fetched session after TTL", got)
+	}
+}
+
+// The non-redirect branch of isAirflowAuthRejection: API endpoints reject with
+// a bare 401 rather than a login redirect, and the transport must refresh and
+// replay those too.
+func TestAuthRetryTransportRecoversFromPlain401(t *testing.T) {
+	ts, port, _, _ := af2AuthBackend(t, "fresh")
+
+	s := NewAirflowSessions()
+	s.sessions[port] = "Cookie session=stale" // as if cached before a restart
+
+	rt := s.Transport(port, http.DefaultTransport)
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/api", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	injectAirflowAuth(req, s.get(port))
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 after refresh-and-replay of a plain 401", resp.StatusCode)
+	}
+}
+
+// The Airflow 2 half of the recovery pass: the replay must REPLACE the stale
+// session cookie, not ride alongside it. Unless the retry strips the rejected
+// cookie first, the replay carries "session=stale; session=fresh", Flask reads
+// the first, and the user dead-ends at the login flow the recovery exists to
+// avoid. Also exercises the absolute-URL Location form of the login redirect
+// and preservation of an unrelated cookie across the rebuild.
+func TestAuthRetryTransportRefreshesStaleAF2Cookie(t *testing.T) {
+	ts, port, pageCookies, _ := af2AuthBackend(t, "fresh")
+
+	s := NewAirflowSessions()
+	s.sessions[port] = "Cookie session=stale" // as if cached before a restart
+
+	rt := s.Transport(port, http.DefaultTransport)
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/page", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// As the request leaves the Rewrite hook: the browser's unrelated cookie,
+	// then injectAirflowAuth adding the (stale) cached session.
+	req.AddCookie(&http.Cookie{Name: "X-Airflow-Port", Value: port})
+	injectAirflowAuth(req, s.get(port))
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 after refresh-and-replay", resp.StatusCode)
+	}
+	if got := s.get(port); got != "Cookie session=fresh" {
+		t.Fatalf("cached session = %q, want refreshed cookie", got)
+	}
+
+	seen := *pageCookies
+	if len(seen) != 2 {
+		t.Fatalf("page requests = %d, want original + exactly one replay", len(seen))
+	}
+	sessions, others := cookieValues(seen[1], airflowSessionCookie), cookieValues(seen[1], "X-Airflow-Port")
+	if len(sessions) != 1 || sessions[0] != "fresh" {
+		t.Fatalf("replay carried session cookies %v, want exactly [fresh] — the stale cookie must be stripped, not appended to", sessions)
+	}
+	if len(others) != 1 || others[0] != port {
+		t.Fatalf("replay carried other cookies %v, want the unrelated cookie preserved", others)
+	}
+}
+
+func cookieValues(cookies []*http.Cookie, name string) []string {
+	var vals []string
+	for _, c := range cookies {
+		if c.Name == name {
+			vals = append(vals, c.Value)
+		}
+	}
+	return vals
+}
+
+// The replay guard: a request whose body can't be reproduced (GetBody == nil —
+// which is every bodied request the ReverseProxy forwards) must not be
+// replayed, and no session refresh should even be attempted; the original
+// rejection goes back to the caller untouched.
+func TestAuthRetryTransportNeverReplaysBodiedRequests(t *testing.T) {
+	var mu sync.Mutex
+	hits := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(ts.Close)
+	port := backendPortOf(t, ts)
+
+	s := NewAirflowSessions()
+	s.sessions[port] = "Cookie session=stale"
+
+	rt := s.Transport(port, http.DefaultTransport)
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v2/dags/x/dagRuns", strings.NewReader(`{"conf":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.GetBody = nil // as the ReverseProxy forwards it: the body streams and can't be reproduced
+	injectAirflowAuth(req, s.get(port))
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want the original 401 passed through", resp.StatusCode)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if hits != 1 {
+		t.Fatalf("backend hits = %d, want 1 — a bodied request must not be replayed (extra hits mean a replay or an auth fetch happened)", hits)
+	}
+}
+
+// The shape a real browser produces: Airflow 2's Set-Cookie responses pass
+// through the proxy untouched, so the browser holds its OWN session cookie and
+// sends it — riding ahead of anything the Rewrite hook adds.
+//
+// That ordering is load-bearing. requestAirflowAuth reads the request back with
+// req.Cookie, which returns the FIRST match, so if injection merely appended,
+// invalidation would be keyed on the browser's value, never match the cache,
+// and Ensure would keep serving the stale credential forever — cached successes
+// have no TTL, so the recovery this transport exists to provide would silently
+// never fire.
+func TestAuthRetryTransportRecoversWithBrowserHeldSessionCookie(t *testing.T) {
+	ts, port, pageCookies, _ := af2AuthBackend(t, "fresh")
+
+	s := NewAirflowSessions()
+	s.sessions[port] = "Cookie session=stale-cached" // as if cached before a restart
+
+	rt := s.Transport(port, http.DefaultTransport)
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/page", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The browser's own cookies go on first, exactly as they arrive, and only
+	// then does the Rewrite hook apply the cached auth.
+	req.AddCookie(&http.Cookie{Name: "X-Airflow-Port", Value: port})
+	req.AddCookie(&http.Cookie{Name: airflowSessionCookie, Value: "stale-browser"})
+	injectAirflowAuth(req, s.get(port))
+
+	// The outbound request must carry our credential, not the browser's.
+	if got := requestAirflowAuth(req); got != "Cookie session=stale-cached" {
+		t.Fatalf("requestAirflowAuth = %q, want the injected credential — invalidation keys on this", got)
+	}
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 after refresh-and-replay", resp.StatusCode)
+	}
+	if got := s.get(port); got != "Cookie session=fresh" {
+		t.Fatalf("cached session = %q, want the cache to have moved on to the refreshed cookie", got)
+	}
+
+	seen := *pageCookies
+	if len(seen) != 2 {
+		t.Fatalf("page requests = %d, want original + exactly one replay", len(seen))
+	}
+	sessions, others := cookieValues(seen[1], airflowSessionCookie), cookieValues(seen[1], "X-Airflow-Port")
+	if len(sessions) != 1 || sessions[0] != "fresh" {
+		t.Fatalf("replay carried session cookies %v, want exactly [fresh] — both the browser's and the rejected cookie must be gone", sessions)
+	}
+	if len(others) != 1 || others[0] != port {
+		t.Fatalf("replay carried other cookies %v, want the unrelated cookie preserved", others)
+	}
+}
+
+// The conservative half of the replace rule: with nothing to offer, the
+// caller's own session cookie must survive rather than being stripped for
+// nothing.
+func TestInjectAirflowAuthLeavesCookiesAloneWithoutCredential(t *testing.T) {
+	for _, auth := range []string{"", airflowAuthNone} {
+		req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/page", http.NoBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.AddCookie(&http.Cookie{Name: airflowSessionCookie, Value: "browser"})
+		injectAirflowAuth(req, auth)
+		c, err := req.Cookie(airflowSessionCookie)
+		if err != nil || c.Value != "browser" {
+			t.Errorf("auth %q: session cookie = %v (err %v), want the browser's own preserved", auth, c, err)
+		}
+	}
+}
+
+// Replacing the session cookie leaves every other cookie exactly as the client
+// sent it, including values Go's cookie parser would drop (JSON) or quote (a
+// space).
+func TestInjectAirflowAuthKeepsOtherCookiesAsSent(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/page", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Cookie", `session=old; prefs={"theme":"dark"}; a=b c; ok=1`)
+	injectAirflowAuth(req, "Cookie session=fresh")
+
+	want := `prefs={"theme":"dark"}; a=b c; ok=1; session=fresh`
+	if got := req.Header.Get("Cookie"); got != want {
+		t.Errorf("Cookie = %q, want %q", got, want)
+	}
+}
+
+// isAirflowAuthRejection parses Location and compares only the path, and the
+// doc comment leans on that to rule out false positives. Every other test here
+// feeds it a true positive, so a "simplification" to a substring check would
+// keep the suite green while breaking unrelated redirects — a /login-help page
+// or a ?next=/auth/login query would start triggering pointless re-auth and
+// replay.
+func TestIsAirflowAuthRejection(t *testing.T) {
+	// status + Location pairs rather than prebuilt responses: these are
+	// synthetic headers with no body, and a helper returning *http.Response
+	// trips bodyclose.
+	type probe struct {
+		status   int
+		location string
+	}
+
+	rejections := map[string]probe{
+		"401":                   {http.StatusUnauthorized, ""},
+		"relative AF3 login":    {http.StatusTemporaryRedirect, "/auth/login"},
+		"relative AF2 login":    {http.StatusFound, "/login"},
+		"trailing slash":        {http.StatusFound, "/login/"},
+		"absolute FAB login":    {http.StatusFound, "http://localhost:8080/login/?next=%2Fhome"},
+		"login with next query": {http.StatusFound, "/auth/login?next=%2Fdags"},
+	}
+	notRejections := map[string]probe{
+		"ok":                     {http.StatusOK, ""},
+		"server error":           {http.StatusInternalServerError, ""},
+		"forbidden is not stale": {http.StatusForbidden, ""},
+		"not modified":           {http.StatusNotModified, ""},
+		"redirect, no Location":  {http.StatusFound, ""},
+		"login-help page":        {http.StatusFound, "/login-help"},
+		"login as a path prefix": {http.StatusFound, "/loginsomething"},
+		"login deeper in path":   {http.StatusFound, "/docs/login/guide"},
+		"next names login":       {http.StatusFound, "/home?next=/auth/login"},
+		"absolute non-login":     {http.StatusFound, "http://localhost:8080/home"},
+	}
+
+	check := func(t *testing.T, cases map[string]probe, want bool) {
+		t.Helper()
+		for name, c := range cases {
+			r := &http.Response{StatusCode: c.status, Header: make(http.Header)}
+			if c.location != "" {
+				r.Header.Set("Location", c.location)
+			}
+			if got := isAirflowAuthRejection(r); got != want {
+				t.Errorf("%s: isAirflowAuthRejection = %v, want %v", name, got, want)
+			}
+		}
+	}
+
+	t.Run("rejections", func(t *testing.T) { check(t, rejections, true) })
+	t.Run("not rejections", func(t *testing.T) { check(t, notRejections, false) })
+}
+
+// A page load sends many requests at once. Without collapsing them, each runs
+// its own lookup — for Airflow 2 a full two-request FAB login apiece.
+func TestEnsureCollapsesConcurrentLogins(t *testing.T) {
+	var mu sync.Mutex
+	logins := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/token" {
+			mu.Lock()
+			logins++
+			mu.Unlock()
+			time.Sleep(50 * time.Millisecond) // hold the flow open so callers pile up
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(ts.Close)
+	port := strconv.Itoa(ts.Listener.Addr().(*net.TCPAddr).Port)
+
+	s := NewAirflowSessions()
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Go(func() { s.Ensure(port) })
+	}
+	wg.Wait()
+
+	mu.Lock()
+	got := logins
+	mu.Unlock()
+	if got != 1 {
+		t.Errorf("login flows = %d, want exactly 1 for a concurrent burst", got)
+	}
+	if auth := s.get(port); auth != airflowAuthServer {
+		t.Errorf("cached session = %q, want the Airflow 3 sentinel", auth)
+	}
+}
+
+// A request that finds a login already in flight for its backend waits for it
+// only as long as the request lasts. A person who gives up on a page must not
+// stay parked behind a login to a backend that never answers.
+func TestAWaiterGivesUpWithItsRequest(t *testing.T) {
+	s := NewAirflowSessions()
+	started, release := make(chan struct{}), make(chan struct{})
+	s.fetch = func(string) (string, error) {
+		close(started)
+		<-release
+		return "Cookie session=late", nil
+	}
+	t.Cleanup(func() { close(release) })
+
+	go s.Ensure("15001") // the login in flight
+	<-started
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	returned := make(chan struct{})
+	go func() {
+		s.ensure(ctx, "15001")
+		close(returned)
+	}()
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("a canceled request kept waiting on another request's login")
+	}
+}
+
+// A bodied request can't be replayed, but the credential it carried is still
+// known-bad. Leaving it cached means the user's next request fails the same
+// way; dropping it means the retry (or the page's next GET) re-authenticates
+// and succeeds. The drop must not itself trigger a login — that's the replay
+// guard's job, and the request has already returned.
+func TestAuthRetryTransportInvalidatesOnBodiedRejection(t *testing.T) {
+	var mu sync.Mutex
+	hits := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		mu.Lock()
+		hits++
+		mu.Unlock()
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	t.Cleanup(ts.Close)
+	port := backendPortOf(t, ts)
+
+	s := NewAirflowSessions()
+	s.sessions[port] = "Cookie session=stale"
+	s.tried[port] = time.Now()
+
+	rt := s.Transport(port, http.DefaultTransport)
+	req, err := http.NewRequest(http.MethodPost, ts.URL+"/api/v2/dags/x/dagRuns", strings.NewReader(`{"conf":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.GetBody = nil
+	injectAirflowAuth(req, s.get(port))
+
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if _, cached := s.sessions[port]; cached {
+		t.Error("the rejected credential should have been dropped from the cache")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if hits != 1 {
+		t.Errorf("backend hits = %d, want 1 — invalidation must not replay or re-authenticate", hits)
+	}
+}
+
+// The point of the move: a page opened through the proxy for an Airflow 2
+// project arrives logged in, the proxy having run FAB's login form itself.
+func TestAProxiedRequestArrivesLoggedInToAirflow2(t *testing.T) {
+	_, port, pageCookies, _ := af2AuthBackend(t, "minted")
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	rec := proxiedGet(t, p, port, "/page")
+	if rec.Code != http.StatusOK || rec.Body.String() != "ok" {
+		t.Fatalf("status %d, body %q: want Airflow 2's page, not its login", rec.Code, rec.Body.String())
+	}
+	if seen := *pageCookies; len(seen) != 1 || len(cookieValues(seen[0], airflowSessionCookie)) != 1 {
+		t.Fatalf("page requests %v, want one, carrying the minted session", seen)
+	}
+}
+
+// An Airflow restart invalidates the cached session; the next page through the
+// proxy still arrives, because the proxy's transport carries the recovery pass.
+func TestAProxiedRequestRecoversFromAStaleSession(t *testing.T) {
+	_, port, pageCookies, _ := af2AuthBackend(t, "after-restart")
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.Sessions.sessions[port] = "Cookie session=before-restart"
+	p.Sessions.tried[port] = time.Now()
+
+	rec := proxiedGet(t, p, port, "/page")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, want the page after a refresh-and-replay", rec.Code)
+	}
+	if n := len(*pageCookies); n != 2 {
+		t.Fatalf("page requests = %d, want the rejected one and its replay", n)
+	}
+}
+
+// A local Airflow 3 runs with every user an admin, and its middleware puts its
+// own admin credential on each request. The proxy adds nothing: every page
+// goes through as it would without the proxy, and the backend is looked at
+// once, not on every page.
+func TestAnAirflow3WithAllAdminsIsGivenNoCredential(t *testing.T) {
+	var mu sync.Mutex
+	probes := 0
+	var authHeaders []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch r.URL.Path {
+		case "/auth/token":
+			probes++
+			w.WriteHeader(http.StatusCreated)
+		default:
+			authHeaders = append(authHeaders, r.Header.Get("Authorization"))
+			_, _ = w.Write([]byte("page " + r.URL.Path))
+		}
+	}))
+	t.Cleanup(ts.Close)
+	port := backendPortOf(t, ts)
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	for _, path := range []string{"/", "/dags", "/api/v2/dags"} {
+		if rec := proxiedGet(t, p, port, path); rec.Code != http.StatusOK || rec.Body.String() != "page "+path {
+			t.Errorf("%s: status %d, body %q, want the page unchanged", path, rec.Code, rec.Body.String())
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if probes != 1 {
+		t.Errorf("probes = %d, want 1 for the backend, not one per page", probes)
+	}
+	for i, h := range authHeaders {
+		if h != "" {
+			t.Errorf("page request %d carried Authorization %q, want none from the proxy", i, h)
+		}
+	}
+}
+
+// What an injected bearer used to break. An Airflow 3 reads the first
+// Authorization header, ahead of the admin credential its all-admins
+// middleware adds, so a token the proxy cached would be validated in its
+// place: rejected once it expired, or once the project's signing key changed.
+// The fake rejects any bearer but the one the client brought itself, and the
+// client's own Authorization must arrive as it was sent, POST included.
+func TestAnAirflow3RequestKeepsItsOwnAuthorization(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/token" {
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
+		if h := r.Header.Values("Authorization"); len(h) > 0 && (len(h) != 1 || h[0] != "Bearer ui-own") {
+			http.Error(w, "Invalid JWT", http.StatusForbidden)
+			return
+		}
+		_, _ = w.Write([]byte("ok"))
+	}))
+	t.Cleanup(ts.Close)
+	port := backendPortOf(t, ts)
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(method, "http://project.localhost/api/v2/dags", strings.NewReader("{}"))
+		req.Header.Set("Authorization", "Bearer ui-own")
+		p.getOrCreateProxy(port).ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s with the client's own bearer: status %d %q, want it to arrive untouched", method, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+// A port that an Airflow 3 project held and an Airflow 2 project now holds:
+// the cache still says "Airflow 3, nothing to add", so the first page is
+// bounced to the login form. That rejection sends the port to be looked at
+// again, and the page arrives logged in.
+func TestAPortTakenOverByAnAirflow2IsLoggedIn(t *testing.T) {
+	_, port, pageCookies, logins := af2AuthBackend(t, "minted")
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.Sessions.sessions[port] = airflowAuthServer
+	p.Sessions.tried[port] = time.Now().Add(-2 * authRetryTTL)
+
+	rec := proxiedGet(t, p, port, "/page")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, want the page after the port was looked at again", rec.Code)
+	}
+	if *logins != 1 || len(*pageCookies) != 2 {
+		t.Errorf("logins = %d, page requests = %d; want one login and the rejected page replayed once", *logins, len(*pageCookies))
+	}
+}
+
+// A backend that offers no login at all still answers every page. The failed
+// login is cached, so it costs one attempt per authRetryTTL rather than one per
+// request.
+func TestABackendWithNoLoginIsLeftAlone(t *testing.T) {
+	var mu sync.Mutex
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth/token", "/login":
+			mu.Lock()
+			attempts++
+			mu.Unlock()
+			http.NotFound(w, r)
+		default:
+			_, _ = w.Write([]byte("open"))
+		}
+	}))
+	t.Cleanup(ts.Close)
+	port := backendPortOf(t, ts)
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	for range 3 {
+		if rec := proxiedGet(t, p, port, "/page"); rec.Code != http.StatusOK || rec.Body.String() != "open" {
+			t.Fatalf("status %d, body %q, want the page", rec.Code, rec.Body.String())
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if attempts != 2 { // one /auth/token, one GET /login, then the cached failure
+		t.Errorf("login requests = %d, want 2 — one attempt, then the failure cached", attempts)
+	}
+}
+
+// A refused login is a failure, not a session. Flask-WTF has already set an
+// anonymous session cookie by the time the form is posted, so a login that
+// only checks for "a session cookie" takes that one for success.
+func TestARefusedAirflow2LoginIsReportedAsAFailure(t *testing.T) {
+	b := af2LoginBackend(t, "minted", "generated-elsewhere")
+
+	auth, err := fetchAirflowAuth(b.port)
+	if err == nil {
+		t.Fatalf("fetchAirflowAuth = %q, nil; want an error for a refused login", auth)
+	}
+}
+
+// An Airflow 2 whose admin password isn't the local default (a non-macOS
+// standalone generates its own) refuses the proxy's login. A person who logged
+// in by hand still gets through: their own session cookie reaches Airflow
+// untouched on every request, and the refused login is tried once and cached
+// rather than run again on each page.
+func TestARefusedLoginLeavesThePersonsOwnSessionAlone(t *testing.T) {
+	b := af2LoginBackend(t, "minted", "generated-elsewhere", "logged-in-by-hand")
+	p := NewProxy("0", NewStore(t.TempDir()))
+
+	for i := range 3 {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://project.localhost/page", http.NoBody)
+		req.AddCookie(&http.Cookie{Name: airflowSessionCookie, Value: "logged-in-by-hand"})
+		p.getOrCreateProxy(b.port).ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("request %d: status %d, want the page for the person's own session", i, rec.Code)
+		}
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for i, cookies := range b.pageCookies {
+		if got := cookieValues(cookies, airflowSessionCookie); len(got) != 1 || got[0] != "logged-in-by-hand" {
+			t.Errorf("page request %d carried session cookies %v, want only the person's own", i, got)
+		}
+	}
+	if b.loginPages != 1 {
+		t.Errorf("login attempts = %d, want 1: a refused login is cached, not retried on every page", b.loginPages)
+	}
+}
+
+// Sessions nil turns the login off: the backend sees no login attempt and the
+// page answers as Airflow would to anyone.
+func TestNilSessionsTurnsTheLoginOff(t *testing.T) {
+	_, port, _, logins := af2AuthBackend(t, "minted")
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.Sessions = nil
+
+	if rec := proxiedGet(t, p, port, "/page"); rec.Code != http.StatusFound {
+		t.Errorf("status %d, want Airflow 2's redirect to its login page", rec.Code)
+	}
+	if *logins != 0 {
+		t.Errorf("logins = %d, want none", *logins)
+	}
+}
+
+// One cache shared by a host's proxies logs each backend in once, however many
+// of them relay it. The desktop's hostname proxy and its iframe proxies are
+// the case this exists for.
+func TestASharedSessionLogsInOnce(t *testing.T) {
+	_, port, _, logins := af2AuthBackend(t, "minted")
+	shared := NewAirflowSessions()
+	a := NewProxy("0", NewStore(t.TempDir()))
+	b := NewProxy("0", NewStore(t.TempDir()))
+	a.Sessions, b.Sessions = shared, shared
+
+	for _, p := range []*Proxy{a, b} {
+		if rec := proxiedGet(t, p, port, "/page"); rec.Code != http.StatusOK {
+			t.Fatalf("status %d, want the page", rec.Code)
+		}
+	}
+	if *logins != 1 {
+		t.Errorf("logins = %d, want 1 across both proxies", *logins)
+	}
+}
+
+// The session's recovery pass wraps the host's transport rather than replacing
+// it, so a host's settings (the desktop turns keep-alives off) carry every
+// round trip, the replay included.
+func TestTheSessionWrapsTheHostsTransport(t *testing.T) {
+	host := &http.Transport{DisableKeepAlives: true}
+	p := NewProxy("0", NewStore(t.TempDir()))
+	p.Transport = func(string) http.RoundTripper { return host }
+
+	retry, ok := p.transportFor("15001").(*authRetryTransport)
+	if !ok {
+		t.Fatalf("transport = %T, want the session's recovery pass", p.transportFor("15001"))
+	}
+	if retry.inner != host {
+		t.Errorf("the recovery pass wraps %T, want the host's transport", retry.inner)
+	}
+
+	p.Sessions = nil
+	if got := p.transportFor("15001"); got != host {
+		t.Errorf("with no Sessions, transport = %T, want the host's own", got)
+	}
+}

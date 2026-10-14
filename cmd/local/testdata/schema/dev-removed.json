@@ -1,5 +1,7 @@
 {
   "error": "x",
+  "code": -1,
+  "kind": "x",
   "typed_command": "x",
   "replacement": "x",
   "mapping": [
@@ -9,8 +11,11 @@
     }
   ],
   "v1_project": true,
+  "v1_dir": "x",
   "notes": [
     "x"
   ],
-  "convert": "x"
+  "convert": "x",
+  "under_apc": true,
+  "context_unresolved": true
 }
