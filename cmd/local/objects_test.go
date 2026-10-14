@@ -169,12 +169,12 @@ func TestEnvSourcedValuesArePointedAt(t *testing.T) {
 		want    string
 		notWant string
 	}{
-		{runAstroLinkQuery, nil, "connections", "`astro env connection list --deployment clm2xk9dq000108l7a2b3c4d5`", ""},
-		{runAstroLinkQuery, nil, "variables", "`astro env airflow-variable list --deployment clm2xk9dq000108l7a2b3c4d5`", ""},
+		{runAstroLinkQuery, nil, "connections", "astro env connection list --deployment clm2xk9dq000108l7a2b3c4d5", ""},
+		{runAstroLinkQuery, nil, "variables", "astro env airflow-variable list --deployment clm2xk9dq000108l7a2b3c4d5", ""},
 		{runQuery, nil, "connections", "not in Airflow's database", "astro env"},
 		{runQuery, nil, "variables", "not in Airflow's database", "astro env"},
-		{runLocalQuery, []string{"local", afName}, "connections", "`astro local env connection list`", ""},
-		{runLocalQuery, []string{"local", afName}, "variables", "`astro local env airflow-variable list`", ""},
+		{runLocalQuery, []string{"local", afName}, "connections", "astro local env connection list", ""},
+		{runLocalQuery, []string{"local", afName}, "variables", "astro local env airflow-variable list", ""},
 	}
 	for _, tc := range cases {
 		args := append(append([]string(nil), tc.prefix...), tc.family)

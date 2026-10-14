@@ -714,7 +714,7 @@ func pipInstallNote(data []byte) []string {
 		quoted[i] = `"` + s + `"`
 	}
 	return []string{"Dockerfile: its RUN steps install " + strings.Join(quoted, ", ") +
-		". Standalone mode and `astro local check` do not have " + pronoun(len(specs)) +
+		". Standalone mode and astro local check do not have " + pronoun(len(specs)) +
 		" unless you add " + pronoun(len(specs)) + " to [project] dependencies"}
 }
 

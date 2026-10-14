@@ -154,7 +154,7 @@ func TestDeploymentInspectPrintsPinnedBytes(t *testing.T) {
 			}
 			want, err := os.ReadFile(path)
 			require.NoError(t, err, "missing golden; regenerate with make update-schemas")
-			require.Equal(t, string(want), out, "`astro deployment inspect %s` changed its bytes", strings.Join(tc.args, " "))
+			require.Equal(t, string(want), out, "astro deployment inspect %s changed its bytes", strings.Join(tc.args, " "))
 		})
 	}
 }

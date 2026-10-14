@@ -131,10 +131,10 @@ func TestAirflowUpgradePromptMatchesTheDesktopsWordForWord(t *testing.T) {
 func TestAirflowUpgradePromptUsesTheCallersWords(t *testing.T) {
 	p := AirflowUpgradePrompt(ptr(promptBase()), UpgradePromptOptions{
 		Editor:  "The Astro CLI",
-		BringUp: "`astro local restart` if it is running, `astro local start` if it is stopped",
+		BringUp: "astro local restart if it is running, astro local start if it is stopped",
 	})
 	assert.Contains(t, p, "The Astro CLI has already made the mechanical edit")
-	assert.Contains(t, p, "bring Airflow up on 3.1: `astro local restart` if it is running, `astro local start` if it is stopped.")
+	assert.Contains(t, p, "bring Airflow up on 3.1: astro local restart if it is running, astro local start if it is stopped.")
 	assert.NotContains(t, p, "Astro Desktop")
 	assert.NotContains(t, p, "airflow_restart")
 }

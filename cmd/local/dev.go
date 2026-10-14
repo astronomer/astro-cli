@@ -84,7 +84,7 @@ type devContext struct {
 // exits 2.
 func NewDevCmd(d Deps) *cobra.Command {
 	c := &cli{d: d}
-	return cliout.RemovedCommand(nameDev, []string{"d"}, "Removed in v2 — local Airflow lives under `astro local`", func(cmd *cobra.Command, args []string) error {
+	return cliout.RemovedCommand(nameDev, []string{"d"}, "Removed in v2 — local Airflow lives under astro local", func(cmd *cobra.Command, args []string) error {
 		return c.runDevRemoved(cmd, args)
 	})
 }
@@ -203,7 +203,7 @@ func buildDevRemoved(typed string, args []string, dc devContext) DevRemoved {
 			p.Replacement, p.Notes = devBuildReplacement(args, dc)
 		}
 	}
-	p.Error = fmt.Sprintf("`%s` was removed in Astro CLI v2", p.Typed)
+	p.Error = fmt.Sprintf("%s was removed in Astro CLI v2", p.Typed)
 	return p
 }
 
@@ -227,7 +227,7 @@ func devStartReplacement(replacement string, args []string, dc devContext) (comm
 	}
 	cmd, notes = withBuildSecrets(cmd, args, dc.buildSecret, dc)
 	if builds && replacement == replaceRestart {
-		notes = append(notes, fmt.Sprintf("With nothing running, restart starts in standalone mode, which builds no image; use `%s --docker` then", replaceStart))
+		notes = append(notes, fmt.Sprintf("With nothing running, restart starts in standalone mode, which builds no image; then use %s --docker", replaceStart))
 	}
 	if slices.ContainsFunc(args, isWaitFlag) {
 		example := "10m"
@@ -329,12 +329,12 @@ func renderDevRemoved(p DevRemoved) string {
 	initBelowRoot := p.Replacement == replaceInit && p.Convert != "" && p.Convert != replaceInit
 	switch {
 	case initBelowRoot:
-		fmt.Fprintf(&b, ". Use `%s` to make a new project here, or `%s` to convert the 1.x project at %s in place",
+		fmt.Fprintf(&b, ". Use %s to make a new project here, or %s to convert the 1.x project at %s in place",
 			replaceInit, p.Convert, p.V1Dir)
 	case p.Replacement != "" && p.Convert != "" && p.Replacement != p.Convert:
-		fmt.Fprintf(&b, ". Convert with `%s`, then use `%s`", p.Convert, p.Replacement)
+		fmt.Fprintf(&b, ". Convert with %s, then use %s", p.Convert, p.Replacement)
 	case p.Replacement != "":
-		fmt.Fprintf(&b, ". Use `%s` instead", p.Replacement)
+		fmt.Fprintf(&b, ". Use %s instead", p.Replacement)
 	case p.UnderAPC || p.ContextUnresolved:
 		// The notes below say what to do instead.
 	case p.Typed != "astro dev":
@@ -349,7 +349,7 @@ func renderDevRemoved(p DevRemoved) string {
 	if p.UnderAPC || p.ContextUnresolved {
 		return b.String()
 	}
-	b.WriteString("\nLocal Airflow now lives under `astro local`:\n\n")
+	b.WriteString("\nLocal Airflow now lives under astro local:\n\n")
 	examples := []devReplacement{
 		{Command: nameStart, Replacement: replaceStart},
 		{Command: nameLogs, Replacement: replaceLogs},

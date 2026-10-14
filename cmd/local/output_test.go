@@ -208,12 +208,12 @@ func TestFailingCommandEmitsJSONErrorObject(t *testing.T) {
 func TestUnknownLocalSubcommandFails(t *testing.T) {
 	d, _ := testDeps(t)
 	if err := execute(t, d, "local", "bogus"); err == nil {
-		t.Fatal("`astro local bogus` must fail, not print help and exit 0")
+		t.Fatal("astro local bogus must fail, not print help and exit 0")
 	}
 	// A bare `astro local` prints help and succeeds.
 	d, _ = testDeps(t)
 	if err := execute(t, d, "local"); err != nil {
-		t.Fatalf("bare `astro local` should succeed: %v", err)
+		t.Fatalf("bare astro local should succeed: %v", err)
 	}
 }
 

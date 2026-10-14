@@ -254,10 +254,10 @@ func (r *Runtime) refuseLiveStart(p Plan) error {
 	// tells a person which command to type, a claim lets its consumer decide
 	// — but what happened is now the same value either way.
 	if rec.Mode != p.Mode {
-		return fmt.Errorf("%w: local Airflow is already running for this project in %s mode; stop it first with `astro local stop`",
+		return fmt.Errorf("%w: local Airflow is already running for this project in %s mode; stop it first with astro local stop",
 			ErrForeignMode, modeLabel(rec.Mode))
 	}
-	return fmt.Errorf("%w; use `astro local restart` to restart it or `astro local stop` to stop it", ErrAlreadyRunning)
+	return fmt.Errorf("%w; use astro local restart to restart it or astro local stop to stop it", ErrAlreadyRunning)
 }
 
 // RunInImage runs one command in a docker-mode project's image, with no

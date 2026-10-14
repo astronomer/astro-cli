@@ -214,7 +214,7 @@ func checkInScope(obj *astrov1.EnvironmentObject, id string, scope Scope, object
 		want, id, owner, obj.ScopeEntityId, strings.ToLower(string(wantScope)), wantEntity, owner, obj.ScopeEntityId)
 	if obj.Scope == astrov1.EnvironmentObjectScopeWORKSPACE && scope.DeploymentID != "" && objectType != objectTypeMetrics {
 		msg = fmt.Sprintf("%s %s belongs to workspace %s, not deployment %s. To change it everywhere, pass --workspace %s. "+
-			"To remove it from just this deployment, use `astro env %s link delete` (or `link set --exclude` if it is auto-linked)",
+			"To remove it from just this deployment, use astro env %s link delete (or link set --exclude if it is auto-linked)",
 			want, id, obj.ScopeEntityId, wantEntity, obj.ScopeEntityId, want)
 	}
 	return &outOfScopeError{msg: msg, obj: obj}

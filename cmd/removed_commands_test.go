@@ -156,7 +156,7 @@ func assertStubSaysWhatReplacedIt(t *testing.T, root *cobra.Command, out *bytes.
 	assert.Equal(t, before, *preRuns, "%s: a disarmed pre-run started for the stub", label)
 	_, guidance, removed := strings.Cut(msg, "was removed in Astro CLI v2")
 	if assert.True(t, removed, "%s: does not say it was removed in Astro CLI v2: %s", label, msg) {
-		assert.True(t, namesReplacement(guidance), "%s: names no replacement, and does not say there is none: %s", label, msg)
+		assert.True(t, namesReplacement(root, guidance), "%s: names no replacement, and does not say there is none: %s", label, msg)
 	}
 	assert.Empty(t, stdout, label)
 	assert.Contains(t, stderr, "Error: "+msg, label)
@@ -187,14 +187,39 @@ func assertStubSaysWhatReplacedIt(t *testing.T, root *cobra.Command, out *bytes.
 }
 
 // namesReplacement reports whether the guidance after "was removed in Astro
-// CLI v2" names an astro command to use instead, or says there is none.
-func namesReplacement(guidance string) bool {
-	for _, s := range []string{"`astro ", "use:  astro ", "no direct replacement", "no replacement"} {
-		if strings.Contains(guidance, s) {
+// CLI v2" names an astro command to use instead, or says there is none. A
+// command counts when the words after "astro " reach one in root that runs:
+// not the root itself, and not another removed command's or version gate's
+// stub.
+func namesReplacement(root *cobra.Command, guidance string) bool {
+	if strings.Contains(guidance, "no replacement") || strings.Contains(guidance, "no direct replacement") {
+		return true
+	}
+	for rest := guidance; ; {
+		_, after, ok := strings.Cut(rest, "astro ")
+		if !ok {
+			return false
+		}
+		rest = after
+		var words []string
+		for _, w := range strings.Fields(after) {
+			if strings.HasPrefix(w, "-") || strings.HasPrefix(w, "<") || len(words) == 4 {
+				break
+			}
+			trimmed := strings.TrimRight(w, ".,;:)")
+			words = append(words, trimmed)
+			if trimmed != w {
+				break
+			}
+		}
+		if len(words) == 0 {
+			continue
+		}
+		cmd, _, err := root.Find(words)
+		if err == nil && cmd != root && !cliout.IsRemovedCommand(cmd) && !isVersionGateStub(cmd) {
 			return true
 		}
 	}
-	return false
 }
 
 // The inventory parses, names only the trees there are, and is in order, so a

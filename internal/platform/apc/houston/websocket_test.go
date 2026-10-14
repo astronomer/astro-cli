@@ -125,7 +125,7 @@ func (s *Suite) TestSubscribe() {
 		defer srv.Close()
 
 		err := Subscribe("test-token", wsURL(srv), `{}`, io.Discard, func(DeploymentLog) error { return nil })
-		s.EqualError(err, "the log stream refused your login (Prohibited connection!); it may have expired: log in again with `astro login`")
+		s.EqualError(err, "the log stream refused your login (Prohibited connection!); it may have expired: log in again with astro login")
 	})
 
 	s.Run("the start names its operation", func() {

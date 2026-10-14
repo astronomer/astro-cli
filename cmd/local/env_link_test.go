@@ -496,7 +496,7 @@ func TestEnvPlainSetOfAPinnedGlobalKeepsThePin(t *testing.T) {
 func TestEnvSetGlobalCreatesItUnlinked(t *testing.T) {
 	dir := envProject(t, "")
 	_, stderr := mustRun(t, dir, "connection", "set", "warehouse", "--value", linkTestURI, "--global")
-	if !strings.Contains(stderr, "warehouse reaches no project yet. Link it with `astro local env connection link warehouse`, or re-run with --auto-link.") {
+	if !strings.Contains(stderr, "warehouse reaches no project yet. Link it with astro local env connection link warehouse, or re-run with --auto-link.") {
 		t.Errorf("stderr:\n%s", stderr)
 	}
 	if r := reachOf(t, "conn:global:warehouse"); r.Everywhere || len(r.Projects) != 0 {

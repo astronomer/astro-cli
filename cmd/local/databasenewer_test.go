@@ -22,7 +22,7 @@ func TestADatabaseANewerAirflowUpgradedIsToldAboutReset(t *testing.T) {
 
 		err := adviseDatabaseNewer(engineErr)
 		if !strings.Contains(err.Error(), "astro local reset") {
-			t.Errorf("adviseDatabaseNewer() = %q, which never names `astro local reset`", err)
+			t.Errorf("adviseDatabaseNewer() = %q, which never names astro local reset", err)
 		}
 		// Both places the version can come from. A project with a declared
 		// Dockerfile runs its base image whatever the pin says, so advice naming
@@ -106,7 +106,7 @@ dependencies = ['apache-airflow==3.1.*']
 				t.Fatal("the runtime refused to start; the command must fail")
 			}
 			if !strings.Contains(err.Error(), "astro local reset") {
-				t.Errorf("`astro %s` reported %q, which never names `astro local reset`",
+				t.Errorf("astro %s reported %q, which never names astro local reset",
 					strings.Join(tc.args, " "), err)
 			}
 		})

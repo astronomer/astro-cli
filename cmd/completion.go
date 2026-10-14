@@ -38,7 +38,7 @@ macOS:
 
 	%[1]s completion zsh > $(brew --prefix)/share/zsh/site-functions/_%[1]s
 
-On Apple Silicon, zsh does not search Homebrew's site-functions directory unless your shell runs `+"`brew shellenv`"+`. If it does not, add this line to ~/.zshrc, above compinit (or above the line that sources oh-my-zsh.sh, which runs compinit):
+On Apple Silicon, zsh does not search Homebrew's site-functions directory unless your shell runs brew shellenv. If it does not, add this line to ~/.zshrc, above compinit (or above the line that sources oh-my-zsh.sh, which runs compinit):
 
 	fpath=(/opt/homebrew/share/zsh/site-functions $fpath)
 

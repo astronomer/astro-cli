@@ -210,7 +210,7 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 				_, err := executeCommand(args...)
 				s.Require().Error(err)
 				s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
-				s.ErrorContains(err, "`"+tc.key+"` was removed in Astro CLI v2")
+				s.ErrorContains(err, tc.key+" was removed in Astro CLI v2")
 				s.ErrorContains(err, tc.want)
 				s.Equal(before, config.CFGStrMap[tc.key].GetHomeString(), "the refused value was written")
 			})
@@ -226,7 +226,7 @@ func (s *CmdSuite) TestConfigGetRefusesRemovedKeys() {
 	_, err := executeCommand("config", "get", "project.deployment")
 	s.Require().Error(err)
 	s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
-	s.ErrorContains(err, "`project.deployment` was removed in Astro CLI v2")
+	s.ErrorContains(err, "project.deployment was removed in Astro CLI v2")
 }
 
 // configSet guards the write on its own, for a caller that skips the pre-run.

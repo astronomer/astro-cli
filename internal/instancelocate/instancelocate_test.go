@@ -120,7 +120,7 @@ func TestAstroLinkNamesTheProjectsDomainWhenTheSessionIsRefused(t *testing.T) {
 	})
 	l.domain = "astronomer-dev.io"
 	_, err := l.BaseURL(context.Background(), astroInstance())
-	want := "your astronomer-dev.io session expired. Log in again with `astro login astronomer-dev.io` (looking up \"prod\")"
+	want := "your astronomer-dev.io session expired. Log in again with astro login astronomer-dev.io (looking up \"prod\")"
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
 	}
@@ -174,7 +174,7 @@ func TestAstroLinkNeedsASession(t *testing.T) {
 		return nil, nil
 	})
 	l.session = func(context.Context) (string, error) {
-		return "", errors.New("your session expired — log in with `astro login`")
+		return "", errors.New("your session expired — log in with astro login")
 	}
 	_, err := l.BaseURL(context.Background(), astroInstance())
 	if err == nil || !strings.Contains(err.Error(), "session expired") {

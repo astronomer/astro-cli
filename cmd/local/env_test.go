@@ -505,7 +505,7 @@ func TestVarMeansAPlainEnvVarAsItDoesOnTheCloudSide(t *testing.T) {
 	}
 	if got.Kind != localenv.KindEnv {
 		t.Errorf("`env var set` kind = %q, want %q: `var` is a plain environment "+
-			"variable in `astro env`, so it has to be one here too",
+			"variable in astro env, so it has to be one here too",
 			got.Kind, localenv.KindEnv)
 	}
 }

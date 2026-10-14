@@ -634,7 +634,7 @@ func TestTheDevStubUnderAPC(t *testing.T) {
 			t.Errorf("text lacks the note %q:\n%s", n, text)
 		}
 	}
-	if strings.Contains(text, "Use `") || strings.Contains(text, "# was: astro dev") {
+	if strings.Contains(text, "Use ") || strings.Contains(text, "Convert with ") || strings.Contains(text, "# was: astro dev") {
 		t.Errorf("text names astro local commands under APC:\n%s", text)
 	}
 
@@ -814,7 +814,7 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	if err == nil {
 		t.Fatal("astro dev must fail")
 	}
-	line := "Use `" + replaceInit + "` to make a new project here, or `" + want + "` to convert the 1.x project at " + root + " in place"
+	line := "Use " + replaceInit + " to make a new project here, or " + want + " to convert the 1.x project at " + root + " in place"
 	if !strings.Contains(err.Error(), line) {
 		t.Errorf("text lacks %q:\n%v", line, err)
 	}
@@ -832,7 +832,7 @@ func TestInitRedirectsGiveTheRefusal(t *testing.T) {
 			d, dir, _ := initDeps(t)
 			write1xProject(t, dir)
 			err := execute(t, d, args...)
-			if err == nil || !strings.Contains(err.Error(), "`"+replaceInit+"`") {
+			if err == nil || !strings.Contains(err.Error(), replaceInit) {
 				t.Errorf("under Astro: %v", err)
 			}
 
