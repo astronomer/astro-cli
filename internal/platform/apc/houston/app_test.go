@@ -70,10 +70,6 @@ func (s *Suite) TestGetAppConfig() {
 		})
 		api := NewClient(client)
 
-		// reset the local variables
-		appConfig = nil
-		appConfigErr = nil
-
 		config, err := api.GetAppConfig(GetAppConfigRequest{})
 		s.Contains(err.Error(), "Internal Server Error")
 		s.Nil(config)
@@ -86,10 +82,6 @@ func (s *Suite) TestGetAppConfig() {
 	})
 
 	s.Run("unavailable fields error", func() {
-		// reset the local variables
-		appConfig = nil
-		appConfigErr = nil
-
 		response := `{"errors": [{"message": "Cannot query field \"triggererEnabled\" on type AppConfig."}]}`
 		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
 			return &http.Response{

@@ -403,6 +403,35 @@ func TestAnUnreadableLoginSurvivesAWriteBackButNotASignOut(t *testing.T) {
 	}
 }
 
+// Signing out leaves no credential, and nothing about the login, on disk: the
+// email and the token's expiry go with the tokens, in the same write.
+func TestSignOutClearsEveryLoginField(t *testing.T) {
+	expiring := plaintextConfig + "    expiresin: 2099-01-01T00:00:00Z\n"
+	loginHome(t, expiring, nil)
+	c, err := GetCurrentContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SignOut(); err != nil {
+		t.Fatal(err)
+	}
+	for _, left := range []string{plainToken, plainRefresh, "someone@example.com", "2099-01-01"} {
+		if configHolds(t, left) {
+			t.Errorf("SignOut left %q in the config", left)
+		}
+	}
+	out, err := GetCurrentContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Token != "" || out.RefreshToken != "" || out.UserEmail != "" {
+		t.Errorf("signed-out context still holds a login: %+v", out)
+	}
+	if expiry, err := out.GetExpiresIn(); err != nil || !expiry.IsZero() {
+		t.Errorf("signed-out context's expiry = %v, %v; want the zero time", expiry, err)
+	}
+}
+
 // This process loaded the config before another tool saved a newer login.
 // The older login it holds is used, but not moved over the newer one.
 func TestAStaleSnapshotIsNotMoved(t *testing.T) {
