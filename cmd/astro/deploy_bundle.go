@@ -2,6 +2,7 @@ package astro
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/input"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // The transport astro deploy bundle calls, vars so a test can stand in for
@@ -59,10 +61,12 @@ func newDeployBundleCmd() *cobra.Command {
 			"With --delete it removes the bundle mounted at that path instead.\n\n" +
 			"A bundle's type decides its defaults. With no --type, the type is the first one PATH looks like (" + types + "), else none. " +
 			"A dbt project (a directory holding dbt_project.yml) mounts at " + astrodeploy.DbtDefaultMountPathPrefix + "<project name> unless --mount-path says otherwise. " +
-			"Any other --type is recorded as a label, with no defaults, so it needs --mount-path.\n\n" +
+			"Any other --type is recorded as a label, with no defaults, so it needs --mount-path. " +
+			"With --delete and no bundle at PATH, a mount path below a type's default directory says the type.\n\n" +
+			"--deployment takes a link name of the project in the current directory, a Deployment id, or the name of a Deployment in the workspace. " +
 			"This deploys the bundle's files; astro deploy deploys the project and its DAGs. " +
 			"To list or change the bundles a Deployment has registered, use astro deployment bundle. " +
-			"A project link called bundle is not reachable as astro deploy bundle: pass it as astro deploy --deployment bundle.",
+			"A project link called bundle is not reachable as astro deploy bundle: deploy the project to it with astro deploy --deployment bundle.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDeployBundle(cmd, args, o)
@@ -72,6 +76,9 @@ func newDeployBundleCmd() *cobra.Command {
 
   # Deploy a dbt project elsewhere to a given Deployment
   astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>
+
+  # Deploy it to a Deployment named analytics in a given Workspace
+  astro deploy bundle <PATH> --deployment analytics --workspace <WORKSPACE_ID>
 
   # Deploy another kind of bundle, which needs a mount path
   astro deploy bundle <PATH> --type <TYPE> --mount-path /usr/local/airflow/<NAME> \
@@ -83,11 +90,11 @@ func newDeployBundleCmd() *cobra.Command {
 	f := cmd.Flags()
 	f.StringVarP(&o.mountPath, "mount-path", "m", "", "Path the bundle is mounted at in Airflow, for reference by Dags. Default: the type's, "+astrodeploy.DbtDefaultMountPathPrefix+"<project name> for a dbt project")
 	f.StringVar(&o.bundleType, "type", "", "Type of the bundle: "+types+", or any other label, which has no defaults. Default: detected from PATH, else none")
-	f.StringVarP(&o.deployment, "deployment", "d", "", "Deployment to deploy to: a link name from the project here, or a Deployment id")
-	f.StringVar(&o.workspace, "workspace", "", "Workspace whose Deployments are offered when no --deployment is given")
+	f.StringVar(&o.deployment, "deployment", "", "Deployment to deploy to: a link name from the project here, a Deployment id, or a Deployment name")
+	f.StringVar(&o.workspace, "workspace", "", "Workspace a Deployment name is looked up in, and whose Deployments are offered when no --deployment is given")
 	f.StringVar(&o.description, "description", "", "Description to store on the deploy")
 	f.BoolVarP(&o.wait, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
-	f.DurationVar(&o.waitTime, "wait-time", deployWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
+	f.DurationVarP(&o.waitTime, "wait-time", "t", deployWaitTime, "Time to wait for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
 	f.BoolVar(&o.delete, "delete", false, "Remove the bundle mounted at --mount-path (by default the one PATH's type would mount at) instead of deploying")
 	cliout.AddOutputFlag(cmd, &o.output)
 	return cmd
@@ -131,13 +138,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	if !utils.Locate(path).None() {
 		return fmt.Errorf("bundle path %s is within an Astro project: a non-DAG bundle is a directory of its own. To deploy the project, run astro deploy", path)
 	}
-	bt := astrodeploy.ResolveBundleType(o.bundleType, path)
-	if bt.Validate != nil {
-		if err := bt.Validate(path); err != nil {
-			return err
-		}
-	}
-	mountPath, err := resolveBundleMountPath(cmd, path, bt, o.mountPath)
+	b, err := resolveBundle(cmd, path, o)
 	if err != nil {
 		return err
 	}
@@ -149,10 +150,10 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 
 	in := &astrodeploy.DeployBundleInput{
 		BundlePath:    path,
-		MountPath:     mountPath,
+		MountPath:     b.mountPath,
 		DeploymentID:  targetID,
 		Deployment:    target,
-		BundleType:    bt.Name,
+		BundleType:    b.bundleType,
 		Description:   o.description,
 		AstroV1Client: login.client,
 	}
@@ -169,25 +170,16 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	}
 	return publishThenWaitWith(cmd, o.output, o.wait, bundleWait(cmd, &login, res.DeploymentID, o.waitTime), func(waitErr error) error {
 		r := cliout.Renderer{Format: o.output, Out: out}
-		return r.Emit(newBundleDeployJSON(&res, bt.Name, bundlePath, o.wait, waitErr), renderBundleUploaded(res.BundleVersion))
+		return r.Emit(newBundleDeployJSON(&res, &b, bundlePath, o.wait, waitErr), renderBundleUploaded(res.BundleVersion))
 	})
 }
 
 // deleteBundle removes the bundle mounted at --mount-path, or at the mount
 // path the bundle at path would deploy to.
 func deleteBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundleOptions) error {
-	bt := astrodeploy.ResolveBundleType(o.bundleType, path)
-	mountPath := o.mountPath
-	if mountPath == "" {
-		if bt.Validate != nil {
-			if err := bt.Validate(path); err != nil {
-				return err
-			}
-		}
-		var err error
-		if mountPath, err = resolveBundleMountPath(cmd, path, bt, ""); err != nil {
-			return err
-		}
+	b, err := resolveBundle(cmd, path, o)
+	if err != nil {
+		return err
 	}
 	targetID, target, login, err := bundleTarget(cmd.Context(), o.deployment, o.workspace, o.output)
 	if err != nil {
@@ -196,10 +188,10 @@ func deleteBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	cmd.SilenceUsage = true
 
 	in := &astrodeploy.DeleteBundleInput{
-		MountPath:     mountPath,
+		MountPath:     b.mountPath,
 		DeploymentID:  targetID,
 		Deployment:    target,
-		BundleType:    bt.Name,
+		BundleType:    b.bundleType,
 		Description:   o.description,
 		AstroV1Client: login.client,
 	}
@@ -212,25 +204,62 @@ func deleteBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	}
 	return publishThenWaitWith(cmd, o.output, o.wait, bundleWait(cmd, &login, res.DeploymentID, o.waitTime), func(waitErr error) error {
 		r := cliout.Renderer{Format: o.output, Out: out}
-		return r.Emit(newBundleDeleteJSON(&res, bt.Name, o.wait, waitErr), renderBundleDeleted(res.MountPath))
+		return r.Emit(newBundleDeleteJSON(&res, &b, o.wait, waitErr), renderBundleDeleted(res.MountPath))
 	})
 }
 
-// resolveBundleMountPath is given, or else the default of the bundle's type, which
-// it says on stderr it chose. A type with no default needs one given.
-func resolveBundleMountPath(cmd *cobra.Command, path string, bt astrodeploy.BundleType, given string) (string, error) {
-	if given != "" {
-		return given, nil
+// resolvedBundle is what a bundle deploy or delete acts on: the type it is
+// recorded as, the mount path, and the bundle's name, when its type names
+// it.
+type resolvedBundle struct {
+	bundleType string
+	mountPath  string
+	name       string
+}
+
+// resolveBundle settles the bundle at path, for a deploy and a delete alike.
+//
+// The type is --type when given; else the first registered type that
+// detects path; else, for a delete given a mount path, the type whose
+// default directory that mount path is below; else none.
+//
+// The mount path is --mount-path when given, and then path is not checked:
+// --type dbt with a mount path deploys any directory, as 1.x's
+// --non-dags-bundle-type dbt did. Otherwise the type checks path and derives
+// the mount path from it, which the run says on stderr; a type with no
+// default needs --mount-path.
+func resolveBundle(cmd *cobra.Command, path string, o *deployBundleOptions) (resolvedBundle, error) {
+	bt := astrodeploy.ResolveBundleType(o.bundleType, path)
+	if o.bundleType == "" && bt.Name == astrodeploy.BundleTypeNone && o.delete && o.mountPath != "" {
+		if inferred, ok := astrodeploy.BundleTypeForMountPath(o.mountPath); ok {
+			bt = inferred
+		}
 	}
-	if bt.DefaultMountPath == nil {
-		return "", cliout.Usage(fmt.Errorf("--mount-path is required for a bundle of type %s: only a %s bundle has a default", bt.Name, strings.Join(astrodeploy.BundleTypeNames(), " or ")))
+	b := resolvedBundle{bundleType: bt.Name, mountPath: o.mountPath}
+	if b.mountPath == "" {
+		if !bt.HasDefaultMountPath() {
+			return b, cliout.Usage(fmt.Errorf("--mount-path is required for a bundle of type %s: only a %s bundle has a default", bt.Name, strings.Join(astrodeploy.BundleTypeNames(), " or ")))
+		}
+		if bt.Validate != nil {
+			if err := bt.Validate(path); err != nil {
+				return b, err
+			}
+		}
+		mountPath, err := bt.DefaultMountPath(path)
+		if err != nil {
+			return b, err
+		}
+		b.mountPath = mountPath
+		fmt.Fprintf(cmd.ErrOrStderr(), "mount path %s: the default for a %s bundle\n", mountPath, bt.Name)
 	}
-	mountPath, err := bt.DefaultMountPath(path)
-	if err != nil {
-		return "", err
+	// The name is the bundle's when path holds one this type names: a
+	// --type dbt deploy of another directory has none.
+	if bt.BundleName != nil && (bt.Detect == nil || bt.Detect(path)) {
+		if name, err := bt.BundleName(path); err == nil {
+			b.name = name
+		}
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "mount path %s: the default for a %s bundle\n", mountPath, bt.Name)
-	return mountPath, nil
+	return b, nil
 }
 
 // bundleWait waits for the Deployment under the login the bundle went to.
@@ -251,8 +280,9 @@ func bundleWait(cmd *cobra.Command, login *deployLogin, deploymentID string, wai
 // project's (its Astro host's), for everything; anywhere else, or when the
 // manifest does not load, the current context's.
 //
-// The target: name (--deployment), a link name of the project here or a
-// Deployment id. Without one, the workspace's Deployments are offered
+// The target: name (--deployment), a link name of the project here, else a
+// Deployment id (a CUID), else the name of a Deployment in the workspace
+// (deploymentNamed). Without one, the workspace's Deployments are offered
 // (workspace, else the login's): only to a run that can be asked, and only on
 // the current context's host, as astro deploy offers them. A run that cannot
 // be asked, under --output json or without a terminal, is refused as astro
@@ -270,14 +300,25 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 	}
 
 	if name != "" {
-		if m == nil || !hasLink(m, name) {
+		if m != nil && hasLink(m, name) {
+			named, _, err := manifestdeploy.ResolveNamed(m, name, "", workspace, "")
+			if err != nil {
+				return "", nil, login, cliout.Usage(err)
+			}
+			return named.DeploymentID, nil, login, nil
+		}
+		if util.IsCUID(name) {
 			return name, nil, login, nil
 		}
-		named, _, err := manifestdeploy.ResolveNamed(m, name, "", workspace, "")
-		if err != nil {
-			return "", nil, login, cliout.Usage(err)
+		projectWorkspace := ""
+		if m != nil {
+			projectWorkspace = m.Astro.Workspace
 		}
-		return named.DeploymentID, nil, login, nil
+		dep, err := deploymentNamed(name, cmp.Or(workspace, projectWorkspace, login.context.Workspace), &login)
+		if err != nil {
+			return "", nil, login, err
+		}
+		return dep.Id, dep, login, nil
 	}
 
 	if format != cliout.FormatText || !stdinIsTerminal() {
@@ -302,6 +343,36 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 	return picked.Id, &picked, login, nil
 }
 
+// deploymentNamed is the one Deployment called name in workspace ws, listed
+// under login. None, or more than one, is an error that says so, naming the
+// ids of the ones that share the name.
+func deploymentNamed(name, ws string, login *deployLogin) (*astrov1.Deployment, error) {
+	if ws == "" {
+		return nil, fmt.Errorf("--deployment %s is not a link of the project here or a Deployment id, and there is no Workspace to look it up by name in: pass --workspace, or the Deployment id", name)
+	}
+	deps, err := deployment.ListDeployments(ws, login.context.Organization, login.client)
+	if err != nil {
+		return nil, err
+	}
+	var found []astrov1.Deployment
+	for i := range deps {
+		if deps[i].Name == name {
+			found = append(found, deps[i])
+		}
+	}
+	switch len(found) {
+	case 0:
+		return nil, fmt.Errorf("no Deployment named %s in workspace %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, ws)
+	case 1:
+		return &found[0], nil
+	}
+	ids := make([]string, len(found))
+	for i := range found {
+		ids[i] = found[i].Id
+	}
+	return nil, fmt.Errorf("%d Deployments are named %s in workspace %s (%s): pass the id of the one you mean with --deployment", len(found), name, ws, strings.Join(ids, ", "))
+}
+
 // errBundleNoTarget is a bundle deploy or delete that names no Deployment and
 // cannot be asked for one, in astro deploy's words for the same refusal.
 var errBundleNoTarget = errors.New("this deploy names no Deployment and this run cannot be asked: pass the Deployment id or a link name with --deployment")
@@ -316,8 +387,10 @@ type bundleDeployJSON struct {
 	// DeployID is the deploy record the upload created on the Deployment.
 	DeployID string `json:"deploy_id"`
 	// BundleType is the type the bundle deployed as (--type, or detected),
-	// BundlePath the directory bundled, as an absolute path.
+	// BundleName the bundle's name when its type names it (a dbt project's
+	// name), and BundlePath the directory bundled, as an absolute path.
 	BundleType string `json:"bundle_type"`
+	BundleName string `json:"bundle_name,omitempty"`
 	BundlePath string `json:"bundle_path"`
 	MountPath  string `json:"mount_path"`
 	// BundleVersion is the version of the uploaded bundle.
@@ -330,13 +403,14 @@ type bundleDeployJSON struct {
 	Git       *deployGitJSON `json:"git,omitempty"`
 }
 
-func newBundleDeployJSON(res *astrodeploy.BundleDeploy, bundleType, bundlePath string, waited bool, waitErr error) bundleDeployJSON {
+func newBundleDeployJSON(res *astrodeploy.BundleDeploy, b *resolvedBundle, bundlePath string, waited bool, waitErr error) bundleDeployJSON {
 	return bundleDeployJSON{
 		Deployment:     res.DeploymentID,
 		DeploymentName: res.DeploymentName,
 		Workspace:      res.WorkspaceID,
 		DeployID:       res.DeployID,
-		BundleType:     bundleType,
+		BundleType:     b.bundleType,
+		BundleName:     b.name,
 		BundlePath:     bundlePath,
 		MountPath:      res.MountPath,
 		BundleVersion:  res.BundleVersion,
@@ -357,18 +431,22 @@ type bundleDeleteJSON struct {
 	Workspace  string `json:"workspace,omitempty"`
 	DeployID   string `json:"deploy_id"`
 	BundleType string `json:"bundle_type"`
+	// BundleName is the name of the bundle at PATH when its type names it,
+	// omitted when the delete was given a mount path and no bundle.
+	BundleName string `json:"bundle_name,omitempty"`
 	MountPath  string `json:"mount_path"`
 	Waited     bool   `json:"waited"`
 	WaitError  string `json:"wait_error,omitempty"`
 }
 
-func newBundleDeleteJSON(res *astrodeploy.BundleDelete, bundleType string, waited bool, waitErr error) bundleDeleteJSON {
+func newBundleDeleteJSON(res *astrodeploy.BundleDelete, b *resolvedBundle, waited bool, waitErr error) bundleDeleteJSON {
 	return bundleDeleteJSON{
 		Action:     "deleted",
 		Deployment: res.DeploymentID,
 		Workspace:  res.WorkspaceID,
 		DeployID:   res.DeployID,
-		BundleType: bundleType,
+		BundleType: b.bundleType,
+		BundleName: b.name,
 		MountPath:  res.MountPath,
 		Waited:     waited,
 		WaitError:  errText(waitErr),

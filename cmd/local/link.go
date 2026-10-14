@@ -342,8 +342,8 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 	name = strings.TrimSpace(name)
 	// bundle is astro deploy bundle, so a link by that name could not be
 	// deployed to by name: refused before anything is asked.
-	if name == deploy.BundleCommand {
-		return cliout.Usage(deploy.ErrBundleLinkName)
+	if name == scaffold.BundleLinkName {
+		return cliout.Usage(scaffold.ErrBundleLinkName)
 	}
 	// A NAME already linked is refused before anything asks a question or
 	// calls the platform.
@@ -453,7 +453,7 @@ func (c *cli) pickAstroDeployment(link *scaffold.Link, m *manifest.Manifest, nam
 		return name, nil
 	}
 	name = scaffold.LinkNameFor(dep.Name)
-	if name == "" || name == manifest.ReservedLinkName || name == deploy.BundleCommand {
+	if name == "" || name == manifest.ReservedLinkName || name == scaffold.BundleLinkName {
 		return "", fmt.Errorf("the Deployment's name does not make a link name: pass one, astro link add NAME --%s %s", flagLinkDeployment, dep.ID)
 	}
 	return name, nil

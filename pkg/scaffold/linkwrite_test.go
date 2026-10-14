@@ -169,6 +169,7 @@ func TestSaveLinkRefusesAnInvalidLink(t *testing.T) {
 	}{
 		{"no name", Link{Name: "  ", Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"}, "needs a name"},
 		{"the reserved name", Link{Name: manifest.ReservedLinkName, Kind: manifest.KindMWAA, Environment: "env"}, "reserved"},
+		{"the deploy bundle subcommand's name", Link{Name: BundleLinkName, Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"}, "astro deploy bundle deploys a non-DAG bundle"},
 		{"an astro link with no deployment", Link{Name: "prod", Kind: manifest.KindAstro, Workspace: "W"}, "needs a deployment"},
 		{"an mwaa link with no environment", Link{Name: "aws", Kind: manifest.KindMWAA}, "needs an environment"},
 		{"an endpoint with no url", Link{Name: "oss", Kind: manifest.KindEndpoint, Auth: manifest.Auth{Method: manifest.AuthNone}}, "needs a url"},

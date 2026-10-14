@@ -54,7 +54,7 @@ const (
 	errDeployNameRemoved       = "--deployment-name was removed in Astro CLI v2: name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
 	// astro deploy --non-dags became astro deploy bundle, a subcommand of
 	// its own with the bundle's directory as its argument.
-	errDeployNonDagsRemoved = "--non-dags was removed in Astro CLI v2: use astro deploy bundle [PATH] --deployment <id or link name>, " +
+	errDeployNonDagsRemoved = "--non-dags was removed in Astro CLI v2: use astro deploy bundle [PATH] --deployment <Deployment id, name or link name>, " +
 		"which deploys a non-DAG bundle such as a dbt project from its directory"
 	errDeployNonDagsMountPathRemoved  = "--non-dags-mount-path was removed in Astro CLI v2: use astro deploy bundle --mount-path"
 	errDeployNonDagsLocalPathRemoved  = "--non-dags-local-path was removed in Astro CLI v2: pass the bundle's directory as the argument, astro deploy bundle <PATH>"

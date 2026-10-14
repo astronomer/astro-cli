@@ -33,6 +33,17 @@ import (
 // because the parser would refuse it. The message names the field.
 var ErrInvalidLink = errors.New("invalid link")
 
+// BundleLinkName is a name no link may have: astro deploy reads astro deploy
+// bundle as its subcommand that deploys a non-DAG bundle, so a deploy could
+// never reach a link by that name as its argument. A manifest that already
+// has one still loads, and it is reached with --deployment.
+const BundleLinkName = "bundle"
+
+// ErrBundleLinkName is SaveLink refusing BundleLinkName. It wraps
+// ErrInvalidLink.
+var ErrBundleLinkName = fmt.Errorf("%w: %s cannot name a link: astro deploy %s deploys a non-DAG bundle, "+
+	"so astro deploy %s would never reach the link. Name the link something else", ErrInvalidLink, BundleLinkName, BundleLinkName, BundleLinkName)
+
 // ErrComposerProjectRequired and ErrComposerLocationRequired report a Composer
 // link saved without the Google Cloud project or the region holding its
 // environment. The parser does not require them, but an environment name alone
@@ -615,6 +626,8 @@ func (l *Link) validate() error {
 		return invalidLink("a link needs a name")
 	case manifest.ReservedLinkName:
 		return invalidLink("%q is reserved: it always means the Airflow running on this machine", manifest.ReservedLinkName)
+	case BundleLinkName:
+		return ErrBundleLinkName
 	}
 	switch l.Kind {
 	case manifest.KindAstro:

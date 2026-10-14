@@ -25,6 +25,10 @@ func TestResolveBundleType(t *testing.T) {
 		bt := ResolveBundleType("", dbt)
 		assert.Equal(t, "dbt", bt.Name)
 		require.NoError(t, bt.Validate(dbt))
+		name, err := bt.BundleName(dbt)
+		require.NoError(t, err)
+		assert.Equal(t, "jaffle_shop", name)
+		require.True(t, bt.HasDefaultMountPath())
 		mount, err := bt.DefaultMountPath(dbt)
 		require.NoError(t, err)
 		assert.Equal(t, "/usr/local/airflow/dbt/jaffle_shop", mount)
@@ -38,17 +42,23 @@ func TestResolveBundleType(t *testing.T) {
 	})
 	t.Run("nothing detected", func(t *testing.T) {
 		bt := ResolveBundleType("", plain)
-		assert.Equal(t, BundleType{Name: BundleTypeNone}, bt)
+		assert.Equal(t, BundleTypeNone, bt.Name)
+		assert.False(t, bt.HasDefaultMountPath())
+		_, err := bt.DefaultMountPath(plain)
+		assert.ErrorContains(t, err, "has no default mount path")
 	})
 	t.Run("any other type is a label with no defaults", func(t *testing.T) {
 		for _, name := range []string{"seeds", BundleTypeNone} {
 			bt := ResolveBundleType(name, dbt)
-			assert.Equal(t, BundleType{Name: name}, bt, "even where a dbt project is")
+			assert.Equal(t, name, bt.Name, "even where a dbt project is")
+			assert.False(t, bt.HasDefaultMountPath(), name)
+			assert.Nil(t, bt.Validate, name)
 		}
 	})
 	t.Run("a dbt project with no name", func(t *testing.T) {
 		nameless := dbtDir(t, "version: 2\n")
-		_, err := ResolveBundleType("", nameless).DefaultMountPath(nameless)
+		bt := ResolveBundleType("", nameless)
+		_, err := bt.DefaultMountPath(nameless)
 		assert.ErrorContains(t, err, "dbt project name not found")
 	})
 	t.Run("a directory called dbt_project.yml is no dbt project", func(t *testing.T) {
@@ -57,4 +67,15 @@ func TestResolveBundleType(t *testing.T) {
 		assert.Equal(t, BundleTypeNone, ResolveBundleType("", dir).Name)
 	})
 	assert.Equal(t, []string{"dbt"}, BundleTypeNames())
+}
+
+// A mount path below a type's default directory says the type.
+func TestBundleTypeForMountPath(t *testing.T) {
+	bt, ok := BundleTypeForMountPath("/usr/local/airflow/dbt/jaffle_shop")
+	require.True(t, ok)
+	assert.Equal(t, "dbt", bt.Name)
+	for _, p := range []string{"/usr/local/airflow/dbt/", "/usr/local/airflow/dbt", "/usr/local/airflow/seeds", ""} {
+		_, ok := BundleTypeForMountPath(p)
+		assert.False(t, ok, p)
+	}
 }

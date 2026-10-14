@@ -781,13 +781,9 @@ func unlinkedTarget(req Request, d Deployer) (Target, error) {
 
 // BundleCommand is the word astro deploy bundle is spelled with. astro
 // deploy reads it as that subcommand, never as a link name, so no link is
-// saved under it: astro link add refuses it, and a link a deploy saves for a
-// picked Deployment is named otherwise. A link by that name already in a
-// manifest is still reached with --deployment.
-const BundleCommand = "bundle"
-
-// ErrBundleLinkName is astro link add refusing BundleCommand as a link name.
-var ErrBundleLinkName = fmt.Errorf("%[1]s cannot name a link: astro deploy %[1]s deploys a non-DAG bundle, so astro deploy %[1]s would never reach the link. Name the link something else", BundleCommand)
+// saved under it (scaffold.BundleLinkName): a link a deploy saves for a
+// picked Deployment is named otherwise.
+const BundleCommand = scaffold.BundleLinkName
 
 // DefaultMark is the word that marks a project's default link in a list of
 // links: the deploy prompt's "linked, default", and the `astro use` and `astro

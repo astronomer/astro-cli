@@ -11,22 +11,46 @@ import (
 )
 
 // BundleType is a kind of non-DAG bundle that astro deploy bundle knows by
-// its contents: how to tell a directory holds one, how to check it before
-// anything is uploaded, and where it mounts when the deploy names no mount
-// path. Adding a type is adding an entry to bundleTypes.
+// its contents: how to tell a directory holds one, how to check it, what the
+// bundle is called, and where it mounts when the deploy names no mount path.
+// Adding a type is adding an entry to bundleTypes.
 type BundleType struct {
 	// Name is the type recorded on the deploy, and what --type selects.
 	Name string
 	// Detect reports whether dir holds a bundle of this type, for a deploy
 	// that names no type. nil detects nothing.
 	Detect func(dir string) bool
-	// Validate checks dir is a bundle of this type. nil accepts any
-	// directory.
+	// Validate checks dir is a bundle of this type, before a mount path is
+	// derived from it. nil accepts any directory.
 	Validate func(dir string) error
-	// DefaultMountPath is where the bundle at dir mounts when no mount path
-	// is given. nil means the type has no default, so a mount path is
-	// required.
-	DefaultMountPath func(dir string) (string, error)
+	// BundleName is the name of the bundle at dir (a dbt project's name).
+	// nil means bundles of this type have none.
+	BundleName func(dir string) (string, error)
+	// MountPathPrefix is the directory in Airflow a bundle of this type
+	// mounts below by default, at MountPathPrefix + its BundleName. A mount
+	// path below it says a bundle is of this type, for a delete that names
+	// no type and runs where no bundle is. Empty means no default.
+	MountPathPrefix string
+}
+
+// HasDefaultMountPath reports whether a bundle of this type has a mount path
+// without one being given.
+func (t *BundleType) HasDefaultMountPath() bool {
+	return t.MountPathPrefix != "" && t.BundleName != nil
+}
+
+// DefaultMountPath is where the bundle at dir mounts when no mount path is
+// given: MountPathPrefix and the bundle's name. It is an error for a type
+// with no default (HasDefaultMountPath).
+func (t *BundleType) DefaultMountPath(dir string) (string, error) {
+	if !t.HasDefaultMountPath() {
+		return "", fmt.Errorf("a bundle of type %s has no default mount path", t.Name)
+	}
+	name, err := t.BundleName(dir)
+	if err != nil {
+		return "", err
+	}
+	return t.MountPathPrefix + name, nil
 }
 
 // BundleTypeNone is the type of a bundle that names no type and that no
@@ -43,10 +67,11 @@ const dbtProjectFile = "dbt_project.yml"
 // tries them.
 var bundleTypes = []BundleType{
 	{
-		Name:             "dbt",
-		Detect:           isDbtProject,
-		Validate:         validateDbtProject,
-		DefaultMountPath: dbtDefaultMountPath,
+		Name:            "dbt",
+		Detect:          isDbtProject,
+		Validate:        validateDbtProject,
+		BundleName:      dbtProjectName,
+		MountPathPrefix: DbtDefaultMountPathPrefix,
 	},
 }
 
@@ -72,6 +97,17 @@ func ResolveBundleType(name, dir string) BundleType {
 	return BundleType{Name: name}
 }
 
+// BundleTypeForMountPath is the registered type whose bundles mount below
+// mountPath's directory by default, and whether there is one.
+func BundleTypeForMountPath(mountPath string) (BundleType, bool) {
+	for _, t := range bundleTypes {
+		if t.MountPathPrefix != "" && strings.HasPrefix(mountPath, t.MountPathPrefix) && len(mountPath) > len(t.MountPathPrefix) {
+			return t, true
+		}
+	}
+	return BundleType{}, false
+}
+
 // BundleTypeNames is the name of every registered bundle type, in order.
 func BundleTypeNames() []string {
 	names := make([]string, 0, len(bundleTypes))
@@ -95,30 +131,21 @@ func validateDbtProject(dir string) error {
 	return err
 }
 
-// dbtDefaultMountPath is DbtDefaultMountPathPrefix and the project's name,
-// from its dbt_project.yml.
-func dbtDefaultMountPath(dir string) (string, error) {
-	name, err := dbtProjectName(dir)
-	if err != nil {
-		return "", fmt.Errorf("dbt project name not found in %s: %w", dir, err)
-	}
-	return DbtDefaultMountPathPrefix + name, nil
-}
-
+// dbtProjectName is the project's name, from its dbt_project.yml.
 func dbtProjectName(dir string) (string, error) {
 	path := filepath.Join(dir, dbtProjectFile)
 	file, err := os.Open(path)
 	if err != nil {
-		return "", fmt.Errorf("could not open %s: %w", path, err)
+		return "", fmt.Errorf("dbt project name not found in %s: could not open %s: %w", dir, path, err)
 	}
 	defer file.Close()
 	var project map[string]any
 	if err := yaml.NewDecoder(file).Decode(&project); err != nil {
-		return "", fmt.Errorf("could not decode %s: %w", path, err)
+		return "", fmt.Errorf("dbt project name not found in %s: could not decode %s: %w", dir, path, err)
 	}
 	name, ok := project["name"].(string)
 	if !ok || name == "" {
-		return "", errors.New("invalid dbt project name")
+		return "", fmt.Errorf("dbt project name not found in %s: invalid dbt project name", dir)
 	}
 	return name, nil
 }
