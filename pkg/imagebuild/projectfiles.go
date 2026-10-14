@@ -185,6 +185,10 @@ type walker struct {
 	// then neither entered nor visited. A generated build's filter leaves all
 	// of it out.
 	vcs func(rel string)
+	// cosmosBoost, when set, takes each Cosmos Boost file an earlier Astro CLI
+	// wrote into the project (airflowrt.CosmosBoostFileWrittenByAstro) that
+	// the walk carries. A generated build's filter leaves them out instead.
+	cosmosBoost func(rel string)
 	// link, when set, takes each symlink a following walk goes through: the
 	// link's own path, for a file carried as what it points at or a directory
 	// entered through it.
@@ -266,13 +270,55 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 		case info.Mode().IsRegular(), info.Mode()&fs.ModeSymlink != 0:
 			// A symlink gets here only when links are not followed: it is
 			// carried as itself.
-			if err := w.visit(childRel, src, info.Mode()); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			if err := w.carry(childRel, src, info.Mode()); err != nil {
 				return err
 			}
 		}
 		// A socket, a pipe or a device has no place in an image.
 	}
 	return nil
+}
+
+// carry visits a file the walk carries, unless it is a Cosmos Boost file an
+// earlier Astro CLI wrote (staleCosmosBoost), which a generated build leaves
+// out and a declared one reports.
+func (w walker) carry(rel, src string, mode fs.FileMode) error {
+	if mode.IsRegular() {
+		stale, err := w.staleCosmosBoost(rel, src)
+		if err != nil {
+			return err
+		}
+		if stale && w.filter.generated {
+			return nil
+		}
+		if stale && w.cosmosBoost != nil {
+			w.cosmosBoost(rel)
+		}
+	}
+	if err := w.visit(rel, src, mode); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// staleCosmosBoost reports whether the regular file at src is a Cosmos Boost
+// sidecar an earlier Astro CLI wrote into the project, which the plugin would
+// read as current in the image (airflowrt.CosmosBoostFileWrittenByAstro). The
+// CLI no longer writes them; a deploy's bundle leaves them out, and so does a
+// generated image. Only a file at a sidecar's path is read, and only when the
+// answer is used.
+func (w walker) staleCosmosBoost(rel, src string) (bool, error) {
+	if (!w.filter.generated && w.cosmosBoost == nil) || !airflowrt.IsCosmosBoostFile(rel) {
+		return false, nil
+	}
+	data, err := os.ReadFile(src)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return airflowrt.CosmosBoostFileWrittenByAstro(rel, data), nil
 }
 
 // enter walks the directory at src, unless it is one already being walked
@@ -306,6 +352,11 @@ type ProjectSurvey struct {
 	// Dockerfile's context carries, which its ignore file leaves in: each
 	// one's path, not what is in it. A generated build carries none.
 	VCS []string
+	// CosmosBoost are the Cosmos Boost files an earlier Astro CLI wrote into
+	// the project that a declared Dockerfile's context carries, which the
+	// plugin would read as current in the image. A generated build leaves
+	// them out and lists none.
+	CosmosBoost []string
 	// IgnoreFile is the ignore file a declared Dockerfile's build reads
 	// (declaredIgnoreFile), "" for none or for a generated build.
 	IgnoreFile string
@@ -349,7 +400,12 @@ func SurveyProject(dir, dockerfile string, podman bool) (ProjectSurvey, error) {
 		if filter, err = newDeclaredFilter(resolved, s.IgnoreFile); err != nil {
 			return ProjectSurvey{}, err
 		}
-		w := walker{filter: filter, vcs: func(rel string) { s.VCS = append(s.VCS, rel) }, visit: collect}
+		w := walker{
+			filter:      filter,
+			vcs:         func(rel string) { s.VCS = append(s.VCS, rel) },
+			cosmosBoost: func(rel string) { s.CosmosBoost = append(s.CosmosBoost, rel) },
+			visit:       collect,
+		}
 		err = w.walkDir(resolved, "", map[string]bool{resolved: true})
 	}
 	if err != nil {

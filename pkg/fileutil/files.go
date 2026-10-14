@@ -13,6 +13,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -105,31 +106,53 @@ func WriteToFile(filePath string, r io.Reader) error {
 	return err
 }
 
-// Tar writes the directory source to the tarball target, its paths
-// relative to source, or to source's parent with prependBaseDir. A source
-// that is not there makes an empty tarball, not an error.
-func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []string) error {
+// TarOverlay changes what Tar writes without touching source. Paths are
+// slash-separated and relative to source, before any base directory is
+// prepended.
+type TarOverlay struct {
+	// Skip, when set, is asked about each entry the walk reaches below source -
+	// a file, a link, a directory - by rel, its path on disk and what Lstat
+	// says of it, and leaves it out on true: a directory with everything
+	// under it. An error fails the tarball.
+	Skip func(rel, file string, info os.FileInfo) (bool, error)
+	// Extra adds a regular file with these bytes at each path, in place of a
+	// file or link the walk finds there. A directory there is still walked
+	// unless Skip leaves it out, and its entries would collide with the file:
+	// a caller adding an extra where one may exist skips it too.
+	Extra map[string][]byte
+}
+
+// extraFileMode is an Extra file's mode in the tarball: world-readable, since
+// whatever unpacks it (the Airflow runtime user) must be able to read it.
+const extraFileMode = 0o644
+
+// TarGz writes the directory source to the gzip-compressed tarball target,
+// in one pass, its paths relative to source, or to source's parent with
+// prependBaseDir, changed by overlay. A source that is not there makes an
+// empty tarball, not an error.
+func TarGz(source, target string, prependBaseDir bool, excludePathPrefixes []string, overlay TarOverlay) error {
 	baseDir := ""
 	if prependBaseDir {
 		baseDir = filepath.Base(source)
 	}
-	return writeTar(source, target, baseDir, excludePathPrefixes, false)
+	return writeTar(source, target, baseDir, excludePathPrefixes, overlay, true, false)
 }
 
 // TarDir writes the directory source to the tarball target, each path in it
 // under baseDir: "dags" makes dags/my_dag.py of source/my_dag.py, whatever
-// source is called. Unlike Tar it fails on a source that is not there, or
+// source is called. Unlike TarGz it fails on a source that is not there, or
 // that goes while it is read, rather than writing a tarball short of it.
 func TarDir(source, target, baseDir string) error {
-	return writeTar(source, target, baseDir, nil, true)
+	return writeTar(source, target, baseDir, nil, TarOverlay{}, false, true)
 }
 
 // createTarFile creates the tarball writeTar writes; a test fails its Close.
 var createTarFile = func(name string) (io.WriteCloser, error) { return os.Create(name) }
 
-// writeTar writes the tarball. A tarball whose footer or file did not close
-// is not one, so failing to close either fails it.
-func writeTar(source, target, baseDir string, excludePathPrefixes []string, mustExist bool) (err error) {
+// writeTar writes the tarball, gzip-compressed with gzipped. A tarball whose
+// footer, compressed stream or file did not close is not one - a full disk
+// shows up there - so failing to close any of them fails it.
+func writeTar(source, target, baseDir string, excludePathPrefixes []string, overlay TarOverlay, gzipped, mustExist bool) (err error) {
 	tarfile, err := createTarFile(target)
 	if err != nil {
 		return err
@@ -140,18 +163,31 @@ func writeTar(source, target, baseDir string, excludePathPrefixes []string, must
 		}
 	}()
 
-	tarball := tar.NewWriter(tarfile)
-	// Closing writes the footer; deferred after the file's, it runs first.
+	var out io.Writer = tarfile
+	if gzipped {
+		gz := gzip.NewWriter(tarfile)
+		// Closing flushes what is still compressed in memory; deferred after
+		// the file's, it runs before it.
+		defer func() {
+			if cerr := gz.Close(); err == nil {
+				err = cerr
+			}
+		}()
+		out = gz
+	}
+
+	tarball := tar.NewWriter(out)
+	// Closing writes the footer; deferred last, it runs first.
 	defer func() {
 		if cerr := tarball.Close(); err == nil {
 			err = cerr
 		}
 	}()
-	return addToTar(tarball, source, target, baseDir, excludePathPrefixes, mustExist)
+	return addToTar(tarball, source, target, baseDir, excludePathPrefixes, overlay, mustExist)
 }
 
 // addToTar writes the directory source into tarball, as writeTar says.
-func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPrefixes []string, mustExist bool) error {
+func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPrefixes []string, overlay TarOverlay, mustExist bool) error {
 	sourceInfo, err := os.Stat(source)
 	if err != nil {
 		if mustExist {
@@ -164,14 +200,14 @@ func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPr
 		return errors.New("source is not a directory")
 	}
 
-	return filepath.Walk(source,
+	err = filepath.Walk(source,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 
 			if info.IsDir() {
-				return skipPycache(info, path, source)
+				return tarDir(path, source, info, overlay)
 			}
 
 			if path == target {
@@ -190,22 +226,10 @@ func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPr
 				return err
 			}
 
-			// set the tar file path to be relative to the source directory
-			headerName := strings.TrimPrefix(path, filepath.Clean(source))
-			headerName = strings.TrimPrefix(headerName, string(filepath.Separator))
-			// prepend the base directory to the tar file path, e.g. "dags/" to "my_dag.py"
-			headerName = filepath.Join(baseDir, headerName)
-			// force use forward slashes in tar files
-			headerName = filepath.ToSlash(headerName)
-
-			// ignore excluded paths
-			for _, excludePathPrefix := range excludePathPrefixes {
-				if strings.HasPrefix(headerName, excludePathPrefix) {
-					logger.Debugf("Excluding tarball path: %s", headerName)
-					return nil
-				}
+			headerName, ok, err := tarEntryName(path, source, baseDir, excludePathPrefixes, overlay, info)
+			if err != nil || !ok {
+				return err
 			}
-
 			header.Name = headerName
 			logger.Debugf("Adding to tarball: %s", header.Name)
 
@@ -225,6 +249,98 @@ func addToTar(tarball *tar.Writer, source, target, baseDir string, excludePathPr
 			_, err = io.Copy(tarball, file)
 			return err
 		})
+	if err != nil {
+		return err
+	}
+	return addExtrasToTar(tarball, baseDir, overlay.Extra)
+}
+
+// tarDir decides whether the walk descends into the directory at dir:
+// filepath.SkipDir for one the overlay skips, or a bytecode cache.
+func tarDir(dir, source string, info os.FileInfo, overlay TarOverlay) error {
+	if dir != source && overlay.Skip != nil {
+		rel, err := filepath.Rel(source, dir)
+		if err != nil {
+			return err
+		}
+		skip, err := overlay.Skip(filepath.ToSlash(rel), dir, info)
+		if err != nil {
+			return err
+		}
+		if skip {
+			logger.Debugf("Leaving out of the tarball: %s", rel)
+			return filepath.SkipDir
+		}
+	}
+	return skipPycache(info, dir, source)
+}
+
+// tarEntryName is the name file goes into the tarball under, or false when
+// it stays out: one under an excluded prefix, or one the overlay skips or
+// replaces. info is what Lstat says of file.
+func tarEntryName(file, source, baseDir string, excludePathPrefixes []string, overlay TarOverlay, info os.FileInfo) (name string, ok bool, err error) {
+	// the tar file path is relative to the source directory, which may be "."
+	relName, err := filepath.Rel(source, file)
+	if err != nil {
+		return "", false, err
+	}
+	// prepend the base directory to the tar file path, e.g. "dags/" to "my_dag.py",
+	// with forward slashes whatever the platform
+	headerName := filepath.ToSlash(filepath.Join(baseDir, relName))
+
+	// ignore excluded paths
+	for _, excludePathPrefix := range excludePathPrefixes {
+		if strings.HasPrefix(headerName, excludePathPrefix) {
+			logger.Debugf("Excluding tarball path: %s", headerName)
+			return "", false, nil
+		}
+	}
+
+	rel := filepath.ToSlash(relName)
+	if overlay.Skip != nil {
+		skip, err := overlay.Skip(rel, file, info)
+		if err != nil {
+			return "", false, err
+		}
+		if skip {
+			logger.Debugf("Leaving out of the tarball: %s", rel)
+			return "", false, nil
+		}
+	}
+	if overlay.Extra[rel] != nil {
+		logger.Debugf("Replacing in the tarball: %s", rel)
+		return "", false, nil
+	}
+	return headerName, true, nil
+}
+
+// addExtrasToTar writes each of extra into tarball under baseDir, in path
+// order so the same overlay makes the same tarball.
+func addExtrasToTar(tarball *tar.Writer, baseDir string, extra map[string][]byte) error {
+	names := make([]string, 0, len(extra))
+	for name := range extra {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	now := time.Now()
+	for _, name := range names {
+		data := extra[name]
+		header := &tar.Header{
+			Typeflag: tar.TypeReg,
+			Name:     path.Join(filepath.ToSlash(baseDir), name),
+			Mode:     extraFileMode,
+			Size:     int64(len(data)),
+			ModTime:  now,
+		}
+		logger.Debugf("Adding to tarball: %s", header.Name)
+		if err := tarball.WriteHeader(header); err != nil {
+			return err
+		}
+		if _, err := tarball.Write(data); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // skipPycache keeps bytecode caches out of a tarball. Only the directory is

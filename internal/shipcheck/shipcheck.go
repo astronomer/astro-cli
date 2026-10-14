@@ -119,6 +119,20 @@ func (r *Report) Err() error {
 	return nil
 }
 
+// CosmosBoostWarning is the warning for the Cosmos Boost files an earlier
+// Astro CLI wrote into the project that a declared Dockerfile's context
+// carries (imagebuild.ProjectSurvey.CosmosBoost), or "" when there are none.
+// A generated image leaves them out; a declared Dockerfile decides for itself
+// what it copies, so the build goes ahead, but the plugin would read any it
+// copies as current.
+func CosmosBoostWarning(survey *imagebuild.ProjectSurvey) string {
+	if len(survey.CosmosBoost) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("the build context carries Cosmos Boost files an earlier Astro CLI wrote into the project: %s. The Cosmos Boost plugin would read them as current if the Dockerfile copies them into the image. This CLI no longer writes them; delete them",
+		cappedList(survey.CosmosBoost))
+}
+
 // Survey is the check a command runs before it builds an image to push. It
 // surveys what the image built from the project at dir would carry
 // (imagebuild.SurveyProject; dockerfile is the manifest's [tool.astro]
@@ -134,6 +148,9 @@ func Survey(dir, dockerfile string, podman bool, warn func(string)) (*imagebuild
 		return nil, err
 	}
 	if w := scaffold.LocalFilesWarningFor(dockerfile, survey.IgnoreFile, slices.Concat(survey.Files, survey.VCS)); w != "" {
+		warn(w)
+	}
+	if w := CosmosBoostWarning(&survey); w != "" {
 		warn(w)
 	}
 	r := Check(dir, &survey)

@@ -98,9 +98,9 @@ func hashProject(dir string, cfg dbtConfig) (hash string, files int, totalBytes 
 		if d.IsDir() {
 			// Our own sidecar directory must never affect the project hash, at ANY
 			// depth. A dbt manifest.json in a subdirectory (e.g. docs/manifest.json)
-			// gets its own sidecar written into the walked tree (docs/.astro/), and
-			// because manifest and project units run concurrently, hashing it would
-			// make the project hash depend on that sidecar and vary between runs.
+			// gets its own sidecar at docs/.astro/ in the bundle, and earlier
+			// astro-cli versions wrote those into the tree itself, so hashing it
+			// would make the project hash depend on whether one was lying there.
 			// .astro is always our output, never dbt source, so skipping it by name
 			// everywhere is safe (unlike target/logs, which are matched root-relative
 			// to avoid over-excluding a same-named source dir).

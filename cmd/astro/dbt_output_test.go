@@ -132,15 +132,6 @@ func TestDbtTextOutputUnchanged(t *testing.T) {
 		require.NoError(t, r.err, "stderr:\n%s", r.stderr)
 		assert.Equal(t, "Successfully uploaded bundle with version "+dbtTestVersion+" to Astro.\n", r.stdout)
 	})
-	t.Run("cleanup", func(t *testing.T) {
-		dir := t.TempDir()
-		artifact := filepath.Join(dir, ".astro", "dbt_metadata.json")
-		require.NoError(t, os.MkdirAll(filepath.Dir(artifact), 0o755))
-		require.NoError(t, os.WriteFile(artifact, []byte(`{"generated_by": {"application": "astro"}}`), 0o600))
-		r := execDbtRun(t, nil, "cleanup", dir)
-		require.NoError(t, r.err, "stderr:\n%s", r.stderr)
-		assert.Equal(t, "Removed the Cosmos Boost artifacts\n", r.stdout)
-	})
 }
 
 // stubBundleWait stands in for the wait a --wait does, writing one line of
@@ -331,52 +322,30 @@ func TestPublishThenWaitReportsBothFailures(t *testing.T) {
 	assert.Equal(t, cliout.ExitFailure, cliout.ExitCode(context.Background(), err))
 }
 
-func TestDbtCleanupJSON(t *testing.T) {
+// astro dbt cleanup is a tombstone: it touches nothing, and says why in text
+// and as the one error object under json, whatever paths and flags it gets.
+func TestDbtCleanupRemoved(t *testing.T) {
 	dir := t.TempDir()
-	// The cleanup walks the directory with symlinks resolved (macOS keeps
-	// temp dirs under /private/var), and reports the files at those paths.
-	walked, err := filepath.EvalSymlinks(dir)
-	require.NoError(t, err)
-	ours := filepath.Join(walked, ".astro", "dbt_metadata.json")
-	foreign := filepath.Join(walked, "other", ".astro", "dbt_metadata.json")
-	for path, app := range map[string]string{ours: "astro", foreign: "someone-else"} {
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-		require.NoError(t, os.WriteFile(path, []byte(`{"generated_by": {"application": "`+app+`"}}`), 0o600))
-	}
+	artifact := filepath.Join(dir, ".astro", "dbt_metadata.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(artifact), 0o755))
+	require.NoError(t, os.WriteFile(artifact, []byte(`{"generated_by": {"application": "astro"}}`), 0o600))
 
-	r := execDbtRun(t, nil, "cleanup", dir, "-o", "json")
-	require.NoError(t, r.err, "stderr:\n%s", r.stderr)
-	var got dbtCleanupJSON
+	r := execDbtRun(t, nil, "cleanup", dir)
+	require.Error(t, r.err)
+	assert.Equal(t, cliout.ExitUsage, r.code)
+	assert.Equal(t, errDbtCleanupRemoved, r.err.Error())
+	assert.Contains(t, r.err.Error(), "no longer writes Cosmos Boost files")
+	assert.NotContains(t, r.err.Error(), "`", "command names are plain text")
+	assert.Empty(t, r.stdout)
+	assert.FileExists(t, artifact, "the tombstone removes nothing")
+
+	r = execDbtRun(t, nil, "cleanup", dir, "-o", "json")
+	require.Error(t, r.err)
+	assert.Equal(t, cliout.ExitUsage, r.code)
+	var got errorJSON
 	decodeOne(t, r.stdout, &got)
-	assert.Equal(t, dbtCleanupJSON{Action: "removed", Paths: []string{dir}, Removed: []string{ours}, Kept: []string{foreign}}, got)
-
-	t.Run("nothing to remove", func(t *testing.T) {
-		r := execDbtRun(t, nil, "cleanup", t.TempDir(), "-o", "json")
-		require.NoError(t, r.err)
-		var got dbtCleanupJSON
-		fields := decodeOne(t, r.stdout, &got)
-		assert.JSONEq(t, "[]", string(fields["removed"]))
-		assert.JSONEq(t, "[]", string(fields["kept"]))
-	})
-	t.Run("no path: the current directory, absolute", func(t *testing.T) {
-		here := t.TempDir()
-		t.Chdir(here)
-		r := execDbtRun(t, nil, "cleanup", "-o", "json")
-		require.NoError(t, r.err)
-		var got dbtCleanupJSON
-		decodeOne(t, r.stdout, &got)
-		wd, err := os.Getwd()
-		require.NoError(t, err)
-		assert.Equal(t, []string{wd}, got.Paths)
-	})
-	t.Run("a path that does not exist", func(t *testing.T) {
-		r := execDbtRun(t, nil, "cleanup", filepath.Join(t.TempDir(), "missing"), "-o", "json")
-		require.Error(t, r.err)
-		assert.Equal(t, cliout.ExitFailure, r.code)
-		var got errorJSON
-		decodeOne(t, r.stdout, &got)
-		assert.Contains(t, got.Error, "missing")
-	})
+	assert.Equal(t, errDbtCleanupRemoved, got.Error)
+	assert.FileExists(t, artifact)
 }
 
 // Under --output json the deployment picker is refused as input_required,

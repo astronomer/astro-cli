@@ -75,7 +75,7 @@ func includeMonitoringDag(orgHosted bool, deploymentType astrov1.DeploymentType)
 	return !orgHosted && !deployment.IsDeploymentDedicated(deploymentType) && !deployment.IsDeploymentStandard(deploymentType)
 }
 
-func uploadDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag, noDagsBaseDir bool) (string, error) {
+func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitoringDag, noDagsBaseDir bool) (string, error) {
 	if monitoringDag {
 		monitoringDagPath := filepath.Join(dagsPath, "astronomer_monitoring_dag.py")
 
@@ -102,7 +102,7 @@ func uploadDags(path, dagsPath, dagsUploadURL, currentRuntimeVersion string, mon
 	// By default, prepend dags/ directory prefix. Use --no-dags-base-dir to place files at bundle root
 	// (needed for some Airflow 3.x deployments where sys.path includes the bundle root, not dags/).
 	prependBaseDir := !noDagsBaseDir
-	versionID, err := UploadBundle(path, dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion)
+	versionID, err := UploadBundle(dagsPath, dagsUploadURL, prependBaseDir, currentRuntimeVersion)
 	if err != nil {
 		return "", err
 	}
