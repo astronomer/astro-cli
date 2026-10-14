@@ -219,9 +219,10 @@ type resolvedBundle struct {
 
 // resolveBundle settles the bundle at path, for a deploy and a delete alike.
 //
-// The type is --type when given; else the first registered type that
-// detects path; else, for a delete given a mount path, the type whose
-// default directory that mount path is below; else none.
+// The type, for a deploy and a delete alike, is --type when given; else the
+// first registered type that detects path; else, given a mount path, the
+// type whose default directory that mount path is directly below; else
+// none. So a deploy and a delete of the same bundle record the same type.
 //
 // The mount path is --mount-path when given, and then path is not checked:
 // --type dbt with a mount path deploys any directory, as 1.x's
@@ -230,12 +231,29 @@ type resolvedBundle struct {
 // default needs --mount-path.
 func resolveBundle(cmd *cobra.Command, path string, o *deployBundleOptions) (resolvedBundle, error) {
 	bt := astrodeploy.ResolveBundleType(o.bundleType, path)
-	if o.bundleType == "" && bt.Name == astrodeploy.BundleTypeNone && o.delete && o.mountPath != "" {
+	if o.bundleType == "" && bt.Name == astrodeploy.BundleTypeNone && o.mountPath != "" {
 		if inferred, ok := astrodeploy.BundleTypeForMountPath(o.mountPath); ok {
 			bt = inferred
 		}
 	}
 	b := resolvedBundle{bundleType: bt.Name, mountPath: o.mountPath}
+	// The name is the bundle's when the mount path is the one this type
+	// derives from path: a mount path of its own names some other bundle,
+	// or none, and PATH says nothing of it.
+	named := func() string {
+		if !bt.HasDefaultMountPath() || (bt.Detect != nil && !bt.Detect(path)) {
+			return ""
+		}
+		derived, err := bt.DefaultMountPath(path)
+		if err != nil || derived != b.mountPath {
+			return ""
+		}
+		name, err := bt.BundleName(path)
+		if err != nil {
+			return ""
+		}
+		return name
+	}
 	if b.mountPath == "" {
 		if !bt.HasDefaultMountPath() {
 			return b, cliout.Usage(fmt.Errorf("--mount-path is required for a bundle of type %s: only a %s bundle has a default", bt.Name, strings.Join(astrodeploy.BundleTypeNames(), " or ")))
@@ -252,13 +270,7 @@ func resolveBundle(cmd *cobra.Command, path string, o *deployBundleOptions) (res
 		b.mountPath = mountPath
 		fmt.Fprintf(cmd.ErrOrStderr(), "mount path %s: the default for a %s bundle\n", mountPath, bt.Name)
 	}
-	// The name is the bundle's when path holds one this type names: a
-	// --type dbt deploy of another directory has none.
-	if bt.BundleName != nil && (bt.Detect == nil || bt.Detect(path)) {
-		if name, err := bt.BundleName(path); err == nil {
-			b.name = name
-		}
-	}
+	b.name = named()
 	return b, nil
 }
 
@@ -348,34 +360,26 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 // ids of the ones that share the name.
 func deploymentNamed(name, ws string, login *deployLogin) (*astrov1.Deployment, error) {
 	if ws == "" {
-		return nil, fmt.Errorf("--deployment %s is not a link of the project here or a Deployment id, and there is no Workspace to look it up by name in: pass --workspace, or the Deployment id", name)
+		return nil, cliout.Usage(fmt.Errorf("--deployment %s is not a link of the project here or a Deployment id, and there is no Workspace to look it up by name in: pass --workspace, or the Deployment id", name))
 	}
-	deps, err := deployment.ListDeployments(ws, login.context.Organization, login.client)
+	found, err := deployment.DeploymentsNamed(name, ws, login.context.Organization, login.client)
 	if err != nil {
 		return nil, err
 	}
-	var found []astrov1.Deployment
-	for i := range deps {
-		if deps[i].Name == name {
-			found = append(found, deps[i])
-		}
-	}
 	switch len(found) {
 	case 0:
-		return nil, fmt.Errorf("no Deployment named %s in workspace %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, ws)
+		// Named wrong, as a link name that is not one would be: a usage
+		// mistake, not a failure of the deploy.
+		return nil, cliout.Usage(fmt.Errorf("no Deployment named %s in workspace %s: pass a Deployment id, a link name of the project here, or the name of a Deployment in that workspace", name, ws))
 	case 1:
 		return &found[0], nil
 	}
-	ids := make([]string, len(found))
-	for i := range found {
-		ids[i] = found[i].Id
-	}
-	return nil, fmt.Errorf("%d Deployments are named %s in workspace %s (%s): pass the id of the one you mean with --deployment", len(found), name, ws, strings.Join(ids, ", "))
+	return nil, cliout.Usage(fmt.Errorf("%d Deployments are named %s in workspace %s (%s): pass the id of the one you mean with --deployment", len(found), name, ws, strings.Join(deployment.DeploymentIDs(found), ", ")))
 }
 
 // errBundleNoTarget is a bundle deploy or delete that names no Deployment and
 // cannot be asked for one, in astro deploy's words for the same refusal.
-var errBundleNoTarget = errors.New("this deploy names no Deployment and this run cannot be asked: pass the Deployment id or a link name with --deployment")
+var errBundleNoTarget = errors.New("this deploy names no Deployment and this run cannot be asked: pass --deployment with a Deployment id, a Deployment name, or a link name")
 
 // bundleDeployJSON is what astro deploy bundle --output json publishes: the
 // bundle deployed and where. Its deployment, workspace and git keys are the

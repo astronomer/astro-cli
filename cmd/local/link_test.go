@@ -171,6 +171,12 @@ func TestLinkAddRefusesBundleAsAName(t *testing.T) {
 	assert.True(t, cliout.IsUsage(err), "%v", err)
 	assert.Contains(t, err.Error(), "bundle cannot name a link: astro deploy bundle deploys a non-DAG bundle")
 	assert.Equal(t, linkManifest, readManifest(t, dir))
+
+	// One already called bundle is replaced as any other is.
+	dir, path := linkTestProject(t, linkManifest+"\n[tool.astro.deployments.bundle]\ndeployment = 'dep-old'\n")
+	_, _, err = runLink(t, dir, "add", "bundle", "--deployment", "dep-new", "--replace")
+	require.NoError(t, err)
+	assert.Equal(t, "dep-new", loadManifest(t, path).Astro.Deployments["bundle"].Deployment)
 }
 
 // An MWAA link writes the shared region when given one, and an empty --region

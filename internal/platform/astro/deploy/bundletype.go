@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"strings"
 
@@ -97,11 +98,18 @@ func ResolveBundleType(name, dir string) BundleType {
 	return BundleType{Name: name}
 }
 
-// BundleTypeForMountPath is the registered type whose bundles mount below
-// mountPath's directory by default, and whether there is one.
+// BundleTypeForMountPath is the registered type whose default mount path
+// mountPath has the shape of, MountPathPrefix and one path component, and
+// whether there is one. The path is cleaned first, so .. cannot climb out of
+// the prefix and a nested path is no default's.
 func BundleTypeForMountPath(mountPath string) (BundleType, bool) {
+	clean := pathpkg.Clean(mountPath)
 	for _, t := range bundleTypes {
-		if t.MountPathPrefix != "" && strings.HasPrefix(mountPath, t.MountPathPrefix) && len(mountPath) > len(t.MountPathPrefix) {
+		if t.MountPathPrefix == "" {
+			continue
+		}
+		rest, ok := strings.CutPrefix(clean, t.MountPathPrefix)
+		if ok && rest != "" && !strings.Contains(rest, "/") {
 			return t, true
 		}
 	}

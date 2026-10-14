@@ -169,7 +169,6 @@ func TestSaveLinkRefusesAnInvalidLink(t *testing.T) {
 	}{
 		{"no name", Link{Name: "  ", Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"}, "needs a name"},
 		{"the reserved name", Link{Name: manifest.ReservedLinkName, Kind: manifest.KindMWAA, Environment: "env"}, "reserved"},
-		{"the deploy bundle subcommand's name", Link{Name: BundleLinkName, Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"}, "astro deploy bundle deploys a non-DAG bundle"},
 		{"an astro link with no deployment", Link{Name: "prod", Kind: manifest.KindAstro, Workspace: "W"}, "needs a deployment"},
 		{"an mwaa link with no environment", Link{Name: "aws", Kind: manifest.KindMWAA}, "needs an environment"},
 		{"an endpoint with no url", Link{Name: "oss", Kind: manifest.KindEndpoint, Auth: manifest.Auth{Method: manifest.AuthNone}}, "needs a url"},
@@ -188,6 +187,24 @@ func TestSaveLinkRefusesAnInvalidLink(t *testing.T) {
 			assert.Equal(t, linkFixture, readFile(t, path))
 		})
 	}
+}
+
+// A new link cannot be called bundle, the word astro deploy bundle takes; one
+// already called that saves again.
+func TestSaveLinkRefusesANewBundleLink(t *testing.T) {
+	dir, path := linkProject(t, linkFixture)
+	err := SaveLink(dir, nil, Link{Name: BundleLinkName, Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"})
+	require.ErrorIs(t, err, ErrBundleLinkName)
+	require.ErrorIs(t, err, ErrInvalidLink)
+	assert.Contains(t, err.Error(), "astro deploy bundle deploys a non-DAG bundle")
+	assert.Equal(t, linkFixture, readFile(t, path))
+
+	existing := linkFixture + "\n[tool.astro.deployments.bundle]\nworkspace = 'W'\ndeployment = 'old'\n"
+	dir, path = linkProject(t, existing)
+	require.NoError(t, SaveLink(dir, nil, Link{Name: BundleLinkName, Kind: manifest.KindAstro, Deployment: "new"}))
+	m, err := manifest.Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "new", m.Astro.Deployments[BundleLinkName].Deployment)
 }
 
 // A credential pasted where an env var name belongs is refused, and the error

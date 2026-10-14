@@ -33,10 +33,11 @@ import (
 // because the parser would refuse it. The message names the field.
 var ErrInvalidLink = errors.New("invalid link")
 
-// BundleLinkName is a name no link may have: astro deploy reads astro deploy
-// bundle as its subcommand that deploys a non-DAG bundle, so a deploy could
-// never reach a link by that name as its argument. A manifest that already
-// has one still loads, and it is reached with --deployment.
+// BundleLinkName is a name no new link may have: astro deploy reads astro
+// deploy bundle as its subcommand that deploys a non-DAG bundle, so a deploy
+// could never reach a link by that name as its argument. A link already
+// called that still loads, is reached with --deployment, and saves again: only
+// adding one is refused.
 const BundleLinkName = "bundle"
 
 // ErrBundleLinkName is SaveLink refusing BundleLinkName. It wraps
@@ -208,6 +209,9 @@ func SaveLink(dir string, wrap func(run func() error) error, l Link) error {
 //nolint:gocritic // hugeParam: by value, as SaveLink holds it
 func (l Link) edit() ManifestEdit {
 	return func(before *manifest.Manifest, ed tomledit.Editor) error {
+		if _, exists := before.Astro.Deployments[l.Name]; l.Name == BundleLinkName && !exists {
+			return ErrBundleLinkName
+		}
 		key := linkKey(l.Name)
 		// Read from the raw TOML, before the entry is replaced: the parsed
 		// link has the defaults folded in, so it cannot say which keys the link
@@ -626,8 +630,6 @@ func (l *Link) validate() error {
 		return invalidLink("a link needs a name")
 	case manifest.ReservedLinkName:
 		return invalidLink("%q is reserved: it always means the Airflow running on this machine", manifest.ReservedLinkName)
-	case BundleLinkName:
-		return ErrBundleLinkName
 	}
 	switch l.Kind {
 	case manifest.KindAstro:

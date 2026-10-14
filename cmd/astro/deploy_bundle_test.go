@@ -292,7 +292,7 @@ func TestDeployBundleTarget(t *testing.T) {
 			var got errorJSON
 			decodeOne(t, r.stdout, &got)
 			assert.Equal(t, string(cliout.KindInputRequired), got.Kind)
-			assert.Contains(t, got.Error, "pass the Deployment id or a link name with --deployment")
+			assert.Contains(t, got.Error, "pass --deployment with a Deployment id, a Deployment name, or a link name")
 		})
 		t.Run(name+": none named, without a terminal", func(t *testing.T) {
 			bundle := dbtProject(t)
@@ -319,6 +319,62 @@ func TestDeployBundleTarget(t *testing.T) {
 	}
 }
 
+// A deploy and a delete of the same bundle record the same type: --type,
+// else what PATH holds, else what the mount path's shape says.
+func TestDeployBundleDeployAndDeleteAgreeOnTheType(t *testing.T) {
+	for _, tc := range []struct {
+		name, mountPath, want string
+		args                  []string
+		dbtHere               bool
+	}{
+		{name: "a dbt mount path, no bundle here", mountPath: "/usr/local/airflow/dbt/jaffle_shop", want: "dbt"},
+		{name: "a nested mount path", mountPath: "/usr/local/airflow/dbt/a/b", want: "none"},
+		{name: "a mount path climbing out", mountPath: "/usr/local/airflow/dbt/../x", want: "none"},
+		{name: "a dbt project here, another mount path", mountPath: "/usr/local/airflow/x", want: "dbt", dbtHere: true},
+		{name: "--type wins", mountPath: "/usr/local/airflow/dbt/jaffle_shop", want: "seeds", args: []string{"--type", "seeds"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bundle := plainBundle(t)
+			if tc.dbtHere {
+				bundle = dbtProject(t)
+			}
+			deployed, deleted := fakeDeployBundle(t), fakeDeleteBundle(t)
+			args := append([]string{bundle, "--deployment", bundleTestID, "--mount-path", tc.mountPath}, tc.args...)
+			r := execBundleRun(t, nil, "", args...)
+			require.NoError(t, r.err, r.stderr)
+			r = execBundleRun(t, nil, "", append([]string{"--delete"}, args...)...)
+			require.NoError(t, r.err, r.stderr)
+			assert.Equal(t, tc.want, (*deployed).BundleType)
+			assert.Equal(t, tc.want, (*deleted).BundleType)
+		})
+	}
+}
+
+// bundle_name names the bundle the mount path was derived from: a mount path
+// of its own is some other bundle's, or none.
+func TestDeployBundleNameOnlyForTheDerivedMountPath(t *testing.T) {
+	for mountPath, named := range map[string]bool{
+		"":                                   true,
+		"/usr/local/airflow/dbt/jaffle_shop": true,
+		"/usr/local/airflow/dbt/custom":      false,
+	} {
+		project := dbtProject(t)
+		args := []string{project, "--deployment", dbtTestDeploymentID, "-o", "json"}
+		if mountPath != "" {
+			args = append(args, "--mount-path", mountPath)
+		}
+		r := execBundleRun(t, dbtBundleMock(t, fakeBlobStore(t)), "", args...)
+		require.NoError(t, r.err, r.stderr)
+		var got bundleDeployJSON
+		fields := decodeOne(t, r.stdout, &got)
+		if named {
+			assert.Equal(t, "jaffle_shop", got.BundleName, mountPath)
+		} else {
+			assert.NotContains(t, fields, "bundle_name", mountPath)
+		}
+	}
+}
+
 // --deployment that is neither a link nor an id is a Deployment's name in
 // the workspace: one match is used, as read; none, or several, are errors
 // that say so.
@@ -340,19 +396,29 @@ func TestDeployBundleDeploymentByName(t *testing.T) {
 		require.NoError(t, r.err, r.stderr)
 		assert.Equal(t, dbtTestDeploymentID, (*captured).DeploymentID)
 	})
+	// None, or several, is a Deployment named wrong: a usage error, under
+	// json the usage error object.
 	t.Run("none", func(t *testing.T) {
 		project := dbtProject(t)
 		noBundleTransport(t)
-		r := execBundleRun(t, coreMock(t, dbtTestDeployment()), "", project, "--deployment", "reporting", "--workspace", "clxdbtworkspace0000000000")
+		r := execBundleRun(t, coreMock(t, dbtTestDeployment()), "", project, "--deployment", "reporting", "--workspace", "clxdbtworkspace0000000000", "-o", "json")
 		require.Error(t, r.err)
-		assert.Contains(t, r.err.Error(), "no Deployment named reporting in workspace clxdbtworkspace0000000000")
+		assert.Equal(t, cliout.ExitUsage, r.code)
+		var got errorJSON
+		decodeOne(t, r.stdout, &got)
+		assert.Equal(t, string(cliout.KindUsage), got.Kind)
+		assert.Contains(t, got.Error, "no Deployment named reporting in workspace clxdbtworkspace0000000000")
 	})
 	t.Run("two", func(t *testing.T) {
 		project := dbtProject(t)
 		noBundleTransport(t)
-		r := execBundleRun(t, coreMock(t, dbtTestDeployment(), other), "", project, "--deployment", "analytics", "--workspace", "clxdbtworkspace0000000000")
+		r := execBundleRun(t, coreMock(t, dbtTestDeployment(), other), "", project, "--deployment", "analytics", "--workspace", "clxdbtworkspace0000000000", "-o", "json")
 		require.Error(t, r.err)
-		assert.Contains(t, r.err.Error(), "2 Deployments are named analytics in workspace clxdbtworkspace0000000000 ("+dbtTestDeploymentID+", clxdbtother00000000000000)")
+		assert.Equal(t, cliout.ExitUsage, r.code)
+		var got errorJSON
+		decodeOne(t, r.stdout, &got)
+		assert.Equal(t, string(cliout.KindUsage), got.Kind)
+		assert.Contains(t, got.Error, "2 Deployments are named analytics in workspace clxdbtworkspace0000000000 ("+dbtTestDeploymentID+", clxdbtother00000000000000)")
 	})
 }
 
@@ -518,6 +584,8 @@ func TestDbtRemovedReadsTheSubcommand(t *testing.T) {
 		{[]string{"-n", "prod", "delete"}, errDbtDeleteRemoved},
 		{[]string{"--project-path=.", "cleanup"}, errDbtCleanupRemoved},
 		{[]string{"-w", "deploy"}, errDbtDeployRemoved},
+		{[]string{"-wt", "5m", "deploy"}, errDbtDeployRemoved},
+		{[]string{"-nprod", "delete"}, errDbtDeleteRemoved},
 		{[]string{"--workspace-id", "deploy"}, errDbtRemoved},
 		{[]string{"--", "deploy"}, errDbtRemoved},
 	} {

@@ -78,9 +78,16 @@ func dbtTypedSubcommand(args []string) string {
 				i++
 			}
 		case strings.HasPrefix(a, "-") && len(a) > 1:
-			// -n prod takes the next word; -nprod carries its value.
-			if len(a) == 2 && dbtValueFlags[a[1:]] {
-				i++
+			// A group of shorthands: the first that takes a value takes the
+			// rest of the group (-nprod), or the next word when it is the
+			// group's last letter (-n prod, -wt 5m).
+			for j := 1; j < len(a); j++ {
+				if dbtValueFlags[a[j:j+1]] {
+					if j == len(a)-1 {
+						i++
+					}
+					break
+				}
 			}
 		default:
 			return a

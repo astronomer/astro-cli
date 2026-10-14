@@ -340,9 +340,10 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 		return err
 	}
 	name = strings.TrimSpace(name)
-	// bundle is astro deploy bundle, so a link by that name could not be
-	// deployed to by name: refused before anything is asked.
-	if name == scaffold.BundleLinkName {
+	// bundle is astro deploy bundle, so a new link by that name could not be
+	// deployed to by name: refused before anything is asked. One that exists
+	// is the --replace check's.
+	if _, exists := m.Astro.Deployments[name]; name == scaffold.BundleLinkName && !exists {
 		return cliout.Usage(scaffold.ErrBundleLinkName)
 	}
 	// A NAME already linked is refused before anything asks a question or

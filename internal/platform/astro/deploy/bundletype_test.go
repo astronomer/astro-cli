@@ -74,7 +74,13 @@ func TestBundleTypeForMountPath(t *testing.T) {
 	bt, ok := BundleTypeForMountPath("/usr/local/airflow/dbt/jaffle_shop")
 	require.True(t, ok)
 	assert.Equal(t, "dbt", bt.Name)
-	for _, p := range []string{"/usr/local/airflow/dbt/", "/usr/local/airflow/dbt", "/usr/local/airflow/seeds", ""} {
+	bt, ok = BundleTypeForMountPath("/usr/local/airflow/dbt/jaffle_shop/")
+	require.True(t, ok, "a trailing slash is cleaned away")
+	assert.Equal(t, "dbt", bt.Name)
+	for _, p := range []string{
+		"/usr/local/airflow/dbt/", "/usr/local/airflow/dbt", "/usr/local/airflow/seeds", "",
+		"/usr/local/airflow/dbt/../seeds", "/usr/local/airflow/dbt/a/b", "/usr/local/airflow/dbt/a/..",
+	} {
 		_, ok := BundleTypeForMountPath(p)
 		assert.False(t, ok, p)
 	}
