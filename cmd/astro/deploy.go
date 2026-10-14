@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -503,6 +504,9 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
+		// Resolved once, when a deploy that builds first needs it, and
+		// shared by the checks and the transport.
+		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
 		// A Deployment picked from the workspace rather than from the links is
 		// linked as `astro link add` would link it, once the deploy to it has
 		// succeeded, so the next deploy offers it by name. Only an interactive
@@ -557,6 +561,23 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	return renderManifestDeploy(out, format, &res)
 }
 
+// onceEngine memoizes an engine resolver, so a deploy resolves its engine
+// once however many steps ask.
+func onceEngine(resolve func() (string, []string, error)) func() (string, []string, error) {
+	type engine struct {
+		bin string
+		env []string
+	}
+	once := sync.OnceValues(func() (engine, error) {
+		bin, env, err := resolve()
+		return engine{bin, env}, err
+	})
+	return func() (string, []string, error) {
+		e, err := once()
+		return e.bin, e.env, err
+	}
+}
+
 // announceDeployTarget prints the one line every resolving command puts on
 // stderr before it acts, so a deploy's target is never invisible either. It
 // matches cmd/local's announceInstance: the name, then what the name does not
@@ -605,14 +626,22 @@ type deployJSON struct {
 	// Link is the manifest link the deploy resolved to, omitted when the target
 	// was named by id. It is what the person typed and what their teammates
 	// call it; the id alone makes a consumer look it up again.
-	Link             string         `json:"link,omitempty"`
-	Workspace        string         `json:"workspace"`
-	Type             string         `json:"type"`
-	ImageTag         string         `json:"image_tag,omitempty"`
-	DagBundleVersion string         `json:"dag_bundle_version,omitempty"`
-	RuntimeVersion   string         `json:"runtime_version,omitempty"`
-	URL              string         `json:"url,omitempty"`
-	Git              *deployGitJSON `json:"git,omitempty"`
+	Link             string `json:"link,omitempty"`
+	Workspace        string `json:"workspace"`
+	Type             string `json:"type"`
+	ImageTag         string `json:"image_tag,omitempty"`
+	DagBundleVersion string `json:"dag_bundle_version,omitempty"`
+	// DagsInImage is set on an image-and-dag deploy to a Deployment with DAG
+	// deploys off, which uploads no DAGs: the Deployment runs those inside
+	// the image.
+	DagsInImage bool `json:"dags_in_image,omitempty"`
+	// RemoteExecution is set on an image-and-dag deploy to a
+	// remote-execution Deployment with DAG deploys off, which uploads no
+	// DAGs.
+	RemoteExecution bool           `json:"remote_execution,omitempty"`
+	RuntimeVersion  string         `json:"runtime_version,omitempty"`
+	URL             string         `json:"url,omitempty"`
+	Git             *deployGitJSON `json:"git,omitempty"`
 }
 
 type deployGitJSON struct {
@@ -637,6 +666,8 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		Type:             res.Type,
 		ImageTag:         res.ImageTag,
 		DagBundleVersion: res.DagTarballVersion,
+		DagsInImage:      res.DagsInImage,
+		RemoteExecution:  res.RemoteExecution,
 		RuntimeVersion:   res.RuntimeVersion,
 		URL:              res.URL,
 	}
@@ -650,7 +681,17 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 			fmt.Fprintf(b, "Deployed DAGs (version %s) to %s.\n", res.DagTarballVersion, target)
 		case "image-only":
 			fmt.Fprintf(b, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
-		default: // image-and-dag
+		case "image-and-dag":
+			if res.DagsInImage {
+				fmt.Fprintf(b, "Deployed image (tag %s) to %s, with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.\n", res.ImageTag, target)
+				break
+			}
+			if res.RemoteExecution {
+				fmt.Fprintf(b, "Deployed image (tag %s) to %s. It runs remote execution with DAG deploys off, so no DAGs were uploaded.\n", res.ImageTag, target)
+				break
+			}
+			fallthrough
+		default:
 			fmt.Fprintf(b, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
 		}
 		if res.URL != "" {
@@ -907,6 +948,9 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		ImageName:     in.ImageName,
 		OnBuild:       in.OnBuild,
 		IncludeDags:   in.IncludeDags,
+		Warn:          in.Warn,
+		Survey:        in.Survey,
+		Engine:        in.Engine,
 		Description:   in.Description,
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,
@@ -921,6 +965,8 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		RuntimeVersion:    res.RuntimeVersion,
 		ImageTag:          res.ImageTag,
 		DagTarballVersion: res.DagTarballVersion,
+		DagsInImage:       res.DagsInImage,
+		RemoteExecution:   res.RemoteExecution,
 		URL:               res.URL,
 		Git:               toManifestDeployGit(res.Git),
 	}, nil

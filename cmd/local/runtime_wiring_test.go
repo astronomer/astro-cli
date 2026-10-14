@@ -247,7 +247,7 @@ func TestPackageChecksTheRuntimeBuild(t *testing.T) {
 // about the per-machine files that build would copy into the image, and go on.
 // Standalone builds no image, so it says nothing.
 func TestStartWarnsAboutLocalFilesInTheImageInDockerModeOnly(t *testing.T) {
-	const warning = "warning: the image built from Dockerfile would copy in these per-machine files: " +
+	const warning = "warning: the image built from Dockerfile would copy in these local or per-machine files: " +
 		".astro/standalone. To keep them out, add it to .dockerignore"
 	for _, tc := range []struct {
 		name string

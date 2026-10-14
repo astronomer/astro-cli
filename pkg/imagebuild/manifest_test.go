@@ -208,8 +208,22 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 		".astro/standalone/airflow.db":         "never\n",
 		"plugins/fix_local_executor_pickle.py": "never\n",
 		"tests/test_dags.py":                   "ignored by the project\n",
+		// Never shipped, at any depth: local env values and 1.x settings.
+		"include/.env":                      "SECRET=never\n",
+		".env.prod":                         "SECRET=never\n",
+		"include/cfg/.env.local":            "SECRET=never\n",
+		".envrc":                            "export SECRET=never\n",
+		"airflow_settings.yaml":             "never\n",
+		"include/airflow_settings.yaml":     "never\n",
+		"airflow.db":                        "never\n",
+		"airflow.cfg":                       "never\n",
+		"logs/scheduler/latest.log":         "never\n",
+		"include/logs/fixture.json":         "the project's own\n",
+		"include/airflow.cfg":               "the project's own\n",
+		"include/sample_env":                "the project's own\n",
+		"include/environment/defaults.yaml": "the project's own\n",
 		// The project's own rules apply, but cannot bring a built-in back.
-		".dockerignore": "tests/\n!.env\n",
+		".dockerignore": "tests/\n!.env\n!**/.env\n!airflow_settings.yaml\n!airflow.cfg\n!logs/\n",
 	})
 	req, err := ForManifest(ManifestBuild{ProjectDir: project, AirflowVersion: "3.1", Dependencies: []string{"pandas"}}, nil)
 	require.NoError(t, err)
@@ -226,6 +240,7 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
 	assert.ElementsMatch(t, []string{
 		"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml", ".astro/config.yaml",
+		"include/logs/fixture.json", "include/airflow.cfg", "include/sample_env", "include/environment/defaults.yaml",
 		requirementsName, packagesName,
 	}, contextFiles(t, ctxDir))
 	reqs, err := os.ReadFile(filepath.Join(ctxDir, requirementsName))

@@ -20,13 +20,17 @@ The image is built by [`pkg/imagebuild`](../pkg/imagebuild/imagebuild.go), the s
 
 - **Generated (the common case).** A one-line `FROM astrocrpublic.azurecr.io/runtime:<tag>` Dockerfile, plus a `requirements.txt` holding `[project] dependencies` without `apache-airflow`/`apache-airflow-core` (`manifest.WithoutAirflow`) and a `packages.txt` holding `[tool.astro] packages`, plus `git` when a dependency is a git direct reference (a `[tool.uv.sources]` git source becomes `name @ git+https://…`, and the runtime image ships no git for uv to fetch it with). The tag is `[tool.astro] runtime` when set, else the series of the Airflow requirement (`runtime:3.3`). When `[project] requires-python` does not admit that build's default Python, the tag is instead the exact build's Python flavor, `runtime:3.3-8-python-3.13`, for the newest Python the build ships that it admits; with no `runtime` set, the build is the catalog's newest of the series. A `requires-python` admitting none of the build's Pythons is refused before the build, and without a readable catalog the default Python is kept (`imagebuild.RuntimeImageForPython`). The Python is `runtimeversions.ProjectPython`'s choice, which a standalone environment of the same manifest runs too (`imagebuild.StandalonePython`) (see [`requires-python`](manifest-reference.md#requires-python)). Deploy builds only Airflow 3 bases from a generated build.
 
-  The image a deploy or `astro package astro` generates also carries the project's own files in `/usr/local/airflow`: `include/`, `plugins/`, the modules `dags/` imports, everything a DAG can reach on Astro. A deploy sends `dags/` alone beside the image, so without them a DAG that imports `include` fails there. They are copied by the runtime image's trailing `ONBUILD COPY . .`, after both installs, so the dependency layers keep their cache. Left out at any depth: `.git`, `.venv`, `venv`, `__pycache__`, `node_modules` and the tool caches; at the root, the project's own `requirements.txt` and `packages.txt` in any case (the generated ones win). A project's `.dockerignore` applies, during the copy, so an excluded directory is never read. After it come `imagebuild.ShippedImageIgnores`, which no `!` line of the project's can undo: the plaintext local `.env` and the per-machine files Astro tools write (`.astro/standalone/`, `.astro/worktrees/`, the `*.local.*` files, Otto's `mcp.json`, the Airflow 2 pickle-fix plugin), the same rules `astro init` writes into a declared Dockerfile's `.dockerignore`. A symlink is carried as what it points at, inside the project or out of it, since a link copied as a link would dangle in the image. The project's files are part of `astro package astro`'s content-addressed tag, so editing one moves the tag. Docker-mode `astro local start` runs the project mounted, so its image holds the dependencies alone (`imagebuild.ForLocalManifest`).
+  The image a deploy or `astro package astro` generates also carries the project's own files in `/usr/local/airflow`: `include/`, `plugins/`, the modules `dags/` imports, everything a DAG can reach on Astro. A deploy sends `dags/` alone beside the image, so without them a DAG that imports `include` fails there. They are copied by the runtime image's trailing `ONBUILD COPY . .`, after both installs, so the dependency layers keep their cache. Left out at any depth: `.git`, `.venv`, `venv`, `__pycache__`, `node_modules` and the tool caches; at the root, the project's own `requirements.txt` and `packages.txt` in any case (the generated ones win). A project's `.dockerignore` applies, during the copy, so an excluded directory is never read. After it come `imagebuild.ShippedImageIgnores`, which no `!` line of the project's can undo, the same rules `astro init` writes into a declared Dockerfile's `.dockerignore`. They are two lists in `pkg/airflowrt`:
+
+  - `ShippedImageRules`, files no shipped image carries. At any depth: `.env`, `.env.*` and `.envrc` (local values, their per-stage variants, direnv's exports), and `airflow_settings.yaml` (1.x's local connections and variables, in cleartext). At the root only: `airflow.db`, `airflow.cfg` and `logs/`, what an Airflow run with the project as its home leaves there. The image's `AIRFLOW_HOME` is the project root, so a shipped `airflow.cfg` would replace the runtime's own; below the root these names are the project's own data. 1.x's default `.dockerignore` also had `astro`, the CLI binary; it is not here, because a root `astro/` can be a Python package (astro-sdk imports as `astro`). These are not added to `.gitignore`: some are committed on purpose, and git is the project's business.
+  - `LocalFileRules`, the per-machine files Astro tools write (`.astro/standalone/`, `.astro/worktrees/`, the `*.local.*` files, Otto's `mcp.json`, the Airflow 2 pickle-fix plugin), which `.gitignore` also gets. A symlink is carried as what it points at, inside the project or out of it, since a link copied as a link would dangle in the image. The project's files are part of `astro package astro`'s content-addressed tag, so editing one moves the tag. Docker-mode `astro local start` runs the project mounted, so its image holds the dependencies alone (`imagebuild.ForLocalManifest`).
 - **Declared Dockerfile.** When `[tool.astro] dockerfile` is set, that file is the build, with the project directory as context. No base is resolved.
 
 Before anything is built, the deploy checks the project:
 
 - the Dockerfile's `FROM` agrees with the Airflow requirement (`scaffold.CheckDockerfileAirflow`);
 - the build secrets resolve, and the local files a declared Dockerfile would copy into the image are warned about;
+- the image would carry no gitignored file that looks like a credential (see [Gitignored files and credentials](#gitignored-files-and-credentials));
 - a `[tool.astro] runtime` build agrees with the requirement, against the runtime catalog.
 
 The pipeline, in order (`DeployManifestImage` in [`manifest_image.go`](../internal/platform/astro/deploy/manifest_image.go)):
@@ -34,11 +38,11 @@ The pipeline, in order (`DeployManifestImage` in [`manifest_image.go`](../intern
 1. Check for a running container engine. Without one the deploy stops (see [Without Docker](#5-without-docker)).
 2. Log in with the login for the project's host (see [Selecting the Deployment](#3-selecting-the-deployment)).
 3. Collect git metadata (see [Command surface](#6-command-surface)).
-4. Fetch the Deployment and check it can take this deploy: CI/CD enforcement, DAG deploys enabled for a both deploy, and the runtimes it offers.
+4. Fetch the Deployment and check it can take this deploy: CI/CD enforcement, DAG deploys enabled for an `--image` deploy, and the runtimes it offers. A both deploy to a Deployment with DAG deploys off puts the DAGs inside the image (see [DAG deploys off](#dag-deploys-off)).
 5. Check the planned runtime before the build. The planned runtime is `[tool.astro] runtime`, else the base's tag without any `-python-X.Y` (the series, or the exact build a Python flavor names), or for a declared Dockerfile the runtime its final `FROM` names (`airflowrt.ReadDeclaredBase`). An exact version gets the full rules: no downgrade, a version the Deployment offers, and the Airflow 2→3 floor. A series is refused only when it is older than the Deployment's, or the Deployment offers no build of it. A downgrade error names the line to change. This makes a bad pin fail in seconds rather than after a long build.
 6. Build for `linux/amd64` and print "Building your project image, this can take a few minutes...".
 7. Read `io.astronomer.docker.runtime.version` off the built image and run the runtime rules again on it. The label is the authority, because the requirement states what the project intends and the label states what the image is.
-8. Create the deploy, push the image as user `cli` with the session token, upload the DAG tarball for a both deploy, finalize, and wait for health with `--wait`.
+8. Create the deploy, push the image as user `cli` with the session token, upload the DAG tarball for a both deploy to a Deployment with DAG deploys on, finalize, and wait for health with `--wait`.
 
 **A deploy to Astro requires an Astro Runtime base.** An image without the runtime label is refused, never deployed on the requirement's word:
 
@@ -48,6 +52,43 @@ The pipeline, in order (`DeployManifestImage` in [`manifest_image.go`](../intern
 This is the one limit on a declared Dockerfile. It builds and runs locally on any base, but deploys to Astro only on a runtime base.
 
 `--image-name <ref>` deploys a prebuilt local image and skips the build. It is how CI deploys an image `astro package` built (see [The Astro target](#the-astro-target)).
+
+### DAG deploys off
+
+A Deployment with DAG deploys off takes no DAG upload, so the image is the only way DAGs reach it. A default deploy there ships the image alone, with the DAGs inside it, as the 1.x CLI did: the generated image carries `dags/` with the rest of the project, the deploy is created as `IMAGE_AND_DAG` and finalized without a tarball, and nothing is uploaded. The summary says so (`Deployed image (tag …) to …, with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.`), and `-o json` adds `"dags_in_image": true`.
+
+A remote-execution Deployment runs its DAGs on its remote agents. With DAG deploys off, a default deploy uploads nothing and holds the image to nothing about DAGs, as the 1.x CLI uploaded none there; the summary says `It runs remote execution with DAG deploys off, so no DAGs were uploaded.`, and `-o json` adds `"remote_execution": true`. With DAG deploys on, it uploads them like any other Deployment.
+
+| Deployment / flags | what ships |
+| --- | --- |
+| DAG deploys on (remote execution or not), default | the image (which carries `dags/` too), and the DAGs uploaded beside it |
+| DAG deploys off, default, generated build | the image with the DAGs inside; refused when the project's `.dockerignore` leaves out every `.py` file under `dags/`, since the Deployment would run none |
+| DAG deploys off, default, declared Dockerfile | the image as the Dockerfile builds it; a warning when its ignore file leaves out every DAG, since its own steps may put DAGs in the image |
+| DAG deploys off, default, `--image-name` | the prebuilt image, with a warning that the Deployment runs the DAGs inside it |
+| DAG deploys off, `--image` (with or without `--image-name`) | refused, as in 1.x: `--image` leaves the running DAGs in place, and there they are the image's |
+| remote execution, DAG deploys off, default | the image; no DAGs uploaded, and a `.dockerignore` dropping them is not refused |
+| remote execution, DAG deploys off, `--image` | the image, as an image-only deploy |
+| DAG deploys off, `--dags` | refused |
+
+### Gitignored files and credentials
+
+An image a deploy or `astro package astro` builds is pushed to a registry, so before either builds, `shipcheck.Survey` lists what the image would carry, once per command (`imagebuild.SurveyProject`: what a generated build copies, or a declared Dockerfile's context under its ignore file), and asks git about it. The same listing feeds the declared Dockerfile's local-files warning and, through the transport, the DAG check above. It runs for a generated build and a declared Dockerfile alike, and not for `--dags` or `--image-name`, which build nothing. A declared Dockerfile is held to a generated build's rule: everything in its build context counts as shipped, whatever the Dockerfile copies.
+
+| what the image would carry | outcome |
+| --- | --- |
+| a file git ignores | warned about: ten named, the rest counted, with the ignore file as the fix. Generated output such as a dbt `target/` ships on purpose often enough that this is a warning |
+| a file that looks like a credential and that git ignores, or that was never added | **refused**, naming it |
+| a file that looks like a credential and that git tracks (committed or staged) | goes ahead: the project's choice |
+| anything, where git cannot answer (not installed, an unsafe owner, another failure) | warned about, with git's reason and the files that look like credentials; the build goes ahead, so a CI deploy does not break on committed files |
+| a declared Dockerfile's context carrying `.git` | warned about, with `**/.git` as the fix; **refused** when its `config` holds an `extraheader`, or a URL (a remote or an `insteadOf`) whose userinfo has a password or starts with a known token prefix (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`, `glpat-`, `x-access-token`, `oauth2`). A plain user (`ssh://git@…`, `https://user@…`) is fine, and an opaque token of an unknown kind used as a bare user is not detected |
+| a generated build's file reached through a link out of the project | not asked of git; **refused** when its path in the project or where the link leads looks like a credential (`dockercfg/config.json → ~/.docker/config.json`), whether or not the project is a git repository, and even when the target is committed elsewhere: the fix is one ignore-file line |
+| a symlink in a declared Dockerfile's context | ships as a link, so it is never refused |
+
+- The patterns are one table, `shipcheck.LooksSecret`: `*.pem`, `*.key`, `*.p12`, `*.p8`, `*.pfx`, `*.jks`, `*.keystore`, `*.ppk`, `id_rsa*`, `id_ed25519*`, `id_ecdsa*`, `id_dsa*`, `*credentials*`, `*-key.json`, `*_key.json`, `service-account*.json`, `sa-*.json`, `client_secret*.json`, `token.json`, `.netrc`, `.npmrc`, `.pypirc`, `.pgpass`, `*.kubeconfig`, `kubeconfig`, `*.tfvars`, `*.tfstate`, `.env*`, `*.env`, `*.env.*`, `config.json` under `.docker/`, and anything under `.aws/` or `.ssh/`. A bare `*secret*` is not one: too many modules are named for it.
+- Git is asked once per repository: the project's, and each submodule or nested clone, about its own files. A nested repository its parent ignores whole counts as ignored.
+- A generated build carries a link as what it points at. Git refuses a path beyond a symbolic link, so a file reached through a link that stays inside the project is asked about at its real path (`include/shared -> ../libs/shared` is asked about as `libs/shared/…`), and one whose link cannot be resolved is asked about as its outermost link. The survey records the links it goes through, and only files under them are resolved. A declared build carries a link as a link, so git is asked about the link itself.
+- Outside a git work tree there is nothing to ask, and nothing is said.
+- A declared build's survey reads the ignore file its engine reads: under podman a `.containerignore` first, as podman and buildah do (docker never reads one); then `<Dockerfile>.dockerignore`, else `.dockerignore`. The refusal names that file as the fix. The engine is podman when `<engine> --version` says so, which counts the podman-docker shim, or, when it does not answer, when its binary is named podman; a deploy resolves its engine once, when a build first needs it, and its checks and its build share it.
 
 ## 2. Dags-only deploys
 

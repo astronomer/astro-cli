@@ -351,7 +351,7 @@ func TestRun_DefaultIsImageAndDag(t *testing.T) {
 		Git:               Git{Commit: &Commit{SHA: "abc123", Branch: "main"}},
 	}}
 	res, err := Run(Request{
-		ProjectDir: "/proj",
+		ProjectDir: t.TempDir(),
 		LinkName:   "prod",
 		Manifest: &manifest.Manifest{
 			Project: manifest.Project{Dependencies: []string{"apache-airflow==3.1.*", "pandas"}},
@@ -714,7 +714,7 @@ func TestRun_CarriesTheDeclaredDockerfile(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			d := &fakeDeployer{img: ImageResult{WorkspaceID: "ws-prod", RuntimeVersion: "3.1-2"}}
 			_, err := Run(Request{
-				ProjectDir: "/proj",
+				ProjectDir: t.TempDir(),
 				LinkName:   "prod",
 				Manifest: &manifest.Manifest{
 					Project: manifest.Project{Dependencies: []string{"pandas"}},
@@ -741,7 +741,7 @@ func TestRun_CarriesTheDeclaredDockerfile(t *testing.T) {
 func TestRun_CarriesBuildSecretsWithADeclaredDockerfile(t *testing.T) {
 	d := &fakeDeployer{img: ImageResult{WorkspaceID: "ws-prod", RuntimeVersion: "3.1-2"}}
 	_, err := Run(Request{
-		ProjectDir:   "/proj",
+		ProjectDir:   t.TempDir(),
 		LinkName:     "prod",
 		BuildSecrets: []string{"id=pypi,src=/tmp/pypi.txt"},
 		Manifest: &manifest.Manifest{
@@ -768,7 +768,7 @@ func TestRun_CarriesBuildSecretsWithADeclaredDockerfile(t *testing.T) {
 func TestRun_CarriesBuildSecretsEvenWithoutADockerfile(t *testing.T) {
 	d := &fakeDeployer{img: ImageResult{WorkspaceID: "ws-prod", RuntimeVersion: "3.1-2"}}
 	_, err := Run(Request{
-		ProjectDir:   "/proj",
+		ProjectDir:   t.TempDir(),
 		LinkName:     "prod",
 		BuildSecrets: []string{"id=pypi"},
 		Manifest: &manifest.Manifest{

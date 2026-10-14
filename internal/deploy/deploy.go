@@ -12,6 +12,7 @@
 package deploy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -19,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -94,6 +96,14 @@ type Request struct {
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
+	// Engine resolves the container engine that will build the image: its
+	// CLI and the env that reaches its daemon. cmd hands the same memoized
+	// resolver to the transport, so the engine is resolved once. It is
+	// called only by a deploy that builds, to learn whether the engine is
+	// podman, whose builds of a declared Dockerfile read a .containerignore
+	// first. nil, or an engine it cannot resolve, counts as docker here; the
+	// transport reports a missing engine.
+	Engine func() (bin string, env []string, err error)
 	// Link saves a link to a Deployment the prompt offered from the workspace
 	// rather than from the manifest, once it is picked, so the next deploy
 	// offers it by name. cmd wires it to scaffold.SaveLink. nil links nothing:
@@ -111,7 +121,14 @@ type Result struct {
 	RuntimeVersion    string
 	ImageTag          string
 	DagTarballVersion string
-	URL               string
+	// DagsInImage reports an image-and-dag deploy to a Deployment with DAG
+	// deploys off: no DAGs were uploaded, and the Deployment runs those
+	// inside the image.
+	DagsInImage bool
+	// RemoteExecution reports an image-and-dag deploy to a remote-execution
+	// Deployment with DAG deploys off, to which no DAGs were uploaded.
+	RemoteExecution bool
+	URL             string
 	// LinkName is the manifest link the deploy resolved to, "" if unlinked.
 	LinkName string
 	Git      Git
@@ -172,8 +189,17 @@ type ImageDeploy struct {
 	BuildSecrets []string
 	ImageName    string
 	// OnBuild is Request.OnBuild, for the transport to call.
-	OnBuild       func()
-	IncludeDags   bool
+	OnBuild func()
+	// IncludeDags marks a "both" deploy. To a Deployment with DAG deploys
+	// off, the transport ships the image alone, with the DAGs inside it.
+	IncludeDags bool
+	// Warn is Request.Warn, for the transport to report with.
+	Warn func(string)
+	// Survey is what the image built from the manifest would carry, as the
+	// checks before the deploy listed it; nil for a prebuilt image.
+	Survey *imagebuild.ProjectSurvey
+	// Engine is Request.Engine, for the transport to build with.
+	Engine        func() (bin string, env []string, err error)
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -181,12 +207,15 @@ type ImageDeploy struct {
 }
 
 // ImageResult is what the transport reports after an image deploy. A "both"
-// deploy also carries a DagTarballVersion.
+// deploy also carries a DagTarballVersion, or DagsInImage when the
+// Deployment's DAG deploys are off and the DAGs went inside the image.
 type ImageResult struct {
 	WorkspaceID       string
 	RuntimeVersion    string
 	ImageTag          string
 	DagTarballVersion string
+	DagsInImage       bool
+	RemoteExecution   bool
 	URL               string
 	Git               Git
 }
@@ -239,7 +268,7 @@ func Run(req Request, d Deployer) (Result, error) {
 	}
 	// Also before anything is asked: a project whose image source is refused
 	// should not first make someone pick where to ship it.
-	missingSecrets, err := checkImageSource(req)
+	missingSecrets, survey, err := checkImageSource(req)
 	if err != nil {
 		return Result{}, err
 	}
@@ -256,7 +285,7 @@ func Run(req Request, d Deployer) (Result, error) {
 	if req.DagsOnly {
 		res, err = runDagsOnly(req, target, d)
 	} else {
-		res, err = runImage(req, target, d)
+		res, err = runImage(req, target, d, survey)
 		err = missingSecrets.Explain(err)
 	}
 	if err != nil {
@@ -285,19 +314,22 @@ func saveNewLink(req Request, target Target, res *Result) {
 // checkImageSource holds what an image deploy would build from to the Airflow
 // requirement, for a deploy that builds one from the manifest: a declared
 // Dockerfile's FROM line (scaffold.CheckDockerfileAirflow), and a
-// [tool.astro] runtime build (Request.CheckRuntime). It also warns about the
-// per-machine files a declared Dockerfile's build would copy into the image
-// (scaffold.LocalFilesWarning). A dags-only deploy and one
-// adopting a prebuilt --image-name build nothing from the manifest, and are not
-// held to it. It returns the build secrets the declared Dockerfile mounts and
-// nobody gave, for a failed build to name again.
-func checkImageSource(req Request) (imagebuild.MissingSecrets, error) {
+// [tool.astro] runtime build (Request.CheckRuntime). It also checks the
+// build secrets, and holds the files the image would carry to shipcheck.Survey:
+// the local and per-machine files a declared Dockerfile's context carries are
+// warned about, and so are the files git ignores, and a file that looks like a
+// credential and that git does not track is refused. A dags-only deploy and
+// one adopting a prebuilt --image-name build nothing from the manifest, and
+// are not held to any of it. It returns the build secrets the declared Dockerfile mounts and
+// nobody gave, for a failed build to name again, and the survey of what the
+// image would carry, made once for every check of it (the transport's too).
+func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.ProjectSurvey, error) {
 	var missing imagebuild.MissingSecrets
 	if req.DagsOnly || req.ImageName != "" || req.Manifest == nil {
-		return missing, nil
+		return missing, nil, nil
 	}
 	if err := scaffold.CheckDockerfileAirflow(req.ProjectDir, req.Manifest); err != nil {
-		return missing, err
+		return missing, nil, err
 	}
 	warn := req.Warn
 	if warn == nil {
@@ -305,24 +337,36 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, error) {
 	}
 	var err error
 	if missing, err = imagebuild.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets); err != nil {
-		return missing, err
+		return missing, nil, err
 	}
 	missing.Hint = util.BuildSecretHint
 	for _, w := range missing.Warnings() {
 		warn(w)
 	}
-	if w := scaffold.LocalFilesWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
-		warn(w)
+	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, enginePodman(req.Engine), warn)
+	if err != nil {
+		return missing, nil, err
 	}
 	airflow := req.Manifest.Airflow()
 	if airflow.Runtime == "" || req.CheckRuntime == nil {
-		return missing, nil
+		return missing, survey, nil
 	}
 	warnings, err := req.CheckRuntime(airflow.Runtime, airflow.Pin)
 	for _, w := range warnings {
 		warn(manifest.Marker + ": tool.astro.runtime: " + w.Message)
 	}
-	return missing, err
+	return missing, survey, err
+}
+
+// enginePodman reports whether the engine engine resolves is podman, by
+// asking it (imagebuild.IsPodman). nil, or an engine that cannot be resolved,
+// is not.
+func enginePodman(engine func() (string, []string, error)) bool {
+	if engine == nil {
+		return false
+	}
+	bin, env, err := engine()
+	return err == nil && imagebuild.IsPodman(context.Background(), imagebuild.NewExecCommander(), bin, env)
 }
 
 // runDagsOnly ships just the dags/ directory through the transport.
@@ -353,7 +397,7 @@ func runDagsOnly(req Request, target Target, d Deployer) (Result, error) {
 
 // runImage builds or adopts the project image and ships it, plus the dags for a
 // default "both" deploy. --image drops the dags.
-func runImage(req Request, target Target, d Deployer) (Result, error) {
+func runImage(req Request, target Target, d Deployer, survey *imagebuild.ProjectSurvey) (Result, error) {
 	// Secrets are carried here; checkImageSource has already checked that
 	// their variables are set. Whether asking for one is a mistake depends on
 	// whether the USER asked — ResolveProjectBuildSecrets also reads
@@ -374,6 +418,9 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		ImageName:     req.ImageName,
 		OnBuild:       req.OnBuild,
 		IncludeDags:   includeDags,
+		Warn:          req.Warn,
+		Survey:        survey,
+		Engine:        req.Engine,
 		Description:   req.Description,
 		NoDagsBaseDir: req.NoDagsBaseDir,
 		Wait:          req.Wait,
@@ -393,6 +440,8 @@ func runImage(req Request, target Target, d Deployer) (Result, error) {
 		RuntimeVersion:    img.RuntimeVersion,
 		ImageTag:          img.ImageTag,
 		DagTarballVersion: img.DagTarballVersion,
+		DagsInImage:       img.DagsInImage,
+		RemoteExecution:   img.RemoteExecution,
 		URL:               img.URL,
 		LinkName:          target.LinkName,
 		Git:               img.Git,

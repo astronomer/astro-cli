@@ -51,3 +51,47 @@ var localFileRules = []string{
 func LocalFileRules() []string {
 	return slices.Clone(localFileRules)
 }
+
+// shippedImageRules are files no image a project ships may carry, whoever
+// wrote them, as .dockerignore rules. They differ from localFileRules in one
+// way that matters: they are not added to .gitignore, since some (an
+// airflow.cfg, a .env.example) are committed on purpose, and git is the
+// project's business. An image is pushed to a registry, and none of these
+// belongs in one:
+//
+//   - **/.env, **/.env.* and **/.envrc, at any depth: local environment
+//     values (`astro local env set --plain` writes .env), their per-stage
+//     variants, and direnv's file of exported variables. The variants include
+//     templates such as .env.example, which have no use inside an image either.
+//   - **/airflow_settings.yaml, at any depth: the 1.x CLI's local connections,
+//     variables and pools, with their values in cleartext. Nothing on Astro
+//     reads it.
+//   - airflow.db, airflow.cfg and logs/, at the root only: what an Airflow run
+//     with the project as its AIRFLOW_HOME leaves there, a SQLite database with
+//     its connections, a config with its fernet key and database URL, and its
+//     task logs. The image's AIRFLOW_HOME is the project's root, so a shipped
+//     airflow.cfg would replace the runtime's own. Below the root these names
+//     are the project's own data, and are left alone.
+//
+// 1.x's default .dockerignore listed these too, except the .env variants and
+// .envrc, plus `astro`, the CLI binary some installs dropped at the root. That
+// one is not here: a root astro/ can be a Python package (astro-sdk imports
+// as `astro`), and leaving it out would break a DAG's import without a word.
+var shippedImageRules = []string{
+	"**/.env",
+	"**/.env.*",
+	"**/.envrc",
+	"**/airflow_settings.yaml",
+	"airflow.db",
+	"airflow.cfg",
+	"logs/",
+}
+
+// ShippedImageRules returns the rules every shipped image applies beyond the
+// per-machine ones (LocalFileRules): the files generated images leave out
+// (pkg/imagebuild), and that pkg/scaffold writes into the .dockerignore a
+// declared Dockerfile's build reads. A copy, so no caller can change what the
+// others read.
+func ShippedImageRules() []string {
+	return slices.Clone(shippedImageRules)
+}

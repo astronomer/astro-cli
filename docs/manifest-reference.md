@@ -149,11 +149,18 @@ It is refused wherever the project runs, in both modes: `astro local start` and 
 
 Every path that builds an image honours it: `astro local start --docker`, `astro deploy`, `astro package`, and Astro Desktop. Standalone mode has no image and ignores it, so a project pinned to a Dockerfile gets no benefit from it there.
 
-The build context is the whole project directory, and only `.dockerignore` (or a `<Dockerfile>.dockerignore` beside the file, which Docker reads instead) keeps anything out of it. An Astro Runtime base copies the rest into the image (its ONBUILD `COPY . .`), including the per-machine files Astro tools write: the virtualenv, `.env`, and standalone Airflow's database, config and logs under `.astro/standalone/`. When `astro init` keeps a Dockerfile, it creates that ignore file or adds each of these lines it does not already exclude, and leaves the lines already there alone:
+The build context is the whole project directory, and only `.dockerignore` (or a `<Dockerfile>.dockerignore` beside the file, which Docker reads instead) keeps anything out of it. An Astro Runtime base copies the rest into the image (its ONBUILD `COPY . .`), including local secrets and the per-machine files Astro tools write: the virtualenv, git's metadata (whose config can hold a token), `.env` files at any depth, a 1.x `airflow_settings.yaml`, an Airflow run's `airflow.db`, `airflow.cfg` and `logs/` at the root, and standalone Airflow's database, config and logs under `.astro/standalone/`. When `astro init` keeps a Dockerfile, it creates that ignore file or adds each of these lines it does not already exclude, and leaves the lines already there alone:
 
 ```
 .venv/
-.env
+**/.git
+**/.env
+**/.env.*
+**/.envrc
+**/airflow_settings.yaml
+airflow.db
+airflow.cfg
+logs/
 .astro/standalone/
 .astro/worktrees/
 .astro/*.local.yaml
@@ -163,7 +170,7 @@ The build context is the whole project directory, and only `.dockerignore` (or a
 plugins/fix_local_executor_pickle.py
 ```
 
-If you added `dockerfile` to the manifest by hand, add the lines yourself. Until you do, every `astro` build from the Dockerfile warns and names the per-machine files it would copy in.
+If you added `dockerfile` to the manifest by hand, add the lines yourself. Until you do, every `astro` build from the Dockerfile warns and names the files it would copy in (`astro local start` leaves `.git` out of that warning: a local image is not pushed). `astro deploy` and `astro package astro` also refuse a build whose context carries an uncommitted file that looks like a credential, whatever the Dockerfile copies (see [deploy.md](deploy.md#gitignored-files-and-credentials)).
 
 Use forward slashes, on every platform. The path has to stay inside the project: an absolute path, or one climbing out with `..`, is refused when the manifest is read.
 

@@ -171,7 +171,8 @@ func TestRunRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
 // its build context would carry into the pushed image, and still deploys.
 func TestRunWarnsAboutLocalFilesInTheContext(t *testing.T) {
 	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".venv"), 0o750))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".venv", "bin"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".venv", "bin", "python"), nil, 0o600))
 	var warnings []string
 	warn := func(s string) { warnings = append(warnings, s) }
 	d := &fakeDeployer{}
