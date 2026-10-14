@@ -10,9 +10,9 @@ import (
 
 // daemon is this CLI's proxy daemon: its own binary, re-executed into
 // ServeSubcommand, serving the routes under ~/.astro/proxy. The lifecycle is
-// pkg/proxy's, shared with every other tool that serves those routes; what is
-// this CLI's is the executable, its version, and the astro 1.x takeover that
-// runs before a start.
+// pkg/proxy's, shared with every other tool that serves those routes, and so
+// is the astro 1.x takeover before a start; what is this CLI's is the
+// executable and its version.
 //
 // Built per call, like Routes, so a test that points config.HomeConfigPath at
 // a temp dir or sets version.CurrVersion is seen by the next call.
@@ -24,12 +24,11 @@ func daemon() *pkgproxy.Daemon {
 		logger.Debugf("cannot find the CLI executable for the proxy daemon: %s", err)
 	}
 	return &pkgproxy.Daemon{
-		Store:       Routes(),
-		Exe:         exe,
-		ServeArgs:   []string{ServeSubcommand},
-		Version:     version.CurrVersion,
-		BeforeStart: beforeStart,
-		Logf:        logger.Debugf,
+		Store:     Routes(),
+		Exe:       exe,
+		ServeArgs: []string{ServeSubcommand},
+		Version:   version.CurrVersion,
+		Logf:      logger.Debugf,
 	}
 }
 

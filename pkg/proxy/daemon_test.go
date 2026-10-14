@@ -235,32 +235,6 @@ func TestEnsureRunning_ConcurrentStartsOnlyOne(t *testing.T) {
 	assert.Equal(t, int32(1), starts.Load())
 }
 
-// BeforeStart runs before a start, under the lock and with the port about to
-// be bound, and not at all when a running daemon is adopted.
-func TestEnsureRunning_RunsBeforeStartOnlyBeforeAStart(t *testing.T) {
-	d := newTestDaemon(t)
-	var calls []string
-	var startedAfter atomic.Bool
-	d.BeforeStart = func(port string) { calls = append(calls, port) }
-	swapStart(t, func(d *Daemon, port string) (string, error) {
-		startedAfter.Store(len(calls) == 1)
-		if err := os.MkdirAll(d.Store.Dir(), 0o755); err != nil {
-			return "", err
-		}
-		return port, d.writeRecord(os.Getpid(), port)
-	})
-	swapIsProxy(t, func(*Daemon, int, string) bool { return true })
-
-	_, err := d.EnsureRunning("7001")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"7001"}, calls)
-	assert.True(t, startedAfter.Load(), "BeforeStart has to run before the start, not after")
-
-	_, err = d.EnsureRunning("7001")
-	require.NoError(t, err)
-	assert.Len(t, calls, 1, "adopting a running daemon must not run BeforeStart")
-}
-
 func TestAddRoute_PersistsWhenDaemonFails(t *testing.T) {
 	d := newTestDaemon(t)
 

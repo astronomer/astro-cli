@@ -48,9 +48,9 @@ const ServeSubcommand = "__proxy-serve"
 //
 // It lives here rather than in either tool because both have to agree on all
 // of it — which files name a running daemon, when one is reused, how it is
-// stopped. A host supplies only what differs between them: the executable that
-// serves (the CLI re-execs itself; another host points at the astro binary it
-// ships), and anything it must do before a start.
+// stopped, and what it does about an astro 1.x proxy holding its port. A host
+// supplies only what differs between them: the executable that serves (the CLI
+// re-execs itself; another host points at the astro binary it ships).
 type Daemon struct {
 	// Store is the route store the daemon serves. Its directory also holds the
 	// daemon's own files: the record, the bound port and the log.
@@ -66,12 +66,6 @@ type Daemon struct {
 	// Version is the host's version, written into the record for diagnostics.
 	// It does not decide reuse; DaemonProtocol does.
 	Version string
-
-	// BeforeStart runs under the routes lock just before a start, with the
-	// port about to be bound. The CLI stops an astro 1.x proxy holding that
-	// port here, so the daemon serves there rather than on a fallback. Nil
-	// does nothing.
-	BeforeStart func(port string)
 
 	// Logf receives debug messages about the daemon's lifecycle. Nil discards
 	// them.
@@ -132,9 +126,9 @@ const (
 	exitPollWait = 25 * time.Millisecond
 	// startTimeout plus two stops (stopTimeout and a poll each) must stay
 	// below the routes lock timeout (lockTimeout): EnsureRunning holds that
-	// lock while it stops an older daemon, runs BeforeStart (the CLI takes the
-	// port from astro 1.x there) and starts, and waiters on it must outlast a
-	// worst-case start.
+	// lock while it stops an older daemon, takes the port from an astro 1.x
+	// proxy (takeOverFromV1, another stop) and starts, and waiters on it must
+	// outlast a worst-case start.
 	startTimeout  = 10 * time.Second
 	startPollWait = 50 * time.Millisecond
 
@@ -191,28 +185,27 @@ var isProxyDaemon = func(d *Daemon, pid int, port string) bool {
 // Host makes the proxy answer with its own landing page (which sets the
 // header) instead of routing to a backend.
 func probeProxySignature(port string) bool {
-	resp, ok := probeProxy(port, "localhost")
+	resp, _, ok := probeProxy(port, "localhost")
 	return ok && resp.Header.Get(SignatureHeader) == SignatureValue
 }
 
-// probeProxy GETs / on port with the given Host, within proxyProbeTimeout.
-func probeProxy(port, host string) (*http.Response, bool) {
+// probeProxy GETs / on port with the given Host, within proxyProbeTimeout, and
+// returns the response with the start of its body (up to probeBodyLimit).
+func probeProxy(port, host string) (resp *http.Response, body []byte, ok bool) {
 	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+port+"/", http.NoBody)
 	if err != nil {
-		return nil, false
+		return nil, nil, false
 	}
 	req.Host = host
 
 	client := &http.Client{Timeout: proxyProbeTimeout}
-	resp, err := client.Do(req)
+	resp, err = client.Do(req)
 	if err != nil {
-		return nil, false
+		return nil, nil, false
 	}
 	defer resp.Body.Close()
-	// Drained so the connection closes cleanly; the body itself says nothing
-	// the header does not.
-	_, err = io.Copy(io.Discard, io.LimitReader(resp.Body, probeBodyLimit))
-	return resp, err == nil
+	body, err = io.ReadAll(io.LimitReader(resp.Body, probeBodyLimit))
+	return resp, body, err == nil
 }
 
 // startProxy starts a proxy on port. When port is taken, it tries the port it
@@ -240,7 +233,8 @@ func (d *Daemon) startProxy(port string) (*Proxy, error) {
 //
 // A running daemon is reused when it speaks this DaemonProtocol or a newer
 // one, and replaced when it speaks an older one (see reusable). Before a
-// start, BeforeStart runs with the port about to be bound.
+// start, an astro 1.x proxy holding the port is stopped (takeOverFromV1), so the
+// daemon serves on port rather than on a fallback whichever tool starts it.
 func (d *Daemon) EnsureRunning(port string) (string, error) {
 	if port == "" {
 		port = DefaultPort
@@ -277,11 +271,14 @@ func (d *Daemon) EnsureRunning(port string) (string, error) {
 	// Clean up a stale record
 	os.Remove(d.RecordPath()) //nolint:errcheck // best-effort cleanup
 
-	if d.BeforeStart != nil {
-		d.BeforeStart(port)
-	}
+	beforeStart(d, port)
 	return d.Start(port)
 }
+
+// beforeStart is what EnsureRunning does just before a start, under the routes
+// lock and with the port about to be bound. A seam so a test can see that it
+// runs before a start and not when a daemon is adopted.
+var beforeStart = (*Daemon).takeOverFromV1
 
 // reusable reports whether a running daemon that wrote rec can serve for this
 // one: it speaks this DaemonProtocol or a newer one.

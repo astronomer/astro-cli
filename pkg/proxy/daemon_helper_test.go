@@ -30,7 +30,17 @@ const (
 	helperIdleEnv  = "ASTRO_PROXY_TEST_IDLE"
 )
 
+// helperModes are further roles the test binary can be run in, registered by
+// platform-specific test files. Each reports whether its environment picked it,
+// and runs that role to completion if so.
+var helperModes []func() bool
+
 func TestMain(m *testing.M) {
+	for _, mode := range helperModes {
+		if mode() {
+			return
+		}
+	}
 	if dir := os.Getenv(helperServeEnv); dir != "" {
 		// Spawned by Daemon.Start as <exe> serve --port <port>. The port is
 		// parsed as the number it is rather than passed through as a raw

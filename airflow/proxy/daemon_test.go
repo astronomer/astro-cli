@@ -28,7 +28,7 @@ func setupTestDir(t *testing.T) {
 
 // The lifecycle is pkg/proxy's and tested there. What is this CLI's is how it
 // configures one: the store under the config home, its own binary re-executed
-// into ServeSubcommand, its version, and the 1.x takeover before a start.
+// into ServeSubcommand, and its version. The 1.x takeover is pkg/proxy's.
 func TestDaemonIsThisCLIs(t *testing.T) {
 	setupTestDir(t)
 	origVersion := version.CurrVersion
@@ -44,7 +44,6 @@ func TestDaemonIsThisCLIs(t *testing.T) {
 	assert.Equal(t, exe, d.Exe)
 	assert.Equal(t, []string{ServeSubcommand}, d.ServeArgs)
 	assert.Equal(t, "2.3.4", d.Version)
-	assert.NotNil(t, d.BeforeStart, "the 1.x takeover has to run before a start")
 	assert.NotNil(t, d.Logf)
 }
 
