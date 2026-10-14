@@ -137,8 +137,20 @@ func NewProxy(port string, store *Store) *Proxy {
 		store:     store,
 		port:      port,
 		proxies:   make(map[string]*httputil.ReverseProxy),
-		transport: &http.Transport{},
+		transport: newBackendTransport(),
 	}
+}
+
+// newBackendTransport is the default transport to a project's Airflow, with
+// keep-alives off.
+//
+// A project restart brings its Airflow back on the same port, and a connection
+// pooled from before the restart is a socket to a process that is gone or going.
+// A request sent on it hangs until something times out rather than failing
+// fast and reconnecting, so the first page after every restart stalls. These are
+// loopback connections, so opening one per request costs next to nothing.
+func newBackendTransport() *http.Transport {
+	return &http.Transport{DisableKeepAlives: true}
 }
 
 // Port returns the proxy's listening port. Before a successful Start it
