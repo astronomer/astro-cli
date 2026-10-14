@@ -348,6 +348,23 @@ func TestInjectAirflowAuthLeavesCookiesAloneWithoutCredential(t *testing.T) {
 	}
 }
 
+// Replacing the session cookie leaves every other cookie exactly as the client
+// sent it, including values Go's cookie parser would drop (JSON) or quote (a
+// space).
+func TestInjectAirflowAuthKeepsOtherCookiesAsSent(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1/page", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Cookie", `session=old; prefs={"theme":"dark"}; a=b c; ok=1`)
+	injectAirflowAuth(req, "Cookie session=fresh")
+
+	want := `prefs={"theme":"dark"}; a=b c; ok=1; session=fresh`
+	if got := req.Header.Get("Cookie"); got != want {
+		t.Errorf("Cookie = %q, want %q", got, want)
+	}
+}
+
 // isAirflowAuthRejection parses Location and compares only the path, and the
 // doc comment leans on that to rule out false positives. Every other test here
 // feeds it a true positive, so a "simplification" to a substring check would

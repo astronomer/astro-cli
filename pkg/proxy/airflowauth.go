@@ -301,15 +301,30 @@ func requestAirflowAuth(req *http.Request) string {
 	return ""
 }
 
-// stripCookie removes the named cookie from req's Cookie header, preserving
-// the rest.
+// stripCookie removes the named cookie from req's Cookie headers and keeps the
+// rest as the client sent them.
+//
+// Filtered as text rather than through req.Cookies and AddCookie: Go's cookie
+// parser drops a value it considers invalid (JSON, say) and AddCookie quotes one
+// with a space, so a round trip would quietly rewrite or lose cookies the proxy
+// has no business touching.
 func stripCookie(req *http.Request, name string) {
-	cookies := req.Cookies()
-	req.Header.Del("Cookie")
-	for _, c := range cookies {
-		if c.Name != name {
-			req.AddCookie(c)
+	var kept []string
+	for _, line := range req.Header.Values("Cookie") {
+		for _, pair := range strings.Split(line, ";") {
+			pair = strings.TrimSpace(pair)
+			if pair == "" {
+				continue
+			}
+			if n, _, _ := strings.Cut(pair, "="); strings.TrimSpace(n) == name {
+				continue
+			}
+			kept = append(kept, pair)
 		}
+	}
+	req.Header.Del("Cookie")
+	if len(kept) > 0 {
+		req.Header.Set("Cookie", strings.Join(kept, "; "))
 	}
 }
 
