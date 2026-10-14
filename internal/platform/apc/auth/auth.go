@@ -281,24 +281,24 @@ func switchWorkspace(pageSize int, houstonVersion string, client houston.ClientI
 	return config.PrintCurrentSoftwareContext(out)
 }
 
-// Logout removes the locally stored token and reset current context
-func Logout(domain string) {
+// Logout clears every credential the domain's context holds and unsets the
+// current context when that domain was the current one, as the Astro logout
+// does. A domain with no login is an error rather than a silent success.
+func Logout(domain string) error {
 	c, err := context.GetContext(domain)
 	if err != nil {
-		return
+		return fmt.Errorf("failed to find a login for %s: %w", domain, err)
 	}
 
-	err = c.SignOut()
-	if err != nil {
-		return
+	if err := c.SignOut(); err != nil {
+		return fmt.Errorf("failed to clear the credentials for %s: %w", domain, err)
 	}
 
-	// remove the current context
-	err = config.ResetCurrentContext()
-	if err != nil {
-		fmt.Println("Failed to reset current context: ", err.Error())
-		return
+	// Logging out of another domain leaves the current one selected
+	if err := config.ResetCurrentContextFor(domain); err != nil {
+		return fmt.Errorf("failed to reset the current context: %w", err)
 	}
+	return nil
 }
 
 func checkClusterDomain(domain string) error {

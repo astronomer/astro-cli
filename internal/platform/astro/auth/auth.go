@@ -774,10 +774,8 @@ func Logout(domain string, out io.Writer) error {
 	}
 
 	// Logging out of another domain leaves the current one selected
-	if current, err := config.GetCurrentDomain(); err == nil && current == domain {
-		if err := config.ResetCurrentContext(); err != nil {
-			return fmt.Errorf("failed to reset the current context: %w", err)
-		}
+	if err := config.ResetCurrentContextFor(domain); err != nil {
+		return fmt.Errorf("failed to reset the current context: %w", err)
 	}
 
 	fmt.Fprintln(out, "Successfully logged out of Astronomer")

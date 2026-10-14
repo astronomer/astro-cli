@@ -253,8 +253,10 @@ func (s *CmdSuite) TestLogout() {
 		s.Equal(localDomain, domain)
 		return cloudLogoutErr
 	}
-	apcLogout = func(domain string) {
+	var apcLogoutErr error
+	apcLogout = func(domain string) error {
 		s.Equal(apcDomain, domain)
+		return apcLogoutErr
 	}
 
 	// cloud logout success
@@ -270,6 +272,12 @@ func (s *CmdSuite) TestLogout() {
 	// software logout success
 	err = logout(&cobra.Command{}, []string{apcDomain}, os.Stdout)
 	s.NoError(err)
+
+	// an APC logout that fails fails the command too
+	apcLogoutErr = errors.New("failed to find a login")
+	err = logout(&cobra.Command{}, []string{apcDomain}, os.Stdout)
+	s.ErrorIs(err, apcLogoutErr)
+	apcLogoutErr = nil
 
 	// no domain, cloud logout
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -293,7 +301,10 @@ func (s *CmdSuite) TestLogoutExpandsShortNames() {
 		loggedOut = domain
 		return nil
 	}
-	apcLogout = func(domain string) { s.Fail("a short name must not reach the APC logout", domain) }
+	apcLogout = func(domain string) error {
+		s.Fail("a short name must not reach the APC logout", domain)
+		return nil
+	}
 
 	for short, host := range map[string]string{"prod": "astronomer.io", "dev": "astronomer-dev.io", "pr41523": "pr41523.astronomer-dev.io"} {
 		s.NoError(logout(&cobra.Command{}, []string{short}, io.Discard))

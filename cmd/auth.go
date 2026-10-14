@@ -178,8 +178,7 @@ func logout(cmd *cobra.Command, args []string, out io.Writer) error {
 	if context.IsCloudDomain(domain) {
 		return cloudLogout(domain, out)
 	}
-	apcLogout(domain)
-	return nil
+	return apcLogout(domain)
 }
 
 func newAuthRootCmd(astroV1Client astrov1.APIClient, out io.Writer) *cobra.Command {

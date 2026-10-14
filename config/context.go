@@ -74,6 +74,19 @@ func ResetCurrentContext() error {
 	return CFG.Context.SetHomeString("")
 }
 
+// ResetCurrentContextFor unsets the saved current context when it is domain,
+// for a logout from domain. It compares against the saved context, the one
+// ResetCurrentContext clears, not GetCurrentDomain, which prefers
+// ASTRO_DOMAIN: a logout from the domain ASTRO_DOMAIN names leaves another
+// saved selection alone, and a logout from the saved one clears it whatever
+// ASTRO_DOMAIN names.
+func ResetCurrentContextFor(domain string) error {
+	if saved := CFG.Context.GetHomeString(); saved == "" || saved != domain {
+		return nil
+	}
+	return ResetCurrentContext()
+}
+
 // GetContextKey allows a context domain to be used without interfering
 // with viper's dot (.) notation for fetching configs by replacing with underscores (_)
 func (c *Context) GetContextKey() (string, error) {

@@ -1962,6 +1962,23 @@ func TestLogout(t *testing.T) {
 		assert.ErrorIs(t, err, config.ErrGetHomeString)
 	})
 
+	// ASTRO_DOMAIN chooses the domain a command talks to, not the saved
+	// selection a logout clears.
+	t.Run("the saved current context is the one compared, whatever ASTRO_DOMAIN names", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		saved, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+		assert.NoError(t, context.SetContext("astronomer-dev.io"))
+		saveLogin(t, "astronomer-dev.io", "Bearer other", "other-refresh", 3600)
+		t.Setenv("ASTRO_DOMAIN", "astronomer-dev.io")
+
+		assert.NoError(t, Logout("astronomer-dev.io", io.Discard))
+		assert.Equal(t, saved, config.CFG.Context.GetHomeString(), "a logout from the ASTRO_DOMAIN domain cleared another saved selection")
+
+		assert.NoError(t, Logout(saved, io.Discard))
+		assert.Empty(t, config.CFG.Context.GetHomeString(), "a logout from the saved domain left it selected")
+	})
+
 	t.Run("an unknown domain fails without reporting success", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		current, err := config.GetCurrentContext()
