@@ -8,9 +8,9 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 )
 
-// HibernationSince is the first Houston whose upsertDeployment takes a
-// hibernationOverride (houston-api ded69507, APC-1653).
-const HibernationSince = "2.2.0"
+// HibernationSince is the first Houston that takes a hibernation override:
+// the gate Call applies to the mutation, checked here before the question.
+const HibernationSince = houston.HibernationOverrideSince
 
 var (
 	errHibernationNotServed = errors.New("hibernating or waking up a Deployment needs Astro Private Cloud " + HibernationSince + " or later")

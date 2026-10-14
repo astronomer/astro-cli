@@ -653,12 +653,16 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 	return emitCreated(r, d, executorType)
 }
 
+// hibernationNow is the clock hibernate and wake-up read: when --until is
+// checked against, and when a --for override starts. Tests replace it.
+var hibernationNow = time.Now
+
 // deploymentHibernate sets, or with --remove-override removes, the override
 // of a Deployment's hibernation schedule: hibernate holds it hibernating, and
 // wake-up (hibernate false) awake.
 func deploymentHibernate(cmd *cobra.Command, args []string, hibernate bool, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
-	until, err := hibernationEnd(hibernateUntil, hibernateForDuration)
+	end, err := hibernationEnd(hibernateUntil, hibernateForDuration)
 	if err != nil {
 		return err
 	}
@@ -692,33 +696,47 @@ func deploymentHibernate(cmd *cobra.Command, args []string, hibernate bool, out 
 	if hibernateRemove {
 		d, err = deployment.RemoveHibernationOverride(id, houstonClient)
 	} else {
-		d, err = deployment.SetHibernationOverride(id, hibernate, until, houstonClient)
+		// A --for counts from now, not from before the question was
+		// answered.
+		d, err = deployment.SetHibernationOverride(id, hibernate, end(), houstonClient)
 	}
 	if err != nil {
 		return err
 	}
-	return emitHibernation(r, newHibernationJSON(id, d), verb)
+	return emitHibernation(r, newHibernationJSON(id, d), verb, hibernateRemove)
 }
 
-// hibernationEnd is when an override set with --until or --for ends, or nil
-// for one that lasts until it is removed.
-func hibernationEnd(until, forDuration string) (*time.Time, error) {
+// hibernationEnd checks --until and --for, and returns what gives the end of
+// the override they set: nil for one that lasts until it is removed. A --for
+// end is computed when that is called, so it counts from the request, not
+// from the check. A --until not in the future, or a --for that is not
+// positive, is a usage error: Houston would refuse the first, and the second
+// would set an override that has already ended.
+func hibernationEnd(until, forDuration string) (func() *time.Time, error) {
 	switch {
 	case until != "":
 		t, err := time.Parse(time.RFC3339, until)
 		if err != nil {
-			return nil, fmt.Errorf("--until takes a date and time in RFC 3339, such as 2026-01-01T00:00:00Z: %w", err)
+			return nil, cliout.Usage(fmt.Errorf("--until takes a date and time in RFC 3339, such as 2026-01-01T00:00:00Z: %w", err))
 		}
-		return &t, nil
+		if !t.After(hibernationNow()) {
+			return nil, cliout.Usage(fmt.Errorf("--until %s is not in the future", until))
+		}
+		return func() *time.Time { return &t }, nil
 	case forDuration != "":
 		d, err := time.ParseDuration(forDuration)
 		if err != nil {
-			return nil, fmt.Errorf("--for takes a duration, such as 1h30m: %w", err)
+			return nil, cliout.Usage(fmt.Errorf("--for takes a duration, such as 1h30m: %w", err))
 		}
-		t := time.Now().Add(d)
-		return &t, nil
+		if d <= 0 {
+			return nil, cliout.Usage(fmt.Errorf("--for %s is not a positive duration", forDuration))
+		}
+		return func() *time.Time {
+			t := hibernationNow().Add(d)
+			return &t
+		}, nil
 	}
-	return nil, nil
+	return func() *time.Time { return nil }, nil
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {

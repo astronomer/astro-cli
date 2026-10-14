@@ -32,6 +32,17 @@ func newHibernationClient(left *houston.Deployment) *mocks.ClientInterface {
 	return api
 }
 
+// hibernationClock is the time stopTheClock fixes hibernationNow at.
+var hibernationClock = time.Date(2030, 5, 6, 7, 8, 9, 0, time.UTC)
+
+// stopTheClock fixes hibernationNow at hibernationClock for the test.
+func stopTheClock(t *testing.T) {
+	t.Helper()
+	prev := hibernationNow
+	hibernationNow = func() time.Time { return hibernationClock }
+	t.Cleanup(func() { hibernationNow = prev })
+}
+
 func withOverride(hibernate bool, until *time.Time) *houston.Deployment {
 	d := hibernatingDep
 	d.HibernationOverride = &houston.HibernationOverride{IsHibernating: hibernate, OverrideUntil: until}
@@ -106,6 +117,25 @@ func TestDeploymentHibernationText(t *testing.T) {
 		})
 	}
 
+	// What was asked for decides the message: a set Houston answers with no
+	// override was sent, and is not reported as a removal.
+	t.Run("a set answered with no override is not a removal", func(t *testing.T) {
+		api := newHibernationClient(&hibernatingDep)
+
+		run := runAPC(t, api, "", "deployment", "hibernate", "dep-hb", "--yes")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Equal(t, "\nSent the request to hibernate deployment rel-hb, but Houston returned no hibernation override for it, so the CLI cannot confirm that the override is set.\n", run.stdout)
+		assert.NotContains(t, run.stdout, "removed")
+	})
+
+	t.Run("a removal is reported from --remove-override, whatever Houston returned", func(t *testing.T) {
+		api := newHibernationClient(withOverride(true, nil))
+
+		run := runAPC(t, api, "", "deployment", "wake-up", "dep-hb", "--remove-override", "--yes")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		assert.Contains(t, run.stdout, "Successfully removed the hibernation override on deployment rel-hb")
+	})
+
 	t.Run("a declined question changes nothing", func(t *testing.T) {
 		api := newHibernationClient(nil)
 
@@ -150,12 +180,21 @@ func TestDeploymentHibernationRefusals(t *testing.T) {
 		{"--for and --remove-override together", []string{"--for", "2h", "--remove-override"}},
 		{"a --for that is no duration", []string{"--for", "soon"}},
 		{"an --until that is no time", []string{"--until", "tomorrow"}},
+		// Houston would refuse an end in the past, and a --for of zero or
+		// less sets an override that has already ended.
+		{"an --until in the past", []string{"--until", "2000-01-01T00:00:00Z"}},
+		{"an --until of now", []string{"--until", hibernationClock.Format(time.RFC3339)}},
+		{"a --for of zero", []string{"--for", "0s"}},
+		{"a negative --for", []string{"--for=-1h"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			stopTheClock(t)
 			api := newHibernationClient(nil)
 
 			run := runAPC(t, api, "", append([]string{"deployment", "hibernate", "dep-hb", "--yes"}, c.args...)...)
-			assert.NotEqual(t, 0, run.code)
+			assert.Equal(t, 2, run.code, "a bad flag is a usage error; stderr:\n%s", run.stderr)
+			// Refused before anything asks Houston.
+			api.AssertNotCalled(t, "GetDeployment", mock.Anything)
 			api.AssertNotCalled(t, "HibernateOverrideDeployment", mock.Anything)
 		})
 	}
@@ -168,4 +207,25 @@ func TestDeploymentHibernationRefusals(t *testing.T) {
 		assert.NotEqual(t, 0, run.code)
 		api.AssertNotCalled(t, "HibernateOverrideDeployment", mock.Anything)
 	})
+}
+
+// A --for counts from the request, not from when the flags were read: here
+// the clock moves on while the Deployment is checked, before the question.
+func TestDeploymentHibernationForCountsFromTheRequest(t *testing.T) {
+	now := hibernationClock
+	prev := hibernationNow
+	hibernationNow = func() time.Time { return now }
+	t.Cleanup(func() { hibernationNow = prev })
+
+	api := newHibernationClient(withOverride(true, nil))
+	api.On("GetDeployment", "dep-hb").Unset()
+	api.On("GetDeployment", "dep-hb").Run(func(mock.Arguments) { now = now.Add(10 * time.Minute) }).Return(&hibernatingDep, nil)
+
+	run := runAPC(t, api, "y\n", "deployment", "hibernate", "dep-hb", "--for", "2h")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	want := hibernationClock.Add(10*time.Minute + 2*time.Hour).Format(time.RFC3339)
+	api.AssertCalled(t, "HibernateOverrideDeployment", mock.MatchedBy(func(vars map[string]interface{}) bool {
+		o, ok := vars["hibernationOverride"].(map[string]interface{})
+		return ok && o["overrideUntil"] == want
+	}))
 }

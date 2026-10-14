@@ -396,17 +396,24 @@ func newHibernationJSON(id string, d *houston.Deployment) deploymentHibernationJ
 	return out
 }
 
-// emitHibernation publishes the override hibernate or wake-up set, or its
-// removal. verb is the command's, "hibernate" or "wake up".
-func emitHibernation(r cliout.Renderer, h deploymentHibernationJSON, verb string) error {
+// emitHibernation publishes the override hibernate or wake-up set, or with
+// removed (--remove-override) its removal. verb is the command's, "hibernate"
+// or "wake up". What was asked for decides the message, not what Houston
+// returned: a set that comes back with no override was sent, and is not a
+// removal.
+func emitHibernation(r cliout.Renderer, h deploymentHibernationJSON, verb string, removed bool) error {
 	return r.Emit(h, cliout.Text(func(b *bufio.Writer) {
 		name := h.ReleaseName
 		if name == "" {
 			name = h.DeploymentID
 		}
 		o := h.HibernationOverride
-		if o == nil {
+		switch {
+		case removed:
 			fmt.Fprintf(b, "\nSuccessfully removed the hibernation override on deployment %s. Its hibernation schedule, if it has one, resumes now.\n", name)
+			return
+		case o == nil:
+			fmt.Fprintf(b, "\nSent the request to %s deployment %s, but Houston returned no hibernation override for it, so the CLI cannot confirm that the override is set.\n", verb, name)
 			return
 		}
 		state := "Successfully woke up deployment " + name

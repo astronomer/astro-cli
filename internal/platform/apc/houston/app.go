@@ -9,11 +9,6 @@ import (
 )
 
 var (
-	appConfig    *AppConfig
-	appConfigErr error
-)
-
-var (
 	AppConfigRequest = queryList{
 		{
 			version: "0.29.2",
@@ -157,14 +152,15 @@ func (h ClientImplementation) GetAppConfig(req GetAppConfigRequest) (*AppConfig,
 		Variables: vars,
 	}
 
-	var r *Response
-	r, appConfigErr = httpReq.DoWithClient(h.client)
-	if appConfigErr != nil {
-		appConfigErr = handleAPIErr(appConfigErr)
-		return nil, appConfigErr
+	// Each answer is the caller's alone: one scoped to a Deployment
+	// (deployment update, hibernate) must not become what a later read of the
+	// platform's settings sees.
+	r, err := httpReq.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
 	}
 
-	appConfig = r.Data.GetAppConfig
+	appConfig := r.Data.GetAppConfig
 	if appConfig.Flags == (FeatureFlags{}) { // Case when CLI is connected to Houston 0.25.x flags in the response won't be part of featureFlags
 		appConfig.Flags.NfsMountDagDeployment = appConfig.NfsMountDagDeployment
 		appConfig.Flags.HardDeleteDeployment = appConfig.HardDeleteDeployment
