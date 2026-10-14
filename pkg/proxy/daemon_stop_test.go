@@ -3,6 +3,7 @@ package proxy
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 // The stop sequence every platform shares: ask, then wait, then force. These
@@ -95,6 +96,29 @@ func TestStopIfEmptyWaitsOnlyForADaemonItCouldAsk(t *testing.T) {
 		if got := len(s.forgot) == 1; got != canAsk {
 			t.Errorf("canAsk=%v: forgot %v", canAsk, s.forgot)
 		}
+	}
+}
+
+// A daemon that exits promptly is waited for only as long as it takes. Removing
+// a project's last route stops the daemon on the way out, so a fixed wait here
+// is a delay on every project stop.
+func TestWaitForExitReturnsSoonAfterAPromptExit(t *testing.T) {
+	origAlive := IsPIDAlive
+	t.Cleanup(func() { IsPIDAlive = origAlive })
+	s := withStopSeams(t, true)
+
+	exitAt := time.Now().Add(50 * time.Millisecond)
+	IsPIDAlive = func(int) bool { return time.Now().Before(exitAt) }
+
+	start := time.Now()
+	waitForExit(4242)
+	took := time.Since(start)
+
+	if took >= stopPollWait/2 {
+		t.Errorf("waitForExit took %s for a process gone after 50ms, want well under %s", took.Round(time.Millisecond), stopPollWait)
+	}
+	if len(s.killed) != 0 {
+		t.Errorf("killed %v, want nothing forced for a process that exited", s.killed)
 	}
 }
 

@@ -128,6 +128,8 @@ const (
 	daemonFallbackName = "proxy.fallback-port"
 	stopTimeout        = 5 * time.Second
 	stopPollWait       = 500 * time.Millisecond
+	// exitPollWait is how often waitForExit looks for a stopped process.
+	exitPollWait = 25 * time.Millisecond
 	// startTimeout plus two stops (stopTimeout and a poll each) must stay
 	// below the routes lock timeout (lockTimeout): EnsureRunning holds that
 	// lock while it stops an older daemon, runs BeforeStart (the CLI takes the
@@ -445,13 +447,21 @@ func (d *Daemon) Stop() error {
 // waitForExit polls until pid is gone, escalating to killProcess once
 // stopTimeout has passed. Shared with StopIfEmpty, which does its own signaling under the
 // routes lock and then waits out here.
+//
+// It looks before it sleeps, and then every exitPollWait: a daemon with nothing
+// in flight exits within a few milliseconds of being asked, and a host that
+// stops it on the way out of a project (Astro Desktop removing its last route)
+// waits for exactly that long rather than a fixed half second.
 func waitForExit(pid int) {
 	deadline := time.Now().Add(stopTimeout)
-	for time.Now().Before(deadline) {
-		time.Sleep(stopPollWait)
+	for {
 		if !IsPIDAlive(pid) {
 			return
 		}
+		if !time.Now().Before(deadline) {
+			break
+		}
+		time.Sleep(exitPollWait)
 	}
 	killProcess(pid)
 	time.Sleep(stopPollWait)
