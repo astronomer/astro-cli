@@ -7,24 +7,29 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"testing"
 )
 
 // Each proxied request opens its own connection to the backend. A connection
 // pooled from before a project restart reaches a process that is gone; see
 // newBackendTransport.
+//
+// Counted by the client address each proxied request arrives from, not by the
+// connections the backend accepts: the proxy's one-time look at the backend
+// (AirflowSessions, GET /auth/token) opens a connection of its own, which is not
+// a proxied request and says nothing about reuse.
 func TestEachProxiedRequestOpensItsOwnBackendConnection(t *testing.T) {
-	var opened atomic.Int32
-	backend := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	var mu sync.Mutex
+	addrs := map[string]bool{}
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/token" {
+			mu.Lock()
+			addrs[r.RemoteAddr] = true
+			mu.Unlock()
+		}
 		_, _ = io.WriteString(w, "ok")
 	}))
-	backend.Config.ConnState = func(_ net.Conn, state http.ConnState) {
-		if state == http.StateNew {
-			opened.Add(1)
-		}
-	}
-	backend.Start()
 	t.Cleanup(backend.Close)
 	_, port, _ := strings.Cut(strings.TrimPrefix(backend.URL, "http://"), ":")
 
@@ -38,8 +43,10 @@ func TestEachProxiedRequestOpensItsOwnBackendConnection(t *testing.T) {
 			t.Fatalf("backend not reached: %q", rec.Body.String())
 		}
 	}
-	if got := opened.Load(); got != 3 {
-		t.Errorf("3 requests opened %d backend connections, want 3: a connection is being reused across requests", got)
+	mu.Lock()
+	defer mu.Unlock()
+	if got := len(addrs); got != 3 {
+		t.Errorf("3 proxied requests arrived on %d connections, want 3: a connection is being reused across requests", got)
 	}
 }
 
