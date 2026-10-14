@@ -3,11 +3,13 @@
 package proxy
 
 import (
+	"io"
 	"net/http"
 	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -36,6 +38,20 @@ type process struct {
 	env  []string
 }
 
+const (
+	// stopTimeout is how long a 1.x proxy gets to exit on SIGTERM before it
+	// is killed. It counts against the routes lock pkg/proxy's EnsureRunning
+	// holds while BeforeStart runs, which is sized for it.
+	stopTimeout  = 5 * time.Second
+	stopPollWait = 500 * time.Millisecond
+
+	probeTimeout   = 500 * time.Millisecond
+	probeBodyLimit = 64 << 10
+)
+
+// beforeStart is what the daemon runs before every start.
+var beforeStart = takeOverFromV1
+
 // listOwnProcesses returns this user's processes whose arguments and
 // environment can be read. It is a seam so tests never see real processes.
 var listOwnProcesses = ownProcesses
@@ -44,6 +60,20 @@ var listOwnProcesses = ownProcesses
 var stopProcess = func(pid int) {
 	syscall.Kill(pid, syscall.SIGTERM) //nolint:errcheck // waitForExit checks the outcome
 	waitForExit(pid)
+}
+
+// waitForExit polls until pid is gone, escalating to SIGKILL once stopTimeout
+// has passed.
+func waitForExit(pid int) {
+	deadline := time.Now().Add(stopTimeout)
+	for time.Now().Before(deadline) {
+		time.Sleep(stopPollWait)
+		if !pkgproxy.IsPIDAlive(pid) {
+			return
+		}
+	}
+	syscall.Kill(pid, syscall.SIGKILL) //nolint:errcheck // nothing left to try
+	time.Sleep(stopPollWait)
 }
 
 // takeOverFromV1 stops the astro 1.x proxy holding port, so this CLI's daemon
@@ -141,4 +171,23 @@ func sameDir(dir string) string {
 func answersAsAstroProxy(port string) bool {
 	resp, body, ok := probeProxy(port, takeoverProbeHost)
 	return ok && resp.StatusCode == http.StatusNotFound && strings.Contains(string(body), notFoundHeading)
+}
+
+// probeProxy GETs / on port with the given Host, within probeTimeout, and
+// returns the response with the start of its body.
+func probeProxy(port, host string) (resp *http.Response, body []byte, ok bool) {
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:"+port+"/", http.NoBody)
+	if err != nil {
+		return nil, nil, false
+	}
+	req.Host = host
+
+	client := &http.Client{Timeout: probeTimeout}
+	resp, err = client.Do(req)
+	if err != nil {
+		return nil, nil, false
+	}
+	defer resp.Body.Close()
+	body, err = io.ReadAll(io.LimitReader(resp.Body, probeBodyLimit))
+	return resp, body, err == nil
 }
