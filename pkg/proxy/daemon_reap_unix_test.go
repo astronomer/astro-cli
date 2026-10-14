@@ -14,7 +14,7 @@ import (
 // and a child it never waits for stays a zombie that signal 0 still reports
 // alive: the stop would sit out the whole stopTimeout, then SIGKILL the corpse,
 // and leave a <defunct> process behind. This test process is that starter, the
-// way Astro Desktop is.
+// way any long-running host is.
 func TestStoppingTheDaemonItStartedLeavesNoZombie(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv(helperServeEnv, dir)

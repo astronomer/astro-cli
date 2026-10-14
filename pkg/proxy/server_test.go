@@ -25,8 +25,9 @@ func TestProxy_LandingPage(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "Astro Local Proxy")
 	assert.Contains(t, w.Body.String(), "astro local start")
-	// One daemon serves projects started from either tool, so the hint names both.
-	assert.Contains(t, w.Body.String(), "Astro Desktop")
+	// The daemon serves projects whichever tool started them, so the hint offers
+	// the command as one way rather than the way.
+	assert.Contains(t, w.Body.String(), "Start a project to see it here")
 	assert.Contains(t, w.Body.String(), "No active projects")
 }
 

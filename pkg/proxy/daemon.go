@@ -364,9 +364,9 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 // exits, and on unix a child that exits unwaited stays a zombie, which
 // IsPIDAlive's signal 0 still reports alive: a Stop from that starter would
 // wait out the whole stopTimeout and then SIGKILL the corpse, and every start
-// and stop would leave one more <defunct> process behind. Astro Desktop starts
-// the daemon and runs for hours; the CLI never saw this because its process
-// exits right after the start and init collects the orphan. On Windows the
+// and stop would leave one more <defunct> process behind. A host that starts
+// the daemon and keeps running for hours hits this; the CLI never saw it because
+// its process exits right after the start and init collects the orphan. On Windows the
 // wait holds the process handle until the daemon exits and then closes it, as
 // Release would have closed it at once.
 func reapWhenItExits(cmd *exec.Cmd) {
