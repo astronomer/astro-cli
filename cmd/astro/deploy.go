@@ -486,6 +486,13 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	interactive := format == cliout.FormatText && stdinIsTerminal()
 
 	errOut := cmd.ErrOrStderr()
+	// Every warning the deploy gives goes to stderr as it is given, and into
+	// the result's warnings, so -o json carries the same ones.
+	var warnings []string
+	warn := func(msg string) {
+		warnings = append(warnings, msg)
+		fmt.Fprintf(errOut, "warning: %s\n", msg)
+	}
 	noteIgnoredDeploymentEnv(errOut, m, interactive, linkName, manifestDeployment)
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
@@ -515,7 +522,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
-		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
+		Warn: warn,
 		// Resolved once, when a deploy that builds first needs it, and
 		// shared by the checks and the transport.
 		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
@@ -570,17 +577,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 	if res.Git.Uncommitted {
 		fmt.Fprintln(errOut, "note: the project has uncommitted changes, so this deploy records no git commit")
 	}
-	var warnings []string
 	if !inProject {
-		// The image shipped alone. A Deployment that takes DAG deploys
-		// keeps the DAGs it had; one that does not runs whatever DAGs the
-		// image carries, which may be none.
-		w := fmt.Sprintf(warningDagsInImage, res.DeploymentID, imageName)
-		if res.DagDeployEnabled {
-			w = fmt.Sprintf(warningDagsNotUpdated, res.DeploymentID, res.DeploymentID)
-		}
-		warnings = append(warnings, w)
-		fmt.Fprintf(errOut, "warning: %s\n", w)
+		warn(imageAloneWarning(&res, imageName))
 	}
 	return renderManifestDeploy(out, format, &res, warnings)
 }
@@ -668,10 +666,9 @@ type deployJSON struct {
 	RuntimeVersion  string         `json:"runtime_version,omitempty"`
 	URL             string         `json:"url,omitempty"`
 	Git             *deployGitJSON `json:"git,omitempty"`
-	// Warnings are what the deploy warned about without failing, as text
-	// prints them on stderr (less the "warning: " prefix): an image shipped
-	// alone to a Deployment that takes DAG deploys, whose DAGs it left as
-	// they were.
+	// Warnings are what the deploy warned about without failing, every one
+	// that text prints on stderr (less the "warning: " prefix): the DAG and
+	// build checks', a link it could not save, an image shipped alone.
 	Warnings []string `json:"warnings,omitempty"`
 }
 
@@ -686,6 +683,28 @@ const warningDagsNotUpdated = "this deploy shipped the image alone, so Deploymen
 // there. APC's deploy warns the same (warningImageNameDagsInImage).
 const warningDagsInImage = "Deployment %s runs the DAGs inside the image %s; no dags folder was deployed. " +
 	"An image astro package built without a dockerfile declared under [tool.astro] contains none"
+
+// imageAloneWarning is the warning an --image-name deploy outside a project
+// gives: the image shipped alone. A Deployment that takes DAG deploys keeps
+// the DAGs it had; a remote-execution one with them off runs the DAGs its
+// remote agents have, which this deploy did not touch; any other runs
+// whatever DAGs the image carries, which may be none.
+func imageAloneWarning(res *manifestdeploy.Result, imageName string) string {
+	switch {
+	case res.DagDeployEnabled:
+		return fmt.Sprintf(warningDagsNotUpdated, res.DeploymentID, res.DeploymentID)
+	case res.RemoteExecutionEnabled:
+		return fmt.Sprintf(warningRemoteDagsNotUpdated, res.DeploymentID)
+	default:
+		return fmt.Sprintf(warningDagsInImage, res.DeploymentID, imageName)
+	}
+}
+
+// warningRemoteDagsNotUpdated is the same deploy to a remote-execution
+// Deployment with DAG deploys off: the image updates its orchestration plane,
+// and its DAGs are where its remote agents keep them.
+const warningRemoteDagsNotUpdated = "this deploy shipped the image alone, and Deployment %s runs remote execution with DAG deploys off, " +
+	"so its DAGs are the ones its remote agents run, which this deploy did not change"
 
 type deployGitJSON struct {
 	CommitSHA string `json:"commit_sha"`
@@ -1006,15 +1025,16 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		return manifestdeploy.ImageResult{}, err
 	}
 	return manifestdeploy.ImageResult{
-		WorkspaceID:       res.WorkspaceID,
-		RuntimeVersion:    res.RuntimeVersion,
-		ImageTag:          res.ImageTag,
-		DagTarballVersion: res.DagTarballVersion,
-		DagsInImage:       res.DagsInImage,
-		RemoteExecution:   res.RemoteExecution,
-		URL:               res.URL,
-		Git:               toManifestDeployGit(res.Git),
-		DagDeployEnabled:  res.DagDeployEnabled,
+		WorkspaceID:            res.WorkspaceID,
+		RuntimeVersion:         res.RuntimeVersion,
+		ImageTag:               res.ImageTag,
+		DagTarballVersion:      res.DagTarballVersion,
+		DagsInImage:            res.DagsInImage,
+		RemoteExecution:        res.RemoteExecution,
+		URL:                    res.URL,
+		Git:                    toManifestDeployGit(res.Git),
+		DagDeployEnabled:       res.DagDeployEnabled,
+		RemoteExecutionEnabled: res.RemoteExecutionEnabled,
 	}, nil
 }
 

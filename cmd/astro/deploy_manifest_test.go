@@ -88,8 +88,11 @@ type fakeCmdDeployer struct {
 	// refuseBeforeBuild returns imgErr the way the transport refuses a deploy
 	// the deployment will not take: before the build starts.
 	refuseBeforeBuild bool
-	dagInput          *manifestdeploy.DagDeploy
-	imgInput          *manifestdeploy.ImageDeploy
+	// warn is a warning the transport gives through ImageDeploy.Warn, as
+	// the real one does for a check the deploy goes ahead despite.
+	warn     string
+	dagInput *manifestdeploy.DagDeploy
+	imgInput *manifestdeploy.ImageDeploy
 }
 
 func (f *fakeCmdDeployer) ConfirmTarget([]manifestdeploy.Choice, string) (string, error) {
@@ -116,6 +119,9 @@ func (f *fakeCmdDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 	}
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
+	}
+	if f.warn != "" && in.Warn != nil {
+		in.Warn(f.warn)
 	}
 	return f.img, f.imgErr
 }
@@ -361,6 +367,26 @@ func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
 	assert.Equal(t, "image-and-dag", m["type"])
 	assert.Equal(t, true, m["dags_in_image"])
 	assert.NotContains(t, m, "dag_bundle_version")
+}
+
+// Every warning the deploy gives reaches -o json's warnings, not only stderr:
+// here the transport's warning for a prebuilt image deployed to a Deployment
+// with DAG deploys off (#2306).
+func TestDeployManifestJSONCarriesTheTransportsWarnings(t *testing.T) {
+	const w = "astro deployment clx-dep has DAG deploys off, so it will run the DAGs inside img:1; no DAGs are uploaded"
+	img := manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "img-1", DagsInImage: true}
+	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
+	out, errOut, err := execDeployIO("", "prod", "--image-name", "img:1", "--output", "json")
+	require.NoError(t, err)
+	assert.Contains(t, errOut, "warning: "+w+"\n", "stderr still has it")
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, []any{w}, m["warnings"])
+
+	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
+	out, errOut, err = execDeployIO("", "prod", "--image-name", "img:1")
+	require.NoError(t, err)
+	assert.Contains(t, errOut, "warning: "+w+"\n")
+	assert.NotContains(t, out, w, "text keeps warnings off stdout")
 }
 
 // A remote-execution Deployment with DAG deploys off takes no DAGs at all.

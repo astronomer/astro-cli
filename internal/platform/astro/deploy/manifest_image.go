@@ -101,6 +101,10 @@ type ManifestImageDeployResult struct {
 	Git             ManifestDeployGit
 	// DagDeployEnabled is whether the Deployment takes DAG deploys.
 	DagDeployEnabled bool
+	// RemoteExecutionEnabled is whether the Deployment runs remote
+	// execution, whatever this deploy shipped (RemoteExecution is the narrower
+	// "both" deploy that uploaded no DAGs because of it).
+	RemoteExecutionEnabled bool
 }
 
 // errNoDocker is the plain, actionable message for the no-Docker user
@@ -232,15 +236,16 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	}
 
 	return ManifestImageDeployResult{
-		WorkspaceID:       dep.WorkspaceId,
-		RuntimeVersion:    runtimeVersion,
-		ImageTag:          created.ImageTag,
-		DagTarballVersion: tarballVersion,
-		DagsInImage:       dags.inImage,
-		RemoteExecution:   dags.remote,
-		URL:               dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
-		Git:               gitInfo,
-		DagDeployEnabled:  dep.IsDagDeployEnabled,
+		WorkspaceID:            dep.WorkspaceId,
+		RuntimeVersion:         runtimeVersion,
+		ImageTag:               created.ImageTag,
+		DagTarballVersion:      tarballVersion,
+		DagsInImage:            dags.inImage,
+		RemoteExecution:        dags.remote,
+		URL:                    dashboardURL(c.Domain, dep.Id, dep.WorkspaceId),
+		Git:                    gitInfo,
+		DagDeployEnabled:       dep.IsDagDeployEnabled,
+		RemoteExecutionEnabled: deployment.IsRemoteExecutionEnabled(&dep),
 	}, nil
 }
 

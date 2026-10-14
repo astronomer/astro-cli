@@ -493,6 +493,29 @@ func TestRun_UnlinkedPickIsLinked(t *testing.T) {
 	assert.Equal(t, "picked-one", res.LinkName)
 }
 
+// An --image-name deploy outside any project has no pyproject.toml to link
+// into: the Deployment it picks is used, and no link is saved or warned about.
+func TestRun_ImageAloneOutsideAProjectLinksNothing(t *testing.T) {
+	d := &fakeDeployer{unlinkedID: "dep-picked"}
+	var saved []scaffold.Link
+	var warned []string
+	res, err := Run(Request{
+		ImageName:        "my-image:1",
+		ImageAlone:       true,
+		Interactive:      true,
+		ContextWorkspace: "ws-ctx",
+		Link:             func(l scaffold.Link) error { saved = append(saved, l); return nil },
+		Warn:             func(w string) { warned = append(warned, w) },
+	}, d)
+	require.NoError(t, err)
+	assert.Equal(t, 1, d.resolves)
+	assert.Equal(t, "dep-picked", d.imgInput.DeploymentID)
+	assert.True(t, d.imgInput.ImageAlone)
+	assert.Empty(t, saved, "no link save is attempted")
+	assert.Empty(t, warned)
+	assert.Empty(t, res.LinkName)
+}
+
 // A project that links nothing lists the workspace it declares, as the prompt
 // with links does, before the login's.
 func TestRun_UnlinkedUsesTheProjectsWorkspace(t *testing.T) {

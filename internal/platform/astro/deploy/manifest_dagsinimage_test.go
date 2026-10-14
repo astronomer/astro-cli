@@ -107,6 +107,7 @@ func TestDeployManifestImage_DagDeployOffTakesAnImageFromOutsideAProject(t *test
 	require.NoError(t, err)
 	assert.False(t, res.DagsInImage)
 	assert.False(t, res.DagDeployEnabled)
+	assert.False(t, res.RemoteExecutionEnabled)
 	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, "test-org-id", "test-deployment-id",
 		mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool { return r.Type == astrov1.CreateDeployRequestTypeIMAGEONLY }))
 }
@@ -269,6 +270,7 @@ func TestDeployManifestImage_RemoteExecutionDagDeployOff(t *testing.T) {
 	}, client)
 	require.NoError(t, err, "--image is not refused")
 	assert.False(t, res.RemoteExecution, "an image-only deploy says nothing of DAGs")
+	assert.True(t, res.RemoteExecutionEnabled, "but says the Deployment runs remote execution")
 	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, "test-org-id", "test-deployment-id",
 		mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool { return r.Type == astrov1.CreateDeployRequestTypeIMAGEONLY }))
 }

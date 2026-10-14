@@ -128,9 +128,10 @@ func imageDeployer(t *testing.T, fake *fakeCmdDeployer) {
 // id. A Deployment that takes DAG deploys keeps the DAGs it had, which the
 // deploy says on stderr and in the json result's warnings.
 func TestDeployImageNameOutsideAProject(t *testing.T) {
-	for _, dagDeploy := range []bool{false, true} {
-		t.Run(fmt.Sprintf("dag deploy %v", dagDeploy), func(t *testing.T) {
-			fake := &fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "deploy-1", WorkspaceID: "clw-ws", DagDeployEnabled: dagDeploy}}
+	for _, tc := range []struct{ dagDeploy, remote bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		dagDeploy := tc.dagDeploy
+		t.Run(fmt.Sprintf("dag deploy %v, remote execution %v", tc.dagDeploy, tc.remote), func(t *testing.T) {
+			fake := &fakeCmdDeployer{img: manifestdeploy.ImageResult{ImageTag: "deploy-1", WorkspaceID: "clw-ws", DagDeployEnabled: dagDeploy, RemoteExecutionEnabled: tc.remote}}
 			imageDeployer(t, fake)
 			deployIn(t, t.TempDir())
 
@@ -140,12 +141,18 @@ func TestDeployImageNameOutsideAProject(t *testing.T) {
 			assert.Equal(t, actionDeploymentID, fake.imgInput.DeploymentID)
 			assert.Equal(t, "img:1", fake.imgInput.ImageName)
 			assert.False(t, fake.imgInput.IncludeDags, "no DAGs ship from outside a project")
+			assert.True(t, fake.imgInput.ImageAlone, "the transport is told the image ships alone")
 			assert.Contains(t, out, `"type":"image-only"`)
-			// With DAG deploys the Deployment keeps its DAGs; without, it
-			// runs whatever DAGs the image carries.
+			// With DAG deploys the Deployment keeps its DAGs; without, a
+			// remote-execution one runs its remote agents' DAGs, and any
+			// other runs whatever DAGs the image carries.
 			warning := fmt.Sprintf(warningDagsInImage, actionDeploymentID, "img:1")
-			if dagDeploy {
+			switch {
+			case dagDeploy:
 				warning = fmt.Sprintf(warningDagsNotUpdated, actionDeploymentID, actionDeploymentID)
+			case tc.remote:
+				warning = fmt.Sprintf(warningRemoteDagsNotUpdated, actionDeploymentID)
+				assert.NotContains(t, out, "inside the image")
 			}
 			assert.Contains(t, out, `"warnings":["`+warning+`"]`)
 			assert.Contains(t, out, "warning: "+warning)

@@ -138,6 +138,9 @@ type Result struct {
 	// DagDeployEnabled is whether the Deployment takes DAG deploys, as an
 	// image deploy read it; false for a dags-only deploy.
 	DagDeployEnabled bool
+	// RemoteExecutionEnabled is whether the Deployment runs remote
+	// execution, as an image deploy read it, whatever the deploy shipped.
+	RemoteExecutionEnabled bool
 }
 
 // Git is what a deploy recorded about the commit it shipped.
@@ -231,6 +234,9 @@ type ImageResult struct {
 	// DagDeployEnabled is whether the Deployment takes DAG deploys, read
 	// while the image deploy checked it.
 	DagDeployEnabled bool
+	// RemoteExecutionEnabled is whether the Deployment runs remote
+	// execution, read alongside it.
+	RemoteExecutionEnabled bool
 }
 
 // Deployer is the seam onto the deploy transport. The CLI wires it to the
@@ -455,18 +461,19 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		kind = "image-and-dag"
 	}
 	return Result{
-		DeploymentID:      target.DeploymentID,
-		WorkspaceID:       firstNonEmpty(img.WorkspaceID, target.WorkspaceID),
-		Type:              kind,
-		RuntimeVersion:    img.RuntimeVersion,
-		ImageTag:          img.ImageTag,
-		DagTarballVersion: img.DagTarballVersion,
-		DagsInImage:       img.DagsInImage,
-		RemoteExecution:   img.RemoteExecution,
-		URL:               img.URL,
-		LinkName:          target.LinkName,
-		Git:               img.Git,
-		DagDeployEnabled:  img.DagDeployEnabled,
+		DeploymentID:           target.DeploymentID,
+		WorkspaceID:            firstNonEmpty(img.WorkspaceID, target.WorkspaceID),
+		Type:                   kind,
+		RuntimeVersion:         img.RuntimeVersion,
+		ImageTag:               img.ImageTag,
+		DagTarballVersion:      img.DagTarballVersion,
+		DagsInImage:            img.DagsInImage,
+		RemoteExecution:        img.RemoteExecution,
+		URL:                    img.URL,
+		LinkName:               target.LinkName,
+		Git:                    img.Git,
+		DagDeployEnabled:       img.DagDeployEnabled,
+		RemoteExecutionEnabled: img.RemoteExecutionEnabled,
 	}, nil
 }
 
@@ -678,7 +685,9 @@ func linkedTarget(req Request, name string, dep Deployment) Target {
 		DeploymentID: dep.ID,
 		WorkspaceID:  firstNonEmpty(req.WorkspaceID, dep.WorkspaceID, req.ContextWorkspace),
 	}
-	if req.Link == nil {
+	// Outside a project (an --image-name deploy with no manifest) there is
+	// no pyproject.toml to save a link into.
+	if req.Link == nil || req.Manifest == nil {
 		return target
 	}
 	target.LinkName = name
