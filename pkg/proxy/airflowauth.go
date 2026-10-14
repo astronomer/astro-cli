@@ -96,10 +96,25 @@ func NewAirflowSessions() *AirflowSessions {
 // can call it ahead of time to warm the cache, so a person's first request
 // doesn't pay for them.
 func (s *AirflowSessions) Ensure(backendPort string) {
+	s.ensure(context.Background(), backendPort)
+}
+
+// ensure is Ensure for a request: a caller that finds another request already
+// logging in for the port waits for it only as long as ctx lasts, so a person
+// who gives up on a page isn't held behind a login to a wedged backend.
+//
+// Checked under the read lock first, because almost every call finds the
+// session already cached, and it runs on every proxied request.
+func (s *AirflowSessions) ensure(ctx context.Context, backendPort string) {
+	s.mu.RLock()
+	settled := s.settledLocked(backendPort)
+	s.mu.RUnlock()
+	if settled {
+		return
+	}
+
 	s.mu.Lock()
-	auth, ok := s.sessions[backendPort]
-	tried := s.tried[backendPort]
-	if ok && (auth != airflowAuthNone || time.Since(tried) < authRetryTTL) {
+	if s.settledLocked(backendPort) {
 		s.mu.Unlock()
 		return
 	}
@@ -107,7 +122,10 @@ func (s *AirflowSessions) Ensure(backendPort string) {
 	// instead of starting a competing login flow.
 	if wait, busy := s.inflight[backendPort]; busy {
 		s.mu.Unlock()
-		<-wait
+		select {
+		case <-wait:
+		case <-ctx.Done():
+		}
 		return
 	}
 	done := make(chan struct{})
@@ -129,8 +147,8 @@ func (s *AirflowSessions) Ensure(backendPort string) {
 		// not the local default (a non-macOS standalone generates one), which
 		// FAB refuses for as long as the project runs and would otherwise log on
 		// every retry while someone browses it. Either way the request goes
-		// through with nothing of ours on it, the person's own session cookie
-		// included, and Airflow answers it as it would anyone.
+		// through as it came, with the person's own session cookie if they have
+		// one, and Airflow answers it as it would anyone.
 		slog.Debug("proxy: could not log in to Airflow", "backendPort", backendPort, "error", err)
 		fetched = airflowAuthNone // cache the failure; retried after authRetryTTL
 	}
@@ -150,11 +168,19 @@ func (s *AirflowSessions) Ensure(backendPort string) {
 	s.mu.Unlock()
 }
 
+// settledLocked reports whether the cache already answers for backendPort: a
+// session or an Airflow 3, or a failure still inside authRetryTTL. The caller
+// holds s.mu.
+func (s *AirflowSessions) settledLocked(backendPort string) bool {
+	auth, ok := s.sessions[backendPort]
+	return ok && (auth != airflowAuthNone || time.Since(s.tried[backendPort]) < authRetryTTL)
+}
+
 // Inject makes sure there is a session for backendPort and puts it on req.
 // With no session to offer — the login failed, or the backend needs none —
 // req is left as it came, so the caller's own cookie gets its chance.
 func (s *AirflowSessions) Inject(req *http.Request, backendPort string) {
-	s.Ensure(backendPort)
+	s.ensure(req.Context(), backendPort)
 	injectAirflowAuth(req, s.get(backendPort))
 }
 
@@ -236,7 +262,7 @@ func (t *authRetryTransport) RoundTrip(req *http.Request) (*http.Response, error
 		return resp, nil
 	}
 
-	t.s.Ensure(t.backendPort)
+	t.s.ensure(req.Context(), t.backendPort)
 	fresh := t.s.get(t.backendPort)
 	if fresh == "" || fresh == airflowAuthNone || fresh == airflowAuthServer || fresh == rejected {
 		return resp, nil

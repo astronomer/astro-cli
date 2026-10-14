@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -452,6 +453,37 @@ func TestEnsureCollapsesConcurrentLogins(t *testing.T) {
 	}
 	if auth := s.get(port); auth != airflowAuthServer {
 		t.Errorf("cached session = %q, want the Airflow 3 sentinel", auth)
+	}
+}
+
+// A request that finds a login already in flight for its backend waits for it
+// only as long as the request lasts. A person who gives up on a page must not
+// stay parked behind a login to a backend that never answers.
+func TestAWaiterGivesUpWithItsRequest(t *testing.T) {
+	s := NewAirflowSessions()
+	started, release := make(chan struct{}), make(chan struct{})
+	s.fetch = func(string) (string, error) {
+		close(started)
+		<-release
+		return "Cookie session=late", nil
+	}
+	t.Cleanup(func() { close(release) })
+
+	go s.Ensure("15001") // the login in flight
+	<-started
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	returned := make(chan struct{})
+	go func() {
+		s.ensure(ctx, "15001")
+		close(returned)
+	}()
+
+	select {
+	case <-returned:
+	case <-time.After(2 * time.Second):
+		t.Fatal("a canceled request kept waiting on another request's login")
 	}
 }
 
