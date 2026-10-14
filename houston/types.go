@@ -106,28 +106,34 @@ type Decoded struct {
 
 // Deployment defines structure of a houston response Deployment object
 type Deployment struct {
-	ID                    string              `json:"id"`
-	Type                  string              `json:"type"`
-	Label                 string              `json:"label"`
-	ReleaseName           string              `json:"releaseName"`
-	Namespace             string              `json:"namespace"`
-	Version               string              `json:"version"`
-	AirflowVersion        string              `json:"airflowVersion"`
-	DesiredAirflowVersion string              `json:"desiredAirflowVersion"`
-	RuntimeVersion        string              `json:"runtimeVersion"`
-	RuntimeAirflowVersion string              `json:"runtimeAirflowVersion"`
-	DesiredRuntimeVersion string              `json:"desiredRuntimeVersion"`
-	DeploymentInfo        DeploymentInfo      `json:"deployInfo"`
-	Workspace             Workspace           `json:"workspace"`
-	Urls                  []DeploymentURL     `json:"urls"`
-	CreatedAt             time.Time           `json:"createdAt"`
-	UpdatedAt             time.Time           `json:"updatedAt"`
-	DagDeployment         DagDeploymentConfig `json:"dagDeployment"`
-	ClusterID             string              `json:"clusterId"`
+	ID                    string               `json:"id"`
+	Type                  string               `json:"type"`
+	Label                 string               `json:"label"`
+	ReleaseName           string               `json:"releaseName"`
+	Namespace             string               `json:"namespace"`
+	Version               string               `json:"version"`
+	AirflowVersion        string               `json:"airflowVersion"`
+	DesiredAirflowVersion string               `json:"desiredAirflowVersion"`
+	RuntimeVersion        string               `json:"runtimeVersion"`
+	RuntimeAirflowVersion string               `json:"runtimeAirflowVersion"`
+	DesiredRuntimeVersion string               `json:"desiredRuntimeVersion"`
+	DeploymentInfo        DeploymentInfo       `json:"deployInfo"`
+	Workspace             Workspace            `json:"workspace"`
+	Urls                  []DeploymentURL      `json:"urls"`
+	CreatedAt             time.Time            `json:"createdAt"`
+	UpdatedAt             time.Time            `json:"updatedAt"`
+	DagDeployment         DagDeploymentConfig  `json:"dagDeployment"`
+	ClusterID             string               `json:"clusterId"`
+	HibernationOverride   *HibernationOverride `json:"hibernationOverride,omitempty"`
 }
 
 type DagDeploymentConfig struct {
 	Type string `json:"type"`
+}
+
+type HibernationOverride struct {
+	IsHibernating bool       `json:"hibernate"`
+	OverrideUntil *time.Time `json:"overrideUntil,omitempty"`
 }
 
 // DeploymentURL defines structure of a houston response DeploymentURL object

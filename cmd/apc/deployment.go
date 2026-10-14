@@ -60,6 +60,11 @@ var (
 	clusterID               string
 	deploymentMode          string
 
+	hibernateUntil       string
+	hibernateForDuration string
+	hibernateRemove      bool
+	hibernateForce       bool
+
 	adoptName                    string
 	adoptNamespace               string
 	adoptLabel                   string
@@ -144,6 +149,8 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentListCmd(out),
 		newDeploymentUpdateCmd(out),
 		newDeploymentDeleteCmd(out),
+		newDeploymentHibernateCmd(out),
+		newDeploymentWakeUpCmd(out),
 		newDeploymentAdoptCmd(out),
 		newDeploymentUnadoptCmd(out),
 		newLogsCmd(out),
@@ -256,6 +263,72 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&hardDelete, "hard", false, "Deprecated: deletions always remove all infrastructure and records for the Deployment")
 	_ = cmd.Flags().MarkDeprecated("hard", "deletions are always hard deletes; the --hard flag no longer has any effect")
 	return cmd
+}
+
+//nolint:dupl
+func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "hibernate [deployment ID]",
+		Aliases: []string{"hb"},
+		Short:   "Hibernate a Deployment",
+		Long:    "Hibernate a Deployment. Overrides any existing hibernation schedule and sets the Deployment to hibernate for a specific duration or until a specific time. Use the '--remove-override' flag to remove any existing override and resume the regular hibernation schedule.",
+		Example: `
+# Hibernate until the override is removed.
+$ astro deployment hibernate <deployment-id>
+
+# Hibernate for a duration.
+$ astro deployment hibernate <deployment-id> --for 2h30m
+
+# Hibernate until a specific time.
+$ astro deployment hibernate <deployment-id> --until 2024-06-01T12:00:00Z
+
+# Remove any existing override and resume the regular hibernation schedule.
+$ astro deployment hibernate <deployment-id> --remove-override
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentHibernate(cmd, args, true, out)
+		},
+	}
+	addHibernationFlags(cmd, "hibernate")
+	return cmd
+}
+
+//nolint:dupl
+func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "wake-up [deployment ID]",
+		Aliases: []string{"wu"},
+		Short:   "Wake up a Deployment",
+		Long:    "Wake up a Deployment from hibernation. Overrides any existing hibernation schedule and sets the Deployment to run for a specific duration or until a specific time. Use the '--remove-override' flag to remove any existing override and resume the regular hibernation schedule.",
+		Example: `
+# Wake up until the override is removed.
+$ astro deployment wake-up <deployment-id>
+
+# Wake up for a duration.
+$ astro deployment wake-up <deployment-id> --for 4h
+
+# Wake up until a specific time.
+$ astro deployment wake-up <deployment-id> --until 2024-06-01T18:00:00Z
+
+# Remove any existing override and resume the regular hibernation schedule.
+$ astro deployment wake-up <deployment-id> --remove-override
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return deploymentHibernate(cmd, args, false, out)
+		},
+	}
+	addHibernationFlags(cmd, "wake up")
+	return cmd
+}
+
+func addHibernationFlags(cmd *cobra.Command, action string) {
+	cmd.Flags().StringVarP(&hibernateUntil, "until", "u", "", "Set the override period using an end date and time. Example value: 2021-01-01T00:00:00Z")
+	cmd.Flags().StringVarP(&hibernateForDuration, "for", "d", "", "Set the override period using a duration. Example value: 1h30m")
+	cmd.Flags().BoolVarP(&hibernateRemove, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule.")
+	cmd.Flags().BoolVarP(&hibernateForce, "force", "f", false, fmt.Sprintf("Force %s. The CLI will not prompt to confirm before updating the Deployment.", action))
+	cmd.MarkFlagsMutuallyExclusive("until", "for", "remove-override")
 }
 
 func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
@@ -551,6 +624,11 @@ func deploymentCreate(cmd *cobra.Command, out io.Writer) error {
 		Mode:              deploymentMode,
 	}
 	return deployment.Create(req, houstonClient, out, appConfig)
+}
+
+func deploymentHibernate(cmd *cobra.Command, args []string, isHibernating bool, out io.Writer) error {
+	cmd.SilenceUsage = true
+	return deployment.Hibernate(args[0], isHibernating, hibernateRemove, hibernateUntil, hibernateForDuration, hibernateForce, houstonClient, out)
 }
 
 func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {

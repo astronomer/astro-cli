@@ -810,6 +810,72 @@ func (s *Suite) TestCancelUpdateDeploymentRuntime() {
 	})
 }
 
+func (s *Suite) TestHibernateOverrideDeployment() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	mockDeployment := &Response{
+		Data: ResponseData{
+			UpsertDeployment: &Deployment{
+				ID:          "deployment-test-id",
+				Label:       "test deployment",
+				ReleaseName: "prehistoric-gravity-930",
+			},
+		},
+	}
+	jsonResponse, err := json.Marshal(mockDeployment)
+	s.NoError(err)
+
+	s.Run("success for Houston >= 2.2.0", func() {
+		oldVersion := version
+		version = "2.2.0"
+		defer func() { version = oldVersion }()
+
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		deployment, err := api.HibernateOverrideDeployment(map[string]interface{}{"deploymentId": "deployment-test-id"})
+		s.NoError(err)
+		s.Equal(mockDeployment.Data.UpsertDeployment, deployment)
+	})
+
+	s.Run("not available for Houston < 2.2.0", func() {
+		oldVersion := version
+		version = "2.1.0"
+		defer func() { version = oldVersion }()
+
+		api := NewClient(testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewBuffer(jsonResponse)), Header: make(http.Header)}
+		}))
+
+		_, err := api.HibernateOverrideDeployment(map[string]interface{}{})
+		s.ErrorAs(err, &ErrFieldsNotAvailable{})
+	})
+
+	s.Run("error", func() {
+		oldVersion := version
+		version = "2.2.0"
+		defer func() { version = oldVersion }()
+
+		client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: 500,
+				Body:       io.NopCloser(bytes.NewBufferString("Internal Server Error")),
+				Header:     make(http.Header),
+			}
+		})
+		api := NewClient(client)
+
+		_, err := api.HibernateOverrideDeployment(map[string]interface{}{})
+		s.Contains(err.Error(), "Internal Server Error")
+	})
+}
+
 func (s *Suite) TestUpdateDeploymentImage() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
