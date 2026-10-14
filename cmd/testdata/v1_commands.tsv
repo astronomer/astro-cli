@@ -1,0 +1,237 @@
+# Every visible command of Astro CLI 1.x (main at 7aa23cdc), help and
+# completion left out: the trees that had it, and its path without "astro".
+# The trees are the ones cmd/v1_flags.tsv names: 1.x's Astro tree for a
+# non-hosted organization (astro) and a hosted one (astro-hosted), and its
+# APC tree (apc).
+#
+# It records 1.x, so nothing in v2 changes it. Only the tests read it
+# (removed_commands_test.go): every path here is a command v2 still has, or
+# reaches a hidden stub that says what replaced it.
+astro,astro-hosted,apc	api
+astro,astro-hosted,apc	api airflow
+astro,astro-hosted,apc	api airflow describe
+astro,astro-hosted,apc	api airflow ls
+astro,astro-hosted,apc	api cloud
+astro,astro-hosted,apc	api cloud describe
+astro,astro-hosted,apc	api cloud ls
+astro,astro-hosted,apc	api registry
+astro,astro-hosted,apc	api registry describe
+astro,astro-hosted,apc	api registry ls
+astro,astro-hosted,apc	auth
+astro,astro-hosted,apc	auth login
+astro,astro-hosted,apc	auth logout
+astro,astro-hosted,apc	auth token
+astro,astro-hosted,apc	config
+astro,astro-hosted,apc	config get
+astro,astro-hosted,apc	config set
+astro,astro-hosted,apc	context
+astro,astro-hosted,apc	context delete
+astro,astro-hosted,apc	context list
+astro,astro-hosted,apc	context switch
+astro,astro-hosted	dbt
+astro,astro-hosted	dbt cleanup
+astro,astro-hosted	dbt delete
+astro,astro-hosted	dbt deploy
+astro,astro-hosted,apc	deploy
+astro,astro-hosted,apc	deployment
+apc	deployment airflow
+apc	deployment airflow upgrade
+astro,astro-hosted	deployment airflow-variable
+astro,astro-hosted	deployment airflow-variable copy
+astro,astro-hosted	deployment airflow-variable create
+astro,astro-hosted	deployment airflow-variable list
+astro,astro-hosted	deployment airflow-variable update
+astro,astro-hosted	deployment bundle
+astro,astro-hosted	deployment bundle create
+astro,astro-hosted	deployment bundle delete
+astro,astro-hosted	deployment bundle list
+astro,astro-hosted	deployment bundle update
+astro,astro-hosted	deployment connection
+astro,astro-hosted	deployment connection copy
+astro,astro-hosted	deployment connection create
+astro,astro-hosted	deployment connection list
+astro,astro-hosted	deployment connection update
+astro,astro-hosted,apc	deployment create
+astro,astro-hosted,apc	deployment delete
+astro,astro-hosted	deployment hibernate
+astro,astro-hosted	deployment inspect
+astro,astro-hosted,apc	deployment list
+astro,astro-hosted,apc	deployment logs
+apc	deployment logs scheduler
+apc	deployment logs webserver
+apc	deployment logs workers
+astro,astro-hosted	deployment pool
+astro,astro-hosted	deployment pool copy
+astro,astro-hosted	deployment pool create
+astro,astro-hosted	deployment pool list
+astro,astro-hosted	deployment pool update
+apc	deployment service-account
+apc	deployment service-account create
+apc	deployment service-account delete
+apc	deployment service-account list
+astro,astro-hosted,apc	deployment team
+astro,astro-hosted,apc	deployment team add
+astro,astro-hosted,apc	deployment team list
+astro,astro-hosted,apc	deployment team remove
+astro,astro-hosted,apc	deployment team update
+astro,astro-hosted	deployment token
+astro,astro-hosted	deployment token create
+astro,astro-hosted	deployment token delete
+astro,astro-hosted	deployment token list
+astro,astro-hosted	deployment token organization-token
+astro,astro-hosted	deployment token organization-token add
+astro,astro-hosted	deployment token organization-token list
+astro,astro-hosted	deployment token organization-token remove
+astro,astro-hosted	deployment token organization-token update
+astro,astro-hosted	deployment token rotate
+astro,astro-hosted	deployment token update
+astro,astro-hosted	deployment token workspace-token
+astro,astro-hosted	deployment token workspace-token add
+astro,astro-hosted	deployment token workspace-token list
+astro,astro-hosted	deployment token workspace-token remove
+astro,astro-hosted	deployment token workspace-token update
+astro,astro-hosted,apc	deployment update
+astro,astro-hosted,apc	deployment user
+astro,astro-hosted,apc	deployment user add
+astro,astro-hosted,apc	deployment user list
+astro,astro-hosted,apc	deployment user remove
+astro,astro-hosted,apc	deployment user update
+astro,astro-hosted	deployment variable
+astro,astro-hosted	deployment variable create
+astro,astro-hosted	deployment variable list
+astro,astro-hosted	deployment variable update
+astro,astro-hosted	deployment wake-up
+astro,astro-hosted	deployment worker-queue
+astro,astro-hosted	deployment worker-queue create
+astro,astro-hosted	deployment worker-queue delete
+astro,astro-hosted	deployment worker-queue update
+astro,astro-hosted,apc	dev
+astro,astro-hosted,apc	dev bash
+astro,astro-hosted,apc	dev build
+astro,astro-hosted,apc	dev init
+astro,astro-hosted,apc	dev kill
+astro,astro-hosted,apc	dev logs
+astro,astro-hosted,apc	dev object
+astro,astro-hosted,apc	dev object export
+astro,astro-hosted,apc	dev object import
+astro,astro-hosted,apc	dev parse
+astro,astro-hosted,apc	dev proxy
+astro,astro-hosted,apc	dev proxy status
+astro,astro-hosted,apc	dev proxy stop
+astro,astro-hosted,apc	dev ps
+astro,astro-hosted,apc	dev pytest
+astro,astro-hosted,apc	dev restart
+astro,astro-hosted,apc	dev run
+astro,astro-hosted,apc	dev start
+astro,astro-hosted,apc	dev stop
+astro,astro-hosted,apc	dev upgrade-test
+astro,astro-hosted	env
+astro,astro-hosted	env airflow-variable
+astro,astro-hosted	env airflow-variable create
+astro,astro-hosted	env airflow-variable delete
+astro,astro-hosted	env airflow-variable get
+astro,astro-hosted	env airflow-variable list
+astro,astro-hosted	env airflow-variable update
+astro,astro-hosted	env connection
+astro,astro-hosted	env connection create
+astro,astro-hosted	env connection delete
+astro,astro-hosted	env connection get
+astro,astro-hosted	env connection list
+astro,astro-hosted	env connection update
+astro,astro-hosted	env metrics-export
+astro,astro-hosted	env metrics-export create
+astro,astro-hosted	env metrics-export delete
+astro,astro-hosted	env metrics-export get
+astro,astro-hosted	env metrics-export list
+astro,astro-hosted	env metrics-export update
+astro,astro-hosted	env variable
+astro,astro-hosted	env variable create
+astro,astro-hosted	env variable delete
+astro,astro-hosted	env variable export
+astro,astro-hosted	env variable get
+astro,astro-hosted	env variable link
+astro,astro-hosted	env variable link create
+astro,astro-hosted	env variable link delete
+astro,astro-hosted	env variable link list
+astro,astro-hosted	env variable list
+astro,astro-hosted	env variable update
+astro,astro-hosted	ide
+astro,astro-hosted	ide project
+astro,astro-hosted	ide project export
+astro,astro-hosted	ide project import
+astro,astro-hosted	ide project list
+astro,astro-hosted,apc	login
+astro,astro-hosted,apc	logout
+astro,astro-hosted	organization
+astro,astro-hosted	organization audit-logs
+astro,astro-hosted	organization audit-logs export
+astro,astro-hosted	organization list
+astro,astro-hosted	organization role
+astro,astro-hosted	organization role list
+astro,astro-hosted	organization switch
+astro,astro-hosted	organization team
+astro,astro-hosted	organization team create
+astro,astro-hosted	organization team delete
+astro,astro-hosted	organization team list
+astro,astro-hosted	organization team update
+astro,astro-hosted	organization team user
+astro,astro-hosted	organization team user add
+astro,astro-hosted	organization team user list
+astro,astro-hosted	organization team user remove
+astro,astro-hosted	organization token
+astro,astro-hosted	organization token create
+astro,astro-hosted	organization token delete
+astro,astro-hosted	organization token list
+astro,astro-hosted	organization token roles
+astro,astro-hosted	organization token rotate
+astro,astro-hosted	organization token update
+astro,astro-hosted	organization user
+astro,astro-hosted	organization user invite
+astro,astro-hosted	organization user list
+astro,astro-hosted	organization user update
+astro,astro-hosted,apc	otto
+astro,astro-hosted	remote
+astro,astro-hosted	remote deploy
+astro,astro-hosted,apc	run
+apc	team
+apc	team get
+apc	team list
+apc	team update
+astro,astro-hosted,apc	telemetry
+astro,astro-hosted,apc	telemetry disable
+astro,astro-hosted,apc	telemetry enable
+apc	user
+apc	user create
+astro,astro-hosted,apc	version
+astro,astro-hosted,apc	workspace
+astro,astro-hosted,apc	workspace create
+astro,astro-hosted,apc	workspace delete
+astro,astro-hosted,apc	workspace list
+apc	workspace service-account
+apc	workspace service-account create
+apc	workspace service-account delete
+apc	workspace service-account list
+astro,astro-hosted,apc	workspace switch
+astro,astro-hosted,apc	workspace team
+astro,astro-hosted,apc	workspace team add
+astro,astro-hosted,apc	workspace team list
+astro,astro-hosted,apc	workspace team remove
+astro,astro-hosted,apc	workspace team update
+astro,astro-hosted	workspace token
+astro,astro-hosted	workspace token add
+astro,astro-hosted	workspace token create
+astro,astro-hosted	workspace token delete
+astro,astro-hosted	workspace token list
+astro,astro-hosted	workspace token organization-token
+astro,astro-hosted	workspace token organization-token add
+astro,astro-hosted	workspace token organization-token list
+astro,astro-hosted	workspace token organization-token remove
+astro,astro-hosted	workspace token organization-token update
+astro,astro-hosted	workspace token rotate
+astro,astro-hosted	workspace token update
+astro,astro-hosted,apc	workspace update
+astro,astro-hosted,apc	workspace user
+astro,astro-hosted,apc	workspace user add
+astro,astro-hosted,apc	workspace user list
+astro,astro-hosted,apc	workspace user remove
+astro,astro-hosted,apc	workspace user update

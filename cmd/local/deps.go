@@ -222,7 +222,10 @@ func stdoutIsTerminal() bool {
 // is spelled out here because core packages never import config/, which
 // internal/telemetry pulls in. The shell root's PersistentPreRunE checks this
 // annotation on the invoked command, so `astro local` stays offline: no
-// network call runs before the command does.
+// network call runs before the command does. The removal stubs (`astro dev`,
+// `astro run`) carry cliout.RemovedCommandAnnotation instead, for which the
+// root only sets up logging and records the command where telemetry already
+// holds state.
 const skipPreRunAnnotation = "skipPreRun"
 
 // markSkipPreRun annotates cmd and every descendant. Cobra annotations do

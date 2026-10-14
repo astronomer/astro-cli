@@ -5,6 +5,7 @@ package e2e
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -27,16 +28,17 @@ import (
 // the first-run notice records that it has been shown. Measured, `astro
 // version` on a fresh home leaves a 1083-byte config.yaml for that reason —
 // shell behavior doing what it means to do. Core commands carry the skip-pre-run
-// annotation, so none of that runs for them.
+// annotation, so none of that runs for them, except the removal stubs, which
+// are recorded only where the notice was already shown.
 //
-// Which is also the limit of what these two cases prove. The harness sets
-// ASTRO_TELEMETRY_DISABLED=1 for every run and cannot do otherwise, since
-// there is no way to point the sender somewhere other than production — so
-// if a core command ever lost its annotation, the telemetry write it started
-// doing would not show up here. That half is checked structurally instead,
-// by TestTreeInvariants in cmd/local. What these two own is the config read:
-// that InitConfig, which runs for every invocation whatever the annotation
-// says, creates nothing.
+// Which is also the limit of what the first two cases prove. The harness sets
+// ASTRO_TELEMETRY_DISABLED=1 for every run, so if a core command ever lost its
+// annotation, the telemetry write it started doing would not show up in them.
+// That half is checked structurally instead, by TestTreeInvariants in
+// cmd/local. What these two own is the config read: that InitConfig, which
+// runs for every invocation whatever the annotation says, creates nothing.
+// The stubs' case turns telemetry on, pointed at an address nothing listens
+// on (telemetryOn).
 //
 // Tier 0: the harness points HOME and ASTRO_HOME at the test's own temp
 // directory, so anything found here was created by the run.
@@ -59,6 +61,48 @@ func TestAFailingCoreCommandLeavesNoHomeConfigBehind(t *testing.T) {
 
 	p.run("dev", "ps", "--output", "json").requireFailure()
 
+	checkNoHomeConfig(t, p)
+	checkVaultUntouched(t, p)
+}
+
+// telemetryOn turns telemetry back on for one run, sending to an address
+// nothing listens on, so no event reaches production analytics. The harness's
+// ASTRO_TELEMETRY_DISABLED=1 is overridden, not removed: os/exec keeps the
+// last of two values for one variable.
+var telemetryOn = map[string]string{
+	"ASTRO_TELEMETRY_DISABLED": "0",
+	"ASTRO_TELEMETRY_API_URL":  "http://127.0.0.1:9/",
+}
+
+// The removal stubs `astro dev` and `astro run` are the core commands that do
+// run part of the root's pre-run: it records them, so we learn when nobody
+// types them any more. On a fresh machine that must still leave nothing
+// behind, with telemetry on, which the cases above cannot see: the event is
+// sent only where the first-run notice has already been shown, and the stub
+// shows no notice of its own.
+func TestARemovedCommandLeavesNoHomeConfigBehindWithTelemetryOn(t *testing.T) {
+	tier(t, 0)
+
+	// The control: with telemetry on, a shell command shows the notice and
+	// records it, so the override above does turn telemetry on.
+	control := newProject(t)
+	r := control.runWith(telemetryOn, "version")
+	r.requireSuccess()
+	if !strings.Contains(r.Stderr, "collects usage data") {
+		t.Fatalf("telemetry is not on for these runs: `astro version` showed no notice\nstderr:\n%s", r.Stderr)
+	}
+	if _, err := os.Stat(filepath.Join(control.home, ".astro", "config.yaml")); err != nil {
+		t.Fatalf("telemetry is not on for these runs: `astro version` recorded no notice: %v", err)
+	}
+
+	p := newProject(t)
+	for _, args := range [][]string{{"dev", "ps"}, {"run", "my_dag"}, {"dev", "start", "-o", "json"}} {
+		r := p.runWith(telemetryOn, args...)
+		r.requireFailure()
+		if strings.Contains(r.Stderr, "collects usage data") {
+			t.Errorf("astro %s showed the telemetry notice:\n%s", strings.Join(args, " "), r.Stderr)
+		}
+	}
 	checkNoHomeConfig(t, p)
 	checkVaultUntouched(t, p)
 }

@@ -132,6 +132,9 @@ func (s *AddCmdSuite) TestNeedsPlatform() {
 		{[]string{"--jklsdjkfljsfd"}, false},
 		{[]string{"help"}, false},
 		{[]string{"local", "start"}, false},
+		// The removal stubs say what replaced them without the platform.
+		{[]string{"dev", "start"}, false},
+		{[]string{"run", "my_dag", "-o", "json"}, false},
 		{[]string{"deployment"}, true},
 		{[]string{"deployment", "create", "--help"}, true},
 		{[]string{"de", "ls"}, true},

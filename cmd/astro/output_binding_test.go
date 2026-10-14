@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	astrov1alpha1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1alpha1"
 	astrodeploy "github.com/astronomer/astro-cli/internal/platform/astro/deploy"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -25,6 +26,13 @@ import (
 // cmd.OutOrStdout() while strayStdoutToStderr has pointed os.Stdout at
 // stderr; this does not.
 func execUnboundRoot(t *testing.T, client astrov1.APIClient, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
+	return execUnboundRootWith(t, client, nil, args...)
+}
+
+// execUnboundRootWith is execUnboundRoot with a v1alpha1 client too, which
+// the bundle commands call.
+func execUnboundRootWith(t *testing.T, client astrov1.APIClient, alpha astrov1alpha1.APIClient, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	testUtil.SetupOSArgsForGinkgo()
@@ -54,7 +62,7 @@ func execUnboundRoot(t *testing.T, client astrov1.APIClient, args ...string) (st
 	gotOut, gotErr := read(outR), read(errR)
 
 	root := &cobra.Command{Use: "astro", SilenceErrors: true}
-	root.AddCommand(AddCmds(client, nil, nil, os.Stdout)...)
+	root.AddCommand(AddCmds(client, alpha, nil, os.Stdout)...)
 	err = cliout.Execute(context.Background(), root, args, os.Stdout, nil)
 
 	os.Stdout, os.Stderr = prevOut, prevErr
