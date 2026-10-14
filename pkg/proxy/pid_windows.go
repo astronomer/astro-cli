@@ -10,11 +10,11 @@ const waitTimeout = uintptr(0x00000102)
 
 // IsPIDAlive reports whether a process with the given PID is still running.
 //
-// Answered rather than stubbed, because this is not only the daemon's question
-// any more. The daemon does not run on Windows, but the desktop does, publishes
-// a proxy record there, and LiveRecord reads it — so a fixed false makes a
-// serving proxy read as absent on the one platform the record exists for. The
-// same answer feeds route pruning, where "dead" evicts a route that is in use.
+// Answered rather than stubbed, because it decides more than one thing here: a
+// Windows host reads the daemon's record with it and the desktop's own proxy
+// record too (through LiveRecord), so a fixed false makes a serving proxy read
+// as absent. The same answer feeds route pruning, where "dead" evicts a route
+// that is in use.
 //
 // Asked via the process handle's signal state rather than its exit code.
 // GetExitCodeProcess is the more obvious route and has a trap: it reports
