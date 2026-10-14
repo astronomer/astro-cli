@@ -367,6 +367,22 @@ func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
 }
 
 // A remote-execution Deployment with DAG deploys off takes no DAGs at all.
+// A deploy resolves its engine once, however many steps ask.
+func TestOnceEngineResolvesOnce(t *testing.T) {
+	calls := 0
+	engine := onceEngine(func() (string, []string, error) {
+		calls++
+		return "podman", []string{"CONTAINER_HOST=x"}, nil
+	})
+	for range 3 {
+		bin, env, err := engine()
+		require.NoError(t, err)
+		assert.Equal(t, "podman", bin)
+		assert.Equal(t, []string{"CONTAINER_HOST=x"}, env)
+	}
+	assert.Equal(t, 1, calls)
+}
+
 func TestDeployManifestSaysNoDagsWentToARemoteExecutionDeployment(t *testing.T) {
 	img := manifestdeploy.ImageResult{ImageTag: "deploy-2026", RemoteExecution: true}
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})

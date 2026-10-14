@@ -150,7 +150,7 @@ func (t *AstroTarget) reachEngineAndCheck(ctx context.Context, req Request, cb l
 		return engineCLI{}, err
 	}
 	warn := func(w string) { emit(cb, "warning: "+w) }
-	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, container.IsPodman(cli.bin), warn)
+	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, cli.run, cli.bin, cli.env), warn)
 	return cli, err
 }
 

@@ -185,6 +185,10 @@ type walker struct {
 	// then neither entered nor visited. A generated build's filter leaves all
 	// of it out.
 	vcs func(rel string)
+	// link, when set, takes each symlink a following walk goes through: the
+	// link's own path, for a file carried as what it points at or a directory
+	// entered through it.
+	link func(rel string)
 	// visit is called for each file carried, with its path relative to the
 	// project (slash-separated), its source path and its mode: a regular
 	// file's, or a symlink's when links are not followed.
@@ -199,6 +203,12 @@ type walker struct {
 // to a directory already being walked is not followed again, and a dangling
 // one is left out. The root itself may be a symlink.
 func walkProject(root string, visit func(rel, src string, mode fs.FileMode) error) error {
+	return walkProjectLinks(root, visit, nil)
+}
+
+// walkProjectLinks is walkProject, handing link each symlink it goes through
+// (walker.link).
+func walkProjectLinks(root string, visit func(rel, src string, mode fs.FileMode) error, link func(rel string)) error {
 	resolved, err := filepath.EvalSymlinks(root)
 	if err != nil {
 		return err
@@ -207,7 +217,7 @@ func walkProject(root string, visit func(rel, src string, mode fs.FileMode) erro
 	if err != nil {
 		return err
 	}
-	w := walker{filter: filter, follow: true, visit: visit}
+	w := walker{filter: filter, follow: true, link: link, visit: visit}
 	return w.walkDir(resolved, "", map[string]bool{resolved: true})
 }
 
@@ -241,6 +251,9 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 		}
 		if skip && !descend {
 			continue
+		}
+		if w.follow && w.link != nil && e.Type()&fs.ModeSymlink != 0 && (info.IsDir() || !skip) {
+			w.link(childRel)
 		}
 		switch {
 		case info.IsDir():
@@ -296,6 +309,12 @@ type ProjectSurvey struct {
 	// IgnoreFile is the ignore file a declared Dockerfile's build reads
 	// (declaredIgnoreFile), "" for none or for a generated build.
 	IgnoreFile string
+	// Links are the symlinks a generated build goes through, slash-separated
+	// and relative to the project: each carried file is either one of them
+	// (a file link, carried as its target) or under one (a linked directory)
+	// or neither, and only those are anywhere but where Files says. A
+	// declared build carries a link as a link, and lists none here.
+	Links []string
 	// DagsOnDisk counts the DAG files (.py, as the 1.x CLI counted them)
 	// under dags/, links followed and no rule applied. DagsCarried counts
 	// those of them the image carries.
@@ -323,7 +342,7 @@ func SurveyProject(dir, dockerfile string, podman bool) (ProjectSurvey, error) {
 		return nil
 	}
 	if dockerfile == "" {
-		err = walkProject(resolved, collect)
+		err = walkProjectLinks(resolved, collect, func(rel string) { s.Links = append(s.Links, rel) })
 	} else {
 		s.IgnoreFile = declaredIgnoreFile(resolved, dockerfile, podman)
 		var filter projectFilter

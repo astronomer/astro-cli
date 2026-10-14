@@ -77,7 +77,7 @@ func TestCheckFindsGitignoredFilesAndSecretsAmongThem(t *testing.T) {
 	assert.Contains(t, w[0], "add them to .dockerignore")
 	err := r.Err()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "keys/service-account.json look like credentials, are not committed to git")
+	assert.Contains(t, err.Error(), "keys/service-account.json look like credentials and are not tracked by git")
 	assert.Contains(t, err.Error(), "to a registry")
 
 	// A .dockerignore line is the way out, and the warning goes with it.
@@ -198,14 +198,19 @@ func TestCheckAsksAboutAnInProjectLinkAtItsRealPath(t *testing.T) {
 		"judged by the real path: the committed ca.pem is not refused through the link either")
 }
 
-// A file whose real location is outside the project is not git's to answer
-// for here, and counts as untracked: one that looks like a credential is
-// refused, whatever repository it sits in.
-func TestCheckCountsFilesBehindALinkOutOfTheProjectAsUntracked(t *testing.T) {
+// A file a generated build carries through a link out of the project is asked
+// of the repository that holds where the link leads: in a monorepo, a
+// committed shared library is not refused, and an uncommitted key in it is.
+func TestCheckAsksTheRepositoryALinkLeadsTo(t *testing.T) {
 	needsGit(t)
 	repo := t.TempDir()
 	gitRun(t, repo, "init", "-q")
-	writeFiles(t, repo, map[string]string{"shared-lib/util.py": "", "shared-lib/sa-prod.json": "{}", "project/dags/a.py": ""})
+	writeFiles(t, repo, map[string]string{
+		"shared-lib/util.py":       "",
+		"shared-lib/sa-prod.json":  "{}",
+		"shared-lib/sa-local.json": "{}",
+		"project/dags/a.py":        "",
+	})
 	gitRun(t, repo, "add", "shared-lib/util.py", "shared-lib/sa-prod.json", "project/dags/a.py")
 	project := filepath.Join(repo, "project")
 	require.NoError(t, os.MkdirAll(filepath.Join(project, "include"), 0o755))
@@ -215,8 +220,62 @@ func TestCheckCountsFilesBehindALinkOutOfTheProjectAsUntracked(t *testing.T) {
 
 	r := check(t, project, "")
 	assert.Empty(t, r.Unanswered)
-	assert.Equal(t, []string{"include/shared/sa-prod.json"}, r.Secrets, "committed in its own place, but outside the project")
-	assert.Empty(t, r.Gitignored)
+	assert.Equal(t, []string{"include/shared/sa-local.json"}, r.Secrets, "the committed sa-prod.json is the monorepo's choice")
+	assert.Empty(t, r.Outside)
+}
+
+// A link to a place no git repository holds leaves nothing to say the file
+// was meant to be shared: one that looks like a credential is refused, and
+// the message says why without claiming git judged it.
+func TestCheckRefusesCredentialsBehindALinkOutOfAnyRepository(t *testing.T) {
+	needsGit(t)
+	project := t.TempDir()
+	gitRun(t, project, "init", "-q")
+	writeFiles(t, project, map[string]string{"dags/a.py": ""})
+	outside := t.TempDir()
+	writeFiles(t, outside, map[string]string{"keys/sa-prod.json": "{}", "keys/helper.py": ""})
+	if err := os.Symlink(filepath.Join(outside, "keys"), filepath.Join(project, "keys")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+
+	r := check(t, project, "")
+	assert.Equal(t, []string{"keys/sa-prod.json"}, r.Outside)
+	assert.Empty(t, r.Secrets)
+	err := r.Err()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "outside any git repository")
+	assert.NotContains(t, err.Error(), "not tracked by git")
+}
+
+// A linked file that cannot be resolved (gone since the survey) is asked
+// about as its link, never as a path beyond one; a file under no link is
+// asked about as listed, without resolving anything.
+func TestLocate(t *testing.T) {
+	root := t.TempDir()
+	in, out := locate(root, []string{"gone/x.py", "dags/a.py"}, []string{"gone"})
+	assert.Equal(t, map[string]string{"gone/x.py": "gone", "dags/a.py": "dags/a.py"}, in)
+	assert.Empty(t, out)
+}
+
+// A declared build carries a link as a link, so git is asked about the link
+// itself: a committed link is fine wherever it points, an untracked one that
+// looks like a credential is refused.
+func TestCheckAsksAboutADeclaredBuildsLinkItself(t *testing.T) {
+	needsGit(t)
+	project := t.TempDir()
+	gitRun(t, project, "init", "-q")
+	writeFiles(t, project, map[string]string{"Dockerfile": "FROM python:3.12\n"})
+	outside := t.TempDir()
+	writeFiles(t, outside, map[string]string{"real.pem": "k"})
+	if err := os.Symlink(filepath.Join(outside, "real.pem"), filepath.Join(project, "ca.pem")); err != nil {
+		t.Skipf("symlinks unavailable here: %v", err)
+	}
+	require.NoError(t, os.Symlink(filepath.Join(outside, "real.pem"), filepath.Join(project, "new.pem")))
+	gitRun(t, project, "add", "ca.pem")
+
+	r := check(t, project, "Dockerfile")
+	assert.Equal(t, []string{"new.pem"}, r.Secrets)
+	assert.Empty(t, r.Outside)
 }
 
 // A declared Dockerfile's context carries .git unless its ignore file drops
@@ -236,10 +295,23 @@ func TestCheckDeclaredGitMetadata(t *testing.T) {
 		"[remote \"origin\"]\n\turl = https://bot:ghp_secret@github.com/acme/repo.git\n",
 		"[remote \"origin\"]\n\turl = https://ghp_0123456789abcdef@github.com/acme/repo.git\n",
 		"[url \"https://x-access-token:ghs_abc@github.com/\"]\n\tinsteadOf = https://github.com/\n",
+		"[url \"https://oauth2:glpat-abcdef@gitlab.com/\"]\n\tinsteadOf = https://gitlab.com/\n",
+		"[remote \"origin\"]\n\turl = https://glpat-abcdefghij@gitlab.com/acme/repo.git\n",
+		"[remote \"origin\"]\n\turl = https://0123456789abcdef0123456789abcdef@example.com/acme/repo.git\n",
 	} {
 		writeFiles(t, dir, map[string]string{".git/config": config})
 		r = check(t, dir, "Dockerfile")
 		assert.ErrorContains(t, r.Err(), "holds a credential", config)
+	}
+	// A plain user is not a credential.
+	for _, config := range []string{
+		"[remote \"origin\"]\n\turl = ssh://git@github.com/acme/repo.git\n",
+		"[remote \"origin\"]\n\turl = https://user@bitbucket.org/acme/repo.git\n",
+		"[remote \"origin\"]\n\turl = git@github.com:acme/repo.git\n",
+	} {
+		writeFiles(t, dir, map[string]string{".git/config": config})
+		r = check(t, dir, "Dockerfile")
+		assert.NoError(t, r.Err(), config)
 	}
 
 	writeFiles(t, dir, map[string]string{".dockerignore": "**/.git\n"})

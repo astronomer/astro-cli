@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,4 +68,25 @@ func TestRun_CarriesWarnAndDagsInImage(t *testing.T) {
 	assert.Equal(t, "image-and-dag", res.Type)
 	assert.True(t, res.DagsInImage)
 	assert.Empty(t, res.DagTarballVersion)
+}
+
+// The engine is resolved only by a deploy that builds, and the resolver is
+// handed on to the transport rather than resolved again.
+func TestRun_ResolvesTheEngineOnlyToBuild(t *testing.T) {
+	calls := 0
+	engine := func() (string, []string, error) {
+		calls++
+		return "", nil, errors.New("no engine")
+	}
+	d := &fakeDeployer{}
+	_, err := Run(Request{ProjectDir: t.TempDir(), LinkName: "prod", Manifest: linkedManifest(), DagsOnly: true, Engine: engine}, d)
+	require.NoError(t, err)
+	_, err = Run(Request{ProjectDir: t.TempDir(), LinkName: "prod", Manifest: linkedManifest(), ImageName: "img:1", Engine: engine}, d)
+	require.NoError(t, err)
+	assert.Zero(t, calls, "a dags-only or prebuilt deploy builds nothing")
+
+	_, err = Run(Request{ProjectDir: t.TempDir(), LinkName: "prod", Manifest: linkedManifest(), Engine: engine}, d)
+	require.NoError(t, err, "an engine that cannot be resolved is the transport's to report")
+	assert.Equal(t, 1, calls)
+	assert.NotNil(t, d.imgInput.Engine)
 }

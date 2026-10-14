@@ -156,6 +156,7 @@ func TestSurveyProjectLinks(t *testing.T) {
 	generated, err := SurveyProject(project, "", false)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"docker/Dockerfile", "dags/far.py", "keys/sa-prod.json"}, generated.Files)
+	assert.ElementsMatch(t, []string{"dags", "keys"}, generated.Links, "the links the walk went through")
 	assert.Equal(t, 1, generated.DagsOnDisk)
 	assert.Equal(t, 1, generated.DagsCarried)
 
@@ -164,4 +165,5 @@ func TestSurveyProjectLinks(t *testing.T) {
 	assert.ElementsMatch(t, []string{"docker/Dockerfile", "dags", "keys"}, declared.Files)
 	assert.Equal(t, 1, declared.DagsOnDisk)
 	assert.Equal(t, 0, declared.DagsCarried)
+	assert.Empty(t, declared.Links, "a declared build carries links as links")
 }

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,7 +20,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
-	"github.com/astronomer/astro-cli/internal/containercfg"
 	manifestdeploy "github.com/astronomer/astro-cli/internal/deploy"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
@@ -27,7 +27,6 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
-	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/git"
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -505,9 +504,9 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
 		Warn: func(msg string) { fmt.Fprintf(errOut, "warning: %s\n", msg) },
-		// Which engine builds the image decides the ignore file a declared
-		// Dockerfile's build reads; the transport resolves it again to build.
-		Podman: deployEngineIsPodman(config.WorkingPath),
+		// Resolved once, when a deploy that builds first needs it, and
+		// shared by the checks and the transport.
+		Engine: onceEngine(astrodeploy.ResolveContainerEngine),
 		// A Deployment picked from the workspace rather than from the links is
 		// linked as `astro link add` would link it, once the deploy to it has
 		// succeeded, so the next deploy offers it by name. Only an interactive
@@ -562,13 +561,21 @@ func deployManifest(cmd *cobra.Command, args []string) error {
 	return renderManifestDeploy(out, format, &res)
 }
 
-// deployEngineIsPodman reports whether the engine a build of the project at
-// dir would use is podman: the container.binary pin, else pkg/container's
-// detection. An engine that cannot be resolved is not podman here; the
-// transport reports it when it builds.
-func deployEngineIsPodman(dir string) bool {
-	bin, err := container.GetContainerRuntimeBinary(container.Config{Binary: containercfg.Binary(dir)})
-	return err == nil && container.IsPodman(bin)
+// onceEngine memoizes an engine resolver, so a deploy resolves its engine
+// once however many steps ask.
+func onceEngine(resolve func() (string, []string, error)) func() (string, []string, error) {
+	type engine struct {
+		bin string
+		env []string
+	}
+	once := sync.OnceValues(func() (engine, error) {
+		bin, env, err := resolve()
+		return engine{bin, env}, err
+	})
+	return func() (string, []string, error) {
+		e, err := once()
+		return e.bin, e.env, err
+	}
 }
 
 // announceDeployTarget prints the one line every resolving command puts on
@@ -943,6 +950,7 @@ func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestd
 		IncludeDags:   in.IncludeDags,
 		Warn:          in.Warn,
 		Survey:        in.Survey,
+		Engine:        in.Engine,
 		Description:   in.Description,
 		NoDagsBaseDir: in.NoDagsBaseDir,
 		Wait:          in.Wait,

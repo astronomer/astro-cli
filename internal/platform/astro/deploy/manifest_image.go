@@ -64,7 +64,11 @@ type ManifestImageDeployInput struct {
 	// Survey is what the image built from the manifest would carry, as the
 	// checks before the deploy listed it (imagebuild.SurveyProject). nil
 	// surveys the project here when it is needed.
-	Survey        *imagebuild.ProjectSurvey
+	Survey *imagebuild.ProjectSurvey
+	// Engine resolves the container engine, memoized by the caller so the
+	// checks before the deploy and the build share one resolution. nil is
+	// ResolveContainerEngine.
+	Engine        func() (bin string, env []string, err error)
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -123,7 +127,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	ctx := context.Background()
 
 	cmd := newImageBuildCommander()
-	bin, env, err := ensureContainerEngine(ctx, cmd)
+	bin, env, err := ensureContainerEngine(ctx, cmd, in.Engine)
 	if err != nil {
 		return ManifestImageDeployResult{}, err
 	}
@@ -160,7 +164,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if err := checkPlannedRuntime(dep.AstroRuntimeVersion, &planned, allowed); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
-	dags, err := planDags(&in, &req, &dep, container.IsPodman(bin))
+	dags, err := planDags(&in, &req, &dep, func() bool { return imagebuild.IsPodman(ctx, cmd, bin, env) })
 	if err != nil {
 		return ManifestImageDeployResult{}, err
 	}
@@ -279,7 +283,7 @@ type dagsPlan struct {
 // planDags works out how a deploy's DAGs reach the Deployment dep, and holds a
 // deploy whose DAGs go inside the image to an image that carries them
 // (checkDagsInImage).
-func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment, podman bool) (dagsPlan, error) {
+func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov1.Deployment, podman func() bool) (dagsPlan, error) {
 	if !in.IncludeDags {
 		return dagsPlan{}, nil
 	}
@@ -298,7 +302,7 @@ func planDags(in *ManifestImageDeployInput, req *imagebuild.Request, dep *astrov
 // dags/ is refused: it would replace the running DAGs with none. A declared
 // Dockerfile's is warned about instead, since its own steps may put DAGs in
 // the image, and so is a prebuilt image, which cannot be looked into here.
-func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, podman bool) error {
+func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, podman func() bool) error {
 	warn := in.Warn
 	if warn == nil {
 		warn = func(string) {}
@@ -309,7 +313,7 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, pod
 	}
 	survey := in.Survey
 	if survey == nil {
-		s, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile, podman)
+		s, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile, podman())
 		if err != nil {
 			return err
 		}
@@ -607,8 +611,11 @@ func finalizeManifestDeploy(organizationID, deploymentID, deployID, dagTarballVe
 // reachable, so an image deploy fails with a plain message before any transport
 // work when Docker is absent or down — or, for podman with no machine up, with
 // the podman command that brings one up, which "Start Docker" would not be.
-func ensureContainerEngine(ctx context.Context, cmd imagebuild.Commander) (bin string, env []string, err error) {
-	bin, env, err = resolveContainerEngine()
+func ensureContainerEngine(ctx context.Context, cmd imagebuild.Commander, resolve func() (string, []string, error)) (bin string, env []string, err error) {
+	if resolve == nil {
+		resolve = ResolveContainerEngine
+	}
+	bin, env, err = resolve()
 	if errors.Is(err, container.ErrMachineNotRunning) {
 		return "", nil, fmt.Errorf("an image deploy needs a running container engine, but %w. Or run 'astro deploy --dags' to deploy just your DAGs (no container engine needed)", err)
 	}
@@ -621,6 +628,13 @@ func ensureContainerEngine(ctx context.Context, cmd imagebuild.Commander) (bin s
 		return "", nil, errNoDocker
 	}
 	return bin, env, nil
+}
+
+// ResolveContainerEngine resolves the container CLI and the env that reaches
+// its daemon, through the seam tests replace (resolveContainerEngine). cmd
+// memoizes it for a deploy's checks and its build to share.
+func ResolveContainerEngine() (bin string, env []string, err error) {
+	return resolveContainerEngine()
 }
 
 // defaultResolveContainerEngine picks the engine the way local Docker mode and

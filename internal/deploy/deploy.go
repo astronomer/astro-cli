@@ -12,6 +12,7 @@
 package deploy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -95,9 +96,14 @@ type Request struct {
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
-	// Podman says the engine that will build the image is podman, whose
-	// builds of a declared Dockerfile read a .containerignore first.
-	Podman bool
+	// Engine resolves the container engine that will build the image: its
+	// CLI and the env that reaches its daemon. cmd hands the same memoized
+	// resolver to the transport, so the engine is resolved once. It is
+	// called only by a deploy that builds, to learn whether the engine is
+	// podman, whose builds of a declared Dockerfile read a .containerignore
+	// first. nil, or an engine it cannot resolve, counts as docker here; the
+	// transport reports a missing engine.
+	Engine func() (bin string, env []string, err error)
 	// Link saves a link to a Deployment the prompt offered from the workspace
 	// rather than from the manifest, once it is picked, so the next deploy
 	// offers it by name. cmd wires it to scaffold.SaveLink. nil links nothing:
@@ -191,7 +197,9 @@ type ImageDeploy struct {
 	Warn func(string)
 	// Survey is what the image built from the manifest would carry, as the
 	// checks before the deploy listed it; nil for a prebuilt image.
-	Survey        *imagebuild.ProjectSurvey
+	Survey *imagebuild.ProjectSurvey
+	// Engine is Request.Engine, for the transport to build with.
+	Engine        func() (bin string, env []string, err error)
 	Description   string
 	NoDagsBaseDir bool
 	Wait          bool
@@ -306,13 +314,13 @@ func saveNewLink(req Request, target Target, res *Result) {
 // checkImageSource holds what an image deploy would build from to the Airflow
 // requirement, for a deploy that builds one from the manifest: a declared
 // Dockerfile's FROM line (scaffold.CheckDockerfileAirflow), and a
-// [tool.astro] runtime build (Request.CheckRuntime). It also warns about the
-// per-machine files a declared Dockerfile's build would copy into the image
-// (scaffold.LocalFilesWarning), warns about the files it would carry that git
-// ignores, and refuses one carrying such a file that looks like a credential
-// (shipcheck.Run). A dags-only deploy and one
-// adopting a prebuilt --image-name build nothing from the manifest, and are not
-// held to it. It returns the build secrets the declared Dockerfile mounts and
+// [tool.astro] runtime build (Request.CheckRuntime). It also checks the
+// build secrets, and holds the files the image would carry to shipcheck.Survey:
+// the local and per-machine files a declared Dockerfile's context carries are
+// warned about, and so are the files git ignores, and a file that looks like a
+// credential and that git does not track is refused. A dags-only deploy and
+// one adopting a prebuilt --image-name build nothing from the manifest, and
+// are not held to any of it. It returns the build secrets the declared Dockerfile mounts and
 // nobody gave, for a failed build to name again, and the survey of what the
 // image would carry, made once for every check of it (the transport's too).
 func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.ProjectSurvey, error) {
@@ -335,7 +343,7 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 	for _, w := range missing.Warnings() {
 		warn(w)
 	}
-	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.Podman, warn)
+	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, enginePodman(req.Engine), warn)
 	if err != nil {
 		return missing, nil, err
 	}
@@ -348,6 +356,17 @@ func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.Proje
 		warn(manifest.Marker + ": tool.astro.runtime: " + w.Message)
 	}
 	return missing, survey, err
+}
+
+// enginePodman reports whether the engine engine resolves is podman, by
+// asking it (imagebuild.IsPodman). nil, or an engine that cannot be resolved,
+// is not.
+func enginePodman(engine func() (string, []string, error)) bool {
+	if engine == nil {
+		return false
+	}
+	bin, env, err := engine()
+	return err == nil && imagebuild.IsPodman(context.Background(), imagebuild.NewExecCommander(), bin, env)
 }
 
 // runDagsOnly ships just the dags/ directory through the transport.
@@ -401,6 +420,7 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		IncludeDags:   includeDags,
 		Warn:          req.Warn,
 		Survey:        survey,
+		Engine:        req.Engine,
 		Description:   req.Description,
 		NoDagsBaseDir: req.NoDagsBaseDir,
 		Wait:          req.Wait,
