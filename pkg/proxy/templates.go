@@ -33,7 +33,8 @@ type Pages struct {
 
 	// StartHint is the sentence that tells someone how to start a project,
 	// shown on the landing page with no projects and on the not-found page.
-	// Empty points at `astro local start`, which suits a shell and not an app.
+	// Empty names both ways in, Astro Desktop and `astro local start`, since
+	// one daemon serves projects started from either.
 	StartHint string
 }
 

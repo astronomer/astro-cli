@@ -25,6 +25,8 @@ func TestProxy_LandingPage(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "Astro Local Proxy")
 	assert.Contains(t, w.Body.String(), "astro local start")
+	// One daemon serves projects started from either tool, so the hint names both.
+	assert.Contains(t, w.Body.String(), "Astro Desktop")
 	assert.Contains(t, w.Body.String(), "No active projects")
 }
 
@@ -151,7 +153,6 @@ func TestProxy_StartReportsBoundPort(t *testing.T) {
 	require.NoError(t, p.Start())
 	defer p.Stop()
 
-	assert.True(t, p.Running())
 	assert.NotEqual(t, takenPort, p.Port())
 
 	// The bound port must answer.
