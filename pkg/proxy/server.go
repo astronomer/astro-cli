@@ -40,8 +40,9 @@ const (
 // Proxy is an HTTP reverse proxy that routes requests based on the Host
 // header, using a Store to resolve hostnames to backend ports.
 type Proxy struct {
-	// ModifyResponse hooks run in order on every proxied response.
-	// Set them before calling Start.
+	// ModifyResponse hooks run in order on every proxied response, after the
+	// proxy has put the Astronomer theme into it (InjectAirflowTheme). Set them
+	// before calling Start.
 	ModifyResponse []func(*http.Response) error
 
 	// ModifyRequest hooks run in order on every proxied request, after the
@@ -282,6 +283,11 @@ func (p *Proxy) getOrCreateProxy(backendPort string) *httputil.ReverseProxy {
 		}
 	}
 	rp.ModifyResponse = func(resp *http.Response) error {
+		// Every tool serving these routes themes Airflow the same way, so the
+		// theme is the proxy's rather than a hook each host has to remember.
+		if err := InjectAirflowTheme(resp); err != nil {
+			return err
+		}
 		for _, hook := range p.ModifyResponse {
 			if err := hook(resp); err != nil {
 				return err
