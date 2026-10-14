@@ -338,8 +338,8 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 
 	bound, err := d.waitForPortFile()
 	if err != nil {
-		cmd.Process.Kill()    //nolint:errcheck // the start has already failed
-		cmd.Process.Release() //nolint:errcheck // the start has already failed
+		cmd.Process.Kill() //nolint:errcheck // the start has already failed
+		cmd.Wait()         //nolint:errcheck // reaps the child; its exit status is the kill
 		return "", fmt.Errorf("proxy daemon did not start: %w (see %s)", err, d.LogPath())
 	}
 
@@ -347,15 +347,30 @@ var startDaemon = func(d *Daemon, port string) (string, error) {
 		if requestStop(pid) {
 			forgetStop(pid)
 		}
-		cmd.Process.Release() //nolint:errcheck // the start has already failed
+		reapWhenItExits(cmd)
 		return "", fmt.Errorf("error writing proxy PID file: %w", err)
 	}
 
-	// Release the process so it doesn't become a zombie
-	cmd.Process.Release() //nolint:errcheck // nothing to do if it fails
+	reapWhenItExits(cmd)
 
 	d.logf("proxy daemon started (PID %d) on port %s", pid, bound)
 	return bound, nil
+}
+
+// reapWhenItExits waits for the daemon in the background, so whoever started
+// it collects its exit status whenever it ends.
+//
+// Not Release. A starter that outlives its daemon is its parent until it
+// exits, and on unix a child that exits unwaited stays a zombie, which
+// IsPIDAlive's signal 0 still reports alive: a Stop from that starter would
+// wait out the whole stopTimeout and then SIGKILL the corpse, and every start
+// and stop would leave one more <defunct> process behind. Astro Desktop starts
+// the daemon and runs for hours; the CLI never saw this because its process
+// exits right after the start and init collects the orphan. On Windows the
+// wait holds the process handle until the daemon exits and then closes it, as
+// Release would have closed it at once.
+func reapWhenItExits(cmd *exec.Cmd) {
+	go cmd.Wait() //nolint:errcheck // the exit status is nobody's business but the log's
 }
 
 // waitForPortFile polls for the port file the daemon writes after binding.
