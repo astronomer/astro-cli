@@ -40,13 +40,15 @@ func TestCosmosBoostFileWrittenByAstro(t *testing.T) {
 		{slim, `{"generated_by":{"application":"astro"}}`, false},
 		{slim, `{"_generated_by":{"application":"someone-else"}}`, false},
 		{".astro/config.yaml", `{"generated_by":{"application":"astro"}}`, false},
-		// The marker after other keys, nested ones skipped whole.
-		{sidecar, `{"schema":1,"version":{"algo":"x","hash":"h","n":[1,{"a":[]}]},"generated_by":{"application":"astro"}}`, true},
-		{slim, `{"nodes":{"a":{"generated_by":{"application":"astro"}}},"_generated_by":{"application":"astro"}}`, true},
+		// The whole document is read: the marker after other keys, the last
+		// of a repeated key, and nothing below the top level.
+		{sidecar, `{"schema":1,"version":{"algo":"x","hash":"h"},"generated_by":{"application":"astro"}}`, true},
+		{sidecar, `{"generated_by":{"application":"astro"},"generated_by":{"application":"someone-else"}}`, false},
 		{slim, `{"nodes":{"a":{"_generated_by":{"application":"astro"}}}}`, false},
+		// Malformed is not ours.
 		{sidecar, `["generated_by",{"application":"astro"}]`, false},
 		{sidecar, `{"generated_by":"astro"}`, false},
-		{sidecar, `{"schema":1,`, false},
+		{sidecar, `{"generated_by":{"application":"astro"}},`, false},
 	} {
 		assert.Equal(t, tc.want, CosmosBoostFileWrittenByAstro(tc.rel, []byte(tc.data)), "%s %s", tc.rel, tc.data)
 	}

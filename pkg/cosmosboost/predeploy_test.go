@@ -2,6 +2,7 @@ package cosmosboost
 
 import (
 	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"io"
@@ -76,15 +77,17 @@ func bundle(t *testing.T, dir string, enabled bool) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	target := filepath.Join(t.TempDir(), "bundle.tar")
-	if err := fileutil.Tar(dir, target, false, []string{".git/"}, overlay); err != nil {
+	target := filepath.Join(t.TempDir(), "bundle.tar.gz")
+	if err := fileutil.TarGz(dir, target, false, []string{".git/"}, overlay); err != nil {
 		return nil, err
 	}
 	file, err := os.Open(target)
 	require.NoError(t, err)
 	defer file.Close()
+	gz, err := gzip.NewReader(file)
+	require.NoError(t, err)
 	entries := map[string]string{}
-	tr := tar.NewReader(file)
+	tr := tar.NewReader(gz)
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -115,9 +118,8 @@ func TestBundleEnabledAddsSidecars(t *testing.T) {
 	require.ElementsMatch(t, []string{"dbt_project.yml", "models/a.sql", "target/manifest.json", sidecarRel, "target/" + sidecarRel, "target/" + slimRel}, keys(entries))
 
 	// The contents are exactly what the pre-deploy step produces for the tree.
-	units, err := precompute.Discover([]string{dir})
+	summary, err := precompute.Run([]string{dir}, "1.2.3", precompute.Options{SlimManifest: true})
 	require.NoError(t, err)
-	summary := units.Run("1.2.3", precompute.Options{SlimManifest: true})
 	for _, a := range summary.Artifacts() {
 		rel, err := filepath.Rel(dir, a.Path)
 		require.NoError(t, err)
@@ -215,12 +217,11 @@ func TestBundleLeavesOutStaleSidecars(t *testing.T) {
 }
 
 // TestBundleForeignSidecar: a file from an unrecognized producer is the
-// user's. Disabled, it ships untouched. Enabled, where the step would put a
-// sidecar the plugin reads - a discovered project's or manifest's .astro/ -
-// the deploy stops before anything is hashed and asks for its removal; the
-// replacement would hide it, and the plugin would have read it.
+// user's. Disabled, it ships untouched. Enabled, where the step puts a fresh
+// sidecar, the deploy stops and asks for its removal, before saying the step
+// is complete: the plugin reads that path, and the replacement would hide it.
 func TestBundleForeignSidecar(t *testing.T) {
-	for _, rel := range []string{sidecarRel, slimRel, "target/" + sidecarRel} {
+	for _, rel := range []string{sidecarRel, "target/" + sidecarRel, "target/" + slimRel} {
 		dir := t.TempDir()
 		writeDbtProject(t, dir)
 		writeFiles(t, dir, map[string]string{"target/manifest.json": dbtManifest, rel: foreignFile})
@@ -235,35 +236,45 @@ func TestBundleForeignSidecar(t *testing.T) {
 		require.ErrorContains(t, err, "unrecognized producer")
 		require.ErrorContains(t, err, foreign)
 		require.ErrorContains(t, err, "Remove them and retry")
-		require.NotContains(t, out, "pre-deploy step complete", "the refusal comes before the step")
+		require.NotContains(t, out, "pre-deploy step complete", "the refusal comes before the step says it is done")
 		require.FileExists(t, foreign, "a file another tool wrote must never be deleted")
 	}
 }
 
-// TestBundleShipsForeignSidecarsTheStepDoesNotWrite: one where no sidecar
-// would go - an installed package's own, under dbt_packages/ - is the
-// project's file, and an enabled deploy ships it.
-func TestBundleShipsForeignSidecarsTheStepDoesNotWrite(t *testing.T) {
+// TestBundleShipsForeignSidecarsTheStepDoesNotReplace: where the step writes
+// nothing - an installed package's own sidecar under dbt_packages/, logs/,
+// beside a manifest.json that is not dbt's, a slim manifest with the slim
+// optimization off - another producer's file is the project's, and an enabled
+// deploy ships it.
+func TestBundleShipsForeignSidecarsTheStepDoesNotReplace(t *testing.T) {
+	t.Setenv(slimManifestEnvVar, "false")
 	dir := t.TempDir()
 	writeDbtProject(t, dir)
+	shipped := map[string]string{
+		"dbt_packages/utils/" + sidecarRel: foreignFile,
+		"logs/" + sidecarRel:               foreignFile,
+		"webapp/" + sidecarRel:             foreignFile,
+		slimRel:                            foreignFile,
+	}
+	writeFiles(t, dir, shipped)
 	writeFiles(t, dir, map[string]string{
 		"dbt_packages/utils/dbt_project.yml": "name: utils\n",
-		"dbt_packages/utils/" + sidecarRel:   foreignFile,
-		"logs/" + sidecarRel:                 foreignFile,
+		"webapp/manifest.json":               `{"name":"My App"}`,
 	})
 
 	entries, err := bundle(t, dir, true)
 	require.NoError(t, err)
-	require.Equal(t, foreignFile, entries["dbt_packages/utils/"+sidecarRel])
-	require.Equal(t, foreignFile, entries["logs/"+sidecarRel])
+	for rel, content := range shipped {
+		require.Equal(t, content, entries[rel], rel)
+	}
 	require.Contains(t, entries, sidecarRel, "the project itself is stamped")
 }
 
-// TestBundleLeavesOutNonRegularEntriesAtSidecarPaths: a link or a directory
-// where a sidecar goes never ships, with a warning naming it. Enabled, a link
-// is replaced by the fresh sidecar; a directory cannot be, so that unit fails
-// (a warning) and nothing is shipped there.
-func TestBundleLeavesOutNonRegularEntriesAtSidecarPaths(t *testing.T) {
+// TestBundleLinksAndDirectoriesAtSidecarPaths: disabled, a link at a
+// sidecar's path is the user's and ships as it is. Enabled, a link or a
+// directory where the step puts a sidecar is left out and the fresh sidecar
+// takes its place.
+func TestBundleLinksAndDirectoriesAtSidecarPaths(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		dir := t.TempDir()
 		writeDbtProject(t, filepath.Join(dir, "linked"))
@@ -278,20 +289,18 @@ func TestBundleLeavesOutNonRegularEntriesAtSidecarPaths(t *testing.T) {
 			t.Skipf("cannot create a symlink here: %v", err)
 		}
 
-		var entries map[string]string
-		var err error
-		out := captureStdout(t, func() { entries, err = bundle(t, dir, enabled) })
+		entries, err := bundle(t, dir, enabled)
 		require.NoError(t, err, "enabled=%v", enabled)
-		require.Contains(t, out, "leaving "+link+" out of the bundle", "enabled=%v", enabled)
-		require.Contains(t, out, "leaving "+filepath.Join(dir, "blocked", ".astro", "dbt_metadata.json")+" out of the bundle", "enabled=%v", enabled)
-		require.NotContains(t, entries, "blocked/"+sidecarRel+"/x", "enabled=%v", enabled)
-		require.NotContains(t, entries, "blocked/"+sidecarRel, "enabled=%v: a directory cannot be replaced", enabled)
 		if enabled {
-			require.Contains(t, out, "pre-deploy step failed")
-			require.Contains(t, entries, "linked/"+sidecarRel)
-			require.NotContains(t, entries["linked/"+sidecarRel], "stale", "the fresh sidecar replaces the link")
+			require.NotContains(t, entries, "blocked/"+sidecarRel+"/x")
+			for _, rel := range []string{"linked/" + sidecarRel, "blocked/" + sidecarRel} {
+				require.Contains(t, entries, rel)
+				require.NotContains(t, entries[rel], "stale", "the fresh sidecar replaces it")
+			}
 		} else {
-			require.NotContains(t, entries, "linked/"+sidecarRel)
+			require.Contains(t, entries, "linked/"+sidecarRel, "a link ships as it is")
+			require.Empty(t, entries["linked/"+sidecarRel], "as a link, not as what it points at")
+			require.Contains(t, entries, "blocked/"+sidecarRel+"/x")
 		}
 	}
 }
@@ -351,14 +360,12 @@ func TestBundleStepFailureIsAWarning(t *testing.T) {
 	require.NoError(t, os.Chmod(model, 0o000))
 	t.Cleanup(func() { _ = os.Chmod(model, 0o644) })
 
-	overlay, err := BundleOverlay(dir, true)
+	var overlay fileutil.TarOverlay
+	var err error
+	out := captureStdout(t, func() { overlay, err = BundleOverlay(dir, true) })
 	require.NoError(t, err)
+	require.Contains(t, out, "pre-deploy step failed for 1 unit(s)")
 	require.Equal(t, []string{"fine/" + sidecarRel}, keys(overlay.Extra))
-
-	units, err := precompute.Discover([]string{dir})
-	require.NoError(t, err)
-	_, err = preDeploy(units)
-	require.ErrorContains(t, err, "failed for 1 unit(s)")
 }
 
 func keys[V any](m map[string]V) []string {

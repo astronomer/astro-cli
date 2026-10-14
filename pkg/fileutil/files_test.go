@@ -241,7 +241,7 @@ func (s *Suite) TestTar() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			// check that the tar operation was successful
-			assert.True(s.T(), tt.errAssertion(s.T(), Tar(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths, TarOverlay{})))
+			assert.True(s.T(), tt.errAssertion(s.T(), TarGz(tt.args.source, tt.args.target, tt.args.prependBaseDir, tt.args.excludePaths, TarOverlay{})))
 
 			// check that all the files are in the tar at the correct paths
 			file, err := os.Open(tt.args.target)
@@ -249,7 +249,9 @@ func (s *Suite) TestTar() {
 				s.Fail("Error opening file %s", tt.args.target)
 			}
 			defer file.Close()
-			tarReader := tar.NewReader(file)
+			gz, err := gzip.NewReader(file)
+			require.NoError(s.T(), err)
+			tarReader := tar.NewReader(gz)
 			numIteratedFiles := 0
 			for {
 				header, err := tarReader.Next()
@@ -293,7 +295,7 @@ func (s *Suite) TestTarDir() {
 
 	missing := filepath.Join(dir, "missing")
 	s.ErrorIs(TarDir(missing, filepath.Join(dir, "missing.tar"), "dags"), os.ErrNotExist)
-	s.NoError(Tar(missing, filepath.Join(dir, "missing-tar.tar"), true, nil, TarOverlay{}), "Tar is unchanged")
+	s.NoError(TarGz(missing, filepath.Join(dir, "missing-tar.tar"), true, nil, TarOverlay{}), "Tar is unchanged")
 }
 
 // TarOverlay leaves Skip's files out, adds Extra's under the base directory
@@ -324,12 +326,14 @@ func (s *Suite) TestTarOverlay() {
 		prefix  string
 	}{{false, ""}, {true, "proj/"}} {
 		target := filepath.Join(dir, fmt.Sprintf("overlay-%v.tar", tc.prepend))
-		s.Require().NoError(Tar(source, target, tc.prepend, nil, overlay))
+		s.Require().NoError(TarGz(source, target, tc.prepend, nil, overlay))
 
 		file, err := os.Open(target)
 		s.Require().NoError(err)
 		got := map[string]string{}
-		tr := tar.NewReader(file)
+		gz, err := gzip.NewReader(file)
+		s.Require().NoError(err)
+		tr := tar.NewReader(gz)
 		for {
 			header, err := tr.Next()
 			if err == io.EOF {
@@ -359,13 +363,13 @@ func (s *Suite) TestTarOverlay() {
 	s.Run("source is the working directory", func() {
 		s.T().Chdir(source)
 		target := filepath.Join(dir, "dot.tar")
-		s.Require().NoError(Tar(".", target, false, nil, overlay))
+		s.Require().NoError(TarGz(".", target, false, nil, overlay))
 		s.Equal([]string{".astro/replaced.json", "a.sql", "sub/.astro/added.json"}, tarNames(s.T(), target))
 	})
 
 	s.Run("a Skip error fails the tarball", func() {
 		boom := errors.New("boom")
-		err := Tar(source, filepath.Join(dir, "boom.tar"), false, nil, TarOverlay{Skip: func(string, string, os.FileInfo) (bool, error) { return false, boom }})
+		err := TarGz(source, filepath.Join(dir, "boom.tar"), false, nil, TarOverlay{Skip: func(string, string, os.FileInfo) (bool, error) { return false, boom }})
 		s.ErrorIs(err, boom)
 	})
 
@@ -375,12 +379,38 @@ func (s *Suite) TestTarOverlay() {
 	s.NoDirExists(filepath.Join(source, "sub"))
 }
 
+// failingWrite is a tarball file that takes the first write - a gzip
+// header - and fails every one after it, as a full disk does.
+type failingWrite struct{ writes int }
+
+func (f *failingWrite) Write(p []byte) (int, error) {
+	f.writes++
+	if f.writes > 1 {
+		return 0, errors.New("no space left on device")
+	}
+	return len(p), nil
+}
+
+func (*failingWrite) Close() error { return nil }
+
+// A compressed stream that could not be flushed fails TarGz: gzip holds the
+// data until it closes, so the write that fails is the close's.
+func (s *Suite) TestTarGzFailsWhenTheCompressedStreamCannotBeWritten() {
+	prev := createTarFile
+	defer func() { createTarFile = prev }()
+	createTarFile = func(string) (io.WriteCloser, error) { return &failingWrite{}, nil }
+	source := s.T().TempDir()
+	s.Require().NoError(os.WriteFile(filepath.Join(source, "a.py"), []byte("a"), 0o600))
+
+	s.EqualError(TarGz(source, "bundle.tar.gz", false, nil, TarOverlay{}), "no space left on device")
+}
+
 // failingClose is a tarball file whose writes land and whose Close fails.
 type failingClose struct{ bytes.Buffer }
 
 func (*failingClose) Close() error { return errors.New("close failed") }
 
-// A tarball that did not close is not one: TarDir and Tar both fail on it.
+// A tarball that did not close is not one: TarDir and TarGz both fail on it.
 func (s *Suite) TestTarFailsOnAFailedClose() {
 	prev := createTarFile
 	defer func() { createTarFile = prev }()
@@ -394,7 +424,7 @@ func (s *Suite) TestTarFailsOnAFailedClose() {
 
 	s.EqualError(TarDir(source, "dags.tar", "dags"), "close failed")
 	s.Positive(written.Len(), "the footer was flushed before the file was closed")
-	s.EqualError(Tar(source, "dags.tar", true, nil, TarOverlay{}), "close failed")
+	s.EqualError(TarGz(source, "dags.tar", true, nil, TarOverlay{}), "close failed")
 }
 
 func (s *Suite) TestReadFileToString() {
@@ -994,7 +1024,9 @@ func tarNames(t *testing.T, target string) []string {
 	require.NoError(t, err)
 	defer file.Close()
 	var names []string
-	tr := tar.NewReader(file)
+	gz, err := gzip.NewReader(file)
+	require.NoError(t, err)
+	tr := tar.NewReader(gz)
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {

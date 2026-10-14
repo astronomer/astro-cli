@@ -92,20 +92,14 @@ func sidecarArtifact(dir, algo, hash, version string, filtered *FilteredManifest
 	return Artifact{Path: filepath.Join(dir, sidecarDir, sidecarName), Data: data}
 }
 
-// checkArtifactPaths fails when the tree holds something an artifact could
-// not cleanly replace in a bundle: a .astro under dir that is not a directory
-// (a file, or a link), or a directory where an artifact goes, whose contents
-// would be unpacked beside it. Anything else there - an old sidecar, a link -
-// the bundle leaves out and carries the artifact in its place.
-func checkArtifactPaths(dir string, artifacts []Artifact) error {
+// checkSidecarDir fails when something other than a directory holds dir's
+// .astro (a file, or a link): a bundle cannot carry the artifacts under it.
+// Whatever is at an artifact's own path - an old sidecar, a link, a
+// directory - the bundle leaves out and carries the artifact in its place.
+func checkSidecarDir(dir string) error {
 	astroDir := filepath.Join(dir, sidecarDir)
 	if info, err := os.Lstat(astroDir); err == nil && !info.IsDir() {
 		return fmt.Errorf("%s is not a directory, so its Cosmos Boost files cannot sit under it", astroDir)
-	}
-	for _, a := range artifacts {
-		if info, err := os.Lstat(a.Path); err == nil && info.IsDir() {
-			return fmt.Errorf("%s is a directory, so the Cosmos Boost file cannot take its place", a.Path)
-		}
 	}
 	return nil
 }

@@ -293,8 +293,7 @@ func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRunt
 			fmt.Println("\nPlease delete the archived file manually from path: " + tarDir)
 		}
 	}()
-	tarFilePath := filepath.Join(tarDir, "bundle.tar")
-	tarGzFilePath := tarFilePath + ".gz"
+	tarGzFilePath := filepath.Join(tarDir, "bundle.tar.gz")
 
 	// Cosmos Boost: its sidecars go into the tarball only, never into the
 	// tree. Ones an earlier CLI wrote into the tree are always left out (a
@@ -305,14 +304,8 @@ func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRunt
 		return "", err
 	}
 
-	// Generate the bundle tar
-	err = fileutil.Tar(bundlePath, tarFilePath, prependBaseDir, []string{".git/"}, overlay)
-	if err != nil {
-		return "", err
-	}
-
-	// Gzip the tar
-	err = fileutil.GzipFile(tarFilePath, tarGzFilePath)
+	// Generate the gzipped bundle tarball
+	err = fileutil.TarGz(bundlePath, tarGzFilePath, prependBaseDir, []string{".git/"}, overlay)
 	if err != nil {
 		return "", err
 	}

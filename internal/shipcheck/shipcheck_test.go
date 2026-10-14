@@ -361,7 +361,7 @@ func TestSurveyWarnsAboutStaleCosmosBoostFilesInADeclaredContext(t *testing.T) {
 	_, err := Survey(dir, "Dockerfile", false, func(w string) { warned = append(warned, w) })
 	require.NoError(t, err)
 	all := fmt.Sprint(warned)
-	assert.Contains(t, all, "old Cosmos Boost sidecars, written into the project by an earlier Astro CLI or linked there: dbt/shop/.astro/dbt_metadata.json, dbt/shop/.astro/manifest.slim.json.")
+	assert.Contains(t, all, "Cosmos Boost files an earlier Astro CLI wrote into the project: dbt/shop/.astro/dbt_metadata.json, dbt/shop/.astro/manifest.slim.json.")
 	assert.Contains(t, all, "delete them")
 	assert.NotContains(t, all, "dbt/other")
 

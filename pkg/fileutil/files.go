@@ -116,8 +116,9 @@ type TarOverlay struct {
 	// under it. An error fails the tarball.
 	Skip func(rel, file string, info os.FileInfo) (bool, error)
 	// Extra adds a regular file with these bytes at each path, in place of a
-	// file or link the walk finds there. A directory there is not replaced:
-	// callers must not add an extra where one exists.
+	// file or link the walk finds there. A directory there is still walked
+	// unless Skip leaves it out, and its entries would collide with the file:
+	// a caller adding an extra where one may exist skips it too.
 	Extra map[string][]byte
 }
 
@@ -125,31 +126,33 @@ type TarOverlay struct {
 // whatever unpacks it (the Airflow runtime user) must be able to read it.
 const extraFileMode = 0o644
 
-// Tar writes the directory source to the tarball target, its paths
-// relative to source, or to source's parent with prependBaseDir, changed by
-// overlay. A source that is not there makes an empty tarball, not an error.
-func Tar(source, target string, prependBaseDir bool, excludePathPrefixes []string, overlay TarOverlay) error {
+// TarGz writes the directory source to the gzip-compressed tarball target,
+// in one pass, its paths relative to source, or to source's parent with
+// prependBaseDir, changed by overlay. A source that is not there makes an
+// empty tarball, not an error.
+func TarGz(source, target string, prependBaseDir bool, excludePathPrefixes []string, overlay TarOverlay) error {
 	baseDir := ""
 	if prependBaseDir {
 		baseDir = filepath.Base(source)
 	}
-	return writeTar(source, target, baseDir, excludePathPrefixes, overlay, false)
+	return writeTar(source, target, baseDir, excludePathPrefixes, overlay, true, false)
 }
 
 // TarDir writes the directory source to the tarball target, each path in it
 // under baseDir: "dags" makes dags/my_dag.py of source/my_dag.py, whatever
-// source is called. Unlike Tar it fails on a source that is not there, or
+// source is called. Unlike TarGz it fails on a source that is not there, or
 // that goes while it is read, rather than writing a tarball short of it.
 func TarDir(source, target, baseDir string) error {
-	return writeTar(source, target, baseDir, nil, TarOverlay{}, true)
+	return writeTar(source, target, baseDir, nil, TarOverlay{}, false, true)
 }
 
 // createTarFile creates the tarball writeTar writes; a test fails its Close.
 var createTarFile = func(name string) (io.WriteCloser, error) { return os.Create(name) }
 
-// writeTar writes the tarball. A tarball whose footer or file did not close
-// is not one, so failing to close either fails it.
-func writeTar(source, target, baseDir string, excludePathPrefixes []string, overlay TarOverlay, mustExist bool) (err error) {
+// writeTar writes the tarball, gzip-compressed with gzipped. A tarball whose
+// footer, compressed stream or file did not close is not one - a full disk
+// shows up there - so failing to close any of them fails it.
+func writeTar(source, target, baseDir string, excludePathPrefixes []string, overlay TarOverlay, gzipped, mustExist bool) (err error) {
 	tarfile, err := createTarFile(target)
 	if err != nil {
 		return err
@@ -160,8 +163,21 @@ func writeTar(source, target, baseDir string, excludePathPrefixes []string, over
 		}
 	}()
 
-	tarball := tar.NewWriter(tarfile)
-	// Closing writes the footer; deferred after the file's, it runs first.
+	var out io.Writer = tarfile
+	if gzipped {
+		gz := gzip.NewWriter(tarfile)
+		// Closing flushes what is still compressed in memory; deferred after
+		// the file's, it runs before it.
+		defer func() {
+			if cerr := gz.Close(); err == nil {
+				err = cerr
+			}
+		}()
+		out = gz
+	}
+
+	tarball := tar.NewWriter(out)
+	// Closing writes the footer; deferred last, it runs first.
 	defer func() {
 		if cerr := tarball.Close(); err == nil {
 			err = cerr

@@ -246,7 +246,7 @@ func (w walker) walkDir(dir, rel string, onPath map[string]bool) error {
 		if err != nil {
 			return err
 		}
-		skip, descend := w.decide(childRel, e.Type(), info)
+		skip, descend := w.filter.skip(childRel, info.IsDir())
 		if w.vcs != nil && vcsNames[e.Name()] {
 			if !skip {
 				w.vcs(childRel)
@@ -301,37 +301,6 @@ func (w walker) carry(rel, src string, mode fs.FileMode) error {
 	return nil
 }
 
-// decide is the filter's word on the entry at rel (projectFilter.skip), and
-// oddSidecar's on one at a Cosmos Boost sidecar's path. entry is the
-// directory entry's own type, info what the walk's stat says.
-func (w walker) decide(rel string, entry fs.FileMode, info fs.FileInfo) (skip, descend bool) {
-	skip, descend = w.filter.skip(rel, info.IsDir())
-	if !skip && w.oddSidecar(rel, entry, info.Mode()) {
-		return true, false
-	}
-	return skip, descend
-}
-
-// oddSidecar handles a link, a directory or anything else that is not a
-// plain regular file at a Cosmos Boost sidecar's path (airflowrt.IsCosmosBoostFile):
-// the plugin would read whatever it leads to as a sidecar. A generated build
-// leaves it out, which oddSidecar reports by returning true; a declared one
-// carries it and reports it, as staleCosmosBoost does an old sidecar. entry
-// is the directory entry's own type, mode what the walk's stat says.
-func (w walker) oddSidecar(rel string, entry, mode fs.FileMode) bool {
-	if (!w.filter.generated && w.cosmosBoost == nil) || !airflowrt.IsCosmosBoostFile(rel) {
-		return false
-	}
-	if entry&fs.ModeSymlink == 0 && mode.IsRegular() {
-		return false
-	}
-	if w.filter.generated {
-		return true
-	}
-	w.cosmosBoost(rel)
-	return false
-}
-
 // staleCosmosBoost reports whether the regular file at src is a Cosmos Boost
 // sidecar an earlier Astro CLI wrote into the project, which the plugin would
 // read as current in the image (airflowrt.CosmosBoostFileWrittenByAstro). The
@@ -383,11 +352,10 @@ type ProjectSurvey struct {
 	// Dockerfile's context carries, which its ignore file leaves in: each
 	// one's path, not what is in it. A generated build carries none.
 	VCS []string
-	// CosmosBoost are the entries at a Cosmos Boost sidecar's path that a
-	// declared Dockerfile's context carries and the plugin would read as
-	// current in the image: the sidecars an earlier Astro CLI wrote into the
-	// project, and any link or directory there. A generated build leaves them
-	// out and lists none.
+	// CosmosBoost are the Cosmos Boost files an earlier Astro CLI wrote into
+	// the project that a declared Dockerfile's context carries, which the
+	// plugin would read as current in the image. A generated build leaves
+	// them out and lists none.
 	CosmosBoost []string
 	// IgnoreFile is the ignore file a declared Dockerfile's build reads
 	// (declaredIgnoreFile), "" for none or for a generated build.

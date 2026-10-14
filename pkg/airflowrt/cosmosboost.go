@@ -1,7 +1,6 @@
 package airflowrt
 
 import (
-	"bytes"
 	"encoding/json"
 	"path"
 )
@@ -42,61 +41,25 @@ func IsCosmosBoostFile(rel string) bool {
 // file at rel (one IsCosmosBoostFile accepts), carries an Astro CLI's
 // producer marker: generated_by.application in a dbt_metadata.json,
 // _generated_by.application in a manifest.slim.json. Each file is judged by
-// its own marker, never by its neighbor's, and one that does not parse or
-// names another producer is not the CLI's: it is the user's.
-//
-// It reads only as far as the marker: a slim manifest can be large, and the
-// CLI writes the marker first.
+// its own marker, never by its neighbor's, and one that does not parse as a
+// JSON object or names another producer is not the CLI's: it is the user's.
 func CosmosBoostFileWrittenByAstro(rel string, data []byte) bool {
-	var key string
+	var marker struct {
+		GeneratedBy struct {
+			Application string `json:"application"`
+		} `json:"generated_by"`
+		SlimGeneratedBy struct {
+			Application string `json:"application"`
+		} `json:"_generated_by"`
+	}
+	if json.Unmarshal(data, &marker) != nil {
+		return false
+	}
 	switch path.Base(rel) {
 	case CosmosBoostSidecar:
-		key = "generated_by"
+		return marker.GeneratedBy.Application == CosmosBoostProducer
 	case CosmosBoostSlimManifest:
-		key = "_generated_by"
-	default:
-		return false
-	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
-		return false
-	}
-	for dec.More() {
-		name, err := dec.Token()
-		if err != nil {
-			return false
-		}
-		if name != key {
-			if skipJSONValue(dec) != nil {
-				return false
-			}
-			continue
-		}
-		var marker struct {
-			Application string `json:"application"`
-		}
-		return dec.Decode(&marker) == nil && marker.Application == CosmosBoostProducer
+		return marker.SlimGeneratedBy.Application == CosmosBoostProducer
 	}
 	return false
-}
-
-// skipJSONValue reads past the next value in dec, token by token, without
-// holding it.
-func skipJSONValue(dec *json.Decoder) error {
-	depth := 0
-	for {
-		tok, err := dec.Token()
-		if err != nil {
-			return err
-		}
-		switch tok {
-		case json.Delim('{'), json.Delim('['):
-			depth++
-		case json.Delim('}'), json.Delim(']'):
-			depth--
-		}
-		if depth == 0 {
-			return nil
-		}
-	}
 }

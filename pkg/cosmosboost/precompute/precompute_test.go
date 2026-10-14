@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -737,10 +736,10 @@ func TestRunFailsUnitWhenAstroIsAFile(t *testing.T) {
 	}
 }
 
-// TestRunFailsUnitWhenArtifactPathIsNotAFile: a directory where a sidecar
-// goes would collide with it in the bundle, so that unit fails and produces
-// nothing, while a regular file there (an old sidecar) is fine.
-func TestRunFailsUnitWhenArtifactPathIsNotAFile(t *testing.T) {
+// TestRunReplacesWhateverIsAtAnArtifactPath: an old sidecar, or a directory,
+// where a sidecar goes is left out of the bundle and the fresh sidecar takes
+// its place, so the unit succeeds.
+func TestRunReplacesWhateverIsAtAnArtifactPath(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
 		"blocked/dbt_project.yml":                     "name: blocked\n",
@@ -753,10 +752,10 @@ func TestRunFailsUnitWhenArtifactPathIsNotAFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.CountFailed() != 1 {
-		t.Fatalf("want one failed unit, got %+v", summary.Results)
+	if summary.CountFailed() != 0 {
+		t.Fatalf("want no failures, got %+v", summary.Results)
 	}
-	mustNotProduce(t, summary, filepath.Join(root, "blocked", sidecarDir, sidecarName))
+	mustProduce(t, summary, filepath.Join(root, "blocked", sidecarDir, sidecarName))
 	mustProduce(t, summary, filepath.Join(root, "fine", sidecarDir, sidecarName))
 }
 
@@ -781,29 +780,6 @@ func TestRunReplacesALinkAtAnArtifactPath(t *testing.T) {
 		t.Fatalf("want no failures, got %+v", summary.Results)
 	}
 	mustProduce(t, summary, filepath.Join(root, "proj", sidecarDir, sidecarName))
-}
-
-// TestUnitsSidecarDirs: one .astro per unit, beside a project or a manifest,
-// known before any unit is read.
-func TestUnitsSidecarDirs(t *testing.T) {
-	root := t.TempDir()
-	writeFiles(t, root, map[string]string{
-		"proj/dbt_project.yml":      "name: p\n",
-		"proj/target/manifest.json": "not even json",
-		"shipped/manifest.json":     "{}",
-	})
-	units, err := Discover([]string{root})
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{
-		filepath.Join(root, "proj", sidecarDir),
-		filepath.Join(root, "proj", "target", sidecarDir),
-		filepath.Join(root, "shipped", sidecarDir),
-	}
-	if got := units.SidecarDirs(); !slices.Equal(got, want) {
-		t.Fatalf("SidecarDirs = %v, want %v", got, want)
-	}
 }
 
 // treeSnapshot maps every file under root to its contents.
