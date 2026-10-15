@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // A 1.x Astro project states its shape in the files v2 replaces:
@@ -83,6 +84,12 @@ type project1x struct {
 	// is read here, and only half of whether the file can go: the other half is
 	// whether its tag is the pin that won.
 	dockerfilePinOnly bool
+	// dockerfileForeign reports a Dockerfile whose final stage builds on an
+	// image that is not Astro Runtime (dockerfileBase). Such a file is never
+	// declared as the build: Docker mode refuses to start it, and in a repo
+	// that is not an Airflow project at all it is somebody else's image, as the
+	// astro-cli repo's own docker:dind one is.
+	dockerfileForeign bool
 	// dockerfileBody is kept so a retirement can ask what the file references.
 	// A Dockerfile that survives because it has a RUN may name requirements.txt
 	// inside it, and deleting that file while keeping the build that reads it is
@@ -209,59 +216,113 @@ func read1xProject(dir string) (*project1x, error) {
 		from1x.present = append(from1x.present, SettingsRelPath)
 	}
 
-	if data, err := readIfPresent(filepath.Join(dir, "Dockerfile")); err != nil {
+	if data, err := readIfPresent(filepath.Join(dir, fileDockerfile)); err != nil {
 		return nil, err
 	} else if data != nil {
-		version, stated, notes := airflowFromDockerfile(data)
-		from1x.airflow = version
-		build := buildStepsNote(data)
-		from1x.notes = append(from1x.notes, notes...)
-		from1x.notes = append(from1x.notes, build...)
-		from1x.notes = append(from1x.notes, pipInstallNote(data)...)
-		from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, "Dockerfile"))...)
-		if stated {
-			from1x.statedVersion = true
-		}
-		from1x.present = append(from1x.present, "Dockerfile")
-		from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
-		from1x.dockerfileBody = data
-		if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); base.RuntimeVersion() != "" {
-			_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
-		}
-		// Two sources for one list, so say it rather than let someone find out.
-		//
-		// A declared Dockerfile is the build, and imagebuild ignores the
-		// manifest's dependencies and packages in that mode, so requirements.txt
-		// and packages.txt are KEPT (planRetirements spares them) because the
-		// runtime base's ONBUILD reads them from the context. The manifest gets
-		// the lists too, for the day the Dockerfile goes away. Both being live
-		// at once is deliberate and is exactly the kind of thing that reads as a
-		// conversion bug when nothing mentions it.
-		if !from1x.dockerfilePinOnly {
-			for _, kept := range []string{"requirements.txt", "packages.txt"} {
-				if slices.Contains(from1x.present, kept) {
-					from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
-						"during the build. Its contents are in pyproject.toml as well, which is what a project "+
-						"without a Dockerfile installs from")
-				}
-			}
-		}
-		// A Dockerfile that is not pin-only and drew no note is kept and
-		// unmentioned, which it must not be: the point of keeping it
-		// is that the project still has a build the manifest does not describe,
-		// and the user has to be told. buildStepsNote covers the RUN/COPY/ENV
-		// shapes; this covers the rest — a second stage, an instruction no
-		// regex here knows — where the file survives precisely because nothing
-		// recognized it.
-		if !from1x.dockerfilePinOnly && len(notes) == 0 && len(build) == 0 {
-			from1x.notes = append(from1x.notes,
-				"Dockerfile: it does more than name a base image, so it was kept and declared as this "+
-					"project's build. What it does is not described in pyproject.toml, which is the point of "+
-					"declaring it")
-		}
+		from1x.readDockerfile(dir, data)
 	}
 
 	return from1x, nil
+}
+
+// readDockerfile reads the project's Dockerfile, data, into from1x: the
+// Airflow version its tag names, whether it is the project's build, and the
+// notes either answer needs.
+func (from1x *project1x) readDockerfile(dir string, data []byte) {
+	version, stated, notes := airflowFromDockerfile(data)
+	from1x.airflow = version
+	if stated {
+		from1x.statedVersion = true
+	}
+	from1x.present = append(from1x.present, fileDockerfile)
+	from1x.dockerfileBody = data
+
+	kind, ref := dockerfileBase(filepath.Join(dir, fileDockerfile), data)
+	// airflowFromDockerfile reads the text after FROM as written, so a base
+	// built from a build argument drew "no stage builds on an Astro Runtime
+	// image (${BASE})" whatever the argument names. Whether it is one is
+	// dockerfileBase's answer, and the notes below give it.
+	if !stated && strings.Contains(ref, "$") {
+		notes = nil
+	}
+	if kind == baseForeign {
+		// Left as it is and not declared, so the notes that describe it as the
+		// build (its RUN steps "still run", requirements.txt "kept because the
+		// base reads it", its build secrets) would all be false. One note
+		// replaces them, keeping only what explains a version the file did
+		// state. The note names the file, so planRetirements keeps it.
+		from1x.dockerfileForeign = true
+		if !stated {
+			notes = nil
+		}
+		from1x.notes = append(from1x.notes, notes...)
+		from1x.notes = append(from1x.notes, foreignDockerfileNote(ref))
+		return
+	}
+
+	from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
+	switch {
+	case kind == baseUnknown && ref != "" && !from1x.dockerfilePinOnly:
+		// A base this run could not classify is declared, as every Dockerfile
+		// was before the check existed, because the alternative is ignoring a
+		// build that may well be right. Said out loud when the reason is a
+		// build argument, which a person can settle by reading one line.
+		notes = append(notes, "Dockerfile: its final FROM is "+ref+
+			", which uses a build argument in a form this run does not expand, so whether it builds on an "+
+			"Astro Runtime image is unknown. It was declared as this project's build; if its base is not "+
+			"Astro Runtime, remove dockerfile from [tool.astro] in "+manifest.Marker)
+	case kind == baseRuntime && !stated && strings.Contains(ref, "$"):
+		notes = append(notes, "Dockerfile: its final FROM is "+ref+
+			", an Astro Runtime image named by a build argument, so the Airflow version was not read from its tag")
+	}
+	build := buildStepsNote(data)
+	from1x.notes = append(from1x.notes, notes...)
+	from1x.notes = append(from1x.notes, build...)
+	from1x.notes = append(from1x.notes, pipInstallNote(data)...)
+	from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
+	if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); base.RuntimeVersion() != "" {
+		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
+	}
+	// Two sources for one list, so say it rather than let someone find out.
+	//
+	// A declared Dockerfile is the build, and imagebuild ignores the
+	// manifest's dependencies and packages in that mode, so requirements.txt
+	// and packages.txt are KEPT (planRetirements spares them) because the
+	// runtime base's ONBUILD reads them from the context. The manifest gets
+	// the lists too, for the day the Dockerfile goes away. Both being live
+	// at once is deliberate and is exactly the kind of thing that reads as a
+	// conversion bug when nothing mentions it.
+	if !from1x.dockerfilePinOnly {
+		for _, kept := range []string{"requirements.txt", "packages.txt"} {
+			if slices.Contains(from1x.present, kept) {
+				from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
+					"during the build. Its contents are in pyproject.toml as well, which is what a project "+
+					"without a Dockerfile installs from")
+			}
+		}
+	}
+	// A Dockerfile that is not pin-only and drew no note is kept and
+	// unmentioned, which it must not be: the point of keeping it
+	// is that the project still has a build the manifest does not describe,
+	// and the user has to be told. buildStepsNote covers the RUN/COPY/ENV
+	// shapes; this covers the rest — a second stage, an instruction no
+	// regex here knows — where the file survives precisely because nothing
+	// recognized it.
+	if !from1x.dockerfilePinOnly && len(notes) == 0 && len(build) == 0 {
+		from1x.notes = append(from1x.notes,
+			"Dockerfile: it does more than name a base image, so it was kept and declared as this "+
+				"project's build. What it does is not described in pyproject.toml, which is the point of "+
+				"declaring it")
+	}
+}
+
+// foreignDockerfileNote tells the user a Dockerfile was found and not made the
+// project's build, and how to make one that would be. ref is its base.
+func foreignDockerfileNote(ref string) string {
+	return "Dockerfile: left as it is and not declared as this project's build, because its final stage " +
+		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode builds only on one. " +
+		"To build this project from a Dockerfile, base its final stage on astrocrpublic.azurecr.io/runtime " +
+		"and add dockerfile = 'Dockerfile' under [tool.astro] in " + manifest.Marker
 }
 
 // dockerfileIsPinOnly reports a Dockerfile that says nothing except which
