@@ -132,7 +132,7 @@ To install a specific version of the CLI, specify the version number as a flag a
 curl -sSL install.astronomer.io | sudo bash -s -- v1.1.0
 ```
 
-The leading `v` is optional. A partial version installs the newest release under it: `v1.46` the newest 1.46.x, `v1` the newest 1.x. Either one takes the newest stable release, or the newest pre-release while there is no stable one.
+The leading `v` is optional. A partial version installs the highest release under it: `v1.46` the highest 1.46.x, `v1` the highest 1.x. Either one takes the highest stable release, or the highest pre-release while there is no stable one.
 
 Every release also publishes an `install.sh` asset. That copy installs the release it ships with and no other, so the URL itself names the version. Use it in a Dockerfile or a CI job, where a pinned URL is easier to audit than a flag:
 

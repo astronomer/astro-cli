@@ -1,79 +1,92 @@
 #!/usr/bin/env bash
 #
 # Tests the version resolution in godownloader.sh, the script behind
-# install.astronomer.io. Each case runs the whole installer under sh and bash
-# with a stubbed curl that answers the GitHub API from fixtures below and
+# install.astronomer.io. Each case runs the whole installer under sh, bash and
+# dash with a stubbed curl that answers the GitHub API from fixtures below and
 # fails every download, so nothing is installed: the case reads the tag the
-# installer settled on from its "found version" log line.
+# installer settled on from its "found version" log line, and the stub's
+# request log says how many API calls it took.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/stub" "$work/api" "$work/tmp"
+api=$work/api
+mkdir -p "$work/stub" "$api" "$work/tmp"
 
-# release TAG PRERELEASE CHECKSUMS prints one release as the API pretty-prints
-# it, with only the fields the installer reads plus a body that quotes another
-# version.
+# Every tag in the fixture repository. matching-refs lists them in text order,
+# so v1.46.10 comes before v1.46.9 and v1.10.0 before v1.9.0.
+cat >"$api/all-tags" <<'EOF'
+v0.6.0
+v0.6.1
+v0.6.2
+v1.10.0
+v1.4.1
+v1.46.0
+v1.46.0-rc.1
+v1.46.10
+v1.46.11-rc.1
+v1.46.9
+v1.47.0-rc.1
+v1.47.0-rc.2
+v1.9.0
+v2.0.0-nightly.20261014
+v2.0.0-nightly.20261015
+v3.0.0
+v3.0.0-rc.1
+v3.0.1
+v3.0.2
+v3.0.3
+v3.0.4
+v3.0.5
+EOF
+
+# release TAG [CHECKSUMS] writes the releases/tags answer for TAG, with its
+# checksums asset unless CHECKSUMS is "no", and a body that would break echo
+# under dash and quotes another release's asset name.
 release() {
-  local tag=$1 pre=$2 sums=$3 sep=${4:-,}
-  cat <<EOF
+  local tag=$1 sums=${2:-yes}
   {
-    "html_url": "https://github.com/astronomer/astro-cli/releases/tag/$tag",
-    "tag_name": "$tag",
-    "name": "$tag",
-    "draft": false,
-    "prerelease": $pre,
-    "assets": [
-EOF
-  if [ "$sums" = yes ]; then
     cat <<EOF
-      {
-        "name": "astro_${tag#v}_checksums.txt",
-        "size": 1024
-      },
+{
+  "tag_name": "$tag",
+  "name": "$tag",
+  "prerelease": false,
+  "assets": [
 EOF
-  fi
-  cat <<EOF
-      {
-        "name": "astro_${tag#v}_linux_amd64.tar.gz",
-        "size": 1024
-      }
-    ],
-    "tarball_url": "https://api.github.com/repos/astronomer/astro-cli/tarball/$tag",
-    "zipball_url": "https://api.github.com/repos/astronomer/astro-cli/zipball/$tag",
-    "body": "Upgrade notes: see v1.99.0"
-  }$sep
+    if [ "$sums" = yes ]; then
+      cat <<EOF
+    {
+      "name": "astro_${tag#v}_checksums.txt",
+      "size": 1024
+    },
 EOF
+    fi
+    cat <<EOF
+    {
+      "name": "astro_${tag#v}_linux_amd64.tar.gz",
+      "size": 1024
+    }
+  ],
+  "body": "Fixes \\\\c in paths. See \\"name\\": \\"astro_${tag#v}_checksums.txt\\""
 }
-
-# Newest first, as the API lists them. Page 1 is all pre-releases, as daily
-# nightlies make it; the newest nightly is still uploading its checksums.
-{
-  echo '['
-  release v2.0.0-nightly.20261015 true no
-  release v2.0.0-nightly.20261014 true yes
-  release v1.47.0-rc.1 true yes
-  release v1.46.1-rc.2 true yes
-  release v1.46.1-rc.1 true yes ''
-  echo ']'
-} >"$work/api/releases-page-1"
-{
-  echo '['
-  release v1.46.0 false yes
-  release v1.46.0-rc.1 true yes
-  release v1.45.2 false yes
-  release v1.4.1 false yes ''
-  echo ']'
-} >"$work/api/releases-page-2"
-echo '[]' >"$work/api/releases-page-3"
-for tag in v1.46.0 v1.4.1 v2.0.0-nightly.20261014; do
-  release "$tag" false yes '' >"$work/api/tags-$tag"
+EOF
+  } >"$api/tags-$tag"
+}
+# v0.6.2 has no release; v1.46.10, v1.47.0-rc.2 and v2.0.0-nightly.20261015
+# are still uploading; v3's stable tags have no releases, only its rc does.
+for tag in v0.6.0 v0.6.1 v1.10.0 v1.4.1 v1.46.0 v1.46.0-rc.1 v1.46.9 \
+  v1.46.11-rc.1 v1.47.0-rc.1 v1.9.0 v2.0.0-nightly.20261014 v3.0.0-rc.1; do
+  release "$tag"
+done
+for tag in v1.46.10 v1.47.0-rc.2 v2.0.0-nightly.20261015; do
+  release "$tag" no
 done
 
 cat >"$work/stub/curl" <<'EOF'
 #!/bin/sh
-# Serves api.github.com from $STUB_API and fails every other request.
+# Serves api.github.com from $STUB_API and fails every other request. A file
+# $STUB_API/status-KEY makes the request for KEY answer with that status.
 url=
 for arg in "$@"; do
   case "$arg" in
@@ -82,103 +95,162 @@ for arg in "$@"; do
   esac
 done
 case "$url" in
-  https://api.github.com/*)
-    if [ -n "${STUB_RATE_LIMIT:-}" ]; then
-      echo '{"message": "API rate limit exceeded for 192.0.2.1."}'
-      exit 0
-    fi
-    case "$url" in
-      */releases\?per_page=100\&page=*) file=releases-page-${url##*page=} ;;
-      */releases/tags/*) file=tags-${url##*/} ;;
-      *) file=none ;;
-    esac
-    if [ -f "$STUB_API/$file" ]; then
-      cat "$STUB_API/$file"
+  https://api.github.com/*) ;;
+  *)
+    printf 404
+    exit 0
+    ;;
+esac
+echo "${url#https://api.github.com/}" >>"$STUB_API/requests"
+case "$url" in
+  */git/matching-refs/tags/*) key=refs-${url##*/} ;;
+  */releases/tags/*) key=tags-${url##*/} ;;
+  *) key=none ;;
+esac
+if [ -f "$STUB_API/status-$key" ]; then
+  status=$(cat "$STUB_API/status-$key")
+  case "$status" in
+    403) echo '{"message": "API rate limit exceeded for 192.0.2.1."}' ;;
+    *) echo '{"message": "Server Error"}' ;;
+  esac
+  printf '%s' "$status"
+  exit 0
+fi
+case "$key" in
+  refs-*)
+    want=${key#refs-}
+    echo '['
+    awk -v want="$want" 'index($0, want) == 1' "$STUB_API/all-tags" | LC_ALL=C sort |
+      awk '{ if (NR > 1) print "  },"; print "  {"; print "    \"ref\": \"refs/tags/" $0 "\"," ; print "    \"object\": { \"type\": \"tag\" }" }
+        END { if (NR) print "  }" }'
+    echo ']'
+    printf 200
+    ;;
+  tags-*)
+    if [ -f "$STUB_API/$key" ]; then
+      cat "$STUB_API/$key"
+      printf 200
     else
       echo '{"message": "Not Found", "status": "404"}'
+      printf 404
     fi
     ;;
-  *) printf 404 ;;
+  *)
+    echo '{"message": "Not Found", "status": "404"}'
+    printf 404
+    ;;
 esac
 EOF
-chmod +x "$work/stub/curl"
+# linux/amd64 everywhere, so a host that is darwin/arm64 does not refuse v0.6.
+cat >"$work/stub/uname" <<'EOF'
+#!/bin/sh
+case "$1" in
+  -s) echo Linux ;;
+  -m) echo x86_64 ;;
+  *) echo Linux ;;
+esac
+EOF
+chmod +x "$work/stub/curl" "$work/stub/uname"
 
 failures=0
+fail() {
+  echo "FAIL $*"
+  sed 's/^/    /' "$work/stderr"
+  failures=$((failures + 1))
+}
+
 # sh is dash on Debian and Ubuntu, bash on macOS; test both when both exist.
 shells=(sh bash)
 if command -v dash >/dev/null; then
   shells+=(dash)
 fi
-# resolve SHELL ARG... runs the installer and prints the tag it resolved, or
+
+# resolve SHELL ARG runs the installer and prints the tag it resolved, or
 # nothing when it gave up before a download.
 resolve() {
-  local shell=$1
-  shift
-  PATH="$work/stub:$PATH" STUB_API="$work/api" TMPDIR="$work/tmp" \
-    "$shell" "$root/godownloader.sh" -b "$work/bin" "$@" 2>"$work/stderr" >/dev/null || true
+  rm -f "$api/requests"
+  PATH="$work/stub:$PATH" STUB_API="$api" TMPDIR="$work/tmp" \
+    "$1" "$root/godownloader.sh" -b "$work/bin" "$2" 2>"$work/stderr" >/dev/null || true
   sed -n 's/.*found version: [^ ]* for \([^/]*\)\/.*/\1/p' "$work/stderr"
 }
+requests() {
+  if [ -f "$api/requests" ]; then wc -l <"$api/requests" | tr -d ' '; else echo 0; fi
+}
 
+# check WANT ARG [CALLS] [STDERR]: ARG resolves to WANT ('' for a failure)
+# under every shell, in CALLS API requests, saying STDERR.
 check() {
-  local want=$1 arg=$2 shell got
+  local want=$1 arg=$2 calls=${3:-} says=${4:-} shell got n
   for shell in "${shells[@]}"; do
     got=$(resolve "$shell" "$arg")
+    n=$(requests)
     if [ "$got" != "$want" ]; then
-      echo "FAIL [$shell] '$arg': want '${want:-<failure>}', got '${got:-<failure>}'"
-      sed 's/^/    /' "$work/stderr"
-      failures=$((failures + 1))
+      fail "[$shell] '$arg': want '${want:-<failure>}', got '${got:-<failure>}'"
+    elif [ -n "$calls" ] && [ "$n" != "$calls" ]; then
+      fail "[$shell] '$arg': want $calls API requests, made $n"
+    elif [ -n "$says" ] && ! grep -qF "$says" "$work/stderr"; then
+      fail "[$shell] '$arg': stderr does not say '$says'"
     else
-      echo "ok   [$shell] '$arg' -> ${got:-<failure>}"
+      echo "ok   [$shell] '$arg' -> ${got:-<failure>} ($n requests)"
     fi
   done
 }
 
-# A bare major: the newest stable, else the newest pre-release with checksums.
-check v1.46.0 v1
-check v1.46.0 1
-check v2.0.0-nightly.20261014 v2
-check v2.0.0-nightly.20261014 2
-# A major.minor: the same, under that minor. v1.46's stable is on page 2,
-# behind its newer rcs; v1.4 does not match v1.46.*; v1.47 has only an rc.
-check v1.46.0 v1.46
-check v1.46.0 1.46
-check v1.4.1 v1.4
-check v1.47.0-rc.1 v1.47
+# vX.Y: the highest stable by version, not by text or creation order, in one
+# listing and one confirmation.
+check v1.4.1 v1.4 2
+check v1.4.1 1.4 2
+check v1.10.0 v1.10 2
+# v1.46.10 is still uploading, so v1.46.9; never the rcs around it.
+check v1.46.9 v1.46 3
+check v1.46.9 1.46 3
+# v0.6.2 has no release; an old minor still resolves.
+check v0.6.1 v0.6 3
+# No stable tag: the highest pre-release with checksums.
+check v1.47.0-rc.1 v1.47 3
+# vX: the same over the whole major. v1.10.0 is not the highest, v1.46.10 is.
+check v1.46.9 v1 3
+check v1.46.9 1 3
+check v2.0.0-nightly.20261014 v2 3
+check v2.0.0-nightly.20261014 2 3
+# Five stable tags without a release stop the search: no rc is installed in
+# their place, and v3.0.0 is never asked about.
+check '' v3 6 'no release has its checksums uploaded'
 # A full version or a pre-release: exactly that tag, with or without the v.
-check v1.46.0 v1.46.0
-check v1.46.0 1.46.0
-check v1.4.1 1.4.1
-check v2.0.0-nightly.20261014 v2.0.0-nightly.20261014
-# Nothing to find. v1.99.0 appears only in release bodies.
-check '' v9
-check '' v1.99
-check '' v1.99.0
-check '' v1.46.
-check '' v1..46
-check '' latest
+check v1.46.0 v1.46.0 1
+check v1.46.0 1.46.0 1
+check v2.0.0-nightly.20261014 v2.0.0-nightly.20261014 1
+# Nothing to find.
+check '' v9 1 'no tag starts with v9.'
+check '' v1.99 1
+check '' v1.99.0 1
+check '' v1.46. 1
+check '' v1..46 1
+check '' latest 1
 
-# A rate-limited answer says so.
-STUB_RATE_LIMIT=1 resolve sh v1.46 >/dev/null
-if grep -q 'rate limit exceeded; set GITHUB_TOKEN' "$work/stderr"; then
-  echo "ok   rate limit is reported"
-else
-  echo "FAIL rate limit is not reported"
-  failures=$((failures + 1))
-fi
+# An error from the API fails the install instead of settling for another tag.
+echo 403 >"$api/status-tags-v1.46.10"
+check '' v1.46 2 'rate limit exceeded; set GITHUB_TOKEN'
+rm "$api/status-tags-v1.46.10"
+echo 502 >"$api/status-refs-v1.46."
+check '' v1.46 1 'HTTP 502'
+rm "$api/status-refs-v1.46."
+echo 503 >"$api/status-tags-v1.46.0"
+check '' v1.46.0 1 'HTTP 503'
+rm "$api/status-tags-v1.46.0"
 
 # GITHUB_TOKEN is sent on every API request.
-rm -f "$work/api/auth-log"
+rm -f "$api/auth-log"
 GITHUB_TOKEN=secret resolve sh v1.46 >/dev/null
-if [ "$(sort -u "$work/api/auth-log" 2>/dev/null)" = "Authorization: Bearer secret" ]; then
+if [ "$(sort -u "$api/auth-log" 2>/dev/null)" = "Authorization: Bearer secret" ] &&
+  [ "$(wc -l <"$api/auth-log" | tr -d ' ')" = "$(requests)" ]; then
   echo "ok   GITHUB_TOKEN is sent"
 else
-  echo "FAIL GITHUB_TOKEN is not sent"
-  failures=$((failures + 1))
+  fail "GITHUB_TOKEN is not sent on every request"
 fi
 
 if [ -n "$(ls -A "$work/bin" 2>/dev/null)" ]; then
-  echo "FAIL something was installed into $work/bin"
-  failures=$((failures + 1))
+  fail "something was installed into $work/bin"
 fi
 
 if [ "$failures" -ne 0 ]; then
