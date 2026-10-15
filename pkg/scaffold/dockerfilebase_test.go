@@ -262,7 +262,7 @@ func TestInitDecidesABuildArgumentBaseByItsDefault(t *testing.T) {
 		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
 		joined := strings.Join(res.Notes, "\n")
 		assert.Contains(t, joined, "${BASE:?unset}")
-		assert.Contains(t, joined, "remove dockerfile from [tool.astro]")
+		assert.Contains(t, joined, "remove dockerfile under [tool.astro] in pyproject.toml")
 	})
 }
 

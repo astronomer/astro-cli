@@ -270,7 +270,7 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		notes = append(notes, "Dockerfile: its final FROM is "+ref+
 			", which uses a build argument in a form this run does not expand, so whether it builds on an "+
 			"Astro Runtime image is unknown. It was declared as this project's build; if its base is not "+
-			"Astro Runtime, remove dockerfile from [tool.astro] in "+manifest.Marker)
+			"Astro Runtime, remove dockerfile under [tool.astro] in "+manifest.Marker)
 	case kind == baseRuntime && !stated && strings.Contains(ref, "$"):
 		notes = append(notes, "Dockerfile: its final FROM is "+ref+
 			", an Astro Runtime image named by a build argument, so the Airflow version was not read from its tag")
