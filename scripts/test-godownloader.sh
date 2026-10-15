@@ -14,33 +14,6 @@ trap 'rm -rf "$work"' EXIT
 api=$work/api
 mkdir -p "$work/stub" "$api" "$work/tmp"
 
-# Every tag in the fixture repository. matching-refs lists them in text order,
-# so v1.46.10 comes before v1.46.9 and v1.10.0 before v1.9.0.
-cat >"$api/all-tags" <<'EOF'
-v0.6.0
-v0.6.1
-v0.6.2
-v1.10.0
-v1.4.1
-v1.46.0
-v1.46.0-rc.1
-v1.46.10
-v1.46.11-rc.1
-v1.46.9
-v1.47.0-rc.1
-v1.47.0-rc.2
-v1.9.0
-v2.0.0-nightly.20261014
-v2.0.0-nightly.20261015
-v3.0.0
-v3.0.0-rc.1
-v3.0.1
-v3.0.2
-v3.0.3
-v3.0.4
-v3.0.5
-EOF
-
 # release TAG [CHECKSUMS] writes the releases/tags answer for TAG, with its
 # checksums asset unless CHECKSUMS is "no", and a body that would break echo
 # under dash and quotes another release's asset name.
@@ -73,15 +46,39 @@ EOF
 EOF
   } >"$api/tags-$tag"
 }
-# v0.6.2 has no release; v1.46.10, v1.47.0-rc.2 and v2.0.0-nightly.20261015
-# are still uploading; v3's stable tags have no releases, only its rc does.
-for tag in v0.6.0 v0.6.1 v1.10.0 v1.4.1 v1.46.0 v1.46.0-rc.1 v1.46.9 \
-  v1.46.11-rc.1 v1.47.0-rc.1 v1.9.0 v2.0.0-nightly.20261014 v3.0.0-rc.1; do
-  release "$tag"
-done
-for tag in v1.46.10 v1.47.0-rc.2 v2.0.0-nightly.20261015; do
-  release "$tag" no
-done
+# Every tag in the fixture repository and the state of its release: a release
+# with checksums, a release still uploading them, or no release at all.
+# Rows are in matching-refs text order: v1.46.10 before v1.46.9, v1.10.0 before v1.9.0.
+while read -r tag state; do
+  echo "$tag" >>"$api/all-tags"
+  case "$state" in
+    release) release "$tag" ;;
+    uploading) release "$tag" no ;;
+  esac
+done <<'EOF'
+v0.6.0 release
+v0.6.1 release
+v0.6.2 none
+v1.10.0 release
+v1.4.1 release
+v1.46.0 release
+v1.46.0-rc.1 release
+v1.46.10 uploading
+v1.46.11-rc.1 release
+v1.46.9 release
+v1.47.0-rc.1 release
+v1.47.0-rc.2 uploading
+v1.9.0 release
+v2.0.0-nightly.20261014 release
+v2.0.0-nightly.20261015 uploading
+v3.0.0 none
+v3.0.0-rc.1 release
+v3.0.1 none
+v3.0.2 none
+v3.0.3 none
+v3.0.4 none
+v3.0.5 none
+EOF
 
 cat >"$work/stub/curl" <<'EOF'
 #!/bin/sh
