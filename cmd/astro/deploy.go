@@ -2,7 +2,6 @@ package astro
 
 import (
 	"bufio"
-	"cmp"
 	"context"
 	goerrors "errors"
 	"fmt"
@@ -46,10 +45,6 @@ var (
 	imageName          string
 	deployDescription  string
 	noDagsBaseDir      bool
-	nonDags            bool
-	nonDagsMountPath   string
-	nonDagsBundleType  string
-	nonDagsBundlePath  string
 	manifestDeployment string
 	manifestWorkspace  string
 	deployOutput       string
@@ -63,7 +58,10 @@ var (
   astro deploy <DEPLOYMENT_ID> --dags
 
   # Deploy an image built on this machine, from any directory
-  astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>`
+  astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>
+
+  # Deploy a dbt project, or another non-DAG bundle, from its own directory
+  astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>`
 
 	buildSecrets = []string{}
 )
@@ -72,14 +70,13 @@ const (
 	deployWaitTime = 300 * time.Second
 
 	imageNameFlag = "image-name"
-	nonDagsFlag   = "non-dags"
 )
 
 func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy [DEPLOYMENT_ID]",
 		Short:   "Ship this project's code to a Deployment",
-		Long:    "Deploy your project to a Deployment on Astro. Run it in a project with a pyproject.toml ([tool.astro]): it builds the project into a Docker image and pushes that image, with the project's DAGs, to Astronomer. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) is converted with astro init, or deployed with Astro CLI 1.x. With --image-name it deploys an image built on this machine, from any directory. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use astro remote deploy instead. It does not include any metadata associated with your local Airflow environment.",
+		Long:    "Deploy your project to a Deployment on Astro. Run it in a project with a pyproject.toml ([tool.astro]): it builds the project into a Docker image and pushes that image, with the project's DAGs, to Astronomer. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) is converted with astro init, or deployed with Astro CLI 1.x. With --image-name it deploys an image built on this machine, from any directory. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use astro remote deploy instead. It does not include any metadata associated with your local Airflow environment. To deploy a dbt project or another non-DAG bundle, use astro deploy bundle.",
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    deploy,
 		Example: deployExample,
@@ -111,22 +108,17 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
-	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-Dag bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
-	cmd.Flags().StringVar(&nonDagsMountPath, "non-dags-mount-path", "", "Path to mount the non-Dag bundle in Airflow, for reference by Dags. Used with --non-dags")
-	cmd.Flags().StringVar(&nonDagsBundleType, "non-dags-bundle-type", "none", "Free-form label identifying the kind of non-Dag bundle (e.g. dbt). Any value is accepted. Defaults to \"none\". Used with --non-dags")
-	cmd.Flags().StringVar(&nonDagsBundlePath, "non-dags-local-path", "", "Path to the non-Dag bundle to deploy. Default current directory. Used with --non-dags")
 
 	annotateDeployFlag(cmd, "image", deployGroupImage)
 	annotateDeployFlag(cmd, imageNameFlag, deployGroupImage)
 	annotateDeployFlag(cmd, "build-secret", deployGroupImage)
 	annotateDeployFlag(cmd, "dags", deployGroupDAG)
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
-	annotateDeployFlag(cmd, nonDagsFlag, deployGroupNonDAG)
-	annotateDeployFlag(cmd, "non-dags-mount-path", deployGroupNonDAG)
-	annotateDeployFlag(cmd, "non-dags-bundle-type", deployGroupNonDAG)
-	annotateDeployFlag(cmd, "non-dags-local-path", deployGroupNonDAG)
 	orderDeployFlagGroups(cmd)
 	utils.MarkPreferredFlag(cmd.Flags(), "workspace", "workspace-id")
+	// astro deploy bundle is the subcommand, so the word bundle is never a
+	// Deployment argument: a link of that name is reached with --deployment.
+	cmd.AddCommand(newDeployBundleCmd())
 	applyPreferredFlagsIn(cmd)
 	return cmd
 }
@@ -134,10 +126,7 @@ func NewDeployCmd() *cobra.Command {
 // deploy ships a project with a pyproject.toml ([tool.astro]), the one kind
 // of project v2 deploys (deployManifest), run from the project's root.
 //
-// --non-dags deploys a directory that must not be inside a project at all, so
-// where it runs from says nothing about the project. It is checked first.
-//
-// Everywhere else the project decides, by utils.Locate's walk. In or below a
+// The project decides, by utils.Locate's walk. In or below a
 // project in the Astro CLI 1.x layout every mode is refused, naming the two
 // ways forward: convert it with astro init, or deploy it with Astro CLI 1.x,
 // which keeps deploying that layout. --image-name is refused there too: a
@@ -150,9 +139,6 @@ func NewDeployCmd() *cobra.Command {
 // Deployment that takes DAG deploys keeps the DAGs it had, and the deploy
 // says so.
 func deploy(cmd *cobra.Command, args []string) error {
-	if nonDags {
-		return deployNonDagsBundle(cmd, args)
-	}
 	// One walk routes the deploy and words its refusal.
 	where := utils.Locate(config.WorkingPath)
 	if where.AtRoot(config.WorkingPath) {
@@ -194,193 +180,6 @@ func refuseFlagCombinations(cmd *cobra.Command, inProject bool) error {
 	}
 	return nil
 }
-
-// nonDagsDeployJSON is what `astro deploy --non-dags --output json`
-// publishes: the bundle deployed and where. Its keys are the ones
-// `astro dbt deploy`'s result uses for the same facts.
-type nonDagsDeployJSON struct {
-	Deployment     string `json:"deployment"`
-	DeploymentName string `json:"deployment_name"`
-	Workspace      string `json:"workspace"`
-	DeployID       string `json:"deploy_id"`
-	// BundleType is --non-dags-bundle-type, BundlePath the directory bundled.
-	BundleType    string `json:"bundle_type"`
-	BundlePath    string `json:"bundle_path"`
-	MountPath     string `json:"mount_path"`
-	BundleVersion string `json:"bundle_version"`
-	// Waited is true when the run waited for the Deployment to become
-	// healthy (--wait), and WaitError says why that wait failed.
-	Waited    bool           `json:"waited"`
-	WaitError string         `json:"wait_error,omitempty"`
-	Git       *deployGitJSON `json:"git,omitempty"`
-}
-
-func newNonDagsDeployJSON(res *astrodeploy.BundleDeploy, bundleType, bundlePath string, waited bool, waitErr error) nonDagsDeployJSON {
-	return nonDagsDeployJSON{
-		Deployment:     res.DeploymentID,
-		DeploymentName: res.DeploymentName,
-		Workspace:      res.WorkspaceID,
-		DeployID:       res.DeployID,
-		BundleType:     bundleType,
-		BundlePath:     bundlePath,
-		MountPath:      res.MountPath,
-		BundleVersion:  res.BundleVersion,
-		Waited:         waited,
-		WaitError:      errText(waitErr),
-		Git:            bundleGitJSON(res.Git),
-	}
-}
-
-func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
-	// Read first, so a bad --output is the usage error reported.
-	format, err := cliout.ParseFormat(deployOutput)
-	if err != nil {
-		return err
-	}
-	// The result goes where stdout is now. What the platform code prints on
-	// the way (the git note, the archive's) is the output text mode has always
-	// shown; under json it goes to stderr, as astro dbt deploy's does.
-	out := cmd.OutOrStdout()
-	defer strayStdoutToStderr(format)()
-
-	for _, f := range []string{"dags", "image", imageNameFlag, "build-secret", "no-dags-base-dir"} {
-		if cmd.Flags().Changed(f) {
-			return cliout.Usage(fmt.Errorf("cannot use --%s with --non-dags; --non-dags performs a non-Dag bundle deploy", f))
-		}
-	}
-
-	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
-		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
-	}
-
-	if nonDagsMountPath == "" {
-		return cliout.Usage(errors.New("--non-dags-mount-path is required with --non-dags"))
-	}
-
-	if nonDagsBundlePath == "" {
-		nonDagsBundlePath = config.WorkingPath
-	}
-
-	info, err := os.Stat(nonDagsBundlePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("bundle path %s does not exist", nonDagsBundlePath)
-		}
-		return fmt.Errorf("failed to access bundle path %s: %w", nonDagsBundlePath, err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("bundle path %s is not a directory", nonDagsBundlePath)
-	}
-
-	// The walk every deploy decides by: a pyproject.toml project or a 1.x
-	// one at or above the bundle path.
-	if !utils.Locate(nonDagsBundlePath).None() {
-		return errors.New("bundle path is within an Astro project. Non-Dag bundles must be a separate directory")
-	}
-
-	targetID, target, login, err := nonDagsTarget(cmd.Context(), args, format)
-	if err != nil {
-		return err
-	}
-
-	cmd.SilenceUsage = true
-
-	deployBundleInput := &astrodeploy.DeployBundleInput{
-		BundlePath:    nonDagsBundlePath,
-		MountPath:     nonDagsMountPath,
-		DeploymentID:  targetID,
-		Deployment:    target,
-		BundleType:    nonDagsBundleType,
-		Description:   deployDescription,
-		AstroV1Client: login.client,
-	}
-	if !login.current {
-		deployBundleInput.Login = &login.context
-	}
-	res, err := DeployBundle(deployBundleInput)
-	if err != nil {
-		return err
-	}
-	waitDone := func() error {
-		if login.current {
-			return waitForBundle(cmd.ErrOrStderr(), res.DeploymentID, waitTime, login.client)
-		}
-		return astrodeploy.WaitForBundleIn(cmd.ErrOrStderr(), &login.context, res.DeploymentID, waitTime, login.client)
-	}
-	return publishThenWaitWith(cmd, format, waitForDeploy, waitDone, func(waitErr error) error {
-		if format == cliout.FormatJSON {
-			return cliout.Renderer{Format: format, Out: out}.Emit(newNonDagsDeployJSON(&res, nonDagsBundleType, nonDagsBundlePath, waitForDeploy, waitErr), nil)
-		}
-		return renderBundleUploaded(res.BundleVersion)(out)
-	})
-}
-
-// nonDagsTarget is the Deployment a non-Dag bundle deploys to, and the login
-// it deploys under, the way astro deploy from the same directory picks them.
-//
-// The login: in a pyproject.toml project here whose manifest loads, the
-// project's (its Astro host's), for everything; anywhere else, or when the
-// manifest does not load, the current context's.
-//
-// The target: the argument or --deployment, which must agree, a link name of
-// the project here or a Deployment id. With neither, the workspace's
-// Deployments are offered (--workspace, else --workspace-id, else the
-// login's): only to a run that can be asked, and only on the current
-// context's host, as astro deploy offers them. A run that cannot be asked,
-// under --output json or without a terminal, is refused as astro deploy's is,
-// with kind input_required.
-func nonDagsTarget(ctx context.Context, args []string, format cliout.Format) (string, *astrov1.Deployment, deployLogin, error) {
-	linkName := ""
-	if len(args) > 0 {
-		linkName = args[0]
-	}
-	ws := cmp.Or(manifestWorkspace, workspaceID)
-	// Agreement first, before anything is read.
-	if _, _, err := manifestdeploy.ResolveNamed(nil, linkName, manifestDeployment, ws, ""); err != nil {
-		current, _ := loginForDeploy(ctx, "") //nolint:errcheck // with no domain it is the current context, and never fails
-		return "", nil, current, cliout.Usage(err)
-	}
-
-	m := manifestHere()
-	domain := ""
-	if m != nil {
-		domain = m.Astro.LoginDomain()
-	}
-	login, err := loginForDeploy(ctx, domain)
-	if err != nil {
-		return "", nil, login, err
-	}
-
-	if name := cmp.Or(linkName, manifestDeployment); name != "" {
-		if m == nil || !hasLink(m, name) {
-			return name, nil, login, nil
-		}
-		named, _, err := manifestdeploy.ResolveNamed(m, name, "", ws, "")
-		if err != nil {
-			return "", nil, login, cliout.Usage(err)
-		}
-		return named.DeploymentID, nil, login, nil
-	}
-
-	if format != cliout.FormatText || !stdinIsTerminal() {
-		return "", nil, login, input.Required(errNonDagsNoTarget)
-	}
-	if !login.current {
-		return "", nil, login, errPickerOtherHost(login.context.Domain)
-	}
-	if ws == "" {
-		ws, err = coalesceWorkspace()
-		if err != nil {
-			return "", nil, login, errors.Wrap(err, "failed to find a valid workspace")
-		}
-	}
-	id, read, err := resolveBundleDeployment(nil, ws, "", noCreateUnderJSON(format, "to deploy to"))
-	return id, read, login, err
-}
-
-// errNonDagsNoTarget is a --non-dags deploy that names no Deployment and
-// cannot be asked for one, in astro deploy's words for the same refusal.
-var errNonDagsNoTarget = errors.New("this deploy names no Deployment and this run cannot be asked: pass the Deployment id as the argument or with --deployment")
 
 // errPickerOtherHost is the workspace picker refused on a login other than
 // the current context's: it lists only the current context's Deployments.

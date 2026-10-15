@@ -54,7 +54,6 @@ func resetDeployFlagVars() {
 	workspaceID = ""
 	deploymentName = ""
 	deployDescription = ""
-	nonDags = false
 	deployOutput = string(cliout.FormatText)
 }
 
@@ -1165,97 +1164,6 @@ func TestDeployManifestUsesTheManifestDomainsLogin(t *testing.T) {
 			assert.IsType(t, &astrov1.ClientWithResponses{}, picked.client)
 		})
 	}
-}
-
-// --non-dags from a project deploys under the project's host as the project's
-// deploy does, a link and a bare Deployment id alike; outside a project a
-// bare id goes under the current context.
-func TestDeployNonDagsUsesTheManifestDomainsLogin(t *testing.T) {
-	for _, args := range [][]string{{"test"}, {"--deployment", "clx-bare"}} {
-		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			setupDeployOnStage(t, manifestOnProd)
-			logInToProd(t)
-			var captured *astrodeploy.DeployBundleInput
-			prev := DeployBundle
-			t.Cleanup(func() { DeployBundle = prev })
-			DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
-				captured = in
-				return astrodeploy.BundleDeploy{}, nil
-			}
-
-			_, err := execDeployCapture(append(args, "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", t.TempDir())...)
-			require.NoError(t, err)
-			require.NotNil(t, captured.Login, "deployed under the project's host")
-			assert.Equal(t, "astronomer.io", captured.Login.Domain)
-			assert.Equal(t, "prod-org", captured.Login.Organization)
-		})
-	}
-
-	t.Run("outside a project", func(t *testing.T) {
-		setupDeployOnStage(t, manifestOnProd)
-		require.NoError(t, os.Remove(filepath.Join(config.WorkingPath, "pyproject.toml")))
-		var captured *astrodeploy.DeployBundleInput
-		prev := DeployBundle
-		t.Cleanup(func() { DeployBundle = prev })
-		DeployBundle = func(in *astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
-			captured = in
-			return astrodeploy.BundleDeploy{}, nil
-		}
-		_, err := execDeployCapture("--deployment", "clx-bare", "--non-dags", "--non-dags-mount-path", "/x", "--non-dags-local-path", t.TempDir())
-		require.NoError(t, err)
-		assert.Nil(t, captured.Login, "the current context")
-	})
-}
-
-// --non-dags naming no Deployment: a run that cannot be asked is refused as
-// astro deploy's is, input_required, before any picker; one that can is
-// offered the picker only on the current context's host, so from a project
-// on another host it is refused with the same words astro deploy uses.
-func TestDeployNonDagsWithNoTarget(t *testing.T) {
-	noBundle := func(t *testing.T) {
-		prev := DeployBundle
-		t.Cleanup(func() { DeployBundle = prev })
-		DeployBundle = func(*astrodeploy.DeployBundleInput) (astrodeploy.BundleDeploy, error) {
-			t.Fatal("no target, so nothing is deployed")
-			return astrodeploy.BundleDeploy{}, nil
-		}
-	}
-	nonDags := []string{"--non-dags", "--non-dags-mount-path", "/x"}
-
-	t.Run("under --output json", func(t *testing.T) {
-		setupDeployOnStage(t, manifestOnProd)
-		logInToProd(t)
-		noBundle(t)
-		out, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir(), "--output", "json")...)
-		require.Error(t, err)
-		var obj struct {
-			Error string `json:"error"`
-			Kind  string `json:"kind"`
-		}
-		require.NoError(t, json.Unmarshal([]byte(out), &obj), out)
-		assert.Equal(t, "input_required", obj.Kind)
-		assert.Contains(t, obj.Error, "pass the Deployment id as the argument or with --deployment")
-	})
-
-	t.Run("without a terminal", func(t *testing.T) {
-		setupDeployOnStage(t, manifestOnProd)
-		logInToProd(t)
-		noBundle(t)
-		_, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir())...)
-		require.Error(t, err)
-		assert.True(t, input.IsRequired(err), "%v", err)
-	})
-
-	t.Run("the picker on another host", func(t *testing.T) {
-		setupDeployOnStage(t, manifestOnProd)
-		logInToProd(t)
-		interactiveDeploy(t)
-		noBundle(t)
-		_, err := execDeployCapture(append(nonDags, "--non-dags-local-path", t.TempDir())...)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "the deployment picker lists only the current context's Deployments")
-		assert.Contains(t, err.Error(), "astro context switch astronomer.io")
-	})
 }
 
 // ASTRO_API_TOKEN outranks the stored login, and goes out with its scheme like

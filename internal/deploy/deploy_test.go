@@ -538,6 +538,7 @@ func TestResolveTarget_OffersTheWorkspacesUnlinkedDeployments(t *testing.T) {
 		{ID: "dep-new", Name: "Orders (EU)"},                        // offered as orders-eu
 		{ID: "dep-clash", Name: "Staging"},                          // "staging" is a link already
 		{ID: "dep-local", Name: "Local"},                            // "local" is reserved
+		{ID: "dep-bundle", Name: "Bundle"},                          // "bundle" is astro deploy bundle
 		{ID: "dep-other", Name: "Orders (EU)", WorkspaceID: "ws-1"}, // same name twice
 	}
 	req := Request{Interactive: true, Manifest: manifestWith(links), ContextWorkspace: "ws-1"}
@@ -548,7 +549,7 @@ func TestResolveTarget_OffersTheWorkspacesUnlinkedDeployments(t *testing.T) {
 		_, err := resolveTarget(req, d)
 		require.NoError(t, err)
 		assert.Equal(t, "ws-1", d.listedWS)
-		assert.Equal(t, []string{"dev", "prod", "staging", "dep-local", "orders-eu", "orders-eu-2", "staging-2"}, choiceNames(d.offered))
+		assert.Equal(t, []string{"dev", "prod", "staging", "dep-bundle", "dep-local", "orders-eu", "orders-eu-2", "staging-2"}, choiceNames(d.offered))
 		for _, c := range d.offered {
 			assert.Equal(t, !slices.Contains([]string{"dev", "prod", "staging"}, c.Name), c.Unlinked, c.Name)
 		}

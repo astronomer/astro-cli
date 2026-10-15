@@ -104,6 +104,8 @@ Everything below fails with an error naming the replacement, instead of an "unkn
 | `astro deployment connection copy` | no per-Deployment copy: set it once in the workspace with `astro env connection set <key> --workspace <id> --auto-link`, or on each Deployment |
 | `astro deployment pool …` | the Airflow UI or API, until pools reach the Environment Manager |
 | `astro env … create`, `astro env … update` | `astro env … set`, which creates or updates |
+| `astro dbt deploy [DEPLOYMENT_ID]` | `astro deploy bundle [PATH] --deployment <id, name or link name>`: PATH replaces `--project-path`, `--deployment` the argument and `--deployment-name`, `--workspace` `--workspace-id`; `-m`, `-w` and `-t` are unchanged. Under `-o json`, `project` and `project_path` are now `bundle_name` and `bundle_path`, beside `bundle_type` |
+| `astro dbt delete [DEPLOYMENT_ID]` | `astro deploy bundle --delete [PATH] --deployment <id, name or link name>`, with the same flags |
 
 Run inside a 1.x project, an `astro dev` command also tells you to convert it with `astro init`. One with a replacement says so in its first line (convert, then use the replacement); bare `astro dev`, `upgrade-test` and `proxy` say it after the list of `astro local` commands.
 
@@ -129,8 +131,12 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--dags-path` | `astro deploy --dags` from the project, which ships its `dags/` | `astro deploy` |
 | `--dag-bundle-name` | no replacement yet: use Astro CLI 1.x | `astro deploy` |
 | `--no-cache` | no replacement: v2 builds no image for Astro Private Cloud | `astro deploy` on Astro Private Cloud |
+| `--non-dags` | `astro deploy bundle [PATH]`, which detects a dbt project and gives it a mount path | `astro deploy` |
+| `--non-dags-local-path` | the PATH argument of `astro deploy bundle` | `astro deploy` |
+| `--non-dags-mount-path` | `astro deploy bundle --mount-path` | `astro deploy` |
+| `--non-dags-bundle-type` | `astro deploy bundle --type` | `astro deploy` |
 
-Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands, `astro env` and `astro dbt deploy` / `delete`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them.
+Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands and `astro env`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them.
 
 ### Behavior
 

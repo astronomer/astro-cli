@@ -52,7 +52,14 @@ const (
 	errDeployDagsPathRemoved   = "--dags-path was removed in Astro CLI v2: astro deploy --dags ships the project's dags directory, so run it from the project"
 	errDeployBundleNameRemoved = "--dag-bundle-name was removed in Astro CLI v2: deploying to a named DAG bundle is not supported yet. Use Astro CLI 1.x for it"
 	errDeployNameRemoved       = "--deployment-name was removed in Astro CLI v2: name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
-	errAPCDeployNoCache        = "--no-cache was removed in Astro CLI v2: Astro CLI v2 builds no image for Astro Private Cloud. " +
+	// astro deploy --non-dags became astro deploy bundle, a subcommand of
+	// its own with the bundle's directory as its argument.
+	errDeployNonDagsRemoved = "--non-dags was removed in Astro CLI v2: use astro deploy bundle [PATH] --deployment <Deployment id, name or link name>, " +
+		"which deploys a non-DAG bundle such as a dbt project from its directory"
+	errDeployNonDagsMountPathRemoved  = "--non-dags-mount-path was removed in Astro CLI v2: use astro deploy bundle --mount-path"
+	errDeployNonDagsLocalPathRemoved  = "--non-dags-local-path was removed in Astro CLI v2: pass the bundle's directory as the argument, astro deploy bundle <PATH>"
+	errDeployNonDagsBundleTypeRemoved = "--non-dags-bundle-type was removed in Astro CLI v2: use astro deploy bundle --type, which detects a dbt project by itself"
+	errAPCDeployNoCache               = "--no-cache was removed in Astro CLI v2: Astro CLI v2 builds no image for Astro Private Cloud. " +
 		"Build and deploy the project with Astro CLI 1.x"
 )
 
@@ -132,6 +139,10 @@ var removedFlags = []removedFlag{
 	{name: "dag-bundle-name", under: []string{"deploy"}, msg: errDeployBundleNameRemoved},
 	{name: "deployment-name", under: []string{"deploy"}, msg: errDeployNameRemoved},
 	{name: "no-cache", under: []string{"deploy"}, msg: errAPCDeployNoCache},
+	{name: "non-dags", under: []string{"deploy"}, msg: errDeployNonDagsRemoved},
+	{name: "non-dags-mount-path", under: []string{"deploy"}, msg: errDeployNonDagsMountPathRemoved},
+	{name: "non-dags-local-path", under: []string{"deploy"}, msg: errDeployNonDagsLocalPathRemoved},
+	{name: "non-dags-bundle-type", under: []string{"deploy"}, msg: errDeployNonDagsBundleTypeRemoved},
 }
 
 // removedFlagErr is a run refused for passing a removed 1.x flag.

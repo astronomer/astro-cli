@@ -38,8 +38,9 @@ func execUnboundRootWith(t *testing.T, client astrov1.APIClient, alpha astrov1al
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	testUtil.SetupOSArgsForGinkgo()
 	prevClient, prevAlpha := astroV1Client, astroV1Alpha1Client
-	// dbt deploy resolves a Workspace into the package's workspaceID, which
-	// coalesceWorkspace reads before the context; see execDeployCmd.
+	// A bundle deploy may resolve a Workspace into the package's
+	// workspaceID, which coalesceWorkspace reads before the context; see
+	// execDeployCmd.
 	t.Cleanup(func() { astroV1Client, astroV1Alpha1Client, workspaceID = prevClient, prevAlpha, "" })
 
 	outR, outW, perr := os.Pipe()
@@ -75,20 +76,20 @@ func execUnboundRootWith(t *testing.T, client astrov1.APIClient, alpha astrov1al
 // Under --output json the result is on stdout and nothing of it on stderr,
 // in the tree production builds.
 func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
-	t.Run("dbt deploy", func(t *testing.T) {
+	t.Run("deploy bundle", func(t *testing.T) {
 		project := dbtProject(t)
-		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "dbt", "deploy", dbtTestDeploymentID, "--project-path", project, "-o", "json")
+		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "deploy", "bundle", project, "--deployment", dbtTestDeploymentID, "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
-		var got dbtDeployJSON
+		var got bundleDeployJSON
 		decodeOne(t, stdout, &got)
 		assert.Equal(t, dbtTestVersion, got.BundleVersion)
 		assert.NotContains(t, stderr, dbtTestVersion, "the result went to stderr")
-		assert.Contains(t, stderr, "Initiating dbt deploy", "the notes go to stderr")
+		assert.Contains(t, stderr, "mount path /usr/local/airflow/dbt/jaffle_shop", "the notes go to stderr")
 	})
 	// The bundle sits in a git checkout with uncommitted changes, so the
 	// platform code prints its note on the way: under json that goes to
 	// stderr, and stdout is the one result object.
-	t.Run("deploy --non-dags from a dirty checkout", func(t *testing.T) {
+	t.Run("deploy bundle from a dirty checkout", func(t *testing.T) {
 		if _, err := exec.LookPath("git"); err != nil {
 			t.Skip("needs git")
 		}
@@ -103,11 +104,10 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 		gitIn("add", ".")
 		gitIn("commit", "-q", "-m", "first")
 		require.NoError(t, os.WriteFile(filepath.Join(bundle, "dbt_project.yml"), []byte("name: changed\n"), 0o600))
-		resetDeployFlagVars()
 
-		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "deploy", dbtTestDeploymentID, "--non-dags", "--non-dags-mount-path", "/usr/local/airflow/x", "--non-dags-local-path", bundle, "--output", "json")
+		stdout, stderr, err := execUnboundRoot(t, dbtBundleMock(t, fakeBlobStore(t)), "deploy", "bundle", bundle, "--deployment", dbtTestDeploymentID, "--mount-path", "/usr/local/airflow/x", "--output", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)
-		var got nonDagsDeployJSON
+		var got bundleDeployJSON
 		decodeOne(t, stdout, &got)
 		assert.Equal(t, dbtTestVersion, got.BundleVersion)
 		assert.Contains(t, stderr, "uncommitted changes", "the platform's note goes to stderr")

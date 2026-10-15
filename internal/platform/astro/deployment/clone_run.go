@@ -23,23 +23,43 @@ func CloneSource(ref, ws string, astroV1Client astrov1.APIClient) (astrov1.Deplo
 	if ws == "" {
 		return astrov1.Deployment{}, fmt.Errorf("no Workspace to look up the Deployment named %q in: pass --workspace, or its id to --clone", ref)
 	}
-	deployments, err := ListDeployments(ws, "", astroV1Client)
+	named, err := DeploymentsNamed(ref, ws, "", astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, err
 	}
-	var ids []string
-	for i := range deployments {
-		if deployments[i].Name == ref {
-			ids = append(ids, deployments[i].Id)
-		}
-	}
-	switch len(ids) {
+	switch len(named) {
 	case 0:
 		return astrov1.Deployment{}, fmt.Errorf("no Deployment named %q in Workspace %s. Pass its id to --clone to copy one from another Workspace", ref, ws)
 	case 1:
-		return GetDeploymentByID("", ids[0], astroV1Client)
+		return GetDeploymentByID("", named[0].Id, astroV1Client)
 	}
-	return astrov1.Deployment{}, fmt.Errorf("%d Deployments are named %q in Workspace %s: pass one of their ids to --clone instead: %s", len(ids), ref, ws, strings.Join(ids, ", "))
+	return astrov1.Deployment{}, fmt.Errorf("%d Deployments are named %q in Workspace %s: pass one of their ids to --clone instead: %s", len(named), ref, ws, strings.Join(DeploymentIDs(named), ", "))
+}
+
+// DeploymentsNamed is every Deployment in workspace ws called name, listed
+// in organization orgID ("" for the current context's). A name is not
+// unique, so a caller decides what none, or several, means.
+func DeploymentsNamed(name, ws, orgID string, astroV1Client astrov1.APIClient) ([]astrov1.Deployment, error) {
+	deployments, err := ListDeployments(ws, orgID, astroV1Client)
+	if err != nil {
+		return nil, err
+	}
+	var named []astrov1.Deployment
+	for i := range deployments {
+		if deployments[i].Name == name {
+			named = append(named, deployments[i])
+		}
+	}
+	return named, nil
+}
+
+// DeploymentIDs is the id of each of ds, in order.
+func DeploymentIDs(ds []astrov1.Deployment) []string {
+	ids := make([]string, len(ds))
+	for i := range ds {
+		ids[i] = ds[i].Id
+	}
+	return ids
 }
 
 // Clone creates a copy of src named name, in workspaceID or else src's own

@@ -171,6 +171,9 @@ type DeleteBundleInput struct {
 	BundleType    string
 	Description   string
 	AstroV1Client astrov1.APIClient
+	// Login is the Astro login the delete runs under, whose host the
+	// Deployment lives on; nil is the current context.
+	Login *config.Context
 }
 
 // BundleDelete is what a bundle delete did: the deploy that removes the
@@ -188,7 +191,7 @@ type BundleDelete struct {
 // It does not report the result: its caller renders the BundleDelete it
 // returns.
 func DeleteBundle(input *DeleteBundleInput) (BundleDelete, error) {
-	c, err := config.GetCurrentContext()
+	c, err := loginOrCurrent(input.Login)
 	if err != nil {
 		return BundleDelete{}, err
 	}

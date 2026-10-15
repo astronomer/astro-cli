@@ -1,8 +1,6 @@
 package astro
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 )
 
@@ -10,9 +8,8 @@ import (
 // apply to which kind of deploy. Each value is the section's title: the root's
 // help (cmd/help.go) lists a flag annotated "Image" under "Image Flags:".
 const (
-	deployGroupImage  = "Image"
-	deployGroupDAG    = "Dag"
-	deployGroupNonDAG = "Non-Dag Bundle"
+	deployGroupImage = "Image"
+	deployGroupDAG   = "Dag"
 )
 
 // The annotation keys cmd/help.go reads a flag's section and the sections'
@@ -29,12 +26,10 @@ func annotateDeployFlag(cmd *cobra.Command, name, group string) {
 }
 
 // orderDeployFlagGroups lists deploy's sections in the order a deploy narrows:
-// what image ships, which DAGs, and what rides beside.
+// what image ships, then which DAGs.
 func orderDeployFlagGroups(cmd *cobra.Command) {
 	if cmd.Annotations == nil {
 		cmd.Annotations = map[string]string{}
 	}
-	cmd.Annotations[flagGroupOrderAnnotation] = strings.Join([]string{
-		deployGroupImage, deployGroupDAG, deployGroupNonDAG,
-	}, ",")
+	cmd.Annotations[flagGroupOrderAnnotation] = deployGroupImage + "," + deployGroupDAG
 }

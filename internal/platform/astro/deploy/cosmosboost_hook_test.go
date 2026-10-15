@@ -193,7 +193,7 @@ func TestUploadBundleSkipsPreDeployByDefault(t *testing.T) {
 }
 
 // TestDeployBundleDbtPathGeneratesSidecarsWhenEnabled drives the full
-// `astro dbt deploy` bundle path (DeployBundle into UploadBundle).
+// `astro deploy bundle` path (DeployBundle into UploadBundle).
 func TestDeployBundleDbtPathGeneratesSidecarsWhenEnabled(t *testing.T) {
 	setupCosmosBoostEnv(t)
 	enableCosmosBoost(t)
@@ -217,7 +217,7 @@ func TestDeployBundleDbtPathGeneratesSidecarsWhenEnabled(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Contains(t, uploaded(), cosmosBoostArtifact, "astro dbt deploy must ship the sidecar")
+	assert.Contains(t, uploaded(), cosmosBoostArtifact, "astro deploy bundle must ship the sidecar")
 	assert.NoDirExists(t, filepath.Join(bundleDir, ".astro"))
 }
 
@@ -300,7 +300,7 @@ func TestUploadBundleMissingDirIsUnchanged(t *testing.T) {
 	}
 }
 
-// TestUploadBundleFromTheWorkingDirectory: astro dbt deploy --project-path .
+// TestUploadBundleFromTheWorkingDirectory: astro deploy bundle .
 // bundles ".", from the working directory, and an old sidecar there is still
 // replaced by the fresh one, at the same path, with no second copy under
 // another name. Nor does the tarball carry itself: it is written outside the

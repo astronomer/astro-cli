@@ -153,11 +153,10 @@ var publishedPayloads = []cliouttest.Case{
 	// astro deploy --output json, in a project with a manifest: the one
 	// object a finished deploy prints.
 	{Name: "deploy", Value: deployJSON{}},
-	{Name: "deploy-non-dags", Value: nonDagsDeployJSON{}},
-	// astro dbt deploy: what it deployed where. delete: the bundle it
+	// astro deploy bundle: what it deployed where. --delete: the bundle it
 	// removed.
-	{Name: "dbt-deploy", Value: dbtDeployJSON{}},
-	{Name: "dbt-delete", Value: dbtDeleteJSON{}},
+	{Name: "deploy-bundle", Value: bundleDeployJSON{}},
+	{Name: "deploy-bundle-delete", Value: bundleDeleteJSON{}},
 	// astro remote deploy: the client image it pushed.
 	{Name: "remote-deploy", Value: remoteDeployJSON{}},
 
@@ -234,7 +233,7 @@ func TestEveryGoldenHasACase(t *testing.T) {
 
 // minWatchedPayloads is a floor under the tally, not a target: an empty tally
 // reads exactly like a clean one, so without it the observer coming unwired
-// would be silent. Fifty-two shapes reach Emit in this package's tests
+// would be silent. Fifty-one shapes reach Emit in this package's tests
 // today: the deployment variable results (2) and the six API token results;
 // the deployment, workspace and organization user and team results, with the
 // organization's invite and team membership (10); the pkg/output lists their
@@ -243,14 +242,16 @@ func TestEveryGoldenHasACase(t *testing.T) {
 // deployment inspect's deployment (which create and update publish too),
 // delete's removal, hibernate's override, the worker-queue result and the
 // log entry (6); the bundle a bundle create or update leaves and what a
-// bundle delete did (2); the dbt deploy, delete and cleanup results and the remote
-// deploy's pushed image (4); the Workspace a create, update or switch
+// bundle delete did (2); astro deploy bundle's deploy and delete results and the
+// remote deploy's pushed image (3); the Workspace a create, update or switch
 // publishes and what a Workspace delete did, what an Organization switch left
 // current, the role list and the file an audit-log export wrote (5); the
 // Astro IDE project list and what an import or an export moved (3); and the
 // error object.
-// Raise it as conversions land; lower it only saying why.
-const minWatchedPayloads = 52
+// Raise it as conversions land; lower it only saying why. It went from 52
+// to 51 when astro dbt deploy, astro dbt delete and astro deploy --non-dags,
+// three shapes, became astro deploy bundle's two.
+const minWatchedPayloads = 51
 
 // pinnedElsewhere names the shapes that reach Emit here and are pinned by
 // another tree's goldens, keyed by type, with where. Pinning one twice would
