@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -111,18 +112,21 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 // localhost:5000/astro-runtime:3.1-12 on the first one reads the image as
 // "localhost".
 //
-// A digest reference pins an exact image and carries no tag. Empty rather than
-// the digest, so that a caller reading a generation off the tag is told it has
-// nothing to read instead of being handed a hex string that parses as Airflow 2.
+// A digest pins an exact image and is not a tag. A reference with a digest
+// alone carries no tag: empty rather than the digest, so that a caller reading
+// a generation off the tag is told it has nothing to read instead of being
+// handed a hex string that parses as Airflow 2. One with both
+// (runtime:3.1-12@sha256:...) keeps its tag, which is still what it says it is.
 func splitImageRef(ref string) (image, tag string) {
-	if at := strings.Index(ref, "@"); at >= 0 {
-		return ref[:at], ""
+	name, _, digested := strings.Cut(ref, "@")
+	lastSlash := strings.LastIndex(name, "/")
+	if colon := strings.LastIndex(name, ":"); colon > lastSlash {
+		return name[:colon], name[colon+1:]
 	}
-	lastSlash := strings.LastIndex(ref, "/")
-	if colon := strings.LastIndex(ref, ":"); colon > lastSlash {
-		return ref[:colon], ref[colon+1:]
+	if digested {
+		return name, ""
 	}
-	return ref, "latest"
+	return name, "latest"
 }
 
 // ParseRuntimeTagPython extracts the base runtime tag and the Python version from a
@@ -160,14 +164,15 @@ func IsRuntime3(baseTag string) bool {
 	return strings.HasPrefix(baseTag, "3.")
 }
 
-// The repository names an Astro Runtime image is published under: the last
-// path segment of astrocrpublic.azurecr.io/runtime (Airflow 3) and of
-// quay.io/astronomer/astro-runtime (Airflow 2).
+// The repositories Astronomer publishes Astro Runtime under: Airflow 3 and
+// Airflow 2 images. Any tag on these is Runtime.
 //
-// Matched on that segment and not on the registry, so a mirror counts: an exact
-// copy pushed to a private registry (registry.corp.example/astronomer/astro-runtime,
-// mirror/runtime) keeps the repository's name and its tag scheme, and is the
-// same image the compose file is written for.
+// A mirror — an exact copy pushed to another registry — keeps the repository's
+// last path segment and its tag scheme, so it is recognized by both: a
+// repository named runtime or astro-runtime AND a tag that is a Runtime
+// version (mirrorRuntimeTagRe). The name alone would also take
+// mcr.microsoft.com/dotnet/runtime:8.0 and ghcr.io/x/runtime:latest, which are
+// not Astro Runtime and on which the compose file cannot start.
 //
 // pkg/imagebuild's isAstroBase is NOT this rule, on purpose: it decides whether
 // a build may force a pull, which a mirror in a private or air-gapped registry
@@ -176,7 +181,29 @@ func IsRuntime3(baseTag string) bool {
 // Another definition exists and is NOT this one: internal/platform/apc names a
 // wider set — including astronomerinc/ap-airflow — for the v1 Software deploy
 // path, which warns rather than refusing and does not write this compose file.
+var publishedRuntimeRepos = []string{
+	"astrocrpublic.azurecr.io/runtime",
+	"quay.io/astronomer/astro-runtime",
+}
+
+// runtimeRepoNames are the last path segments a mirror of a published
+// repository keeps.
 var runtimeRepoNames = []string{"runtime", "astro-runtime"}
+
+// mirrorRuntimeTagRe is a Runtime version as a mirror's tag must spell it once
+// ParseRuntimeTagPython has stripped a -python-X.Y, -base or -slim flavor: an
+// exact Airflow 3 build (3.1-12) or an exact Airflow 2 runtime (12.1.0). A
+// floating tag (3.1, 12, latest, stable) is not enough on a name that is not
+// Astronomer's: it is what any other image called runtime carries too.
+var mirrorRuntimeTagRe = regexp.MustCompile(`^(?:3\.\d+-\d+|(\d+)\.\d+\.\d+)$`)
+
+// minAirflow2Runtime is the first Airflow 2 runtime major: runtimes 1 to 3
+// predate every Airflow Docker mode runs (pkg/manifest's grammar says the same).
+const minAirflow2Runtime = 4
+
+// dockerHubHosts are the spellings of Docker Hub's registry, where a repository
+// with no namespace, or under library/, is an official image and not a mirror.
+var dockerHubHosts = []string{"docker.io/", "index.docker.io/", "registry-1.docker.io/"}
 
 // ErrUnsupportedBase reports a declared Dockerfile whose final stage does not
 // build on an Astro Runtime image.
@@ -189,29 +216,60 @@ var runtimeRepoNames = []string{"runtime", "astro-runtime"}
 var ErrUnsupportedBase = errors.New("a declared Dockerfile must build on an Astro Runtime image")
 
 // IsAstroRuntimeImage reports whether an image reference names an Astro
-// Runtime image, published or mirrored: its last path segment is exactly
-// runtime or astro-runtime, on any registry.
+// Runtime image: IsAstroRuntimeRef on the reference split into its repository
+// and tag. A reference given without a tag is only ever one of Astronomer's
+// published repositories, since a mirror is recognized by its tag too.
+func IsAstroRuntimeImage(ref string) bool {
+	image, tag := splitImageRef(ref)
+	return IsAstroRuntimeRef(image, tag)
+}
+
+// IsAstroRuntimeRef reports whether image, with tag ("" for none), is an Astro
+// Runtime image: one of Astronomer's published repositories with any tag, or a
+// mirror of one — a repository on another registry whose last path segment is
+// exactly runtime or astro-runtime and whose tag is a Runtime version.
 //
-// A tag or digest is ignored, so the reference may be given with or without
-// one (ParseDockerfileAt returns it without). The name has to be a repository
-// under a registry or namespace: a bare `runtime` names docker.io/library/runtime,
-// an official image Docker Hub does not publish, and `FROM
-// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io,
-// an unrelated image. Neither is Astro Runtime. A segment that merely contains
-// the word (myco/our-runtime, astro-runtime-dev) is not one either, and the
-// comparison is exact, because Docker repository names are lowercase and an
-// uppercase one is not a reference Docker accepts. A reference built from a
-// build argument is never one: what it names is not in the text (IsUnresolvedRef).
-func IsAstroRuntimeImage(image string) bool {
-	if image == "" || IsUnresolvedRef(image) {
+// Not a mirror: a Docker Hub official image (runtime, docker.io/runtime,
+// docker.io/library/runtime), which no Astronomer image is; a segment that
+// only contains the word (myco/our-runtime); a floating or foreign tag
+// (dotnet/runtime:8.0, x/runtime:latest); and a mirror pinned by digest alone,
+// which carries no tag to read. A reference built from a build argument is
+// never one either: what it names is not in the text (IsUnresolvedRef). The
+// comparison is exact, because Docker repository names are lowercase.
+func IsAstroRuntimeRef(image, tag string) bool {
+	if image == "" || IsUnresolvedRef(image) || IsUnresolvedRef(tag) {
 		return false
 	}
-	repo, _ := splitImageRef(image)
+	if slices.Contains(publishedRuntimeRepos, image) {
+		return true
+	}
+	repo := image
+	for _, host := range dockerHubHosts {
+		repo = strings.TrimPrefix(repo, host)
+	}
 	slash := strings.LastIndex(repo, "/")
-	if slash < 0 {
+	if slash < 0 || strings.HasPrefix(repo, "library/") {
 		return false
 	}
-	return slices.Contains(runtimeRepoNames, repo[slash+1:])
+	if !slices.Contains(runtimeRepoNames, repo[slash+1:]) {
+		return false
+	}
+	return isMirrorRuntimeTag(tag)
+}
+
+// isMirrorRuntimeTag reports a tag that spells an exact Runtime version, flavor
+// suffixes aside (mirrorRuntimeTagRe).
+func isMirrorRuntimeTag(tag string) bool {
+	v, _ := ParseRuntimeTagPython(tag)
+	m := mirrorRuntimeTagRe.FindStringSubmatch(v)
+	if m == nil {
+		return false
+	}
+	if m[1] == "" {
+		return true
+	}
+	major, err := strconv.Atoi(m[1])
+	return err == nil && major >= minAirflow2Runtime
 }
 
 // IsUnresolvedRef reports a FROM reference this package cannot resolve on its
@@ -261,7 +319,7 @@ func ReadDeclaredBase(path string) DeclaredBase {
 // base is unknown, is not an Astro Runtime image, or is pinned by digest, which
 // names an exact image and no version.
 func (b DeclaredBase) RuntimeVersion() string {
-	if !b.Known || !IsAstroRuntimeImage(b.Image) || b.Tag == "" {
+	if !b.Known || !IsAstroRuntimeRef(b.Image, b.Tag) || b.Tag == "" {
 		return ""
 	}
 	v, _ := ParseRuntimeTagPython(b.Tag)

@@ -160,14 +160,15 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 // Only what the file positively says is refused. A base that could not be read
 // at all is left alone, for the reason airflowrt.ReadDeclaredBase gives.
 func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
-	if !base.Known || airflowrt.IsAstroRuntimeImage(base.Image) {
+	if !base.Known || airflowrt.IsAstroRuntimeRef(base.Image, base.Tag) {
 		return nil
 	}
 	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
 		"astro user and takes its service set from the runtime tag, so another base cannot start. "+
-		"Base the final stage on astrocrpublic.azurecr.io/runtime, or on a mirror of it whose repository "+
-		"is named runtime or astro-runtime",
-		airflowrt.ErrUnsupportedBase, declared, base.Image)
+		"Base the final stage on one of Astronomer's published Runtime images "+
+		"(astrocrpublic.azurecr.io/runtime, quay.io/astronomer/astro-runtime), or on a mirror whose "+
+		"repository is named runtime or astro-runtime and whose tag is a Runtime version, such as 3.1-12 or 12.1.0",
+		airflowrt.ErrUnsupportedBase, declared, base.Ref())
 }
 
 // planMajor is the Airflow generation the compose file has to describe: read
@@ -184,31 +185,22 @@ func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
 // in the CLI's, and leaving it would have relocated the divergence the declared
 // tier exists to end rather than closing it.
 //
-// The pin is the answer whenever the file does not carry a generation. That is
-// a file nothing could be read from, and a runtime pinned by digest — whose
-// reference names an exact image and no version at all, so there is nothing in
-// it to be read.
+// The pin is the answer whenever the file does not carry a generation: a file
+// nothing could be read from, a runtime pinned by digest — whose reference
+// names an exact image and no version at all — and a published runtime whose
+// tag is not a Runtime version (runtime:latest, or no tag), which says nothing
+// about which Airflow it is.
 //
 // The version is read by airflowrt.DeclaredBase, the same reader the check
 // that the FROM agrees with the requirement uses (scaffold.CheckDockerfileAirflow),
-// and a tag that check can read (manifest.ParseRuntimeTag) takes its generation
-// from the same grammar, so for those tags the two cannot disagree, and the
-// check has already refused a start where the tag and the pin differ. Only a
-// tag the grammar does not read falls to the looser rule below: an Astronomer
-// image whose tag is not a runtime version at all (ap-airflow:2.5.1) is still
-// Airflow 2 to the compose file, where the check has nothing to compare.
+// and its generation by the same grammar (manifest.ParseRuntimeTag), so the two
+// cannot disagree, and the check has already refused a start where the tag and
+// the pin differ.
 func planMajor(airflowVersion string, base airflowrt.DeclaredBase) string {
-	v := base.RuntimeVersion()
-	if v == "" {
-		return airflowMajor(airflowVersion)
-	}
-	if t, ok := manifest.ParseRuntimeTag(v); ok {
+	if t, ok := manifest.ParseRuntimeTag(base.RuntimeVersion()); ok {
 		return t.Major
 	}
-	if airflowrt.IsRuntime3(v) {
-		return "3"
-	}
-	return "2"
+	return airflowMajor(airflowVersion)
 }
 
 // Start brings the project's compose stack up and waits for Airflow to be

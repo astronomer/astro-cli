@@ -162,53 +162,66 @@ func TestIsAstroRuntimeImage(t *testing.T) {
 		image string
 		want  bool
 	}{
-		// The published names, with and without a tag or digest.
+		// Astronomer's published repositories: any tag, or none.
 		{"astrocrpublic.azurecr.io/runtime", true},
 		{"astrocrpublic.azurecr.io/runtime:3.1-12", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1", true},
+		{"astrocrpublic.azurecr.io/runtime:latest", true},
 		{"astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12", true},
 		{"astrocrpublic.azurecr.io/runtime@sha256:abc123", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1-12@sha256:abc123", true},
 		{"quay.io/astronomer/astro-runtime", true},
 		{"quay.io/astronomer/astro-runtime:12.1.0", true},
 
-		// Mirrors: the repository keeps its name on another registry, at any
-		// depth, behind a port too.
+		// Mirrors: the repository's name on another registry, at any depth or
+		// behind a port, with a tag that is an exact Runtime version.
 		{"registry.corp.example/astronomer/astro-runtime:12.1.0", true},
+		{"registry.corp.example/astronomer/astro-runtime:12.1.0-slim", true},
 		{"mirror/runtime:3.1-12", true},
+		{"mirror/runtime:3.1-12-python-3.12-base", true},
 		{"registry.corp.example/a/b/c/runtime:3.1-12", true},
 		{"localhost:5000/astro-runtime:3.1-12", true},
-		{"localhost:5000/runtime", true},
-		{"quay.io/astronomer-mirror/astro-runtime", true},
-		{"astrocrpublic.azurecr.io.example.com/runtime", true},
+		{"quay.io/astronomer-mirror/astro-runtime:13.4.0", true},
+		{"mirror/runtime:3.1-12@sha256:abc123", true},
+		{"docker.io/myco/astro-runtime:12.1.0", true},
 
-		// A registry or namespace alone is not a repository: `FROM
-		// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io.
+		// The name alone is not enough: other images are called runtime too.
+		{"mcr.microsoft.com/dotnet/runtime:8.0", false},
+		{"ghcr.io/x/runtime:latest", false},
+		{"registry.corp/astro-runtime:stable", false},
+		{"mirror/runtime", false},
+		{"mirror/runtime:3.1", false},
+		{"mirror/astro-runtime:12", false},
+		{"mirror/runtime:3.1.0", false},
+		{"mirror/runtime@sha256:abc123", false},
+
+		// Docker Hub official images, which no Astronomer image is.
+		{"runtime", false},
+		{"runtime:3.1-12", false},
+		{"astro-runtime:12.1.0", false},
+		{"docker.io/runtime:3.1-12", false},
+		{"docker.io/library/runtime:3.1-12", false},
+		{"library/runtime:3.1-12", false},
+		{"index.docker.io/library/astro-runtime:12.1.0", false},
+
+		// A registry or namespace alone is not a repository.
 		{"astrocrpublic.azurecr.io", false},
 		{"quay.io/astronomer", false},
 		{"astrocrpublic.azurecr.io/", false},
-		// Bare, the name is a Docker Hub official image, docker.io/library/runtime,
-		// which Docker Hub does not publish and Astronomer is not.
-		{"runtime", false},
-		{"astro-runtime:12.1.0", false},
 
 		// Other Astronomer images are not Astro Runtime.
-		{"quay.io/astronomer/ap-airflow", false},
-		{"quay.io/astronomer/astro-runtime-dev", false},
+		{"quay.io/astronomer/ap-airflow:2.5.1", false},
+		{"quay.io/astronomer/astro-runtime-dev:12.1.0", false},
 
-		// The ordinary OSS image, which is the shape a v1 repo brings.
-		{"apache/airflow", false},
 		{"apache/airflow:2.9.3", false},
 		{"python", false},
 		{"python:3.12-slim", false},
-		{"ubuntu", false},
-		// Named to look like one without being one.
-		{"myco/our-runtime", false},
-		{"myco/runtime-tools", false},
-		// Docker repository names are lowercase; this is not a reference.
-		{"mirror/Runtime", false},
-		// The segment is the repository, not the tag.
+		{"myco/our-runtime:3.1-12", false},
+		{"myco/runtime-tools:12.1.0", false},
+		{"mirror/Runtime:3.1-12", false},
 		{"myco/base:runtime", false},
-		// A build argument names nothing the text can show.
 		{"${REGISTRY}/runtime:3.1-12", false},
+		{"mirror/runtime:${TAG}", false},
 		{"", false},
 	} {
 		t.Run(tc.image, func(t *testing.T) {
@@ -263,6 +276,13 @@ func TestParseDockerfileAtReadsRealReferences(t *testing.T) {
 			name:      "a digest reference has no tag",
 			body:      "FROM astrocrpublic.azurecr.io/runtime@sha256:abc123\n",
 			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "",
+		},
+		{
+			// Both: the tag is still what the reference says it is, and the
+			// repository is not "runtime:3.1-12".
+			name:      "a tag and a digest",
+			body:      "FROM localhost:5000/runtime:3.1-12@sha256:abc123\n",
+			wantImage: "localhost:5000/runtime", wantTag: "3.1-12",
 		},
 		{
 			name:      "case and alias keywords are not the image",

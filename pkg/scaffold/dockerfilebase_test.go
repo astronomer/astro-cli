@@ -42,6 +42,11 @@ func TestDockerfileBase(t *testing.T) {
 		{name: "a mirror in another registry", body: "FROM quay.io/astronomerfake/astro-runtime:12.1.0\n", want: baseRuntime},
 		{name: "a mirror of the airflow 3 image", body: "FROM mirror/runtime:3.1-12\n", want: baseRuntime},
 		{name: "a mirror behind a port", body: "FROM localhost:5000/astronomer/astro-runtime:12.1.0\n", want: baseRuntime},
+		// The name alone is not enough off Astronomer's registries.
+		{name: "the .NET runtime", body: "FROM mcr.microsoft.com/dotnet/runtime:8.0\n", want: baseForeign},
+		{name: "an untagged mirror name", body: "FROM mirror/runtime\n", want: baseForeign},
+		{name: "a mirror name on a floating tag", body: "FROM registry.corp/astro-runtime:stable\n", want: baseForeign},
+		{name: "a Docker Hub official image", body: "FROM docker.io/library/runtime:3.1-12\n", want: baseForeign},
 
 		{
 			name: "multi-stage, runtime last",
