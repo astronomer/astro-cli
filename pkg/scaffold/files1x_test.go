@@ -189,7 +189,7 @@ func TestRuntimeTagFormats(t *testing.T) {
 	// than being an accident of how these were written.
 	assert.True(t, runtimeTagRe.MatchString("3.1-12"))
 	assert.True(t, oldRuntimeTagRe.MatchString("3.1-12"), "overlapping is expected; precedence is what decides")
-	got, _, _ := airflowFromDockerfile([]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"))
+	got, _, _ := airflowFromDockerfile(parseFinalStage(t, "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"))
 	assert.Equal(t, "3.1", got, "the new format must win the overlap")
 }
 
@@ -235,11 +235,12 @@ func TestAirflowFromDockerfile(t *testing.T) {
 			wantNote:   "is not an Astro Runtime version",
 		},
 		{
-			name: "an untagged runtime image states nothing",
-			in:   "FROM astrocrpublic.azurecr.io/runtime\n",
-			// Reached only because the image IS a runtime image; a tagless
-			// python base is rejected earlier, by the image check.
-			wantNote: "carries no tag",
+			// Docker reads an untagged image as :latest, and so does
+			// airflowrt.ParseDockerfileAt, which is what reads the final stage.
+			name:       "an untagged runtime image is latest",
+			in:         "FROM astrocrpublic.azurecr.io/runtime\n",
+			wantStated: true,
+			wantNote:   "the tag latest is not an Astro Runtime version",
 		},
 		{
 			name:     "a digest pins no readable tag",
@@ -258,12 +259,12 @@ func TestAirflowFromDockerfile(t *testing.T) {
 			// Airflow "2", pinning a 3.0.1 project back a whole generation.
 			name:     "an Airflow image that is not Astro Runtime is not read",
 			in:       "FROM apache/airflow:3.0.1\n",
-			wantNote: "no stage builds on an Astro Runtime image",
+			wantNote: "which is not an Astro Runtime image, so it names no Airflow version",
 		},
 		{
 			name:     "an unrelated base image is not read as Airflow 2",
 			in:       "FROM ubuntu:22.04\n",
-			wantNote: "no stage builds on an Astro Runtime image",
+			wantNote: "which is not an Astro Runtime image, so it names no Airflow version",
 		},
 		{
 			// The standard Apple-silicon workaround. A \S+ capture took the
@@ -312,7 +313,7 @@ func TestAirflowFromDockerfile(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			version, stated, notes := airflowFromDockerfile([]byte(tc.in))
+			version, stated, notes := airflowFromDockerfile(parseFinalStage(t, tc.in))
 			assert.Equal(t, tc.wantVersion, version)
 			assert.Equal(t, tc.wantStated, stated)
 			if tc.wantNote == "" {
