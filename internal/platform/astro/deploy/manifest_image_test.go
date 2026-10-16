@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/deploybuild"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -58,7 +59,7 @@ func withImageSeams(t *testing.T, runtimeVersion string) (*fakeImageCmd, *mocks.
 	t.Helper()
 	cmd := &fakeImageCmd{}
 	handler := new(mocks.ImageHandler)
-	handler.On("GetLabel", mock.Anything, runtimeImageLabel).Return(runtimeVersion, nil).Maybe()
+	handler.On("GetLabel", mock.Anything, airflowrt.RuntimeVersionLabel).Return(runtimeVersion, nil).Maybe()
 	handler.On("Push", mock.Anything, registryUsername, mock.Anything, mock.Anything).Return("", nil).Maybe()
 
 	origResolve := resolveContainerEngine
@@ -244,7 +245,7 @@ func containerdStore(t *testing.T, runtimeVersion string) (cmd *fakeImageCmd, ha
 			label = runtimeVersion
 		}
 		h := new(mocks.ImageHandler)
-		h.On("GetLabel", mock.Anything, runtimeImageLabel).Return(label, nil).Maybe()
+		h.On("GetLabel", mock.Anything, airflowrt.RuntimeVersionLabel).Return(label, nil).Maybe()
 		h.On("Push", mock.Anything, registryUsername, mock.Anything, mock.Anything).Return("", nil).Maybe()
 		handlers[name] = h
 		return h

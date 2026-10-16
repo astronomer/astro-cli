@@ -336,19 +336,17 @@ func saveNewLink(req Request, target Target, res *Result) {
 }
 
 // checkImageSource holds what an image deploy would build from to the checks
-// before a build (deploybuild.CheckSource), for a deploy that builds one from
-// the manifest. A dags-only deploy and one adopting a prebuilt --image-name
-// build nothing from the manifest, and are not held to any of it. It returns
-// the build secrets the declared Dockerfile mounts and nobody gave, for a
-// failed build to name again, and the survey of what the image would carry,
-// made once for every check of it (the transport's too).
+// before a build (deploybuild.CheckSource, which skips a dags-only deploy and
+// a prebuilt --image-name). It returns the build secrets the declared
+// Dockerfile mounts and nobody gave, for a failed build to name again, and the
+// survey of what the image would carry, made once for every check of it (the
+// transport's too).
 func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.ProjectSurvey, error) {
-	if req.DagsOnly || req.ImageName != "" || req.Manifest == nil {
-		return imagebuild.MissingSecrets{}, nil, nil
-	}
 	return deploybuild.CheckSource(&deploybuild.Source{
 		ProjectDir:   req.ProjectDir,
 		Manifest:     req.Manifest,
+		DagsOnly:     req.DagsOnly,
+		ImageName:    req.ImageName,
 		BuildSecrets: req.BuildSecrets,
 		CheckRuntime: req.CheckRuntime,
 		Warn:         req.Warn,

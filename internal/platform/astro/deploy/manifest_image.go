@@ -376,13 +376,13 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 		}
 		return in.ImageName, version, nil
 	}
+	req.Secrets = in.BuildSecrets
+	req.Bin = bin
+	req.Env = env
 	return deploybuild.BuildImage(ctx, &deploybuild.Image{
 		Request:    *req,
 		ProjectDir: in.Build.ProjectDir,
 		Dockerfile: in.Build.Dockerfile,
-		Secrets:    in.BuildSecrets,
-		Bin:        bin,
-		Env:        env,
 		Commander:  cmd,
 		Now:        buildNow,
 		Progress:   in.Progress,

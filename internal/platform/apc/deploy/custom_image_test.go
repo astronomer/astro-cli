@@ -6,6 +6,7 @@ import (
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
 // A custom --image-name pushed to the APC registry goes to
@@ -32,7 +33,7 @@ func (s *Suite) TestCustomImageToTheAPCRegistryTakesTheNextTag() {
 		var pushedTo string
 		imageHandlerInit = func(image string) airflow.ImageHandler {
 			s.mockImageHandler.On("TagLocalImage", c.image).Return(nil).Once()
-			s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("12.2.0", nil).Once()
+			s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("12.2.0", nil).Once()
 			s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 				pushedTo = args.String(0)
 			}).Return("", nil).Once()

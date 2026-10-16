@@ -17,6 +17,11 @@ type Source struct {
 	// ProjectDir is the project's root, and Manifest its loaded pyproject.toml.
 	ProjectDir string
 	Manifest   *manifest.Manifest
+	// DagsOnly is a deploy of the DAGs alone (--dags), and ImageName a
+	// prebuilt image (--image-name). Neither builds from the manifest, so
+	// neither is checked.
+	DagsOnly  bool
+	ImageName string
 	// BuildSecrets are the docker build --secret specs the build will be
 	// handed.
 	BuildSecrets []string
@@ -44,8 +49,15 @@ type Source struct {
 // track is refused. It returns the build secrets the declared Dockerfile
 // mounts and nobody gave, for a failed build to name again, and the survey of
 // what the image would carry, made once for every check of it.
+//
+// A deploy that builds nothing from the manifest (Source.DagsOnly,
+// Source.ImageName) and one with no manifest are not held to any of it, and
+// get no survey.
 func CheckSource(s *Source) (imagebuild.MissingSecrets, *imagebuild.ProjectSurvey, error) {
 	var missing imagebuild.MissingSecrets
+	if s.DagsOnly || s.ImageName != "" || s.Manifest == nil {
+		return missing, nil, nil
+	}
 	if err := scaffold.CheckDockerfileAirflow(s.ProjectDir, s.Manifest); err != nil {
 		return missing, nil, err
 	}

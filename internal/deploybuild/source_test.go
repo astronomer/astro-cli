@@ -48,6 +48,40 @@ func TestCheckSourceChecksTheRuntimeBuild(t *testing.T) {
 	assert.Equal(t, []string{"pyproject.toml: tool.astro.runtime: yanked"}, warned)
 }
 
+// A deploy that builds nothing from the manifest, and one with no manifest,
+// are checked for nothing: a Dockerfile FROM another Airflow, which an image
+// built from the manifest is refused for, goes through, and nothing is
+// surveyed or asked.
+func TestCheckSourceSkipsWhatBuildsNothing(t *testing.T) {
+	dir, m := sourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.3-8")
+	// Neither is meant to run; one that does fails the test.
+	check := func(string, string) ([]runtimeversions.Finding, error) { //nolint:unparam // never called
+		t.Error("the runtime check ran")
+		return nil, nil
+	}
+	engine := func() (string, []string, error) { //nolint:unparam // never called
+		t.Error("the engine was resolved")
+		return "", nil, nil
+	}
+	for name, s := range map[string]Source{
+		"--dags":       {DagsOnly: true, Manifest: m},
+		"--image-name": {ImageName: "prebuilt:1", Manifest: m},
+		"no manifest":  {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s.ProjectDir, s.CheckRuntime, s.Engine = dir, check, engine
+			s.Warn = func(w string) { t.Errorf("warned: %s", w) }
+			missing, survey, err := CheckSource(&s)
+			require.NoError(t, err)
+			assert.Nil(t, survey)
+			assert.Zero(t, missing)
+		})
+	}
+
+	_, _, err := CheckSource(&Source{ProjectDir: dir, Manifest: m})
+	require.Error(t, err, "the same project is refused when its image is built")
+}
+
 // A declared Dockerfile FROM another Airflow than the pin is refused.
 func TestCheckSourceRefusesADockerfileOfAnotherAirflow(t *testing.T) {
 	dir, m := sourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.3-8")

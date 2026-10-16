@@ -8,13 +8,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
-
-// RuntimeLabel is the label an Astro Runtime image carries its runtime
-// version in, and the one a deploy reads off the image it ships.
-const RuntimeLabel = "io.astronomer.docker.runtime.version"
 
 // Platform is the platform a deploy image is built at: the one a Deployment
 // runs.
@@ -27,20 +24,17 @@ type LabelReader func(image, label string) (string, error)
 
 // Image is what BuildImage builds, and what it builds it with.
 type Image struct {
-	// Request is the image the manifest builds (imagebuild.ForManifest's).
-	// BuildImage fills in where it is built and how: WorkDir, Tag, Platform,
-	// Secrets, Bin and Env.
+	// Request is the image the manifest builds (imagebuild.ForManifest's),
+	// with the caller's Secrets, Labels and engine (Bin and Env, as
+	// EnsureEngine resolved them), which BuildImage passes on as given. It
+	// sets only where the image is built and what it is called: WorkDir, Tag
+	// and Platform.
 	Request imagebuild.Request
 	// ProjectDir is the project's root, which names the built tag (ImageTag).
 	ProjectDir string
 	// Dockerfile is the declared Dockerfile as the manifest names it, for
 	// messages; "" for a generated build.
 	Dockerfile string
-	// Secrets are docker build --secret specs (imagebuild.Request.Secrets).
-	Secrets []string
-	// Bin and Env are the container engine EnsureEngine resolved.
-	Bin string
-	Env []string
 	// Commander runs the build; Now is its clock.
 	Commander imagebuild.Commander
 	Now       func() time.Time
@@ -63,10 +57,7 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 	req := in.Request
 	req.WorkDir = workDir
 	req.Tag = ImageTag(in.ProjectDir)
-	req.Secrets = in.Secrets
 	req.Platform = Platform
-	req.Bin = in.Bin
-	req.Env = in.Env
 	// BuildLocal, not Build: the image is inspected, tagged and pushed next, so
 	// it has to be a single-platform image in the local store even when there
 	// is nothing to install. See BuildLocal for why a pulled base is not.
@@ -84,7 +75,7 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 		return "", "", err
 	}
 
-	version, err := in.ReadLabel(built, RuntimeLabel)
+	version, err := in.ReadLabel(built, airflowrt.RuntimeVersionLabel)
 	if err != nil {
 		return "", "", fmt.Errorf("reading the runtime version off the built image: %w", err)
 	}
@@ -95,9 +86,9 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 		// Astro Runtime, and naming the base there would name an empty string
 		// and send them at a decision they did not make.
 		if req.FromDeclaredDockerfile() {
-			return "", "", fmt.Errorf("the image built from %s is missing the %s label, so it is not based on Astro Runtime; build it FROM an Astro Runtime image", in.Dockerfile, RuntimeLabel)
+			return "", "", fmt.Errorf("the image built from %s is missing the %s label, so it is not based on Astro Runtime; build it FROM an Astro Runtime image", in.Dockerfile, airflowrt.RuntimeVersionLabel)
 		}
-		return "", "", fmt.Errorf("the built image is missing the %s label; the runtime base %s should carry it", RuntimeLabel, req.BaseImage)
+		return "", "", fmt.Errorf("the built image is missing the %s label; the runtime base %s should carry it", airflowrt.RuntimeVersionLabel, req.BaseImage)
 	}
 	return built, version, nil
 }
@@ -107,12 +98,12 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 // label is read off the local image: an inspect that fails is the "not found
 // locally" signal, and an image without the label is not Astro Runtime.
 func PrebuiltRuntime(image string, readLabel LabelReader) (string, error) {
-	version, err := readLabel(image, RuntimeLabel)
+	version, err := readLabel(image, airflowrt.RuntimeVersionLabel)
 	if err != nil {
 		return "", fmt.Errorf("image %q was not found locally or could not be inspected; build it or 'docker load' it first: %w", image, err)
 	}
 	if version == "" {
-		return "", fmt.Errorf("image %q is not based on Astro Runtime (the %s label is missing); build it FROM the Astro runtime", image, RuntimeLabel)
+		return "", fmt.Errorf("image %q is not based on Astro Runtime (the %s label is missing); build it FROM the Astro runtime", image, airflowrt.RuntimeVersionLabel)
 	}
 	return version, nil
 }
