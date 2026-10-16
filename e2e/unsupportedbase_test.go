@@ -119,11 +119,22 @@ func dockerRun(t *testing.T, timeout time.Duration, args ...string) {
 }
 
 // removeIfPulledHere removes image when the case ends, if it was not in the
-// local store when the case began.
+// local store when the case began and is there now. BuildKit keeps a base it
+// pulled in its own cache rather than tagging it in the image store, so the
+// image is often not there to remove.
 func removeIfPulledHere(t *testing.T, image string) {
 	t.Helper()
-	if err := exec.CommandContext(t.Context(), "docker", "image", "inspect", image).Run(); err == nil {
+	present := func(ctx context.Context) bool {
+		return exec.CommandContext(ctx, "docker", "image", "inspect", image).Run() == nil
+	}
+	if present(t.Context()) {
 		return
 	}
-	t.Cleanup(func() { dockerRun(t, time.Minute, "image", "rm", image) })
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		if present(ctx) {
+			dockerRun(t, time.Minute, "image", "rm", image)
+		}
+	})
 }
