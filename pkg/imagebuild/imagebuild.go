@@ -208,6 +208,10 @@ type Request struct {
 	// the dependencies. Ignored in Dockerfile mode, whose context is already
 	// the project. See copyProjectFiles for what is left out.
 	ProjectFiles string
+	// Labels are image labels ("key=value"), each passed to the build as a
+	// --label, in the order given, in either mode. A deploy marks its image
+	// with them for the control plane that reads them; nil adds none.
+	Labels []string
 	// Platform is the build platform (e.g. "linux/amd64"). Empty builds for the
 	// host — what local Docker mode wants; the deploy path pins linux/amd64.
 	Platform string
@@ -251,8 +255,8 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 // share so little). Otherwise the request's dependencies and OS packages are
 // installed into a layer over its base image through the runtime image's ONBUILD
 // triggers, with the project's files over them when the request carries
-// ProjectFiles. With nothing to install and no project files it builds nothing
-// and returns the base image unchanged (the fast path).
+// ProjectFiles. With nothing to install, no project files and no labels it
+// builds nothing and returns the base image unchanged (the fast path).
 //
 // Build output streams to cb.OnLine (component "build"); a failed build returns
 // a named error, never a hang.
@@ -291,8 +295,9 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	deps := runtimeDeps(req.Dependencies)
 	// The base image already provides Airflow, so a project with nothing beyond
 	// Airflow and no OS packages needs no build and runs the base as-is.
-	// An image carrying the project's files is never the bare base.
-	if fastPath && len(deps) == 0 && len(req.Packages) == 0 && req.ProjectFiles == "" {
+	// An image carrying the project's files, or labels of its own, is never
+	// the bare base.
+	if fastPath && len(deps) == 0 && len(req.Packages) == 0 && req.ProjectFiles == "" && len(req.Labels) == 0 {
 		return req.BaseImage, nil
 	}
 
@@ -362,6 +367,9 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	}
 	for _, secret := range req.buildSecrets() {
 		args = append(args, "--secret", secret)
+	}
+	for _, label := range req.Labels {
+		args = append(args, "--label", label)
 	}
 	if req.Platform != "" {
 		args = append(args, "--platform", req.Platform)

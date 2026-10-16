@@ -33,8 +33,6 @@ const (
 )
 
 var (
-	deployImagePlatformSupport = []string{"linux/amd64"}
-
 	// Monkey patched to write unit tests
 	airflowImageHandler = airflow.ImageHandlerInit
 	azureUploader       = azure.Upload

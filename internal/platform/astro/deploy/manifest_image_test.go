@@ -18,6 +18,7 @@ import (
 
 	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/airflow/mocks"
+	"github.com/astronomer/astro-cli/internal/deploybuild"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/container"
@@ -279,7 +280,7 @@ func TestDeployManifestImage_NothingToInstallBuildsASinglePlatformImage(t *testi
 	require.NoError(t, err)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 
-	tag := deployImageTag(dir)
+	tag := deploybuild.ImageTag(dir)
 	assert.True(t, hasImageCall(cmd.calls, "build --tag "+tag+" "), "nothing to install still builds, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "at linux/amd64, got %v", cmd.calls)
 	assert.False(t, hasImageCall(cmd.calls, "docker pull"), "a pulled base is not what ships, got %v", cmd.calls)
@@ -361,64 +362,6 @@ func TestDeployManifestImage_NoPodmanMachineNamesThePodmanFix(t *testing.T) {
 	assert.Contains(t, err.Error(), "astro deploy --dags")
 	assert.NotContains(t, err.Error(), "Start Docker")
 	client.AssertNotCalled(t, "GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything)
-}
-
-func TestCheckRuntimeVersion(t *testing.T) {
-	// No current version: nothing to check.
-	require.NoError(t, checkRuntimeVersion("", "7.0.0", nil, nil))
-	// Supported and equal: fine.
-	require.NoError(t, checkRuntimeVersion("7.0.0", "7.0.0", []string{"7.0.0"}, nil))
-	// Downgrade.
-	assert.ErrorContains(t, checkRuntimeVersion("7.0.0", "6.0.0", []string{"6.0.0", "7.0.0"}, nil), "downgrade")
-	// Not in the allowed set.
-	assert.ErrorContains(t, checkRuntimeVersion("7.0.0", "8.0.0", []string{"7.0.0"}, nil), "unsupported")
-	// A downgrade names the fix when the caller knows it.
-	err := checkRuntimeVersion("3.3-8", "3.3-7", []string{"3.3-7", "3.3-8"}, func(minimum string) string { return "use " + minimum })
-	assert.EqualError(t, err, "cannot deploy Astro Runtime 3.3-7: it is a downgrade from the deployment's current 3.3-8; to deploy, use 3.3-8")
-}
-
-func TestCheckPlannedRuntime(t *testing.T) {
-	offered := []string{"3.2-10", "3.3-7", "3.3-8", "3.10-1"}
-	raise := func(minimum string) string { return "raise to " + minimum }
-	tests := []struct {
-		name    string
-		current string
-		planned plannedRuntime
-		wantErr string
-	}{
-		{name: "nothing planned", current: "3.3-8", planned: plannedRuntime{}},
-		{name: "no current version", current: "", planned: plannedRuntime{version: "3.2", series: true}},
-		{name: "older series", current: "3.3-8", planned: plannedRuntime{version: "3.2", series: true, raise: raise}, wantErr: "cannot deploy Astro Runtime 3.2: it is a downgrade from the deployment's current 3.3-8; to deploy, raise to 3.3-8"},
-		{name: "same series leaves the patch to the label", current: "3.3-8", planned: plannedRuntime{version: "3.3", series: true}},
-		{name: "series not offered", current: "3.3-8", planned: plannedRuntime{version: "3.5", series: true}, wantErr: "unsupported"},
-		{name: "series compared as numbers", current: "3.9-1", planned: plannedRuntime{version: "3.10", series: true}},
-		{name: "series over an Airflow 2 deployment below the floor", current: "11.0.0", planned: plannedRuntime{version: "3.3", series: true}, wantErr: "Airflow 2 to Airflow 3"},
-		{name: "series over an Airflow 2 deployment at the floor", current: "12.1.0", planned: plannedRuntime{version: "3.3", series: true}},
-		{name: "exact downgrade", current: "3.3-8", planned: plannedRuntime{version: "3.3-7", raise: raise}, wantErr: "downgrade from the deployment's current 3.3-8; to deploy, raise to 3.3-8"},
-		{name: "exact not offered", current: "3.3-8", planned: plannedRuntime{version: "3.3-9"}, wantErr: "unsupported"},
-		{name: "exact fine", current: "3.3-7", planned: plannedRuntime{version: "3.3-8"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := checkPlannedRuntime(tt.current, &tt.planned, offered)
-			if tt.wantErr == "" {
-				require.NoError(t, err)
-				return
-			}
-			assert.ErrorContains(t, err, tt.wantErr)
-		})
-	}
-}
-
-func TestPlanRuntimeReadsTheGeneratedBase(t *testing.T) {
-	series := planRuntime(&ManifestImageDeployInput{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3"})
-	assert.Equal(t, "3.3", series.version)
-	assert.True(t, series.series)
-
-	exact := planRuntime(&ManifestImageDeployInput{}, &imagebuild.Request{BaseImage: imagebuild.RuntimeImageRepo + ":3.3-8-python-3.13"})
-	assert.Equal(t, "3.3-8", exact.version)
-	assert.False(t, exact.series)
-	assert.Equal(t, "set [tool.astro] runtime to 3.3-9 or newer in pyproject.toml", exact.raise("3.3-9"))
 }
 
 // A deploy the deployment would refuse for its runtime is refused before the
@@ -530,23 +473,6 @@ func TestDeployManifestImage_ImageNameDowngradeNamesTheFix(t *testing.T) {
 	}, client)
 	require.EqualError(t, err, "cannot deploy Astro Runtime 3.2-10: it is a downgrade from the deployment's current 3.3-8; to deploy, rebuild astro-package/demo:3.2-10-abc FROM Astro Runtime 3.3-8 or newer")
 	client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-}
-
-func TestDeployImageTag(t *testing.T) {
-	// Two same-named projects in different directories must not share a tag.
-	a := filepath.Join(t.TempDir(), "proj")
-	b := filepath.Join(t.TempDir(), "proj")
-	require.NoError(t, os.MkdirAll(a, 0o755))
-	require.NoError(t, os.MkdirAll(b, 0o755))
-
-	tagA := deployImageTag(a)
-	tagB := deployImageTag(b)
-	assert.True(t, strings.HasPrefix(tagA, "astro-deploy/proj-"), "got %q", tagA)
-	assert.True(t, strings.HasPrefix(tagB, "astro-deploy/proj-"), "got %q", tagB)
-	assert.NotEqual(t, tagA, tagB, "same-named projects in different dirs must get different tags")
-
-	// A path with no usable base name falls back to a stable label.
-	assert.True(t, strings.HasPrefix(deployImageTag("/"), "astro-deploy/project"), "got %q", deployImageTag("/"))
 }
 
 func hasImageCall(calls []string, substr string) bool {
