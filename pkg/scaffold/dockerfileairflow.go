@@ -44,10 +44,13 @@ func dockerfilePath(dir string, m *manifest.Manifest) string {
 // caller shows and branches on it as it does any other manifest problem; the
 // fix it offers is MatchAirflowToDockerfile.
 //
-// A FROM that cannot be compared passes: no declared Dockerfile, a file that
-// cannot be read (the build reports that, naming the path), a base built from a
-// build argument, one pinned by digest, one that is not an Astro Runtime image,
-// or a tag the runtime grammar does not read (an untagged FROM among them).
+// A base built from build arguments is compared through their defaults, which
+// is the image astro builds, since it passes no --build-arg
+// (airflowrt.ReadDeclaredBase). A FROM that cannot be compared passes: no
+// declared Dockerfile, a file that cannot be read (the build reports that,
+// naming the path), a build argument that could not be expanded, one pinned by
+// digest, one that is not an Astro Runtime image, or a tag the runtime grammar
+// does not read (an untagged FROM among them).
 func CheckDockerfileAirflow(dir string, m *manifest.Manifest) error {
 	path := dockerfilePath(dir, m)
 	if path == "" {
@@ -175,7 +178,7 @@ func versionForTag(tag manifest.RuntimeTag, runtime string, opts AirflowPinOptio
 // fromForMessage names what a FROM line said, for an error that could not use it.
 func fromForMessage(b airflowrt.DeclaredBase) string {
 	if !b.Known {
-		return "a base that could not be read (a build argument, or no FROM line)"
+		return "a base that could not be read (a build argument that could not be expanded, or no FROM line)"
 	}
 	if b.Tag == "" {
 		return b.Image + ", pinned by digest"

@@ -42,8 +42,13 @@ func dockerfileBase(base airflowrt.DeclaredBase) (kind baseKind, ref string) {
 	if !base.Known {
 		return baseUnknown, ref
 	}
-	if base.Expanded != base.From {
+	switch {
+	case base.Expanded == base.From:
+	case airflowrt.IsUnresolvedRef(base.From):
 		ref += " (" + base.Expanded + " by default)"
+	default:
+		// Only quotes were removed.
+		ref = base.Expanded
 	}
 	if airflowrt.IsAstroRuntimeImage(base.Image) {
 		return baseRuntime, ref

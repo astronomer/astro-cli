@@ -307,7 +307,7 @@ func TestInitDecidesABuildArgumentBaseByItsDefault(t *testing.T) {
 		})
 		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
 		joined := strings.Join(res.Notes, "\n")
-		assert.Contains(t, joined, "${BASE:?unset}, which uses a build argument in a form this run does not expand")
+		assert.Contains(t, joined, "${BASE:?unset}, which uses a build argument this run does not expand")
 		assert.Contains(t, joined, "remove dockerfile under [tool.astro] in pyproject.toml")
 	})
 	t.Run("a FROM and nothing else, not expanded", func(t *testing.T) {
@@ -317,7 +317,7 @@ func TestInitDecidesABuildArgumentBaseByItsDefault(t *testing.T) {
 		assert.FileExists(t, filepath.Join(dir, fileDockerfile), "nothing replaced it, so it stays")
 		notes := dockerfileNotes(res)
 		require.Len(t, notes, 1, "told once: %q", notes)
-		assert.Contains(t, notes[0], "its final FROM is ${BASE:?required}, which uses a build argument in a form this run does not expand")
+		assert.Contains(t, notes[0], "its final FROM is ${BASE:?required}, which uses a build argument this run does not expand")
 		assert.Contains(t, notes[0], "left as it is and not declared")
 	})
 	t.Run("a FROM and nothing else, with no default", func(t *testing.T) {
@@ -326,6 +326,33 @@ func TestInitDecidesABuildArgumentBaseByItsDefault(t *testing.T) {
 		notes := dockerfileNotes(res)
 		require.Len(t, notes, 1, "told once: %q", notes)
 		assert.Contains(t, notes[0], "a build argument with no default")
+	})
+	t.Run("a platform argument", func(t *testing.T) {
+		// BuildKit sets it, so its note must not blame a missing --build-arg.
+		_, res, m := initWith(t, map[string]string{
+			fileDockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.1-12-${TARGETARCH}\nENV TZ=UTC\n",
+		})
+		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+		notes := strings.Join(dockerfileNotes(res), "\n")
+		assert.Contains(t, notes, "which uses a build argument this run does not expand")
+		assert.NotContains(t, notes, "--build-arg")
+		assert.NotContains(t, notes, "no default")
+	})
+	t.Run("an alias named by a build argument", func(t *testing.T) {
+		_, _, m := initWith(t, map[string]string{
+			fileDockerfile: "ARG ENV=prod\nFROM astrocrpublic.azurecr.io/runtime:3.1-12 AS build-prod\nFROM build-${ENV}\nENV TZ=UTC\n",
+		})
+		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+		assert.Equal(t, "3.1", m.Airflow().Pin)
+	})
+	t.Run("an unset suffix", func(t *testing.T) {
+		// Docker expands it to empty, which leaves a Runtime reference.
+		_, res, m := initWith(t, map[string]string{
+			fileDockerfile: "ARG SUFFIX\nFROM astrocrpublic.azurecr.io/runtime:3.1-12${SUFFIX}\nENV TZ=UTC\n",
+		})
+		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+		assert.Equal(t, "3.1", m.Airflow().Pin)
+		assert.NotContains(t, strings.Join(res.Notes, "\n"), "build argument")
 	})
 }
 

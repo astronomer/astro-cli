@@ -166,7 +166,7 @@ func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
 		return nil
 	}
 	image := base.Image
-	if base.Expanded != base.From {
+	if airflowrt.IsUnresolvedRef(base.From) {
 		image += " (FROM " + base.From + ", by its default)"
 	}
 	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+

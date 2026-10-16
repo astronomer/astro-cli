@@ -42,17 +42,48 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("error reading Dockerfile: %w", err)
 	}
-	ref, err := finalStageRef(data)
+	stages, err := readStages(data)
 	if err != nil {
 		return "", "", err
 	}
-	image, tag = splitImageRef(ref)
+	refs := make([]string, len(stages))
+	for i, st := range stages {
+		refs[i] = st.ref
+	}
+	image, tag = splitImageRef(refs[baseStage(stages, refs)])
 	return image, tag, nil
 }
 
-// finalStageRef is the reference the final stage of the Dockerfile in data
-// builds on, as written, followed back through any stage alias it names.
-func finalStageRef(data []byte) (string, error) {
+// stage is one FROM: the reference it builds on, as written, and the alias it
+// is given, lower-cased.
+type stage struct{ alias, ref string }
+
+// baseStage is the index of the stage whose reference the final stage builds
+// on: the final one, followed back through any stage alias it names. refs[i]
+// is stage i's reference as the caller reads it, so that a reference built
+// from a build argument (`FROM build-${ENV}`) can name an alias once expanded.
+// An empty ref names nothing.
+//
+// Each hop moves strictly earlier in the file, as a FROM can only name an
+// earlier stage, so this ends.
+func baseStage(stages []stage, refs []string) int {
+	cur := len(stages) - 1
+	for {
+		earlier := -1
+		for i := range cur {
+			if stages[i].alias != "" && refs[cur] != "" && strings.EqualFold(stages[i].alias, refs[cur]) {
+				earlier = i
+			}
+		}
+		if earlier < 0 {
+			return cur
+		}
+		cur = earlier
+	}
+}
+
+// readStages reads every FROM in the Dockerfile in data, in order.
+func readStages(data []byte) ([]stage, error) {
 	// The LAST stage, not the first, and then back through any alias it names.
 	//
 	// docker builds the final image from the final FROM, so the first one answers
@@ -65,9 +96,7 @@ func finalStageRef(data []byte) (string, error) {
 	// existed and still took the wrong stage.
 	//
 	// A final stage may name an earlier one (`FROM base`), so aliases are
-	// followed to the image they resolve to. Bounded by the number of stages,
-	// since each hop moves strictly earlier in the file.
-	type stage struct{ alias, ref string }
+	// followed to the image they resolve to (baseStage).
 	var stages []stage
 	for _, line := range strings.Split(string(data), "\n") {
 		// Tokenized rather than prefix-matched. docker splits an instruction on
@@ -96,24 +125,9 @@ func finalStageRef(data []byte) (string, error) {
 		stages = append(stages, stage{alias: alias, ref: ref})
 	}
 	if len(stages) == 0 {
-		return "", fmt.Errorf("no FROM instruction found in Dockerfile")
+		return nil, fmt.Errorf("no FROM instruction found in Dockerfile")
 	}
-
-	ref := stages[len(stages)-1].ref
-	for hop := 0; hop < len(stages); hop++ {
-		earlier := -1
-		for i, st := range stages[:len(stages)-1] {
-			if st.alias != "" && strings.EqualFold(st.alias, ref) {
-				earlier = i
-			}
-		}
-		if earlier < 0 {
-			break
-		}
-		ref = stages[earlier].ref
-	}
-
-	return ref, nil
+	return stages, nil
 }
 
 // splitImageRef separates an image reference into its name and tag.
@@ -268,9 +282,12 @@ type DeclaredBase struct {
 //
 // A FROM built from build arguments is expanded from the ARGs declared before
 // the first FROM, the only ones a FROM can use, each default expanded against
-// the ones before it: $NAME, ${NAME}, ${NAME:-word} and ${NAME:+word}, nested.
-// What cannot be expanded is unknown, never some other base: an argument with
-// no default (ArgUnset), or any other form (ArgUnsupported).
+// the ones before it: $NAME, ${NAME}, ${NAME:-word} and ${NAME:+word}, nested,
+// with quotes removed and an argument with no value empty, as Docker does.
+// Every stage is expanded before stage aliases are followed. A result that is
+// an image reference is the base; what is not is unknown, never some other
+// base: empty or not a reference because an argument had no value
+// (ArgUnset), or anything this does not expand (ArgUnsupported).
 func ReadDeclaredBase(path string) DeclaredBase {
 	if path == "" {
 		return DeclaredBase{}
@@ -279,27 +296,24 @@ func ReadDeclaredBase(path string) DeclaredBase {
 	if err != nil {
 		return DeclaredBase{}
 	}
-	from, err := finalStageRef(data)
+	stages, err := readStages(data)
 	if err != nil {
 		return DeclaredBase{}
 	}
-	base := DeclaredBase{From: from, Expanded: from}
-	if IsUnresolvedRef(from) {
-		v := globalBuildArgs(data).expand(from)
-		switch {
-		case v.problem != ArgNone:
-			base.ArgProblem = v.problem
-		case v.value == "":
-			// `${A:+x}` with A unset: nothing to build on without a --build-arg.
-			base.ArgProblem = ArgUnset
-		case IsUnresolvedRef(v.value) || strings.ContainsAny(v.value, " \t"):
-			base.ArgProblem = ArgUnsupported
-		}
-		if base.ArgProblem != ArgNone {
-			base.Expanded = ""
-			return base
-		}
-		base.Expanded = v.value
+	// Every stage's reference is expanded before aliases are followed, so
+	// `FROM build-${ENV}` and `FROM ${STAGE}` can name an earlier stage. One
+	// that could not be expanded names none, and is the answer only if the
+	// final stage reaches it.
+	args := globalBuildArgs(data)
+	refs := make([]string, len(stages))
+	problems := make([]ArgProblem, len(stages))
+	for i, st := range stages {
+		refs[i], problems[i] = args.expandRef(st.ref)
+	}
+	i := baseStage(stages, refs)
+	base := DeclaredBase{From: stages[i].ref, ArgProblem: problems[i], Expanded: refs[i]}
+	if base.ArgProblem != ArgNone {
+		return base
 	}
 	base.Image, base.Tag = splitImageRef(base.Expanded)
 	base.Known = true

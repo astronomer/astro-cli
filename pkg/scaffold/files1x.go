@@ -327,7 +327,9 @@ func unexpandedBaseNote(ref string, problem airflowrt.ArgProblem, pinOnly bool) 
 		note += ", which comes from a build argument with no default. astro passes no --build-arg, so it " +
 			"cannot build this file until the argument has one, and whether its base is an Astro Runtime image is unknown."
 	} else {
-		note += ", which uses a build argument in a form this run does not expand, so whether it builds on an " +
+		// Not "with no default": a platform argument BuildKit sets, or a form
+		// this does not read, is not something a --build-arg would settle.
+		note += ", which uses a build argument this run does not expand, so whether it builds on an " +
 			"Astro Runtime image is unknown."
 	}
 	if pinOnly {
@@ -692,9 +694,12 @@ func airflowFromBase(base airflowrt.DeclaredBase) (version string, stated bool, 
 		// note explains.
 		return "", false, nil
 	}
-	ref, tag := splitImageRef(base.Expanded)
-	if tag == "" {
-		return "", false, []string{prefix + "the image " + ref + " carries no tag, so it names no Airflow version"}
+	// A digest pin carries no tag, and an untagged reference is given
+	// "latest" by the read, which is what docker pulls but not a version the
+	// file stated.
+	tag := base.Tag
+	if tag == "" || !strings.HasSuffix(base.Expanded, ":"+tag) {
+		return "", false, []string{prefix + "the image " + base.Expanded + " carries no tag, so it names no Airflow version"}
 	}
 
 	bare := strings.TrimPrefix(tag, "v")
@@ -951,27 +956,4 @@ func buildSecretNotes(path string) []string {
 			"add 'id=%s,env=<VAR>' to build-secrets under [tool.astro], where <VAR> is the environment variable that holds it", m.Line, m.ID, m.ID))
 	}
 	return notes
-}
-
-// splitImageRef splits an image reference into the reference without its tag
-// and the tag as written: "" for an untagged or digest-pinned reference, where
-// airflowrt's own split supplies the "latest" docker pulls. Which is the
-// difference that matters here: a tag the file did not write is not a version
-// it stated.
-func splitImageRef(ref string) (image, tag string) {
-	// A ':' in a registry host:port is not the tag separator, so only the last
-	// path segment is split. The digest form (image@sha256:...) names no tag.
-	seg := ref
-	if i := strings.LastIndex(seg, "/"); i >= 0 {
-		seg = seg[i+1:]
-	}
-	if i := strings.Index(seg, "@"); i >= 0 {
-		seg = seg[:i]
-	}
-	_, t, found := strings.Cut(seg, ":")
-	if !found {
-		return ref, ""
-	}
-	// image keeps its full reference for messages; the tag is stripped off it.
-	return strings.TrimSuffix(ref, ":"+t), t
 }

@@ -97,6 +97,34 @@ func TestReadDeclaredBaseExpandsBuildArguments(t *testing.T) {
 		{name: "a default holding an unsupported form", body: "ARG BASE=${X:?no}\nFROM ${BASE:-" + rt + ":3.1-1}\n", problem: ArgUnsupported},
 		{name: "a single-quoted default keeps its dollar", body: "ARG REG=astrocrpublic.azurecr.io\nARG BASE='${REG}/runtime:3.1-1'\nFROM ${BASE}\n", problem: ArgUnsupported},
 		{name: "an unclosed quote", body: "ARG BASE=\"" + rt + ":3.1-1\nFROM ${BASE}\n", problem: ArgUnsupported},
+
+		// Quotes are removed, as Docker's lexer removes them, and never kept in
+		// the image.
+		{name: "a double-quoted FROM", body: "ARG BASE=" + rt + ":3.1-1\nFROM \"${BASE}\"\n", expanded: rt + ":3.1-1"},
+		{name: "a single-quoted FROM keeps its dollar", body: "ARG BASE=" + rt + ":3.1-1\nFROM '${BASE}'\n", problem: ArgUnsupported},
+		{name: "an unclosed quote in the FROM", body: "ARG BASE=" + rt + ":3.1-1\nFROM \"${BASE}\n", problem: ArgUnsupported},
+		{name: "a quote inside braces", body: "FROM ${BASE:-\"" + rt + ":3.1-1\"}\n", problem: ArgUnsupported},
+
+		// A later ARG with no default keeps the value an earlier one gave.
+		{name: "a later declaration with no default", body: "ARG BASE=" + rt + ":3.1-1\nARG BASE\nFROM ${BASE}\n", expanded: rt + ":3.1-1"},
+
+		// The platform arguments BuildKit sets itself are the build's, not the file's.
+		{name: "a target platform argument", body: "FROM " + rt + ":3.1-1-${TARGETARCH}\n", problem: ArgUnsupported},
+		{name: "a build platform argument", body: "FROM ${BUILDPLATFORM}/runtime:3.1-1\n", problem: ArgUnsupported},
+		{name: "a platform argument with a default", body: "FROM " + rt + ":${TARGETOS:-3.1-1}\n", problem: ArgUnsupported},
+		{name: "a platform argument declared", body: "ARG TARGETARCH=amd64\nFROM " + rt + ":3.1-1-${TARGETARCH}\n", problem: ArgUnsupported},
+
+		// Only ${ opens a level, as in Docker's lexer: a lone '{' is a literal
+		// character, which no image reference holds.
+		{name: "a literal brace in a default", body: "FROM ${BASE:-" + rt + "{:3.1-1}\n", problem: ArgUnsupported},
+		{name: "a literal brace after a reference", body: "ARG BASE=" + rt + "\nFROM ${BASE}{:3.1-1}\n", problem: ArgUnsupported},
+
+		// An argument with no value is empty, as Docker expands it, and the
+		// result is the base when it is still an image reference.
+		{name: "an unset suffix", body: "ARG SUFFIX\nFROM " + rt + ":3.1-12${SUFFIX}\n", expanded: rt + ":3.1-12"},
+		{name: "an unset suffix never declared", body: "FROM " + rt + ":3.1-12$SUFFIX\n", expanded: rt + ":3.1-12"},
+		{name: "an unset registry leaves no reference", body: "ARG REG\nFROM $REG/runtime:3.1-12\n", problem: ArgUnset},
+		{name: "an unset tag leaves no reference", body: "ARG TAG\nFROM " + rt + ":${TAG}\n", problem: ArgUnset},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "Dockerfile")
@@ -113,6 +141,57 @@ func TestReadDeclaredBaseExpandsBuildArguments(t *testing.T) {
 			}
 			assert.Equal(t, tc.expanded, base.Ref())
 		})
+	}
+}
+
+// A stage named through a build argument is followed to the stage it names,
+// because every stage is expanded before aliases are followed.
+func TestReadDeclaredBaseFollowsAnAliasNamedByABuildArgument(t *testing.T) {
+	const rt = "astrocrpublic.azurecr.io/runtime"
+	for _, tc := range []struct{ name, body, want string }{
+		{
+			name: "an alias with a build argument in it",
+			body: "ARG ENV=prod\nFROM " + rt + ":3.1-12 AS build-prod\nFROM python:3.12 AS build-dev\nFROM build-${ENV}\n",
+			want: rt + ":3.1-12",
+		},
+		{
+			name: "the other alias",
+			body: "ARG ENV=dev\nFROM " + rt + ":3.1-12 AS build-prod\nFROM python:3.12 AS build-dev\nFROM build-${ENV}\n",
+			want: "python:3.12",
+		},
+		{name: "an alias that is a build argument", body: "ARG STAGE=base\nFROM " + rt + ":3.1-12 AS base\nFROM ${STAGE}\n", want: rt + ":3.1-12"},
+		{name: "through an expanded stage", body: "ARG BASE=" + rt + ":3.1-12\nARG STAGE=one\nFROM ${BASE} AS one\nFROM ${STAGE}\n", want: rt + ":3.1-12"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "Dockerfile")
+			require.NoError(t, os.WriteFile(path, []byte(tc.body), 0o600))
+			base := ReadDeclaredBase(path)
+			require.True(t, base.Known, "%+v", base)
+			assert.Equal(t, tc.want, base.Ref())
+		})
+	}
+
+	t.Run("an alias argument with no default", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "Dockerfile")
+		require.NoError(t, os.WriteFile(path, []byte("ARG ENV\nFROM "+rt+":3.1-12 AS build-prod\nFROM build-${ENV}\n"), 0o600))
+		base := ReadDeclaredBase(path)
+		assert.False(t, base.Known)
+		assert.Equal(t, ArgUnset, base.ArgProblem)
+	})
+}
+
+// A quoted FROM with no build argument loses its quotes, as Docker reads it.
+func TestReadDeclaredBaseRemovesQuotes(t *testing.T) {
+	for _, body := range []string{
+		"FROM \"astrocrpublic.azurecr.io/runtime:3.1-12\"\n",
+		"FROM 'astrocrpublic.azurecr.io/runtime:3.1-12'\n",
+	} {
+		path := filepath.Join(t.TempDir(), "Dockerfile")
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+		base := ReadDeclaredBase(path)
+		require.True(t, base.Known, body)
+		assert.Equal(t, "astrocrpublic.azurecr.io/runtime", base.Image, body)
+		assert.Equal(t, "3.1-12", base.Tag, body)
 	}
 }
 
