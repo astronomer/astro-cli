@@ -13,12 +13,16 @@ const (
 	// ArgNone is a FROM whose build arguments all expanded, or one that uses
 	// none.
 	ArgNone ArgProblem = iota
-	// ArgUnset is a FROM that expands to no image reference because it needs
-	// a build argument that was never given a value: declared without a
-	// default, or not declared before the first FROM at all. Docker expands it
-	// to empty, and astro passes no --build-arg, so astro's own build of the
-	// file fails; only a build given that argument works, and what it builds
-	// on is up to that build.
+	// ArgUnset is a FROM that uses a build argument never given a value:
+	// declared without a default, or not declared before the first FROM at
+	// all, whether in the FROM itself or in an ARG default it uses. Docker
+	// expands one to empty, and astro passes no --build-arg, but what the
+	// author meant the argument to supply is not in the file: for
+	// `runtime:3.1-12${SUFFIX}` an empty one is harmless, and for
+	// `runtime:1${MAJOR}.0.0` it names a version that does not exist. So the
+	// base is unknown whatever the expansion would look like, rather than read
+	// as a reference that may be wrong. ${NAME:-word} is not this: the word
+	// is the file's own answer for an argument with no value.
 	ArgUnset
 	// ArgUnsupported is a FROM this package does not expand: one using a
 	// modifier other than :- and :+, an escape, an unbalanced brace or quote,
@@ -42,21 +46,32 @@ var platformArgs = []string{
 type buildArgs map[string]argValue
 
 // argValue is a build argument's default, or a FROM reference, as expanded.
-// unset reports that an argument with no value went into it as empty, which is
-// what a reference that turns out not to be one is put down to. problem is
-// ArgUnsupported when something in it could not be expanded at all.
+// unset reports that an argument with no value went into it as empty, which
+// makes a FROM using it ArgUnset. problem is ArgUnsupported when something in
+// it could not be expanded at all.
 type argValue struct {
 	value   string
 	unset   bool
 	problem ArgProblem
 }
 
-func (v *argValue) absorb(w argValue) {
-	v.value += w.value
-	v.unset = v.unset || w.unset
-	if w.problem > v.problem {
-		v.problem = w.problem
+// lexed is an argValue being built up by lex.
+type lexed struct {
+	b       strings.Builder
+	unset   bool
+	problem ArgProblem
+}
+
+func (l *lexed) absorb(w argValue) {
+	l.b.WriteString(w.value)
+	l.unset = l.unset || w.unset
+	if w.problem > l.problem {
+		l.problem = w.problem
 	}
+}
+
+func (l *lexed) value() argValue {
+	return argValue{value: l.b.String(), unset: l.unset, problem: l.problem}
 }
 
 var unsupported = argValue{problem: ArgUnsupported}
@@ -99,12 +114,9 @@ func (args buildArgs) expandRef(ref string) (string, ArgProblem) {
 	switch {
 	case v.problem != ArgNone:
 		return "", v.problem
-	case v.value == "":
+	case v.unset, v.value == "":
 		return "", ArgUnset
 	case !imageRefRe.MatchString(v.value):
-		if v.unset {
-			return "", ArgUnset
-		}
 		return "", ArgUnsupported
 	}
 	return v.value, ArgNone
@@ -118,7 +130,7 @@ func (args buildArgs) expandRef(ref string) (string, ArgProblem) {
 // reference holds. Inside ${...} a quote is unsupported rather than guessed
 // at.
 func (args buildArgs) lex(s string, quotes bool) argValue {
-	var v argValue
+	var v lexed
 	inDouble := false
 	for i := 0; i < len(s); {
 		c := s[i]
@@ -136,11 +148,11 @@ func (args buildArgs) lex(s string, quotes bool) argValue {
 			if end < 0 {
 				return unsupported
 			}
-			v.value += s[i+1 : i+1+end]
+			v.b.WriteString(s[i+1 : i+1+end])
 			i += end + 2
 			continue
 		case c != '$':
-			v.value += string(c)
+			v.b.WriteByte(c)
 			i++
 			continue
 		}
@@ -164,7 +176,7 @@ func (args buildArgs) lex(s string, quotes bool) argValue {
 	if inDouble {
 		return unsupported
 	}
-	return v
+	return v.value()
 }
 
 // braced expands the inside of ${...}: a name, optionally followed by :-word
@@ -181,22 +193,27 @@ func (args buildArgs) braced(inner string) argValue {
 	if len(rest) < 2 || slices.Contains(platformArgs, name) {
 		return unsupported
 	}
-	v := args[name]
+	v, ok := args[name]
 	word := rest[2:]
 	switch rest[:2] {
 	case ":-":
+		// The word is the file's own answer for an argument with no value.
 		if v.problem != ArgNone || v.value != "" {
 			return v
 		}
 		return args.lex(word, false)
 	case ":+":
+		// Whether the word appears turns on the argument, so one with no
+		// value, or one built from such, leaves the result unset.
 		if v.problem != ArgNone {
 			return v
 		}
 		if v.value == "" {
-			return argValue{}
+			return argValue{unset: !ok || v.unset}
 		}
-		return args.lex(word, false)
+		w := args.lex(word, false)
+		w.unset = w.unset || v.unset
+		return w
 	default:
 		return unsupported
 	}

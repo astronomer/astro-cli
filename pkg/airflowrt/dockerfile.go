@@ -137,12 +137,19 @@ func readStages(data []byte) ([]stage, error) {
 // localhost:5000/astro-runtime:3.1-12 on the first one reads the image as
 // "localhost".
 //
-// A digest reference pins an exact image and carries no tag. Empty rather than
-// the digest, so that a caller reading a generation off the tag is told it has
-// nothing to read instead of being handed a hex string that parses as Airflow 2.
+// A digest is dropped. One alone pins an exact image and carries no tag: empty
+// rather than the digest, so that a caller reading a generation off the tag is
+// told it has nothing to read instead of being handed a hex string that parses
+// as Airflow 2. One after a tag (`runtime:3.1-12@sha256:…`) leaves the tag,
+// which names the version the digest pins.
 func splitImageRef(ref string) (image, tag string) {
 	if at := strings.Index(ref, "@"); at >= 0 {
-		return ref[:at], ""
+		ref = ref[:at]
+		lastSlash := strings.LastIndex(ref, "/")
+		if colon := strings.LastIndex(ref, ":"); colon > lastSlash {
+			return ref[:colon], ref[colon+1:]
+		}
+		return ref, ""
 	}
 	lastSlash := strings.LastIndex(ref, "/")
 	if colon := strings.LastIndex(ref, ":"); colon > lastSlash {

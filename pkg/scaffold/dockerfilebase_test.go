@@ -346,14 +346,36 @@ func TestInitDecidesABuildArgumentBaseByItsDefault(t *testing.T) {
 		assert.Equal(t, "3.1", m.Airflow().Pin)
 	})
 	t.Run("an unset suffix", func(t *testing.T) {
-		// Docker expands it to empty, which leaves a Runtime reference.
+		// Docker expands it to empty, which here leaves a Runtime reference,
+		// but for `1${MAJOR}.0.0` would leave a phantom version. The file does
+		// not say which, so the base is unknown: declared, with the note.
 		_, res, m := initWith(t, map[string]string{
 			fileDockerfile: "ARG SUFFIX\nFROM astrocrpublic.azurecr.io/runtime:3.1-12${SUFFIX}\nENV TZ=UTC\n",
 		})
 		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
-		assert.Equal(t, "3.1", m.Airflow().Pin)
-		assert.NotContains(t, strings.Join(res.Notes, "\n"), "build argument")
+		labels := strings.Join(append(res.Created, res.Updated...), "\n")
+		assert.NotContains(t, labels, "from the Dockerfile", "no Airflow version is read from an unknown base")
+		notes := strings.Join(dockerfileNotes(res), "\n")
+		assert.Contains(t, notes, "which comes from a build argument with no default")
 	})
+}
+
+// A digest after a tag pins the image the tag names, so the tag is still the
+// Airflow version; a digest alone names none.
+func TestInitReadsTheTagBeforeADigest(t *testing.T) {
+	digest := "@sha256:" + strings.Repeat("a", 64)
+	_, res, m := initWith(t, map[string]string{
+		fileDockerfile: "FROM astrocrpublic.azurecr.io/runtime:3.1-12" + digest + "\nENV TZ=UTC\n",
+	})
+	assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+	assert.Equal(t, "3.1", m.Airflow().Pin)
+	assert.NotContains(t, strings.Join(res.Notes, "\n"), "carries no tag")
+
+	_, res, m = initWith(t, map[string]string{
+		fileDockerfile: "FROM astrocrpublic.azurecr.io/runtime" + digest + "\nENV TZ=UTC\n",
+	})
+	assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+	assert.Contains(t, strings.Join(res.Notes, "\n"), "carries no tag")
 }
 
 // A Dockerfile left undeclared contributes no Airflow version, even from an

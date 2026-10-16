@@ -3,6 +3,7 @@ package airflowrt
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,7 @@ func TestDeclaredBaseRuntimeVersion(t *testing.T) {
 		{name: "airflow 2 build", body: "FROM quay.io/astronomer/astro-runtime:13.7.0-slim\n", known: true, want: "13.7.0"},
 		{name: "final stage wins", body: "FROM python:3.12 AS b\nFROM astrocrpublic.azurecr.io/runtime:3.2-4\n", known: true, want: "3.2-4"},
 		{name: "digest pin", body: "FROM astrocrpublic.azurecr.io/runtime@sha256:abc\n", known: true, want: ""},
+		{name: "tag and digest", body: "FROM astrocrpublic.azurecr.io/runtime:3.3-8@sha256:" + strings.Repeat("a", 64) + "\n", known: true, want: "3.3-8"},
 		{name: "not a runtime image", body: "FROM apache/airflow:3.0.1\n", known: true, want: ""},
 		{name: "build argument", body: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.3-8\nFROM ${BASE}\n", known: true, want: "3.3-8"},
 		{name: "build argument with no default", body: "ARG BASE\nFROM ${BASE}\n", known: false, want: ""},
@@ -119,10 +121,19 @@ func TestReadDeclaredBaseExpandsBuildArguments(t *testing.T) {
 		{name: "a literal brace in a default", body: "FROM ${BASE:-" + rt + "{:3.1-1}\n", problem: ArgUnsupported},
 		{name: "a literal brace after a reference", body: "ARG BASE=" + rt + "\nFROM ${BASE}{:3.1-1}\n", problem: ArgUnsupported},
 
-		// An argument with no value is empty, as Docker expands it, and the
-		// result is the base when it is still an image reference.
-		{name: "an unset suffix", body: "ARG SUFFIX\nFROM " + rt + ":3.1-12${SUFFIX}\n", expanded: rt + ":3.1-12"},
-		{name: "an unset suffix never declared", body: "FROM " + rt + ":3.1-12$SUFFIX\n", expanded: rt + ":3.1-12"},
+		// Any argument with no value that reaches the FROM makes it unknown,
+		// even where the empty expansion still reads as a reference: an empty
+		// suffix is harmless, an empty version digit names an image that is
+		// not the one meant, and the file cannot tell the two apart.
+		{name: "an unset suffix", body: "ARG SUFFIX\nFROM " + rt + ":3.1-12${SUFFIX}\n", problem: ArgUnset},
+		{name: "an unset suffix never declared", body: "FROM " + rt + ":3.1-12$SUFFIX\n", problem: ArgUnset},
+		{name: "an unset major", body: "ARG MAJOR\nFROM quay.io/astronomer/astro-runtime:1${MAJOR}.0.0\n", problem: ArgUnset},
+		{name: "an unset minor", body: "ARG MINOR\nFROM " + rt + ":3.${MINOR}1-12\n", problem: ArgUnset},
+		{name: "an unset patch", body: "ARG PATCH\nFROM quay.io/astronomer/astro-runtime:12.1.${PATCH}0\n", problem: ArgUnset},
+		{name: "an unset argument through a default", body: "ARG SUFFIX\nARG BASE=" + rt + ":3.1-12${SUFFIX}\nFROM ${BASE}\n", problem: ArgUnset},
+		{name: ":+ on an unset argument beside text", body: "ARG R\nFROM " + rt + ":3.1-12${R:+-python-3.12}\n", problem: ArgUnset},
+		{name: ":- on an unset argument is the file's answer", body: "ARG SUFFIX\nFROM " + rt + ":3.1-12${SUFFIX:-}\n", expanded: rt + ":3.1-12"},
+		{name: "a set argument that does not make a reference", body: "ARG TAG=3.1-12!\nFROM " + rt + ":${TAG}\n", problem: ArgUnsupported},
 		{name: "an unset registry leaves no reference", body: "ARG REG\nFROM $REG/runtime:3.1-12\n", problem: ArgUnset},
 		{name: "an unset tag leaves no reference", body: "ARG TAG\nFROM " + rt + ":${TAG}\n", problem: ArgUnset},
 	} {
@@ -178,6 +189,25 @@ func TestReadDeclaredBaseFollowsAnAliasNamedByABuildArgument(t *testing.T) {
 		assert.False(t, base.Known)
 		assert.Equal(t, ArgUnset, base.ArgProblem)
 	})
+}
+
+// A digest is not part of the image or the tag: a tag before one is still the
+// tag, and a digest alone leaves none.
+func TestReadDeclaredBaseSplitsADigest(t *testing.T) {
+	digest := "@sha256:" + strings.Repeat("a", 64)
+	for _, tc := range []struct{ body, image, tag string }{
+		{body: "FROM astrocrpublic.azurecr.io/runtime:3.1-12" + digest + "\n", image: "astrocrpublic.azurecr.io/runtime", tag: "3.1-12"},
+		{body: "FROM astrocrpublic.azurecr.io/runtime" + digest + "\n", image: "astrocrpublic.azurecr.io/runtime", tag: ""},
+		{body: "FROM localhost:5000/runtime:3.1-12" + digest + "\n", image: "localhost:5000/runtime", tag: "3.1-12"},
+		{body: "FROM localhost:5000/runtime" + digest + "\n", image: "localhost:5000/runtime", tag: ""},
+	} {
+		path := filepath.Join(t.TempDir(), "Dockerfile")
+		require.NoError(t, os.WriteFile(path, []byte(tc.body), 0o600))
+		base := ReadDeclaredBase(path)
+		require.True(t, base.Known, tc.body)
+		assert.Equal(t, tc.image, base.Image, tc.body)
+		assert.Equal(t, tc.tag, base.Tag, tc.body)
+	}
 }
 
 // A quoted FROM with no build argument loses its quotes, as Docker reads it.

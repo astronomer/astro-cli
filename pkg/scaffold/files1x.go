@@ -694,11 +694,11 @@ func airflowFromBase(base airflowrt.DeclaredBase) (version string, stated bool, 
 		// note explains.
 		return "", false, nil
 	}
-	// A digest pin carries no tag, and an untagged reference is given
+	// A digest alone carries no tag, and an untagged reference is given
 	// "latest" by the read, which is what docker pulls but not a version the
-	// file stated.
+	// file stated. A tag before a digest is read.
 	tag := base.Tag
-	if tag == "" || !strings.HasSuffix(base.Expanded, ":"+tag) {
+	if written, _, _ := strings.Cut(base.Expanded, "@"); tag == "" || !strings.HasSuffix(written, ":"+tag) {
 		return "", false, []string{prefix + "the image " + base.Expanded + " carries no tag, so it names no Airflow version"}
 	}
 
