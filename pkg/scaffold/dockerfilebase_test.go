@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -83,18 +84,33 @@ func TestDockerfileBase(t *testing.T) {
 			want: baseForeign,
 		},
 		{
+			// An ARG default naming an earlier ARG, which Docker expands.
+			name:    "a default naming an earlier argument",
+			body:    "ARG REG=astrocrpublic.azurecr.io\nARG BASE=${REG}/runtime:3.1-1\nFROM ${BASE}\n",
+			want:    baseRuntime,
+			wantRef: "${BASE} (astrocrpublic.azurecr.io/runtime:3.1-1 by default)",
+		},
+		{
+			// The reference ends at the brace matching its own, not the first.
+			name:    "a nested default",
+			body:    "ARG REG=astrocrpublic.azurecr.io\nFROM ${BASE:-${REG}/runtime:3.1-1}\n",
+			want:    baseRuntime,
+			wantRef: "${BASE:-${REG}/runtime:3.1-1} (astrocrpublic.azurecr.io/runtime:3.1-1 by default)",
+		},
+		{
 			// Docker expands an argument with no default to empty, and astro
-			// passes no --build-arg, so this is a base Docker mode cannot build.
+			// passes no --build-arg, so astro cannot build this as it stands;
+			// a build that passes one builds on whatever it names.
 			name:    "build argument with no default",
 			body:    "ARG BASE\nFROM ${BASE}\n",
-			want:    baseForeign,
-			wantRef: "${BASE} (a build argument with no default)",
+			want:    baseUnknown,
+			wantRef: "${BASE}",
 		},
 		{
 			// Only the ARGs before the first FROM reach a FROM.
 			name: "stage-scoped argument",
 			body: "FROM python:3.12 AS one\nARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\n",
-			want: baseForeign,
+			want: baseUnknown,
 		},
 		{
 			name:    "a modifier this does not expand",
@@ -105,16 +121,21 @@ func TestDockerfileBase(t *testing.T) {
 		{name: "no FROM", body: "RUN true\n", want: baseUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), fileDockerfile)
-			require.NoError(t, os.WriteFile(path, []byte(tc.body), 0o600))
-
-			kind, ref := dockerfileBase(path, []byte(tc.body))
+			kind, ref := dockerfileBase(declaredBase(t, tc.body))
 			assert.Equal(t, tc.want, kind)
 			if tc.wantRef != "" {
 				assert.Equal(t, tc.wantRef, ref)
 			}
 		})
 	}
+}
+
+// declaredBase writes body as a Dockerfile and reads its base as init does.
+func declaredBase(t *testing.T, body string) airflowrt.DeclaredBase {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), fileDockerfile)
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	return airflowrt.ReadDeclaredBase(path)
 }
 
 // initWith runs init in a fresh directory holding files, and returns the
@@ -237,23 +258,48 @@ func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
 }
 
 // A FROM built from a build argument is decided by its default, which is what
-// astro's build uses. One in a form this does not expand is declared, as
-// every Dockerfile was before the check, with a note saying it was not read.
+// astro's build uses, and the Airflow version is read from what the default
+// names. One that cannot be expanded is declared, as every Dockerfile was
+// before the check, with a note saying why its base is unknown.
 func TestInitDecidesABuildArgumentBaseByItsDefault(t *testing.T) {
-	t.Run("defaulting to runtime", func(t *testing.T) {
-		_, res, m := initWith(t, map[string]string{
-			fileDockerfile: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\nENV TZ=UTC\n",
+	for _, tc := range []struct{ name, body string }{
+		{name: "defaulting to runtime", body: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\nENV TZ=UTC\n"},
+		{
+			// Classified foreign, and left undeclared, when ARG defaults were
+			// not expanded against earlier ones.
+			name: "a default naming an earlier argument",
+			body: "ARG REG=astrocrpublic.azurecr.io\nARG BASE=${REG}/runtime:3.1-12\nFROM ${BASE}\nENV TZ=UTC\n",
+		},
+		{
+			// Truncated at the first '}' once: foreign, a garbled note, and an
+			// Airflow 2 note read off the tag "3.1-12}".
+			name: "a nested default",
+			body: "ARG REG=astrocrpublic.azurecr.io\nFROM ${BASE:-${REG}/runtime:3.1-12}\nENV TZ=UTC\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, res, m := initWith(t, map[string]string{fileDockerfile: tc.body})
+			assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+			assert.Equal(t, "3.1", m.Airflow().Pin, "the version the default names")
+			joined := strings.Join(res.Notes, "\n")
+			assert.NotContains(t, joined, "not an Astro Runtime image")
+			assert.NotContains(t, joined, "Airflow 2")
+			assert.NotContains(t, joined, "build argument")
+			assert.Contains(t, strings.Join(res.Created, "\n"), "read Airflow 3.1 from the Dockerfile")
 		})
-		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
-		joined := strings.Join(res.Notes, "\n")
-		assert.NotContains(t, joined, "no stage builds on an Astro Runtime image")
-		assert.NotContains(t, joined, "not an Astro Runtime image")
-		assert.Contains(t, joined, "an Astro Runtime image named by a build argument")
-	})
+	}
+
 	t.Run("with no default", func(t *testing.T) {
+		// Reported as "not an Astro Runtime image" once. Nothing says what it
+		// is: a build given --build-arg BASE builds on whatever that names,
+		// and astro's own build, which passes none, cannot build it at all.
 		_, res, m := initWith(t, map[string]string{fileDockerfile: "ARG BASE\nFROM ${BASE}\nRUN true\n"})
-		assert.Empty(t, m.Astro.Dockerfile)
-		assert.Contains(t, strings.Join(res.Notes, "\n"), "${BASE} (a build argument with no default)")
+		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+		notes := strings.Join(dockerfileNotes(res), "\n")
+		assert.NotContains(t, notes, "not an Astro Runtime image")
+		assert.Contains(t, notes, "its final FROM is ${BASE}, which comes from a build argument with no default")
+		assert.Contains(t, notes, "astro passes no --build-arg")
+		assert.Contains(t, notes, "remove dockerfile under [tool.astro] in pyproject.toml")
 	})
 	t.Run("not expanded", func(t *testing.T) {
 		_, res, m := initWith(t, map[string]string{
@@ -261,9 +307,64 @@ func TestInitDecidesABuildArgumentBaseByItsDefault(t *testing.T) {
 		})
 		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
 		joined := strings.Join(res.Notes, "\n")
-		assert.Contains(t, joined, "${BASE:?unset}")
+		assert.Contains(t, joined, "${BASE:?unset}, which uses a build argument in a form this run does not expand")
 		assert.Contains(t, joined, "remove dockerfile under [tool.astro] in pyproject.toml")
 	})
+	t.Run("a FROM and nothing else, not expanded", func(t *testing.T) {
+		// Not declared, since it is only a base, and once said nothing at all.
+		dir, res, m := initWith(t, map[string]string{fileDockerfile: "FROM ${BASE:?required}\n"})
+		assert.Empty(t, m.Astro.Dockerfile)
+		assert.FileExists(t, filepath.Join(dir, fileDockerfile), "nothing replaced it, so it stays")
+		notes := dockerfileNotes(res)
+		require.Len(t, notes, 1, "told once: %q", notes)
+		assert.Contains(t, notes[0], "its final FROM is ${BASE:?required}, which uses a build argument in a form this run does not expand")
+		assert.Contains(t, notes[0], "left as it is and not declared")
+	})
+	t.Run("a FROM and nothing else, with no default", func(t *testing.T) {
+		_, res, m := initWith(t, map[string]string{fileDockerfile: "FROM ${BASE}\n"})
+		assert.Empty(t, m.Astro.Dockerfile)
+		notes := dockerfileNotes(res)
+		require.Len(t, notes, 1, "told once: %q", notes)
+		assert.Contains(t, notes[0], "a build argument with no default")
+	})
+}
+
+// A Dockerfile left undeclared contributes no Airflow version, even from an
+// Astro Runtime builder stage: the image it builds runs something else, and
+// the project's Airflow is not that stage's.
+func TestInitReadsNoAirflowFromAForeignDockerfile(t *testing.T) {
+	for _, body := range []string{
+		"FROM quay.io/astronomer/astro-runtime:12.1.0 AS airflow\nFROM python:3.12-slim\n",
+		"FROM astrocrpublic.azurecr.io/runtime:3.0-1 AS airflow\nFROM python:3.12-slim\nCOPY --from=airflow / /\n",
+		"FROM myco/our-runtime:3.0-1\nRUN true\n",
+		"FROM localhost:5000/astronomer/astro-runtime:3.0-1\nRUN true\n",
+	} {
+		t.Run(body, func(t *testing.T) {
+			_, res, m := initWith(t, map[string]string{fileDockerfile: body})
+			assert.Empty(t, m.Astro.Dockerfile)
+			pin := m.Airflow().Pin
+			assert.NotEqual(t, "2", pin, "an Airflow 2 builder stage is not the project's Airflow")
+			assert.NotEqual(t, "3.0", pin, "neither is an Airflow 3 one")
+			labels := strings.Join(append(res.Created, res.Updated...), "\n")
+			assert.NotContains(t, labels, "from the Dockerfile")
+			notes := dockerfileNotes(res)
+			require.Len(t, notes, 1, "told once: %q", notes)
+			assert.Contains(t, notes[0], "not an Astro Runtime image")
+		})
+	}
+}
+
+// The Python a declared Dockerfile's Runtime base runs is read through a build
+// argument as well, as its Airflow is.
+func TestRead1xProjectReadsBasePythonThroughABuildArgument(t *testing.T) {
+	dir := t.TempDir()
+	writeTree(t, dir, map[string]string{
+		fileDockerfile: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12\nFROM ${BASE}\nENV TZ=UTC\n",
+	})
+	from1x, err := read1xProject(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "3.12", from1x.buildPython())
+	assert.Equal(t, "3.1", from1x.airflow)
 }
 
 // A 1.x project's Dockerfile builds on Astro Runtime, and its conversion is

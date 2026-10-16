@@ -229,58 +229,49 @@ func read1xProject(dir string) (*project1x, error) {
 // Airflow version its tag names, whether it is the project's build, and the
 // notes either answer needs.
 func (from1x *project1x) readDockerfile(dir string, data []byte) {
-	version, stated, notes := airflowFromDockerfile(data)
-	from1x.airflow = version
-	if stated {
-		from1x.statedVersion = true
-	}
+	path := filepath.Join(dir, fileDockerfile)
 	from1x.present = append(from1x.present, fileDockerfile)
 	from1x.dockerfileBody = data
 
-	kind, ref := dockerfileBase(filepath.Join(dir, fileDockerfile), data)
-	// airflowFromDockerfile reads the text after FROM as written, so a base
-	// built from a build argument drew "no stage builds on an Astro Runtime
-	// image (${BASE})" whatever the argument names. Whether it is one is
-	// dockerfileBase's answer, and the notes below give it.
-	if !stated && strings.Contains(ref, "$") {
-		notes = nil
-	}
+	// One read of the base, by the reader Docker mode's start uses, for every
+	// question asked here: whether the file is declared, the Airflow version
+	// it names, and the Python its base runs.
+	base := airflowrt.ReadDeclaredBase(path)
+	kind, ref := dockerfileBase(base)
 	if kind == baseForeign {
 		// Left as it is and not declared, so the notes that describe it as the
 		// build (its RUN steps "still run", requirements.txt "kept because the
-		// base reads it", its build secrets) would all be false. One note
-		// replaces them, keeping only what explains a version the file did
-		// state. The note names the file, so planRetirements keeps it.
+		// base reads it", its build secrets) would all be false. So would an
+		// Airflow version read from it: the image it builds is not Astro
+		// Runtime, and an earlier stage that is one is a builder, not what
+		// runs. One note replaces them. The note names the file, so
+		// planRetirements keeps it.
 		from1x.dockerfileForeign = true
-		if !stated {
-			notes = nil
-		}
-		from1x.notes = append(from1x.notes, notes...)
 		from1x.notes = append(from1x.notes, foreignDockerfileNote(ref))
 		return
 	}
 
+	version, stated, notes := airflowFromBase(base)
+	from1x.airflow = version
+	if stated {
+		from1x.statedVersion = true
+	}
 	from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
-	switch {
-	case kind == baseUnknown && ref != "" && !from1x.dockerfilePinOnly:
-		// A base this run could not classify is declared, as every Dockerfile
+	if base.ArgProblem != airflowrt.ArgNone {
+		// A base this run could not expand is declared, as every Dockerfile
 		// was before the check existed, because the alternative is ignoring a
-		// build that may well be right. Said out loud when the reason is a
-		// build argument, which a person can settle by reading one line.
-		notes = append(notes, "Dockerfile: its final FROM is "+ref+
-			", which uses a build argument in a form this run does not expand, so whether it builds on an "+
-			"Astro Runtime image is unknown. It was declared as this project's build; if its base is not "+
-			"Astro Runtime, remove dockerfile under [tool.astro] in "+manifest.Marker)
-	case kind == baseRuntime && !stated && strings.Contains(ref, "$"):
-		notes = append(notes, "Dockerfile: its final FROM is "+ref+
-			", an Astro Runtime image named by a build argument, so the Airflow version was not read from its tag")
+		// build that may well be right. Said out loud, since a person can
+		// settle it by reading one line; and said for a file that is only that
+		// FROM as well, which is not declared and would otherwise go
+		// unmentioned.
+		notes = append(notes, unexpandedBaseNote(ref, base.ArgProblem, from1x.dockerfilePinOnly))
 	}
 	build := buildStepsNote(data)
 	from1x.notes = append(from1x.notes, notes...)
 	from1x.notes = append(from1x.notes, build...)
 	from1x.notes = append(from1x.notes, pipInstallNote(data)...)
-	from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
-	if base := airflowrt.ReadDeclaredBase(filepath.Join(dir, fileDockerfile)); base.RuntimeVersion() != "" {
+	from1x.notes = append(from1x.notes, buildSecretNotes(path)...)
+	if base.RuntimeVersion() != "" {
 		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
 	}
 	// Two sources for one list, so say it rather than let someone find out.
@@ -323,6 +314,28 @@ func foreignDockerfileNote(ref string) string {
 		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode builds only on one. " +
 		"To build this project from a Dockerfile, base its final stage on astrocrpublic.azurecr.io/runtime " +
 		"and add dockerfile = 'Dockerfile' under [tool.astro] in " + manifest.Marker
+}
+
+// unexpandedBaseNote tells the user a Dockerfile's final FROM uses a build
+// argument this run could not expand, so whether it builds on an Astro Runtime
+// image is unknown, and what was done with the file. ref is its FROM as
+// written, and pinOnly reports a file that says nothing else, which is left
+// undeclared.
+func unexpandedBaseNote(ref string, problem airflowrt.ArgProblem, pinOnly bool) string {
+	note := "Dockerfile: its final FROM is " + ref
+	if problem == airflowrt.ArgUnset {
+		note += ", which comes from a build argument with no default. astro passes no --build-arg, so it " +
+			"cannot build this file until the argument has one, and whether its base is an Astro Runtime image is unknown."
+	} else {
+		note += ", which uses a build argument in a form this run does not expand, so whether it builds on an " +
+			"Astro Runtime image is unknown."
+	}
+	if pinOnly {
+		return note + " It names nothing but that base, so it was left as it is and not declared as this " +
+			"project's build, and no Airflow version was read from it"
+	}
+	return note + " It was declared as this project's build; if its base is not Astro Runtime, remove " +
+		"dockerfile under [tool.astro] in " + manifest.Marker
 }
 
 // dockerfileIsPinOnly reports a Dockerfile that says nothing except which
@@ -602,13 +615,6 @@ func stripComment(line string) string {
 	return line
 }
 
-// fromLineRe finds a Dockerfile FROM instruction and captures the rest of the
-// line, flags included. The flags are stripped afterwards rather than in the
-// pattern, because `FROM --platform=linux/amd64 image:tag` is ordinary — it is
-// the standard Apple-silicon workaround — and a pattern that captured \S+ took
-// the flag as the image and read no version at all.
-var fromLineRe = regexp.MustCompile(`(?im)^[ \t]*FROM[ \t]+(.+)$`)
-
 // runtimeTagRe is the Astro Runtime tag format introduced with Airflow 3:
 // "<airflow-major>.<airflow-minor>-<build>", as in "3.1-12", optionally with a
 // flavor suffix ("3.1-12-base", "3.1-12.rc1").
@@ -639,30 +645,26 @@ var runtimeTagRe = regexp.MustCompile(`^(\d+)\.(\d+)-\d+(?:[.-].+)?$`)
 // A leading "v" is trimmed before matching, mirroring stripVersionPrefix.
 var oldRuntimeTagRe = regexp.MustCompile(`^\d+(\.\d+){0,2}(?:[.-].+)?$`)
 
-// runtimeImageHint is what makes an image reference an Astro Runtime image.
+// airflowFromBase reads the Airflow version a Dockerfile's base names, from the
+// base airflowrt.ReadDeclaredBase read: the final stage, followed through
+// aliases, with build arguments expanded. The second return reports that the
+// Dockerfile stated a version at all, whether or not it could be used.
 //
-// Substring rather than an exact repository, matching isAirflow3Runtime in the
-// desktop: the published names are ".../runtime" and ".../astro-runtime", and an
-// earlier hand-rolled check elsewhere matched only a path segment literally
-// named "runtime" and missed the second.
-const runtimeImageHint = "runtime"
-
-// airflowFromDockerfile reads the Airflow version a 1.x Dockerfile's runtime tag
-// names. The second return reports that the Dockerfile stated a version at all,
-// whether or not it could be used.
+// The caller asks only of a base that is not foreign (dockerfileBase): one on
+// an Astro Runtime image, or one that could not be read, which names no
+// version. The image is checked before the tag, and that is the whole point
+// rather than a detail. Reading the tag alone made every version-shaped tag an
+// Airflow 2 image: `FROM apache/airflow:3.0.1` — the ordinary OSS Airflow
+// Dockerfile, and exactly the repo shape adopt exists for — became airflow =
+// "2", pinning an Airflow 3.0.1 project back a whole generation.
 //
-// The image is checked before the tag, and that is the whole point rather than a
-// detail. Reading the tag alone made every version-shaped tag an Airflow 2
-// image: `FROM apache/airflow:3.0.1` — the ordinary OSS Airflow Dockerfile, and
-// exactly the repo shape adopt exists for — became airflow = "2", pinning an
-// Airflow 3.0.1 project back a whole generation, and `FROM ubuntu:22.04` became
-// Airflow 2 as well. A tag only means an Airflow version if the image it belongs
-// to is an Astro Runtime image.
-//
-// Every stage is scanned and the LAST runtime stage wins. A multi-stage
-// Dockerfile ordinarily starts `FROM python:3.11-slim AS builder`, so taking the
-// first FROM read the builder: at best no version, and with a numeric builder
-// tag ("alpine:3.19") a confident wrong one.
+// The final stage only, because that is the image that runs. Scanning every
+// stage for a runtime image read a builder's: a file whose last stage is
+// python and whose first is Astro Runtime pinned the project to an Airflow it
+// does not build. And a multi-stage Dockerfile ordinarily starts `FROM
+// python:3.11-slim AS builder`, so taking the first FROM read the builder: at
+// best no version, and with a numeric builder tag ("alpine:3.19") a confident
+// wrong one.
 //
 // The two tag formats are the remaining subtlety, and they are not
 // interchangeable:
@@ -679,28 +681,18 @@ const runtimeImageHint = "runtime"
 // what is known. It is honest rather than approximate, and a caller that wants
 // the exact minor resolves the tag itself and passes Options.AirflowVersion,
 // which wins over anything read here.
-func airflowFromDockerfile(data []byte) (version string, stated bool, notes []string) {
+func airflowFromBase(base airflowrt.DeclaredBase) (version string, stated bool, notes []string) {
 	const prefix = "Dockerfile: "
 
-	stages := fromLineRe.FindAllStringSubmatch(string(data), -1)
-	if len(stages) == 0 {
+	switch {
+	case base.From == "":
 		return "", false, []string{prefix + "no FROM instruction, so it names no Airflow version"}
+	case !base.Known:
+		// A build argument that could not be expanded, which the caller's
+		// note explains.
+		return "", false, nil
 	}
-
-	// Last runtime stage wins. Anything else in the file is a builder.
-	var ref, tag string
-	for _, m := range stages {
-		image, t := splitImageRef(m[1])
-		if strings.Contains(image, runtimeImageHint) {
-			ref, tag = image, t
-		}
-	}
-	if ref == "" {
-		// Not an Astro Runtime project. Naming the images keeps this actionable
-		// rather than mysterious.
-		return "", false, []string{prefix + "no stage builds on an Astro Runtime image (" +
-			strings.Join(allImages(stages), ", ") + "), so it names no Airflow version"}
-	}
+	ref, tag := splitImageRef(base.Expanded)
 	if tag == "" {
 		return "", false, []string{prefix + "the image " + ref + " carries no tag, so it names no Airflow version"}
 	}
@@ -961,24 +953,12 @@ func buildSecretNotes(path string) []string {
 	return notes
 }
 
-// splitImageRef turns the text after FROM into an image reference and its tag,
-// dropping build flags and a stage alias.
-//
-// `--platform=...` and any other `--flag` lead; `AS <name>` trails. Neither is
-// part of the image, and both appear in ordinary Dockerfiles.
-func splitImageRef(rest string) (image, tag string) {
-	fields := strings.Fields(rest)
-	ref := ""
-	for _, f := range fields {
-		if strings.HasPrefix(f, "--") {
-			continue
-		}
-		ref = f
-		break
-	}
-	if ref == "" {
-		return "", ""
-	}
+// splitImageRef splits an image reference into the reference without its tag
+// and the tag as written: "" for an untagged or digest-pinned reference, where
+// airflowrt's own split supplies the "latest" docker pulls. Which is the
+// difference that matters here: a tag the file did not write is not a version
+// it stated.
+func splitImageRef(ref string) (image, tag string) {
 	// A ':' in a registry host:port is not the tag separator, so only the last
 	// path segment is split. The digest form (image@sha256:...) names no tag.
 	seg := ref
@@ -994,16 +974,4 @@ func splitImageRef(rest string) (image, tag string) {
 	}
 	// image keeps its full reference for messages; the tag is stripped off it.
 	return strings.TrimSuffix(ref, ":"+t), t
-}
-
-// allImages lists the image references a Dockerfile builds on, for a message
-// that has to explain why none of them was usable.
-func allImages(stages [][]string) []string {
-	out := make([]string, 0, len(stages))
-	for _, m := range stages {
-		if image, _ := splitImageRef(m[1]); image != "" {
-			out = append(out, image)
-		}
-	}
-	return out
 }

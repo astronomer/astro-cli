@@ -260,7 +260,11 @@ func TestCheckDockerfileAirflow(t *testing.T) {
 		{name: "airflow 2 runtime beside airflow 3", requirement: "apache-airflow==3.3.*", from: "FROM quay.io/astronomer/astro-runtime:13.11.0", want: true},
 		{name: "airflow 3 runtime beside airflow 2", requirement: "apache-airflow==2.11.*", from: "FROM astrocrpublic.azurecr.io/runtime:3.3-8", want: true},
 		{name: "airflow 2 beside airflow 2", requirement: "apache-airflow==2.10.*", from: "FROM quay.io/astronomer/astro-runtime:13.11.0"},
-		{name: "a build argument", requirement: "apache-airflow==3.3.*", from: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.2-4\nFROM ${BASE}"},
+		// The default is what astro builds, since it passes no --build-arg.
+		{name: "a build argument", requirement: "apache-airflow==3.3.*", from: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.2-4\nFROM ${BASE}", want: true},
+		{name: "a build argument that agrees", requirement: "apache-airflow==3.3.*", from: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.3-8\nFROM ${BASE}"},
+		{name: "a build argument with no default", requirement: "apache-airflow==3.3.*", from: "ARG BASE\nFROM ${BASE}"},
+		{name: "a build argument not expanded", requirement: "apache-airflow==3.3.*", from: "ARG BASE=astrocrpublic.azurecr.io/runtime:3.2-4\nFROM ${BASE:?x}"},
 		{name: "a digest pin", requirement: "apache-airflow==3.3.*", from: "FROM astrocrpublic.azurecr.io/runtime@sha256:0123abcd"},
 		{name: "not a runtime image", requirement: "apache-airflow==3.3.*", from: "FROM apache/airflow:2.10.5"},
 		{name: "untagged", requirement: "apache-airflow==3.3.*", from: "FROM astrocrpublic.azurecr.io/runtime"},

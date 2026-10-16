@@ -33,12 +33,26 @@ func ParseDockerfile(projectPath string) (image, tag string, err error) {
 // itself and may have DEFAULTED the pin, so a project whose Dockerfile sits on
 // an Airflow 2 base can carry a pin that says 3 — and a caller trusting the pin
 // then picks the compose service set for the wrong generation.
+//
+// The reference comes back as written: a FROM built from a build argument
+// keeps its '$' (IsUnresolvedRef). ReadDeclaredBase is the reader that
+// expands one.
 func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 	data, err := os.ReadFile(dockerfilePath)
 	if err != nil {
 		return "", "", fmt.Errorf("error reading Dockerfile: %w", err)
 	}
+	ref, err := finalStageRef(data)
+	if err != nil {
+		return "", "", err
+	}
+	image, tag = splitImageRef(ref)
+	return image, tag, nil
+}
 
+// finalStageRef is the reference the final stage of the Dockerfile in data
+// builds on, as written, followed back through any stage alias it names.
+func finalStageRef(data []byte) (string, error) {
 	// The LAST stage, not the first, and then back through any alias it names.
 	//
 	// docker builds the final image from the final FROM, so the first one answers
@@ -82,7 +96,7 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 		stages = append(stages, stage{alias: alias, ref: ref})
 	}
 	if len(stages) == 0 {
-		return "", "", fmt.Errorf("no FROM instruction found in Dockerfile")
+		return "", fmt.Errorf("no FROM instruction found in Dockerfile")
 	}
 
 	ref := stages[len(stages)-1].ref
@@ -99,8 +113,7 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 		ref = stages[earlier].ref
 	}
 
-	image, tag = splitImageRef(ref)
-	return image, tag, nil
+	return ref, nil
 }
 
 // splitImageRef separates an image reference into its name and tag.
@@ -165,13 +178,11 @@ func IsRuntime3(baseTag string) bool {
 // requires only the contract leaf, deliberately, so it cannot import this
 // module. Its isAstroBase is the same rule, checked on its own side.
 //
-// Two other definitions exist and are NOT this one. pkg/scaffold matches the
-// substring "runtime" when reading a version out of a v1 Dockerfile, so it
-// reads one from a private myco/our-runtime that docker mode then refuses.
-// internal/platform/apc names a wider set — including astronomerinc/ap-airflow
-// — for the v1 Software deploy path, which warns rather than refusing and does
-// not write this compose file. Neither is safe to fold in here without knowing
-// that those images carry the `astro` user, which is what this gate is for.
+// Another definition exists and is NOT this one. internal/platform/apc names
+// a wider set — including astronomerinc/ap-airflow — for the v1 Software
+// deploy path, which warns rather than refusing and does not write this
+// compose file. It is not safe to fold in here without knowing that those
+// images carry the `astro` user, which is what this gate is for.
 const (
 	astroRegistryHost  = "astrocrpublic.azurecr.io"
 	quayAstronomerRepo = "quay.io/astronomer"
@@ -206,29 +217,46 @@ func IsAstroRuntimeImage(image string) bool {
 	return false
 }
 
-// IsUnresolvedRef reports a FROM reference this package cannot resolve on its
-// own, because it is built from a build argument.
+// IsUnresolvedRef reports a FROM reference built from a build argument, which
+// ParseDockerfileAt returns as written.
 //
 // `ARG BASE=...` then `FROM ${BASE}` is a real and supported shape, and its
-// value can also come from the command line, so nothing here can say what it
-// builds on. A caller deciding whether to refuse has to treat this the way it
-// treats a file it could not read: as no answer rather than a wrong one.
+// value can also come from the command line, so the text alone does not say
+// what it builds on. ReadDeclaredBase expands it the way astro's own build
+// does, from the defaults; a caller of ParseDockerfileAt has to treat it the
+// way it treats a file it could not read: as no answer rather than a wrong one.
 func IsUnresolvedRef(image string) bool {
 	return strings.Contains(image, "$")
 }
 
 // DeclaredBase is what a project's own Dockerfile builds on, as far as the file
-// alone can say: the final stage's image and tag, read by ParseDockerfileAt.
+// alone can say: the final stage's image and tag, followed back through stage
+// aliases, with its build arguments replaced by their defaults.
 //
 // One reader for every caller that asks, so the refusal of a foreign base, the
-// generation a compose file describes and the check that the FROM agrees with
-// the manifest's Airflow requirement read the same line the same way.
+// generation a compose file describes, the check that the FROM agrees with
+// the manifest's Airflow requirement, and astro init's decision whether to
+// declare the file all read the same line the same way.
+//
+// The defaults, because nothing in astro passes a --build-arg: Docker mode,
+// deploy and package all build the image the defaults name.
 type DeclaredBase struct {
 	Image, Tag string
 	// Known is false when there is no declared Dockerfile, when the file could
-	// not be parsed, and when its FROM is built from a build argument. All
-	// three mean the same thing to a caller: no answer, rather than a wrong one.
+	// not be parsed, and when its FROM uses a build argument that could not be
+	// expanded (ArgProblem says why). All three mean the same thing to a
+	// caller deciding whether to refuse: no answer, rather than a wrong one.
 	Known bool
+	// ArgProblem says why a From that uses build arguments could not be
+	// expanded, and is ArgNone otherwise.
+	ArgProblem ArgProblem
+	// From is the final stage's reference as the file writes it, build
+	// arguments unexpanded, for a message; "" when no FROM was read.
+	From string
+	// Expanded is From with its build arguments replaced by their defaults,
+	// the reference astro's build pulls. It equals From when there are none,
+	// and is "" when they could not be expanded.
+	Expanded string
 }
 
 // ReadDeclaredBase reads the base out of a project's declared Dockerfile, at
@@ -237,15 +265,45 @@ type DeclaredBase struct {
 // A file that cannot be parsed is neither an answer nor a failure here. The
 // build reports that with the path and the reason, and guessing at this depth
 // would replace a good message with a worse one.
+//
+// A FROM built from build arguments is expanded from the ARGs declared before
+// the first FROM, the only ones a FROM can use, each default expanded against
+// the ones before it: $NAME, ${NAME}, ${NAME:-word} and ${NAME:+word}, nested.
+// What cannot be expanded is unknown, never some other base: an argument with
+// no default (ArgUnset), or any other form (ArgUnsupported).
 func ReadDeclaredBase(path string) DeclaredBase {
 	if path == "" {
 		return DeclaredBase{}
 	}
-	image, tag, err := ParseDockerfileAt(path)
-	if err != nil || IsUnresolvedRef(image) {
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return DeclaredBase{}
 	}
-	return DeclaredBase{Image: image, Tag: tag, Known: true}
+	from, err := finalStageRef(data)
+	if err != nil {
+		return DeclaredBase{}
+	}
+	base := DeclaredBase{From: from, Expanded: from}
+	if IsUnresolvedRef(from) {
+		v := globalBuildArgs(data).expand(from)
+		switch {
+		case v.problem != ArgNone:
+			base.ArgProblem = v.problem
+		case v.value == "":
+			// `${A:+x}` with A unset: nothing to build on without a --build-arg.
+			base.ArgProblem = ArgUnset
+		case IsUnresolvedRef(v.value) || strings.ContainsAny(v.value, " \t"):
+			base.ArgProblem = ArgUnsupported
+		}
+		if base.ArgProblem != ArgNone {
+			base.Expanded = ""
+			return base
+		}
+		base.Expanded = v.value
+	}
+	base.Image, base.Tag = splitImageRef(base.Expanded)
+	base.Known = true
+	return base
 }
 
 // RuntimeVersion is the Astro Runtime version the base names: its tag with any

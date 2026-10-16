@@ -158,15 +158,21 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 // a daemon error about a missing unix user.
 //
 // Only what the file positively says is refused. A base that could not be read
-// at all is left alone, for the reason airflowrt.ReadDeclaredBase gives.
+// at all is left alone, for the reason airflowrt.ReadDeclaredBase gives. A
+// base named by a build argument is judged by the argument's default, which
+// is what this engine's build, passing no --build-arg, builds on.
 func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
 	if !base.Known || airflowrt.IsAstroRuntimeImage(base.Image) {
 		return nil
 	}
+	image := base.Image
+	if base.Expanded != base.From {
+		image += " (FROM " + base.From + ", by its default)"
+	}
 	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
 		"astro user and takes its service set from the runtime tag, so another base cannot start. "+
 		"Base the final stage on astrocrpublic.azurecr.io/runtime",
-		airflowrt.ErrUnsupportedBase, declared, base.Image)
+		airflowrt.ErrUnsupportedBase, declared, image)
 }
 
 // planMajor is the Airflow generation the compose file has to describe: read

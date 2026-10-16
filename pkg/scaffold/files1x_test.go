@@ -185,11 +185,11 @@ func TestRuntimeTagFormats(t *testing.T) {
 	// once the old format admits a suffix: "3.1-12" reads as new format, and
 	// also as old format ("3.1" plus the suffix "-12"). Upstream has exactly the
 	// same overlap and resolves it the same way, by testing isNewFormat first,
-	// so airflowFromDockerfile's switch order mirrors airflow_versions rather
+	// so airflowFromBase's switch order mirrors airflow_versions rather
 	// than being an accident of how these were written.
 	assert.True(t, runtimeTagRe.MatchString("3.1-12"))
 	assert.True(t, oldRuntimeTagRe.MatchString("3.1-12"), "overlapping is expected; precedence is what decides")
-	got, _, _ := airflowFromDockerfile([]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"))
+	got, _, _ := airflowFromBase(declaredBase(t, "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n"))
 	assert.Equal(t, "3.1", got, "the new format must win the overlap")
 }
 
@@ -205,12 +205,6 @@ func TestAirflowFromDockerfile(t *testing.T) {
 			name:        "an Airflow 3 tag names the version outright",
 			in:          "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
 			wantVersion: "3.1",
-			wantStated:  true,
-		},
-		{
-			name:        "a registry port is not the tag separator",
-			in:          "FROM localhost:5000/astronomer/astro-runtime:3.0-1\n",
-			wantVersion: "3.0",
 			wantStated:  true,
 		},
 		{
@@ -252,20 +246,6 @@ func TestAirflowFromDockerfile(t *testing.T) {
 			wantNote: "no FROM instruction",
 		},
 		{
-			// The worst of the bugs this rewrite fixes. apache/airflow is the
-			// ordinary OSS Airflow Dockerfile and exactly the repo shape adopt
-			// exists for; reading the tag without checking the image made this
-			// Airflow "2", pinning a 3.0.1 project back a whole generation.
-			name:     "an Airflow image that is not Astro Runtime is not read",
-			in:       "FROM apache/airflow:3.0.1\n",
-			wantNote: "no stage builds on an Astro Runtime image",
-		},
-		{
-			name:     "an unrelated base image is not read as Airflow 2",
-			in:       "FROM ubuntu:22.04\n",
-			wantNote: "no stage builds on an Astro Runtime image",
-		},
-		{
 			// The standard Apple-silicon workaround. A \S+ capture took the
 			// flag as the image, so the version went unread AND stated stayed
 			// false, which suppressed the defaulted-pin warning as well.
@@ -293,7 +273,7 @@ func TestAirflowFromDockerfile(t *testing.T) {
 			// Multi-stage ordinarily starts with a builder, so taking the first
 			// FROM read the wrong stage. With a numeric builder tag it read a
 			// confident wrong answer rather than none.
-			name:        "the last runtime stage wins, not the first FROM",
+			name:        "the final stage is read, not the first FROM",
 			in:          "FROM python:3.11-slim AS builder\nRUN pip install x\n\nFROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
 			wantVersion: "3.1",
 			wantStated:  true,
@@ -305,14 +285,54 @@ func TestAirflowFromDockerfile(t *testing.T) {
 			wantStated:  true,
 		},
 		{
+			// The final stage, not the last runtime one: an earlier runtime
+			// builder names an Airflow the image does not run.
+			name:        "an earlier runtime stage does not win over the final one",
+			in:          "FROM astrocrpublic.azurecr.io/runtime:3.0-1 AS old\nFROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
+			wantVersion: "3.1",
+			wantStated:  true,
+		},
+		{
 			name:        "a stage alias is not part of the image",
 			in:          "FROM astrocrpublic.azurecr.io/runtime:3.1-12 AS astro\n",
 			wantVersion: "3.1",
 			wantStated:  true,
 		},
+		{
+			name:        "a final stage naming an earlier one is followed",
+			in:          "FROM astrocrpublic.azurecr.io/runtime:3.1-12 AS base\nFROM base\n",
+			wantVersion: "3.1",
+			wantStated:  true,
+		},
+		{
+			// astro's build passes no --build-arg, so the default is the image.
+			name:        "a build argument is read through its default",
+			in:          "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\n",
+			wantVersion: "3.1",
+			wantStated:  true,
+		},
+		{
+			name:        "a default naming an earlier argument",
+			in:          "ARG REG=astrocrpublic.azurecr.io\nARG BASE=${REG}/runtime:3.1-12\nFROM ${BASE}\n",
+			wantVersion: "3.1",
+			wantStated:  true,
+		},
+		{
+			// A nested default once ended at the first '}', and read the tag
+			// "3.1-1}" as an Airflow 2 runtime.
+			name:        "a nested default",
+			in:          "ARG REG=astrocrpublic.azurecr.io\nFROM ${BASE:-${REG}/runtime:3.1-1}\n",
+			wantVersion: "3.1",
+			wantStated:  true,
+		},
+		{
+			// readDockerfile's note explains a FROM that could not be expanded.
+			name: "a build argument that could not be expanded states nothing",
+			in:   "FROM ${BASE:?required}\n",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			version, stated, notes := airflowFromDockerfile([]byte(tc.in))
+			version, stated, notes := airflowFromBase(declaredBase(t, tc.in))
 			assert.Equal(t, tc.wantVersion, version)
 			assert.Equal(t, tc.wantStated, stated)
 			if tc.wantNote == "" {

@@ -159,6 +159,9 @@ func TestStartJudgesRealReferenceShapes(t *testing.T) {
 		{"a tab after FROM", "FROM\tastrocrpublic.azurecr.io/runtime:3.1-12\n", false},
 		{"a runtime pinned by digest", "FROM astrocrpublic.azurecr.io/runtime@sha256:abc123\n", false},
 		{"a base named by a build argument", "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\n", false},
+		{"a base named by a nested default", "ARG REG=astrocrpublic.azurecr.io\nFROM ${BASE:-${REG}/runtime:3.1-12}\n", false},
+		{"a build argument with no default", "ARG BASE\nFROM ${BASE}\n", false},
+		{"a build argument in a form not expanded", "FROM ${BASE:?required}\n", false},
 		// Still refused, including where the old prefix match could not see it.
 		{"an OSS airflow base", "FROM apache/airflow:2.9.3\n", true},
 		{"an OSS airflow base after a tab", "FROM\tapache/airflow:2.9.3\n", true},
@@ -175,6 +178,33 @@ func TestStartJudgesRealReferenceShapes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A base named by a build argument is judged by its default, which is what
+// this engine's build, passing no --build-arg, builds on. Declared by hand,
+// `ARG BASE=python:3.12` then `FROM ${BASE}` passed this check once and
+// failed at container start on a missing astro user.
+func TestStartRefusesAForeignBaseNamedByABuildArgument(t *testing.T) {
+	for _, body := range []string{
+		"ARG BASE=python:3.12\nFROM ${BASE}\n",
+		"ARG REG=docker.io/library\nARG BASE=${REG}/python:3.12\nFROM ${BASE}\n",
+		"FROM ${BASE:-python:3.12}\n",
+	} {
+		path := writeDockerfile(t, body)
+		err := refuseFor(t, path)
+		require.Error(t, err, body)
+		assert.ErrorIs(t, err, airflowrt.ErrUnsupportedBase)
+		assert.Contains(t, err.Error(), "python")
+		assert.Contains(t, err.Error(), "by its default", "the refusal says where the image came from")
+	}
+}
+
+// A Runtime base named by a build argument gives the compose file its
+// generation, as one written out does.
+func TestPlanMajorReadsABaseNamedByABuildArgument(t *testing.T) {
+	base := airflowrt.ReadDeclaredBase(writeDockerfile(t,
+		"ARG BASE=quay.io/astronomer/astro-runtime:13.11.0\nFROM ${BASE}\n"))
+	assert.Equal(t, "2", planMajor("3.3", base), "the Dockerfile builds Airflow 2, whatever the pin says")
 }
 
 // A digest-pinned runtime takes its generation from the pin.
