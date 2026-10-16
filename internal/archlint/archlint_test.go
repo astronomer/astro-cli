@@ -82,14 +82,16 @@ var coreBelowCmd = []string{
 
 // coreConfigReaders lists the core packages that read config/ on purpose. Each
 // exists so exactly one place in the tree touches it — the login session, the
-// Environment Manager provider, the coordinate lookups — and the packages that
-// need what they read take them as a seam instead. They are below cmd/, so the
-// no-printing rule applies; the no-config rule cannot.
+// Environment Manager provider, the coordinate lookups, the proxy daemon's
+// home under ~/.astro — and the packages that need what they read take them as
+// a seam instead. They are below cmd/, so the no-printing rule applies; the
+// no-config rule cannot.
 var coreConfigReaders = []string{
 	"internal/astrosession",
 	"internal/containercfg",
 	"internal/emenv",
 	"internal/instancelocate",
+	"internal/proxydaemon",
 }
 
 // shellInternal lists the shell packages under internal/: they predate the
@@ -98,6 +100,9 @@ var coreConfigReaders = []string{
 // to register it".
 var shellInternal = []string{
 	"internal/archlint",
+	// The image half of a deploy, shared by both platforms: it prints its
+	// progress and reads config/.
+	"internal/imagepush",
 	"internal/otto",
 	"internal/telemetry",
 	// Both control-plane platforms: shell code that prints and reads config/,

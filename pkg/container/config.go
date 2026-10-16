@@ -2,7 +2,7 @@
 // Podman) and how to reach it, decoupled from astro-cli's
 // global config singleton and CLI spinner so it can be imported by other tools
 // (e.g. Astro Desktop). It is a faithful, dependency-injected port of the logic
-// in astro-cli's airflow/runtimes package; the goal is one shared source of
+// that was in astro-cli's airflow/runtimes package; the goal is one shared source of
 // truth for "which engine, and how to reach it."
 package container
 

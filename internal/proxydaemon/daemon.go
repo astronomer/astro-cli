@@ -1,4 +1,4 @@
-package proxy
+package proxydaemon
 
 import (
 	"os"

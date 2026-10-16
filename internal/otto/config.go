@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -124,13 +124,13 @@ func detectProjectAirflow(cwd string) string {
 // hostname URL because it's stable across `astro dev restart` — the container
 // port rotates, the hostname doesn't.
 func detect1xAirflow(cwd string) string {
-	route, err := proxy.Routes().GetRouteByProject(cwd)
+	route, err := proxydaemon.Routes().GetRouteByProject(cwd)
 	if err != nil || route == nil || route.Port == "" {
 		return ""
 	}
 
 	if route.Hostname != "" {
-		proxyPort := proxy.BoundPort()
+		proxyPort := proxydaemon.BoundPort()
 		if proxyPort == "" {
 			proxyPort = pkgproxy.DefaultPort
 		}

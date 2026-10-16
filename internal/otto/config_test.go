@@ -13,9 +13,9 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/localrttest"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
@@ -349,7 +349,7 @@ func (s *ConfigSuite) writeProjectRecord(projectPath string, port int) {
 
 func (s *ConfigSuite) writeRoute(r *pkgproxy.Route) {
 	s.T().Helper()
-	s.Require().NoError(proxy.Routes().AddRoute(r))
+	s.Require().NoError(proxydaemon.Routes().AddRoute(r))
 }
 
 func (s *ConfigSuite) startFakeAirflow() *httptest.Server {

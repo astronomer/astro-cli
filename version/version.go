@@ -21,7 +21,7 @@ import (
 // is empty in any build that did not pass the -ldflags. Read it through
 // [Current], which supplies a version when it is empty.
 //
-// The proxy daemon handshake in airflow/proxy reads this directly, and on
+// The proxy daemon handshake in internal/proxydaemon reads this directly, and on
 // purpose: an unstamped build must not force a running daemon to restart, and
 // an empty version is how it recognizes itself as one.
 var CurrVersion string

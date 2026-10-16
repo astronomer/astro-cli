@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/airflow"
-	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/imagepush"
+	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -154,7 +154,7 @@ func (s *Suite) TestRegistryAuthSuccess() {
 	config.InitConfig(fs)
 
 	mockRegistryHandler := new(mocks.RegistryHandler)
-	registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+	registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
 		mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(nil).Once()
 		return mockRegistryHandler, nil
 	}
@@ -255,7 +255,7 @@ func (s *Suite) TestRegistryAuthRegistryDomain() {
 			mockRegistryHandler := new(mocks.RegistryHandler)
 			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(nil).Once()
 
-			registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+			registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
 				assert.Equal(s.T(), registryDomain, registry)
 				return mockRegistryHandler, nil
 			}
@@ -284,7 +284,7 @@ func (s *Suite) TestRegistryAuthFailure() {
 	config.InitConfig(fs)
 
 	s.Run("registry failures", func() {
-		registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+		registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
 			return nil, errMockRegistry
 		}
 
@@ -296,7 +296,7 @@ func (s *Suite) TestRegistryAuthFailure() {
 		s.ErrorIs(err, errMockRegistry)
 
 		mockRegistryHandler := new(mocks.RegistryHandler)
-		registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+		registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
 			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(errMockRegistry).Once()
 			return mockRegistryHandler, nil
 		}
@@ -522,7 +522,7 @@ func (s *Suite) TestLoginFailure() {
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
 		mockRegistryHandler := new(mocks.RegistryHandler)
-		registryHandlerInit = func(registry string) (airflow.RegistryHandler, error) {
+		registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
 			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(errMockRegistry).Once()
 			return mockRegistryHandler, nil
 		}

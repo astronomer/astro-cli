@@ -1,4 +1,4 @@
-package airflow
+package imagepush
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/astronomer/astro-cli/airflow/mocks"
-	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -24,7 +22,7 @@ func (s *Suite) TestDockerRegistryInit() {
 
 func (s *Suite) TestRegistryLogin() {
 	s.Run("success", func() {
-		mockClient := new(mocks.DockerRegistryAPI)
+		mockClient := new(mockDockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, nil).Once()
 
@@ -40,7 +38,7 @@ func (s *Suite) TestRegistryLogin() {
 
 	s.Run("debug log hides the token", func() {
 		const fakeToken = "fake-secret-token-9d3a7b"
-		mockClient := new(mocks.DockerRegistryAPI)
+		mockClient := new(mockDockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
 
@@ -61,7 +59,7 @@ func (s *Suite) TestRegistryLogin() {
 	})
 
 	s.Run("registry error", func() {
-		mockClient := new(mocks.DockerRegistryAPI)
+		mockClient := new(mockDockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
 
@@ -118,13 +116,13 @@ func (s *Suite) TestDockerLogin() {
 	})
 
 	s.Run("container runtime not found", func() {
-		// Mock runtimes.GetContainerRuntimeBinary to return error
-		originalFunc := runtimes.GetContainerRuntimeBinary
-		runtimes.GetContainerRuntimeBinary = func() (string, error) {
+		// Mock getContainerRuntimeBinary to return error
+		originalFunc := getContainerRuntimeBinary
+		getContainerRuntimeBinary = func() (string, error) {
 			return "", errors.New("container runtime not found")
 		}
 		defer func() {
-			runtimes.GetContainerRuntimeBinary = originalFunc
+			getContainerRuntimeBinary = originalFunc
 		}()
 
 		err := DockerLogin("test.registry.com", "testuser", "testtoken")

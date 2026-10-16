@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/airflow"
-	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/internal/deploybuild"
+	"github.com/astronomer/astro-cli/internal/imagepush"
+	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -67,7 +67,7 @@ func withImageSeams(t *testing.T, runtimeVersion string) (*fakeImageCmd, *mocks.
 	origHandler := airflowImageHandler
 	resolveContainerEngine = func() (string, []string, error) { return "docker", nil, nil }
 	newImageBuildCommander = func() imagebuild.Commander { return cmd }
-	airflowImageHandler = func(string) airflow.ImageHandler { return handler }
+	airflowImageHandler = func(string) imagepush.ImageHandler { return handler }
 	t.Cleanup(func() {
 		resolveContainerEngine = origResolve
 		newImageBuildCommander = origCmd
@@ -236,7 +236,7 @@ func containerdStore(t *testing.T, runtimeVersion string) (cmd *fakeImageCmd, ha
 	t.Helper()
 	cmd, _ = withImageSeams(t, runtimeVersion)
 	handlers = map[string]*mocks.ImageHandler{}
-	airflowImageHandler = func(name string) airflow.ImageHandler {
+	airflowImageHandler = func(name string) imagepush.ImageHandler {
 		if h, ok := handlers[name]; ok {
 			return h
 		}

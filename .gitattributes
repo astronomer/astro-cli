@@ -12,7 +12,7 @@
 # compared an embedded Dockerfile against a literal and got "\r\n" where the
 # source file has "\n".
 *.tmpl                          text eol=lf
-airflow/include/**              text eol=lf
+internal/platform/astro/deploy/include/** text eol=lf
 pkg/checks/**.py                text eol=lf
 pkg/airflowrt/include/**        text eol=lf
 pkg/airflowrt/standalone_scripts/** text eol=lf

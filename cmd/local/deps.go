@@ -20,12 +20,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
+	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -243,9 +243,9 @@ func markSkipPreRun(cmd *cobra.Command) {
 // errAborted reports a confirmation answered "no".
 var errAborted = errors.New("aborted")
 
-// proxyDaemon adapts airflow/proxy's daemon lifecycle to the engines'
+// proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
 // localrt.ProxyDaemon seam. It lives at the composition layer because
-// airflow/proxy pulls in config, which the core engines must not import; they
+// internal/proxydaemon reads config, which the core engines must not import; they
 // see only the interface.
 type proxyDaemon struct{}
 

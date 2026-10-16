@@ -15,8 +15,8 @@ import (
 	"github.com/docker/docker/api/types/versions"
 	"golang.org/x/mod/semver"
 
-	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/imagepush"
 	"github.com/astronomer/astro-cli/internal/platform/apc/auth"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -28,7 +28,7 @@ import (
 
 var (
 	// this is used to monkey patch the function in order to write unit test cases
-	imageHandlerInit = airflow.ImageHandlerInit
+	imageHandlerInit = imagepush.ImageHandlerInit
 
 	gzipFile = fileutil.GzipFile
 
@@ -173,7 +173,7 @@ func (o Options) progress() io.Writer {
 }
 
 // progressSetter is an image handler that can draw its progress somewhere
-// other than stdout (airflow.DockerImage).
+// other than stdout (imagepush.DockerImage).
 type progressSetter interface{ ProgressTo(io.Writer) }
 
 // Airflow tags the local image named (--image-name), pushes it to the
@@ -347,7 +347,7 @@ func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID st
 	return dagsFrom(deploymentInfo, appConfig)
 }
 
-func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler airflow.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string, opts Options) (string, error) {
+func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler imagepush.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string, opts Options) (string, error) {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
@@ -371,10 +371,10 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 				return "", err
 			}
-			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+			remoteImage = fmt.Sprintf("%s/%s", registry, imagepush.ImageName(name, nextTag))
 		} else {
 			registry = registryDomainPrefix + cloudDomain
-			remoteImage = fmt.Sprintf("%s/%s", registry, airflow.ImageName(name, nextTag))
+			remoteImage = fmt.Sprintf("%s/%s", registry, imagepush.ImageName(name, nextTag))
 			token = c.Token
 		}
 	}
@@ -412,7 +412,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 
 // tagCustomImage tags the local image customImageName as the Deployment's
 // and checks the runtime its label names against the platform's.
-func tagCustomImage(imageHandler airflow.ImageHandler, customImageName string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface, opts Options) error {
+func tagCustomImage(imageHandler imagepush.ImageHandler, customImageName string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface, opts Options) error {
 	fmt.Fprintln(opts.progress(), composeSkipImageBuildingPromptMsg)
 	err := imageHandler.TagLocalImage(customImageName)
 	if err != nil {
@@ -439,7 +439,7 @@ func getGetTagFromImageName(imageName string) string {
 }
 
 func tagPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, nextTag, cloudDomain, byoRegistryDomain string, byoRegistryEnabled bool, customImageName string, opts Options) (string, error) {
-	imageName := airflow.ImageName(name, "latest")
+	imageName := imagepush.ImageName(name, "latest")
 	imageHandler := imageHandlerInit(imageName)
 	if p, ok := imageHandler.(progressSetter); ok {
 		p.ProgressTo(opts.progress())

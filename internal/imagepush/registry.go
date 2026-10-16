@@ -1,4 +1,4 @@
-package airflow
+package imagepush
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/registry"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -82,7 +81,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 // dockerLogin performs docker login using the container runtime's CLI instead of Docker API
 // This is useful for OAuth-based registries that require special authentication flows
 func dockerLogin(registryName, username, token string) error {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	containerRuntime, err := getContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}

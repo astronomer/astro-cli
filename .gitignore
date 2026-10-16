@@ -1,4 +1,3 @@
-!airflow/include/*/requirements.txt
 *.ndjson.gz
 *.test
 *.yaml.lock
@@ -7,9 +6,6 @@
 .env
 .idea/
 .vscode/
-airflow/docker-compose.yaml
-airflow/Dockerfile
-airflow/pod-config.yml
 airflow_settings*
 /astro
 astro-cli
