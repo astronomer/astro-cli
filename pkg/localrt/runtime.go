@@ -151,13 +151,9 @@ type Config struct {
 var ErrHealthTimeout = airflowrt.ErrHealthTimeout
 
 // ErrUnsupportedBase reports a start refused because the project's declared
-// Dockerfile does not build on an Astro Runtime image: the image it built
-// carries no runtime version label (airflowrt.RuntimeVersionLabel). A mirror of
-// a Runtime image keeps the label and is not refused, whatever its registry.
-// The refusal comes after the build and before any container is created, and
-// errors.As also finds the *airflowrt.NotRuntimeImageError naming the base.
-// Docker mode only: the refusal is about the compose file this runtime writes,
-// and standalone builds no image at all.
+// Dockerfile does not build on an Astro Runtime image. Docker mode only: the
+// refusal is about the compose file this runtime writes, and standalone builds
+// no image at all.
 var ErrUnsupportedBase = airflowrt.ErrUnsupportedBase
 
 // ErrDatabaseNewerThanAirflow reports a start whose Airflow refused the

@@ -327,23 +327,16 @@ func buildArgDockerfileNote(ref string, pinOnly bool) string {
 			"as the build, replace the build argument in FROM with a literal Astro Runtime image"
 	}
 	return note + "It was declared as this project's build (dockerfile under [tool.astro] in " + manifest.Marker +
-		"); astro local start checks the image it builds for the Astro Runtime label and refuses one without it"
+		"); make sure its base is one, because a base that is not fails when the containers start"
 }
 
 // foreignDockerfileNote tells the user a Dockerfile was found and not made the
 // project's build, and how to make one that would be. ref is its base.
-//
-// Judged by name, because init builds nothing: a name that is not Astronomer's
-// may still be a mirror of a Runtime image, which astro local start accepts by
-// the label the built image carries. So the note says how to declare it in that
-// case rather than calling it unusable.
 func foreignDockerfileNote(ref string) string {
 	return "Dockerfile: left as it is and not declared as this project's build, because its final stage " +
-		"builds on " + ref + ", which is not an Astro Runtime image by name, and Docker mode builds only on one. " +
-		"If " + ref + " is a mirror of an Astro Runtime image, add dockerfile = 'Dockerfile' under [tool.astro] in " +
-		manifest.Marker + ": astro local start checks the image it builds for the Astro Runtime label and accepts it " +
-		"when the label is there. Otherwise, to build this project from a Dockerfile, base its final stage on " +
-		"astrocrpublic.azurecr.io/runtime and add the same line"
+		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode builds only on one. " +
+		"To build this project from a Dockerfile, base its final stage on astrocrpublic.azurecr.io/runtime " +
+		"and add dockerfile = 'Dockerfile' under [tool.astro] in " + manifest.Marker
 }
 
 // dockerfileIsPinOnly reports a Dockerfile that says nothing except which

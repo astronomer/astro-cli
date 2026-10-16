@@ -118,21 +118,11 @@ func TestBuildImageWithoutTheLabel(t *testing.T) {
 	_, _, err := BuildImage(context.Background(), in)
 	assert.EqualError(t, err, "the built image is missing the "+airflowrt.RuntimeVersionLabel+" label; the runtime base example.com/base:1 should carry it")
 
-	// A declared Dockerfile's refusal names the base as its FROM does, in the
-	// words astro local start uses for the same file — a mirror's name is not
-	// what refuses it, the missing label is.
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM python:3.12-slim\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM scratch\n"), 0o600))
 	in.Request = imagebuild.Request{Dockerfile: filepath.Join(dir, "Dockerfile"), Context: dir}
 	in.Dockerfile = "Dockerfile"
 	_, _, err = BuildImage(context.Background(), in)
-	assert.EqualError(t, err, "python:3.12-slim is not an Astro Runtime image: it has no runtime version label ("+airflowrt.RuntimeVersionLabel+")")
-	var notRuntime *airflowrt.NotRuntimeImageError
-	assert.ErrorAs(t, err, &notRuntime)
-
-	// A FROM built from a build argument names no base, so the file is named.
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("ARG BASE=python:3.12\nFROM ${BASE}\n"), 0o600))
-	_, _, err = BuildImage(context.Background(), in)
-	assert.EqualError(t, err, "the image built from Dockerfile is not an Astro Runtime image: it has no runtime version label ("+airflowrt.RuntimeVersionLabel+")")
+	assert.EqualError(t, err, "the image built from Dockerfile is missing the "+airflowrt.RuntimeVersionLabel+" label, so it is not based on Astro Runtime; build it FROM an Astro Runtime image")
 
 	in.ReadLabel = labels("", errors.New("no such image"))
 	_, _, err = BuildImage(context.Background(), in)
@@ -148,7 +138,7 @@ func TestPrebuiltRuntime(t *testing.T) {
 	assert.ErrorContains(t, err, `image "img:1" was not found locally`)
 
 	_, err = PrebuiltRuntime("img:1", labels("", nil))
-	assert.EqualError(t, err, "img:1 is not an Astro Runtime image: it has no runtime version label ("+airflowrt.RuntimeVersionLabel+")")
+	assert.ErrorContains(t, err, `image "img:1" is not based on Astro Runtime`)
 }
 
 func TestImageTag(t *testing.T) {

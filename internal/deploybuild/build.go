@@ -84,16 +84,9 @@ func BuildImage(ctx context.Context, in *Image) (image, runtimeVersion string, e
 		// missing the label means the base we chose is wrong, which is ours. A
 		// declared Dockerfile missing it means the user's own FROM is not an
 		// Astro Runtime, and naming the base there would name an empty string
-		// and send them at a decision they did not make. That one reads as
-		// `astro local start` refuses the same file (airflowrt.NotRuntimeImageError):
-		// the base as the FROM names it, or the file when the FROM is a build
-		// argument, and the label it lacks.
+		// and send them at a decision they did not make.
 		if req.FromDeclaredDockerfile() {
-			what := "the image built from " + in.Dockerfile
-			if base := airflowrt.ReadDeclaredBase(req.Dockerfile); base.Known {
-				what = base.Ref()
-			}
-			return "", "", &airflowrt.NotRuntimeImageError{Image: what}
+			return "", "", fmt.Errorf("the image built from %s is missing the %s label, so it is not based on Astro Runtime; build it FROM an Astro Runtime image", in.Dockerfile, airflowrt.RuntimeVersionLabel)
 		}
 		return "", "", fmt.Errorf("the built image is missing the %s label; the runtime base %s should carry it", airflowrt.RuntimeVersionLabel, req.BaseImage)
 	}
@@ -110,7 +103,7 @@ func PrebuiltRuntime(image string, readLabel LabelReader) (string, error) {
 		return "", fmt.Errorf("image %q was not found locally or could not be inspected; build it or 'docker load' it first: %w", image, err)
 	}
 	if version == "" {
-		return "", &airflowrt.NotRuntimeImageError{Image: image}
+		return "", fmt.Errorf("image %q is not based on Astro Runtime (the %s label is missing); build it FROM the Astro runtime", image, airflowrt.RuntimeVersionLabel)
 	}
 	return version, nil
 }

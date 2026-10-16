@@ -25,17 +25,13 @@ const (
 // from what airflowrt.ParseDockerfileAt read of it: image and tag, or err.
 // ref is the base for a message: the FROM reference as written.
 //
-// The rule is by name, and not files1x's "runtime" substring:
-// airflowrt.ReadDeclaredBase reads the final stage (following aliases) and
-// airflowrt.IsAstroRuntimeImage decides. Docker mode's start judges the image
-// itself instead, by the runtime version label the built image carries, which
-// init cannot do because it builds nothing. The two agree on every name this
-// accepts — a published Runtime image carries the label — and a name this
-// rejects may still be a mirror that start accepts, which is why its note
-// (foreignDockerfileNote) says how to declare one. A Dockerfile init declared
-// that start then refuses is the failure this exists to prevent; a `-base` or
-// `-python-X.Y` tag and a digest pin are all Runtime, because the image decides
-// and not the tag.
+// The rule is the one Docker mode's start enforces, deliberately, and not
+// files1x's "runtime" substring: airflowrt.ReadDeclaredBase reads the final
+// stage (following aliases) and airflowrt.IsAstroRuntimeImage decides, which
+// is what localdocker's refuseUnsupportedBase asks before every start. A
+// Dockerfile init declared that start then refuses is the failure this
+// exists to prevent, so the two must agree; a `-base` or `-python-X.Y` tag
+// and a digest pin are all Runtime, because the image decides and not the tag.
 //
 // A FROM built from a build argument (`ARG BASE=...` then `FROM ${BASE}`) is
 // unknown, as it is to start: what it names depends on ARG defaults, their
