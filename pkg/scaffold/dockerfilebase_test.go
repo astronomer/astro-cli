@@ -34,7 +34,14 @@ func TestDockerfileBase(t *testing.T) {
 		{name: "python", body: "FROM python:3.12\n", want: baseForeign, wantRef: "python:3.12"},
 		{name: "OSS Airflow", body: "FROM apache/airflow:3.0.1\n", want: baseForeign},
 		{name: "a private image named runtime", body: "FROM myco/our-runtime:3.1-12\n", want: baseForeign},
-		{name: "a lookalike registry", body: "FROM quay.io/astronomerfake/astro-runtime:12.1.0\n", want: baseForeign},
+		{name: "a private image whose name ends in runtime", body: "FROM myco/runtime-tools:1\n", want: baseForeign},
+		{name: "runtime as a bare Docker Hub name", body: "FROM runtime:3.1-12\n", want: baseForeign},
+
+		// A mirror keeps the repository's name on another registry, at any
+		// depth, so it is Runtime and the file is adopted.
+		{name: "a mirror in another registry", body: "FROM quay.io/astronomerfake/astro-runtime:12.1.0\n", want: baseRuntime},
+		{name: "a mirror of the airflow 3 image", body: "FROM mirror/runtime:3.1-12\n", want: baseRuntime},
+		{name: "a mirror behind a port", body: "FROM localhost:5000/astronomer/astro-runtime:12.1.0\n", want: baseRuntime},
 
 		{
 			name: "multi-stage, runtime last",
@@ -197,7 +204,8 @@ func notesBase(note string) string {
 }
 
 // A Dockerfile on an Astro Runtime image that does more than name it is
-// declared, as before, whatever the registry or flavor.
+// declared, as before, whatever the registry or flavor — a mirror's included,
+// since it keeps the repository's name.
 func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
 	for _, from := range []string{
 		"astrocrpublic.azurecr.io/runtime:3.1-12",
@@ -205,6 +213,8 @@ func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
 		"astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12",
 		"--platform=linux/amd64 astrocrpublic.azurecr.io/runtime:3.1-12",
 		"quay.io/astronomer/astro-runtime:12.1.0",
+		"registry.corp.example/astronomer/astro-runtime:12.1.0",
+		"mirror/runtime:3.1-12",
 	} {
 		t.Run(from, func(t *testing.T) {
 			body := "FROM " + from + "\nENV TZ=UTC\n"
@@ -223,8 +233,9 @@ func TestInitDeclaresADockerfileOnARuntimeBase(t *testing.T) {
 
 // A FROM built from a build argument is unknown, whatever its defaults name:
 // declared, as every Dockerfile was before the base check, with one note that
-// says its base was not read and that astro local start checks the image it
-// builds. No Airflow version is read from it, so the pin defaults, and says so.
+// says its base was not read and that a base that is not Runtime fails when
+// the containers start. No Airflow version is read from it, so the pin
+// defaults, and says so.
 func TestInitDeclaresABuildArgumentBaseAsUnknown(t *testing.T) {
 	for _, tc := range []struct{ name, body, ref string }{
 		{

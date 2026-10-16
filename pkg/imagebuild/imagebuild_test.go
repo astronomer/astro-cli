@@ -366,6 +366,14 @@ func TestPullOnlyWhenEveryBaseComesFromAstro(t *testing.T) {
 			from: "FROM quay.io/astronomerfake/runtime:1\n",
 			want: false,
 		},
+		{
+			// A mirror is an Astro Runtime image (airflowrt.IsAstroRuntimeImage),
+			// but not one a pull can be forced on: it may be in a registry this
+			// daemon is not logged into, or loaded with no registry at all.
+			name: "declared, a mirrored runtime",
+			from: "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\n",
+			want: false,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := &fakeCmd{}

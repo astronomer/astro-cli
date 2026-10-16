@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -159,23 +160,23 @@ func IsRuntime3(baseTag string) bool {
 	return strings.HasPrefix(baseTag, "3.")
 }
 
-// The registries an Astro Runtime image is published to.
+// The repository names an Astro Runtime image is published under: the last
+// path segment of astrocrpublic.azurecr.io/runtime (Airflow 3) and of
+// quay.io/astronomer/astro-runtime (Airflow 2).
 //
-// pkg/imagebuild carries its own copy of these two hostnames and must: it
-// requires only the contract leaf, deliberately, so it cannot import this
-// module. Its isAstroBase is the same rule, checked on its own side.
+// Matched on that segment and not on the registry, so a mirror counts: an exact
+// copy pushed to a private registry (registry.corp.example/astronomer/astro-runtime,
+// mirror/runtime) keeps the repository's name and its tag scheme, and is the
+// same image the compose file is written for.
 //
-// Two other definitions exist and are NOT this one. pkg/scaffold matches the
-// substring "runtime" when reading a version out of a v1 Dockerfile, so it
-// reads one from a private myco/our-runtime that docker mode then refuses.
-// internal/platform/apc names a wider set — including astronomerinc/ap-airflow
-// — for the v1 Software deploy path, which warns rather than refusing and does
-// not write this compose file. Neither is safe to fold in here without knowing
-// that those images carry the `astro` user, which is what this gate is for.
-const (
-	astroRegistryHost  = "astrocrpublic.azurecr.io"
-	quayAstronomerRepo = "quay.io/astronomer"
-)
+// pkg/imagebuild's isAstroBase is NOT this rule, on purpose: it decides whether
+// a build may force a pull, which a mirror in a private or air-gapped registry
+// must not get, so it names Astronomer's two registries only.
+//
+// Another definition exists and is NOT this one: internal/platform/apc names a
+// wider set — including astronomerinc/ap-airflow — for the v1 Software deploy
+// path, which warns rather than refusing and does not write this compose file.
+var runtimeRepoNames = []string{"runtime", "astro-runtime"}
 
 // ErrUnsupportedBase reports a declared Dockerfile whose final stage does not
 // build on an Astro Runtime image.
@@ -187,23 +188,30 @@ const (
 // names nothing the author wrote.
 var ErrUnsupportedBase = errors.New("a declared Dockerfile must build on an Astro Runtime image")
 
-// IsAstroRuntimeImage reports whether an image reference names an image
-// published as Astro Runtime.
+// IsAstroRuntimeImage reports whether an image reference names an Astro
+// Runtime image, published or mirrored: its last path segment is exactly
+// runtime or astro-runtime, on any registry.
 //
-// The reference without its tag, as ParseDockerfileAt returns it. Matched
-// against the registries rather than by looking for "runtime" in the name,
-// which also accepts a private `myco/our-runtime` that shares none of the
-// conventions the compose file depends on.
+// A tag or digest is ignored, so the reference may be given with or without
+// one (ParseDockerfileAt returns it without). The name has to be a repository
+// under a registry or namespace: a bare `runtime` names docker.io/library/runtime,
+// an official image Docker Hub does not publish, and `FROM
+// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io,
+// an unrelated image. Neither is Astro Runtime. A segment that merely contains
+// the word (myco/our-runtime, astro-runtime-dev) is not one either, and the
+// comparison is exact, because Docker repository names are lowercase and an
+// uppercase one is not a reference Docker accepts. A reference built from a
+// build argument is never one: what it names is not in the text (IsUnresolvedRef).
 func IsAstroRuntimeImage(image string) bool {
-	for _, base := range []string{astroRegistryHost, quayAstronomerRepo} {
-		// A repository under the registry, not the registry alone: `FROM
-		// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io,
-		// an unrelated image that shares none of the conventions here.
-		if rest, ok := strings.CutPrefix(image, base+"/"); ok && rest != "" {
-			return true
-		}
+	if image == "" || IsUnresolvedRef(image) {
+		return false
 	}
-	return false
+	repo, _ := splitImageRef(image)
+	slash := strings.LastIndex(repo, "/")
+	if slash < 0 {
+		return false
+	}
+	return slices.Contains(runtimeRepoNames, repo[slash+1:])
 }
 
 // IsUnresolvedRef reports a FROM reference this package cannot resolve on its

@@ -165,7 +165,8 @@ func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
 	}
 	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
 		"astro user and takes its service set from the runtime tag, so another base cannot start. "+
-		"Base the final stage on astrocrpublic.azurecr.io/runtime",
+		"Base the final stage on astrocrpublic.azurecr.io/runtime, or on a mirror of it whose repository "+
+		"is named runtime or astro-runtime",
 		airflowrt.ErrUnsupportedBase, declared, base.Image)
 }
 

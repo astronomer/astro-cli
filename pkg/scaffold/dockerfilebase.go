@@ -31,7 +31,8 @@ const (
 // is what localdocker's refuseUnsupportedBase asks before every start. A
 // Dockerfile init declared that start then refuses is the failure this
 // exists to prevent, so the two must agree; a `-base` or `-python-X.Y` tag
-// and a digest pin are all Runtime, because the image decides and not the tag.
+// and a digest pin are all Runtime, because the image decides and not the tag,
+// and so is a mirror on another registry, which keeps the repository name.
 //
 // A FROM built from a build argument (`ARG BASE=...` then `FROM ${BASE}`) is
 // unknown, as it is to start: what it names depends on ARG defaults, their

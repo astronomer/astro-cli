@@ -162,27 +162,53 @@ func TestIsAstroRuntimeImage(t *testing.T) {
 		image string
 		want  bool
 	}{
+		// The published names, with and without a tag or digest.
 		{"astrocrpublic.azurecr.io/runtime", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1-12", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12", true},
+		{"astrocrpublic.azurecr.io/runtime@sha256:abc123", true},
 		{"quay.io/astronomer/astro-runtime", true},
-		{"quay.io/astronomer/ap-airflow", true},
+		{"quay.io/astronomer/astro-runtime:12.1.0", true},
 
-		// A repository under the registry, not the registry alone: `FROM
-		// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io,
-		// which is an unrelated image and not this one.
+		// Mirrors: the repository keeps its name on another registry, at any
+		// depth, behind a port too.
+		{"registry.corp.example/astronomer/astro-runtime:12.1.0", true},
+		{"mirror/runtime:3.1-12", true},
+		{"registry.corp.example/a/b/c/runtime:3.1-12", true},
+		{"localhost:5000/astro-runtime:3.1-12", true},
+		{"localhost:5000/runtime", true},
+		{"quay.io/astronomer-mirror/astro-runtime", true},
+		{"astrocrpublic.azurecr.io.example.com/runtime", true},
+
+		// A registry or namespace alone is not a repository: `FROM
+		// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io.
 		{"astrocrpublic.azurecr.io", false},
 		{"quay.io/astronomer", false},
 		{"astrocrpublic.azurecr.io/", false},
+		// Bare, the name is a Docker Hub official image, docker.io/library/runtime,
+		// which Docker Hub does not publish and Astronomer is not.
+		{"runtime", false},
+		{"astro-runtime:12.1.0", false},
+
+		// Other Astronomer images are not Astro Runtime.
+		{"quay.io/astronomer/ap-airflow", false},
+		{"quay.io/astronomer/astro-runtime-dev", false},
 
 		// The ordinary OSS image, which is the shape a v1 repo brings.
 		{"apache/airflow", false},
+		{"apache/airflow:2.9.3", false},
 		{"python", false},
+		{"python:3.12-slim", false},
 		{"ubuntu", false},
-		// Named to look like one without being published as one.
+		// Named to look like one without being one.
 		{"myco/our-runtime", false},
-		{"runtime", false},
-		// A registry whose name merely starts with the real one.
-		{"astrocrpublic.azurecr.io.example.com/runtime", false},
-		{"quay.io/astronomer-mirror/astro-runtime", false},
+		{"myco/runtime-tools", false},
+		// Docker repository names are lowercase; this is not a reference.
+		{"mirror/Runtime", false},
+		// The segment is the repository, not the tag.
+		{"myco/base:runtime", false},
+		// A build argument names nothing the text can show.
+		{"${REGISTRY}/runtime:3.1-12", false},
 		{"", false},
 	} {
 		t.Run(tc.image, func(t *testing.T) {

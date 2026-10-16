@@ -335,8 +335,10 @@ func buildArgDockerfileNote(ref string, pinOnly bool) string {
 func foreignDockerfileNote(ref string) string {
 	return "Dockerfile: left as it is and not declared as this project's build, because its final stage " +
 		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode builds only on one. " +
+		"An Astro Runtime image is recognized by its repository name, runtime or astro-runtime, on any " +
+		"registry, so a mirror of one counts. " +
 		"To build this project from a Dockerfile, base its final stage on astrocrpublic.azurecr.io/runtime " +
-		"and add dockerfile = 'Dockerfile' under [tool.astro] in " + manifest.Marker
+		"or a mirror of it, and add dockerfile = 'Dockerfile' under [tool.astro] in " + manifest.Marker
 }
 
 // dockerfileIsPinOnly reports a Dockerfile that says nothing except which
