@@ -21,8 +21,9 @@ const (
 	baseForeign
 )
 
-// dockerfileBase classifies the base the Dockerfile at path builds its final
-// image on. ref is the base for a message: the FROM reference as written.
+// dockerfileBase classifies the base a Dockerfile builds its final image on,
+// from what airflowrt.ParseDockerfileAt read of it: image and tag, or err.
+// ref is the base for a message: the FROM reference as written.
 //
 // The rule is the one Docker mode's start enforces, deliberately, and not
 // files1x's "runtime" substring: airflowrt.ReadDeclaredBase reads the final
@@ -34,10 +35,8 @@ const (
 //
 // A FROM built from a build argument (`ARG BASE=...` then `FROM ${BASE}`) is
 // unknown, as it is to start: what it names depends on ARG defaults, their
-// scoping and Docker's expansion rules, and the image astro local start builds
-// is what settles it, so this does not guess from the text.
-func dockerfileBase(path string) (kind baseKind, ref string) {
-	image, tag, err := airflowrt.ParseDockerfileAt(path)
+// scoping and Docker's expansion rules, so this does not guess from the text.
+func dockerfileBase(image, tag string, err error) (kind baseKind, ref string) {
 	if err != nil {
 		return baseUnknown, ""
 	}

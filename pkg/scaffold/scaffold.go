@@ -1174,9 +1174,12 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 		out = append(out, linksNote)
 	}
 	// A pin-only Dockerfile whose pin lost to --airflow-version or an existing
-	// pin is kept (dockerfileIsSpent) and not declared, and its reader had
-	// nothing to say about it, so it would stay without a word.
-	if from1x.dockerfilePinOnly && from1x.airflow != "" && !dockerfileIsSpent(from1x, version) {
+	// pin is kept (dockerfileIsSpent) and not declared. When its reader had
+	// nothing to say about it, it would stay without a word; when it did, that
+	// note already names it, and a second one about the same pin would only
+	// repeat or contradict it.
+	readerNoted := slices.ContainsFunc(from1x.notes, func(n string) bool { return strings.HasPrefix(n, fileDockerfile+":") })
+	if from1x.dockerfilePinOnly && !dockerfileIsSpent(from1x, version) && !readerNoted {
 		out = append(out, "Dockerfile: kept and not declared as this project's build. It names only a base image, on "+
 			"Airflow "+from1x.airflow+", and this project's pin is Airflow "+version+"; delete it if the pin is right")
 	}

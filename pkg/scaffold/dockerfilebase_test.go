@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -84,16 +85,22 @@ func TestDockerfileBase(t *testing.T) {
 		{name: "no FROM", body: "RUN true\n", want: baseUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), fileDockerfile)
-			require.NoError(t, os.WriteFile(path, []byte(tc.body), 0o600))
-
-			kind, ref := dockerfileBase(path)
+			kind, ref := dockerfileBase(parseFinalStage(t, tc.body))
 			assert.Equal(t, tc.want, kind)
 			if tc.wantRef != "" {
 				assert.Equal(t, tc.wantRef, ref)
 			}
 		})
 	}
+}
+
+// parseFinalStage writes body as a Dockerfile and resolves its final stage, as
+// readDockerfile does.
+func parseFinalStage(t *testing.T, body string) (image, tag string, err error) {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), fileDockerfile)
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+	return airflowrt.ParseDockerfileAt(path)
 }
 
 // initWith runs init in a fresh directory holding files, and returns the
@@ -254,7 +261,8 @@ func TestInitDeclaresABuildArgumentBaseAsUnknown(t *testing.T) {
 			require.Len(t, buildArg, 1, "told once: %q", dockerfileNotes(res))
 			assert.Contains(t, buildArg[0], tc.ref)
 			assert.Contains(t, buildArg[0], "dockerfile under [tool.astro] in pyproject.toml")
-			assert.Contains(t, buildArg[0], "astro local start checks the image it builds")
+			assert.Contains(t, buildArg[0], "cannot confirm it is an Astro Runtime image")
+			assert.Contains(t, buildArg[0], "fails when the containers start")
 			assert.Contains(t, joined, "is the default, not this project's version")
 			for _, label := range append(res.Created, res.Updated...) {
 				assert.NotContains(t, label, "from the Dockerfile")
@@ -278,7 +286,43 @@ func TestInitKeepsAPinOnlyBuildArgumentDockerfileWithANote(t *testing.T) {
 	require.Len(t, notes, 1, "notes: %q", notes)
 	assert.Contains(t, notes[0], "${BASE:?unset}")
 	assert.Contains(t, notes[0], "kept and not declared")
-	assert.Contains(t, notes[0], "dockerfile = 'Dockerfile' under [tool.astro]")
+	assert.Contains(t, notes[0], "replace the build argument in FROM with a literal Astro Runtime image")
+	assert.NotContains(t, notes[0], "dockerfile = 'Dockerfile'", "astro passes no --build-arg, so declaring it cannot build")
+}
+
+// A build argument that leaves the image's name and tag literal still names
+// the Airflow version, as it did before the base check: the file stays unknown
+// and declared, and the pin is the tag's.
+func TestInitReadsAirflowFromALiteralTagBehindABuildArgument(t *testing.T) {
+	for _, tc := range []struct{ name, from, airflow string }{
+		{name: "an old tag", from: "${REGISTRY}/astro-runtime:12.1.0", airflow: "2"},
+		{name: "an Airflow 3 tag", from: "${REGISTRY}/runtime:3.1-12", airflow: "3.1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, res, m := initWith(t, map[string]string{
+				fileDockerfile: "ARG REGISTRY=quay.io/astronomer\nFROM " + tc.from + "\nENV TZ=UTC\n",
+			})
+
+			assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+			assert.Equal(t, tc.airflow, res.AirflowVersion)
+			assert.Contains(t, m.Project.Dependencies, airflowRequirement(tc.airflow))
+			assert.Contains(t, strings.Join(append(res.Created, res.Updated...), "\n"),
+				"read Airflow "+tc.airflow+" from the Dockerfile")
+			joined := strings.Join(res.Notes, "\n")
+			assert.Contains(t, joined, "cannot confirm it is an Astro Runtime image")
+			assert.NotContains(t, joined, "is the default, not this project's version")
+		})
+	}
+	t.Run("a tag that is an argument", func(t *testing.T) {
+		_, res, m := initWith(t, map[string]string{
+			fileDockerfile: "ARG TAG=3.1-12\nFROM astrocrpublic.azurecr.io/runtime:${TAG}\nENV TZ=UTC\n",
+		})
+		assert.Equal(t, fileDockerfile, m.Astro.Dockerfile)
+		for _, label := range append(res.Created, res.Updated...) {
+			assert.NotContains(t, label, "from the Dockerfile")
+		}
+		assert.Contains(t, strings.Join(res.Notes, "\n"), "is the default, not this project's version")
+	})
 }
 
 // A pin-only Dockerfile on a Runtime base whose pin did not win is kept, not
@@ -295,6 +339,18 @@ func TestInitKeepsAPinOnlyDockerfileWhosePinLostWithANote(t *testing.T) {
 	assert.Contains(t, notes[0], "kept and not declared")
 	assert.Contains(t, notes[0], "Airflow 3.1")
 	assert.Contains(t, notes[0], "Airflow 3.0")
+
+	t.Run("one note when the reader already gave one", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTree(t, dir, map[string]string{fileDockerfile: "FROM quay.io/astronomer/astro-runtime:12.1.0\n"})
+		res, err := Run(dir, Options{AirflowVersion: "3.0"})
+		require.NoError(t, err)
+
+		assert.FileExists(t, filepath.Join(dir, fileDockerfile))
+		notes := dockerfileNotes(res)
+		require.Len(t, notes, 1, "notes: %q", notes)
+		assert.Contains(t, notes[0], "is an Airflow 2 image")
+	})
 }
 
 // A final stage on another base is the image, whatever an earlier stage built
