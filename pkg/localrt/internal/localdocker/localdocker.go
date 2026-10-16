@@ -154,7 +154,9 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 // as the plain reason, airflowrt.NotRuntimeImageError, and matches
 // airflowrt.ErrUnsupportedBase too, which cmd/local's problem kind and Astro
 // Desktop test for.
-type unsupportedBaseError struct{ reason *airflowrt.NotRuntimeImageError }
+type unsupportedBaseError struct {
+	reason *airflowrt.NotRuntimeImageError
+}
 
 func (e *unsupportedBaseError) Error() string { return e.reason.Error() }
 
@@ -162,7 +164,7 @@ func (e *unsupportedBaseError) Unwrap() []error {
 	return []error{e.reason, airflowrt.ErrUnsupportedBase}
 }
 
-// refuseUnlabelledBase rejects a declared Dockerfile whose built image carries
+// refuseUnlabeledBase rejects a declared Dockerfile whose built image carries
 // no runtime version label: one that does not build on an Astro Runtime image.
 //
 // The compose file this engine writes is for that image and not for any image:
@@ -175,7 +177,7 @@ func (e *unsupportedBaseError) Unwrap() []error {
 // The refusal names the base the way the file wrote it, which is what the
 // reader has to change, and falls back to naming the file when the FROM is a
 // build argument or could not be read.
-func refuseUnlabelledBase(declaredRel string, base airflowrt.DeclaredBase) error {
+func refuseUnlabeledBase(declaredRel string, base airflowrt.DeclaredBase) error {
 	what := "the image built from " + declaredRel
 	if base.Known {
 		what = base.Ref()
@@ -216,7 +218,7 @@ func (e *Engine) judgeDeclaredBuild(ctx context.Context, conn engineConn, image,
 	}
 	if version == "" {
 		e.removeBuiltImage(ctx, conn, projectName)
-		return "", refuseUnlabelledBase(declaredRel, base)
+		return "", refuseUnlabeledBase(declaredRel, base)
 	}
 	return version, nil
 }

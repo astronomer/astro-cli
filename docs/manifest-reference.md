@@ -139,6 +139,14 @@ A project-relative path to the project's own Dockerfile — the escape hatch for
 
 Set it and **that file is the build**: the Airflow requirement, `packages` and your other dependencies stop describing the image, because the Dockerfile decides what goes in. Install your Python and OS packages inside the file itself. The Airflow requirement is still required and still read — standalone mode installs it, and it tells the CLI which Airflow generation to run (the service set differs between 2 and 3) — but it no longer picks the image. [`runtime`](#runtime) is refused beside it, since the `FROM` line picks the base.
 
+The final stage has to build on an Astro Runtime image, because the containers Docker mode runs and the image `astro deploy` ships are set up for one. That is judged by the image, not its name: once the file is built, the image has to carry Astro Runtime's version label (`io.astronomer.docker.runtime.version`), which every Runtime image has and a built image inherits. A mirror of a Runtime image in your own registry (`FROM registry.example.com/astronomer/astro-runtime:12.1.0`) keeps the label and is accepted; a base without it, such as `python` or `apache/airflow`, is refused after the build and before any container starts:
+
+```
+python:3.12-slim is not an Astro Runtime image: it has no runtime version label (io.astronomer.docker.runtime.version)
+```
+
+A `FROM` built from a build argument is judged the same way, and the refusal names the file instead (`the image built from Dockerfile is not …`). With the label read, Docker mode takes the Airflow generation (and so its service set) from the runtime version the image carries.
+
 The file's `FROM` and the requirement have to agree, or Docker mode runs one Airflow and standalone installs another. When the final stage's `FROM` names an Astro Runtime tag, it is compared with the requirement — by series for an Airflow 3 tag (`runtime:3.2-4` beside `apache-airflow==3.3.*`), by generation for an Airflow 2 one — and a disagreement is refused, naming both lines and the fix:
 
 ```

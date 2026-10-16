@@ -360,10 +360,9 @@ func TestAFailedDockerBuildSaysSoAndLeavesNothingBehind(t *testing.T) {
 	p := dockerProject(t, "badfile")
 	needsDocker(t, p)
 	// The runtime base, not a small unrelated one. Docker mode refuses a
-	// declared Dockerfile that does not build on an Astro Runtime image, and it
-	// refuses before the build — so a project on `alpine` never reaches the
-	// build this case is about, and passes on a refusal message that happens to
-	// contain the word "Dockerfile".
+	// declared Dockerfile whose built image has no Astro Runtime label — so a
+	// project on `alpine` that built would be refused for its base, and could
+	// pass on that refusal rather than on the failed build this case is about.
 	write(t, filepath.Join(p.Dir, "Dockerfile"),
 		"FROM "+runtimeImageFor(t, p)+"\nRUN exit 1\n")
 	declareDockerfile(t, p)
@@ -376,12 +375,11 @@ func TestAFailedDockerBuildSaysSoAndLeavesNothingBehind(t *testing.T) {
 	if !strings.Contains(r.Stderr, "Dockerfile") {
 		t.Errorf("the error does not name the Dockerfile that failed\n%s", r.output())
 	}
-	// And it failed at the BUILD. The base refusal also names a Dockerfile, so
-	// a project this case could not build for some other reason would satisfy
-	// the check above while never reaching the build — which is what happened
-	// when this case still said `FROM alpine`.
-	if strings.Contains(r.Stderr, "must build on an Astro Runtime image") {
-		t.Errorf("this case was refused before the build, so it is not testing a failed build\n%s", r.output())
+	// And it failed at the BUILD, not on the base refusal, which a project
+	// this case could not build for some other reason might reach instead —
+	// as happened when this case still said `FROM alpine`.
+	if strings.Contains(r.Stderr, "is not an Astro Runtime image") {
+		t.Errorf("this case was refused for its base, so it is not testing a failed build\n%s", r.output())
 	}
 
 	// The same four things the standalone twin checks, for the same reason it

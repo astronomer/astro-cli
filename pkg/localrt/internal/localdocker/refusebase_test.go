@@ -24,17 +24,25 @@ func writeDockerfile(t *testing.T, body string) string {
 	return path
 }
 
-// labelled answers the runtime label inspect with v for every image.
-func labelled(v string) func(string) (string, error) {
+// labeled answers the runtime label inspect with v for every image.
+func labeled(v string) func(string) (string, error) {
 	return func(string) (string, error) { return v, nil }
 }
 
+// declaredStart is what startDeclared saw: the start's error, the commands the
+// engine ran, the builds it asked for and the plan it started.
+type declaredStart struct {
+	err    error
+	cmd    *fakeCmd
+	images *stubImages
+	plan   rt.Plan
+}
+
 // startDeclared starts a project whose declared Dockerfile is body, against a
-// fake engine whose built image carries label ("" for none). It returns the
-// start's error, the commands the engine ran and the builds it asked for.
-func startDeclared(t *testing.T, body, label string) (*fakeCmd, *stubImages, rt.Plan, error) {
+// fake engine whose built image carries label ("" for none).
+func startDeclared(t *testing.T, body, label string) declaredStart {
 	t.Helper()
-	cmd := &fakeCmd{output: noProjects, runtimeLabel: labelled(label)}
+	cmd := &fakeCmd{output: noProjects, runtimeLabel: labeled(label)}
 	e := testEngine(t, cmd)
 	images, ok := e.images.(*stubImages)
 	require.True(t, ok)
@@ -44,7 +52,7 @@ func startDeclared(t *testing.T, body, label string) (*fakeCmd, *stubImages, rt.
 	p.Dockerfile = "Dockerfile"
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
-	return cmd, images, p, err
+	return declaredStart{err: err, cmd: cmd, images: images, plan: p}
 }
 
 func ranAny(calls []string, substr string) bool {
@@ -61,8 +69,9 @@ func ranAny(calls []string, substr string) bool {
 // label it kept is what says what it is. Accepted silently: nothing about the
 // start differs from one on the published name.
 func TestStartAcceptsAMirroredRuntimeByItsLabel(t *testing.T) {
-	cmd, _, _, err := startDeclared(t,
+	got := startDeclared(t,
 		"FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nRUN echo hi\n", "12.1.0")
+	cmd, err := got.cmd, got.err
 
 	require.NoError(t, err)
 	assert.True(t, ranAny(cmd.calls, "up --detach"), "the stack should have come up; calls: %v", cmd.calls)
@@ -73,7 +82,8 @@ func TestStartAcceptsAMirroredRuntimeByItsLabel(t *testing.T) {
 // the refusal is the plain reason: the base as the FROM wrote it, and what it
 // lacks.
 func TestStartRefusesABaseWithoutTheRuntimeLabel(t *testing.T) {
-	cmd, images, p, err := startDeclared(t, "FROM python:3.12-slim\nRUN echo hi\n", "")
+	got := startDeclared(t, "FROM python:3.12-slim\nRUN echo hi\n", "")
+	cmd, images, p, err := got.cmd, got.images, got.plan, got.err
 
 	require.Error(t, err)
 	assert.Equal(t,
@@ -95,8 +105,8 @@ func TestStartRefusesABaseWithoutTheRuntimeLabel(t *testing.T) {
 // The final stage decides, because that is the image that runs, and it is the
 // one the refusal names.
 func TestStartRefusalNamesTheFinalStage(t *testing.T) {
-	_, _, _, err := startDeclared(t,
-		"FROM astrocrpublic.azurecr.io/runtime:3.1-12 AS base\nFROM apache/airflow:2.9.3\n", "")
+	err := startDeclared(t,
+		"FROM astrocrpublic.azurecr.io/runtime:3.1-12 AS base\nFROM apache/airflow:2.9.3\n", "").err
 
 	require.Error(t, err)
 	assert.True(t, strings.HasPrefix(err.Error(), "apache/airflow:2.9.3 is not an Astro Runtime image"), err.Error())
@@ -105,7 +115,8 @@ func TestStartRefusalNamesTheFinalStage(t *testing.T) {
 // A FROM built from a build argument names nothing the file can show, so the
 // name-based check let it through unjudged. The image it built can be asked.
 func TestStartRefusesABuildArgumentFROMOnANonRuntimeBase(t *testing.T) {
-	_, images, _, err := startDeclared(t, "ARG BASE=python:3.12-slim\nFROM ${BASE}\n", "")
+	got := startDeclared(t, "ARG BASE=python:3.12-slim\nFROM ${BASE}\n", "")
+	images, err := got.images, got.err
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, airflowrt.ErrUnsupportedBase)
@@ -117,7 +128,7 @@ func TestStartRefusesABuildArgumentFROMOnANonRuntimeBase(t *testing.T) {
 
 // An Astronomer name is not enough either: the image is asked, not its name.
 func TestStartRefusesAnAstronomerNamedImageWithoutTheLabel(t *testing.T) {
-	_, _, _, err := startDeclared(t, "FROM quay.io/astronomer/ap-airflow:2.5.1\n", "")
+	err := startDeclared(t, "FROM quay.io/astronomer/ap-airflow:2.5.1\n", "").err
 	assert.ErrorIs(t, err, airflowrt.ErrUnsupportedBase)
 }
 
@@ -141,7 +152,7 @@ func TestStartReportsAFailedLabelReadAsItself(t *testing.T) {
 // resolved, and with nothing to install that base is what runs, not yet pulled
 // into the local store for an inspect to find.
 func TestStartDoesNotInspectAGeneratedBuild(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects, runtimeLabel: labelled("")}
+	cmd := &fakeCmd{output: noProjects, runtimeLabel: labeled("")}
 	e := testEngine(t, cmd)
 
 	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
@@ -152,7 +163,7 @@ func TestStartDoesNotInspectAGeneratedBuild(t *testing.T) {
 // The refusal is reported the way every other failed start is: starting, then
 // error with the refusal, so a consumer streaming states sees the reason.
 func TestStartReportsTheRefusalAsAnErrorState(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects, runtimeLabel: labelled("")}
+	cmd := &fakeCmd{output: noProjects, runtimeLabel: labeled("")}
 	e := testEngine(t, cmd)
 	p := testPlan(t)
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),

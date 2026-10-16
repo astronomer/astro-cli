@@ -188,6 +188,24 @@ func TestInitDoesNotDeclareADockerfileOnAnotherBase(t *testing.T) {
 	}
 }
 
+// A base under a name that is not Astronomer's may be a mirror of a Runtime
+// image. init cannot tell, so it leaves the file undeclared, and the note says
+// what astro local start does if it is declared: it accepts the image by its
+// runtime label, not its name.
+func TestInitNotesHowAMirroredBaseIsAccepted(t *testing.T) {
+	const mirror = "registry.corp.example/astronomer/astro-runtime:12.1.0"
+	_, res, m := initWith(t, map[string]string{
+		fileDockerfile: "FROM " + mirror + "\nRUN true\n",
+	})
+
+	assert.Empty(t, m.Astro.Dockerfile, "a name init does not recognize is left undeclared")
+	notes := dockerfileNotes(res)
+	require.Len(t, notes, 1, "notes: %q", notes)
+	assert.Contains(t, notes[0], "If "+mirror+" is a mirror of an Astro Runtime image, add dockerfile = 'Dockerfile' under [tool.astro]")
+	assert.Contains(t, notes[0], "astro local start checks the image it builds for the Astro Runtime label and accepts it")
+	assert.NotContains(t, notes[0], "`", "plain text")
+}
+
 // notesBase recovers the ref foreignDockerfileNote was given, so a test can
 // compare the whole note without restating it.
 func notesBase(note string) string {
@@ -262,7 +280,7 @@ func TestInitDeclaresABuildArgumentBaseAsUnknown(t *testing.T) {
 			assert.Contains(t, buildArg[0], tc.ref)
 			assert.Contains(t, buildArg[0], "dockerfile under [tool.astro] in pyproject.toml")
 			assert.Contains(t, buildArg[0], "cannot confirm it is an Astro Runtime image")
-			assert.Contains(t, buildArg[0], "fails when the containers start")
+			assert.Contains(t, buildArg[0], "astro local start checks the image it builds for the Astro Runtime label")
 			assert.Contains(t, joined, "is the default, not this project's version")
 			for _, label := range append(res.Created, res.Updated...) {
 				assert.NotContains(t, label, "from the Dockerfile")
