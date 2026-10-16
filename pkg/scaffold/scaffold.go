@@ -623,7 +623,8 @@ func dockerfileIsSpent(from1x *project1x, pinned string) bool {
 }
 
 // declaresDockerfile reports that this project's Dockerfile IS the build: it is
-// present, and it does more than name a base image.
+// present, it does more than name a base image, and that base is not one
+// Docker mode refuses (dockerfileForeign).
 //
 // Named because three places ask it — the declaration, and a label in each
 // manifest arm — and because the whole point of separating it from
@@ -631,7 +632,7 @@ func dockerfileIsSpent(from1x *project1x, pinned string) bool {
 // times, any refinement (a file with only comments and a FROM, an ARG-only one)
 // lands in some of them and the label and the declaration disagree.
 func declaresDockerfile(from1x *project1x) bool {
-	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly
+	return len(from1x.dockerfileBody) > 0 && !from1x.dockerfilePinOnly && !from1x.dockerfileForeign
 }
 
 // buildPython is the Python this project's image runs when its Dockerfile is

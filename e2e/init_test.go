@@ -215,6 +215,33 @@ func TestInitKeepsACommentWithItsOwnDependency(t *testing.T) {
 	}
 }
 
+// A Dockerfile that is not on an Astro Runtime image is somebody else's build,
+// as the astro-cli repo's own docker:dind one is. init in such a repo used to
+// declare it in [tool.astro], and Docker mode then refused to start the
+// project. It is left as it was, undeclared, and the run says so once.
+func TestInitLeavesADockerfileOnAnotherBaseUndeclared(t *testing.T) {
+	tier(t, 0)
+
+	p := newProject(t)
+	dockerfile := "FROM docker:19.03.2-dind\nRUN apk add --no-cache make\n"
+	write(t, filepath.Join(p.Dir, "Dockerfile"), dockerfile)
+
+	out := p.run("init").requireSuccess().output()
+
+	if got := read(t, filepath.Join(p.Dir, "pyproject.toml")); strings.Contains(got, "dockerfile") {
+		t.Errorf("init declared a Dockerfile Docker mode cannot start:\n%s", got)
+	}
+	if got := read(t, filepath.Join(p.Dir, "Dockerfile")); got != dockerfile {
+		t.Errorf("init changed the Dockerfile:\n%s", got)
+	}
+	if n := strings.Count(out, "not an Astro Runtime image"); n != 1 {
+		t.Errorf("the reason was given %d times, want once:\n%s", n, out)
+	}
+	if !strings.Contains(out, "dockerfile = 'Dockerfile' under [tool.astro]") {
+		t.Errorf("the output does not say how to declare a Dockerfile:\n%s", out)
+	}
+}
+
 // The version the binary reports. Stamped by the suite's own build, so this
 // pins that the -ldflags path still reaches the command — the fallback in
 // version.Current means an unstamped build no longer prints an empty label,
