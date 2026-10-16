@@ -24,6 +24,10 @@ func TestParseRuntimeTagPython(t *testing.T) {
 		{"13.7.0-slim", "13.7.0", ""},
 		{"13.7.0-slim-python-3.12", "13.7.0", "3.12"},
 		{"3.1-12-slim", "3.1-12", ""},
+		// Any order, each once.
+		{"12.1.0-python-3.12-slim", "12.1.0", "3.12"},
+		{"3.1-12-base-python-3.11", "3.1-12", "3.11"},
+		{"13.7.0-slim-python-3.12-base", "13.7.0", "3.12"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.tag, func(t *testing.T) {
@@ -157,7 +161,7 @@ func TestParseDockerfileAtResolvesTheFinalStage(t *testing.T) {
 // "runtime")` check, which accepted three of the cases below — and the compose
 // file written for such an image runs Airflow as the `astro` user and reads a
 // generation off the tag, neither of which an arbitrary base offers.
-func TestIsAstroRuntimeImage(t *testing.T) {
+func TestIsAstroRuntimeRef(t *testing.T) {
 	for _, tc := range []struct {
 		image string
 		want  bool
@@ -179,6 +183,10 @@ func TestIsAstroRuntimeImage(t *testing.T) {
 		{"registry.corp.example/astronomer/astro-runtime:12.1.0-slim", true},
 		{"mirror/runtime:3.1-12", true},
 		{"mirror/runtime:3.1-12-python-3.12-base", true},
+		// Flavors in any order, as on a published tag.
+		{"mirror/astro-runtime:12.1.0-python-3.12-slim", true},
+		{"mirror/astro-runtime:12.1.0-slim-python-3.12", true},
+		{"mirror/runtime:3.1-12-base-python-3.12", true},
 		{"registry.corp.example/a/b/c/runtime:3.1-12", true},
 		{"localhost:5000/astro-runtime:3.1-12", true},
 		{"quay.io/astronomer-mirror/astro-runtime:13.4.0", true},
@@ -225,8 +233,9 @@ func TestIsAstroRuntimeImage(t *testing.T) {
 		{"", false},
 	} {
 		t.Run(tc.image, func(t *testing.T) {
-			if got := IsAstroRuntimeImage(tc.image); got != tc.want {
-				t.Errorf("IsAstroRuntimeImage(%q) = %v, want %v", tc.image, got, tc.want)
+			image, tag := splitImageRef(tc.image)
+			if got := IsAstroRuntimeRef(image, tag); got != tc.want {
+				t.Errorf("IsAstroRuntimeRef(%q, %q) = %v, want %v", image, tag, got, tc.want)
 			}
 		})
 	}
@@ -326,7 +335,7 @@ func TestUnresolvedRefsAreReportedAsSuch(t *testing.T) {
 	if !IsUnresolvedRef(image) {
 		t.Errorf("IsUnresolvedRef(%q) = false; a caller would judge the literal text", image)
 	}
-	if IsAstroRuntimeImage(image) {
+	if IsAstroRuntimeRef(image, "") {
 		t.Errorf("%q is not a resolved image reference and must not read as one", image)
 	}
 	if IsUnresolvedRef("astrocrpublic.azurecr.io/runtime") {

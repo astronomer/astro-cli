@@ -130,6 +130,27 @@ func TestStartAcceptsAMirroredRuntimeBase(t *testing.T) {
 	assert.True(t, upped, "the stack should have come up; calls: %v", cmd.calls)
 }
 
+// A FROM whose tag is a build argument starts: init declares that file, so
+// start refusing it would be the disagreement this check exists to prevent.
+func TestStartLetsABuildArgumentTagThrough(t *testing.T) {
+	for _, from := range []string{
+		"astrocrpublic.azurecr.io/runtime:${V}",
+		"mirror.corp/runtime:${TAG}",
+	} {
+		t.Run(from, func(t *testing.T) {
+			cmd := &fakeCmd{output: noProjects}
+			e := testEngine(t, cmd)
+			p := testPlan(t)
+			require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
+				[]byte("ARG V=3.1-12\nARG TAG=3.1-12\nFROM "+from+"\n"), 0o600))
+			p.Dockerfile = "Dockerfile"
+
+			_, err := e.Start(context.Background(), p, rt.Callbacks{})
+			require.NoError(t, err)
+		})
+	}
+}
+
 // Start refuses, and does it without waking the engine.
 //
 // Every case above calls the helper. None of them says the helper is WIRED,
@@ -183,6 +204,12 @@ func TestStartJudgesRealReferenceShapes(t *testing.T) {
 		{"a tab after FROM", "FROM\tastrocrpublic.azurecr.io/runtime:3.1-12\n", false},
 		{"a runtime pinned by digest", "FROM astrocrpublic.azurecr.io/runtime@sha256:abc123\n", false},
 		{"a base named by a build argument", "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\n", false},
+		// A build argument in the tag alone is as unknown as one in the image,
+		// which is what init decides too: declared, and not judged here.
+		{"a published runtime tagged by a build argument", "ARG V=3.1-12\nFROM astrocrpublic.azurecr.io/runtime:${V}\n", false},
+		{"a mirror tagged by a build argument", "FROM mirror.corp/runtime:${TAG}\n", false},
+		// Flavors in any order, as on a published tag.
+		{"a mirror with flavors after the python one", "FROM mirror/astro-runtime:12.1.0-python-3.12-slim\n", false},
 		// Mirrors: the repository keeps its name on another registry.
 		{"a mirror behind a port", "FROM localhost:5000/astro-runtime:3.1-12\n", false},
 		{"a mirror in a corporate registry", "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\n", false},
@@ -253,6 +280,9 @@ func TestPlanMajorReadsTheDeclaredBase(t *testing.T) {
 		{from: "astrocrpublic.azurecr.io/runtime", pin: "3.3", want: "3"},
 		{from: "astrocrpublic.azurecr.io/runtime:latest", pin: "3.3", want: "3"},
 		{from: "quay.io/astronomer/astro-runtime:latest", pin: "2.10", want: "2"},
+		// A tag from a build argument carries no generation the file can show.
+		{from: "astrocrpublic.azurecr.io/runtime:${V}", pin: "2.10", want: "2"},
+		{from: "mirror.corp/runtime:${TAG}", pin: "3.3", want: "3"},
 		{from: "python:3.12-slim", pin: "3.3", want: "3"},
 		{from: "python:3.12-slim", pin: "2.10", want: "2"},
 	}

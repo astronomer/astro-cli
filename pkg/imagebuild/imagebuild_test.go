@@ -367,7 +367,7 @@ func TestPullOnlyWhenEveryBaseComesFromAstro(t *testing.T) {
 			want: false,
 		},
 		{
-			// A mirror is an Astro Runtime image (airflowrt.IsAstroRuntimeImage),
+			// A mirror is an Astro Runtime image (airflowrt.IsAstroRuntimeRef),
 			// but not one a pull can be forced on: it may be in a registry this
 			// daemon is not logged into, or loaded with no registry at all.
 			name: "declared, a mirrored runtime",

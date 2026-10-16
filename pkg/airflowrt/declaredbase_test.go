@@ -24,6 +24,9 @@ func TestDeclaredBaseRuntimeVersion(t *testing.T) {
 		{name: "mirrored airflow 3 build", body: "FROM mirror/runtime:3.1-12\n", known: true, want: "3.1-12"},
 		{name: "mirrored airflow 2 build", body: "FROM mirror/astronomer/astro-runtime:12.1.0\n", known: true, want: "12.1.0"},
 		{name: "mirror behind a port", body: "FROM localhost:5000/runtime:3.1-12-python-3.12\n", known: true, want: "3.1-12"},
+		// A build argument in the tag is as unresolved as one in the image.
+		{name: "build argument in the tag", body: "ARG V=3.1-12\nFROM astrocrpublic.azurecr.io/runtime:${V}\n", known: false, want: ""},
+		{name: "build argument in a mirror's tag", body: "FROM mirror.corp/runtime:${TAG}\n", known: false, want: ""},
 		{name: "tag and digest", body: "FROM mirror/runtime:3.1-12@sha256:abc\n", known: true, want: "3.1-12"},
 		{name: "mirror pinned by digest alone", body: "FROM mirror/runtime@sha256:abc\n", known: true, want: ""},
 		{name: "untagged mirror", body: "FROM mirror/runtime\n", known: true, want: ""},

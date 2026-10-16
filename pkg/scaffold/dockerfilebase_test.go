@@ -253,6 +253,18 @@ func TestInitDeclaresABuildArgumentBaseAsUnknown(t *testing.T) {
 			body: "FROM ${BASE:-${REGISTRY:-astrocrpublic.azurecr.io}/runtime:3.1-12}\nENV TZ=UTC\n",
 		},
 		{name: "an argument with no default", body: "ARG BASE\nFROM ${BASE}\nRUN true\n", ref: "${BASE}"},
+		// An argument in the tag alone is as unknown, published repository
+		// or mirror; astro local start lets it through the same way.
+		{
+			name: "an argument in a published tag",
+			body: "ARG V=3.1-12\nFROM astrocrpublic.azurecr.io/runtime:${V}\nENV TZ=UTC\n",
+			ref:  "astrocrpublic.azurecr.io/runtime:${V}",
+		},
+		{
+			name: "an argument in a mirror's tag",
+			body: "ARG TAG=3.1-12\nFROM mirror.corp/runtime:${TAG}\nENV TZ=UTC\n",
+			ref:  "mirror.corp/runtime:${TAG}",
+		},
 		{name: "defaulting to python", body: "ARG BASE=python:3.12\nFROM ${BASE}\nRUN true\n", ref: "${BASE}"},
 		{
 			name: "after a Runtime builder stage",

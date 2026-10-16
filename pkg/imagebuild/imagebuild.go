@@ -477,7 +477,7 @@ func shouldPull(declared, dockerfile string) bool {
 // isAstroBase reports whether a FROM reference names an image published to one
 // of the registries Astro Runtime comes from.
 //
-// Deliberately not airflowrt.IsAstroRuntimeImage, which also accepts a mirror
+// Deliberately not airflowrt.IsAstroRuntimeRef, which also accepts a mirror
 // (a repository named runtime or astro-runtime, on a Runtime version tag). That
 // answers "is this an Astro Runtime image"; this answers "can a pull be forced
 // on it", and a mirror lives in exactly the kind of registry shouldPull exists
