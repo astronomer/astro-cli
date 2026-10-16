@@ -12,7 +12,6 @@
 package deploy
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -20,13 +19,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astronomer/astro-cli/internal/shipcheck"
+	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
-	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // Request is the resolved input for a manifest deploy. cmd fills it from flags, args,
@@ -337,62 +335,23 @@ func saveNewLink(req Request, target Target, res *Result) {
 	}
 }
 
-// checkImageSource holds what an image deploy would build from to the Airflow
-// requirement, for a deploy that builds one from the manifest: a declared
-// Dockerfile's FROM line (scaffold.CheckDockerfileAirflow), and a
-// [tool.astro] runtime build (Request.CheckRuntime). It also checks the
-// build secrets, and holds the files the image would carry to shipcheck.Survey:
-// the local and per-machine files a declared Dockerfile's context carries are
-// warned about, and so are the files git ignores, and a file that looks like a
-// credential and that git does not track is refused. A dags-only deploy and
-// one adopting a prebuilt --image-name build nothing from the manifest, and
-// are not held to any of it. It returns the build secrets the declared Dockerfile mounts and
-// nobody gave, for a failed build to name again, and the survey of what the
-// image would carry, made once for every check of it (the transport's too).
+// checkImageSource holds what an image deploy would build from to the checks
+// before a build (deploybuild.CheckSource, which skips a dags-only deploy and
+// a prebuilt --image-name). It returns the build secrets the declared
+// Dockerfile mounts and nobody gave, for a failed build to name again, and the
+// survey of what the image would carry, made once for every check of it (the
+// transport's too).
 func checkImageSource(req Request) (imagebuild.MissingSecrets, *imagebuild.ProjectSurvey, error) {
-	var missing imagebuild.MissingSecrets
-	if req.DagsOnly || req.ImageName != "" || req.Manifest == nil {
-		return missing, nil, nil
-	}
-	if err := scaffold.CheckDockerfileAirflow(req.ProjectDir, req.Manifest); err != nil {
-		return missing, nil, err
-	}
-	warn := req.Warn
-	if warn == nil {
-		warn = func(string) {}
-	}
-	var err error
-	if missing, err = imagebuild.CheckBuildSecrets(req.ProjectDir, req.Manifest.Astro.Dockerfile, req.BuildSecrets); err != nil {
-		return missing, nil, err
-	}
-	missing.Hint = util.BuildSecretHint
-	for _, w := range missing.Warnings() {
-		warn(w)
-	}
-	survey, err := shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, enginePodman(req.Engine), warn)
-	if err != nil {
-		return missing, nil, err
-	}
-	airflow := req.Manifest.Airflow()
-	if airflow.Runtime == "" || req.CheckRuntime == nil {
-		return missing, survey, nil
-	}
-	warnings, err := req.CheckRuntime(airflow.Runtime, airflow.Pin)
-	for _, w := range warnings {
-		warn(manifest.Marker + ": tool.astro.runtime: " + w.Message)
-	}
-	return missing, survey, err
-}
-
-// enginePodman reports whether the engine engine resolves is podman, by
-// asking it (imagebuild.IsPodman). nil, or an engine that cannot be resolved,
-// is not.
-func enginePodman(engine func() (string, []string, error)) bool {
-	if engine == nil {
-		return false
-	}
-	bin, env, err := engine()
-	return err == nil && imagebuild.IsPodman(context.Background(), imagebuild.NewExecCommander(), bin, env)
+	return deploybuild.CheckSource(&deploybuild.Source{
+		ProjectDir:   req.ProjectDir,
+		Manifest:     req.Manifest,
+		DagsOnly:     req.DagsOnly,
+		ImageName:    req.ImageName,
+		BuildSecrets: req.BuildSecrets,
+		CheckRuntime: req.CheckRuntime,
+		Warn:         req.Warn,
+		Engine:       req.Engine,
+	})
 }
 
 // runDagsOnly ships just the dags/ directory through the transport.

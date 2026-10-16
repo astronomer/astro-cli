@@ -26,15 +26,12 @@ import (
 
 const (
 	registryUsername         = "cli"
-	runtimeImageLabel        = airflow.RuntimeImageLabel
 	enableDagDeployMsg       = "Dag-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable Dag-only deploys"
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
 	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
 )
 
 var (
-	deployImagePlatformSupport = []string{"linux/amd64"}
-
 	// Monkey patched to write unit tests
 	airflowImageHandler = airflow.ImageHandlerInit
 	azureUploader       = azure.Upload

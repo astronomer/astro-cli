@@ -39,6 +39,7 @@ const modulePrefix = "github.com/astronomer/astro-cli/"
 var coreBelowCmd = []string{
 	"internal/apirequest",
 	"internal/deploy",
+	"internal/deploybuild",
 	"internal/envresolve",
 	"internal/localenv",
 	"internal/pack",

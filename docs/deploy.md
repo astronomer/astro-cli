@@ -42,7 +42,7 @@ Because `bundle` is a subcommand, `astro deploy bundle` never means a Deployment
 
 `astro remote deploy`, which builds and pushes a Remote Execution client image, follows the same walk: it builds at a `pyproject.toml` project's root, refuses in or below a 1.x project and below a project's root with the messages above, and with `--image-name` pushes an image already built from outside any project.
 
-The deploy code lives in `internal/platform/astro/deploy` (`manifest.go`, `manifest_image.go`, and the bundle and Remote Execution client paths beside them) and in [`internal/deploy`](../internal/deploy/deploy.go).
+The deploy code lives in `internal/platform/astro/deploy` (`manifest.go`, `manifest_image.go`, and the bundle and Remote Execution client paths beside them) and in [`internal/deploy`](../internal/deploy/deploy.go). The build half that is not about Astro (the checks before a build, the engine check, the build at linux/amd64 and the read of its runtime label, and the runtime rules the image is held to) is in [`internal/deploybuild`](../internal/deploybuild/doc.go), so a deploy to another control plane builds and judges an image the same way.
 
 ### Astro Private Cloud
 

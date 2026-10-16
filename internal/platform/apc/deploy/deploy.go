@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/auth"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
@@ -64,7 +65,7 @@ var (
 	// under astronomer.houston.config in the platform's values.
 	ErrBYORegistryDomainNotSet               = errors.New("Custom registry host is not set in config. It can be set at astronomer.houston.config.registry.protectedCustomRegistry.updateRegistry.host")
 	ErrDeploymentTypeIncorrectForImageOnly   = errors.New("--image only works for Dag-only, Git-sync-based and NFS-based deployments")
-	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label io.astronomer.docker.runtime.version")
+	ErrNoRuntimeLabelOnCustomImage           = errors.New("the image should have label " + airflowrt.RuntimeVersionLabel)
 	ErrRuntimeVersionNotPassedForRemoteImage = errors.New("if --image-name and --remote is passed, it's mandatory to pass --runtime-version")
 )
 
@@ -77,7 +78,6 @@ const (
 	warningInvalidNameTagEmptyRecommendations = "WARNING! You are about to push an image using the '%s' tag. This is not recommended.\nAre you sure you want to continue?"
 
 	registryDomainPrefix              = "registry."
-	runtimeImageLabel                 = "io.astronomer.docker.runtime.version"
 	airflowImageLabel                 = "io.astronomer.docker.airflow.version"
 	composeSkipImageBuildingPromptMsg = "Skipping building image since --image-name flag is used..."
 )
@@ -400,8 +400,8 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		if useShaAsTag {
 			remoteImage = fmt.Sprintf("%s@%s", registry, sha)
 		}
-		runtimeVersion, _ := imageHandler.GetLabel("", runtimeImageLabel) //nolint:errcheck // error deliberately ignored in this shell code
-		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel) //nolint:errcheck // error deliberately ignored in this shell code
+		runtimeVersion, _ := imageHandler.GetLabel("", airflowrt.RuntimeVersionLabel) //nolint:errcheck // error deliberately ignored in this shell code
+		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)             //nolint:errcheck // error deliberately ignored in this shell code
 		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
 		if _, err = houston.Call(houstonClient.UpdateDeploymentImage)(req); err != nil {
 			return "", err
@@ -418,7 +418,7 @@ func tagCustomImage(imageHandler airflow.ImageHandler, customImageName string, d
 	if err != nil {
 		return err
 	}
-	runtimeLabel, err := imageHandler.GetLabel("", airflow.RuntimeImageLabel)
+	runtimeLabel, err := imageHandler.GetLabel("", airflowrt.RuntimeVersionLabel)
 	if err != nil {
 		fmt.Fprintln(opts.progress(), "unable get runtime version from image")
 		return err

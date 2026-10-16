@@ -24,6 +24,7 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houston_mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
 	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -149,7 +150,7 @@ func (s *Suite) TestTagPushDockerImageSuccessWithBYORegistry() {
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil).Once()
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("image_sha", nil).Once()
-		s.mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("12.2.0", nil).Twice()
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("12.2.0", nil).Twice()
 		s.mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil).Once()
 		return s.mockImageHandler
 	}
@@ -179,7 +180,7 @@ func (s *Suite) TestTagPushDockerImageSuccessWithBYORegistryAndCustomImageName()
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil)
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("image_sha", nil)
-		s.mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("12.2.0", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("12.2.0", nil)
 		s.mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("1.10.12", nil)
 
 		return s.mockImageHandler
@@ -215,7 +216,7 @@ func (s *Suite) TestTagPushDockerImageFailure() {
 	s.mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil).Once()
-		s.mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("12.2.0", nil).Once()
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("12.2.0", nil).Once()
 		return s.mockImageHandler
 	}
 	s.houstonMock.On("GetDeploymentConfig", nil).Return(nil, errMockHouston).Once()
@@ -226,7 +227,7 @@ func (s *Suite) TestTagPushDockerImageFailure() {
 	s.mockImageHandler = new(mocks.ImageHandler)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil).Once()
-		s.mockImageHandler.On("GetLabel", "", runtimeImageLabel).Return("12.2.0", nil).Once()
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("12.2.0", nil).Once()
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", errSomeContainerIssue).Once()
 		return s.mockImageHandler
 	}
@@ -416,7 +417,7 @@ func (s *Suite) TestAirflowSuccess() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", "img:1").Return(nil).Once()
-		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("4.2.5", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("4.2.5", nil)
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
 		return s.mockImageHandler
 	}
@@ -469,9 +470,9 @@ func (s *Suite) TestAirflowSuccessForBYORegistry() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", "img:1").Return(nil).Once()
-		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("4.2.5", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("4.2.5", nil)
 		s.mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool { return strings.Contains(remoteImage, "my.registry.domain") }), mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
-		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("4.2.5", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("4.2.5", nil)
 		s.mockImageHandler.On("GetLabel", "", airflowImageLabel).Return("2.2.5", nil)
 		return s.mockImageHandler
 	}
@@ -540,7 +541,7 @@ func (s *Suite) TestAirflowSuccessForImageOnly() {
 
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", "img:1").Return(nil)
-		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("4.2.5", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("4.2.5", nil)
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil).Once()
 		return s.mockImageHandler
 	}
@@ -586,7 +587,7 @@ func (s *Suite) TestAirflowSuccessForImageName() {
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil)
-		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("test", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("test", nil)
 		return s.mockImageHandler
 	}
 
@@ -630,7 +631,7 @@ func (s *Suite) TestAirflowFailForImageNameWhenImageHasNoRuntimeLabel() {
 	customImageName := "test-image-name"
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", customImageName).Return(nil)
-		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("", nil)
 		return s.mockImageHandler
 	}
 	s.houstonMock.On("GetWorkspace", mock.Anything).Return(&houston.Workspace{}, nil).Once()
@@ -655,7 +656,7 @@ func (s *Suite) TestAirflowFailureForImageOnly() {
 	config.InitConfig(s.fsForLocalConfig)
 	imageHandlerInit = func(image string) airflow.ImageHandler {
 		s.mockImageHandler.On("TagLocalImage", "img:1").Return(nil)
-		s.mockImageHandler.On("GetLabel", "", airflow.RuntimeImageLabel).Return("4.2.5", nil)
+		s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("4.2.5", nil)
 		s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		return s.mockImageHandler
 	}

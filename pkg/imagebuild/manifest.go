@@ -40,10 +40,10 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 	}
 }
 
-// baseImageFunc resolves the runtime base a generated build starts FROM, from
+// BaseImageFunc resolves the runtime base a generated build starts FROM, from
 // the manifest's Airflow pin, its [tool.astro] runtime build ("" for none) and
 // its requires-python.
-type baseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
+type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 
 // ForManifest is the one rule for which image a project's manifest builds, so
 // every caller building from a manifest builds the same image from it.
@@ -65,9 +65,18 @@ type baseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
-	return forManifestWith(context.Background(), m, shipped, func(_ context.Context, m ManifestBuild) (string, error) {
+	return ForManifestWith(context.Background(), m, func(_ context.Context, m ManifestBuild) (string, error) {
 		return RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
 	})
+}
+
+// ForManifestWith is ForManifest with the generated build's runtime base
+// resolved by base, for a caller that knows better than the public catalog
+// which runtime builds its target accepts. Everything else is ForManifest's
+// rule: a declared Dockerfile is the build and base is not called, and a
+// generated image ships, so it carries the project's files.
+func ForManifestWith(ctx context.Context, m ManifestBuild, base BaseImageFunc) (Request, error) {
+	return forManifestWith(ctx, m, shipped, base)
 }
 
 // Whether the image a manifest builds is shipped, which decides whether a
@@ -96,7 +105,7 @@ func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Op
 // generated build's base resolved by base. base is not called for a declared
 // Dockerfile. A generated build of an image that ships carries the project's
 // files; a declared Dockerfile's context is the project already.
-func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base baseImageFunc) (Request, error) {
+func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base BaseImageFunc) (Request, error) {
 	req := Request{
 		Dependencies: m.Dependencies,
 		Packages:     m.Packages,
