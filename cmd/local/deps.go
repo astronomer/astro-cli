@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -244,16 +243,15 @@ func markSkipPreRun(cmd *cobra.Command) {
 var errAborted = errors.New("aborted")
 
 // proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
-// localrt.ProxyDaemon seam. It lives at the composition layer because
-// internal/proxydaemon reads config, which the core engines must not import; they
-// see only the interface.
+// localrt.ProxyDaemon seam, for the routes under routesDir. The engines see
+// only the interface.
 type proxyDaemon struct{}
 
 func (proxyDaemon) EnsureRunning() (string, error) {
-	return proxydaemon.EnsureRunning(proxy.DefaultPort)
+	return proxydaemon.EnsureRunning(routesDir(), proxy.DefaultPort)
 }
 
-func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
+func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty(routesDir()) }
 
 // newProxyDaemon returns the daemon seam, or nil on Windows, where astro local
 // does not start the proxy (docs/architecture.md, "Platform support"): the
@@ -271,15 +269,11 @@ func newProxyDaemon() localrt.ProxyDaemon {
 	return proxyDaemon{}
 }
 
-// routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the
-// same location v1 uses, honoring the same ASTRO_HOME override — v1 and v2
-// must see each other's routes.
+// routesDir is where pkg/proxy keeps routes.json and the daemon its record:
+// <astro home>/proxy, the same location v1 uses, honoring the same ASTRO_HOME
+// override — v1 and v2 must see each other's routes. See proxydaemon.Dir.
 func routesDir() string {
-	home := os.Getenv("ASTRO_HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir() //nolint:errcheck // falls back to a relative path, matching v1's ASTRO_HOME handling
-	}
-	return filepath.Join(home, ".astro", "proxy")
+	return proxydaemon.Dir()
 }
 
 // newRuntime builds the shared local runtime with the CLI's composition: the

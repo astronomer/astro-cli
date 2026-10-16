@@ -10,35 +10,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/config"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 	"github.com/astronomer/astro-cli/version"
 )
 
-// setupTestDir points config.HomeConfigPath at a temp dir so Routes() and the
-// daemon files live under it.
-func setupTestDir(t *testing.T) {
-	t.Helper()
-	orig := config.HomeConfigPath
-	config.HomeConfigPath = t.TempDir()
-	t.Cleanup(func() {
-		config.HomeConfigPath = orig
-	})
-}
-
 // The lifecycle is pkg/proxy's and tested there. What is this CLI's is how it
-// configures one: the store under the config home, its own binary re-executed
-// into ServeSubcommand, and its version. The 1.x takeover is pkg/proxy's.
+// configures one: the store under the dir it is given, its own binary
+// re-executed into ServeSubcommand, and its version. The 1.x takeover is
+// pkg/proxy's.
 func TestDaemonIsThisCLIs(t *testing.T) {
-	setupTestDir(t)
+	dir := t.TempDir()
 	origVersion := version.CurrVersion
 	version.CurrVersion = "2.3.4"
 	t.Cleanup(func() { version.CurrVersion = origVersion })
 
-	d := daemon()
+	d := daemon(dir)
 
-	assert.Equal(t, filepath.Join(config.HomeConfigPath, proxyDir), d.Store.Dir())
-	assert.Equal(t, filepath.Join(config.HomeConfigPath, proxyDir, "proxy.pid"), d.RecordPath())
+	assert.Equal(t, dir, d.Store.Dir())
+	assert.Equal(t, filepath.Join(dir, "proxy.pid"), d.RecordPath())
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	assert.Equal(t, exe, d.Exe)
@@ -50,9 +39,21 @@ func TestDaemonIsThisCLIs(t *testing.T) {
 // BoundPort reads the record the daemon publishes, at the path this CLI's
 // daemon uses.
 func TestBoundPortReadsTheDaemonsRecord(t *testing.T) {
-	setupTestDir(t)
-	require.NoError(t, os.MkdirAll(Routes().Dir(), 0o755))
-	require.NoError(t, pkgproxy.WriteRecord(daemon().RecordPath(), pkgproxy.Record{PID: os.Getpid(), Port: "16123"}))
+	dir := t.TempDir()
+	require.NoError(t, pkgproxy.WriteRecord(daemon(dir).RecordPath(), pkgproxy.Record{PID: os.Getpid(), Port: "16123"}))
 
-	assert.Equal(t, "16123", BoundPort())
+	assert.Equal(t, "16123", BoundPort(dir))
+}
+
+// Dir is <astro home>/.astro/proxy: ASTRO_HOME when set, the user's home
+// otherwise.
+func TestDirFollowsAstroHome(t *testing.T) {
+	astroHome := t.TempDir()
+	t.Setenv("ASTRO_HOME", astroHome)
+	assert.Equal(t, filepath.Join(astroHome, ".astro", "proxy"), Dir())
+
+	t.Setenv("ASTRO_HOME", "")
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(home, ".astro", "proxy"), Dir())
 }

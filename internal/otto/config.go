@@ -120,17 +120,24 @@ func detectProjectAirflow(cwd string) string {
 	return url
 }
 
+// proxyDir is the proxy daemon's directory under the config home: the routes
+// and the daemon's record. It is the path proxydaemon.Dir works out without
+// reading config/.
+func proxyDir() string {
+	return filepath.Join(config.HomeConfigPath, "proxy")
+}
+
 // detect1xAirflow resolves through the v1 proxy routes. It prefers the proxy
 // hostname URL because it's stable across `astro dev restart` — the container
 // port rotates, the hostname doesn't.
 func detect1xAirflow(cwd string) string {
-	route, err := proxydaemon.Routes().GetRouteByProject(cwd)
+	route, err := proxydaemon.Routes(proxyDir()).GetRouteByProject(cwd)
 	if err != nil || route == nil || route.Port == "" {
 		return ""
 	}
 
 	if route.Hostname != "" {
-		proxyPort := proxydaemon.BoundPort()
+		proxyPort := proxydaemon.BoundPort(proxyDir())
 		if proxyPort == "" {
 			proxyPort = pkgproxy.DefaultPort
 		}

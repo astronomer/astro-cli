@@ -22,7 +22,7 @@ func newProxyServeCmd(_ Deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return proxydaemon.Serve(port)
+			return proxydaemon.Serve(routesDir(), port)
 		},
 	}
 	cmd.Flags().StringVar(&port, "port", proxy.DefaultPort, "Port to listen on")

@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/astronomer/astro-cli/internal/imagepush/mocks/dockerapi"
 	"github.com/astronomer/astro-cli/pkg/logger"
 )
 
@@ -22,7 +23,7 @@ func (s *Suite) TestDockerRegistryInit() {
 
 func (s *Suite) TestRegistryLogin() {
 	s.Run("success", func() {
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, nil).Once()
 
@@ -38,7 +39,7 @@ func (s *Suite) TestRegistryLogin() {
 
 	s.Run("debug log hides the token", func() {
 		const fakeToken = "fake-secret-token-9d3a7b"
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
 
@@ -59,7 +60,7 @@ func (s *Suite) TestRegistryLogin() {
 	})
 
 	s.Run("registry error", func() {
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Return(nil).Once()
 		mockClient.On("RegistryLogin", context.Background(), mock.AnythingOfType("registry.AuthConfig")).Return(registry.AuthenticateOKBody{}, errMockDocker).Once()
 

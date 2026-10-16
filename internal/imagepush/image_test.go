@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/astronomer/astro-cli/internal/imagepush/mocks/dockerapi"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -228,7 +229,7 @@ func (s *Suite) TestDockerImagePush() {
 		s.Run(tc.input, func() {
 			testUtil.InitTestConfig(tc.platform)
 
-			mockClient := new(mockDockerRegistryAPI)
+			mockClient := new(dockerapi.DockerRegistryAPI)
 			mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 			mockClient.On("ImagePush", context.Background(), tc.expected, mock.MatchedBy(func(opts image.PushOptions) bool {
 				decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -263,7 +264,7 @@ func (s *Suite) TestDockerImagePush() {
 
 	s.Run("the Docker API gets the token without its Bearer prefix", func() {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), "images.astronomer.io/foo/bar:123", mock.MatchedBy(func(opts image.PushOptions) bool {
 			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -302,7 +303,7 @@ func (s *Suite) TestDockerImagePushWithGetRepoImageSha() {
 
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), expectedImage, mock.MatchedBy(func(opts image.PushOptions) bool {
 			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -344,7 +345,7 @@ func (s *Suite) TestDockerImagePushWithGetRepoImageSha() {
 
 		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), expectedImage, mock.MatchedBy(func(opts image.PushOptions) bool {
 			decodedAuth, err := base64.URLEncoding.DecodeString(opts.RegistryAuth)
@@ -539,7 +540,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 
 	s.Run("an auth error from the Docker API with a username set skips the CLI retry", func() {
 		const fakeToken = "fake-secret-token-2b8e41"
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
 		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }
@@ -573,7 +574,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 	})
 
 	s.Run("an auth error from the Docker API without a username still tries the CLI", func() {
-		mockClient := new(mockDockerRegistryAPI)
+		mockClient := new(dockerapi.DockerRegistryAPI)
 		mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 		mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
 		getDockerClient = func() (client.APIClient, error) { return mockClient, nil }

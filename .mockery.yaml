@@ -17,15 +17,12 @@ packages:
       RegistryHandler:
       ImageHandler:
       # Only imagepush's own tests use this one, and mocks/ imports imagepush
-      # (ImageHandler's Build takes an ImageBuildConfig), so it is generated
-      # into the package as a test file: from mocks/ it would be a cycle.
+      # (ImageHandler's Build takes an ImageBuildConfig), so it gets a package
+      # of its own: in mocks/ it would be an import cycle.
       DockerRegistryAPI:
         config:
-          dir: internal/imagepush
-          inpackage: true
-          outpkg: imagepush
-          mockname: mockDockerRegistryAPI
-          filename: mock_docker_registry_api_test.go
+          dir: internal/imagepush/mocks/dockerapi
+          outpkg: dockerapi
   github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1:
     config:
       dir: internal/platform/astro/clients/astrov1/mocks

@@ -10,6 +10,8 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/astronomer/astro-cli/internal/imagepush/mocks/dockerapi"
 )
 
 // A push draws its progress where ProgressTo says, stdout otherwise: a
@@ -32,7 +34,7 @@ func (s *Suite) TestDockerImagePushProgressGoesWhereItIsSent() {
 			if c.to != nil {
 				handler.ProgressTo(c.to)
 			}
-			mockClient := new(mockDockerRegistryAPI)
+			mockClient := new(dockerapi.DockerRegistryAPI)
 			mockClient.On("NegotiateAPIVersion", context.Background()).Once()
 			mockClient.On("ImagePush", context.Background(), "test", mock.Anything).Return(io.NopCloser(strings.NewReader("{}")), nil).Once()
 			getDockerClient = func() (client.APIClient, error) { return mockClient, nil }

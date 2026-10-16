@@ -727,7 +727,7 @@ func directURL(st localrt.Status) string {
 // record) the direct URL, which always works, stands in.
 func primaryURL(st localrt.Status) string {
 	if st.Hostname != "" {
-		if port := proxydaemon.BoundPort(); port != "" {
+		if port := proxydaemon.BoundPort(routesDir()); port != "" {
 			return fmt.Sprintf("http://%s:%s", st.Hostname, port)
 		}
 	}

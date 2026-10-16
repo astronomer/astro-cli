@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
@@ -347,9 +348,31 @@ func (s *ConfigSuite) writeProjectRecord(projectPath string, port int) {
 	}))
 }
 
+// Otto reads the routes from the config home; astro local's daemon keeps them
+// at proxydaemon.Dir, which works the same path out without config/. They have
+// to be one directory, with ASTRO_HOME set and without, or Otto misses the
+// routes astro local wrote.
+func (s *ConfigSuite) TestProxyDirIsTheDaemonsDir() {
+	// InitConfig moves HomeConfigFile with ASTRO_HOME, and the next test's
+	// InitTestConfig writes its config there: put both back once ASTRO_HOME
+	// is.
+	defer func() {
+		config.InitConfig(afero.NewMemMapFs())
+		testUtil.InitTestConfig(config.CloudPlatform)
+		config.HomeConfigPath = s.tmpDir
+	}()
+	for name, astroHome := range map[string]string{"unset": "", "set": s.T().TempDir()} {
+		s.Run("ASTRO_HOME "+name, func() {
+			s.T().Setenv("ASTRO_HOME", astroHome)
+			config.InitConfig(afero.NewMemMapFs())
+			s.Equal(proxydaemon.Dir(), proxyDir())
+		})
+	}
+}
+
 func (s *ConfigSuite) writeRoute(r *pkgproxy.Route) {
 	s.T().Helper()
-	s.Require().NoError(proxydaemon.Routes().AddRoute(r))
+	s.Require().NoError(proxydaemon.Routes(proxyDir()).AddRoute(r))
 }
 
 func (s *ConfigSuite) startFakeAirflow() *httptest.Server {
