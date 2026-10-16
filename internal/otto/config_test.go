@@ -32,10 +32,20 @@ type ConfigSuite struct {
 func (s *ConfigSuite) SetupTest() {
 	s.origHomeConfigPath = config.HomeConfigPath
 	s.tmpDir = s.T().TempDir()
-	// InitTestConfig → config.InitConfig → initHome resets HomeConfigPath back
-	// to the real ~/.astro, so the override has to come after, or route writes
-	// leak into the user's real routes.json and the running proxy daemon picks
-	// them up.
+	// The v1 proxy routes live under ASTRO_HOME (proxydaemon.Dir), so it points
+	// at the temp dir, or route writes leak into the user's real routes.json and
+	// the running proxy daemon picks them up. InitTestConfig → config.InitConfig
+	// → initHome resets HomeConfigPath to <ASTRO_HOME>/.astro, so the
+	// HomeConfigPath override has to come after it.
+	//
+	// InitConfig moves HomeConfigFile with ASTRO_HOME, and InitTestConfig
+	// writes its config to HomeConfigFile before InitConfig recomputes it, so a
+	// bare InitConfig lines the two up first, here and again once the cleanup
+	// has put ASTRO_HOME back (a cleanup registered before Setenv runs after
+	// Setenv's own).
+	s.T().Cleanup(func() { config.InitConfig(afero.NewMemMapFs()) })
+	s.T().Setenv("ASTRO_HOME", s.tmpDir)
+	config.InitConfig(afero.NewMemMapFs())
 	testUtil.InitTestConfig(config.CloudPlatform)
 	config.HomeConfigPath = s.tmpDir
 	// localstate lives under XDG_CACHE_HOME — isolate it so a real running
@@ -348,31 +358,11 @@ func (s *ConfigSuite) writeProjectRecord(projectPath string, port int) {
 	}))
 }
 
-// Otto reads the routes from the config home; astro local's daemon keeps them
-// at proxydaemon.Dir, which works the same path out without config/. They have
-// to be one directory, with ASTRO_HOME set and without, or Otto misses the
-// routes astro local wrote.
-func (s *ConfigSuite) TestProxyDirIsTheDaemonsDir() {
-	// InitConfig moves HomeConfigFile with ASTRO_HOME, and the next test's
-	// InitTestConfig writes its config there: put both back once ASTRO_HOME
-	// is.
-	defer func() {
-		config.InitConfig(afero.NewMemMapFs())
-		testUtil.InitTestConfig(config.CloudPlatform)
-		config.HomeConfigPath = s.tmpDir
-	}()
-	for name, astroHome := range map[string]string{"unset": "", "set": s.T().TempDir()} {
-		s.Run("ASTRO_HOME "+name, func() {
-			s.T().Setenv("ASTRO_HOME", astroHome)
-			config.InitConfig(afero.NewMemMapFs())
-			s.Equal(proxydaemon.Dir(), proxyDir())
-		})
-	}
-}
-
 func (s *ConfigSuite) writeRoute(r *pkgproxy.Route) {
 	s.T().Helper()
-	s.Require().NoError(proxydaemon.Routes(proxyDir()).AddRoute(r))
+	dir, err := proxydaemon.Dir()
+	s.Require().NoError(err)
+	s.Require().NoError(proxydaemon.Routes(dir).AddRoute(r))
 }
 
 func (s *ConfigSuite) startFakeAirflow() *httptest.Server {

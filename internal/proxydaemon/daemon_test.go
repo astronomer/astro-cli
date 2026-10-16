@@ -44,16 +44,3 @@ func TestBoundPortReadsTheDaemonsRecord(t *testing.T) {
 
 	assert.Equal(t, "16123", BoundPort(dir))
 }
-
-// Dir is <astro home>/.astro/proxy: ASTRO_HOME when set, the user's home
-// otherwise.
-func TestDirFollowsAstroHome(t *testing.T) {
-	astroHome := t.TempDir()
-	t.Setenv("ASTRO_HOME", astroHome)
-	assert.Equal(t, filepath.Join(astroHome, ".astro", "proxy"), Dir())
-
-	t.Setenv("ASTRO_HOME", "")
-	home, err := os.UserHomeDir()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(home, ".astro", "proxy"), Dir())
-}

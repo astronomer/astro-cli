@@ -1,8 +1,12 @@
 package proxydaemon
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/mitchellh/go-homedir"
 
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
 )
@@ -14,16 +18,23 @@ import (
 // standalone engine's `__supervise` convention.
 const ServeSubcommand = pkgproxy.ServeSubcommand
 
-// Dir is where the daemon keeps routes.json and its record: <astro home>/proxy,
-// the same location v1 uses, honoring the same ASTRO_HOME override, since v1
-// and v2 must see each other's routes. It is config.HomeConfigPath's proxy
-// directory worked out without reading config/, so the core tree can name it.
-func Dir() string {
+// Dir is where the daemon keeps routes.json and its record:
+// <ASTRO_HOME or home>/.astro/proxy, the location v1 uses, since v1 and v2 must
+// see each other's routes. Home is found the way config.HomeConfigPath finds it,
+// through go-homedir, which falls back to getent or dscl when $HOME is unset.
+// When there is no home at all, Dir fails rather than return a relative path.
+func Dir() (string, error) {
 	home := os.Getenv("ASTRO_HOME")
 	if home == "" {
-		home, _ = os.UserHomeDir() //nolint:errcheck // falls back to a relative path, matching v1's ASTRO_HOME handling
+		var err error
+		if home, err = homedir.Dir(); err != nil {
+			return "", fmt.Errorf("finding the home directory for the proxy routes: %w", err)
+		}
+		if home == "" {
+			return "", errors.New("finding the home directory for the proxy routes: none found")
+		}
 	}
-	return filepath.Join(home, ".astro", "proxy")
+	return filepath.Join(home, ".astro", "proxy"), nil
 }
 
 // Routes returns the route store rooted at dir. Stores are cheap; building one

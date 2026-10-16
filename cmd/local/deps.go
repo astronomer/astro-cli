@@ -188,7 +188,7 @@ func NewDeps() Deps {
 		Stdin:            os.Stdin,
 		Stdout:           os.Stdout,
 		Stderr:           os.Stderr,
-		Runtime:          newRuntime(),
+		Runtime:          coreRuntime(),
 		Checks:           runner,
 		CheckVenv:        runner,
 		Provisioner:      newUVProvisioner,
@@ -243,15 +243,25 @@ func markSkipPreRun(cmd *cobra.Command) {
 var errAborted = errors.New("aborted")
 
 // proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
-// localrt.ProxyDaemon seam, for the routes under routesDir. The engines see
-// only the interface.
+// localrt.ProxyDaemon seam, for the routes under proxydaemon.Dir. The engines
+// see only the interface.
 type proxyDaemon struct{}
 
 func (proxyDaemon) EnsureRunning() (string, error) {
-	return proxydaemon.EnsureRunning(routesDir(), proxy.DefaultPort)
+	dir, err := proxydaemon.Dir()
+	if err != nil {
+		return "", err
+	}
+	return proxydaemon.EnsureRunning(dir, proxy.DefaultPort)
 }
 
-func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty(routesDir()) }
+// StopIfEmpty has nothing to stop when there is no routes dir: no daemon could
+// have been started for one.
+func (proxyDaemon) StopIfEmpty() {
+	if dir, err := proxydaemon.Dir(); err == nil {
+		proxydaemon.StopIfEmpty(dir)
+	}
+}
 
 // newProxyDaemon returns the daemon seam, or nil on Windows, where astro local
 // does not start the proxy (docs/architecture.md, "Platform support"): the
@@ -269,26 +279,52 @@ func newProxyDaemon() localrt.ProxyDaemon {
 	return proxyDaemon{}
 }
 
-// routesDir is where pkg/proxy keeps routes.json and the daemon its record:
-// <astro home>/proxy, the same location v1 uses, honoring the same ASTRO_HOME
-// override — v1 and v2 must see each other's routes. See proxydaemon.Dir.
-func routesDir() string {
-	return proxydaemon.Dir()
-}
-
 // newRuntime builds the shared local runtime with the CLI's composition: the
-// v1-compatible routes dir, the proxy daemon that shells out to `astro proxy`, and
-// the real image builder.
-func newRuntime() *localrt.Runtime {
+// v1-compatible routes dir (proxydaemon.Dir), the proxy daemon that shells out
+// to `astro proxy`, and the real image builder. It fails only when there is no
+// home directory to keep the routes in.
+func newRuntime() (*localrt.Runtime, error) {
+	routesDir, err := proxydaemon.Dir()
+	if err != nil {
+		return nil, err
+	}
 	return localrt.New(localrt.Config{
-		RoutesDir:     routesDir(),
+		RoutesDir:     routesDir,
 		ProxyDaemon:   newProxyDaemon(),
 		Images:        newImageBuilder(),
 		HealthTimeout: healthTimeout(),
 		// container.binary pins the engine docker mode drives: project
 		// config over global, read for the project being acted on.
 		ContainerBinary: containercfg.Binary,
-	})
+	}), nil
+}
+
+// noRoutesRuntime stands in for the runtime when newRuntime fails: every
+// command that needs one reports why, and the rest of the CLI still runs.
+type noRoutesRuntime struct{ err error }
+
+func (r noRoutesRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks) (localrt.Airflow, error) {
+	return nil, r.err
+}
+func (r noRoutesRuntime) Attach(string) (localrt.Airflow, error)        { return nil, r.err }
+func (r noRoutesRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) { return nil, r.err }
+func (r noRoutesRuntime) LogSource(string) (localrt.Airflow, error)     { return nil, r.err }
+func (r noRoutesRuntime) ReadStatus(string) (localrt.Status, error) {
+	return localrt.Status{}, r.err
+}
+func (r noRoutesRuntime) List() ([]localrt.Status, error)       { return nil, r.err }
+func (r noRoutesRuntime) PruneStale() ([]localrt.Status, error) { return nil, r.err }
+func (r noRoutesRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
+	return localrt.ResetReport{}, r.err
+}
+
+// coreRuntime is newRuntime for NewDeps, which cannot fail.
+func coreRuntime() Runtime {
+	rt, err := newRuntime()
+	if err != nil {
+		return noRoutesRuntime{err: err}
+	}
+	return rt
 }
 
 // healthTimeoutEnv names how long a start waits for Airflow before giving up.
