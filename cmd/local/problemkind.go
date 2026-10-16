@@ -41,7 +41,8 @@ const (
 	// there.
 	KindLocked cliout.ProblemKind = "locked"
 	// KindUnsupportedBase: the project's declared Dockerfile does not build on
-	// an Astro Runtime image, so docker mode refuses before starting anything.
+	// an Astro Runtime image (the image it built has no runtime version label),
+	// so docker mode refuses before creating any container.
 	// Not transient and not about the machine: the project has to change.
 	KindUnsupportedBase cliout.ProblemKind = "unsupported_base"
 	// KindDatabaseNewerThanAirflow: a newer Airflow already upgraded the

@@ -141,36 +141,89 @@ func New(routesDir string, daemon rt.ProxyDaemon, images rt.ImageBuilder) *Engin
 	return e
 }
 
-// The declared Dockerfile's base is read once per start, by
-// airflowrt.ReadDeclaredBase, and shared by the two decisions that depend on
-// it: whether the start is refused, and which generation the compose file
-// describes. Parsing the same path twice is wasted I/O, and worse, two answers
-// that can disagree about a file edited between them.
+// What a declared Dockerfile builds on is judged by the image it builds, not by
+// the name its FROM line gives the base. An Astro Runtime image carries
+// airflowrt.RuntimeVersionLabel, a built image inherits its base's labels, and
+// a mirror of a Runtime image under a private registry's name is an exact copy
+// that keeps them — so the label accepts a mirror that a list of registries
+// would refuse, and judges a FROM named by a build argument that no reading of
+// the file could. The file is still read, by airflowrt.ReadDeclaredBase, for
+// the name a refusal gives the base and for a generation to fall back on.
 
-// refuseUnsupportedBase rejects a declared Dockerfile that does not build on an
-// Astro Runtime image.
+// unsupportedBaseError is a declared Dockerfile refused for its base. It reads
+// as the plain reason, airflowrt.NotRuntimeImageError, and matches
+// airflowrt.ErrUnsupportedBase too, which cmd/local's problem kind and Astro
+// Desktop test for.
+type unsupportedBaseError struct{ reason *airflowrt.NotRuntimeImageError }
+
+func (e *unsupportedBaseError) Error() string { return e.reason.Error() }
+
+func (e *unsupportedBaseError) Unwrap() []error {
+	return []error{e.reason, airflowrt.ErrUnsupportedBase}
+}
+
+// refuseUnlabelledBase rejects a declared Dockerfile whose built image carries
+// no runtime version label: one that does not build on an Astro Runtime image.
 //
 // The compose file this engine writes is for that image and not for any image:
 // it runs every service as the `astro` user, and the service set comes from the
-// runtime tag. On an ordinary `apache/airflow` base — the shape a 1.x repo
-// brings, and one nothing else here rejects — the containers never start, and
-// what reaches the person is "starting project containers: exit status 1" over
-// a daemon error about a missing unix user.
+// runtime version. On an ordinary `apache/airflow` or `python` base — the shape
+// a 1.x repo brings — the containers never start, and what reaches the person
+// is "starting project containers: exit status 1" over a daemon error about a
+// missing unix user.
 //
-// Only what the file positively says is refused. A base that could not be read
-// at all is left alone, for the reason airflowrt.ReadDeclaredBase gives.
-func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
-	if !base.Known || airflowrt.IsAstroRuntimeImage(base.Image) {
-		return nil
+// The refusal names the base the way the file wrote it, which is what the
+// reader has to change, and falls back to naming the file when the FROM is a
+// build argument or could not be read.
+func refuseUnlabelledBase(declaredRel string, base airflowrt.DeclaredBase) error {
+	what := "the image built from " + declaredRel
+	if base.Known {
+		what = base.Ref()
 	}
-	return fmt.Errorf("%w: %s builds on %s. The generated compose file runs Airflow as the "+
-		"astro user and takes its service set from the runtime tag, so another base cannot start. "+
-		"Base the final stage on astrocrpublic.azurecr.io/runtime",
-		airflowrt.ErrUnsupportedBase, declared, base.Image)
+	return &unsupportedBaseError{reason: &airflowrt.NotRuntimeImageError{Image: what}}
+}
+
+// readRuntimeLabel reads airflowrt.RuntimeVersionLabel off a local image, ""
+// when the image does not carry it. It errors when the image cannot be
+// inspected, which says nothing about its base and so is not reported as if it
+// did.
+func (e *Engine) readRuntimeLabel(ctx context.Context, conn engineConn, image string) (string, error) {
+	format := fmt.Sprintf("{{ index .Config.Labels %q }}", airflowrt.RuntimeVersionLabel)
+	out, err := e.cmd.Output(ctx, conn.env, conn.bin, "image", "inspect", "--format", format, image)
+	if err != nil {
+		return "", fmt.Errorf("reading the runtime version label off %s: %w", image, err)
+	}
+	v := strings.TrimSpace(string(out))
+	// The template prints "<no value>" for a label that is absent.
+	if v == "<no value>" {
+		return "", nil
+	}
+	return v, nil
+}
+
+// judgeDeclaredBuild reads the runtime version off the image a declared
+// Dockerfile built, and refuses the start when there is none. The image is
+// removed on a refusal: it is this start's, nothing can run it, and it is the
+// size of whatever it was built on.
+//
+// A generated build is not judged. Its base is the runtime image the builder
+// resolved from the pin, and with nothing to install that base is what runs —
+// an image compose pulls on the up, not yet in the local store to inspect.
+func (e *Engine) judgeDeclaredBuild(ctx context.Context, conn engineConn, image, projectName, declaredRel string, base airflowrt.DeclaredBase) (string, error) {
+	version, err := e.readRuntimeLabel(ctx, conn, image)
+	if err != nil {
+		return "", err
+	}
+	if version == "" {
+		e.removeBuiltImage(ctx, conn, projectName)
+		return "", refuseUnlabelledBase(declaredRel, base)
+	}
+	return version, nil
 }
 
 // planMajor is the Airflow generation the compose file has to describe: read
-// off the declared Dockerfile where there is one, and off the pin otherwise.
+// off the runtime version of the image a declared Dockerfile built where there
+// is one, and off the pin otherwise.
 //
 // The pin alone was wrong for exactly the projects the declared tier is for. A
 // conversion writes the declaration itself and may have DEFAULTED the pin, so a
@@ -183,21 +236,24 @@ func refuseUnsupportedBase(declared string, base airflowrt.DeclaredBase) error {
 // in the CLI's, and leaving it would have relocated the divergence the declared
 // tier exists to end rather than closing it.
 //
-// The pin is the answer whenever the file does not carry a generation. That is
-// a file nothing could be read from, and a runtime pinned by digest — whose
-// reference names an exact image and no version at all, so there is nothing in
-// it to be read.
+// runtimeVersion is the built image's label when Start has read one, which is
+// the image's own word and holds for a mirror, or a build-argument FROM, whose
+// reference names no version Astronomer's way. Before a build there is no
+// image to ask, and the FROM tag is the fallback
+// (airflowrt.DeclaredBase.RuntimeVersion): the same reader the check that the
+// FROM agrees with the requirement uses (scaffold.CheckDockerfileAirflow).
 //
-// The version is read by airflowrt.DeclaredBase, the same reader the check
-// that the FROM agrees with the requirement uses (scaffold.CheckDockerfileAirflow),
-// and a tag that check can read (manifest.ParseRuntimeTag) takes its generation
-// from the same grammar, so for those tags the two cannot disagree, and the
-// check has already refused a start where the tag and the pin differ. Only a
-// tag the grammar does not read falls to the looser rule below: an Astronomer
-// image whose tag is not a runtime version at all (ap-airflow:2.5.1) is still
-// Airflow 2 to the compose file, where the check has nothing to compare.
-func planMajor(airflowVersion string, base airflowrt.DeclaredBase) string {
-	v := base.RuntimeVersion()
+// The pin is the answer whenever neither carries a generation: a file nothing
+// could be read from, a base under a name that is not Astronomer's, and a
+// runtime pinned by digest — whose reference names an exact image and no
+// version at all.
+//
+// A version manifest.ParseRuntimeTag reads takes its generation from that
+// grammar. Only a tag the grammar does not read falls to the looser rule below:
+// an Astronomer image whose tag is not a runtime version at all
+// (ap-airflow:2.5.1) is still Airflow 2 to the compose file.
+func planMajor(airflowVersion, runtimeVersion string) string {
+	v, _ := airflowrt.ParseRuntimeTagPython(runtimeVersion)
 	if v == "" {
 		return airflowMajor(airflowVersion)
 	}
@@ -223,11 +279,16 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", p.ProjectPath, err)
 	}
-	// The declared Dockerfile's path, for the two decisions made off the file
-	// before a build is picked: the refusal of a base that is not Astro
-	// Runtime, and the generation the compose file describes. The build itself
-	// takes its Dockerfile and Context from the image builder's request
-	// (imagebuild.ForLocalManifest), which joins the same path the same way.
+	// The declared Dockerfile's path, for what is read off the file: the base a
+	// refusal names, and the generation to fall back on if no label is read.
+	// The build itself takes its Dockerfile and Context from the image
+	// builder's request (imagebuild.ForLocalManifest), which joins the same
+	// path the same way.
+	//
+	// Nothing is refused here by the base's name. Whether a Dockerfile builds
+	// on Astro Runtime is a property of the image it builds, which a mirror's
+	// name or a build argument's FROM cannot show, so it is judged after the
+	// build, off the image's label (judgeDeclaredBuild).
 	declared := ""
 	if p.Dockerfile != "" {
 		// FromSlash because the manifest carries a slash-separated path (see the
@@ -235,17 +296,6 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		declared = filepath.Join(projectPath, filepath.FromSlash(p.Dockerfile))
 	}
 	base := airflowrt.ReadDeclaredBase(declared)
-	// Before the engine, because it needs no engine: what a Dockerfile builds
-	// on is a property of the file. Starting a stopped Docker Desktop to then
-	// refuse is a minute of somebody's time spent on an answer already on disk.
-	//
-	// And before StateStarting, with the mode and path checks, because nothing
-	// has been started. A consumer told starting→error for a project where no
-	// engine, port or record was ever touched cannot tell this from a start
-	// that got partway and may have left something behind.
-	if err := refuseUnsupportedBase(declared, base); err != nil {
-		return nil, err
-	}
 
 	rt.OnState(cb, rt.StateStarting, nil)
 	// Every failure from here on reports StateError, once, with whatever error is
@@ -281,7 +331,6 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err != nil {
 		return nil, err
 	}
-	major := planMajor(p.AirflowVersion, base)
 	hostname, err := localshared.PlanHostname(p, projectPath)
 	if err != nil {
 		return nil, err
@@ -335,6 +384,16 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err != nil {
 		return nil, err
 	}
+	// After the build, because a declared Dockerfile's base is judged by the
+	// image it built, and before compose, because a compose file for an image
+	// that cannot run it is a stack that never comes up.
+	runtimeVersion := base.RuntimeVersion()
+	if build.Dockerfile != "" {
+		if runtimeVersion, err = e.judgeDeclaredBuild(ctx, conn, image, name, p.Dockerfile, base); err != nil {
+			return nil, err
+		}
+	}
+	major := planMajor(p.AirflowVersion, runtimeVersion)
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
 	composePath, err := e.writeComposeFile(stateDir, composeInput{

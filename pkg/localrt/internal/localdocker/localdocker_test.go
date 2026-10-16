@@ -41,7 +41,20 @@ type fakeCmd struct {
 	// context in a struct is the thing containedctx exists to refuse, and the
 	// only question a test asks of one here is whether it was bounded at all.
 	outputBounded []bool
+	// runtimeLabel answers the inspect that reads the runtime version label
+	// off a built image: the label's value, "" for an image without it. Nil
+	// is an image built on an Astro Runtime base, defaultRuntimeLabel, since
+	// that is what every declared Dockerfile here builds on unless a test
+	// says otherwise.
+	runtimeLabel func(image string) (string, error)
 }
+
+// defaultRuntimeLabel is the runtime version label fakeCmd reports for a built
+// image when a test sets none: the version dockerfilePlan's FROM names.
+const defaultRuntimeLabel = "3.1-2"
+
+// runtimeLabelInspect is the prefix of the inspect readRuntimeLabel runs.
+const runtimeLabelInspect = `docker image inspect --format {{ index .Config.Labels "io.astronomer.docker.runtime.version" }} `
 
 // envFor returns the environment recorded for the first call containing substr.
 func (f *fakeCmd) envFor(substr string) ([]string, bool) {
@@ -74,6 +87,17 @@ func (f *fakeCmd) Output(ctx context.Context, _ []string, name string, args ...s
 				return nil, ctx.Err()
 			}
 		}
+	}
+	if image, ok := strings.CutPrefix(call, runtimeLabelInspect); ok {
+		if f.runtimeLabel == nil {
+			return []byte(defaultRuntimeLabel + "\n"), nil
+		}
+		v, err := f.runtimeLabel(image)
+		if v == "" && err == nil {
+			// What docker prints for an absent label.
+			v = "<no value>"
+		}
+		return []byte(v + "\n"), err
 	}
 	if f.output == nil {
 		return nil, nil
@@ -783,9 +807,10 @@ func TestContainersGone(t *testing.T) {
 func dockerfilePlan(t *testing.T) rt.Plan {
 	t.Helper()
 	p := testPlan(t)
-	// An Astro Runtime base, because Start refuses anything else: the compose
-	// file runs Airflow as the `astro` user and reads its service set off the
-	// runtime tag, so another base cannot come up. See refusebase_test.go.
+	// An Astro Runtime base, matching the runtime label fakeCmd reports for the
+	// built image by default: Start refuses an image without one, since the
+	// compose file runs Airflow as the `astro` user and reads its service set
+	// off the runtime version. See refusebase_test.go.
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
 		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n"), 0o600))
 	p.Dockerfile = "Dockerfile"
@@ -901,24 +926,22 @@ func TestStartWithoutProjectDockerfileStillResolvesBase(t *testing.T) {
 	assert.Equal(t, []string{"pandas"}, req.Dependencies)
 }
 
-// AirflowVersion is honored with a Dockerfile no base can be read from.
+// The built image's label decides the generation where the file says nothing.
 //
-// One path reaches this now. A base that reads as something other than Astro
-// Runtime is refused outright, so the pin decides the service set only when the
-// parser could not answer at all — a file with no FROM here. That is left to
-// imagebuild.Build on purpose, which reports it with the path and the reason;
-// meanwhile the compose file still has to be written for some generation, and
-// the pin is the only statement there is.
+// A base the parser could not read — a file with no FROM here — has no tag to
+// fall back on, and the pin used to decide. The image the build produced is
+// asked instead, so an Airflow 2 runtime gets the Airflow 2 service set beside
+// a pin of either generation.
 //
 // An Airflow 2 project is the case that would break: it has no dag-processor,
 // and declaring one fails the whole compose merge.
-func TestStartWithProjectDockerfileStillUsesPlanGeneration(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
+func TestStartTakesTheGenerationFromTheLabelWhereTheFileSaysNothing(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects, runtimeLabel: func(string) (string, error) { return "12.1.0", nil }}
 	e := testEngine(t, cmd)
 	p := dockerfilePlan(t)
 	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
 		[]byte("RUN echo no FROM here\n"), 0o600))
-	p.AirflowVersion = "2.10.5"
+	p.AirflowVersion = "3.1"
 
 	_, err := e.Start(context.Background(), p, rt.Callbacks{})
 	require.NoError(t, err)
@@ -1372,14 +1395,19 @@ func TestStartResolvesADeclaredDockerfileInASubdirectory(t *testing.T) {
 //
 // Astro Desktop fixed this in its own plan builder; this asserts the CLI's, so
 // the two tools agree rather than the divergence moving.
+//
+// The generation is the built image's runtime version label, which is the
+// image's own word: it holds where the FROM names no version Astronomer's way,
+// a mirror or a build argument, and where the tag and the label disagree.
 func TestStartReadsTheGenerationFromTheDeclaredDockerfile(t *testing.T) {
 	for _, tc := range []struct {
-		name, pin, body, wantMajor string
+		name, pin, body, label, wantMajor string
 	}{
 		{
-			name: "pin says 3, file is airflow 2",
-			pin:  "3.1",
-			body: "FROM astrocrpublic.azurecr.io/runtime:12.1.0\nRUN echo hi\n",
+			name:  "pin says 3, file is airflow 2",
+			pin:   "3.1",
+			body:  "FROM astrocrpublic.azurecr.io/runtime:12.1.0\nRUN echo hi\n",
+			label: "12.1.0",
 			// runtime 12.x is an Airflow 2 image.
 			wantMajor: "2",
 		},
@@ -1387,31 +1415,47 @@ func TestStartReadsTheGenerationFromTheDeclaredDockerfile(t *testing.T) {
 			name:      "pin says 2, file is airflow 3",
 			pin:       "2",
 			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN echo hi\n",
+			label:     "3.1-2",
 			wantMajor: "3",
 		},
 		{
 			name:      "multi-stage takes the final stage",
 			pin:       "2",
 			body:      "FROM python:3.12-slim AS builder\nFROM astrocrpublic.azurecr.io/runtime:3.1-2\n",
+			label:     "3.1-2",
 			wantMajor: "3",
 		},
 		{
-			// Astronomer publishes more than one image name. This one is
-			// accepted because of where it comes from, not what it is called,
-			// and the generation is then read from its tag like any other —
-			// matching on "runtime" appearing in the name instead would accept
-			// the image and then ignore what it says.
-			name:      "an astronomer image whose name is not runtime",
+			// A mirror's name is not Astronomer's, so nothing can be read off
+			// its tag by name; the label it kept says Airflow 2.
+			name:      "a mirrored runtime beside a pin of the other generation",
 			pin:       "3.1",
-			body:      "FROM quay.io/astronomer/ap-airflow:2.5.1\nRUN echo hi\n",
+			body:      "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\n",
+			label:     "12.1.0",
 			wantMajor: "2",
 		},
-		// A non-runtime base used to appear here, falling back to the pin.
+		{
+			name:      "a build-argument FROM",
+			pin:       "2",
+			body:      "ARG BASE=registry.corp.example/runtime:3.1-2\nFROM ${BASE}\n",
+			label:     "3.1-2",
+			wantMajor: "3",
+		},
+		{
+			// The tag says Airflow 3; the image says it is runtime 12. The
+			// image is what runs.
+			name:      "the label over the tag",
+			pin:       "3.1",
+			body:      "FROM astrocrpublic.azurecr.io/runtime:3.1-2\n",
+			label:     "12.1.0",
+			wantMajor: "2",
+		},
+		// A base without the label used to appear here, falling back to the pin.
 		// Start refuses that file now rather than writing a compose file for an
 		// image it cannot run, so the case lives in refusebase_test.go.
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := &fakeCmd{output: noProjects}
+			cmd := &fakeCmd{output: noProjects, runtimeLabel: func(string) (string, error) { return tc.label, nil }}
 			e := testEngine(t, cmd)
 
 			p := testPlan(t)

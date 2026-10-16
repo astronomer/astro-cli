@@ -165,35 +165,42 @@ func IsRuntime3(baseTag string) bool {
 // requires only the contract leaf, deliberately, so it cannot import this
 // module. Its isAstroBase is the same rule, checked on its own side.
 //
+// A name is only a guess at what an image is, so nothing refuses an image by
+// it where the image itself is at hand: docker mode and deploy read
+// RuntimeVersionLabel off the built image (NotRuntimeImageError), which a
+// mirror under another registry's name keeps. The name is for what is decided
+// before a build, from the file alone — reading a runtime version off a FROM
+// tag, and whether a base is pulled.
+//
 // Two other definitions exist and are NOT this one. pkg/scaffold matches the
-// substring "runtime" when reading a version out of a v1 Dockerfile, so it
-// reads one from a private myco/our-runtime that docker mode then refuses.
+// substring "runtime" when reading a version out of a v1 Dockerfile.
 // internal/platform/apc names a wider set — including astronomerinc/ap-airflow
 // — for the v1 Software deploy path, which warns rather than refusing and does
-// not write this compose file. Neither is safe to fold in here without knowing
-// that those images carry the `astro` user, which is what this gate is for.
+// not write the docker-mode compose file.
 const (
 	astroRegistryHost  = "astrocrpublic.azurecr.io"
 	quayAstronomerRepo = "quay.io/astronomer"
 )
 
 // ErrUnsupportedBase reports a declared Dockerfile whose final stage does not
-// build on an Astro Runtime image.
+// build on an Astro Runtime image: one whose built image carries no
+// RuntimeVersionLabel, mirrored or not.
 //
 // The generated compose file is written for that image and not for any image:
 // it runs the services as the `astro` user and picks the service set from the
-// runtime tag's generation. On another base the containers fail to start at
+// runtime version's generation. On another base the containers fail to start at
 // all — "unable to find user astro: no matching entries in passwd file" — which
 // names nothing the author wrote.
 var ErrUnsupportedBase = errors.New("a declared Dockerfile must build on an Astro Runtime image")
 
 // IsAstroRuntimeImage reports whether an image reference names an image
-// published as Astro Runtime.
+// published as Astro Runtime, by its name alone.
 //
 // The reference without its tag, as ParseDockerfileAt returns it. Matched
 // against the registries rather than by looking for "runtime" in the name,
-// which also accepts a private `myco/our-runtime` that shares none of the
-// conventions the compose file depends on.
+// which also matches a private `myco/our-runtime` that is no Runtime image.
+// False says only that the name is not Astronomer's: a mirror of a Runtime
+// image is one, and where the image exists, its label is the answer.
 func IsAstroRuntimeImage(image string) bool {
 	for _, base := range []string{astroRegistryHost, quayAstronomerRepo} {
 		// A repository under the registry, not the registry alone: `FROM
@@ -220,9 +227,9 @@ func IsUnresolvedRef(image string) bool {
 // DeclaredBase is what a project's own Dockerfile builds on, as far as the file
 // alone can say: the final stage's image and tag, read by ParseDockerfileAt.
 //
-// One reader for every caller that asks, so the refusal of a foreign base, the
-// generation a compose file describes and the check that the FROM agrees with
-// the manifest's Airflow requirement read the same line the same way.
+// One reader for every caller that asks, so the generation a compose file
+// describes before a build and the check that the FROM agrees with the
+// manifest's Airflow requirement read the same line the same way.
 type DeclaredBase struct {
 	Image, Tag string
 	// Known is false when there is no declared Dockerfile, when the file could
