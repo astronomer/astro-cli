@@ -229,51 +229,39 @@ func read1xProject(dir string) (*project1x, error) {
 // Airflow version its tag names, whether it is the project's build, and the
 // notes either answer needs.
 func (from1x *project1x) readDockerfile(dir string, data []byte) {
-	version, stated, notes := airflowFromDockerfile(data)
-	from1x.airflow = version
-	if stated {
-		from1x.statedVersion = true
-	}
 	from1x.present = append(from1x.present, fileDockerfile)
 	from1x.dockerfileBody = data
 
-	kind, ref := dockerfileBase(filepath.Join(dir, fileDockerfile), data)
-	// airflowFromDockerfile reads the text after FROM as written, so a base
-	// built from a build argument drew "no stage builds on an Astro Runtime
-	// image (${BASE})" whatever the argument names. Whether it is one is
-	// dockerfileBase's answer, and the notes below give it.
-	if !stated && strings.Contains(ref, "$") {
-		notes = nil
-	}
+	kind, ref := dockerfileBase(filepath.Join(dir, fileDockerfile))
 	if kind == baseForeign {
 		// Left as it is and not declared, so the notes that describe it as the
 		// build (its RUN steps "still run", requirements.txt "kept because the
-		// base reads it", its build secrets) would all be false. One note
-		// replaces them, keeping only what explains a version the file did
-		// state. The note names the file, so planRetirements keeps it.
+		// base reads it", its build secrets) would all be false, and so would
+		// an Airflow version read from an earlier, Runtime, stage: that stage
+		// is not the image. One note replaces them. The note names the file,
+		// so planRetirements keeps it.
 		from1x.dockerfileForeign = true
-		if !stated {
-			notes = nil
-		}
-		from1x.notes = append(from1x.notes, notes...)
 		from1x.notes = append(from1x.notes, foreignDockerfileNote(ref))
 		return
 	}
 
 	from1x.dockerfilePinOnly = dockerfileIsPinOnly(data)
-	switch {
-	case kind == baseUnknown && ref != "" && !from1x.dockerfilePinOnly:
-		// A base this run could not classify is declared, as every Dockerfile
-		// was before the check existed, because the alternative is ignoring a
-		// build that may well be right. Said out loud when the reason is a
-		// build argument, which a person can settle by reading one line.
-		notes = append(notes, "Dockerfile: its final FROM is "+ref+
-			", which uses a build argument in a form this run does not expand, so whether it builds on an "+
-			"Astro Runtime image is unknown. It was declared as this project's build; if its base is not "+
-			"Astro Runtime, remove dockerfile under [tool.astro] in "+manifest.Marker)
-	case kind == baseRuntime && !stated && strings.Contains(ref, "$"):
-		notes = append(notes, "Dockerfile: its final FROM is "+ref+
-			", an Astro Runtime image named by a build argument, so the Airflow version was not read from its tag")
+	var notes []string
+	if airflowrt.IsUnresolvedRef(ref) {
+		// Unknown, and nothing is read from its text: airflowFromDockerfile
+		// would read `${BASE}` as a base that is not Runtime, or an earlier
+		// stage's tag as this image's Airflow. The pin defaults, and the
+		// defaulted-pin note says so.
+		from1x.statedVersion = true
+		notes = []string{buildArgDockerfileNote(ref, from1x.dockerfilePinOnly)}
+	} else {
+		var version string
+		var stated bool
+		version, stated, notes = airflowFromDockerfile(finalStage(data))
+		from1x.airflow = version
+		if stated {
+			from1x.statedVersion = true
+		}
 	}
 	build := buildStepsNote(data)
 	from1x.notes = append(from1x.notes, notes...)
@@ -314,6 +302,57 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 				"project's build. What it does is not described in pyproject.toml, which is the point of "+
 				"declaring it")
 	}
+}
+
+// buildArgDockerfileNote tells the user a Dockerfile's final FROM, ref, is
+// built from a build argument, so its base was not judged. pinOnly is a file
+// that says nothing else, which is kept and not declared, as a pin-only file
+// on a Runtime base is when the pin came from elsewhere.
+func buildArgDockerfileNote(ref string, pinOnly bool) string {
+	note := "Dockerfile: its final FROM is " + ref + ", which comes from a build argument this run does not " +
+		"expand, so neither its base image nor an Airflow version was read from it. "
+	if pinOnly {
+		return note + "It names nothing else, so it was kept and not declared as this project's build; to build " +
+			"from it, add dockerfile = 'Dockerfile' under [tool.astro] in " + manifest.Marker +
+			", and astro local start checks the image it builds"
+	}
+	return note + "It was declared as this project's build (dockerfile under [tool.astro] in " + manifest.Marker +
+		"), and astro local start checks the image it builds"
+}
+
+// finalStage is data cut down to the FROM line the final stage builds on,
+// following a stage alias (`FROM base`) back to the FROM it names, so a version
+// is read from the image Docker builds and never from a builder stage. data
+// itself when it has no FROM, for airflowFromDockerfile to say so.
+func finalStage(data []byte) []byte {
+	stages := fromLineRe.FindAllStringSubmatch(string(data), -1)
+	if len(stages) == 0 {
+		return data
+	}
+	i := len(stages) - 1
+	for hop := 0; hop < len(stages); hop++ {
+		image, _ := splitImageRef(stages[i][1])
+		earlier := -1
+		for j, m := range stages[:i] {
+			if alias := stageAlias(m[1]); alias != "" && strings.EqualFold(alias, image) {
+				earlier = j
+			}
+		}
+		if earlier < 0 {
+			break
+		}
+		i = earlier
+	}
+	return []byte("FROM " + stages[i][1] + "\n")
+}
+
+// stageAlias is the name `AS name` gives a stage, from the text after FROM.
+func stageAlias(rest string) string {
+	fields := slices.DeleteFunc(strings.Fields(rest), func(f string) bool { return strings.HasPrefix(f, "--") })
+	if len(fields) >= 3 && strings.EqualFold(fields[1], "AS") {
+		return fields[2]
+	}
+	return ""
 }
 
 // foreignDockerfileNote tells the user a Dockerfile was found and not made the

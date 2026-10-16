@@ -1173,6 +1173,13 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 		linksNote = config1xRelPath + ": " + instancesNote(from1x.instances)
 		out = append(out, linksNote)
 	}
+	// A pin-only Dockerfile whose pin lost to --airflow-version or an existing
+	// pin is kept (dockerfileIsSpent) and not declared, and its reader had
+	// nothing to say about it, so it would stay without a word.
+	if from1x.dockerfilePinOnly && from1x.airflow != "" && !dockerfileIsSpent(from1x, version) {
+		out = append(out, "Dockerfile: kept and not declared as this project's build. It names only a base image, on "+
+			"Airflow "+from1x.airflow+", and this project's pin is Airflow "+version+"; delete it if the pin is right")
+	}
 	checks := []struct{ file, note string }{
 		{"docker-compose.yml", "not read — astro local start replaces it"},
 		{"docker-compose.yaml", "not read — astro local start replaces it"},
