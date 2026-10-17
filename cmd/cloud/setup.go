@@ -26,13 +26,14 @@ import (
 )
 
 var (
-	authLogin          = auth.Login
-	defaultDomain      = "astronomer.io"
-	client             = httputil.NewHTTPClient()
-	isDeploymentFile   = false
-	parseAPIToken      = util.ParseAPIToken
-	errNotAPIToken     = errors.New("the API token given does not appear to be an Astro API Token")
-	errExpiredAPIToken = errors.New("the API token given has expired")
+	authLogin             = auth.Login
+	fetchDomainAuthConfig = auth.FetchDomainAuthConfig
+	defaultDomain         = "astronomer.io"
+	client                = httputil.NewHTTPClient()
+	isDeploymentFile      = false
+	parseAPIToken         = util.ParseAPIToken
+	errNotAPIToken        = errors.New("the API token given does not appear to be an Astro API Token")
+	errExpiredAPIToken    = errors.New("the API token given has expired")
 )
 
 const (
@@ -107,7 +108,7 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, astroV1Client)
+	apiToken, err := checkAPIToken(astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -147,7 +148,7 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 
 		return nil
 	} else if isExpired(expireTime, accessTokenExpThreshold) {
-		authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
+		authConfig, err := fetchDomainAuthConfig(c.Domain)
 		if err != nil {
 			return err
 		}
@@ -158,6 +159,9 @@ func checkToken(astroV1Client astrov1.APIClient, out io.Writer) error {
 			if err != nil {
 				return err
 			}
+			// authLogin already persisted the new context, so don't fall through
+			// and overwrite it with the failed refresh's zero-value token
+			return nil
 		}
 		// persist the updated context with the renewed access token
 		err = c.SetContextKey("token", "Bearer "+res.AccessToken)
@@ -272,7 +276,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 		}
 	}
 
-	authConfig, err := auth.FetchDomainAuthConfig(c.Domain)
+	authConfig, err := fetchDomainAuthConfig(c.Domain)
 	if err != nil {
 		return false, err
 	}
@@ -351,15 +355,13 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
+func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
 		return false, nil
 	}
-	if !isDeploymentFile {
-		fmt.Println("Using an Astro API Token")
-	}
+	logger.Debug("Using an Astro API Token")
 
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context

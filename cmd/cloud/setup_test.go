@@ -16,6 +16,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -368,6 +369,13 @@ func TestCheckAPIKeys(t *testing.T) {
 			return nil
 		}
 
+		// Stub auth config fetch so the test doesn't hit the network.
+		origFetch := fetchDomainAuthConfig
+		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
+			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
+		}
+		defer func() { fetchDomainAuthConfig = origFetch }()
+
 		t.Setenv("ASTRONOMER_KEY_ID", "key")
 		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
 
@@ -422,6 +430,30 @@ func TestCheckToken(t *testing.T) {
 		// run checkToken
 		err = checkToken(mockV1Client, nil)
 		assert.Contains(t, err.Error(), "failed to login")
+	})
+	t.Run("does not overwrite the token when refresh fails but relogin succeeds", func(t *testing.T) {
+		mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+
+		// the test config has no refresh token and an expired (zero-value) ExpiresIn,
+		// so checkToken will call refresh, which fails against the real auth endpoint
+		// with an empty refresh token, then falls back to authLogin above.
+		ctx, err := context.GetCurrentContext()
+		assert.NoError(t, err)
+		err = ctx.SetContextKey("token", "Bearer relogin-token")
+		assert.NoError(t, err)
+
+		// run checkToken
+		err = checkToken(mockV1Client, nil)
+		assert.NoError(t, err)
+
+		// the token set by the (mocked) successful relogin must survive: it should
+		// not be clobbered by the failed refresh's zero-value response
+		ctx, err = context.GetCurrentContext()
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer relogin-token", ctx.Token)
 	})
 }
 
@@ -479,7 +511,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -502,7 +534,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
@@ -521,7 +553,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -558,7 +590,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(false, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 
@@ -598,7 +630,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
 
@@ -637,7 +669,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 }

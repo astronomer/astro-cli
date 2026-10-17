@@ -411,7 +411,7 @@ func TestInspect(t *testing.T) {
 		out := new(bytes.Buffer)
 
 		err := Inspect(workspaceID, "", deploymentID, "yaml", mockV1Client, out, "", false, false)
-		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
+		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 		mockV1Client.AssertExpectations(t)
 		mockV1Client.AssertExpectations(t)
 	})
@@ -508,7 +508,7 @@ func TestGetDeploymentInspectInfo(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.ErrorReturningContext)
 		expectedDeploymentMetadata := deploymentMetadata{}
 		rawDeploymentInfo, err := getDeploymentInfo(mockCoreDeploymentResponse[0])
-		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
+		assert.ErrorContains(t, err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 		err = decodeToStruct(rawDeploymentInfo, &actualDeploymentMeta)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedDeploymentMetadata, actualDeploymentMeta)

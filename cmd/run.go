@@ -19,8 +19,8 @@ var (
 func newRunCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run DAG-ID",
-		Short: "Run a local DAG with Python by running its tasks sequentially",
-		Long:  "Run a local DAG by running its tasks sequentially. This command spins up a single Airflow worker to execute your DAG code. It parses all files in your dags folder if the --dag-file flag is not used. Use the --dag-file flag to only parse the DAG file where your DAG is defined.",
+		Short: "Run a local Dag with Python by running its tasks sequentially",
+		Long:  "Run a local Dag by running its tasks sequentially. This command spins up a single Airflow worker to execute your Dag code. It parses all files in your dags folder if the --dag-file flag is not used. Use the --dag-file flag to only parse the Dag file where your Dag is defined.",
 		Args:  cobra.ExactArgs(1),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			return nil
@@ -31,7 +31,7 @@ func newRunCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables")
 	cmd.Flags().BoolVarP(&noCache, "no-cache", "", false, "Do not use cache when building container image")
 	cmd.Flags().StringVarP(&settingsFile, "settings-file", "s", "airflow_settings.yaml", "Settings file for importing Airflow objects")
-	cmd.Flags().StringVarP(&dagFile, "dag-file", "d", "", "(Optional) The file where your DAG is located. Use this flag to parse only the DAG file that has the DAG you want to run. You may get parsing errors related to other DAGs if you don't specify a DAG file")
+	cmd.Flags().StringVarP(&dagFile, "dag-file", "d", "", "(Optional) The file where your Dag is located. Use this flag to parse only the Dag file that has the Dag you want to run. You may get parsing errors related to other Dags if you don't specify a Dag file")
 	cmd.Flags().StringVarP(&executionDate, "execution-date", "", "", "(Optional) Execution date for the dagrun. Defaults to now. Acceptable date formats: %Y-%m-%d, %Y-%m-%dT%H:%M:%S, %Y-%m-%d %H:%M:%S")
 	cmd.Flags().BoolVarP(&taskLogs, "verbose", "", false, "(Optional) Print out the logs of the dag run")
 

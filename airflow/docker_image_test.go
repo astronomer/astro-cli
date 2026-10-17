@@ -26,6 +26,15 @@ import (
 
 var errMock = errors.New("build error")
 
+func countOccurrences(haystack []string, needle string) (count int) {
+	for _, s := range haystack {
+		if s == needle {
+			count++
+		}
+	}
+	return count
+}
+
 func (s *Suite) TestDockerImageBuild() {
 	handler := DockerImage{
 		imageName: "testing",
@@ -48,7 +57,7 @@ func (s *Suite) TestDockerImageBuild() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err = handler.Build("", "secret", options)
+		err = handler.Build("", []string{"secret"}, options)
 		s.NoError(err)
 	})
 
@@ -58,7 +67,7 @@ func (s *Suite) TestDockerImageBuild() {
 			s.Contains(args, "--no-cache")
 			return nil
 		}
-		err = handler.Build("", "", options)
+		err = handler.Build("", nil, options)
 		s.NoError(err)
 	})
 
@@ -71,7 +80,7 @@ func (s *Suite) TestDockerImageBuild() {
 			s.NotContains(args, "--pull")
 			return nil
 		}
-		err = handler.Build(dockerfile.Name(), "", options)
+		err = handler.Build(dockerfile.Name(), nil, options)
 		s.NoError(err)
 	})
 
@@ -85,7 +94,7 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 			s.NotContains(args, "--pull")
 			return nil
 		}
-		err = handler.Build(dockerfile.Name(), "", options)
+		err = handler.Build(dockerfile.Name(), nil, options)
 		s.NoError(err)
 	})
 
@@ -98,7 +107,34 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 			s.Contains(args, "--pull")
 			return nil
 		}
-		err = handler.Build(dockerfile.Name(), "", options)
+		err = handler.Build(dockerfile.Name(), nil, options)
+		s.NoError(err)
+	})
+
+	s.Run("build with a single build secret", func() {
+		dockerfile, _ := os.CreateTemp(os.TempDir(), "temp-Dockerfile")
+		defer os.Remove(dockerfile.Name())
+		dockerfile.WriteString("FROM nginx")
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Equal(1, countOccurrences(args, "--secret"))
+			s.Contains(args, "id=mysecret,src=secrets.txt")
+			return nil
+		}
+		err = handler.Build(dockerfile.Name(), []string{"id=mysecret,src=secrets.txt"}, options)
+		s.NoError(err)
+	})
+
+	s.Run("build with multiple build secrets", func() {
+		dockerfile, _ := os.CreateTemp(os.TempDir(), "temp-Dockerfile")
+		defer os.Remove(dockerfile.Name())
+		dockerfile.WriteString("FROM nginx")
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Equal(2, countOccurrences(args, "--secret"))
+			s.Contains(args, "id=aws,src=credentials")
+			s.Contains(args, "id=PLATFORM_PASSWORD,env=PLATFORM_PASSWORD")
+			return nil
+		}
+		err = handler.Build(dockerfile.Name(), []string{"id=aws,src=credentials", "id=PLATFORM_PASSWORD,env=PLATFORM_PASSWORD"}, options)
 		s.NoError(err)
 	})
 
@@ -108,14 +144,14 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 			s.Contains(args, "--label", "io.astronomer.skip.revision=true")
 			return nil
 		}
-		err = handler.Build("", "", options)
+		err = handler.Build("", nil, options)
 		s.NoError(err)
 	})
 	s.Run("build error", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return errMock
 		}
-		err = handler.Build("", "", options)
+		err = handler.Build("", nil, options)
 		s.Errorf(err, "expected build error")
 	})
 	s.Run("unable to read file error", func() {
@@ -125,7 +161,7 @@ FROM quay.io/astronomer/astro-runtime:12.0.0`
 			NoCache:         false,
 		}
 
-		err = handler.Build("", "", options)
+		err = handler.Build("", nil, options)
 		s.Error(err)
 	})
 }
@@ -184,6 +220,23 @@ func (s *Suite) TestDockerImagePytest() {
 		out, err := handler.Pytest("", "", "", "", []string{}, true, options)
 		s.Error(err)
 		s.Equal(out, "exit code 1")
+	})
+
+	s.Run("exit code trimmed to clean integer", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			switch {
+			case args[0] == "start":
+				return errMock
+			case args[0] == "inspect":
+				stdout.Write([]byte("10\n")) // docker inspect prints the code with a trailing newline
+				return nil
+			default:
+				return nil
+			}
+		}
+		out, err := handler.Pytest("", "", "", "", []string{}, true, options)
+		s.Error(err)
+		s.Equal("10", out)
 	})
 
 	s.Run("copy error", func() {

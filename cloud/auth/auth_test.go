@@ -118,6 +118,51 @@ var (
 )
 
 func Test_FetchDomainAuthConfig(t *testing.T) {
+	// Stub the package http client so the test builds the right URL per
+	// domain and parses the response without hitting live environments.
+	originalHTTPClient := httpClient
+	t.Cleanup(func() { httpClient = originalHTTPClient })
+
+	responses := map[string]Config{
+		"https://api.astronomer.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "5XYJZYf5xZ0eKALgBH3O08WzgfUfz7y9",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer.io/",
+		},
+		"https://api.astronomer-dev.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "PH3Nac2DtpSx1Tx3IGQmh2zaRbF5ubZG",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer-dev.io/",
+		},
+		"https://api.astronomer-stage.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "jsarDat3BeDXZ1monEAeqJPOvRvterpm",
+			Audience:  "astronomer-ee",
+			DomainURL: "https://auth.astronomer-stage.io/",
+		},
+		"https://pr1234.api.astronomer-dev.io/private/v1alpha1/cli/auth-config": {
+			ClientID:  "client-id",
+			Audience:  "audience",
+			DomainURL: "https://myURL.com/",
+		},
+	}
+
+	httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
+		cfg, ok := responses[req.URL.String()]
+		if !ok {
+			return &http.Response{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(bytes.NewBufferString("unexpected URL: " + req.URL.String())),
+				Header:     make(http.Header),
+			}
+		}
+		body, _ := json.Marshal(cfg)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(bytes.NewBuffer(body)),
+			Header:     make(http.Header),
+		}
+	})
+
 	domain := "astronomer.io"
 	actual, err := FetchDomainAuthConfig(domain)
 	assert.NoError(t, err)
@@ -126,16 +171,16 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer.io/")
 
 	domain = "gcp0001.us-east4.astronomer.io" // Gen1 CLI domain
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
 
 	domain = "astronomer-dev.io"
 	actual, err = FetchDomainAuthConfig(domain)
@@ -145,10 +190,10 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-dev.io/")
 
 	domain = "fail.astronomer-dev.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
 
 	domain = "astronomer-stage.io"
 	actual, err = FetchDomainAuthConfig(domain)
@@ -158,39 +203,24 @@ func Test_FetchDomainAuthConfig(t *testing.T) {
 	assert.Equal(t, actual.DomainURL, "https://auth.astronomer-stage.io/")
 
 	domain = "fail.astronomer-stage.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
 
 	domain = "fail.astronomer-perf.io"
-	actual, err = FetchDomainAuthConfig(domain)
+	_, err = FetchDomainAuthConfig(domain)
 	assert.Error(t, err)
 	assert.Errorf(t, err, "Error! Invalid domain. "+
-		"Are you trying to authenticate to Astro Private Cloud? If so, change your current context with 'astro context switch'. ")
+		"Are you trying to authenticate to APC? If so, change your current context with 'astro context switch'. ")
 
 	t.Run("pr preview is a valid domain", func(t *testing.T) {
-		// mocking this as once a PR closes, test would fail
-		mockResponse := Config{
-			ClientID:  "client-id",
-			Audience:  "audience",
-			DomainURL: "https://myURL.com/",
-		}
-		jsonResponse, err := json.Marshal(mockResponse)
-		assert.NoError(t, err)
-		httpClient = testUtil.NewTestClient(func(req *http.Request) *http.Response {
-			return &http.Response{
-				StatusCode: 200,
-				Body:       io.NopCloser(bytes.NewBuffer(jsonResponse)),
-				Header:     make(http.Header),
-			}
-		})
 		domain = "pr1234.astronomer-dev.io"
 		actual, err = FetchDomainAuthConfig(domain)
 		assert.NoError(t, err)
-		assert.Equal(t, actual.ClientID, mockResponse.ClientID)
-		assert.Equal(t, actual.Audience, mockResponse.Audience)
-		assert.Equal(t, actual.DomainURL, mockResponse.DomainURL)
+		assert.Equal(t, actual.ClientID, "client-id")
+		assert.Equal(t, actual.Audience, "audience")
+		assert.Equal(t, actual.DomainURL, "https://myURL.com/")
 	})
 }
 
@@ -918,40 +948,75 @@ func TestLogin(t *testing.T) {
 }
 
 func TestLogout(t *testing.T) {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	t.Run("success", func(t *testing.T) {
-		buf := new(bytes.Buffer)
-		Logout("astronomer.io", buf)
-		assert.Equal(t, "Successfully logged out of Astronomer\n", buf.String())
-	})
+	// loggedIn gives the context every credential a login writes
+	loggedIn := func(t *testing.T, c config.Context) {
+		t.Helper()
+		assert.NoError(t, c.SetContextKey("user_email", "test.user@astronomer.io"))
+		assert.NoError(t, c.SetContextKey("token", "Bearer some-token"))
+		assert.NoError(t, c.SetContextKey("refreshtoken", "some-refresh-token"))
+		assert.NoError(t, c.SetExpiresIn(3600))
+	}
+	stored := func(t *testing.T, domain string) config.Context {
+		t.Helper()
+		c, err := (&config.Context{Domain: domain}).GetContext()
+		assert.NoError(t, err)
+		return c
+	}
 
-	t.Run("success_with_email", func(t *testing.T) {
-		assertions := func(expUserEmail string, expToken string) {
-			contexts, err := config.GetContexts()
-			assert.NoError(t, err)
-			context := contexts.Contexts["localhost"]
-
-			assert.NoError(t, err)
-			assert.Equal(t, expUserEmail, context.UserEmail)
-			assert.Equal(t, expToken, context.Token)
-		}
+	t.Run("clears every credential and the current context", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		c, err := config.GetCurrentContext()
 		assert.NoError(t, err)
-		err = c.SetContextKey("user_email", "test.user@astronomer.io")
-		assert.NoError(t, err)
-		err = c.SetContextKey("token", "Bearer some-token")
-		assert.NoError(t, err)
-		// test before
-		assertions("test.user@astronomer.io", "Bearer some-token")
+		loggedIn(t, c)
 
-		// log out
-		c, err = config.GetCurrentContext()
-		assert.NoError(t, err)
-		Logout(c.Domain, os.Stdout)
+		buf := new(bytes.Buffer)
+		assert.NoError(t, Logout(c.Domain, buf))
 
-		// test after logout
-		assertions("", "")
+		after := stored(t, c.Domain)
+		assert.Empty(t, after.Token)
+		assert.Empty(t, after.RefreshToken)
+		assert.Empty(t, after.UserEmail)
+		expiresIn, err := after.GetExpiresIn()
+		assert.NoError(t, err)
+		assert.True(t, expiresIn.IsZero(), "expiry left behind: %v", expiresIn)
+		_, err = config.GetCurrentDomain()
+		assert.ErrorIs(t, err, config.ErrGetHomeString)
+		assert.Equal(t, "Successfully logged out of Astronomer\n", buf.String())
+	})
+
+	t.Run("logging out of another domain keeps the current one", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		current, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		loggedIn(t, current)
+		other := config.Context{Domain: "astronomer-dev.io", Token: "Bearer other-token", RefreshToken: "other-refresh-token"}
+		assert.NoError(t, other.SetContext())
+
+		assert.NoError(t, Logout(other.Domain, new(bytes.Buffer)))
+
+		assert.Empty(t, stored(t, other.Domain).RefreshToken)
+		domain, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+		assert.Equal(t, current.Domain, domain)
+		assert.Equal(t, "some-refresh-token", stored(t, current.Domain).RefreshToken)
+	})
+
+	t.Run("an unknown domain fails without reporting success", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		current, err := config.GetCurrentContext()
+		assert.NoError(t, err)
+		loggedIn(t, current)
+
+		buf := new(bytes.Buffer)
+		err = Logout("never-logged-in.io", buf)
+		assert.ErrorContains(t, err, "never-logged-in.io")
+		assert.Empty(t, buf.String())
+		// no stub context is written, and the real login is untouched
+		assert.False(t, (&config.Context{Domain: "never-logged-in.io"}).ContextExists())
+		assert.Equal(t, "some-refresh-token", stored(t, current.Domain).RefreshToken)
+		domain, err := config.GetCurrentDomain()
+		assert.NoError(t, err)
+		assert.Equal(t, current.Domain, domain)
 	})
 }
 

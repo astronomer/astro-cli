@@ -26,7 +26,7 @@ const (
 	ErrorReturningContext = "error"
 )
 
-var perm os.FileMode = 0o777
+var perm os.FileMode = 0o600
 
 // RoundTripFunc
 type RoundTripFunc func(req *http.Request) *http.Response
