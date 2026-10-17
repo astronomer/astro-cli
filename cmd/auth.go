@@ -52,7 +52,7 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 			if context.IsCloudDomain(ctx.Domain) {
 				fmt.Fprintf(out, "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
-			return apcLogin(args[0], oAuth, "", "", houstonVersion, houstonClient, out)
+			return apcLogin(args[0], oAuth, "", "", token, houstonVersion, houstonClient, out)
 		}
 		return cloudLogin(args[0], token, astroV1Client, out, shouldDisplayLoginLink)
 	}
@@ -64,7 +64,7 @@ func login(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient, o
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink)
 	}
-	return apcLogin(ctx.Domain, oAuth, "", "", houstonVersion, houstonClient, out)
+	return apcLogin(ctx.Domain, oAuth, "", "", token, houstonVersion, houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -115,8 +115,10 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 	}
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
+	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
+	// A token login asks for nothing, so --oauth would be silently ignored.
+	cmd.MarkFlagsMutuallyExclusive("token-login", "oauth")
 	return cmd
 }
 
