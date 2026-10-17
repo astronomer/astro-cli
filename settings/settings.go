@@ -2,6 +2,7 @@ package settings
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,13 +48,11 @@ var (
 const (
 	airflowConnectionList = "airflow connections list -o yaml"
 	ariflowPoolsList      = "airflow pools list -o yaml"
-	airflowConnExport     = "airflow connections export tmp.connections --file-format env"
-	airflowVarExport      = "airflow variables export tmp.var"
-	catVarFile            = "cat tmp.var"
-	rmVarFile             = "rm tmp.var"
-	catConnFile           = "cat tmp.connections"
-	configReadErrorMsg    = "Error reading Airflow Settings file. Connections, Variables, and Pools were not loaded please check your Settings file syntax: %s\n"
-	noColorString         = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+	// The export commands take the file to write, from exportFileName.
+	airflowConnExport  = "airflow connections export %s --file-format env"
+	airflowVarExport   = "airflow variables export %s"
+	configReadErrorMsg = "Error reading Airflow Settings file. Connections, Variables, and Pools were not loaded please check your Settings file syntax: %s\n"
+	noColorString      = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
 )
 
 var (
@@ -436,94 +435,127 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 	return errors.New("Command must be used with Airflow 2.X")
 }
 
-func EnvExportVariables(id, envFile string) error {
-	// setup airflow command to export variables
-	out, err := execAirflowCommand(id, airflowVarExport)
+// exportScript is the one bash script an export runs, in the container for
+// a Docker project and on the host for a standalone one. exportCmd (one of
+// the export commands) writes the values, passwords among them, in plain
+// text to a file the script then prints after marker. The file is:
+//   - under $AIRFLOW_HOME, which is the image's for a Docker project and the
+//     gitignored .astro/standalone for a standalone one, never the project
+//     itself, where git or a deploy would pick it up;
+//   - owner-only (umask 077), and named per export (token), so two at once
+//     do not read or remove each other's;
+//   - removed by the script itself on any exit, an interrupt included, so
+//     its removal does not depend on the CLI living to run it.
+func exportScript(exportCmd, what, token, marker string) string {
+	return "umask 077; " +
+		`f="${AIRFLOW_HOME:-.}/.astro-` + what + "-export-" + token + `"; ` +
+		`trap 'rm -f "$f"' EXIT; trap 'exit 130' INT TERM HUP; ` +
+		fmt.Sprintf(exportCmd, `"$f"`) + ` && echo ` + marker + ` && cat "$f"`
+}
+
+// readAirflowExport runs exportCmd through exportScript and returns what it
+// wrote. what is "variable" or "connection".
+func readAirflowExport(id, exportCmd, what string) (string, error) {
+	token := rand.Text()
+	marker := "ASTRO-EXPORT-" + token
+	out, err := execAirflowCommand(id, exportScript(exportCmd, what, token, marker))
 	if err != nil {
-		return fmt.Errorf("error exporting variables: %w", err)
+		return "", fmt.Errorf("error exporting %ss: %w", what, err)
 	}
-	logger.Debugf("Env Export Variables logs:\n\n%s", out)
-
-	if strings.Contains(out, "successfully") {
-		// get variables from file created by airflow command
-		out, err = execAirflowCommand(id, catVarFile)
-		if err != nil {
-			return fmt.Errorf("error reading variables file: %w", err)
-		}
-
-		m := map[string]string{}
-		err := json.Unmarshal([]byte(out), &m)
-		if err != nil {
-			fmt.Printf("variable json decode unsuccessful: %s", err.Error())
-		}
-		// add variables to the env file; env file can hold secret values, so keep it owner-only
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
-		if err != nil {
-			return errors.Wrap(err, "Writing variables to file unsuccessful")
-		}
-
-		defer f.Close()
-
-		for k, v := range m {
-			fmt.Println("Exporting Variable: " + k)
-			_, err := f.WriteString("\nAIRFLOW_VAR_" + strings.ToUpper(k) + "=" + v)
-			if err != nil {
-				fmt.Printf("error adding variable %s to file: %s\n", k, err.Error())
-			}
-		}
-		fmt.Println("Aiflow variables successfully export to the file " + envFile + "\n")
-		_, err = execAirflowCommand(id, rmVarFile)
-		if err != nil {
-			return fmt.Errorf("error removing variables file: %w", err)
-		}
-		return nil
+	// With a terminal, `docker exec -t` ends lines with "\r\n".
+	out = strings.ReplaceAll(out, "\r\n", "\n")
+	logs, content, ok := strings.Cut(out, marker+"\n")
+	logger.Debugf("Export %ss logs:\n%s", what, logs)
+	if !ok || !strings.Contains(logs, "successfully") {
+		return "", fmt.Errorf("%s export unsuccessful", what)
 	}
-	return errors.New("variable export unsuccessful")
+	return content, nil
+}
+
+// decodeVariables reads the variables Airflow exported, a JSON object. A
+// value Airflow wrote as JSON rather than a string (a number, a list, an
+// object) is kept as that JSON text, which is how it reads back as an
+// Airflow variable, rather than dropped.
+func decodeVariables(out string) (map[string]string, error) {
+	raw := map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+		return nil, fmt.Errorf("variable json decode unsuccessful: %w", err)
+	}
+	vars := make(map[string]string, len(raw))
+	for k, v := range raw {
+		var s string
+		if err := json.Unmarshal(v, &s); err == nil {
+			vars[k] = s
+		} else {
+			vars[k] = string(v)
+		}
+	}
+	return vars, nil
+}
+
+// appendEnvLines appends lines to envFile, which can hold secret values, so
+// is owner-only. A line that is not written, or a file that does not close,
+// is an error: a .env missing values is not a successful export.
+func appendEnvLines(envFile string, lines []string) (err error) {
+	f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := f.Close(); err == nil {
+			err = closeErr
+		}
+	}()
+	for _, line := range lines {
+		if _, err := f.WriteString("\n" + line); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func EnvExportVariables(id, envFile string) error {
+	out, err := readAirflowExport(id, airflowVarExport, "variable")
+	if err != nil {
+		return err
+	}
+
+	m, err := decodeVariables(out)
+	if err != nil {
+		return err
+	}
+	lines := make([]string, 0, len(m))
+	for k, v := range m {
+		fmt.Println("Exporting Variable: " + k)
+		lines = append(lines, "AIRFLOW_VAR_"+strings.ToUpper(k)+"="+v)
+	}
+	if err := appendEnvLines(envFile, lines); err != nil {
+		return errors.Wrap(err, "Writing variables to file unsuccessful")
+	}
+	fmt.Println("Airflow variables successfully exported to the file " + envFile + "\n")
+	return nil
 }
 
 func EnvExportConnections(id, envFile string) error {
-	// Airflow command to export connections to env uris
-	out, err := execAirflowCommand(id, airflowConnExport)
+	// Airflow exports connections as env URIs, passwords included.
+	out, err := readAirflowExport(id, airflowConnExport, "connection")
 	if err != nil {
-		return fmt.Errorf("error exporting connections: %w", err)
+		return err
 	}
-	logger.Debugf("Env Export Connections logs:\n%s", out)
 
-	if strings.Contains(out, "successfully") {
-		// get connections from file craeted by airflow command
-		out, err = execAirflowCommand(id, catConnFile)
-		if err != nil {
-			return fmt.Errorf("error reading connections file: %w", err)
+	var lines []string
+	for _, line := range strings.Split(out, "\n") {
+		varSplit := strings.SplitN(line, "=", 2) //nolint:mnd
+		if len(varSplit) > 1 {
+			fmt.Println("Exporting Connection: " + varSplit[0])
+			lines = append(lines, "AIRFLOW_CONN_"+strings.ToUpper(varSplit[0])+"="+varSplit[1])
 		}
-
-		vars := strings.Split(out, "\n")
-		// add connections to the env file; connection URIs contain passwords, so keep it owner-only
-		f, err := os.OpenFile(envFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:mnd
-		if err != nil {
-			return errors.Wrap(err, "Writing connections to file unsuccessful")
-		}
-
-		defer f.Close()
-
-		for i := range vars {
-			varSplit := strings.SplitN(vars[i], "=", 2) //nolint:mnd
-			if len(varSplit) > 1 {
-				fmt.Println("Exporting Connection: " + varSplit[0])
-				_, err := f.WriteString("\nAIRFLOW_CONN_" + strings.ToUpper(varSplit[0]) + "=" + varSplit[1])
-				if err != nil {
-					fmt.Printf("error adding connection %s to file: %s\n", varSplit[0], err.Error())
-				}
-			}
-		}
-		fmt.Println("Aiflow connections successfully export to the file " + envFile + "\n")
-		rmCmd := "rm tmp.connection"
-		_, err = execAirflowCommand(id, rmCmd)
-		if err != nil {
-			return fmt.Errorf("error removing connections file: %w", err)
-		}
-		return nil
 	}
-	return errors.New("connection export unsuccessful")
+	if err := appendEnvLines(envFile, lines); err != nil {
+		return errors.Wrap(err, "Writing connections to file unsuccessful")
+	}
+	fmt.Println("Airflow connections successfully exported to the file " + envFile + "\n")
+	return nil
 }
 
 func Export(id, settingsFile string, version uint64, connections, variables, pools bool) error {
@@ -628,54 +660,38 @@ func ExportConnections(id string) error {
 }
 
 func ExportVariables(id string) error {
-	// setup files
-	out, err := execAirflowCommand(id, airflowVarExport)
+	out, err := readAirflowExport(id, airflowVarExport, "variable")
 	if err != nil {
-		return fmt.Errorf("error exporting variables: %w", err)
+		return err
 	}
-	logger.Debugf("Export Variables logs:\n%s", out)
 
-	if strings.Contains(out, "successfully") {
-		// get variables created by the airflow command
-		out, err = execAirflowCommand(id, catVarFile)
-		if err != nil {
-			return fmt.Errorf("error reading variables file: %w", err)
-		}
-
-		m := map[string]string{}
-		err := json.Unmarshal([]byte(out), &m)
-		if err != nil {
-			fmt.Println("variable json decode unsuccessful")
-		}
-		// add the variables to settings object
-		for k, v := range m {
-			for j := range settings.Airflow.Variables {
-				if settings.Airflow.Variables[j].VariableName == k {
-					fmt.Println("Updating Pool: " + k)
-					// Remove variable if it already exits
-					settings.Airflow.Variables = append(settings.Airflow.Variables[:j], settings.Airflow.Variables[j+1:]...)
-					break
-				}
+	m, err := decodeVariables(out)
+	if err != nil {
+		return err
+	}
+	// add the variables to settings object
+	for k, v := range m {
+		for j := range settings.Airflow.Variables {
+			if settings.Airflow.Variables[j].VariableName == k {
+				fmt.Println("Updating Variable: " + k)
+				// Remove variable if it already exits
+				settings.Airflow.Variables = append(settings.Airflow.Variables[:j], settings.Airflow.Variables[j+1:]...)
+				break
 			}
+		}
 
-			newVariables := Variables{{k, v}}
-			fmt.Println("Exporting Variable: " + k)
-			settings.Airflow.Variables = append(settings.Airflow.Variables, newVariables...)
-		}
-		// write variables to settings file
-		viperSettings.Set("airflow", settings.Airflow)
-		err = viperSettings.WriteConfig()
-		if err != nil {
-			return err
-		}
-		_, err = execAirflowCommand(id, rmVarFile)
-		if err != nil {
-			return fmt.Errorf("error removing variables file: %w", err)
-		}
-		fmt.Printf("successfully exported variables\n\n")
-		return nil
+		newVariables := Variables{{k, v}}
+		fmt.Println("Exporting Variable: " + k)
+		settings.Airflow.Variables = append(settings.Airflow.Variables, newVariables...)
 	}
-	return errors.New("variable export unsuccessful")
+	// write variables to settings file
+	viperSettings.Set("airflow", settings.Airflow)
+	err = viperSettings.WriteConfig()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("successfully exported variables\n\n")
+	return nil
 }
 
 func ExportPools(id string) error {

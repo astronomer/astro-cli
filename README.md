@@ -132,6 +132,18 @@ To install a specific version of the CLI, specify the version number as a flag a
 curl -sSL install.astronomer.io | sudo bash -s -- v1.1.0
 ```
 
+Every release also publishes an `install.sh` asset. That copy installs the release it ships with and no other, so the URL itself names the version. Use it in a Dockerfile or a CI job, where a pinned URL is easier to audit than a flag:
+
+```sh
+# a fixed version
+curl -sSL https://github.com/astronomer/astro-cli/releases/download/v1.45.0/install.sh | sudo bash -s -- -b /usr/local/bin
+
+# whichever version is newest
+curl -sSL https://github.com/astronomer/astro-cli/releases/latest/download/install.sh | sudo bash -s -- -b /usr/local/bin
+```
+
+Do not fetch `godownloader.sh` from a Git tag. That copy carries the version that was current when the release branch was cut, which is the release before the tag. Use the `install.sh` asset to pin a version.
+
 > If you receive a `mkdir` error during installation, download and run the [godownloader](https://raw.githubusercontent.com/astronomer/astro-cli/main/godownloader.sh) script locally using:
 >
 >```sh
@@ -179,7 +191,7 @@ If you encounter issues when installing the Astro CLI:
     └── requirements.txt
     ```
 
-    DAGs can go in the `dags` folder, custom Airflow plugins in `plugins`, python packages needed can go in `requirements.txt`, and OS level packages can go in `packages.txt`.
+    Dags can go in the `dags` folder, custom Airflow plugins in `plugins`, python packages needed can go in `requirements.txt`, and OS level packages can go in `packages.txt`.
 
 3. Run `astro dev start` to start a local version of airflow on your machine. This will spin up a few locally running docker containers - one for the airflow scheduler, one for the webserver, and one for postgres.
 (Run `astro dev ps` to verify).
