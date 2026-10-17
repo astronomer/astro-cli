@@ -94,7 +94,6 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		ContextWorkspace: c.Workspace,
 		DagsOnly:         isDagOnlyDeploy,
 		Image:            isImageOnlyDeploy,
-		ImageName:        imageName,
 		Description:      description,
 		Interactive:      interactive,
 		BuildSecrets:     util.ResolveProjectBuildSecrets(deploySecrets, m.Astro.BuildSecretSpecs()),
@@ -143,7 +142,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 }
 
 // refuseBuildSecret refuses --build-secret where nothing reads it, as astro
-// deploy does on Astro: with --dags or --image-name nothing is built, and a
+// deploy does on Astro: with --dags nothing is built, and a
 // generated build mounts only the secret the runtime's install step reads.
 // Gated on the flag, not the resolved value, which BUILD_SECRET_INPUT can
 // fill without anyone asking.
@@ -154,8 +153,6 @@ func refuseBuildSecret(cmd *cobra.Command, m *manifest.Manifest) error {
 	switch {
 	case isDagOnlyDeploy:
 		return errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image")
-	case imageName != "":
-		return errors.New("--build-secret has no effect with --image-name: the image is already built")
 	case m.Astro.Dockerfile == "":
 		return util.CheckGeneratedBuildSecrets(deploySecrets)
 	}
@@ -166,7 +163,7 @@ func refuseBuildSecret(cmd *cobra.Command, m *manifest.Manifest) error {
 // current context's: the deploy talks to one Houston, the context's, so the
 // fix is to switch to that domain's context, or to log in to it first.
 func otherDomain(link, domain string) error {
-	if _, err := (&config.Context{Domain: domain}).GetContext(); err == nil {
+	if (&config.Context{Domain: domain}).ContextExists() {
 		return fmt.Errorf("link %q is on %s, and the current context is another Astro Private Cloud: run astro context switch %s, then deploy again", link, domain, domain)
 	}
 	return fmt.Errorf("link %q is on %s, and this machine has no login there: run astro login %s, then deploy again", link, domain, domain)
@@ -292,7 +289,6 @@ func (d *apcManifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manif
 		WorkspaceID:  in.WorkspaceID,
 		Build:        in.Build,
 		BuildSecrets: in.BuildSecrets,
-		ImageName:    in.ImageName,
 		IncludeDags:  in.IncludeDags,
 		OnBuild:      in.OnBuild,
 		Warn:         in.Warn,

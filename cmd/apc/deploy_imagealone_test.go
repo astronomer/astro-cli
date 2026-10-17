@@ -65,4 +65,18 @@ func TestDeployRefusesDagsWithImageName(t *testing.T) {
 	assert.EqualError(t, run.err, "--dags deploys only your DAGs; drop --image-name")
 	assert.True(t, cliout.IsUsage(run.err))
 	assert.Zero(t, seen.dagUploads)
+
+	// --remote names an image in a registry: the same mistake, said the same
+	// way, from a project's root, where it used to upload the DAGs alone.
+	for _, args := range [][]string{
+		{"deploy", "dep-ac", "--dags", "--remote", "-o", "json"},
+		{"deploy", "dep-ac", "--dags", "--remote", "--image-name", "img:1", "-o", "json"},
+	} {
+		run = runAPC(t, newAPCClient(), "", args...)
+		require.Error(t, run.err, "%v", args)
+		assert.True(t, cliout.IsUsage(run.err), "%v", args)
+		assert.Contains(t, run.err.Error(), "--dags deploys only your DAGs; drop ", "%v", args)
+		assert.Contains(t, run.err.Error(), "--remote", "%v", args)
+	}
+	assert.Zero(t, seen.dagUploads)
 }

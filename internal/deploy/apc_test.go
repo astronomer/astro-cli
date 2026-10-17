@@ -130,6 +130,57 @@ func TestResolveTargetAPC(t *testing.T) {
 	})
 }
 
+// [tool.astro] workspace is an Astro workspace: an APC deploy lists the
+// context's, or --workspace's, never it; an Astro deploy lists it.
+func TestAPCDeployListsNoAstroWorkspace(t *testing.T) {
+	m := manifestWith(map[string]manifest.Link{
+		"prod": {Target: "apc", Domain: "astro.corp.example", Workspace: "ws-prod", Deployment: "dep-prod"},
+	})
+	m.Astro.Workspace = "astro-ws"
+
+	req := apcRequest(nil)
+	req.Manifest, req.Interactive = m, true
+	d := &fakeDeployer{answer: "prod"}
+	_, err := resolveTarget(req, d)
+	require.NoError(t, err)
+	assert.Equal(t, "ws-ctx", d.listedWS)
+
+	req.WorkspaceID = "ws-flag"
+	_, err = resolveTarget(req, d)
+	require.NoError(t, err)
+	assert.Equal(t, "ws-flag", d.listedWS)
+
+	astro := Request{Manifest: manifestWith(map[string]manifest.Link{"cloud": {Target: "astro", Workspace: "w", Deployment: "d"}}), ContextWorkspace: "ws-ctx", Interactive: true}
+	astro.Manifest.Astro.Workspace = "astro-ws"
+	d = &fakeDeployer{answer: "cloud"}
+	_, err = resolveTarget(astro, d)
+	require.NoError(t, err)
+	assert.Equal(t, "astro-ws", d.listedWS)
+}
+
+// A link that could not be saved is warned of with the command that saves
+// it, naming the Deployment as its platform does.
+func TestUnsavedLinkWarningNamesThePlatform(t *testing.T) {
+	for _, tc := range []struct {
+		req  Request
+		want string
+	}{
+		{apcRequest(nil), "could not save a link to apc deployment dep-new: disk full. Link it with astro link add picked-one --deployment dep-new"},
+		{Request{Manifest: manifestWith(nil), ContextWorkspace: "ws"}, "could not save a link to astro deployment dep-new: disk full. Link it with astro link add picked-one --deployment dep-new"},
+	} {
+		req := tc.req
+		req.Interactive = true
+		req.Link = func(scaffold.Link) error { return errors.New("disk full") }
+		var warnings []string
+		req.Warn = func(w string) { warnings = append(warnings, w) }
+		target, err := resolveTarget(req, &fakeDeployer{unlinkedID: "dep-new"})
+		require.NoError(t, err)
+		saveNewLink(req, target, &Result{})
+		require.Len(t, warnings, 1)
+		assert.Contains(t, warnings[0], tc.want)
+	}
+}
+
 func withName(req Request, name string) Request {
 	req.LinkName = name
 	return req

@@ -6,13 +6,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
 // The domain runAPC's context is on, and so the one this project's apc links
@@ -202,6 +205,22 @@ func TestDeployManifestLinkOnAnotherDomain(t *testing.T) {
 	require.Equal(t, 1, run.code)
 	assert.Contains(t, run.stdout, "run astro login astro.other.example")
 	assert.Empty(t, *asked)
+}
+
+// A link on a domain this machine has a context for is reached by switching
+// to it; on one it has none for, by logging in there. Whether there is one
+// is read off the config, not the login.
+func TestOtherDomainNamesTheWayThere(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	assert.ErrorContains(t, otherDomain("elsewhere", "astro.other.example"), "run astro login astro.other.example")
+
+	// A second context in an in-memory config, with no login stored for it.
+	fs := afero.NewMemMapFs()
+	cfg := strings.Replace(string(testUtil.NewTestConfig(testUtil.SoftwarePlatform)), "contexts:\n", "contexts:\n  astro_other_example:\n    domain: astro.other.example\n", 1)
+	require.NoError(t, afero.WriteFile(fs, config.HomeConfigFile, []byte(cfg), 0o600))
+	config.InitConfig(fs)
+	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.SoftwarePlatform) })
+	assert.ErrorContains(t, otherDomain("elsewhere", "astro.other.example"), "run astro context switch astro.other.example")
 }
 
 // --dags uploads the project's DAGs to the link named, with no build.

@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,11 +37,29 @@ type fakeEngineCmd struct {
 	dockerfiles []string
 	// label answers a label read of an image.
 	label func(image, label string) string
+	// pushAuth is the credential file the last push ran with, as it read
+	// while the push ran: "" when the push carried none.
+	pushAuth string
 }
 
-func (f *fakeEngineCmd) Run(_ context.Context, _ []string, stdio localrt.Stdio, name string, args ...string) error {
+func (f *fakeEngineCmd) Run(_ context.Context, env []string, stdio localrt.Stdio, name string, args ...string) error {
 	f.calls = append(f.calls, name+" "+strings.Join(args, " "))
 	switch {
+	case len(args) > 0 && args[0] == "push":
+		f.pushAuth = ""
+		for _, kv := range env {
+			if dir, ok := strings.CutPrefix(kv, "DOCKER_CONFIG="); ok {
+				data, err := os.ReadFile(filepath.Join(dir, "config.json"))
+				if err != nil {
+					return err
+				}
+				f.pushAuth = string(data)
+			}
+		}
+	case len(args) > 3 && args[0] == "image" && args[1] == "inspect" && args[3] == "{{json .RepoDigests}}" && stdio.Out != nil:
+		image := args[len(args)-1]
+		repo := image[:strings.LastIndex(image, ":")]
+		fmt.Fprintf(stdio.Out, "[%q]\n", repo+"@sha256:abc")
 	case len(args) > 0 && args[0] == "build":
 		if i := slices.Index(args, "--file"); i >= 0 {
 			data, err := os.ReadFile(args[i+1])
@@ -125,7 +144,7 @@ func (a *apcTarget) client(t *testing.T) *houston_mocks.ClientInterface {
 		cfg.Flags.BYORegistryEnabled, cfg.BYORegistryDomain = true, "byo.example.com/team/repo"
 	}
 	c.On("GetAppConfig", mock.Anything).Return(cfg, nil).Maybe()
-	c.On("GetRuntimeReleases", map[string]interface{}{"clusterId": "cl"}).Return(a.listed, nil).Maybe()
+	c.On("GetRuntimeReleases", map[string]interface{}{"clusterId": "cl", "workspaceUuid": "ws", "deploymentUuid": "dep"}).Return(a.listed, nil).Maybe()
 	c.On("GetPlatformVersion", mock.Anything).Return(a.version, nil).Maybe()
 	return c
 }
@@ -222,7 +241,7 @@ func TestDeployManifestImageUpgradesAirflow2To3(t *testing.T) {
 
 // What Houston would drop after the push, where the deploy never hears of
 // it, is refused before anything is built: a downgrade, Airflow 3 to 2
-// among them, a runtime it does not list, and one newer than its newest.
+// among them, and a runtime newer than the newest it lists.
 func TestDeployManifestImageRefusesWhatHoustonWouldDrop(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -232,7 +251,6 @@ func TestDeployManifestImageRefusesWhatHoustonWouldDrop(t *testing.T) {
 	}{
 		{"a downgrade", "3.1-5", imagebuild.ManifestBuild{AirflowVersion: "3.0"}, "cannot deploy Astro Runtime 3.0-9: it is a downgrade from the deployment's current 3.1-5"},
 		{"Airflow 3 to 2", "3.0-9", imagebuild.ManifestBuild{AirflowVersion: "2.10"}, "cannot deploy Astro Runtime 12.1.1: it is a downgrade from the deployment's current 3.0-9"},
-		{"a runtime Houston does not list", "3.0-9", imagebuild.ManifestBuild{AirflowVersion: "3.1", Runtime: "3.1-4"}, "the platform does not list it for this Deployment"},
 		{"newer than the newest listed", "3.0-9", imagebuild.ManifestBuild{AirflowVersion: "3.2", Runtime: "3.2-1"}, "it is newer than the newest the platform lists for this Deployment, 3.1-5"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -364,4 +382,175 @@ func TestHoustonBase(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+// The push to the platform registry carries the context's token as the
+// registry's user, in the credential file made for that push alone.
+func TestDeployManifestImagePushCarriesTheToken(t *testing.T) {
+	cmd := withManifestEngine(t, "3.1-5")
+	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0"}).client(t)
+	c, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	require.NotEmpty(t, c.Token)
+	var warnings []string
+	_, err = DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+	require.NoError(t, err)
+	want := base64.StdEncoding.EncodeToString([]byte(registryUser + ":" + strings.TrimPrefix(c.Token, "Bearer ")))
+	assert.Contains(t, cmd.pushAuth, want, "the push's credential file")
+	assert.Contains(t, cmd.pushAuth, "registry.example.com")
+}
+
+// A BYO registry takes the push on the engine's own login, with no
+// credential of the deploy's, and under sha_as_tag the mutation names the
+// image by its digest. The deploy's description goes with the mutation.
+func TestDeployManifestImageToABYORegistryByDigest(t *testing.T) {
+	cmd := withManifestEngine(t, "3.1-5")
+	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0", byo: true}).client(t)
+	require.NoError(t, config.CFG.ShaAsTag.SetHomeString("true"))
+	t.Cleanup(func() { _ = config.CFG.ShaAsTag.SetHomeString("false") })
+	client.On("UpdateDeploymentImage", houston.UpdateDeploymentImageRequest{
+		ReleaseName: "my-release", Image: "byo.example.com/team/repo@sha256:abc", AirflowVersion: "3.1.1", RuntimeVersion: "3.1-5", DeployRevisionDescription: "ship it",
+	}).Return(nil, nil).Once()
+	var warnings []string
+	res, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+	require.NoError(t, err)
+	assert.Equal(t, "byo.example.com/team/repo@sha256:abc", res.Image)
+	assert.Empty(t, cmd.pushAuth, "no credential of the deploy's")
+	client.AssertExpectations(t)
+}
+
+// A runtime the platform does not list, and no newer than the newest it
+// does (an older build of a listed Airflow, say), deploys: Houston takes any
+// build it knows. The deploy says so.
+func TestDeployManifestImageWarnsOfAnUnlistedRuntime(t *testing.T) {
+	cmd := withManifestEngine(t, "3.1-4")
+	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.0-9", listed: houstonLists, version: "1.0.0"}).client(t)
+	var warnings []string
+	res, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1", Runtime: "3.1-4"}, &warnings))
+	require.NoError(t, err)
+	assert.Equal(t, "3.1-4", res.RuntimeVersion)
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "Astro Runtime 3.1-4 is not one the platform lists for this Deployment")
+	assert.True(t, cmd.called(" push "))
+}
+
+// The built image's label is the authority: one newer than the newest listed
+// is refused after the build, though the plan passed, and nothing is pushed.
+func TestDeployManifestImageRefusesABuiltRuntimeNewerThanListed(t *testing.T) {
+	cmd := withManifestEngine(t, "3.2-1")
+	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.0-9", listed: houstonLists, version: "1.0.0"}).client(t)
+	var warnings []string
+	_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot deploy Astro Runtime 3.2-1: it is newer than the newest the platform lists")
+	assert.True(t, cmd.called(" build "), "the plan passed")
+	assert.False(t, cmd.called(" push "))
+}
+
+// An image Deployment runs the DAGs in its image: a generated image whose
+// .dockerignore drops every DAG file is refused before the build, and a
+// declared Dockerfile's is warned about, since its own steps may copy them.
+func TestDeployManifestImageHoldsAnImageDeploymentToDagsInTheImage(t *testing.T) {
+	t.Run("a generated build", func(t *testing.T) {
+		cmd := withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0"}).client(t)
+		dir := projectWithDags(t)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("dags/\n"), 0o600))
+		var warnings []string
+		_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1"}, &warnings))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "the project's .dockerignore leaves out every Dag file under dags/")
+		assert.False(t, cmd.called(" build "))
+	})
+	t.Run("a declared Dockerfile", func(t *testing.T) {
+		cmd := withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0"}).client(t)
+		dir := projectWithDags(t)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM astrocrpublic.azurecr.io/runtime:3.1-5\n"), 0o600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte("dags/\n"), 0o600))
+		var warnings []string
+		_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"}, &warnings))
+		require.NoError(t, err)
+		require.Len(t, warnings, 1)
+		assert.Contains(t, warnings[0], "leaves out every Dag file under dags/")
+		assert.True(t, cmd.called(" push "))
+	})
+}
+
+// A Deployment whose DAG source could not be read is uploaded to; one that
+// turns out to take no upload ships the image alone, and the deploy says so.
+// So does one that takes uploads, from a project with no dags directory.
+func TestDeployManifestImageSaysWhyNoDagsShipped(t *testing.T) {
+	t.Run("a Deployment whose DAG source was not read takes no upload", func(t *testing.T) {
+		withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: "", current: "3.1-5", listed: houstonLists, version: "1.0.0"}).client(t)
+		unread := &houston.Deployment{ID: "dep", ReleaseName: "my-release", ClusterID: "cl", RuntimeVersion: "3.1-5", Workspace: houston.Workspace{ID: "ws"}, Urls: []houston.DeploymentURL{{Type: houston.RegistryURLType, URL: "registry.example.com"}}}
+		client.ExpectedCalls = slices.DeleteFunc(client.ExpectedCalls, func(c *mock.Call) bool { return c.Method == "GetDeployment" })
+		client.On("GetDeployment", "dep").Return(unread, nil)
+		var warnings []string
+		res, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+		require.NoError(t, err)
+		assert.True(t, res.DagsNotShipped)
+		require.Len(t, warnings, 1)
+		assert.Contains(t, warnings[0], "Deployment dep takes no Dag upload")
+	})
+	t.Run("a dag_deploy Deployment and no dags directory", func(t *testing.T) {
+		withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: houston.DagOnlyDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0", dagsHook: "https://dags.invalid"}).client(t)
+		dir := t.TempDir()
+		var warnings []string
+		res, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1"}, &warnings))
+		require.NoError(t, err)
+		assert.True(t, res.DagsNotShipped)
+		assert.Equal(t, []string{"no Dags were uploaded: there is no dags directory in " + dir + ", and the Deployment keeps the Dags it had"}, warnings)
+	})
+}
+
+// A DAG upload that fails after the image was pushed says the image is
+// deployed, which one, and the command that uploads the DAGs.
+func TestDeployManifestImageDagUploadFailureNamesTheRetry(t *testing.T) {
+	withManifestEngine(t, "3.1-5")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	t.Cleanup(server.Close)
+	client := (&apcTarget{dagType: houston.DagOnlyDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0", dagsHook: server.URL}).client(t)
+	var warnings []string
+	_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+	var after *DagsAfterImageError
+	require.ErrorAs(t, err, &after)
+	assert.Equal(t, "registry.example.com/my-release/airflow:deploy-7", after.Image)
+	assert.Contains(t, err.Error(), "the image registry.example.com/my-release/airflow:deploy-7 was pushed to Deployment dep")
+	assert.Contains(t, err.Error(), "run astro deploy dep --dags")
+}
+
+// --image to an image Deployment is refused before the container engine is
+// needed at all.
+func TestDeployManifestImageRefusesImageOnlyBeforeTheEngine(t *testing.T) {
+	cmd := withManifestEngine(t, "3.1-5")
+	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0"}).client(t)
+	var warnings []string
+	in := manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings)
+	in.IncludeDags = false
+	in.Engine = func() (string, []string, error) { return "", nil, errSomeContainerIssue }
+	_, err := DeployManifestImage(client, in)
+	require.ErrorIs(t, err, ErrDeploymentTypeIncorrectForImageOnly)
+	assert.Empty(t, cmd.calls)
+}
+
+// Of several builds of a series, the newest is the base, whatever order the
+// list gives them in.
+func TestNewestForPicksTheNewestBuild(t *testing.T) {
+	l := listedReleases{
+		{Version: "3.1-3", AirflowVersion: "3.1.0"},
+		{Version: "3.1-5", AirflowVersion: "3.1.1"},
+		{Version: "3.1-4", AirflowVersion: "3.1.1"},
+		{Version: "3.0-9", AirflowVersion: "3.0.6"},
+		{Version: "12.1.0", AirflowVersion: "2.10.3"},
+		{Version: "12.1.1", AirflowVersion: "2.10.3"},
+	}
+	assert.Equal(t, "3.1-5", l.newestFor("3.1"))
+	assert.Equal(t, "3.1-3", l.newestFor("3.1.0"))
+	assert.Equal(t, "12.1.1", l.newestFor("2.10"))
+	assert.Equal(t, "", l.newestFor("3.2"))
 }

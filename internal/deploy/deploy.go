@@ -376,7 +376,8 @@ func saveNewLink(req Request, target Target, res *Result) {
 	if err := req.Link(*target.newLink); err != nil {
 		res.LinkName = ""
 		if req.Warn != nil {
-			req.Warn(fmt.Sprintf("deployed, but could not save a link to astro deployment %s: %v", target.DeploymentID, err))
+			req.Warn(fmt.Sprintf("deployed, but could not save a link to %s deployment %s: %v. Link it with astro link add %s --deployment %s",
+				req.platform(), target.DeploymentID, err, target.newLink.Name, target.DeploymentID))
 		}
 	}
 }

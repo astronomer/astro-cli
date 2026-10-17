@@ -65,6 +65,8 @@ Commands that print a result take `-o json` (`--output json`), with a stable sha
 - requests through `astro api airflow`, `cloud` and `registry` print the API's own response, shaped with `--jq` and `--template` (their `ls` and `describe` take `-o`);
 - `astro completion` prints a shell script.
 
+`astro deploy` on Astro Private Cloud spells its result's `type` as Astro's deploy does: `image-and-dag`, `image-only` and `dag-only`, where earlier v2 builds wrote `image_and_dags`, `image` and `dags`. A script reading it matches the new values. It also publishes `link` (the link the deploy resolved, when a link named it) and `dags_in_image` (an image Deployment, which runs the DAGs inside the image), and `runtime_version` for a project's image deploy as well as for `--image-name --remote`.
+
 Commands that ask before deleting or replacing something take `--yes` (`-y`) to answer for you. `astro deploy` on Astro has no `--yes`: it asks only which Deployment to deploy to, which naming one (`--deployment`, or a link name as the argument) answers.
 
 ### Smaller changes

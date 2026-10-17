@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -136,14 +137,14 @@ func refuseUndeployable(where utils.Where) (inProject bool, err error) {
 		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
 	}
 	switch {
-	case isDagOnlyDeploy && imageName != "":
+	case isDagOnlyDeploy && (imageName != "" || imagePresentOnRemote):
 		// As astro deploy says it: an image source makes no sense with a
 		// deploy that ships only DAGs.
-		return inProject, cliout.Usage(errDagsWithImageName)
+		return inProject, cliout.Usage(errDagsWithImageSource())
 	case isDagOnlyDeploy:
-		if !inProject {
-			return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
-		}
+		// --dags at a project's root is the manifest deploy's, so this is
+		// --dags with no project here to upload the DAGs of.
+		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
 	case imagePresentOnRemote && imageName == "":
 		return inProject, ErrImageNameNotPassedForRemoteFlag
 	case imageName == "":
@@ -155,8 +156,18 @@ func refuseUndeployable(where utils.Where) (inProject bool, err error) {
 	return inProject, nil
 }
 
-// errDagsWithImageName is --dags with --image-name, in astro deploy's words.
-var errDagsWithImageName = errors.New("--dags deploys only your DAGs; drop --image-name")
+// errDagsWithImageSource is --dags with --image-name or --remote, in astro
+// deploy's words, naming the ones given.
+func errDagsWithImageSource() error {
+	var passed []string
+	if imageName != "" {
+		passed = append(passed, "--image-name")
+	}
+	if imagePresentOnRemote {
+		passed = append(passed, "--remote")
+	}
+	return fmt.Errorf("--dags deploys only your DAGs; drop %s", strings.Join(passed, " and "))
+}
 
 // The kinds of deploy deployJSON.Type names, spelled as astro deploy on Astro
 // spells them.
@@ -241,16 +252,11 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
-	if isImageOnlyDeploy && isDagOnlyDeploy {
-		cmd.SilenceUsage = true
-		return ErrBothDagsOnlyAndImageOnlySet
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
 	if description == "" {
-		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
+		description = utils.GetDefaultDeployDescription(false)
 	}
 
 	// The deploy's progress (its notes, the image push, the DAG upload) goes
@@ -262,15 +268,6 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	// dags is where the Deployment takes its DAGs from, as the image deploy
 	// found it.
 	var dags deploy.DagsFrom
-
-	if isDagOnlyDeploy {
-		deployedTo, err := DagsOnlyDeploy(houstonClient, ws, deploymentID, config.WorkingPath, nil, true, description, opts)
-		if err != nil {
-			return err
-		}
-		result.Deployment, result.Type = deployedTo, deployTypeDags
-		return emitDeploy(r, &result)
-	}
 
 	if imagePresentOnRemote {
 		deployed, err := UpdateDeploymentImage(houstonClient, deploymentID, ws, runtimeVersionForImageName, imageName, opts)

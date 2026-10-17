@@ -55,15 +55,12 @@ type ManifestImage struct {
 	// BuildSecrets are docker build --secret specs for a declared
 	// Dockerfile's build.
 	BuildSecrets []string
-	// ImageName is a prebuilt local image (--image-name) to deploy instead of
-	// building one; "" builds from the manifest.
-	ImageName string
 	// IncludeDags is a deploy of the image and the DAGs: the default. False
 	// is --image, which leaves the Deployment's DAGs as they are and so is
 	// refused for a Deployment whose DAGs are its image's.
 	IncludeDags bool
 	// OnBuild runs just before the build, once the Deployment has cleared the
-	// deploy. A prebuilt image never calls it. nil skips it.
+	// deploy. nil skips it.
 	OnBuild func()
 	// Warn reports what the deploy goes ahead despite. nil drops it.
 	Warn func(string)
@@ -100,8 +97,9 @@ type ManifestImageResult struct {
 	// Deployment runs the DAGs the image carries.
 	DagsInImage bool
 	// DagsNotShipped is a deploy of the image and the DAGs that shipped no
-	// DAGs: the Deployment takes them from git-sync or a volume, or there was
-	// no dags directory to upload. Warn said why.
+	// DAGs: the Deployment takes them from git-sync or a volume, or turned
+	// out to take no upload, or there was no dags directory to upload. Warn
+	// said why.
 	DagsNotShipped bool
 	// Airflow3Upgrade is a deploy that moves the Deployment from Airflow 2
 	// to Airflow 3.
@@ -115,22 +113,26 @@ type manifestTarget struct {
 	nextTag   string
 	info      *houston.Deployment
 	appConfig *houston.AppConfig
+	// workspace is the workspace Houston places the Deployment in, which its
+	// app config and runtime list are scoped to.
+	workspace string
 	dags      DagsFrom
 	// byo is a cluster whose Deployments take images from a registry of the
 	// customer's own, through the updateDeploymentImage mutation.
 	byo bool
 }
 
-// DeployManifestImage builds a project's image (or takes a prebuilt one),
-// holds its runtime to the rules Houston holds a pushed image to, pushes it
-// to the Deployment's registry, and delivers the DAGs the way the Deployment
-// takes them: inside the image for an image Deployment, as an upload for a
-// dag_deploy one, and not at all for git-sync or volume.
+// DeployManifestImage builds a project's image, holds its runtime to what
+// Houston refuses of a pushed image, pushes it to the Deployment's registry,
+// and delivers the DAGs the way the Deployment takes them: inside the image
+// for an image Deployment, as an upload for a dag_deploy one, and not at all
+// for git-sync or volume.
 //
-// Everything Houston would refuse after the push, where the deploy never sees
-// its answer, is refused before it: a runtime the platform does not list, one
-// newer than the newest it lists, and a downgrade (Airflow 3 to 2 included).
-// The image is built at linux/amd64, since Houston drops an arm image.
+// What Houston would refuse after the push, where the deploy never sees its
+// answer, is refused before it: a downgrade (Airflow 3 to 2 included) and a
+// runtime newer than the newest it lists. A runtime it does not list
+// otherwise deploys, with a warning. The image is built at linux/amd64, since
+// Houston drops an arm image.
 func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (ManifestImageResult, error) {
 	ctx := context.Background()
 	progress := in.Progress
@@ -142,12 +144,8 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 		warn = func(string) {}
 	}
 
-	cmd := newManifestCommander()
-	bin, env, err := deploybuild.EnsureEngine(ctx, cmd, in.Engine)
-	if err != nil {
-		return ManifestImageResult{}, err
-	}
-
+	// The Deployment is read first: a deploy it refuses outright needs no
+	// container engine to be told so.
 	t, err := lookUpManifestTarget(client, in.WorkspaceID, in.DeploymentID)
 	if err != nil {
 		return ManifestImageResult{}, err
@@ -156,36 +154,43 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 		return ManifestImageResult{}, fmt.Errorf("%w: Deployment %s runs the Dags inside its image, so an image without them would leave it none. Run astro deploy without --image to deploy the image with the project's Dags inside it", ErrDeploymentTypeIncorrectForImageOnly, in.DeploymentID)
 	}
 
-	listed := listedRuntimes(client, t.info.ClusterID)
-	var req imagebuild.Request
-	if in.ImageName == "" {
-		req, err = imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog))
-		if err != nil {
-			return ManifestImageResult{}, err
-		}
+	cmd := newManifestCommander()
+	bin, env, err := deploybuild.EnsureEngine(ctx, cmd, in.Engine)
+	if err != nil {
+		return ManifestImageResult{}, err
 	}
-	planned := deploybuild.PlanRuntime(in.ImageName, &req, &in.Build)
+
+	listed := listedRuntimes(client, t.info.ClusterID, t.workspace, in.DeploymentID)
+	req, err := imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog))
+	if err != nil {
+		return ManifestImageResult{}, err
+	}
+	planned := deploybuild.PlanRuntime("", &req, &in.Build)
 	allowed := listed.versions()
 	current := t.info.RuntimeVersion
 	if err := planned.CheckListed(current, allowed); err != nil {
 		return ManifestImageResult{}, err
 	}
-	engine := imagebuild.Engine{Cmd: cmd, Bin: bin, Env: env}
 	if in.IncludeDags && t.dags == DagsFromImage {
 		if err := checkDagsInImage(in, &req, func() bool { return imagebuild.IsPodman(ctx, cmd, bin, env) }, warn); err != nil {
 			return ManifestImageResult{}, err
 		}
 	}
 
-	if in.ImageName == "" && in.OnBuild != nil {
+	if in.OnBuild != nil {
 		in.OnBuild()
 	}
-	localImage, runtimeVersion, err := manifestImage(ctx, in, &req, engine, progress)
+	engine := imagebuild.Engine{Cmd: cmd, Bin: bin, Env: env}
+	localImage, runtimeVersion, err := buildManifestImage(ctx, in, &req, engine, progress)
 	if err != nil {
 		return ManifestImageResult{}, err
 	}
-	if err := planned.CheckBuiltListed(current, runtimeVersion, allowed); err != nil {
+	unlisted, err := planned.CheckBuiltListed(current, runtimeVersion, allowed)
+	if err != nil {
 		return ManifestImageResult{}, err
+	}
+	if unlisted != "" {
+		warn(unlisted)
 	}
 	upgrade := deploybuild.Airflow3Upgrade(current, runtimeVersion)
 	if upgrade {
@@ -194,7 +199,7 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 
 	fmt.Fprintf(progress, houstonDeploymentPrompt, t.release)
 	c, _ := config.GetCurrentContext() //nolint:errcheck // the target lookup has already read it
-	pushed, err := pushManifestImage(ctx, client, &c, t, engine, localImage, runtimeVersion, progress)
+	pushed, err := pushManifestImage(ctx, client, &c, t, engine, localImage, runtimeVersion, in.Description, progress)
 	if err != nil {
 		return ManifestImageResult{}, err
 	}
@@ -233,16 +238,33 @@ func deliverDags(client houston.ClientInterface, in *ManifestImage, t *manifestT
 		return nil
 	case t.dags == DagsFromUnknown && (IsDagOnlyDeployDisabledInClusterConfig(err) || errors.Is(err, ErrDagOnlyDeployNotEnabledForDeployment)):
 		// A Deployment whose DAG source could not be read, which turns out
-		// to take no upload: the image is what it runs.
+		// to take no upload: the image shipped alone.
 		res.DagsNotShipped = true
+		warn(fmt.Sprintf("Deployment %s takes no Dag upload (%v), so this deploy shipped the image alone and the Dags are the ones it runs from elsewhere", in.DeploymentID, err))
 		return nil
 	case errors.Is(err, ErrNoDagsDirectory):
 		res.DagsNotShipped = true
 		warn(fmt.Sprintf("no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had", in.Build.ProjectDir))
 		return nil
 	}
-	return fmt.Errorf("the image was deployed, but uploading the Dags failed: %w", err)
+	return &DagsAfterImageError{Image: res.Image, DeploymentID: in.DeploymentID, Err: err}
 }
+
+// DagsAfterImageError is a DAG upload that failed after the image was
+// pushed: the Deployment runs the new image with the DAGs it had.
+type DagsAfterImageError struct {
+	// Image is the image pushed.
+	Image        string
+	DeploymentID string
+	Err          error
+}
+
+func (e *DagsAfterImageError) Error() string {
+	return fmt.Sprintf("the image %s was pushed to Deployment %s, but uploading the Dags failed: %v. The Deployment runs the new image with the Dags it had; to upload them, run astro deploy %s --dags",
+		e.Image, e.DeploymentID, e.Err, e.DeploymentID)
+}
+
+func (e *DagsAfterImageError) Unwrap() error { return e.Err }
 
 // dagsSource names where a Deployment that takes no DAGs from a deploy gets
 // them.
@@ -284,8 +306,8 @@ func lookUpManifestTarget(client houston.ClientInterface, wsID, deploymentID str
 	if err != nil {
 		return nil, fmt.Errorf("failed to get deployment info: %w", err)
 	}
-	ws := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, t.info)
-	t.appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: t.info.ClusterID, WorkspaceUUID: ws, DeploymentUUID: deploymentID})
+	t.workspace = resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, t.info)
+	t.appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: t.info.ClusterID, WorkspaceUUID: t.workspace, DeploymentUUID: deploymentID})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrAppConfigUnread, err)
 	}
@@ -313,16 +335,21 @@ func (l listedReleases) versions() []string {
 	return out
 }
 
-// listedRuntimes reads the runtime builds Houston lists for a Deployment's
-// cluster (houston-api's runtimeReleases query): stable, not yanked, Airflow
-// 3 only where the cluster has it on, and, unless the platform lists every
-// runtime, the newest build of each Airflow version. A Houston too old to
-// list them (before 0.29.0), and one whose list cannot be read, list none,
-// and the deploy then holds the image to the downgrade rule alone.
-func listedRuntimes(client houston.ClientInterface, clusterID string) listedReleases {
+// listedRuntimes reads the runtime builds Houston lists for a Deployment
+// (houston-api's runtimeReleases query): stable, not yanked, Airflow 3 only
+// where it is on, at or above its minimum, and, unless the platform lists
+// every runtime, the newest build of each Airflow version. From Houston
+// 2.0.0 the query takes the workspace and the Deployment, so their overrides
+// of those settings apply, as they do to the app config
+// (houston.GetRuntimeReleases leaves them out before it). A Houston too old
+// to list runtimes (before 0.29.0), and one whose list cannot be read, list
+// none, and the deploy then holds the image to the downgrade rule alone.
+func listedRuntimes(client houston.ClientInterface, clusterID, workspaceID, deploymentID string) listedReleases {
 	vars := map[string]interface{}{}
-	if clusterID != "" {
-		vars["clusterId"] = clusterID
+	for k, v := range map[string]string{"clusterId": clusterID, "workspaceUuid": workspaceID, "deploymentUuid": deploymentID} {
+		if v != "" {
+			vars[k] = v
+		}
 	}
 	releases, err := houston.Call(client.GetRuntimeReleases)(vars)
 	if err != nil {
@@ -371,19 +398,12 @@ func houstonBase(listed listedReleases, o runtimeversions.Options) imagebuild.Ba
 	}
 }
 
-// manifestImage returns the local image a manifest deploy pushes and the
-// runtime its label carries: the prebuilt image named, or the one built from
-// the manifest at linux/amd64 with the labels Houston reads.
-func manifestImage(ctx context.Context, in *ManifestImage, req *imagebuild.Request, engine imagebuild.Engine, progress io.Writer) (localImage, runtimeVersion string, err error) {
+// buildManifestImage builds the image a manifest deploy pushes, at
+// linux/amd64 with the labels Houston reads, and returns its local tag and
+// the runtime its label carries.
+func buildManifestImage(ctx context.Context, in *ManifestImage, req *imagebuild.Request, engine imagebuild.Engine, progress io.Writer) (localImage, runtimeVersion string, err error) {
 	readLabel := func(image, label string) (string, error) {
 		return engine.Label(ctx, image, label)
-	}
-	if in.ImageName != "" {
-		version, err := deploybuild.PrebuiltRuntime(in.ImageName, readLabel)
-		if err != nil {
-			return "", "", err
-		}
-		return in.ImageName, version, nil
 	}
 	req.Secrets = in.BuildSecrets
 	req.Bin, req.Env = engine.Bin, engine.Env
@@ -406,13 +426,8 @@ func manifestImage(ctx context.Context, in *ManifestImage, req *imagebuild.Reque
 // image's, to an image that carries them. A generated image whose
 // .dockerignore leaves out every DAG file under dags/ is refused: it would
 // replace the running DAGs with none. A declared Dockerfile's is warned
-// about, since its own steps may put DAGs in the image, and so is a prebuilt
-// image, which cannot be looked into here.
+// about, since its own steps may put DAGs in the image.
 func checkDagsInImage(in *ManifestImage, req *imagebuild.Request, podman func() bool, warn func(string)) error {
-	if in.ImageName != "" {
-		warn(fmt.Sprintf(warningPrebuiltDagsInImage, in.DeploymentID, in.ImageName))
-		return nil
-	}
 	survey := in.Survey
 	if survey == nil {
 		s, err := imagebuild.SurveyProject(in.Build.ProjectDir, in.Build.Dockerfile, podman())
@@ -432,10 +447,6 @@ func checkDagsInImage(in *ManifestImage, req *imagebuild.Request, podman func() 
 	return fmt.Errorf("Deployment %s runs the Dags inside its image, but the project's .dockerignore leaves out every Dag file under dags/. Remove the rule that drops them", in.DeploymentID)
 }
 
-// warningPrebuiltDagsInImage is a prebuilt image deployed to an image
-// Deployment: it runs whatever DAGs the image carries.
-const warningPrebuiltDagsInImage = "Deployment %s runs the Dags inside the image %s; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none"
-
 // pushManifestImage pushes localImage to the registry the Deployment takes
 // its image from, under Houston's tag scheme, and returns the reference
 // pushed. The platform registry (the Deployment's own from 1.0.0, registry.
@@ -443,8 +454,8 @@ const warningPrebuiltDagsInImage = "Deployment %s runs the Dags inside the image
 // the context's token, carried by the push alone: nothing is written to the
 // user's container config. A BYO registry takes the push on the engine's own
 // login, and the image by the updateDeploymentImage mutation, which reads no
-// labels, so the runtime goes with it.
-func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *config.Context, t *manifestTarget, engine imageEngine, localImage, runtimeVersion string, progress io.Writer) (string, error) {
+// labels, so the runtime and the deploy's description go with it.
+func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *config.Context, t *manifestTarget, engine imageEngine, localImage, runtimeVersion, description string, progress io.Writer) (string, error) {
 	var registry, remoteImage string
 	push := imagebuild.PushRequest{Source: localImage, Digest: config.CFG.ShaAsTag.GetBool(), Out: progress}
 	if t.byo {
@@ -476,7 +487,7 @@ func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *c
 		remoteImage = registry + "@" + sha
 	}
 	airflowVersion, _ := engine.Label(ctx, localImage, airflowImageLabel) //nolint:errcheck // the mutation takes an empty one, as APC deploy has always sent it
-	req := houston.UpdateDeploymentImageRequest{ReleaseName: t.release, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
+	req := houston.UpdateDeploymentImageRequest{ReleaseName: t.release, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion, DeployRevisionDescription: description}
 	if _, err := houston.Call(client.UpdateDeploymentImage)(req); err != nil {
 		return "", err
 	}
