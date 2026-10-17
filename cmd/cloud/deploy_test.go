@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,8 +28,18 @@ func execDeployCmd(args ...string) error {
 	return err
 }
 
+// cleanCheckout makes the uncommitted-changes check see a clean checkout for
+// the rest of t, whatever state the one the tests run in is in.
+func cleanCheckout(t *testing.T) {
+	t.Helper()
+	previous := hasUncommittedChanges
+	hasUncommittedChanges = func(string) bool { return false }
+	t.Cleanup(func() { hasUncommittedChanges = previous })
+}
+
 func TestDeployImage(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	cleanCheckout(t)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
@@ -75,8 +86,47 @@ func TestDeployImage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// A project with uncommitted changes is not deployed without --force, and the
+// refusal is an error, so a CI job running astro deploy fails rather than
+// reporting a deploy that never ran (#1721).
+func TestDeployRefusesUncommittedChanges(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prevUncommitted, prevEnsure, prevDeploy := hasUncommittedChanges, EnsureProjectDir, DeployImage
+	t.Cleanup(func() {
+		hasUncommittedChanges, EnsureProjectDir, DeployImage = prevUncommitted, prevEnsure, prevDeploy
+	})
+	hasUncommittedChanges = func(string) bool { return true }
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+	deployed := false
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+		deployed = true
+		return nil
+	}
+	saved := config.CFG.ProjectDeployment.GetProjectString()
+
+	cmd := NewDeployCmd()
+	cmd.SetArgs([]string{"refused-deployment-id", "--save"})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	restore := testUtil.SetupOSArgsForGinkgo()
+	_, err := cmd.ExecuteC()
+	restore()
+	assert.EqualError(t, err, registryUncommitedChangesMsg)
+	assert.False(t, deployed, "deployed a project with uncommitted changes")
+	assert.NotContains(t, out.String(), "Usage:", "a refusal is not a usage mistake")
+	assert.Equal(t, saved, config.CFG.ProjectDeployment.GetProjectString(), "a refused deploy saved its deployment id")
+
+	assert.NoError(t, execDeployCmd("test-deployment-id", "-f"))
+	assert.True(t, deployed, "--force did not deploy")
+}
+
 func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// The refusal of uncommitted changes comes before the save this tests.
+	cleanCheckout(t)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
@@ -150,6 +200,53 @@ func TestDeploySkipsEnsureProjectDirWhenImageNameSet(t *testing.T) {
 
 	// Without --image-name, the project-dir check should still run and propagate.
 	err = execDeployCmd("-f", "test-deployment-id")
+	assert.ErrorIs(t, err, assert.AnError)
+}
+
+func TestDeploySkipsEnsureProjectDirWhenDagsPathSet(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return assert.AnError
+	}
+	defer func() {
+		EnsureProjectDir = func(cmd *cobra.Command, args []string) error { return nil }
+	}()
+
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+		return nil
+	}
+
+	// With --dags and --dags-path, the DAGs are read entirely from --dags-path, so the
+	// project-dir check should be skipped.
+	err := execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "./external-dags")
+	assert.NoError(t, err)
+
+	// --dags alone (DAGs read from the working directory) still needs the project-dir check.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// --dags-path alone (without --dags, i.e. a full image+dags deploy) still needs the project
+	// root as the Docker build context.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags-path", "./external-dags")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// --pytest/--parse build and run a local image to test-parse the DAGs, so the project-dir
+	// check should still run even with --dags-path set.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "./external-dags", "--pytest")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "./external-dags", "--parse")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// Explicitly passing --dags=false must not be misread as enabling the bypass just because
+	// the flag was mentioned on the command line - this is really a full image+dags deploy.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags=false", "--dags-path", "./external-dags")
+	assert.ErrorIs(t, err, assert.AnError)
+
+	// An explicit empty --dags-path falls back to the working directory's dags/ folder
+	// (cloud/deploy/deploy.go), so it must not be misread as enabling the bypass either.
+	err = execDeployCmd("-f", "test-deployment-id", "--dags", "--dags-path", "")
 	assert.ErrorIs(t, err, assert.AnError)
 }
 

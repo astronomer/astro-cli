@@ -7,6 +7,9 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+-nightly.[0-9]*'
 
+env:
+  STABLE_MAJOR: 1
+
 permissions:
   contents: write
   pull-requests: write
@@ -19,6 +22,8 @@ jobs:
       type: ${{ steps.parse.outputs.type }}
       version: ${{ steps.parse.outputs.version }}
       tag: ${{ steps.parse.outputs.tag }}
+      major: ${{ steps.parse.outputs.major }}
+      stable: ${{ steps.parse.outputs.stable }}
     steps:
       - name: Parse tag
         id: parse
@@ -38,9 +43,13 @@ jobs:
             VERSION="${TAG#v}"
           fi
 
+          MAJOR="${VERSION%%.*}"
+
           echo "type=$TYPE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Parsed — Tag: $TAG | Type: $TYPE | Version: $VERSION"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "stable=$([ "$MAJOR" = "$STABLE_MAJOR" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Parsed — Tag: $TAG | Type: $TYPE | Version: $VERSION | Stable major: $STABLE_MAJOR"
 
   release:
     needs: detect
@@ -72,25 +81,31 @@ jobs:
       - name: Find previous GA tag for changelog
         id: prev-tag
         run: |
-          # Find the latest GA tag (excluding the current tag and any prereleases).
           # All release types (nightly/RC/GA) compare against the last GA for changelog continuity.
-          PREV_GA=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" \
-            | grep -v -- '-' \
-            | grep -v "^${{ needs.detect.outputs.tag }}$" \
-            | sed 's/^v//' \
-            | sort -t. -k1,1n -k2,2n -k3,3n \
-            | tail -1 \
-            | sed 's/^/v/')
+          PREV_GA=$(make prev-ga-tag MAJOR="${{ needs.detect.outputs.major }}" EXCLUDE="${{ needs.detect.outputs.tag }}")
           echo "tag=$PREV_GA" >> "$GITHUB_OUTPUT"
           echo "Previous GA tag for changelog: $PREV_GA"
 
       - name: Get Homebrew token via Octo STS
-        if: needs.detect.outputs.type == 'ga'
+        if: needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true'
         uses: octo-sts/action@f603d3be9d8dd9871a265776e625a27b00effe05 # v1.1.1
         id: homebrew-token
         with:
           scope: astronomer
           identity: astro-cli-homebrew
+
+      - name: Stamp the installer with this release's version
+        env:
+          TAG: ${{ needs.detect.outputs.tag }}
+        run: |
+          set -e
+          sed "s/^LATEST_VERSION=.*/LATEST_VERSION=${TAG}/" godownloader.sh > install.sh
+          chmod +x install.sh
+          if ! grep -qx "LATEST_VERSION=${TAG}" install.sh; then
+            echo "::error::install.sh was not stamped with ${TAG}. Did the constant in godownloader.sh get renamed?"
+            exit 1
+          fi
+          echo "Stamped install.sh with ${TAG}"
 
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
         with:
@@ -102,9 +117,12 @@ jobs:
           GORELEASER_CURRENT_TAG: ${{ needs.detect.outputs.tag }}
           GORELEASER_PREVIOUS_TAG: ${{ steps.prev-tag.outputs.tag }}
 
+  # install.astronomer.io fetches godownloader.sh from main, so this job keeps
+  # that path current. Pinned installs use the install.sh release asset instead,
+  # which carries its own version and does not depend on the PR this job opens.
   update-godownloader:
     needs: [detect, release]
-    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true' && needs.release.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - name: Verify GitHub release exists
@@ -156,7 +174,7 @@ jobs:
 
   update-winget:
     needs: [detect, release]
-    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.release.result != 'skipped'
+    if: always() && !cancelled() && needs.detect.outputs.type == 'ga' && needs.detect.outputs.stable == 'true' && needs.release.result != 'skipped'
     runs-on: windows-latest
     steps:
       - name: Verify GitHub release exists
@@ -184,7 +202,7 @@ jobs:
           version: ${{ needs.detect.outputs.version }}
           release-tag: ${{ needs.detect.outputs.tag }}
           installers-regex: '\.exe$'
-          token: ${{ steps.winget-token.outputs.token }}
+          token: ${{ secrets.WINGET_PAT }}
 
   cleanup-nightlies:
     needs: [detect, release]
@@ -196,27 +214,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          KEEP=5
-
-          # List all nightly releases sorted by creation date (newest first)
-          NIGHTLY_TAGS=$(gh release list \
+          # Keep the 5 newest nightlies of each major; list the rest
+          STALE_TAGS=$(gh release list \
             --repo "${{ github.repository }}" \
             --limit 100 \
             --json tagName,createdAt \
-            --jq '[.[] | select(.tagName | test("-nightly\\.")) ] | sort_by(.createdAt) | reverse | .[].tagName')
+            --jq '[.[] | select(.tagName | test("-nightly\\.")) ] | group_by(.tagName | capture("^v(?<major>[0-9]+)").major) | map(sort_by(.createdAt) | reverse | .[5:]) | .[][].tagName')
 
           COUNT=0
-          for TAG in $NIGHTLY_TAGS; do
+          for TAG in $STALE_TAGS; do
             COUNT=$((COUNT + 1))
-            if [ "$COUNT" -le "$KEEP" ]; then
-              echo "Keeping: $TAG"
-              continue
-            fi
             echo "Deleting release and tag: $TAG"
             gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag
           done
 
-          echo "Nightly cleanup complete. Kept $KEEP most recent, deleted $((COUNT - KEEP > 0 ? COUNT - KEEP : 0)) old nightlies."
+          echo "Nightly cleanup complete. Kept the 5 most recent per major, deleted $COUNT old nightlies."
 
   notify:
     needs: [detect, release, update-godownloader, update-winget]

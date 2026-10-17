@@ -133,6 +133,7 @@ def get_import_errors():
 )
 def test_file_imports(rel_path, rv):
     """Test for import errors on a file"""
+    exceptions = []
     if os.path.exists(".astro/dag_integrity_exceptions.txt"):
         with open(".astro/dag_integrity_exceptions.txt", "r") as f:
             exceptions = [line.strip() for line in f.readlines()]

@@ -16,6 +16,7 @@ import (
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -368,6 +369,13 @@ func TestCheckAPIKeys(t *testing.T) {
 			return nil
 		}
 
+		// Stub auth config fetch so the test doesn't hit the network.
+		origFetch := fetchDomainAuthConfig
+		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
+			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
+		}
+		defer func() { fetchDomainAuthConfig = origFetch }()
+
 		t.Setenv("ASTRONOMER_KEY_ID", "key")
 		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
 
@@ -503,7 +511,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -526,7 +534,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
@@ -545,7 +553,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -582,7 +590,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(false, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 
@@ -622,7 +630,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
 
@@ -661,7 +669,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 }

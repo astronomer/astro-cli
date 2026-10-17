@@ -49,7 +49,11 @@ Menu will be presented if you do not specify a deployment ID:
 
 	DeployImage      = cloud.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
-	buildSecrets     = []string{}
+
+	// hasUncommittedChanges is a variable so a test does not depend on the
+	// state of the checkout it runs in.
+	hasUncommittedChanges = git.HasUncommittedChanges
+	buildSecrets          = []string{}
 )
 
 const (
@@ -59,6 +63,7 @@ const (
 
 	imageNameFlag = "image-name"
 	nonDagsFlag   = "non-dags"
+	dagsPathFlag  = "dags-path"
 )
 
 func NewDeployCmd() *cobra.Command {
@@ -69,6 +74,14 @@ func NewDeployCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed(imageNameFlag) || cmd.Flags().Changed(nonDagsFlag) {
+				return nil
+			}
+			// A DAG-only deploy sourcing its DAGs from --dags-path doesn't read anything else
+			// from the working directory, unless --pytest/--parse is also used, which builds
+			// and runs a local image to test-parse the DAGs and so still needs the project root.
+			// Check the bound values (not cmd.Flags().Changed) so --dags=false or an explicit
+			// empty --dags-path can't be misread as enabling the bypass.
+			if dags && dagsPath != "" && !pytest && !parse {
 				return nil
 			}
 			return EnsureProjectDir(cmd, args)
@@ -84,29 +97,23 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&envFile, "env", "e", ".env", "Location of file containing environment variables for Pytests")
 	cmd.Flags().StringVarP(&pytestFile, "test", "t", "", "Location of Pytests or specific Pytest file. All Pytest files must be located in the tests directory")
 	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a custom image to deploy, or image name with custom tag when used with --client")
-	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only DAGs to your Astro Deployment")
+	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
-	cmd.Flags().StringVar(&dagBundleName, "dag-bundle-name", "", "Deploy DAGs to a named DAG bundle on the Deployment instead of the default bundle. Requires Airflow 3, and the bundle must already exist on the Deployment")
-	cmd.Flags().MarkHidden("dag-bundle-name") //nolint:errcheck
-	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have DAG Deploy enabled your DAGs will not be affected.")
-	cmd.Flags().StringVar(&dagsPath, "dags-path", "", "If set deploy dags from this path instead of the dags from working directory")
+	cmd.Flags().StringVar(&dagBundleName, "dag-bundle-name", "", "Deploy Dags to a named Dag bundle on the Deployment instead of the default bundle. Requires Airflow 3, and the bundle must already exist on the Deployment")
+	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment. If you have Dag Deploy enabled your Dags will not be affected.")
+	cmd.Flags().StringVar(&dagsPath, dagsPathFlag, "", "If set deploy dags from this path instead of the dags from working directory")
 	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to deploy to")
-	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all DAGs in your Astro project parse without errors")
+	cmd.Flags().BoolVar(&parse, "parse", false, "Succeed only if all Dags in your Astro project parse without errors")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
 	cmd.Flags().DurationVar(&waitTime, "wait-time", deployWaitTime, "Wait time for the Deployment to become healthy before ending the command. Can only be used with --wait=true")
-	cmd.Flags().MarkHidden("dags-path") //nolint:errcheck
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlags(cmd.Flags(), &buildSecrets)
 	cmd.Flags().Bool("force-upgrade-to-af3", false, "This flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.")
 	cmd.Flags().MarkDeprecated("force-upgrade-to-af3", "this flag is no longer required for Airflow 2 to Airflow 3 upgrades. Support will be removed in a future release.") //nolint:errcheck
-	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-DAG bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
-	cmd.Flags().StringVar(&nonDagsMountPath, "non-dags-mount-path", "", "Path to mount the non-DAG bundle in Airflow, for reference by DAGs. Used with --non-dags")
-	cmd.Flags().StringVar(&nonDagsBundleType, "non-dags-bundle-type", "none", "Free-form label identifying the kind of non-DAG bundle (e.g. dbt). Any value is accepted. Defaults to \"none\". Used with --non-dags")
-	cmd.Flags().StringVar(&nonDagsBundlePath, "non-dags-local-path", "", "Path to the non-DAG bundle to deploy. Default current directory. Used with --non-dags")
-	cmd.Flags().MarkHidden(nonDagsFlag)            //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-mount-path")  //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-bundle-type") //nolint:errcheck
-	cmd.Flags().MarkHidden("non-dags-local-path")  //nolint:errcheck
+	cmd.Flags().BoolVar(&nonDags, nonDagsFlag, false, "Deploy a non-Dag bundle from a separate directory, instead of your Astro project. Requires --non-dags-mount-path")
+	cmd.Flags().StringVar(&nonDagsMountPath, "non-dags-mount-path", "", "Path to mount the non-Dag bundle in Airflow, for reference by Dags. Used with --non-dags")
+	cmd.Flags().StringVar(&nonDagsBundleType, "non-dags-bundle-type", "none", "Free-form label identifying the kind of non-Dag bundle (e.g. dbt). Any value is accepted. Defaults to \"none\". Used with --non-dags")
+	cmd.Flags().StringVar(&nonDagsBundlePath, "non-dags-local-path", "", "Path to the non-Dag bundle to deploy. Default current directory. Used with --non-dags")
 
 	annotateDeployFlag(cmd, "image", "image")
 	annotateDeployFlag(cmd, imageNameFlag, "image")
@@ -114,7 +121,7 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "dags", "dag")
 	annotateDeployFlag(cmd, "no-dags-base-dir", "dag")
 	annotateDeployFlag(cmd, "dag-bundle-name", "dag")
-	annotateDeployFlag(cmd, "dags-path", "dag")
+	annotateDeployFlag(cmd, dagsPathFlag, "dag")
 	annotateDeployFlag(cmd, "pytest", "test")
 	annotateDeployFlag(cmd, "test", "test")
 	annotateDeployFlag(cmd, "env", "test")
@@ -168,7 +175,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 
 	if dagBundleName != "" && image {
-		return errors.New("cannot use --dag-bundle-name with --image; named DAG bundles apply only to deploys that include DAGs")
+		return errors.New("cannot use --dag-bundle-name with --image; named Dag bundles apply only to deploys that include Dags")
 	}
 
 	if cmd.Flags().Changed(imageNameFlag) {
@@ -183,17 +190,21 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return deployNonDagsBundle(cmd, args)
 	}
 
+	// Refusing is a failure, so CI sees a non-zero exit rather than a deploy
+	// that reported success without running. It comes before --save, so a
+	// refused deploy changes nothing.
+	if hasUncommittedChanges("") && !forceDeploy {
+		// Not a usage mistake, so no usage block under the error.
+		cmd.SilenceUsage = true
+		return errors.New(registryUncommitedChangesMsg)
+	}
+
 	// Save deploymentId in config if specified
 	if deploymentID != "" && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
 		if err != nil {
 			return errors.Wrap(err, "failed to save deployment id in config")
 		}
-	}
-
-	if git.HasUncommittedChanges("") && !forceDeploy {
-		fmt.Println(registryUncommitedChangesMsg)
-		return nil
 	}
 
 	// case for astro deploy --dags whose default operation should be not running any tests
@@ -233,7 +244,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 	for _, f := range []string{"dags", "image", imageNameFlag, "dag-bundle-name", "pytest", "parse", "build-secret", "build-secrets", "dags-path", "no-dags-base-dir"} {
 		if cmd.Flags().Changed(f) {
-			return fmt.Errorf("cannot use --%s with --non-dags; --non-dags performs a non-DAG bundle deploy", f)
+			return fmt.Errorf("cannot use --%s with --non-dags; --non-dags performs a non-Dag bundle deploy", f)
 		}
 	}
 
@@ -261,7 +272,7 @@ func deployNonDagsBundle(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to verify bundle path is not within an Astro project: %w", err)
 	}
 	if withinAstroProject {
-		return errors.New("bundle path is within an Astro project. Non-DAG bundles must be a separate directory")
+		return errors.New("bundle path is within an Astro project. Non-Dag bundles must be a separate directory")
 	}
 
 	targetDeploymentID, err := resolveDeploymentIDFromArgsFlags(args, workspaceID, deploymentName)

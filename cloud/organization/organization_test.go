@@ -175,6 +175,57 @@ func (s *Suite) TestListWithFormat() {
 	})
 }
 
+// orgOffsetIs matches ListOrganizationsParams whose Offset equals want.
+func orgOffsetIs(want int) any {
+	return mock.MatchedBy(func(p *astrov1.ListOrganizationsParams) bool {
+		return p != nil && p.Offset != nil && *p.Offset == want
+	})
+}
+
+func (s *Suite) TestListOrganizations() {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+
+	s.Run("paginates across pages advancing the offset", func() {
+		page1 := astrov1.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astrov1.OrganizationsPaginated{
+				Organizations: []astrov1.Organization{{Id: "org1", Name: "org1", Product: &mockOrganizationProduct}},
+				TotalCount:    2,
+				Limit:         100,
+				Offset:        0,
+			},
+		}
+		page2 := astrov1.ListOrganizationsResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200: &astrov1.OrganizationsPaginated{
+				Organizations: []astrov1.Organization{{Id: "org2", Name: "org2", Product: &mockOrganizationProduct}},
+				TotalCount:    2,
+				Limit:         100,
+				Offset:        1,
+			},
+		}
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, orgOffsetIs(0)).Return(&page1, nil).Once()
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, orgOffsetIs(1)).Return(&page2, nil).Once()
+
+		orgs, err := ListOrganizations(mockClient)
+		s.NoError(err)
+		s.Len(orgs, 2)
+		s.Equal("org1", orgs[0].Id)
+		s.Equal("org2", orgs[1].Id)
+		mockClient.AssertExpectations(s.T())
+	})
+
+	s.Run("returns error on failure", func() {
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(nil, errNetwork).Once()
+
+		_, err := ListOrganizations(mockClient)
+		s.ErrorIs(err, errNetwork)
+		mockClient.AssertExpectations(s.T())
+	})
+}
+
 func (s *Suite) TestGetOrganizationSelection() {
 	// initialize empty config
 	testUtil.InitTestConfig(testUtil.LocalPlatform)

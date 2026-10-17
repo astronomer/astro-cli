@@ -117,16 +117,19 @@ func normalizeName(s string) string {
 	return strings.TrimLeft(s, "_-")
 }
 
-// PortOverrides allows callers to override the default ports used in the
-// generated compose config. When nil, ports are read from config as usual.
-type PortOverrides struct {
+// ComposeOverrides allows callers to override values that are otherwise read from
+// config when generating the compose file. Empty fields fall back to config.
+type ComposeOverrides struct {
 	PostgresPort  string
 	WebserverPort string
 	APIServerPort string
+	// PostgresTag pins the postgres image to the version a project's existing data
+	// directory was written by, so an upgraded default never strands it.
+	PostgresTag string
 }
 
 // generateConfig generates the docker-compose config
-func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, portOverrides ...*PortOverrides) (string, error) {
+func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile string, imageLabels map[string]string, composeOverrides ...*ComposeOverrides) (string, error) {
 	runtimeVersion, ok := imageLabels[runtimeVersionLabelName]
 	if !ok {
 		return "", errors.New("runtime version label not found")
@@ -182,8 +185,9 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 	pgPort := config.CFG.PostgresPort.GetString()
 	wsPort := config.CFG.WebserverPort.GetString()
 	apiPort := config.CFG.APIServerPort.GetString()
-	if len(portOverrides) > 0 && portOverrides[0] != nil {
-		po := portOverrides[0]
+	pgTag := config.CFG.PostgresTag.GetString()
+	if len(composeOverrides) > 0 && composeOverrides[0] != nil {
+		po := composeOverrides[0]
 		if po.PostgresPort != "" {
 			pgPort = po.PostgresPort
 		}
@@ -193,6 +197,9 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		if po.APIServerPort != "" {
 			apiPort = po.APIServerPort
 		}
+		if po.PostgresTag != "" {
+			pgTag = po.PostgresTag
+		}
 	}
 
 	cfg := ComposeConfig{
@@ -201,7 +208,7 @@ func generateConfig(projectName, airflowHome, envFile, buildImage, settingsFile 
 		PostgresHost:          config.CFG.PostgresHost.GetString(),
 		PostgresPort:          pgPort,
 		PostgresRepository:    config.CFG.PostgresRepository.GetString(),
-		PostgresTag:           config.CFG.PostgresTag.GetString(),
+		PostgresTag:           pgTag,
 		AirflowImage:          airflowImage,
 		AirflowHome:           airflowHome,
 		AirflowUser:           "astro",
