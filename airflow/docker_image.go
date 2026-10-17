@@ -334,7 +334,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 	err = d.pushWithClient(&authConfig, remoteImage)
 	if err != nil {
 		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
-		err = pushWithBash(&authConfig, remoteImage)
+		err = pushWithCLI(&authConfig, remoteImage)
 		if err != nil {
 			// Check for 403 errors only after both methods fail
 			if is403Error(err) {
@@ -456,9 +456,7 @@ func (d *DockerImage) Pull(remoteImage, username, token string) error {
 		if registry, err = d.getRegistryToAuth(remoteImage); err != nil {
 			return err
 		}
-		pass := token
-		pass = strings.TrimPrefix(pass, prefix)
-		err = cmdExecWithStdin(containerRuntime, pass, os.Stdout, os.Stderr, "login", registry, "-u", username, "--password-stdin")
+		err = cliRegistryLogin(containerRuntime, registry, username, token, os.Stdout, os.Stderr)
 	}
 	if err != nil {
 		return err
@@ -722,18 +720,30 @@ var cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ..
 	return nil
 }
 
+// cliRegistryLogin logs the container runtime's CLI in to registry. The
+// password, less any "Bearer " prefix, goes to the command's stdin
+// (--password-stdin): never into its arguments, which other users can read
+// from the process list, and never through a shell. An empty registry is left
+// out, so the runtime logs in to its default; `--` and --username= keep a
+// registry or username that starts with "-" from being read as an option.
+func cliRegistryLogin(containerRuntime, registry, username, password string, stdout, stderr io.Writer) error {
+	args := []string{"login", "--username=" + username, "--password-stdin"}
+	if registry != "" {
+		args = append(args, "--", registry)
+	}
+	return cmdExecWithStdin(containerRuntime, strings.TrimPrefix(password, prefix), stdout, stderr, args...)
+}
+
 // When login and push do not work via the go client, fall back to invoking the container runtime binary directly. This function is for users using colima
-func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
+func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
 
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		pass := authConfig.Password
-		pass = strings.TrimPrefix(pass, prefix)
 		var stderr bytes.Buffer
-		err = cmdExecWithStdin(containerRuntime, pass, os.Stdout, &stderr, "login", authConfig.ServerAddress, "-u", authConfig.Username, "--password-stdin")
+		err = cliRegistryLogin(containerRuntime, authConfig.ServerAddress, authConfig.Username, authConfig.Password, os.Stdout, &stderr)
 		if err != nil {
 			stderrOutput := stderr.String()
 			if stderrOutput != "" {

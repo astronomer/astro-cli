@@ -353,10 +353,8 @@ func (s *Suite) TestDockerPull() {
 		}
 		err := handler.Pull("", "username", trickyPass)
 		s.NoError(err)
-		s.NotEqual("bash", gotCmd)
 		s.Equal(trickyPass, gotStdin, "password must reach the login command unmodified, not interpolated into a shell string")
-		s.Contains(gotArgs, "--password-stdin")
-		s.NotContains(gotArgs, "-c")
+		s.assertStdinLogin(gotCmd, gotArgs, "username", nil, trickyPass)
 	})
 	s.Run("pull error", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -401,7 +399,7 @@ func (s *Suite) TestDockerPull() {
 			cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
 				// Login must go straight to the container runtime, never through a shell.
 				s.Equal("docker", cmd)
-				s.Contains(args[1], tc.expectedLogin)
+				s.Contains(args[len(args)-1], tc.expectedLogin)
 				loginSeen = true
 				return nil
 			}
@@ -776,7 +774,7 @@ func (s *Suite) TestExecCmdWithStdin() {
 	})
 }
 
-func (s *Suite) TestUseBash() {
+func (s *Suite) TestPushWithCLI() {
 	s.Run("success", func() {
 		var gotStdin string
 		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
@@ -789,27 +787,29 @@ func (s *Suite) TestUseBash() {
 			s.Contains([]string{"push", "rmi"}, args[0])
 			return nil
 		}
-		err := pushWithBash(&types.AuthConfig{Username: "testing", Password: "pass"}, "test")
+		err := pushWithCLI(&types.AuthConfig{Username: "testing", Password: "pass"}, "test")
 		s.NoError(err)
 		s.Equal("pass", gotStdin, "password must reach login via stdin, not a shell string")
 	})
 
 	s.Run("success with password containing shell metacharacters", func() {
 		const trickyPass = `p$(whoami)"'` + "`id`"
-		var gotStdin string
+		var gotCmd, gotStdin string
 		var gotArgs []string
 		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
-			gotStdin = stdin
-			gotArgs = args
+			gotCmd, gotStdin, gotArgs = cmd, stdin, args
 			return nil
 		}
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
-		err := pushWithBash(&types.AuthConfig{Username: "testing", Password: trickyPass}, "test")
+		err := pushWithCLI(&types.AuthConfig{Username: "testing", Password: trickyPass}, "test")
 		s.NoError(err)
 		s.Equal(trickyPass, gotStdin, "password must reach the login command unmodified, not interpolated into a shell string")
-		s.NotContains(gotArgs, "-c")
+		// No ServerAddress: no registry argument, so the runtime's default,
+		// as when this was a shell string; not a literal "".
+		empty := ""
+		s.assertStdinLogin(gotCmd, gotArgs, "testing", &empty, trickyPass)
 	})
 
 	s.Run("exec failure", func() {
@@ -817,7 +817,7 @@ func (s *Suite) TestUseBash() {
 			s.Contains(args[0], "push")
 			return errMockDocker
 		}
-		err := pushWithBash(&types.AuthConfig{}, "test")
+		err := pushWithCLI(&types.AuthConfig{}, "test")
 		s.ErrorIs(err, errMockDocker)
 	})
 
@@ -826,7 +826,7 @@ func (s *Suite) TestUseBash() {
 			s.Equal("docker", cmd)
 			return errMockDocker
 		}
-		err := pushWithBash(&types.AuthConfig{Username: "testing"}, "test")
+		err := pushWithCLI(&types.AuthConfig{Username: "testing"}, "test")
 		s.ErrorIs(err, errMockDocker)
 	})
 }
@@ -920,7 +920,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 		s.Contains(err.Error(), "https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push")
 	})
 
-	s.Run("403 forbidden error from pushWithBash fallback", func() {
+	s.Run("403 forbidden error from pushWithCLI fallback", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			if args[0] == "tag" {
 				return nil

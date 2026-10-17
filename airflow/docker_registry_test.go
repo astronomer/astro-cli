@@ -72,7 +72,7 @@ func (s *Suite) TestDockerLogin() {
 		s.NoError(err)
 		s.Equal("docker", capturedCmd)
 		s.Equal("testtoken", capturedStdin, "password must be piped to stdin, not interpolated into a command string")
-		s.Equal([]string{"login", "test.registry.com", "-u", "testuser", "--password-stdin"}, capturedArgs)
+		s.Equal([]string{"login", "--username=testuser", "--password-stdin", "--", "test.registry.com"}, capturedArgs)
 	})
 
 	s.Run("success with bearer token", func() {
@@ -91,23 +91,23 @@ func (s *Suite) TestDockerLogin() {
 		s.Equal("docker", capturedCmd)
 		// Should strip Bearer prefix
 		s.Equal("testtoken123", capturedStdin)
-		s.Equal([]string{"login", "test.registry.com", "-u", "testuser", "--password-stdin"}, capturedArgs)
+		s.Equal([]string{"login", "--username=testuser", "--password-stdin", "--", "test.registry.com"}, capturedArgs)
 	})
 
 	s.Run("password with shell metacharacters reaches login intact", func() {
 		const trickyPass = `p$(whoami)"'` + "`id`"
-		var capturedStdin string
+		var capturedCmd, capturedStdin string
 		var capturedArgs []string
 		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
-			capturedStdin = stdin
-			capturedArgs = args
+			capturedCmd, capturedStdin, capturedArgs = cmd, stdin, args
 			return nil
 		}
 
 		err := DockerLogin("test.registry.com", "testuser", trickyPass)
 		s.NoError(err)
 		s.Equal(trickyPass, capturedStdin, "password must reach the login command unmodified, not interpolated into a shell string")
-		s.NotContains(capturedArgs, "-c")
+		wantRegistry := "test.registry.com"
+		s.assertStdinLogin(capturedCmd, capturedArgs, "testuser", &wantRegistry, trickyPass)
 	})
 
 	s.Run("no operation with empty credentials", func() {
