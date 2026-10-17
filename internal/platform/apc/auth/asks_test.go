@@ -79,7 +79,7 @@ func (s *Suite) TestLoginAsksForTheWorkspaceOnStderr() {
 	out := &bytes.Buffer{}
 	var err error
 	stdout, stderr := captureProcessOutput(s.T(), func() {
-		err = Login("localhost", false, "test", "test", "0.30.0", houstonMock, out)
+		err = Login("localhost", false, "test", "test", "", "0.30.0", houstonMock, out)
 	})
 	s.NoError(err)
 	s.Empty(stdout)
@@ -106,7 +106,7 @@ func (s *Suite) loginPaged(pageSize, houstonVersion, answers string, houstonMock
 
 	buf := &bytes.Buffer{}
 	_, stderr = captureProcessOutput(s.T(), func() {
-		err = Login("localhost", false, "test", "test", houstonVersion, houstonMock, buf)
+		err = Login("localhost", false, "test", "test", "", houstonVersion, houstonMock, buf)
 	})
 	return buf.String(), stderr, err
 }
