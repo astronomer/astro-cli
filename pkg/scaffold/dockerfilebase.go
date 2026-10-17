@@ -27,11 +27,13 @@ const (
 //
 // The rule is the one Docker mode's start enforces, deliberately, and not
 // files1x's "runtime" substring: airflowrt.ReadDeclaredBase reads the final
-// stage (following aliases) and airflowrt.IsAstroRuntimeImage decides, which
+// stage (following aliases) and airflowrt.IsAstroRuntimeRef decides, which
 // is what localdocker's refuseUnsupportedBase asks before every start. A
 // Dockerfile init declared that start then refuses is the failure this
-// exists to prevent, so the two must agree; a `-base` or `-python-X.Y` tag
-// and a digest pin are all Runtime, because the image decides and not the tag.
+// exists to prevent, so the two must agree. On Astronomer's published
+// repositories any tag is Runtime — a `-base` or `-python-X.Y` flavor, a
+// digest pin. A mirror on another registry is Runtime when its repository is
+// named runtime or astro-runtime and its tag is a Runtime version.
 //
 // A FROM built from a build argument (`ARG BASE=...` then `FROM ${BASE}`) is
 // unknown, as it is to start: what it names depends on ARG defaults, their
@@ -52,7 +54,7 @@ func dockerfileBase(image, tag string, err error) (kind baseKind, ref string) {
 		}
 		return baseUnknown, ref
 	}
-	if airflowrt.IsAstroRuntimeImage(image) {
+	if airflowrt.IsAstroRuntimeRef(image, tag) {
 		return baseRuntime, ref
 	}
 	return baseForeign, ref

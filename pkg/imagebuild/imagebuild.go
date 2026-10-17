@@ -477,6 +477,15 @@ func shouldPull(declared, dockerfile string) bool {
 // isAstroBase reports whether a FROM reference names an image published to one
 // of the registries Astro Runtime comes from.
 //
+// Deliberately not airflowrt.IsAstroRuntimeRef, which also accepts a mirror
+// (a repository named runtime or astro-runtime, on a Runtime version tag). That
+// answers "is this an Astro Runtime image"; this answers "can a pull be forced
+// on it", and a mirror lives in exactly the kind of registry shouldPull exists
+// to leave alone — a private one this daemon may not be logged into, or a copy
+// retagged locally for an offline build. A mirror builds as a plain
+// `docker build` would, from what the daemon has. An image under one of
+// Astronomer's own names is still pulled, `docker load`ed or not.
+//
 // Matched at a path boundary, not as a bare prefix: quay.io/astronomerfake/x
 // starts with quay.io/astronomer and is somebody else's registry, and treating
 // it as ours would force a pull the user did not ask for.

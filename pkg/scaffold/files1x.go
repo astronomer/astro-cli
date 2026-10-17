@@ -278,7 +278,7 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 	from1x.notes = append(from1x.notes, build...)
 	from1x.notes = append(from1x.notes, pipInstallNote(data)...)
 	from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
-	base := airflowrt.DeclaredBase{Image: image, Tag: tag, Known: err == nil && !airflowrt.IsUnresolvedRef(image)}
+	base := airflowrt.NewDeclaredBase(image, tag, err)
 	if base.RuntimeVersion() != "" {
 		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
 	}
@@ -334,8 +334,11 @@ func buildArgDockerfileNote(ref string, pinOnly bool) string {
 // project's build, and how to make one that would be. ref is its base.
 func foreignDockerfileNote(ref string) string {
 	return "Dockerfile: left as it is and not declared as this project's build, because its final stage " +
-		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode builds only on one. " +
-		"To build this project from a Dockerfile, base its final stage on astrocrpublic.azurecr.io/runtime " +
+		"builds on " + ref + ", which is not an Astro Runtime image, and Docker mode builds only on one: " +
+		"one of Astronomer's published Runtime images (astrocrpublic.azurecr.io/runtime, " +
+		"quay.io/astronomer/astro-runtime), or a mirror whose repository is named runtime or astro-runtime " +
+		"and whose tag is a Runtime version, such as 3.1-12 or 12.1.0. " +
+		"To build this project from a Dockerfile, base its final stage on one of those, " +
 		"and add dockerfile = 'Dockerfile' under [tool.astro] in " + manifest.Marker
 }
 
