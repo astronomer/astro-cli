@@ -130,7 +130,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 		api.NewAPICmd(),
 		newTelemetryCmd(o.out),
 		newTelemetrySendCmd(),
-		newOttoCmd(),
+		newOttoCmd(astroV1Client),
 	)
 
 	if isCloudCtx { // Include all the commands to be exposed for cloud users
@@ -185,7 +185,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	wireLinkPickers(&coreDeps, o.platform, astroV1Client, o.out)
 	// A single positional argument is Otto's first message in an interactive
 	// session.
-	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }
+	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}, ottoMembership(astroV1Client)) }
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)

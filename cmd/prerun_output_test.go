@@ -50,10 +50,12 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 	}{
 		// The case that printed "Using an Astro API Token" on stdout ahead
 		// of the object: a command the login check does not exempt, which
-		// is every cloud command that calls the API.
-		{name: "an API token, a command that logs in", apiToken: true, args: []string{"probe", "-o", "json"}, stderrHas: "Using an Astro API Token"},
-		// With debug logs on, the pre-run logs the login check's failure.
-		{name: "an API token, with debug logs", apiToken: true, args: []string{"probe", "-o", "json", "--verbosity", "debug"}, stderrHas: "level=debug"},
+		// is every cloud command that calls the API. The note is a debug log
+		// now, so by default it is not printed at all.
+		{name: "an API token, a command that logs in", apiToken: true, args: []string{"probe", "-o", "json"}, stderrLacks: "Using an Astro API Token"},
+		// With debug logs on, the pre-run logs the token and the login
+		// check's failure, on stderr.
+		{name: "an API token, with debug logs", apiToken: true, args: []string{"probe", "-o", "json", "--verbosity", "debug"}, stderrHas: "Using an Astro API Token"},
 		{name: "an API token, auth token", apiToken: true, args: []string{"auth", "token", "-o", "json"}, ok: true},
 		{name: "an API token, telemetry", apiToken: true, args: []string{"telemetry", "-o", "json"}, ok: true, stderrLacks: "Using an Astro API Token"},
 		// With no login, a command that logs in reaches the login flow:

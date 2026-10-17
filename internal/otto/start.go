@@ -19,10 +19,13 @@ var ErrNotLoggedIn = errors.New("not logged in")
 // isHelpOrVersion reports whether args is a help- or version-only invocation.
 // Otto's --help / --version exit before bootstrap() runs (see otto cli.ts),
 // so they don't need an auth context — let them through even when logged out.
+// The flags are the ones Otto's parseArgs (src/args.ts) takes, matched
+// exactly as it matches them: it has -v for --version, and refuses
+// --help=true as an unknown flag rather than showing help.
 func isHelpOrVersion(args []string) bool {
 	for _, a := range args {
 		switch a {
-		case "--help", "-h", "--version":
+		case "--help", "-h", "--version", "-v":
 			return true
 		}
 	}
@@ -30,8 +33,10 @@ func isHelpOrVersion(args []string) bool {
 }
 
 // Start spawns Otto with the given arguments and environment from the current context.
-// It blocks until Otto exits, forwarding signals for clean shutdown.
-func Start(args []string) error {
+// It blocks until Otto exits, forwarding signals for clean shutdown. check
+// confirms the signed-in user belongs to the organization Otto runs in; nil
+// skips it.
+func Start(args []string, check MembershipCheck) error {
 	cfg := NewConfigFromContext()
 	if cfg.Token == "" && !isHelpOrVersion(args) {
 		fmt.Fprintln(os.Stderr, "You're not logged in to Astro. Otto is an AI assistant for Airflow — sign in or start a trial to use it.")
@@ -40,6 +45,13 @@ func Start(args []string) error {
 		fmt.Fprintln(os.Stderr, "  • Free trial:     https://www.astronomer.io/try-astro")
 		fmt.Fprintln(os.Stderr, "  • What Otto does: astro otto --help")
 		return ErrNotLoggedIn
+	}
+
+	// Help and version need no organization, and should not wait on the API.
+	if !isHelpOrVersion(args) {
+		if err := verifyOrgMembership(cfg, check, os.Stderr); err != nil {
+			return err
+		}
 	}
 
 	if err := EnsureBinary(); err != nil {

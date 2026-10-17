@@ -30,6 +30,13 @@ type Config struct {
 	// ProjectAirflow is true when AirflowURL is a project's Airflow, which Otto
 	// authenticates to itself: no username and password are injected for it.
 	ProjectAirflow bool
+	// loginOrganization is the login's own organization, which Organization
+	// differs from when the project names another.
+	loginOrganization string
+	// projectDomain is the Astro host the project's workspace lives on, set
+	// when the project's manifest loads. A project's organization belongs to
+	// that host, which need not be the login's.
+	projectDomain string
 }
 
 // NewConfigFromContext builds a Config from the current astro login context.
@@ -43,7 +50,8 @@ func NewConfigFromContext() *Config {
 	if err == nil {
 		cfg.Token = strings.TrimPrefix(ctx.Token, "Bearer ")
 		cfg.Domain = ctx.Domain
-		cfg.Organization = projectOrganization(ctx.Organization)
+		cfg.loginOrganization = ctx.Organization
+		cfg.Organization, cfg.projectDomain = projectOrganization(ctx.Organization)
 	}
 
 	return cfg
@@ -53,21 +61,23 @@ func NewConfigFromContext() *Config {
 // directory's project names for its workspace, else fallback, the login's.
 // It is chosen the way the workspace reads choose it
 // (manifest.Astro.WorkspaceOrganization), so Otto asks about the organization
-// the project's values come from. A manifest that does not load names none.
-func projectOrganization(fallback string) string {
+// the project's values come from. It also returns the host that workspace
+// lives on (manifest.Astro.WorkspaceDomain). A manifest that does not load
+// names neither.
+func projectOrganization(fallback string) (org, domain string) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fallback
+		return fallback, ""
 	}
 	proj, err := project.Discover(cwd)
 	if err != nil {
-		return fallback
+		return fallback, ""
 	}
 	m, err := manifest.Load(filepath.Join(proj.Dir, project.Marker))
 	if err != nil {
-		return fallback
+		return fallback, ""
 	}
-	return m.Astro.WorkspaceOrganization(fallback)
+	return m.Astro.WorkspaceOrganization(fallback), m.Astro.WorkspaceDomain()
 }
 
 // DetectAirflow returns a URL to the Airflow belonging to the current project

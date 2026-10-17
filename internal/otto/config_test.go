@@ -79,8 +79,9 @@ func (s *ConfigSuite) TestNewConfigFromContextTakesTheProjectsOrganization() {
 	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(body), 0o600))
 	s.Equal("test-org-id", NewConfigFromContext().Organization, "a project naming no organization")
 
-	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(body+"organization = \"clother\"\n"), 0o600))
+	s.Require().NoError(os.WriteFile(filepath.Join(dir, project.Marker), []byte(body+"organization = \"clother\"\ndomain = \"astronomer-dev.io\"\n"), 0o600))
 	s.Equal("clother", NewConfigFromContext().Organization)
+	s.Equal("astronomer-dev.io", NewConfigFromContext().projectDomain, "the host the project's organization is on")
 	env := strings.Join((&Config{Organization: NewConfigFromContext().Organization}).BuildEnv(), "\n")
 	s.Contains(env, "ASTRO_ORGANIZATION=clother")
 }
