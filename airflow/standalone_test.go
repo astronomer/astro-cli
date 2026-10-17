@@ -631,8 +631,18 @@ func (s *Suite) TestStandaloneBuildEnv_WithEnvFile() {
 	s.Equal("hello", envMap["MY_CUSTOM_VAR"])
 }
 
+// clearBindEnv unsets the bind settings for the rest of the test, so a
+// developer's own does not decide what the loopback tests see.
+func (s *Suite) clearBindEnv() {
+	for _, k := range []string{"AIRFLOW__API__HOST", "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"} {
+		s.T().Setenv(k, "") // restores the developer's value afterwards
+		s.Require().NoError(os.Unsetenv(k))
+	}
+}
+
 func (s *Suite) TestStandaloneBuildEnv_LoopbackDefaults() {
-	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	s.clearBindEnv()
+	handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
 	s.NoError(err)
 
 	env := handler.buildEnv()
@@ -651,12 +661,11 @@ func (s *Suite) TestStandaloneBuildEnv_LoopbackDefaults() {
 }
 
 func (s *Suite) TestStandaloneBuildEnv_LoopbackOverriddenByEnvFile() {
-	tmpDir, err := os.MkdirTemp("", "standalone-loopback-envfile")
-	s.NoError(err)
-	defer os.RemoveAll(tmpDir)
+	s.clearBindEnv()
+	tmpDir := s.T().TempDir()
 
 	envContent := "AIRFLOW__API__HOST=0.0.0.0\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
-	err = os.WriteFile(filepath.Join(tmpDir, ".env"), []byte(envContent), 0o644)
+	err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte(envContent), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, "", "Dockerfile")
@@ -680,7 +689,7 @@ func (s *Suite) TestStandaloneBuildEnv_LoopbackOverriddenByInheritedEnv() {
 	s.T().Setenv("AIRFLOW__API__HOST", "0.0.0.0")
 	s.T().Setenv("AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "0.0.0.0")
 
-	handler, err := StandaloneInit("/tmp/test-project", "", "Dockerfile")
+	handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
 	s.NoError(err)
 
 	env := handler.buildEnv()
@@ -695,6 +704,61 @@ func (s *Suite) TestStandaloneBuildEnv_LoopbackOverriddenByInheritedEnv() {
 	// A user's setting in the inherited environment wins over the loopback default.
 	s.Equal("0.0.0.0", envMap["AIRFLOW__API__HOST"])
 	s.Equal("0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+}
+
+// The secret standalone Airflow signs sessions and tokens with is random,
+// kept owner-only in the project's standalone home, and the same for every
+// command once Start has kept it; never the project's name, which anyone who
+// knew the project could sign tokens with.
+func (s *Suite) TestStandaloneSigningSecret() {
+	envOf := func(h *Standalone) map[string]string {
+		envMap := map[string]string{}
+		for _, e := range h.buildEnv() {
+			if parts := splitEnvVar(e); parts != nil {
+				envMap[parts[0]] = parts[1]
+			}
+		}
+		return envMap
+	}
+
+	s.Run("kept by Start, owner-only, and used for every signing setting", func() {
+		project := s.T().TempDir()
+		handler, err := StandaloneInit(project, "", "Dockerfile")
+		s.Require().NoError(err)
+		handler.airflowMajorVersion = "3"
+
+		handler.persistSigningSecret()
+		path := filepath.Join(project, standaloneDir, standaloneSecretFile)
+		info, err := os.Stat(path)
+		s.Require().NoError(err)
+		s.Equal(os.FileMode(0o600), info.Mode().Perm())
+		kept, err := os.ReadFile(path)
+		s.Require().NoError(err)
+
+		handler.persistSigningSecret() // a second Start keeps the first secret
+		again, err := os.ReadFile(path)
+		s.Require().NoError(err)
+		s.Equal(kept, again)
+
+		env := envOf(handler)
+		s.Equal(string(kept), env["AIRFLOW__API__SECRET_KEY"])
+		s.Equal(string(kept), env["AIRFLOW__API_AUTH__JWT_SECRET"])
+		s.Equal(string(kept), envOf(handler)["AIRFLOW__API_AUTH__JWT_SECRET"], "the secret changes between commands")
+	})
+
+	s.Run("without a kept secret, a random one, not the project's name", func() {
+		handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
+		s.Require().NoError(err)
+		handler.airflowMajorVersion = "3"
+
+		first, second := envOf(handler)["AIRFLOW__API__SECRET_KEY"], envOf(handler)["AIRFLOW__API__SECRET_KEY"]
+		s.NotEmpty(first)
+		s.NotEqual(first, second, "an unkept secret is not random")
+		s.NotEqual("astro-standalone", first)
+		if name, err := ProjectNameUnique(); err == nil {
+			s.NotEqual(name, first)
+		}
+	})
 }
 
 func splitEnvVar(s string) []string {

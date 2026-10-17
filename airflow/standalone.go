@@ -4,6 +4,7 @@ package airflow
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -47,7 +48,6 @@ var (
 	standaloneIndexURL    = airflowrt.StandaloneIndexURL
 	defaultPythonVersion  = airflowrt.DefaultPython
 	stopPollInterval      = airflowrt.StopPollInterval
-	stopTimeout           = airflowrt.StopTimeout
 	filePermissions       = airflowrt.FilePermissions
 	dirPermissions        = airflowrt.DirPermissions
 	standaloneVersionFile = airflowrt.StandaloneVersionFile
@@ -298,6 +298,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 	}
 	s.airflowMajorVersion = afMajor
 	s.persistVersion()
+	s.persistSigningSecret()
 
 	pythonVersion := resolvePythonVersion(baseTag, tagPython)
 
@@ -729,12 +730,7 @@ func (s *Standalone) buildEnv() []string {
 	// Stable Fernet key so encrypted connection extras survive restart.
 	// Same value the docker compose template ships.
 	overrides["AIRFLOW__CORE__FERNET_KEY"] = "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-	// Stable per-project signing secret so login sessions / JWTs survive
-	// restart. Falls back to a constant if the project hash isn't available.
-	signingSecret, err := ProjectNameUnique()
-	if err != nil {
-		signingSecret = "astro-standalone"
-	}
+	signingSecret := standaloneSigningSecret(standaloneHome)
 	port := s.webserverPort()
 	if s.airflowMajorVersion == "3" {
 		overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
@@ -867,6 +863,44 @@ func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, er
 	return string(out), nil
 }
 
+// standaloneSecretFile holds a project's standalone signing secret, in the
+// standalone Airflow home (.astro/standalone), owner-only.
+const standaloneSecretFile = ".signing-secret"
+
+// standaloneSigningSecret is the secret a project's standalone Airflow signs
+// its sessions and API tokens with: the api-server's JWTs, and the tokens its
+// log servers (which listen on every interface) accept. It is the random one
+// persistSigningSecret keeps in standaloneHome, so logins survive a restart;
+// it was the project's name, or a constant, which anyone who knew the
+// project could reproduce and sign tokens with. With none kept, it is random
+// for this run.
+func standaloneSigningSecret(standaloneHome string) string {
+	if b, err := os.ReadFile(filepath.Join(standaloneHome, standaloneSecretFile)); err == nil {
+		if secret := strings.TrimSpace(string(b)); secret != "" {
+			return secret
+		}
+	}
+	return rand.Text()
+}
+
+// persistSigningSecret keeps a random signing secret in the project's
+// standalone home, owner-only, unless one is already there. Start calls it,
+// so the Airflow it starts, and every later command, sign with the same one.
+func (s *Standalone) persistSigningSecret() {
+	dir := filepath.Join(s.airflowHome, standaloneDir)
+	path := filepath.Join(dir, standaloneSecretFile)
+	if b, err := os.ReadFile(path); err == nil && strings.TrimSpace(string(b)) != "" {
+		return
+	}
+	if err := os.MkdirAll(dir, dirPermissions); err != nil {
+		logger.Debugf("Warning: could not create standalone dir for the signing secret: %v", err)
+		return
+	}
+	if err := os.WriteFile(path, []byte(rand.Text()), 0o600); err != nil { //nolint:mnd
+		logger.Debugf("Warning: could not keep the standalone signing secret, so logins will not survive a restart: %v", err)
+	}
+}
+
 // readPID delegates to airflowrt.ReadPID.
 func (s *Standalone) readPID() (int, bool) {
 	return airflowrt.ReadPID(s.pidFilePath())
@@ -883,35 +917,20 @@ func (s *Standalone) Stop(_ bool) error {
 		return nil
 	}
 
-	if !alive {
-		// Stale PID file — clean up
-		os.Remove(s.pidFilePath())
+	// airflowrt.StopProcess stops the whole process group (Setpgid at start)
+	// and waits for it to go, including when the master has already died and
+	// left its scheduler/api-server/triggerer running.
+	if alive || airflowrt.ProcessGroupAlive(pid) {
+		fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
+	}
+	stopped, err := airflowrt.StopProcess(s.pidFilePath())
+	if err != nil {
+		return fmt.Errorf("stopping Airflow standalone: %w", err)
+	}
+	if !stopped {
 		fmt.Println("No standalone Airflow process found (cleaned up stale PID file).")
 		return nil
 	}
-
-	fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
-	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
-
-	// Poll the process group — not just the master PID. airflow standalone
-	// spawns scheduler/api-server/triggerer into the same group (Setpgid at
-	// start), and the master often exits on SIGTERM before its children
-	// finish; returning then would leave them running.
-	deadline := time.Now().Add(stopTimeout)
-	for time.Now().Before(deadline) {
-		time.Sleep(stopPollInterval)
-		if !airflowrt.ProcessGroupAlive(pid) {
-			break
-		}
-	}
-
-	// If any group member is still alive, send SIGKILL
-	if airflowrt.ProcessGroupAlive(pid) {
-		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
-		time.Sleep(stopPollInterval)
-	}
-
-	os.Remove(s.pidFilePath())
 	fmt.Println("Airflow standalone stopped.")
 	return nil
 }

@@ -88,11 +88,11 @@ func stubStopSeams(t *testing.T, groupAlive func(pid int) bool, terminated, kill
 	t.Helper()
 	origAlive, origGroupAlive := isProcessAlive, isProcessGroupAlive
 	origTerm, origKill := terminateProcess, killProcess
-	origPoll, origTimeout := stopPollInterval, stopTimeout
+	origPoll, origTimeout, origKillTimeout := stopPollInterval, stopTimeout, killTimeout
 	t.Cleanup(func() {
 		isProcessAlive, isProcessGroupAlive = origAlive, origGroupAlive
 		terminateProcess, killProcess = origTerm, origKill
-		stopPollInterval, stopTimeout = origPoll, origTimeout
+		stopPollInterval, stopTimeout, killTimeout = origPoll, origTimeout, origKillTimeout
 	})
 	isProcessAlive = func(int) bool { return true }
 	isProcessGroupAlive = groupAlive
@@ -100,6 +100,46 @@ func stubStopSeams(t *testing.T, groupAlive func(pid int) bool, terminated, kill
 	killProcess = func(pid int) { *killed = append(*killed, pid) }
 	stopPollInterval = time.Millisecond
 	stopTimeout = 50 * time.Millisecond
+	killTimeout = 20 * time.Millisecond
+}
+
+// The master died on its own (a crash, an OOM kill) and its children run on
+// in its group: that is a running instance to stop, not a stale PID file.
+func TestStopProcess_StopsChildrenOfADeadMaster(t *testing.T) {
+	dir := t.TempDir()
+	pidFile := filepath.Join(dir, "airflow.pid")
+	require.NoError(t, WritePID(pidFile, 12345))
+
+	var terminated, killed []int
+	stubStopSeams(t, func(int) bool { return len(terminated) == 0 }, &terminated, &killed)
+	isProcessAlive = func(int) bool { return false }
+
+	stopped, err := StopProcess(pidFile)
+	assert.NoError(t, err)
+	assert.True(t, stopped, "the children of a dead master were left running")
+	assert.Equal(t, []int{12345}, terminated)
+
+	_, statErr := os.Stat(pidFile)
+	assert.True(t, os.IsNotExist(statErr), "PID file should be cleaned up")
+}
+
+// A group that outlives SIGKILL is an error, and its PID file is kept so a
+// later stop can still reach it.
+func TestStopProcess_GroupThatSurvivesSIGKILL(t *testing.T) {
+	dir := t.TempDir()
+	pidFile := filepath.Join(dir, "airflow.pid")
+	require.NoError(t, WritePID(pidFile, 12345))
+
+	var terminated, killed []int
+	stubStopSeams(t, func(int) bool { return true }, &terminated, &killed)
+
+	stopped, err := StopProcess(pidFile)
+	assert.True(t, stopped)
+	assert.ErrorContains(t, err, "still running after SIGKILL")
+	assert.Equal(t, []int{12345}, killed)
+
+	_, statErr := os.Stat(pidFile)
+	assert.NoError(t, statErr, "the PID file of a group still running should be kept")
 }
 
 func TestStopProcess_WaitsForProcessGroup(t *testing.T) {
@@ -135,10 +175,10 @@ func TestStopProcess_ForceKillsSurvivingGroup(t *testing.T) {
 	pidFile := filepath.Join(dir, "airflow.pid")
 	require.NoError(t, WritePID(pidFile, 12345))
 
-	// The group never exits within the timeout: StopProcess must escalate to
-	// SIGKILL and still clean up.
+	// The group ignores SIGTERM past the timeout: StopProcess must escalate to
+	// SIGKILL, which it does go for, and clean up.
 	var terminated, killed []int
-	stubStopSeams(t, func(int) bool { return true }, &terminated, &killed)
+	stubStopSeams(t, func(int) bool { return len(killed) == 0 }, &terminated, &killed)
 
 	stopped, err := StopProcess(pidFile)
 	assert.NoError(t, err)

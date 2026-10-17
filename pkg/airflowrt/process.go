@@ -21,9 +21,11 @@ const (
 
 // stopPollInterval and stopTimeout mirror the exported constants; tests
 // shorten them to exercise the stop path without real processes.
+// killTimeout bounds the wait for a group to go after SIGKILL.
 var (
 	stopPollInterval = StopPollInterval
 	stopTimeout      = StopTimeout
+	killTimeout      = 5 * time.Second
 )
 
 // ReadPID reads a PID file and checks if the process is alive.
@@ -53,13 +55,21 @@ func WritePID(pidFilePath string, pid int) error {
 // StopProcess stops a process by PID using SIGTERM, then SIGKILL if needed.
 // It sends signals to the entire process group (-pid) so child processes are also killed.
 // Returns true if the process was found and stopped, false if no process was running.
+// It removes the PID file only once the whole group is gone: a group that
+// outlives SIGKILL is an error, and its PID file is kept so a later stop can
+// still reach it.
 func StopProcess(pidFilePath string) (bool, error) {
 	pid, alive := ReadPID(pidFilePath)
 	if pid == 0 {
 		return false, nil
 	}
 
-	if !alive {
+	// The master can be gone while its scheduler/api-server/triggerer run on
+	// (it crashed, was OOM-killed, or took a SIGTERM of its own): they keep
+	// its process group, so the group, not the master, says whether anything
+	// is left to stop. A PID is not reused while a group with that ID exists,
+	// so a live group here is still ours.
+	if !alive && !isProcessGroupAlive(pid) {
 		// Stale PID file — clean up
 		os.Remove(pidFilePath)
 		return false, nil
@@ -72,22 +82,29 @@ func StopProcess(pidFilePath string) (bool, error) {
 	// group; the master often exits on SIGTERM well before its children finish
 	// graceful shutdown. Watching only the master would return early here and
 	// leave those subprocesses running.
-	deadline := time.Now().Add(stopTimeout)
-	for time.Now().Before(deadline) {
-		time.Sleep(stopPollInterval)
-		if !isProcessGroupAlive(pid) {
-			break
-		}
-	}
-
-	// If any group member is still alive, force kill
-	if isProcessGroupAlive(pid) {
+	if !waitGroupGone(pid, stopTimeout) {
+		// If any group member is still alive, force kill
 		killProcess(pid)
-		time.Sleep(stopPollInterval)
+		if !waitGroupGone(pid, killTimeout) {
+			return true, fmt.Errorf("process group %d is still running after SIGKILL; kept %s so a later stop can reach it", pid, pidFilePath)
+		}
 	}
 
 	os.Remove(pidFilePath)
 	return true, nil
+}
+
+// waitGroupGone polls until no process in pid's group is alive, or timeout
+// passes, and reports whether the group is gone.
+func waitGroupGone(pid int, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		time.Sleep(stopPollInterval)
+		if !isProcessGroupAlive(pid) {
+			return true
+		}
+	}
+	return !isProcessGroupAlive(pid)
 }
 
 // ProcessGroupAlive reports whether any process in pid's group is still

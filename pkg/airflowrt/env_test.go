@@ -60,7 +60,18 @@ func TestBuildEnv(t *testing.T) {
 	assert.True(t, strings.HasPrefix(envMap["PATH"], filepath.Join(dir, ".venv", "bin")))
 }
 
+// clearBindEnv unsets the bind settings for the rest of the test, so a
+// developer's own does not decide what the loopback tests see.
+func clearBindEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{"AIRFLOW__API__HOST", "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"} {
+		t.Setenv(k, "") // restores the developer's value afterwards
+		require.NoError(t, os.Unsetenv(k))
+	}
+}
+
 func TestBuildEnv_LoopbackDefaults(t *testing.T) {
+	clearBindEnv(t)
 	dir := t.TempDir()
 
 	env := BuildEnv(dir, "", "")
@@ -73,6 +84,7 @@ func TestBuildEnv_LoopbackDefaults(t *testing.T) {
 }
 
 func TestBuildEnv_LoopbackOverriddenByEnvFile(t *testing.T) {
+	clearBindEnv(t)
 	dir := t.TempDir()
 	envFile := filepath.Join(dir, ".env")
 	content := "AIRFLOW__API__HOST=0.0.0.0\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
