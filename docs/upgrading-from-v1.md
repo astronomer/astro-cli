@@ -12,7 +12,7 @@ astro init
 
 `astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too. `astro deploy --image-name` too: a prebuilt image deployed from a 1.x checkout would leave its DAGs stale. Outside any project, `--image-name` deploys an image you already built, alone, with no DAGs.
 
-On Astro Private Cloud, v2 does not build and deploy projects yet, converted or not: use Astro CLI 1.x to deploy there for now. v2 deploys an image you built there (`astro deploy --image-name`, from a converted project or outside any project), and uploads a converted project's DAGs (`astro deploy --dags`). Support for `pyproject.toml` projects on Astro Private Cloud is coming.
+On Astro Private Cloud, v2 builds and deploys `pyproject.toml` projects, Airflow 2 and 3, to the `apc` links a project names, as it does on Astro (see [deploy.md](deploy.md#astro-private-cloud)). A deploy names its Deployment, as the argument or with `--deployment`, or asks: a 1.x CI job that ran a bare `astro deploy` against the Deployment `--save` remembered fails until it names one. `astro init` does not convert a 1.x project under an Astro Private Cloud context yet, so a project kept in the 1.x layout there deploys with Astro CLI 1.x for now. v2 also deploys an image you built (`astro deploy --image-name`, from a converted project or outside any project).
 
 ## What's new
 
@@ -127,10 +127,10 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--pytest`, `--test` (`-t`), `--env` (`-e`) | run your tests first: `uv run pytest && astro deploy` | `astro deploy` |
 | `--parse` | check your DAGs first: `astro local check && astro deploy` | `astro deploy` |
 | `--deployment-name`, `-n` | the argument, or `--deployment`, either taking a link name or a Deployment id | `astro deploy` |
-| `--save`, `-s` | name the Deployment on each deploy; on Astro, link it with `astro link add` and mark it `default = true` to preselect it | `astro deploy` |
+| `--save`, `-s` | name the Deployment on each deploy; link it with `astro link add` (an `apc` link under an Astro Private Cloud context) and mark it `default = true` to preselect it | `astro deploy` |
 | `--dags-path` | `astro deploy --dags` from the project, which ships its `dags/` | `astro deploy` |
 | `--dag-bundle-name` | no replacement yet: use Astro CLI 1.x | `astro deploy` |
-| `--no-cache` | no replacement: v2 builds no image for Astro Private Cloud | `astro deploy` on Astro Private Cloud |
+| `--no-cache` | no replacement: the build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro deploy` on Astro Private Cloud |
 | `--non-dags` | `astro deploy bundle [PATH]`, which detects a dbt project and gives it a mount path | `astro deploy` |
 | `--non-dags-local-path` | the PATH argument of `astro deploy bundle` | `astro deploy` |
 | `--non-dags-mount-path` | `astro deploy bundle --mount-path` | `astro deploy` |

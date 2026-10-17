@@ -13,18 +13,16 @@ import (
 	"github.com/astronomer/astro-cli/context"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/pkg/git"
 )
 
 var (
-	forceDeploy  bool
-	forcePrompt  bool
-	deployOutput cliout.Format
-	deployYes    bool
-
-	// hasUncommittedChanges is a variable so a test does not depend on the
-	// state of the checkout it runs in.
-	hasUncommittedChanges = git.HasUncommittedChanges
+	deployOutput     cliout.Format
+	deployYes        bool
+	deployDeployment string
+	workspaceFlag    string
+	deployForce      bool
+	deployPrompt     bool
+	deploySecrets    = []string{}
 
 	DeployAirflowImage                 = deploy.Airflow
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
@@ -39,8 +37,11 @@ var (
 	ErrImageNameNotPassedForRemoteFlag = errors.New("--image-name is mandatory when --remote flag is passed")
 )
 
-var deployExample = `  # Deploy an image built on this machine, picking the Deployment from a list
-  astro deploy --image-name <IMAGE_NAME>
+var deployExample = `  # Build this project and deploy it, picking the Deployment from a list
+  astro deploy
+
+  # Build this project and deploy it to a linked Deployment, or one by id
+  astro deploy <LINK_OR_DEPLOYMENT_ID>
 
   # Deploy an image built on this machine to a given Deployment
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>`
@@ -70,41 +71,40 @@ const (
 	noticeDagsUndecided = "Dags were NOT updated: whether this Deployment takes Dag uploads could not be read (%v). The image was deployed, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
 )
 
-// What a deploy that would build the project is told: v2 builds no project
-// for APC. Astro CLI 1.x keeps deploying projects there, and a pyproject.toml
-// project gets an APC deploy of its own later.
-const (
-	errBuildDeployNoProject = "Astro CLI v2 cannot build and deploy projects to Astro Private Cloud yet: use Astro CLI 1.x for now. " +
-		"To deploy an image you built yourself, pass --image-name"
-	errBuildDeployManifest = "Astro CLI v2 cannot build and deploy projects to Astro Private Cloud yet: use Astro CLI 1.x for now. " +
-		"Support for pyproject.toml projects on Astro Private Cloud is coming. Until then, --dags uploads this project's DAGs, " +
-		"and a project that declares dockerfile under [tool.astro] (a Dockerfile FROM an Astro Runtime image) " +
-		"builds an image with astro package --tag <image> that astro deploy <deployment-id> --image-name <image> deploys"
-)
-
-var errUncommittedChanges = errors.New("project directory has uncommitted changes: commit them, or use astro deploy <deployment-id> --force to deploy anyway")
-
 func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy [DEPLOYMENT_ID]",
 		Short: "Deploy an image or Dags to a Deployment",
-		Long: "Deploy an image you built, or a project's Dags, to an APC Deployment. Astro CLI v2 does not build projects for Astro Private Cloud yet: " +
-			"to build and deploy a project there, use Astro CLI 1.x. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) deploys with Astro CLI 1.x only.",
+		Long: "Deploy a pyproject.toml project ([tool.astro]) to an Astro Private Cloud Deployment. Run it at the project's root: it builds the project into an image, Airflow 2 or Airflow 3, and pushes it to the Deployment, with the project's Dags inside the image for an image Deployment and uploaded beside it for a Dag-only one. " +
+			"Name the Deployment by a link of the project (target = 'apc', written by astro link add) or by its id; an interactive deploy that names none asks, with the project's default link preselected. " +
+			"With --image-name it deploys an image built on this machine, from any directory. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) deploys with Astro CLI 1.x only.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deployAirflow(cmd, args, out)
 		},
 		Example: deployExample,
 	}
-	cmd.Flags().BoolVarP(&forceDeploy, "force", "f", false, "Force deploy if uncommitted changes")
-	cmd.Flags().BoolVarP(&forcePrompt, "prompt", "p", false, "Force prompt to choose target deployment")
+	// --force answered 1.x's uncommitted-changes check, which v2's deploy
+	// does not make, and --prompt asked for the Deployment list with one
+	// named, which v2 offers whenever none is. Both stay, accepted, hidden
+	// and read by nothing on a project's deploy, because astronomer/deploy-
+	// action passes --force on every deploy. --prompt still forces the list
+	// on an --image-name deploy, as it always did.
+	cmd.Flags().BoolVarP(&deployForce, "force", "f", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
+	cmd.Flags().BoolVarP(&deployPrompt, "prompt", "p", false, "Has no effect on a project's deploy; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
+	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
+	cmd.Flags().StringVar(&workspaceFlag, "workspace", "", "Workspace for the deploy, overriding the context")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace assigned to the Deployment")
+	utils.MarkPreferredFlag(cmd.Flags(), "workspace", "workspace-id")
 	cmd.Flags().StringVar(&description, "description", "", "Description to attach to the deploy, for traceability (default: one based on the deploy type)")
 	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of the custom image (present locally unless --remote is specified) to deploy")
 	cmd.Flags().StringVar(&runtimeVersionForImageName, "runtime-version", "", "Runtime version of the image to deploy. Example - 12.1.1. Mandatory if --image-name --remote is provided")
 	cmd.Flags().BoolVarP(&imagePresentOnRemote, "remote", "", false, "Custom image which is present on the remote registry. Can only be used with --image-name flag")
-	cmd.Flags().BoolVarP(&deployYes, "yes", "y", false, "Answer the deploy's confirmations yes: an image tag that is not recommended, and a DAGs folder with no DAGs")
+	cmd.Flags().BoolVarP(&deployYes, "yes", "y", false, "Answer the confirmations of an --image-name deploy yes: an image tag that is not recommended, and a Dags folder with no Dags")
+	utils.AddBuildSecretFlag(cmd.Flags(), &deploySecrets)
 	cliout.AddOutputFlag(cmd, &deployOutput)
 
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
@@ -113,25 +113,22 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// refuseUndeployable stops a deploy v2 does not make on APC, before anything
-// is asked or sent:
+// refuseUndeployable stops a deploy that is not a pyproject.toml project's
+// build or --dags (deployManifest takes those) before anything is asked or
+// sent:
 //
 //   - any deploy in or below a project in the Astro CLI 1.x layout, which
 //     Astro CLI 1.x deploys, or below a pyproject.toml project's root
 //     (kind no_project), --image-name included (utils.Locate's walk);
 //   - --dags anywhere but in a pyproject.toml project: it uploads that
 //     project's dags directory (kind no_project);
-//   - a deploy with no --image-name, which would build the project: v2 builds
-//     none for APC yet. From a pyproject.toml project that is a mode v2 does
-//     not have, a usage error; anywhere else there is no project to build,
-//     kind no_project, as astro deploy on Astro says.
+//   - a deploy with no --image-name outside a project, which has nothing to
+//     build (kind no_project), as astro deploy on Astro says.
 //
 // --image-name (with or without --remote) runs at a pyproject.toml project's
 // root, where the project's DAGs are uploaded after it to a Deployment that
 // takes them, and outside any project, where the image ships alone.
-func refuseUndeployable() (inProject bool, err error) {
-	// One walk routes the deploy and words its refusal.
-	where := utils.Locate(config.WorkingPath)
+func refuseUndeployable(where utils.Where) (inProject bool, err error) {
 	inProject = where.AtRoot(config.WorkingPath)
 	if !inProject && !where.None() {
 		// In or below a 1.x project, or below a pyproject.toml project's
@@ -151,11 +148,9 @@ func refuseUndeployable() (inProject bool, err error) {
 		return inProject, ErrImageNameNotPassedForRemoteFlag
 	case imageName == "":
 		// The value, not whether the flag was given: an empty --image-name=
-		// names no image, so this would be a build.
-		if inProject {
-			return true, cliout.Usage(errors.New(errBuildDeployManifest))
-		}
-		return false, utils.NoProject(errBuildDeployNoProject)
+		// names no image, so this would be a build, and there is no project
+		// here to build.
+		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
 	}
 	return inProject, nil
 }
@@ -163,11 +158,12 @@ func refuseUndeployable() (inProject bool, err error) {
 // errDagsWithImageName is --dags with --image-name, in astro deploy's words.
 var errDagsWithImageName = errors.New("--dags deploys only your DAGs; drop --image-name")
 
-// The kinds of deploy deployJSON.Type names.
+// The kinds of deploy deployJSON.Type names, spelled as astro deploy on Astro
+// spells them.
 const (
-	deployTypeImageAndDags = "image_and_dags"
-	deployTypeImage        = "image"
-	deployTypeDags         = "dags"
+	deployTypeImageAndDags = "image-and-dag"
+	deployTypeImage        = "image-only"
+	deployTypeDags         = "dag-only"
 )
 
 // deployJSON is the one object `astro deploy --output json` publishes on APC,
@@ -175,33 +171,64 @@ const (
 // not apply to a deploy are omitted: a dags-only deploy pushes no image.
 type deployJSON struct {
 	Deployment string `json:"deployment"`
-	Workspace  string `json:"workspace"`
-	// Type is image_and_dags, image (--image, or a Deployment that takes no
-	// DAG-only deploy), or dags (--dags).
+	// Link is the manifest link the deploy resolved to, omitted when the
+	// target was named by id.
+	Link      string `json:"link,omitempty"`
+	Workspace string `json:"workspace"`
+	// Type is image-and-dag (the image, and the DAGs inside it or uploaded
+	// beside it), image-only (--image, or a deploy whose Deployment took no
+	// DAGs from it), or dag-only (--dags).
 	Type string `json:"type"`
 	// Image is the image the Deployment now runs: the one pushed, or the one
 	// --image-name --remote named.
 	Image string `json:"image,omitempty"`
-	// RuntimeVersion is --runtime-version, given with --image-name --remote.
+	// DagsInImage is set on an image-and-dag deploy to an image Deployment,
+	// which runs the DAGs inside the image: none were uploaded.
+	DagsInImage bool `json:"dags_in_image,omitempty"`
+	// RuntimeVersion is the runtime the pushed image carries, or
+	// --runtime-version, given with --image-name --remote.
 	RuntimeVersion string `json:"runtime_version,omitempty"`
 	// URL is the Deployment's Airflow UI, when Houston gives it.
 	URL string `json:"url,omitempty"`
 	// Warnings are what the deploy warned about without failing, as text
 	// prints them (less the "Warning: " prefix): an --image-name image that
-	// is all an image Deployment's DAGs (not when show_warnings is off), or
-	// a DAG upload that did not happen (always): skipped for want of a dags
+	// is all an image Deployment's DAGs (not when show_warnings is off), a
+	// DAG upload that did not happen (always): skipped for want of a dags
 	// directory, to a Deployment that takes DAG uploads, or because whether
-	// the Deployment takes them could not be read.
+	// the Deployment takes them could not be read; and a project's deploy's
+	// own: an Airflow 2 to 3 upgrade, a Deployment that takes its DAGs from
+	// elsewhere, and the checks before the build.
 	Warnings []string `json:"warnings,omitempty"`
 }
 
 func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
-	inProject, err := refuseUndeployable()
+	// --workspace and its older spelling --workspace-id must agree.
+	if err := utils.ApplyPreferredFlags(cmd.Flags(), nil); err != nil {
+		return err
+	}
+	if len(args) > 0 && deployDeployment != "" && args[0] != deployDeployment {
+		return cliout.Usage(fmt.Errorf("the Deployment argument %q and --deployment %q disagree: pass only one", args[0], deployDeployment))
+	}
+	// One walk routes the deploy and words its refusal. A pyproject.toml
+	// project's deploy from its root, a build or --dags, is the manifest
+	// deploy. An image named on the command line (--image-name, local or
+	// --remote) keeps APC's own route, from anywhere, as it was.
+	where := utils.Locate(config.WorkingPath)
+	if where.AtRoot(config.WorkingPath) && imageName == "" && !imagePresentOnRemote {
+		cmd.SilenceUsage = true
+		return deployManifest(cmd, args, &where, out)
+	}
+
+	inProject, err := refuseUndeployable(where)
 	if err != nil {
 		// Not a usage mistake to print the usage block under: what is in
 		// the directory decided it.
 		cmd.SilenceUsage = true
 		return err
+	}
+	if cmd.Flags().Changed("build-secret") {
+		cmd.SilenceUsage = true
+		return errors.New("--build-secret has no effect with --image-name: the image is already built")
 	}
 
 	ws, err := coalesceWorkspace()
@@ -209,36 +236,14 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		return fmt.Errorf("failed to find a valid workspace: %w", err)
 	}
 
-	deploymentID := ""
-
-	// Get release name from args, if passed
-	//
-	// TODO(apc-manifest-deploy): the argument is a Houston Deployment id only.
-	// The project's apc links ([tool.astro.deployments.*] with target = "apc",
-	// written by astro link add under this context) are not read here yet:
-	// resolving a link name, --deployment and the default link through
-	// internal/deploy's target resolution is the APC manifest deploy's change
-	// (docs/deploy.md, Astro Private Cloud), not this one's.
+	deploymentID := deployDeployment
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}
 
-	// Flags that cannot go together are reported before the git state, so
-	// --force is never the first fix asked for a command that will not run
-	// either way.
 	if isImageOnlyDeploy && isDagOnlyDeploy {
 		cmd.SilenceUsage = true
 		return ErrBothDagsOnlyAndImageOnlySet
-	}
-
-	// An error, not a printed note: returning nil here made a deploy that never
-	// happened exit 0, so CI reported it as a success. Only a deploy that
-	// reads the project is held to it: an image deployed alone from outside
-	// one reads nothing from the directory.
-	if inProject && hasUncommittedChanges("") && !forceDeploy {
-		// Not a usage mistake, so no usage block under the error.
-		cmd.SilenceUsage = true
-		return errUncommittedChanges
 	}
 
 	// Silence Usage as we have now validated command input
@@ -276,7 +281,7 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		result.Image, result.RuntimeVersion = imageName, runtimeVersionForImageName
 	} else {
 		// Since we prompt the user to enter the deploymentID in come cases for DeployAirflowImage, reusing the same  deploymentID for DagsOnlyDeploy
-		deployed, err := DeployAirflowImage(houstonClient, deploymentID, ws, forcePrompt, isImageOnlyDeploy, imageName, opts)
+		deployed, err := DeployAirflowImage(houstonClient, deploymentID, ws, deployPrompt, isImageOnlyDeploy, imageName, opts)
 		if err != nil {
 			return err
 		}

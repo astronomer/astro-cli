@@ -1,8 +1,10 @@
 {
   "deployment": "x",
+  "link": "x",
   "workspace": "x",
   "type": "x",
   "image": "x",
+  "dags_in_image": true,
   "runtime_version": "x",
   "url": "x",
   "warnings": [

@@ -36,7 +36,7 @@ func TestDeployImageNameOutsideAProjectShipsTheImageAlone(t *testing.T) {
 			assert.Zero(t, seen.dagUploads, "no dags/ is uploaded from outside a project")
 			var got deployJSON
 			decodeOne(t, run.stdout, &got)
-			assert.Equal(t, "image", got.Type)
+			assert.Equal(t, "image-only", got.Type)
 			assert.Equal(t, []string{tc.want}, got.Warnings)
 		})
 	}
@@ -53,26 +53,6 @@ func TestDeployBelowAProjectRoot(t *testing.T) {
 	run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
 	require.Error(t, run.err)
 	assert.Contains(t, run.err.Error(), "Run the deploy from the project directory, "+dir)
-}
-
-// The uncommitted-changes gate is for a deploy that reads the checkout. An
-// image deployed alone from outside any project reads nothing from the
-// directory, so a dirty one does not stop it; a project's deploy is held to
-// it as before.
-func TestDeployUncommittedChangesGateOnlyForAProject(t *testing.T) {
-	prev := hasUncommittedChanges
-	hasUncommittedChanges = func(string) bool { return true }
-	t.Cleanup(func() { hasUncommittedChanges = prev })
-
-	inWorkingDir(t, false)
-	deployMocks(t, deployPushed, nil)
-	run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-
-	inProject(t, true)
-	deployMocks(t, deployPushed, nil)
-	run = runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
-	require.ErrorIs(t, run.err, errUncommittedChanges)
 }
 
 // --dags with --image-name is refused in astro deploy's words, before
