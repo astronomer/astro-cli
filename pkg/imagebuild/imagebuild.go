@@ -21,14 +21,16 @@
 // engine and deploy resolve it the same way.
 //
 // Per the layer rules (docs/architecture.md) it prints nothing and never
-// exits: build output flows through rt.Callbacks and a failed install
-// returns a named error.
+// exits: build output flows through rt.Callbacks, or raw to Request.Stdout
+// and Request.Stderr when a caller sets them, and a failed install returns a
+// named error.
 package imagebuild
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,6 +117,13 @@ func AirflowSeries(pin string) (series string, ok bool) {
 	return parts[0] + "." + parts[1], true
 }
 
+// ErrDockerfileNotAFile reports that a declared Dockerfile names something
+// other than a regular file, a directory most often. A caller that knows the
+// file by another name can tell it apart with errors.Is and say so in its own
+// words; a Dockerfile that is missing or unreadable wraps the *fs.PathError
+// of its stat instead.
+var ErrDockerfileNotAFile = errors.New("not a file")
+
 // ErrDockerfileBuild reports that the build of the project's own Dockerfile
 // failed, rather than the install of a generated build.
 var ErrDockerfileBuild = errors.New("building the project's Dockerfile failed; see the build output above")
@@ -143,6 +152,15 @@ type Commander interface {
 	// Run runs the command wired to the given stdio. Nil readers/writers are
 	// allowed and mean "none"/discard.
 	Run(ctx context.Context, env []string, s rt.Stdio, name string, args ...string) error
+}
+
+// DirCommander is a Commander that can also run a command in a given working
+// directory, which a Request with Dir set needs. It is a separate interface so
+// every existing Commander stays one.
+type DirCommander interface {
+	Commander
+	// RunIn is Run with the command's working directory set to dir.
+	RunIn(ctx context.Context, dir string, env []string, s rt.Stdio, name string, args ...string) error
 }
 
 // filePermRW is the mode for the files written into the build context:
@@ -212,12 +230,36 @@ type Request struct {
 	// --label, in the order given, in either mode. A deploy marks its image
 	// with them for the control plane that reads them; nil adds none.
 	Labels []string
-	// Platform is the build platform (e.g. "linux/amd64"). Empty builds for the
-	// host — what local Docker mode wants; the deploy path pins linux/amd64.
+	// Platform is the build platform (e.g. "linux/amd64"), or several joined
+	// with commas ("linux/amd64,linux/arm64"), passed to --platform as given.
+	// Empty builds for the host — what local Docker mode wants; the deploy
+	// path pins linux/amd64.
 	Platform string
+	// Format is the image format podman builds (its --format: "docker" or
+	// "oci"). Empty passes no --format, which is the only thing to pass to
+	// docker, whose build has no such flag. The remote-execution client image
+	// is built in docker format under podman, as the Astro CLI 1.x built it.
+	Format string
 	// Bin is the container CLI to shell out to; Env reaches its daemon.
 	Bin string
 	Env []string
+	// Dir is the build command's working directory; empty is the process's.
+	// A relative Dir, and the relative WorkDir, Dockerfile and Context of a
+	// request that sets it, are resolved against the process's working
+	// directory, not against Dir; the command line carries them absolute.
+	// Docker resolves what the command line leaves relative against it — a
+	// build secret's src above all — so a caller whose secrets are written
+	// relative to the build context sets it there. It is not WorkDir, which
+	// is where a generated build's files are written and says nothing about
+	// where docker runs. Setting it needs a Commander that is a DirCommander,
+	// as NewExecCommander's is.
+	Dir string
+	// Stdout and Stderr, when set, take the build's own stdout and stderr
+	// raw, as the container CLI writes them, in place of the lines Build
+	// otherwise hands to its callbacks. Either may be set alone; a stream
+	// left nil reaches the callbacks as before.
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 // Builder builds images. cmd and now are seams: production values come from
@@ -239,8 +281,13 @@ func NewExecCommander() Commander { return execCommander{} }
 
 type execCommander struct{}
 
-func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, name string, args ...string) error {
+func (c execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, name string, args ...string) error {
+	return c.RunIn(ctx, "", extraEnv, s, name, args...)
+}
+
+func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s rt.Stdio, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), extraEnv...)
 	// A nil reader/writer means "none": os/exec routes a nil Stdout/Stderr to the
 	// null device, so a silent probe needs no extra plumbing.
@@ -258,8 +305,9 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 // ProjectFiles. With nothing to install, no project files and no labels it
 // builds nothing and returns the base image unchanged (the fast path).
 //
-// Build output streams to cb.OnLine (component "build"); a failed build returns
-// a named error, never a hang.
+// Build output streams to cb.OnLine (component "build") as lines, unless
+// req.Stdout or req.Stderr is set, in which case that stream goes to it raw;
+// a failed build returns a named error, never a hang.
 func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (string, error) {
 	return b.buildImage(ctx, req, cb, true)
 }
@@ -268,6 +316,12 @@ func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (stri
 // fastPath false a request with nothing to install still builds, producing
 // req.Tag over the base rather than returning the base itself.
 func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, fastPath bool) (string, error) {
+	if req.Dir != "" {
+		var err error
+		if req, err = absPaths(req); err != nil {
+			return "", err
+		}
+	}
 	if req.Dockerfile != "" {
 		// Checked here rather than in each caller, because this is where they
 		// meet: localdocker reaches it through the rt.ImageBuilder seam, and
@@ -284,7 +338,7 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 		case err != nil:
 			return "", fmt.Errorf("the Dockerfile this project declares (%s) could not be read: %w", req.Dockerfile, err)
 		case !info.Mode().IsRegular():
-			return "", fmt.Errorf("the Dockerfile this project declares (%s) is not a file", req.Dockerfile)
+			return "", fmt.Errorf("the Dockerfile this project declares (%s) is %w", req.Dockerfile, ErrDockerfileNotAFile)
 		}
 		// No fast path here. An unchanged Dockerfile is the daemon's layer cache
 		// to short-circuit, not ours to skip: we cannot tell from the outside
@@ -362,6 +416,9 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	// linux/amd64) is added only when set, so the host-platform local build
 	// keeps its exact command.
 	args := []string{"build", "--tag", req.Tag, "--file", dockerfile}
+	if req.Format != "" {
+		args = append(args, "--format", req.Format)
+	}
 	if shouldPull(req.Dockerfile, dockerfile) {
 		args = append(args, "--pull")
 	}
@@ -375,7 +432,21 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		args = append(args, "--platform", req.Platform)
 	}
 	args = append(args, contextDir)
-	err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: w, Err: w}, req.Bin, args...)
+	stdio := rt.Stdio{Out: w, Err: w}
+	if req.Stdout != nil {
+		stdio.Out = req.Stdout
+	}
+	if req.Stderr != nil {
+		stdio.Err = req.Stderr
+	}
+	var err error
+	if req.Dir == "" {
+		err = b.cmd.Run(ctx, req.Env, stdio, req.Bin, args...)
+	} else if dc, ok := b.cmd.(DirCommander); ok {
+		err = dc.RunIn(ctx, req.Dir, req.Env, stdio, req.Bin, args...)
+	} else {
+		return "", fmt.Errorf("the build has to run in %s, and its runner cannot set a working directory", req.Dir)
+	}
 	w.Flush()
 	if err != nil {
 		// The two modes fail for different reasons and a user reading this has
@@ -390,6 +461,25 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		return "", err
 	}
 	return req.Tag, nil
+}
+
+// absPaths makes a request that runs in Dir carry absolute paths: Dir itself,
+// WorkDir, Dockerfile and Context, each resolved against the process's
+// working directory as the caller wrote them. Left relative, the file checks
+// here would read them against the process's directory while docker, running
+// in Dir, read the same strings against Dir.
+func absPaths(req Request) (Request, error) {
+	for _, p := range []*string{&req.Dir, &req.WorkDir, &req.Dockerfile, &req.Context} {
+		if *p == "" {
+			continue
+		}
+		abs, err := filepath.Abs(*p)
+		if err != nil {
+			return req, fmt.Errorf("resolving %s: %w", *p, err)
+		}
+		*p = abs
+	}
+	return req, nil
 }
 
 // buildSecrets are the Secrets the build can read. A declared Dockerfile
@@ -433,11 +523,14 @@ func (b *Builder) mountsRuntimeSecret(ctx context.Context, req Request) bool {
 // `docker build` succeeds there and this failed, which is not a tradeoff a
 // tier-3 escape hatch gets to make.
 //
-// The rule is v1's, deliberately: internal/imagepush/image.go's shouldAddPullFlag
-// skips --pull as soon as ANY FROM names something other than an Astro base, so
-// a project moving to v2 keeps the behavior it had. Any is the right quantifier
-// rather than the final stage — a builder stage on an unreachable image fails
-// the build just as hard.
+// The rule follows v1's image handler, which skipped --pull as soon as ANY FROM
+// named something other than an Astro base. Any is the right quantifier rather
+// than the final stage — a builder stage on an unreachable image fails the
+// build just as hard. It does not read every Dockerfile as v1 did: v1 matched
+// a case-sensitive "FROM " prefix at the start of the line against bare
+// registry prefixes, so a lowercase or indented from, a FROM followed by a tab,
+// a `FROM --platform=…` stage and a lookalike repository
+// (quay.io/astronomerfoo/…) are each read differently here.
 func shouldPull(declared, dockerfile string) bool {
 	if declared == "" {
 		return true

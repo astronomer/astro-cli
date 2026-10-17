@@ -204,7 +204,8 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Mock image handler
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("imagepush.ImageBuildConfig")).Return(nil).Once()
+		buildCmd := withClientBuild(t, "docker")
+		defer func() { assert.Len(t, buildCmd.calls, 1, "one build: %v", buildCmd.calls) }()
 		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", nil).Once()
 
 		// Override airflowImageHandler
@@ -320,7 +321,8 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Mock image handler with build failure
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("imagepush.ImageBuildConfig")).Return(errors.New("build failed")).Once()
+		buildCmd := withClientBuild(t, "docker")
+		buildCmd.buildErr = errors.New("build failed")
 
 		// Override airflowImageHandler
 		originalAirflowImageHandler := airflowImageHandler
@@ -376,7 +378,8 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Mock image handler with push failure
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("imagepush.ImageBuildConfig")).Return(nil).Once()
+		buildCmd := withClientBuild(t, "docker")
+		defer func() { assert.Len(t, buildCmd.calls, 1, "one build: %v", buildCmd.calls) }()
 		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", errors.New("push failed")).Once()
 
 		// Override airflowImageHandler
