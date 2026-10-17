@@ -91,10 +91,11 @@ func TestDeployImage(t *testing.T) {
 // reporting a deploy that never ran (#1721).
 func TestDeployRefusesUncommittedChanges(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	previous := hasUncommittedChanges
+	prevUncommitted, prevEnsure, prevDeploy := hasUncommittedChanges, EnsureProjectDir, DeployImage
+	t.Cleanup(func() {
+		hasUncommittedChanges, EnsureProjectDir, DeployImage = prevUncommitted, prevEnsure, prevDeploy
+	})
 	hasUncommittedChanges = func(string) bool { return true }
-	t.Cleanup(func() { hasUncommittedChanges = previous })
-
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
 	}
@@ -103,17 +104,20 @@ func TestDeployRefusesUncommittedChanges(t *testing.T) {
 		deployed = true
 		return nil
 	}
+	saved := config.CFG.ProjectDeployment.GetProjectString()
 
 	cmd := NewDeployCmd()
-	cmd.SetArgs([]string{"test-deployment-id"})
+	cmd.SetArgs([]string{"refused-deployment-id", "--save"})
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
-	testUtil.SetupOSArgsForGinkgo()
+	restore := testUtil.SetupOSArgsForGinkgo()
 	_, err := cmd.ExecuteC()
+	restore()
 	assert.EqualError(t, err, registryUncommitedChangesMsg)
 	assert.False(t, deployed, "deployed a project with uncommitted changes")
 	assert.NotContains(t, out.String(), "Usage:", "a refusal is not a usage mistake")
+	assert.Equal(t, saved, config.CFG.ProjectDeployment.GetProjectString(), "a refused deploy saved its deployment id")
 
 	assert.NoError(t, execDeployCmd("test-deployment-id", "-f"))
 	assert.True(t, deployed, "--force did not deploy")
@@ -121,6 +125,8 @@ func TestDeployRefusesUncommittedChanges(t *testing.T) {
 
 func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// The refusal of uncommitted changes comes before the save this tests.
+	cleanCheckout(t)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil

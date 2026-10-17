@@ -98,6 +98,23 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		deploymentID = args[0]
 	}
 
+	// Flags that cannot go together are reported before the git state, so
+	// adding --force is never the first fix asked for a command that will
+	// not run either way.
+	if isImageOnlyDeploy && isDagOnlyDeploy {
+		cmd.SilenceUsage = true
+		return ErrBothDagsOnlyAndImageOnlySet
+	}
+
+	// Refusing is a failure, so CI sees a non-zero exit rather than a deploy
+	// that reported success without running. It comes before --save, so a
+	// refused deploy changes nothing.
+	if hasUncommittedChanges("") && !forceDeploy {
+		// Not a usage mistake, so no usage block under the error.
+		cmd.SilenceUsage = true
+		return errors.New(registryUncommittedChanges)
+	}
+
 	// Save release name in config if specified
 	if deploymentID != "" && saveDeployConfig {
 		err = config.CFG.ProjectDeployment.SetProjectString(deploymentID)
@@ -106,23 +123,11 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Refusing is a failure, so CI sees a non-zero exit rather than a deploy
-	// that reported success without running.
-	if hasUncommittedChanges("") && !forceDeploy {
-		// Not a usage mistake, so no usage block under the error.
-		cmd.SilenceUsage = true
-		return errors.New(registryUncommittedChanges)
-	}
-
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
 	if description == "" {
 		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
-	}
-
-	if isImageOnlyDeploy && isDagOnlyDeploy {
-		return ErrBothDagsOnlyAndImageOnlySet
 	}
 
 	if isDagOnlyDeploy {

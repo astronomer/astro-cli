@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/apc/deploy"
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/houston"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -42,8 +43,10 @@ func (s *Suite) TestDeployRefusesUncommittedChanges() {
 		return nil
 	}
 
+	saved := config.CFG.ProjectDeployment.GetProjectString()
+
 	cmd := NewDeployCmd()
-	cmd.SetArgs([]string{"test-deployment-id"})
+	cmd.SetArgs([]string{"refused-deployment-id", "--save"})
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
@@ -53,6 +56,10 @@ func (s *Suite) TestDeployRefusesUncommittedChanges() {
 	s.EqualError(err, registryUncommittedChanges)
 	s.False(deployed, "deployed a project with uncommitted changes")
 	s.NotContains(out.String(), "Usage:", "a refusal is not a usage mistake")
+	s.Equal(saved, config.CFG.ProjectDeployment.GetProjectString(), "a refused deploy saved its deployment id")
+
+	// Flags that conflict are reported first, not hidden behind the refusal.
+	s.ErrorIs(execDeployCmd("test-deployment-id", "--dags", "--image"), ErrBothDagsOnlyAndImageOnlySet)
 
 	s.NoError(execDeployCmd("test-deployment-id", "-f"))
 	s.True(deployed, "--force did not deploy")

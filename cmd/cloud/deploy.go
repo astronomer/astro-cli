@@ -190,20 +190,21 @@ func deploy(cmd *cobra.Command, args []string) error {
 		return deployNonDagsBundle(cmd, args)
 	}
 
+	// Refusing is a failure, so CI sees a non-zero exit rather than a deploy
+	// that reported success without running. It comes before --save, so a
+	// refused deploy changes nothing.
+	if hasUncommittedChanges("") && !forceDeploy {
+		// Not a usage mistake, so no usage block under the error.
+		cmd.SilenceUsage = true
+		return errors.New(registryUncommitedChangesMsg)
+	}
+
 	// Save deploymentId in config if specified
 	if deploymentID != "" && saveDeployConfig {
 		err := config.CFG.ProjectDeployment.SetProjectString(deploymentID)
 		if err != nil {
 			return errors.Wrap(err, "failed to save deployment id in config")
 		}
-	}
-
-	// Refusing is a failure, so CI sees a non-zero exit rather than a deploy
-	// that reported success without running.
-	if hasUncommittedChanges("") && !forceDeploy {
-		// Not a usage mistake, so no usage block under the error.
-		cmd.SilenceUsage = true
-		return errors.New(registryUncommitedChangesMsg)
 	}
 
 	// case for astro deploy --dags whose default operation should be not running any tests
