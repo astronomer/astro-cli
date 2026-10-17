@@ -421,6 +421,9 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 
 	// 7. Build environment
 	env := s.buildEnv()
+	if warning := networkExposureWarning(env, s.airflowMajorVersion); warning != "" {
+		fmt.Print(warning)
+	}
 
 	// 9. Start airflow standalone
 	fmt.Println("\nStarting Airflow in standalone mode…")
@@ -773,11 +776,6 @@ func (s *Standalone) buildEnv() []string {
 		overrides["AIRFLOW__WEBSERVER__EXPOSE_CONFIG"] = "True"
 	}
 
-	// Bind the api-server (AF3) / webserver (AF2) to loopback so the
-	// all-admins instance isn't reachable from the LAN. Unlike the settings
-	// above these are defaults: a user's .env or inherited env wins.
-	airflowrt.ApplyLoopbackDefaults(overrides)
-
 	// Layer 3: macOS fork-safety workarounds.
 	// a) Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
 	//    When Airflow forks, this can spin at 100% CPU indefinitely.
@@ -870,6 +868,32 @@ func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, er
 // standaloneSecretFile holds a project's standalone signing secret, in the
 // standalone Airflow home (.astro/standalone), owner-only.
 const standaloneSecretFile = ".signing-secret"
+
+// networkExposureWarning is a warning for a standalone Airflow that will
+// listen on every network interface, or "" for one bound to this machine.
+// Standalone runs with every user as admin, and the api-server (Airflow 3)
+// and webserver (Airflow 2) bind 0.0.0.0 unless told otherwise, so anyone on
+// the same network can use it as admin. 1.x keeps that default, which some
+// rely on (another machine, a VM, a container's published port), and says
+// how to restrict it; Astro CLI v2 binds to this machine by default.
+func networkExposureWarning(env []string, airflowMajor string) string {
+	key := "AIRFLOW__API__HOST"
+	if airflowMajor == "2" {
+		key = "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"
+	}
+	host := ""
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok && k == key {
+			host = strings.TrimSpace(v)
+		}
+	}
+	if host == "localhost" || host == "::1" || strings.HasPrefix(host, "127.") {
+		return ""
+	}
+	return fmt.Sprintf("Warning: standalone Airflow will be reachable from other machines on your network, with admin access.\n"+
+		"  To keep it to this machine, set %s=127.0.0.1 in your project's .env file.\n"+
+		"  Astro CLI v2 does this by default.\n", key)
+}
 
 // signingSecretPath is where a project keeps its standalone signing secret.
 func (s *Standalone) signingSecretPath() string {

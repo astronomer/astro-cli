@@ -631,79 +631,49 @@ func (s *Suite) TestStandaloneBuildEnv_WithEnvFile() {
 	s.Equal("hello", envMap["MY_CUSTOM_VAR"])
 }
 
-// clearBindEnv unsets the bind settings for the rest of the test, so a
-// developer's own does not decide what the loopback tests see.
-func (s *Suite) clearBindEnv() {
-	for _, k := range []string{"AIRFLOW__API__HOST", "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"} {
-		s.T().Setenv(k, "") // restores the developer's value afterwards
-		s.Require().NoError(os.Unsetenv(k))
+// Standalone keeps Airflow's own bind (every interface) and warns about it,
+// naming the setting that restricts it, unless that setting already binds to
+// this machine.
+func (s *Suite) TestNetworkExposureWarning() {
+	for _, tc := range []struct {
+		name, major string
+		env         []string
+		warns       bool
+		key         string
+	}{
+		{"AF3, unset", "3", nil, true, "AIRFLOW__API__HOST"},
+		{"AF3, every interface", "3", []string{"AIRFLOW__API__HOST=0.0.0.0"}, true, "AIRFLOW__API__HOST"},
+		{"AF3, empty", "3", []string{"AIRFLOW__API__HOST="}, true, "AIRFLOW__API__HOST"},
+		{"AF3, loopback", "3", []string{"AIRFLOW__API__HOST=127.0.0.1"}, false, ""},
+		{"AF3, localhost", "3", []string{"AIRFLOW__API__HOST=localhost"}, false, ""},
+		{"AF3, IPv6 loopback", "3", []string{"AIRFLOW__API__HOST=::1"}, false, ""},
+		{"AF3 ignores the AF2 key", "3", []string{"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1"}, true, "AIRFLOW__API__HOST"},
+		{"AF2, unset", "2", nil, true, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"},
+		{"AF2, loopback", "2", []string{"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1"}, false, ""},
+	} {
+		s.Run(tc.name, func() {
+			got := networkExposureWarning(tc.env, tc.major)
+			if !tc.warns {
+				s.Empty(got)
+				return
+			}
+			s.Contains(got, "reachable from other machines")
+			s.Contains(got, tc.key+"=127.0.0.1")
+		})
 	}
 }
 
-func (s *Suite) TestStandaloneBuildEnv_LoopbackDefaults() {
-	s.clearBindEnv()
+// Standalone no longer changes Airflow's bind: some rely on reaching it
+// from another machine, so 1.x warns instead (TestNetworkExposureWarning).
+func (s *Suite) TestStandaloneBuildEnvKeepsAirflowsBind() {
+	s.T().Setenv("AIRFLOW__API__HOST", "")
+	s.Require().NoError(os.Unsetenv("AIRFLOW__API__HOST"))
 	handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
-	s.NoError(err)
-
-	env := handler.buildEnv()
-
-	envMap := make(map[string]string)
-	for _, e := range env {
-		if parts := splitEnvVar(e); parts != nil {
-			envMap[parts[0]] = parts[1]
-		}
+	s.Require().NoError(err)
+	for _, kv := range handler.buildEnv() {
+		s.False(strings.HasPrefix(kv, "AIRFLOW__API__HOST="), "buildEnv set %s", kv)
+		s.False(strings.HasPrefix(kv, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST="), "buildEnv set %s", kv)
 	}
-
-	// The api-server (AF3) and webserver (AF2) must default to loopback so a
-	// standalone instance with all-admins auth is not reachable from the LAN.
-	s.Equal("127.0.0.1", envMap["AIRFLOW__API__HOST"])
-	s.Equal("127.0.0.1", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
-}
-
-func (s *Suite) TestStandaloneBuildEnv_LoopbackOverriddenByEnvFile() {
-	s.clearBindEnv()
-	tmpDir := s.T().TempDir()
-
-	envContent := "AIRFLOW__API__HOST=0.0.0.0\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST=0.0.0.0\n"
-	err := os.WriteFile(filepath.Join(tmpDir, ".env"), []byte(envContent), 0o644)
-	s.NoError(err)
-
-	handler, err := StandaloneInit(tmpDir, "", "Dockerfile")
-	s.NoError(err)
-
-	env := handler.buildEnv()
-
-	envMap := make(map[string]string)
-	for _, e := range env {
-		if parts := splitEnvVar(e); parts != nil {
-			envMap[parts[0]] = parts[1]
-		}
-	}
-
-	// A user's explicit .env setting wins over the loopback default.
-	s.Equal("0.0.0.0", envMap["AIRFLOW__API__HOST"])
-	s.Equal("0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
-}
-
-func (s *Suite) TestStandaloneBuildEnv_LoopbackOverriddenByInheritedEnv() {
-	s.T().Setenv("AIRFLOW__API__HOST", "0.0.0.0")
-	s.T().Setenv("AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "0.0.0.0")
-
-	handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
-	s.NoError(err)
-
-	env := handler.buildEnv()
-
-	envMap := make(map[string]string)
-	for _, e := range env {
-		if parts := splitEnvVar(e); parts != nil {
-			envMap[parts[0]] = parts[1]
-		}
-	}
-
-	// A user's setting in the inherited environment wins over the loopback default.
-	s.Equal("0.0.0.0", envMap["AIRFLOW__API__HOST"])
-	s.Equal("0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
 }
 
 // The secret standalone Airflow signs sessions and tokens with is random,
