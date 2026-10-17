@@ -52,6 +52,7 @@ For detailed troubleshooting steps, visit:
 https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`)
 
 	errGetImageLabel = errors.New("error getting image label")
+	errGetImageEnv   = errors.New("error getting image environment")
 )
 
 var getDockerClient = func() (client.APIClient, error) {
@@ -534,7 +535,7 @@ func (d *DockerImage) HasEnvVarWithPrefix(altImageName, prefix string) (bool, er
 		return false, err
 	}
 	if execErr := stderr.String(); execErr != "" {
-		return false, fmt.Errorf("%s: %w", execErr, errGetImageLabel)
+		return false, fmt.Errorf("%s: %w", execErr, errGetImageEnv)
 	}
 
 	// envVars ("KEY=VALUE" pairs, potentially including secret values) is intentionally

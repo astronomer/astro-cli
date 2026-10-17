@@ -706,7 +706,7 @@ func (s *Suite) TestDockerImageHasEnvVarWithPrefix() {
 		}
 
 		_, err := handler.HasEnvVarWithPrefix("", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
-		s.ErrorIs(err, errGetImageLabel)
+		s.ErrorIs(err, errGetImageEnv)
 	})
 }
 
