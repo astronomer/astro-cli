@@ -51,12 +51,7 @@ func (s *Suite) TestRegistryLogin() {
 }
 
 func (s *Suite) TestDockerLogin() {
-	// Store original cmdExecWithStdin to restore after tests
-	originalCmdExecWithStdin := cmdExecWithStdin
-	defer func() {
-		cmdExecWithStdin = originalCmdExecWithStdin
-	}()
-
+	// Suite.TearDownTest restores cmdExecWithStdin.
 	s.Run("success with credentials", func() {
 		var capturedCmd string
 		var capturedStdin string

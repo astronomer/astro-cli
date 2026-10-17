@@ -24,8 +24,11 @@ func (s *Suite) assertStdinLogin(cmd string, args []string, user string, registr
 	default:
 		s.Equal([]string{"--", *registry}, args[3:])
 	}
-	for _, a := range args {
-		s.NotContains(a, strings.TrimPrefix(password, prefix), "the password is in the login's arguments")
+	// An empty password is in every string, and in none to leak.
+	if secret := strings.TrimPrefix(password, prefix); secret != "" {
+		for _, a := range args {
+			s.NotContains(a, secret, "the password is in the login's arguments")
+		}
 	}
 }
 
@@ -35,8 +38,7 @@ func (s *Suite) assertStdinLogin(cmd string, args []string, user string, registr
 func (s *Suite) TestCLIRegistryLogin() {
 	var gotCmd, gotStdin string
 	var gotArgs []string
-	prev := cmdExecWithStdin
-	s.T().Cleanup(func() { cmdExecWithStdin = prev })
+	// Suite.TearDownTest restores cmdExecWithStdin.
 	cmdExecWithStdin = func(cmd, stdin string, _, _ io.Writer, args ...string) error {
 		gotCmd, gotStdin, gotArgs = cmd, stdin, args
 		return nil

@@ -329,11 +329,12 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		authConfig.ServerAddress = registry
 	}
 
-	logger.Debugf("Exec Push %s creds %v \n", containerRuntime, authConfig)
+	// Never the password: debug output ends up in tickets and CI logs.
+	logger.Debugf("Exec Push %s to %s as %s\n", containerRuntime, authConfig.ServerAddress, authConfig.Username)
 
 	err = d.pushWithClient(&authConfig, remoteImage)
 	if err != nil {
-		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
+		// if it does not work with the go library, run the container runtime's CLI. Support for (old?) versions of Colima
 		err = pushWithCLI(&authConfig, remoteImage)
 		if err != nil {
 			// Check for 403 errors only after both methods fail
@@ -408,7 +409,7 @@ func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImag
 	responseBody, err := cli.ImagePush(ctx, remoteImage, image.PushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
 		logger.Debugf("Error pushing image to docker: %v", err)
-		// if NewClientWithOpt does not work use bash to run docker commands
+		// if NewClientWithOpt does not work, Push falls back to the container runtime's CLI
 		return err
 	}
 	defer responseBody.Close()
