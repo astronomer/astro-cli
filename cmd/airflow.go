@@ -1262,6 +1262,14 @@ func getRegistryEndpoint() (string, error) {
 		}
 	} else {
 		registryEndpoint = config.CFG.RemoteClientRegistry.GetString()
+		// A value already saved is checked as a new one is: it may predate the
+		// check, or have been written into config.yaml by hand, and init saves
+		// it into the project.
+		if registryEndpoint != "" {
+			if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
+				return "", fmt.Errorf("the saved remote.client_registry is not a valid registry endpoint: %w. Pass --remote-image-repository, or fix it with 'astro config set remote.client_registry <registry>/<repository>'", err)
+			}
+		}
 		if registryEndpoint == "" {
 			fmt.Println("Enter the remote Docker repository for the client image (leave blank if not known but you will not be able to use the Astro CLI to deploy the client image until configured)")
 			registryEndpoint = input.Text("Remote client image repository endpoint (e.g. quay.io/acme/my-deployment-image): ")

@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"github.com/distribution/reference"
 )
 
 // registerValidator is a helper to register a validator for a config option
@@ -47,13 +49,19 @@ func ValidateRegistryEndpoint(endpoint string) error {
 		return fmt.Errorf("registry endpoint cannot start or end with slashes")
 	}
 
-	// The repository path (everything after the first slash) must not contain
-	// an embedded image tag. A colon before the first slash is a valid registry
-	// port (e.g. "localhost:5000/repo"), but a colon after it means the user
-	// included a ":tag" on the repository path, which the CLI will double up
-	// with its own "deploy-<timestamp>" tag and produce an invalid reference.
-	repoPath := endpoint[strings.Index(endpoint, "/")+1:]
-	if strings.Contains(repoPath, ":") {
+	// The rest is Docker's own grammar for an image name, so what passes here
+	// is what a deploy can push: lowercase, legal characters, a numeric port on
+	// the registry host if any, and no tag or digest. The CLI appends its own
+	// "deploy-<timestamp>" tag, so a tag or digest here would make an invalid
+	// reference that Docker reports only as "invalid reference format".
+	ref, err := reference.ParseNormalizedNamed(endpoint)
+	if err != nil {
+		return fmt.Errorf("registry endpoint %q is not a valid image repository: %w", endpoint, err)
+	}
+	if _, ok := ref.(reference.Digested); ok {
+		return fmt.Errorf("registry endpoint must not include an image digest -- got %q, use 'registry[:port]/repository/path' without '@sha256:...' (the CLI appends its own deploy tag automatically)", endpoint)
+	}
+	if _, ok := ref.(reference.Tagged); ok {
 		return fmt.Errorf("registry endpoint must not include an image tag -- got %q, use 'registry[:port]/repository/path' without a trailing ':tag' (the CLI appends its own deploy tag automatically)", endpoint)
 	}
 

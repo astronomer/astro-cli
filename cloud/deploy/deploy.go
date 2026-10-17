@@ -1081,6 +1081,13 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		fmt.Println("Please provide your private registry information so the Astro CLI can push client images.")
 		return errors.New("remote client registry is not configured. To configure it, run: 'astro config set remote.client_registry <endpoint>' and try again.")
 	}
+	// Checked here too, not only when it is set: a value saved before the
+	// check existed, or written into config.yaml by hand, would otherwise reach
+	// Docker as an invalid reference it reports only as "invalid reference
+	// format".
+	if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
+		return fmt.Errorf("remote.client_registry is not a usable registry endpoint: %w. To fix it, run: 'astro config set remote.client_registry <registry>/<repository>' and try again", err)
+	}
 
 	// Use consistent deploy-<timestamp> tagging mechanism like regular deploys
 	// The ImageName flag only specifies which local image to use, not the remote tag

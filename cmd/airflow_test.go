@@ -2046,3 +2046,22 @@ func (s *AirflowSuite) TestAirflowBuild() {
 		s.ErrorIs(err, errMock)
 	})
 }
+
+// A registry already saved is checked as a new one is, since init saves it
+// into the project: one saved with a tag (before the check existed, or by
+// hand) is an error naming what to do, not a value deploys will choke on.
+func (s *AirflowSuite) TestGetRegistryEndpointChecksASavedValue() {
+	prevFlag := remoteImageRepository
+	s.T().Cleanup(func() { remoteImageRepository = prevFlag })
+	remoteImageRepository = ""
+
+	s.Require().NoError(config.CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/my-image:1.0"))
+	_, err := getRegistryEndpoint()
+	s.ErrorContains(err, "the saved remote.client_registry is not a valid registry endpoint")
+	s.ErrorContains(err, "must not include an image tag")
+
+	s.Require().NoError(config.CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/my-image"))
+	got, err := getRegistryEndpoint()
+	s.NoError(err)
+	s.Equal("quay.io/acme/my-image", got)
+}
