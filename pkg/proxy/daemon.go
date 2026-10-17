@@ -170,6 +170,10 @@ func (d *Daemon) portPath() string { return filepath.Join(d.Store.Dir(), daemonP
 func (d *Daemon) fallbackPath() string { return filepath.Join(d.Store.Dir(), daemonFallbackName) }
 
 // writeRecord publishes this daemon's record. See WriteRecord for the format.
+//
+// The protocol and revision are the starter's own, which stand for Exe's
+// because every host builds the two from one commit: the CLI runs itself, and
+// the desktop bundles the astro built from the CLI commit it links.
 func (d *Daemon) writeRecord(pid int, port string) error {
 	return WriteRecord(d.RecordPath(), Record{
 		PID:      pid,
@@ -307,7 +311,8 @@ var beforeStart = (*Daemon).takeOverFromV1
 // an older client relies on, and a newer revision serves what this one would
 // or later. Without that, two tools built at different times (the desktop's
 // bundled astro and an installed CLI) would each replace the other's daemon on
-// every start, dropping whatever it was serving.
+// every start, dropping whatever it was serving. The cost is a downgrade: the
+// newer daemon stays until its last route is gone or it is stopped.
 func reusable(rec Record) bool {
 	if rec.Protocol != DaemonProtocol {
 		return rec.Protocol > DaemonProtocol

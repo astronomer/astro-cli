@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"io/fs"
@@ -12,27 +13,48 @@ import (
 var servedAt = struct {
 	revision    int
 	fingerprint string
-}{1, "552d69bf241a68457e6e9a66f9d427eb6a354e4c6548fb4f49fdc4f20e98df19"}
+}{1, "5d532abda52505ea2ab45691804c70505d5e83e8fac27bcf4fc056c1f5082a09"}
 
 // servedFingerprint hashes what a user sees from the daemon that is not
-// code: the snippet it injects into every Airflow page and the pages it
-// renders itself.
+// routing: the snippet it injects into every Airflow page, every file it
+// embeds for its own pages, and those pages rendered with fixed data, which
+// takes in the copy Go supplies to them (the default title and start hint).
 func servedFingerprint(t *testing.T) string {
 	t.Helper()
 	h := sha256.New()
 	h.Write([]byte(airflowThemeSnippet))
-	names, err := fs.Glob(templateFS, "templates/*.html")
-	if err != nil || len(names) == 0 {
-		t.Fatalf("no page templates to fingerprint: %v", err)
-	}
-	for _, name := range names { // fs.Glob returns them sorted
-		body, err := fs.ReadFile(templateFS, name)
-		if err != nil {
-			t.Fatal(err)
+
+	// The whole embedded tree rather than the embed's own pattern restated, so
+	// an asset added beside the templates is covered without anyone editing
+	// this test.
+	err := fs.WalkDir(templateFS, ".", func(name string, e fs.DirEntry, err error) error {
+		if err != nil || e.IsDir() {
+			return err
 		}
+		body, err := fs.ReadFile(templateFS, name)
 		h.Write([]byte(name))
 		h.Write(body)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("fingerprinting the embedded pages: %v", err)
 	}
+
+	var pages bytes.Buffer
+	for _, page := range []struct {
+		name string
+		data any
+	}{
+		{landingPageName, landingData{Title: Pages{}.title()}},
+		{landingPageName, landingData{Title: Pages{}.title(), Routes: []LandingRoute{{Name: "demo", URL: "http://demo.localhost:6563", Port: "8080", ProjectDir: "/demo"}}}},
+		{notFoundPageName, notFoundData{Hostname: "demo.localhost", Port: "6563"}},
+		{unavailablePageName, nil},
+	} {
+		if err := pageTmpl.ExecuteTemplate(&pages, page.name, page.data); err != nil {
+			t.Fatalf("rendering %s: %v", page.name, err)
+		}
+	}
+	h.Write(pages.Bytes())
 	return hex.EncodeToString(h.Sum(nil))
 }
 

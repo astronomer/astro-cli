@@ -18,6 +18,8 @@ pkg/airflowrt/include/**        text eol=lf
 pkg/airflowrt/standalone_scripts/** text eol=lf
 pkg/localrt/internal/localdocker/*.tmpl text eol=lf
 pkg/proxy/**.tmpl               text eol=lf
+# The proxy's pages; TestDaemonRevisionCoversWhatItServes also hashes them.
+pkg/proxy/templates/**          text eol=lf
 # The 1.x flag inventory is embedded and read line by line; with CRLF every
 # line ended in "\r" and the CLI could not read it on a Windows build.
 cmd/v1_flags.tsv                text eol=lf
