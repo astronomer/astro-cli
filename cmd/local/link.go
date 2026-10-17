@@ -359,8 +359,7 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 	if err != nil {
 		return err
 	}
-	deploymentGiven := cmd.Flags().Changed(flagLinkDeployment)
-	picking := !deploymentGiven && c.mayPrompt()
+	picking := !cmd.Flags().Changed(flagLinkDeployment) && c.mayPrompt()
 	switch {
 	case link.Kind == manifest.KindAstro && picking && c.d.PickDeployment != nil:
 		if name, err = c.pickAstroDeployment(&link, m, name); err != nil {
@@ -371,7 +370,7 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 			return err
 		}
 	case link.Kind == manifest.KindAPC:
-		if err := c.apcWorkspace(&link, m, name, deploymentGiven); err != nil {
+		if err := c.apcWorkspace(&link); err != nil {
 			return err
 		}
 	}
@@ -489,10 +488,10 @@ func pickedLinkName(name string, dep PickedDeployment) (string, error) {
 func (c *cli) pickAPCDeployment(link *scaffold.Link, m *manifest.Manifest, name string) (string, error) {
 	ws := link.Workspace
 	if ws == "" {
-		ws = c.apcContextWorkspace()
-	}
-	if ws == "" {
-		return "", errNoAPCWorkspace
+		var err error
+		if ws, err = c.apcContextWorkspace(); err != nil {
+			return "", err
+		}
 	}
 	linked := map[string]string{}
 	for other := range m.Astro.Deployments {
@@ -513,29 +512,31 @@ func (c *cli) pickAPCDeployment(link *scaffold.Link, m *manifest.Manifest, name 
 }
 
 // apcWorkspace fills in the workspace of an apc link that was not picked:
-// --workspace, else the APC context's. The workspace of the link being
-// replaced is kept (left to the writer) only when it is an apc link on the
-// same domain and no --deployment names another Deployment, which may live in
-// another workspace.
-func (c *cli) apcWorkspace(link *scaffold.Link, m *manifest.Manifest, name string, deploymentGiven bool) error {
+// --workspace, else the APC context's. A replaced link's workspace is never
+// carried over: the Deployment named may be in another one.
+func (c *cli) apcWorkspace(link *scaffold.Link) error {
 	if link.Workspace != "" {
 		return nil
 	}
-	if l, ok := m.Astro.Deployments[name]; ok && !deploymentGiven && l.Kind() == manifest.KindAPC && l.Domain == link.Domain {
-		return nil
-	}
-	if link.Workspace = c.apcContextWorkspace(); link.Workspace == "" {
-		return errNoAPCWorkspace
-	}
-	return nil
+	ws, err := c.apcContextWorkspace()
+	link.Workspace = ws
+	return err
 }
 
-// apcContextWorkspace is the APC context's current workspace, "" when none.
-func (c *cli) apcContextWorkspace() string {
+// apcContextWorkspace is the APC context's current workspace. None set is
+// errNoAPCWorkspace; a context that cannot be read says so in its own words.
+func (c *cli) apcContextWorkspace() (string, error) {
 	if c.d.APC == nil || c.d.APC.CurrentWorkspace == nil {
-		return ""
+		return "", errNoAPCWorkspace
 	}
-	return c.d.APC.CurrentWorkspace()
+	ws, err := c.d.APC.CurrentWorkspace()
+	switch {
+	case err != nil:
+		return "", err
+	case ws == "":
+		return "", errNoAPCWorkspace
+	}
+	return ws, nil
 }
 
 // errNoAPCWorkspace is an apc link with no workspace to name: none given and
@@ -648,8 +649,9 @@ var credentialFlags = map[manifest.AuthMethod][]string{
 
 // kind is what add's flags point at: a url makes an endpoint; otherwise
 // --target, or the target the link would inherit. Under an Astro Private
-// Cloud context (onAPC) a link that names no target is an apc link, whatever
-// [tool.astro] target says: that context's Deployments are the ones it lists.
+// Cloud context (onAPC), a link that names no target in a project whose target
+// is unset or astro is an apc link: that context's Deployments are the ones
+// it lists. A project whose target is mwaa or composer keeps that kind.
 func (in *linkAddInput) kind(given func(string) bool, m *manifest.Manifest, onAPC bool) (manifest.LinkKind, error) {
 	platform := manifest.KindAstro
 	if onAPC {
@@ -664,7 +666,7 @@ func (in *linkAddInput) kind(given func(string) bool, m *manifest.Manifest, onAP
 	target := in.target
 	if !given(flagLinkTarget) {
 		target = m.Astro.Target
-		if target == "" || onAPC {
+		if target == "" || (onAPC && target == string(manifest.KindAstro)) {
 			target = string(platform)
 		}
 		// An environment names an MWAA or Composer environment, so in a

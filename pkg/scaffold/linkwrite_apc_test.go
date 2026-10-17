@@ -156,6 +156,28 @@ func TestSaveLinkAnAPCLinkOnAnotherDomainDropsItsWorkspace(t *testing.T) {
 	assert.Equal(t, "other.corp.example", got.Domain)
 }
 
+// A workspace is carried over only from a link of the same kind: an astro
+// link replacing an apc link of the same name takes [tool.astro] workspace,
+// not the Houston one, and an apc link replacing an astro link must name its
+// own.
+func TestSaveLinkCarriesNoWorkspaceAcrossKinds(t *testing.T) {
+	dir, path := linkProject(t, inheritingFixture)
+	saveLink(t, dir, apcLink("prod-apc"))
+	saveLink(t, dir, Link{Name: "prod-apc", Kind: manifest.KindAstro, Deployment: "clx1"})
+	_, got := onlyLink(t, path)
+	assert.Equal(t, manifest.KindAstro, got.Kind())
+	assert.Equal(t, "ws-default", got.Workspace, "the apc link's workspace is not carried over")
+	assert.NotContains(t, apcTable(t, path), "workspace")
+
+	dir, path = linkProject(t, inheritingFixture)
+	saveLink(t, dir, Link{Name: "prod-apc", Kind: manifest.KindAstro, Workspace: "ws-own", Deployment: "clx1"})
+	again := apcLink("prod-apc")
+	again.Workspace = ""
+	require.ErrorIs(t, SaveLink(dir, nil, again), ErrInvalidLink)
+	_, got = onlyLink(t, path)
+	assert.Equal(t, manifest.KindAstro, got.Kind(), "a refused save writes nothing")
+}
+
 // The apc method is an apc link's: on any other kind SaveLink refuses it by
 // field, before the manifest is read.
 func TestSaveLinkRefusesTheAPCMethodOnAnotherKind(t *testing.T) {

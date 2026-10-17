@@ -39,7 +39,9 @@ func TestAPCLinkingIsWiredUnderAPC(t *testing.T) {
 	wireLinkPickers(&d, apcPlatform, astrov1_mocks.NewClientWithResponsesInterface(t), houston_mocks.NewClientInterface(t), &bytes.Buffer{})
 	require.NotNil(t, d.APC)
 	assert.Equal(t, "astronomer_dev.com", d.APC.Domain)
-	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", d.APC.CurrentWorkspace())
+	ws, err := d.APC.CurrentWorkspace()
+	require.NoError(t, err)
+	assert.Equal(t, "ck05r3bor07h40d02y2hw4n4v", ws)
 	assert.Nil(t, d.PickDeployment)
 
 	var cloud local.Deps
@@ -49,11 +51,12 @@ func TestAPCLinkingIsWiredUnderAPC(t *testing.T) {
 }
 
 // withAPCLinking runs as the root is built, for every command under an APC
-// context, so outside the closures it hands astro link add it reads the
-// current domain and nothing that resolves a login: GetCurrentContext and
-// GetContext can reach the OS keyring or the secrets vault. The closures read
-// the workspace when link add asks.
-func TestAPCLinkingReadsNoLogin(t *testing.T) {
+// context, so it adds no login read there: outside the closures it hands
+// astro link add, it reads the current domain and nothing that resolves a
+// login (GetCurrentContext and GetContext can reach the OS keyring or the
+// secrets vault). The closures read the workspace when link add asks. It
+// says nothing of the rest of the root's construction.
+func TestAPCLinkingAddsNoLoginRead(t *testing.T) {
 	file, err := parser.ParseFile(gotoken.NewFileSet(), "link_pickers_apc.go", nil, 0)
 	require.NoError(t, err)
 	var body *ast.BlockStmt

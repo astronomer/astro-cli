@@ -46,9 +46,12 @@ func withAPCLinking(d *local.Deps, client houston.ClientInterface) {
 	}
 	d.APC = &local.APCLinking{
 		Domain: manifest.NormalizeAPCDomain(domain),
-		CurrentWorkspace: func() string {
-			ws, _ := workspace.GetCurrentWorkspace() //nolint:errcheck // no current workspace reads as none
-			return ws
+		CurrentWorkspace: func() (string, error) {
+			ws, err := workspace.GetCurrentWorkspace()
+			if errors.Is(err, workspace.ErrWorkspaceContextNotSet) {
+				return "", nil
+			}
+			return ws, err
 		},
 		PickDeployment: func(workspaceID string, linked map[string]string) (local.PickedDeployment, error) {
 			return pickAPCDeployment(client, workspaceID, linked)

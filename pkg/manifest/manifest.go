@@ -468,9 +468,10 @@ const (
 	// CodeDomainRequired is an apc link with no domain: nothing else says
 	// which installation its ids belong to.
 	CodeDomainRequired ProblemCode = "domain_required"
-	// CodeDomainOnNonAPCLink is domain on another kind of link, a warning
-	// (Manifest.Warnings) rather than a problem: an astro link's host is
-	// [tool.astro] domain, the other kinds have none, and nothing reads it.
+	// CodeDomainOnNonAPCLink is domain on another kind of link. An astro
+	// link's host is [tool.astro] domain and the other kinds have none, so
+	// it is refused rather than ignored: a link must not look like it names a
+	// host it is not reached on.
 	CodeDomainOnNonAPCLink ProblemCode = "domain_on_non_apc_link"
 	// CodeEnvironmentOnAPCLink is environment on an apc link, which names a
 	// Deployment instead.
@@ -1063,15 +1064,12 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 }
 
 // domain decodes a link's domain, which an apc link must carry, normalized.
-// A value that normalizes to nothing ("https://") is a missing domain.
-//
-// On any other kind it is a warning, not a problem: nothing reads it there
-// (an astro link's host is [tool.astro] domain), and a manifest that carries
-// one must keep loading. It is dropped from the link.
+// A value that normalizes to nothing ("https://") is a missing domain. On any
+// other kind it is a problem, as any key a link does not take always was.
 func (p *parser) domain(key string, kind LinkKind, raw any) string {
 	if kind != KindAPC {
 		if raw != nil {
-			p.warn(CodeDomainOnNonAPCLink, key+".domain", fmt.Sprintf("ignored: only an apc link sets domain, and this is %s link. "+
+			p.add(CodeDomainOnNonAPCLink, key+".domain", fmt.Sprintf("only an apc link sets domain, and this is %s link. "+
 				"An astro link's host is [tool.astro] domain", KindWithArticle(kind)))
 		}
 		return ""

@@ -173,7 +173,8 @@ var linkEnvNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 //   - an apc link always writes its domain and workspace, since it inherits
 //     neither: [tool.astro] domain and workspace describe Astro. An empty
 //     Workspace keeps the one the link sets when it replaces an apc link on
-//     the same domain, and with none it is refused.
+//     the same domain, and with none it is refused. Any link keeps its own
+//     workspace only from a link of the same kind.
 //   - an auth table is written only when it says more than the kind's default
 //     method, and carries only the fields its method takes.
 //   - default = true is carried over when the link had it. The flag belongs to
@@ -261,11 +262,12 @@ func (l *Link) coordinates(before *manifest.Manifest, ed tomledit.Editor, pinned
 	table := map[string]any{}
 	// Not given, a link keeps the workspace it sets itself: the table is
 	// replaced whole, and dropping a pin there would move an astro link to
-	// [tool.astro] workspace and leave an apc link with none. An apc link
-	// keeps it only on the same domain: another installation's workspace id
-	// names nothing there.
+	// [tool.astro] workspace and leave an apc link with none. It is carried
+	// over only from a link of the same kind, and for apc on the same domain:
+	// an Astro workspace id names nothing on APC, nor one installation's on
+	// another.
 	workspace := l.Workspace
-	if workspace == "" && !l.ClearWorkspace && l.sameAPCDomain(before) {
+	if workspace == "" && !l.ClearWorkspace && l.mayKeepWorkspace(before) {
 		own, _ := ed.Get(append(linkKey(l.Name), manifestKeyWorkspace))
 		workspace, _ = own.(string)
 	}
@@ -294,15 +296,19 @@ func (l *Link) coordinates(before *manifest.Manifest, ed tomledit.Editor, pinned
 	return table, nil
 }
 
-// sameAPCDomain reports whether the link l replaces may lend it its workspace:
-// always for a kind other than apc, and for an apc link only when the link it
-// replaces is an apc link on the same domain.
-func (l *Link) sameAPCDomain(before *manifest.Manifest) bool {
-	if l.Kind != manifest.KindAPC {
+// mayKeepWorkspace reports whether the link l replaces may lend it the
+// workspace it sets itself: only a link of the same kind, and for apc one on
+// the same domain. With no link of that name there is nothing to keep, and
+// the raw read finds none.
+func (l *Link) mayKeepWorkspace(before *manifest.Manifest) bool {
+	existing, ok := before.Astro.Deployments[l.Name]
+	if !ok {
 		return true
 	}
-	existing, ok := before.Astro.Deployments[l.Name]
-	return ok && existing.Kind() == manifest.KindAPC && existing.Domain == l.Domain
+	if existing.Kind() != l.Kind {
+		return false
+	}
+	return l.Kind != manifest.KindAPC || existing.Domain == l.Domain
 }
 
 // keepTheOnlyLinkDefault marks a project's only link default = true when a
@@ -702,7 +708,7 @@ func (l *Link) validate() error {
 		}
 	case manifest.KindEndpoint:
 		if l.URL == "" {
-			return invalidLink("an endpoint link needs a url")
+			return invalidLink("a url link needs a url")
 		}
 		// Refused here, and never quoted: the parser's own messages quote
 		// the url, which would print the password.

@@ -461,11 +461,12 @@ type APCLinking struct {
 	// Domain is the current context's domain, the APC installation an apc
 	// link is written on.
 	Domain string
-	// CurrentWorkspace is the context's current workspace, "" when none: the
-	// workspace a link names, and lists Deployments from, without --workspace.
-	// [tool.astro] workspace never stands in for it: that is an Astro
-	// workspace.
-	CurrentWorkspace func() string
+	// CurrentWorkspace is the context's current workspace, "" with no error
+	// when none is set: the workspace a link names, and lists Deployments
+	// from, without --workspace. Any other error (a context that cannot be
+	// read) comes back as it is. [tool.astro] workspace never stands in for
+	// it: that is an Astro workspace.
+	CurrentWorkspace func() (string, error)
 	// PickDeployment asks which of the workspace's Deployments to link,
 	// leaving out the ones in linked (a Deployment ID to the link naming it),
 	// and reports ErrAllDeploymentsLinked when that leaves none. nil means the

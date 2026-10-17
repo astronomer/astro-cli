@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ func apcDeps(t *testing.T, dir, current string, dep PickedDeployment) (Deps, *ap
 	run := &apcRun{}
 	d.APC = &APCLinking{
 		Domain:           "astro.corp.example",
-		CurrentWorkspace: func() string { return current },
+		CurrentWorkspace: func() (string, error) { return current, nil },
 		PickDeployment: func(ws string, linked map[string]string) (PickedDeployment, error) {
 			run.workspaces = append(run.workspaces, ws)
 			run.linked = linked
@@ -138,14 +139,37 @@ func TestLinkAddUnderAPCReplacesAcrossDomains(t *testing.T) {
 	assert.Equal(t, "ckdep-new", got.Deployment)
 }
 
-// Under APC a link that names no target is an apc link even in a project
-// whose [tool.astro] target is something else.
-func TestLinkAddUnderAPCIgnoresTheProjectTarget(t *testing.T) {
-	const body = "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\ntarget = 'mwaa'\n"
-	dir, path := linkTestProject(t, body)
+// Under APC a link that names no target is an apc link in a project whose
+// target is unset or astro. A project whose target is mwaa or composer keeps
+// that kind, so its environment flags work as they do under Astro.
+func TestLinkAddUnderAPCFollowsAnMWAAOrComposerProjectTarget(t *testing.T) {
+	const bare = "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n"
+	dir, path := linkTestProject(t, bare+"target = 'astro'\n")
 	d, _ := apcDeps(t, dir, "ckws-current", PickedDeployment{})
 	require.NoError(t, execute(t, d, "link", "add", "prod-apc", "--deployment", "ckdep-1"))
 	assert.Equal(t, manifest.KindAPC, loadManifest(t, path).Astro.Deployments["prod-apc"].Kind())
+
+	dir, path = linkTestProject(t, bare+"target = 'mwaa'\n")
+	d, _ = apcDeps(t, dir, "ckws-current", PickedDeployment{})
+	require.NoError(t, execute(t, d, "link", "add", "aws", "--environment", "orders", "--region", "eu-west-1"))
+	assert.Equal(t, manifest.KindMWAA, loadManifest(t, path).Astro.Deployments["aws"].Kind())
+
+	dir, path = linkTestProject(t, bare+"target = 'composer'\n")
+	d, _ = apcDeps(t, dir, "ckws-current", PickedDeployment{})
+	require.NoError(t, execute(t, d, "link", "add", "gcp", "--environment", "orders", "--project", "acme", "--location", "us-central1"))
+	assert.Equal(t, manifest.KindComposer, loadManifest(t, path).Astro.Deployments["gcp"].Kind())
+}
+
+// A workspace that is simply not set says what to pass; a context that
+// cannot be read reports its own error rather than "pass --workspace".
+func TestLinkAddUnderAPCReportsAWorkspaceReadError(t *testing.T) {
+	dir, _ := linkTestProject(t, linkManifest)
+	d, _ := apcDeps(t, dir, "", PickedDeployment{})
+	broken := errors.New("reading the context: config unreadable")
+	d.APC.CurrentWorkspace = func() (string, error) { return "", broken }
+	err := execute(t, d, "link", "add", "prod-apc", "--deployment", "ckdep-1")
+	require.ErrorIs(t, err, broken)
+	assert.Equal(t, linkManifest, readManifest(t, dir))
 }
 
 // Under APC the other kinds are still linked with their flags, and an astro

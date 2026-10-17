@@ -87,16 +87,6 @@ func TestEveryCodeIsReachable(t *testing.T) {
 	for _, tc := range authCases() {
 		record(endpointLink(tc.auth))
 	}
-	// The codes raised as warnings, on a manifest that still loads.
-	for _, content := range warningCases {
-		m, err := Load(write(t, content))
-		if err != nil {
-			t.Fatalf("a warning fixture does not load: %v", err)
-		}
-		for _, w := range m.Warnings {
-			raised[w.Code] = true
-		}
-	}
 	// The one code Parse cannot raise, because it needs the Dockerfile: its
 	// fixtures go through the function that raises it.
 	for _, tc := range dockerfileRuntimeCases {

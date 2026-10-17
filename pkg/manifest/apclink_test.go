@@ -83,40 +83,6 @@ deployment = "ckdep-apc"
 	}
 }
 
-// warningCases are manifests that load with a warning, for the codes only a
-// warning raises (TestEveryCodeIsReachable).
-var warningCases = []string{astroLinkWithDomain}
-
-// astroLinkWithDomain is an astro link carrying a domain, which nothing reads.
-const astroLinkWithDomain = `
-[project]
-name = "p"
-dependencies = ["apache-airflow==3.1.*"]
-
-[tool.astro]
-workspace = "ws-abc"
-
-[tool.astro.deployments.dev]
-deployment = "dep-xyz"
-domain = "astronomer-dev.io"
-`
-
-// A domain on another kind of link is ignored with a warning, never refused:
-// a manifest that carries one keeps loading.
-func TestADomainOnAnAstroLinkIsAWarning(t *testing.T) {
-	m, err := Load(write(t, astroLinkWithDomain))
-	if err != nil {
-		t.Fatalf("an astro link with a domain must still load: %v", err)
-	}
-	dev := m.Astro.Deployments["dev"]
-	if dev.Kind() != KindAstro || dev.Deployment != "dep-xyz" || dev.Workspace != "ws-abc" || dev.Domain != "" {
-		t.Errorf("dev = %#v, want the astro link with its domain dropped", dev)
-	}
-	if len(m.Warnings) != 1 || m.Warnings[0].Code != CodeDomainOnNonAPCLink || m.Warnings[0].Key != "tool.astro.deployments.dev.domain" {
-		t.Errorf("warnings = %+v, want one domain_on_non_apc_link on the link's domain", m.Warnings)
-	}
-}
-
 func TestKindWithArticle(t *testing.T) {
 	for kind, want := range map[LinkKind]string{
 		KindAstro: "an astro", KindAPC: "an apc", KindMWAA: "an mwaa", KindComposer: "a composer", KindEndpoint: "a url",
