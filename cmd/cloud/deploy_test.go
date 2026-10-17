@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,8 +28,18 @@ func execDeployCmd(args ...string) error {
 	return err
 }
 
+// cleanCheckout makes the uncommitted-changes check see a clean checkout for
+// the rest of t, whatever state the one the tests run in is in.
+func cleanCheckout(t *testing.T) {
+	t.Helper()
+	previous := hasUncommittedChanges
+	hasUncommittedChanges = func(string) bool { return false }
+	t.Cleanup(func() { hasUncommittedChanges = previous })
+}
+
 func TestDeployImage(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	cleanCheckout(t)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil
@@ -75,8 +86,47 @@ func TestDeployImage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// A project with uncommitted changes is not deployed without --force, and the
+// refusal is an error, so a CI job running astro deploy fails rather than
+// reporting a deploy that never ran (#1721).
+func TestDeployRefusesUncommittedChanges(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	prevUncommitted, prevEnsure, prevDeploy := hasUncommittedChanges, EnsureProjectDir, DeployImage
+	t.Cleanup(func() {
+		hasUncommittedChanges, EnsureProjectDir, DeployImage = prevUncommitted, prevEnsure, prevDeploy
+	})
+	hasUncommittedChanges = func(string) bool { return true }
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+	deployed := false
+	DeployImage = func(deployInput cloud.InputDeploy, astroV1Client astrov1.APIClient, astroV1Alpha1Client astrov1alpha1.APIClient) error {
+		deployed = true
+		return nil
+	}
+	saved := config.CFG.ProjectDeployment.GetProjectString()
+
+	cmd := NewDeployCmd()
+	cmd.SetArgs([]string{"refused-deployment-id", "--save"})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	restore := testUtil.SetupOSArgsForGinkgo()
+	_, err := cmd.ExecuteC()
+	restore()
+	assert.EqualError(t, err, registryUncommitedChangesMsg)
+	assert.False(t, deployed, "deployed a project with uncommitted changes")
+	assert.NotContains(t, out.String(), "Usage:", "a refusal is not a usage mistake")
+	assert.Equal(t, saved, config.CFG.ProjectDeployment.GetProjectString(), "a refused deploy saved its deployment id")
+
+	assert.NoError(t, execDeployCmd("test-deployment-id", "-f"))
+	assert.True(t, deployed, "--force did not deploy")
+}
+
 func TestDeployReturnsErrorWhenSaveConfigFails(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// The refusal of uncommitted changes comes before the save this tests.
+	cleanCheckout(t)
 
 	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
 		return nil

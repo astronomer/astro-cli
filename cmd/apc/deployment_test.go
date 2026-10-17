@@ -750,6 +750,48 @@ func (s *Suite) TestDeploymentUpdateCommand() {
 	}
 }
 
+func (s *Suite) TestDeploymentHibernateCommand() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	mockHibernatedDeployment := &houston.Deployment{
+		ID:          "cknrml96n02523xr97ygj95n5",
+		Label:       "test",
+		ReleaseName: "accurate-radioactivity-8677",
+	}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+	api.On("HibernateOverrideDeployment", mock.Anything).Return(mockHibernatedDeployment, nil)
+
+	myTests := []struct {
+		cmdArgs        []string
+		expectedOutput string
+	}{
+		{cmdArgs: []string{"hibernate", "cknrml96n02523xr97ygj95n5", "--force"}, expectedOutput: "Successfully set deployment accurate-radioactivity-8677 to hibernate"},
+		{cmdArgs: []string{"hibernate", "cknrml96n02523xr97ygj95n5", "--for=2h", "--force"}, expectedOutput: "Successfully set deployment accurate-radioactivity-8677 to hibernate"},
+		{cmdArgs: []string{"wake-up", "cknrml96n02523xr97ygj95n5", "--force"}, expectedOutput: "Successfully woke up deployment accurate-radioactivity-8677"},
+		{cmdArgs: []string{"hibernate", "cknrml96n02523xr97ygj95n5", "--remove-override", "--force"}, expectedOutput: "Successfully removed the hibernation override"},
+	}
+	for _, tt := range myTests {
+		houstonClient = api
+		output, err := execDeploymentCmd(tt.cmdArgs...)
+		s.NoError(err)
+		s.Contains(output, tt.expectedOutput)
+	}
+}
+
+func (s *Suite) TestDeploymentHibernateCommandMutuallyExclusiveFlags() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+
+	api := new(mocks.ClientInterface)
+	api.On("GetPlatformVersion", nil).Return("0.25.0", nil)
+	houstonClient = api
+
+	_, err := execDeploymentCmd("hibernate", "cknrml96n02523xr97ygj95n5", "--for=2h", "--until=2024-06-01T12:00:00Z", "--force")
+	s.Error(err)
+	api.AssertNotCalled(s.T(), "HibernateOverrideDeployment", mock.Anything)
+}
+
 func (s *Suite) TestDeploymentUpdateTriggererEnabledCommand() {
 	appConfig = &houston.AppConfig{
 		TriggererEnabled: true,

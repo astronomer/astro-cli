@@ -51,82 +51,99 @@ func (s *Suite) TestRegistryLogin() {
 }
 
 func (s *Suite) TestDockerLogin() {
-	// Store original cmdExec to restore after tests
-	originalCmdExec := cmdExec
-	defer func() {
-		cmdExec = originalCmdExec
-	}()
-
+	// Suite.TearDownTest restores cmdExecWithStdin.
 	s.Run("success with credentials", func() {
 		var capturedCmd string
+		var capturedStdin string
 		var capturedArgs []string
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
 			capturedCmd = cmd
+			capturedStdin = stdin
 			capturedArgs = args
 			return nil
 		}
 
 		err := DockerLogin("test.registry.com", "testuser", "testtoken")
 		s.NoError(err)
-		s.Equal("bash", capturedCmd)
-		s.Equal([]string{"-c", "echo \"testtoken\" | docker login test.registry.com -u testuser --password-stdin"}, capturedArgs)
+		s.Equal("docker", capturedCmd)
+		s.Equal("testtoken", capturedStdin, "password must be piped to stdin, not interpolated into a command string")
+		s.Equal([]string{"login", "--username=testuser", "--password-stdin", "--", "test.registry.com"}, capturedArgs)
 	})
 
 	s.Run("success with bearer token", func() {
 		var capturedCmd string
+		var capturedStdin string
 		var capturedArgs []string
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
 			capturedCmd = cmd
+			capturedStdin = stdin
 			capturedArgs = args
 			return nil
 		}
 
 		err := DockerLogin("test.registry.com", "testuser", "Bearer testtoken123")
 		s.NoError(err)
-		s.Equal("bash", capturedCmd)
+		s.Equal("docker", capturedCmd)
 		// Should strip Bearer prefix
-		s.Equal([]string{"-c", "echo \"testtoken123\" | docker login test.registry.com -u testuser --password-stdin"}, capturedArgs)
+		s.Equal("testtoken123", capturedStdin)
+		s.Equal([]string{"login", "--username=testuser", "--password-stdin", "--", "test.registry.com"}, capturedArgs)
+	})
+
+	s.Run("password with shell metacharacters reaches login intact", func() {
+		const trickyPass = `p$(whoami)"'` + "`id`"
+		var capturedCmd, capturedStdin string
+		var capturedArgs []string
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			capturedCmd, capturedStdin, capturedArgs = cmd, stdin, args
+			return nil
+		}
+
+		err := DockerLogin("test.registry.com", "testuser", trickyPass)
+		s.NoError(err)
+		s.Equal(trickyPass, capturedStdin, "password must reach the login command unmodified, not interpolated into a shell string")
+		wantRegistry := "test.registry.com"
+		s.assertStdinLogin(capturedCmd, capturedArgs, "testuser", &wantRegistry, trickyPass)
 	})
 
 	s.Run("no operation with empty credentials", func() {
 		cmdExecCalled := false
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
 			cmdExecCalled = true
 			return nil
 		}
 
 		err := DockerLogin("test.registry.com", "", "")
 		s.NoError(err)
-		s.False(cmdExecCalled, "cmdExec should not be called with empty credentials")
+		s.False(cmdExecCalled, "cmdExecWithStdin should not be called with empty credentials")
 	})
 
 	s.Run("no operation with empty username", func() {
 		cmdExecCalled := false
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
 			cmdExecCalled = true
 			return nil
 		}
 
 		err := DockerLogin("test.registry.com", "", "testtoken")
 		s.NoError(err)
-		s.False(cmdExecCalled, "cmdExec should not be called with empty username")
+		s.False(cmdExecCalled, "cmdExecWithStdin should not be called with empty username")
 	})
 
 	s.Run("no operation with empty token", func() {
 		cmdExecCalled := false
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
 			cmdExecCalled = true
 			return nil
 		}
 
 		err := DockerLogin("test.registry.com", "testuser", "")
 		s.NoError(err)
-		s.False(cmdExecCalled, "cmdExec should not be called with empty token")
+		s.False(cmdExecCalled, "cmdExecWithStdin should not be called with empty token")
 	})
 
 	s.Run("docker login command fails", func() {
 		expectedErr := errors.New("docker login failed")
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
 			return expectedErr
 		}
 

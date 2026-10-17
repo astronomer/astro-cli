@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 
 	cliConfig "github.com/docker/cli/cli/config"
 	cliTypes "github.com/docker/cli/cli/config/types"
@@ -59,7 +58,8 @@ func (d *DockerRegistry) Login(username, token string) error {
 		authConfig.Password = auth.Password
 	}
 
-	logger.Debugf("docker creds %v \n", authConfig)
+	// Never the password: debug output ends up in tickets and CI logs.
+	logger.Debugf("docker login to %s as %s\n", authConfig.ServerAddress, authConfig.Username)
 	_, err := d.cli.RegistryLogin(ctx, authConfig)
 	if err != nil {
 		return fmt.Errorf("registry login error: %w", err)
@@ -80,7 +80,7 @@ func (d *DockerRegistry) Login(username, token string) error {
 	return nil
 }
 
-// dockerLogin performs docker login using bash command instead of Docker API
+// dockerLogin performs docker login by invoking the container runtime binary directly, instead of the Docker API.
 // This is useful for OAuth-based registries that require special authentication flows
 func dockerLogin(registryName, username, token string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
@@ -89,11 +89,7 @@ func dockerLogin(registryName, username, token string) error {
 	}
 
 	if username != "" && token != "" {
-		// Remove Bearer prefix if present (consistent with pushWithBash)
-		const prefix = "Bearer "
-		pass := strings.TrimPrefix(token, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + registryName + " -u " + username + " --password-stdin"
-		err = cmdExec("bash", nil, os.Stderr, "-c", cmd)
+		err = cliRegistryLogin(containerRuntime, registryName, username, token, nil, os.Stderr)
 		if err != nil {
 			return fmt.Errorf("docker login failed: %w", err)
 		}
