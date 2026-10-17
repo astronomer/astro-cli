@@ -21,6 +21,10 @@ var (
 
 	ignoreCacheDeploy = false
 
+	// hasUncommittedChanges is a variable so a test does not depend on the
+	// state of the checkout it runs in.
+	hasUncommittedChanges = git.HasUncommittedChanges
+
 	EnsureProjectDir                   = utils.EnsureProjectDir
 	DeployAirflowImage                 = deploy.Airflow
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
@@ -46,7 +50,7 @@ $ astro deploy
 `
 
 const (
-	registryUncommittedChanges = "Project directory has uncommmited changes, use `astro deploy <deployment-id> -f` to force deploy."
+	registryUncommittedChanges = "Project directory has uncommitted changes, use `astro deploy <deployment-id> -f` to force deploy."
 )
 
 func NewDeployCmd() *cobra.Command {
@@ -102,9 +106,12 @@ func deployAirflow(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if git.HasUncommittedChanges("") && !forceDeploy {
-		fmt.Println(registryUncommittedChanges)
-		return nil
+	// Refusing is a failure, so CI sees a non-zero exit rather than a deploy
+	// that reported success without running.
+	if hasUncommittedChanges("") && !forceDeploy {
+		// Not a usage mistake, so no usage block under the error.
+		cmd.SilenceUsage = true
+		return errors.New(registryUncommittedChanges)
 	}
 
 	// Silence Usage as we have now validated command input

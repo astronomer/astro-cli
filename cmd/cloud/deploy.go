@@ -49,7 +49,11 @@ Menu will be presented if you do not specify a deployment ID:
 
 	DeployImage      = cloud.Deploy
 	EnsureProjectDir = utils.EnsureProjectDir
-	buildSecrets     = []string{}
+
+	// hasUncommittedChanges is a variable so a test does not depend on the
+	// state of the checkout it runs in.
+	hasUncommittedChanges = git.HasUncommittedChanges
+	buildSecrets          = []string{}
 )
 
 const (
@@ -194,7 +198,11 @@ func deploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if git.HasUncommittedChanges("") && !forceDeploy {
+	// Refusing is a failure, so CI sees a non-zero exit rather than a deploy
+	// that reported success without running.
+	if hasUncommittedChanges("") && !forceDeploy {
+		// Not a usage mistake, so no usage block under the error.
+		cmd.SilenceUsage = true
 		return errors.New(registryUncommitedChangesMsg)
 	}
 

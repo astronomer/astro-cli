@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,45 @@ func execDeployCmd(args ...string) error {
 	defer testUtil.SetupOSArgsForGinkgo()()
 	_, err := cmd.ExecuteC()
 	return err
+}
+
+// A project with uncommitted changes is not deployed without --force, and the
+// refusal is an error, so a CI job running astro deploy fails rather than
+// reporting a deploy that never ran (#1721).
+func (s *Suite) TestDeployRefusesUncommittedChanges() {
+	appConfig = &houston.AppConfig{
+		BYORegistryDomain: "test.registry.io",
+		Flags: houston.FeatureFlags{
+			BYORegistryEnabled: true,
+		},
+	}
+	hasUncommittedChanges = func(string) bool { return true }
+	EnsureProjectDir = func(cmd *cobra.Command, args []string) error {
+		return nil
+	}
+	deployed := false
+	DeployAirflowImage = func(houstonClient houston.ClientInterface, path, deploymentID, wsID string, ignoreCacheDeploy, prompt bool, description string, isImageOnlyDeploy bool, imageName string) (string, error) {
+		deployed = true
+		return deploymentID, nil
+	}
+	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string) error {
+		return nil
+	}
+
+	cmd := NewDeployCmd()
+	cmd.SetArgs([]string{"test-deployment-id"})
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	restore := testUtil.SetupOSArgsForGinkgo()
+	_, err := cmd.ExecuteC()
+	restore()
+	s.EqualError(err, registryUncommittedChanges)
+	s.False(deployed, "deployed a project with uncommitted changes")
+	s.NotContains(out.String(), "Usage:", "a refusal is not a usage mistake")
+
+	s.NoError(execDeployCmd("test-deployment-id", "-f"))
+	s.True(deployed, "--force did not deploy")
 }
 
 func (s *Suite) TestDeploy() {
