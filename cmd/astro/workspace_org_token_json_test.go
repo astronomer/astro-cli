@@ -39,6 +39,7 @@ func wsOrgTokenFixtures() (ws, org astrov1.ApiToken) {
 	ws = astrov1.ApiToken{
 		Id: "tok-ws", Name: "ws-token", Description: "Workspace CI",
 		Scope:     astrov1.ApiTokenScopeWORKSPACE,
+		Kind:      astrov1.ApiTokenKindDIRECTACCESS,
 		Roles:     &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeWORKSPACE, EntityId: curWorkspaceID, Role: "WORKSPACE_MEMBER"}},
 		CreatedAt: now.Add(-50 * time.Hour),
 		CreatedBy: &astrov1.BasicSubjectProfile{FullName: tokPtr("Ada Lovelace")},
@@ -46,6 +47,7 @@ func wsOrgTokenFixtures() (ws, org astrov1.ApiToken) {
 	org = astrov1.ApiToken{
 		Id: "tok-org", Name: "org-token", Description: "Org wide",
 		Scope: astrov1.ApiTokenScopeORGANIZATION,
+		Kind:  astrov1.ApiTokenKindSTANDARD,
 		Roles: &[]astrov1.ApiTokenRole{
 			{EntityType: astrov1.ApiTokenRoleEntityTypeORGANIZATION, EntityId: "test-org-id", Role: "ORGANIZATION_MEMBER"},
 			{EntityType: astrov1.ApiTokenRoleEntityTypeWORKSPACE, EntityId: curWorkspaceID, Role: "WORKSPACE_OPERATOR"},
@@ -175,19 +177,19 @@ func withNumber(n string, row map[string]string) map[string]string {
 	return out
 }
 
-func wsRoleRow(id, name, desc, scope, role, created, by string) map[string]string {
+func wsRoleRow(id, name, desc, scope, kind, role, created, by string) map[string]string {
 	return map[string]string{
-		"ID": id, "NAME": name, "DESCRIPTION": desc, "SCOPE": scope,
+		"ID": id, "NAME": name, "DESCRIPTION": desc, "SCOPE": scope, "KIND": kind,
 		"WORKSPACE ROLE": role, "CREATED": created, "CREATED BY": by,
 	}
 }
 
 var (
-	wsTokRow  = wsRoleRow("tok-ws", "ws-token", "Workspace CI", "WORKSPACE", "WORKSPACE_MEMBER", "2 days ago", "Ada Lovelace")
-	orgTokRow = wsRoleRow("tok-org", "org-token", "Org wide", "ORGANIZATION", "WORKSPACE_OPERATOR", "3 hours ago", "bootstrap")
+	wsTokRow  = wsRoleRow("tok-ws", "ws-token", "Workspace CI", "WORKSPACE", "DIRECT_ACCESS", "WORKSPACE_MEMBER", "2 days ago", "Ada Lovelace")
+	orgTokRow = wsRoleRow("tok-org", "org-token", "Org wide", "ORGANIZATION", "STANDARD", "WORKSPACE_OPERATOR", "3 hours ago", "bootstrap")
 	// The Organization picker's row: no ID, scope or creator, and the
-	// lifetime the token was created with.
-	orgPickRow = map[string]string{"#": "1", "NAME": "org-token", "DESCRIPTION": "Org wide", "ROLE": "ORGANIZATION_MEMBER", "EXPIRES": "30"}
+	// lifetime the token was created with; its kind, as every token table.
+	orgPickRow = map[string]string{"#": "1", "NAME": "org-token", "DESCRIPTION": "Org wide", "KIND": "STANDARD", "ROLE": "ORGANIZATION_MEMBER", "EXPIRES": "30"}
 )
 
 // What `astro workspace token` prints in text: what it printed before it
@@ -412,7 +414,7 @@ func TestOrganizationTokenText(t *testing.T) {
 	renamed := org
 	renamed.Name = "org-token-2"
 	orgListRow := map[string]string{
-		"ID": "tok-org", "NAME": "org-token", "DESCRIPTION": "Org wide", "SCOPE": "ORGANIZATION",
+		"ID": "tok-org", "NAME": "org-token", "DESCRIPTION": "Org wide", "SCOPE": "ORGANIZATION", "KIND": "STANDARD",
 		"ORGANIZATION ROLE": "ORGANIZATION_MEMBER", "CREATED": "3 hours ago", "CREATED BY": "bootstrap",
 	}
 	roleRows := []map[string]string{
@@ -555,14 +557,14 @@ func jsonWsOrgTokenFixtures() (ws, org astrov1.ApiToken) {
 // command is about, which differs by family.
 func wsTokJSON(role string) tokenJSON {
 	return tokenJSON{
-		ID: "tok-ws", Name: "ws-token", Description: "Workspace CI", Scope: "WORKSPACE",
+		ID: "tok-ws", Name: "ws-token", Description: "Workspace CI", Scope: "WORKSPACE", Kind: "DIRECT_ACCESS",
 		Role: role, CreatedAt: tokCreated, CreatedBy: "Ada Lovelace",
 	}
 }
 
 func orgTokJSON(role string) tokenJSON {
 	return tokenJSON{
-		ID: "tok-org", Name: "org-token", Description: "Org wide", Scope: "ORGANIZATION",
+		ID: "tok-org", Name: "org-token", Description: "Org wide", Scope: "ORGANIZATION", Kind: "STANDARD",
 		Role: role, CreatedAt: tokCreated, CreatedBy: "bootstrap",
 		ExpiresAt: tokPtr(time.Date(2027, 1, 2, 0, 0, 0, 0, time.UTC)),
 	}

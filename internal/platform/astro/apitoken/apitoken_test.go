@@ -49,6 +49,28 @@ func TestFromAPI(t *testing.T) {
 		assert.NotContains(t, keys, "expiry_period_in_days")
 		assert.NotContains(t, keys, "ExpiryPeriodInDays")
 	})
+
+	t.Run("its kind is published when the API names one", func(t *testing.T) {
+		direct := *api
+		direct.Kind = astrov1.ApiTokenKindDIRECTACCESS
+		tok := FromAPI(&direct, "")
+		assert.Equal(t, "DIRECT_ACCESS", tok.Kind)
+		b, err := json.Marshal(tok)
+		require.NoError(t, err)
+		assert.Contains(t, string(b), `"kind":"DIRECT_ACCESS"`)
+
+		b, err = json.Marshal(FromAPI(api, ""))
+		require.NoError(t, err)
+		assert.NotContains(t, string(b), `"kind"`, "no kind from the API, none published")
+	})
+}
+
+// The token tables show a kind the API named none for as "-", not a blank
+// cell.
+func TestKindText(t *testing.T) {
+	assert.Equal(t, "STANDARD", KindText(&Token{Kind: "STANDARD"}))
+	assert.Equal(t, "DIRECT_ACCESS", KindText(&Token{Kind: "DIRECT_ACCESS"}))
+	assert.Equal(t, "-", KindText(&Token{}))
 }
 
 func TestAllFromAPIIsNeverNil(t *testing.T) {

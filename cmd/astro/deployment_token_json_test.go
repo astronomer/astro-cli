@@ -46,12 +46,14 @@ const (
 func tokPtr[T any](v T) *T { return &v }
 
 // tokenFixtures builds the three kinds of token a Deployment can hold, created
-// at times whose "ago" rendering is stable for the length of a test run.
+// at times whose "ago" rendering is stable for the length of a test run. Their
+// kinds are one of each the tables show: STANDARD, DIRECT_ACCESS, and none.
 func tokenFixtures() (dep, ws, org astrov1.ApiToken) {
 	now := time.Now()
 	dep = astrov1.ApiToken{
 		Id: "tok-dep", Name: "ci-deploy", Description: "Deploys from CI",
 		Scope:     astrov1.ApiTokenScopeDEPLOYMENT,
+		Kind:      astrov1.ApiTokenKindSTANDARD,
 		Roles:     &[]astrov1.ApiTokenRole{{EntityType: astrov1.ApiTokenRoleEntityTypeDEPLOYMENT, EntityId: tokDeploymentID, Role: "DEPLOYMENT_ADMIN"}},
 		CreatedAt: now.Add(-50 * time.Hour),
 		CreatedBy: &astrov1.BasicSubjectProfile{FullName: tokPtr("Ada Lovelace")},
@@ -59,6 +61,7 @@ func tokenFixtures() (dep, ws, org astrov1.ApiToken) {
 	ws = astrov1.ApiToken{
 		Id: "tok-ws", Name: "ws-token",
 		Scope: astrov1.ApiTokenScopeWORKSPACE,
+		Kind:  astrov1.ApiTokenKindDIRECTACCESS,
 		Roles: &[]astrov1.ApiTokenRole{
 			{EntityType: astrov1.ApiTokenRoleEntityTypeWORKSPACE, EntityId: tokWorkspaceID, Role: "WORKSPACE_MEMBER"},
 			{EntityType: astrov1.ApiTokenRoleEntityTypeDEPLOYMENT, EntityId: tokDeploymentID, Role: "DEPLOYMENT_MEMBER"},
@@ -278,17 +281,17 @@ func requireLine(t *testing.T, out, line string) {
 
 // The rows each kind of token shows in a Deployment's list: the role is its
 // role on this Deployment, whatever else it holds.
-func listRow(id, name, desc, scope, role, created, by string) map[string]string {
+func listRow(id, name, desc, scope, kind, role, created, by string) map[string]string {
 	return map[string]string{
-		"ID": id, "NAME": name, "DESCRIPTION": desc, "SCOPE": scope,
+		"ID": id, "NAME": name, "DESCRIPTION": desc, "SCOPE": scope, "KIND": kind,
 		"DEPLOYMENT ROLE": role, "CREATED": created, "CREATED BY": by,
 	}
 }
 
 var (
-	depRow = listRow("tok-dep", "ci-deploy", "Deploys from CI", "DEPLOYMENT", "DEPLOYMENT_ADMIN", "2 days ago", "Ada Lovelace")
-	wsRow  = listRow("tok-ws", "ws-token", "", "WORKSPACE", "DEPLOYMENT_MEMBER", "3 hours ago", "bootstrap")
-	orgRow = listRow("tok-org", "org-token", "Org wide", "ORGANIZATION", "DEPLOYMENT_ADMIN", "10 minutes ago", "")
+	depRow = listRow("tok-dep", "ci-deploy", "Deploys from CI", "DEPLOYMENT", "STANDARD", "DEPLOYMENT_ADMIN", "2 days ago", "Ada Lovelace")
+	wsRow  = listRow("tok-ws", "ws-token", "", "WORKSPACE", "DIRECT_ACCESS", "DEPLOYMENT_MEMBER", "3 hours ago", "bootstrap")
+	orgRow = listRow("tok-org", "org-token", "Org wide", "ORGANIZATION", "-", "DEPLOYMENT_ADMIN", "10 minutes ago", "")
 )
 
 // What each command prints in text: the same messages, in the same order, as
@@ -636,6 +639,7 @@ type (
 		Name        string     `json:"name"`
 		Description string     `json:"description"`
 		Scope       string     `json:"scope"`
+		Kind        string     `json:"kind"`
 		Role        string     `json:"role"`
 		CreatedAt   time.Time  `json:"created_at"`
 		CreatedBy   string     `json:"created_by"`
@@ -663,10 +667,13 @@ var tokCreated = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 
 // tokenKeys is the set of keys a token publishes, which decoding cannot show:
 // an absent key and a null one decode alike. description is always there;
-// role, created_by, expires_at and token only when they have a value, so a
-// dropped omitempty turns up here as an unexpected key.
+// kind, role, created_by, expires_at and token only when they have a value,
+// so a dropped omitempty turns up here as an unexpected key.
 func tokenKeys(tok *tokenJSON) []string {
 	keys := []string{"created_at", "description", "id", "name", "scope"}
+	if tok.Kind != "" {
+		keys = append(keys, "kind")
+	}
 	if tok.Role != "" {
 		keys = append(keys, "role")
 	}
@@ -700,11 +707,11 @@ func jsonTokenFixtures() (dep, ws, org astrov1.ApiToken) {
 // What jsonTokenFixtures publish, each with its role on this Deployment.
 var (
 	depTokenJSON = tokenJSON{
-		ID: "tok-dep", Name: "ci-deploy", Description: "Deploys from CI", Scope: "DEPLOYMENT",
+		ID: "tok-dep", Name: "ci-deploy", Description: "Deploys from CI", Scope: "DEPLOYMENT", Kind: "STANDARD",
 		Role: "DEPLOYMENT_ADMIN", CreatedAt: tokCreated, CreatedBy: "Ada Lovelace",
 	}
 	wsTokenJSON = tokenJSON{
-		ID: "tok-ws", Name: "ws-token", Scope: "WORKSPACE",
+		ID: "tok-ws", Name: "ws-token", Scope: "WORKSPACE", Kind: "DIRECT_ACCESS",
 		Role: "DEPLOYMENT_MEMBER", CreatedAt: tokCreated, CreatedBy: "bootstrap",
 		ExpiresAt: tokPtr(time.Date(2027, 1, 2, 0, 0, 0, 0, time.UTC)),
 	}

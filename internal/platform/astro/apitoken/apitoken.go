@@ -24,7 +24,10 @@ type Token struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Scope       string `json:"scope"`
-	Role        string `json:"role,omitempty"`
+	// Kind is STANDARD or DIRECT_ACCESS, as the API names it; empty, and not
+	// published, when the API names none.
+	Kind string `json:"kind,omitempty"`
+	Role string `json:"role,omitempty"`
 	// CreatedBy is the creator's full name, or the name of the API token that
 	// created it.
 	CreatedAt time.Time  `json:"created_at"`
@@ -159,6 +162,15 @@ func WithRole(roles []astrov1.ApiTokenRole, entityType astrov1.ApiTokenRoleEntit
 	return out
 }
 
+// KindText is t's kind as the token tables show it: "-" when the API named
+// none, rather than a blank cell.
+func KindText(t *Token) string {
+	if t.Kind == "" {
+		return "-"
+	}
+	return t.Kind
+}
+
 // FromAPI reports t with role as its role, and no secret.
 func FromAPI(t *astrov1.ApiToken, role string) Token {
 	tok := Token{
@@ -166,6 +178,7 @@ func FromAPI(t *astrov1.ApiToken, role string) Token {
 		Name:               t.Name,
 		Description:        t.Description,
 		Scope:              string(t.Scope),
+		Kind:               string(t.Kind),
 		Role:               role,
 		CreatedAt:          t.CreatedAt,
 		ExpiresAt:          t.EndAt,
