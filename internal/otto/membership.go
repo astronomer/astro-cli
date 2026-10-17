@@ -7,9 +7,12 @@ import (
 	"io"
 	"os"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-// ErrNotOrgMember signals that the signed-in user is not a member of the
+// ErrNotOrgMember signals that the signed-in user cannot reach the
 // organization Otto would run in. Start has already printed what to do about
 // it, so launchOtto exits quietly, as for ErrNotLoggedIn.
 var ErrNotOrgMember = errors.New("not a member of the organization")
@@ -48,15 +51,29 @@ func effectiveOrganization(cfg *Config) (org, source string) {
 	}
 }
 
-// verifyOrgMembership stops the launch when the signed-in user is not a member
-// of the organization Otto would run in. Otto's model gateway is not
+// isAPIToken reports whether token is an Astro API token rather than a user's
+// login: its claims carry the permissions it was granted, as checkAPIToken in
+// cmd/astro reads them. An API token reaches an organization by those grants,
+// not by membership, so there is no membership to check.
+func isAPIToken(token string) bool {
+	claims, err := util.ParseAPIToken(token)
+	return err == nil && len(claims.Permissions) > 0
+}
+
+// verifyOrgMembership stops the launch when the signed-in user cannot reach
+// the organization Otto would run in. Otto's model gateway is not
 // permission-checked, so without this a mismatch (a stale ASTRO_ORGANIZATION,
 // an organization chosen under another login) shows only later, as a 403 from
 // the first organization-scoped call, which reads like a bug in that feature.
-// A nil check, no organization, or no token skips it.
+// A nil check, no organization, no token, or an API token skips it, and so
+// does a project organization on another host than the login's: the check
+// asks the login's host, which would not know it.
 func verifyOrgMembership(cfg *Config, check MembershipCheck, out io.Writer) error {
 	org, source := effectiveOrganization(cfg)
-	if check == nil || org == "" || cfg.Token == "" {
+	if check == nil || org == "" || cfg.Token == "" || isAPIToken(cfg.Token) {
+		return nil
+	}
+	if source == orgFromProject && manifest.NormalizeDomain(cfg.projectDomain) != manifest.NormalizeDomain(cfg.Domain) {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), membershipTimeout)
@@ -66,7 +83,11 @@ func verifyOrgMembership(cfg *Config, check MembershipCheck, out io.Writer) erro
 		return nil
 	}
 
-	fmt.Fprintf(out, "%s isn't a member of organization %s, so Otto can't run in it.\n", user, org)
+	// The API refused or hid the organization. Most often the user is not a
+	// member, but the organization may not exist, or may want a fresh sign-in
+	// (SSO, say), so say what was seen rather than guess.
+	fmt.Fprintf(out, "%s can't access organization %s, so Otto can't run in it.\n", user, org)
+	fmt.Fprintln(out, "You may not be a member of it, it may not exist, or it may need you to sign in again.")
 	fmt.Fprintln(out)
 	switch source {
 	case orgFromEnv:
@@ -79,6 +100,6 @@ func verifyOrgMembership(cfg *Config, check MembershipCheck, out io.Writer) erro
 		fmt.Fprintln(out, "The organization was selected for this login. To fix:")
 		fmt.Fprintln(out, "  • Switch organization:      astro organization switch")
 	}
-	fmt.Fprintln(out, "  • Sign in as another user:  astro login")
+	fmt.Fprintln(out, "  • Sign in again:            astro login")
 	return ErrNotOrgMember
 }

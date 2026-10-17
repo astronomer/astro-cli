@@ -5,7 +5,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // checkAnswering is a MembershipCheck that records the organization it was
@@ -40,7 +43,8 @@ func TestVerifyOrgMembership(t *testing.T) {
 			org: "org-a", where: "selected for this login", fix: "astro organization switch",
 		},
 		{
-			name: "the project's organization", cfg: &Config{Token: "t", Organization: "org-p", loginOrganization: "org-a"},
+			// The same host, written two ways.
+			name: "the project's organization", cfg: &Config{Token: "t", Domain: "astronomer.io", Organization: "org-p", loginOrganization: "org-a", projectDomain: "https://cloud.astronomer.io/"},
 			org: "org-p", where: "[tool.astro] organization", fix: "Run Otto outside this project",
 		},
 		{
@@ -57,7 +61,8 @@ func TestVerifyOrgMembership(t *testing.T) {
 			assert.ErrorIs(t, err, ErrNotOrgMember)
 			assert.Equal(t, tc.org, asked)
 			msg := out.String()
-			assert.Contains(t, msg, "b@example.com isn't a member of organization "+tc.org)
+			assert.Contains(t, msg, "b@example.com can't access organization "+tc.org)
+			assert.Contains(t, msg, "sign in again")
 			assert.Contains(t, msg, tc.where)
 			assert.Contains(t, msg, tc.fix)
 			assert.Contains(t, msg, "astro login")
@@ -76,6 +81,17 @@ func TestVerifyOrgMembership(t *testing.T) {
 	})
 	t.Run("no token skips the check", func(t *testing.T) {
 		assert.NoError(t, verifyOrgMembership(&Config{Organization: "org-a"}, never(t), &bytes.Buffer{}))
+	})
+	t.Run("an API token skips the check", func(t *testing.T) {
+		token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, util.CustomClaims{
+			Permissions: []string{"workspaceId:ws", "organizationId:org-a"},
+		}).SignedString([]byte("k"))
+		assert.NoError(t, err)
+		assert.NoError(t, verifyOrgMembership(&Config{Token: token, Organization: "org-a"}, never(t), &bytes.Buffer{}))
+	})
+	t.Run("a project organization on another host skips the check", func(t *testing.T) {
+		cfg := &Config{Token: "t", Domain: "astronomer.io", Organization: "org-p", loginOrganization: "org-a", projectDomain: "astronomer-dev.io"}
+		assert.NoError(t, verifyOrgMembership(cfg, never(t), &bytes.Buffer{}))
 	})
 	t.Run("no check skips it", func(t *testing.T) {
 		assert.NoError(t, verifyOrgMembership(&Config{Token: "t", Organization: "org-a"}, nil, &bytes.Buffer{}))

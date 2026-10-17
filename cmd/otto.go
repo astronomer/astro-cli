@@ -15,7 +15,6 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/otto"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
-	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 // hasHelpFlag reports whether args ask for help with a word of their own
@@ -45,14 +44,16 @@ func printAstroSubcommands(w io.Writer) {
 	fmt.Fprintln(w)
 }
 
-func newOttoCmd() *cobra.Command {
+func newOttoCmd(astroV1Client astrov1.APIClient) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                "otto [ARGS]...",
 		Short:              "Start the Otto AI agent",
 		Long:               "Start the Otto AI agent for AI-assisted Airflow development and operations. All flags and arguments are forwarded directly to Otto.",
 		SilenceUsage:       true,
 		DisableFlagParsing: true,
-		RunE:               ottoRun,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return ottoRun(args, astroV1Client)
+		},
 		Example: `  # Start Otto
   astro otto`,
 	}
@@ -60,7 +61,7 @@ func newOttoCmd() *cobra.Command {
 	return cmd
 }
 
-func ottoRun(cmd *cobra.Command, args []string) error {
+func ottoRun(args []string, astroV1Client astrov1.APIClient) error {
 	// With DisableFlagParsing, cobra won't route to subcommands,
 	// so we dispatch "update" and "version" ourselves. "upgrade" is
 	// aliased to "update" — otherwise it falls through to Otto and gets
@@ -90,13 +91,17 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 
 	// `astro otto --help` forwards to Otto's own help, which doesn't know
 	// about the astro CLI's `update` / `version` subcommands. Prepend a short
-	// banner so they're discoverable.
+	// banner so they're discoverable. Help needs no organization, so it skips
+	// the membership check, which otto.Start's own test for help does not
+	// catch in every spelling (`--help=true`, `-h=true`).
+	check := ottoMembership(astroV1Client)
 	if hasHelpFlag(args) {
 		printAstroSubcommands(os.Stdout)
+		check = nil
 	}
 
 	// Everything else (flags, prompt, etc.) is forwarded directly to Otto.
-	return launchOtto(args)
+	return launchOtto(args, check)
 }
 
 // launchOtto runs Otto with args and waits for it. It propagates Otto's exit
@@ -104,9 +109,9 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 // cobra's "Error: exit status N" would be noise. Same treatment for
 // ErrNotLoggedIn and ErrNotOrgMember: Start has already printed the guidance
 // to stderr, so returning the error to cobra would just tack on a redundant
-// "Error: ..." line.
-func launchOtto(args []string) error {
-	err := otto.Start(args, ottoMembership(astrov1.NewV1Client(httputil.NewHTTPClient())))
+// "Error: ..." line. check is the membership check Start runs; nil skips it.
+func launchOtto(args []string, check otto.MembershipCheck) error {
+	err := otto.Start(args, check)
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		os.Exit(exitErr.ExitCode())
@@ -118,10 +123,11 @@ func launchOtto(args []string) error {
 }
 
 // ottoMembership is the check Start runs before spawning Otto, against the
-// Astro API. A 403 or 404 for the organization means not a member only when
-// the login is a user who can say who they are: an API token reaches an
-// organization by its own grants, not membership, so it is never refused
-// here. Every other answer lets the launch go ahead.
+// Astro API. Start never asks it about an API token, which reaches an
+// organization by its own grants; a 403 or 404 for the organization refuses
+// the launch only when the self-user lookup confirms the login is a user,
+// which also covers a token Start could not tell apart. Every other answer
+// lets the launch go ahead.
 func ottoMembership(client astrov1.APIClient) otto.MembershipCheck {
 	return func(ctx context.Context, org string) (string, bool) {
 		resp, err := client.GetOrganizationWithResponse(ctx, org, &astrov1.GetOrganizationParams{})
