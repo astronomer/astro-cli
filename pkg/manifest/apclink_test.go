@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -80,6 +81,26 @@ deployment = "ckdep-apc"
 	ve := validationError(t, err)
 	if codes := problemCodesOf(ve); !reflect.DeepEqual(codes, []ProblemCode{CodeDomainWithoutWorkspace}) {
 		t.Errorf("codes = %v, want domain_without_workspace", codes)
+	}
+}
+
+// The [tool.astro] domain hint is for an astro link only: an mwaa link has
+// no Astro host to point at.
+func TestADomainOnANonAPCLinkNamesTheHostOnlyForAstro(t *testing.T) {
+	reason := func(link string) string {
+		_, err := Load(write(t, "[project]\nname = \"p\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\nworkspace = \"ws\"\n\n"+
+			"[tool.astro.deployments.x]\n"+link+"domain = \"astro.corp.example\"\n"))
+		ve := validationError(t, err)
+		if len(ve.Problems) != 1 || ve.Problems[0].Code != CodeDomainOnNonAPCLink {
+			t.Fatalf("problems = %+v", ve.Problems)
+		}
+		return ve.Problems[0].Reason
+	}
+	if r := reason("deployment = \"dep\"\n"); !strings.Contains(r, "[tool.astro] domain") {
+		t.Errorf("astro link: %q should name [tool.astro] domain", r)
+	}
+	if r := reason("target = \"mwaa\"\nenvironment = \"e\"\n"); strings.Contains(r, "[tool.astro] domain") {
+		t.Errorf("mwaa link: %q should not name [tool.astro] domain", r)
 	}
 }
 

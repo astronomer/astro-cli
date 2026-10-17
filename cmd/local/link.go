@@ -369,7 +369,9 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 		if name, err = c.pickAPCDeployment(&link, m, name); err != nil {
 			return err
 		}
-	case link.Kind == manifest.KindAPC:
+	case link.Kind == manifest.KindAPC && link.Deployment != "":
+		// With no Deployment the save refuses the link for that first, so the
+		// workspace is not asked about.
 		if err := c.apcWorkspace(&link); err != nil {
 			return err
 		}
@@ -532,7 +534,8 @@ func (c *cli) apcContextWorkspace() (string, error) {
 	ws, err := c.d.APC.CurrentWorkspace()
 	switch {
 	case err != nil:
-		return "", err
+		// Never a bare context error, whose text is about Astro.
+		return "", APCWorkspaceUnreadable(err)
 	case ws == "":
 		return "", errNoAPCWorkspace
 	}
@@ -651,7 +654,9 @@ var credentialFlags = map[manifest.AuthMethod][]string{
 // --target, or the target the link would inherit. Under an Astro Private
 // Cloud context (onAPC), a link that names no target in a project whose target
 // is unset or astro is an apc link: that context's Deployments are the ones
-// it lists. A project whose target is mwaa or composer keeps that kind.
+// it lists. A project whose target is mwaa or composer keeps that kind, unless
+// --deployment is given: that names a Deployment of the context's platform,
+// so the link is apc, as on v2 under Astro it is astro.
 func (in *linkAddInput) kind(given func(string) bool, m *manifest.Manifest, onAPC bool) (manifest.LinkKind, error) {
 	platform := manifest.KindAstro
 	if onAPC {

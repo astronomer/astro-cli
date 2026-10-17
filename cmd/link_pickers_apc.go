@@ -38,7 +38,7 @@ var errInvalidAPCLinkSelection = errors.New("invalid Deployment selected")
 // current domain, which is the config's context key, never the login:
 // GetCurrentContext resolves the login, which can reach the OS keyring or the
 // secrets vault. The workspace and the Deployments are read inside the
-// closures, when astro link add asks (TestAPCLinkingReadsNoLogin).
+// closures, when astro link add asks (TestAPCLinkingAddsNoLoginRead).
 func withAPCLinking(d *local.Deps, client houston.ClientInterface) {
 	domain, err := config.GetCurrentDomain()
 	if err != nil || domain == "" {
@@ -48,10 +48,13 @@ func withAPCLinking(d *local.Deps, client houston.ClientInterface) {
 		Domain: manifest.NormalizeAPCDomain(domain),
 		CurrentWorkspace: func() (string, error) {
 			ws, err := workspace.GetCurrentWorkspace()
-			if errors.Is(err, workspace.ErrWorkspaceContextNotSet) {
+			switch {
+			case errors.Is(err, workspace.ErrWorkspaceContextNotSet):
 				return "", nil
+			case err != nil:
+				return "", local.APCWorkspaceUnreadable(err)
 			}
-			return ws, err
+			return ws, nil
 		},
 		PickDeployment: func(workspaceID string, linked map[string]string) (local.PickedDeployment, error) {
 			return pickAPCDeployment(client, workspaceID, linked)

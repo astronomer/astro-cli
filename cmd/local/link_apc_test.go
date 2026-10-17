@@ -165,10 +165,31 @@ func TestLinkAddUnderAPCFollowsAnMWAAOrComposerProjectTarget(t *testing.T) {
 func TestLinkAddUnderAPCReportsAWorkspaceReadError(t *testing.T) {
 	dir, _ := linkTestProject(t, linkManifest)
 	d, _ := apcDeps(t, dir, "", PickedDeployment{})
-	broken := errors.New("reading the context: config unreadable")
+	broken := errors.New("no context set, have you authenticated to Astro or APC?")
 	d.APC.CurrentWorkspace = func() (string, error) { return "", broken }
 	err := execute(t, d, "link", "add", "prod-apc", "--deployment", "ckdep-1")
 	require.ErrorIs(t, err, broken)
+	require.ErrorIs(t, err, ErrAPCWorkspaceUnreadable)
+	assert.Equal(t, "reading the current Astro Private Cloud workspace: "+broken.Error()+"; pass --workspace", err.Error())
+	assert.Equal(t, linkManifest, readManifest(t, dir))
+
+	// Already said by the reader, it is not said twice.
+	said := APCWorkspaceUnreadable(broken)
+	assert.Same(t, said, APCWorkspaceUnreadable(said))
+}
+
+// A run that cannot be asked and names no Deployment is told about the
+// Deployment first, before any workspace is looked for.
+func TestLinkAddUnderAPCNamesTheMissingDeploymentFirst(t *testing.T) {
+	dir, _ := linkTestProject(t, linkManifest)
+	d, _ := apcDeps(t, dir, "", PickedDeployment{})
+	d.APC.CurrentWorkspace = func() (string, error) {
+		t.Error("the workspace was read for a link with no Deployment")
+		return "", nil
+	}
+	err := execute(t, d, "link", "add", "prod-apc")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "needs a deployment")
 	assert.Equal(t, linkManifest, readManifest(t, dir))
 }
 

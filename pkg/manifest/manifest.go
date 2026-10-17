@@ -1069,8 +1069,11 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 func (p *parser) domain(key string, kind LinkKind, raw any) string {
 	if kind != KindAPC {
 		if raw != nil {
-			p.add(CodeDomainOnNonAPCLink, key+".domain", fmt.Sprintf("only an apc link sets domain, and this is %s link. "+
-				"An astro link's host is [tool.astro] domain", KindWithArticle(kind)))
+			reason := fmt.Sprintf("only an apc link sets domain, and this is %s link", KindWithArticle(kind))
+			if kind == KindAstro {
+				reason += ". An astro link's host is [tool.astro] domain"
+			}
+			p.add(CodeDomainOnNonAPCLink, key+".domain", reason)
 		}
 		return ""
 	}

@@ -474,6 +474,20 @@ type APCLinking struct {
 	PickDeployment func(workspaceID string, linked map[string]string) (PickedDeployment, error)
 }
 
+// ErrAPCWorkspaceUnreadable is a current APC workspace that could not be read,
+// for a reason other than none being set.
+var ErrAPCWorkspaceUnreadable = errors.New("reading the current Astro Private Cloud workspace")
+
+// APCWorkspaceUnreadable says the current APC workspace could not be read, and
+// that --workspace answers it, around err. An error that already says so is
+// returned as it is, so the root's reader and astro link add do not repeat it.
+func APCWorkspaceUnreadable(err error) error {
+	if errors.Is(err, ErrAPCWorkspaceUnreadable) {
+		return err
+	}
+	return fmt.Errorf("%w: %w; pass --workspace", ErrAPCWorkspaceUnreadable, err)
+}
+
 // PickedDeployment is the Deployment a picker chose.
 type PickedDeployment struct {
 	ID          string
