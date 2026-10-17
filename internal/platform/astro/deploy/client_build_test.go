@@ -69,13 +69,14 @@ const agentBase = "images.astronomer.cloud/baseimages/astro-remote-execution-age
 // handler did.
 func TestClientBuildRequest(t *testing.T) {
 	ctx := t.TempDir()
-	req := clientBuildRequest(ctx, "registry.example.com/agents/client:deploy-1", []string{"linux/amd64", "linux/arm64"}, []string{"id=aws,src=/abs/creds"}, "podman")
+	creds := filepath.Join(t.TempDir(), "creds")
+	req := clientBuildRequest(ctx, "registry.example.com/agents/client:deploy-1", []string{"linux/amd64", "linux/arm64"}, []string{"id=aws,src=" + creds}, "podman")
 	assert.Equal(t, imagebuild.Request{
 		Dockerfile: filepath.Join(ctx, "Dockerfile.client"),
 		Context:    ctx,
 		Tag:        "registry.example.com/agents/client:deploy-1",
 		Platform:   "linux/amd64,linux/arm64",
-		Secrets:    []string{"id=aws,src=/abs/creds"},
+		Secrets:    []string{"id=aws,src=" + creds},
 		Format:     "docker",
 		Bin:        "podman",
 	}, req)
