@@ -824,7 +824,7 @@ func TestImageDeployOnRemoteExecutionDeploymentSucceedsWithoutDagDeploy(t *testi
 	err = Deploy(deployInput, mockV1Client, nil)
 	assert.NoError(t, err)
 	if err != nil {
-		assert.NotContains(t, err.Error(), "DAG-only deploys are not enabled")
+		assert.NotContains(t, err.Error(), "Dag-only deploys are not enabled")
 	}
 
 	mockV1Client.AssertExpectations(t)
@@ -854,7 +854,7 @@ func TestDagsDeployFailed(t *testing.T) {
 
 	defer testUtil.MockUserInput(t, "y")()
 	err := Deploy(deployInput, mockV1Client, nil)
-	assert.Equal(t, err.Error(), "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update test-deployment-id --dag-deploy enable' to enable DAG-only deploys")
+	assert.Equal(t, err.Error(), "Dag-only deploys are not enabled for this Deployment. Run 'astro deployment update test-deployment-id --dag-deploy enable' to enable Dag-only deploys")
 
 	mockImageHandler := new(mocks.ImageHandler)
 	airflowImageHandler = func(image string) airflow.ImageHandler {

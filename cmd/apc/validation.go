@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ErrInvalidDAGDeploymentType = errors.New("please specify the correct DAG deployment type, one of the following: image, volume, git_sync(if enabled in platform config), dag_deploy(if enabled in platform config)")
+	ErrInvalidDAGDeploymentType = errors.New("please specify the correct Dag deployment type, one of the following: image, volume, git_sync(if enabled in platform config), dag_deploy(if enabled in platform config)")
 	errNFSLocationNotFound      = errors.New("please specify the nfs location via --nfs-location flag")
 	errGitRepoNotFound          = errors.New("please specify a valid git repository URL via --git-repository-url")
 	errInvalidExecutorType      = errors.New("please specify correct executor, one of: local, celery, kubernetes, k8s")

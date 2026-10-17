@@ -61,6 +61,7 @@ type ClientInterface interface {
 	UpdateDeploymentAirflow(variables map[string]interface{}) (*Deployment, error)
 	UpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
 	CancelUpdateDeploymentRuntime(variables map[string]interface{}) (*Deployment, error)
+	HibernateOverrideDeployment(variables map[string]interface{}) (*Deployment, error)
 	GetDeploymentConfig(interface{}) (*DeploymentConfig, error)
 	ListDeploymentLogs(filters ListDeploymentLogsRequest) ([]DeploymentLog, error)
 	UpdateDeploymentImage(req UpdateDeploymentImageRequest) (interface{}, error)
@@ -127,9 +128,9 @@ func NewHTTPClient() *httputil.HTTPClient {
 	dialTimeout := config.CFG.HoustonDialTimeout.GetInt()
 	// #nosec
 	httpClient.HTTPClient.Transport = &http.Transport{
-		Dial: (&net.Dialer{
+		DialContext: (&net.Dialer{
 			Timeout: time.Duration(dialTimeout) * time.Second,
-		}).Dial,
+		}).DialContext,
 		TLSHandshakeTimeout: time.Duration(dialTimeout) * time.Second,
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: config.CFG.HoustonSkipVerifyTLS.GetBool()},
 	}

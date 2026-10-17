@@ -159,14 +159,38 @@ func (c *Context) SetContextKey(key, value string) error {
 // a partial struct with every unset field zeroed out.
 // See https://github.com/spf13/viper/issues/1106.
 func setContextField(cKey, field string, value interface{}) error {
+	return updateContextMap(cKey, func(ctxMap map[string]interface{}) { ctxMap[field] = value })
+}
+
+// updateContextMap applies update to the context's map and persists the config
+// in one write, for the reason setContextField gives.
+func updateContextMap(cKey string, update func(map[string]interface{})) error {
 	parentPath := fmt.Sprintf("%s.%s", contextsKey, cKey)
 	ctxMap := viperHome.GetStringMap(parentPath)
 	if ctxMap == nil {
 		ctxMap = map[string]interface{}{}
 	}
-	ctxMap[field] = value
+	update(ctxMap)
 	viperHome.Set(parentPath, ctxMap)
 	return saveConfig(viperHome, HomeConfigFile)
+}
+
+// ClearCredentials empties every credential the context holds: the access
+// token, the refresh token, the user's email and the token's expiry. It is one
+// write, so a logout that fails to save leaves the context as it was rather
+// than with the long-lived refresh token still in place.
+func (c *Context) ClearCredentials() error {
+	cKey, err := c.GetContextKey()
+	if err != nil {
+		return err
+	}
+	return updateContextMap(cKey, func(ctxMap map[string]interface{}) {
+		ctxMap["token"] = ""
+		ctxMap["refreshtoken"] = ""
+		ctxMap["user_email"] = ""
+		// viper lowercases keys, so SetExpiresIn's "ExpiresIn" is stored as this
+		delete(ctxMap, "expiresin")
+	})
 }
 
 // set organization id and short name in context config

@@ -148,7 +148,10 @@ func SetupOSArgsForGinkgo() func() {
 			newArgs = append(newArgs, origArgs[i])
 		}
 	}
-	if len(os.Args) > 1 {
+	// The filter can leave nothing: a test binary's own path contains "test"
+	// (cloud.test), as does every -test.* flag. Cobra reads os.Args[0], so
+	// it must never be empty.
+	if len(newArgs) > 0 {
 		os.Args = newArgs
 	} else {
 		os.Args = []string{"single-arg-for-cobra"}

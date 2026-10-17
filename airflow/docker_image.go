@@ -638,8 +638,8 @@ func (d *DockerImage) RunDAG(dagID, envFile, settingsFile, containerName, dagFil
 
 	args = append(args, cmdArgs...)
 
-	fmt.Println("\nStarting a DAG run for " + dagID + "...")
-	fmt.Println("\nLoading DAGs...")
+	fmt.Println("\nStarting a Dag run for " + dagID + "...")
+	fmt.Println("\nLoading Dags...")
 	logger.Debug("args passed to docker command:")
 	logger.Debug(args)
 

@@ -104,6 +104,7 @@ Welcome to the Astro CLI, the modern command line interface for data orchestrati
 		apcCmd.VersionMatchCmds(rootCmd, []string{"astro"})
 	}
 
+	rootCmd.SetFlagErrorFunc(trackUnknownFlag)
 	rootCmd.SetHelpTemplate(getResourcesHelpTemplate(houstonVersion, ctx))
 	rootCmd.PersistentFlags().StringVarP(&verboseLevel, "verbosity", "", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic")
 

@@ -49,7 +49,7 @@ const (
 
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
-	enableDagDeployMsg       = "DAG-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable DAG-only deploys"
+	enableDagDeployMsg       = "Dag-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable Dag-only deploys"
 	dagDeployDisabled        = "dag deploy is not enabled for deployment"
 	invalidWorkspaceID       = "Invalid workspace id %s was provided through the --workspace-id flag\n"
 	errCiCdEnforcementUpdate = "cannot deploy since ci/cd enforcement is enabled for the deployment %s. Please use API Tokens instead"
@@ -72,7 +72,7 @@ var (
 )
 
 var (
-	errDagsParseFailed = errors.New("your local DAGs did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
+	errDagsParseFailed = errors.New("your local Dags did not parse. Fix the listed errors or use `astro deploy [deployment-id] -f` to force deploy") //nolint:revive
 	envFileMissing     = errors.New("Env file path is incorrect: ")                                                                                  //nolint:revive
 )
 
@@ -335,7 +335,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 
 	if deployInput.Dags {
 		if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+			i, _ := input.Confirm("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?")
 
 			if !i {
 				fmt.Println("Canceling deploy...")
@@ -358,7 +358,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 			return fmt.Errorf(enableDagDeployMsg, deployInfo.deploymentID) //nolint
 		}
 
-		fmt.Println("Initiating DAG deploy for: " + deployInfo.deploymentID)
+		fmt.Println("Initiating Dag deploy for: " + deployInfo.deploymentID)
 		dagTarballVersion, err = deployDags(deployInput.Path, dagsPath, dagsUploadURL, deployInfo.currentVersion, astrov1.DeploymentType(deployInfo.deploymentType), deployInput.NoDagsBaseDir)
 		if err != nil {
 			if strings.Contains(err.Error(), dagDeployDisabled) {
@@ -382,7 +382,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 			}
 
 			fmt.Println(
-				"\nSuccessfully uploaded DAGs with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
+				"\nSuccessfully uploaded Dags with version " + ansi.Bold(dagTarballVersion) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful." +
 					fmt.Sprintf(accessYourDeploymentFmt, ansi.Bold(deploymentURL), ansi.Bold(deployInfo.webserverURL)),
 			)
 
@@ -390,7 +390,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		fmt.Println(
-			"\nSuccessfully uploaded DAGs with version " + ansi.Bold(
+			"\nSuccessfully uploaded Dags with version " + ansi.Bold(
 				dagTarballVersion,
 			) + " to Astro. Navigate to the Airflow UI to confirm that your deploy was successful. The Airflow UI takes about 1 minute to update." +
 				fmt.Sprintf(
@@ -414,7 +414,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		}
 
 		if deployInfo.dagDeployEnabled && len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !deployInput.Image && !deployInput.Force {
-			i, _ := input.Confirm("Warning: No DAGs found. This will delete any existing DAGs. Are you sure you want to deploy?")
+			i, _ := input.Confirm("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?")
 
 			if !i {
 				fmt.Println("Canceling deploy...")
@@ -434,7 +434,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 				return err
 			}
 		} else {
-			fmt.Println("No DAGs found. Skipping testing...")
+			fmt.Println("No Dags found. Skipping testing...")
 		}
 
 		repository := imageRepository
@@ -455,7 +455,7 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 					return err
 				}
 			} else {
-				fmt.Println("Image Deploy only. Skipping deploying DAG...")
+				fmt.Println("Image Deploy only. Skipping deploying Dag...")
 			}
 		}
 		// finish deploy
@@ -543,7 +543,7 @@ func getDeploymentInfo(
 func parseOrPytestDAG(pytest, runtimeVersion, envFile, deployImage, namespace string, buildSecrets []string) error {
 	validDAGParseVersion := airflowversions.CompareRuntimeVersions(runtimeVersion, dagParseAllowedVersion) >= 0
 	if !validDAGParseVersion {
-		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip DAG parse...")
+		fmt.Println("\nruntime image is earlier than 4.1.0, this deploy will skip Dag parse...")
 	}
 
 	containerHandler, err := containerHandlerInit(config.WorkingPath, envFile, "Dockerfile", namespace)
@@ -607,7 +607,7 @@ func checkPytest(pytest, deployImage string, buildSecrets []string, containerHan
 		if strings.Contains(exitCode, "1") { // exit code is 1 meaning tests failed
 			return errors.New("at least 1 pytest in your tests directory failed. Fix the issues listed or rerun the command without the '--pytest' flag to deploy")
 		}
-		return errors.Wrap(err, "Something went wrong while Pytesting your DAGs,\nif the issue persists rerun the command without the '--pytest' flag to deploy")
+		return errors.Wrap(err, "Something went wrong while Pytesting your Dags,\nif the issue persists rerun the command without the '--pytest' flag to deploy")
 	}
 
 	fmt.Print("\nAll Pytests passed!\n")
@@ -808,7 +808,7 @@ func finalizeDeploy(deployID, deploymentID, organizationID, dagTarballVersion st
 		return err
 	}
 	if resp.JSON200.DagTarballVersion != nil {
-		fmt.Println("Deployed DAG bundle: ", *resp.JSON200.DagTarballVersion)
+		fmt.Println("Deployed Dag bundle: ", *resp.JSON200.DagTarballVersion)
 	}
 	if resp.JSON200.ImageTag != "" {
 		fmt.Println("Deployed Image Tag: ", resp.JSON200.ImageTag)

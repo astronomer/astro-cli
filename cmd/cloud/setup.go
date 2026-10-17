@@ -108,7 +108,7 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 	}
 
 	// Check for APITokens before API keys or refresh tokens
-	apiToken, err := checkAPIToken(isDeploymentFile, astroV1Client)
+	apiToken, err := checkAPIToken(astroV1Client)
 	if err != nil {
 		return err
 	}
@@ -355,15 +355,13 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
+func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	// check os variables
 	astroAPIToken := os.Getenv("ASTRO_API_TOKEN")
 	if astroAPIToken == "" {
 		return false, nil
 	}
-	if !isDeploymentFile {
-		fmt.Println("Using an Astro API Token")
-	}
+	logger.Debug("Using an Astro API Token")
 
 	// get authConfig
 	c, err := context.GetCurrentContext() // get current context

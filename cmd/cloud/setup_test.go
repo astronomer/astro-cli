@@ -511,7 +511,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -534,7 +534,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
@@ -553,7 +553,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -590,7 +590,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(false, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 
@@ -630,7 +630,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
 
@@ -669,7 +669,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 }
