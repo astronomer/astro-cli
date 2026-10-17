@@ -379,10 +379,11 @@ func (s *Suite) TestListTokens() {
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&resp, nil)
 		s.NoError(ListTokens(mockClient, out))
 
-		s.Contains(out.String(), "KIND")
-		s.Regexp(`direct-token\s.*DIRECT_ACCESS`, out.String())
+		// KIND is the last column, so every earlier one keeps its position.
+		s.Regexp(`CREATED BY\s+KIND`, out.String())
+		s.Regexp(`(?m)direct-token\s.*\sDIRECT_ACCESS\s*$`, out.String())
 		// A token the API names no kind for shows "-", not a blank cell.
-		s.Regexp(`kindless-token\s.*ORGANIZATION\s+-\s`, out.String())
+		s.Regexp(`(?m)kindless-token\s.*\s-\s*$`, out.String())
 	})
 }
 
