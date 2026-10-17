@@ -580,7 +580,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -603,7 +603,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
@@ -622,7 +622,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -659,7 +659,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(false, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 
@@ -699,7 +699,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
 
@@ -738,7 +738,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 }
@@ -785,7 +785,7 @@ func TestSetupReadsTheAPITokenByTheOneRule(t *testing.T) {
 			got = token
 			return nil, errStop
 		}
-		ok, err := checkAPIToken(true, new(astrov1_mocks.ClientWithResponsesInterface))
+		ok, err := checkAPIToken(new(astrov1_mocks.ClientWithResponsesInterface))
 		assert.False(t, ok, "ASTRO_API_TOKEN=%q", env)
 		if parsed == "" {
 			assert.NoError(t, err, "ASTRO_API_TOKEN=%q", env)

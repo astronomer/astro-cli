@@ -163,7 +163,7 @@ func ensureLogin(deploymentFile bool, astroV1Client astrov1.APIClient) error {
 // ensureEnvCredentials sets up an API token or API keys from the environment,
 // reporting whether one was found. They come before any saved login.
 func ensureEnvCredentials(deploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
-	apiToken, err := checkAPIToken(deploymentFile, astroV1Client)
+	apiToken, err := checkAPIToken(astroV1Client)
 	if err != nil || apiToken {
 		return apiToken, err
 	}
@@ -529,7 +529,7 @@ func checkAPIKeys(astroV1Client astrov1.APIClient, isDeploymentFile bool) (bool,
 	return true, nil
 }
 
-func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool, error) {
+func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	// check os variables
 	// Read as every reader of the variable reads it: one holding only the
 	// scheme ("Bearer ") is no token, and one holding the scheme too is the
@@ -539,9 +539,7 @@ func checkAPIToken(isDeploymentFile bool, astroV1Client astrov1.APIClient) (bool
 		return false, nil
 	}
 	astroAPIToken := astrosession.Credential(stored)
-	if !isDeploymentFile {
-		fmt.Fprintln(os.Stderr, "Using an Astro API Token")
-	}
+	logger.Debug("Using an Astro API Token")
 
 	// Parse the token to peek at the custom claims
 	claims, err := parseAPIToken(astroAPIToken)
