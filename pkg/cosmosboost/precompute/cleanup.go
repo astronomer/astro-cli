@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -39,8 +40,9 @@ type CleanupSummary struct {
 }
 
 // Cleanup removes every .astro/dbt_metadata.json sidecar and every
-// .astro/manifest.slim.json under the given roots that this tool wrote,
-// pruning each containing .astro directory when removal leaves it empty.
+// .astro/*.slim.json slim manifest under the given roots that this tool
+// wrote, pruning each containing .astro directory when removal leaves it
+// empty.
 //
 // Each file is judged by its own producer marker, never by its neighbor's,
 // because the mixed states are real: a slim manifest outlives its sidecar when
@@ -70,10 +72,10 @@ func Cleanup(roots []string) (CleanupSummary, error) {
 			if filepath.Base(filepath.Dir(path)) != sidecarDir {
 				return nil
 			}
-			switch d.Name() {
-			case sidecarName:
+			switch {
+			case d.Name() == sidecarName:
 				recordOnce(seen, &results, path, removeSidecar)
-			case slimManifestName:
+			case strings.HasSuffix(d.Name(), slimManifestSuffix):
 				recordOnce(seen, &results, path, removeSlimManifest)
 			}
 			return nil
@@ -143,8 +145,8 @@ func removeSidecar(path string) CleanupResult {
 	})
 }
 
-// removeSlimManifest removes one .astro/manifest.slim.json, keeping it unless
-// its own _generated_by marker names this tool.
+// removeSlimManifest removes one .astro/*.slim.json, keeping it unless its
+// own _generated_by marker names this tool.
 func removeSlimManifest(path string) CleanupResult {
 	return removeArtifact(path, func(data []byte) bool {
 		var marker struct {

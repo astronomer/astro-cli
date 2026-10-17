@@ -45,7 +45,7 @@ func TestPreDeployWritesArtifact(t *testing.T) {
 		} `json:"generated_by"`
 	}
 	require.NoError(t, json.Unmarshal(data, &meta))
-	require.Equal(t, 1, meta.Schema, "schema is the plugin's compatibility gate and must stay 1")
+	require.Equal(t, 2, meta.Schema, "schema is the plugin's compatibility gate - bump deliberately, not by accident")
 	require.NotEmpty(t, meta.Version.Hash, "version.hash is what the plugin consumes")
 	require.NotEmpty(t, meta.Version.Algo)
 	require.Equal(t, "astro", meta.GeneratedBy.Application)
@@ -99,6 +99,19 @@ func TestSlimManifestEnabled(t *testing.T) {
 		t.Setenv(slimManifestEnvVar, tc.value)
 		require.Equal(t, tc.want, slimManifestEnabled(), "value %q", tc.value)
 	}
+}
+
+// TestPreDeployDiscoversCustomNamedManifest: a manifest not literally named
+// manifest.json is found and stamped automatically - by name and content,
+// with nothing to configure.
+func TestPreDeployDiscoversCustomNamedManifest(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "manifest_full.json"), []byte(manifest), 0o644))
+
+	require.NoError(t, PreDeploy(dir))
+	require.FileExists(t, filepath.Join(dir, artifactRelPath))
+	require.FileExists(t, filepath.Join(dir, ".astro", "manifest_full.slim.json"))
 }
 
 func TestPreDeployNoDbtContentIsANoOp(t *testing.T) {
