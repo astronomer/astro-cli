@@ -16,8 +16,6 @@ var (
 	RuntimePythonRe = regexp.MustCompile(`-python-(\d+\.\d+)(-base)?$`)
 	// FullRuntimeTagRe matches a pinned runtime tag in the new format (X.Y-Z).
 	FullRuntimeTagRe = regexp.MustCompile(`^\d+\.\d+-\d+`)
-	// pythonSuffixRe is a -python-X.Y flavor at the end of a tag.
-	pythonSuffixRe = regexp.MustCompile(`-python-(\d+\.\d+)$`)
 )
 
 // ParseDockerfile extracts the runtime image name and tag from the Dockerfile at
@@ -145,27 +143,15 @@ func splitImageRef(ref string) (image, tag string) {
 //	"3.1-12-python-3.11-base"  → base="3.1-12", python="3.11"
 //	"13.7.0-slim"              → base="13.7.0", python=""
 //	"13.7.0-slim-python-3.12"  → base="13.7.0", python="3.12"
-//
-// The flavors are stripped in any order ("12.1.0-python-3.12-slim" is
-// "12.1.0" too), each at most once, so a tag reads the same whichever way its
-// suffixes were written.
 func ParseRuntimeTagPython(tag string) (baseTag, pythonVersion string) {
-	baseTag = tag
-	stripped := map[string]bool{}
-	for {
-		switch {
-		case !stripped["base"] && strings.HasSuffix(baseTag, "-base"):
-			baseTag, stripped["base"] = strings.TrimSuffix(baseTag, "-base"), true
-		case !stripped["slim"] && strings.HasSuffix(baseTag, "-slim"):
-			baseTag, stripped["slim"] = strings.TrimSuffix(baseTag, "-slim"), true
-		default:
-			loc := pythonSuffixRe.FindStringSubmatchIndex(baseTag)
-			if loc == nil || stripped["python"] {
-				return baseTag, pythonVersion
-			}
-			baseTag, pythonVersion, stripped["python"] = baseTag[:loc[0]], baseTag[loc[2]:loc[3]], true
-		}
+	if loc := RuntimePythonRe.FindStringSubmatchIndex(tag); loc != nil {
+		baseTag, pythonVersion = tag[:loc[0]], tag[loc[2]:loc[3]]
+	} else {
+		baseTag = tag
 	}
+	baseTag = strings.TrimSuffix(baseTag, "-base")
+	baseTag = strings.TrimSuffix(baseTag, "-slim")
+	return baseTag, pythonVersion
 }
 
 // IsValidRuntimeTag checks if a tag looks like a valid pinned runtime version (X.Y-Z).
@@ -312,10 +298,15 @@ func ReadDeclaredBase(path string) DeclaredBase {
 	if path == "" {
 		return DeclaredBase{}
 	}
-	image, tag, err := ParseDockerfileAt(path)
-	// A build argument in the tag (runtime:${V}) is as unresolved as one in
-	// the image: what it names is not in the text, so neither the base nor its
-	// version is judged, at start or at init.
+	return NewDeclaredBase(ParseDockerfileAt(path))
+}
+
+// NewDeclaredBase is the DeclaredBase for what ParseDockerfileAt returned, for
+// a caller that has already parsed the file. Unknown when the parse failed, and
+// when the image or the tag is built from a build argument (runtime:${V}):
+// what it names is not in the text, so neither the base nor its version is
+// judged, at start or at init.
+func NewDeclaredBase(image, tag string, err error) DeclaredBase {
 	if err != nil || IsUnresolvedRef(image) || IsUnresolvedRef(tag) {
 		return DeclaredBase{}
 	}

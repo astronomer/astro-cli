@@ -45,6 +45,12 @@ func TestDeclaredBaseRuntimeVersion(t *testing.T) {
 			assert.Equal(t, tt.want, base.RuntimeVersion())
 		})
 	}
+	// The rule a caller holding a parse already applies (scaffold's 1.x
+	// conversion) is the same one.
+	assert.True(t, NewDeclaredBase("mirror/runtime", "3.1-12", nil).Known)
+	assert.False(t, NewDeclaredBase("mirror/runtime", "${TAG}", nil).Known)
+	assert.False(t, NewDeclaredBase("${BASE}", "latest", nil).Known)
+	assert.False(t, NewDeclaredBase("", "", os.ErrNotExist).Known)
 	assert.False(t, ReadDeclaredBase("").Known, "no path is no Dockerfile")
 	assert.False(t, ReadDeclaredBase(filepath.Join(t.TempDir(), "missing")).Known)
 }

@@ -278,7 +278,7 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 	from1x.notes = append(from1x.notes, build...)
 	from1x.notes = append(from1x.notes, pipInstallNote(data)...)
 	from1x.notes = append(from1x.notes, buildSecretNotes(filepath.Join(dir, fileDockerfile))...)
-	base := airflowrt.DeclaredBase{Image: image, Tag: tag, Known: err == nil && !airflowrt.IsUnresolvedRef(image)}
+	base := airflowrt.NewDeclaredBase(image, tag, err)
 	if base.RuntimeVersion() != "" {
 		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
 	}

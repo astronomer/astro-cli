@@ -208,8 +208,7 @@ func TestStartJudgesRealReferenceShapes(t *testing.T) {
 		// which is what init decides too: declared, and not judged here.
 		{"a published runtime tagged by a build argument", "ARG V=3.1-12\nFROM astrocrpublic.azurecr.io/runtime:${V}\n", false},
 		{"a mirror tagged by a build argument", "FROM mirror.corp/runtime:${TAG}\n", false},
-		// Flavors in any order, as on a published tag.
-		{"a mirror with flavors after the python one", "FROM mirror/astro-runtime:12.1.0-python-3.12-slim\n", false},
+		{"a mirror with a published flavor", "FROM mirror/astro-runtime:13.7.0-slim-python-3.12\n", false},
 		// Mirrors: the repository keeps its name on another registry.
 		{"a mirror behind a port", "FROM localhost:5000/astro-runtime:3.1-12\n", false},
 		{"a mirror in a corporate registry", "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\n", false},
