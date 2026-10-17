@@ -22,7 +22,7 @@ var servedAt = struct {
 func servedFingerprint(t *testing.T) string {
 	t.Helper()
 	h := sha256.New()
-	h.Write([]byte(airflowThemeSnippet))
+	h.Write([]byte(airflowThemeSnippet()))
 
 	// The whole embedded tree rather than the embed's own pattern restated, so
 	// an asset added beside the templates is covered without anyone editing

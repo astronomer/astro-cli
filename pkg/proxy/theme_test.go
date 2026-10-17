@@ -265,12 +265,15 @@ func TestInjectAirflowThemeSetsRuntimesPalettes(t *testing.T) {
 		}
 	}
 
-	vars := regexp.MustCompile(`--chakra-colors-([a-z]+)`).FindAllStringSubmatch(got, -1)
+	// Any variable name at all, so a stray one in capitals or digits is
+	// counted and named too.
+	vars := regexp.MustCompile(`--chakra-colors-([^:\s]+)`).FindAllStringSubmatch(got, -1)
 	if len(vars) != 24 {
 		t.Errorf("theme CSS sets %d colors, want Runtime's 24 (11 brand, 11 gray, black, white)", len(vars))
 	}
 	for _, v := range vars {
-		switch v[1] {
+		palette, _, _ := strings.Cut(v[1], "-")
+		switch palette {
 		case "brand", "gray", "black", "white":
 		default:
 			t.Errorf("theme CSS sets %s, which Runtime's theme leaves to Airflow", v[0])
@@ -288,8 +291,8 @@ func TestInjectAirflowThemeSetsRuntimesPalettes(t *testing.T) {
 // before 50.
 func TestParseAirflowThemeOrdersStepsNumerically(t *testing.T) {
 	theme, err := parseAirflowTheme([]byte(`{"tokens":{"colors":{
-		"black":{"value":"#000"},"white":{"value":"#fff"},
-		"brand":{"950":{"value":"c"},"100":{"value":"b"},"50":{"value":"a"}}}}}`))
+		"black":{"value":"oklch(0.2 0 0)"},"white":{"value":"oklch(1 0 0)"},
+		"brand":{"950":{"value":"oklch(0.1 0 0)"},"100":{"value":"oklch(0.9 0 0)"},"50":{"value":"oklch(0.95 0 0)"}}}}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,19 +306,75 @@ func TestParseAirflowThemeOrdersStepsNumerically(t *testing.T) {
 	}
 }
 
-func TestParseAirflowThemeRejectsWhatItCannotPaint(t *testing.T) {
-	for name, doc := range map[string]string{
-		"not JSON":             `{`,
-		"no black or white":    `{"tokens":{"colors":{"brand":{"50":{"value":"a"}}}}}`,
-		"a step not a number":  `{"tokens":{"colors":{"black":{"value":"#000"},"white":{"value":"#fff"},"brand":{"solid":{"value":"a"}}}}}`,
-		"a step with no value": `{"tokens":{"colors":{"black":{"value":"#000"},"white":{"value":"#fff"},"brand":{"50":{}}}}}`,
-		"a color neither":      `{"tokens":{"colors":{"black":{"value":"#000"},"white":{"value":"#fff"},"brand":"purple"}}}`,
+// themeWith is a theme Airflow and the proxy both take, with colors added to
+// its palette and rest added beside its tokens, so a case below breaks exactly
+// one rule.
+func themeWith(colors, rest string) string {
+	return `{"tokens":{"colors":{"black":{"value":"oklch(0.2 0 0)"},"white":{"value":"oklch(1 0 0)"}` +
+		colors + `}}` + rest + `}`
+}
+
+// The shape Runtime ships parses: an empty globalCss rule (its workaround for
+// Airflow 3.2.0) and no icons.
+func TestParseAirflowThemeTakesRuntimesShape(t *testing.T) {
+	if _, err := parseAirflowTheme([]byte(themeWith(`,"brand":{"600":{"value":"oklch(0.46 0.19 298)"}}`, `,"globalCss":{"html":{}},"icon":null`))); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A theme is refused when Airflow would refuse it, and when Airflow would show
+// something the proxy cannot paint. Either way a Runtime theme copied in that
+// the proxy would render differently fails here, instead of local Airflow
+// quietly drifting from Astro.
+func TestParseAirflowThemeRefusesWhatItCannotPaintAsAirflowWould(t *testing.T) {
+	for _, tc := range []struct{ name, doc, wantErr string }{
+		{"not JSON", `{`, "parsing"},
+		{"no colors", `{"globalCss":{"html":{}}}`, "no colors"},
+		{"no black or white", `{"tokens":{"colors":{"brand":{"50":{"value":"oklch(0.9 0 0)"}}}}}`, "black and white"},
+		// Airflow's own palettes are brand and gray; Chakra's others are not
+		// part of a theme Airflow takes.
+		{"another palette", themeWith(`,"blue":{"500":{"value":"oklch(0.5 0.2 250)"}}`, ""), `"blue"`},
+		{"a camel-cased palette", themeWith(`,"brandAccent":{"500":{"value":"oklch(0.5 0.2 250)"}}`, ""), `"brandAccent"`},
+		{"semantic tokens", themeWith("", `,"semanticTokens":{"colors":{}}`), `"semanticTokens"`},
+		{"a step Airflow lacks", themeWith(`,"brand":{"solid":{"value":"oklch(0.5 0.2 250)"}}`, ""), `"solid"`},
+		{"a step spelled another way", themeWith(`,"brand":{"050":{"value":"oklch(0.5 0.2 250)"}}`, ""), `"050"`},
+		{"a step with no value", themeWith(`,"brand":{"50":{}}`, ""), "not an oklch() color"},
+		{"a token reference", themeWith(`,"gray":{"900":{"value":"{colors.gray.800}"}}`, ""), "not an oklch() color"},
+		{"a hex color", themeWith(`,"gray":{"900":{"value":"#123456"}}`, ""), "not an oklch() color"},
+		{"a value that ends the style block", themeWith(`,"gray":{"900":{"value":"oklch(0 0 0)</style>"}}`, ""), "not an oklch() color"},
+		{"a value that ends the script string", themeWith(`,"gray":{"900":{"value":"oklch(0 0 0)'"}}`, ""), "not an oklch() color"},
+		{"a per-mode value", themeWith(`,"gray":{"900":{"value":{"base":"oklch(0 0 0)","_dark":"oklch(1 0 0)"}}}`, ""), "parsing"},
+		{"a color that is neither a shade nor a scale", themeWith(`,"brand":"purple"`, ""), "parsing"},
+		{"an icon", themeWith("", `,"icon":"https://example.com/logo.svg"`), "icon"},
+		{"a dark-mode icon", themeWith("", `,"icon_dark_mode":"https://example.com/logo.svg"`), "icon_dark_mode"},
+		{"a globalCss rule", themeWith("", `,"globalCss":{"html":{"fontFamily":"serif"}}`), "globalCss"},
 	} {
-		t.Run(name, func(t *testing.T) {
-			if _, err := parseAirflowTheme([]byte(doc)); err == nil {
-				t.Error("parsed without an error")
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseAirflowTheme([]byte(tc.doc))
+			if err == nil {
+				t.Fatal("parsed without an error")
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("refused for another reason than %q: %v", tc.wantErr, err)
 			}
 		})
+	}
+}
+
+// A theme that does not parse leaves Airflow's pages as they are, rather than
+// breaking every program that links this package as it starts.
+func TestInjectAirflowThemeWithNoThemeLeavesThePageAlone(t *testing.T) {
+	orig := airflowThemeSnippet
+	airflowThemeSnippet = func() string { return "" }
+	t.Cleanup(func() { airflowThemeSnippet = orig })
+
+	const page = "<html><head></head><body></body></html>"
+	resp := newHTMLResponse(t, page, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+	if err := InjectAirflowTheme(resp); err != nil {
+		t.Fatal(err)
+	}
+	if got := readBody(t, resp); got != page {
+		t.Errorf("page changed with no theme to inject: %q", got)
 	}
 }
 

@@ -59,6 +59,13 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 		overrides["AIRFLOW__API__PORT"] = port
 	}
 	overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
+	// The Astro theme, as the Runtime image's entrypoint sets it, so Airflow
+	// looks the same opened on its own port as through the local proxy or on
+	// Astro. A theme of the user's own, in .env or the shell, wins, as it does
+	// there. Airflow before 3.2 ignores the setting.
+	if _, fromEnvFile := overrides[UIThemeEnv]; !fromEnvFile && os.Getenv(UIThemeEnv) == "" {
+		overrides[UIThemeEnv] = UITheme()
+	}
 
 	// Layer 3: macOS proxy workaround.
 	// Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
