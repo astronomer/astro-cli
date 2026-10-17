@@ -330,8 +330,31 @@ func (s *Suite) TestDockerPull() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			return nil
 		}
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
 		err := handler.Pull("", "username", "")
 		s.NoError(err)
+	})
+
+	s.Run("pull login uses stdin, not a shell, for the password", func() {
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		const trickyPass = `p$(whoami)"'` + "`id`"
+		var gotCmd string
+		var gotStdin string
+		var gotArgs []string
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			gotCmd = cmd
+			gotStdin = stdin
+			gotArgs = args
+			return nil
+		}
+		err := handler.Pull("", "username", trickyPass)
+		s.NoError(err)
+		s.Equal(trickyPass, gotStdin, "password must reach the login command unmodified, not interpolated into a shell string")
+		s.assertStdinLogin(gotCmd, gotArgs, "username", nil, trickyPass)
 	})
 	s.Run("pull error", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
@@ -342,6 +365,9 @@ func (s *Suite) TestDockerPull() {
 	})
 
 	s.Run("login error", func() {
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			return errMock
+		}
 		err := handler.Pull("", "username", "")
 		s.Error(err)
 	})
@@ -363,20 +389,19 @@ func (s *Suite) TestDockerPull() {
 			pullSeen := false
 			loginSeen := false
 			cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-				switch cmd {
-				case "bash":
-					// The _current_ way we log in.
-					s.Contains(args[1], tc.expectedLogin)
-					loginSeen = true
+				if cmd == "docker" && args[0] == "pull" {
+					s.Contains(args, tc.expected)
+					pullSeen = true
 					return nil
-				case "docker":
-					if args[0] == "pull" {
-						s.Contains(args, tc.expected)
-						pullSeen = true
-						return nil
-					}
 				}
 				return fmt.Errorf("unexpected command %q %q", cmd, args)
+			}
+			cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+				// Login must go straight to the container runtime, never through a shell.
+				s.Equal("docker", cmd)
+				s.Contains(args[len(args)-1], tc.expectedLogin)
+				loginSeen = true
+				return nil
 			}
 			err := handler.Pull(tc.input, tc.username, "")
 			s.NoError(err)
@@ -403,6 +428,7 @@ func (s *Suite) TestDockerImagePush() {
 
 	// Set the default for the rest of the subtests -- run without error
 	cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error { return nil }
+	cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error { return nil }
 
 	s.Run("success", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error { return nil }
@@ -725,14 +751,65 @@ func (s *Suite) TestExecCmd() {
 	})
 }
 
-func (s *Suite) TestUseBash() {
+func (s *Suite) TestExecCmdWithStdin() {
 	s.Run("success", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains([]string{"-c", "push", "rmi"}, args[0])
+		stdout := new(bytes.Buffer)
+		stderr := new(bytes.Buffer)
+		err := cmdExecWithStdin("cat", "s3cr3t", stdout, stderr)
+		s.NoError(err)
+		s.Equal("s3cr3t", stdout.String())
+		s.Empty(stderr.String())
+	})
+
+	s.Run("invalid cmd", func() {
+		err := cmdExecWithStdin("invalid-cmd", "", nil, nil)
+		s.Contains(err.Error(), "failed to find the invalid-cmd command")
+	})
+
+	s.Run("cmd failure", func() {
+		stdout := new(bytes.Buffer)
+		stderr := new(bytes.Buffer)
+		err := cmdExecWithStdin("test", "", stdout, stderr, "-f", "does-not-exist")
+		s.Contains(err.Error(), "failed to execute cmd")
+	})
+}
+
+func (s *Suite) TestPushWithCLI() {
+	s.Run("success", func() {
+		var gotStdin string
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			s.Equal("docker", cmd)
+			s.Contains(args, "login")
+			gotStdin = stdin
 			return nil
 		}
-		err := pushWithBash(&types.AuthConfig{Username: "testing", Password: "pass"}, "test")
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			s.Contains([]string{"push", "rmi"}, args[0])
+			return nil
+		}
+		err := pushWithCLI(&types.AuthConfig{Username: "testing", Password: "pass"}, "test")
 		s.NoError(err)
+		s.Equal("pass", gotStdin, "password must reach login via stdin, not a shell string")
+	})
+
+	s.Run("success with password containing shell metacharacters", func() {
+		const trickyPass = `p$(whoami)"'` + "`id`"
+		var gotCmd, gotStdin string
+		var gotArgs []string
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			gotCmd, gotStdin, gotArgs = cmd, stdin, args
+			return nil
+		}
+		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+		err := pushWithCLI(&types.AuthConfig{Username: "testing", Password: trickyPass}, "test")
+		s.NoError(err)
+		s.Equal(trickyPass, gotStdin, "password must reach the login command unmodified, not interpolated into a shell string")
+		// No ServerAddress: no registry argument, so the runtime's default,
+		// as when this was a shell string; not a literal "".
+		empty := ""
+		s.assertStdinLogin(gotCmd, gotArgs, "testing", &empty, trickyPass)
 	})
 
 	s.Run("exec failure", func() {
@@ -740,16 +817,16 @@ func (s *Suite) TestUseBash() {
 			s.Contains(args[0], "push")
 			return errMockDocker
 		}
-		err := pushWithBash(&types.AuthConfig{}, "test")
+		err := pushWithCLI(&types.AuthConfig{}, "test")
 		s.ErrorIs(err, errMockDocker)
 	})
 
 	s.Run("login exec failure", func() {
-		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
-			s.Contains(cmd, "bash")
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			s.Equal("docker", cmd)
 			return errMockDocker
 		}
-		err := pushWithBash(&types.AuthConfig{Username: "testing"}, "test")
+		err := pushWithCLI(&types.AuthConfig{Username: "testing"}, "test")
 		s.ErrorIs(err, errMockDocker)
 	})
 }
@@ -825,6 +902,12 @@ func (s *Suite) TestDockerImagePush403Error() {
 			return nil
 		}
 
+		// the bash-less fallback logs in via cmdExecWithStdin; without this stub
+		// the test would invoke the real container runtime
+		cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+			return nil
+		}
+
 		displayJSONMessagesToStream = func(_ io.ReadCloser, _ func(jsonmessage.JSONMessage)) error {
 			return fmt.Errorf("Error response from daemon: authentication required")
 		}
@@ -837,7 +920,7 @@ func (s *Suite) TestDockerImagePush403Error() {
 		s.Contains(err.Error(), "https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push")
 	})
 
-	s.Run("403 forbidden error from pushWithBash fallback", func() {
+	s.Run("403 forbidden error from pushWithCLI fallback", func() {
 		cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 			if args[0] == "tag" {
 				return nil
