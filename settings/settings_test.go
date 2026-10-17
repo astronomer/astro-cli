@@ -456,26 +456,13 @@ func (s *Suite) TestInitSettingsFailure() {
 
 func (s *Suite) TestEnvExport() {
 	s.Run("success", func() {
-		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			switch airflowCommand {
-			case airflowVarExport:
-				return "1 variables successfully exported to tmp.var", nil
-			case catVarFile:
-				return `{
-					"myvar": "myval"
-				}`, nil
-			case airflowConnExport:
-				return "Connections successfully exported to tmp.json", nil
-			case catConnFile:
-				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema", nil
-			default:
-				return "", nil
-			}
-		}
+		s.install(&fakeAirflow{variables: fakeVariables, connections: fakeConnections})
+		env, read := s.envFile()
 
-		err := EnvExport("id", "testfiles/test.env", 2, true, true)
+		err := EnvExport("id", env, 2, true, true)
 		s.NoError(err)
-		_ = fileutil.WriteStringToFile("testfiles/test.env", "")
+		s.Contains(read(), "AIRFLOW_VAR_MYVAR=myval")
+		s.Contains(read(), "AIRFLOW_CONN_LOCAL_POSTGRES=")
 	})
 	s.Run("missing id", func() {
 		err := EnvExport("", "", 2, true, true)
@@ -506,10 +493,8 @@ func (s *Suite) TestEnvExport() {
 func (s *Suite) TestExport() {
 	s.Run("success", func() {
 		WorkingPath = "./testfiles/"
-		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			switch airflowCommand {
-			case airflowConnectionList:
-				return `
+		s.install(&fakeAirflow{variables: `{"myvar": "myval"}`, others: map[string]string{
+			airflowConnectionList: `
 - conn_id: local_postgres
   conn_type: postgres
   description: null
@@ -522,25 +507,15 @@ func (s *Suite) TestExport() {
   login: username
   password: password
   port: '5432'
-  schema: schema`, nil
-			case airflowVarExport:
-				return "1 variables successfully exported to tmp.var", nil
-			case catVarFile:
-				return `{
-					"myvar": "myval"
-				}`, nil
-			case ariflowPoolsList:
-				return `
+  schema: schema`,
+			ariflowPoolsList: `
 - description: Default pool
   pool: default_pool
   slots: '128'
 - description: ''
   pool: subdag_limit
-  slots: '3'`, nil
-			default:
-				return "", nil
-			}
-		}
+  slots: '3'`,
+		}})
 
 		err := Export("id", "airflow_settings_export.yaml", 2, true, true, true)
 		s.NoError(err)
