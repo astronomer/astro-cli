@@ -13,7 +13,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/astronomer/astro-cli/internal/imagepush"
 	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -31,15 +30,16 @@ var errClientBuild = errors.New("an error was encountered while building the ima
 
 // clientBuildRequest is the build of the client image: Dockerfile.client run
 // against contextDir, the copy of the project prepareClientBuildContext made,
-// tagged tag, for platforms (none is the host's), on the engine binary bin,
-// with the build's stdout and stderr raw to out and errOut. Under podman it is
-// built in docker format, as the 1.x image handler built it.
+// tagged tag, for platforms (none is the host's), on the engine binary bin
+// with its connection env, with the build's stdout and stderr raw to out and
+// errOut. Under podman it is built in docker format, as the 1.x image handler
+// built it.
 //
 // The build runs in contextDir, as the 1.x handler's did after its chdir, and
 // the secrets go to it as given, so docker resolves a relative secret source
 // against the copy of the project as it always has, whatever form the spec
 // takes.
-func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin string, out, errOut io.Writer) imagebuild.Request {
+func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin string, env []string, out, errOut io.Writer) imagebuild.Request {
 	req := imagebuild.Request{
 		Dockerfile: filepath.Join(contextDir, clientDockerfile),
 		Context:    contextDir,
@@ -48,6 +48,7 @@ func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin
 		Platform:   strings.Join(platforms, ","),
 		Secrets:    secrets,
 		Bin:        bin,
+		Env:        env,
 		Stdout:     out,
 		Stderr:     errOut,
 	}
@@ -62,14 +63,10 @@ func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin
 // image handler showed and keeps the build's output for a failure; at debug
 // level the output streams instead, stdout to stdout and stderr to stderr.
 //
-// The engine is imagepush's, not the containercfg.Engine resolution the
-// manifest deploy builds on: the registry login before the build and the
-// push after it run there, and an image built on one engine and pushed from
-// another is not there to push.
-// TODO: when the push moves into pkg/imagebuild (step 2 of retiring
-// imagepush), move the build, the login and the push to containercfg.Engine
-// together.
-func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []string) error {
+// It builds on engine, the one the registry login before the build and the
+// push after it run on: an image built on one engine and pushed from another
+// is not there to push.
+func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []string, engine imagebuild.Engine) error {
 	s := spinner.NewSpinner("Building project image…")
 	debug := logger.IsLevelEnabled(logrus.DebugLevel)
 	if !debug {
@@ -77,13 +74,10 @@ func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []s
 		defer s.Stop()
 	}
 
-	bin, err := imagepush.ContainerRuntimeBinary()
-	if err != nil {
-		return err
-	}
 	// Absolute, so the Dockerfile, the context and the directory the build
 	// runs in name the same place however the caller spelled it.
-	if contextDir, err = filepath.Abs(contextDir); err != nil {
+	contextDir, err := filepath.Abs(contextDir)
+	if err != nil {
 		return err
 	}
 
@@ -94,8 +88,8 @@ func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []s
 		// pointed it at stderr.
 		out, errOut = os.Stdout, os.Stderr
 	}
-	req := clientBuildRequest(contextDir, tag, platforms, secrets, bin, out, errOut)
-	_, err = imagebuild.New(newImageBuildCommander(), buildNow).Build(context.Background(), req, localrt.Callbacks{})
+	req := clientBuildRequest(contextDir, tag, platforms, secrets, engine.Bin, engine.Env, out, errOut)
+	_, err = imagebuild.New(engine.Cmd, buildNow).Build(context.Background(), req, localrt.Callbacks{})
 	switch {
 	case err == nil:
 		spinner.StopWithCheckmark(s, "Project image has been updated")
@@ -127,4 +121,26 @@ func clientDockerfileError(err error, projectDir, dockerfile string) error {
 		return fmt.Errorf("the project at %s has no %s, %s", projectDir, clientDockerfile, builtFrom)
 	}
 	return fmt.Errorf("the %s in the project at %s, %s, could not be read: %w", clientDockerfile, projectDir, builtFrom, pe.Err)
+}
+
+// clientImageEngine is the engine a client deploy builds, logs in and pushes
+// on: the one the manifest deploy resolves (ResolveContainerEngine), over the
+// build runner.
+func clientImageEngine() (imagebuild.Engine, error) {
+	bin, env, err := ResolveContainerEngine()
+	if err != nil {
+		return imagebuild.Engine{}, err
+	}
+	return imagebuild.Engine{Cmd: newImageBuildCommander(), Bin: bin, Env: env}, nil
+}
+
+// loginBaseImageRegistry logs engine in to the registry the client image's
+// base comes from, as the CLI user with the Astro token. Without a token there
+// is nothing to log in with, and the build is left to the credential the
+// engine already holds.
+func loginBaseImageRegistry(ctx context.Context, engine imagebuild.Engine, registry, token string) error {
+	if token == "" {
+		return nil
+	}
+	return engine.Login(ctx, registry, registryUsername, token)
 }

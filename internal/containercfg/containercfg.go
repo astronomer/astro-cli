@@ -8,6 +8,7 @@ package containercfg
 import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/container"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 )
 
 // Binary returns container.binary for the project at projectPath: the
@@ -41,4 +42,17 @@ func Engine(projectPath string) (bin string, env []string, err error) {
 		return "", nil, err
 	}
 	return bin, env, nil
+}
+
+// ImageEngine is Engine for the project at projectPath as the pkg/imagebuild
+// engine an image's actions run on, over the exec runner: its build, its
+// registry login, its tag and push, and reading its labels. A caller that
+// takes one engine here for all of them never builds on one engine and pushes
+// from another.
+func ImageEngine(projectPath string) (imagebuild.Engine, error) {
+	bin, env, err := Engine(projectPath)
+	if err != nil {
+		return imagebuild.Engine{}, err
+	}
+	return imagebuild.Engine{Cmd: imagebuild.NewExecCommander(), Bin: bin, Env: env}, nil
 }

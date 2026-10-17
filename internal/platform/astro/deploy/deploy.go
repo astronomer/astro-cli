@@ -15,11 +15,11 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
-	"github.com/astronomer/astro-cli/internal/imagepush"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/azure"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -32,9 +32,8 @@ const (
 
 var (
 	// Monkey patched to write unit tests
-	airflowImageHandler = imagepush.ImageHandlerInit
-	azureUploader       = azure.Upload
-	canCiCdDeploy       = deployment.CanCiCdDeploy
+	azureUploader = azure.Upload
+	canCiCdDeploy = deployment.CanCiCdDeploy
 )
 
 var (
@@ -45,7 +44,6 @@ var (
 
 type deploymentInfo struct {
 	namespace                string
-	deployImage              string
 	currentVersion           string
 	organizationID           string
 	workspaceID              string
@@ -131,12 +129,8 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 		desiredDagTarballVersion = ""
 	}
 
-	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
-	deployImage := imagepush.ImageName(namespace, "latest")
-
 	return deploymentInfo{
 		namespace:                namespace,
-		deployImage:              deployImage,
 		currentVersion:           currentVersion,
 		organizationID:           organizationID,
 		workspaceID:              workspaceID,
@@ -350,15 +344,20 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	// Build the full remote image name
 	remoteImage := fmt.Sprintf("%s:%s", registryEndpoint, imageTag)
 
-	// Create an image handler for tagging and pushing
-	imageHandler := airflowImageHandler(remoteImage)
+	// One engine tags or builds the image, logs in and pushes it: an image
+	// built on one engine is not there for another to push.
+	ctx := httpContext.Background()
+	engine, err := clientImageEngine()
+	if err != nil {
+		return ClientDeploy{}, err
+	}
 
 	// Use empty slice to let Docker build for host platform by default
 	targetPlatforms := []string{}
 	if deployInput.ImageName != "" {
 		// Use the provided local image (tag will be ignored, remote tag is always timestamp-based)
 		fmt.Println("Using provided image:", deployInput.ImageName)
-		err := imageHandler.TagLocalImage(deployInput.ImageName)
+		err := engine.Tag(ctx, deployInput.ImageName, remoteImage)
 		if err != nil {
 			return ClientDeploy{}, fmt.Errorf("failed to tag local image: %w", err)
 		}
@@ -375,7 +374,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			}
 			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
-			err := imagepush.DockerLogin(baseImageRegistry, registryUsername, c.Token)
+			err := loginBaseImageRegistry(ctx, engine, baseImageRegistry, c.Token)
 			if err != nil {
 				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file.")
 				fmt.Println("This could be because either your token has expired or you don't have permission to pull the base agent image.")
@@ -408,7 +407,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		}
 
 		// Build the image from the prepared context, tagged as it is pushed
-		err = buildClientImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets)
+		err = buildClientImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets, engine)
 		if err != nil {
 			return ClientDeploy{}, fmt.Errorf("failed to build client image: %w", err)
 		}
@@ -416,9 +415,9 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 
 	// Push the image to the remote registry (assumes docker login was done externally)
 	fmt.Println("Pushing client image to configured remote registry")
-	_, err = imageHandler.Push(remoteImage, "", "", false)
+	_, err = engine.Push(ctx, imagebuild.PushRequest{Image: remoteImage, Out: os.Stdout})
 	if err != nil {
-		if errors.Is(err, imagepush.ErrImagePush403) {
+		if errors.Is(err, imagebuild.ErrPushForbidden) {
 			fmt.Printf("\n--------------------------------\n")
 			fmt.Printf("Failed to push client image to %s\n", registryEndpoint)
 			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")

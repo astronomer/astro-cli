@@ -85,7 +85,7 @@ The pipeline, in order (`DeployManifestImage` in [`manifest_image.go`](../intern
 5. Check the planned runtime before the build. The planned runtime is `[tool.astro] runtime`, else the base's tag without any `-python-X.Y` (the series, or the exact build a Python flavor names), or for a declared Dockerfile the runtime its final `FROM` names (`airflowrt.ReadDeclaredBase`). An exact version gets the full rules: no downgrade, a version the Deployment offers, and the Airflow 2→3 floor. A series is refused only when it is older than the Deployment's, or the Deployment offers no build of it. A downgrade error names the line to change. This makes a bad pin fail in seconds rather than after a long build.
 6. Build for `linux/amd64` and print "Building your project image, this can take a few minutes...".
 7. Read `io.astronomer.docker.runtime.version` off the built image and run the runtime rules again on it. The label is the authority, because the requirement states what the project intends and the label states what the image is.
-8. Create the deploy, push the image as user `cli` with the session token, upload the DAG tarball for a both deploy to a Deployment with DAG deploys on, finalize, and wait for health with `--wait`.
+8. Create the deploy, log the container engine in to the Deployment's registry as user `cli` with the session token and push the image, upload the DAG tarball for a both deploy to a Deployment with DAG deploys on, finalize, and wait for health with `--wait`.
 
 **A deploy to Astro requires an Astro Runtime base.** An image without the runtime label is refused, never deployed on the requirement's word:
 
@@ -229,6 +229,8 @@ an image deploy needs Docker, but no running container engine was found. Start D
 ```
 
 The check runs for `--image-name` too. A dags-only deploy never needs Docker, and neither do the `mwaa` and `composer` package targets. `astro package astro` refuses the same way. A server-side build, where the CLI uploads the context and the control plane builds, is the long-term answer for users without Docker and is not built.
+
+**One engine does every image step.** The build, the label reads, the registry login and the push all run on the engine resolved once for the deploy: `container.binary` for the working directory's project (a 1.x project's `.astro/config.yaml` over the global setting), else Docker or Podman found on `PATH`, with a Podman machine's connection env. `astro remote deploy` and an image deploy to Astro Private Cloud resolve it the same way, as does the registry login `astro login` makes for Astro Private Cloud. Each step is the engine's own command, through `pkg/imagebuild`: the login is `<engine> login <registry> -u <user> --password-stdin`, so the token is never on a command line, and the credential stays in the engine's credential store as any `docker login` leaves it. A push the registry refuses with a 403 fails with advice on clearing cached credentials.
 
 ## 6. Command surface
 

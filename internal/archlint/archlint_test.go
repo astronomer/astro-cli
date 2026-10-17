@@ -99,9 +99,6 @@ var coreConfigReaders = []string{
 // to register it".
 var shellInternal = []string{
 	"internal/archlint",
-	// The image half of a deploy, shared by both platforms: it prints its
-	// progress and reads config/.
-	"internal/imagepush",
 	"internal/otto",
 	"internal/telemetry",
 	// Both control-plane platforms: shell code that prints and reads config/,

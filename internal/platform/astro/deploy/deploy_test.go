@@ -10,12 +10,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/imagepush"
-	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -160,294 +160,132 @@ var (
 	}
 )
 
+// clientDeployProject is a project with a Dockerfile.client FROM the agent
+// base and its client dependency files, in the cloud test config with a
+// logged-in context, pushing to registry.
+func clientDeployProject(t *testing.T, token, registry string) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile.client"), []byte("FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements-client.txt"), []byte("requests==2.28.0"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "packages-client.txt"), []byte("curl"), 0o600))
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	ctx, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	ctx.Token = token
+	require.NoError(t, ctx.SetContext())
+	require.NoError(t, config.CFG.RemoteClientRegistry.SetHomeString(registry))
+	return dir
+}
+
 func TestDeployClientImage(t *testing.T) {
-	// Store original DockerLogin function to restore after tests
-	originalDockerLogin := imagepush.DockerLogin
-	defer func() {
-		imagepush.DockerLogin = originalDockerLogin
-	}()
-
 	t.Run("successful client deploy", func(t *testing.T) {
-		// Set up temporary directory with Dockerfile.client
-		tempDir, err := os.MkdirTemp("", "test-deploy-*")
-		assert.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
 
-		// Create a basic Dockerfile.client file for the test
-		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
-		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
-		assert.NoError(t, err)
+		got, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		require.NoError(t, err)
+		// The base image registry is logged in to as the CLI user with the
+		// context's token on stdin, then the image is built under the
+		// reference it is pushed as, pushed, and its tag dropped.
+		require.Len(t, cmd.calls, 4, "%v", cmd.calls)
+		assert.Equal(t, "docker login images.astronomer.cloud -u cli --password-stdin", cmd.calls[0])
+		assert.Equal(t, "test-token", cmd.stdins[0])
+		assert.True(t, strings.HasPrefix(cmd.calls[1], "docker build --tag "+got.Image+" "), cmd.calls[1])
+		assert.Equal(t, "docker push "+got.Image, cmd.calls[2])
+		assert.Equal(t, "docker rmi "+got.Image, cmd.calls[3])
+	})
 
-		// Create required client dependency files
-		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("requests==2.28.0"), 0o644)
-		assert.NoError(t, err)
-		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("curl"), 0o644)
-		assert.NoError(t, err)
+	t.Run("no token, no login", func(t *testing.T) {
+		dir := clientDeployProject(t, "", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
 
-		// Set up current context
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.Token = "test-token"
-		err = ctx.SetContext()
-		assert.NoError(t, err)
-		// Mock DockerLogin
-		dockerLoginCalled := false
-		var capturedRegistry, capturedUsername, capturedToken string
-		imagepush.DockerLogin = func(registry, username, token string) error {
-			dockerLoginCalled = true
-			capturedRegistry = registry
-			capturedUsername = username
-			capturedToken = token
-			return nil
-		}
-
-		// Mock image handler
-		mockImageHandler := new(mocks.ImageHandler)
-		buildCmd := withClientBuild(t, "docker")
-		defer func() { assert.Len(t, buildCmd.calls, 1, "one build: %v", buildCmd.calls) }()
-		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", nil).Once()
-
-		// Override airflowImageHandler
-		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
-			return mockImageHandler
-		}
-		defer func() {
-			airflowImageHandler = originalAirflowImageHandler
-		}()
-
-		// Mock config.CFG.RemoteClientRegistry
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
-
-		deployInput := InputClientDeploy{
-			Path:         tempDir,
-			BuildSecrets: nil,
-		}
-
-		_, err = DeployClientImage(deployInput, nil)
-		assert.NoError(t, err)
-		assert.True(t, dockerLoginCalled, "DockerLogin should have been called")
-		assert.Equal(t, "images.astronomer.cloud", capturedRegistry)
-		assert.Equal(t, "cli", capturedUsername)
-		assert.Equal(t, "test-token", capturedToken)
-		mockImageHandler.AssertExpectations(t)
+		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		require.NoError(t, err)
+		assert.False(t, hasImageCall(cmd.calls, " login "), "nothing to log in with: %v", cmd.calls)
 	})
 
 	t.Run("docker login failure", func(t *testing.T) {
-		// Set up current context
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.Token = "test-token"
-		err = ctx.SetContext()
-		assert.NoError(t, err)
+		clientDeployProject(t, "test-token", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
+		cmd.errs = map[string]error{"login": errors.New("login failed")}
 
-		// Mock DockerLogin to return error
-		imagepush.DockerLogin = func(registry, username, token string) error {
-			return errors.New("login failed")
-		}
-
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
-
-		deployInput := InputClientDeploy{
-			Path:         "/test/path",
-			BuildSecrets: nil,
-		}
-
-		_, err = DeployClientImage(deployInput, nil)
-		assert.Error(t, err)
+		_, err := DeployClientImage(InputClientDeploy{Path: "/test/path"}, nil)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
+		assert.Contains(t, err.Error(), "login failed")
+		assert.False(t, hasImageCall(cmd.calls, " build "), "nothing is built: %v", cmd.calls)
 	})
 
 	t.Run("missing registry configuration", func(t *testing.T) {
-		// Set up current context
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.Token = "test-token"
-		err = ctx.SetContext()
-		assert.NoError(t, err)
+		clientDeployProject(t, "test-token", "")
+		cmd := withClientBuild(t, "docker")
 
-		// Mock DockerLogin (shouldn't be called)
-		dockerLoginCalled := false
-		imagepush.DockerLogin = func(registry, username, token string) error {
-			dockerLoginCalled = true
-			return nil
-		}
-
-		config.CFG.RemoteClientRegistry.SetHomeString("") // Empty registry
-
-		deployInput := InputClientDeploy{
-			Path:         "/test/path",
-			BuildSecrets: nil,
-		}
-
-		_, err = DeployClientImage(deployInput, nil)
-		assert.Error(t, err)
+		_, err := DeployClientImage(InputClientDeploy{Path: "/test/path"}, nil)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
-		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
+		assert.Empty(t, cmd.calls, "no login, no build")
+	})
+
+	t.Run("no container engine", func(t *testing.T) {
+		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
+		resolveContainerEngine = func() (string, []string, error) { return "", nil, errors.New("no container engine found") }
+
+		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		require.EqualError(t, err, "no container engine found")
+		assert.Empty(t, cmd.calls)
 	})
 
 	t.Run("build failure", func(t *testing.T) {
-		// Set up temporary directory
-		tempDir, err := os.MkdirTemp("", "test-deploy-*")
-		assert.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
+		cmd.buildErr = errors.New("build failed")
 
-		// Create a basic Dockerfile.client file for the test
-		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
-		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
-		assert.NoError(t, err)
-
-		// Create required client dependency files
-		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("numpy==1.21.0"), 0o644)
-		assert.NoError(t, err)
-		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("git"), 0o644)
-		assert.NoError(t, err)
-
-		// Set up current context
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.Token = "test-token"
-		err = ctx.SetContext()
-		assert.NoError(t, err)
-
-		// Mock successful DockerLogin
-		imagepush.DockerLogin = func(registry, username, token string) error {
-			return nil
-		}
-
-		// Mock image handler with build failure
-		mockImageHandler := new(mocks.ImageHandler)
-		buildCmd := withClientBuild(t, "docker")
-		buildCmd.buildErr = errors.New("build failed")
-
-		// Override airflowImageHandler
-		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
-			return mockImageHandler
-		}
-		defer func() {
-			airflowImageHandler = originalAirflowImageHandler
-		}()
-
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
-
-		deployInput := InputClientDeploy{
-			Path:         tempDir,
-			BuildSecrets: nil,
-		}
-
-		_, err = DeployClientImage(deployInput, nil)
-		assert.Error(t, err)
+		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to build client image")
-		mockImageHandler.AssertExpectations(t)
+		assert.False(t, hasImageCall(cmd.calls, " push "), "nothing is pushed: %v", cmd.calls)
 	})
 
 	t.Run("push failure", func(t *testing.T) {
-		// Set up temporary directory
-		tempDir, err := os.MkdirTemp("", "test-deploy-*")
-		assert.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
+		cmd.errs = map[string]error{"push": errors.New("push failed")}
 
-		// Create a basic Dockerfile.client file for the test
-		dockerfileContent := "FROM images.astronomer.cloud/baseimages/astro-remote-execution-agent:latest"
-		err = os.WriteFile(filepath.Join(tempDir, "Dockerfile.client"), []byte(dockerfileContent), 0o644)
-		assert.NoError(t, err)
-
-		// Create required client dependency files
-		err = os.WriteFile(filepath.Join(tempDir, "requirements-client.txt"), []byte("flask==2.0.0"), 0o644)
-		assert.NoError(t, err)
-		err = os.WriteFile(filepath.Join(tempDir, "packages-client.txt"), []byte("vim"), 0o644)
-		assert.NoError(t, err)
-
-		// Set up current context
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.Token = "test-token"
-		err = ctx.SetContext()
-		assert.NoError(t, err)
-
-		// Mock successful DockerLogin
-		imagepush.DockerLogin = func(registry, username, token string) error {
-			return nil
-		}
-
-		// Mock image handler with push failure
-		mockImageHandler := new(mocks.ImageHandler)
-		buildCmd := withClientBuild(t, "docker")
-		defer func() { assert.Len(t, buildCmd.calls, 1, "one build: %v", buildCmd.calls) }()
-		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", errors.New("push failed")).Once()
-
-		// Override airflowImageHandler
-		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
-			return mockImageHandler
-		}
-		defer func() {
-			airflowImageHandler = originalAirflowImageHandler
-		}()
-
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
-
-		deployInput := InputClientDeploy{
-			Path:         tempDir,
-			BuildSecrets: nil,
-		}
-
-		_, err = DeployClientImage(deployInput, nil)
-		assert.Error(t, err)
+		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to push client image")
-		mockImageHandler.AssertExpectations(t)
+		assert.Contains(t, err.Error(), "push failed")
+	})
+
+	// A push the registry refuses says what to do about it, and still
+	// reports the 403.
+	t.Run("push forbidden", func(t *testing.T) {
+		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
+		cmd.errs = map[string]error{"push": errors.New("denied: 403 Forbidden")}
+
+		var err error
+		out := captureStdout(t, func() { _, err = DeployClientImage(InputClientDeploy{Path: dir}, nil) })
+		require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
+		assert.Contains(t, err.Error(), "failed to push client image: failed to push image due to authentication error (403 Forbidden)")
+		assert.Contains(t, out, "Please ensure that you have logged in to test-registry:latest via docker login and try again")
 	})
 
 	t.Run("deploy with custom image name", func(t *testing.T) {
-		// Set up current context
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		ctx, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		ctx.Token = "test-token"
-		err = ctx.SetContext()
-		assert.NoError(t, err)
+		clientDeployProject(t, "test-token", "test-registry:latest")
+		cmd := withClientBuild(t, "docker")
 
-		// Mock image handler
-		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("TagLocalImage", "custom-image:tag").Return(nil).Once()
-		// Remote image will use timestamp tag, not the user-provided tag
-		mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool {
-			// Verify it uses timestamp-based tag format, not "tag" from the user input
-			return strings.Contains(remoteImage, "test-registry:latest:deploy-") &&
-				!strings.Contains(remoteImage, ":tag")
-		}), "", "", false).Return("", nil).Once()
-
-		// Override airflowImageHandler
-		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
-			return mockImageHandler
-		}
-		defer func() {
-			airflowImageHandler = originalAirflowImageHandler
-		}()
-
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
-
-		// Set up temporary directory for consistency
-		tempDir, err := os.MkdirTemp("", "test-deploy-*")
-		assert.NoError(t, err)
-		defer os.RemoveAll(tempDir)
-
-		deployInput := InputClientDeploy{
-			Path:         tempDir,
-			ImageName:    "custom-image:tag",
-			BuildSecrets: nil,
-		}
-
-		_, err = DeployClientImage(deployInput, nil)
-		assert.NoError(t, err)
-		mockImageHandler.AssertExpectations(t)
+		got, err := DeployClientImage(InputClientDeploy{Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
+		require.NoError(t, err)
+		// The remote tag is timestamp-based, not the user's "tag".
+		assert.True(t, strings.HasPrefix(got.Image, "test-registry:latest:deploy-"), got.Image)
+		assert.Equal(t, []string{
+			"docker tag custom-image:tag " + got.Image,
+			"docker push " + got.Image,
+			"docker rmi " + got.Image,
+		}, cmd.calls)
 	})
 }
 
