@@ -345,6 +345,18 @@ func TestParseAirflowThemeRefusesWhatItCannotPaintAsAirflowWould(t *testing.T) {
 		{"a value that ends the script string", themeWith(`,"gray":{"900":{"value":"oklch(0 0 0)'"}}`, ""), "not an oklch() color"},
 		{"a per-mode value", themeWith(`,"gray":{"900":{"value":{"base":"oklch(0 0 0)","_dark":"oklch(1 0 0)"}}}`, ""), "parsing"},
 		{"a color that is neither a shade nor a scale", themeWith(`,"brand":"purple"`, ""), "parsing"},
+		// Airflow matches keys exactly; encoding/json's structs would not.
+		{"a palette in capitals", themeWith(`,"Brand":{"500":{"value":"oklch(0.5 0.2 250)"}}`, ""), `"Brand"`},
+		{"tokens in capitals", `{"Tokens":{"colors":{}}}`, `"Tokens"`},
+		{"a value key in capitals", themeWith(`,"gray":{"900":{"Value":"oklch(0.2 0 0)"}}`, ""), `"Value"`},
+		{"an icon key in capitals", themeWith("", `,"ICON":"/logo.svg"`), `"ICON"`},
+		{"data after the theme", themeWith("", "") + `{"icon":"/logo.svg"}`, "parsing"},
+		// Airflow's own oklch pattern and ranges.
+		{"a hue with a unit", themeWith(`,"gray":{"900":{"value":"oklch(0.5 0.2 250deg)"}}`, ""), "not an oklch() color"},
+		{"two spaces", themeWith(`,"gray":{"900":{"value":"oklch(0.5  0.2 250)"}}`, ""), "not an oklch() color"},
+		{"an empty oklch", themeWith(`,"gray":{"900":{"value":"oklch(   )"}}`, ""), "not an oklch() color"},
+		{"lightness past 1", themeWith(`,"gray":{"900":{"value":"oklch(1.5 0.2 250)"}}`, ""), "not an oklch() color"},
+		{"chroma past 0.5", themeWith(`,"gray":{"900":{"value":"oklch(0.5 0.6 250)"}}`, ""), "not an oklch() color"},
 		{"an icon", themeWith("", `,"icon":"https://example.com/logo.svg"`), "icon"},
 		{"a dark-mode icon", themeWith("", `,"icon_dark_mode":"https://example.com/logo.svg"`), "icon_dark_mode"},
 		{"a globalCss rule", themeWith("", `,"globalCss":{"html":{"fontFamily":"serif"}}`), "globalCss"},

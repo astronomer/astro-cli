@@ -128,8 +128,26 @@ func TestBuildEnv_UITheme(t *testing.T) {
 		// Runtime's brand.600, so this is the theme Astro runs and not merely
 		// whatever the embed holds.
 		assert.Contains(t, got, `"oklch(0.460 0.190 298.0)"`)
+		assert.NotContains(t, got, "\n", "the theme goes into the environment as one line")
 		assert.Equal(t, 1, themeEntries(env))
 	})
+	// Empty is no theme to Airflow, which cannot parse it, so it gets the Astro
+	// theme as the Runtime entrypoint gives it one. {} is the way to turn the
+	// theme off, and is kept.
+	for _, tc := range []struct{ name, set, want string }{
+		{"an empty theme in .env gets the Astro theme", "", UITheme()},
+		{"{} in .env turns the theme off", "{}", "{}"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(UIThemeEnv, "")
+			dir := t.TempDir()
+			envFile := filepath.Join(dir, ".env")
+			require.NoError(t, os.WriteFile(envFile, []byte(UIThemeEnv+"="+tc.set+"\n"), 0o644))
+			env := BuildEnv(dir, "8080", envFile)
+			assert.Equal(t, tc.want, envToMap(env)[UIThemeEnv])
+			assert.Equal(t, 1, themeEntries(env))
+		})
+	}
 	t.Run("a theme in .env wins", func(t *testing.T) {
 		t.Setenv(UIThemeEnv, "")
 		dir := t.TempDir()

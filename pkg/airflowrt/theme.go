@@ -1,6 +1,11 @@
 package airflowrt
 
-import _ "embed"
+import (
+	"bytes"
+	_ "embed"
+	"encoding/json"
+	"sync"
+)
 
 // UIThemeEnv is the Airflow setting that themes Airflow 3.2+'s UI.
 const UIThemeEnv = "AIRFLOW__API__THEME"
@@ -13,5 +18,14 @@ const UIThemeEnv = "AIRFLOW__API__THEME"
 var uiTheme string
 
 // UITheme returns Astro Runtime's Airflow UI theme, the JSON document
-// UIThemeEnv takes.
-func UITheme() string { return uiTheme }
+// UIThemeEnv takes, compacted to one line: it goes into the environment of
+// every standalone Airflow process, where a multi-line value is noise to
+// anything that reads that environment line by line.
+var UITheme = sync.OnceValue(func() string {
+	var b bytes.Buffer
+	if err := json.Compact(&b, []byte(uiTheme)); err != nil {
+		// pkg/proxy's tests parse this file; one that is not JSON never ships.
+		return uiTheme
+	}
+	return b.String()
+})
