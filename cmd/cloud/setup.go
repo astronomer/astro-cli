@@ -390,16 +390,9 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 		}
 	}
 
-	err = c.SetContextKey("token", "Bearer "+astroAPIToken)
-	if err != nil {
-		return false, err
-	}
-
-	err = c.SetExpiresIn(time.Now().AddDate(1, 0, 0).Unix())
-	if err != nil {
-		return false, err
-	}
-	// Parse the token to peek at the custom claims
+	// Parse the token to peek at the custom claims. This comes before anything
+	// is saved, so a value that is not an API token, or one that has expired,
+	// does not replace the context's login.
 	claims, err := parseAPIToken(astroAPIToken)
 	if err != nil {
 		return false, err
@@ -410,6 +403,25 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 	if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
 		fmt.Printf("The given API Token %s has expired \n", claims.APITokenID)
 		return false, errExpiredAPIToken
+	}
+
+	err = c.SetContextKey("token", "Bearer "+astroAPIToken)
+	if err != nil {
+		return false, err
+	}
+
+	// The token's own expiry, or a year for one that names none. The token
+	// stays in the context after ASTRO_API_TOKEN is unset, and the expiry is
+	// what sends the user back to log in once it no longer works.
+	// SetExpiresIn takes seconds from now; this once passed a Unix
+	// timestamp, which stored an expiry decades out.
+	expiresAt := time.Now().AddDate(1, 0, 0)
+	if claims.ExpiresAt != nil {
+		expiresAt = claims.ExpiresAt.Time
+	}
+	err = c.SetExpiresIn(int64(time.Until(expiresAt) / time.Second))
+	if err != nil {
+		return false, err
 	}
 
 	var wsID, orgID string
