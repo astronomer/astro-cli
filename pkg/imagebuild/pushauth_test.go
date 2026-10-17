@@ -410,3 +410,67 @@ func TestCopyTree(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "key", string(data))
 }
+
+// A temp dir whose path holds glob metacharacters is swept all the same.
+func TestStaleSweepInATempPathWithBrackets(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "tmp[1]")
+	require.NoError(t, os.Mkdir(root, 0o700))
+	orig := tempDir
+	tempDir = func() string { return root }
+	t.Cleanup(func() { tempDir = orig })
+	old := filepath.Join(root, "astro-push-auth-old")
+	require.NoError(t, os.Mkdir(old, 0o700))
+	longAgo := time.Now().Add(-2 * time.Hour)
+	require.NoError(t, os.Chtimes(old, longAgo, longAgo))
+
+	removeStaleAuth()
+	assert.NoDirExists(t, old)
+}
+
+// A relative DOCKER_CONFIG still carries its contexts: the link points at
+// the absolute directory, not at a path relative to the throwaway one.
+func TestRelativeDockerConfigCarriesItsContexts(t *testing.T) {
+	userDir, _ := userDockerDir(t)
+	withTempDir(t)
+	t.Chdir(filepath.Dir(userDir))
+	t.Setenv("DOCKER_CONFIG", filepath.Base(userDir))
+
+	a, err := newPushAuth("r.example.com", "cli", "tok", false, nil)
+	require.NoError(t, err)
+	defer a.remove()
+	meta, err := os.ReadFile(filepath.Join(a.dir, "contexts", "meta", "colima", "meta.json"))
+	require.NoError(t, err)
+	assert.Contains(t, string(meta), "unix:///colima.sock")
+}
+
+// A Docker Hub credential is written under both keys, docker's and
+// containers'.
+func TestDockerHubCredentialKeys(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, writeAuthConfig(dir, "", "docker.io", "cli", "tok"))
+	data, err := os.ReadFile(filepath.Join(dir, "config.json"))
+	require.NoError(t, err)
+	auth := base64.StdEncoding.EncodeToString([]byte("cli:tok"))
+	assert.JSONEq(t, `{"auths":{"https://index.docker.io/v1/":{"auth":"`+auth+`"},"docker.io":{"auth":"`+auth+`"}}}`, string(data))
+}
+
+// With no user docker config to read, a push that would lose its docker
+// context or TLS settings is refused, plainly; one that would lose nothing
+// goes ahead on docker's default context.
+func TestPushWithoutAUserDockerConfig(t *testing.T) {
+	withTempDir(t)
+	t.Setenv("DOCKER_CONFIG", "")
+	t.Setenv("HOME", "")
+	t.Setenv("USERPROFILE", "")
+	if _, err := os.UserHomeDir(); err == nil {
+		t.Skip("this platform finds a home directory without HOME")
+	}
+	for _, env := range [][]string{{"DOCKER_CONTEXT=colima"}, {"DOCKER_TLS_VERIFY=1"}, {"DOCKER_TLS=1"}} {
+		_, err := newPushAuth("r.example.com", "cli", "tok", false, env)
+		require.ErrorIs(t, err, errNoDockerConfig, "%v", env)
+		assert.Contains(t, err.Error(), "can't carry the Docker context/TLS settings into the push")
+	}
+	a, err := newPushAuth("r.example.com", "cli", "tok", false, nil)
+	require.NoError(t, err)
+	a.remove()
+}

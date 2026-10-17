@@ -30,7 +30,7 @@ https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-ima
 // credentialRefusedAdvice is what the CLI says when the registry refused the
 // credential a push carried itself, the session token: clearing the user's
 // cached logins would change nothing, since the push never read them.
-const credentialRefusedAdvice = `failed to push image: the registry refused the credential this push was made with (403 Forbidden).
+const credentialRefusedAdvice = `failed to push image: the registry refused the credential this push was made with.
 
 The token may have expired, or it may not have permission to push to this registry. Run 'astro login' (or check the permissions of the API token in use) and try again.
 

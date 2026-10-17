@@ -134,9 +134,9 @@ type PushRequest struct {
 	// Username and Secret, when set, are the credential the push uses for
 	// Image's registry. No login is run: they are written to a credential
 	// file made for this one push and deleted after it, success or not (see
-	// pushAuth), never the user's own store, so nothing is left behind and
-	// concurrent pushes never share one. A "Bearer " prefix on Secret is
-	// dropped. Unset, the push uses the engine's own config and the
+	// pushAuth), never the user's own credential store, so nothing is left
+	// behind and concurrent pushes never share one. A "Bearer " prefix on
+	// Secret is dropped. Unset, the push uses the engine's own config and the
 	// credential it already holds for the registry, as any `<bin> push` does.
 	Username string
 	Secret   string
@@ -165,10 +165,19 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		return "", err
 	}
 	credential := registry != ""
+	untag := false
 	if req.Source != "" && req.Source != req.Image {
 		if err := e.Tag(ctx, req.Source, req.Image); err != nil {
 			return "", err
 		}
+		// The remote name is ours from here: dropped however the push ends,
+		// even canceled, as well as on success below.
+		untag = true
+		defer func() {
+			if untag {
+				e.Untag(context.WithoutCancel(ctx), req.Image) //nolint:errcheck // best-effort on a failed push
+			}
+		}()
 	}
 	podman := (credential || req.Digest) && IsPodman(ctx, e.Cmd, e.Bin, e.Env)
 	auth := &pushAuth{}
@@ -200,6 +209,7 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 			return "", err
 		}
 	}
+	untag = false
 	if err := e.Untag(ctx, req.Image); err != nil {
 		return "", err
 	}
@@ -293,14 +303,32 @@ func readDigestFile(path, image string) (string, error) {
 	return digest, nil
 }
 
-// registryOf is the registry host an image reference is pushed to: the part
-// before the first "/". A reference without one names no registry.
+// registryOf is the registry an image reference is pushed to, read as docker
+// reads a reference: the first component is a registry only when
+// it holds a "." or a ":" or is "localhost"; anything else (alpine:3,
+// org/repo:t) is on Docker Hub, docker.io.
 func registryOf(image string) (string, error) {
+	if image == "" {
+		return "", errors.New("no image was given to push")
+	}
 	host, _, ok := strings.Cut(image, "/")
-	if !ok || host == "" {
-		return "", fmt.Errorf("the image %q names no registry to log in to", image)
+	if !ok || (!strings.ContainsAny(host, ".:") && host != "localhost") {
+		return dockerHub, nil
 	}
 	return host, nil
+}
+
+// dockerHub is Docker Hub's registry as registryOf names it.
+const dockerHub = "docker.io"
+
+// authKeys are the keys a credential for registry is stored under so that
+// both engines find it. Docker looks Docker Hub up under its legacy index
+// URL, containers under docker.io; any other registry is its host for both.
+func authKeys(registry string) []string {
+	if registry == dockerHub || registry == "index.docker.io" {
+		return []string{"https://index.docker.io/v1/", dockerHub}
+	}
+	return []string{registry}
 }
 
 // repository is an image reference without its tag or digest.
@@ -355,9 +383,12 @@ func pushForbidden(said string) bool {
 
 // credentialRefused reports a push whose own credential the registry
 // refused: what pushForbidden reports, or a 401, "unauthorized", "incorrect
-// username or password" or "denied". A push on the user's stored credential
-// is held to pushForbidden alone, as it always was.
+// username or password" or a registry's "requested access to the resource is
+// denied". Not a bare "denied", which a socket or a file the engine cannot
+// open says too. A push on the user's stored credential is held to
+// pushForbidden alone, as it always was.
 func credentialRefused(said string) bool {
 	return pushForbidden(said) || http401.MatchString(said) || strings.Contains(said, "unauthorized") ||
-		strings.Contains(said, "incorrect username or password") || strings.Contains(said, "denied")
+		strings.Contains(said, "incorrect username or password") ||
+		strings.Contains(said, "requested access to the resource is denied")
 }

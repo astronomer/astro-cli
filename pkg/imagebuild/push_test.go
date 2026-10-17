@@ -244,16 +244,19 @@ func errorChainContains(err error, s string) bool {
 // a push's own credential in.
 func TestForbiddenForms(t *testing.T) {
 	for said, want := range map[string][2]bool{ // {stored credential, own credential}
-		"unexpected status: 403 forbidden":                      {true, true},
-		"denied: requested access to the resource is forbidden": {true, true},
-		"unauthorized: authentication required":                 {true, true},
-		"failed with status: 401 unauthorized":                  {false, true},
-		"unauthorized: incorrect username or password":          {false, true},
-		"denied: requested access to the resource is denied":    {false, true},
-		"exit status 1: manifest unknown":                       {false, false},
-		"layer size 14030 bytes":                                {false, false},
-		"exit status 1":                                         {false, false},
-		"dial tcp: lookup r.example.com: no such host":          {false, false},
+		"unexpected status: 403 forbidden":                                                                     {true, true},
+		"denied: requested access to the resource is forbidden":                                                {true, true},
+		"unauthorized: authentication required":                                                                {true, true},
+		"failed with status: 401 unauthorized":                                                                 {false, true},
+		"unauthorized: incorrect username or password":                                                         {false, true},
+		"denied: requested access to the resource is denied":                                                   {false, true},
+		"permission denied while trying to connect to the docker daemon socket at unix:///var/run/docker.sock": {false, false},
+		"open /tmp/astro-push-auth-1/config.json: permission denied":                                           {false, false},
+		"error: access denied":                                                                                 {false, false},
+		"exit status 1: manifest unknown":                                                                      {false, false},
+		"layer size 14030 bytes":                                                                               {false, false},
+		"exit status 1":                                                                                        {false, false},
+		"dial tcp: lookup r.example.com: no such host":                                                         {false, false},
 	} {
 		assert.Equal(t, want[0], pushForbidden(said), "stored: %s", said)
 		assert.Equal(t, want[1], credentialRefused(said), "own: %s", said)
@@ -290,11 +293,11 @@ func TestPushCredentialRefused(t *testing.T) {
 	assert.NotErrorIs(t, err, ErrPushForbidden)
 }
 
-// A request refused before anything runs leaves no tag behind: a credential
-// for a reference that names no registry, or a secret without a username.
+// A request refused before anything runs leaves no tag behind: no image, or
+// a secret without a username.
 func TestPushRefusedRequestLeavesNoTag(t *testing.T) {
 	for _, req := range []PushRequest{
-		{Source: "l:1", Image: "alpine:3", Username: "u", Secret: "s"},
+		{Source: "l:1", Image: "", Username: "u", Secret: "s"},
 		{Source: "l:1", Image: "r.example.com/a:t", Secret: "s"},
 	} {
 		cmd := &engineCmd{}
@@ -331,8 +334,8 @@ func ranVerb(cmd *engineCmd, verb string) bool {
 	return false
 }
 
-// Any other failed push carries the engine's stderr, and leaves the remote
-// tag for a retry rather than untagging.
+// Any other failed push carries the engine's stderr, and the remote name it
+// tagged is dropped all the same.
 func TestPushFailure(t *testing.T) {
 	cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
 		"push": func(_ []string, s rt.Stdio) error {
@@ -343,7 +346,32 @@ func TestPushFailure(t *testing.T) {
 	_, err := testEngine(cmd, "docker").Push(context.Background(), PushRequest{Source: "l:1", Image: "r.example.com/a:t"})
 	require.EqualError(t, err, "docker push r.example.com/a:t failed: exit status 1: manifest blob unknown")
 	assert.NotErrorIs(t, err, ErrPushForbidden)
-	assert.Equal(t, []string{"docker tag l:1 r.example.com/a:t", "docker push r.example.com/a:t"}, cmd.commands())
+	assert.Equal(t, []string{"docker tag l:1 r.example.com/a:t", "docker push r.example.com/a:t", "docker rmi r.example.com/a:t"}, cmd.commands())
+}
+
+// A refused push, with or without its own credential, drops the remote name
+// it tagged; one that tagged nothing (Image pushed as it is) untags only on
+// success, as before.
+func TestRefusedPushLeavesNoTag(t *testing.T) {
+	refuse := map[string]func([]string, rt.Stdio) error{
+		"push": func(_ []string, s rt.Stdio) error {
+			fmt.Fprintln(s.Err, "denied: 403 Forbidden")
+			return errors.New("exit status 1")
+		},
+	}
+	for _, req := range []PushRequest{
+		{Source: "l:1", Image: "r.example.com/a:t"},
+		{Source: "l:1", Image: "r.example.com/a:t", Username: "cli", Secret: "tok"},
+	} {
+		cmd := &engineCmd{reply: refuse}
+		_, err := testEngine(cmd, "docker").Push(context.Background(), req)
+		require.ErrorIs(t, err, ErrPushForbidden)
+		assert.True(t, ranVerb(cmd, "rmi"), "the tag is dropped: %v", cmd.commands())
+	}
+	cmd := &engineCmd{reply: refuse}
+	_, err := testEngine(cmd, "docker").Push(context.Background(), PushRequest{Image: "r.example.com/a:t"})
+	require.Error(t, err)
+	assert.False(t, ranVerb(cmd, "rmi"), "an image pushed as it is keeps its name on a failure")
 }
 
 // Docker records the pushed digest among the image's repo digests; the one
@@ -401,11 +429,31 @@ func TestPushDigestUnderPodman(t *testing.T) {
 	assert.NoFileExists(t, file, "the digest file is removed")
 }
 
-func TestPushWithACredentialNeedsARegistry(t *testing.T) {
-	cmd := &engineCmd{}
-	_, err := testEngine(cmd, "docker").Push(context.Background(), PushRequest{Image: "alpine:3", Username: "u", Secret: "s"})
-	require.ErrorContains(t, err, `the image "alpine:3" names no registry`)
-	assert.Empty(t, cmd.calls)
+// A reference's registry is read as docker reads it, and a Docker Hub
+// credential is stored under the key each engine looks it up by.
+func TestRegistryOf(t *testing.T) {
+	for image, want := range map[string]string{
+		"reg.example.com/a/b:t":      "reg.example.com",
+		"localhost:5000/a:t":         "localhost:5000",
+		"localhost/a:t":              "localhost",
+		"myhost:5000/a":              "myhost:5000",
+		"docker.io/library/alpine:3": "docker.io",
+		"index.docker.io/org/repo:t": "index.docker.io",
+		"org/repo:t":                 "docker.io",
+		"alpine:3":                   "docker.io",
+		"123.dkr.ecr.aws.com/repo:t": "123.dkr.ecr.aws.com",
+	} {
+		got, err := registryOf(image)
+		require.NoError(t, err, image)
+		assert.Equal(t, want, got, image)
+	}
+	_, err := registryOf("")
+	require.Error(t, err)
+
+	hub := []string{"https://index.docker.io/v1/", "docker.io"}
+	assert.Equal(t, hub, authKeys("docker.io"))
+	assert.Equal(t, hub, authKeys("index.docker.io"))
+	assert.Equal(t, []string{"localhost:5000"}, authKeys("localhost:5000"))
 }
 
 func TestRepository(t *testing.T) {

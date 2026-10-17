@@ -14,12 +14,18 @@ import (
 
 // pushAuth is where a push that carries its own credential keeps it: one
 // file, written for that push into a directory of its own and deleted with it,
-// never the user's own engine config. No login is run: the credential is
+// never the user's own credential store. No login is run: the credential is
 // written into the file directly, in the format docker's config.json and
 // containers' auth.json share ({"auths": {"<registry>": {"auth": …}}}), and
 // the push is pointed at it every way an engine looks for one — DOCKER_CONFIG
 // for docker, REGISTRY_AUTH_FILE and --authfile for podman — so that an
-// engine taken for the other still finds it, and finds nothing of the user's.
+// engine taken for the other still finds it, and none of the user's logins.
+//
+// Of the user's own docker config only what picks the daemon is read: its
+// currentContext, and its contexts/ directory, which the throwaway directory
+// links to (or, where a symlink is refused, copies, the copy removed with the
+// directory). Their credsStore, credHelpers and auths are neither read nor
+// written.
 //
 // So a deploy's token is never left in the user's credential store or
 // keychain, and two pushes running at once with different credentials for
@@ -38,8 +44,12 @@ const (
 	authFilePerm = 0o600
 )
 
-// authDirPattern names a throwaway credential directory in the temp dir.
-const authDirPattern = "astro-push-auth-*"
+// authDirPrefix starts the name of every throwaway credential directory in
+// the temp dir; authDirPattern makes one.
+const (
+	authDirPrefix  = "astro-push-auth-"
+	authDirPattern = authDirPrefix + "*"
+)
 
 // staleAuthAge is how old a throwaway credential directory has to be before
 // a later push takes it for one a killed push left behind and removes it.
@@ -51,12 +61,19 @@ const staleAuthAge = time.Hour
 // keep theirs apart.
 var tempDir = os.TempDir
 
+// errNoDockerConfig is a push that would lose what decides its daemon: there
+// is no user docker config to carry a context or TLS settings over from.
+var errNoDockerConfig = errors.New("can't carry the Docker context/TLS settings into the push: no home directory, and DOCKER_CONFIG is not set")
+
 // newPushAuth writes the credential for one push to registry into a
 // directory of its own: username and secret (a "Bearer " prefix dropped),
-// the user's docker context so docker reaches the daemon it always does, and
-// nothing else of the user's. env is the engine's env; podman adds
-// --authfile.
+// and the user's docker context so docker reaches the daemon it always does.
+// env is the engine's env; podman adds --authfile.
 func newPushAuth(registry, username, secret string, podman bool, env []string) (*pushAuth, error) {
+	userDir := userDockerConfigDir(env)
+	if userDir == "" && (envValue(env, "DOCKER_CONTEXT") != "" || envValue(env, "DOCKER_TLS_VERIFY") != "" || envValue(env, "DOCKER_TLS") != "") {
+		return nil, errNoDockerConfig
+	}
 	removeStaleAuth()
 	dir, err := os.MkdirTemp(tempDir(), authDirPattern)
 	if err != nil {
@@ -69,7 +86,6 @@ func newPushAuth(registry, username, secret string, podman bool, env []string) (
 		a.remove()
 		return nil, fmt.Errorf("securing the push's credential directory: %w", err)
 	}
-	userDir := userDockerConfigDir(env)
 	if err := writeAuthConfig(dir, userDir, registry, username, strings.TrimPrefix(secret, bearerPrefix)); err != nil {
 		a.remove()
 		return nil, err
@@ -127,11 +143,16 @@ func (a *pushAuth) cmdEnv(env []string) []string {
 // temp dir: the user's own, older than staleAuthAge. Errors are ignored; the
 // next push tries again.
 func removeStaleAuth() {
-	dirs, err := filepath.Glob(filepath.Join(tempDir(), authDirPattern))
+	root := tempDir()
+	entries, err := os.ReadDir(root)
 	if err != nil {
 		return
 	}
-	for _, dir := range dirs {
+	for _, entry := range entries {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), authDirPrefix) {
+			continue
+		}
+		dir := filepath.Join(root, entry.Name())
 		info, err := os.Lstat(dir)
 		if err != nil || !info.IsDir() || time.Since(info.ModTime()) < staleAuthAge || !ownedByUser(info) {
 			continue
@@ -159,9 +180,10 @@ type authConfigFile struct {
 // DOCKER_HOST in the environment still take precedence over the file, as for
 // any docker command, since they pass through untouched.
 func writeAuthConfig(dir, userDir, registry, username, secret string) error {
-	cfg := authConfigFile{Auths: map[string]authEntry{
-		registry: {Auth: base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))},
-	}}
+	cfg := authConfigFile{Auths: map[string]authEntry{}}
+	for _, key := range authKeys(registry) {
+		cfg.Auths[key] = authEntry{Auth: base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))}
+	}
 	if userDir != "" {
 		cfg.CurrentContext = readCurrentContext(filepath.Join(userDir, "config.json"))
 		if err := carryContexts(filepath.Join(userDir, "contexts"), filepath.Join(dir, "contexts")); err != nil {
@@ -199,6 +221,12 @@ func readCurrentContext(path string) string {
 // the symlink privilege). docker only reads it for a push. A user with no
 // contexts directory has nothing to carry.
 func carryContexts(src, dst string) error {
+	// Absolute, or a link made from a relative DOCKER_CONFIG would point
+	// somewhere relative to the throwaway directory instead.
+	src, err := filepath.Abs(src)
+	if err != nil {
+		return fmt.Errorf("resolving the docker contexts at %s: %w", src, err)
+	}
 	info, err := os.Stat(src)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
