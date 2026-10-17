@@ -281,12 +281,13 @@ Inside the project, `astro env` and `astro deployment` take an Astro link's name
 
 A link says where the Airflow is and, when the default is not what you want, how to prove yourself to it. It never holds a credential — the values themselves come from the environment when a command runs.
 
-There are four kinds of link, and the kind follows from what the link sets:
+There are five kinds of link, and the kind follows from what the link sets:
 
 - an **Astro** link sets `deployment`, the Deployment id;
 - an **MWAA** link sets `target = 'mwaa'` and `environment`, the MWAA environment name;
 - a **Composer** link sets `target = 'composer'` and `environment`, the Composer environment name;
-- an **endpoint** link sets `url`, the address of an Airflow with no control plane to ask — an instance on a VM, a platform team's shared Airflow.
+- an **endpoint** link sets `url`, the address of an Airflow with no control plane to ask — an instance on a VM, a platform team's shared Airflow;
+- an **Astro Private Cloud** link sets `target = 'apc'`, `domain`, `workspace` and `deployment`: a Deployment on an Astro Private Cloud installation. See [Astro Private Cloud links](#astro-private-cloud-links).
 
 A link names coordinates (`deployment` or `environment`) or a `url`, never both.
 
@@ -294,7 +295,7 @@ Pick any name you like, with two rules: it cannot be empty, and it cannot be `lo
 
 ### `deployment`
 
-The Astro Deployment id this link points at. Required on an Astro link, and an error on an MWAA or Composer link, which name an `environment` instead.
+The Deployment id this link points at: an Astro Deployment's on an Astro link, an Astro Private Cloud Deployment's on an `apc` link. Required on both, and an error on an MWAA or Composer link, which name an `environment` instead.
 
 ### `environment`
 
@@ -308,19 +309,19 @@ A `url` must not carry a username or password (`https://admin:hunter2@airflow.co
 
 ### `workspace`
 
-The workspace an Astro Deployment lives in. Optional if `[tool.astro]` sets a default `workspace`; the link's own value wins when it sets one. An Astro link with no workspace at either level is an error. Only an Astro link has a workspace — MWAA, Composer and endpoint links are not in one, the `[tool.astro]` default does not reach them, and setting `workspace` on one is an error.
+The workspace an Astro Deployment lives in. Optional if `[tool.astro]` sets a default `workspace`; the link's own value wins when it sets one. An Astro link with no workspace at either level is an error. On an `apc` link it is the Astro Private Cloud workspace, required on the link itself: the `[tool.astro]` default is an Astro workspace and never reaches an `apc` link. Only Astro and `apc` links have a workspace — MWAA, Composer and endpoint links are not in one, the `[tool.astro]` default does not reach them, and setting `workspace` on one is an error.
 
 ### `target`
 
 The target to build and deploy this link with, and — for `mwaa` and `composer` — the platform the link points at. Optional: it falls back to the `[tool.astro]` default `target`, and then to the built-in `astro` when neither level names one.
 
-A link's target must be `astro`, `mwaa`, or `composer`, spelled in lower case; anything else is an error, including a value inherited from `[tool.astro]`. (The package targets are a wider set — `astro package oss` builds an artifact for an Airflow there is nothing to link to.) Setting it to an empty string is an error too — an empty string means you meant something and got it wrong.
+A link's target must be `astro`, `mwaa`, `composer` or `apc`, spelled in lower case; anything else is an error, including a value inherited from `[tool.astro]`. (The package targets are a wider set — `astro package oss` builds an artifact for an Airflow there is nothing to link to.) Setting it to an empty string is an error too — an empty string means you meant something and got it wrong.
 
 ### `auth`
 
 How the CLI proves itself to this link's Airflow, as an inline table: `auth = { method = '…', … }`. Where an Airflow is and how it checks callers are separate questions, so any method attaches to any kind of link — a self-hosted Airflow behind Google IAP is a `url` link with `method = 'google'`, an Airflow 3 under Keycloak a `url` link with `method = 'airflow-token'`.
 
-The table is optional on every kind but the endpoint one, where there is no safe default. Left out, a link takes its kind's default: an Astro link `astro`, an MWAA link `aws`, a Composer link `google`.
+The table is optional on every kind but the endpoint one, where there is no safe default. Left out, a link takes its kind's default: an Astro link `astro`, an MWAA link `aws`, a Composer link `google`, an `apc` link `apc`.
 
 | `method` | Where the credential comes from | Fields |
 | -- | -- | -- |
@@ -332,6 +333,7 @@ The table is optional on every kind but the endpoint one, where there is no safe
 | `airflow-token` | credentials exchanged at the Airflow's own `/auth/token` | `client-id-env` with `client-secret-env`, or `username-env` with `password-env` — one pair, whichever your instance takes |
 | `exec` | a command you run that prints a token | `command` |
 | `none` | nothing is sent: local instances, open dev servers | none |
+| `apc` | your `astro login` session for the `apc` link's [`domain`](#astro-private-cloud-links). Only an `apc` link names a domain, so the method is an error on any other kind | none |
 
 Every field that carries a credential is a `*-env` name: it names the environment variable holding the value, never the value. No literal secret is legal in this file, and a field that would hold one does not exist. The variables themselves resolve the way every other value does — the shell, the project `.env`, `astro local env <noun> set` — so a teammate who is missing one is told which variable to set.
 
@@ -371,9 +373,30 @@ url = 'https://airflow.acme.internal'
 auth = { method = 'exec', command = ['acme-airflow-token'] }
 ```
 
+### Astro Private Cloud links
+
+An `apc` link names a Deployment on an Astro Private Cloud (APC) installation, so a project can link APC Deployments beside Astro ones while it moves between them:
+
+```toml
+[tool.astro.deployments.prod-apc]
+target = 'apc'
+domain = 'astro.example.com'    # the APC base domain, as astro login takes it
+workspace = 'your-apc-workspace-id'
+deployment = 'your-apc-deployment-id'
+default = true                  # optional
+```
+
+- **`domain` is required, on the link.** It is the APC base domain you give `astro login`, and it picks the login the link is reached with. It is written the way `astro login` stores an APC login: lower case, with any `https://` and trailing `/` removed. Unlike `[tool.astro] domain` it keeps a leading `cloud.` or `app.`, because an APC login is stored under the base domain exactly as given. `[tool.astro] domain` is Astro's host and never reaches an `apc` link, and `domain` on any other kind of link is an error.
+- **`workspace` is required, on the link.** `[tool.astro] workspace` is an Astro workspace, so an `apc` link never inherits it.
+- **`target = 'apc'` is what makes it one.** APC and Astro ids look alike, so the target, not the id, says which platform a link is on.
+- **No `environment` or `url`.** An `apc` link names a Deployment, and its Airflow is that Deployment's. A link has no `organization` key on any kind.
+- **What reads it today.** `astro link` writes and lists `apc` links, and `astro use` lists and selects them like any other. `astro deploy` does not deploy to them yet: under an Astro context it ships to Astro links only and never offers an `apc` link, and under an APC context it still deploys by Deployment id. The commands that query an Airflow (`astro af`, `astro api airflow`) refuse an `apc` link by name rather than reach for it, since querying an APC Deployment's Airflow is not supported yet.
+
+Each problem has its own code: `domain_required`, `workspace_required` and `deployment_required` for a missing field, `environment_on_apc_link` and `url_on_apc_link` for a field an `apc` link does not take, `domain_on_non_apc_link` for a domain on another kind, and `auth_apc_on_non_apc_link` for the `apc` method on another kind.
+
 ### How links resolve
 
-The two levels fold together at parse time, so by the time the CLI acts on a link every value is already filled in. The rules: an Astro link's `workspace` is its own value if it set one, else the `[tool.astro]` default, and it must end up with one; a link's `target` is its own value, else the `[tool.astro]` default, else the built-in `astro`; a link's auth method is its own `auth` table if it has one, else its kind's default; and at most one link may carry `default = true`.
+The two levels fold together at parse time, so by the time the CLI acts on a link every value is already filled in. The rules: an Astro link's `workspace` is its own value if it set one, else the `[tool.astro]` default, and it must end up with one; an `apc` link's `domain` and `workspace` are its own and never inherited; a link's `target` is its own value, else the `[tool.astro]` default, else the built-in `astro`; a link's auth method is its own `auth` table if it has one, else its kind's default; and at most one link may carry `default = true`.
 
 ### Linking from the command line
 
@@ -381,12 +404,15 @@ The two levels fold together at parse time, so by the time the CLI acts on a lin
 
 In a terminal, a missing argument is asked for instead: `astro link add` with no `--deployment` lists the Astro Deployments in the project's workspace (else your current one) with the picker `astro deploy` uses, and names the link after the one chosen, lowercased with each run of other characters turned into a dash; `remove` and `default` list the project's links. A run that cannot be asked, with no terminal or with `--output json`, never prompts and names the missing argument instead.
 
+Under an Astro Private Cloud context, `astro link add` writes an `apc` link by default (with no `--target` and no `[tool.astro] target`, or with `--deployment` alone), on the current context's domain. With no `--deployment` it lists the APC Deployments of `--workspace`, else the context's current workspace (never `[tool.astro] workspace`, which is Astro's), and names the link the same way. With `--deployment`, the link's workspace is `--workspace`, else the one a replaced `apc` link already sets, else the context's. `--target mwaa`, `composer`, `astro` and `--url` still link those kinds there. Under an Astro context, `--target apc` is refused: the domain is the APC context's, so switch to it first.
+
 ```sh
 astro link add prod --deployment your-prod-deployment-id
 astro link add prod-mwaa --target mwaa --environment orders-prod --region eu-west-1
 astro link add gcp --target composer --environment orders --project acme-data --location us-central1
 astro link add staging --url https://airflow.staging.corp.dev --auth token --token-env STAGING_AIRFLOW_TOKEN
 astro link add bespoke --url https://airflow.acme.internal --auth exec -- acme-airflow-token --profile prod
+astro link add prod-apc --deployment your-apc-deployment-id   # under an Astro Private Cloud context
 ```
 
 A link writes `target` and `workspace` only where they differ from what it inherits, so it keeps following `[tool.astro]` when that changes; a link that already sets one keeps it. The Composer `project` and `location` and the MWAA `region` go to the shared `[tool.astro.targets.<name>]` section one key at a time, and a Composer link that names neither takes the ones already there. `add` refuses a name already linked unless `--replace` is passed, and a replaced link keeps its `default` and, when `--workspace` is not given, the workspace it sets itself. A `*-env` flag is refused unless `--auth` names a method that reads it. `--output json` prints `{"name", "kind", "status", "manifest"}`, with `status` one of `added`, `replaced`, `removed`, `default`, `cleared` or `unchanged`.

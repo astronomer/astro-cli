@@ -80,6 +80,13 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	if why, root := project.Convert1xBlocked(dir); why != project.NotBlocked {
 		return &convert1xBlockedError{msg: project.Blocked1xMessage(why, root)}
 	}
+	// Under an APC context a converted project's saved deploy target is an
+	// APC Deployment, linked on the context's domain. The refusal above stops
+	// every 1.x project there for now, so this takes effect once the APC
+	// manifest deploy lifts it.
+	if c.d.APC != nil {
+		opts.APCDomain = c.d.APC.Domain
+	}
 
 	res, err := scaffold.Run(dir, opts)
 	if err != nil {

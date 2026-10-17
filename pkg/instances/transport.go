@@ -107,6 +107,9 @@ func (i Instance) TargetString(field string) (string, error) {
 // the request in a signed AWS call with no URL in sight, so it is dispatched
 // before anything looks a URL up.
 func (i Instance) Transport(ctx context.Context, d Deps) (airflowapi.Transport, error) {
+	if i.Kind == KindAPC {
+		return nil, apcUnsupported(i.Name)
+	}
 	method := i.authMethod()
 	// Before anything else, including the coordinate lookup below. A build that
 	// cannot perform this method should say so, not fail at whatever the
@@ -155,6 +158,17 @@ func (i Instance) httpTransport(ctx context.Context, d Deps) (airflowapi.Transpo
 	return airflowapi.NewHTTPTransport(baseURL, opts...)
 }
 
+// ErrAPCUnsupported reports an apc link, an Astro Private Cloud Deployment,
+// given to a command that queries an Airflow. Such a link is listed, pinned
+// and resolved like any other, but reaching its Airflow is not supported yet,
+// so it is refused before any lookup rather than sent somewhere it is not.
+var ErrAPCUnsupported = errors.New("apc links are not supported by commands that query an Airflow yet")
+
+// apcUnsupported is ErrAPCUnsupported for the link called name.
+func apcUnsupported(name string) error {
+	return fmt.Errorf("%q is an Astro Private Cloud link, and %w: name another link", name, ErrAPCUnsupported)
+}
+
 // HTTPDoor is an Airflow reachable over plain HTTP: where it answers, and the
 // Authorization header value that proves the caller to it. Authorization is
 // empty when this instance sends no credential at all, which is a real answer —
@@ -181,6 +195,9 @@ var ErrNotHTTP = errors.New("this deployment is not reached over HTTP: its reque
 // request, which is the cost of handing it over as a string; one command run is
 // short enough that a token minted at the start is still good at the end.
 func (i Instance) HTTPDoorFor(ctx context.Context, d Deps) (HTTPDoor, error) {
+	if i.Kind == KindAPC {
+		return HTTPDoor{}, apcUnsupported(i.Name)
+	}
 	method := i.authMethod()
 	// Whether this build carries the method comes first, before the answer
 	// that it is not an HTTP door at all. A build with no aws provider asked

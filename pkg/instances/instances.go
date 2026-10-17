@@ -36,16 +36,20 @@ const LocalName = manifest.ReservedLinkName
 // lifetime — one exported value makes this terminal the prod terminal.
 const EnvVar = "ASTRO_DEPLOYMENT"
 
-// Kind is what an instance points at: the four manifest link kinds, plus the
-// local Airflow, which no manifest declares.
+// Kind is what an instance points at: the manifest link kinds, plus the local
+// Airflow, which no manifest declares.
 type Kind string
 
 const (
-	KindAstro         = Kind(manifest.KindAstro)
-	KindMWAA          = Kind(manifest.KindMWAA)
-	KindComposer      = Kind(manifest.KindComposer)
-	KindEndpoint      = Kind(manifest.KindEndpoint)
-	KindLocal    Kind = "local"
+	KindAstro    = Kind(manifest.KindAstro)
+	KindMWAA     = Kind(manifest.KindMWAA)
+	KindComposer = Kind(manifest.KindComposer)
+	KindEndpoint = Kind(manifest.KindEndpoint)
+	// KindAPC is an Astro Private Cloud Deployment. It is listed and resolved
+	// like any link, but no command reaches its Airflow yet: Transport and
+	// HTTPDoorFor refuse it with ErrAPCUnsupported.
+	KindAPC        = Kind(manifest.KindAPC)
+	KindLocal Kind = "local"
 )
 
 // Source is where an instance came from: declared in the committed manifest,
@@ -237,6 +241,8 @@ func linkWhere(d manifest.Link) string {
 		return "environment " + d.Environment
 	case manifest.KindEndpoint:
 		return d.URL
+	case manifest.KindAPC:
+		return "deployment " + d.Deployment + " on " + d.Domain
 	}
 	return ""
 }

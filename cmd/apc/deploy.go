@@ -212,6 +212,13 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 	deploymentID := ""
 
 	// Get release name from args, if passed
+	//
+	// TODO(apc-manifest-deploy): the argument is a Houston Deployment id only.
+	// The project's apc links ([tool.astro.deployments.*] with target = "apc",
+	// written by astro link add under this context) are not read here yet:
+	// resolving a link name, --deployment and the default link through
+	// internal/deploy's target resolution is the APC manifest deploy's change
+	// (docs/deploy.md, Astro Private Cloud), not this one's.
 	if len(args) > 0 {
 		deploymentID = args[0]
 	}

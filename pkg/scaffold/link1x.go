@@ -23,9 +23,19 @@ var astroIDRe = regexp.MustCompile(`^c[a-z0-9]{24}$`)
 // cmd/apc/deploy.go saves there, and the id shape is what tells the two apart.
 // A link needs a workspace to parse, and the conversion has no login to look
 // one up with, so a saved target without one stays a note.
+//
+// Under an Astro Private Cloud context (Options.APCDomain) the target is a
+// Houston Deployment in a Houston workspace, also cuids, and becomes an apc
+// link on that context's domain.
 func (from1x *project1x) deployLink() (Link, bool) {
 	if !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
 		return Link{}, false
+	}
+	if from1x.apcDomain != "" {
+		return Link{
+			Name: Link1xName, Kind: manifest.KindAPC, Domain: from1x.apcDomain,
+			Deployment: from1x.deployment, Workspace: from1x.workspace,
+		}, true
 	}
 	return Link{Name: Link1xName, Kind: manifest.KindAstro, Deployment: from1x.deployment, Workspace: from1x.workspace}, true
 }
@@ -57,6 +67,10 @@ func (from1x *project1x) deployLinkAdvisory() string {
 	if !ok {
 		return ""
 	}
+	where := ""
+	if l.Kind == manifest.KindAPC {
+		where = " on Astro Private Cloud " + l.Domain
+	}
 	return config1xRelPath + ": its saved deploy target is now the " + l.Name + " link in " + manifest.Marker +
-		" ([tool.astro.deployments." + l.Name + "], deployment " + l.Deployment + " in workspace " + l.Workspace + ")"
+		" ([tool.astro.deployments." + l.Name + "], deployment " + l.Deployment + " in workspace " + l.Workspace + where + ")"
 }

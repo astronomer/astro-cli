@@ -182,7 +182,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// The root's out, os.Stdout in production, so a test of the assembled
 	// root reads what a core command publishes where it reads the rest.
 	coreDeps.Stdout = o.out
-	wireLinkPickers(&coreDeps, o.platform, astroV1Client, o.out)
+	wireLinkPickers(&coreDeps, o.platform, astroV1Client, houstonClient, o.out)
 	// A single positional argument is Otto's first message in an interactive
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}) }

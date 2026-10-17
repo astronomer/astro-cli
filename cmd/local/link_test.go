@@ -268,7 +268,7 @@ func TestLinkAddRefusesAFlagTheKindDoesNotTake(t *testing.T) {
 		{[]string{"--url", "https://a.example.com", "--auth", "none", "--workspace", "w"}, "--workspace does not apply to a url link"},
 		{[]string{"--url", "https://a.example.com", "--target", "mwaa"}, "cannot be combined"},
 		{[]string{"--environment", "e"}, "pass --target mwaa or --target composer"},
-		{[]string{"--target", "endpoint", "--deployment", "d"}, "must be astro, mwaa or composer"},
+		{[]string{"--target", "endpoint", "--deployment", "d"}, "must be astro, mwaa, composer or apc"},
 		{[]string{"--deployment", "d", "--", "tool"}, "is for --auth exec"},
 	} {
 		t.Run(tc.want, func(t *testing.T) {

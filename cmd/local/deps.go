@@ -100,6 +100,11 @@ type Deps struct {
 	PickDeployment func(workspaceID string, linked map[string]string) (PickedDeployment, error)
 	PickWorkspace  func() (string, error)
 
+	// APC is set by the root when the current context is Astro Private
+	// Cloud's, and nil under Astro. `astro link add` then links an APC
+	// Deployment by default (target = "apc"), on this context's domain.
+	APC *APCLinking
+
 	// Interactive reports whether this run may ask the user a question. It is a
 	// seam rather than a stdin type-assertion so a test can drive the prompt
 	// path without a pty. nil means non-interactive, which is the safe default:
@@ -449,7 +454,26 @@ func (imageBuilder) Build(ctx context.Context, req localrt.BuildRequest, cb loca
 // because the project already links every Deployment in the workspace.
 var ErrAllDeploymentsLinked = errors.New("every Deployment in the workspace is already linked")
 
-// PickedDeployment is the Astro Deployment a picker chose.
+// APCLinking is what `astro link add` needs to link an Astro Private Cloud
+// Deployment, wired by the root over the Houston client and the current
+// context, which this tree cannot import.
+type APCLinking struct {
+	// Domain is the current context's domain, the APC installation an apc
+	// link is written on.
+	Domain string
+	// CurrentWorkspace is the context's current workspace, "" when none: the
+	// workspace a link names, and lists Deployments from, without --workspace.
+	// [tool.astro] workspace never stands in for it: that is an Astro
+	// workspace.
+	CurrentWorkspace func() string
+	// PickDeployment asks which of the workspace's Deployments to link,
+	// leaving out the ones in linked (a Deployment ID to the link naming it),
+	// and reports ErrAllDeploymentsLinked when that leaves none. nil means the
+	// run cannot pick, and --deployment is required.
+	PickDeployment func(workspaceID string, linked map[string]string) (PickedDeployment, error)
+}
+
+// PickedDeployment is the Deployment a picker chose.
 type PickedDeployment struct {
 	ID          string
 	Name        string

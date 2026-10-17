@@ -46,7 +46,7 @@ The deploy code lives in `internal/platform/astro/deploy` (`manifest.go`, `manif
 
 ### Astro Private Cloud
 
-v2 does not build projects for Astro Private Cloud yet. Support for `pyproject.toml` projects there is planned. Until then, `astro deploy` under an APC context follows the same walk and the same `--image-name` rule:
+v2 does not build projects for Astro Private Cloud yet. Support for `pyproject.toml` projects there is planned. A project can already link APC Deployments (`target = 'apc'`, written by `astro link add` under an APC context; see [Astro Private Cloud links](manifest-reference.md#astro-private-cloud-links)), but `astro deploy` does not read those links yet: under an APC context it takes a Deployment id as before. Until then, `astro deploy` under an APC context follows the same walk and the same `--image-name` rule:
 
 - **a deploy that would build the project**, one without `--image-name`, is refused: `Astro CLI v2 cannot build and deploy projects to Astro Private Cloud yet: use Astro CLI 1.x for now.` At a `pyproject.toml` project's root it adds that support is coming, and that `--dags` uploads the project's DAGs and an image built with `astro package` deploys with `--image-name`; that is a usage error (exit 2), a mode v2 does not have. Outside any project it is kind `no_project` (exit 1), as on Astro;
 - **in or below a project in the 1.x layout every deploy is refused**, `--image-name` and `--dags` included: `… uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), which Astro CLI v2 does not deploy to Astro Private Cloud. Deploy it with Astro CLI 1.x` (kind `no_project`). It does not suggest `astro init`, which refuses to convert a project under an APC context. Below a `pyproject.toml` project's root, the deploy is told to run from the root;
@@ -140,7 +140,7 @@ An image a deploy or `astro package astro` builds is pushed to a registry, so be
 
 ## 3. Selecting the Deployment
 
-The manifest's `[tool.astro.deployments.<name>]` links name the Deployments a project ships to (see the [manifest reference](manifest-reference.md#toolastrodeploymentsname)). `astro deploy` ships only to Astro links. A named MWAA, Composer or endpoint link is refused: `link "<name>" is <kind>, and astro deploy ships to Astro Deployments`. Use `astro package` for those platforms.
+The manifest's `[tool.astro.deployments.<name>]` links name the Deployments a project ships to (see the [manifest reference](manifest-reference.md#toolastrodeploymentsname)). `astro deploy` ships only to Astro links. A named MWAA, Composer, endpoint or Astro Private Cloud (`apc`) link is refused: `link "<name>" is <kind>, and astro deploy ships to Astro Deployments`. Use `astro package` for MWAA and Composer. An `apc` link is never offered by the prompt and never preselected, even as the project's default.
 
 **Deploy never picks for you.** Shipping code is too consequential to decide from a marker, a pinned selection or an exported variable, so:
 

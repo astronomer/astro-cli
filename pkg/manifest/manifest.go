@@ -211,21 +211,29 @@ type Astro struct {
 
 // Link is one committed deployment link: an Airflow the project talks to,
 // named. A link carries coordinates for something the CLI can look up
-// (Deployment for astro, Environment for mwaa and composer) or a URL for an
-// Airflow with no control plane to ask — never both. No credential is ever
+// (Deployment for astro and apc, Environment for mwaa and composer) or a URL
+// for an Airflow with no control plane to ask — never both. No credential is ever
 // stored here; Auth names how to prove yourself and the values themselves come
 // from the environment at request time.
 //
 // Target and Workspace are already resolved: a link's own value if it set one,
 // else the [tool.astro] default, and for Target "astro" when neither level
-// sets it.
+// sets it. An apc link's Workspace is always its own: [tool.astro] workspace
+// names an Astro workspace, never an Astro Private Cloud one.
 type Link struct {
 	Target string
-	// Workspace is the Astro workspace the Deployment lives in, and is set on
-	// astro links only — the other kinds are not in a workspace.
+	// Workspace is the workspace the Deployment lives in: an Astro workspace on
+	// an astro link, an Astro Private Cloud (Houston) workspace on an apc link.
+	// The other kinds are not in a workspace.
 	Workspace string
-	// Deployment is the Astro Deployment id on an astro link.
+	// Deployment is the Deployment id on an astro link (Astro's) or an apc
+	// link (Houston's).
 	Deployment string
+	// Domain is an apc link's Astro Private Cloud base domain, normalized by
+	// NormalizeAPCDomain the way `astro login` stores an APC login, so it names
+	// the login the link is reached with. Set on apc links only: an astro
+	// link's host is [tool.astro] domain (Astro.LoginDomain).
+	Domain string
 	// Environment is the platform's own environment name on an mwaa or
 	// composer link — the coordinate that stands in for Deployment there.
 	Environment string
@@ -250,28 +258,35 @@ type Link struct {
 // re-deriving the rule.
 type LinkKind string
 
-// The mwaa and composer kinds are spelled the same as the targets that select
-// them, deliberately: one vocabulary for where a link deploys and what it
-// points at.
+// The mwaa, composer and apc kinds are spelled the same as the targets that
+// select them, deliberately: one vocabulary for where a link deploys and what
+// it points at.
 const (
 	KindAstro    LinkKind = "astro"
 	KindMWAA     LinkKind = "mwaa"
 	KindComposer LinkKind = "composer"
 	KindEndpoint LinkKind = "endpoint"
+	// KindAPC is an Astro Private Cloud Deployment: a Houston Deployment id in
+	// a Houston workspace, on the installation the link's domain names.
+	KindAPC LinkKind = "apc"
 )
 
 // linkTargets is the closed set of targets a link may carry. The package
 // targets are a wider set — `astro package oss` builds an artifact for an
 // Airflow there is nothing to link to — so a link keeps its own list.
-var linkTargets = []LinkKind{KindAstro, KindMWAA, KindComposer}
+var linkTargets = []LinkKind{KindAstro, KindMWAA, KindComposer, KindAPC}
 
-// Kind reports what the link points at: a URL makes it an endpoint, the mwaa
-// and composer targets make it a coordinate link on that platform, and
-// anything else is an Astro link.
+// Kind reports what the link points at: the apc target makes it an Astro
+// Private Cloud link, a URL makes it an endpoint, the mwaa and composer
+// targets make it a coordinate link on that platform, and anything else is an
+// Astro link. The apc target is read before the URL, so a url on an apc link
+// is refused as one (CodeURLOnAPCLink) rather than read as an endpoint.
 //
 //nolint:gocritic // hugeParam: the value receiver is the point — Kind() must be callable on a map element, which is not addressable
 func (l Link) Kind() LinkKind {
 	switch {
+	case l.Target == string(KindAPC):
+		return KindAPC
 	case l.URL != "":
 		return KindEndpoint
 	case l.Target == string(KindMWAA):
@@ -447,6 +462,22 @@ const (
 	CodeWorkspaceRequired           ProblemCode = "workspace_required"
 	CodeMultipleDefaults            ProblemCode = "multiple_defaults"
 
+	// An apc link: an Astro Private Cloud Deployment, which names its own
+	// domain and workspace and inherits neither.
+	//
+	// CodeDomainRequired is an apc link with no domain: nothing else says
+	// which installation its ids belong to.
+	CodeDomainRequired ProblemCode = "domain_required"
+	// CodeDomainOnNonAPCLink is domain on another kind of link. An astro
+	// link's host is [tool.astro] domain, and the other kinds have none.
+	CodeDomainOnNonAPCLink ProblemCode = "domain_on_non_apc_link"
+	// CodeEnvironmentOnAPCLink is environment on an apc link, which names a
+	// Deployment instead.
+	CodeEnvironmentOnAPCLink ProblemCode = "environment_on_apc_link"
+	// CodeURLOnAPCLink is url on an apc link: its Airflow is the
+	// Deployment's, never an address written down.
+	CodeURLOnAPCLink ProblemCode = "url_on_apc_link"
+
 	// A link's url.
 	CodeURLInvalid  ProblemCode = "url_invalid"
 	CodeURLNoScheme ProblemCode = "url_no_scheme"
@@ -467,6 +498,10 @@ const (
 	//nolint:gosec // G101: as above, a rule identifier
 	CodeAuthNeedsCredentials ProblemCode = "auth_needs_credentials"
 	CodeAuthTooManyPairs     ProblemCode = "auth_too_many_pairs"
+	// CodeAuthAPCOnNonAPCLink is the apc method on another kind of link: the
+	// method reads the Astro Private Cloud login for the link's domain, and
+	// only an apc link names one.
+	CodeAuthAPCOnNonAPCLink ProblemCode = "auth_apc_on_non_apc_link"
 
 	// [tool.astro.pools].
 	CodePoolNameInvalid  ProblemCode = "pool_name_invalid"
@@ -501,13 +536,15 @@ var problemCodes = []ProblemCode{
 	CodeEnvironmentRequired, CodeEnvironmentOnAstroLink, CodeDeploymentRequired,
 	CodeWorkspaceOnNonAstroLink, CodeWorkspaceRequired, CodeMultipleDefaults,
 
+	CodeDomainRequired, CodeDomainOnNonAPCLink, CodeEnvironmentOnAPCLink, CodeURLOnAPCLink,
+
 	CodeURLInvalid, CodeURLNoScheme, CodeURLNotHTTP, CodeURLNoHost,
 	CodeURLHasCredentials,
 
 	CodeAuthRequired, CodeAuthMethodRequired, CodeAuthMethodUnknown,
 	CodeAuthFieldNotForMethod, CodeAuthFieldRequired, CodeAuthEnvNameInvalid,
 	CodeAuthCommandEmpty, CodeAuthPairIncomplete, CodeAuthNeedsCredentials,
-	CodeAuthTooManyPairs,
+	CodeAuthTooManyPairs, CodeAuthAPCOnNonAPCLink,
 
 	CodePoolNameInvalid, CodePoolSlotsInvalid, CodeDefaultPoolDescription,
 }
@@ -724,7 +761,7 @@ const astroRoot = "tool.astro"
 // in silence.
 var (
 	astroKeys = []string{"airflow", "build-secrets", "deployments", "dockerfile", "domain", "env", "organization", "packages", "pools", "runtime", "target", "targets", "workspace"}
-	linkKeys  = []string{"auth", "default", "deployment", "environment", "target", "url", "workspace"}
+	linkKeys  = []string{"auth", "default", "deployment", "domain", "environment", "target", "url", "workspace"}
 )
 
 // ReservedLinkName is the word that means the Airflow running on this machine
@@ -875,6 +912,20 @@ func (a *Astro) LoginDomain() string {
 	return NormalizeDomain(d)
 }
 
+// NormalizeAPCDomain reduces an Astro Private Cloud base domain as someone
+// might write it to the form `astro login` stores an APC login under: lower
+// case, with no scheme and no trailing slash, so "https://Astro.Corp.Example/"
+// is "astro.corp.example". Unlike NormalizeDomain it keeps a leading "cloud."
+// or "app.": `astro login` stores an APC login under the base domain as it was
+// given, and a base domain may begin with either, so stripping one would name
+// another installation.
+func NormalizeAPCDomain(d string) string {
+	d = strings.ToLower(strings.TrimSpace(d))
+	d = strings.TrimPrefix(d, "https://")
+	d = strings.TrimPrefix(d, "http://")
+	return strings.TrimRight(d, "/")
+}
+
 // NormalizeDomain reduces an Astro host as someone might write it — a copied
 // URL, the cloud UI's host, mixed case — to the form `astro login` stores its
 // login under: "https://cloud.astronomer-dev.io/" is "astronomer-dev.io". A
@@ -916,7 +967,7 @@ var targetKeys = map[string][]string{
 }
 
 // reservedTargets are the targets whose sections nothing reads yet.
-var reservedTargets = []string{"astro", "oss"}
+var reservedTargets = []string{"astro", "oss", "apc"}
 
 // targets decodes [tool.astro.targets], one plain-data section per backend.
 //
@@ -949,7 +1000,7 @@ func (p *parser) targets(v any) map[string]map[string]any {
 				}
 			}
 		case !slices.Contains(reservedTargets, name):
-			p.warn(CodeUnknownKey, sectionKey, "not a target, ignored: the targets are astro, mwaa, composer and oss")
+			p.warn(CodeUnknownKey, sectionKey, "not a target, ignored: the targets are astro, mwaa, composer, apc and oss")
 		}
 	}
 	return out
@@ -993,6 +1044,7 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 		Deployment:  p.str(key+".deployment", table["deployment"]),
 		Environment: p.str(key+".environment", table["environment"]),
 		URL:         p.str(key+".url", table["url"]),
+		Domain:      NormalizeAPCDomain(p.str(key+".domain", table["domain"])),
 		Default:     p.boolean(key+".default", table["default"]),
 	}
 	if !slices.Contains(linkTargets, LinkKind(link.Target)) {
@@ -1001,15 +1053,40 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 	}
 	kind := link.Kind()
 	p.coordinates(key, kind, &link)
+	p.domain(key, kind, table["domain"] != nil, link.Domain)
 	link.Workspace = p.workspace(key, kind, table["workspace"], a.Workspace)
 	link.Auth = p.auth(key+".auth", table["auth"], kind)
+	if link.Auth.Method == AuthAPC && kind != KindAPC {
+		p.add(CodeAuthAPCOnNonAPCLink, key+".auth.method", fmt.Sprintf("the apc method reads the Astro Private Cloud login for an apc link's domain; this is %s link", kindWithArticle(kind)))
+	}
 	return link
+}
+
+// domain checks a link's domain, which an apc link must carry and no other
+// kind may. written says whether the key was there at all, so a value that
+// normalizes to nothing ("https://") is reported as missing on an apc link
+// and still refused on any other.
+func (p *parser) domain(key string, kind LinkKind, written bool, domain string) {
+	switch {
+	case kind == KindAPC && domain == "":
+		p.add(CodeDomainRequired, key+".domain", "required on an apc link: the Astro Private Cloud base domain, as astro login takes it (astro.example.com)")
+	case kind != KindAPC && written:
+		p.add(CodeDomainOnNonAPCLink, key+".domain", fmt.Sprintf("only an apc link sets domain; this is %s link. An astro link's host is [tool.astro] domain", kindWithArticle(kind)))
+	}
+}
+
+// kindWithArticle is a kind as a sentence reads it: "an astro", "a composer".
+func kindWithArticle(kind LinkKind) string {
+	if kind == KindComposer {
+		return "a " + string(kind)
+	}
+	return "an " + string(kind)
 }
 
 // badTarget says where the target came from, because the fix differs: the
 // link's own key, or the [tool.astro] default it inherited.
 func (p *parser) badTarget(key, target string, own bool) {
-	const supported = " — supported: astro, mwaa, composer, in lower case"
+	const supported = " — supported: astro, mwaa, composer, apc, in lower case"
 	if own {
 		p.add(CodeTargetUnusable, key+".target", fmt.Sprintf("%q is not a target a link can use", target)+supported)
 		return
@@ -1020,6 +1097,10 @@ func (p *parser) badTarget(key, target string, own bool) {
 // coordinates checks that the link names the one coordinate its kind uses, and
 // only that one.
 func (p *parser) coordinates(key string, kind LinkKind, link *Link) {
+	if kind == KindAPC {
+		p.apcCoordinates(key, link)
+		return
+	}
 	if link.URL != "" && link.Target != string(KindAstro) {
 		p.add(CodeTargetNeedsEnvironment, key, fmt.Sprintf("target = %q names an environment, not a url: set environment = '<%s environment name>', or drop target for a plain url link", link.Target, link.Target))
 		return
@@ -1045,6 +1126,22 @@ func (p *parser) coordinates(key string, kind LinkKind, link *Link) {
 		if link.Deployment == "" {
 			p.add(CodeDeploymentRequired, key+".deployment", "required on an astro link: the Deployment id — or set target = 'mwaa' or target = 'composer' with an environment, or a url")
 		}
+	case KindAPC:
+		// Checked by apcCoordinates, above.
+	}
+}
+
+// apcCoordinates checks that an apc link names a Deployment, and neither an
+// environment nor a url: its Airflow is that Deployment's.
+func (p *parser) apcCoordinates(key string, link *Link) {
+	if link.URL != "" {
+		p.add(CodeURLOnAPCLink, key+".url", "an apc link names a Deployment, not a url: its Airflow is the Deployment's. For an Airflow no platform can look up, drop target for a plain url link")
+	}
+	if link.Environment != "" {
+		p.add(CodeEnvironmentOnAPCLink, key+".environment", "only an mwaa or composer link sets environment; this is an apc link")
+	}
+	if link.Deployment == "" {
+		p.add(CodeDeploymentRequired, key+".deployment", "required on an apc link: the Astro Private Cloud Deployment id")
 	}
 }
 
@@ -1066,14 +1163,22 @@ func (p *parser) url(key, raw string) {
 	}
 }
 
-// workspace resolves the workspace, which only an astro link has: the other
-// kinds are not in an Astro workspace, so the [tool.astro] default does not
-// reach them and setting one on them is a mistake.
+// workspace resolves the workspace, which only an astro or apc link has: the
+// other kinds are not in a workspace, so setting one on them is a mistake. An
+// astro link falls back to the [tool.astro] default; an apc link never does,
+// because that default is an Astro workspace and an apc link's is Houston's.
 func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) string {
 	own := p.str(key+".workspace", raw)
-	if kind != KindAstro {
+	switch kind {
+	case KindAstro:
+	case KindAPC:
+		if own == "" {
+			p.add(CodeWorkspaceRequired, key+".workspace", "required on an apc link: the Astro Private Cloud workspace id. [tool.astro] workspace names an Astro workspace, so an apc link never inherits it")
+		}
+		return own
+	case KindMWAA, KindComposer, KindEndpoint:
 		if own != "" {
-			p.add(CodeWorkspaceOnNonAstroLink, key+".workspace", fmt.Sprintf("only an astro link has a workspace; this is a %s link", kind))
+			p.add(CodeWorkspaceOnNonAstroLink, key+".workspace", fmt.Sprintf("only an astro or apc link has a workspace; this is %s link", kindWithArticle(kind)))
 		}
 		return ""
 	}
