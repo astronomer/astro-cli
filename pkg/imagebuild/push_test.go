@@ -153,9 +153,10 @@ func TestTagFailureCarriesTheEngineOutput(t *testing.T) {
 	require.EqualError(t, err, "docker tag local:1 r.example.com/a:t failed: exit status 1: Error response from daemon: No such image: local:1")
 }
 
-// A push tags the source as the remote reference, logs in when given a
-// credential, pushes with the progress to Out, and drops the remote tag.
-func TestPushTagsLogsInPushesAndUntags(t *testing.T) {
+// A push tags the source as the remote reference, pushes with the progress
+// to Out, and drops the remote tag. A credential runs no login, and never
+// reaches an argument.
+func TestPushTagsPushesAndUntags(t *testing.T) {
 	cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
 		"push": func(_ []string, s rt.Stdio) error { fmt.Fprint(s.Out, "pushed\n"); return nil },
 	}}
@@ -172,11 +173,13 @@ func TestPushTagsLogsInPushesAndUntags(t *testing.T) {
 	assert.Equal(t, []string{
 		"docker tag astro-deploy/proj-abc123 images.example.com/org/dep:deploy-1",
 		"docker --version",
-		"docker login images.example.com -u cli --password-stdin",
 		"docker push images.example.com/org/dep:deploy-1",
 		"docker rmi images.example.com/org/dep:deploy-1",
 	}, cmd.commands())
-	assert.Equal(t, "s3cret-token", cmd.calls[2].stdin)
+	for _, c := range cmd.calls {
+		assert.NotContains(t, c.String(), "s3cret", "the secret is never an argument")
+		assert.Empty(t, c.stdin)
+	}
 	assert.Equal(t, "pushed\n", out.String())
 }
 
@@ -189,22 +192,27 @@ func TestPushWithTheStoredCredential(t *testing.T) {
 	assert.Equal(t, []string{"docker push reg.example.com/client:deploy-1", "docker rmi reg.example.com/client:deploy-1"}, cmd.commands())
 }
 
-// A 403 from the registry, at the login or the push, is ErrPushForbidden,
-// whose text is the sentinel's, and still wraps what the engine said.
+// A 403 from the registry is a *PushForbiddenError, saying whether the push
+// carried its own credential, and wrapping what the engine said.
 func TestPushForbidden(t *testing.T) {
-	for _, at := range []string{"login", "push"} {
-		t.Run(at, func(t *testing.T) {
-			cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
-				at: func(_ []string, s rt.Stdio) error {
-					fmt.Fprint(s.Err, "denied: 403 Forbidden\n")
-					return errors.New("exit status 1")
-				},
-			}}
-			_, err := testEngine(cmd, "docker").Push(context.Background(), PushRequest{Image: "r.example.com/a:t", Username: "cli", Secret: "tok"})
-			require.ErrorIs(t, err, ErrPushForbidden)
-			assert.True(t, strings.HasPrefix(err.Error(), ErrPushForbidden.Error()+": "), err.Error())
-			assert.True(t, errorChainContains(err, "denied: 403 Forbidden"), "the engine's failure is wrapped")
-		})
+	for _, withCredential := range []bool{true, false} {
+		cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
+			"push": func(_ []string, s rt.Stdio) error {
+				fmt.Fprint(s.Err, "denied: 403 Forbidden\n")
+				return errors.New("exit status 1")
+			},
+		}}
+		req := PushRequest{Image: "r.example.com/a:t"}
+		if withCredential {
+			req.Username, req.Secret = "cli", "tok"
+		}
+		_, err := testEngine(cmd, "docker").Push(context.Background(), req)
+		require.ErrorIs(t, err, ErrPushForbidden)
+		var forbidden *PushForbiddenError
+		require.ErrorAs(t, err, &forbidden)
+		assert.Equal(t, withCredential, forbidden.WithCredential)
+		assert.True(t, strings.HasPrefix(err.Error(), ErrPushForbidden.Error()+": "), err.Error())
+		assert.True(t, errorChainContains(err, "denied: 403 Forbidden"), "the engine's failure is wrapped")
 	}
 }
 
@@ -233,41 +241,46 @@ func errorChainContains(err error, s string) bool {
 }
 
 // The forms a registry refuses an upload in, and the further forms it refuses
-// a login's credential in.
+// a push's own credential in.
 func TestForbiddenForms(t *testing.T) {
-	for said, want := range map[string][2]bool{ // {push, login}
+	for said, want := range map[string][2]bool{ // {stored credential, own credential}
 		"unexpected status: 403 forbidden":                      {true, true},
 		"denied: requested access to the resource is forbidden": {true, true},
 		"unauthorized: authentication required":                 {true, true},
-		"login attempt failed with status: 401 unauthorized":    {false, true},
+		"failed with status: 401 unauthorized":                  {false, true},
 		"unauthorized: incorrect username or password":          {false, true},
+		"denied: requested access to the resource is denied":    {false, true},
 		"exit status 1: manifest unknown":                       {false, false},
 		"layer size 14030 bytes":                                {false, false},
 		"exit status 1":                                         {false, false},
+		"dial tcp: lookup r.example.com: no such host":          {false, false},
 	} {
-		assert.Equal(t, want[0], pushForbidden(said), "push: %s", said)
-		assert.Equal(t, want[1], loginRefused(said), "login: %s", said)
+		assert.Equal(t, want[0], pushForbidden(said), "stored: %s", said)
+		assert.Equal(t, want[1], credentialRefused(said), "own: %s", said)
 	}
 }
 
-// A login the registry refuses the credential of, 401 included, fails the
-// push as ErrPushForbidden over the engine's failure, and pushes nothing.
-func TestPushLoginRefused(t *testing.T) {
+// A push whose own credential the registry rejects, as a 401, unauthorized
+// or denied, is a *PushForbiddenError over the engine's failure; a push that
+// fails for another reason is not.
+func TestPushCredentialRefused(t *testing.T) {
 	for _, said := range []string{
-		"Error response from daemon: login attempt to https://r.example.com/v2/ failed with status: 401 Unauthorized",
-		"Error: logging into \"r.example.com\": invalid username/password: unauthorized: incorrect username or password",
+		"unexpected status from HEAD request to https://r.example.com/v2/a/blobs/sha256:1: 401 Unauthorized",
+		"unauthorized: incorrect username or password",
+		"denied: requested access to the resource is denied",
 	} {
 		cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
-			"login": func(_ []string, s rt.Stdio) error { fmt.Fprintln(s.Err, said); return errors.New("exit status 1") },
+			"push": func(_ []string, s rt.Stdio) error { fmt.Fprintln(s.Err, said); return errors.New("exit status 1") },
 		}}
 		_, err := testEngine(cmd, "docker").Push(context.Background(), PushRequest{Image: "r.example.com/a:t", Username: "cli", Secret: "tok"})
 		require.ErrorIs(t, err, ErrPushForbidden, said)
+		var forbidden *PushForbiddenError
+		require.ErrorAs(t, err, &forbidden)
+		assert.True(t, forbidden.WithCredential)
 		assert.True(t, errorChainContains(err, said), "the cause is wrapped")
-		assert.False(t, ranVerb(cmd, "push"), "nothing is pushed")
 	}
-	// A login that fails for another reason is not a refusal.
 	cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
-		"login": func(_ []string, s rt.Stdio) error {
+		"push": func(_ []string, s rt.Stdio) error {
 			fmt.Fprintln(s.Err, "dial tcp: lookup r.example.com: no such host")
 			return errors.New("exit status 1")
 		},
@@ -275,6 +288,21 @@ func TestPushLoginRefused(t *testing.T) {
 	_, err := testEngine(cmd, "docker").Push(context.Background(), PushRequest{Image: "r.example.com/a:t", Username: "cli", Secret: "tok"})
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, ErrPushForbidden)
+}
+
+// A request refused before anything runs leaves no tag behind: a credential
+// for a reference that names no registry, or a secret without a username.
+func TestPushRefusedRequestLeavesNoTag(t *testing.T) {
+	for _, req := range []PushRequest{
+		{Source: "l:1", Image: "alpine:3", Username: "u", Secret: "s"},
+		{Source: "l:1", Image: "r.example.com/a:t", Secret: "s"},
+	} {
+		cmd := &engineCmd{}
+		_, err := testEngine(cmd, "docker").Push(context.Background(), req)
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "\"s\"")
+		assert.Empty(t, cmd.calls, "%+v", req)
+	}
 }
 
 // Only what the engine said decides a refusal, never the reference it ran

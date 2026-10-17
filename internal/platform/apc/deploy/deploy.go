@@ -399,7 +399,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflowImage(name, nextTag))
 		} else {
 			// Below 1.0 nothing logged in for this Deployment, so the push
-			// logs in with the context's token as it starts.
+			// carries the context's token.
 			registry = registryDomainPrefix + cloudDomain
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflowImage(name, nextTag))
 			token = c.Token
@@ -419,7 +419,7 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	}
 	useShaAsTag := config.CFG.ShaAsTag.GetBool()
 	fmt.Fprintln(opts.progress(), "Pushing image to configured registry")
-	// Below APC 1.0 the push logs in with the context's token as it starts.
+	// Below APC 1.0 the push carries the context's token.
 	// From 1.0 RegistryAuth has just logged in, and a BYO registry takes the
 	// credential the engine already holds, so neither carries one.
 	push := imagebuild.PushRequest{Source: localImage, Image: remoteImage, Digest: useShaAsTag, Out: opts.progress()}

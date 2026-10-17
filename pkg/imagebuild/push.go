@@ -24,27 +24,37 @@ import (
 //
 // Every action is the engine's own CLI, `<bin> login`, `<bin> tag`,
 // `<bin> push`, `<bin> image inspect`, so docker and podman are driven the same
-// way and credentials live where `<bin> login` keeps them.
+// way.
 type Engine struct {
 	Cmd Commander
 	Bin string
 	Env []string
 }
 
-// ErrPushForbidden reports a push the registry refused as unauthorized: a 403
-// on the push, or a login before it that the registry rejected. The error a
-// push returns for it wraps both this sentinel and the engine's own failure,
-// so errors.Is finds the one and the other is not lost. What to advise is the
+// ErrPushForbidden reports a push the registry refused as unauthorized. A
+// push returns it as a *PushForbiddenError, which says whose credential was
+// refused and carries the engine's own failure. What to advise is the
 // caller's: this says nothing about any one product's registries.
 var ErrPushForbidden = errors.New("failed to push image due to authentication error (403 Forbidden)")
 
-// forbiddenError is ErrPushForbidden over the engine's own failure.
-type forbiddenError struct{ cause error }
-
-func (e *forbiddenError) Error() string {
-	return ErrPushForbidden.Error() + ": " + e.cause.Error()
+// PushForbiddenError is a push the registry refused as unauthorized. It
+// matches ErrPushForbidden with errors.Is.
+type PushForbiddenError struct {
+	// WithCredential is true when the push carried its own credential
+	// (PushRequest.Username and Secret) and the registry refused that, false
+	// when the credential refused was the one the engine holds for the
+	// registry in the user's own config.
+	WithCredential bool
+	// Err is the engine's failure: the command and what it said, with the
+	// push's secret redacted.
+	Err error
 }
-func (e *forbiddenError) Unwrap() []error { return []error{ErrPushForbidden, e.cause} }
+
+func (e *PushForbiddenError) Error() string {
+	return ErrPushForbidden.Error() + ": " + e.Err.Error()
+}
+
+func (e *PushForbiddenError) Unwrap() []error { return []error{ErrPushForbidden, e.Err} }
 
 // bearerPrefix is dropped from a login secret given as an HTTP Authorization
 // value: the registry takes the token alone.
@@ -60,30 +70,24 @@ const bearerPrefix = "Bearer "
 // one when that is missing or refused. A secret without a username is
 // refused: there is no login to make with it.
 func (e Engine) Login(ctx context.Context, registry, username, secret string) error {
-	_, err := e.loginIn(ctx, e.Env, []string{"login"}, registry, username, secret)
-	return err
-}
-
-// loginIn is Login run as args (the login subcommand, and any flag that
-// points it at a credential store) with env, also reporting whether the
-// registry refused the credential: what the engine said, not the command it
-// ran, says so.
-func (e Engine) loginIn(ctx context.Context, env, args []string, registry, username, secret string) (refused bool, err error) {
-	args = append(append([]string(nil), args...), registry)
+	args := []string{"login", registry}
 	var stdin io.Reader
 	switch {
 	case username != "":
 		args = append(args, "-u", username, "--password-stdin")
 		stdin = strings.NewReader(strings.TrimPrefix(secret, bearerPrefix))
 	case secret != "":
-		return false, fmt.Errorf("logging in to %s: a secret was given without a username", registry)
+		return errSecretWithoutUser(registry)
 	}
 	var stderr bytes.Buffer
-	if runErr := e.Cmd.Run(ctx, env, rt.Stdio{In: stdin, Err: &stderr}, e.Bin, args...); runErr != nil {
-		said := engineSaid(runErr, stderr.String(), registry)
-		return loginRefused(said), commandError(e.Bin+" login "+registry, runErr, stderr.String(), secret)
+	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{In: stdin, Err: &stderr}, e.Bin, args...); err != nil {
+		return commandError(e.Bin+" login "+registry, err, stderr.String(), secret)
 	}
-	return false, nil
+	return nil
+}
+
+func errSecretWithoutUser(registry string) error {
+	return fmt.Errorf("logging in to %s: a secret was given without a username", registry)
 }
 
 // Tag points dst at the image src names.
@@ -127,13 +131,13 @@ type PushRequest struct {
 	// leaves no remote-named tag behind; an image built under that name alone
 	// goes with it.
 	Image string
-	// Username and Secret, when set, log the engine in to Image's registry
-	// before the push, and the push uses that credential. The login is kept
-	// in a credential store made for this one push and deleted after it,
-	// success or not (see pushAuth): never the user's own store, so nothing
-	// is left behind and concurrent pushes never share one. Unset, the push
-	// uses the engine's own config and the credential it already holds for
-	// the registry, as any `<bin> push` does.
+	// Username and Secret, when set, are the credential the push uses for
+	// Image's registry. No login is run: they are written to a credential
+	// file made for this one push and deleted after it, success or not (see
+	// pushAuth), never the user's own store, so nothing is left behind and
+	// concurrent pushes never share one. A "Bearer " prefix on Secret is
+	// dropped. Unset, the push uses the engine's own config and the
+	// credential it already holds for the registry, as any `<bin> push` does.
 	Username string
 	Secret   string
 	// Digest asks for the digest of the manifest pushed (sha256:…).
@@ -146,31 +150,33 @@ type PushRequest struct {
 // Push pushes an image to its registry on the engine and returns the pushed
 // manifest's digest when req.Digest asks for it, "" otherwise.
 //
-// A registry that refuses the login or the push as unauthorized fails it
-// with ErrPushForbidden; any other failure carries the engine's own output.
+// A registry that refuses the push as unauthorized fails it with a
+// *PushForbiddenError (ErrPushForbidden); any other failure carries the
+// engine's own output.
 //
 // The digest is the one the registry holds. Docker records it among the
 // image's repo digests once the push is done, and it is read from there.
 // Podman does not record it (its repo digests are the local manifest's, which
 // a push may re-encode), so a podman push writes it to a --digestfile instead.
 func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
+	// Checked before anything runs, so a refused request leaves no tag.
+	registry, err := credentialRegistry(&req)
+	if err != nil {
+		return "", err
+	}
+	credential := registry != ""
 	if req.Source != "" && req.Source != req.Image {
 		if err := e.Tag(ctx, req.Source, req.Image); err != nil {
 			return "", err
 		}
 	}
-	credential := req.Username != "" || req.Secret != ""
+	podman := (credential || req.Digest) && IsPodman(ctx, e.Cmd, e.Bin, e.Env)
+	auth := &pushAuth{}
 	if credential {
-		// Before anything runs: a reference naming no registry has no login.
-		if _, err := registryOf(req.Image); err != nil {
+		if auth, err = newPushAuth(registry, req.Username, req.Secret, podman, e.Env); err != nil {
 			return "", err
 		}
-	}
-	podman := (credential || req.Digest) && IsPodman(ctx, e.Cmd, e.Bin, e.Env)
-	auth, err := e.pushLogin(ctx, &req, podman)
-	defer auth.remove()
-	if err != nil {
-		return "", err
+		defer auth.remove()
 	}
 
 	var args []string
@@ -185,21 +191,12 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 	args = auth.cmdArgs("push", append(args, req.Image)...)
 	var stderr bytes.Buffer
 	if runErr := e.Cmd.Run(ctx, auth.cmdEnv(e.Env), rt.Stdio{Out: req.Out, Err: &stderr}, e.Bin, args...); runErr != nil {
-		err := commandError(e.Bin+" push "+req.Image, runErr, stderr.String(), req.Secret)
-		if pushForbidden(engineSaid(runErr, stderr.String(), req.Image, repository(req.Image))) {
-			return "", &forbiddenError{cause: err}
-		}
-		return "", err
+		return "", e.pushError(&req, credential, runErr, stderr.String())
 	}
 
 	digest := ""
 	if req.Digest {
-		if digestFile != "" {
-			digest, err = readDigestFile(digestFile, req.Image)
-		} else {
-			digest, err = e.repoDigest(ctx, req.Image)
-		}
-		if err != nil {
+		if digest, err = e.pushedDigest(ctx, req.Image, digestFile); err != nil {
 			return "", err
 		}
 	}
@@ -209,29 +206,43 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 	return digest, nil
 }
 
-// pushLogin logs the engine in for a push that carries a credential, into a
-// pushAuth made for it, and returns that pushAuth. A push without one gets an
-// empty pushAuth: its push runs on the engine's own config. The pushAuth is
-// returned on an error too, for the caller's deferred remove.
-func (e Engine) pushLogin(ctx context.Context, req *PushRequest, podman bool) (*pushAuth, error) {
+// credentialRegistry is the registry a push that carries its own credential
+// is authenticated to, "" for a push that carries none. A credential for a
+// reference that names no registry, or a secret without a username, is
+// refused.
+func credentialRegistry(req *PushRequest) (string, error) {
 	if req.Username == "" && req.Secret == "" {
-		return &pushAuth{}, nil
+		return "", nil
 	}
 	registry, err := registryOf(req.Image)
 	if err != nil {
-		return &pushAuth{}, err
+		return "", err
 	}
-	auth, err := newPushAuth(podman, e.Env)
-	if err != nil {
-		return &pushAuth{}, err
+	if req.Username == "" {
+		return "", errSecretWithoutUser(registry)
 	}
-	if refused, err := e.loginWith(ctx, auth, registry, req.Username, req.Secret); err != nil {
-		if refused {
-			return auth, &forbiddenError{cause: err}
-		}
-		return auth, err
+	return registry, nil
+}
+
+// pushError is a failed push: a *PushForbiddenError when what the engine said
+// is a refusal of the credential (its own, when it carried one), its plain
+// failure otherwise. The secret is redacted from both.
+func (e Engine) pushError(req *PushRequest, credential bool, runErr error, stderr string) error {
+	err := commandError(e.Bin+" push "+req.Image, runErr, stderr, req.Secret)
+	said := engineSaid(runErr, stderr, req.Image, repository(req.Image))
+	if pushForbidden(said) || (credential && credentialRefused(said)) {
+		return &PushForbiddenError{WithCredential: credential, Err: err}
 	}
-	return auth, nil
+	return err
+}
+
+// pushedDigest is the digest of the manifest just pushed as image: podman's
+// digestFile when it wrote one, docker's recorded repo digest otherwise.
+func (e Engine) pushedDigest(ctx context.Context, image, digestFile string) (string, error) {
+	if digestFile != "" {
+		return readDigestFile(digestFile, image)
+	}
+	return e.repoDigest(ctx, image)
 }
 
 // newDigestFile is an empty temporary file for podman to write a push's
@@ -342,10 +353,11 @@ func pushForbidden(said string) bool {
 	return http403.MatchString(said) || strings.Contains(said, "forbidden") || strings.Contains(said, "authentication required")
 }
 
-// loginRefused reports a login the registry refused the credential of: what
-// pushForbidden reports, or a 401, "unauthorized" or "incorrect username or
-// password".
-func loginRefused(said string) bool {
+// credentialRefused reports a push whose own credential the registry
+// refused: what pushForbidden reports, or a 401, "unauthorized", "incorrect
+// username or password" or "denied". A push on the user's stored credential
+// is held to pushForbidden alone, as it always was.
+func credentialRefused(said string) bool {
 	return pushForbidden(said) || http401.MatchString(said) || strings.Contains(said, "unauthorized") ||
-		strings.Contains(said, "incorrect username or password")
+		strings.Contains(said, "incorrect username or password") || strings.Contains(said, "denied")
 }

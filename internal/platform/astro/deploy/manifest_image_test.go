@@ -3,6 +3,7 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +46,8 @@ type fakeImageCmd struct {
 	label func(image string) string
 	// pushOut is what a push writes to its stdout: its progress.
 	pushOut string
+	// pushAuth is the content of the --authfile the last push was given.
+	pushAuth string
 	// buildOut is what a build writes to its stdout, and buildErr how it
 	// ends.
 	buildOut string
@@ -78,6 +81,10 @@ func (f *fakeImageCmd) Run(_ context.Context, env []string, stdio localrt.Stdio,
 	}
 	if len(args) == 1 && args[0] == "--version" && stdio.Out != nil {
 		fmt.Fprintf(stdio.Out, "%s version 5.6.0\n", name)
+	}
+	if len(args) > 2 && args[0] == "push" && args[1] == "--authfile" {
+		data, _ := os.ReadFile(args[2])
+		f.pushAuth = string(data)
 	}
 	if len(args) > 0 && args[0] == "push" && f.pushOut != "" && stdio.Out != nil {
 		fmt.Fprint(stdio.Out, f.pushOut)
@@ -609,8 +616,8 @@ func TestDeployManifestImage_RefusesAnUnreadableDeclaration(t *testing.T) {
 // The probe, the build, the label read, the registry login and the push of a
 // manifest image deploy all run on the one engine it resolves, its connection
 // env included: the image pushed is the one built, from where the login was
-// made. The token reaches the login on stdin, never as an argument, without
-// the "Bearer " prefix the context stores it with.
+// made. The token reaches the push in a throwaway --authfile, never as an
+// argument, without the "Bearer " prefix the context stores it with.
 func TestDeployManifestImage_RunsOnOneEngine(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -634,19 +641,18 @@ func TestDeployManifestImage_RunsOnOneEngine(t *testing.T) {
 	verbs := make([]string, 0, len(cmd.calls))
 	for i, call := range cmd.calls {
 		assert.True(t, strings.HasPrefix(call, "podman "), call)
-		assert.Equal(t, podmanEnv, cmd.envs[i], call)
+		assert.Equal(t, podmanEnv, cmd.envs[i][:1], call)
 		assert.NotContains(t, call, "ctx-token", "the token is never an argument")
 		verbs = append(verbs, strings.Fields(call)[1])
 	}
-	assert.Equal(t, []string{"info", "build", "image", "tag", "--version", "login", "push", "rmi"}, verbs, "%v", cmd.calls)
+	assert.Equal(t, []string{"info", "build", "image", "tag", "--version", "push", "rmi"}, verbs, "%v", cmd.calls)
 	assert.Contains(t, cmd.calls, "podman tag "+tag+" "+remote)
-	// The login and the push share a throwaway --authfile.
-	login := slices.IndexFunc(cmd.calls, func(c string) bool { return strings.HasPrefix(c, "podman login --authfile ") })
-	require.NotEqual(t, -1, login, "%v", cmd.calls)
-	authfile := strings.Fields(cmd.calls[login])[3]
-	assert.Equal(t, "podman login --authfile "+authfile+" registry.astro -u cli --password-stdin", cmd.calls[login])
-	assert.Contains(t, cmd.calls, "podman push --authfile "+authfile+" "+remote)
-	assert.Equal(t, "ctx-token", cmd.stdins[login])
+	push := slices.IndexFunc(cmd.calls, func(c string) bool { return strings.HasPrefix(c, "podman push --authfile ") })
+	require.NotEqual(t, -1, push, "%v", cmd.calls)
+	authfile := strings.Fields(cmd.calls[push])[3]
+	assert.Equal(t, "podman push --authfile "+authfile+" "+remote, cmd.calls[push])
+	assert.Contains(t, cmd.pushAuth, base64.StdEncoding.EncodeToString([]byte("cli:ctx-token")), "the push's credential")
+	assert.NoFileExists(t, authfile, "removed after the push")
 }
 
 // A push the registry refuses is ErrPushForbidden, with its advice, and the
@@ -665,7 +671,11 @@ func TestDeployManifestImage_PushForbidden(t *testing.T) {
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
-	assert.Contains(t, err.Error(), "Run 'docker logout' for each Astro registry to clear cached credentials")
+	// The push carried the session token, so the advice is about that, not
+	// the user's cached logins.
+	assert.Contains(t, err.Error(), "the registry refused the credential this push was made with")
+	assert.Contains(t, err.Error(), "unexpected status from PUT request: 403 Forbidden")
+	assert.NotContains(t, err.Error(), "docker logout")
 	client.AssertNotCalled(t, "FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 

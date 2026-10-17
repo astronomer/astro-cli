@@ -1,7 +1,7 @@
 package imagebuild
 
 import (
-	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,21 +9,25 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
-// pushAuth is where a push that carries its own credential keeps it: a
-// throwaway directory made for that one push, never the user's own engine
-// config. Its login and its push run with extra args and env pointing the
-// engine there, and remove deletes it, credential and all.
+// pushAuth is where a push that carries its own credential keeps it: one
+// file, written for that push into a directory of its own and deleted with it,
+// never the user's own engine config. No login is run: the credential is
+// written into the file directly, in the format docker's config.json and
+// containers' auth.json share ({"auths": {"<registry>": {"auth": …}}}), and
+// the push is pointed at it every way an engine looks for one — DOCKER_CONFIG
+// for docker, REGISTRY_AUTH_FILE and --authfile for podman — so that an
+// engine taken for the other still finds it, and finds nothing of the user's.
 //
-// So a deploy's token is never left behind in the user's credential store or
-// keychain, and two pushes running at once, with different credentials for
-// the same registry, cannot overwrite each other's: each has its own
-// directory.
+// So a deploy's token is never left in the user's credential store or
+// keychain, and two pushes running at once with different credentials for
+// the same registry cannot overwrite each other's: each has its own file.
 type pushAuth struct {
 	dir string
 	// args go right after the subcommand (podman's --authfile); env is
-	// appended to the engine's env (docker's DOCKER_CONFIG).
+	// appended to the engine's env.
 	args []string
 	env  []string
 }
@@ -34,10 +38,27 @@ const (
 	authFilePerm = 0o600
 )
 
-// newPushAuth makes the throwaway credential directory for one push on an
-// engine: podman's --authfile, or docker's config directory.
-func newPushAuth(podman bool, env []string) (*pushAuth, error) {
-	dir, err := os.MkdirTemp("", "astro-push-auth-*")
+// authDirPattern names a throwaway credential directory in the temp dir.
+const authDirPattern = "astro-push-auth-*"
+
+// staleAuthAge is how old a throwaway credential directory has to be before
+// a later push takes it for one a killed push left behind and removes it.
+// A push holds its directory for as long as its upload runs, so this is well
+// past the longest one.
+const staleAuthAge = time.Hour
+
+// tempDir is the directory throwaway credentials are made in; a var so tests
+// keep theirs apart.
+var tempDir = os.TempDir
+
+// newPushAuth writes the credential for one push to registry into a
+// directory of its own: username and secret (a "Bearer " prefix dropped),
+// the user's docker context so docker reaches the daemon it always does, and
+// nothing else of the user's. env is the engine's env; podman adds
+// --authfile.
+func newPushAuth(registry, username, secret string, podman bool, env []string) (*pushAuth, error) {
+	removeStaleAuth()
+	dir, err := os.MkdirTemp(tempDir(), authDirPattern)
 	if err != nil {
 		return nil, fmt.Errorf("creating the push's credential directory: %w", err)
 	}
@@ -48,16 +69,30 @@ func newPushAuth(podman bool, env []string) (*pushAuth, error) {
 		a.remove()
 		return nil, fmt.Errorf("securing the push's credential directory: %w", err)
 	}
-	if podman {
-		a.args = []string{"--authfile", filepath.Join(dir, "auth.json")}
-		return a, nil
-	}
-	if err := writeDockerConfig(dir, userDockerConfigDir(env)); err != nil {
+	userDir := userDockerConfigDir(env)
+	if err := writeAuthConfig(dir, userDir, registry, username, strings.TrimPrefix(secret, bearerPrefix)); err != nil {
 		a.remove()
 		return nil, err
 	}
-	a.env = []string{"DOCKER_CONFIG=" + dir}
+	file := filepath.Join(dir, "config.json")
+	a.env = []string{"DOCKER_CONFIG=" + dir, "REGISTRY_AUTH_FILE=" + file}
+	// Docker reads a TLS daemon's client certificates from its config
+	// directory unless told otherwise, and that is no longer the user's.
+	if tlsWithoutCertPath(env) && userDir != "" {
+		a.env = append(a.env, "DOCKER_CERT_PATH="+userDir)
+	}
+	if podman {
+		a.args = []string{"--authfile", file}
+	}
 	return a, nil
+}
+
+// tlsWithoutCertPath reports a docker env that talks TLS to its daemon
+// (DOCKER_TLS_VERIFY or DOCKER_TLS) and leaves the certificates to the config
+// directory (no DOCKER_CERT_PATH).
+func tlsWithoutCertPath(env []string) bool {
+	return (envValue(env, "DOCKER_TLS_VERIFY") != "" || envValue(env, "DOCKER_TLS") != "") &&
+		envValue(env, "DOCKER_CERT_PATH") == ""
 }
 
 // remove deletes the directory and the credential in it; a pushAuth with no
@@ -69,13 +104,14 @@ func (a *pushAuth) remove() {
 	os.RemoveAll(a.dir) //nolint:errcheck // best-effort: a temp dir the OS also cleans
 }
 
-// cmdArgs is the engine subcommand sub, pointed at the credential directory,
-// with the rest of its arguments.
+// cmdArgs is the engine subcommand sub, pointed at the credential, with the
+// rest of its arguments.
 func (a *pushAuth) cmdArgs(sub string, rest ...string) []string {
 	args := append([]string{sub}, a.args...)
 	return append(args, rest...)
 }
 
+// cmdEnv is env with the credential's env after it, so it wins.
 func (a *pushAuth) cmdEnv(env []string) []string {
 	if len(a.env) == 0 {
 		return env
@@ -86,31 +122,46 @@ func (a *pushAuth) cmdEnv(env []string) []string {
 	return append(out, a.env...)
 }
 
-// placeholderAuth is a registry no one pushes to, listed in the throwaway
-// docker config so it holds an "auths" entry. A docker config with no
-// credentials of any kind has docker detect the platform's credential helper
-// (the keychain, Docker Desktop's, wincred) and store the login there; one
-// that already holds an entry stores the login in the file, which the push's
-// cleanup deletes.
-const placeholderAuth = "astro-cli-push.invalid"
-
-// dockerConfigFile is the part of docker's config.json the throwaway config
-// carries: what decides which daemon docker talks to, and the placeholder
-// that keeps the credential in the file. credsStore, credHelpers and the
-// user's own auths are left out on purpose.
-type dockerConfigFile struct {
-	Auths          map[string]struct{} `json:"auths"`
-	CurrentContext string              `json:"currentContext,omitempty"`
+// removeStaleAuth removes the throwaway credential directories a push that
+// never got to its cleanup (killed, or its machine put to sleep) left in the
+// temp dir: the user's own, older than staleAuthAge. Errors are ignored; the
+// next push tries again.
+func removeStaleAuth() {
+	dirs, err := filepath.Glob(filepath.Join(tempDir(), authDirPattern))
+	if err != nil {
+		return
+	}
+	for _, dir := range dirs {
+		info, err := os.Lstat(dir)
+		if err != nil || !info.IsDir() || time.Since(info.ModTime()) < staleAuthAge || !ownedByUser(info) {
+			continue
+		}
+		os.RemoveAll(dir) //nolint:errcheck // best-effort, retried by the next push
+	}
 }
 
-// writeDockerConfig writes the throwaway docker config into dir from the
-// user's config directory userDir: the user's current context, and their
-// contexts (each context's endpoint and TLS material), so docker reaches the
-// same daemon it does for the user. DOCKER_CONTEXT and DOCKER_HOST in the
-// environment still take precedence over the config file, as for any docker
-// command, since they pass through untouched.
-func writeDockerConfig(dir, userDir string) error {
-	cfg := dockerConfigFile{Auths: map[string]struct{}{placeholderAuth: {}}}
+// authEntry is one registry's credential, as docker and containers store it.
+type authEntry struct {
+	Auth string `json:"auth"`
+}
+
+// authConfigFile is the throwaway credential file: the push's credential,
+// and the user's current docker context, which decides the daemon docker
+// talks to. Containers' auth.json readers ignore the context.
+type authConfigFile struct {
+	Auths          map[string]authEntry `json:"auths"`
+	CurrentContext string               `json:"currentContext,omitempty"`
+}
+
+// writeAuthConfig writes the throwaway credential file into dir, and carries
+// the user's docker contexts over from userDir (their endpoints and TLS
+// material), so the current context it names resolves. DOCKER_CONTEXT and
+// DOCKER_HOST in the environment still take precedence over the file, as for
+// any docker command, since they pass through untouched.
+func writeAuthConfig(dir, userDir, registry, username, secret string) error {
+	cfg := authConfigFile{Auths: map[string]authEntry{
+		registry: {Auth: base64.StdEncoding.EncodeToString([]byte(username + ":" + secret))},
+	}}
 	if userDir != "" {
 		cfg.CurrentContext = readCurrentContext(filepath.Join(userDir, "config.json"))
 		if err := carryContexts(filepath.Join(userDir, "contexts"), filepath.Join(dir, "contexts")); err != nil {
@@ -122,7 +173,7 @@ func writeDockerConfig(dir, userDir string) error {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), data, authFilePerm); err != nil {
-		return fmt.Errorf("writing the push's docker config: %w", err)
+		return fmt.Errorf("writing the push's credential: %w", err)
 	}
 	return nil
 }
@@ -145,8 +196,8 @@ func readCurrentContext(path string) string {
 
 // carryContexts makes the user's contexts directory src visible at dst: a
 // symlink where the platform allows one, a copy otherwise (Windows without
-// the symlink privilege). docker only reads it for a login and a push. A user
-// with no contexts directory has nothing to carry.
+// the symlink privilege). docker only reads it for a push. A user with no
+// contexts directory has nothing to carry.
 func carryContexts(src, dst string) error {
 	info, err := os.Stat(src)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -189,10 +240,7 @@ func copyTree(src, dst string) error {
 // commands read: DOCKER_CONFIG from the engine's env or the process's, else
 // ~/.docker. "" when there is no home to find it in.
 func userDockerConfigDir(env []string) string {
-	if dir := envDockerConfig(env); dir != "" {
-		return dir
-	}
-	if dir := os.Getenv("DOCKER_CONFIG"); dir != "" {
+	if dir := envValue(env, "DOCKER_CONFIG"); dir != "" {
 		return dir
 	}
 	home, err := os.UserHomeDir()
@@ -202,20 +250,17 @@ func userDockerConfigDir(env []string) string {
 	return filepath.Join(home, ".docker")
 }
 
-// envDockerConfig is DOCKER_CONFIG in env, the last one winning as it does for
-// a command run with it.
-func envDockerConfig(env []string) string {
-	val := ""
+// envValue is key's value as a command run with env sees it: the last
+// key= in env, else the process's own.
+func envValue(env []string, key string) string {
+	val, found := "", false
 	for _, kv := range env {
-		if v, ok := strings.CutPrefix(kv, "DOCKER_CONFIG="); ok {
-			val = v
+		if v, ok := strings.CutPrefix(kv, key+"="); ok {
+			val, found = v, true
 		}
 	}
-	return val
-}
-
-// loginWith logs the engine in to registry into a, as Login does into the
-// engine's own config.
-func (e Engine) loginWith(ctx context.Context, a *pushAuth, registry, username, secret string) (refused bool, err error) {
-	return e.loginIn(ctx, a.cmdEnv(e.Env), a.cmdArgs("login"), registry, username, secret)
+	if found {
+		return val
+	}
+	return os.Getenv(key)
 }
