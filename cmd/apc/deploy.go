@@ -223,6 +223,14 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 		deploymentID = args[0]
 	}
 
+	// Flags that cannot go together are reported before the git state, so
+	// --force is never the first fix asked for a command that will not run
+	// either way.
+	if isImageOnlyDeploy && isDagOnlyDeploy {
+		cmd.SilenceUsage = true
+		return ErrBothDagsOnlyAndImageOnlySet
+	}
+
 	// An error, not a printed note: returning nil here made a deploy that never
 	// happened exit 0, so CI reported it as a success. Only a deploy that
 	// reads the project is held to it: an image deployed alone from outside
@@ -238,10 +246,6 @@ func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
 
 	if description == "" {
 		description = utils.GetDefaultDeployDescription(isDagOnlyDeploy)
-	}
-
-	if isImageOnlyDeploy && isDagOnlyDeploy {
-		return ErrBothDagsOnlyAndImageOnlySet
 	}
 
 	// The deploy's progress (its notes, the image push, the DAG upload) goes
