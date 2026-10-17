@@ -13,9 +13,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/astro-client-v1"
 	astrov1_mocks "github.com/astronomer/astro-cli/astro-client-v1/mocks"
+	"github.com/astronomer/astro-cli/cloud/auth"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -368,6 +370,13 @@ func TestCheckAPIKeys(t *testing.T) {
 			return nil
 		}
 
+		// Stub auth config fetch so the test doesn't hit the network.
+		origFetch := fetchDomainAuthConfig
+		fetchDomainAuthConfig = func(domain string) (auth.Config, error) {
+			return auth.Config{DomainURL: "https://auth." + domain + "/"}, nil
+		}
+		defer func() { fetchDomainAuthConfig = origFetch }()
+
 		t.Setenv("ASTRONOMER_KEY_ID", "key")
 		t.Setenv("ASTRONOMER_KEY_SECRET", "secret")
 
@@ -503,8 +512,78 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
+	})
+
+	// The stored expiry is the token's own, or a year for one that names none,
+	// and a token that is refused is not stored at all. It once stored a Unix
+	// timestamp as seconds from now, an expiry decades out, so a context kept
+	// a dead API token as a live login long after ASTRO_API_TOKEN was unset.
+	t.Run("stores the token's expiry, and only a token it accepts", func(t *testing.T) {
+		domain := "astronomer-dev.io"
+		origParse := parseAPIToken
+		t.Cleanup(func() { parseAPIToken = origParse })
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
+			return nil
+		}
+		// Its own permissions: later subtests change the shared ones.
+		tokenPermissions := []string{"workspaceId:workspace-id", "organizationId:org-ID"}
+		claimsWith := func(perms []string, expiresAt *jwt.NumericDate) *util.CustomClaims {
+			return &util.CustomClaims{Permissions: perms, APITokenID: "tok", RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: expiresAt}}
+		}
+		// run checks the API token with claims, from a context logged in
+		// with "Bearer working-token", and returns the context after.
+		run := func(t *testing.T, claims *util.CustomClaims, listsOrgs bool) (config.Context, error) {
+			t.Helper()
+			require.NoError(t, context.Switch(domain))
+			c, err := context.GetContext(domain)
+			require.NoError(t, err)
+			require.NoError(t, c.SetContextKey("token", "Bearer working-token"))
+			require.NoError(t, c.SetExpiresIn(3600))
+			parseAPIToken = func(string) (*util.CustomClaims, error) { return claims, nil }
+			if listsOrgs {
+				mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&mockOrgsResponse, nil).Once()
+			}
+			t.Setenv("ASTRO_API_TOKEN", "api-token")
+			_, runErr := checkAPIToken(mockV1Client)
+			after, err := context.GetContext(domain)
+			require.NoError(t, err)
+			return after, runErr
+		}
+		expiry := func(t *testing.T, c config.Context) time.Time {
+			t.Helper()
+			at, err := c.GetExpiresIn()
+			require.NoError(t, err)
+			return at
+		}
+
+		t.Run("a token that expires stores its own expiry", func(t *testing.T) {
+			week := time.Now().Add(7 * 24 * time.Hour)
+			c, err := run(t, claimsWith(tokenPermissions, jwt.NewNumericDate(week)), true)
+			require.NoError(t, err)
+			assert.Equal(t, "Bearer api-token", c.Token)
+			assert.WithinDuration(t, week, expiry(t, c), time.Minute)
+		})
+
+		t.Run("a token that names no expiry stores a year", func(t *testing.T) {
+			c, err := run(t, claimsWith(tokenPermissions, nil), true)
+			require.NoError(t, err)
+			assert.WithinDuration(t, time.Now().AddDate(1, 0, 0), expiry(t, c), time.Minute)
+		})
+
+		t.Run("an expired token leaves the login there was", func(t *testing.T) {
+			c, err := run(t, claimsWith(tokenPermissions, jwt.NewNumericDate(time.Now().Add(-time.Hour))), false)
+			assert.ErrorIs(t, err, errExpiredAPIToken)
+			assert.Equal(t, "Bearer working-token", c.Token)
+			assert.WithinDuration(t, time.Now().Add(time.Hour), expiry(t, c), time.Minute)
+		})
+
+		t.Run("a token that is not an API token leaves the login there was", func(t *testing.T) {
+			c, err := run(t, claimsWith(nil, nil), false)
+			assert.ErrorIs(t, err, errNotAPIToken)
+			assert.Equal(t, "Bearer working-token", c.Token)
+		})
 	})
 
 	t.Run("failed to parse api token", func(t *testing.T) {
@@ -526,7 +605,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.Error(t, err)
 	})
 	t.Run("unable to fetch current context", func(t *testing.T) {
@@ -545,7 +624,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 
@@ -582,7 +661,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(false, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errNotAPIToken)
 	})
 
@@ -622,7 +701,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.ErrorIs(t, err, errExpiredAPIToken)
 	})
 
@@ -661,7 +740,7 @@ func TestCheckAPIToken(t *testing.T) {
 		assert.NoError(t, err)
 
 		// run checkAPIToken
-		_, err = checkAPIToken(true, mockV1Client)
+		_, err = checkAPIToken(mockV1Client)
 		assert.NoError(t, err)
 	})
 }
