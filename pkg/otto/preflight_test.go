@@ -2,6 +2,7 @@ package otto
 
 import (
 	"bytes"
+	http_context "context"
 	"errors"
 	"net/http"
 	"testing"
@@ -27,17 +28,22 @@ func selfResp(username string) *astrov1.GetSelfUserResponse {
 func TestEffectiveOrganization(t *testing.T) {
 	t.Run("context org wins over env", func(t *testing.T) {
 		t.Setenv("ASTRO_ORGANIZATION", "env-org")
-		assert.Equal(t, "ctx-org", effectiveOrganization(&Config{Organization: "ctx-org"}))
+		org, fromEnv := effectiveOrganization(&Config{Organization: "ctx-org"})
+		assert.Equal(t, "ctx-org", org)
+		assert.False(t, fromEnv)
 	})
 
 	t.Run("falls back to env when context org empty", func(t *testing.T) {
 		t.Setenv("ASTRO_ORGANIZATION", "env-org")
-		assert.Equal(t, "env-org", effectiveOrganization(&Config{Organization: ""}))
+		org, fromEnv := effectiveOrganization(&Config{Organization: ""})
+		assert.Equal(t, "env-org", org)
+		assert.True(t, fromEnv)
 	})
 
 	t.Run("empty when neither set", func(t *testing.T) {
 		t.Setenv("ASTRO_ORGANIZATION", "")
-		assert.Equal(t, "", effectiveOrganization(&Config{Organization: ""}))
+		org, _ := effectiveOrganization(&Config{Organization: ""})
+		assert.Equal(t, "", org)
 	})
 }
 
@@ -77,6 +83,7 @@ func TestVerifyOrgMembership(t *testing.T) {
 			assert.Contains(t, msg, "b@example.com")
 			assert.Contains(t, msg, "org-a")
 			assert.Contains(t, msg, "astro organization switch")
+			assert.NotContains(t, msg, "unset ASTRO_ORGANIZATION")
 			client.AssertExpectations(t)
 		})
 	}
@@ -93,11 +100,31 @@ func TestVerifyOrgMembership(t *testing.T) {
 		err := verifyOrgMembership(&Config{Token: "t", Organization: ""}, client, &out)
 
 		assert.ErrorIs(t, err, ErrNotOrgMember)
-		assert.Contains(t, out.String(), "stale-env-org")
+		msg := out.String()
+		assert.Contains(t, msg, "stale-env-org")
+		assert.Contains(t, msg, "unset ASTRO_ORGANIZATION")
+		assert.NotContains(t, msg, "astro organization switch")
 		client.AssertExpectations(t)
 	})
 
-	t.Run("forbidden with failed self-user lookup still blocks, with generic subject", func(t *testing.T) {
+	// A 403/404 blocks only a login the self-user lookup can name. An API token
+	// reaches an organization by its own grants, not membership.
+	t.Run("forbidden for an API token lets the launch proceed", func(t *testing.T) {
+		client := new(astrov1_mocks.ClientWithResponsesInterface)
+		client.On("GetOrganizationWithResponse", mock.Anything, "org-a", mock.Anything).
+			Return(orgResp(http.StatusForbidden), nil).Once()
+		client.On("GetSelfUserWithResponse", mock.Anything, mock.Anything).
+			Return(&astrov1.GetSelfUserResponse{HTTPResponse: &http.Response{StatusCode: http.StatusUnauthorized}}, nil).Once()
+
+		var out bytes.Buffer
+		err := verifyOrgMembership(&Config{Token: "t", Organization: "org-a"}, client, &out)
+
+		assert.NoError(t, err)
+		assert.Empty(t, out.String())
+		client.AssertExpectations(t)
+	})
+
+	t.Run("forbidden with failed self-user lookup lets the launch proceed", func(t *testing.T) {
 		client := new(astrov1_mocks.ClientWithResponsesInterface)
 		client.On("GetOrganizationWithResponse", mock.Anything, "org-a", mock.Anything).
 			Return(orgResp(http.StatusForbidden), nil).Once()
@@ -107,8 +134,23 @@ func TestVerifyOrgMembership(t *testing.T) {
 		var out bytes.Buffer
 		err := verifyOrgMembership(&Config{Token: "t", Organization: "org-a"}, client, &out)
 
-		assert.ErrorIs(t, err, ErrNotOrgMember)
-		assert.Contains(t, out.String(), "The Astro account you're signed in as")
+		assert.NoError(t, err)
+		assert.Empty(t, out.String())
+		client.AssertExpectations(t)
+	})
+
+	t.Run("the API calls run under a deadline", func(t *testing.T) {
+		hasDeadline := mock.MatchedBy(func(ctx http_context.Context) bool {
+			_, ok := ctx.Deadline()
+			return ok
+		})
+		client := new(astrov1_mocks.ClientWithResponsesInterface)
+		client.On("GetOrganizationWithResponse", hasDeadline, "org-a", mock.Anything).
+			Return(orgResp(http.StatusOK), nil).Once()
+
+		err := verifyOrgMembership(&Config{Token: "t", Organization: "org-a"}, client, &bytes.Buffer{})
+
+		assert.NoError(t, err)
 		client.AssertExpectations(t)
 	})
 
