@@ -77,20 +77,34 @@ func ValidateRegistryEndpoint(endpoint string) error {
 // A saved value is checked as a new one is, since it may predate the check or
 // have been written into the file by hand, and one that is not a registry
 // endpoint a deploy can push to is an error naming the config that holds it
-// and the command that fixes it there: a global value needs -g, and outside
-// a project `astro config set` without it would change nothing.
+// and the command that fixes it there.
 func ClientRegistry() (string, error) {
-	c := CFG.RemoteClientRegistry
-	value := c.GetString()
+	value := CFG.RemoteClientRegistry.GetString()
 	if value == "" {
 		return "", nil
 	}
 	if err := ValidateRegistryEndpoint(value); err != nil {
-		where, fix := "your global config", "astro config set -g remote.client_registry <registry>/<repository>"
-		if configExists(viperProject) && viperProject.IsSet(c.Path) {
-			where, fix = "this project's config", "astro config set remote.client_registry <registry>/<repository>"
-		}
+		where, fix := clientRegistryScope()
 		return "", fmt.Errorf("remote.client_registry in %s is not a usable registry endpoint: %w. Fix it with: '%s'", where, err, fix)
 	}
 	return value, nil
+}
+
+// ClientRegistryFix is the command that sets remote.client_registry where the
+// CLI reads it from, for an error that says to set it.
+func ClientRegistryFix() string {
+	_, fix := clientRegistryScope()
+	return fix
+}
+
+// clientRegistryScope names the config remote.client_registry is read from
+// and the command that changes it there: the project's when it sets the key,
+// even to "", since that shadows the global one; else the global one, which
+// needs -g, since outside a project `astro config set` without it saves
+// nothing and still reports success.
+func clientRegistryScope() (where, fix string) {
+	if c := CFG.RemoteClientRegistry; configExists(viperProject) && viperProject.IsSet(c.Path) {
+		return "this project's config", "astro config set remote.client_registry <registry>/<repository>"
+	}
+	return "your global config", "astro config set -g remote.client_registry <registry>/<repository>"
 }

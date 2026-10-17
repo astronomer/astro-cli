@@ -1081,9 +1081,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		fmt.Println("The Astro CLI is not configured to push client images to your private registry.")
 		fmt.Println("For remote Deployments, client images must be stored in your private registry, not in Astronomer managed registries.")
 		fmt.Println("Please provide your private registry information so the Astro CLI can push client images.")
-		// -g: without it, outside a project, `astro config set` saves nothing
-		// and still reports success.
-		return errors.New("remote client registry is not configured. To configure it, run: 'astro config set -g remote.client_registry <registry>/<repository>' and try again.")
+		return fmt.Errorf("remote client registry is not configured. To configure it, run: '%s' and try again.", config.ClientRegistryFix())
 	}
 
 	// Validate deployment runtime version if deployment ID is provided

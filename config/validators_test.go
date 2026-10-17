@@ -62,12 +62,10 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 // the global one, since outside a project `astro config set` without it
 // changes nothing.
 func (s *Suite) TestClientRegistry() {
+	// initTestConfig replaces both configs; put back the ones it replaced.
+	prevHome, prevProject := viperHome, viperProject
+	s.T().Cleanup(func() { viperHome, viperProject = prevHome, prevProject })
 	initTestConfig()
-	prevProject, prevHome := viperProject, CFG.RemoteClientRegistry.GetHomeString()
-	s.T().Cleanup(func() {
-		viperProject = prevProject
-		CFG.RemoteClientRegistry.SetHomeString(prevHome) //nolint:errcheck // best-effort restore for later tests
-	})
 	noProject := func() { viperProject = viper.New() }
 	withProject := func(value string) {
 		viperProject = viper.New()
@@ -107,6 +105,16 @@ func (s *Suite) TestClientRegistry() {
 		s.ErrorContains(err, "remote.client_registry in this project's config")
 		s.ErrorContains(err, "'astro config set remote.client_registry")
 		s.NotContains(err.Error(), "config set -g", "a project's value is fixed in the project, not the global config")
+	})
+
+	// An unset registry is set where it is read: globally, with -g, unless
+	// the project sets the key, even to "", which shadows the global value.
+	s.Run("the fix for an unset value", func() {
+		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString(""))
+		noProject()
+		s.Equal("astro config set -g remote.client_registry <registry>/<repository>", ClientRegistryFix())
+		withProject("")
+		s.Equal("astro config set remote.client_registry <registry>/<repository>", ClientRegistryFix())
 	})
 }
 
