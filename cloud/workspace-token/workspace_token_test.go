@@ -276,6 +276,21 @@ func (s *Suite) TestListTokens() {
 		s.NoError(err)
 	})
 
+	s.Run("shows each token's kind", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		direct := ListWorkspaceAPITokensResponseOK.JSON200.Tokens[0]
+		direct.Name = "direct-token"
+		direct.Kind = astrov1.ApiTokenKindDIRECTACCESS
+		resp := ListWorkspaceAPITokensResponseOK
+		resp.JSON200 = &astrov1.ApiTokensPaginated{Tokens: []astrov1.ApiToken{direct}, TotalCount: 1}
+		out := new(bytes.Buffer)
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&resp, nil)
+		s.NoError(ListTokens(mockClient, "", nil, out))
+		s.Contains(out.String(), "KIND")
+		s.Regexp(`direct-token\s.*DIRECT_ACCESS`, out.String())
+	})
+
 	s.Run("with specified workspace", func() {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		out := new(bytes.Buffer)

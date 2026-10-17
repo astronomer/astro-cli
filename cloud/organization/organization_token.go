@@ -35,7 +35,7 @@ const (
 func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "TYPE", "ORGANIZATION ROLE", "CREATED", "CREATED BY"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "KIND", "ORGANIZATION ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
@@ -49,8 +49,19 @@ func newTokenRolesTableOut() *printutil.Table {
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "DESCRIPTION", "ROLE", "EXPIRES"},
+		Header:         []string{"#", "NAME", "DESCRIPTION", "KIND", "ROLE", "EXPIRES"},
 	}
+}
+
+// TokenKind is the token's kind for the KIND column of the token tables,
+// STANDARD or DIRECT_ACCESS, or "-" when the API names none. The column is
+// KIND, as the API names it, because these packages already use "token type"
+// for the token's scope.
+func TokenKind(token astrov1.ApiToken) string { //nolint:gocritic // ApiToken is large; the tables pass rows by value
+	if token.Kind == "" {
+		return "-"
+	}
+	return string(token.Kind)
 }
 
 // tokenRoles returns the token's roles as a flat slice, handling the nil pointer case.
@@ -152,6 +163,7 @@ func selectTokens(apiTokens []astrov1.ApiToken) (astrov1.ApiToken, error) {
 			strconv.Itoa(index),
 			name,
 			description,
+			TokenKind(apiTokens[i]),
 			orgRole,
 			expiresStr,
 		}, false)
@@ -263,7 +275,7 @@ func ListTokens(client astrov1.APIClient, out io.Writer) error {
 			apiTokens[i].Name,
 			apiTokens[i].Description,
 			string(apiTokens[i].Scope),
-			string(apiTokens[i].Kind),
+			TokenKind(apiTokens[i]),
 			orgRoleOf(apiTokens[i]),
 			created,
 			createdBy,

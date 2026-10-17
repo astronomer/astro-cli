@@ -33,14 +33,14 @@ const (
 func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "TYPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "KIND", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "TYPE", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
+		Header:         []string{"#", "ID", "NAME", "DESCRIPTION", "SCOPE", "KIND", "DEPLOYMENT ROLE", "CREATED", "CREATED BY"},
 	}
 }
 
@@ -123,7 +123,7 @@ func ListTokens(client astrov1.APIClient, deploymentID string, tokenTypes *[]Dep
 			apiTokens[i].Name,
 			apiTokens[i].Description,
 			string(apiTokens[i].Scope),
-			string(apiTokens[i].Kind),
+			organization.TokenKind(apiTokens[i]),
 			deploymentRoleOf(apiTokens[i], deploymentID),
 			created,
 			createdBy,
@@ -361,7 +361,7 @@ func selectTokens(deploymentID string, apiTokens []astrov1.ApiToken) (astrov1.Ap
 			apiTokens[i].Name,
 			apiTokens[i].Description,
 			string(apiTokens[i].Scope),
-			string(apiTokens[i].Kind),
+			organization.TokenKind(apiTokens[i]),
 			deploymentRoleOf(apiTokens[i], deploymentID),
 			created,
 			createdBy,
