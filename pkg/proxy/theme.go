@@ -3,28 +3,24 @@ package proxy
 import (
 	"bytes"
 	"compress/gzip"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
-	"sort"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
 
 // themeTagID marks the theme's <style> block. InjectAirflowTheme looks for it
 // before injecting, so a page that already carries the theme is left alone.
 const themeTagID = "astro-theme"
-
-// runtimeThemeJSON is the Airflow UI theme Astro Runtime ships, a verbatim copy
-// of astro-runtime's image/files/airflow-ui-theme.json. Runtime hands it to
-// Airflow 3.2+ as AIRFLOW__API__THEME, which makes it how Airflow looks on
-// Astro; the proxy paints the same tokens so a local Airflow looks the same.
-//
-//go:embed airflow-ui-theme.json
-var runtimeThemeJSON []byte
 
 // cssVar is one CSS custom property the theme sets.
 type cssVar struct{ name, value string }
@@ -39,63 +35,177 @@ type airflowTheme struct {
 	black, white string
 }
 
-// parseAirflowTheme reads the color tokens of an AIRFLOW__API__THEME document.
-// A token is a single value ({"value": ...}, as black and white are) or a scale
-// of numbered steps, each one a single value (brand, gray).
-func parseAirflowTheme(raw []byte) (airflowTheme, error) {
-	type token struct {
-		Value string `json:"value"`
-	}
-	var doc struct {
-		Tokens struct {
-			Colors map[string]json.RawMessage `json:"colors"`
-		} `json:"tokens"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return airflowTheme{}, fmt.Errorf("parsing the Airflow theme: %w", err)
-	}
+// themeSteps are the steps a palette may have, lightest first: the ones
+// Airflow accepts.
+var themeSteps = []string{"50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"}
 
-	names := make([]string, 0, len(doc.Tokens.Colors))
-	for name := range doc.Tokens.Colors {
-		names = append(names, name)
+// oklchColor is Airflow's own pattern for a theme color (OklchColor in
+// airflow/api_fastapi/common/types.py), the one syntax it accepts. Holding a
+// value to it also keeps the value from ending the <style> block or the
+// pre-paint script's string it is written into.
+var oklchColor = regexp.MustCompile(`^oklch\((-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)\)$`)
+
+// validOklch reports whether Airflow would take v as a theme color: its
+// pattern, and its ranges for lightness, chroma and hue.
+func validOklch(v string) bool {
+	m := oklchColor.FindStringSubmatch(v)
+	if m == nil {
+		return false
 	}
-	sort.Strings(names)
+	var lch [3]float64
+	for i, s := range m[1:] {
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return false
+		}
+		lch[i] = f
+	}
+	return lch[0] >= 0 && lch[0] <= 1 && lch[1] >= 0 && lch[1] <= 0.5 && lch[2] >= 0 && lch[2] <= 360
+}
+
+// themeObject parses raw as a JSON object whose keys are all among allowed.
+//
+// Keys are matched exactly, as Airflow's model matches them. A struct would not
+// do: encoding/json folds case when it fills one, even with
+// DisallowUnknownFields, so "Brand" would be painted as brand where Airflow
+// refuses it.
+func themeObject(raw json.RawMessage, what string, allowed ...string) (map[string]json.RawMessage, error) {
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return nil, fmt.Errorf("parsing the Airflow theme's %s: %w", what, err)
+	}
+	for key := range obj {
+		if !slices.Contains(allowed, key) {
+			return nil, fmt.Errorf("the Airflow theme's %s has %q, which Airflow's theme does not", what, key)
+		}
+	}
+	return obj, nil
+}
+
+// parseAirflowTheme reads an AIRFLOW__API__THEME document into what the proxy
+// paints, holding it to Airflow's own Theme model
+// (airflow/api_fastapi/common/types.py). It refuses what Airflow would, and
+// also what Airflow would show but the proxy cannot paint (icons, globalCss
+// rules), so a theme copied in from Runtime that the proxy would render
+// differently fails the tests instead of quietly drifting from Astro.
+func parseAirflowTheme(raw []byte) (airflowTheme, error) {
+	doc, err := themeObject(raw, "document", "tokens", "globalCss", "icon", "icon_dark_mode")
+	if err != nil {
+		return airflowTheme{}, err
+	}
+	if err := refuseUnpaintable(doc); err != nil {
+		return airflowTheme{}, err
+	}
+	colors, err := themeColors(doc)
+	if err != nil {
+		return airflowTheme{}, err
+	}
 
 	var theme airflowTheme
-	for _, name := range names {
-		var single token
-		if err := json.Unmarshal(doc.Tokens.Colors[name], &single); err == nil && single.Value != "" {
-			theme.colors = append(theme.colors, cssVar{"--chakra-colors-" + name, single.Value})
-			switch name {
-			case "black":
-				theme.black = single.Value
-			case "white":
-				theme.white = single.Value
-			}
-			continue
-		}
-		var scale map[string]token
-		if err := json.Unmarshal(doc.Tokens.Colors[name], &scale); err != nil {
-			return airflowTheme{}, fmt.Errorf("color %q in the Airflow theme: %w", name, err)
-		}
-		steps := make([]int, 0, len(scale))
-		for step, tok := range scale {
-			n, err := strconv.Atoi(step)
-			if err != nil || tok.Value == "" {
-				return airflowTheme{}, fmt.Errorf("color %q in the Airflow theme: step %q is not a numbered color", name, step)
-			}
-			steps = append(steps, n)
-		}
-		sort.Ints(steps)
-		for _, n := range steps {
-			step := strconv.Itoa(n)
-			theme.colors = append(theme.colors, cssVar{"--chakra-colors-" + name + "-" + step, scale[step].Value})
-		}
+	if theme.black, err = theme.addShade("black", colors["black"]); err != nil {
+		return airflowTheme{}, err
 	}
-	if theme.black == "" || theme.white == "" {
-		return airflowTheme{}, errors.New("the Airflow theme has no black and white tokens to paint the page with")
+	if err := errors.Join(theme.addScale("brand", colors), theme.addScale("gray", colors)); err != nil {
+		return airflowTheme{}, err
+	}
+	if theme.white, err = theme.addShade("white", colors["white"]); err != nil {
+		return airflowTheme{}, err
 	}
 	return theme, nil
+}
+
+// refuseUnpaintable refuses what Airflow would show from a theme but the proxy
+// cannot paint: an icon, and a globalCss rule. Runtime carries an empty rule
+// to work around Airflow 3.2.0, which is nothing to paint.
+func refuseUnpaintable(doc map[string]json.RawMessage) error {
+	for _, name := range []string{"icon", "icon_dark_mode"} {
+		if icon, ok := doc[name]; ok && string(icon) != "null" {
+			return fmt.Errorf("the Airflow theme sets %s, which the proxy cannot paint", name)
+		}
+	}
+	raw, ok := doc["globalCss"]
+	if !ok {
+		return nil
+	}
+	var rules map[string]map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &rules); err != nil {
+		return fmt.Errorf("parsing the Airflow theme's globalCss: %w", err)
+	}
+	for selector, r := range rules {
+		if len(r) > 0 {
+			return fmt.Errorf("the Airflow theme has globalCss rules for %q, which the proxy cannot paint", selector)
+		}
+	}
+	return nil
+}
+
+// themeColors is the theme's tokens.colors, which must hold black and white:
+// they are what the proxy paints the page with before Airflow boots.
+func themeColors(doc map[string]json.RawMessage) (map[string]json.RawMessage, error) {
+	errNoColors := errors.New("the Airflow theme has no colors")
+	tokensRaw, ok := doc["tokens"]
+	if !ok {
+		return nil, errNoColors
+	}
+	tokens, err := themeObject(tokensRaw, "tokens", "colors")
+	if err != nil {
+		return nil, err
+	}
+	colorsRaw, ok := tokens["colors"]
+	if !ok {
+		return nil, errNoColors
+	}
+	colors, err := themeObject(colorsRaw, "colors", "brand", "gray", "black", "white")
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range []string{"black", "white"} {
+		if _, ok := colors[name]; !ok {
+			return nil, errors.New("the Airflow theme has no black and white tokens to paint the page with")
+		}
+	}
+	return colors, nil
+}
+
+// addShade adds the color {"value": "oklch(...)"} as the variable for name, and
+// returns its value.
+func (t *airflowTheme) addShade(name string, raw json.RawMessage) (string, error) {
+	shade, err := themeObject(raw, "color "+name, "value")
+	if err != nil {
+		return "", err
+	}
+	var v string
+	if raw, ok := shade["value"]; ok {
+		if err := json.Unmarshal(raw, &v); err != nil {
+			return "", fmt.Errorf("parsing the Airflow theme's color %s: %w", name, err)
+		}
+	}
+	if !validOklch(v) {
+		return "", fmt.Errorf("color %s in the Airflow theme is %q, not an oklch() color Airflow takes", name, v)
+	}
+	t.colors = append(t.colors, cssVar{"--chakra-colors-" + name, v})
+	return v, nil
+}
+
+// addScale adds the palette name, if the theme has one, step by step from
+// lightest to darkest.
+func (t *airflowTheme) addScale(name string, colors map[string]json.RawMessage) error {
+	raw, ok := colors[name]
+	if !ok {
+		return nil
+	}
+	scale, err := themeObject(raw, "color "+name, themeSteps...)
+	if err != nil {
+		return err
+	}
+	for _, step := range themeSteps {
+		if s, ok := scale[step]; ok {
+			if _, err := t.addShade(name+"-"+step, s); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // css sets the theme's color tokens on an Airflow 3 page.
@@ -107,6 +217,12 @@ func parseAirflowTheme(raw []byte) (airflowTheme, error) {
 // its tokens layer: Airflow's own palette before 3.2, and on 3.2+ the same
 // values again when the Runtime image has set the theme. Airflow 3.0 has no
 // brand palette, so it takes the theme's neutrals and keeps its blue accent.
+//
+// It outranks a theme of the user's own just the same: an AIRFLOW__API__THEME
+// they set lands in that tokens layer, so behind the proxy the page shows
+// Runtime's colors anyway. The proxy cannot see the setting from the page it
+// relays, and leaving the variables to Chakra instead would leave Airflow
+// before 3.2 unthemed.
 //
 // html.light and html.dark are the classes next-themes puts on Airflow 3's
 // root. Airflow 2 never sets them, and Runtime does not theme it either, so it
@@ -183,14 +299,20 @@ func prePaintScript(dark, light string) string {
 
 // airflowThemeSnippet is everything that has to be in place before an Airflow
 // page's first paint, injected in one pass.
-var airflowThemeSnippet = func() string {
-	theme, err := parseAirflowTheme(runtimeThemeJSON)
+//
+// Built on first use, and empty if Runtime's theme does not parse: Airflow
+// pages then go out unthemed, rather than every program linking this package
+// failing as it starts. The tests parse it, so that is a build that never
+// ships.
+var airflowThemeSnippet = sync.OnceValue(func() string {
+	theme, err := parseAirflowTheme([]byte(airflowrt.UITheme()))
 	if err != nil {
-		panic(err)
+		slog.Error("Airflow pages will not be themed", "error", err)
+		return ""
 	}
 	return `<style id="` + themeTagID + `">` + theme.css() + scrollbarCSS + `</style>` +
 		prePaintScript(theme.black, theme.white)
-}()
+})
 
 // InjectAirflowTheme puts the Astronomer theme into an Airflow HTML page: the
 // brand colors, thin scrollbars, and a background painted before Airflow's
@@ -202,7 +324,11 @@ var airflowThemeSnippet = func() string {
 // ModifyResponse hooks. Exported for a host that serves Airflow outside this
 // proxy: the desktop's iframe proxies.
 func InjectAirflowTheme(resp *http.Response) error {
-	return injectIntoHTML(resp, airflowThemeSnippet, "</head>", `id="`+themeTagID+`"`)
+	snippet := airflowThemeSnippet()
+	if snippet == "" {
+		return nil
+	}
+	return injectIntoHTML(resp, snippet, "</head>", `id="`+themeTagID+`"`)
 }
 
 // InjectIntoHTML inserts snippet into an HTML response immediately before

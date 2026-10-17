@@ -41,11 +41,7 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 	// match or every such DAG is an import error locally. A PYTHONPATH from
 	// .env or the shell is kept, after the project root.
 	pythonPath := projectPath
-	extra, fromEnvFile := overrides["PYTHONPATH"]
-	if !fromEnvFile {
-		extra = os.Getenv("PYTHONPATH")
-	}
-	if extra != "" {
+	if extra := userSetting(overrides, "PYTHONPATH"); extra != "" {
 		pythonPath += string(os.PathListSeparator) + extra
 	}
 	overrides["PYTHONPATH"] = pythonPath
@@ -59,6 +55,15 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 		overrides["AIRFLOW__API__PORT"] = port
 	}
 	overrides["AIRFLOW__CORE__EXECUTION_API_SERVER_URL"] = "http://localhost:" + port + "/execution/"
+	// The Astro theme, as the Runtime image's entrypoint sets it, so Airflow
+	// looks the same opened on its own port as through the local proxy or on
+	// Astro. A theme of the user's own, in .env or the shell, wins, as it does
+	// there; an empty one is no theme to Airflow (it cannot parse ""), so it is
+	// replaced, also as there. {} is how to turn the theme off. Airflow before
+	// 3.2 ignores the setting.
+	if userSetting(overrides, UIThemeEnv) == "" {
+		overrides[UIThemeEnv] = UITheme()
+	}
 
 	// Layer 3: macOS proxy workaround.
 	// Python's _scproxy calls SCDynamicStoreCopyProxies which is not fork-safe.
@@ -83,6 +88,15 @@ func BuildEnv(projectPath, port, envFilePath string) []string {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// userSetting is what the user set key to: its value in .env when .env has
+// it, and otherwise the shell's.
+func userSetting(overrides map[string]string, key string) string {
+	if v, ok := overrides[key]; ok {
+		return v
+	}
+	return os.Getenv(key)
 }
 
 // LoadEnvFile reads a .env file and returns key=value pairs.

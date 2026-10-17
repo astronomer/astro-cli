@@ -106,6 +106,65 @@ func TestBuildEnv_WithEnvFile(t *testing.T) {
 	assert.Equal(t, "hello", envMap["MY_VAR"])
 }
 
+// Standalone Airflow gets the Astro theme the Runtime image's entrypoint gives
+// it, unless the user has set a theme of their own, which wins as it does there.
+func TestBuildEnv_UITheme(t *testing.T) {
+	const ownTheme = `{"tokens":{"colors":{"brand":{"600":{"value":"#123456"}}}}}`
+	themeEntries := func(env []string) int {
+		n := 0
+		for _, kv := range env {
+			if strings.HasPrefix(kv, UIThemeEnv+"=") {
+				n++
+			}
+		}
+		return n
+	}
+
+	t.Run("the Astro theme by default", func(t *testing.T) {
+		t.Setenv(UIThemeEnv, "")
+		env := BuildEnv(t.TempDir(), "8080", "")
+		got := envToMap(env)[UIThemeEnv]
+		assert.Equal(t, UITheme(), got)
+		// Runtime's brand.600, so this is the theme Astro runs and not merely
+		// whatever the embed holds.
+		assert.Contains(t, got, `"oklch(0.460 0.190 298.0)"`)
+		assert.NotContains(t, got, "\n", "the theme goes into the environment as one line")
+		assert.Equal(t, 1, themeEntries(env))
+	})
+	// Empty is no theme to Airflow, which cannot parse it, so it gets the Astro
+	// theme as the Runtime entrypoint gives it one. {} is the way to turn the
+	// theme off, and is kept.
+	for _, tc := range []struct{ name, set, want string }{
+		{"an empty theme in .env gets the Astro theme", "", UITheme()},
+		{"{} in .env turns the theme off", "{}", "{}"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(UIThemeEnv, "")
+			dir := t.TempDir()
+			envFile := filepath.Join(dir, ".env")
+			require.NoError(t, os.WriteFile(envFile, []byte(UIThemeEnv+"="+tc.set+"\n"), 0o644))
+			env := BuildEnv(dir, "8080", envFile)
+			assert.Equal(t, tc.want, envToMap(env)[UIThemeEnv])
+			assert.Equal(t, 1, themeEntries(env))
+		})
+	}
+	t.Run("a theme in .env wins", func(t *testing.T) {
+		t.Setenv(UIThemeEnv, "")
+		dir := t.TempDir()
+		envFile := filepath.Join(dir, ".env")
+		require.NoError(t, os.WriteFile(envFile, []byte(UIThemeEnv+"='"+ownTheme+"'\n"), 0o644))
+		env := BuildEnv(dir, "8080", envFile)
+		assert.Equal(t, ownTheme, envToMap(env)[UIThemeEnv])
+		assert.Equal(t, 1, themeEntries(env))
+	})
+	t.Run("a theme in the shell wins", func(t *testing.T) {
+		t.Setenv(UIThemeEnv, ownTheme)
+		env := BuildEnv(t.TempDir(), "8080", "")
+		assert.Equal(t, ownTheme, envToMap(env)[UIThemeEnv])
+		assert.Equal(t, 1, themeEntries(env))
+	})
+}
+
 func TestHasProxyConfigured(t *testing.T) {
 	// No proxy set
 	assert.False(t, HasProxyConfigured(map[string]string{}))
