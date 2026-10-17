@@ -1068,18 +1068,25 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		return errors.Wrap(err, "failed to get current context")
 	}
 
-	// Validate deployment runtime version if deployment ID is provided
-	if err := validateClientImageRuntimeVersion(deployInput, astroV1Client); err != nil {
+	// Get the remote client registry endpoint from config. It is checked as a
+	// new value is, so one saved with a tag (before the check, or by hand) is
+	// a clear error rather than Docker's "invalid reference format"; and
+	// before anything that calls the API, so a config problem is not hidden
+	// behind an auth or network one.
+	registryEndpoint, err := config.ClientRegistry()
+	if err != nil {
 		return err
 	}
-
-	// Get the remote client registry endpoint from config
-	registryEndpoint := config.CFG.RemoteClientRegistry.GetString()
 	if registryEndpoint == "" {
 		fmt.Println("The Astro CLI is not configured to push client images to your private registry.")
 		fmt.Println("For remote Deployments, client images must be stored in your private registry, not in Astronomer managed registries.")
 		fmt.Println("Please provide your private registry information so the Astro CLI can push client images.")
 		return errors.New("remote client registry is not configured. To configure it, run: 'astro config set remote.client_registry <endpoint>' and try again.")
+	}
+
+	// Validate deployment runtime version if deployment ID is provided
+	if err := validateClientImageRuntimeVersion(deployInput, astroV1Client); err != nil {
+		return err
 	}
 
 	// Use consistent deploy-<timestamp> tagging mechanism like regular deploys

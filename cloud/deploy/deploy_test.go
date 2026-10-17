@@ -1474,7 +1474,7 @@ func TestDeployClientImage(t *testing.T) {
 		}()
 
 		// Mock config.CFG.RemoteClientRegistry
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         tempDir,
@@ -1504,7 +1504,7 @@ func TestDeployClientImage(t *testing.T) {
 			return errors.New("login failed")
 		}
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         "/test/path",
@@ -1542,6 +1542,26 @@ func TestDeployClientImage(t *testing.T) {
 		err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
+		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
+	})
+
+	// A registry saved with a tag (before the check existed, or by hand in
+	// config.yaml) is refused with what to fix, before anything is built,
+	// rather than reaching Docker as "invalid reference format" (#2223).
+	t.Run("a saved registry that carries a tag", func(t *testing.T) {
+		dockerLoginCalled := false
+		airflow.DockerLogin = func(registry, username, token string) error {
+			dockerLoginCalled = true
+			return nil
+		}
+		config.CFG.RemoteClientRegistry.SetHomeString("myregistry.example.com:7990/repository/path/my-image:1.0")
+		t.Cleanup(func() { config.CFG.RemoteClientRegistry.SetHomeString("") })
+
+		// No API client: the registry is checked before anything calls the API.
+		err := DeployClientImage(InputClientDeploy{Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
+		assert.ErrorContains(t, err, "is not a usable registry endpoint")
+		assert.ErrorContains(t, err, "must not include an image tag")
+		assert.ErrorContains(t, err, "astro config set")
 		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
 	})
 
@@ -1588,7 +1608,7 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         tempDir,
@@ -1645,7 +1665,7 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         tempDir,
@@ -1673,7 +1693,7 @@ func TestDeployClientImage(t *testing.T) {
 		// Remote image will use timestamp tag, not the user-provided tag
 		mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool {
 			// Verify it uses timestamp-based tag format, not "tag" from the user input
-			return strings.Contains(remoteImage, "test-registry:latest:deploy-") &&
+			return strings.Contains(remoteImage, "test-registry.io/acme/client-image:deploy-") &&
 				!strings.Contains(remoteImage, ":tag")
 		}), "", "", false).Return("", nil).Once()
 
@@ -1686,7 +1706,7 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		// Set up temporary directory for consistency
 		tempDir, err := os.MkdirTemp("", "test-deploy-*")
