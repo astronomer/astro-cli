@@ -146,7 +146,7 @@ func HostnameDiscriminator(projectPath string) string {
 // wrong the first time it is not.
 //
 // It reaps on the count this removal returned rather than by asking the daemon
-// to decide. Asking meant airflow/proxy.StopIfEmpty, which re-lists through a
+// to decide. Asking meant internal/proxydaemon.StopIfEmpty, which re-lists through a
 // store built with no liveness predicate — the default one, which evicts a
 // route whose recorded PID is dead. That is not the same question: a
 // standalone master exits before the children in its group during shutdown, so

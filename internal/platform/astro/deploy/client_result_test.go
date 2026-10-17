@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/airflow"
-	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/imagepush"
+	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -21,8 +21,8 @@ import (
 // to render (cmd/astro's renderRemoteDeploy), so under --output json they
 // become the result object instead.
 func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
-	origLogin, origHandler := airflow.DockerLogin, airflowImageHandler
-	t.Cleanup(func() { airflow.DockerLogin, airflowImageHandler = origLogin, origHandler })
+	origLogin, origHandler := imagepush.DockerLogin, airflowImageHandler
+	t.Cleanup(func() { imagepush.DockerLogin, airflowImageHandler = origLogin, origHandler })
 
 	cases := []struct {
 		name     string
@@ -58,13 +58,13 @@ func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements-client.txt"), nil, 0o600))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "packages-client.txt"), nil, 0o600))
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
-			airflow.DockerLogin = func(string, string, string) error { return nil }
+			imagepush.DockerLogin = func(string, string, string) error { return nil }
 			h := new(mocks.ImageHandler)
 			h.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 			h.On("TagLocalImage", "local:1").Return(nil).Maybe()
 			h.On("Push", mock.Anything, "", "", false).Return("", nil).Once()
 			var tagged string
-			airflowImageHandler = func(image string) airflow.ImageHandler { tagged = image; return h }
+			airflowImageHandler = func(image string) imagepush.ImageHandler { tagged = image; return h }
 			config.CFG.RemoteClientRegistry.SetHomeString("registry.example.com/agents/client")
 			tc.in.Path = dir
 

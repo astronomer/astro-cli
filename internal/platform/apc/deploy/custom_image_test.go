@@ -3,8 +3,8 @@ package deploy
 import (
 	"github.com/stretchr/testify/mock"
 
-	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/imagepush"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
@@ -31,7 +31,7 @@ func (s *Suite) TestCustomImageToTheAPCRegistryTakesTheNextTag() {
 		{"my-image:v7", "deploy-5", "registry.example.com/my-release/airflow:deploy-5"},
 	} {
 		var pushedTo string
-		imageHandlerInit = func(image string) airflow.ImageHandler {
+		imageHandlerInit = func(image string) imagepush.ImageHandler {
 			s.mockImageHandler.On("TagLocalImage", c.image).Return(nil).Once()
 			s.mockImageHandler.On("GetLabel", "", airflowrt.RuntimeVersionLabel).Return("12.2.0", nil).Once()
 			s.mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {

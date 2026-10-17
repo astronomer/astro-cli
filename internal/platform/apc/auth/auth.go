@@ -9,9 +9,9 @@ import (
 
 	"github.com/docker/docker/api/types/versions"
 
-	"github.com/astronomer/astro-cli/airflow"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
+	"github.com/astronomer/astro-cli/internal/imagepush"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -44,7 +44,7 @@ var (
 	errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
 
 	// this is used to monkey patch the function in order to write unit test cases
-	registryHandlerInit = airflow.RegistryHandlerInit
+	registryHandlerInit = imagepush.RegistryHandlerInit
 )
 
 // basicAuth handles authentication with the houston api

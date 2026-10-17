@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	types "github.com/astronomer/astro-cli/airflow/types"
+	imagepush "github.com/astronomer/astro-cli/internal/imagepush"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,7 +13,7 @@ type ImageHandler struct {
 }
 
 // Build provides a mock function with given fields: dockerfile, buildSecrets, config
-func (_m *ImageHandler) Build(dockerfile string, buildSecrets []string, config types.ImageBuildConfig) error {
+func (_m *ImageHandler) Build(dockerfile string, buildSecrets []string, config imagepush.ImageBuildConfig) error {
 	ret := _m.Called(dockerfile, buildSecrets, config)
 
 	if len(ret) == 0 {
@@ -21,7 +21,7 @@ func (_m *ImageHandler) Build(dockerfile string, buildSecrets []string, config t
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, []string, types.ImageBuildConfig) error); ok {
+	if rf, ok := ret.Get(0).(func(string, []string, imagepush.ImageBuildConfig) error); ok {
 		r0 = rf(dockerfile, buildSecrets, config)
 	} else {
 		r0 = ret.Error(0)

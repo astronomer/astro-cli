@@ -1,4 +1,4 @@
-package airflow
+package imagepush
 
 import (
 	"bufio"
@@ -22,15 +22,19 @@ import (
 	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/sirupsen/logrus"
 
-	"github.com/astronomer/astro-cli/airflow/runtimes"
-	airflowTypes "github.com/astronomer/astro-cli/airflow/types"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/spinner"
 )
 
 const (
 	prefix = "Bearer "
+
+	// The registries of the Astro Runtime base images: a Dockerfile whose
+	// every FROM names one of them builds with --pull.
+	quayBaseImageName               = "quay.io/astronomer"
+	astroImageRegistryBaseImageName = "astrocrpublic.azurecr.io"
 )
 
 var (
@@ -95,7 +99,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "FROM ") && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", QuayBaseImageName)) && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", AstroImageRegistryBaseImageName)) {
+		if strings.HasPrefix(line, "FROM ") && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", quayBaseImageName)) && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", astroImageRegistryBaseImageName)) {
 			return false, nil
 		}
 	}
@@ -105,7 +109,7 @@ func shouldAddPullFlag(dockerfilePath string) (bool, error) {
 	return true, nil
 }
 
-func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildConfig airflowTypes.ImageBuildConfig) error {
+func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildConfig ImageBuildConfig) error {
 	// Start the spinner.
 	s := spinner.NewSpinner("Building project image…")
 	if !logger.IsLevelEnabled(logrus.DebugLevel) {
@@ -113,7 +117,7 @@ func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildC
 		defer s.Stop()
 	}
 
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	containerRuntime, err := getContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -125,7 +129,7 @@ func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildC
 	if err != nil {
 		return fmt.Errorf("reading dockerfile: %w", err)
 	}
-	if runtimes.IsPodman(containerRuntime) {
+	if container.IsPodman(containerRuntime) {
 		args = append(args, "--format", "docker")
 	}
 	if addPullFlag {
@@ -182,7 +186,7 @@ func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildC
 }
 
 func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha bool) (string, error) {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	containerRuntime, err := getContainerRuntimeBinary()
 	if err != nil {
 		return "", err
 	}
@@ -260,7 +264,7 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 }
 
 func (d *DockerImage) GetImageRepoSHA(registry string) (string, error) {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	containerRuntime, err := getContainerRuntimeBinary()
 	if err != nil {
 		return "", err
 	}
@@ -349,7 +353,7 @@ var displayJSONMessagesToStream = func(responseBody io.ReadCloser, w io.Writer, 
 }
 
 func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	containerRuntime, err := getContainerRuntimeBinary()
 	if err != nil {
 		return "", err
 	}
@@ -375,7 +379,7 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 }
 
 func (d *DockerImage) TagLocalImage(localImage string) error {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	containerRuntime, err := getContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
@@ -437,7 +441,7 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 
 // pushWithCLI is the fallback for runtimes, such as older Colima, that reject the Go client's push.
 func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string, out io.Writer) error {
-	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	containerRuntime, err := getContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}

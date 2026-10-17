@@ -13,7 +13,7 @@ import (
 //
 // landingPage listed through ListRoutes, which prunes and then writes the
 // pruned list back. The daemon builds its proxy with a store carrying no
-// liveness predicate (airflow/proxy's Routes()), so the prune judged a route
+// liveness predicate (internal/proxydaemon's Routes()), so the prune judged a route
 // by the pid recorded in it — and that pid is the process that registered the
 // route, not the runtime. When the two diverge, which is what happens whenever
 // the owner is replaced (Astro Desktop restarting, or a standalone master

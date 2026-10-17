@@ -12,11 +12,10 @@ import (
 	"github.com/moby/patternmatcher/ignorefile"
 	"github.com/pkg/errors"
 
-	"github.com/astronomer/astro-cli/airflow"
-	"github.com/astronomer/astro-cli/airflow/types"
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/internal/imagepush"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/azure"
@@ -33,7 +32,7 @@ const (
 
 var (
 	// Monkey patched to write unit tests
-	airflowImageHandler = airflow.ImageHandlerInit
+	airflowImageHandler = imagepush.ImageHandlerInit
 	azureUploader       = azure.Upload
 	canCiCdDeploy       = deployment.CanCiCdDeploy
 )
@@ -79,9 +78,9 @@ func uploadDags(dagsPath, dagsUploadURL, currentRuntimeVersion string, monitorin
 		var monitoringDag string
 		switch airflowversions.AirflowMajorVersionForRuntimeVersion(currentRuntimeVersion) {
 		case "2":
-			monitoringDag = airflow.Af2MonitoringDag
+			monitoringDag = af2MonitoringDag
 		case "3":
-			monitoringDag = airflow.Af3MonitoringDag
+			monitoringDag = af3MonitoringDag
 		default:
 			return "", errors.New("unsupported Airflow major version for runtime version " + currentRuntimeVersion)
 		}
@@ -133,7 +132,7 @@ func fetchDeploymentDetails(deploymentID, organizationID string, astroV1Client a
 	}
 
 	// We use latest and keep this tag around after deployments to keep subsequent deploys quick
-	deployImage := airflow.ImageName(namespace, "latest")
+	deployImage := imagepush.ImageName(namespace, "latest")
 
 	return deploymentInfo{
 		namespace:                namespace,
@@ -376,7 +375,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			}
 			baseImageRegistry := config.CFG.RemoteBaseImageRegistry.GetString()
 			fmt.Printf("Authenticating with base image registry: %s\n", baseImageRegistry)
-			err := airflow.DockerLogin(baseImageRegistry, registryUsername, c.Token)
+			err := imagepush.DockerLogin(baseImageRegistry, registryUsername, c.Token)
 			if err != nil {
 				fmt.Println("Failed to authenticate with Astronomer registry that contains the base agent image used in the Dockerfile.client file.")
 				fmt.Println("This could be because either your token has expired or you don't have permission to pull the base agent image.")
@@ -409,7 +408,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		}
 
 		// Build the image from the prepared context
-		buildConfig := types.ImageBuildConfig{
+		buildConfig := imagepush.ImageBuildConfig{
 			Path:            buildContext.TempDir,
 			TargetPlatforms: targetPlatforms,
 		}
@@ -424,7 +423,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	fmt.Println("Pushing client image to configured remote registry")
 	_, err = imageHandler.Push(remoteImage, "", "", false)
 	if err != nil {
-		if errors.Is(err, airflow.ErrImagePush403) {
+		if errors.Is(err, imagepush.ErrImagePush403) {
 			fmt.Printf("\n--------------------------------\n")
 			fmt.Printf("Failed to push client image to %s\n", registryEndpoint)
 			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")

@@ -433,7 +433,7 @@ func (b *Builder) mountsRuntimeSecret(ctx context.Context, req Request) bool {
 // `docker build` succeeds there and this failed, which is not a tradeoff a
 // tier-3 escape hatch gets to make.
 //
-// The rule is v1's, deliberately: airflow/docker_image.go's shouldAddPullFlag
+// The rule is v1's, deliberately: internal/imagepush/image.go's shouldAddPullFlag
 // skips --pull as soon as ANY FROM names something other than an Astro base, so
 // a project moving to v2 keeps the behavior it had. Any is the right quantifier
 // rather than the final stage — a builder stage on an unreachable image fails

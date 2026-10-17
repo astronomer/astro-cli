@@ -1,4 +1,4 @@
-package airflow
+package imagepush
 
 import (
 	"github.com/pkg/errors"

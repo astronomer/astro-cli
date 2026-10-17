@@ -115,7 +115,7 @@ func TestCleanPutsTheProxyAwayAfterADockerRouteGoes(t *testing.T) {
 // And it leaves the proxy alone while anything still needs it.
 //
 // This is the assertion that keeps the reap honest. Asking the daemon to
-// decide for itself meant airflow/proxy.StopIfEmpty, which re-lists through a
+// decide for itself meant internal/proxydaemon.StopIfEmpty, which re-lists through a
 // store built with no liveness predicate: the default one judges a route by
 // its recorded PID, and a standalone master exits before the rest of its group
 // during shutdown, so that store calls a live project's route dead. ListRoutes

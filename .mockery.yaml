@@ -9,14 +9,20 @@ packages:
       dir: houston/mocks
     interfaces:
       ClientInterface:
-  github.com/astronomer/astro-cli/airflow:
+  github.com/astronomer/astro-cli/internal/imagepush:
     config:
-      dir: airflow/mocks
+      dir: internal/imagepush/mocks
       outpkg: mocks
     interfaces:
       RegistryHandler:
       ImageHandler:
+      # Only imagepush's own tests use this one, and mocks/ imports imagepush
+      # (ImageHandler's Build takes an ImageBuildConfig), so it gets a package
+      # of its own: in mocks/ it would be an import cycle.
       DockerRegistryAPI:
+        config:
+          dir: internal/imagepush/mocks/dockerapi
+          outpkg: dockerapi
   github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1:
     config:
       dir: internal/platform/astro/clients/astrov1/mocks

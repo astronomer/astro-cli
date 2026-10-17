@@ -636,7 +636,7 @@ func get(t *testing.T, port int) int {
 // for .localhost — it works on a developer's Mac and wherever
 // systemd-resolved synthesizes it, and returns a connection error elsewhere.
 // The nightly runs on ubuntu-latest, where a missing rule would file an issue
-// reading as a proxy regression. airflow/proxy's own probeProxySignature asks
+// reading as a proxy regression. pkg/proxy's own probeProxySignature asks
 // the same way and for the same reason.
 func getURL(t *testing.T, rawURL string) int {
 	t.Helper()

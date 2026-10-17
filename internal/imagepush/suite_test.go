@@ -1,4 +1,4 @@
-package airflow
+package imagepush
 
 import (
 	"io"
@@ -26,7 +26,7 @@ var (
 	_ suite.TearDownSubTest   = (*Suite)(nil)
 )
 
-func TestAirflow(t *testing.T) {
+func TestImagePush(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 

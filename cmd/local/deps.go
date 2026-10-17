@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -20,12 +19,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/astrosession"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/emenv"
 	"github.com/astronomer/astro-cli/internal/instancelocate"
+	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
@@ -45,6 +44,11 @@ type Deps struct {
 
 	// Runtime is the pkg/localrt surface the commands call.
 	Runtime Runtime
+	// ProxyDir is where the proxy routes and the daemon's record live
+	// (proxydaemon.Dir), resolved once per run. Empty when there is no home
+	// directory: HomeErr then says why, and Runtime is a stand-in returning it.
+	ProxyDir string
+	HomeErr  error
 
 	// Checks runs `astro local check`'s DAG parse against the project venv.
 	Checks checks.Parser
@@ -185,11 +189,10 @@ type Runtime interface {
 // NewDeps builds the production Deps. Call it once, from main.
 func NewDeps() Deps {
 	runner := checks.NewVenvRunner()
-	return Deps{
+	d := Deps{
 		Stdin:            os.Stdin,
 		Stdout:           os.Stdout,
 		Stderr:           os.Stderr,
-		Runtime:          newRuntime(),
 		Checks:           runner,
 		CheckVenv:        runner,
 		Provisioner:      newUVProvisioner,
@@ -205,6 +208,17 @@ func NewDeps() Deps {
 		AstroBuild:       runtimecatalog.AstroBuild,
 		RuntimeCatalog:   runtimecatalog.Catalog,
 	}
+	// One resolution of the routes dir for the whole run. Without a home the
+	// runtime is a stand-in whose every call says so; commands that never
+	// reach the runtime run as usual.
+	if dir, err := proxydaemon.Dir(); err != nil {
+		d.HomeErr = err
+		d.Runtime = homelessRuntime{err: err}
+	} else {
+		d.ProxyDir = dir
+		d.Runtime = newRuntime(dir)
+	}
+	return d
 }
 
 // stdinIsTerminal is the production answer to "can this run ask a question".
@@ -243,17 +257,16 @@ func markSkipPreRun(cmd *cobra.Command) {
 // errAborted reports a confirmation answered "no".
 var errAborted = errors.New("aborted")
 
-// proxyDaemon adapts airflow/proxy's daemon lifecycle to the engines'
-// localrt.ProxyDaemon seam. It lives at the composition layer because
-// airflow/proxy pulls in config, which the core engines must not import; they
-// see only the interface.
-type proxyDaemon struct{}
+// proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
+// localrt.ProxyDaemon seam, for the routes under dir. The engines see only the
+// interface.
+type proxyDaemon struct{ dir string }
 
-func (proxyDaemon) EnsureRunning() (string, error) {
-	return proxydaemon.EnsureRunning(proxy.DefaultPort)
+func (p proxyDaemon) EnsureRunning() (string, error) {
+	return proxydaemon.EnsureRunning(p.dir, proxy.DefaultPort)
 }
 
-func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
+func (p proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty(p.dir) }
 
 // newProxyDaemon returns the daemon seam, or nil on Windows, where astro local
 // does not start the proxy (docs/architecture.md, "Platform support"): the
@@ -264,37 +277,58 @@ func (proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty() }
 // Astro Desktop to share. Return proxyDaemon{} here too once it has been run on
 // a real Windows host: started, adopted across two tools, stopped, and the
 // starting terminal closed.
-func newProxyDaemon() localrt.ProxyDaemon {
+func newProxyDaemon(dir string) localrt.ProxyDaemon {
 	if runtime.GOOS == "windows" {
 		return nil
 	}
-	return proxyDaemon{}
-}
-
-// routesDir is where pkg/proxy keeps routes.json: <astro home>/proxy, the
-// same location v1 uses, honoring the same ASTRO_HOME override — v1 and v2
-// must see each other's routes.
-func routesDir() string {
-	home := os.Getenv("ASTRO_HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir() //nolint:errcheck // falls back to a relative path, matching v1's ASTRO_HOME handling
-	}
-	return filepath.Join(home, ".astro", "proxy")
+	return proxyDaemon{dir: dir}
 }
 
 // newRuntime builds the shared local runtime with the CLI's composition: the
-// v1-compatible routes dir, the proxy daemon that shells out to `astro proxy`, and
-// the real image builder.
-func newRuntime() *localrt.Runtime {
+// v1-compatible routes dir (proxydaemon.Dir), the proxy daemon that shells out
+// to `astro proxy`, and the real image builder.
+func newRuntime(routesDir string) *localrt.Runtime {
 	return localrt.New(localrt.Config{
-		RoutesDir:     routesDir(),
-		ProxyDaemon:   newProxyDaemon(),
+		RoutesDir:     routesDir,
+		ProxyDaemon:   newProxyDaemon(routesDir),
 		Images:        newImageBuilder(),
 		HealthTimeout: healthTimeout(),
 		// container.binary pins the engine docker mode drives: project
 		// config over global, read for the project being acted on.
 		ContainerBinary: containercfg.Binary,
 	})
+}
+
+// proxyDir is ProxyDir, or why there is none: the resolution's own error, or,
+// for a Deps built without NewDeps, that nothing resolved one.
+func (d Deps) proxyDir() (string, error) {
+	switch {
+	case d.ProxyDir != "":
+		return d.ProxyDir, nil
+	case d.HomeErr != nil:
+		return "", d.HomeErr
+	}
+	return "", errors.New("no directory for local Airflow's proxy routes was resolved")
+}
+
+// homelessRuntime stands in for the runtime when there is no home directory
+// for the proxy routes: every call returns why, so a command that needs the
+// runtime fails with it and one that never asks runs as usual.
+type homelessRuntime struct{ err error }
+
+func (r homelessRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks) (localrt.Airflow, error) {
+	return nil, r.err
+}
+func (r homelessRuntime) Attach(string) (localrt.Airflow, error)        { return nil, r.err }
+func (r homelessRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) { return nil, r.err }
+func (r homelessRuntime) LogSource(string) (localrt.Airflow, error)     { return nil, r.err }
+func (r homelessRuntime) ReadStatus(string) (localrt.Status, error) {
+	return localrt.Status{}, r.err
+}
+func (r homelessRuntime) List() ([]localrt.Status, error)       { return nil, r.err }
+func (r homelessRuntime) PruneStale() ([]localrt.Status, error) { return nil, r.err }
+func (r homelessRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
+	return localrt.ResetReport{}, r.err
 }
 
 // healthTimeoutEnv names how long a start waits for Airflow before giving up.

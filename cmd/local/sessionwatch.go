@@ -11,7 +11,7 @@ import (
 // (pkg/localrt). It waits for the starting process to exit, then
 // stops the project's compose stack. Never typed by users — the engine spawns
 // it with a machine-built command line.
-func newSessionWatchCmd(_ Deps) *cobra.Command {
+func newSessionWatchCmd(d Deps) *cobra.Command {
 	var (
 		parentPID int
 		project   string
@@ -24,7 +24,13 @@ func newSessionWatchCmd(_ Deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return newRuntime().WatchAndStop(cmd.Context(), project, parentPID)
+			// WatchAndStop is not on the Runtime seam, so this builds its
+			// own from the dir NewDeps resolved for this process.
+			dir, err := d.proxyDir()
+			if err != nil {
+				return err
+			}
+			return newRuntime(dir).WatchAndStop(cmd.Context(), project, parentPID)
 		},
 	}
 	cmd.Flags().IntVar(&parentPID, "parent-pid", 0, "PID to watch; the project is stopped when it exits")

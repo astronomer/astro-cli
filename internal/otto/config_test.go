@@ -11,11 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/astronomer/astro-cli/airflow/proxy"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/localrttest"
 	pkgproxy "github.com/astronomer/astro-cli/pkg/proxy"
@@ -31,10 +32,20 @@ type ConfigSuite struct {
 func (s *ConfigSuite) SetupTest() {
 	s.origHomeConfigPath = config.HomeConfigPath
 	s.tmpDir = s.T().TempDir()
-	// InitTestConfig → config.InitConfig → initHome resets HomeConfigPath back
-	// to the real ~/.astro, so the override has to come after, or route writes
-	// leak into the user's real routes.json and the running proxy daemon picks
-	// them up.
+	// The v1 proxy routes live under ASTRO_HOME (proxydaemon.Dir), so it points
+	// at the temp dir, or route writes leak into the user's real routes.json and
+	// the running proxy daemon picks them up. InitTestConfig → config.InitConfig
+	// → initHome resets HomeConfigPath to <ASTRO_HOME>/.astro, so the
+	// HomeConfigPath override has to come after it.
+	//
+	// InitConfig moves HomeConfigFile with ASTRO_HOME, and InitTestConfig
+	// writes its config to HomeConfigFile before InitConfig recomputes it, so a
+	// bare InitConfig lines the two up first, here and again once the cleanup
+	// has put ASTRO_HOME back (a cleanup registered before Setenv runs after
+	// Setenv's own).
+	s.T().Cleanup(func() { config.InitConfig(afero.NewMemMapFs()) })
+	s.T().Setenv("ASTRO_HOME", s.tmpDir)
+	config.InitConfig(afero.NewMemMapFs())
 	testUtil.InitTestConfig(config.CloudPlatform)
 	config.HomeConfigPath = s.tmpDir
 	// localstate lives under XDG_CACHE_HOME — isolate it so a real running
@@ -349,7 +360,9 @@ func (s *ConfigSuite) writeProjectRecord(projectPath string, port int) {
 
 func (s *ConfigSuite) writeRoute(r *pkgproxy.Route) {
 	s.T().Helper()
-	s.Require().NoError(proxy.Routes().AddRoute(r))
+	dir, err := proxydaemon.Dir()
+	s.Require().NoError(err)
+	s.Require().NoError(proxydaemon.Routes(dir).AddRoute(r))
 }
 
 func (s *ConfigSuite) startFakeAirflow() *httptest.Server {

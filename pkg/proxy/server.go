@@ -105,7 +105,7 @@ type Proxy struct {
 	// the ResponseWriter. Status and headers are committed before either runs,
 	// because one of those headers is the proxy's signature — how a daemon
 	// decides whether the process holding a recorded port is really a proxy
-	// (airflow/proxy's probeProxySignature GETs the landing page for exactly
+	// (probeProxySignature GETs the landing page for exactly
 	// this). A hook that reached the headers could drop it, and the failure
 	// would surface as an unrelated tool concluding the proxy is not running
 	// and starting a second one.
@@ -495,7 +495,7 @@ func (p *Proxy) handler(w http.ResponseWriter, r *http.Request) {
 //
 // Reads and filters; never writes. It listed through ListRoutes, which prunes
 // and then persists what it pruned — so rendering this page deleted rows. The
-// daemon's store carries no liveness predicate (airflow/proxy's Routes()), so
+// daemon's store carries no liveness predicate (internal/proxydaemon's Routes()), so
 // the verdict being persisted was the default one: a route judged by the pid
 // recorded in it, which is the process that registered the route rather than
 // the runtime it fronts. Those diverge whenever the owner is replaced — desktop

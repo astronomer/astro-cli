@@ -3,16 +3,16 @@ package local
 import (
 	"github.com/spf13/cobra"
 
-	proxydaemon "github.com/astronomer/astro-cli/airflow/proxy"
+	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/proxy"
 )
 
 // newProxyServeCmd builds the hidden `astro __proxy-serve` subcommand: the
-// reverse-proxy server loop the daemon re-execs into (airflow/proxy's
-// StartDaemon spawns `<astro> __proxy-serve --port <port>`). Never typed by
+// reverse-proxy server loop the daemon re-execs into (internal/proxydaemon's
+// EnsureRunning spawns `<astro> __proxy-serve --port <port>`). Never typed by
 // users. It mirrors the standalone engine's `__supervise` convention, and
 // re-homes the server that v2's dev-tree removal took `dev proxy serve` with.
-func newProxyServeCmd(_ Deps) *cobra.Command {
+func newProxyServeCmd(d Deps) *cobra.Command {
 	var port string
 	cmd := &cobra.Command{
 		Use:           proxydaemon.ServeSubcommand,
@@ -22,7 +22,13 @@ func newProxyServeCmd(_ Deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return proxydaemon.Serve(port)
+			// The daemon re-execs the CLI into this command, so NewDeps
+			// resolved the dir in this process.
+			dir, err := d.proxyDir()
+			if err != nil {
+				return err
+			}
+			return proxydaemon.Serve(dir, port)
 		},
 	}
 	cmd.Flags().StringVar(&port, "port", proxy.DefaultPort, "Port to listen on")

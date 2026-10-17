@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/astronomer/astro-cli/airflow"
-	"github.com/astronomer/astro-cli/airflow/mocks"
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/imagepush"
+	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -162,9 +162,9 @@ var (
 
 func TestDeployClientImage(t *testing.T) {
 	// Store original DockerLogin function to restore after tests
-	originalDockerLogin := airflow.DockerLogin
+	originalDockerLogin := imagepush.DockerLogin
 	defer func() {
-		airflow.DockerLogin = originalDockerLogin
+		imagepush.DockerLogin = originalDockerLogin
 	}()
 
 	t.Run("successful client deploy", func(t *testing.T) {
@@ -194,7 +194,7 @@ func TestDeployClientImage(t *testing.T) {
 		// Mock DockerLogin
 		dockerLoginCalled := false
 		var capturedRegistry, capturedUsername, capturedToken string
-		airflow.DockerLogin = func(registry, username, token string) error {
+		imagepush.DockerLogin = func(registry, username, token string) error {
 			dockerLoginCalled = true
 			capturedRegistry = registry
 			capturedUsername = username
@@ -204,12 +204,12 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Mock image handler
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
+		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("imagepush.ImageBuildConfig")).Return(nil).Once()
 		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", nil).Once()
 
 		// Override airflowImageHandler
 		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
 			return mockImageHandler
 		}
 		defer func() {
@@ -243,7 +243,7 @@ func TestDeployClientImage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Mock DockerLogin to return error
-		airflow.DockerLogin = func(registry, username, token string) error {
+		imagepush.DockerLogin = func(registry, username, token string) error {
 			return errors.New("login failed")
 		}
 
@@ -270,7 +270,7 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Mock DockerLogin (shouldn't be called)
 		dockerLoginCalled := false
-		airflow.DockerLogin = func(registry, username, token string) error {
+		imagepush.DockerLogin = func(registry, username, token string) error {
 			dockerLoginCalled = true
 			return nil
 		}
@@ -314,17 +314,17 @@ func TestDeployClientImage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Mock successful DockerLogin
-		airflow.DockerLogin = func(registry, username, token string) error {
+		imagepush.DockerLogin = func(registry, username, token string) error {
 			return nil
 		}
 
 		// Mock image handler with build failure
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(errors.New("build failed")).Once()
+		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("imagepush.ImageBuildConfig")).Return(errors.New("build failed")).Once()
 
 		// Override airflowImageHandler
 		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
 			return mockImageHandler
 		}
 		defer func() {
@@ -370,18 +370,18 @@ func TestDeployClientImage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Mock successful DockerLogin
-		airflow.DockerLogin = func(registry, username, token string) error {
+		imagepush.DockerLogin = func(registry, username, token string) error {
 			return nil
 		}
 
 		// Mock image handler with push failure
 		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
+		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("imagepush.ImageBuildConfig")).Return(nil).Once()
 		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", errors.New("push failed")).Once()
 
 		// Override airflowImageHandler
 		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
 			return mockImageHandler
 		}
 		defer func() {
@@ -422,7 +422,7 @@ func TestDeployClientImage(t *testing.T) {
 
 		// Override airflowImageHandler
 		originalAirflowImageHandler := airflowImageHandler
-		airflowImageHandler = func(imageName string) airflow.ImageHandler {
+		airflowImageHandler = func(imageName string) imagepush.ImageHandler {
 			return mockImageHandler
 		}
 		defer func() {
