@@ -456,26 +456,14 @@ func (s *Suite) TestInitSettingsFailure() {
 
 func (s *Suite) TestEnvExport() {
 	s.Run("success", func() {
-		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			switch airflowCommand {
-			case airflowVarExport:
-				return "1 variables successfully exported to tmp.var", nil
-			case catVarFile:
-				return `{
-					"myvar": "myval"
-				}`, nil
-			case airflowConnExport:
-				return "Connections successfully exported to tmp.json", nil
-			case catConnFile:
-				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema", nil
-			default:
-				return "", nil
-			}
-		}
+		f := s.install(&fakeAirflow{variables: fakeVariables, connections: fakeConnections})
+		env, read := s.envFile()
 
-		err := EnvExport("id", "testfiles/test.env", 2, true, true)
+		err := EnvExport("id", env, 2, true, true)
 		s.NoError(err)
-		_ = fileutil.WriteStringToFile("testfiles/test.env", "")
+		s.Contains(read(), "AIRFLOW_VAR_MYVAR=myval")
+		s.Contains(read(), "AIRFLOW_CONN_LOCAL_POSTGRES=")
+		s.Empty(f.left())
 	})
 	s.Run("missing id", func() {
 		err := EnvExport("", "", 2, true, true)
@@ -503,62 +491,11 @@ func (s *Suite) TestEnvExport() {
 	})
 }
 
-func (s *Suite) TestEnvExportConnectionsCleansUpTempFile() {
-	s.Run("export, read, and remove all target the same in-container temp path", func() {
-		exportedPath := strings.TrimPrefix(catConnFile, "cat ")
-		s.True(strings.HasPrefix(exportedPath, "/tmp/"), "connections should be exported under /tmp inside the container, got %q", exportedPath)
-		s.Contains(airflowConnExport, exportedPath, "export command should write to the same path the cat command reads")
-		s.Equal(exportedPath, strings.TrimPrefix(rmConnFile, "rm "), "remove command should target the same path the file was exported to")
-	})
-
-	s.Run("removes the temp file on success", func() {
-		var commands []string
-		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			commands = append(commands, airflowCommand)
-			switch airflowCommand {
-			case airflowConnExport:
-				return "1 connections successfully exported", nil
-			case catConnFile:
-				return "local_postgres=postgres://username:password@example.db.example.com:5432/schema", nil
-			default:
-				return "", nil
-			}
-		}
-
-		err := EnvExportConnections("id", "testfiles/test.env")
-		s.NoError(err)
-		s.Contains(commands, rmConnFile)
-		_ = fileutil.WriteStringToFile("testfiles/test.env", "")
-	})
-
-	s.Run("still removes the temp file when reading the connections back fails", func() {
-		var commands []string
-		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			commands = append(commands, airflowCommand)
-			switch airflowCommand {
-			case airflowConnExport:
-				return "1 connections successfully exported", nil
-			case catConnFile:
-				return "", fmt.Errorf("boom")
-			default:
-				return "", nil
-			}
-		}
-
-		err := EnvExportConnections("id", "testfiles/test.env")
-		s.Error(err)
-		s.Contains(err.Error(), "error reading connections file")
-		s.Contains(commands, rmConnFile, "the temp file should still be removed even though the read failed")
-	})
-}
-
 func (s *Suite) TestExport() {
 	s.Run("success", func() {
 		WorkingPath = "./testfiles/"
-		execAirflowCommand = func(id, airflowCommand string) (string, error) {
-			switch airflowCommand {
-			case airflowConnectionList:
-				return `
+		f := s.install(&fakeAirflow{variables: fakeVariables, others: map[string]string{
+			airflowConnectionList: `
 - conn_id: local_postgres
   conn_type: postgres
   description: null
@@ -571,28 +508,19 @@ func (s *Suite) TestExport() {
   login: username
   password: password
   port: '5432'
-  schema: schema`, nil
-			case airflowVarExport:
-				return "1 variables successfully exported to tmp.var", nil
-			case catVarFile:
-				return `{
-					"myvar": "myval"
-				}`, nil
-			case ariflowPoolsList:
-				return `
+  schema: schema`,
+			ariflowPoolsList: `
 - description: Default pool
   pool: default_pool
   slots: '128'
 - description: ''
   pool: subdag_limit
-  slots: '3'`, nil
-			default:
-				return "", nil
-			}
-		}
+  slots: '3'`,
+		}})
 
 		err := Export("id", "airflow_settings_export.yaml", 2, true, true, true)
 		s.NoError(err)
+		s.Empty(f.left())
 	})
 
 	s.Run("variable failure", func() {
