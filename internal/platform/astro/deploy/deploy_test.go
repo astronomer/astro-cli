@@ -242,6 +242,10 @@ func TestDeployClientImage(t *testing.T) {
 		_, err := DeployClientImage(InputClientDeploy{Path: "/test/path"}, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
+		// Outside a project the advice is the global command; config's own
+		// tests pin its wording.
+		assert.Contains(t, err.Error(), "'"+config.ClientRegistryFix()+"'")
+		assert.Contains(t, err.Error(), "config set -g")
 		assert.Empty(t, cmd.calls, "no login, no build")
 	})
 
