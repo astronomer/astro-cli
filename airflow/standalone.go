@@ -4,9 +4,11 @@ package airflow
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -47,7 +49,6 @@ var (
 	standaloneIndexURL    = airflowrt.StandaloneIndexURL
 	defaultPythonVersion  = airflowrt.DefaultPython
 	stopPollInterval      = airflowrt.StopPollInterval
-	stopTimeout           = airflowrt.StopTimeout
 	filePermissions       = airflowrt.FilePermissions
 	dirPermissions        = airflowrt.DirPermissions
 	standaloneVersionFile = airflowrt.StandaloneVersionFile
@@ -119,6 +120,7 @@ var resolvePythonVersion = func(baseTag, tagPython string) string {
 // Standalone implements ContainerHandler using `airflow standalone` instead of Docker Compose.
 type Standalone struct {
 	airflowHome         string
+	signingSecret       string // once known, the secret every env this Standalone builds signs with
 	envFile             string
 	dockerfile          string
 	foreground          bool   // if true, run in foreground (stream output, block on Wait)
@@ -309,10 +311,14 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 
 	// 3b. In background mode, bail early if already running (before any install work)
 	if !s.foreground {
-		if pid, alive := s.readPID(); alive {
+		if pid, running := s.running(); running {
 			return fmt.Errorf("standalone Airflow is already running (PID %d). Run 'astro dev stop' first", pid)
 		}
 	}
+
+	// Only once this start is going ahead: an instance already running signs
+	// with the secret it started with, and a new one kept now would not be it.
+	s.persistSigningSecret()
 
 	// 3c. Determine port: try default port first, allocate random only if taken
 	var proxyHostname, proxyPort string
@@ -416,6 +422,9 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 
 	// 7. Build environment
 	env := s.buildEnv()
+	if warning := networkExposureWarning(env, s.airflowMajorVersion, s.envFile); warning != "" {
+		fmt.Print(warning)
+	}
 
 	// 9. Start airflow standalone
 	fmt.Println("\nStarting Airflow in standalone mode…")
@@ -729,12 +738,7 @@ func (s *Standalone) buildEnv() []string {
 	// Stable Fernet key so encrypted connection extras survive restart.
 	// Same value the docker compose template ships.
 	overrides["AIRFLOW__CORE__FERNET_KEY"] = "d6Vefz3G9U_ynXB3cr7y_Ak35tAHkEGAVxuz_B-jzWw="
-	// Stable per-project signing secret so login sessions / JWTs survive
-	// restart. Falls back to a constant if the project hash isn't available.
-	signingSecret, err := ProjectNameUnique()
-	if err != nil {
-		signingSecret = "astro-standalone"
-	}
+	signingSecret := s.signingSecretForEnv()
 	port := s.webserverPort()
 	if s.airflowMajorVersion == "3" {
 		overrides["AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS"] = "True"
@@ -862,48 +866,179 @@ func (s *Standalone) standaloneExecAirflowCommand(_, command string) (string, er
 	return string(out), nil
 }
 
+// standaloneSecretFile holds a project's standalone signing secret, in the
+// standalone Airflow home (.astro/standalone), owner-only.
+const standaloneSecretFile = ".signing-secret"
+
+// networkExposureWarning is a warning for a standalone Airflow that will
+// listen on every network interface, or "" for one bound to this machine.
+// Standalone runs with every user as admin, and the api-server (Airflow 3)
+// and webserver (Airflow 2) bind 0.0.0.0 unless told otherwise, so anyone on
+// the same network can use it as admin. 1.x keeps that default, which some
+// rely on (another machine, a VM, a container's published port), and says
+// how to restrict it; Astro CLI v2 binds to this machine by default.
+// envFile is the env file the run reads, as the advice names it. A bind set
+// only in airflow.cfg is not seen, so it still warns.
+func networkExposureWarning(env []string, airflowMajor, envFile string) string {
+	key := "AIRFLOW__API__HOST"
+	if airflowMajor == "2" {
+		key = "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"
+	}
+	host := ""
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok && k == key {
+			host = strings.TrimSpace(v)
+		}
+	}
+	// Any spelling of loopback: 127.0.0.1 or anything in 127/8, ::1, [::1],
+	// the expanded IPv6 form, or localhost.
+	if ip := net.ParseIP(strings.Trim(host, "[]")); host == "localhost" || (ip != nil && ip.IsLoopback()) {
+		return ""
+	}
+	if envFile == "" {
+		envFile = ".env"
+	}
+	return fmt.Sprintf("Warning: standalone Airflow will be reachable from other machines on your network, with admin access.\n"+
+		"  To keep it to this machine, set %s=127.0.0.1 in %s.\n"+
+		"  Astro CLI v2 does this by default.\n", key, envFile)
+}
+
+// signingSecretPath is where a project keeps its standalone signing secret.
+func (s *Standalone) signingSecretPath() string {
+	return filepath.Join(s.airflowHome, standaloneDir, standaloneSecretFile)
+}
+
+// readSigningSecret is the secret kept at path, or "" if none is.
+func readSigningSecret(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
+// signingSecretForEnv is the secret a project's standalone Airflow signs its
+// sessions and API tokens with: the api-server's JWTs, and the tokens its log
+// servers (which listen on every interface) accept. It is the random one
+// persistSigningSecret keeps, so logins survive a restart.
+//
+// With none kept, no Airflow this CLI started is running, but one an earlier
+// CLI started may be, signing with what that CLI used: the project's name,
+// or a constant. A command run against it has to sign the same way, so that
+// is the fallback. Every start keeps a random secret first, so nothing this
+// CLI starts signs with it.
+func (s *Standalone) signingSecretForEnv() string {
+	if s.signingSecret == "" {
+		s.signingSecret = readSigningSecret(s.signingSecretPath())
+	}
+	if s.signingSecret == "" {
+		s.signingSecret = legacySigningSecret()
+	}
+	return s.signingSecret
+}
+
+// legacySigningSecret is the secret standalone Airflow signed with before it
+// kept a random one.
+func legacySigningSecret() string {
+	if name, err := ProjectNameUnique(); err == nil {
+		return name
+	}
+	return "astro-standalone"
+}
+
+// persistSigningSecret keeps a random signing secret in the project's
+// standalone home, owner-only, unless one is already there. Start calls it
+// once it is going ahead, so the Airflow it starts and every later command
+// sign with the same one.
+//
+// The secret is written whole to a file of its own, then linked into place:
+// the link either makes it the secret, all at once, or fails because another
+// start's is there, which this start then reads. So two starts at once keep
+// one secret, and a crash never leaves an empty or half-written one. An empty
+// one from before this was atomic is replaced.
+func (s *Standalone) persistSigningSecret() {
+	path := s.signingSecretPath()
+	if secret := readSigningSecret(path); secret != "" {
+		s.signingSecret = secret
+		return
+	}
+	dir := filepath.Dir(path)
+	secret := rand.Text()
+	s.signingSecret = secret // if it cannot be kept, this start still signs with one
+	if err := os.MkdirAll(dir, dirPermissions); err != nil {
+		logger.Debugf("Warning: could not create standalone dir for the signing secret: %v", err)
+		return
+	}
+	tmp, err := os.CreateTemp(dir, standaloneSecretFile+".*") // owner-only
+	if err != nil {
+		logger.Debugf("Warning: could not keep the standalone signing secret, so logins may not survive a restart: %v", err)
+		return
+	}
+	defer os.Remove(tmp.Name())
+	_, err = tmp.WriteString(secret)
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
+	if err == nil {
+		err = os.Link(tmp.Name(), path)
+		switch {
+		case errors.Is(err, os.ErrExist) && readSigningSecret(path) == "":
+			err = os.Rename(tmp.Name(), path) // replace an empty one
+		case err != nil && !errors.Is(err, os.ErrExist):
+			err = os.Rename(tmp.Name(), path) // a file system without hard links
+		}
+	}
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		logger.Debugf("Warning: could not keep the standalone signing secret, so logins may not survive a restart: %v", err)
+	}
+	// What is in the file now: ours, or another start's that got there first.
+	if kept := readSigningSecret(path); kept != "" {
+		s.signingSecret = kept
+	}
+}
+
 // readPID delegates to airflowrt.ReadPID.
 func (s *Standalone) readPID() (int, bool) {
 	return airflowrt.ReadPID(s.pidFilePath())
 }
 
+// running reports the recorded PID and whether standalone Airflow is still
+// running from it: anything in its process group (Setpgid at start), the
+// master or, if it has died, the scheduler, api-server or triggerer it left.
+// The group, not the PID: a PID file can outlive its process and the PID go
+// to an unrelated one, which is in no group of that ID.
+func (s *Standalone) running() (int, bool) {
+	pid, _ := s.readPID()
+	return pid, pid != 0 && airflowrt.ProcessGroupAlive(pid)
+}
+
 // Stop terminates the standalone Airflow process.
 func (s *Standalone) Stop(_ bool) error {
-	// Deregister proxy route
-	s.removeProxyRoute()
-
-	pid, alive := s.readPID()
+	pid, running := s.running()
 	if pid == 0 {
+		// Deregister proxy route
+		s.removeProxyRoute()
 		fmt.Println("No standalone Airflow process found.")
 		return nil
 	}
 
-	if !alive {
-		// Stale PID file — clean up
-		os.Remove(s.pidFilePath())
+	// airflowrt.StopProcess stops the whole process group and waits for it to
+	// go, including when the master has already died and left its
+	// scheduler/api-server/triggerer running.
+	if running {
+		fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
+	}
+	stopped, err := airflowrt.StopProcess(s.pidFilePath())
+	if err != nil {
+		// Still running, so it keeps its proxy route too.
+		return fmt.Errorf("stopping Airflow standalone: %w", err)
+	}
+	// Deregister proxy route, now nothing is left to reach through it.
+	s.removeProxyRoute()
+	if !stopped {
 		fmt.Println("No standalone Airflow process found (cleaned up stale PID file).")
 		return nil
 	}
-
-	fmt.Printf("Stopping Airflow standalone (PID %d)…\n", pid)
-	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
-
-	// Poll for process exit
-	deadline := time.Now().Add(stopTimeout)
-	for time.Now().Before(deadline) {
-		time.Sleep(stopPollInterval)
-		if _, stillAlive := s.readPID(); !stillAlive {
-			break
-		}
-	}
-
-	// If still alive, send SIGKILL
-	if _, stillAlive := s.readPID(); stillAlive {
-		syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
-		time.Sleep(stopPollInterval)
-	}
-
-	os.Remove(s.pidFilePath())
 	fmt.Println("Airflow standalone stopped.")
 	return nil
 }
@@ -928,7 +1063,11 @@ func (s *Standalone) removeProxyRoute() {
 
 // Kill stops a running process (if any) and cleans up standalone state files.
 func (s *Standalone) Kill() error {
-	s.Stop(false) //nolint:errcheck
+	// A stop that fails leaves Airflow running, and its PID file, in the
+	// standalone dir about to be removed, is what a later stop reaches it by.
+	if err := s.Stop(false); err != nil {
+		return fmt.Errorf("%w; the standalone environment was not cleaned up", err)
+	}
 
 	sp := spinner.NewSpinner("Cleaning up standalone environment…")
 	sp.Start()
@@ -952,12 +1091,13 @@ func (s *Standalone) Kill() error {
 // PS reports the status of the standalone Airflow process.
 // PS returns structured process status data
 func (s *Standalone) PS() (*types.PSStatus, error) {
-	pid, alive := s.readPID()
+	// Running as Stop sees it: the master, or the children it left behind.
+	pid, running := s.running()
 	status := &types.PSStatus{
 		Mode:    "standalone",
-		Running: &alive,
+		Running: &running,
 	}
-	if alive {
+	if running {
 		status.PID = &pid
 	}
 	return status, nil
@@ -1113,8 +1253,9 @@ func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {
 
 // ImportSettings imports connections/variables/pools from the settings file.
 func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variables, pools bool) error {
-	// Verify standalone is actually running before attempting to import.
-	if _, alive := s.readPID(); !alive {
+	// Verify standalone is actually running before attempting to import, as
+	// ps and stop see it: its api-server can outlive a dead master.
+	if _, running := s.running(); !running {
 		return errors.New("standalone Airflow is not running, run astro dev start --standalone to start it")
 	}
 
