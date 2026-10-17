@@ -423,19 +423,25 @@ func TestStartProxyRemembersItsFallbackPort(t *testing.T) {
 }
 
 // Whether a running daemon is reused is the protocol's to decide, and nothing
-// else's: not the version of the tool that started it.
+// else's: not the version of the tool that started it. Within a protocol the
+// revision decides, so a daemon serving an older theme or page is replaced.
 //
 // The record is written raw, the way each generation of daemon leaves it,
 // rather than through writeRecord, which only ever writes this protocol.
-func TestEnsureRunningReusesByProtocol(t *testing.T) {
+func TestEnsureRunningReusesByProtocolThenRevision(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		record    string
 		wantReuse bool
 	}{
-		{"the same protocol is reused", fmt.Sprintf("%%d SNAPSHOT-abc 16123 %d", DaemonProtocol), true},
-		{"a newer protocol is reused", fmt.Sprintf("%%d 2.0.0 16123 %d", DaemonProtocol+1), true},
-		{"an older protocol is replaced", fmt.Sprintf("%%d 9.9.9 16123 %d", DaemonProtocol-1), false},
+		{"the same protocol and revision is reused", fmt.Sprintf("%%d SNAPSHOT-abc 16123 %d %d", DaemonProtocol, DaemonRevision), true},
+		{"a newer revision is reused", fmt.Sprintf("%%d SNAPSHOT-abc 16123 %d %d", DaemonProtocol, DaemonRevision+1), true},
+		{"an older revision is replaced", fmt.Sprintf("%%d SNAPSHOT-abc 16123 %d %d", DaemonProtocol, DaemonRevision-1), false},
+		// What every daemon of this protocol wrote before revisions, serving
+		// whatever theme it was built with.
+		{"a record from before revisions is replaced", fmt.Sprintf("%%d SNAPSHOT-abc 16123 %d", DaemonProtocol), false},
+		{"a newer protocol is reused whatever its revision", fmt.Sprintf("%%d 2.0.0 16123 %d", DaemonProtocol+1), true},
+		{"an older protocol is replaced whatever its revision", fmt.Sprintf("%%d 9.9.9 16123 %d %d", DaemonProtocol-1, DaemonRevision+5), false},
 		// Every daemon from before protocols, whatever its version, including
 		// one newer than the tool asking: the version no longer decides.
 		{"a record from before protocols is replaced", "%d 9.9.9 16123", false},
@@ -473,9 +479,9 @@ func TestEnsureRunningReusesByProtocol(t *testing.T) {
 	}
 }
 
-// A daemon this package starts records the protocol it speaks, so the next
-// tool can decide by it.
-func TestAStartedDaemonRecordsItsProtocol(t *testing.T) {
+// A daemon this package starts records the protocol it speaks and the
+// revision it serves, so the next tool can decide by them.
+func TestAStartedDaemonRecordsItsProtocolAndRevision(t *testing.T) {
 	d := newTestDaemon(t)
 	require.NoError(t, os.MkdirAll(d.Store.Dir(), 0o755))
 	require.NoError(t, d.writeRecord(os.Getpid(), "16123"))
@@ -483,6 +489,7 @@ func TestAStartedDaemonRecordsItsProtocol(t *testing.T) {
 	rec, err := d.readRecord()
 	require.NoError(t, err)
 	assert.Equal(t, DaemonProtocol, rec.Protocol)
+	assert.Equal(t, DaemonRevision, rec.Revision)
 }
 
 // An older record whose PID now belongs to someone else is stale, not a daemon

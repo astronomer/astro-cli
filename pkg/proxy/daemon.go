@@ -26,14 +26,32 @@ const (
 // the record's format, and any daemon behavior a client depends on (the
 // signature header, the files it writes, how it stops). Bump it when a change
 // to any of those would leave an older daemon serving a newer client wrongly.
-// Changes a client cannot observe do not bump it — the pages the daemon
-// renders, its logging, a fix that leaves those contracts as they were.
+// Changes a client cannot observe do not bump it: a change to what the daemon
+// serves (its pages, the Airflow theme, a routing fix) bumps DaemonRevision
+// instead, and its logging bumps neither.
 //
 // It is deliberately not the host's version. Two tools built at different
 // times share one daemon — Astro Desktop's bundled astro and a user's own CLI
 // — and comparing their versions would have each replace the other's daemon
 // on every start. Protocol 0 is any daemon from before this field existed.
 const DaemonProtocol = 1
+
+// DaemonRevision orders daemons that speak the same DaemonProtocol by what
+// they serve, so an astro that serves something newer replaces a running
+// daemon that serves something older: a new Airflow theme or landing page is
+// on screen after an upgrade, not after the old daemon happens to exit.
+//
+// Bump it with any change a user would see from the daemon: the pages it
+// renders, what it injects into Airflow's, how it routes. Never lower it.
+// TestDaemonRevisionCoversWhatItServes fails when the pages or the theme change
+// without a bump, since those are the changes nothing else would flag.
+//
+// It is a number rather than the host's version or build time for the reason
+// DaemonProtocol is: tools built at different times share one daemon, and only
+// an order every one of them agrees on lets the older tool adopt the newer
+// daemon instead of the two replacing each other. Revision 0 is any daemon
+// from before this field existed.
+const DaemonRevision = 1
 
 // ServeSubcommand is the astro CLI's hidden subcommand that runs the daemon's
 // server loop: a host spawns `astro ServeSubcommand --port <port>`. Every host
@@ -152,12 +170,17 @@ func (d *Daemon) portPath() string { return filepath.Join(d.Store.Dir(), daemonP
 func (d *Daemon) fallbackPath() string { return filepath.Join(d.Store.Dir(), daemonFallbackName) }
 
 // writeRecord publishes this daemon's record. See WriteRecord for the format.
+//
+// The protocol and revision are the starter's own, which stand for Exe's
+// because every host builds the two from one commit: the CLI runs itself, and
+// the desktop bundles the astro built from the CLI commit it links.
 func (d *Daemon) writeRecord(pid int, port string) error {
 	return WriteRecord(d.RecordPath(), Record{
 		PID:      pid,
 		Version:  d.Version,
 		Port:     port,
 		Protocol: DaemonProtocol,
+		Revision: DaemonRevision,
 	})
 }
 
@@ -231,8 +254,8 @@ func (d *Daemon) startProxy(port string) (*Proxy, error) {
 // EnsureRunning starts the daemon if it's not already running, and returns the
 // port it is actually listening on.
 //
-// A running daemon is reused when it speaks this DaemonProtocol or a newer
-// one, and replaced when it speaks an older one (see reusable). Before a
+// A running daemon is reused when it is this one or newer, by DaemonProtocol
+// and then DaemonRevision, and replaced when it is older (see reusable). Before a
 // start, an astro 1.x proxy holding the port is stopped (takeOverFromV1), so the
 // daemon serves on port rather than on a fallback whichever tool starts it.
 func (d *Daemon) EnsureRunning(port string) (string, error) {
@@ -262,8 +285,8 @@ func (d *Daemon) EnsureRunning(port string) (string, error) {
 			d.logf("proxy daemon already running (PID %d, version %q)", rec.PID, rec.Version)
 			return rec.Port, nil
 		default:
-			d.logf("proxy daemon (PID %d, version %q) speaks protocol %d, older than %d; restarting",
-				rec.PID, rec.Version, rec.Protocol, DaemonProtocol)
+			d.logf("proxy daemon (PID %d, version %q) is protocol %d revision %d, older than %d/%d; restarting",
+				rec.PID, rec.Version, rec.Protocol, rec.Revision, DaemonProtocol, DaemonRevision)
 			d.Stop() //nolint:errcheck // Stop reports nothing a start could act on
 		}
 	}
@@ -281,14 +304,20 @@ func (d *Daemon) EnsureRunning(port string) (string, error) {
 var beforeStart = (*Daemon).takeOverFromV1
 
 // reusable reports whether a running daemon that wrote rec can serve for this
-// one: it speaks this DaemonProtocol or a newer one.
+// one: it speaks a newer DaemonProtocol, or this one at this DaemonRevision or
+// a newer one.
 //
 // Newer is kept, not replaced, because a newer protocol only ever adds to what
-// an older client relies on. Without that, two tools built at different times
-// (the desktop's bundled astro and an installed CLI) would each replace the
-// other's daemon on every start, dropping whatever it was serving.
+// an older client relies on, and a newer revision serves what this one would
+// or later. Without that, two tools built at different times (the desktop's
+// bundled astro and an installed CLI) would each replace the other's daemon on
+// every start, dropping whatever it was serving. The cost is a downgrade: the
+// newer daemon stays until its last route is gone or it is stopped.
 func reusable(rec Record) bool {
-	return rec.Protocol >= DaemonProtocol
+	if rec.Protocol != DaemonProtocol {
+		return rec.Protocol > DaemonProtocol
+	}
+	return rec.Revision >= DaemonRevision
 }
 
 // Start runs Exe with ServeArgs in the background. It waits for the daemon to

@@ -15,7 +15,7 @@ func recordPath(t *testing.T) string {
 // bound, another process reads it back.
 func TestARecordSurvivesTheRoundTrip(t *testing.T) {
 	path := recordPath(t)
-	want := Record{PID: 4321, Version: "1.2.3", Port: "51234", Protocol: 2}
+	want := Record{PID: 4321, Version: "1.2.3", Port: "51234", Protocol: 2, Revision: 5}
 	if err := WriteRecord(path, want); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -71,6 +71,9 @@ func TestAShorterRecordYieldsWhatItHas(t *testing.T) {
 		// than trusted.
 		{"garbage protocol", "99 1.0.0 6563 x", Record{PID: 99, Version: "1.0.0", Port: "6563"}},
 		{"negative protocol", "99 1.0.0 6563 -2", Record{PID: 99, Version: "1.0.0", Port: "6563"}},
+		// A fifth field is the revision, read the way the protocol is.
+		{"with a revision", "99 1.0.0 6563 3 4", Record{PID: 99, Version: "1.0.0", Port: "6563", Protocol: 3, Revision: 4}},
+		{"garbage revision", "99 1.0.0 6563 3 x", Record{PID: 99, Version: "1.0.0", Port: "6563", Protocol: 3}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := recordPath(t)
@@ -157,6 +160,9 @@ func TestWriteRecordRefusesWhatReadRecordWould(t *testing.T) {
 		// the port.
 		{"protocol without a port", Record{PID: 1, Version: "1.0", Protocol: 1}},
 		{"negative protocol", Record{PID: 1, Version: "1.0", Port: "6564", Protocol: -1}},
+		// With no protocol, the revision would be read back as the protocol.
+		{"revision without a protocol", Record{PID: 1, Version: "1.0", Port: "6564", Revision: 2}},
+		{"negative revision", Record{PID: 1, Version: "1.0", Port: "6564", Protocol: 1, Revision: -1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := recordPath(t)

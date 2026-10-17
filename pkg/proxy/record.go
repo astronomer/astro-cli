@@ -13,9 +13,10 @@ import (
 // and the desktop's in-process proxy write one.
 //
 // The format lives here rather than beside either writer because it is a wire
-// contract between them: "<pid> <version> <port> [<protocol>]", one line,
-// space separated. The protocol is the daemon's (DaemonProtocol); a record
-// that does not carry one is protocol 0.
+// contract between them: "<pid> <version> <port> [<protocol> [<revision>]]",
+// one line, space separated. The protocol and revision are the daemon's
+// (DaemonProtocol, DaemonRevision); a record that does not carry them is 0 for
+// each.
 // Two spellings of it is how one tool comes to read a record the other wrote as
 // a port that is not there.
 
@@ -27,6 +28,9 @@ const missingVersion = "-"
 // protocolField is the protocol's index among the record's fields, after the
 // pid, the version and the port.
 const protocolField = 3
+
+// revisionField is the revision's index, after the protocol.
+const revisionField = 4
 
 // Record is what a running proxy publishes about itself.
 //
@@ -41,6 +45,9 @@ type Record struct {
 	// for a record without one: written by a daemon from before protocols, or
 	// by a proxy that is not a daemon (the desktop's in-process one).
 	Protocol int
+	// Revision is the DaemonRevision of the daemon that wrote the record, or 0
+	// for a record without one.
+	Revision int
 }
 
 // WriteRecord publishes r at path.
@@ -70,8 +77,12 @@ func WriteRecord(path string, r Record) error {
 	if strings.ContainsAny(ver, " \t\n") || strings.ContainsAny(r.Port, " \t\n") {
 		return fmt.Errorf("proxy record fields cannot contain whitespace: version %q, port %q", ver, r.Port)
 	}
-	if r.Protocol < 0 {
-		return fmt.Errorf("proxy record protocol cannot be negative, got %d", r.Protocol)
+	if r.Protocol < 0 || r.Revision < 0 {
+		return fmt.Errorf("proxy record protocol and revision cannot be negative, got %d and %d", r.Protocol, r.Revision)
+	}
+	// The fields are positional, so a revision needs a protocol before it.
+	if r.Revision > 0 && r.Protocol == 0 {
+		return fmt.Errorf("proxy record with a revision needs a protocol")
 	}
 	line := fmt.Sprintf("%d %s %s", r.PID, ver, r.Port)
 	if r.Protocol > 0 {
@@ -82,15 +93,18 @@ func WriteRecord(path string, r Record) error {
 		}
 		line += " " + strconv.Itoa(r.Protocol)
 	}
+	if r.Revision > 0 {
+		line += " " + strconv.Itoa(r.Revision)
+	}
 	return fsatomic.WriteFile(path, []byte(line), FilePermRW)
 }
 
 // ReadRecord parses the record at path.
 //
-// Version, port and protocol may be absent — a record written by an older
+// Version, port, protocol and revision may be absent — a record written by an older
 // proxy has fewer fields — and are returned empty rather than as an error,
 // because a reader that can still learn the PID should not be denied it. A
-// protocol that is not a positive integer reads as 0, the oldest, which is
+// protocol or revision that is not a positive integer reads as 0, the oldest, which is
 // the safe way to be wrong about it: the daemon is replaced rather than
 // trusted.
 func ReadRecord(path string) (Record, error) {
@@ -116,6 +130,11 @@ func ReadRecord(path string) (Record, error) {
 	if len(fields) > protocolField {
 		if n, err := strconv.Atoi(fields[protocolField]); err == nil && n > 0 {
 			out.Protocol = n
+		}
+	}
+	if len(fields) > revisionField {
+		if n, err := strconv.Atoi(fields[revisionField]); err == nil && n > 0 {
+			out.Revision = n
 		}
 	}
 	return out, nil
