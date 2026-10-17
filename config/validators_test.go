@@ -62,9 +62,7 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 // the global one, since outside a project `astro config set` without it
 // changes nothing.
 func (s *Suite) TestClientRegistry() {
-	// initTestConfig replaces both configs; put back the ones it replaced.
-	prevHome, prevProject := viperHome, viperProject
-	s.T().Cleanup(func() { viperHome, viperProject = prevHome, prevProject })
+	s.restoreConfigGlobals()
 	initTestConfig()
 	noProject := func() { viperProject = viper.New() }
 	withProject := func(value string) {
