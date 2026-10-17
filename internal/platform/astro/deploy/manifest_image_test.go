@@ -39,6 +39,13 @@ type fakeImageCmd struct {
 	buildErr error
 	// stdios are the streams each build was wired to.
 	stdios []localrt.Stdio
+	// dirs are the working directories RunIn was asked for.
+	dirs []string
+}
+
+func (f *fakeImageCmd) RunIn(ctx context.Context, dir string, env []string, stdio localrt.Stdio, name string, args ...string) error {
+	f.dirs = append(f.dirs, dir)
+	return f.Run(ctx, env, stdio, name, args...)
 }
 
 func (f *fakeImageCmd) Run(_ context.Context, _ []string, stdio localrt.Stdio, name string, args ...string) error {

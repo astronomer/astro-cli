@@ -1,8 +1,11 @@
 package deploy
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,53 +66,33 @@ func captureStdout(t *testing.T, f func()) string {
 const agentBase = "images.astronomer.cloud/baseimages/astro-remote-execution-agent:3.1-1-python-3.12-astro-agent-1.1.0"
 
 // The request is a declared-Dockerfile build of Dockerfile.client over the
-// copied project, tagged as it is pushed, at the platforms asked for, with
-// the build secrets and the engine binary as given and no connection env, as
-// the 1.x image handler built it. Podman builds it in docker format, as that
+// copied project, run in it, tagged as it is pushed, at the platforms asked
+// for, with the build secrets and the engine binary as given and no
+// connection env, as the 1.x image handler built it, and the build's output
+// raw to the writers given. Podman builds it in docker format, as that
 // handler did.
 func TestClientBuildRequest(t *testing.T) {
 	ctx := t.TempDir()
-	creds := filepath.Join(t.TempDir(), "creds")
-	req := clientBuildRequest(ctx, "registry.example.com/agents/client:deploy-1", []string{"linux/amd64", "linux/arm64"}, []string{"id=aws,src=" + creds}, "podman")
+	var out, errOut bytes.Buffer
+	req := clientBuildRequest(ctx, "registry.example.com/agents/client:deploy-1", []string{"linux/amd64", "linux/arm64"}, []string{"id=aws,src=creds"}, "podman", &out, &errOut)
 	assert.Equal(t, imagebuild.Request{
 		Dockerfile: filepath.Join(ctx, "Dockerfile.client"),
 		Context:    ctx,
+		Dir:        ctx,
 		Tag:        "registry.example.com/agents/client:deploy-1",
 		Platform:   "linux/amd64,linux/arm64",
-		Secrets:    []string{"id=aws,src=" + creds},
+		Secrets:    []string{"id=aws,src=creds"},
 		Format:     "docker",
 		Bin:        "podman",
+		Stdout:     &out,
+		Stderr:     &errOut,
 	}, req)
 	assert.True(t, req.FromDeclaredDockerfile())
 
-	docker := clientBuildRequest(ctx, "t", nil, nil, "docker")
+	docker := clientBuildRequest(ctx, "t", nil, nil, "docker", nil, nil)
 	assert.Empty(t, docker.Format, "docker build takes no --format")
 	assert.Empty(t, docker.Platform, "no platforms builds for the host")
 	assert.Nil(t, docker.Secrets)
-}
-
-// The 1.x handler ran the build from inside the context, so docker resolved a
-// relative src there. It still is, by making it absolute; an absolute src, an
-// env secret and type=env's src (a variable name) are left as written.
-func TestClientBuildSecretsResolveAgainstTheContext(t *testing.T) {
-	ctx := t.TempDir()
-	abs := filepath.Join(ctx, "elsewhere", "creds")
-	got := secretsFrom(ctx, []string{
-		"id=a,src=secret.txt",
-		"id=b,source=sub/secret.txt",
-		"id=c,src=" + abs,
-		"id=d,env=PW",
-		"type=env,id=e,src=PW",
-		"id=f",
-	})
-	assert.Equal(t, []string{
-		"id=a,src=" + filepath.Join(ctx, "secret.txt"),
-		"id=b,source=" + filepath.Join(ctx, "sub", "secret.txt"),
-		"id=c,src=" + abs,
-		"id=d,env=PW",
-		"type=env,id=e,src=PW",
-		"id=f",
-	}, got)
 }
 
 // The command the build runs. The 1.x image handler ran, from inside the
@@ -117,9 +100,11 @@ func TestClientBuildSecretsResolveAgainstTheContext(t *testing.T) {
 //
 //	docker build -t <tag> -f Dockerfile.client . --platform=<platforms> --secret <spec>
 //
-// and this is the same build: the same file, context, tag, platforms and
-// secrets, spelled with absolute paths instead of a chdir.
+// and this is the same build, run in the same directory: the same file,
+// context, tag and platforms, and the secrets exactly as given, so docker
+// reads every form of them, a relative source included, as it did.
 func TestBuildClientImageCommand(t *testing.T) {
+	abs := filepath.Join(t.TempDir(), "creds")
 	for _, tc := range []struct {
 		name, bin, base string
 		platforms       []string
@@ -127,13 +112,14 @@ func TestBuildClientImageCommand(t *testing.T) {
 		want            func(ctx string) string
 	}{
 		{
-			name: "docker, the agent base, several platforms and secrets",
+			name: "docker, the agent base, several platforms and every form of secret",
 			bin:  "docker", base: agentBase,
 			platforms: []string{"linux/amd64", "linux/arm64"},
-			secrets:   []string{"id=aws,src=creds", "id=PW,env=PW"},
+			secrets:   []string{"id=creds.txt", "id=aws,src=creds", `"id=q,src=a,b.txt"`, "id=abs,src=" + abs, "id=PW,env=PW"},
 			want: func(ctx string) string {
 				return "docker build --tag reg/client:deploy-1 --file " + filepath.Join(ctx, "Dockerfile.client") +
-					" --secret id=aws,src=" + filepath.Join(ctx, "creds") + " --secret id=PW,env=PW --platform linux/amd64,linux/arm64 " + ctx
+					` --secret id=creds.txt --secret id=aws,src=creds --secret "id=q,src=a,b.txt" --secret id=abs,src=` + abs +
+					" --secret id=PW,env=PW --platform linux/amd64,linux/arm64 " + ctx
 			},
 		},
 		{
@@ -156,6 +142,7 @@ func TestBuildClientImageCommand(t *testing.T) {
 			cmd := withClientBuild(t, tc.bin)
 			require.NoError(t, buildClientImage(project, ctx, "reg/client:deploy-1", tc.platforms, tc.secrets))
 			assert.Equal(t, []string{tc.want(ctx)}, cmd.calls)
+			assert.Equal(t, []string{ctx}, cmd.dirs, "run in the build context")
 		})
 	}
 }
@@ -209,6 +196,7 @@ func TestBuildClientImageStreamsAtDebug(t *testing.T) {
 	assert.Contains(t, out, "to stdout\n")
 	require.Len(t, cmd.stdios, 1)
 	assert.Equal(t, os.Stderr, cmd.stdios[0].Err, "stderr goes to stderr")
+	assert.NotEqual(t, cmd.stdios[0].Out, cmd.stdios[0].Err, "the two streams stay apart")
 }
 
 // A Dockerfile.client that is missing, or is not a file, is named as the
@@ -242,4 +230,19 @@ func TestBuildClientImageNeedsDockerfileClient(t *testing.T) {
 			assert.Empty(t, cmd.calls)
 		})
 	}
+}
+
+// A Dockerfile.client the build could not stat for another reason is named
+// as the project's too, with the cause; any other error passes through.
+func TestClientDockerfileError(t *testing.T) {
+	df := filepath.Join(t.TempDir(), clientDockerfile)
+	denied := fmt.Errorf("the Dockerfile this project declares (%s) could not be read: %w", df, &fs.PathError{Op: "stat", Path: df, Err: fs.ErrPermission})
+	err := clientDockerfileError(denied, "/the/project", df)
+	assert.Equal(t, "the Dockerfile.client in the project at /the/project, which the client image is built from, could not be read: permission denied", err.Error())
+	require.ErrorIs(t, err, fs.ErrPermission)
+
+	other := errors.New("no container engine")
+	assert.Same(t, other, clientDockerfileError(other, "/the/project", df))
+	elsewhere := &fs.PathError{Op: "chdir", Path: "/somewhere", Err: fs.ErrNotExist}
+	assert.Same(t, error(elsewhere), clientDockerfileError(elsewhere, "/the/project", df), "a path error about another file is not Dockerfile.client's")
 }

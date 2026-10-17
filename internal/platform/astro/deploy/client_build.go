@@ -31,74 +31,30 @@ var errClientBuild = errors.New("an error was encountered while building the ima
 
 // clientBuildRequest is the build of the client image: Dockerfile.client run
 // against contextDir, the copy of the project prepareClientBuildContext made,
-// tagged tag, for platforms (none is the host's), on the engine binary bin.
-// Under podman it is built in docker format, as the 1.x image handler built it.
+// tagged tag, for platforms (none is the host's), on the engine binary bin,
+// with the build's stdout and stderr raw to out and errOut. Under podman it is
+// built in docker format, as the 1.x image handler built it.
 //
-// A build secret's relative src is resolved against contextDir. The 1.x
-// handler ran the build from inside the context, where docker resolved it, so
-// `--build-secrets id=x,src=secret.txt` keeps naming the copy of the
-// project's secret.txt.
-func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin string) imagebuild.Request {
+// The build runs in contextDir, as the 1.x handler's did after its chdir, and
+// the secrets go to it as given, so docker resolves a relative secret source
+// against the copy of the project as it always has, whatever form the spec
+// takes.
+func clientBuildRequest(contextDir, tag string, platforms, secrets []string, bin string, out, errOut io.Writer) imagebuild.Request {
 	req := imagebuild.Request{
 		Dockerfile: filepath.Join(contextDir, clientDockerfile),
 		Context:    contextDir,
+		Dir:        contextDir,
 		Tag:        tag,
 		Platform:   strings.Join(platforms, ","),
-		Secrets:    secretsFrom(contextDir, secrets),
+		Secrets:    secrets,
 		Bin:        bin,
+		Stdout:     out,
+		Stderr:     errOut,
 	}
 	if container.IsPodman(bin) {
 		req.Format = "docker"
 	}
 	return req
-}
-
-// secretsFrom returns specs with each relative file source (src= or
-// source=) made absolute under dir. Every other field, and a spec of
-// type=env, whose src names an environment variable, is left as written.
-func secretsFrom(dir string, specs []string) []string {
-	if specs == nil {
-		return nil
-	}
-	out := make([]string, 0, len(specs))
-	for _, spec := range specs {
-		fields := strings.Split(spec, ",")
-		envType := false
-		for _, f := range fields {
-			k, v, _ := strings.Cut(f, "=")
-			if strings.EqualFold(strings.TrimSpace(k), "type") && strings.EqualFold(strings.TrimSpace(v), "env") {
-				envType = true
-			}
-		}
-		for i, f := range fields {
-			k, v, ok := strings.Cut(f, "=")
-			key := strings.ToLower(strings.TrimSpace(k))
-			if !ok || envType || (key != "src" && key != "source") {
-				continue
-			}
-			if v = strings.TrimSpace(v); v != "" && !filepath.IsAbs(v) {
-				fields[i] = k + "=" + filepath.Join(dir, v)
-			}
-		}
-		out = append(out, strings.Join(fields, ","))
-	}
-	return out
-}
-
-// clientBuildStreams runs the build with the streams the 1.x image handler
-// gave it, out and errOut, in place of pkg/imagebuild's line callbacks: raw
-// output, blank lines kept, stdout and stderr apart when they are apart.
-// Every other command passes through as asked.
-type clientBuildStreams struct {
-	imagebuild.Commander
-	out, errOut io.Writer
-}
-
-func (c clientBuildStreams) Run(ctx context.Context, env []string, s localrt.Stdio, name string, args ...string) error {
-	if len(args) > 0 && args[0] == "build" {
-		s.Out, s.Err = c.out, c.errOut
-	}
-	return c.Commander.Run(ctx, env, s, name, args...)
 }
 
 // buildClientImage builds the client image of the project at projectDir from
@@ -125,49 +81,45 @@ func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []s
 	if err != nil {
 		return err
 	}
-	if err := checkClientDockerfile(projectDir, contextDir); err != nil {
-		return err
-	}
 
 	var buf bytes.Buffer
-	streams := clientBuildStreams{Commander: newImageBuildCommander(), out: &buf, errOut: &buf}
+	var out, errOut io.Writer = &buf, &buf
 	if debug {
 		// os.Stdout as it is now: under --output json the command has
 		// pointed it at stderr.
-		streams.out, streams.errOut = os.Stdout, os.Stderr
+		out, errOut = os.Stdout, os.Stderr
 	}
-	req := clientBuildRequest(contextDir, tag, platforms, secrets, bin)
-	if _, err := imagebuild.New(streams, buildNow).Build(context.Background(), req, localrt.Callbacks{}); err != nil {
-		if !errors.Is(err, imagebuild.ErrDockerfileBuild) {
-			return err
-		}
+	req := clientBuildRequest(contextDir, tag, platforms, secrets, bin, out, errOut)
+	_, err = imagebuild.New(newImageBuildCommander(), buildNow).Build(context.Background(), req, localrt.Callbacks{})
+	switch {
+	case err == nil:
+		spinner.StopWithCheckmark(s, "Project image has been updated")
+		return nil
+	case errors.Is(err, imagebuild.ErrDockerfileBuild):
 		logger.Debugf("client image build: %v", err)
 		s.FinalMSG = ""
 		s.Stop()
 		fmt.Println(strings.TrimSpace(buf.String()) + "\n")
 		return errClientBuild
+	default:
+		return clientDockerfileError(err, projectDir, req.Dockerfile)
 	}
-
-	spinner.StopWithCheckmark(s, "Project image has been updated")
-	return nil
 }
 
-// checkClientDockerfile refuses a build with no Dockerfile.client to run,
-// naming the file in the project rather than its copy in the temporary
-// context.
-func checkClientDockerfile(projectDir, contextDir string) error {
-	info, err := os.Stat(filepath.Join(contextDir, clientDockerfile))
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		return fmt.Errorf("the project at %s has no %s, which the client image is built from", projectDir, clientDockerfile)
-	case err != nil:
-		var pe *fs.PathError
-		if errors.As(err, &pe) {
-			err = pe.Err
-		}
-		return fmt.Errorf("the %s in the project at %s, which the client image is built from, could not be read: %w", clientDockerfile, projectDir, err)
-	case !info.Mode().IsRegular():
-		return fmt.Errorf("the %s in the project at %s, which the client image is built from, is not a file", clientDockerfile, projectDir)
+// clientDockerfileError names a Dockerfile.client the build could not use by
+// its place in the project, rather than by its copy in the temporary context
+// that pkg/imagebuild's error names. Any other error is returned as it is.
+func clientDockerfileError(err error, projectDir, dockerfile string) error {
+	const builtFrom = "which the client image is built from"
+	if errors.Is(err, imagebuild.ErrDockerfileNotAFile) {
+		return fmt.Errorf("the %s in the project at %s, %s, is not a file", clientDockerfile, projectDir, builtFrom)
 	}
-	return nil
+	var pe *fs.PathError
+	if !errors.As(err, &pe) || pe.Path != dockerfile {
+		return err
+	}
+	if errors.Is(pe.Err, fs.ErrNotExist) {
+		return fmt.Errorf("the project at %s has no %s, %s", projectDir, clientDockerfile, builtFrom)
+	}
+	return fmt.Errorf("the %s in the project at %s, %s, could not be read: %w", clientDockerfile, projectDir, builtFrom, pe.Err)
 }

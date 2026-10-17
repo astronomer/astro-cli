@@ -29,6 +29,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,6 +116,13 @@ func AirflowSeries(pin string) (series string, ok bool) {
 	return parts[0] + "." + parts[1], true
 }
 
+// ErrDockerfileNotAFile reports that a declared Dockerfile names something
+// other than a regular file, a directory most often. A caller that knows the
+// file by another name can tell it apart with errors.Is and say so in its own
+// words; a Dockerfile that is missing or unreadable wraps the *fs.PathError
+// of its stat instead.
+var ErrDockerfileNotAFile = errors.New("not a file")
+
 // ErrDockerfileBuild reports that the build of the project's own Dockerfile
 // failed, rather than the install of a generated build.
 var ErrDockerfileBuild = errors.New("building the project's Dockerfile failed; see the build output above")
@@ -143,6 +151,15 @@ type Commander interface {
 	// Run runs the command wired to the given stdio. Nil readers/writers are
 	// allowed and mean "none"/discard.
 	Run(ctx context.Context, env []string, s rt.Stdio, name string, args ...string) error
+}
+
+// DirCommander is a Commander that can also run a command in a given working
+// directory, which a Request with Dir set needs. It is a separate interface so
+// every existing Commander stays one.
+type DirCommander interface {
+	Commander
+	// RunIn is Run with the command's working directory set to dir.
+	RunIn(ctx context.Context, dir string, env []string, s rt.Stdio, name string, args ...string) error
 }
 
 // filePermRW is the mode for the files written into the build context:
@@ -225,6 +242,20 @@ type Request struct {
 	// Bin is the container CLI to shell out to; Env reaches its daemon.
 	Bin string
 	Env []string
+	// Dir is the build command's working directory; empty is the process's.
+	// Docker resolves what the command line leaves relative against it — a
+	// build secret's src above all — so a caller whose secrets are written
+	// relative to the build context sets it there. It is not WorkDir, which
+	// is where a generated build's files are written and says nothing about
+	// where docker runs. Setting it needs a Commander that is a DirCommander,
+	// as NewExecCommander's is.
+	Dir string
+	// Stdout and Stderr, when set, take the build's own stdout and stderr
+	// raw, as the container CLI writes them, in place of the lines Build
+	// otherwise hands to its callbacks. Either may be set alone; a stream
+	// left nil reaches the callbacks as before.
+	Stdout io.Writer
+	Stderr io.Writer
 }
 
 // Builder builds images. cmd and now are seams: production values come from
@@ -246,8 +277,13 @@ func NewExecCommander() Commander { return execCommander{} }
 
 type execCommander struct{}
 
-func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, name string, args ...string) error {
+func (c execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, name string, args ...string) error {
+	return c.RunIn(ctx, "", extraEnv, s, name, args...)
+}
+
+func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s rt.Stdio, name string, args ...string) error {
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), extraEnv...)
 	// A nil reader/writer means "none": os/exec routes a nil Stdout/Stderr to the
 	// null device, so a silent probe needs no extra plumbing.
@@ -291,7 +327,7 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 		case err != nil:
 			return "", fmt.Errorf("the Dockerfile this project declares (%s) could not be read: %w", req.Dockerfile, err)
 		case !info.Mode().IsRegular():
-			return "", fmt.Errorf("the Dockerfile this project declares (%s) is not a file", req.Dockerfile)
+			return "", fmt.Errorf("the Dockerfile this project declares (%s) is %w", req.Dockerfile, ErrDockerfileNotAFile)
 		}
 		// No fast path here. An unchanged Dockerfile is the daemon's layer cache
 		// to short-circuit, not ours to skip: we cannot tell from the outside
@@ -385,7 +421,21 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		args = append(args, "--platform", req.Platform)
 	}
 	args = append(args, contextDir)
-	err := b.cmd.Run(ctx, req.Env, rt.Stdio{Out: w, Err: w}, req.Bin, args...)
+	stdio := rt.Stdio{Out: w, Err: w}
+	if req.Stdout != nil {
+		stdio.Out = req.Stdout
+	}
+	if req.Stderr != nil {
+		stdio.Err = req.Stderr
+	}
+	var err error
+	if req.Dir == "" {
+		err = b.cmd.Run(ctx, req.Env, stdio, req.Bin, args...)
+	} else if dc, ok := b.cmd.(DirCommander); ok {
+		err = dc.RunIn(ctx, req.Dir, req.Env, stdio, req.Bin, args...)
+	} else {
+		return "", fmt.Errorf("the build has to run in %s, and its runner cannot set a working directory", req.Dir)
+	}
 	w.Flush()
 	if err != nil {
 		// The two modes fail for different reasons and a user reading this has
