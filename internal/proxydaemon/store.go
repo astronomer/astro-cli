@@ -19,7 +19,7 @@ const ServeSubcommand = pkgproxy.ServeSubcommand
 
 // errNoHome is what Dir says when there is no home directory to put the routes
 // under, wrapping the cause.
-const errNoHome = "astro local needs a home directory to keep its proxy routes: set HOME or ASTRO_HOME"
+const errNoHome = "finding a home directory for local Airflow's proxy routes: set HOME or ASTRO_HOME"
 
 // Dir is where the daemon keeps routes.json and its record:
 // <ASTRO_HOME or home>/.astro/proxy, the location v1 uses, since v1 and v2 must

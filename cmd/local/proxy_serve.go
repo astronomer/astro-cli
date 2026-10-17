@@ -12,7 +12,7 @@ import (
 // EnsureRunning spawns `<astro> __proxy-serve --port <port>`). Never typed by
 // users. It mirrors the standalone engine's `__supervise` convention, and
 // re-homes the server that v2's dev-tree removal took `dev proxy serve` with.
-func newProxyServeCmd(_ Deps) *cobra.Command {
+func newProxyServeCmd(d Deps) *cobra.Command {
 	var port string
 	cmd := &cobra.Command{
 		Use:           proxydaemon.ServeSubcommand,
@@ -22,11 +22,14 @@ func newProxyServeCmd(_ Deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			dir, err := proxydaemon.Dir()
-			if err != nil {
+			// The daemon re-execs the CLI into this command, so NewDeps
+			// resolved the dir in this process; empty means no home, and
+			// resolving again says why.
+			if d.ProxyDir == "" {
+				_, err := proxydaemon.Dir()
 				return err
 			}
-			return proxydaemon.Serve(dir, port)
+			return proxydaemon.Serve(d.ProxyDir, port)
 		},
 	}
 	cmd.Flags().StringVar(&port, "port", proxy.DefaultPort, "Port to listen on")

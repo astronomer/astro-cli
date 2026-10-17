@@ -270,7 +270,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	// The status ends the event stream the start wrote, so it is a line of
 	// it: NDJSON on a terminal too.
 	return r.EmitEvent(st, func(w io.Writer) error {
-		return renderStatus(w, st)
+		return renderStatus(w, st, c.d.ProxyDir)
 	})
 }
 
@@ -661,7 +661,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	// The status ends the event stream the start wrote, so it is a line of
 	// it: NDJSON on a terminal too.
 	return r.EmitEvent(st, func(w io.Writer) error {
-		return renderStatus(w, st)
+		return renderStatus(w, st, c.d.ProxyDir)
 	})
 }
 
@@ -689,18 +689,18 @@ func (c *cli) runStatus() error {
 		return err
 	}
 	return r.Emit(st, func(w io.Writer) error {
-		return renderStatus(w, st)
+		return renderStatus(w, st, c.d.ProxyDir)
 	})
 }
 
-func renderStatus(w io.Writer, st localrt.Status) error {
+func renderStatus(w io.Writer, st localrt.Status, proxyDir string) error {
 	if _, err := fmt.Fprintf(w, "project: %s\nstate: %s\n", st.ProjectPath, st.State); err != nil {
 		return err
 	}
 	if st.State != localrt.StateRunning {
 		return nil
 	}
-	url := primaryURL(st)
+	url := primaryURL(st, proxyDir)
 	if _, err := fmt.Fprintf(w, "mode: %s\npid: %d\nurl: %s\n", st.Mode, st.PID, url); err != nil {
 		return err
 	}
@@ -724,13 +724,12 @@ func directURL(st localrt.Status) string {
 // proxy daemon serves when it is running, else the direct localhost URL. The
 // hostname needs the daemon, so it is offered only when the daemon is up and
 // the record carries a hostname; otherwise (daemon down, Windows, older
-// record) the direct URL, which always works, stands in.
-func primaryURL(st localrt.Status) string {
-	if st.Hostname != "" {
-		if dir, err := proxydaemon.Dir(); err == nil {
-			if port := proxydaemon.BoundPort(dir); port != "" {
-				return fmt.Sprintf("http://%s:%s", st.Hostname, port)
-			}
+// record, no home for the proxy routes: proxyDir empty) the direct URL, which
+// always works, stands in.
+func primaryURL(st localrt.Status, proxyDir string) string {
+	if st.Hostname != "" && proxyDir != "" {
+		if port := proxydaemon.BoundPort(proxyDir); port != "" {
+			return fmt.Sprintf("http://%s:%s", st.Hostname, port)
 		}
 	}
 	return directURL(st)
@@ -1149,7 +1148,7 @@ func (c *cli) runOpen(printURL bool) error {
 		return fmt.Errorf("%w: local Airflow is %s; run %s first",
 			localrt.ErrNotRunning, st.State, replaceStart)
 	}
-	url := primaryURL(st)
+	url := primaryURL(st, c.d.ProxyDir)
 	if printURL {
 		return r.Emit(urlResult{URL: url}, func(w io.Writer) error {
 			_, werr := fmt.Fprintln(w, url)

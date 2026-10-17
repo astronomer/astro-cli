@@ -210,12 +210,18 @@ func currentPin(dir string) string {
 	return m.Airflow().Pin
 }
 
-// airflowRunning reports whether the project's Airflow is up, or coming up. A
-// status that cannot be read says nothing either way, and reads as not.
+// airflowRunning reports whether the project's Airflow is up, or coming up.
+// Only a project with no recorded Airflow is known not to be. A status that
+// cannot be read says nothing either way: the pin has already moved, so it
+// warns and keeps the restart hint rather than fail the upgrade or drop it.
 func (c *cli) airflowRunning(dir string) bool {
 	st, err := c.d.Runtime.ReadStatus(dir)
-	if err != nil {
+	switch {
+	case errors.Is(err, localrt.ErrNotRunning):
 		return false
+	case err != nil:
+		fmt.Fprintf(c.d.Stderr, "Warning: could not tell whether Airflow is running (%s); restart it to apply\n", err)
+		return true
 	}
 	return st.State == localrt.StateRunning || st.State == localrt.StateStarting
 }

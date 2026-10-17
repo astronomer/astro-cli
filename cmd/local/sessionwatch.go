@@ -3,6 +3,7 @@ package local
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -11,7 +12,7 @@ import (
 // (pkg/localrt). It waits for the starting process to exit, then
 // stops the project's compose stack. Never typed by users — the engine spawns
 // it with a machine-built command line.
-func newSessionWatchCmd(_ Deps) *cobra.Command {
+func newSessionWatchCmd(d Deps) *cobra.Command {
 	var (
 		parentPID int
 		project   string
@@ -24,11 +25,13 @@ func newSessionWatchCmd(_ Deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			rt, err := newRuntime()
-			if err != nil {
+			// WatchAndStop is not on the Runtime seam, so this builds its
+			// own from the dir NewDeps resolved for this process.
+			if d.ProxyDir == "" {
+				_, err := proxydaemon.Dir()
 				return err
 			}
-			return rt.WatchAndStop(cmd.Context(), project, parentPID)
+			return newRuntime(d.ProxyDir).WatchAndStop(cmd.Context(), project, parentPID)
 		},
 	}
 	cmd.Flags().IntVar(&parentPID, "parent-pid", 0, "PID to watch; the project is stopped when it exits")

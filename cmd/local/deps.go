@@ -44,10 +44,10 @@ type Deps struct {
 
 	// Runtime is the pkg/localrt surface the commands call.
 	Runtime Runtime
-	// NoHome, when set, is why there is no Runtime: there is no home
-	// directory to keep the proxy routes in (proxydaemon.Dir). Every command
-	// that needs the runtime returns it before doing anything (requireHome).
-	NoHome error
+	// ProxyDir is where the proxy routes and the daemon's record live
+	// (proxydaemon.Dir), resolved once per run. Empty when there is no home
+	// directory, in which case Runtime is a stand-in reporting why.
+	ProxyDir string
 
 	// Checks runs `astro local check`'s DAG parse against the project venv.
 	Checks checks.Parser
@@ -207,33 +207,16 @@ func NewDeps() Deps {
 		AstroBuild:       runtimecatalog.AstroBuild,
 		RuntimeCatalog:   runtimecatalog.Catalog,
 	}
-	// One resolution of the routes dir for the whole run. Without a home there
-	// is no runtime, and requireHome makes every command needing one say so.
-	if rt, err := newRuntime(); err != nil {
-		d.NoHome = err
+	// One resolution of the routes dir for the whole run. Without a home the
+	// runtime is a stand-in whose every call says so; commands that never
+	// reach the runtime run as usual.
+	if dir, err := proxydaemon.Dir(); err != nil {
+		d.Runtime = homelessRuntime{err: err}
 	} else {
-		d.Runtime = rt
+		d.ProxyDir = dir
+		d.Runtime = newRuntime(dir)
 	}
 	return d
-}
-
-// requireHome makes every runnable leaf under cmds return noHome before doing
-// anything, when there is no home directory for the proxy routes. A group's
-// own RunE (help, an unknown subcommand) is left alone.
-func requireHome(noHome error, cmds ...*cobra.Command) {
-	if noHome == nil {
-		return
-	}
-	for _, cmd := range cmds {
-		if cmd.HasSubCommands() {
-			requireHome(noHome, cmd.Commands()...)
-			continue
-		}
-		if cmd.RunE != nil || cmd.Run != nil {
-			cmd.Run = nil
-			cmd.RunE = func(*cobra.Command, []string) error { return noHome }
-		}
-	}
 }
 
 // stdinIsTerminal is the production answer to "can this run ask a question".
@@ -273,25 +256,15 @@ func markSkipPreRun(cmd *cobra.Command) {
 var errAborted = errors.New("aborted")
 
 // proxyDaemon adapts internal/proxydaemon's daemon lifecycle to the engines'
-// localrt.ProxyDaemon seam, for the routes under proxydaemon.Dir. The engines
-// see only the interface.
-type proxyDaemon struct{}
+// localrt.ProxyDaemon seam, for the routes under dir. The engines see only the
+// interface.
+type proxyDaemon struct{ dir string }
 
-func (proxyDaemon) EnsureRunning() (string, error) {
-	dir, err := proxydaemon.Dir()
-	if err != nil {
-		return "", err
-	}
-	return proxydaemon.EnsureRunning(dir, proxy.DefaultPort)
+func (p proxyDaemon) EnsureRunning() (string, error) {
+	return proxydaemon.EnsureRunning(p.dir, proxy.DefaultPort)
 }
 
-// StopIfEmpty has nothing to stop when there is no routes dir: no daemon could
-// have been started for one.
-func (proxyDaemon) StopIfEmpty() {
-	if dir, err := proxydaemon.Dir(); err == nil {
-		proxydaemon.StopIfEmpty(dir)
-	}
-}
+func (p proxyDaemon) StopIfEmpty() { proxydaemon.StopIfEmpty(p.dir) }
 
 // newProxyDaemon returns the daemon seam, or nil on Windows, where astro local
 // does not start the proxy (docs/architecture.md, "Platform support"): the
@@ -302,31 +275,46 @@ func (proxyDaemon) StopIfEmpty() {
 // Astro Desktop to share. Return proxyDaemon{} here too once it has been run on
 // a real Windows host: started, adopted across two tools, stopped, and the
 // starting terminal closed.
-func newProxyDaemon() localrt.ProxyDaemon {
+func newProxyDaemon(dir string) localrt.ProxyDaemon {
 	if runtime.GOOS == "windows" {
 		return nil
 	}
-	return proxyDaemon{}
+	return proxyDaemon{dir: dir}
 }
 
 // newRuntime builds the shared local runtime with the CLI's composition: the
 // v1-compatible routes dir (proxydaemon.Dir), the proxy daemon that shells out
-// to `astro proxy`, and the real image builder. It fails only when there is no
-// home directory to keep the routes in, with proxydaemon.Dir's error.
-func newRuntime() (*localrt.Runtime, error) {
-	routesDir, err := proxydaemon.Dir()
-	if err != nil {
-		return nil, err
-	}
+// to `astro proxy`, and the real image builder.
+func newRuntime(routesDir string) *localrt.Runtime {
 	return localrt.New(localrt.Config{
 		RoutesDir:     routesDir,
-		ProxyDaemon:   newProxyDaemon(),
+		ProxyDaemon:   newProxyDaemon(routesDir),
 		Images:        newImageBuilder(),
 		HealthTimeout: healthTimeout(),
 		// container.binary pins the engine docker mode drives: project
 		// config over global, read for the project being acted on.
 		ContainerBinary: containercfg.Binary,
-	}), nil
+	})
+}
+
+// homelessRuntime stands in for the runtime when there is no home directory
+// for the proxy routes: every call returns why, so a command that needs the
+// runtime fails with it and one that never asks runs as usual.
+type homelessRuntime struct{ err error }
+
+func (r homelessRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks) (localrt.Airflow, error) {
+	return nil, r.err
+}
+func (r homelessRuntime) Attach(string) (localrt.Airflow, error)        { return nil, r.err }
+func (r homelessRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) { return nil, r.err }
+func (r homelessRuntime) LogSource(string) (localrt.Airflow, error)     { return nil, r.err }
+func (r homelessRuntime) ReadStatus(string) (localrt.Status, error) {
+	return localrt.Status{}, r.err
+}
+func (r homelessRuntime) List() ([]localrt.Status, error)       { return nil, r.err }
+func (r homelessRuntime) PruneStale() ([]localrt.Status, error) { return nil, r.err }
+func (r homelessRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
+	return localrt.ResetReport{}, r.err
 }
 
 // healthTimeoutEnv names how long a start waits for Airflow before giving up.

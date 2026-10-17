@@ -48,6 +48,8 @@ func (s statusRuntime) ReadStatus(string) (localrt.Status, error) {
 func upgradeDeps(t *testing.T, toml string) (d Deps, launched *string, path string) {
 	t.Helper()
 	d, _ = testDeps(t)
+	// What the real runtime answers for a project with no Airflow recorded.
+	d.Runtime = statusRuntime{state: localrt.StateStopped}
 	dir := t.TempDir()
 	path = filepath.Join(dir, "pyproject.toml")
 	require.NoError(t, os.WriteFile(path, []byte(toml), 0o600))
