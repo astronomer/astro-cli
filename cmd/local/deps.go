@@ -188,7 +188,7 @@ func NewDeps() Deps {
 		Stdin:            os.Stdin,
 		Stdout:           os.Stdout,
 		Stderr:           os.Stderr,
-		Runtime:          coreRuntime(),
+		Runtime:          newRuntime(),
 		Checks:           runner,
 		CheckVenv:        runner,
 		Provisioner:      newUVProvisioner,
@@ -281,50 +281,26 @@ func newProxyDaemon() localrt.ProxyDaemon {
 
 // newRuntime builds the shared local runtime with the CLI's composition: the
 // v1-compatible routes dir (proxydaemon.Dir), the proxy daemon that shells out
-// to `astro proxy`, and the real image builder. It fails only when there is no
-// home directory to keep the routes in.
-func newRuntime() (*localrt.Runtime, error) {
-	routesDir, err := proxydaemon.Dir()
-	if err != nil {
-		return nil, err
-	}
-	return localrt.New(localrt.Config{
-		RoutesDir:     routesDir,
+// to `astro proxy`, and the real image builder. With no home directory to keep
+// the routes in, it runs without routes or the proxy: Airflow is still
+// started, stopped, listed and read on its localhost port, and a start says
+// why it registered no route.
+func newRuntime() *localrt.Runtime {
+	cfg := localrt.Config{
 		ProxyDaemon:   newProxyDaemon(),
 		Images:        newImageBuilder(),
 		HealthTimeout: healthTimeout(),
 		// container.binary pins the engine docker mode drives: project
 		// config over global, read for the project being acted on.
 		ContainerBinary: containercfg.Binary,
-	}), nil
-}
-
-// noRoutesRuntime stands in for the runtime when newRuntime fails: every
-// command that needs one reports why, and the rest of the CLI still runs.
-type noRoutesRuntime struct{ err error }
-
-func (r noRoutesRuntime) Start(context.Context, localrt.Plan, localrt.Callbacks) (localrt.Airflow, error) {
-	return nil, r.err
-}
-func (r noRoutesRuntime) Attach(string) (localrt.Airflow, error)        { return nil, r.err }
-func (r noRoutesRuntime) Stopped(localrt.Plan) (localrt.Airflow, error) { return nil, r.err }
-func (r noRoutesRuntime) LogSource(string) (localrt.Airflow, error)     { return nil, r.err }
-func (r noRoutesRuntime) ReadStatus(string) (localrt.Status, error) {
-	return localrt.Status{}, r.err
-}
-func (r noRoutesRuntime) List() ([]localrt.Status, error)       { return nil, r.err }
-func (r noRoutesRuntime) PruneStale() ([]localrt.Status, error) { return nil, r.err }
-func (r noRoutesRuntime) Reset(context.Context, string) (localrt.ResetReport, error) {
-	return localrt.ResetReport{}, r.err
-}
-
-// coreRuntime is newRuntime for NewDeps, which cannot fail.
-func coreRuntime() Runtime {
-	rt, err := newRuntime()
-	if err != nil {
-		return noRoutesRuntime{err: err}
 	}
-	return rt
+	if dir, err := proxydaemon.Dir(); err != nil {
+		cfg.NoRoutes = err
+		cfg.ProxyDaemon = nil
+	} else {
+		cfg.RoutesDir = dir
+	}
+	return localrt.New(cfg)
 }
 
 // healthTimeoutEnv names how long a start waits for Airflow before giving up.

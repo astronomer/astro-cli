@@ -56,6 +56,9 @@ var ErrNotDockerMode = errors.New("this project's local Airflow is not running i
 // fake.
 type Engine struct {
 	routes *proxy.Store
+	// routesErr, set by DisableRoutes, says why there is no routes store:
+	// routes is nil, and a start registers no proxy route.
+	routesErr error
 	// daemon is the reverse-proxy lifecycle: started after a route lands so
 	// <name>.localhost resolves, reaped when the last route goes. Nil on
 	// Windows and in tests, where localshared.EnsureDaemon/ReapDaemon no-op.
@@ -110,6 +113,16 @@ func (e *Engine) SetHealthTimeout(d time.Duration) {
 	if d > 0 {
 		e.healthTimeout = d
 	}
+}
+
+// DisableRoutes runs the engine without a routes store, for a consumer with no
+// routes dir (localrt.Config.NoRoutes): a start registers no proxy route and
+// reports err instead, a stop has no route to remove, and a port is picked
+// from what is listening rather than from routes.json.
+func (e *Engine) DisableRoutes(err error) {
+	e.routes = nil
+	e.routesErr = err
+	e.allocPort = localshared.AllocateListeningPort
 }
 
 // New builds the production engine. routesDir is where pkg/proxy keeps
@@ -1122,7 +1135,11 @@ func (e *Engine) addRoute(rec localstate.Record, pgPort int, cb rt.Callbacks) st
 		Services:      map[string]string{"postgres": strconv.Itoa(pgPort)},
 		Mode:          proxy.RouteModeDocker,
 	}
-	if err := e.routes.AddRoute(&route); err != nil {
+	err := e.routesErr
+	if e.routes != nil {
+		err = e.routes.AddRoute(&route)
+	}
+	if err != nil {
 		if cb.OnLine != nil {
 			cb.OnLine(rt.LogLine{
 				Component: "system",
