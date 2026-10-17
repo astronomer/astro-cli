@@ -33,13 +33,19 @@ var errInvalidAPCLinkSelection = errors.New("invalid Deployment selected")
 // workspace; and a picker over a workspace's Deployments, listed through the
 // Houston client the APC commands use. A context whose domain cannot be read
 // wires nothing, and add then links as it would under Astro.
+//
+// It runs as the root is built, for every command, so it reads only the
+// current domain, which is the config's context key, never the login:
+// GetCurrentContext resolves the login, which can reach the OS keyring or the
+// secrets vault. The workspace and the Deployments are read inside the
+// closures, when astro link add asks (TestAPCLinkingReadsNoLogin).
 func withAPCLinking(d *local.Deps, client houston.ClientInterface) {
-	ctx, err := config.GetCurrentContext()
-	if err != nil || ctx.Domain == "" {
+	domain, err := config.GetCurrentDomain()
+	if err != nil || domain == "" {
 		return
 	}
 	d.APC = &local.APCLinking{
-		Domain: manifest.NormalizeAPCDomain(ctx.Domain),
+		Domain: manifest.NormalizeAPCDomain(domain),
 		CurrentWorkspace: func() string {
 			ws, _ := workspace.GetCurrentWorkspace() //nolint:errcheck // no current workspace reads as none
 			return ws

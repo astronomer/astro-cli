@@ -77,9 +77,9 @@ type Options struct {
 	// context decides, because the ids cannot: Houston's and Astro's are both
 	// cuids. Empty, the default, writes an astro link.
 	//
-	// While DeploysToAPC refuses a 1.x project, a caller that sets both never
-	// reaches the conversion; the refusal goes once APC deploys pyproject.toml
-	// projects, and this field is what that conversion reads.
+	// DeploysToAPC refuses a directory in a 1.x project before this is read,
+	// so a caller that sets both converts nothing. astro init does not set it
+	// yet; it will once APC deploys pyproject.toml projects.
 	APCDomain string
 }
 

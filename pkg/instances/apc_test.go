@@ -38,6 +38,27 @@ func TestAnAPCLinkIsListedAndResolved(t *testing.T) {
 	}
 }
 
+// -d with the id an apc link carries resolves to that link, so it is refused
+// as the link named is, never read as an Astro Deployment id.
+func TestAnAPCDeploymentIDResolvesToItsLink(t *testing.T) {
+	set := Build(instancestest.Manifest(t, apcLinkBody))
+	sel, err := set.Select(Request{Flag: "ckdep00000000000000000001"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sel.Instance.Name != "prod-apc" || sel.Instance.Kind != KindAPC {
+		t.Fatalf("selected %q (%s), want the prod-apc link", sel.Instance.Name, sel.Instance.Kind)
+	}
+	_, err = sel.Instance.Transport(context.Background(), Deps{})
+	if !errors.Is(err, ErrAPCUnsupported) {
+		t.Errorf("Transport: err = %v, want ErrAPCUnsupported", err)
+	}
+	// An id no link carries is still an Astro Deployment.
+	if it := set.DeploymentByID("clm2xk9dq000108l7a2b3c4d5"); it.Kind != KindAstro {
+		t.Errorf("an unlinked id = %s, want astro", it.Kind)
+	}
+}
+
 // Reaching an apc link's Airflow is not supported yet, so both doors refuse it
 // by name before any lookup: the Locator would otherwise be asked to find an
 // Astro Deployment by a Houston id.

@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"bytes"
+	"go/ast"
+	"go/parser"
+	gotoken "go/token"
 	"strings"
 	"testing"
 
@@ -43,6 +46,35 @@ func TestAPCLinkingIsWiredUnderAPC(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	wireLinkPickers(&cloud, cloudPlatform, astrov1_mocks.NewClientWithResponsesInterface(t), nil, &bytes.Buffer{})
 	assert.Nil(t, cloud.APC)
+}
+
+// withAPCLinking runs as the root is built, for every command under an APC
+// context, so outside the closures it hands astro link add it reads the
+// current domain and nothing that resolves a login: GetCurrentContext and
+// GetContext can reach the OS keyring or the secrets vault. The closures read
+// the workspace when link add asks.
+func TestAPCLinkingReadsNoLogin(t *testing.T) {
+	file, err := parser.ParseFile(gotoken.NewFileSet(), "link_pickers_apc.go", nil, 0)
+	require.NoError(t, err)
+	var body *ast.BlockStmt
+	for _, decl := range file.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && fn.Name.Name == "withAPCLinking" {
+			body = fn.Body
+		}
+	}
+	require.NotNil(t, body, "withAPCLinking not found")
+	ast.Inspect(body, func(n ast.Node) bool {
+		if _, lazy := n.(*ast.FuncLit); lazy {
+			return false
+		}
+		if sel, ok := n.(*ast.SelectorExpr); ok {
+			switch sel.Sel.Name {
+			case "GetCurrentContext", "GetContext", "ListContexts", "IsCloudContext", "GetCurrentWorkspace":
+				t.Errorf("withAPCLinking calls %s as the root is built, which reads a login", sel.Sel.Name)
+			}
+		}
+		return true
+	})
 }
 
 // The picker lists the workspace's Deployments, leaving out the linked ones,

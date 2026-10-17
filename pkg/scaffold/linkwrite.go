@@ -172,7 +172,8 @@ var linkEnvNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 //     target to name, so it is written only in a project whose target is not.
 //   - an apc link always writes its domain and workspace, since it inherits
 //     neither: [tool.astro] domain and workspace describe Astro. An empty
-//     Workspace keeps the one the link sets, and with none it is refused.
+//     Workspace keeps the one the link sets when it replaces an apc link on
+//     the same domain, and with none it is refused.
 //   - an auth table is written only when it says more than the kind's default
 //     method, and carries only the fields its method takes.
 //   - default = true is carried over when the link had it. The flag belongs to
@@ -260,9 +261,11 @@ func (l *Link) coordinates(before *manifest.Manifest, ed tomledit.Editor, pinned
 	table := map[string]any{}
 	// Not given, a link keeps the workspace it sets itself: the table is
 	// replaced whole, and dropping a pin there would move an astro link to
-	// [tool.astro] workspace and leave an apc link with none.
+	// [tool.astro] workspace and leave an apc link with none. An apc link
+	// keeps it only on the same domain: another installation's workspace id
+	// names nothing there.
 	workspace := l.Workspace
-	if workspace == "" && !l.ClearWorkspace {
+	if workspace == "" && !l.ClearWorkspace && l.sameAPCDomain(before) {
 		own, _ := ed.Get(append(linkKey(l.Name), manifestKeyWorkspace))
 		workspace, _ = own.(string)
 	}
@@ -289,6 +292,17 @@ func (l *Link) coordinates(before *manifest.Manifest, ed tomledit.Editor, pinned
 		table["url"] = l.URL
 	}
 	return table, nil
+}
+
+// sameAPCDomain reports whether the link l replaces may lend it its workspace:
+// always for a kind other than apc, and for an apc link only when the link it
+// replaces is an apc link on the same domain.
+func (l *Link) sameAPCDomain(before *manifest.Manifest) bool {
+	if l.Kind != manifest.KindAPC {
+		return true
+	}
+	existing, ok := before.Astro.Deployments[l.Name]
+	return ok && existing.Kind() == manifest.KindAPC && existing.Domain == l.Domain
 }
 
 // keepTheOnlyLinkDefault marks a project's only link default = true when a
@@ -700,6 +714,9 @@ func (l *Link) validate() error {
 		}
 	default:
 		return invalidLink("unknown link kind %q", l.Kind)
+	}
+	if l.Auth.Method == manifest.AuthAPC && l.Kind != manifest.KindAPC {
+		return invalidLink("the apc auth method reads the Astro Private Cloud login for an apc link's domain, and this is %s link: pick another method", manifest.KindWithArticle(l.Kind))
 	}
 	return validateAuth(&l.Auth)
 }

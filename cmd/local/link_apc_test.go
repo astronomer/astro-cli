@@ -101,19 +101,51 @@ func TestLinkAddUnderAPCByFlag(t *testing.T) {
 	require.NoError(t, execute(t, d, "link", "add", "other-apc", "--deployment", "ckdep-8", "--workspace", "ckws-given"))
 	assert.Equal(t, "ckws-given", loadManifest(t, path).Astro.Deployments["other-apc"].Workspace)
 
-	// Replaced without --workspace, the link keeps the workspace it has.
-	d, _ = apcDeps(t, dir, "", PickedDeployment{})
-	require.NoError(t, execute(t, d, "link", "add", "other-apc", "--deployment", "ckdep-7", "--replace"))
-	got := loadManifest(t, path).Astro.Deployments["other-apc"]
-	assert.Equal(t, "ckws-given", got.Workspace)
-	assert.Equal(t, "ckdep-7", got.Deployment)
-
+	// Replaced with another --deployment and no --workspace, the link does
+	// not keep its workspace, which the new Deployment need not be in: it
+	// takes the context's, and with none it says what to pass.
 	before := readManifest(t, dir)
 	d, _ = apcDeps(t, dir, "", PickedDeployment{})
-	err := execute(t, d, "link", "add", "third", "--deployment", "ckdep-6")
+	err := execute(t, d, "link", "add", "other-apc", "--deployment", "ckdep-7", "--replace")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--workspace")
 	assert.Equal(t, before, readManifest(t, dir))
+	d, _ = apcDeps(t, dir, "ckws-current", PickedDeployment{})
+	require.NoError(t, execute(t, d, "link", "add", "other-apc", "--deployment", "ckdep-7", "--replace"))
+	got := loadManifest(t, path).Astro.Deployments["other-apc"]
+	assert.Equal(t, "ckws-current", got.Workspace)
+	assert.Equal(t, "ckdep-7", got.Deployment)
+
+	before = readManifest(t, dir)
+	d, _ = apcDeps(t, dir, "", PickedDeployment{})
+	err = execute(t, d, "link", "add", "third", "--deployment", "ckdep-6")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--workspace")
+	assert.Equal(t, before, readManifest(t, dir))
+}
+
+// Replacing an apc link on another installation never carries its workspace
+// over: that id names nothing on this domain.
+func TestLinkAddUnderAPCReplacesAcrossDomains(t *testing.T) {
+	body := linkManifest + "\n[tool.astro.deployments.prod-apc]\ntarget = 'apc'\ndomain = 'other.corp.example'\n" +
+		"workspace = 'ckws-other'\ndeployment = 'ckdep-other'\n"
+	dir, path := linkTestProject(t, body)
+	d, _ := apcDeps(t, dir, "ckws-current", PickedDeployment{})
+	require.NoError(t, execute(t, d, "link", "add", "prod-apc", "--deployment", "ckdep-new", "--replace"))
+	got := loadManifest(t, path).Astro.Deployments["prod-apc"]
+	assert.Equal(t, "astro.corp.example", got.Domain)
+	assert.Equal(t, "ckws-current", got.Workspace)
+	assert.Equal(t, "ckdep-new", got.Deployment)
+}
+
+// Under APC a link that names no target is an apc link even in a project
+// whose [tool.astro] target is something else.
+func TestLinkAddUnderAPCIgnoresTheProjectTarget(t *testing.T) {
+	const body = "[project]\nname = 'x'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\ntarget = 'mwaa'\n"
+	dir, path := linkTestProject(t, body)
+	d, _ := apcDeps(t, dir, "ckws-current", PickedDeployment{})
+	require.NoError(t, execute(t, d, "link", "add", "prod-apc", "--deployment", "ckdep-1"))
+	assert.Equal(t, manifest.KindAPC, loadManifest(t, path).Astro.Deployments["prod-apc"].Kind())
 }
 
 // Under APC the other kinds are still linked with their flags, and an astro

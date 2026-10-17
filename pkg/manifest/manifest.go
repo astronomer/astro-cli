@@ -468,8 +468,9 @@ const (
 	// CodeDomainRequired is an apc link with no domain: nothing else says
 	// which installation its ids belong to.
 	CodeDomainRequired ProblemCode = "domain_required"
-	// CodeDomainOnNonAPCLink is domain on another kind of link. An astro
-	// link's host is [tool.astro] domain, and the other kinds have none.
+	// CodeDomainOnNonAPCLink is domain on another kind of link, a warning
+	// (Manifest.Warnings) rather than a problem: an astro link's host is
+	// [tool.astro] domain, the other kinds have none, and nothing reads it.
 	CodeDomainOnNonAPCLink ProblemCode = "domain_on_non_apc_link"
 	// CodeEnvironmentOnAPCLink is environment on an apc link, which names a
 	// Deployment instead.
@@ -1044,7 +1045,6 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 		Deployment:  p.str(key+".deployment", table["deployment"]),
 		Environment: p.str(key+".environment", table["environment"]),
 		URL:         p.str(key+".url", table["url"]),
-		Domain:      NormalizeAPCDomain(p.str(key+".domain", table["domain"])),
 		Default:     p.boolean(key+".default", table["default"]),
 	}
 	if !slices.Contains(linkTargets, LinkKind(link.Target)) {
@@ -1053,32 +1053,56 @@ func (p *parser) link(key string, table map[string]any, a *Astro) Link {
 	}
 	kind := link.Kind()
 	p.coordinates(key, kind, &link)
-	p.domain(key, kind, table["domain"] != nil, link.Domain)
+	link.Domain = p.domain(key, kind, table["domain"])
 	link.Workspace = p.workspace(key, kind, table["workspace"], a.Workspace)
 	link.Auth = p.auth(key+".auth", table["auth"], kind)
 	if link.Auth.Method == AuthAPC && kind != KindAPC {
-		p.add(CodeAuthAPCOnNonAPCLink, key+".auth.method", fmt.Sprintf("the apc method reads the Astro Private Cloud login for an apc link's domain; this is %s link", kindWithArticle(kind)))
+		p.add(CodeAuthAPCOnNonAPCLink, key+".auth.method", fmt.Sprintf("the apc method reads the Astro Private Cloud login for an apc link's domain; this is %s link", KindWithArticle(kind)))
 	}
 	return link
 }
 
-// domain checks a link's domain, which an apc link must carry and no other
-// kind may. written says whether the key was there at all, so a value that
-// normalizes to nothing ("https://") is reported as missing on an apc link
-// and still refused on any other.
-func (p *parser) domain(key string, kind LinkKind, written bool, domain string) {
-	switch {
-	case kind == KindAPC && domain == "":
-		p.add(CodeDomainRequired, key+".domain", "required on an apc link: the Astro Private Cloud base domain, as astro login takes it (astro.example.com)")
-	case kind != KindAPC && written:
-		p.add(CodeDomainOnNonAPCLink, key+".domain", fmt.Sprintf("only an apc link sets domain; this is %s link. An astro link's host is [tool.astro] domain", kindWithArticle(kind)))
+// domain decodes a link's domain, which an apc link must carry, normalized.
+// A value that normalizes to nothing ("https://") is a missing domain.
+//
+// On any other kind it is a warning, not a problem: nothing reads it there
+// (an astro link's host is [tool.astro] domain), and a manifest that carries
+// one must keep loading. It is dropped from the link.
+func (p *parser) domain(key string, kind LinkKind, raw any) string {
+	if kind != KindAPC {
+		if raw != nil {
+			p.warn(CodeDomainOnNonAPCLink, key+".domain", fmt.Sprintf("ignored: only an apc link sets domain, and this is %s link. "+
+				"An astro link's host is [tool.astro] domain", KindWithArticle(kind)))
+		}
+		return ""
 	}
+	const required = "required on an apc link: the Astro Private Cloud base domain, as astro login takes it (astro.example.com)"
+	if raw == nil {
+		p.add(CodeDomainRequired, key+".domain", required)
+		return ""
+	}
+	written := p.str(key+".domain", raw)
+	if written == "" {
+		return "" // not a string, or empty: p.str said so
+	}
+	d := NormalizeAPCDomain(written)
+	if d == "" {
+		p.add(CodeDomainRequired, key+".domain", required)
+	}
+	return d
 }
 
-// kindWithArticle is a kind as a sentence reads it: "an astro", "a composer".
-func kindWithArticle(kind LinkKind) string {
-	if kind == KindComposer {
-		return "a " + string(kind)
+// KindWithArticle is a kind as a sentence reads it, article included: "an
+// astro", "a composer", "an apc", and "a url" for an endpoint, which a url is
+// what makes. Both the parser's messages and the CLI's link commands word a
+// kind through it.
+func KindWithArticle(kind LinkKind) string {
+	switch kind {
+	case KindComposer:
+		return "a composer"
+	case KindEndpoint:
+		return "a url"
+	case KindAstro, KindMWAA, KindAPC:
 	}
 	return "an " + string(kind)
 }
@@ -1178,7 +1202,7 @@ func (p *parser) workspace(key string, kind LinkKind, raw any, fallback string) 
 		return own
 	case KindMWAA, KindComposer, KindEndpoint:
 		if own != "" {
-			p.add(CodeWorkspaceOnNonAstroLink, key+".workspace", fmt.Sprintf("only an astro or apc link has a workspace; this is %s link", kindWithArticle(kind)))
+			p.add(CodeWorkspaceOnNonAstroLink, key+".workspace", fmt.Sprintf("only an astro or apc link has a workspace; this is %s link", KindWithArticle(kind)))
 		}
 		return ""
 	}

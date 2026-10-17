@@ -359,7 +359,8 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 	if err != nil {
 		return err
 	}
-	picking := !cmd.Flags().Changed(flagLinkDeployment) && c.mayPrompt()
+	deploymentGiven := cmd.Flags().Changed(flagLinkDeployment)
+	picking := !deploymentGiven && c.mayPrompt()
 	switch {
 	case link.Kind == manifest.KindAstro && picking && c.d.PickDeployment != nil:
 		if name, err = c.pickAstroDeployment(&link, m, name); err != nil {
@@ -370,12 +371,12 @@ func (c *cli) runLinkAdd(cmd *cobra.Command, in *linkAddInput, name string, comm
 			return err
 		}
 	case link.Kind == manifest.KindAPC:
-		if err := c.apcWorkspace(&link, m, name); err != nil {
+		if err := c.apcWorkspace(&link, m, name, deploymentGiven); err != nil {
 			return err
 		}
 	}
 	if name == "" {
-		return errors.New("add needs a NAME for the link. In a terminal, with no --deployment, it asks for an Astro Deployment and names the link after it")
+		return errors.New("add needs a NAME for the link. In a terminal, with no --deployment, it asks for a Deployment and names the link after it")
 	}
 	link.Name = name
 	if err := refuseExisting(m, name, in.replace); err != nil {
@@ -511,14 +512,16 @@ func (c *cli) pickAPCDeployment(link *scaffold.Link, m *manifest.Manifest, name 
 	return pickedLinkName(name, dep)
 }
 
-// apcWorkspace fills in the workspace of an apc link named by --deployment:
-// --workspace, else the one the link being replaced sets (the writer keeps
-// it), else the APC context's.
-func (c *cli) apcWorkspace(link *scaffold.Link, m *manifest.Manifest, name string) error {
+// apcWorkspace fills in the workspace of an apc link that was not picked:
+// --workspace, else the APC context's. The workspace of the link being
+// replaced is kept (left to the writer) only when it is an apc link on the
+// same domain and no --deployment names another Deployment, which may live in
+// another workspace.
+func (c *cli) apcWorkspace(link *scaffold.Link, m *manifest.Manifest, name string, deploymentGiven bool) error {
 	if link.Workspace != "" {
 		return nil
 	}
-	if l, ok := m.Astro.Deployments[name]; ok && l.Kind() == manifest.KindAPC {
+	if l, ok := m.Astro.Deployments[name]; ok && !deploymentGiven && l.Kind() == manifest.KindAPC && l.Domain == link.Domain {
 		return nil
 	}
 	if link.Workspace = c.apcContextWorkspace(); link.Workspace == "" {
@@ -576,7 +579,7 @@ func (in *linkAddInput) link(cmd *cobra.Command, m *manifest.Manifest, name stri
 	}[kind]
 	for _, f := range []string{flagLinkDeployment, flagLinkWorkspace, flagLinkEnvironment, flagLinkRegion, flagLinkProject, flagLinkLocation, flagLinkURL} {
 		if given(f) && !slices.Contains(allowed, f) {
-			return scaffold.Link{}, fmt.Errorf("--%s does not apply to %s link", f, article(kind))
+			return scaffold.Link{}, fmt.Errorf("--%s does not apply to %s link", f, manifest.KindWithArticle(kind))
 		}
 	}
 	if len(command) > 0 && in.auth != string(manifest.AuthExec) {
@@ -645,8 +648,8 @@ var credentialFlags = map[manifest.AuthMethod][]string{
 
 // kind is what add's flags point at: a url makes an endpoint; otherwise
 // --target, or the target the link would inherit. Under an Astro Private
-// Cloud context (onAPC) a link that names no target is an apc link, and so is
-// one given --deployment: that context's Deployments are the ones it lists.
+// Cloud context (onAPC) a link that names no target is an apc link, whatever
+// [tool.astro] target says: that context's Deployments are the ones it lists.
 func (in *linkAddInput) kind(given func(string) bool, m *manifest.Manifest, onAPC bool) (manifest.LinkKind, error) {
 	platform := manifest.KindAstro
 	if onAPC {
@@ -661,7 +664,7 @@ func (in *linkAddInput) kind(given func(string) bool, m *manifest.Manifest, onAP
 	target := in.target
 	if !given(flagLinkTarget) {
 		target = m.Astro.Target
-		if target == "" {
+		if target == "" || onAPC {
 			target = string(platform)
 		}
 		// An environment names an MWAA or Composer environment, so in a
@@ -686,22 +689,6 @@ func (in *linkAddInput) kind(given func(string) bool, m *manifest.Manifest, onAP
 	case manifest.KindEndpoint:
 	}
 	return "", fmt.Errorf("--%s must be astro, mwaa, composer or apc, not %q", flagLinkTarget, target)
-}
-
-// article is the kind with its article, as a message reads it.
-func article(kind manifest.LinkKind) string {
-	switch kind {
-	case manifest.KindAstro:
-		return "an astro"
-	case manifest.KindAPC:
-		return "an apc"
-	case manifest.KindMWAA:
-		return "an mwaa"
-	case manifest.KindEndpoint:
-		return "a url"
-	case manifest.KindComposer:
-	}
-	return "a " + string(kind)
 }
 
 func (c *cli) runLinkRemove(name string) error {

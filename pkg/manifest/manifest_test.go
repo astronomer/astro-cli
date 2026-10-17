@@ -1125,25 +1125,6 @@ organization = "clorg"
 		wantKeys: []string{"tool.astro.deployments.prod-apc.organization"},
 	},
 	{
-		// An astro link's host is [tool.astro] domain; a domain on the link
-		// would be read by nothing.
-		name:      "domain on an astro link",
-		wantCodes: []ProblemCode{CodeDomainOnNonAPCLink},
-		content: `
-[project]
-name = "p"
-dependencies = ["apache-airflow==3.1.*"]
-
-[tool.astro]
-workspace = "ws-abc"
-
-[tool.astro.deployments.dev]
-deployment = "dep-xyz"
-domain = "astronomer-dev.io"
-`,
-		wantKeys: []string{"tool.astro.deployments.dev.domain"},
-	},
-	{
 		// `local` is the machine's own word — `astro local start`,
 		// `astro local af dags list`. A link may not take it, so nobody has to
 		// work out which one a reader meant.

@@ -137,3 +137,32 @@ func TestSetWorkspaceLinkLeavesAnAPCLinkAlone(t *testing.T) {
 	assert.Empty(t, pinned)
 	assert.Equal(t, before, apcTable(t, path))
 }
+
+// Replaced on another domain, an apc link does not keep its workspace: that
+// id belongs to the other installation.
+func TestSaveLinkAnAPCLinkOnAnotherDomainDropsItsWorkspace(t *testing.T) {
+	dir, path := linkProject(t, linkFixture)
+	saveLink(t, dir, apcLink("prod-apc"))
+	moved := apcLink("prod-apc")
+	moved.Domain, moved.Workspace = "other.corp.example", ""
+	require.ErrorIs(t, SaveLink(dir, nil, moved), ErrInvalidLink)
+	_, got := onlyLink(t, path)
+	assert.Equal(t, "astro.corp.example", got.Domain, "a refused save writes nothing")
+
+	moved.Workspace = "ckws-other"
+	saveLink(t, dir, moved)
+	_, got = onlyLink(t, path)
+	assert.Equal(t, "ckws-other", got.Workspace)
+	assert.Equal(t, "other.corp.example", got.Domain)
+}
+
+// The apc method is an apc link's: on any other kind SaveLink refuses it by
+// field, before the manifest is read.
+func TestSaveLinkRefusesTheAPCMethodOnAnotherKind(t *testing.T) {
+	dir, path := linkProject(t, linkFixture)
+	err := SaveLink(dir, nil, Link{Name: "prod", Kind: manifest.KindAstro, Workspace: "ws", Deployment: "clx1", Auth: manifest.Auth{Method: manifest.AuthAPC}})
+	require.ErrorIs(t, err, ErrInvalidLink)
+	assert.Contains(t, err.Error(), "apc auth method")
+	assert.Contains(t, err.Error(), "an astro link")
+	assert.Equal(t, linkFixture, readFile(t, path))
+}
