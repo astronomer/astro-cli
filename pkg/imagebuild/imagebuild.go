@@ -443,10 +443,14 @@ func (b *Builder) mountsRuntimeSecret(ctx context.Context, req Request) bool {
 // `docker build` succeeds there and this failed, which is not a tradeoff a
 // tier-3 escape hatch gets to make.
 //
-// The rule is v1's, deliberately: its image handler skipped --pull as soon as
-// ANY FROM named something other than an Astro base, so a project moving to v2
-// keeps the behavior it had. Any is the right quantifier rather than the final
-// stage — a builder stage on an unreachable image fails the build just as hard.
+// The rule follows v1's image handler, which skipped --pull as soon as ANY FROM
+// named something other than an Astro base. Any is the right quantifier rather
+// than the final stage — a builder stage on an unreachable image fails the
+// build just as hard. It does not read every Dockerfile as v1 did: v1 matched
+// a case-sensitive "FROM " prefix at the start of the line against bare
+// registry prefixes, so a lowercase or indented from, a FROM followed by a tab,
+// a `FROM --platform=…` stage and a lookalike repository
+// (quay.io/astronomerfoo/…) are each read differently here.
 func shouldPull(declared, dockerfile string) bool {
 	if declared == "" {
 		return true

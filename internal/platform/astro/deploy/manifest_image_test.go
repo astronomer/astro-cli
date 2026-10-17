@@ -37,11 +37,14 @@ type fakeImageCmd struct {
 	// ends.
 	buildOut string
 	buildErr error
+	// stdios are the streams each build was wired to.
+	stdios []localrt.Stdio
 }
 
 func (f *fakeImageCmd) Run(_ context.Context, _ []string, stdio localrt.Stdio, name string, args ...string) error {
 	f.calls = append(f.calls, name+" "+strings.Join(args, " "))
 	if len(args) > 0 && args[0] == "build" {
+		f.stdios = append(f.stdios, stdio)
 		if f.buildOut != "" && stdio.Out != nil {
 			fmt.Fprint(stdio.Out, f.buildOut)
 		}

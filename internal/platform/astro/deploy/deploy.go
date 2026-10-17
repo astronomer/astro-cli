@@ -408,7 +408,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		}
 
 		// Build the image from the prepared context, tagged as it is pushed
-		err = buildClientImage(buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets)
+		err = buildClientImage(deployInput.Path, buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets)
 		if err != nil {
 			return ClientDeploy{}, fmt.Errorf("failed to build client image: %w", err)
 		}
