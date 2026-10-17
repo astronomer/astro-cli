@@ -1,7 +1,7 @@
 """
-## Astronaut ETL example DAG
+## Astronaut ETL example Dag
 
-This DAG queries the list of astronauts currently in space from the
+This Dag queries the list of astronauts currently in space from the
 Open Notify API and prints each astronaut's name and flying craft.
 
 There are two tasks, one to get the data from the API and save the results,
@@ -11,11 +11,11 @@ Airflow tasks, and automatically infer dependencies and pass data.
 
 The second task uses dynamic task mapping to create a copy of the task for
 each Astronaut in the list retrieved from the API. This list will change
-depending on how many Astronauts are in space, and the DAG will adjust
+depending on how many Astronauts are in space, and the Dag will adjust
 accordingly each time it runs.
 
 For more explanation and getting started instructions, see our Write your
-first DAG tutorial: https://www.astronomer.io/docs/learn/get-started-with-airflow
+first Dag tutorial: https://www.astronomer.io/docs/learn/get-started-with-airflow
 
 ![Picture of the ISS](https://www.esa.int/var/esa/storage/images/esa_multimedia/images/2010/02/space_station_over_earth/10293696-3-eng-GB/Space_Station_over_Earth_card_full.jpg)
 """
@@ -25,7 +25,7 @@ from pendulum import datetime
 import requests
 
 
-# Define the basic parameters of the DAG, like schedule and start_date
+# Define the basic parameters of the Dag, like schedule and start_date
 @dag(
     start_date=datetime(2025, 4, 22),
     schedule="@daily",
@@ -36,7 +36,7 @@ import requests
 def example_astronauts():
     # Define tasks
     @task(
-        # Define an asset outlet for the task. This can be used to schedule downstream DAGs when this task has run.
+        # Define an asset outlet for the task. This can be used to schedule downstream Dags when this task has run.
         outlets=[Asset("current_astronauts")]
     )  # Define that this task updates the `current_astronauts` Asset
     def get_astronauts(**context) -> list[dict]:
@@ -94,5 +94,5 @@ def example_astronauts():
     )
 
 
-# Instantiate the DAG
+# Instantiate the Dag
 example_astronauts()
