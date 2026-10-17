@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"github.com/distribution/reference"
 )
 
 // registerValidator is a helper to register a validator for a config option
@@ -47,5 +49,48 @@ func ValidateRegistryEndpoint(endpoint string) error {
 		return fmt.Errorf("registry endpoint cannot start or end with slashes")
 	}
 
+	// The rest is Docker's own grammar for an image name, so what passes here
+	// is what a deploy can push: lowercase, legal characters, a numeric port on
+	// the registry host if any, and no tag or digest. The CLI appends its own
+	// "deploy-<timestamp>" tag, so a tag or digest here would make an invalid
+	// reference that Docker reports only as "invalid reference format".
+	ref, err := reference.ParseNormalizedNamed(endpoint)
+	if err != nil {
+		return fmt.Errorf("registry endpoint %q is not a valid image repository: %w", endpoint, err)
+	}
+	_, tagged := ref.(reference.Tagged)
+	_, digested := ref.(reference.Digested)
+	switch {
+	case tagged && digested:
+		return fmt.Errorf("registry endpoint must not include an image tag or digest -- got %q, use 'registry[:port]/repository/path' without the ':tag@sha256:...' (the CLI appends its own deploy tag automatically)", endpoint)
+	case digested:
+		return fmt.Errorf("registry endpoint must not include an image digest -- got %q, use 'registry[:port]/repository/path' without '@sha256:...' (the CLI appends its own deploy tag automatically)", endpoint)
+	case tagged:
+		return fmt.Errorf("registry endpoint must not include an image tag -- got %q, use 'registry[:port]/repository/path' without a trailing ':tag' (the CLI appends its own deploy tag automatically)", endpoint)
+	}
+
 	return nil
+}
+
+// ClientRegistry is remote.client_registry as the CLI uses it: the project
+// config's when it sets one, else the global config's; "" when neither does.
+// A saved value is checked as a new one is, since it may predate the check or
+// have been written into the file by hand, and one that is not a registry
+// endpoint a deploy can push to is an error naming the config that holds it
+// and the command that fixes it there: a global value needs -g, and outside
+// a project `astro config set` without it would change nothing.
+func ClientRegistry() (string, error) {
+	c := CFG.RemoteClientRegistry
+	value := c.GetString()
+	if value == "" {
+		return "", nil
+	}
+	if err := ValidateRegistryEndpoint(value); err != nil {
+		where, fix := "your global config", "astro config set -g remote.client_registry <registry>/<repository>"
+		if configExists(viperProject) && viperProject.IsSet(c.Path) {
+			where, fix = "this project's config", "astro config set remote.client_registry <registry>/<repository>"
+		}
+		return "", fmt.Errorf("remote.client_registry in %s is not a usable registry endpoint: %w. Fix it with: '%s'", where, err, fix)
+	}
+	return value, nil
 }
