@@ -73,12 +73,17 @@ type Link struct {
 	Name string
 	Kind manifest.LinkKind
 
-	// Workspace and Deployment are an astro link's coordinates. An empty
-	// Workspace keeps the workspace the link already sets itself, which is
-	// how SetWorkspaceLink pins a link, and otherwise inherits [tool.astro]
-	// workspace.
+	// Workspace and Deployment are an astro or apc link's coordinates. An
+	// empty Workspace keeps the workspace the link already sets itself, which
+	// is how SetWorkspaceLink pins a link, and otherwise an astro link
+	// inherits [tool.astro] workspace. An apc link inherits nothing, so one
+	// that ends up with no workspace is refused.
 	Workspace  string
 	Deployment string
+	// Domain is an apc link's Astro Private Cloud base domain, required there
+	// and written normalized (manifest.NormalizeAPCDomain). Only an apc link
+	// carries one.
+	Domain string
 	// ClearWorkspace removes the workspace the link sets itself when Workspace
 	// is empty, so the link inherits [tool.astro] workspace again. It is a
 	// separate request for the same reason ClearTargetRegion is: an empty
@@ -145,6 +150,7 @@ var linkDefaultAuth = map[manifest.LinkKind]manifest.AuthMethod{
 	manifest.KindAstro:    manifest.AuthAstro,
 	manifest.KindMWAA:     manifest.AuthAWS,
 	manifest.KindComposer: manifest.AuthGoogle,
+	manifest.KindAPC:      manifest.AuthAPC,
 }
 
 // linkEnvNameRe is the manifest's rule for an env var name, kept identical so a
@@ -164,6 +170,11 @@ var linkEnvNameRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 //     link already sets is kept, with the new value, even where that matches
 //     the default. An endpoint's target is astro, since there is no endpoint
 //     target to name, so it is written only in a project whose target is not.
+//   - an apc link always writes its domain and workspace, since it inherits
+//     neither: [tool.astro] domain and workspace describe Astro. An empty
+//     Workspace keeps the one the link sets when it replaces an apc link on
+//     the same domain, and with none it is refused. Any link keeps its own
+//     workspace only from a link of the same kind.
 //   - an auth table is written only when it says more than the kind's default
 //     method, and carries only the fields its method takes.
 //   - default = true is carried over when the link had it. The flag belongs to
@@ -196,6 +207,7 @@ func SaveLink(dir string, wrap func(run func() error) error, l Link) error {
 	l.Deployment = strings.TrimSpace(l.Deployment)
 	l.Environment = strings.TrimSpace(l.Environment)
 	l.URL = strings.TrimSpace(l.URL)
+	l.Domain = manifest.NormalizeAPCDomain(l.Domain)
 	if err := l.validate(); err != nil {
 		return err
 	}
@@ -220,26 +232,9 @@ func (l Link) edit() ManifestEdit {
 			_, ok := ed.Get(append(key, field))
 			return ok
 		}
-		table := map[string]any{}
-		switch l.Kind {
-		case manifest.KindAstro:
-			// Not given, the link keeps the workspace it sets itself: the
-			// table is replaced whole below, and dropping a pin there would
-			// move the link to [tool.astro] workspace. Never written empty:
-			// the parser rejects an explicitly empty workspace.
-			workspace := l.Workspace
-			if workspace == "" && !l.ClearWorkspace {
-				own, _ := ed.Get(append(key, manifestKeyWorkspace))
-				workspace, _ = own.(string)
-			}
-			if workspace != "" && (workspace != before.Astro.Workspace || pinned("workspace")) {
-				table["workspace"] = workspace
-			}
-			table["deployment"] = l.Deployment
-		case manifest.KindMWAA, manifest.KindComposer:
-			table["environment"] = l.Environment
-		case manifest.KindEndpoint:
-			table["url"] = l.URL
+		table, err := l.coordinates(before, ed, pinned)
+		if err != nil {
+			return err
 		}
 		if target := l.target(); target != inheritedTarget(before) || pinned("target") {
 			table["target"] = target
@@ -258,6 +253,62 @@ func (l Link) edit() ManifestEdit {
 		}
 		return ReplaceTable(ed, key, table)
 	}
+}
+
+// coordinates starts the link's new table with what it points at: the keys of
+// its kind, and for an astro or apc link the workspace it resolves. pinned
+// reports a key the link writes itself in the file as it is now.
+func (l *Link) coordinates(before *manifest.Manifest, ed tomledit.Editor, pinned func(field string) bool) (map[string]any, error) {
+	table := map[string]any{}
+	// Not given, a link keeps the workspace it sets itself: the table is
+	// replaced whole, and dropping a pin there would move an astro link to
+	// [tool.astro] workspace and leave an apc link with none. It is carried
+	// over only from a link of the same kind, and for apc on the same domain:
+	// an Astro workspace id names nothing on APC, nor one installation's on
+	// another.
+	workspace := l.Workspace
+	if workspace == "" && !l.ClearWorkspace && l.mayKeepWorkspace(before) {
+		own, _ := ed.Get(append(linkKey(l.Name), manifestKeyWorkspace))
+		workspace, _ = own.(string)
+	}
+	switch l.Kind {
+	case manifest.KindAstro:
+		// Never written empty: the parser rejects an explicitly empty
+		// workspace.
+		if workspace != "" && (workspace != before.Astro.Workspace || pinned("workspace")) {
+			table["workspace"] = workspace
+		}
+		table["deployment"] = l.Deployment
+	case manifest.KindAPC:
+		// Always the link's own: [tool.astro] workspace is an Astro workspace
+		// and never reaches an apc link.
+		if workspace == "" {
+			return nil, invalidLink("an apc link needs the Astro Private Cloud workspace its Deployment is in")
+		}
+		table["domain"] = l.Domain
+		table["workspace"] = workspace
+		table["deployment"] = l.Deployment
+	case manifest.KindMWAA, manifest.KindComposer:
+		table["environment"] = l.Environment
+	case manifest.KindEndpoint:
+		table["url"] = l.URL
+	}
+	return table, nil
+}
+
+// mayKeepWorkspace reports whether the link l replaces may lend it the
+// workspace it sets itself: only a link of the same kind, and for apc one on
+// the same domain. With no link of that name there is nothing to keep, and
+// the raw read finds none.
+func (l *Link) mayKeepWorkspace(before *manifest.Manifest) bool {
+	existing, ok := before.Astro.Deployments[l.Name]
+	if !ok {
+		return true
+	}
+	if existing.Kind() != l.Kind {
+		return false
+	}
+	return l.Kind != manifest.KindAPC || existing.Domain == l.Domain
 }
 
 // keepTheOnlyLinkDefault marks a project's only link default = true when a
@@ -512,7 +563,7 @@ func setLinkTargets(ed tomledit.Editor, l *Link) error {
 		case l.ClearTargetRegion:
 			ed.Delete(linkTargetKey(manifest.KindMWAA, targetRegionField))
 		}
-	case manifest.KindAstro, manifest.KindEndpoint:
+	case manifest.KindAstro, manifest.KindEndpoint, manifest.KindAPC:
 	}
 	return nil
 }
@@ -636,6 +687,13 @@ func (l *Link) validate() error {
 		if l.Deployment == "" {
 			return invalidLink("an astro link needs a deployment")
 		}
+	case manifest.KindAPC:
+		if l.Deployment == "" {
+			return invalidLink("an apc link needs a deployment")
+		}
+		if l.Domain == "" {
+			return invalidLink("an apc link needs the Astro Private Cloud domain its Deployment is on")
+		}
 	case manifest.KindMWAA, manifest.KindComposer:
 		if l.Environment == "" {
 			return invalidLink("a %s link needs an environment", l.Kind)
@@ -650,7 +708,7 @@ func (l *Link) validate() error {
 		}
 	case manifest.KindEndpoint:
 		if l.URL == "" {
-			return invalidLink("an endpoint link needs a url")
+			return invalidLink("a url link needs a url")
 		}
 		// Refused here, and never quoted: the parser's own messages quote
 		// the url, which would print the password.
@@ -662,6 +720,9 @@ func (l *Link) validate() error {
 		}
 	default:
 		return invalidLink("unknown link kind %q", l.Kind)
+	}
+	if l.Auth.Method == manifest.AuthAPC && l.Kind != manifest.KindAPC {
+		return invalidLink("the apc auth method reads the Astro Private Cloud login for an apc link's domain, and this is %s link: pick another method", manifest.KindWithArticle(l.Kind))
 	}
 	return validateAuth(&l.Auth)
 }
@@ -689,7 +750,7 @@ func validateAuth(a *manifest.Auth) error {
 		}
 	}
 	switch a.Method {
-	case "", manifest.AuthAstro, manifest.AuthAWS, manifest.AuthGoogle, manifest.AuthNone:
+	case "", manifest.AuthAstro, manifest.AuthAWS, manifest.AuthGoogle, manifest.AuthNone, manifest.AuthAPC:
 		return nil
 	case manifest.AuthToken:
 		if a.TokenEnv == "" {

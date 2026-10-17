@@ -163,6 +163,9 @@ func (l *locator) BaseURL(ctx context.Context, i instances.Instance) (string, er
 		return "", fmt.Errorf("an MWAA environment has no Airflow URL to look up: it is reached through the AWS API")
 	case instances.KindEndpoint, instances.KindLocal:
 		return "", fmt.Errorf("%q already knows where its Airflow is; nothing to look up", i.Name)
+	case instances.KindAPC:
+		// Unreachable: pkg/instances refuses an apc link before it asks.
+		return "", fmt.Errorf("%q is an Astro Private Cloud link: %w", i.Name, instances.ErrAPCUnsupported)
 	}
 	return "", fmt.Errorf("cannot look up the Airflow URL of a %s deployment", i.Kind)
 }

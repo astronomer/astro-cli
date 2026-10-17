@@ -58,6 +58,10 @@ func credentials(ctx context.Context, i Instance, baseURL string, d Deps) (airfl
 		return airflowTokenCredentials(i, baseURL, d)
 	case manifest.AuthExec:
 		return execCredentials(i)
+	case manifest.AuthAPC:
+		// Transport and HTTPDoorFor refuse an apc link before a credential
+		// is built, and the parser allows the method on no other kind.
+		return nil, nil, apcUnsupported(i.Name)
 	case manifest.AuthAWS:
 		// Not a credential on an HTTP request at all, so it never reaches
 		// here: Transport dispatches on the method before a credential is

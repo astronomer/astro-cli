@@ -21,7 +21,7 @@ type workspaceSelection struct {
 
 var errInvalidWorkspaceKey = errors.New("invalid workspace selection")
 
-var errWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
+var ErrWorkspaceContextNotSet = errors.New("current workspace context not set, you can switch to a workspace with \n\tastro workspace switch WORKSPACEID")
 
 // errNoWorkspace is a mutation answered with no workspace and no error. Houston
 // answers createWorkspace and updateWorkspace with the record Prisma wrote,
@@ -64,7 +64,7 @@ func GetCurrentWorkspace() (string, error) {
 	}
 
 	if c.Workspace == "" {
-		return "", errWorkspaceContextNotSet
+		return "", ErrWorkspaceContextNotSet
 	}
 
 	return c.Workspace, nil

@@ -211,8 +211,8 @@ func TestLinkPickersPassOtherLoginFailuresThrough(t *testing.T) {
 func TestLinkPickersAreWiredForAstroOnly(t *testing.T) {
 	var cloud, software local.Deps
 	client := astrov1_mocks.NewClientWithResponsesInterface(t)
-	wireLinkPickers(&cloud, cloudPlatform, client, &bytes.Buffer{})
-	wireLinkPickers(&software, apcPlatform, client, &bytes.Buffer{})
+	wireLinkPickers(&cloud, cloudPlatform, client, nil, &bytes.Buffer{})
+	wireLinkPickers(&software, apcPlatform, client, nil, &bytes.Buffer{})
 	assert.NotNil(t, cloud.PickDeployment)
 	assert.NotNil(t, cloud.PickWorkspace)
 	assert.NotNil(t, cloud.CurrentWorkspace)

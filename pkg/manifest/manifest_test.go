@@ -965,6 +965,203 @@ auth = { method = "none" }
 		wantKeys: []string{"tool.astro.deployments.staging.url"},
 	},
 	{
+		// An apc link names its own installation: [tool.astro] domain is
+		// Astro's host and never reaches it.
+		name:      "apc link without a domain",
+		wantCodes: []ProblemCode{CodeDomainRequired},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws-astro"
+domain = "astronomer.io"
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.domain"},
+	},
+	{
+		// A domain that normalizes to nothing is no domain.
+		name:      "apc link whose domain is only a scheme",
+		wantCodes: []ProblemCode{CodeDomainRequired},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "https://"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.domain"},
+	},
+	{
+		// [tool.astro] workspace is an Astro workspace: an apc link that sets
+		// none is refused rather than handed the wrong platform's id.
+		name:      "apc link without a workspace does not inherit Astro's",
+		wantCodes: []ProblemCode{CodeWorkspaceRequired},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws-astro"
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "astro.corp.example"
+deployment = "ckdep-apc"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.workspace"},
+	},
+	{
+		name:      "apc link without a deployment",
+		wantCodes: []ProblemCode{CodeDeploymentRequired},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "astro.corp.example"
+workspace = "ckws-apc"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.deployment"},
+	},
+	{
+		// An apc link inherits its target like any other, and is still held
+		// to its own domain and workspace.
+		name:      "apc link by the inherited target, missing everything",
+		wantCodes: []ProblemCode{CodeDeploymentRequired, CodeDomainRequired, CodeWorkspaceRequired},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+target = "apc"
+workspace = "ws-astro"
+
+[tool.astro.deployments.prod-apc]
+default = true
+`,
+		wantKeys: []string{
+			"tool.astro.deployments.prod-apc.deployment",
+			"tool.astro.deployments.prod-apc.domain",
+			"tool.astro.deployments.prod-apc.workspace",
+		},
+	},
+	{
+		name:      "apc link with an environment",
+		wantCodes: []ProblemCode{CodeEnvironmentOnAPCLink},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "astro.corp.example"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+environment = "orders-prod"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.environment"},
+	},
+	{
+		// Read as an apc link with a url, not as an endpoint with a target.
+		name:      "apc link with a url",
+		wantCodes: []ProblemCode{CodeURLOnAPCLink},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "astro.corp.example"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+url = "https://deployments.astro.corp.example/ckdep-apc/airflow"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.url"},
+	},
+	{
+		// A link has no organization: Houston has none, and an Astro link's
+		// is [tool.astro] organization.
+		name:      "apc link with an organization",
+		wantCodes: []ProblemCode{CodeUnknownKey},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.prod-apc]
+target = "apc"
+domain = "astro.corp.example"
+workspace = "ckws-apc"
+deployment = "ckdep-apc"
+organization = "clorg"
+`,
+		wantKeys: []string{"tool.astro.deployments.prod-apc.organization"},
+	},
+	{
+		// An astro link's host is [tool.astro] domain. A domain on the link
+		// would look like it routes the link to another host, so it is
+		// refused, as any key a link does not take always was.
+		name:      "domain on an astro link",
+		wantCodes: []ProblemCode{CodeDomainOnNonAPCLink},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "ws-abc"
+
+[tool.astro.deployments.dev]
+deployment = "dep-xyz"
+domain = "astronomer-dev.io"
+`,
+		wantKeys: []string{"tool.astro.deployments.dev.domain"},
+	},
+	{
+		name:      "domain on an mwaa link",
+		wantCodes: []ProblemCode{CodeDomainOnNonAPCLink},
+		content: `
+[project]
+name = "p"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.aws]
+target = "mwaa"
+environment = "orders"
+domain = "astro.corp.example"
+`,
+		wantKeys: []string{"tool.astro.deployments.aws.domain"},
+	},
+	{
 		// `local` is the machine's own word — `astro local start`,
 		// `astro local af dags list`. A link may not take it, so nobody has to
 		// work out which one a reader meant.
@@ -1271,6 +1468,14 @@ func authCases() []struct {
 			auth:      `auth = { method = "airflow-token" }`,
 			wantKeys:  []string{key},
 			wantCodes: []ProblemCode{CodeAuthNeedsCredentials},
+		},
+		{
+			// The apc method reads the login for an apc link's domain, and a
+			// url link names none.
+			name:      "the apc method on a url link",
+			auth:      `auth = { method = "apc" }`,
+			wantKeys:  []string{key + ".method"},
+			wantCodes: []ProblemCode{CodeAuthAPCOnNonAPCLink},
 		},
 	}
 }

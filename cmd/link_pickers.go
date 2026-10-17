@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/cmd/local"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/astrosession"
+	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/astro/workspace"
@@ -32,12 +33,13 @@ var (
 	refreshLinkLogin = astroCmd.RefreshLogin
 )
 
-// wireLinkPickers wires the link pickers for an Astro context only. They list
-// Astro Deployments and workspaces through the Astro login, so under Software
-// there is nothing for them to list, and `astro link add` with no --deployment
-// asks for one the way it does in a run that cannot prompt.
-func wireLinkPickers(d *local.Deps, platform string, client astrov1.APIClient, out io.Writer) {
+// wireLinkPickers wires the link pickers for the current context's platform.
+// Under Astro they list Astro Deployments and workspaces through the Astro
+// login. Under Astro Private Cloud, `astro link add` links that platform's
+// Deployments instead (withAPCLinking), and the Astro pickers stay nil.
+func wireLinkPickers(d *local.Deps, platform string, client astrov1.APIClient, houstonClient houston.ClientInterface, out io.Writer) {
 	if platform != cloudPlatform {
+		withAPCLinking(d, houstonClient)
 		return
 	}
 	withLinkPickers(d, client, out)

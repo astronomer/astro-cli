@@ -168,7 +168,10 @@ Which commands read it:
   workspace's values were not checked.
 
 Deployment links (`[tool.astro.deployments.*]`) keep their own `workspace`
-key. How an `astro` link uses `domain` is below, and how `astro env` and
+key. An Astro Private Cloud link (`target = 'apc'`) names its own `domain` and
+`workspace` too, and never inherits `[tool.astro]`'s, which describe Astro (see
+[Astro Private Cloud links](manifest-reference.md#astro-private-cloud-links)).
+How an `astro` link uses `domain` is below, and how `astro env` and
 `astro deployment` use both is under
 [Commands that manage Astro](#commands-that-manage-astro).
 
@@ -202,6 +205,8 @@ a command reads its workspace and Deployment in this order:
    command that takes only an id (the `team`, `user`, `token` and `bundle`
    groups, `astro env`), or as an argument, a value that is neither a link nor
    a Deployment id is refused, and the error lists the project's Astro links.
+   A link of another kind, an Astro Private Cloud link among them, is refused
+   by name: these commands manage Astro Deployments.
 
 `--deployment-id`, `--deployment-name` and `--workspace-id`, the spellings
 these commands took before `--deployment` and `--workspace`, still work and

@@ -246,6 +246,30 @@ func TestResolveTarget(t *testing.T) {
 		assert.Equal(t, []string{"dev"}, choiceNames(d.offered))
 	})
 
+	// An apc link is an Astro Private Cloud Deployment. astro deploy under an
+	// Astro context ships to Astro Deployments only, so the link is neither
+	// offered nor preselected, even as the default, and naming it is refused.
+	apcLinks := map[string]manifest.Link{
+		"prod-apc": {Target: "apc", Domain: "astro.corp.example", Workspace: "ckws-apc", Deployment: "ckdep-apc", Default: true},
+		"dev":      {Target: "astro", Workspace: "ws-dev", Deployment: "dep-dev"},
+	}
+	t.Run("an apc link is never offered or preselected", func(t *testing.T) {
+		d := &stubDeployer{answer: "dev"}
+		target, err := resolveTarget(Request{Manifest: manifestWith(apcLinks), Interactive: true}, d)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"dev"}, choiceNames(d.offered))
+		assert.Empty(t, d.preselect, "an apc default does not move the cursor onto an Astro link")
+		assert.Equal(t, "dep-dev", target.DeploymentID)
+		assert.Equal(t, []string{"dev"}, DeployableLinks(apcLinks))
+	})
+
+	t.Run("a named apc link is turned away", func(t *testing.T) {
+		_, err := resolveTarget(Request{Manifest: manifestWith(apcLinks), LinkName: "prod-apc"}, &stubDeployer{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `link "prod-apc" is apc`)
+		assert.Contains(t, err.Error(), "astro links: dev")
+	})
+
 	t.Run("a project whose links are all unshippable", func(t *testing.T) {
 		d := &stubDeployer{}
 		_, err := resolveTarget(Request{

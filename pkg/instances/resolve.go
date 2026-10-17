@@ -194,9 +194,19 @@ func URLInstance(url string) Instance {
 // --deployment` reads a name no link carries. A link pointing at that
 // Deployment answers for it, so its name and auth apply; otherwise the
 // instance is the Deployment alone, reached with the Astro login.
+//
+// An id no astro link carries but an apc link does is that apc link: the id
+// is a Houston one, and Transport refuses the instance with
+// ErrAPCUnsupported, as it refuses the link named, rather than ask Astro for
+// it.
 func (s Set) DeploymentByID(id string) Instance {
 	for i := range s.items {
 		if s.items[i].Kind == KindAstro && s.items[i].Link.Deployment == id {
+			return s.items[i]
+		}
+	}
+	for i := range s.items {
+		if s.items[i].Kind == KindAPC && s.items[i].Link.Deployment == id {
 			return s.items[i]
 		}
 	}

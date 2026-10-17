@@ -70,6 +70,17 @@ type Options struct {
 	// false, the default, is Astro and refuses nothing. Astro Desktop's
 	// conversions are refused only if it sets this.
 	DeploysToAPC bool
+	// APCDomain is the Astro Private Cloud domain of the caller's current
+	// context, set when that context is APC's. A 1.x project's saved deploy
+	// target (.astro/config.yaml project.deployment, with project.workspace)
+	// then becomes an apc link on this domain rather than an astro link. The
+	// context decides, because the ids cannot: Houston's and Astro's are both
+	// cuids. Empty, the default, writes an astro link.
+	//
+	// DeploysToAPC refuses a directory in a 1.x project before this is read,
+	// so a caller that sets both converts nothing. astro init does not set it
+	// yet; it will once APC deploys pyproject.toml projects.
+	APCDomain string
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -358,6 +369,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	if err != nil {
 		return nil, err
 	}
+	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.

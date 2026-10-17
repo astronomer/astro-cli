@@ -34,10 +34,14 @@ const (
 	AuthExec AuthMethod = "exec"
 	// AuthNone sends no credential: local instances, open dev servers.
 	AuthNone AuthMethod = "none"
+	// AuthAPC takes the Astro Private Cloud login `astro login` stored for
+	// an apc link's domain. Only an apc link names a domain, so only an apc
+	// link may use it (CodeAuthAPCOnNonAPCLink).
+	AuthAPC AuthMethod = "apc"
 )
 
 // authMethods is the closed menu, in the order the messages list it.
-var authMethods = []AuthMethod{AuthAstro, AuthAWS, AuthGoogle, AuthBasic, AuthToken, AuthAirflowToken, AuthExec, AuthNone}
+var authMethods = []AuthMethod{AuthAstro, AuthAWS, AuthGoogle, AuthBasic, AuthToken, AuthAirflowToken, AuthExec, AuthNone, AuthAPC}
 
 // Auth is a link's resolved auth table. Method is always set on a manifest
 // that validates: the link's own `method` when it declares an auth table, else
@@ -108,6 +112,7 @@ var defaultAuthMethod = map[LinkKind]AuthMethod{
 	KindAstro:    AuthAstro,
 	KindMWAA:     AuthAWS,
 	KindComposer: AuthGoogle,
+	KindAPC:      AuthAPC,
 }
 
 // auth types a link's `auth` table, which arrives untyped because its shape
@@ -271,7 +276,7 @@ func (p *authParser) command(raw any) []string {
 }
 
 // required checks the fields the method cannot work without. A method with no
-// spec names nothing: astro reads the session, aws and google their SDK's
+// spec names nothing: astro and apc read a login, aws and google their SDK's
 // credential chain, none sends nothing.
 func (p *authParser) required(method AuthMethod, spec authSpec) {
 	for _, field := range spec.required {
