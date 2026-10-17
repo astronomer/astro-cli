@@ -1,5 +1,11 @@
 package config
 
+import (
+	"path/filepath"
+
+	"github.com/spf13/viper"
+)
+
 func (s *Suite) Test_validateRegistryEndpoint() {
 	s.Run("test valid registry endpoints", func() {
 		validEndpoints := []string{
@@ -37,16 +43,67 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 	// Docker's own grammar: each is refused with the reason that fits.
 	s.Run("refuses what is not a bare repository, saying why", func() {
 		for endpoint, want := range map[string]string{
-			"myregistry.example.com:7990/repository/path/my-image:1.0":                                      "must not include an image tag",
-			"quay.io/acme/my-image:1.0":                                                                     "must not include an image tag",
-			"quay.io/acme/my-image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef": "must not include an image digest",
-			"quay.io/Acme/My-Image":                                                                         "must be lowercase",
-			"quay.io/acme/img@latest":                                                                       "is not a valid image repository",
-			"myhost:abc/repo":                                                                               "is not a valid image repository",
+			"myregistry.example.com:7990/repository/path/my-image:1.0":                                          "must not include an image tag",
+			"quay.io/acme/my-image:1.0":                                                                         "must not include an image tag",
+			"quay.io/acme/my-image@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef":     "must not include an image digest",
+			"quay.io/acme/my-image:1.0@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef": "must not include an image tag or digest",
+			"quay.io/Acme/My-Image":   "must be lowercase",
+			"quay.io/acme/img@latest": "is not a valid image repository",
+			"myhost:abc/repo":         "is not a valid image repository",
 		} {
 			err := ValidateRegistryEndpoint(endpoint)
 			s.ErrorContains(err, want, "for %q", endpoint)
 		}
+	})
+}
+
+// ClientRegistry checks a saved value as a new one is checked, and its error
+// names the config that holds it and the command that fixes it there: -g for
+// the global one, since outside a project `astro config set` without it
+// changes nothing.
+func (s *Suite) TestClientRegistry() {
+	initTestConfig()
+	prevProject := viperProject
+	s.T().Cleanup(func() { viperProject = prevProject })
+	noProject := func() { viperProject = viper.New() }
+	withProject := func(value string) {
+		viperProject = viper.New()
+		viperProject.SetConfigFile(filepath.Join(s.T().TempDir(), ConfigFileNameWithExt))
+		viperProject.Set(CFG.RemoteClientRegistry.Path, value)
+	}
+
+	s.Run("unset", func() {
+		noProject()
+		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString(""))
+		got, err := ClientRegistry()
+		s.NoError(err)
+		s.Empty(got)
+	})
+
+	s.Run("a valid saved value", func() {
+		noProject()
+		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/my-image"))
+		got, err := ClientRegistry()
+		s.NoError(err)
+		s.Equal("quay.io/acme/my-image", got)
+	})
+
+	s.Run("a tagged global value says to fix it with -g", func() {
+		noProject()
+		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/my-image:1.0"))
+		_, err := ClientRegistry()
+		s.ErrorContains(err, "remote.client_registry in your global config is not a usable registry endpoint")
+		s.ErrorContains(err, "must not include an image tag")
+		s.ErrorContains(err, "astro config set -g remote.client_registry")
+	})
+
+	s.Run("a tagged project value says to fix it in the project", func() {
+		s.Require().NoError(CFG.RemoteClientRegistry.SetHomeString("quay.io/acme/fine"))
+		withProject("quay.io/acme/my-image:1.0")
+		_, err := ClientRegistry()
+		s.ErrorContains(err, "remote.client_registry in this project's config")
+		s.ErrorContains(err, "'astro config set remote.client_registry")
+		s.NotContains(err.Error(), "-g")
 	})
 }
 

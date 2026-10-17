@@ -1557,10 +1557,11 @@ func TestDeployClientImage(t *testing.T) {
 		config.CFG.RemoteClientRegistry.SetHomeString("myregistry.example.com:7990/repository/path/my-image:1.0")
 		t.Cleanup(func() { config.CFG.RemoteClientRegistry.SetHomeString("") })
 
-		err := DeployClientImage(InputClientDeploy{Path: "/test/path"}, nil)
-		assert.ErrorContains(t, err, "remote.client_registry is not a usable registry endpoint")
+		// No API client: the registry is checked before anything calls the API.
+		err := DeployClientImage(InputClientDeploy{Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
+		assert.ErrorContains(t, err, "is not a usable registry endpoint")
 		assert.ErrorContains(t, err, "must not include an image tag")
-		assert.ErrorContains(t, err, "astro config set remote.client_registry")
+		assert.ErrorContains(t, err, "astro config set")
 		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
 	})
 

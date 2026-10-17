@@ -1261,14 +1261,14 @@ func getRegistryEndpoint() (string, error) {
 			return "", fmt.Errorf("invalid registry endpoint format: %w", err)
 		}
 	} else {
-		registryEndpoint = config.CFG.RemoteClientRegistry.GetString()
 		// A value already saved is checked as a new one is: it may predate the
 		// check, or have been written into config.yaml by hand, and init saves
-		// it into the project.
-		if registryEndpoint != "" {
-			if err := config.ValidateRegistryEndpoint(registryEndpoint); err != nil {
-				return "", fmt.Errorf("the saved remote.client_registry is not a valid registry endpoint: %w. Pass --remote-image-repository, or fix it with 'astro config set remote.client_registry <registry>/<repository>'", err)
-			}
+		// it into the project. One that is not usable is set aside, with what
+		// is wrong and how to fix it, and init asks for a new one instead.
+		var err error
+		registryEndpoint, err = config.ClientRegistry()
+		if err != nil {
+			fmt.Printf("Warning: %s\n\n", err)
 		}
 		if registryEndpoint == "" {
 			fmt.Println("Enter the remote Docker repository for the client image (leave blank if not known but you will not be able to use the Astro CLI to deploy the client image until configured)")
