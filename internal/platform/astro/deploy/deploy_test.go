@@ -180,7 +180,7 @@ func clientDeployProject(t *testing.T, token, registry string) string {
 
 func TestDeployClientImage(t *testing.T) {
 	t.Run("successful client deploy", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 
 		got, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
@@ -198,7 +198,7 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("no token, no login", func(t *testing.T) {
-		dir := clientDeployProject(t, "", "test-registry:latest")
+		dir := clientDeployProject(t, "", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 
 		_, err := DeployClientImage(InputClientDeploy{Path: dir}, nil)
@@ -207,7 +207,7 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("docker login failure", func(t *testing.T) {
-		clientDeployProject(t, "test-token", "test-registry:latest")
+		clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 		cmd.errs = map[string]error{"login": errors.New("login failed")}
 
@@ -215,6 +215,23 @@ func TestDeployClientImage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to authenticate with registry images.astronomer.cloud")
 		assert.Contains(t, err.Error(), "login failed")
+		assert.False(t, hasImageCall(cmd.calls, " build "), "nothing is built: %v", cmd.calls)
+	})
+
+	// A registry saved with a tag (before the check existed, or by hand in
+	// config.yaml) is refused with what to fix, before anything is built or
+	// the API is called, rather than reaching Docker as "invalid reference
+	// format" (#2223).
+	t.Run("a saved registry that carries a tag", func(t *testing.T) {
+		clientDeployProject(t, "test-token", "myregistry.example.com:7990/repository/path/my-image:1.0")
+		cmd := withClientBuild(t, "docker")
+
+		// No API client: the registry is checked before anything calls the API.
+		_, err := DeployClientImage(InputClientDeploy{Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "is not a usable registry endpoint")
+		assert.Contains(t, err.Error(), "must not include an image tag")
+		assert.Contains(t, err.Error(), "astro config set -g remote.client_registry")
 		assert.False(t, hasImageCall(cmd.calls, " build "), "nothing is built: %v", cmd.calls)
 	})
 
@@ -229,7 +246,7 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("no container engine", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 		resolveContainerEngine = func() (string, []string, error) { return "", nil, errors.New("no container engine found") }
 
@@ -239,7 +256,7 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("build failure", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 		cmd.buildErr = errors.New("build failed")
 
@@ -250,7 +267,7 @@ func TestDeployClientImage(t *testing.T) {
 	})
 
 	t.Run("push failure", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 		cmd.errs = map[string]error{"push": errors.New("push failed")}
 
@@ -263,7 +280,7 @@ func TestDeployClientImage(t *testing.T) {
 	// A push the registry refuses says what to do about it, and still
 	// reports the 403.
 	t.Run("push forbidden", func(t *testing.T) {
-		dir := clientDeployProject(t, "test-token", "test-registry:latest")
+		dir := clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 		cmd.errs = map[string]error{"push": errors.New("denied: 403 Forbidden")}
 
@@ -271,17 +288,17 @@ func TestDeployClientImage(t *testing.T) {
 		out := captureStdout(t, func() { _, err = DeployClientImage(InputClientDeploy{Path: dir}, nil) })
 		require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
 		assert.Contains(t, err.Error(), "failed to push client image: failed to push image due to authentication error (403 Forbidden)")
-		assert.Contains(t, out, "Please ensure that you have logged in to test-registry:latest via docker login and try again")
+		assert.Contains(t, out, "Please ensure that you have logged in to test-registry.io/acme/client-image via docker login and try again")
 	})
 
 	t.Run("deploy with custom image name", func(t *testing.T) {
-		clientDeployProject(t, "test-token", "test-registry:latest")
+		clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
 		cmd := withClientBuild(t, "docker")
 
 		got, err := DeployClientImage(InputClientDeploy{Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
 		require.NoError(t, err)
 		// The remote tag is timestamp-based, not the user's "tag".
-		assert.True(t, strings.HasPrefix(got.Image, "test-registry:latest:deploy-"), got.Image)
+		assert.True(t, strings.HasPrefix(got.Image, "test-registry.io/acme/client-image:deploy-"), got.Image)
 		assert.Equal(t, []string{
 			"docker tag custom-image:tag " + got.Image,
 			"docker --version",
