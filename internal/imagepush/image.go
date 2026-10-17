@@ -1,7 +1,6 @@
 package imagepush
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -20,22 +19,12 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
-	"github.com/sirupsen/logrus"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/logger"
-	"github.com/astronomer/astro-cli/pkg/spinner"
 )
 
-const (
-	prefix = "Bearer "
-
-	// The registries of the Astro Runtime base images: a Dockerfile whose
-	// every FROM names one of them builds with --pull.
-	quayBaseImageName               = "quay.io/astronomer"
-	astroImageRegistryBaseImageName = "astrocrpublic.azurecr.io"
-)
+const prefix = "Bearer "
 
 var (
 	// Enhanced error message for 403 authentication issues
@@ -86,103 +75,6 @@ func (d *DockerImage) progressOut() io.Writer {
 		return d.progress
 	}
 	return os.Stdout
-}
-
-func shouldAddPullFlag(dockerfilePath string) (bool, error) {
-	file, err := os.Open(dockerfilePath)
-	if err != nil {
-		return false, fmt.Errorf("opening file: %w", err)
-	}
-	defer file.Close()
-
-	// scan the Dockerfile to check if any FROM instructions reference an image other than astro runtime
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "FROM ") && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", quayBaseImageName)) && !strings.HasPrefix(line, fmt.Sprintf("FROM %s", astroImageRegistryBaseImageName)) {
-			return false, nil
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return false, fmt.Errorf("scanning file: %w", err)
-	}
-	return true, nil
-}
-
-func (d *DockerImage) Build(dockerfilePath string, buildSecrets []string, buildConfig ImageBuildConfig) error {
-	// Start the spinner.
-	s := spinner.NewSpinner("Building project image…")
-	if !logger.IsLevelEnabled(logrus.DebugLevel) {
-		s.Start()
-		defer s.Stop()
-	}
-
-	containerRuntime, err := getContainerRuntimeBinary()
-	if err != nil {
-		return err
-	}
-	if dockerfilePath == "" {
-		dockerfilePath = "Dockerfile"
-	}
-	args := []string{"build"}
-	addPullFlag, err := shouldAddPullFlag(dockerfilePath)
-	if err != nil {
-		return fmt.Errorf("reading dockerfile: %w", err)
-	}
-	if container.IsPodman(containerRuntime) {
-		args = append(args, "--format", "docker")
-	}
-	if addPullFlag {
-		args = append(args, "--pull")
-	}
-	err = os.Chdir(buildConfig.Path)
-	if err != nil {
-		return err
-	}
-	args = append(args, []string{
-		"-t",
-		d.imageName,
-		"-f",
-		dockerfilePath,
-		".",
-	}...)
-	if buildConfig.NoCache {
-		args = append(args, "--no-cache")
-	}
-
-	for _, label := range buildConfig.Labels {
-		args = append(args, "--label", label)
-	}
-
-	if len(buildConfig.TargetPlatforms) > 0 {
-		args = append(args, fmt.Sprintf("--platform=%s", strings.Join(buildConfig.TargetPlatforms, ",")))
-	}
-	for _, secret := range buildSecrets {
-		args = append(args, "--secret", secret)
-	}
-
-	// Route output streams according to verbosity.
-	var stdout, stderr io.Writer
-	var outBuff bytes.Buffer
-	if logger.IsLevelEnabled(logrus.DebugLevel) {
-		stdout = d.progressOut()
-		stderr = os.Stderr
-	} else {
-		stdout = &outBuff
-		stderr = &outBuff
-	}
-
-	// Build the image
-	err = cmdExec(containerRuntime, stdout, stderr, args...)
-	if err != nil {
-		s.FinalMSG = ""
-		s.Stop()
-		fmt.Println(strings.TrimSpace(outBuff.String()) + "\n")
-		return errors.New("an error was encountered while building the image, see the build logs for details")
-	}
-
-	spinner.StopWithCheckmark(s, "Project image has been updated")
-	return nil
 }
 
 func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha bool) (string, error) {

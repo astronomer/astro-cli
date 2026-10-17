@@ -493,6 +493,38 @@ func TestBuildDockerfileModeStillPinsPlatform(t *testing.T) {
 		"a deploy build pins the platform in either mode, got %v", cmd.calls)
 }
 
+// Format reaches podman as --format, and an empty one passes none, so a
+// docker build, whose CLI has no such flag, keeps its exact command.
+func TestBuildPassesFormatOnlyWhenSet(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := dockerfileRequest(t)
+	req.Bin = "podman"
+	req.Format = "docker"
+	req.Platform = "linux/amd64"
+
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	require.Len(t, cmd.calls, 1)
+	assert.Equal(t, "podman build --tag "+req.Tag+" --file "+req.Dockerfile+" --format docker --platform linux/amd64 "+req.Context, cmd.calls[0])
+
+	cmd = &fakeCmd{}
+	req.Format = ""
+	_, err = testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.False(t, hasCall(cmd.calls, "--format"), "no Format, no --format, got %v", cmd.calls)
+}
+
+// Several platforms are one --platform value, as docker takes them.
+func TestBuildPassesSeveralPlatformsAsOneValue(t *testing.T) {
+	cmd := &fakeCmd{}
+	req := dockerfileRequest(t)
+	req.Platform = "linux/amd64,linux/arm64"
+
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.True(t, hasCall(cmd.calls, "--platform linux/amd64,linux/arm64 "), "got %v", cmd.calls)
+}
+
 // A declared Dockerfile that names nothing is refused, before docker runs.
 //
 // Checked here rather than in each caller because this is where they meet:

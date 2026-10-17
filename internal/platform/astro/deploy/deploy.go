@@ -350,7 +350,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 	// Build the full remote image name
 	remoteImage := fmt.Sprintf("%s:%s", registryEndpoint, imageTag)
 
-	// Create an image handler for building and pushing
+	// Create an image handler for tagging and pushing
 	imageHandler := airflowImageHandler(remoteImage)
 
 	// Use empty slice to let Docker build for host platform by default
@@ -407,13 +407,8 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			return ClientDeploy{}, fmt.Errorf("failed to prepare client build context: %w", err)
 		}
 
-		// Build the image from the prepared context
-		buildConfig := imagepush.ImageBuildConfig{
-			Path:            buildContext.TempDir,
-			TargetPlatforms: targetPlatforms,
-		}
-
-		err = imageHandler.Build("Dockerfile.client", deployInput.BuildSecrets, buildConfig)
+		// Build the image from the prepared context, tagged as it is pushed
+		err = buildClientImage(buildContext.TempDir, remoteImage, targetPlatforms, deployInput.BuildSecrets)
 		if err != nil {
 			return ClientDeploy{}, fmt.Errorf("failed to build client image: %w", err)
 		}

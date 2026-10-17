@@ -212,9 +212,16 @@ type Request struct {
 	// --label, in the order given, in either mode. A deploy marks its image
 	// with them for the control plane that reads them; nil adds none.
 	Labels []string
-	// Platform is the build platform (e.g. "linux/amd64"). Empty builds for the
-	// host — what local Docker mode wants; the deploy path pins linux/amd64.
+	// Platform is the build platform (e.g. "linux/amd64"), or several joined
+	// with commas ("linux/amd64,linux/arm64"), passed to --platform as given.
+	// Empty builds for the host — what local Docker mode wants; the deploy
+	// path pins linux/amd64.
 	Platform string
+	// Format is the image format podman builds (its --format: "docker" or
+	// "oci"). Empty passes no --format, which is the only thing to pass to
+	// docker, whose build has no such flag. The remote-execution client image
+	// is built in docker format under podman, as the Astro CLI 1.x built it.
+	Format string
 	// Bin is the container CLI to shell out to; Env reaches its daemon.
 	Bin string
 	Env []string
@@ -362,6 +369,9 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 	// linux/amd64) is added only when set, so the host-platform local build
 	// keeps its exact command.
 	args := []string{"build", "--tag", req.Tag, "--file", dockerfile}
+	if req.Format != "" {
+		args = append(args, "--format", req.Format)
+	}
 	if shouldPull(req.Dockerfile, dockerfile) {
 		args = append(args, "--pull")
 	}
@@ -433,11 +443,10 @@ func (b *Builder) mountsRuntimeSecret(ctx context.Context, req Request) bool {
 // `docker build` succeeds there and this failed, which is not a tradeoff a
 // tier-3 escape hatch gets to make.
 //
-// The rule is v1's, deliberately: internal/imagepush/image.go's shouldAddPullFlag
-// skips --pull as soon as ANY FROM names something other than an Astro base, so
-// a project moving to v2 keeps the behavior it had. Any is the right quantifier
-// rather than the final stage — a builder stage on an unreachable image fails
-// the build just as hard.
+// The rule is v1's, deliberately: its image handler skipped --pull as soon as
+// ANY FROM named something other than an Astro base, so a project moving to v2
+// keeps the behavior it had. Any is the right quantifier rather than the final
+// stage — a builder stage on an unreachable image fails the build just as hard.
 func shouldPull(declared, dockerfile string) bool {
 	if declared == "" {
 		return true

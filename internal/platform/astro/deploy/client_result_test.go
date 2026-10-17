@@ -60,7 +60,7 @@ func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
 			imagepush.DockerLogin = func(string, string, string) error { return nil }
 			h := new(mocks.ImageHandler)
-			h.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+			withClientBuild(t, "docker")
 			h.On("TagLocalImage", "local:1").Return(nil).Maybe()
 			h.On("Push", mock.Anything, "", "", false).Return("", nil).Once()
 			var tagged string

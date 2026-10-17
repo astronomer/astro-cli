@@ -15,18 +15,9 @@ type RegistryHandler interface {
 
 // ImageHandler defines methods require to handle all operations on/for container images
 type ImageHandler interface {
-	Build(dockerfile string, buildSecrets []string, config ImageBuildConfig) error
 	Push(remoteImage, username, token string, getImageRepoSha bool) (string, error)
 	GetLabel(altImageName, labelName string) (string, error)
 	TagLocalImage(localImage string) error
-}
-
-// ImageBuildConfig defines options when building a container image
-type ImageBuildConfig struct {
-	Path            string
-	TargetPlatforms []string
-	NoCache         bool
-	Labels          []string
 }
 
 type DockerRegistryAPI interface {
