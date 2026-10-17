@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -112,10 +113,11 @@ var (
 
 // DeployManifestImage builds (or adopts) a project's image, pushes it to the
 // deployment's registry, and finalizes; a "both" deploy also uploads the dags/
-// tarball. It uses the shared transport (createDeploy, the registry push in
-// airflow.DockerImage.Push, uploadDags, finalize) and, like DeployManifestDags,
-// neither prints nor exits — it returns a result for cmd to render, and writes
-// only the image build's output and a --wait's progress, to in.Progress.
+// tarball. It uses the shared transport (createDeploy, the registry push
+// through pkg/imagebuild on the engine the image was built on, uploadDags,
+// finalize) and, like DeployManifestDags, neither prints nor exits — it
+// returns a result for cmd to render, and writes only the image build's
+// output, the push's progress and a --wait's progress, to in.Progress.
 //
 // Docker is required and checked before any transport work (docs/deploy.md, section 5).
 //
@@ -173,7 +175,8 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	if in.ImageName == "" && in.OnBuild != nil {
 		in.OnBuild()
 	}
-	localImage, runtimeVersion, err := prepareDeployImage(ctx, &in, &req, cmd, bin, env)
+	engine := imagebuild.Engine{Cmd: cmd, Bin: bin, Env: env}
+	localImage, runtimeVersion, err := prepareDeployImage(ctx, &in, &req, engine)
 	if err != nil {
 		return ManifestImageDeployResult{}, err
 	}
@@ -199,10 +202,23 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	}
 
 	// Push the built/adopted image under the returned repository:tag with the
-	// existing registry auth (CLI username + context token).
+	// existing registry auth (CLI username + context token), on the engine it
+	// was built on.
+	// Its progress goes where the build's went, never to stdout, which under
+	// --output json carries the result alone.
 	remoteImage := fmt.Sprintf("%s:%s", created.ImageRepository, created.ImageTag)
-	if _, err := airflowImageHandler(localImage).Push(remoteImage, registryUsername, c.Token, false); err != nil {
-		return ManifestImageDeployResult{}, err
+	progress := in.Progress
+	if progress == nil {
+		progress = os.Stderr
+	}
+	if _, err := engine.Push(ctx, imagebuild.PushRequest{
+		Source:   localImage,
+		Image:    remoteImage,
+		Username: registryUsername,
+		Secret:   c.Token,
+		Out:      progress,
+	}); err != nil {
+		return ManifestImageDeployResult{}, deploybuild.ExplainPush(err)
 	}
 
 	// A "both" deploy also ships the dags tarball, fitting the image just
@@ -365,9 +381,9 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 // With a prebuilt image (--image-name) it validates the image exists locally and
 // carries a runtime label; otherwise it builds req, ForManifest's request, at
 // linux/amd64 (deploybuild.BuildImage).
-func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *imagebuild.Request, cmd imagebuild.Commander, bin string, env []string) (localImage, runtimeVersion string, err error) {
+func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *imagebuild.Request, engine imagebuild.Engine) (localImage, runtimeVersion string, err error) {
 	readLabel := func(image, label string) (string, error) {
-		return airflowImageHandler(image).GetLabel("", label)
+		return engine.Label(ctx, image, label)
 	}
 	if in.ImageName != "" {
 		version, err := deploybuild.PrebuiltRuntime(in.ImageName, readLabel)
@@ -377,13 +393,13 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 		return in.ImageName, version, nil
 	}
 	req.Secrets = in.BuildSecrets
-	req.Bin = bin
-	req.Env = env
+	req.Bin = engine.Bin
+	req.Env = engine.Env
 	return deploybuild.BuildImage(ctx, &deploybuild.Image{
 		Request:    *req,
 		ProjectDir: in.Build.ProjectDir,
 		Dockerfile: in.Build.Dockerfile,
-		Commander:  cmd,
+		Commander:  engine.Cmd,
 		Now:        buildNow,
 		Progress:   in.Progress,
 		ReadLabel:  readLabel,

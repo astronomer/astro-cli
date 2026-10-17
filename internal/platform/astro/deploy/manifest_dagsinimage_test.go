@@ -38,7 +38,7 @@ func TestDeployManifestImage_DagDeployOffBakesTheDags(t *testing.T) {
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 	}, nil)
 
-	cmd, handler := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 	var warned []string
 	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
@@ -55,7 +55,7 @@ func TestDeployManifestImage_DagDeployOffBakesTheDags(t *testing.T) {
 	assert.Empty(t, res.DagTarballVersion)
 	assert.Empty(t, warned)
 	assert.True(t, hasImageCall(cmd.calls, "build --tag astro-deploy/"), "the image is built, got %v", cmd.calls)
-	handler.AssertCalled(t, "Push", mock.Anything, registryUsername, mock.Anything, mock.Anything)
+	assert.True(t, hasImageCall(cmd.calls, manifestPush), "expected the push, got %v", cmd.calls)
 	// The deploy type is the 1.x CLI's for this deploy.
 	client.AssertCalled(t, "CreateDeployWithResponse", mock.Anything, "test-org-id", "test-deployment-id",
 		mock.MatchedBy(func(r astrov1.CreateDeployRequest) bool { return r.Type == astrov1.CreateDeployRequestTypeIMAGEANDDAG }))
@@ -70,7 +70,7 @@ func TestDeployManifestImage_DagDeployOffRefusesImageOnly(t *testing.T) {
 			testUtil.InitTestConfig(testUtil.LocalPlatform)
 			client := new(astrov1_mocks.ClientWithResponsesInterface)
 			mockManifestDeploymentAt(client, "3.1-2", false, false)
-			cmd, _ := withImageSeams(t, "3.1-2")
+			cmd := withImageSeams(t, "3.1-2")
 
 			_, err := DeployManifestImage(ManifestImageDeployInput{
 				Build:        imagebuild.ManifestBuild{ProjectDir: manifestProjectDir(t), AirflowVersion: "3.1"},
@@ -119,7 +119,7 @@ func TestDeployManifestImage_DagDeployOffRefusesAnImageWithoutDags(t *testing.T)
 	for _, rules := range []string{"dags/\n", "dags/**\n", "**/*.py\n"} {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		client := dagDeployOffClient()
-		cmd, _ := withImageSeams(t, "3.1-2")
+		cmd := withImageSeams(t, "3.1-2")
 
 		dir := manifestProjectDir(t)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, ".dockerignore"), []byte(rules), 0o600))

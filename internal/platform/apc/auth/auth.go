@@ -1,6 +1,7 @@
 package auth
 
 import (
+	stdcontext "context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,7 +12,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/context"
-	"github.com/astronomer/astro-cli/internal/imagepush"
+	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -43,9 +44,22 @@ const (
 var (
 	errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
 
-	// this is used to monkey patch the function in order to write unit test cases
-	registryHandlerInit = imagepush.RegistryHandlerInit
+	// registryLogin logs the container engine in to a registry; tests
+	// replace it.
+	registryLogin = engineRegistryLogin
 )
+
+// engineRegistryLogin logs the working directory's container engine
+// (containercfg, the engine a deploy then pushes on) in to registry, with
+// pkg/imagebuild's Login: with a username, the token on the command's stdin;
+// with neither, a check of the credential the engine already holds.
+func engineRegistryLogin(registry, username, token string) error {
+	engine, err := containercfg.ImageEngine(config.WorkingPath)
+	if err != nil {
+		return err
+	}
+	return engine.Login(stdcontext.Background(), registry, username, token)
+}
 
 // basicAuth handles authentication with the houston api
 func basicAuth(username, password string, ctx *config.Context, client houston.ClientInterface) (string, error) {
@@ -131,15 +145,10 @@ func RegistryAuth(client houston.ClientInterface, out io.Writer, registryDomain 
 
 	// return the host portion of the registry, strip out any path info
 	registryDomain, _, _ = strings.Cut(registry, "/")
-	registryHandler, err := registryHandlerInit(registryDomain)
-	if err != nil {
-		return err
-	}
-
 	if !appConfig.Flags.BYORegistryEnabled {
-		err = registryHandler.Login("user", c.Token)
+		err = registryLogin(registryDomain, "user", c.Token)
 	} else {
-		err = registryHandler.Login("", "")
+		err = registryLogin(registryDomain, "", "")
 	}
 
 	if err != nil && appConfig.Flags.BYORegistryEnabled {

@@ -3,12 +3,14 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,12 +18,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/deploybuild"
-	"github.com/astronomer/astro-cli/internal/imagepush"
-	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -29,10 +29,25 @@ import (
 )
 
 // fakeImageCmd is an imagebuild.Commander that records calls and never touches a
-// real daemon.
+// real daemon. It is the one runner every image action of a deploy goes
+// through: the probe, the build, the label reads, the login, the tag and the
+// push.
 type fakeImageCmd struct {
 	calls []string
-	err   error
+	// envs are the env each call ran with, and stdins what each call that
+	// was given a stdin read from it, keyed by the call's index.
+	envs   [][]string
+	stdins map[int]string
+	err    error
+	// errs fails the calls whose first argument is the key (login, push,
+	// tag...) with the error.
+	errs map[string]error
+	// label is the value a label read of image answers; nil answers "".
+	label func(image string) string
+	// pushOut is what a push writes to its stdout: its progress.
+	pushOut string
+	// pushAuth is the content of the --authfile the last push was given.
+	pushAuth string
 	// buildOut is what a build writes to its stdout, and buildErr how it
 	// ends.
 	buildOut string
@@ -48,8 +63,35 @@ func (f *fakeImageCmd) RunIn(ctx context.Context, dir string, env []string, stdi
 	return f.Run(ctx, env, stdio, name, args...)
 }
 
-func (f *fakeImageCmd) Run(_ context.Context, _ []string, stdio localrt.Stdio, name string, args ...string) error {
+func (f *fakeImageCmd) Run(_ context.Context, env []string, stdio localrt.Stdio, name string, args ...string) error {
 	f.calls = append(f.calls, name+" "+strings.Join(args, " "))
+	f.envs = append(f.envs, env)
+	if stdio.In != nil {
+		in, err := io.ReadAll(stdio.In)
+		if err != nil {
+			return err
+		}
+		if f.stdins == nil {
+			f.stdins = map[int]string{}
+		}
+		f.stdins[len(f.calls)-1] = string(in)
+	}
+	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Labels") && f.label != nil && stdio.Out != nil {
+		fmt.Fprintln(stdio.Out, f.label(args[len(args)-1]))
+	}
+	if len(args) == 1 && args[0] == "--version" && stdio.Out != nil {
+		fmt.Fprintf(stdio.Out, "%s version 5.6.0\n", name)
+	}
+	if len(args) > 2 && args[0] == "push" && args[1] == "--authfile" {
+		data, _ := os.ReadFile(args[2])
+		f.pushAuth = string(data)
+	}
+	if len(args) > 0 && args[0] == "push" && f.pushOut != "" && stdio.Out != nil {
+		fmt.Fprint(stdio.Out, f.pushOut)
+	}
+	if len(args) > 0 && f.errs[args[0]] != nil {
+		return f.errs[args[0]]
+	}
 	if len(args) > 0 && args[0] == "build" {
 		f.stdios = append(f.stdios, stdio)
 		if f.buildOut != "" && stdio.Out != nil {
@@ -62,29 +104,35 @@ func (f *fakeImageCmd) Run(_ context.Context, _ []string, stdio localrt.Stdio, n
 	return f.err
 }
 
-// withImageSeams wires the engine, build commander, and image handler seams to
-// fakes for one test, and restores them after. runtimeVersion is the label the
-// image reports.
-func withImageSeams(t *testing.T, runtimeVersion string) (*fakeImageCmd, *mocks.ImageHandler) {
+// withImageSeams wires the engine and the image commander seams to fakes for
+// one test, and restores them after. runtimeVersion is the label every image
+// reports.
+func withImageSeams(t *testing.T, runtimeVersion string) *fakeImageCmd {
 	t.Helper()
-	cmd := &fakeImageCmd{}
-	handler := new(mocks.ImageHandler)
-	handler.On("GetLabel", mock.Anything, airflowrt.RuntimeVersionLabel).Return(runtimeVersion, nil).Maybe()
-	handler.On("Push", mock.Anything, registryUsername, mock.Anything, mock.Anything).Return("", nil).Maybe()
+	return withEngine(t, "docker", nil, runtimeVersion)
+}
 
+// withEngine is withImageSeams on the engine bin with its connection env.
+func withEngine(t *testing.T, bin string, env []string, runtimeVersion string) *fakeImageCmd {
+	t.Helper()
+	// No push credential lands in, or is read from, the developer's docker
+	// config.
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+	cmd := &fakeImageCmd{label: func(string) string { return runtimeVersion }}
 	origResolve := resolveContainerEngine
 	origCmd := newImageBuildCommander
-	origHandler := airflowImageHandler
-	resolveContainerEngine = func() (string, []string, error) { return "docker", nil, nil }
+	resolveContainerEngine = func() (string, []string, error) { return bin, env, nil }
 	newImageBuildCommander = func() imagebuild.Commander { return cmd }
-	airflowImageHandler = func(string) imagepush.ImageHandler { return handler }
 	t.Cleanup(func() {
 		resolveContainerEngine = origResolve
 		newImageBuildCommander = origCmd
-		airflowImageHandler = origHandler
 	})
-	return cmd, handler
+	return cmd
 }
+
+// manifestPush is the push of a manifest image deploy to the repository and
+// tag mockCreateImageDeploy returns.
+const manifestPush = "docker push registry.astro/test-deployment:deploy-2026-07-24"
 
 // mockDeploymentOptions stubs the allowed-runtime list the version check reads.
 func mockDeploymentOptions(client *astrov1_mocks.ClientWithResponsesInterface, versions ...string) {
@@ -126,7 +174,7 @@ func TestDeployManifestImage_BuildAndImageAndDag(t *testing.T) {
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
-	cmd, handler := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 
 	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
@@ -150,7 +198,7 @@ func TestDeployManifestImage_BuildAndImageAndDag(t *testing.T) {
 	assert.True(t, hasImageCall(cmd.calls, "docker info"), "expected a docker info probe, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, "build --tag astro-deploy/"), "expected a build, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "expected linux/amd64, got %v", cmd.calls)
-	handler.AssertCalled(t, "Push", mock.Anything, registryUsername, mock.Anything, mock.Anything)
+	assert.True(t, hasImageCall(cmd.calls, manifestPush), "expected the push, got %v", cmd.calls)
 	client.AssertExpectations(t)
 }
 
@@ -162,7 +210,7 @@ func TestDeployManifestImage_StreamsTheBuildOutput(t *testing.T) {
 	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 
-	cmd, _ := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 	cmd.buildOut = "#9 error: Git executable not found\n"
 	cmd.buildErr = errors.New("exit status 1")
 
@@ -189,7 +237,7 @@ func TestDeployManifestImage_ImageOnlySkipsDags(t *testing.T) {
 	mockCreateImageDeploy(client, "") // image-only: no upload URL needed
 	mockFinalizeDeploy(client)
 
-	_, handler := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 
 	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
@@ -203,7 +251,7 @@ func TestDeployManifestImage_ImageOnlySkipsDags(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 	assert.Empty(t, res.DagTarballVersion)
-	handler.AssertCalled(t, "Push", mock.Anything, registryUsername, mock.Anything, mock.Anything)
+	assert.True(t, hasImageCall(cmd.calls, manifestPush), "expected the push, got %v", cmd.calls)
 	client.AssertExpectations(t)
 }
 
@@ -216,7 +264,7 @@ func TestDeployManifestImage_ImageNameSkipsBuild(t *testing.T) {
 	mockCreateImageDeploy(client, "")
 	mockFinalizeDeploy(client)
 
-	cmd, _ := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 
 	res, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
@@ -230,6 +278,7 @@ func TestDeployManifestImage_ImageNameSkipsBuild(t *testing.T) {
 	assert.Equal(t, "deploy-2026-07-24", res.ImageTag)
 	// A prebuilt image is adopted: no build command runs.
 	assert.False(t, hasImageCall(cmd.calls, "build --tag"), "prebuilt image must skip the build, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, "docker tag astro-package/demo:7.0.0-abc registry.astro/test-deployment:deploy-2026-07-24"), "the prebuilt image is what is pushed, got %v", cmd.calls)
 	client.AssertExpectations(t)
 }
 
@@ -242,25 +291,16 @@ func TestDeployManifestImage_ImageNameSkipsBuild(t *testing.T) {
 // produced by `docker build --platform linux/amd64` names that one platform,
 // and inspect reads its labels. So a label is only readable off a tag the fake
 // saw built.
-func containerdStore(t *testing.T, runtimeVersion string) (cmd *fakeImageCmd, handlers map[string]*mocks.ImageHandler) {
+func containerdStore(t *testing.T, runtimeVersion string) *fakeImageCmd {
 	t.Helper()
-	cmd, _ = withImageSeams(t, runtimeVersion)
-	handlers = map[string]*mocks.ImageHandler{}
-	airflowImageHandler = func(name string) imagepush.ImageHandler {
-		if h, ok := handlers[name]; ok {
-			return h
+	cmd := withImageSeams(t, runtimeVersion)
+	cmd.label = func(image string) string {
+		if hasImageCall(cmd.calls, "build --tag "+image+" ") {
+			return runtimeVersion
 		}
-		label := ""
-		if hasImageCall(cmd.calls, "build --tag "+name+" ") {
-			label = runtimeVersion
-		}
-		h := new(mocks.ImageHandler)
-		h.On("GetLabel", mock.Anything, airflowrt.RuntimeVersionLabel).Return(label, nil).Maybe()
-		h.On("Push", mock.Anything, registryUsername, mock.Anything, mock.Anything).Return("", nil).Maybe()
-		handlers[name] = h
-		return h
+		return ""
 	}
-	return cmd, handlers
+	return cmd
 }
 
 // No deps and no packages: nothing to install, and the deploy still has to
@@ -276,7 +316,7 @@ func TestDeployManifestImage_NothingToInstallBuildsASinglePlatformImage(t *testi
 	mockCreateImageDeploy(client, "")
 	mockFinalizeDeploy(client)
 
-	cmd, handlers := containerdStore(t, "3.1-2")
+	cmd := containerdStore(t, "3.1-2")
 
 	dir := manifestProjectDir(t)
 	res, err := DeployManifestImage(ManifestImageDeployInput{
@@ -295,8 +335,8 @@ func TestDeployManifestImage_NothingToInstallBuildsASinglePlatformImage(t *testi
 	assert.True(t, hasImageCall(cmd.calls, "build --tag "+tag+" "), "nothing to install still builds, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "at linux/amd64, got %v", cmd.calls)
 	assert.False(t, hasImageCall(cmd.calls, "docker pull"), "a pulled base is not what ships, got %v", cmd.calls)
-	require.Contains(t, handlers, tag, "the built tag is what is inspected and pushed")
-	handlers[tag].AssertCalled(t, "Push", mock.Anything, registryUsername, mock.Anything, mock.Anything)
+	assert.True(t, hasImageCall(cmd.calls, "docker tag "+tag+" registry.astro/test-deployment:deploy-2026-07-24"), "the built tag is what is pushed, got %v", cmd.calls)
+	assert.True(t, hasImageCall(cmd.calls, manifestPush), "expected the push, got %v", cmd.calls)
 	client.AssertExpectations(t)
 }
 
@@ -423,7 +463,7 @@ func TestDeployManifestImage_RefusesAnOlderRuntimeBeforeBuilding(t *testing.T) {
 			client := new(astrov1_mocks.ClientWithResponsesInterface)
 			mockManifestDeploymentAt(client, "3.3-8", true, false)
 			mockDeploymentOptions(client, "3.2-10", "3.3-8")
-			cmd, _ := withImageSeams(t, "3.2-10")
+			cmd := withImageSeams(t, "3.2-10")
 
 			in := tt.in
 			in.OnBuild = func() { t.Error("a refused deploy must not announce a build") }
@@ -449,7 +489,7 @@ func TestDeployManifestImage_ASeriesTagBehindTheDeploymentNamesARuntimeBuild(t *
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 	mockManifestDeploymentAt(client, "3.3-8", true, false)
 	mockDeploymentOptions(client, "3.3-7", "3.3-8")
-	cmd, _ := withImageSeams(t, "3.3-7")
+	cmd := withImageSeams(t, "3.3-7")
 
 	built := false
 	_, err := DeployManifestImage(ManifestImageDeployInput{
@@ -513,7 +553,7 @@ func TestDeployManifestImage_UsesADeclaredDockerfile(t *testing.T) {
 	mockFinalizeDeploy(client)
 	azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
 
-	cmd, _ := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 
 	dir := manifestProjectDir(t)
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "docker"), 0o750))
@@ -557,7 +597,7 @@ func TestDeployManifestImage_RefusesAnUnreadableDeclaration(t *testing.T) {
 	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 
-	cmd, _ := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 
 	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
@@ -571,4 +611,96 @@ func TestDeployManifestImage_RefusesAnUnreadableDeclaration(t *testing.T) {
 	assert.Contains(t, err.Error(), "Dockerfile")
 	assert.False(t, hasImageCall(cmd.calls, "build --tag"),
 		"nothing should be built when the declared file cannot be read, got %v", cmd.calls)
+}
+
+// The probe, the build, the label read, the registry login and the push of a
+// manifest image deploy all run on the one engine it resolves, its connection
+// env included: the image pushed is the one built, from where the login was
+// made. The token reaches the push in a throwaway --authfile, never as an
+// argument, without the "Bearer " prefix the context stores it with.
+func TestDeployManifestImage_RunsOnOneEngine(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
+	mockCreateImageDeploy(client, "")
+	mockFinalizeDeploy(client)
+	podmanEnv := []string{"CONTAINER_HOST=unix:///run/podman/podman.sock"}
+	cmd := withEngine(t, "podman", podmanEnv, "3.1-2")
+
+	dir := manifestProjectDir(t)
+	_, err := DeployManifestImage(ManifestImageDeployInput{
+		Login:        &config.Context{Domain: "localhost", Organization: "test-org-id", Token: "Bearer ctx-token"},
+		Build:        imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dependencies: []string{"pandas"}},
+		DeploymentID: "test-deployment-id",
+	}, client)
+	require.NoError(t, err)
+
+	tag := deploybuild.ImageTag(dir)
+	remote := "registry.astro/test-deployment:deploy-2026-07-24"
+	verbs := make([]string, 0, len(cmd.calls))
+	for i, call := range cmd.calls {
+		assert.True(t, strings.HasPrefix(call, "podman "), call)
+		assert.Equal(t, podmanEnv, cmd.envs[i][:1], call)
+		assert.NotContains(t, call, "ctx-token", "the token is never an argument")
+		verbs = append(verbs, strings.Fields(call)[1])
+	}
+	assert.Equal(t, []string{"info", "build", "image", "tag", "--version", "push", "rmi"}, verbs, "%v", cmd.calls)
+	assert.Contains(t, cmd.calls, "podman tag "+tag+" "+remote)
+	push := slices.IndexFunc(cmd.calls, func(c string) bool { return strings.HasPrefix(c, "podman push --authfile ") })
+	require.NotEqual(t, -1, push, "%v", cmd.calls)
+	authfile := strings.Fields(cmd.calls[push])[3]
+	assert.Equal(t, "podman push --authfile "+authfile+" "+remote, cmd.calls[push])
+	assert.Contains(t, cmd.pushAuth, base64.StdEncoding.EncodeToString([]byte("cli:ctx-token")), "the push's credential")
+	assert.NoFileExists(t, authfile, "removed after the push")
+}
+
+// A push the registry refuses is ErrPushForbidden, with its advice, and the
+// deploy is not finalized.
+func TestDeployManifestImage_PushForbidden(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
+	mockCreateImageDeploy(client, "")
+	cmd := withImageSeams(t, "3.1-2")
+	cmd.errs = map[string]error{"push": errors.New("unexpected status from PUT request: 403 Forbidden")}
+
+	_, err := DeployManifestImage(ManifestImageDeployInput{
+		Build:        imagebuild.ManifestBuild{ProjectDir: manifestProjectDir(t), AirflowVersion: "3.1", Dependencies: []string{"pandas"}},
+		DeploymentID: "test-deployment-id",
+	}, client)
+	require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
+	// The push carried the session token, so the advice is about that, not
+	// the user's cached logins.
+	assert.Contains(t, err.Error(), "the registry refused the credential this push was made with")
+	assert.Contains(t, err.Error(), "unexpected status from PUT request: 403 Forbidden")
+	assert.NotContains(t, err.Error(), "docker logout")
+	client.AssertNotCalled(t, "FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// The push's progress goes to Progress with the build's, never to stdout:
+// under --output json the command's stdout carries the result object alone.
+func TestDeployManifestImage_PushProgressStaysOffStdout(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
+	mockCreateImageDeploy(client, "")
+	mockFinalizeDeploy(client)
+	cmd := withImageSeams(t, "3.1-2")
+	cmd.pushOut = "deploy-2026-07-24: digest: sha256:abc size: 527\n"
+
+	var progress bytes.Buffer
+	var err error
+	stdout := captureStdout(t, func() {
+		_, err = DeployManifestImage(ManifestImageDeployInput{
+			Build:        imagebuild.ManifestBuild{ProjectDir: manifestProjectDir(t), AirflowVersion: "3.1", Dependencies: []string{"pandas"}},
+			DeploymentID: "test-deployment-id",
+			Progress:     &progress,
+		}, client)
+	})
+	require.NoError(t, err)
+	assert.Contains(t, progress.String(), "digest: sha256:abc")
+	assert.Empty(t, stdout)
 }

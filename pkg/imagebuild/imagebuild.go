@@ -20,6 +20,12 @@
 // Airflow version to that base and lives here now that both the local Docker
 // engine and deploy resolve it the same way.
 //
+// The rest of an image's life on the container engine is here too, so every
+// image action runs on one engine: Engine logs in to a registry, tags, pushes
+// (returning the pushed digest when asked) and reads a label, through the same
+// Commander, Bin and Env a build takes. Which registry, which credential and
+// which tag scheme stay with the caller.
+//
 // Per the layer rules (docs/architecture.md) it prints nothing and never
 // exits: build output flows through rt.Callbacks, or raw to Request.Stdout
 // and Request.Stderr when a caller sets them, and a failed install returns a

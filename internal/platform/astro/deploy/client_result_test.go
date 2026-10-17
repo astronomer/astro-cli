@@ -7,12 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/imagepush"
-	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -21,9 +18,6 @@ import (
 // to render (cmd/astro's renderRemoteDeploy), so under --output json they
 // become the result object instead.
 func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
-	origLogin, origHandler := imagepush.DockerLogin, airflowImageHandler
-	t.Cleanup(func() { imagepush.DockerLogin, airflowImageHandler = origLogin, origHandler })
-
 	cases := []struct {
 		name     string
 		in       InputClientDeploy
@@ -58,13 +52,7 @@ func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements-client.txt"), nil, 0o600))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "packages-client.txt"), nil, 0o600))
 			testUtil.InitTestConfig(testUtil.CloudPlatform)
-			imagepush.DockerLogin = func(string, string, string) error { return nil }
-			h := new(mocks.ImageHandler)
-			withClientBuild(t, "docker")
-			h.On("TagLocalImage", "local:1").Return(nil).Maybe()
-			h.On("Push", mock.Anything, "", "", false).Return("", nil).Once()
-			var tagged string
-			airflowImageHandler = func(image string) imagepush.ImageHandler { tagged = image; return h }
+			cmd := withClientBuild(t, "docker")
 			config.CFG.RemoteClientRegistry.SetHomeString("registry.example.com/agents/client")
 			tc.in.Path = dir
 
@@ -79,10 +67,9 @@ func TestDeployClientImageReturnsWhatItPushed(t *testing.T) {
 			require.NoError(t, readErr)
 
 			require.NoError(t, err)
-			h.AssertExpectations(t)
 			assert.Equal(t, tc.progress, string(out))
 			assert.Equal(t, "registry.example.com/agents/client", got.Registry)
-			assert.Equal(t, tagged, got.Image, "the image is the reference pushed")
+			assert.Contains(t, cmd.calls, "docker push "+got.Image, "the image is the reference pushed")
 			assert.Equal(t, got.Registry+":"+got.Tag, got.Image)
 			assert.Nil(t, got.RuntimeCheck, "no Deployment was named")
 			tc.check(t, got)

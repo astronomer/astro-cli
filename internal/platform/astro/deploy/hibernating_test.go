@@ -159,7 +159,7 @@ func TestDeployManifestImage_HibernatingSaysHowToWakeIt(t *testing.T) {
 	mockManifestDeploymentAt(client, "3.1-2", true, false)
 	mockDeploymentOptions(client, "3.1-2")
 	mockCreateDeployRefused(client, blockedByHibernation)
-	_, handler := withImageSeams(t, "3.1-2")
+	cmd := withImageSeams(t, "3.1-2")
 
 	_, err := DeployManifestImage(ManifestImageDeployInput{
 		Build: imagebuild.ManifestBuild{
@@ -170,6 +170,6 @@ func TestDeployManifestImage_HibernatingSaysHowToWakeIt(t *testing.T) {
 	}, client)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), wakeUpHint)
-	handler.AssertNotCalled(t, "Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	assert.False(t, hasImageCall(cmd.calls, " push "), "nothing is pushed, got %v", cmd.calls)
 	client.AssertExpectations(t)
 }

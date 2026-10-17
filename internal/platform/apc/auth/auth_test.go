@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/imagepush"
-	"github.com/astronomer/astro-cli/internal/imagepush/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houstonMocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
@@ -33,6 +31,22 @@ type Suite struct {
 	suite.Suite
 
 	origSwitchToLastUsedWorkspace func(client houston.ClientInterface, c *config.Context) bool
+	origRegistryLogin             func(registry, username, token string) error
+	// logins are the registry logins the test made, through the fake
+	// registryLogin every test starts with.
+	logins []registryLoginCall
+}
+
+// registryLoginCall is one registry login a test made.
+type registryLoginCall struct{ registry, username, token string }
+
+// loginsFail makes every registry login from here on fail with err, and
+// record itself.
+func (s *Suite) loginsFail(err error) {
+	registryLogin = func(registry, username, token string) error {
+		s.logins = append(s.logins, registryLoginCall{registry, username, token})
+		return err
+	}
 }
 
 func TestAuth(t *testing.T) {
@@ -46,10 +60,19 @@ var (
 
 func (s *Suite) SetupSuite() {
 	s.origSwitchToLastUsedWorkspace = switchToLastUsedWorkspace
+	s.origRegistryLogin = registryLogin
+}
+
+// SetupTest gives every test a registry login that succeeds and records
+// itself, so none reaches a real container engine.
+func (s *Suite) SetupTest() {
+	s.logins = nil
+	s.loginsFail(nil)
 }
 
 func (s *Suite) TearDownTest() {
 	switchToLastUsedWorkspace = s.origSwitchToLastUsedWorkspace
+	registryLogin = s.origRegistryLogin
 }
 
 func (s *Suite) TestBasicAuth() {
@@ -153,12 +176,6 @@ func (s *Suite) TestRegistryAuthSuccess() {
 	afero.WriteFile(fs, config.HomeConfigFile, configYaml, 0o777)
 	config.InitConfig(fs)
 
-	mockRegistryHandler := new(mocks.RegistryHandler)
-	registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
-		mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(nil).Once()
-		return mockRegistryHandler, nil
-	}
-
 	out := new(bytes.Buffer)
 	houstonMock := new(houstonMocks.ClientInterface)
 	houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
@@ -201,7 +218,8 @@ func (s *Suite) TestRegistryAuthSuccess() {
 			tt.errAssertion(s.T(), RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{}))
 		})
 	}
-	mockRegistryHandler.AssertExpectations(s.T())
+	// Only the platform domain logs in; the local ones skip it.
+	s.Equal([]registryLoginCall{{"registry.test.astro.io", "user", ""}}, s.logins)
 }
 
 func (s *Suite) TestRegistryAuthRegistryDomain() {
@@ -252,13 +270,7 @@ func (s *Suite) TestRegistryAuthRegistryDomain() {
 				registryDomain, _, _ = strings.Cut(tt.byoRegistryDomain, "/")
 			}
 
-			mockRegistryHandler := new(mocks.RegistryHandler)
-			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(nil).Once()
-
-			registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
-				assert.Equal(s.T(), registryDomain, registry)
-				return mockRegistryHandler, nil
-			}
+			s.logins = nil
 
 			houstonMock := new(houstonMocks.ClientInterface)
 			houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{
@@ -272,7 +284,13 @@ func (s *Suite) TestRegistryAuthRegistryDomain() {
 			out := new(bytes.Buffer)
 			RegistryAuth(houstonMock, out, tt.registryDomain, houston.GetAppConfigRequest{})
 
-			mockRegistryHandler.AssertExpectations(s.T())
+			// The APC registry takes the context's token as "user"; a BYO
+			// registry, the credential the engine already holds.
+			want := registryLoginCall{registryDomain, "user", ""}
+			if tt.byoRegistryEnabled {
+				want = registryLoginCall{registry: registryDomain}
+			}
+			s.Equal([]registryLoginCall{want}, s.logins)
 		})
 	}
 }
@@ -284,32 +302,27 @@ func (s *Suite) TestRegistryAuthFailure() {
 	config.InitConfig(fs)
 
 	s.Run("registry failures", func() {
-		registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
-			return nil, errMockRegistry
-		}
+		s.loginsFail(errMockRegistry)
 
+		// A BYO registry that refuses the engine's credential is left to a
+		// manual docker login, named in the output.
 		out := new(bytes.Buffer)
 		houstonMock := new(houstonMocks.ClientInterface)
-		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: true}}, nil).Twice()
+		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: true}, BYORegistryDomain: "byo.example.com/team"}, nil).Once()
 
 		err := RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
-		s.ErrorIs(err, errMockRegistry)
-
-		mockRegistryHandler := new(mocks.RegistryHandler)
-		registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
-			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(errMockRegistry).Once()
-			return mockRegistryHandler, nil
-		}
-
-		err = RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.NoError(err)
+		s.Contains(out.String(), "please use docker login byo.example.com to manually login")
 
+		// The APC registry's refusal fails the login.
+		out.Reset()
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil).Once()
 
 		err = RegistryAuth(houstonMock, out, "", houston.GetAppConfigRequest{})
 		s.ErrorIs(err, errMockRegistry)
+		s.Contains(out.String(), "Failed to authenticate to the registry")
 
-		mockRegistryHandler.AssertExpectations(s.T())
+		s.Len(s.logins, 2)
 		houstonMock.AssertExpectations(s.T())
 	})
 
@@ -521,11 +534,7 @@ func (s *Suite) TestLoginFailure() {
 		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
 		houstonMock.On("GetAppConfig", mock.Anything).Return(&houston.AppConfig{Flags: houston.FeatureFlags{BYORegistryEnabled: false}}, nil)
 
-		mockRegistryHandler := new(mocks.RegistryHandler)
-		registryHandlerInit = func(registry string) (imagepush.RegistryHandler, error) {
-			mockRegistryHandler.On("Login", mock.Anything, mock.Anything).Return(errMockRegistry).Once()
-			return mockRegistryHandler, nil
-		}
+		s.loginsFail(errMockRegistry)
 
 		out := &bytes.Buffer{}
 		if s.NoError(Login("test.astro.io", false, "test", "test", "0.30.0", houstonMock, out)) {

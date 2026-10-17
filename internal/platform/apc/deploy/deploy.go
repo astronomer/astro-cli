@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -16,19 +17,22 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/astronomer/astro-cli/config"
-	"github.com/astronomer/astro-cli/internal/imagepush"
+	"github.com/astronomer/astro-cli/internal/containercfg"
+	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/apc/auth"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/fileutil"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/logger"
 	"github.com/astronomer/astro-cli/pkg/picker"
 )
 
 var (
-	// this is used to monkey patch the function in order to write unit test cases
-	imageHandlerInit = imagepush.ImageHandlerInit
+	// newImageEngine resolves the container engine a deploy tags, reads and
+	// pushes its image on; tests replace it.
+	newImageEngine = defaultImageEngine
 
 	gzipFile = fileutil.GzipFile
 
@@ -81,6 +85,10 @@ const (
 	airflowImageLabel                 = "io.astronomer.docker.airflow.version"
 	composeSkipImageBuildingPromptMsg = "Skipping building image since --image-name flag is used..."
 )
+
+// registryUser is the username the APC registry takes the context's token
+// under, as auth.RegistryAuth logs in with it.
+const registryUser = "user"
 
 // Deployed is what an image deploy pushed.
 type Deployed struct {
@@ -172,9 +180,24 @@ func (o Options) progress() io.Writer {
 	return os.Stdout
 }
 
-// progressSetter is an image handler that can draw its progress somewhere
-// other than stdout (imagepush.DockerImage).
-type progressSetter interface{ ProgressTo(io.Writer) }
+// imageEngine is what a deploy does to an image on the container engine:
+// pkg/imagebuild's Engine, which tests replace.
+type imageEngine interface {
+	Tag(ctx context.Context, src, dst string) error
+	Label(ctx context.Context, image, label string) (string, error)
+	Push(ctx context.Context, req imagebuild.PushRequest) (string, error)
+}
+
+// defaultImageEngine is the engine the working directory's project resolves
+// (containercfg), the one `astro deploy` to Astro builds and pushes on too.
+func defaultImageEngine() (imageEngine, error) {
+	return containercfg.ImageEngine(config.WorkingPath)
+}
+
+// airflowImage is the APC image reference of a release: <release>/airflow:<tag>.
+func airflowImage(release, tag string) string {
+	return release + "/airflow:" + tag
+}
 
 // Airflow tags the local image named (--image-name), pushes it to the
 // Deployment's registry and returns what it pushed. It builds nothing: v2
@@ -347,13 +370,14 @@ func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID st
 	return dagsFrom(deploymentInfo, appConfig)
 }
 
-func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, imageHandler imagepush.ImageHandler, houstonClient houston.ClientInterface, c *config.Context, customImageName string, opts Options) (string, error) {
+// pushDockerImage pushes localImage, the Deployment's image tagged locally,
+// to the registry the Deployment takes it from, on engine.
+func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment, byoRegistryDomain, name, nextTag, cloudDomain string, engine imageEngine, localImage string, houstonClient houston.ClientInterface, c *config.Context, customImageName string, opts Options) (string, error) {
 	var registry, remoteImage, token string
 	if byoRegistryEnabled {
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
-		token = c.Token
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil) //nolint:errcheck // error deliberately ignored in this shell code
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			var err error
@@ -361,7 +385,8 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			if err != nil {
 				return "", err
 			}
-			// Switch to per deployment registry login
+			// Switch to per deployment registry login. It leaves the engine
+			// logged in, so the push takes no credential of its own.
 			err = auth.RegistryAuth(houstonClient, opts.progress(), registry, houston.GetAppConfigRequest{
 				ClusterID:      deploymentInfo.ClusterID,
 				WorkspaceUUID:  deploymentInfo.Workspace.ID,
@@ -371,10 +396,12 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 				logger.Debugf("There was an error logging into registry: %s", err.Error())
 				return "", err
 			}
-			remoteImage = fmt.Sprintf("%s/%s", registry, imagepush.ImageName(name, nextTag))
+			remoteImage = fmt.Sprintf("%s/%s", registry, airflowImage(name, nextTag))
 		} else {
+			// Below 1.0 nothing logged in for this Deployment, so the push
+			// carries the context's token.
 			registry = registryDomainPrefix + cloudDomain
-			remoteImage = fmt.Sprintf("%s/%s", registry, imagepush.ImageName(name, nextTag))
+			remoteImage = fmt.Sprintf("%s/%s", registry, airflowImage(name, nextTag))
 			token = c.Token
 		}
 	}
@@ -392,16 +419,23 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	}
 	useShaAsTag := config.CFG.ShaAsTag.GetBool()
 	fmt.Fprintln(opts.progress(), "Pushing image to configured registry")
-	sha, err := imageHandler.Push(remoteImage, "", token, useShaAsTag)
+	// Below APC 1.0 the push carries the context's token.
+	// From 1.0 RegistryAuth has just logged in, and a BYO registry takes the
+	// credential the engine already holds, so neither carries one.
+	push := imagebuild.PushRequest{Source: localImage, Image: remoteImage, Digest: useShaAsTag, Out: opts.progress()}
+	if token != "" {
+		push.Username, push.Secret = registryUser, token
+	}
+	sha, err := engine.Push(context.Background(), push)
 	if err != nil {
-		return "", err
+		return "", deploybuild.ExplainPush(err)
 	}
 	if byoRegistryEnabled {
 		if useShaAsTag {
 			remoteImage = fmt.Sprintf("%s@%s", registry, sha)
 		}
-		runtimeVersion, _ := imageHandler.GetLabel("", airflowrt.RuntimeVersionLabel) //nolint:errcheck // error deliberately ignored in this shell code
-		airflowVersion, _ := imageHandler.GetLabel("", airflowImageLabel)             //nolint:errcheck // error deliberately ignored in this shell code
+		runtimeVersion, _ := engine.Label(context.Background(), localImage, airflowrt.RuntimeVersionLabel) //nolint:errcheck // error deliberately ignored in this shell code
+		airflowVersion, _ := engine.Label(context.Background(), localImage, airflowImageLabel)             //nolint:errcheck // error deliberately ignored in this shell code
 		req := houston.UpdateDeploymentImageRequest{ReleaseName: name, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion}
 		if _, err = houston.Call(houstonClient.UpdateDeploymentImage)(req); err != nil {
 			return "", err
@@ -410,15 +444,16 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	return remoteImage, nil
 }
 
-// tagCustomImage tags the local image customImageName as the Deployment's
-// and checks the runtime its label names against the platform's.
-func tagCustomImage(imageHandler imagepush.ImageHandler, customImageName string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface, opts Options) error {
+// tagCustomImage tags the local image customImageName as localImage, the
+// Deployment's, and checks the runtime its label names against the
+// platform's.
+func tagCustomImage(engine imageEngine, customImageName, localImage string, deploymentInfo *houston.Deployment, houstonClient houston.ClientInterface, opts Options) error {
 	fmt.Fprintln(opts.progress(), composeSkipImageBuildingPromptMsg)
-	err := imageHandler.TagLocalImage(customImageName)
+	err := engine.Tag(context.Background(), customImageName, localImage)
 	if err != nil {
 		return err
 	}
-	runtimeLabel, err := imageHandler.GetLabel("", airflowrt.RuntimeVersionLabel)
+	runtimeLabel, err := engine.Label(context.Background(), localImage, airflowrt.RuntimeVersionLabel)
 	if err != nil {
 		fmt.Fprintln(opts.progress(), "unable get runtime version from image")
 		return err
@@ -439,16 +474,16 @@ func getGetTagFromImageName(imageName string) string {
 }
 
 func tagPushDockerImage(houstonClient houston.ClientInterface, c *config.Context, deploymentInfo *houston.Deployment, name, nextTag, cloudDomain, byoRegistryDomain string, byoRegistryEnabled bool, customImageName string, opts Options) (string, error) {
-	imageName := imagepush.ImageName(name, "latest")
-	imageHandler := imageHandlerInit(imageName)
-	if p, ok := imageHandler.(progressSetter); ok {
-		p.ProgressTo(opts.progress())
-	}
-	err := tagCustomImage(imageHandler, customImageName, deploymentInfo, houstonClient, opts)
+	engine, err := newImageEngine()
 	if err != nil {
 		return "", err
 	}
-	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, imageHandler, houstonClient, c, customImageName, opts)
+	imageName := airflowImage(name, "latest")
+	err = tagCustomImage(engine, customImageName, imageName, deploymentInfo, houstonClient, opts)
+	if err != nil {
+		return "", err
+	}
+	return pushDockerImage(byoRegistryEnabled, deploymentInfo, byoRegistryDomain, name, nextTag, cloudDomain, engine, imageName, houstonClient, c, customImageName, opts)
 }
 
 func getAirflowUILink(deploymentID string, deploymentURLs []houston.DeploymentURL) string {
