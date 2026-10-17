@@ -94,16 +94,16 @@ To pass nested values as arrays, declare multiple fields with key[]=value1.`,
 		Example: `  # List Airflow API endpoints
   astro api airflow ls
 
-  # Get all DAGs from local Airflow (default: localhost:8080)
+  # Get all Dags from local Airflow (default: localhost:8080)
   astro api airflow /dags
 
-  # Get a specific DAG by path
+  # Get a specific Dag by path
   astro api airflow /dags/example_dag
 
   # Use operation ID (path params supplied via -p)
   astro api airflow get_dag -p dag_id=example_dag
 
-  # Pause a DAG via operation ID
+  # Pause a Dag via operation ID
   astro api airflow patch_dag -p dag_id=example_dag -F is_paused=true
 
   # Use jq filter on response

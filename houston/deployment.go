@@ -283,6 +283,52 @@ var (
 			      }
 			    }`,
 		},
+		{
+			version: "2.1.0",
+			query: `
+			mutation upsertDeployment(
+				$label: String,
+			    $workspaceId: Uuid,
+			    $clusterId: Uuid,
+			    $releaseName: String,
+				$executor: ExecutorType,
+				$runtimeVersion: String,
+			    $namespace: String,
+				$cloudRole: String,
+				$dagDeployment: DagDeployment,
+				$triggererReplicas: Int,
+				$mode: AllowedDeploymentModeValues,
+			  ) {
+			    upsertDeployment(
+			      workspaceUuid: $workspaceId,
+			      clusterId: $clusterId,
+			      label: $label,
+			      releaseName: $releaseName,
+			      namespace: $namespace,
+			      runtimeVersion: $runtimeVersion,
+			      executor: $executor,
+			      triggerer: {
+						replicas: $triggererReplicas
+					}
+			      dagDeployment: $dagDeployment,
+			      cloudRole: $cloudRole,
+			      mode: $mode,
+			    ) {
+			        id
+					type
+					label
+					releaseName
+					version
+					runtimeVersion
+					urls {
+						type
+						url
+					}
+					createdAt
+					updatedAt
+			      }
+			    }`,
+		},
 	}
 
 	DeploymentsGetRequest = queryList{
@@ -967,6 +1013,19 @@ var (
 			runtimeAirflowVersion
 		}
 	}`
+
+	HibernateOverrideDeploymentRequest = `
+	mutation upsertDeployment($deploymentId: Uuid!, $hibernationOverride: HibernationOverrideInput) {
+		upsertDeployment(deploymentUuid: $deploymentId, hibernationOverride: $hibernationOverride) {
+			id
+			label
+			releaseName
+			hibernationOverride {
+				hibernate
+				overrideUntil
+			}
+		}
+	}`
 )
 
 // CreateDeployment - create a deployment
@@ -1208,4 +1267,22 @@ func (h ClientImplementation) CancelUpdateDeploymentRuntime(variables map[string
 	}
 
 	return res.Data.CancelUpdateDeploymentRuntime, nil
+}
+
+func (h ClientImplementation) HibernateOverrideDeployment(variables map[string]interface{}) (*Deployment, error) {
+	if !VerifyVersionMatch(version, VersionRestrictions{GTE: "2.2.0"}) {
+		return nil, ErrFieldsNotAvailable{}
+	}
+
+	req := Request{
+		Query:     HibernateOverrideDeploymentRequest,
+		Variables: variables,
+	}
+
+	res, err := req.DoWithClient(h.client)
+	if err != nil {
+		return nil, handleAPIErr(err)
+	}
+
+	return res.Data.UpsertDeployment, nil
 }

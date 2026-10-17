@@ -23,7 +23,7 @@ local:
 	err = afero.WriteFile(fs, HomeConfigFile, configRaw, 0o777)
 	InitConfig(fs)
 	_, err = GetCurrentContext()
-	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 }
 
 func (s *Suite) TestPrintContext() {
@@ -274,6 +274,31 @@ func (s *Suite) TestExpiresIn() {
 	s.NoError(err)
 	s.Equal("localhost", outCtx.Domain)
 	s.True(time.Now().Add(time.Duration(12) * time.Second).After(val)) // now + 12 seconds will always be after expire time, since that is set before
+}
+
+// A context loaded from disk holds its expiry under "expiresin", as viper
+// reads keys back lowercased. Setting it again replaces that one: written
+// under "ExpiresIn" it sat beside the old one, and a read could find either.
+func (s *Suite) TestExpiresInReplacesTheLoadedExpiry() {
+	fs := afero.NewMemMapFs()
+	s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(`
+context: localhost
+contexts:
+  localhost:
+    domain: localhost
+    token: token
+    expiresin: 2000-01-01T00:00:00Z
+`), 0o600))
+	InitConfig(fs)
+	ctx := Context{Domain: "localhost"}
+
+	for _, seconds := range []int64{60, 3600, 7200} {
+		s.Require().NoError(ctx.SetExpiresIn(seconds))
+		InitConfig(fs) // as the next command would load it
+		got, err := ctx.GetExpiresIn()
+		s.Require().NoError(err)
+		s.WithinDuration(time.Now().Add(time.Duration(seconds)*time.Second), got, time.Minute, "after setting %ds", seconds)
+	}
 }
 
 func (s *Suite) TestExpiresInFailure() {
