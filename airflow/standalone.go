@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -421,7 +422,7 @@ func (s *Standalone) Start(opts *types.StartOptions) error {
 
 	// 7. Build environment
 	env := s.buildEnv()
-	if warning := networkExposureWarning(env, s.airflowMajorVersion); warning != "" {
+	if warning := networkExposureWarning(env, s.airflowMajorVersion, s.envFile); warning != "" {
 		fmt.Print(warning)
 	}
 
@@ -876,7 +877,9 @@ const standaloneSecretFile = ".signing-secret"
 // the same network can use it as admin. 1.x keeps that default, which some
 // rely on (another machine, a VM, a container's published port), and says
 // how to restrict it; Astro CLI v2 binds to this machine by default.
-func networkExposureWarning(env []string, airflowMajor string) string {
+// envFile is the env file the run reads, as the advice names it. A bind set
+// only in airflow.cfg is not seen, so it still warns.
+func networkExposureWarning(env []string, airflowMajor, envFile string) string {
 	key := "AIRFLOW__API__HOST"
 	if airflowMajor == "2" {
 		key = "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"
@@ -887,12 +890,17 @@ func networkExposureWarning(env []string, airflowMajor string) string {
 			host = strings.TrimSpace(v)
 		}
 	}
-	if host == "localhost" || host == "::1" || strings.HasPrefix(host, "127.") {
+	// Any spelling of loopback: 127.0.0.1 or anything in 127/8, ::1, [::1],
+	// the expanded IPv6 form, or localhost.
+	if ip := net.ParseIP(strings.Trim(host, "[]")); host == "localhost" || (ip != nil && ip.IsLoopback()) {
 		return ""
 	}
+	if envFile == "" {
+		envFile = ".env"
+	}
 	return fmt.Sprintf("Warning: standalone Airflow will be reachable from other machines on your network, with admin access.\n"+
-		"  To keep it to this machine, set %s=127.0.0.1 in your project's .env file.\n"+
-		"  Astro CLI v2 does this by default.\n", key)
+		"  To keep it to this machine, set %s=127.0.0.1 in %s.\n"+
+		"  Astro CLI v2 does this by default.\n", key, envFile)
 }
 
 // signingSecretPath is where a project keeps its standalone signing secret.
@@ -912,51 +920,81 @@ func readSigningSecret(path string) string {
 // signingSecretForEnv is the secret a project's standalone Airflow signs its
 // sessions and API tokens with: the api-server's JWTs, and the tokens its log
 // servers (which listen on every interface) accept. It is the random one
-// persistSigningSecret keeps, so logins survive a restart; it was the
-// project's name, or a constant, which anyone who knew the project could
-// reproduce and sign tokens with. With none kept, it is random, and the same
-// for every environment this Standalone builds.
+// persistSigningSecret keeps, so logins survive a restart.
+//
+// With none kept, no Airflow this CLI started is running, but one an earlier
+// CLI started may be, signing with what that CLI used: the project's name,
+// or a constant. A command run against it has to sign the same way, so that
+// is the fallback. Every start keeps a random secret first, so nothing this
+// CLI starts signs with it.
 func (s *Standalone) signingSecretForEnv() string {
 	if s.signingSecret == "" {
 		s.signingSecret = readSigningSecret(s.signingSecretPath())
 	}
 	if s.signingSecret == "" {
-		s.signingSecret = rand.Text()
+		s.signingSecret = legacySigningSecret()
 	}
 	return s.signingSecret
+}
+
+// legacySigningSecret is the secret standalone Airflow signed with before it
+// kept a random one.
+func legacySigningSecret() string {
+	if name, err := ProjectNameUnique(); err == nil {
+		return name
+	}
+	return "astro-standalone"
 }
 
 // persistSigningSecret keeps a random signing secret in the project's
 // standalone home, owner-only, unless one is already there. Start calls it
 // once it is going ahead, so the Airflow it starts and every later command
-// sign with the same one. The file is created exclusively, so two starts at
-// once keep one secret between them: the one that loses reads the winner's.
+// sign with the same one.
+//
+// The secret is written whole to a file of its own, then linked into place:
+// the link either makes it the secret, all at once, or fails because another
+// start's is there, which this start then reads. So two starts at once keep
+// one secret, and a crash never leaves an empty or half-written one. An empty
+// one from before this was atomic is replaced.
 func (s *Standalone) persistSigningSecret() {
 	path := s.signingSecretPath()
 	if secret := readSigningSecret(path); secret != "" {
 		s.signingSecret = secret
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(path), dirPermissions); err != nil {
+	dir := filepath.Dir(path)
+	secret := rand.Text()
+	s.signingSecret = secret // if it cannot be kept, this start still signs with one
+	if err := os.MkdirAll(dir, dirPermissions); err != nil {
 		logger.Debugf("Warning: could not create standalone dir for the signing secret: %v", err)
 		return
 	}
-	secret := rand.Text()
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:mnd
+	tmp, err := os.CreateTemp(dir, standaloneSecretFile+".*") // owner-only
+	if err != nil {
+		logger.Debugf("Warning: could not keep the standalone signing secret, so logins may not survive a restart: %v", err)
+		return
+	}
+	defer os.Remove(tmp.Name())
+	_, err = tmp.WriteString(secret)
+	if closeErr := tmp.Close(); err == nil {
+		err = closeErr
+	}
 	if err == nil {
-		_, err = f.WriteString(secret)
-		if closeErr := f.Close(); err == nil {
-			err = closeErr
+		err = os.Link(tmp.Name(), path)
+		switch {
+		case errors.Is(err, os.ErrExist) && readSigningSecret(path) == "":
+			err = os.Rename(tmp.Name(), path) // replace an empty one
+		case err != nil && !errors.Is(err, os.ErrExist):
+			err = os.Rename(tmp.Name(), path) // a file system without hard links
 		}
 	}
-	if err != nil {
+	if err != nil && !errors.Is(err, os.ErrExist) {
 		logger.Debugf("Warning: could not keep the standalone signing secret, so logins may not survive a restart: %v", err)
 	}
 	// What is in the file now: ours, or another start's that got there first.
 	if kept := readSigningSecret(path); kept != "" {
-		secret = kept
+		s.signingSecret = kept
 	}
-	s.signingSecret = secret
 }
 
 // readPID delegates to airflowrt.ReadPID.
@@ -965,11 +1003,13 @@ func (s *Standalone) readPID() (int, bool) {
 }
 
 // running reports the recorded PID and whether standalone Airflow is still
-// running from it: the master, or, if it has died, any of the scheduler,
-// api-server or triggerer it left in its process group (Setpgid at start).
+// running from it: anything in its process group (Setpgid at start), the
+// master or, if it has died, the scheduler, api-server or triggerer it left.
+// The group, not the PID: a PID file can outlive its process and the PID go
+// to an unrelated one, which is in no group of that ID.
 func (s *Standalone) running() (int, bool) {
-	pid, alive := s.readPID()
-	return pid, alive || (pid != 0 && airflowrt.ProcessGroupAlive(pid))
+	pid, _ := s.readPID()
+	return pid, pid != 0 && airflowrt.ProcessGroupAlive(pid)
 }
 
 // Stop terminates the standalone Airflow process.
@@ -1213,8 +1253,9 @@ func (s *Standalone) RunDAG(_, _, _, _ string, _, _ bool) error {
 
 // ImportSettings imports connections/variables/pools from the settings file.
 func (s *Standalone) ImportSettings(settingsFile, _ string, connections, variables, pools bool) error {
-	// Verify standalone is actually running before attempting to import.
-	if _, alive := s.readPID(); !alive {
+	// Verify standalone is actually running before attempting to import, as
+	// ps and stop see it: its api-server can outlive a dead master.
+	if _, running := s.running(); !running {
 		return errors.New("standalone Airflow is not running, run astro dev start --standalone to start it")
 	}
 

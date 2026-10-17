@@ -59,17 +59,19 @@ func WritePID(pidFilePath string, pid int) error {
 // outlives SIGKILL is an error, and its PID file is kept so a later stop can
 // still reach it.
 func StopProcess(pidFilePath string) (bool, error) {
-	pid, alive := ReadPID(pidFilePath)
+	pid, _ := ReadPID(pidFilePath)
 	if pid == 0 {
 		return false, nil
 	}
 
-	// The master can be gone while its scheduler/api-server/triggerer run on
-	// (it crashed, was OOM-killed, or took a SIGTERM of its own): they keep
-	// its process group, so the group, not the master, says whether anything
-	// is left to stop. A PID is not reused while a group with that ID exists,
-	// so a live group here is still ours.
-	if !alive && !isProcessGroupAlive(pid) {
+	// The process was started with Setpgid, so its group, not its PID, says
+	// whether anything is left to stop. The master can be gone while its
+	// scheduler/api-server/triggerer run on in the group (it crashed, was
+	// OOM-killed, or took a SIGTERM of its own), and a PID is not reused
+	// while a group with that ID exists, so a live group is still ours. A
+	// live PID with no group is not: the PID file outlived its process and
+	// the PID went to an unrelated one, which must not be signaled.
+	if !isProcessGroupAlive(pid) {
 		// Stale PID file — clean up
 		os.Remove(pidFilePath)
 		return false, nil
@@ -94,20 +96,17 @@ func StopProcess(pidFilePath string) (bool, error) {
 	return true, nil
 }
 
-// waitGroupGone polls until neither pid nor any process in its group is
-// alive, or timeout passes, and reports whether they are gone. pid is checked
-// on its own as well: a process not started with Setpgid leads no group, so
-// the group check alone would call it gone while it runs.
+// waitGroupGone polls until no process in pid's group is alive, or timeout
+// passes, and reports whether the group is gone.
 func waitGroupGone(pid int, timeout time.Duration) bool {
-	gone := func() bool { return !isProcessAlive(pid) && !isProcessGroupAlive(pid) }
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		time.Sleep(stopPollInterval)
-		if gone() {
+		if !isProcessGroupAlive(pid) {
 			return true
 		}
 	}
-	return gone()
+	return !isProcessGroupAlive(pid)
 }
 
 // ProcessGroupAlive reports whether any process in pid's group is still

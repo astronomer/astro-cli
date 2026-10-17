@@ -26,21 +26,14 @@ var isProcessGroupAlive = func(pid int) bool {
 	return syscall.Kill(-pid, syscall.Signal(0)) == nil
 }
 
-// terminateProcess sends SIGTERM to the process group.
+// terminateProcess sends SIGTERM to the process group. Only ever the group:
+// a PID file outlives its process, and the bare PID may since have gone to
+// an unrelated one, which is in no group with that ID.
 var terminateProcess = func(pid int) {
-	signalGroupOrProcess(pid, syscall.SIGTERM)
+	syscall.Kill(-pid, syscall.SIGTERM) //nolint:errcheck
 }
 
-// killProcess sends SIGKILL to the process group.
+// killProcess sends SIGKILL to the process group, never the bare PID.
 var killProcess = func(pid int) {
-	signalGroupOrProcess(pid, syscall.SIGKILL)
-}
-
-// signalGroupOrProcess signals pid's process group, which reaches every
-// child of a process started with Setpgid. For one that was not, there is no
-// group with its ID (ESRCH), so it signals the process itself.
-func signalGroupOrProcess(pid int, sig syscall.Signal) {
-	if err := syscall.Kill(-pid, sig); err == syscall.ESRCH {
-		syscall.Kill(pid, sig) //nolint:errcheck
-	}
+	syscall.Kill(-pid, syscall.SIGKILL) //nolint:errcheck
 }

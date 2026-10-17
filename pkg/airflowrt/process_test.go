@@ -124,39 +124,24 @@ func TestStopProcess_StopsChildrenOfADeadMaster(t *testing.T) {
 	assert.True(t, os.IsNotExist(statErr), "PID file should be cleaned up")
 }
 
-// A process a caller started without Setpgid leads no group, so the group
-// check sees nothing: the stop must still wait for the process itself, and
-// fail rather than report success while it runs.
-func TestStopProcess_ProcessWithoutAGroup(t *testing.T) {
-	for name, tc := range map[string]struct {
-		diesOnKill bool
-		wantErr    bool
-	}{
-		"stopped by SIGKILL":    {diesOnKill: true},
-		"surviving SIGKILL too": {wantErr: true},
-	} {
-		t.Run(name, func(t *testing.T) {
-			pidFile := filepath.Join(t.TempDir(), "airflow.pid")
-			require.NoError(t, WritePID(pidFile, 12345))
+// A PID file can outlive its process, and the PID go to an unrelated one: a
+// live PID with no group of that ID is not ours. It is never signaled, and
+// the PID file is cleaned up as stale.
+func TestStopProcess_NeverSignalsAReusedPID(t *testing.T) {
+	pidFile := filepath.Join(t.TempDir(), "airflow.pid")
+	require.NoError(t, WritePID(pidFile, 12345))
 
-			var terminated, killed []int
-			stubStopSeams(t, func(int) bool { return false }, &terminated, &killed)
-			// Ignores SIGTERM; dies on SIGKILL only if diesOnKill.
-			isProcessAlive = func(int) bool { return !tc.diesOnKill || len(killed) == 0 }
+	var terminated, killed []int
+	stubStopSeams(t, func(int) bool { return false }, &terminated, &killed)
+	isProcessAlive = func(int) bool { return true } // someone else's process
 
-			stopped, err := StopProcess(pidFile)
-			assert.True(t, stopped)
-			assert.Equal(t, []int{12345}, killed, "a process that ignores SIGTERM was not killed")
-			_, statErr := os.Stat(pidFile)
-			if tc.wantErr {
-				assert.ErrorContains(t, err, "still running after SIGKILL")
-				assert.NoError(t, statErr, "the PID file of a process still running should be kept")
-			} else {
-				assert.NoError(t, err)
-				assert.True(t, os.IsNotExist(statErr))
-			}
-		})
-	}
+	stopped, err := StopProcess(pidFile)
+	assert.NoError(t, err)
+	assert.False(t, stopped)
+	assert.Empty(t, terminated, "an unrelated process was sent SIGTERM")
+	assert.Empty(t, killed, "an unrelated process was sent SIGKILL")
+	_, statErr := os.Stat(pidFile)
+	assert.True(t, os.IsNotExist(statErr), "the stale PID file should be cleaned up")
 }
 
 // A group that outlives SIGKILL is an error, and its PID file is kept so a
