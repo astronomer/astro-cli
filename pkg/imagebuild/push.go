@@ -60,14 +60,16 @@ const bearerPrefix = "Bearer "
 // one when that is missing or refused. A secret without a username is
 // refused: there is no login to make with it.
 func (e Engine) Login(ctx context.Context, registry, username, secret string) error {
-	_, err := e.login(ctx, registry, username, secret)
+	_, err := e.loginIn(ctx, e.Env, []string{"login"}, registry, username, secret)
 	return err
 }
 
-// login is Login, also reporting whether the registry refused the
-// credential: what the engine said, not the command it ran, says so.
-func (e Engine) login(ctx context.Context, registry, username, secret string) (refused bool, err error) {
-	args := []string{"login", registry}
+// loginIn is Login run as args (the login subcommand, and any flag that
+// points it at a credential store) with env, also reporting whether the
+// registry refused the credential: what the engine said, not the command it
+// ran, says so.
+func (e Engine) loginIn(ctx context.Context, env, args []string, registry, username, secret string) (refused bool, err error) {
+	args = append(append([]string(nil), args...), registry)
 	var stdin io.Reader
 	switch {
 	case username != "":
@@ -77,7 +79,7 @@ func (e Engine) login(ctx context.Context, registry, username, secret string) (r
 		return false, fmt.Errorf("logging in to %s: a secret was given without a username", registry)
 	}
 	var stderr bytes.Buffer
-	if runErr := e.Cmd.Run(ctx, e.Env, rt.Stdio{In: stdin, Err: &stderr}, e.Bin, args...); runErr != nil {
+	if runErr := e.Cmd.Run(ctx, env, rt.Stdio{In: stdin, Err: &stderr}, e.Bin, args...); runErr != nil {
 		said := engineSaid(runErr, stderr.String(), registry)
 		return loginRefused(said), commandError(e.Bin+" login "+registry, runErr, stderr.String(), secret)
 	}
@@ -126,8 +128,12 @@ type PushRequest struct {
 	// goes with it.
 	Image string
 	// Username and Secret, when set, log the engine in to Image's registry
-	// before the push (Login), and the push uses that credential. Unset, the
-	// push uses the credential the engine already holds for the registry.
+	// before the push, and the push uses that credential. The login is kept
+	// in a credential store made for this one push and deleted after it,
+	// success or not (see pushAuth): never the user's own store, so nothing
+	// is left behind and concurrent pushes never share one. Unset, the push
+	// uses the engine's own config and the credential it already holds for
+	// the registry, as any `<bin> push` does.
 	Username string
 	Secret   string
 	// Digest asks for the digest of the manifest pushed (sha256:…).
@@ -153,12 +159,23 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 			return "", err
 		}
 	}
-	if req.Username != "" || req.Secret != "" {
-		registry, err := registryOf(req.Image)
-		if err != nil {
+	credential := req.Username != "" || req.Secret != ""
+	registry := ""
+	if credential {
+		var err error
+		if registry, err = registryOf(req.Image); err != nil {
 			return "", err
 		}
-		if refused, err := e.login(ctx, registry, req.Username, req.Secret); err != nil {
+	}
+	podman := (credential || req.Digest) && IsPodman(ctx, e.Cmd, e.Bin, e.Env)
+	auth := &pushAuth{}
+	if credential {
+		var err error
+		if auth, err = newPushAuth(podman, e.Env); err != nil {
+			return "", err
+		}
+		defer auth.remove()
+		if refused, err := e.loginWith(ctx, auth, registry, req.Username, req.Secret); err != nil {
 			if refused {
 				return "", &forbiddenError{cause: err}
 			}
@@ -166,9 +183,9 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		}
 	}
 
-	args := []string{"push"}
+	var args []string
 	digestFile := ""
-	if req.Digest && IsPodman(ctx, e.Cmd, e.Bin, e.Env) {
+	if req.Digest && podman {
 		f, err := os.CreateTemp("", "astro-push-digest-*")
 		if err != nil {
 			return "", fmt.Errorf("creating the push's digest file: %w", err)
@@ -178,9 +195,9 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		defer os.Remove(digestFile) //nolint:errcheck // best-effort cleanup of a temp file
 		args = append(args, "--digestfile", digestFile)
 	}
-	args = append(args, req.Image)
+	args = auth.cmdArgs("push", append(args, req.Image)...)
 	var stderr bytes.Buffer
-	if runErr := e.Cmd.Run(ctx, e.Env, rt.Stdio{Out: req.Out, Err: &stderr}, e.Bin, args...); runErr != nil {
+	if runErr := e.Cmd.Run(ctx, auth.cmdEnv(e.Env), rt.Stdio{Out: req.Out, Err: &stderr}, e.Bin, args...); runErr != nil {
 		err := commandError(e.Bin+" push "+req.Image, runErr, stderr.String(), req.Secret)
 		if pushForbidden(engineSaid(runErr, stderr.String(), req.Image, repository(req.Image))) {
 			return "", &forbiddenError{cause: err}

@@ -138,6 +138,14 @@ func clientImageEngine() (imagebuild.Engine, error) {
 // base comes from, as the CLI user with the Astro token. Without a token there
 // is nothing to log in with, and the build is left to the credential the
 // engine already holds.
+//
+// Unlike a push's credential (imagebuild.PushRequest), this one is stored in
+// the user's own engine config, as the 1.x CLI stored it: it is for the
+// build's pull of the base, and a build cannot run on a throwaway config.
+// Docker's build is buildx, a plugin found through the user's config
+// directory (cli-plugins, Docker Desktop's cliPluginsExtraDirs) along with
+// the builder it selects (buildx/), so a build pointed at another
+// DOCKER_CONFIG falls back to the legacy builder, which takes no --secret.
 func loginBaseImageRegistry(ctx context.Context, engine imagebuild.Engine, registry, token string) error {
 	if token == "" {
 		return nil

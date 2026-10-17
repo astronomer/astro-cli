@@ -76,6 +76,9 @@ func (f *fakeImageCmd) Run(_ context.Context, env []string, stdio localrt.Stdio,
 	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Labels") && f.label != nil && stdio.Out != nil {
 		fmt.Fprintln(stdio.Out, f.label(args[len(args)-1]))
 	}
+	if len(args) == 1 && args[0] == "--version" && stdio.Out != nil {
+		fmt.Fprintf(stdio.Out, "%s version 5.6.0\n", name)
+	}
 	if len(args) > 0 && args[0] == "push" && f.pushOut != "" && stdio.Out != nil {
 		fmt.Fprint(stdio.Out, f.pushOut)
 	}
@@ -105,6 +108,9 @@ func withImageSeams(t *testing.T, runtimeVersion string) *fakeImageCmd {
 // withEngine is withImageSeams on the engine bin with its connection env.
 func withEngine(t *testing.T, bin string, env []string, runtimeVersion string) *fakeImageCmd {
 	t.Helper()
+	// No push credential lands in, or is read from, the developer's docker
+	// config.
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
 	cmd := &fakeImageCmd{label: func(string) string { return runtimeVersion }}
 	origResolve := resolveContainerEngine
 	origCmd := newImageBuildCommander
@@ -632,11 +638,14 @@ func TestDeployManifestImage_RunsOnOneEngine(t *testing.T) {
 		assert.NotContains(t, call, "ctx-token", "the token is never an argument")
 		verbs = append(verbs, strings.Fields(call)[1])
 	}
-	assert.Equal(t, []string{"info", "build", "image", "tag", "login", "push", "rmi"}, verbs, "%v", cmd.calls)
+	assert.Equal(t, []string{"info", "build", "image", "tag", "--version", "login", "push", "rmi"}, verbs, "%v", cmd.calls)
 	assert.Contains(t, cmd.calls, "podman tag "+tag+" "+remote)
-	assert.Contains(t, cmd.calls, "podman push "+remote)
-	login := slices.Index(cmd.calls, "podman login registry.astro -u cli --password-stdin")
+	// The login and the push share a throwaway --authfile.
+	login := slices.IndexFunc(cmd.calls, func(c string) bool { return strings.HasPrefix(c, "podman login --authfile ") })
 	require.NotEqual(t, -1, login, "%v", cmd.calls)
+	authfile := strings.Fields(cmd.calls[login])[3]
+	assert.Equal(t, "podman login --authfile "+authfile+" registry.astro -u cli --password-stdin", cmd.calls[login])
+	assert.Contains(t, cmd.calls, "podman push --authfile "+authfile+" "+remote)
 	assert.Equal(t, "ctx-token", cmd.stdins[login])
 }
 

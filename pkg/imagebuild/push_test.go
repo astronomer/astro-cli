@@ -171,11 +171,12 @@ func TestPushTagsLogsInPushesAndUntags(t *testing.T) {
 	assert.Empty(t, digest, "no digest was asked for")
 	assert.Equal(t, []string{
 		"docker tag astro-deploy/proj-abc123 images.example.com/org/dep:deploy-1",
+		"docker --version",
 		"docker login images.example.com -u cli --password-stdin",
 		"docker push images.example.com/org/dep:deploy-1",
 		"docker rmi images.example.com/org/dep:deploy-1",
 	}, cmd.commands())
-	assert.Equal(t, "s3cret-token", cmd.calls[1].stdin)
+	assert.Equal(t, "s3cret-token", cmd.calls[2].stdin)
 	assert.Equal(t, "pushed\n", out.String())
 }
 
