@@ -3,7 +3,6 @@ package local
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 )
 
@@ -27,11 +26,11 @@ func newSessionWatchCmd(d Deps) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// WatchAndStop is not on the Runtime seam, so this builds its
 			// own from the dir NewDeps resolved for this process.
-			if d.ProxyDir == "" {
-				_, err := proxydaemon.Dir()
+			dir, err := d.proxyDir()
+			if err != nil {
 				return err
 			}
-			return newRuntime(d.ProxyDir).WatchAndStop(cmd.Context(), project, parentPID)
+			return newRuntime(dir).WatchAndStop(cmd.Context(), project, parentPID)
 		},
 	}
 	cmd.Flags().IntVar(&parentPID, "parent-pid", 0, "PID to watch; the project is stopped when it exits")

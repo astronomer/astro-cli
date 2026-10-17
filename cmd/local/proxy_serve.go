@@ -23,13 +23,12 @@ func newProxyServeCmd(d Deps) *cobra.Command {
 		SilenceErrors: true,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// The daemon re-execs the CLI into this command, so NewDeps
-			// resolved the dir in this process; empty means no home, and
-			// resolving again says why.
-			if d.ProxyDir == "" {
-				_, err := proxydaemon.Dir()
+			// resolved the dir in this process.
+			dir, err := d.proxyDir()
+			if err != nil {
 				return err
 			}
-			return proxydaemon.Serve(d.ProxyDir, port)
+			return proxydaemon.Serve(dir, port)
 		},
 	}
 	cmd.Flags().StringVar(&port, "port", proxy.DefaultPort, "Port to listen on")

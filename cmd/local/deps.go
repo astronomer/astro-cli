@@ -46,8 +46,9 @@ type Deps struct {
 	Runtime Runtime
 	// ProxyDir is where the proxy routes and the daemon's record live
 	// (proxydaemon.Dir), resolved once per run. Empty when there is no home
-	// directory, in which case Runtime is a stand-in reporting why.
+	// directory: HomeErr then says why, and Runtime is a stand-in returning it.
 	ProxyDir string
+	HomeErr  error
 
 	// Checks runs `astro local check`'s DAG parse against the project venv.
 	Checks checks.Parser
@@ -211,6 +212,7 @@ func NewDeps() Deps {
 	// runtime is a stand-in whose every call says so; commands that never
 	// reach the runtime run as usual.
 	if dir, err := proxydaemon.Dir(); err != nil {
+		d.HomeErr = err
 		d.Runtime = homelessRuntime{err: err}
 	} else {
 		d.ProxyDir = dir
@@ -295,6 +297,18 @@ func newRuntime(routesDir string) *localrt.Runtime {
 		// config over global, read for the project being acted on.
 		ContainerBinary: containercfg.Binary,
 	})
+}
+
+// proxyDir is ProxyDir, or why there is none: the resolution's own error, or,
+// for a Deps built without NewDeps, that nothing resolved one.
+func (d Deps) proxyDir() (string, error) {
+	switch {
+	case d.ProxyDir != "":
+		return d.ProxyDir, nil
+	case d.HomeErr != nil:
+		return "", d.HomeErr
+	}
+	return "", errors.New("no directory for local Airflow's proxy routes was resolved")
 }
 
 // homelessRuntime stands in for the runtime when there is no home directory

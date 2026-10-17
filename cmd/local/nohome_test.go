@@ -21,7 +21,42 @@ var errNoHomeForTest = errors.New("finding a home directory for local Airflow's 
 func homeless(d Deps) Deps {
 	d.Runtime = homelessRuntime{err: errNoHomeForTest}
 	d.ProxyDir = ""
+	d.HomeErr = errNoHomeForTest
 	return d
+}
+
+// A start says there is no home before any of its pre-start work: it does not
+// even look for the project.
+func TestStartWithNoHomeFailsBeforeAnything(t *testing.T) {
+	for _, args := range [][]string{{"local", "start"}, {"start"}, {"local", "list", "--clean"}} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			d, stdout := testDeps(t)
+			d = homeless(d)
+			d.WorkingDir = func() (string, error) {
+				t.Error("looked for the project before saying there is no home")
+				return t.TempDir(), nil
+			}
+
+			err := execute(t, d, args...)
+
+			require.ErrorIs(t, err, errNoHomeForTest)
+			assert.Empty(t, stdout.String(), "nothing ran before the error")
+		})
+	}
+}
+
+// The daemon's and the session watcher's own processes return the error NewDeps
+// resolved, not a second resolution's or none.
+func TestProxyDirReportsTheResolutionError(t *testing.T) {
+	_, err := homeless(Deps{}).proxyDir()
+	require.ErrorIs(t, err, errNoHomeForTest)
+
+	_, err = Deps{}.proxyDir()
+	require.Error(t, err, "a Deps with no dir and no reason still fails")
+
+	dir, err := Deps{ProxyDir: "/x/.astro/proxy"}.proxyDir()
+	require.NoError(t, err)
+	assert.Equal(t, "/x/.astro/proxy", dir)
 }
 
 // The commands that need the runtime fail with the reason, as an error rather

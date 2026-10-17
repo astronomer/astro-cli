@@ -215,6 +215,11 @@ func newStartCmd(c *cli) *cobra.Command {
 }
 
 func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag []string) error {
+	// Without a home for the proxy routes nothing can start: say so before
+	// the refresh, the catalog, the plan and the secret checks.
+	if c.d.HomeErr != nil {
+		return c.d.HomeErr
+	}
 	r := c.renderer()
 	wd, err := c.d.WorkingDir()
 	if err != nil {
@@ -777,6 +782,11 @@ func (c *cli) runListClean(r cliout.Renderer) error {
 	// alternatives: report both, or someone told only "Error: ..." reruns the
 	// command against records it already cleaned and reads the same error as
 	// having done nothing.
+	// Without a home there is nothing it could have read, so there is no
+	// list to show beside the error.
+	if c.d.HomeErr != nil {
+		return c.d.HomeErr
+	}
 	removed, pruneErr := c.d.Runtime.PruneStale()
 	// Everything PruneStale returns is stale by definition; show it all.
 	rows := buildListRows(removed, true, time.Now())
