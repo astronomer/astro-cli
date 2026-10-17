@@ -61,6 +61,9 @@ func (s *Suite) TestDeployRefusesUncommittedChanges() {
 	s.Equal(0, deployed, "a refused deploy ships nothing")
 	s.NotContains(printed.String(), "Usage:", "the refusal is not a usage mistake")
 
+	// Flags that conflict are reported first, not hidden behind the refusal.
+	s.ErrorIs(execDeployCmd("test-deployment-id", "--dags", "--image", "--workspace-id", "test-workspace-id"), ErrBothDagsOnlyAndImageOnlySet)
+
 	s.NoError(execDeployCmd("test-deployment-id", "--image-name", "img:1", "--workspace-id", "test-workspace-id", "--force"))
 	s.Equal(1, deployed, "--force deploys anyway")
 }
