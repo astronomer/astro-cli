@@ -25,9 +25,9 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	os.Setenv("DOCKER_CONFIG", dir) //nolint:errcheck,usetesting // for every test, before any runs
+	os.Setenv("DOCKER_CONFIG", dir) //nolint:usetesting // for every test, before any runs
 	code := m.Run()
-	os.RemoveAll(dir) //nolint:errcheck // a temp dir
+	os.RemoveAll(dir)
 	os.Exit(code)
 }
 
@@ -74,9 +74,9 @@ func (f *credEngine) Run(_ context.Context, env []string, s rt.Stdio, name strin
 	case "login":
 		path := f.credPath(env, args)
 		if f.bin == "docker" {
-			data, _ := os.ReadFile(path) //nolint:errcheck // a missing file reads empty
+			data, _ := os.ReadFile(path)
 			f.seenConfig = append(f.seenConfig, string(data))
-			meta, _ := os.ReadFile(filepath.Join(filepath.Dir(path), "contexts", "meta", "colima", "meta.json")) //nolint:errcheck // absent reads empty
+			meta, _ := os.ReadFile(filepath.Join(filepath.Dir(path), "contexts", "meta", "colima", "meta.json"))
 			f.seenContext = append(f.seenContext, string(meta))
 		}
 		return os.WriteFile(path, []byte(`{"token":"`+c.stdin+`"}`), 0o600)
@@ -151,7 +151,7 @@ func TestPushWithACredentialUsesAThrowawayDockerConfig(t *testing.T) {
 
 	var tmp string
 	for _, c := range cmd.calls {
-		cfg := lastEnv(c.env, "DOCKER_CONFIG")
+		cfg := envDockerConfig(c.env)
 		switch c.args[0] {
 		case "login", "push":
 			require.NotEmpty(t, cfg, c.String())
@@ -209,7 +209,7 @@ func TestPushRemovesTheThrowawayConfigOnFailure(t *testing.T) {
 			var tmp string
 			for _, c := range cmd.calls {
 				if c.args[0] == "login" {
-					tmp = lastEnv(c.env, "DOCKER_CONFIG")
+					tmp = envDockerConfig(c.env)
 				}
 			}
 			require.NotEmpty(t, tmp)
@@ -298,7 +298,7 @@ func TestConcurrentPushesKeepTheirOwnCredentials(t *testing.T) {
 			}
 			for _, c := range cmd.calls {
 				if c.args[0] == "login" {
-					dir := lastEnv(c.env, "DOCKER_CONFIG")
+					dir := envDockerConfig(c.env)
 					if bin == "podman" {
 						dir = filepath.Dir(argOf(c.args, "--authfile"))
 					}
@@ -320,7 +320,7 @@ func TestPushWithoutACredentialUsesTheUsersConfig(t *testing.T) {
 		require.NoError(t, err)
 		for _, c := range cmd.calls {
 			assert.NotContains(t, c.args, "--authfile", c.String())
-			assert.Empty(t, lastEnv(c.env, "DOCKER_CONFIG"), c.String())
+			assert.Empty(t, envDockerConfig(c.env), c.String())
 		}
 	}
 }

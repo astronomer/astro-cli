@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // pushAuth is where a push that carries its own credential keeps it: a
@@ -188,7 +189,7 @@ func copyTree(src, dst string) error {
 // commands read: DOCKER_CONFIG from the engine's env or the process's, else
 // ~/.docker. "" when there is no home to find it in.
 func userDockerConfigDir(env []string) string {
-	if dir := lastEnv(env, "DOCKER_CONFIG"); dir != "" {
+	if dir := envDockerConfig(env); dir != "" {
 		return dir
 	}
 	if dir := os.Getenv("DOCKER_CONFIG"); dir != "" {
@@ -201,13 +202,13 @@ func userDockerConfigDir(env []string) string {
 	return filepath.Join(home, ".docker")
 }
 
-// lastEnv is the value of key in env, the last one winning as it does for a
-// command run with it.
-func lastEnv(env []string, key string) string {
+// envDockerConfig is DOCKER_CONFIG in env, the last one winning as it does for
+// a command run with it.
+func envDockerConfig(env []string) string {
 	val := ""
 	for _, kv := range env {
-		if len(kv) > len(key) && kv[:len(key)] == key && kv[len(key)] == '=' {
-			val = kv[len(key)+1:]
+		if v, ok := strings.CutPrefix(kv, "DOCKER_CONFIG="); ok {
+			val = v
 		}
 	}
 	return val

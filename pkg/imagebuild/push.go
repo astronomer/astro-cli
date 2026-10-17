@@ -160,38 +160,25 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		}
 	}
 	credential := req.Username != "" || req.Secret != ""
-	registry := ""
 	if credential {
-		var err error
-		if registry, err = registryOf(req.Image); err != nil {
+		// Before anything runs: a reference naming no registry has no login.
+		if _, err := registryOf(req.Image); err != nil {
 			return "", err
 		}
 	}
 	podman := (credential || req.Digest) && IsPodman(ctx, e.Cmd, e.Bin, e.Env)
-	auth := &pushAuth{}
-	if credential {
-		var err error
-		if auth, err = newPushAuth(podman, e.Env); err != nil {
-			return "", err
-		}
-		defer auth.remove()
-		if refused, err := e.loginWith(ctx, auth, registry, req.Username, req.Secret); err != nil {
-			if refused {
-				return "", &forbiddenError{cause: err}
-			}
-			return "", err
-		}
+	auth, err := e.pushLogin(ctx, &req, podman)
+	defer auth.remove()
+	if err != nil {
+		return "", err
 	}
 
 	var args []string
 	digestFile := ""
 	if req.Digest && podman {
-		f, err := os.CreateTemp("", "astro-push-digest-*")
-		if err != nil {
-			return "", fmt.Errorf("creating the push's digest file: %w", err)
+		if digestFile, err = newDigestFile(); err != nil {
+			return "", err
 		}
-		digestFile = f.Name()
-		f.Close()
 		defer os.Remove(digestFile) //nolint:errcheck // best-effort cleanup of a temp file
 		args = append(args, "--digestfile", digestFile)
 	}
@@ -207,7 +194,6 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 
 	digest := ""
 	if req.Digest {
-		var err error
 		if digestFile != "" {
 			digest, err = readDigestFile(digestFile, req.Image)
 		} else {
@@ -221,6 +207,46 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		return "", err
 	}
 	return digest, nil
+}
+
+// pushLogin logs the engine in for a push that carries a credential, into a
+// pushAuth made for it, and returns that pushAuth. A push without one gets an
+// empty pushAuth: its push runs on the engine's own config. The pushAuth is
+// returned on an error too, for the caller's deferred remove.
+func (e Engine) pushLogin(ctx context.Context, req *PushRequest, podman bool) (*pushAuth, error) {
+	if req.Username == "" && req.Secret == "" {
+		return &pushAuth{}, nil
+	}
+	registry, err := registryOf(req.Image)
+	if err != nil {
+		return &pushAuth{}, err
+	}
+	auth, err := newPushAuth(podman, e.Env)
+	if err != nil {
+		return &pushAuth{}, err
+	}
+	if refused, err := e.loginWith(ctx, auth, registry, req.Username, req.Secret); err != nil {
+		if refused {
+			return auth, &forbiddenError{cause: err}
+		}
+		return auth, err
+	}
+	return auth, nil
+}
+
+// newDigestFile is an empty temporary file for podman to write a push's
+// digest to.
+func newDigestFile() (string, error) {
+	f, err := os.CreateTemp("", "astro-push-digest-*")
+	if err != nil {
+		return "", fmt.Errorf("creating the push's digest file: %w", err)
+	}
+	name := f.Name()
+	if err := f.Close(); err != nil {
+		os.Remove(name) //nolint:errcheck // best-effort cleanup of a temp file
+		return "", err
+	}
+	return name, nil
 }
 
 // repoDigest reads the digest docker recorded for image's repository when it
