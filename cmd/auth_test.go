@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 
@@ -17,21 +18,21 @@ func (s *CmdSuite) TestAuthRootCommand() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("login", "--help")
 	s.NoError(err)
-	s.Contains(output, "Authenticate to Astro or Astro Private Cloud")
+	s.Contains(output, "Authenticate to Astro or APC")
 }
 
 func (s *CmdSuite) TestLogin() {
 	buf := new(bytes.Buffer)
 	cloudDomain := "astronomer.io"
-	softwareDomain := "astronomer_dev.com"
+	apcDomain := "astronomer_dev.com"
 
 	cloudLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 		s.Equal(cloudDomain, domain)
 		return nil
 	}
 
-	softwareLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
-		s.Equal(softwareDomain, domain)
+	apcLogin = func(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+		s.Equal(apcDomain, domain)
 		return nil
 	}
 
@@ -40,7 +41,7 @@ func (s *CmdSuite) TestLogin() {
 
 	// software login success
 	testUtil.InitTestConfig(testUtil.Initial)
-	login(&cobra.Command{}, []string{softwareDomain}, nil, buf)
+	login(&cobra.Command{}, []string{apcDomain}, nil, buf)
 
 	// no domain, cloud login
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
@@ -55,28 +56,68 @@ func (s *CmdSuite) TestLogin() {
 	login(&cobra.Command{}, []string{}, nil, buf)
 
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	softwareDomain = "software.astronomer.io"
-	login(&cobra.Command{}, []string{softwareDomain}, nil, buf)
-	s.Contains(buf.String(), "To login to Astro Private Cloud follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+	apcDomain = "software.astronomer.io"
+	login(&cobra.Command{}, []string{apcDomain}, nil, buf)
+	s.Contains(buf.String(), "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
+}
+
+// --token-login reaches the APC login, with the domain given or the current
+// context's, as it reaches the Astro one: before, the APC login was handed no
+// token and asked for one interactively, which a CI job cannot answer.
+func (s *CmdSuite) TestLoginPassesTheTokenToAPC() {
+	origAPCLogin, origToken := apcLogin, token
+	defer func() { apcLogin, token = origAPCLogin, origToken }()
+
+	var got []string
+	apcLogin = func(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+		got = append(got, token)
+		return nil
+	}
+	token = "ci-token"
+
+	testUtil.InitTestConfig(testUtil.Initial)
+	s.NoError(login(&cobra.Command{}, []string{"astronomer_dev.com"}, nil, new(bytes.Buffer)))
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.NoError(login(&cobra.Command{}, []string{}, nil, new(bytes.Buffer)))
+	s.Equal([]string{"ci-token", "ci-token"}, got)
+}
+
+// A token login asks for nothing, so --oauth with it is refused rather than
+// silently ignored.
+func (s *CmdSuite) TestLoginRefusesTokenWithOAuth() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	_, err := executeCommand("login", "astronomer_dev.com", "--token-login", "ci-token", "--oauth")
+	s.ErrorContains(err, "[token-login oauth]")
 }
 
 func (s *CmdSuite) TestLogout() {
 	localDomain := "localhost"
-	softwareDomain := "astronomer_dev.com"
+	apcDomain := "astronomer_dev.com"
 
-	cloudLogout = func(domain string, out io.Writer) {
+	origCloudLogout, origAPCLogout := cloudLogout, apcLogout
+	defer func() { cloudLogout, apcLogout = origCloudLogout, origAPCLogout }()
+
+	var cloudLogoutErr error
+	cloudLogout = func(domain string, out io.Writer) error {
 		s.Equal(localDomain, domain)
+		return cloudLogoutErr
 	}
-	softwareLogout = func(domain string) {
-		s.Equal(softwareDomain, domain)
+	apcLogout = func(domain string) {
+		s.Equal(apcDomain, domain)
 	}
 
 	// cloud logout success
 	err := logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
 	s.NoError(err)
 
+	// a cloud logout that fails fails the command, so it exits non-zero
+	cloudLogoutErr = errors.New("failed to clear the credentials")
+	err = logout(&cobra.Command{}, []string{localDomain}, os.Stdout)
+	s.ErrorIs(err, cloudLogoutErr)
+	cloudLogoutErr = nil
+
 	// software logout success
-	err = logout(&cobra.Command{}, []string{softwareDomain}, os.Stdout)
+	err = logout(&cobra.Command{}, []string{apcDomain}, os.Stdout)
 	s.NoError(err)
 
 	// no domain, cloud logout
@@ -92,7 +133,7 @@ func (s *CmdSuite) TestLogout() {
 	// no domain, no current context set
 	config.ResetCurrentContext()
 	err = logout(&cobra.Command{}, []string{}, os.Stdout)
-	s.EqualError(err, "no context set, have you authenticated to Astro or Astro Private Cloud? Run astro login and try again")
+	s.EqualError(err, "no context set, have you authenticated to Astro or APC? Run astro login and try again")
 }
 
 func (s *CmdSuite) TestAuthToken() {
@@ -160,12 +201,12 @@ func (s *CmdSuite) TestAuthRootCmd() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	output, err := executeCommand("auth", "--help")
 	s.NoError(err)
-	s.Contains(output, "Commands for authenticating to Astro or Astro Private Cloud")
+	s.Contains(output, "Commands for authenticating to Astro or APC")
 
 	// Test auth login subcommand exists
 	output, err = executeCommand("auth", "login", "--help")
 	s.NoError(err)
-	s.Contains(output, "Authenticate to Astro or Astro Private Cloud")
+	s.Contains(output, "Authenticate to Astro or APC")
 
 	// Test auth logout subcommand exists
 	output, err = executeCommand("auth", "logout", "--help")
