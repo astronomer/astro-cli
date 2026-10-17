@@ -1,6 +1,7 @@
 package imagebuild
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -65,7 +66,7 @@ func TestPushDockerHandsOutToItsStdout(t *testing.T) {
 	_, err = testEngine(cmd, "docker").Push(context.Background(), PushRequest{Image: "r.example.com/a:t", Out: w})
 	require.NoError(t, err)
 	assert.Same(t, w, gotOut, "docker's stdout is the caller's file, not a pipe")
-	assert.NotEqual(t, gotErr, io.Writer(w), "docker's stderr does not reach Out")
+	assert.IsType(t, &bytes.Buffer{}, gotErr, "docker's stderr is kept for the error alone, not streamed to Out")
 }
 
 // A docker push that fails says why in its error, not in Out as well.
@@ -152,17 +153,21 @@ func TestPushPodmanFailureStreamsAndRedacts(t *testing.T) {
 // of a secret is held back, so a secret split across the cut is redacted.
 func TestRedactingLinesHoldsASplitSecretAtTheCap(t *testing.T) {
 	secrets := secretForms("cli", "s3cret-token")
+	// The longest form, the credential file's base64 entry, is what the
+	// hold-back is sized by: split it one byte before its end, the buffer
+	// exactly at the cap, so holding back one byte less leaks its first.
+	longest := secrets[0]
+	require.Equal(t, base64.StdEncoding.EncodeToString([]byte("cli:s3cret-token")), longest)
+	head := strings.Repeat("x", maxProgressLine-(len(longest)-1))
 	var out strings.Builder
 	l := newRedactingLines(&out, secrets)
-	_, err := l.Write([]byte(strings.Repeat("x", maxProgressLine-4) + "s3cre"))
+	_, err := l.Write([]byte(head + longest[:len(longest)-1]))
 	require.NoError(t, err)
-	assert.NotEmpty(t, out.String(), "the cap forced a write")
-	_, err = l.Write([]byte("t-token done\n"))
+	assert.Equal(t, head, out.String(), "the cap forced a write of all but the held-back start of the secret")
+	_, err = l.Write([]byte(longest[len(longest)-1:] + " done\n"))
 	require.NoError(t, err)
 	l.Flush()
-	assert.NotContains(t, out.String(), "s3cre")
-	assert.True(t, strings.HasSuffix(out.String(), "x[redacted] done\n"), out.String()[len(out.String())-30:])
-	assert.Equal(t, maxProgressLine-4+len("[redacted] done\n"), out.Len())
+	assert.Equal(t, head+"[redacted] done\n", out.String())
 }
 
 func TestSecretForms(t *testing.T) {
