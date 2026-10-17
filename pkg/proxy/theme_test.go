@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -222,8 +223,10 @@ func TestInjectAirflowThemeCarriesThePrePaintBackground(t *testing.T) {
 	if !strings.Contains(got, "if (!document.getElementById('root')) s.remove();") {
 		t.Errorf("pre-paint rule never removes itself on a page with no #root:\n%s", got)
 	}
-	for _, want := range []string{"#161d2d", "#ffffff"} {
-		if !strings.Contains(got, want) {
+	// Runtime's black and white tokens, which Airflow paints the page with
+	// once the theme lands.
+	for _, want := range []string{"oklch(0.220 0.025 289)", "oklch(0.985 0.002 289)"} {
+		if !strings.Contains(got, "'"+want+"'") {
 			t.Errorf("pre-paint script missing background %s:\n%s", want, got)
 		}
 	}
@@ -232,8 +235,87 @@ func TestInjectAirflowThemeCarriesThePrePaintBackground(t *testing.T) {
 	if i := strings.Index(got, themeTag); i < 0 || i > head {
 		t.Errorf("theme CSS is not in the head:\n%s", got)
 	}
-	if !strings.Contains(got, "--chakra-colors-brand-500: #872DED") {
-		t.Errorf("theme CSS does not map Airflow's brand color:\n%s", got)
+	if !strings.Contains(got, "--chakra-colors-brand-600: oklch(0.460 0.190 298.0);") {
+		t.Errorf("theme CSS does not set Runtime's brand color:\n%s", got)
+	}
+}
+
+// The colors are Runtime's theme and nothing else: its brand and gray palettes
+// and its black and white, the same tokens Airflow 3.2+ takes from
+// AIRFLOW__API__THEME on Astro. Airflow's own semantic and status colors stay
+// Airflow's, as they do there.
+func TestInjectAirflowThemeSetsRuntimesPalettes(t *testing.T) {
+	resp := newHTMLResponse(t, `<html><head></head><body><div id="root"></div></body></html>`, false) //nolint:bodyclose // newHTMLResponse registers t.Cleanup
+	if err := InjectAirflowTheme(resp); err != nil {
+		t.Fatal(err)
+	}
+	got := readBody(t, resp)
+
+	for _, want := range []string{
+		"--chakra-colors-black: oklch(0.220 0.025 289);",
+		"--chakra-colors-white: oklch(0.985 0.002 289);",
+		"--chakra-colors-brand-50: oklch(0.975 0.003 289);",
+		"--chakra-colors-brand-300: oklch(0.800 0.080 298.0);",
+		"--chakra-colors-brand-800: oklch(0.328 0.035 289);",
+		"--chakra-colors-gray-500: oklch(0.630 0.008 289);",
+		"--chakra-colors-gray-950: oklch(0.160 0.018 289);",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("theme CSS is missing %q:\n%s", want, got)
+		}
+	}
+
+	vars := regexp.MustCompile(`--chakra-colors-([a-z]+)`).FindAllStringSubmatch(got, -1)
+	if len(vars) != 24 {
+		t.Errorf("theme CSS sets %d colors, want Runtime's 24 (11 brand, 11 gray, black, white)", len(vars))
+	}
+	for _, v := range vars {
+		switch v[1] {
+		case "brand", "gray", "black", "white":
+		default:
+			t.Errorf("theme CSS sets %s, which Runtime's theme leaves to Airflow", v[0])
+		}
+	}
+
+	// Scoped to the classes Airflow 3 puts on its root, so Airflow 2, which
+	// Runtime does not theme, keeps its own colors.
+	if !strings.Contains(got, "html.light, html.dark {\n  --chakra-colors-") {
+		t.Errorf("theme colors are not scoped to Airflow 3's root:\n%s", got)
+	}
+}
+
+// A scale's steps go out lightest to darkest. Sorted as strings, 100 would come
+// before 50.
+func TestParseAirflowThemeOrdersStepsNumerically(t *testing.T) {
+	theme, err := parseAirflowTheme([]byte(`{"tokens":{"colors":{
+		"black":{"value":"#000"},"white":{"value":"#fff"},
+		"brand":{"950":{"value":"c"},"100":{"value":"b"},"50":{"value":"a"}}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, v := range theme.colors {
+		names = append(names, v.name)
+	}
+	want := "--chakra-colors-black --chakra-colors-brand-50 --chakra-colors-brand-100 --chakra-colors-brand-950 --chakra-colors-white"
+	if got := strings.Join(names, " "); got != want {
+		t.Errorf("colors in order\n got: %s\nwant: %s", got, want)
+	}
+}
+
+func TestParseAirflowThemeRejectsWhatItCannotPaint(t *testing.T) {
+	for name, doc := range map[string]string{
+		"not JSON":             `{`,
+		"no black or white":    `{"tokens":{"colors":{"brand":{"50":{"value":"a"}}}}}`,
+		"a step not a number":  `{"tokens":{"colors":{"black":{"value":"#000"},"white":{"value":"#fff"},"brand":{"solid":{"value":"a"}}}}}`,
+		"a step with no value": `{"tokens":{"colors":{"black":{"value":"#000"},"white":{"value":"#fff"},"brand":{"50":{}}}}}`,
+		"a color neither":      `{"tokens":{"colors":{"black":{"value":"#000"},"white":{"value":"#fff"},"brand":"purple"}}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parseAirflowTheme([]byte(doc)); err == nil {
+				t.Error("parsed without an error")
+			}
+		})
 	}
 }
 
