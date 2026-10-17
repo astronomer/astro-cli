@@ -51,12 +51,15 @@ func renderTokenList(format cliout.Format, out io.Writer, tokens []apitoken.Toke
 }
 
 // tokenHeader and tokenRow lay a token out, for a list and for a picker.
+// KIND is STANDARD or DIRECT_ACCESS, as the API names it: "type" would read
+// as the scope. It is the last column, added after the others, so a script
+// that reads the table by position finds every earlier column where it was.
 func tokenHeader(roleHeader string) []string {
-	return []string{"ID", "NAME", "DESCRIPTION", "SCOPE", roleHeader, "CREATED", "CREATED BY"}
+	return []string{"ID", "NAME", "DESCRIPTION", "SCOPE", roleHeader, "CREATED", "CREATED BY", "KIND"}
 }
 
 func tokenRow(t *apitoken.Token) []string {
-	return []string{t.ID, t.Name, t.Description, t.Scope, t.Role, apitoken.TimeAgo(t.CreatedAt), t.CreatedBy}
+	return []string{t.ID, t.Name, t.Description, t.Scope, t.Role, apitoken.TimeAgo(t.CreatedAt), t.CreatedBy, apitoken.KindText(t)}
 }
 
 // renderTokenSecret renders a token that carries its secret: the new one, or
@@ -139,14 +142,16 @@ func workspaceTokenPicker(nameFlag, question string) apitoken.Picker {
 
 // organizationTokenPicker picks among the Organization's tokens, asking
 // question. Its table has always been shorter than the others: no ID, scope
-// or creator, and the lifetime the token was created with.
+// or creator, and the lifetime the token was created with. It shows the kind
+// as they do: rotating or deleting is where telling a DIRECT_ACCESS token
+// from a STANDARD one matters.
 func organizationTokenPicker(nameFlag, question string) apitoken.Picker {
-	return newTokenPicker([]string{"NAME", "DESCRIPTION", "ROLE", "EXPIRES"}, func(t *apitoken.Token) []string {
+	return newTokenPicker([]string{"NAME", "DESCRIPTION", "ROLE", "EXPIRES", "KIND"}, func(t *apitoken.Token) []string {
 		expires := ""
 		if t.ExpiryPeriodInDays != nil {
 			expires = strconv.Itoa(*t.ExpiryPeriodInDays)
 		}
-		return []string{t.Name, t.Description, t.Role, expires}
+		return []string{t.Name, t.Description, t.Role, expires, apitoken.KindText(t)}
 	}, errInvalidOrganizationTokenKey, nameFlag, question)
 }
 
