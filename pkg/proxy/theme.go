@@ -3,9 +3,13 @@ package proxy
 import (
 	"bytes"
 	"compress/gzip"
+	_ "embed"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -14,45 +18,114 @@ import (
 // before injecting, so a page that already carries the theme is left alone.
 const themeTagID = "astro-theme"
 
-// Airflow's own page backgrounds, not brand colors: what Airflow 3 paints once
-// booted (its dark token resolves to oklch(0.23185 0.0323 266.44)). They are
-// only on screen for the moment before Airflow's bundle runs; see
-// prePaintScript.
-const (
-	airflowPageDark  = "#161d2d"
-	airflowPageLight = "#ffffff"
-)
+// runtimeThemeJSON is the Airflow UI theme Astro Runtime ships, a verbatim copy
+// of astro-runtime's image/files/airflow-ui-theme.json. Runtime hands it to
+// Airflow 3.2+ as AIRFLOW__API__THEME, which makes it how Airflow looks on
+// Astro; the proxy paints the same tokens so a local Airflow looks the same.
+//
+//go:embed airflow-ui-theme.json
+var runtimeThemeJSON []byte
 
-// The Astronomer colors the theme maps onto Airflow's Chakra tokens.
-const (
-	newMoon80 = "#343247"
-	purple60  = "#872DED"
-	gold      = "#FFB32D"
-	success   = "#19BA5A"
-	danger    = "#F03A47"
-	info      = "#2676FF"
-)
+// cssVar is one CSS custom property the theme sets.
+type cssVar struct{ name, value string }
 
-// airflowCSS themes Airflow 3's Chakra UI with Astronomer brand colors, and
-// gives every Airflow page the thin scrollbars Astro's own surfaces use.
-const airflowCSS = `
-:root {
-  --chakra-colors-brand-muted: ` + newMoon80 + `;
-  --chakra-colors-brand-emphasized: #434060;
-  --chakra-colors-brand-500: ` + purple60 + `;
-  --chakra-colors-brand-600: ` + purple60 + `;
-  --chakra-colors-fg-muted: #b8b5c4;
-  --chakra-colors-blue-500: ` + purple60 + `;
-  --chakra-colors-blue-600: ` + purple60 + `;
-  --chakra-colors-green-500: ` + success + `;
-  --chakra-colors-red-500: ` + danger + `;
-  --chakra-colors-orange-500: ` + gold + `;
-  --chakra-colors-cyan-500: ` + info + `;
+// airflowTheme is the part of an Airflow UI theme the proxy paints.
+type airflowTheme struct {
+	// colors are the theme's color tokens as Chakra's CSS variables, in a
+	// stable order: palettes by name, a scale's steps from lightest to darkest.
+	colors []cssVar
+	// black and white are the page backgrounds Airflow paints from the theme:
+	// Chakra's bg token is black in dark mode and white in light.
+	black, white string
 }
-/* Thin scrollbars. Translucent gray rather than a Chakra color token: the
- * thumb must read on both of Airflow's themes and outside Chakra-styled
- * subtrees (log panes, Airflow 2). */
-::-webkit-scrollbar {
+
+// parseAirflowTheme reads the color tokens of an AIRFLOW__API__THEME document.
+// A token is a single value ({"value": ...}, as black and white are) or a scale
+// of numbered steps, each one a single value (brand, gray).
+func parseAirflowTheme(raw []byte) (airflowTheme, error) {
+	type token struct {
+		Value string `json:"value"`
+	}
+	var doc struct {
+		Tokens struct {
+			Colors map[string]json.RawMessage `json:"colors"`
+		} `json:"tokens"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return airflowTheme{}, fmt.Errorf("parsing the Airflow theme: %w", err)
+	}
+
+	names := make([]string, 0, len(doc.Tokens.Colors))
+	for name := range doc.Tokens.Colors {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var theme airflowTheme
+	for _, name := range names {
+		var single token
+		if err := json.Unmarshal(doc.Tokens.Colors[name], &single); err == nil && single.Value != "" {
+			theme.colors = append(theme.colors, cssVar{"--chakra-colors-" + name, single.Value})
+			switch name {
+			case "black":
+				theme.black = single.Value
+			case "white":
+				theme.white = single.Value
+			}
+			continue
+		}
+		var scale map[string]token
+		if err := json.Unmarshal(doc.Tokens.Colors[name], &scale); err != nil {
+			return airflowTheme{}, fmt.Errorf("color %q in the Airflow theme: %w", name, err)
+		}
+		steps := make([]int, 0, len(scale))
+		for step, tok := range scale {
+			n, err := strconv.Atoi(step)
+			if err != nil || tok.Value == "" {
+				return airflowTheme{}, fmt.Errorf("color %q in the Airflow theme: step %q is not a numbered color", name, step)
+			}
+			steps = append(steps, n)
+		}
+		sort.Ints(steps)
+		for _, n := range steps {
+			step := strconv.Itoa(n)
+			theme.colors = append(theme.colors, cssVar{"--chakra-colors-" + name + "-" + step, scale[step].Value})
+		}
+	}
+	if theme.black == "" || theme.white == "" {
+		return airflowTheme{}, errors.New("the Airflow theme has no black and white tokens to paint the page with")
+	}
+	return theme, nil
+}
+
+// css sets the theme's color tokens on an Airflow 3 page.
+//
+// Only the palettes are set, the way AIRFLOW__API__THEME sets them: Airflow's
+// semantic tokens (bg, border, brand.solid, ...) refer to palette steps and pick
+// a different step per color mode, so light and dark both come out as they do
+// on Astro. The rule is unlayered, which outranks the variables Chakra keeps in
+// its tokens layer: Airflow's own palette before 3.2, and on 3.2+ the same
+// values again when the Runtime image has set the theme. Airflow 3.0 has no
+// brand palette, so it takes the theme's neutrals and keeps its blue accent.
+//
+// html.light and html.dark are the classes next-themes puts on Airflow 3's
+// root. Airflow 2 never sets them, and Runtime does not theme it either, so it
+// keeps its own colors.
+func (t airflowTheme) css() string {
+	var b strings.Builder
+	b.WriteString("html.light, html.dark {\n")
+	for _, v := range t.colors {
+		fmt.Fprintf(&b, "  %s: %s;\n", v.name, v.value)
+	}
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// scrollbarCSS gives every Airflow page the thin scrollbars Astro's own
+// surfaces use. Translucent gray rather than a Chakra color token: the thumb
+// must read on both of Airflow's themes and outside Chakra-styled subtrees (log
+// panes, Airflow 2).
+const scrollbarCSS = `::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
@@ -89,7 +162,8 @@ const airflowCSS = `
 //     head, so it never needed a bridge — and would otherwise keep this
 //     background on the canvas under its own light chrome for the whole
 //     session. It has no #root, which is what the removal below tests for.
-const prePaintScript = `<script>
+func prePaintScript(dark, light string) string {
+	return `<script>
 (function(){
   var pref;
   try { pref = localStorage.getItem('theme'); } catch(e){}
@@ -98,17 +172,25 @@ const prePaintScript = `<script>
      window.matchMedia('(prefers-color-scheme: dark)').matches);
   var s = document.createElement('style');
   s.textContent = 'html:not(.light):not(.dark){background:' +
-    (dark ? '` + airflowPageDark + `' : '` + airflowPageLight + `') + '}';
+    (dark ? '` + dark + `' : '` + light + `') + '}';
   document.head.appendChild(s);
   addEventListener('DOMContentLoaded', function(){
     if (!document.getElementById('root')) s.remove();
   });
 })();
 </script>`
+}
 
 // airflowThemeSnippet is everything that has to be in place before an Airflow
 // page's first paint, injected in one pass.
-const airflowThemeSnippet = `<style id="` + themeTagID + `">` + airflowCSS + `</style>` + prePaintScript
+var airflowThemeSnippet = func() string {
+	theme, err := parseAirflowTheme(runtimeThemeJSON)
+	if err != nil {
+		panic(err)
+	}
+	return `<style id="` + themeTagID + `">` + theme.css() + scrollbarCSS + `</style>` +
+		prePaintScript(theme.black, theme.white)
+}()
 
 // InjectAirflowTheme puts the Astronomer theme into an Airflow HTML page: the
 // brand colors, thin scrollbars, and a background painted before Airflow's
