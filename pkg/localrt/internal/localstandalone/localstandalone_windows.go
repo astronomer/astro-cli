@@ -34,10 +34,6 @@ func New(_ string, _ rt.ProxyDaemon, _ UVOptions) *Engine { return &Engine{} }
 // without build tags.
 func (e *Engine) SetHealthTimeout(_ time.Duration) {}
 
-// DisableRoutes matches the Unix setter. Nothing here registers a route, so
-// there is nothing to disable.
-func (e *Engine) DisableRoutes(_ error) {}
-
 func (e *Engine) Start(_ context.Context, _ rt.Plan, _ rt.Callbacks) (rt.Airflow, error) {
 	return nil, ErrWindowsUnsupported
 }

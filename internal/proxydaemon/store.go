@@ -17,6 +17,10 @@ import (
 // standalone engine's `__supervise` convention.
 const ServeSubcommand = pkgproxy.ServeSubcommand
 
+// errNoHome is what Dir says when there is no home directory to put the routes
+// under, wrapping the cause.
+const errNoHome = "astro local needs a home directory to keep its proxy routes: set HOME or ASTRO_HOME"
+
 // Dir is where the daemon keeps routes.json and its record:
 // <ASTRO_HOME or home>/.astro/proxy, the location v1 uses, since v1 and v2 must
 // see each other's routes. It is config.HomeConfigPath's proxy directory,
@@ -30,10 +34,10 @@ func Dir() (string, error) {
 	if home == "" {
 		var err error
 		if home, err = fileutil.GetHomeDir(); err != nil {
-			return "", fmt.Errorf("finding the home directory for the proxy routes: %w", err)
+			return "", fmt.Errorf("%s: %w", errNoHome, err)
 		}
 		if home == "" {
-			return "", errors.New("finding the home directory for the proxy routes: none found")
+			return "", errors.New(errNoHome)
 		}
 	}
 	return filepath.Join(home, ".astro", "proxy"), nil

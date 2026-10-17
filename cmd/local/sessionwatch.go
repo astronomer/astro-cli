@@ -24,7 +24,11 @@ func newSessionWatchCmd(_ Deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return newRuntime().WatchAndStop(cmd.Context(), project, parentPID)
+			rt, err := newRuntime()
+			if err != nil {
+				return err
+			}
+			return rt.WatchAndStop(cmd.Context(), project, parentPID)
 		},
 	}
 	cmd.Flags().IntVar(&parentPID, "parent-pid", 0, "PID to watch; the project is stopped when it exits")

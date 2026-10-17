@@ -12,9 +12,7 @@
 package localshared
 
 import (
-	"errors"
 	"fmt"
-	"math/rand/v2"
 	"strconv"
 	"time"
 
@@ -157,11 +155,8 @@ func HostnameDiscriminator(projectPath string) string {
 // what it pruned, so consulting that store did not merely answer wrongly, it
 // deleted a live project's route on the way. The count here comes from this
 // store, which carries the record-aware predicate, and costs no second pass.
-//
-// A nil store is an engine running without routes (DisableRoutes): it
-// registered none, so there is none to remove.
 func RemoveRoute(s *proxy.Store, hostname string, d rt.ProxyDaemon) error {
-	if s == nil || hostname == "" {
+	if hostname == "" {
 		return nil
 	}
 	remaining, err := s.RemoveRoute(hostname)
@@ -172,26 +167,4 @@ func RemoveRoute(s *proxy.Store, hostname string, d rt.ProxyDaemon) error {
 		ReapDaemon(d)
 	}
 	return nil
-}
-
-// AllocateListeningPort's search: pkg/proxy's range and its bound on tries.
-const (
-	listeningPortMin   = 10000
-	listeningPortSpan  = 10000
-	listeningPortTries = 50
-)
-
-// AllocateListeningPort picks a free port in pkg/proxy's range (10000-19999)
-// from what is listening alone. It is the allocator of an engine with no routes
-// store to consult (DisableRoutes), so it cannot see a port another project
-// has reserved in routes.json but not bound yet; with no routes dir there are
-// no such reservations to see.
-func AllocateListeningPort() (string, error) {
-	for range listeningPortTries {
-		port := strconv.Itoa(listeningPortMin + rand.IntN(listeningPortSpan)) //nolint:gosec // G404: spreading attempts across the range, not generating a secret
-		if proxy.IsPortAvailable(port) {
-			return port, nil
-		}
-	}
-	return "", errors.New("no free port found in 10000-19999")
 }

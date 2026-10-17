@@ -14,12 +14,17 @@ import (
 // stderr, or one json object under --output json — is the root's, through
 // cliout.Execute, so it is the same for every command in the CLI.
 func AddCmds(d Deps) []*cobra.Command {
+	local, pack := NewLocalCmd(d), NewPackageCmd(d)
+	aliases := rootAliasCmds(d)
+	// The commands that run on the local runtime, which needs a home for its
+	// proxy routes.
+	requireHome(d.NoHome, append([]*cobra.Command{local, pack}, aliases...)...)
 	cmds := []*cobra.Command{
-		NewLocalCmd(d),
+		local,
 		NewInitCmd(d),
 		NewDevCmd(d),
 		newRunRemovedCmd(),
-		NewPackageCmd(d),
+		pack,
 		NewUseCmd(d),
 		NewLinkCmd(d),
 		newSuperviseCmd(d),
@@ -30,7 +35,7 @@ func AddCmds(d Deps) []*cobra.Command {
 	// commands, built by the same code, act on this machine under
 	// `astro local af` (NewLocalCmd).
 	cmds = append(cmds, newAfCmd(d, func() target { return &deploymentTarget{} }))
-	cmds = append(cmds, rootAliasCmds(d)...)
+	cmds = append(cmds, aliases...)
 	for _, cmd := range cmds {
 		silenceUsage(cmd)
 	}

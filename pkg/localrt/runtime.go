@@ -28,8 +28,7 @@ type Runtime struct {
 	standalone *localstandalone.Engine
 	// routes is the CLI's own view of routes.json, for the list join and the
 	// --clean sweep. It carries the record-aware prune predicate so listing
-	// never evicts a route whose owner is still alive. Nil under
-	// Config.NoRoutes.
+	// never evicts a route whose owner is still alive.
 	routes *proxy.Store
 	// now stamps a claimed runtime's start time. The engines each carry their
 	// own clock for the records they write; this is the same seam for the
@@ -65,12 +64,6 @@ type Config struct {
 	// The CLI and the desktop must pass the same one or they stop seeing each
 	// other's projects.
 	RoutesDir string
-	// NoRoutes, when set, says the consumer has no routes dir, and why (the CLI
-	// could not find a home directory). RoutesDir is ignored: a start
-	// registers no proxy route and reports NoRoutes through its callback, List
-	// joins no routes, and Airflow stays reachable on its localhost port.
-	// Everything else (start, stop, status, logs, list) works as usual.
-	NoRoutes error
 	// ProxyDaemon is the reverse-proxy lifecycle. Nil is valid and means "no
 	// daemon" — Windows, and tests — in which case Airflow stays reachable on
 	// its direct localhost port.
@@ -186,17 +179,10 @@ func New(cfg Config) *Runtime {
 		standalone.SetHealthTimeout(cfg.HealthTimeout)
 	}
 	docker.SetContainerBinary(cfg.ContainerBinary)
-	var routes *proxy.Store
-	if cfg.NoRoutes != nil {
-		docker.DisableRoutes(cfg.NoRoutes)
-		standalone.DisableRoutes(cfg.NoRoutes)
-	} else {
-		routes = proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive))
-	}
 	return &Runtime{
 		docker:         docker,
 		standalone:     standalone,
-		routes:         routes,
+		routes:         proxy.NewStore(cfg.RoutesDir, proxy.WithRouteLiveness(localprune.RouteAlive)),
 		now:            time.Now,
 		containersGone: docker.ContainersGoneAll,
 		dockerStatuses: docker.StatusOfAll,
@@ -557,11 +543,9 @@ func (r *Runtime) List() ([]Status, error) {
 	// list also heals the file. Best-effort — a missing or unreadable proxy
 	// dir must not hide the records.
 	hostByProject := map[string]string{}
-	if r.routes != nil {
-		if routes, rerr := r.routes.ListRoutes(); rerr == nil {
-			for _, rt := range routes {
-				hostByProject[rt.ProjectDir] = rt.Hostname
-			}
+	if routes, rerr := r.routes.ListRoutes(); rerr == nil {
+		for _, rt := range routes {
+			hostByProject[rt.ProjectDir] = rt.Hostname
 		}
 	}
 	statuses, err := r.statusOfAll(recs)

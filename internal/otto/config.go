@@ -126,6 +126,7 @@ func detectProjectAirflow(cwd string) string {
 func detect1xAirflow(cwd string) string {
 	dir, err := proxydaemon.Dir()
 	if err != nil {
+		logger.Debugf("not looking for a v1 Airflow: %s", err)
 		return ""
 	}
 	route, err := proxydaemon.Routes(dir).GetRouteByProject(cwd)
