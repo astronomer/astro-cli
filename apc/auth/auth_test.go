@@ -449,6 +449,67 @@ func (s *Suite) TestLoginSuccess() {
 	})
 }
 
+// A token given with --token-login is used as given (less whitespace and a
+// "Bearer " prefix), with no auth config fetched and nothing asked, and is
+// kept only if Houston accepts it: a refused one leaves the login there was.
+func (s *Suite) TestLoginWithToken() {
+	setup := func() {
+		fs := afero.NewMemMapFs()
+		s.Require().NoError(afero.WriteFile(fs, config.HomeConfigFile, testUtil.NewTestConfig("localhost"), 0o600))
+		config.InitConfig(fs)
+	}
+	currentToken := func() string {
+		c, err := config.GetCurrentContext()
+		s.Require().NoError(err)
+		return c.Token
+	}
+
+	s.Run("a given token is saved, without asking", func() {
+		setup()
+		houstonMock := new(houstonMocks.ClientInterface)
+		houstonMock.On("ListWorkspaces", nil).Return([]houston.Workspace{{ID: "test-workspace-id"}}, nil).Once()
+		houstonMock.On("ValidateWorkspaceID", mock.Anything).Return(&houston.Workspace{ID: "test-workspace-id"}, nil).Maybe()
+
+		s.Require().NoError(Login("localhost", false, "", "", " Bearer ci-token\n", "0.29.0", houstonMock, &bytes.Buffer{}))
+		s.Equal("ci-token", currentToken())
+		houstonMock.AssertNotCalled(s.T(), "GetAuthConfig", mock.Anything)
+		houstonMock.AssertExpectations(s.T())
+	})
+
+	s.Run("a refused token leaves the previous login", func() {
+		setup()
+		c, err := config.GetCurrentContext()
+		s.Require().NoError(err)
+		s.Require().NoError(c.SetContextKey("token", "working-token"))
+
+		houstonMock := new(houstonMocks.ClientInterface)
+		houstonMock.On("ListWorkspaces", nil).Return(nil, errMockRegistry).Once()
+
+		err = Login("localhost", false, "", "", "expired-token", "0.29.0", houstonMock, &bytes.Buffer{})
+		s.ErrorIs(err, errMockRegistry)
+		s.Equal("working-token", currentToken())
+		houstonMock.AssertExpectations(s.T())
+	})
+
+	s.Run("a blank token is refused before anything is asked", func() {
+		setup()
+		houstonMock := new(houstonMocks.ClientInterface)
+		s.ErrorIs(Login("localhost", false, "", "", "  Bearer  ", "0.29.0", houstonMock, &bytes.Buffer{}), errEmptyToken)
+		houstonMock.AssertExpectations(s.T())
+	})
+}
+
+// The interactive flow never hands Login an empty token to save: with basic
+// auth disabled, a username yields no token, and that is an error rather
+// than a wiped login.
+func (s *Suite) TestResolveAuthTokenRefusesNoToken() {
+	houstonMock := new(houstonMocks.ClientInterface)
+	houstonMock.On("GetAuthConfig", mock.Anything).Return(&houston.AuthConfig{LocalEnabled: false}, nil).Once()
+	_, err := resolveAuthToken("", "test", "test", false, &config.Context{Domain: "localhost"}, houstonMock)
+	s.ErrorIs(err, errNoToken)
+	houstonMock.AssertExpectations(s.T())
+}
+
 func (s *Suite) TestLoginFailure() {
 	fs := afero.NewMemMapFs()
 	configYaml := testUtil.NewTestConfig("software")

@@ -115,8 +115,10 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
 	}
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
+	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
+	// A token login asks for nothing, so --oauth would be silently ignored.
+	cmd.MarkFlagsMutuallyExclusive("token-login", "oauth")
 	return cmd
 }
 

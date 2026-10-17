@@ -41,6 +41,8 @@ const (
 
 var (
 	errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
+	errEmptyToken    = errors.New("--token-login was given no token")
+	errNoToken       = errors.New("cannot authenticate: the login returned no token")
 
 	// this is used to monkey patch the function in order to write unit test cases
 	registryHandlerInit = airflow.RegistryHandlerInit
@@ -181,6 +183,9 @@ func Login(domain string, oAuthOnly bool, username, password, token, houstonVers
 		return err
 	}
 
+	// A token given with --token-login has not been through Houston yet: it is
+	// only known to work once a request made with it succeeds.
+	given := token != ""
 	token, err = resolveAuthToken(token, username, password, oAuthOnly, ctx, client)
 	if err != nil {
 		return err
@@ -197,6 +202,10 @@ func Login(domain string, oAuthOnly bool, username, password, token, houstonVers
 		return err
 	}
 
+	// The Houston client reads the token from the context, so it is saved
+	// before the first request; previous is put back if a given token fails
+	// it, so a mistyped or expired token does not replace a working login.
+	previous := c.Token
 	err = c.SetContextKey("token", token)
 	if err != nil {
 		return err
@@ -204,6 +213,11 @@ func Login(domain string, oAuthOnly bool, username, password, token, houstonVers
 
 	workspaces, err := getWorkspaces(client, interactive)
 	if err != nil {
+		if given {
+			if restoreErr := c.SetContextKey("token", previous); restoreErr != nil {
+				return errors.Join(err, restoreErr)
+			}
+		}
 		return err
 	}
 
@@ -288,10 +302,23 @@ func checkClusterDomain(domain string) error {
 	return nil
 }
 
-// resolveAuthToken returns the provided token when non-empty; otherwise it
-// runs the interactive basic-auth/oAuth flow against Houston to obtain one.
+// resolveAuthToken returns the provided token when non-empty, without the
+// whitespace a script reading it from a file leaves and without a "Bearer "
+// the Houston client adds itself; otherwise it runs the interactive
+// basic-auth/oAuth flow against Houston to obtain one. It never returns an
+// empty token without an error: Login would save it over the login there is.
 func resolveAuthToken(token, username, password string, oAuthOnly bool, ctx *config.Context, client houston.ClientInterface) (string, error) {
 	if token != "" {
+		token = strings.TrimSpace(token)
+		if scheme, rest, ok := strings.Cut(token, " "); ok && strings.EqualFold(scheme, "Bearer") {
+			token = strings.TrimSpace(rest)
+		} else if strings.EqualFold(token, "Bearer") {
+			// The scheme alone names no token.
+			token = ""
+		}
+		if token == "" {
+			return "", errEmptyToken
+		}
 		return token, nil
 	}
 	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
@@ -301,7 +328,14 @@ func resolveAuthToken(token, username, password string, oAuthOnly bool, ctx *con
 	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
 		username = input.Text(inputUsername)
 	}
-	return getAuthToken(username, password, authConfig, ctx, client)
+	token, err = getAuthToken(username, password, authConfig, ctx, client)
+	if err != nil {
+		return "", err
+	}
+	if token == "" {
+		return "", errNoToken
+	}
+	return token, nil
 }
 
 func getAuthToken(username, password string, authConfig *houston.AuthConfig, ctx *config.Context, client houston.ClientInterface) (string, error) {
