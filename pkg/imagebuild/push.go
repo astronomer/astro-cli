@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
@@ -142,8 +143,12 @@ type PushRequest struct {
 	Secret   string
 	// Digest asks for the digest of the manifest pushed (sha256:…).
 	Digest bool
-	// Out takes the push's progress as the engine CLI writes it; nil drops
-	// it. The engine's stderr is kept for the error a failed push returns.
+	// Out takes the push's progress as the engine CLI writes it, from its
+	// stdout and its stderr both, whole lines at a time and with Secret
+	// redacted; nil drops it. Docker writes its progress to stdout and podman
+	// to stderr ("Copying blob …"), so either engine's shows. The stderr is
+	// kept as well, for the error a failed push returns. A write to Out that
+	// fails does not fail the push.
 	Out io.Writer
 }
 
@@ -199,7 +204,7 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 	}
 	args = auth.cmdArgs("push", append(args, req.Image)...)
 	var stderr bytes.Buffer
-	if runErr := e.Cmd.Run(ctx, auth.cmdEnv(e.Env), rt.Stdio{Out: req.Out, Err: &stderr}, e.Bin, args...); runErr != nil {
+	if runErr := e.runPush(ctx, auth.cmdEnv(e.Env), &req, &stderr, args); runErr != nil {
 		return "", e.pushError(&req, credential, runErr, stderr.String())
 	}
 
@@ -214,6 +219,20 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		return "", err
 	}
 	return digest, nil
+}
+
+// runPush runs the push command: its stdout and stderr both to req.Out, as
+// whole lines with req.Secret redacted, and its stderr kept in stderr as well.
+func (e Engine) runPush(ctx context.Context, env []string, req *PushRequest, stderr *bytes.Buffer, args []string) error {
+	if req.Out == nil {
+		return e.Cmd.Run(ctx, env, rt.Stdio{Err: stderr}, e.Bin, args...)
+	}
+	progress := &progressLines{w: req.Out, secret: req.Secret}
+	stdout, errLines := progress.stream(), progress.stream()
+	err := e.Cmd.Run(ctx, env, rt.Stdio{Out: stdout, Err: io.MultiWriter(stderr, errLines)}, e.Bin, args...)
+	stdout.flush()
+	errLines.flush()
+	return err
 }
 
 // credentialRegistry is the registry a push that carries its own credential
@@ -344,16 +363,21 @@ func repository(image string) string {
 // it wrote to stderr, with secret (and secret without a "Bearer " prefix)
 // redacted from that output.
 func commandError(what string, err error, stderr, secret string) error {
-	msg := strings.TrimSpace(stderr)
-	for _, s := range []string{secret, strings.TrimPrefix(secret, bearerPrefix)} {
-		if s != "" {
-			msg = strings.ReplaceAll(msg, s, "[redacted]")
-		}
-	}
+	msg := redact(strings.TrimSpace(stderr), secret)
 	if msg == "" {
 		return fmt.Errorf("%s failed: %w", what, err)
 	}
 	return fmt.Errorf("%s failed: %w: %s", what, err, msg)
+}
+
+// redact is s with secret, and secret without a "Bearer " prefix, replaced.
+func redact(s, secret string) string {
+	for _, v := range []string{secret, strings.TrimPrefix(secret, bearerPrefix)} {
+		if v != "" {
+			s = strings.ReplaceAll(s, v, "[redacted]")
+		}
+	}
+	return s
 }
 
 var (
@@ -391,4 +415,61 @@ func credentialRefused(said string) bool {
 	return pushForbidden(said) || http401.MatchString(said) || strings.Contains(said, "unauthorized") ||
 		strings.Contains(said, "incorrect username or password") ||
 		strings.Contains(said, "requested access to the resource is denied")
+}
+
+// progressLines is the one writer a push's stdout and stderr both stream to.
+// The engine writes the two from separate goroutines, so each stream gathers
+// whole lines and hands them over under a lock: a line from one never lands
+// in the middle of a line from the other. Each line has secret redacted
+// before it is written.
+type progressLines struct {
+	mu     sync.Mutex
+	w      io.Writer
+	secret string
+}
+
+// maxProgressLine bounds how much of a line a stream holds before writing it
+// anyway, so output with no newline in it is not held without limit.
+const maxProgressLine = 64 << 10
+
+// stream is a writer for one of the engine's outputs.
+func (p *progressLines) stream() *progressStream { return &progressStream{dst: p} }
+
+func (p *progressLines) write(line []byte) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	// Progress is best-effort: a failed write must neither fail the push
+	// nor stop the stderr it shares a writer with from being kept.
+	io.WriteString(p.w, redact(string(line), p.secret)) //nolint:errcheck // best-effort progress
+}
+
+// progressStream is one output of the engine, written to its progressLines a
+// whole line at a time.
+type progressStream struct {
+	dst *progressLines
+	buf []byte
+}
+
+func (s *progressStream) Write(b []byte) (int, error) {
+	s.buf = append(s.buf, b...)
+	for {
+		i := bytes.IndexByte(s.buf, '\n')
+		if i < 0 {
+			break
+		}
+		s.dst.write(s.buf[:i+1])
+		s.buf = s.buf[i+1:]
+	}
+	if len(s.buf) >= maxProgressLine {
+		s.flush()
+	}
+	return len(b), nil
+}
+
+// flush writes what the stream holds of a line not yet ended.
+func (s *progressStream) flush() {
+	if len(s.buf) > 0 {
+		s.dst.write(s.buf)
+		s.buf = nil
+	}
 }
