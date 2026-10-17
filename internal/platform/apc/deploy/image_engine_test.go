@@ -65,6 +65,29 @@ func (s *Suite) TestTagPushDockerImageAsksTheEngine() {
 		s.Equal("registry.example.com/my-release/airflow:deploy-1", got)
 	})
 
+	// From 1.0 auth.RegistryAuth logs in to the Deployment's registry before
+	// the push, so the push carries no credential and logs in no second time.
+	s.Run("the APC registry from 1.0", func() {
+		// A local platform domain, so RegistryAuth makes no real login here.
+		config.InitConfig(s.fsForLocalConfig)
+		s.houstonMock.On("GetDeploymentConfig", nil).Return(&houston.DeploymentConfig{AirflowImages: mockAirflowImageList}, nil)
+		s.houstonMock.On("GetRuntimeReleases", mock.Anything).Return(houston.RuntimeReleases{}, nil)
+		s.houstonMock.On("GetPlatformVersion", mock.Anything).Return("1.0.0", nil)
+		s.mockImageEngine.On("Tag", "my-image:v1", "my-release/airflow:latest").Return(nil).Once()
+		s.mockImageEngine.On("Label", "my-release/airflow:latest", airflowrt.RuntimeVersionLabel).Return("12.2.0", nil).Once()
+		var progress bytes.Buffer
+		s.mockImageEngine.On("Push", imagebuild.PushRequest{
+			Source: "my-release/airflow:latest",
+			Image:  "registry.dep.example.com/my-release/airflow:deploy-1",
+			Out:    &progress,
+		}).Return("", nil).Once()
+
+		dep := &houston.Deployment{ID: "dep-id", ReleaseName: "my-release", Urls: []houston.DeploymentURL{{URL: "registry.dep.example.com", Type: houston.RegistryURLType}}}
+		got, err := tagPushDockerImage(s.houstonMock, &config.Context{Token: "ctx-token"}, dep, "my-release", "deploy-1", "example.com", "", false, "my-image:v1", Options{Progress: &progress})
+		s.NoError(err)
+		s.Equal("registry.dep.example.com/my-release/airflow:deploy-1", got)
+	})
+
 	s.Run("a BYO registry by digest", func() {
 		s.houstonMock.On("GetDeploymentConfig", nil).Return(&houston.DeploymentConfig{AirflowImages: mockAirflowImageList}, nil)
 		s.houstonMock.On("GetRuntimeReleases", mock.Anything).Return(houston.RuntimeReleases{}, nil)

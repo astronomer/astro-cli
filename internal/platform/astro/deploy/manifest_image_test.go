@@ -43,6 +43,8 @@ type fakeImageCmd struct {
 	errs map[string]error
 	// label is the value a label read of image answers; nil answers "".
 	label func(image string) string
+	// pushOut is what a push writes to its stdout: its progress.
+	pushOut string
 	// buildOut is what a build writes to its stdout, and buildErr how it
 	// ends.
 	buildOut string
@@ -73,6 +75,9 @@ func (f *fakeImageCmd) Run(_ context.Context, env []string, stdio localrt.Stdio,
 	}
 	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Labels") && f.label != nil && stdio.Out != nil {
 		fmt.Fprintln(stdio.Out, f.label(args[len(args)-1]))
+	}
+	if len(args) > 0 && args[0] == "push" && f.pushOut != "" && stdio.Out != nil {
+		fmt.Fprint(stdio.Out, f.pushOut)
 	}
 	if len(args) > 0 && f.errs[args[0]] != nil {
 		return f.errs[args[0]]
@@ -651,6 +656,32 @@ func TestDeployManifestImage_PushForbidden(t *testing.T) {
 		DeploymentID: "test-deployment-id",
 	}, client)
 	require.ErrorIs(t, err, imagebuild.ErrPushForbidden)
-	assert.Equal(t, imagebuild.ErrPushForbidden.Error(), err.Error())
+	assert.Contains(t, err.Error(), "Run 'docker logout' for each Astro registry to clear cached credentials")
 	client.AssertNotCalled(t, "FinalizeDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// The push's progress goes to Progress with the build's, never to stdout:
+// under --output json the command's stdout carries the result object alone.
+func TestDeployManifestImage_PushProgressStaysOffStdout(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
+	mockCreateImageDeploy(client, "")
+	mockFinalizeDeploy(client)
+	cmd := withImageSeams(t, "3.1-2")
+	cmd.pushOut = "deploy-2026-07-24: digest: sha256:abc size: 527\n"
+
+	var progress bytes.Buffer
+	var err error
+	stdout := captureStdout(t, func() {
+		_, err = DeployManifestImage(ManifestImageDeployInput{
+			Build:        imagebuild.ManifestBuild{ProjectDir: manifestProjectDir(t), AirflowVersion: "3.1", Dependencies: []string{"pandas"}},
+			DeploymentID: "test-deployment-id",
+			Progress:     &progress,
+		}, client)
+	})
+	require.NoError(t, err)
+	assert.Contains(t, progress.String(), "digest: sha256:abc")
+	assert.Empty(t, stdout)
 }

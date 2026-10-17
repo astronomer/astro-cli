@@ -31,30 +31,19 @@ type Engine struct {
 	Env []string
 }
 
-// ErrPushForbidden reports a push the registry refused as unauthorized (403
-// Forbidden, or a login the registry rejected). The error a push returns for
-// it says only this, and wraps the engine's own failure as well, so
-// errors.Is finds this sentinel and the engine's output is not lost.
-var ErrPushForbidden = errors.New(`failed to push image due to authentication error (403 Forbidden).
+// ErrPushForbidden reports a push the registry refused as unauthorized: a 403
+// on the push, or a login before it that the registry rejected. The error a
+// push returns for it wraps both this sentinel and the engine's own failure,
+// so errors.Is finds the one and the other is not lost. What to advise is the
+// caller's: this says nothing about any one product's registries.
+var ErrPushForbidden = errors.New("failed to push image due to authentication error (403 Forbidden)")
 
-This commonly occurs due to:
-1. Invalid cached Docker credentials
-2. Incompatible containerd snapshotter configuration
-3. A very long upload: the push credential can expire before a large layer finishes
-
-To resolve:
-• Run 'docker logout' for each Astro registry to clear cached credentials
-• Ensure containerd snapshotter is disabled (Docker Desktop users)
-• If the push ran for many minutes, retry, or make the image smaller
-• Try running 'astro deploy' again
-
-For detailed troubleshooting steps, visit:
-https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`)
-
-// forbiddenError is ErrPushForbidden's text over the engine's own failure.
+// forbiddenError is ErrPushForbidden over the engine's own failure.
 type forbiddenError struct{ cause error }
 
-func (e *forbiddenError) Error() string   { return ErrPushForbidden.Error() }
+func (e *forbiddenError) Error() string {
+	return ErrPushForbidden.Error() + ": " + e.cause.Error()
+}
 func (e *forbiddenError) Unwrap() []error { return []error{ErrPushForbidden, e.cause} }
 
 // bearerPrefix is dropped from a login secret given as an HTTP Authorization
@@ -71,6 +60,13 @@ const bearerPrefix = "Bearer "
 // one when that is missing or refused. A secret without a username is
 // refused: there is no login to make with it.
 func (e Engine) Login(ctx context.Context, registry, username, secret string) error {
+	_, err := e.login(ctx, registry, username, secret)
+	return err
+}
+
+// login is Login, also reporting whether the registry refused the
+// credential: what the engine said, not the command it ran, says so.
+func (e Engine) login(ctx context.Context, registry, username, secret string) (refused bool, err error) {
 	args := []string{"login", registry}
 	var stdin io.Reader
 	switch {
@@ -78,13 +74,14 @@ func (e Engine) Login(ctx context.Context, registry, username, secret string) er
 		args = append(args, "-u", username, "--password-stdin")
 		stdin = strings.NewReader(strings.TrimPrefix(secret, bearerPrefix))
 	case secret != "":
-		return fmt.Errorf("logging in to %s: a secret was given without a username", registry)
+		return false, fmt.Errorf("logging in to %s: a secret was given without a username", registry)
 	}
 	var stderr bytes.Buffer
-	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{In: stdin, Err: &stderr}, e.Bin, args...); err != nil {
-		return commandError(e.Bin+" login "+registry, err, stderr.String(), secret)
+	if runErr := e.Cmd.Run(ctx, e.Env, rt.Stdio{In: stdin, Err: &stderr}, e.Bin, args...); runErr != nil {
+		said := engineSaid(runErr, stderr.String(), registry)
+		return loginRefused(said), commandError(e.Bin+" login "+registry, runErr, stderr.String(), secret)
 	}
-	return nil
+	return false, nil
 }
 
 // Tag points dst at the image src names.
@@ -161,8 +158,8 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if err := e.Login(ctx, registry, req.Username, req.Secret); err != nil {
-			if isForbidden(err) {
+		if refused, err := e.login(ctx, registry, req.Username, req.Secret); err != nil {
+			if refused {
 				return "", &forbiddenError{cause: err}
 			}
 			return "", err
@@ -183,9 +180,9 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 	}
 	args = append(args, req.Image)
 	var stderr bytes.Buffer
-	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Out: req.Out, Err: &stderr}, e.Bin, args...); err != nil {
-		err = commandError(e.Bin+" push "+req.Image, err, stderr.String(), req.Secret)
-		if isForbidden(err) {
+	if runErr := e.Cmd.Run(ctx, e.Env, rt.Stdio{Out: req.Out, Err: &stderr}, e.Bin, args...); runErr != nil {
+		err := commandError(e.Bin+" push "+req.Image, runErr, stderr.String(), req.Secret)
+		if pushForbidden(engineSaid(runErr, stderr.String(), req.Image, repository(req.Image))) {
 			return "", &forbiddenError{cause: err}
 		}
 		return "", err
@@ -277,16 +274,35 @@ func commandError(what string, err error, stderr, secret string) error {
 	return fmt.Errorf("%s failed: %w: %s", what, err, msg)
 }
 
-var http403 = regexp.MustCompile(`\b403\b`)
+var (
+	http403 = regexp.MustCompile(`\b403\b`)
+	http401 = regexp.MustCompile(`\b401\b`)
+)
 
-// isForbidden reports a failure a registry gave as unauthorized: a 403, a
-// "forbidden" or an "authentication required" anywhere in the error's chain.
-func isForbidden(err error) bool {
-	for ; err != nil; err = errors.Unwrap(err) {
-		s := strings.ToLower(err.Error())
-		if http403.MatchString(s) || strings.Contains(s, "forbidden") || strings.Contains(s, "authentication required") {
-			return true
+// engineSaid is what a failed engine command said about its failure: its
+// stderr and the error it ended with, never the command line. The references
+// it ran on are cut out, so a name that happens to hold "403" or "forbidden"
+// (a tag such as deploy-403) is not read as the registry's answer.
+func engineSaid(runErr error, stderr string, refs ...string) string {
+	said := stderr + "\n" + runErr.Error()
+	for _, ref := range refs {
+		if ref != "" {
+			said = strings.ReplaceAll(said, ref, "")
 		}
 	}
-	return false
+	return strings.ToLower(said)
+}
+
+// pushForbidden reports a push the registry refused as unauthorized: a 403, a
+// "forbidden" or an "authentication required" in what the engine said.
+func pushForbidden(said string) bool {
+	return http403.MatchString(said) || strings.Contains(said, "forbidden") || strings.Contains(said, "authentication required")
+}
+
+// loginRefused reports a login the registry refused the credential of: what
+// pushForbidden reports, or a 401, "unauthorized" or "incorrect username or
+// password".
+func loginRefused(said string) bool {
+	return pushForbidden(said) || http401.MatchString(said) || strings.Contains(said, "unauthorized") ||
+		strings.Contains(said, "incorrect username or password")
 }

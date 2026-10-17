@@ -18,6 +18,7 @@ import (
 
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/containercfg"
+	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/apc/auth"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -377,7 +378,6 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 		registry = byoRegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s", registry, fmt.Sprintf("%s-%s", name, nextTag))
 	} else {
-		token = c.Token
 		platformVersion, _ := houstonClient.GetPlatformVersion(nil) //nolint:errcheck // error deliberately ignored in this shell code
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
 			var err error
@@ -385,7 +385,8 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			if err != nil {
 				return "", err
 			}
-			// Switch to per deployment registry login
+			// Switch to per deployment registry login. It leaves the engine
+			// logged in, so the push takes no credential of its own.
 			err = auth.RegistryAuth(houstonClient, opts.progress(), registry, houston.GetAppConfigRequest{
 				ClusterID:      deploymentInfo.ClusterID,
 				WorkspaceUUID:  deploymentInfo.Workspace.ID,
@@ -397,6 +398,8 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 			}
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflowImage(name, nextTag))
 		} else {
+			// Below 1.0 nothing logged in for this Deployment, so the push
+			// logs in with the context's token as it starts.
 			registry = registryDomainPrefix + cloudDomain
 			remoteImage = fmt.Sprintf("%s/%s", registry, airflowImage(name, nextTag))
 			token = c.Token
@@ -416,16 +419,16 @@ func pushDockerImage(byoRegistryEnabled bool, deploymentInfo *houston.Deployment
 	}
 	useShaAsTag := config.CFG.ShaAsTag.GetBool()
 	fmt.Fprintln(opts.progress(), "Pushing image to configured registry")
-	// The APC registry takes the context's token, logged in with on the
-	// engine as the push starts; a BYO registry takes the credential the
-	// engine already holds for it.
+	// Below APC 1.0 the push logs in with the context's token as it starts.
+	// From 1.0 RegistryAuth has just logged in, and a BYO registry takes the
+	// credential the engine already holds, so neither carries one.
 	push := imagebuild.PushRequest{Source: localImage, Image: remoteImage, Digest: useShaAsTag, Out: opts.progress()}
 	if token != "" {
 		push.Username, push.Secret = registryUser, token
 	}
 	sha, err := engine.Push(context.Background(), push)
 	if err != nil {
-		return "", err
+		return "", deploybuild.ExplainPush(err)
 	}
 	if byoRegistryEnabled {
 		if useShaAsTag {

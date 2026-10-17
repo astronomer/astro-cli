@@ -15,6 +15,7 @@ import (
 	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/docker"
+	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/azure"
@@ -423,7 +424,7 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			fmt.Println("It could be due to either your registry token has expired or you don't have permission to push the client image")
 			fmt.Printf("Please ensure that you have logged in to %s via docker login and try again\n\n", registryEndpoint)
 		}
-		return ClientDeploy{}, fmt.Errorf("failed to push client image: %w", err)
+		return ClientDeploy{}, fmt.Errorf("failed to push client image: %w", deploybuild.ExplainPush(err))
 	}
 
 	return ClientDeploy{

@@ -116,8 +116,8 @@ var (
 // tarball. It uses the shared transport (createDeploy, the registry push
 // through pkg/imagebuild on the engine the image was built on, uploadDags,
 // finalize) and, like DeployManifestDags, neither prints nor exits — it
-// returns a result for cmd to render, and writes the image build's output and
-// a --wait's progress to in.Progress, and the push's progress to stdout.
+// returns a result for cmd to render, and writes only the image build's
+// output, the push's progress and a --wait's progress, to in.Progress.
 //
 // Docker is required and checked before any transport work (docs/deploy.md, section 5).
 //
@@ -204,15 +204,21 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 	// Push the built/adopted image under the returned repository:tag with the
 	// existing registry auth (CLI username + context token), on the engine it
 	// was built on.
+	// Its progress goes where the build's went, never to stdout, which under
+	// --output json carries the result alone.
 	remoteImage := fmt.Sprintf("%s:%s", created.ImageRepository, created.ImageTag)
+	progress := in.Progress
+	if progress == nil {
+		progress = os.Stderr
+	}
 	if _, err := engine.Push(ctx, imagebuild.PushRequest{
 		Source:   localImage,
 		Image:    remoteImage,
 		Username: registryUsername,
 		Secret:   c.Token,
-		Out:      os.Stdout,
+		Out:      progress,
 	}); err != nil {
-		return ManifestImageDeployResult{}, err
+		return ManifestImageDeployResult{}, deploybuild.ExplainPush(err)
 	}
 
 	// A "both" deploy also ships the dags tarball, fitting the image just
