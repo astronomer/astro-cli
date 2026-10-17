@@ -1396,15 +1396,18 @@ func TestStartReadsTheGenerationFromTheDeclaredDockerfile(t *testing.T) {
 			wantMajor: "3",
 		},
 		{
-			// Astronomer publishes more than one image name. This one is
-			// accepted because of where it comes from, not what it is called,
-			// and the generation is then read from its tag like any other —
-			// matching on "runtime" appearing in the name instead would accept
-			// the image and then ignore what it says.
-			name:      "an astronomer image whose name is not runtime",
+			// A mirror keeps the tag scheme along with the repository name, so
+			// its generation reads the same way as the published image's.
+			name:      "a mirrored airflow 2 runtime beside a pin of 3",
 			pin:       "3.1",
-			body:      "FROM quay.io/astronomer/ap-airflow:2.5.1\nRUN echo hi\n",
+			body:      "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nRUN echo hi\n",
 			wantMajor: "2",
+		},
+		{
+			name:      "a mirrored airflow 3 runtime beside a pin of 2",
+			pin:       "2",
+			body:      "FROM mirror/runtime:3.1-12\n",
+			wantMajor: "3",
 		},
 		// A non-runtime base used to appear here, falling back to the pin.
 		// Start refuses that file now rather than writing a compose file for an

@@ -157,37 +157,79 @@ func TestParseDockerfileAtResolvesTheFinalStage(t *testing.T) {
 // "runtime")` check, which accepted three of the cases below — and the compose
 // file written for such an image runs Airflow as the `astro` user and reads a
 // generation off the tag, neither of which an arbitrary base offers.
-func TestIsAstroRuntimeImage(t *testing.T) {
+func TestIsAstroRuntimeRef(t *testing.T) {
 	for _, tc := range []struct {
 		image string
 		want  bool
 	}{
+		// Astronomer's published repositories: any tag, or none.
 		{"astrocrpublic.azurecr.io/runtime", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1-12", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1", true},
+		{"astrocrpublic.azurecr.io/runtime:latest", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1-12-python-3.12", true},
+		{"astrocrpublic.azurecr.io/runtime@sha256:abc123", true},
+		{"astrocrpublic.azurecr.io/runtime:3.1-12@sha256:abc123", true},
 		{"quay.io/astronomer/astro-runtime", true},
-		{"quay.io/astronomer/ap-airflow", true},
+		{"quay.io/astronomer/astro-runtime:12.1.0", true},
 
-		// A repository under the registry, not the registry alone: `FROM
-		// astrocrpublic.azurecr.io` names docker.io/library/astrocrpublic.azurecr.io,
-		// which is an unrelated image and not this one.
+		// Mirrors: the repository's name on another registry, at any depth or
+		// behind a port, with a tag that is an exact Runtime version.
+		{"registry.corp.example/astronomer/astro-runtime:12.1.0", true},
+		{"registry.corp.example/astronomer/astro-runtime:12.1.0-slim", true},
+		{"mirror/runtime:3.1-12", true},
+		{"mirror/runtime:3.1-12-python-3.12-base", true},
+		// The same flavors the published tags carry, read by the same parser.
+		{"mirror/astro-runtime:12.1.0-slim-python-3.12", true},
+		{"registry.corp.example/a/b/c/runtime:3.1-12", true},
+		{"localhost:5000/astro-runtime:3.1-12", true},
+		{"quay.io/astronomer-mirror/astro-runtime:13.4.0", true},
+		{"mirror/runtime:3.1-12@sha256:abc123", true},
+		{"docker.io/myco/astro-runtime:12.1.0", true},
+
+		// The name alone is not enough: other images are called runtime too.
+		{"mcr.microsoft.com/dotnet/runtime:8.0", false},
+		{"ghcr.io/x/runtime:latest", false},
+		{"registry.corp/astro-runtime:stable", false},
+		{"mirror/runtime", false},
+		{"mirror/runtime:3.1", false},
+		{"mirror/astro-runtime:12", false},
+		{"mirror/runtime:3.1.0", false},
+		{"mirror/runtime@sha256:abc123", false},
+
+		// Docker Hub official images, which no Astronomer image is.
+		{"runtime", false},
+		{"runtime:3.1-12", false},
+		{"astro-runtime:12.1.0", false},
+		{"docker.io/runtime:3.1-12", false},
+		{"docker.io/library/runtime:3.1-12", false},
+		{"library/runtime:3.1-12", false},
+		{"index.docker.io/library/astro-runtime:12.1.0", false},
+
+		// A registry or namespace alone is not a repository.
 		{"astrocrpublic.azurecr.io", false},
 		{"quay.io/astronomer", false},
 		{"astrocrpublic.azurecr.io/", false},
 
-		// The ordinary OSS image, which is the shape a v1 repo brings.
-		{"apache/airflow", false},
+		// Other Astronomer images are not Astro Runtime.
+		{"quay.io/astronomer/ap-airflow:2.5.1", false},
+		{"quay.io/astronomer/astro-runtime-dev:12.1.0", false},
+
+		{"apache/airflow:2.9.3", false},
 		{"python", false},
-		{"ubuntu", false},
-		// Named to look like one without being published as one.
-		{"myco/our-runtime", false},
-		{"runtime", false},
-		// A registry whose name merely starts with the real one.
-		{"astrocrpublic.azurecr.io.example.com/runtime", false},
-		{"quay.io/astronomer-mirror/astro-runtime", false},
+		{"python:3.12-slim", false},
+		{"myco/our-runtime:3.1-12", false},
+		{"myco/runtime-tools:12.1.0", false},
+		{"mirror/Runtime:3.1-12", false},
+		{"myco/base:runtime", false},
+		{"${REGISTRY}/runtime:3.1-12", false},
+		{"mirror/runtime:${TAG}", false},
 		{"", false},
 	} {
 		t.Run(tc.image, func(t *testing.T) {
-			if got := IsAstroRuntimeImage(tc.image); got != tc.want {
-				t.Errorf("IsAstroRuntimeImage(%q) = %v, want %v", tc.image, got, tc.want)
+			image, tag := splitImageRef(tc.image)
+			if got := IsAstroRuntimeRef(image, tag); got != tc.want {
+				t.Errorf("IsAstroRuntimeRef(%q, %q) = %v, want %v", image, tag, got, tc.want)
 			}
 		})
 	}
@@ -239,6 +281,13 @@ func TestParseDockerfileAtReadsRealReferences(t *testing.T) {
 			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "",
 		},
 		{
+			// Both: the tag is still what the reference says it is, and the
+			// repository is not "runtime:3.1-12".
+			name:      "a tag and a digest",
+			body:      "FROM localhost:5000/runtime:3.1-12@sha256:abc123\n",
+			wantImage: "localhost:5000/runtime", wantTag: "3.1-12",
+		},
+		{
 			name:      "case and alias keywords are not the image",
 			body:      "from astrocrpublic.azurecr.io/runtime:3.1-12 as base\n",
 			wantImage: "astrocrpublic.azurecr.io/runtime", wantTag: "3.1-12",
@@ -280,7 +329,7 @@ func TestUnresolvedRefsAreReportedAsSuch(t *testing.T) {
 	if !IsUnresolvedRef(image) {
 		t.Errorf("IsUnresolvedRef(%q) = false; a caller would judge the literal text", image)
 	}
-	if IsAstroRuntimeImage(image) {
+	if IsAstroRuntimeRef(image, "") {
 		t.Errorf("%q is not a resolved image reference and must not read as one", image)
 	}
 	if IsUnresolvedRef("astrocrpublic.azurecr.io/runtime") {

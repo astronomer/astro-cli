@@ -106,6 +106,51 @@ func TestStartRefusesNothingElse(t *testing.T) {
 	})
 }
 
+// A mirror of a Runtime image starts, through Start and not only the helper:
+// the refusal is wired before the engine, so a mirror it wrongly refused would
+// never reach the build or the compose up this asserts.
+func TestStartAcceptsAMirroredRuntimeBase(t *testing.T) {
+	cmd := &fakeCmd{output: noProjects}
+	e := testEngine(t, cmd)
+	images, ok := e.images.(*stubImages)
+	require.True(t, ok)
+
+	p := testPlan(t)
+	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
+		[]byte("FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nRUN echo hi\n"), 0o600))
+	p.Dockerfile = "Dockerfile"
+
+	_, err := e.Start(context.Background(), p, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Len(t, images.requests, 1, "the mirror's Dockerfile is the build")
+	upped := false
+	for _, c := range cmd.calls {
+		upped = upped || strings.Contains(c, "up --detach")
+	}
+	assert.True(t, upped, "the stack should have come up; calls: %v", cmd.calls)
+}
+
+// A FROM whose tag is a build argument starts: init declares that file, so
+// start refusing it would be the disagreement this check exists to prevent.
+func TestStartLetsABuildArgumentTagThrough(t *testing.T) {
+	for _, from := range []string{
+		"astrocrpublic.azurecr.io/runtime:${V}",
+		"mirror.corp/runtime:${TAG}",
+	} {
+		t.Run(from, func(t *testing.T) {
+			cmd := &fakeCmd{output: noProjects}
+			e := testEngine(t, cmd)
+			p := testPlan(t)
+			require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
+				[]byte("ARG V=3.1-12\nARG TAG=3.1-12\nFROM "+from+"\n"), 0o600))
+			p.Dockerfile = "Dockerfile"
+
+			_, err := e.Start(context.Background(), p, rt.Callbacks{})
+			require.NoError(t, err)
+		})
+	}
+}
+
 // Start refuses, and does it without waking the engine.
 //
 // Every case above calls the helper. None of them says the helper is WIRED,
@@ -159,10 +204,31 @@ func TestStartJudgesRealReferenceShapes(t *testing.T) {
 		{"a tab after FROM", "FROM\tastrocrpublic.azurecr.io/runtime:3.1-12\n", false},
 		{"a runtime pinned by digest", "FROM astrocrpublic.azurecr.io/runtime@sha256:abc123\n", false},
 		{"a base named by a build argument", "ARG BASE=astrocrpublic.azurecr.io/runtime:3.1-12\nFROM ${BASE}\n", false},
+		// A build argument in the tag alone is as unknown as one in the image,
+		// which is what init decides too: declared, and not judged here.
+		{"a published runtime tagged by a build argument", "ARG V=3.1-12\nFROM astrocrpublic.azurecr.io/runtime:${V}\n", false},
+		{"a mirror tagged by a build argument", "FROM mirror.corp/runtime:${TAG}\n", false},
+		{"a mirror with a published flavor", "FROM mirror/astro-runtime:13.7.0-slim-python-3.12\n", false},
+		// Mirrors: the repository keeps its name on another registry.
+		{"a mirror behind a port", "FROM localhost:5000/astro-runtime:3.1-12\n", false},
+		{"a mirror in a corporate registry", "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\n", false},
+		{"a mirror of the airflow 3 image", "FROM mirror/runtime:3.1-12\n", false},
+		{"a mirror with a tag and a digest", "FROM mirror/runtime:3.1-12@sha256:abc123\n", false},
+		{"an untagged published runtime", "FROM astrocrpublic.azurecr.io/runtime\n", false},
 		// Still refused, including where the old prefix match could not see it.
 		{"an OSS airflow base", "FROM apache/airflow:2.9.3\n", true},
 		{"an OSS airflow base after a tab", "FROM\tapache/airflow:2.9.3\n", true},
-		{"a private registry with a port", "FROM localhost:5000/astro-runtime:3.1-12\n", true},
+		{"a private image whose name only contains runtime", "FROM myco/our-runtime:3.1-12\n", true},
+		// A repository named runtime is not enough off Astronomer's registries:
+		// the tag has to be a Runtime version too.
+		{"the .NET runtime", "FROM mcr.microsoft.com/dotnet/runtime:8.0\n", true},
+		{"another runtime at latest", "FROM ghcr.io/x/runtime:latest\n", true},
+		{"a mirror name on a floating tag", "FROM registry.corp/astro-runtime:stable\n", true},
+		{"an untagged mirror name", "FROM registry.corp/astro-runtime\n", true},
+		{"a mirror name pinned by digest alone", "FROM mirror/runtime@sha256:abc123\n", true},
+		{"a Docker Hub official image", "FROM docker.io/library/runtime:3.1-12\n", true},
+		{"a Docker Hub official image, short", "FROM docker.io/runtime:3.1-12\n", true},
+		{"an astronomer image that is not runtime", "FROM quay.io/astronomer/ap-airflow:2.5.1\n", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := writeDockerfile(t, tc.body)
@@ -205,8 +271,17 @@ func TestPlanMajorReadsTheDeclaredBase(t *testing.T) {
 		// A generation-only tag reads by the check's grammar, not the loose
 		// "3." prefix rule, which would call it Airflow 2.
 		{from: "astrocrpublic.azurecr.io/runtime:3", pin: "2.10", want: "3"},
-		// Not a runtime version: the loose rule still reads Airflow 2.
-		{from: "quay.io/astronomer/ap-airflow:2.5.1", pin: "3.3", want: "2"},
+		// A mirror reads the same tag scheme.
+		{from: "mirror/runtime:3.1-12", pin: "2.10", want: "3"},
+		{from: "mirror/astronomer/astro-runtime:12.1.0", pin: "3.3", want: "2"},
+		// A published runtime whose tag is no Runtime version says nothing
+		// about its generation, so the pin decides.
+		{from: "astrocrpublic.azurecr.io/runtime", pin: "3.3", want: "3"},
+		{from: "astrocrpublic.azurecr.io/runtime:latest", pin: "3.3", want: "3"},
+		{from: "quay.io/astronomer/astro-runtime:latest", pin: "2.10", want: "2"},
+		// A tag from a build argument carries no generation the file can show.
+		{from: "astrocrpublic.azurecr.io/runtime:${V}", pin: "2.10", want: "2"},
+		{from: "mirror.corp/runtime:${TAG}", pin: "3.3", want: "3"},
 		{from: "python:3.12-slim", pin: "3.3", want: "3"},
 		{from: "python:3.12-slim", pin: "2.10", want: "2"},
 	}
