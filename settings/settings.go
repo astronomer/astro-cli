@@ -3,7 +3,6 @@ package settings
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -436,52 +435,62 @@ func EnvExport(id, envFile string, version uint64, connections, variables bool) 
 	return errors.New("Command must be used with Airflow 2.X")
 }
 
-// exportFileName is a file name for one `airflow ... export` to write to: in
-// the working directory of the command, which is the container's for a
-// Docker project and the project's Airflow home for a standalone one, never
-// a directory other users share; and of its own, so two exports at once do
-// not read or remove each other's.
-func exportFileName(what string) (string, error) {
-	b := make([]byte, 8) //nolint:mnd
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return ".astro-" + what + "-export-" + hex.EncodeToString(b), nil
+// exportScript is the one bash script an export runs, in the container for
+// a Docker project and on the host for a standalone one. exportCmd (one of
+// the export commands) writes the values, passwords among them, in plain
+// text to a file the script then prints after marker. The file is:
+//   - under $AIRFLOW_HOME, which is the image's for a Docker project and the
+//     gitignored .astro/standalone for a standalone one, never the project
+//     itself, where git or a deploy would pick it up;
+//   - owner-only (umask 077), and named per export (token), so two at once
+//     do not read or remove each other's;
+//   - removed by the script itself on any exit, an interrupt included, so
+//     its removal does not depend on the CLI living to run it.
+func exportScript(exportCmd, what, token, marker string) string {
+	return "umask 077; " +
+		`f="${AIRFLOW_HOME:-.}/.astro-` + what + "-export-" + token + `"; ` +
+		`trap 'rm -f "$f"' EXIT; trap 'exit 130' INT TERM HUP; ` +
+		fmt.Sprintf(exportCmd, `"$f"`) + ` && echo ` + marker + ` && cat "$f"`
 }
 
-// readAirflowExport runs exportCmd (one of the export commands, which takes
-// the file to write) and returns what it wrote. That file holds the values
-// in plain text, passwords among them, so it is removed whatever happens:
-// the removal is set up before the export runs, as a failed export can
-// still leave a partial file. A removal that fails is a warning naming the
-// file, not a failure of an export that worked. what is "variable" or
-// "connection".
+// readAirflowExport runs exportCmd through exportScript and returns what it
+// wrote. what is "variable" or "connection".
 func readAirflowExport(id, exportCmd, what string) (string, error) {
-	file, err := exportFileName(what)
+	token := rand.Text()
+	marker := "ASTRO-EXPORT-" + token
+	out, err := execAirflowCommand(id, exportScript(exportCmd, what, token, marker))
 	if err != nil {
 		return "", fmt.Errorf("error exporting %ss: %w", what, err)
-	}
-	defer func() {
-		if _, err := execAirflowCommand(id, "rm -f "+file); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: could not remove %s, which holds the exported %ss in plain text; remove it yourself: %s\n", file, what, err)
-		}
-	}()
-
-	out, err := execAirflowCommand(id, fmt.Sprintf(exportCmd, file))
-	if err != nil {
-		return "", fmt.Errorf("error exporting %ss: %w", what, err)
-	}
-	logger.Debugf("Export %ss logs:\n%s", what, out)
-	if !strings.Contains(out, "successfully") {
-		return "", fmt.Errorf("%s export unsuccessful", what)
-	}
-
-	out, err = execAirflowCommand(id, "cat "+file)
-	if err != nil {
-		return "", fmt.Errorf("error reading %ss file: %w", what, err)
 	}
 	// With a terminal, `docker exec -t` ends lines with "\r\n".
-	return strings.ReplaceAll(out, "\r\n", "\n"), nil
+	out = strings.ReplaceAll(out, "\r\n", "\n")
+	logs, content, ok := strings.Cut(out, marker+"\n")
+	logger.Debugf("Export %ss logs:\n%s", what, logs)
+	if !ok || !strings.Contains(logs, "successfully") {
+		return "", fmt.Errorf("%s export unsuccessful", what)
+	}
+	return content, nil
+}
+
+// decodeVariables reads the variables Airflow exported, a JSON object. A
+// value Airflow wrote as JSON rather than a string (a number, a list, an
+// object) is kept as that JSON text, which is how it reads back as an
+// Airflow variable, rather than dropped.
+func decodeVariables(out string) (map[string]string, error) {
+	raw := map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+		return nil, fmt.Errorf("variable json decode unsuccessful: %w", err)
+	}
+	vars := make(map[string]string, len(raw))
+	for k, v := range raw {
+		var s string
+		if err := json.Unmarshal(v, &s); err == nil {
+			vars[k] = s
+		} else {
+			vars[k] = string(v)
+		}
+	}
+	return vars, nil
 }
 
 // appendEnvLines appends lines to envFile, which can hold secret values, so
@@ -511,10 +520,9 @@ func EnvExportVariables(id, envFile string) error {
 		return err
 	}
 
-	m := map[string]string{}
-	err = json.Unmarshal([]byte(out), &m)
+	m, err := decodeVariables(out)
 	if err != nil {
-		fmt.Printf("variable json decode unsuccessful: %s", err.Error())
+		return err
 	}
 	lines := make([]string, 0, len(m))
 	for k, v := range m {
@@ -657,16 +665,15 @@ func ExportVariables(id string) error {
 		return err
 	}
 
-	m := map[string]string{}
-	err = json.Unmarshal([]byte(out), &m)
+	m, err := decodeVariables(out)
 	if err != nil {
-		fmt.Println("variable json decode unsuccessful")
+		return err
 	}
 	// add the variables to settings object
 	for k, v := range m {
 		for j := range settings.Airflow.Variables {
 			if settings.Airflow.Variables[j].VariableName == k {
-				fmt.Println("Updating Pool: " + k)
+				fmt.Println("Updating Variable: " + k)
 				// Remove variable if it already exits
 				settings.Airflow.Variables = append(settings.Airflow.Variables[:j], settings.Airflow.Variables[j+1:]...)
 				break

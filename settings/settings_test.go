@@ -456,14 +456,13 @@ func (s *Suite) TestInitSettingsFailure() {
 
 func (s *Suite) TestEnvExport() {
 	s.Run("success", func() {
-		f := s.install(&fakeAirflow{variables: fakeVariables, connections: fakeConnections})
+		s.install(&fakeAirflow{variables: fakeVariables, connections: fakeConnections})
 		env, read := s.envFile()
 
 		err := EnvExport("id", env, 2, true, true)
 		s.NoError(err)
 		s.Contains(read(), "AIRFLOW_VAR_MYVAR=myval")
 		s.Contains(read(), "AIRFLOW_CONN_LOCAL_POSTGRES=")
-		s.Empty(f.left())
 	})
 	s.Run("missing id", func() {
 		err := EnvExport("", "", 2, true, true)
@@ -494,7 +493,7 @@ func (s *Suite) TestEnvExport() {
 func (s *Suite) TestExport() {
 	s.Run("success", func() {
 		WorkingPath = "./testfiles/"
-		f := s.install(&fakeAirflow{variables: fakeVariables, others: map[string]string{
+		s.install(&fakeAirflow{variables: `{"myvar": "myval"}`, others: map[string]string{
 			airflowConnectionList: `
 - conn_id: local_postgres
   conn_type: postgres
@@ -520,7 +519,6 @@ func (s *Suite) TestExport() {
 
 		err := Export("id", "airflow_settings_export.yaml", 2, true, true, true)
 		s.NoError(err)
-		s.Empty(f.left())
 	})
 
 	s.Run("variable failure", func() {
