@@ -3,12 +3,14 @@ package imagebuild
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -81,7 +83,7 @@ func (e Engine) Login(ctx context.Context, registry, username, secret string) er
 	}
 	var stderr bytes.Buffer
 	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{In: stdin, Err: &stderr}, e.Bin, args...); err != nil {
-		return commandError(e.Bin+" login "+registry, err, stderr.String(), secret)
+		return commandError(e.Bin+" login "+registry, err, stderr.String(), secretForms(username, secret)...)
 	}
 	return nil
 }
@@ -94,7 +96,7 @@ func errSecretWithoutUser(registry string) error {
 func (e Engine) Tag(ctx context.Context, src, dst string) error {
 	var stderr bytes.Buffer
 	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Err: &stderr}, e.Bin, "tag", src, dst); err != nil {
-		return commandError(fmt.Sprintf("%s tag %s %s", e.Bin, src, dst), err, stderr.String(), "")
+		return commandError(fmt.Sprintf("%s tag %s %s", e.Bin, src, dst), err, stderr.String())
 	}
 	return nil
 }
@@ -104,7 +106,7 @@ func (e Engine) Tag(ctx context.Context, src, dst string) error {
 func (e Engine) Untag(ctx context.Context, ref string) error {
 	var stderr bytes.Buffer
 	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Err: &stderr}, e.Bin, "rmi", ref); err != nil {
-		return commandError(e.Bin+" rmi "+ref, err, stderr.String(), "")
+		return commandError(e.Bin+" rmi "+ref, err, stderr.String())
 	}
 	return nil
 }
@@ -116,7 +118,7 @@ func (e Engine) Label(ctx context.Context, image, label string) (string, error) 
 	var out, stderr bytes.Buffer
 	format := fmt.Sprintf("{{ index .Config.Labels %q }}", label)
 	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Out: &out, Err: &stderr}, e.Bin, "image", "inspect", "--format", format, image); err != nil {
-		return "", commandError(e.Bin+" image inspect "+image, err, stderr.String(), "")
+		return "", commandError(e.Bin+" image inspect "+image, err, stderr.String())
 	}
 	return strings.TrimSpace(out.String()), nil
 }
@@ -143,7 +145,11 @@ type PushRequest struct {
 	// Digest asks for the digest of the manifest pushed (sha256:…).
 	Digest bool
 	// Out takes the push's progress as the engine CLI writes it; nil drops
-	// it. The engine's stderr is kept for the error a failed push returns.
+	// it. Docker writes its progress to stdout, which is handed Out as it is,
+	// so a terminal there gets docker's live display; its stderr is kept for
+	// the error a failed push returns. Podman writes its progress to stderr
+	// ("Copying blob …"), so under podman stderr also reaches Out, a line at
+	// a time with the push's credential redacted.
 	Out io.Writer
 }
 
@@ -179,7 +185,7 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 			}
 		}()
 	}
-	podman := (credential || req.Digest) && IsPodman(ctx, e.Cmd, e.Bin, e.Env)
+	podman := (credential || req.Digest || req.Out != nil) && IsPodman(ctx, e.Cmd, e.Bin, e.Env)
 	auth := &pushAuth{}
 	if credential {
 		if auth, err = newPushAuth(registry, req.Username, req.Secret, podman, e.Env); err != nil {
@@ -199,7 +205,7 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 	}
 	args = auth.cmdArgs("push", append(args, req.Image)...)
 	var stderr bytes.Buffer
-	if runErr := e.Cmd.Run(ctx, auth.cmdEnv(e.Env), rt.Stdio{Out: req.Out, Err: &stderr}, e.Bin, args...); runErr != nil {
+	if runErr := e.runPush(ctx, auth.cmdEnv(e.Env), &req, podman, &stderr, args); runErr != nil {
 		return "", e.pushError(&req, credential, runErr, stderr.String())
 	}
 
@@ -214,6 +220,25 @@ func (e Engine) Push(ctx context.Context, req PushRequest) (string, error) {
 		return "", err
 	}
 	return digest, nil
+}
+
+// runPush runs the push command with its stdout to req.Out and its stderr
+// kept in stderr. Under podman, whose progress is on stderr, stderr reaches
+// req.Out as well, a line at a time with the push's credential redacted.
+func (e Engine) runPush(ctx context.Context, env []string, req *PushRequest, podman bool, stderr *bytes.Buffer, args []string) error {
+	if !podman || req.Out == nil {
+		return e.Cmd.Run(ctx, env, rt.Stdio{Out: req.Out, Err: stderr}, e.Bin, args...)
+	}
+	out := req.Out
+	if _, isFile := out.(*os.File); !isFile {
+		// exec copies a non-file stdout on a goroutine of its own, beside
+		// the one copying stderr into the same writer.
+		out = &lockedWriter{w: out}
+	}
+	progress := newRedactingLines(out, secretForms(req.Username, req.Secret))
+	err := e.Cmd.Run(ctx, env, rt.Stdio{Out: out, Err: io.MultiWriter(stderr, progress)}, e.Bin, args...)
+	progress.Flush()
+	return err
 }
 
 // credentialRegistry is the registry a push that carries its own credential
@@ -238,7 +263,7 @@ func credentialRegistry(req *PushRequest) (string, error) {
 // is a refusal of the credential (its own, when it carried one), its plain
 // failure otherwise. The secret is redacted from both.
 func (e Engine) pushError(req *PushRequest, credential bool, runErr error, stderr string) error {
-	err := commandError(e.Bin+" push "+req.Image, runErr, stderr, req.Secret)
+	err := commandError(e.Bin+" push "+req.Image, runErr, stderr, secretForms(req.Username, req.Secret)...)
 	said := engineSaid(runErr, stderr, req.Image, repository(req.Image))
 	if pushForbidden(said) || (credential && credentialRefused(said)) {
 		return &PushForbiddenError{WithCredential: credential, Err: err}
@@ -275,7 +300,7 @@ func newDigestFile() (string, error) {
 func (e Engine) repoDigest(ctx context.Context, image string) (string, error) {
 	var out, stderr bytes.Buffer
 	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Out: &out, Err: &stderr}, e.Bin, "image", "inspect", "--format", "{{json .RepoDigests}}", image); err != nil {
-		return "", fmt.Errorf("failed to get digests for image %s: %w", image, commandError(e.Bin+" image inspect "+image, err, stderr.String(), ""))
+		return "", fmt.Errorf("failed to get digests for image %s: %w", image, commandError(e.Bin+" image inspect "+image, err, stderr.String()))
 	}
 	var digests []string
 	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &digests); err != nil {
@@ -341,19 +366,46 @@ func repository(image string) string {
 }
 
 // commandError is a failed engine command: what ran, how it ended, and what
-// it wrote to stderr, with secret (and secret without a "Bearer " prefix)
-// redacted from that output.
-func commandError(what string, err error, stderr, secret string) error {
-	msg := strings.TrimSpace(stderr)
-	for _, s := range []string{secret, strings.TrimPrefix(secret, bearerPrefix)} {
-		if s != "" {
-			msg = strings.ReplaceAll(msg, s, "[redacted]")
-		}
-	}
+// it wrote to stderr, with each of secrets (secretForms) redacted from that
+// output.
+func commandError(what string, err error, stderr string, secrets ...string) error {
+	msg := redact(strings.TrimSpace(stderr), secrets)
 	if msg == "" {
 		return fmt.Errorf("%s failed: %w", what, err)
 	}
 	return fmt.Errorf("%s failed: %w: %s", what, err, msg)
+}
+
+// redacted replaces a secret in what an engine said.
+const redacted = "[redacted]"
+
+// secretForms are the forms a push's or a login's secret can take in what an
+// engine says: as given, without a "Bearer " prefix, and as the auth entry
+// of the credential file a push writes (base64 of username:secret). Longest
+// first, so a form that holds another is replaced whole.
+func secretForms(username, secret string) []string {
+	if secret == "" {
+		return nil
+	}
+	bare := strings.TrimPrefix(secret, bearerPrefix)
+	forms := []string{
+		base64.StdEncoding.EncodeToString([]byte(username + ":" + bare)),
+		base64.StdEncoding.EncodeToString([]byte(username + ":" + secret)),
+		secret,
+		bare,
+	}
+	slices.SortStableFunc(forms, func(a, b string) int { return len(b) - len(a) })
+	return slices.Compact(forms)
+}
+
+// redact is s with each of secrets replaced.
+func redact(s string, secrets []string) string {
+	for _, v := range secrets {
+		if v != "" {
+			s = strings.ReplaceAll(s, v, redacted)
+		}
+	}
+	return s
 }
 
 var (

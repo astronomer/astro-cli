@@ -188,12 +188,13 @@ func TestDeployClientImage(t *testing.T) {
 		// The base image registry is logged in to as the CLI user with the
 		// context's token on stdin, then the image is built under the
 		// reference it is pushed as, pushed, and its tag dropped.
-		require.Len(t, cmd.calls, 4, "%v", cmd.calls)
+		require.Len(t, cmd.calls, 5, "%v", cmd.calls)
 		assert.Equal(t, "docker login images.astronomer.cloud -u cli --password-stdin", cmd.calls[0])
 		assert.Equal(t, "test-token", cmd.stdins[0])
 		assert.True(t, strings.HasPrefix(cmd.calls[1], "docker build --tag "+got.Image+" "), cmd.calls[1])
-		assert.Equal(t, "docker push "+got.Image, cmd.calls[2])
-		assert.Equal(t, "docker rmi "+got.Image, cmd.calls[3])
+		assert.Equal(t, "docker --version", cmd.calls[2], "the push asks which engine it is, for where its progress is")
+		assert.Equal(t, "docker push "+got.Image, cmd.calls[3])
+		assert.Equal(t, "docker rmi "+got.Image, cmd.calls[4])
 	})
 
 	t.Run("no token, no login", func(t *testing.T) {
@@ -283,6 +284,7 @@ func TestDeployClientImage(t *testing.T) {
 		assert.True(t, strings.HasPrefix(got.Image, "test-registry:latest:deploy-"), got.Image)
 		assert.Equal(t, []string{
 			"docker tag custom-image:tag " + got.Image,
+			"docker --version",
 			"docker push " + got.Image,
 			"docker rmi " + got.Image,
 		}, cmd.calls)
