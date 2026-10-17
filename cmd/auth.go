@@ -145,7 +145,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 			if context.IsCloudDomain(ctx.Domain) {
 				fmt.Fprintf(out, "To login to APC follow the instructions below. If you are attempting to login in to Astro cancel the login and run 'astro login'.\n\n")
 			}
-			return apcLogin(domain, oAuth, "", "", apcPlatformVersion(domain), houstonClient, out)
+			return apcLogin(domain, oAuth, "", "", token, apcPlatformVersion(domain), houstonClient, out)
 		}
 		return cloudLogin(domain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(domain), forceLogin)
 	}
@@ -157,7 +157,7 @@ func runLogin(cmd *cobra.Command, args []string, astroV1Client astrov1.APIClient
 	} else if context.IsCloudDomain(ctx.Domain) {
 		return cloudLogin(ctx.Domain, token, astroV1Client, out, shouldDisplayLoginLink, signupForDomain(ctx.Domain), forceLogin)
 	}
-	return apcLogin(ctx.Domain, oAuth, "", "", apcPlatformVersion(ctx.Domain), houstonClient, out)
+	return apcLogin(ctx.Domain, oAuth, "", "", token, apcPlatformVersion(ctx.Domain), houstonClient, out)
 }
 
 func logout(cmd *cobra.Command, args []string, out io.Writer) error {
@@ -211,17 +211,22 @@ func newAuthLoginCommand(astroV1Client astrov1.APIClient, out io.Writer) *cobra.
   astro auth login <BASEDOMAIN>
 
   # Log in without a browser, with an API token
-  astro auth login --token-login <TOKEN>`,
+  astro auth login --token-login <TOKEN>
+
+  # Log in to an APC installation with a token, as in CI/CD
+  astro auth login <BASEDOMAIN> --token-login <TOKEN>`,
 	}
 
 	cmd.Flags().BoolVarP(&shouldDisplayLoginLink, "login-link", "l", false, "Get login link to login on a separate device for cloud CLI login")
-	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token for browserless cloud CLI login")
+	cmd.Flags().StringVarP(&token, "token-login", "t", "", "Login with a token, with no browser or prompt: for Astro and APC, such as in CI/CD")
 	cmd.Flags().BoolVarP(&oAuth, "oauth", "o", false, "Do not prompt for local auth for APC login")
 	cmd.Flags().BoolVar(&signup, "signup", false, "Create a new Astro account instead of signing in to an existing one")
 	cmd.Flags().BoolVar(&signin, "signin", false, "Sign in to an existing Astro account instead of creating one")
 	cmd.Flags().BoolVar(&forceLogin, "force", false, "Log in through the browser even when a saved login still works, and ask for the password again")
 	cmd.Flags().BoolVar(&loginInVault, "vault", false, "Keep this login in the local secrets vault even after an older Astro CLI or Astro Desktop was seen using it. That older tool will ask you to log in again")
 	cmd.MarkFlagsMutuallyExclusive("signup", "signin")
+	// A token login asks for nothing, so --oauth would be silently ignored.
+	cmd.MarkFlagsMutuallyExclusive("token-login", "oauth")
 	return cmd
 }
 

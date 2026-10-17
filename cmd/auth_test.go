@@ -50,7 +50,7 @@ func (s *CmdSuite) TestLogin() {
 		return nil
 	}
 
-	apcLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+	apcLogin = func(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 		s.Equal(apcDomain, domain)
 		return nil
 	}
@@ -140,7 +140,7 @@ func (s *CmdSuite) TestLoginShortNames() {
 		got = domain
 		return nil
 	}
-	apcLogin = func(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+	apcLogin = func(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 		s.Fail("a short name went to APC login", domain)
 		return nil
 	}
@@ -224,6 +224,37 @@ func (s *CmdSuite) TestLoginSignupAndSigninConflict() {
 
 	_, err := executeCommand("login", "--signup", "--signin")
 	s.ErrorContains(err, "[signup signin]")
+}
+
+// A token login asks for nothing, so --oauth with it is refused rather than
+// silently ignored.
+func (s *CmdSuite) TestLoginTokenAndOAuthConflict() {
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.T().Cleanup(func() { token, oAuth = "", false })
+
+	_, err := executeCommand("login", "astronomer_dev.com", "--token-login", "ci-token", "--oauth")
+	s.ErrorContains(err, "[token-login oauth]")
+}
+
+// --token-login reaches the APC login, with the domain given or the current
+// context's, as it reaches the Astro one: before, the APC login was handed no
+// token and asked for one interactively, which a CI job cannot answer.
+func (s *CmdSuite) TestLoginPassesTheTokenToAPC() {
+	origAPCLogin, origToken := apcLogin, token
+	s.T().Cleanup(func() { apcLogin, token = origAPCLogin, origToken })
+
+	var got []string
+	apcLogin = func(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
+		got = append(got, token)
+		return nil
+	}
+	token = "ci-token"
+
+	testUtil.InitTestConfig(testUtil.Initial)
+	s.NoError(login(&cobra.Command{}, []string{"astronomer_dev.com"}, nil, new(bytes.Buffer)))
+	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+	s.NoError(login(&cobra.Command{}, []string{}, nil, new(bytes.Buffer)))
+	s.Equal([]string{"ci-token", "ci-token"}, got)
 }
 
 // A sign-up that still needs the email address verified worked. Say so and exit

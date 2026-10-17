@@ -43,6 +43,8 @@ const (
 
 var (
 	errOAuthDisabled = errors.New("cannot authenticate, oauth is disabled")
+	errEmptyToken    = errors.New("--token-login was given no token")
+	errNoToken       = errors.New("cannot authenticate: the login returned no token")
 
 	// registryLogin logs the container engine in to a registry; tests
 	// replace it.
@@ -180,9 +182,10 @@ func getWorkspaces(client houston.ClientInterface, interactive bool) ([]houston.
 	return workspaces, err
 }
 
-// Login handles authentication to houston and registry
-func Login(domain string, oAuthOnly bool, username, password, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
-	var token string
+// Login handles authentication to houston and registry. A token given (with
+// --token-login) is used with nothing asked, for CI/CD; with none, Login asks
+// for a username or opens an oAuth flow to get one.
+func Login(domain string, oAuthOnly bool, username, password, token, houstonVersion string, client houston.ClientInterface, out io.Writer) error {
 	var err error
 	var pageSize int
 	var interactive bool
@@ -201,19 +204,10 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		return err
 	}
 
-	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
-	if err != nil {
-		return err
-	}
-
-	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
-		username, err = input.Text(inputUsername)
-		if err != nil {
-			return err
-		}
-	}
-
-	token, err = getAuthToken(username, password, authConfig, ctx, client)
+	// A token given with --token-login has not been through Houston yet: it is
+	// only known to work once a request made with it succeeds.
+	given := token != ""
+	token, err = resolveAuthToken(token, username, password, oAuthOnly, ctx, client)
 	if err != nil {
 		return err
 	}
@@ -229,6 +223,10 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 		return err
 	}
 
+	// The Houston client reads the token from the context, so it is saved
+	// before the first request; previous is put back if a given token fails
+	// it, so a mistyped or expired token does not replace a working login.
+	previous := c.Token
 	err = c.SetContextKey("token", token)
 	if err != nil {
 		return err
@@ -236,6 +234,11 @@ func Login(domain string, oAuthOnly bool, username, password, houstonVersion str
 
 	workspaces, err := getWorkspaces(client, interactive)
 	if err != nil {
+		if given {
+			if restoreErr := c.SetContextKey("token", previous); restoreErr != nil {
+				return errors.Join(err, restoreErr)
+			}
+		}
 		return err
 	}
 
@@ -329,6 +332,45 @@ func checkClusterDomain(domain string) error {
 		}
 	}
 	return nil
+}
+
+// resolveAuthToken returns the provided token when non-empty, without the
+// whitespace a script reading it from a file leaves and without a "Bearer "
+// the Houston client adds itself; otherwise it runs the interactive
+// basic-auth/oAuth flow against Houston to obtain one. It never returns an
+// empty token without an error: Login would save it over the login there is.
+func resolveAuthToken(token, username, password string, oAuthOnly bool, ctx *config.Context, client houston.ClientInterface) (string, error) {
+	if token != "" {
+		token = strings.TrimSpace(token)
+		if scheme, rest, ok := strings.Cut(token, " "); ok && strings.EqualFold(scheme, "Bearer") {
+			token = strings.TrimSpace(rest)
+		} else if strings.EqualFold(token, "Bearer") {
+			// The scheme alone names no token.
+			token = ""
+		}
+		if token == "" {
+			return "", errEmptyToken
+		}
+		return token, nil
+	}
+	authConfig, err := houston.Call(client.GetAuthConfig)(ctx)
+	if err != nil {
+		return "", err
+	}
+	if username == "" && !oAuthOnly && authConfig.LocalEnabled {
+		username, err = input.Text(inputUsername)
+		if err != nil {
+			return "", err
+		}
+	}
+	token, err = getAuthToken(username, password, authConfig, ctx, client)
+	if err != nil {
+		return "", err
+	}
+	if token == "" {
+		return "", errNoToken
+	}
+	return token, nil
 }
 
 func getAuthToken(username, password string, authConfig *houston.AuthConfig, ctx *config.Context, client houston.ClientInterface) (string, error) {
