@@ -63,8 +63,11 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 // changes nothing.
 func (s *Suite) TestClientRegistry() {
 	initTestConfig()
-	prevProject := viperProject
-	s.T().Cleanup(func() { viperProject = prevProject })
+	prevProject, prevHome := viperProject, CFG.RemoteClientRegistry.GetHomeString()
+	s.T().Cleanup(func() {
+		viperProject = prevProject
+		CFG.RemoteClientRegistry.SetHomeString(prevHome) //nolint:errcheck // best-effort restore for later tests
+	})
 	noProject := func() { viperProject = viper.New() }
 	withProject := func(value string) {
 		viperProject = viper.New()
@@ -103,7 +106,7 @@ func (s *Suite) TestClientRegistry() {
 		_, err := ClientRegistry()
 		s.ErrorContains(err, "remote.client_registry in this project's config")
 		s.ErrorContains(err, "'astro config set remote.client_registry")
-		s.NotContains(err.Error(), "-g")
+		s.NotContains(err.Error(), "config set -g", "a project's value is fixed in the project, not the global config")
 	})
 }
 
