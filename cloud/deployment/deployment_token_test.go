@@ -258,8 +258,9 @@ func (s *Suite) TestListTokens() {
 		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
 		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&resp, nil)
 		s.NoError(ListTokens(mockClient, "", nil, out))
-		s.Contains(out.String(), "KIND")
-		s.Regexp(`direct-token\s.*DIRECT_ACCESS`, out.String())
+		// KIND is the last column, so every earlier one keeps its position.
+		s.Regexp(`CREATED BY\s+KIND`, out.String())
+		s.Regexp(`(?m)direct-token\s.*\sDIRECT_ACCESS\s*$`, out.String())
 	})
 
 	s.Run("with specified deployment", func() {

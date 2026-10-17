@@ -35,7 +35,7 @@ const (
 func newTokenTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "KIND", "ORGANIZATION ROLE", "CREATED", "CREATED BY"},
+		Header:         []string{"ID", "NAME", "DESCRIPTION", "SCOPE", "ORGANIZATION ROLE", "CREATED", "CREATED BY", "KIND"},
 	}
 }
 
@@ -49,7 +49,7 @@ func newTokenRolesTableOut() *printutil.Table {
 func newTokenSelectionTableOut() *printutil.Table {
 	return &printutil.Table{
 		DynamicPadding: true,
-		Header:         []string{"#", "NAME", "DESCRIPTION", "KIND", "ROLE", "EXPIRES"},
+		Header:         []string{"#", "NAME", "DESCRIPTION", "ROLE", "EXPIRES", "KIND"},
 	}
 }
 
@@ -163,9 +163,9 @@ func selectTokens(apiTokens []astrov1.ApiToken) (astrov1.ApiToken, error) {
 			strconv.Itoa(index),
 			name,
 			description,
-			TokenKind(apiTokens[i]),
 			orgRole,
 			expiresStr,
+			TokenKind(apiTokens[i]),
 		}, false)
 		apiTokensMap[strconv.Itoa(index)] = apiTokens[i]
 	}
@@ -275,10 +275,10 @@ func ListTokens(client astrov1.APIClient, out io.Writer) error {
 			apiTokens[i].Name,
 			apiTokens[i].Description,
 			string(apiTokens[i].Scope),
-			TokenKind(apiTokens[i]),
 			orgRoleOf(apiTokens[i]),
 			created,
 			createdBy,
+			TokenKind(apiTokens[i]),
 		}, false)
 	}
 	tab.Print(out)
