@@ -19,10 +19,13 @@ var ErrNotLoggedIn = errors.New("not logged in")
 // isHelpOrVersion reports whether args is a help- or version-only invocation.
 // Otto's --help / --version exit before bootstrap() runs (see otto cli.ts),
 // so they don't need an auth context — let them through even when logged out.
+// The flags are the ones Otto's parseArgs (src/args.ts) takes, matched
+// exactly as it matches them: it has -v for --version, and refuses
+// --help=true as an unknown flag rather than showing help.
 func isHelpOrVersion(args []string) bool {
 	for _, a := range args {
 		switch a {
-		case "--help", "-h", "--version":
+		case "--help", "-h", "--version", "-v":
 			return true
 		}
 	}
