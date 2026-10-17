@@ -246,3 +246,16 @@ func TestClientDockerfileError(t *testing.T) {
 	elsewhere := &fs.PathError{Op: "chdir", Path: "/somewhere", Err: fs.ErrNotExist}
 	assert.Same(t, error(elsewhere), clientDockerfileError(elsewhere, "/the/project", df), "a path error about another file is not Dockerfile.client's")
 }
+
+// A relative context is made absolute before the build, so the Dockerfile,
+// the context and the directory the build runs in are the same place.
+func TestBuildClientImageWithARelativeContext(t *testing.T) {
+	project, ctx := clientProject(t, agentBase)
+	t.Chdir(filepath.Dir(ctx))
+	cmd := withClientBuild(t, "docker")
+	require.NoError(t, buildClientImage(project, filepath.Base(ctx), "reg/client:deploy-1", nil, nil))
+	abs, err := filepath.Abs(filepath.Base(ctx))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"docker build --tag reg/client:deploy-1 --file " + filepath.Join(abs, "Dockerfile.client") + " " + abs}, cmd.calls)
+	assert.Equal(t, []string{abs}, cmd.dirs)
+}

@@ -81,6 +81,11 @@ func buildClientImage(projectDir, contextDir, tag string, platforms, secrets []s
 	if err != nil {
 		return err
 	}
+	// Absolute, so the Dockerfile, the context and the directory the build
+	// runs in name the same place however the caller spelled it.
+	if contextDir, err = filepath.Abs(contextDir); err != nil {
+		return err
+	}
 
 	var buf bytes.Buffer
 	var out, errOut io.Writer = &buf, &buf

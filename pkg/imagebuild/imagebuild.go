@@ -21,8 +21,9 @@
 // engine and deploy resolve it the same way.
 //
 // Per the layer rules (docs/architecture.md) it prints nothing and never
-// exits: build output flows through rt.Callbacks and a failed install
-// returns a named error.
+// exits: build output flows through rt.Callbacks, or raw to Request.Stdout
+// and Request.Stderr when a caller sets them, and a failed install returns a
+// named error.
 package imagebuild
 
 import (
@@ -243,6 +244,9 @@ type Request struct {
 	Bin string
 	Env []string
 	// Dir is the build command's working directory; empty is the process's.
+	// A relative Dir, and the relative WorkDir, Dockerfile and Context of a
+	// request that sets it, are resolved against the process's working
+	// directory, not against Dir; the command line carries them absolute.
 	// Docker resolves what the command line leaves relative against it — a
 	// build secret's src above all — so a caller whose secrets are written
 	// relative to the build context sets it there. It is not WorkDir, which
@@ -301,8 +305,9 @@ func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s
 // ProjectFiles. With nothing to install, no project files and no labels it
 // builds nothing and returns the base image unchanged (the fast path).
 //
-// Build output streams to cb.OnLine (component "build"); a failed build returns
-// a named error, never a hang.
+// Build output streams to cb.OnLine (component "build") as lines, unless
+// req.Stdout or req.Stderr is set, in which case that stream goes to it raw;
+// a failed build returns a named error, never a hang.
 func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (string, error) {
 	return b.buildImage(ctx, req, cb, true)
 }
@@ -311,6 +316,12 @@ func (b *Builder) Build(ctx context.Context, req Request, cb rt.Callbacks) (stri
 // fastPath false a request with nothing to install still builds, producing
 // req.Tag over the base rather than returning the base itself.
 func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, fastPath bool) (string, error) {
+	if req.Dir != "" {
+		var err error
+		if req, err = absPaths(req); err != nil {
+			return "", err
+		}
+	}
 	if req.Dockerfile != "" {
 		// Checked here rather than in each caller, because this is where they
 		// meet: localdocker reaches it through the rt.ImageBuilder seam, and
@@ -450,6 +461,25 @@ func (b *Builder) build(ctx context.Context, req Request, dockerfile, contextDir
 		return "", err
 	}
 	return req.Tag, nil
+}
+
+// absPaths makes a request that runs in Dir carry absolute paths: Dir itself,
+// WorkDir, Dockerfile and Context, each resolved against the process's
+// working directory as the caller wrote them. Left relative, the file checks
+// here would read them against the process's directory while docker, running
+// in Dir, read the same strings against Dir.
+func absPaths(req Request) (Request, error) {
+	for _, p := range []*string{&req.Dir, &req.WorkDir, &req.Dockerfile, &req.Context} {
+		if *p == "" {
+			continue
+		}
+		abs, err := filepath.Abs(*p)
+		if err != nil {
+			return req, fmt.Errorf("resolving %s: %w", *p, err)
+		}
+		*p = abs
+	}
+	return req, nil
 }
 
 // buildSecrets are the Secrets the build can read. A declared Dockerfile

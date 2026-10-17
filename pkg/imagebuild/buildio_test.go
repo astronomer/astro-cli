@@ -138,3 +138,29 @@ func TestBuildDockerfileErrorsCanBeToldApart(t *testing.T) {
 	require.ErrorIs(t, err, fs.ErrNotExist)
 	assert.NotErrorIs(t, err, ErrDockerfileNotAFile)
 }
+
+// A request that runs in Dir carries its paths absolute, resolved against the
+// process's working directory: otherwise the checks here would read a
+// relative context where the process is, and docker, running in Dir, would
+// read the same strings against Dir.
+func TestBuildInDirMakesItsPathsAbsolute(t *testing.T) {
+	t.Chdir(t.TempDir())
+	require.NoError(t, os.Mkdir("ctx", 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join("ctx", "Dockerfile"), []byte("FROM my-own-base\n"), 0o600))
+	ctxAbs, err := filepath.Abs("ctx")
+	require.NoError(t, err)
+
+	cmd := &dirCmd{}
+	req := Request{
+		WorkDir:    "work",
+		Dockerfile: filepath.Join("ctx", "Dockerfile"),
+		Context:    "ctx",
+		Dir:        "ctx",
+		Tag:        "astro-local/my-project",
+		Bin:        "docker",
+	}
+	_, err = New(cmd, func() time.Time { return fixedTime }).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{ctxAbs}, cmd.dirs)
+	assert.Equal(t, []string{"docker build --tag astro-local/my-project --file " + filepath.Join(ctxAbs, "Dockerfile") + " " + ctxAbs}, cmd.calls)
+}
