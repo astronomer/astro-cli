@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"time"
-
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/pkg/astroauth"
 )
@@ -57,7 +55,7 @@ func (res Result) writeToContext(c *config.Context) error {
 		return err
 	}
 
-	err = c.SetExpiresIn(time.Duration(res.ExpiresIn) * time.Second)
+	err = c.SetExpiresIn(res.ExpiresIn)
 	if err != nil {
 		return err
 	}

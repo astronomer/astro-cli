@@ -159,6 +159,10 @@ func (c *Context) SetContextKey(key, value string) error {
 // a partial struct with every unset field zeroed out.
 // See https://github.com/spf13/viper/issues/1106.
 func setContextField(cKey, field string, value interface{}) error {
+	// viper reads keys back lowercased, so a field written as "ExpiresIn"
+	// would sit beside the "expiresin" a reload made of it, and a read could
+	// find either. Store the one viper reads.
+	field = strings.ToLower(field)
 	return updateContextMap(cKey, func(ctxMap map[string]interface{}) { ctxMap[field] = value })
 }
 
@@ -241,12 +245,12 @@ func (c *Context) DeleteContext() error {
 	return nil
 }
 
-func (c *Context) SetExpiresIn(d time.Duration) error {
+func (c *Context) SetExpiresIn(value int64) error {
 	cKey, err := c.GetContextKey()
 	if err != nil {
 		return err
 	}
-	expiretime := time.Now().Add(d)
+	expiretime := time.Now().Add(time.Duration(value) * time.Second)
 	return setContextField(cKey, "ExpiresIn", expiretime)
 }
 

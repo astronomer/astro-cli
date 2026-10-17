@@ -230,7 +230,7 @@ contexts:
 	ctx, err := GetCurrentContext()
 	s.Require().NoError(err)
 	s.Require().NoError(ctx.SetContextKey("token", "Bearer new"))
-	s.Require().NoError(ctx.SetExpiresIn(3600 * time.Second))
+	s.Require().NoError(ctx.SetExpiresIn(3600))
 
 	reread, err := GetCurrentContext()
 	s.Require().NoError(err)
@@ -264,7 +264,7 @@ func (s *Suite) TestSetOrganizationContext() {
 func (s *Suite) TestExpiresIn() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
-	err := ctx.SetExpiresIn(12 * time.Second)
+	err := ctx.SetExpiresIn(12)
 	s.NoError(err)
 
 	outCtx, err := ctx.GetContext()
@@ -276,10 +276,35 @@ func (s *Suite) TestExpiresIn() {
 	s.True(time.Now().Add(time.Duration(12) * time.Second).After(val)) // now + 12 seconds will always be after expire time, since that is set before
 }
 
+// A context loaded from disk holds its expiry under "expiresin", as viper
+// reads keys back lowercased. Setting it again replaces that one: written
+// under "ExpiresIn" it sat beside the old one, and a read could find either.
+func (s *Suite) TestExpiresInReplacesTheLoadedExpiry() {
+	fs := afero.NewMemMapFs()
+	s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(`
+context: localhost
+contexts:
+  localhost:
+    domain: localhost
+    token: token
+    expiresin: 2000-01-01T00:00:00Z
+`), 0o600))
+	InitConfig(fs)
+	ctx := Context{Domain: "localhost"}
+
+	for _, seconds := range []int64{60, 3600, 7200} {
+		s.Require().NoError(ctx.SetExpiresIn(seconds))
+		InitConfig(fs) // as the next command would load it
+		got, err := ctx.GetExpiresIn()
+		s.Require().NoError(err)
+		s.WithinDuration(time.Now().Add(time.Duration(seconds)*time.Second), got, time.Minute, "after setting %ds", seconds)
+	}
+}
+
 func (s *Suite) TestExpiresInFailure() {
 	initTestConfig()
 	ctx := Context{}
-	err := ctx.SetExpiresIn(1 * time.Second)
+	err := ctx.SetExpiresIn(1)
 	s.ErrorIs(err, ErrCtxConfigErr)
 
 	val, err := ctx.GetExpiresIn()
