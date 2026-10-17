@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -12,6 +14,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/internal/otto"
+	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
+	"github.com/astronomer/astro-cli/pkg/httputil"
 )
 
 // hasHelpFlag reports whether args ask for help with a word of their own
@@ -98,17 +102,40 @@ func ottoRun(cmd *cobra.Command, args []string) error {
 // launchOtto runs Otto with args and waits for it. It propagates Otto's exit
 // code when it exits non-zero: Otto has already printed its own error, so
 // cobra's "Error: exit status N" would be noise. Same treatment for
-// ErrNotLoggedIn: Start has already printed the sign-up guidance to stderr, so
-// returning the error to cobra would just tack on a redundant "Error: not
-// logged in" line.
+// ErrNotLoggedIn and ErrNotOrgMember: Start has already printed the guidance
+// to stderr, so returning the error to cobra would just tack on a redundant
+// "Error: ..." line.
 func launchOtto(args []string) error {
-	err := otto.Start(args)
+	err := otto.Start(args, ottoMembership(astrov1.NewV1Client(httputil.NewHTTPClient())))
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		os.Exit(exitErr.ExitCode())
 	}
-	if errors.Is(err, otto.ErrNotLoggedIn) {
+	if errors.Is(err, otto.ErrNotLoggedIn) || errors.Is(err, otto.ErrNotOrgMember) {
 		os.Exit(1)
 	}
 	return err
+}
+
+// ottoMembership is the check Start runs before spawning Otto, against the
+// Astro API. A 403 or 404 for the organization means not a member only when
+// the login is a user who can say who they are: an API token reaches an
+// organization by its own grants, not membership, so it is never refused
+// here. Every other answer lets the launch go ahead.
+func ottoMembership(client astrov1.APIClient) otto.MembershipCheck {
+	return func(ctx context.Context, org string) (string, bool) {
+		resp, err := client.GetOrganizationWithResponse(ctx, org, &astrov1.GetOrganizationParams{})
+		if err != nil || resp.HTTPResponse == nil {
+			return "", false
+		}
+		if code := resp.StatusCode(); code != http.StatusForbidden && code != http.StatusNotFound {
+			return "", false
+		}
+		createIfNotExist := false
+		self, err := client.GetSelfUserWithResponse(ctx, &astrov1.GetSelfUserParams{CreateIfNotExist: &createIfNotExist})
+		if err != nil || self.JSON200 == nil || self.JSON200.Username == "" {
+			return "", false
+		}
+		return self.JSON200.Username, true
+	}
 }

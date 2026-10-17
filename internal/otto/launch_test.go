@@ -89,7 +89,7 @@ func (s *ConfigSuite) start(args ...string) launch {
 		got = launch{bin: bin, args: args, env: env}
 		return nil
 	}
-	s.Require().NoError(Start(args))
+	s.Require().NoError(Start(args, nil))
 	s.Require().True(spawned, "Start never reached the Otto spawn")
 	return got
 }

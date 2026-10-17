@@ -30,6 +30,9 @@ type Config struct {
 	// ProjectAirflow is true when AirflowURL is a project's Airflow, which Otto
 	// authenticates to itself: no username and password are injected for it.
 	ProjectAirflow bool
+	// loginOrganization is the login's own organization, which Organization
+	// differs from when the project names another.
+	loginOrganization string
 }
 
 // NewConfigFromContext builds a Config from the current astro login context.
@@ -43,6 +46,7 @@ func NewConfigFromContext() *Config {
 	if err == nil {
 		cfg.Token = strings.TrimPrefix(ctx.Token, "Bearer ")
 		cfg.Domain = ctx.Domain
+		cfg.loginOrganization = ctx.Organization
 		cfg.Organization = projectOrganization(ctx.Organization)
 	}
 
