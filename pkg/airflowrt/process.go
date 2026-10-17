@@ -94,17 +94,20 @@ func StopProcess(pidFilePath string) (bool, error) {
 	return true, nil
 }
 
-// waitGroupGone polls until no process in pid's group is alive, or timeout
-// passes, and reports whether the group is gone.
+// waitGroupGone polls until neither pid nor any process in its group is
+// alive, or timeout passes, and reports whether they are gone. pid is checked
+// on its own as well: a process not started with Setpgid leads no group, so
+// the group check alone would call it gone while it runs.
 func waitGroupGone(pid int, timeout time.Duration) bool {
+	gone := func() bool { return !isProcessAlive(pid) && !isProcessGroupAlive(pid) }
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		time.Sleep(stopPollInterval)
-		if !isProcessGroupAlive(pid) {
+		if gone() {
 			return true
 		}
 	}
-	return !isProcessGroupAlive(pid)
+	return gone()
 }
 
 // ProcessGroupAlive reports whether any process in pid's group is still

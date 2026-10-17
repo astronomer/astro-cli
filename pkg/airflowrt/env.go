@@ -88,12 +88,14 @@ func ApplyLoopbackDefaults(overrides map[string]string) {
 
 // setDefault sets key to value in overrides unless the user already supplied
 // it — via the .env file (already merged into overrides) or the inherited
-// environment (which passes through to the final env untouched).
+// environment (which passes through to the final env untouched). An empty
+// value is no choice: for a bind address it means every interface, the very
+// default this guards against, so it gets the default too.
 func setDefault(overrides map[string]string, key, value string) {
-	if _, ok := overrides[key]; ok {
+	if strings.TrimSpace(overrides[key]) != "" {
 		return
 	}
-	if _, ok := os.LookupEnv(key); ok {
+	if strings.TrimSpace(os.Getenv(key)) != "" {
 		return
 	}
 	overrides[key] = value

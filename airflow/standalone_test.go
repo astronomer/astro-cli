@@ -747,17 +747,35 @@ func (s *Suite) TestStandaloneSigningSecret() {
 	})
 
 	s.Run("without a kept secret, a random one, not the project's name", func() {
-		handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
-		s.Require().NoError(err)
-		handler.airflowMajorVersion = "3"
-
-		first, second := envOf(handler)["AIRFLOW__API__SECRET_KEY"], envOf(handler)["AIRFLOW__API__SECRET_KEY"]
+		newHandler := func() *Standalone {
+			handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
+			s.Require().NoError(err)
+			handler.airflowMajorVersion = "3"
+			return handler
+		}
+		handler := newHandler()
+		first := envOf(handler)["AIRFLOW__API__SECRET_KEY"]
 		s.NotEmpty(first)
-		s.NotEqual(first, second, "an unkept secret is not random")
+		s.Equal(first, envOf(handler)["AIRFLOW__API__SECRET_KEY"], "one command signs with two secrets")
+		s.Equal(first, envOf(handler)["AIRFLOW__API_AUTH__JWT_SECRET"])
+		s.NotEqual(first, envOf(newHandler())["AIRFLOW__API__SECRET_KEY"], "an unkept secret is not random")
 		s.NotEqual("astro-standalone", first)
 		if name, err := ProjectNameUnique(); err == nil {
 			s.NotEqual(name, first)
 		}
+	})
+
+	s.Run("a secret another start kept first is the one used", func() {
+		project := s.T().TempDir()
+		path := filepath.Join(project, standaloneDir, standaloneSecretFile)
+		s.Require().NoError(os.MkdirAll(filepath.Dir(path), 0o700))
+		s.Require().NoError(os.WriteFile(path, []byte("kept-by-another-start"), 0o600))
+
+		handler, err := StandaloneInit(project, "", "Dockerfile")
+		s.Require().NoError(err)
+		handler.airflowMajorVersion = "3"
+		handler.persistSigningSecret()
+		s.Equal("kept-by-another-start", envOf(handler)["AIRFLOW__API__SECRET_KEY"])
 	})
 }
 
@@ -1247,6 +1265,42 @@ func (s *Suite) TestStandaloneStop_Running() {
 	// PID file should be removed
 	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
 	s.True(os.IsNotExist(err))
+}
+
+// The master died (a crash, an OOM kill) and left a child running in its
+// process group: ps reports it running, and stop stops it, rather than
+// calling the PID file stale and leaving the child where nothing can reach it.
+func (s *Suite) TestStandaloneDeadMasterWithLiveChildren() {
+	tmpDir := s.T().TempDir()
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	s.Require().NoError(os.MkdirAll(standaloneStateDir, 0o755))
+
+	// bash leads its own group (Setpgid, as Start does), starts a child in it
+	// and exits: the master is gone, the child lives on in the group. The
+	// child is reparented to init, which reaps it, so it leaves no zombie.
+	master := exec.Command("bash", "-c", "sleep 60 & exit 0")
+	master.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	s.Require().NoError(master.Run())
+	pgid := master.Process.Pid
+	s.T().Cleanup(func() { syscall.Kill(-pgid, syscall.SIGKILL) }) //nolint:errcheck
+	s.Require().True(airflowrt.ProcessGroupAlive(pgid), "the child did not outlive the master")
+	s.Require().NoError(os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", pgid)), 0o644))
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.Require().NoError(err)
+
+	status, err := handler.PS()
+	s.Require().NoError(err)
+	s.True(*status.Running, "ps reports the dead master's children as not running")
+
+	s.Require().NoError(handler.Stop(false))
+	s.False(airflowrt.ProcessGroupAlive(pgid), "stop left the dead master's children running")
+	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
+	s.True(os.IsNotExist(err), "PID file should be removed once the group is gone")
+
+	status, err = handler.PS()
+	s.Require().NoError(err)
+	s.False(*status.Running)
 }
 
 func (s *Suite) TestStandaloneStop_WaitsForProcessGroup() {

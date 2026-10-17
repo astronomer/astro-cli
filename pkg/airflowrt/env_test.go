@@ -98,6 +98,31 @@ func TestBuildEnv_LoopbackOverriddenByEnvFile(t *testing.T) {
 	assert.Equal(t, "0.0.0.0", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
 }
 
+// An empty bind address, which binds every interface, is no user choice: it
+// gets the loopback default, from .env or the inherited environment alike.
+func TestBuildEnv_EmptyBindHostGetsLoopback(t *testing.T) {
+	t.Run("from .env", func(t *testing.T) {
+		clearBindEnv(t)
+		dir := t.TempDir()
+		envFile := filepath.Join(dir, ".env")
+		require.NoError(t, os.WriteFile(envFile, []byte("AIRFLOW__API__HOST=\nAIRFLOW__WEBSERVER__WEB_SERVER_HOST= \n"), 0o600))
+
+		envMap := envToMap(BuildEnv(dir, "", envFile))
+		assert.Equal(t, "127.0.0.1", envMap["AIRFLOW__API__HOST"])
+		assert.Equal(t, "127.0.0.1", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+	})
+	t.Run("from the inherited environment", func(t *testing.T) {
+		t.Setenv("AIRFLOW__API__HOST", "")
+		t.Setenv("AIRFLOW__WEBSERVER__WEB_SERVER_HOST", "")
+
+		env := BuildEnv(t.TempDir(), "", "")
+		envMap := envToMap(env)
+		assert.Equal(t, "127.0.0.1", envMap["AIRFLOW__API__HOST"])
+		assert.Equal(t, "127.0.0.1", envMap["AIRFLOW__WEBSERVER__WEB_SERVER_HOST"])
+		assert.NotContains(t, env, "AIRFLOW__API__HOST=", "the empty inherited value still reaches Airflow")
+	})
+}
+
 func TestBuildEnv_LoopbackOverriddenByInheritedEnv(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("AIRFLOW__API__HOST", "0.0.0.0")
