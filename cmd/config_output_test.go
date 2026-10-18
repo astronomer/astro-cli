@@ -30,46 +30,46 @@ func (s *CmdSuite) with1xProjectOnDisk(project string) {
 func (s *CmdSuite) TestConfigGetOutput() {
 	s.Run("text is the line it always printed", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, _, err := runConfigCmd("get", "page_size", "-g")
+		stdout, _, err := runConfigCmd("get", "apc.page_size", "-g")
 		s.NoError(err)
-		s.Equal("page_size: 50\n", stdout)
+		s.Equal("apc.page_size: 50\n", stdout)
 	})
 
 	s.Run("json with -g publishes the global value, and whether the home config sets it", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, stderr, err := runConfigCmd("get", "page_size", "-g", "-o", "json")
+		stdout, stderr, err := runConfigCmd("get", "apc.page_size", "-g", "-o", "json")
 		s.NoError(err)
 		s.Empty(stderr)
-		s.Equal(configSetting{Key: "page_size", Value: "50", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
+		s.Equal(configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
 
-		stdout, _, err = runConfigCmd("get", "show_warnings", "-g", "-o", "json")
+		stdout, _, err = runConfigCmd("get", "apc.show_warnings", "-g", "-o", "json")
 		s.NoError(err)
-		s.Equal(configSetting{Key: "show_warnings", Value: "true", Scope: "global", Set: false}, decodeOne[configSetting](s, stdout),
+		s.Equal(configSetting{Key: "apc.show_warnings", Value: "true", Scope: "global", Set: false}, decodeOne[configSetting](s, stdout),
 			"the built-in default, as the text prints it")
 	})
 
 	s.Run("json in a 1.x project publishes the project's own value", func() {
 		s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 		s.with1xProjectOnDisk("page_size: 70\n")
-		stdout, _, err := runConfigCmd("get", "page_size", "-o", "json")
+		stdout, _, err := runConfigCmd("get", "apc.page_size", "-o", "json")
 		s.NoError(err)
-		s.Equal(configSetting{Key: "page_size", Value: "70", Scope: "project", Set: true}, decodeOne[configSetting](s, stdout))
+		s.Equal(configSetting{Key: "apc.page_size", Value: "70", Scope: "project", Set: true}, decodeOne[configSetting](s, stdout))
 	})
 
 	s.Run("json and text in a 1.x project that does not set it say so, without falling back", func() {
 		s.initConfigFiles("page_size: 50\n", "show_warnings: false\n")
 		s.with1xProjectOnDisk("show_warnings: false\n")
-		stdout, _, err := runConfigCmd("get", "page_size", "-o", "json")
+		stdout, _, err := runConfigCmd("get", "apc.page_size", "-o", "json")
 		s.NoError(err)
-		s.Equal(configSetting{Key: "page_size", Value: "", Scope: "project", Set: false}, decodeOne[configSetting](s, stdout))
+		s.Equal(configSetting{Key: "apc.page_size", Value: "", Scope: "project", Set: false}, decodeOne[configSetting](s, stdout))
 
-		stdout, _, err = runConfigCmd("get", "page_size")
+		stdout, _, err = runConfigCmd("get", "apc.page_size")
 		s.NoError(err)
-		s.Equal("page_size: \n", stdout, "the text prints the same empty value")
+		s.Equal("apc.page_size: \n", stdout, "the text prints the same empty value")
 
 		stdout, _, err = runConfigCmd("list", "-o", "json")
 		s.NoError(err)
-		s.Contains(decodeOne[configSettings](s, stdout).Settings, configSetting{Key: "page_size", Value: "50", Scope: "global", Set: true},
+		s.Contains(decodeOne[configSettings](s, stdout).Settings, configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true},
 			"list is where the value in effect is")
 	})
 
@@ -85,26 +85,26 @@ func (s *CmdSuite) TestConfigGetOutput() {
 func (s *CmdSuite) TestConfigSetOutput() {
 	s.Run("text is the line it always printed", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, _, err := runConfigCmd("set", "page_size", "60", "-g")
+		stdout, _, err := runConfigCmd("set", "apc.page_size", "60", "-g")
 		s.NoError(err)
-		s.Equal("Setting page_size to 60 successfully\n\n", stdout)
+		s.Equal("Setting apc.page_size to 60 successfully\n\n", stdout)
 	})
 
 	s.Run("json publishes the setting as set", func() {
 		s.initConfigFiles("page_size: 50\n", "")
-		stdout, stderr, err := runConfigCmd("set", "page_size", "60", "-g", "-o", "json")
+		stdout, stderr, err := runConfigCmd("set", "apc.page_size", "60", "-g", "-o", "json")
 		s.NoError(err)
 		s.Empty(stderr)
-		s.Equal(configSetting{Key: "page_size", Value: "60", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
+		s.Equal(configSetting{Key: "apc.page_size", Value: "60", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
 		s.Equal("60", config.CFG.PageSize.GetHomeString(), "and wrote it")
 	})
 
 	s.Run("json in a 1.x project sets the project's value", func() {
 		s.initConfigFiles("page_size: 50\n", "page_size: 70\n")
 		s.with1xProjectOnDisk("page_size: 70\n")
-		stdout, _, err := runConfigCmd("set", "page_size", "80", "-o", "json")
+		stdout, _, err := runConfigCmd("set", "apc.page_size", "80", "-o", "json")
 		s.NoError(err)
-		s.Equal(configSetting{Key: "page_size", Value: "80", Scope: "project", Set: true}, decodeOne[configSetting](s, stdout))
+		s.Equal(configSetting{Key: "apc.page_size", Value: "80", Scope: "project", Set: true}, decodeOne[configSetting](s, stdout))
 		s.Equal("80", config.CFG.PageSize.GetProjectString())
 		s.Equal("50", config.CFG.PageSize.GetHomeString(), "the global value is untouched")
 	})
@@ -127,20 +127,22 @@ func (s *CmdSuite) TestConfigListOutput() {
 		s.NoError(err)
 		s.Empty(stderr)
 		list := decodeOne[configSettings](s, stdout)
-		s.Contains(list.Settings, configSetting{Key: "page_size", Value: "50", Scope: "global", Set: true})
-		s.Contains(list.Settings, configSetting{Key: "show_warnings", Value: "true", Scope: "default"})
+		s.Contains(list.Settings, configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true})
+		s.Contains(list.Settings, configSetting{Key: "apc.show_warnings", Value: "true", Scope: "default"})
 		keys := make([]string, 0, len(list.Settings))
 		for _, setting := range list.Settings {
 			keys = append(keys, setting.Key)
 		}
 		s.True(slices.IsSorted(keys), "by key: %v", keys)
-		for key := range unlistedConfigs {
-			s.NotContains(keys, key)
+		// Only listed settings, and nothing get and set refuse (a removed or
+		// renamed 1.x name), so list and get agree.
+		for _, key := range keys {
+			s.True(config.CFGStrMap[key].Listed(), key)
+			_, refused := config.RemovedSetting(key)
+			s.False(refused, key)
 		}
-		// What get and set refuse is not listed either, so list and get agree.
-		for key := range removedConfigKeys {
-			s.NotContains(keys, key)
-		}
+		s.NotContains(keys, config.CFG.Contexts.Path)
+		s.NotContains(keys, config.CFG.LocalCore.Path)
 		s.NotContains(stdout, "t0ken-value")
 	})
 
@@ -150,6 +152,6 @@ func (s *CmdSuite) TestConfigListOutput() {
 		stdout, _, err := runConfigCmd("list", "-o", "json")
 		s.NoError(err)
 		list := decodeOne[configSettings](s, stdout)
-		s.Contains(list.Settings, configSetting{Key: "page_size", Value: "70", Scope: "project", Set: true})
+		s.Contains(list.Settings, configSetting{Key: "apc.page_size", Value: "70", Scope: "project", Set: true})
 	})
 }
