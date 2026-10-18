@@ -119,7 +119,9 @@ func noteRun(t *testing.T, projectPath string, s *engineState) (calls, lines []s
 	cmd := &fakeCmd{output: s.output}
 	e := testEngine(t, cmd)
 	cb := rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }}
-	e.noteLegacyDatabase(context.Background(), engineConn{bin: "docker"}, projectPath, testComposeProject, cb)
+	conn := engineConn{bin: "docker"}
+	own := e.lookupVolume(context.Background(), conn, testNewVolume)
+	e.noteLegacyDatabase(context.Background(), conn, projectPath, own, cb)
 	return cmd.calls, lines
 }
 

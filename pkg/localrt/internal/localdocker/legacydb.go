@@ -253,17 +253,15 @@ func (e *Engine) findLegacyVolume(ctx context.Context, conn engineConn, projectP
 //
 // Once: only when this runtime has no volume of its own for the project, which
 // is its first start here (and the first after a reset, when "new database" is
-// again what is about to happen). A project that never ran under 1.x stops at
-// the second check, so the common case costs one `volume ls`.
+// again what is about to happen). own is the caller's answer to that, asked
+// once per start because the Postgres choice turns on it too. A project that
+// never ran under 1.x stops at the second check.
 //
 // Silent on anything it cannot tell. It changes nothing, so the worst a missed
 // note costs is the explanation, and a wrong one would send someone looking for
 // a database that is not there.
-func (e *Engine) noteLegacyDatabase(ctx context.Context, conn engineConn, projectPath, composeProject string, cb rt.Callbacks) {
-	if cb.OnLine == nil {
-		return
-	}
-	if e.lookupVolume(ctx, conn, composeProject+"_"+metadataVolumeKey) != volumeAbsent {
+func (e *Engine) noteLegacyDatabase(ctx context.Context, conn engineConn, projectPath string, own volumeLookup, cb rt.Callbacks) {
+	if cb.OnLine == nil || own != volumeAbsent {
 		return
 	}
 	cfg, ok := read1xConfig(projectPath)

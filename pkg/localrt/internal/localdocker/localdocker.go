@@ -303,9 +303,10 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	// Before anything is created, since "does this project have a volume of its
-	// own yet" is the question the note turns on and the up is what makes one.
-	// See legacydb.go.
-	e.noteLegacyDatabase(ctx, conn, projectPath, name, cb)
+	// own yet" is the question both the note and the Postgres choice turn on,
+	// and the up is what makes one. See legacydb.go and pgversion.go.
+	own := e.lookupVolume(ctx, conn, metadataVolume(name))
+	e.noteLegacyDatabase(ctx, conn, projectPath, own, cb)
 
 	stateDir, err := e.stateDir(projectPath)
 	if err != nil {
@@ -333,7 +334,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
 		ProjectName:   name,
 		Image:         image,
-		PostgresImage: postgresImage,
+		PostgresImage: e.metadataPostgresImage(ctx, conn, name, image, own, cb),
 		WebPort:       webPort,
 		PostgresPort:  pgPort,
 		Env:           env,
@@ -710,6 +711,9 @@ func (e *Engine) Clean(ctx context.Context, projectPath string) (composeProject 
 			return "", false, err
 		}
 	}
+	// A Postgres version probe an interrupted start left behind still refers
+	// to the volume, and the engine will not remove a volume in use.
+	e.removePGProbe(ctx, conn, name)
 	// The same graceful window Stop gives containers. A reset with no record
 	// still finds a live project when the record was lost rather than removed,
 	// and there is no reason for that one to be killed harder than a stop.
@@ -881,6 +885,8 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	var extra []string
 	if opts.Clean {
 		extra = []string{"--volumes", "--remove-orphans"}
+		// See Clean: a leftover version probe would keep the volume.
+		a.eng.removePGProbe(ctx, conn, name)
 	}
 	if err := a.eng.downProject(ctx, conn, name, timeout, rt.Callbacks{}, extra...); err != nil {
 		return fmt.Errorf("stopping project containers: %w", err)
