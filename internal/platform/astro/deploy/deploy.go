@@ -421,8 +421,6 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 		}
 	}
 
-	warnIfNotAgentImage(ctx, engine, remoteImage)
-
 	// Push the image to the remote registry (assumes docker login was done externally)
 	fmt.Println("Pushing client image to configured remote registry")
 	_, err = engine.Push(ctx, imagebuild.PushRequest{Image: remoteImage, Out: os.Stdout})
