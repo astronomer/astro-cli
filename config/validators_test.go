@@ -59,8 +59,7 @@ func (s *Suite) Test_validateRegistryEndpoint() {
 
 // ClientRegistry checks a saved value as a new one is checked, and its error
 // names the config that holds it and the command that fixes it there: -g for
-// the global one, since outside a project `astro config set` without it
-// changes nothing.
+// the global one, which `astro config set` without it does not write.
 func (s *Suite) TestClientRegistry() {
 	// initTestConfig replaces both configs; put back the ones it replaced.
 	prevHome, prevProject := viperHome, viperProject

@@ -1665,7 +1665,7 @@ func TestDeployClientImage(t *testing.T) {
 		err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
-		// -g: outside a project, `astro config set` without it saves nothing.
+		// -g: with no project config, the value is read from the global one.
 		assert.Contains(t, err.Error(), "'astro config set -g remote.client_registry <registry>/<repository>'")
 		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
 	})
