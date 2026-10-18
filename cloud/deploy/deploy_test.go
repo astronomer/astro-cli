@@ -3,7 +3,6 @@ package deploy
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -1200,27 +1199,12 @@ func TestBuildImageFailure(t *testing.T) {
 	mockImageHandler.AssertExpectations(t)
 }
 
-// captureStdout redirects os.Stdout for the duration of fn and returns everything written to it.
-func captureStdout(t *testing.T, fn func()) string {
-	t.Helper()
-
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	assert.NoError(t, err)
-	os.Stdout = w
-
-	outC := make(chan string)
-	go func() {
-		var buf bytes.Buffer
-		_, _ = io.Copy(&buf, r)
-		outC <- buf.String()
-	}()
-
-	fn()
-
-	w.Close()
-	os.Stdout = oldStdout
-	return <-outC
+// The prefix matches what the published agent image sets (astro-agent's
+// Dockerfile.standalone), and is the namespace with its separator: the
+// tests below hand the constant to a mock, which would take any value.
+func TestAgentEnvVarPrefix(t *testing.T) {
+	assert.True(t, strings.HasPrefix("ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE", agentEnvVarPrefix))
+	assert.False(t, strings.HasPrefix("ASTRO_AGENT_CLIENTS", agentEnvVarPrefix))
 }
 
 // refuseAgentImage refuses an agent image, which would crash-loop as a hosted
@@ -1584,7 +1568,6 @@ func TestDeployClientImage(t *testing.T) {
 		// Mock image handler
 		mockImageHandler := new(mocks.ImageHandler)
 		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
-		mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(true, nil).Once()
 		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", nil).Once()
 
 		// Override airflowImageHandler
@@ -1779,7 +1762,6 @@ func TestDeployClientImage(t *testing.T) {
 		// Mock image handler with push failure
 		mockImageHandler := new(mocks.ImageHandler)
 		mockImageHandler.On("Build", "Dockerfile.client", mock.Anything, mock.AnythingOfType("types.ImageBuildConfig")).Return(nil).Once()
-		mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(true, nil).Once()
 		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", errors.New("push failed")).Once()
 
 		// Override airflowImageHandler
@@ -1816,7 +1798,6 @@ func TestDeployClientImage(t *testing.T) {
 		// Mock image handler
 		mockImageHandler := new(mocks.ImageHandler)
 		mockImageHandler.On("TagLocalImage", "custom-image:tag").Return(nil).Once()
-		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(true, nil).Once()
 		// Remote image will use timestamp tag, not the user-provided tag
 		mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool {
 			// Verify it uses timestamp-based tag format, not "tag" from the user input
@@ -1849,63 +1830,6 @@ func TestDeployClientImage(t *testing.T) {
 		err = DeployClientImage(deployInput, nil)
 		assert.NoError(t, err)
 		mockImageHandler.AssertExpectations(t)
-	})
-}
-
-// TestDeployClientImageFailsWhenImageLacksAgentMarker verifies the post-build check is fatal:
-// unlike the pre-build check, it inspects the actual image about to be pushed, so there is no
-// ARG/multi-stage ambiguity and no reason to let a non-agent image continue to Push.
-// An image that does not look like an agent image is only warned about: the
-// client deploy pushes it all the same, and a failed inspect warns of nothing.
-func TestDeployClientImageAgentImageCheck(t *testing.T) {
-	deploy := func(t *testing.T, isAgent bool, inspectErr error, showWarnings bool) (string, error) {
-		t.Helper()
-		testUtil.InitTestConfig(testUtil.CloudPlatform)
-		if !showWarnings {
-			config.CFG.ShowWarnings.SetHomeString("false")
-			t.Cleanup(func() { config.CFG.ShowWarnings.SetHomeString("true") })
-		}
-		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("TagLocalImage", "custom-image:tag").Return(nil).Once()
-		mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(isAgent, inspectErr).Maybe()
-		mockImageHandler.On("Push", mock.AnythingOfType("string"), "", "", false).Return("", nil).Once()
-		original := airflowImageHandler
-		t.Cleanup(func() { airflowImageHandler = original })
-		airflowImageHandler = func(string) airflow.ImageHandler { return mockImageHandler }
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
-		t.Cleanup(func() { config.CFG.RemoteClientRegistry.SetHomeString("") })
-
-		var err error
-		output := captureStdout(t, func() {
-			err = DeployClientImage(InputClientDeploy{Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
-		})
-		mockImageHandler.AssertExpectations(t)
-		return output, err
-	}
-	warning := fmt.Sprintf(warningNonAgentImageInClientDeployMsg, agentEnvVarPrefix)
-
-	t.Run("warns of an image that is not an agent image, and pushes it", func(t *testing.T) {
-		output, err := deploy(t, false, nil, true)
-		assert.NoError(t, err)
-		assert.Contains(t, output, warning)
-	})
-
-	t.Run("says nothing of an agent image", func(t *testing.T) {
-		output, err := deploy(t, true, nil, true)
-		assert.NoError(t, err)
-		assert.NotContains(t, output, warning)
-	})
-
-	t.Run("says nothing when the inspect fails", func(t *testing.T) {
-		output, err := deploy(t, false, errors.New("inspect failed"), true)
-		assert.NoError(t, err)
-		assert.NotContains(t, output, warning)
-	})
-
-	t.Run("says nothing with warnings off", func(t *testing.T) {
-		output, err := deploy(t, false, nil, false)
-		assert.NoError(t, err)
-		assert.NotContains(t, output, warning)
 	})
 }
 
