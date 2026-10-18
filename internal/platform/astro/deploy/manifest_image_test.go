@@ -372,6 +372,14 @@ func TestDeployManifestImage_RuntimeVersionRejected(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
+// The prefix matches what the published agent image sets (astro-agent's
+// Dockerfile.standalone), and is the namespace with its separator: the
+// refusal test's fake answers whatever environment it is given.
+func TestAgentEnvVarPrefix(t *testing.T) {
+	assert.True(t, strings.HasPrefix("ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE", agentEnvVarPrefix))
+	assert.False(t, strings.HasPrefix("ASTRO_AGENT_CLIENTS", agentEnvVarPrefix))
+}
+
 // An agent image is built FROM Runtime and passes the label check, but would
 // crash-loop as the Deployment's scheduler: it is refused before the deploy
 // is created, whether built or named with --image-name.
