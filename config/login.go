@@ -42,6 +42,10 @@ var (
 		return l
 	})
 	loginsOverride *secrets.Logins
+	// loginResolved, when set, is told each time resolveLogin runs. A test
+	// sets it, through CountLoginResolutions, to show that a reader never
+	// reaches the keyring or the vault.
+	loginResolved func()
 	// loginWarning makes the warning about an unreadable login print once.
 	loginWarning sync.Once
 	// signedOutChecked holds the contexts whose sign-out this process has
@@ -70,6 +74,9 @@ func isLoginField(field string) bool {
 // say the context is signed out (an older tool's sign-out) remove the vault
 // entry left behind, on the same condition and once per process.
 func resolveLogin(cKey string, c *Context) {
+	if loginResolved != nil {
+		loginResolved()
+	}
 	stored := secrets.Login{Token: c.Token, RefreshToken: c.RefreshToken}
 	var (
 		login secrets.Login

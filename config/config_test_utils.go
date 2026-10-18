@@ -36,3 +36,13 @@ func UseLoginsForTesting(l *secrets.Logins) (restore func()) {
 	loginsOverride = l
 	return func() { loginsOverride = prev }
 }
+
+// CountLoginResolutions counts, for the rest of a test, each time a context's
+// login is resolved: read from the vault or the keyring, perhaps moved there
+// with the config rewritten, perhaps with a warning on stderr. count says how
+// many so far; restore stops counting.
+func CountLoginResolutions() (count func() int, restore func()) {
+	n, prev := 0, loginResolved
+	loginResolved = func() { n++ }
+	return func() int { return n }, func() { loginResolved = prev }
+}

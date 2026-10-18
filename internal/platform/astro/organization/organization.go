@@ -335,7 +335,12 @@ func pluralize(count int) string {
 	return ""
 }
 
+// IsOrgHosted reports whether the current context's organization is hosted.
+// It reads the context without its login (config.CurrentContextWithoutLogin):
+// building the Astro tree asks it, for the flags `deployment create` and
+// `update` take, on every command, and resolving a login can read the keyring
+// or the vault.
 func IsOrgHosted() bool {
-	c, _ := context.GetCurrentContext() //nolint:errcheck // falls back to the zero context in this shell code
+	c, _ := config.CurrentContextWithoutLogin() //nolint:errcheck // falls back to the zero context in this shell code
 	return c.OrganizationProduct == "HOSTED"
 }

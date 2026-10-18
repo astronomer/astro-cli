@@ -175,9 +175,13 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// config.InitConfig before this function runs, and it has to, because
 	// detectRootOptions asks context.IsCloudContext() which of the two
 	// subtrees above to mount — the shape of the tree depends on the config
-	// file before cobra has seen argv. The read creates nothing, so a core
-	// command on a machine that never logged in leaves no config/ state behind
-	// (config.initHome, and TestInitLeavesNoHomeConfigBehind in e2e).
+	// file before cobra has seen argv. It reads the current context but never
+	// its login, as nothing else building the tree does, so a command that
+	// needs no login reaches no keyring or vault
+	// (TestTheRootDecidesThePlatformWithoutTheLogin). The read creates
+	// nothing, so a core command on a machine that never logged in leaves no
+	// config/ state behind (config.initHome, and
+	// TestInitLeavesNoHomeConfigBehind in e2e).
 	coreDeps := local.NewDeps()
 	// The root's out, os.Stdout in production, so a test of the assembled
 	// root reads what a core command publishes where it reads the rest.
