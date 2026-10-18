@@ -67,12 +67,13 @@ const (
 	pgDataDir     = "/var/lib/postgresql/data"
 	pgVersionFile = "PG_VERSION"
 
-	// pgProbeSuffix names the container the version is read through, after the
-	// compose project it belongs to. A fixed name rather than a generated one
-	// so a probe an interrupted start left behind is found and removed by the
-	// next start or reset: it holds the volume, and docker will not delete a
-	// volume a container still refers to.
-	pgProbeSuffix = "-pgversion"
+	// pgProbeLabel marks the container the version is read through, valued
+	// with the compose project it belongs to. A label rather than a fixed
+	// name, as in Astro CLI 1.x: a leftover under a fixed name collides with
+	// the next create, which would switch the check off for good. Leftovers
+	// are found by the label instead and removed — they hold the volume, and
+	// the engine will not delete a volume a container still refers to.
+	pgProbeLabel = "io.astronomer.astro.postgres-version-probe"
 
 	// pgRecordFile is where the state directory remembers what was read.
 	pgRecordFile = "postgres.json"
@@ -89,11 +90,6 @@ const pgProbeCleanupTimeout = 30 * time.Second
 // metadataVolume is the name compose gives a project's metadata volume.
 func metadataVolume(composeProject string) string {
 	return composeProject + "_" + metadataVolumeKey
-}
-
-// pgProbeName is the probe container's name for a compose project.
-func pgProbeName(composeProject string) string {
-	return composeProject + pgProbeSuffix
 }
 
 // pgRecord is what the state directory remembers about one metadata volume.
@@ -319,16 +315,10 @@ func (p *pullError) Unwrap() error { return p.err }
 // counts a project's containers — a leak census, a person with `docker ps` —
 // sees it as the project's. Compose itself does not: it lists only the
 // containers it created, so `down --remove-orphans` leaves a probe in place,
-// and the start, reset and clean stop remove it by name instead.
+// and the start, reset and clean stop remove it by pgProbeLabel instead.
 func (e *Engine) readPGVersion(ctx context.Context, conn engineConn, composeProject, probeImage string) (string, error) {
-	probe := pgProbeName(composeProject)
-	// One left by an interrupted start would make the create below collide.
-	e.removePGProbe(ctx, conn, composeProject)
-	defer func() {
-		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), pgProbeCleanupTimeout)
-		defer cancel()
-		e.removePGProbe(cleanup, conn, composeProject)
-	}()
+	// One left by an interrupted start would still hold the volume.
+	e.removePGProbes(ctx, conn, composeProject)
 
 	// The pull is asked for separately so its failure can be named as one;
 	// left to the create, it would read as the version being unreadable.
@@ -337,15 +327,29 @@ func (e *Engine) readPGVersion(ctx context.Context, conn engineConn, composeProj
 			return "", &pullError{image: probeImage, err: perr}
 		}
 	}
-	if _, err := e.cmd.Output(ctx, conn.env, conn.bin, "container", "create",
-		"--name", probe,
+	out, err := e.cmd.Output(ctx, conn.env, conn.bin, "container", "create",
+		"--label", pgProbeLabel+"="+composeProject,
 		"--label", composeProjectLabel+"="+composeProject,
 		"--label", "io.astronomer.docker=true",
 		"--volume", metadataVolume(composeProject)+":"+pgDataDir+":ro",
-		probeImage); err != nil {
+		probeImage)
+	// Removed by ID once read, whether or not the read works; a probe this
+	// process does not live to remove is found by its label next time.
+	id := lastLine(out)
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), pgProbeCleanupTimeout)
+		defer cancel()
+		if id != "" {
+			e.removeContainer(cleanup, conn, id)
+		}
+	}()
+	if err != nil {
 		return "", fmt.Errorf("creating a container to read it through: %w", err)
 	}
-	archive, err := e.cmd.Output(ctx, conn.env, conn.bin, "container", "cp", probe+":"+pgDataDir+"/"+pgVersionFile, "-")
+	if id == "" {
+		return "", errors.New("creating a container to read it through: the engine returned no container ID")
+	}
+	archive, err := e.cmd.Output(ctx, conn.env, conn.bin, "container", "cp", id+":"+pgDataDir+"/"+pgVersionFile, "-")
 	if err != nil {
 		return "", fmt.Errorf("copying %s out of the volume: %w", pgVersionFile, err)
 	}
@@ -356,12 +360,31 @@ func (e *Engine) readPGVersion(ctx context.Context, conn engineConn, composeProj
 	return parsePGVersion(contents)
 }
 
-// removePGProbe removes the project's probe container, if there is one.
-// Best effort: "no such container" is the ordinary answer, and a probe that
+// lastLine is the last non-empty line of a command's output: the ID `create`
+// prints, after anything a pull wrote to the same stream.
+func lastLine(out []byte) string {
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+// removePGProbes removes every probe container the project has, found by
+// pgProbeLabel. Best effort: none is the ordinary answer, and a probe that
 // survives is removed by the next start or reset.
-func (e *Engine) removePGProbe(ctx context.Context, conn engineConn, composeProject string) {
-	//nolint:errcheck // best effort by design; see the doc comment
-	_ = e.cmd.Run(ctx, conn.env, rt.Stdio{}, conn.bin, "container", "rm", "--force", pgProbeName(composeProject))
+func (e *Engine) removePGProbes(ctx context.Context, conn engineConn, composeProject string) {
+	out, err := e.cmd.Output(ctx, conn.env, conn.bin, "container", "ls", "--all", "--quiet",
+		"--filter", "label="+pgProbeLabel+"="+composeProject)
+	if err != nil {
+		return
+	}
+	for _, id := range strings.Fields(string(out)) {
+		e.removeContainer(ctx, conn, id)
+	}
+}
+
+// removeContainer force-removes one container. Best effort, like its callers.
+func (e *Engine) removeContainer(ctx context.Context, conn engineConn, id string) {
+	//nolint:errcheck // best effort by design; see the callers
+	_ = e.cmd.Run(ctx, conn.env, rt.Stdio{}, conn.bin, "container", "rm", "--force", id)
 }
 
 // errNoFileInArchive is a copy stream that held no regular file.

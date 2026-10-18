@@ -732,7 +732,7 @@ func (e *Engine) teardown(ctx context.Context, conn engineConn, name, composeFil
 	// to the volume, and the engine will not remove a volume in use. Compose
 	// does not count it among the project's containers (see readPGVersion), so
 	// --remove-orphans does not reach it.
-	e.removePGProbe(ctx, conn, name)
+	e.removePGProbes(ctx, conn, name)
 	// The same graceful window Stop gives containers. A reset with no record
 	// still finds a live project when the record was lost rather than removed,
 	// and there is no reason for that one to be killed harder than a stop.
@@ -931,7 +931,7 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	if opts.Clean {
 		extra = []string{"--volumes", "--remove-orphans"}
 		// See Clean: a leftover version probe would keep the volume.
-		a.eng.removePGProbe(ctx, conn, name)
+		a.eng.removePGProbes(ctx, conn, name)
 	}
 	if err := a.eng.downProject(ctx, conn, name, timeout, rt.Callbacks{}, extra...); err != nil {
 		return fmt.Errorf("stopping project containers: %w", err)

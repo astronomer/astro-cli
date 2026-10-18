@@ -55,7 +55,9 @@ func TestAnExistingPostgres12DatabaseKeepsItsVersion(t *testing.T) {
 	// The probe the version was read through is created and removed within the
 	// start. One left behind would hold the volume, and the reset in cleanup
 	// could not delete it.
-	if left, err := dockerLines(t.Context(), "ps", "--all", "--filter", "name=^"+project+"-pgversion$", "--format", "{{.Names}}"); err != nil {
+	// Found by the label the probe carries, since it has no fixed name.
+	if left, err := dockerLines(t.Context(), "ps", "--all",
+		"--filter", "label=io.astronomer.astro.postgres-version-probe="+project, "--format", "{{.Names}}"); err != nil {
 		t.Fatalf("listing probe containers: %v", err)
 	} else if len(left) != 0 {
 		t.Errorf("the start left its Postgres version probe behind: %v", left)

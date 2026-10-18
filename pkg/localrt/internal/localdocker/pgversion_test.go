@@ -88,6 +88,16 @@ type pgEngine struct {
 	// imageMissing makes `image inspect` fail, and pullErr the pull after it.
 	imageMissing bool
 	pullErr      error
+	// leftovers are probe containers an earlier start left behind.
+	leftovers []string
+}
+
+// testProbeID is the ID the fake engine gives a created probe.
+const testProbeID = "0123456789ab"
+
+// probeSweep is the call that finds a compose project's probe containers.
+func probeSweep(composeProject string) string {
+	return "docker container ls --all --quiet --filter label=" + pgProbeLabel + "=" + composeProject
 }
 
 func (s *pgEngine) output(call string) ([]byte, error) {
@@ -105,6 +115,10 @@ func (s *pgEngine) output(call string) ([]byte, error) {
 			return nil, errors.New("exit status 1")
 		}
 		return []byte("sha256:abc\n"), nil
+	case strings.Contains(call, " container ls ") && strings.Contains(call, pgProbeLabel):
+		return []byte(strings.Join(s.leftovers, "\n")), nil
+	case strings.Contains(call, " container create "):
+		return []byte(testProbeID + "\n"), nil
 	case strings.Contains(call, " container cp "):
 		if s.cpErr != nil {
 			return nil, s.cpErr
@@ -198,27 +212,41 @@ func TestAnExistingPostgres12DatabaseKeepsRunningOn12(t *testing.T) {
 	create := callIndex(got.calls, " container create ")
 	require.GreaterOrEqual(t, create, 0, "calls were %v", got.calls)
 	assert.Contains(t, got.calls[create], "--volume "+metadataVolume(got.name)+":"+pgDataDir+":ro")
-	assert.Contains(t, got.calls[create], "--name "+pgProbeName(got.name))
-	// Labeled as the project's, so whatever counts a project's containers
-	// counts this one.
+	// No fixed name, which a leftover would collide with: found by its own
+	// label, and labeled as the project's so whatever counts a project's
+	// containers counts this one.
+	assert.NotContains(t, got.calls[create], "--name")
+	assert.Contains(t, got.calls[create], "--label "+pgProbeLabel+"="+got.name)
 	assert.Contains(t, got.calls[create], "--label "+composeProjectLabel+"="+got.name)
+	assert.Less(t, callIndex(got.calls, probeSweep(got.name)), create, "leftovers are looked for before the create")
+	assert.Contains(t, got.calls[callIndex(got.calls, " container cp ")], " "+testProbeID+":"+pgDataDir+"/"+pgVersionFile,
+		"read by the ID the create returned")
 	// testPlan adds no dependencies, so the image the project runs is the
 	// stub's runtime base as-is.
 	assert.True(t, strings.HasSuffix(got.calls[create], " "+newStubImages().base),
 		"the probe is created from the project's own image, got %s", got.calls[create])
 	assert.Equal(t, -1, callIndex(got.calls, " pull "), "an image the engine has is not pulled")
 
-	// And taken back out, before the up, so it never holds the volume compose
-	// is about to mount.
-	up := callIndex(got.calls, " up ")
-	rms := 0
-	for i, c := range got.calls {
-		if c == "docker container rm --force "+pgProbeName(got.name) {
-			rms++
-			assert.Less(t, i, up, "the probe is removed before the up")
-		}
+	// And taken back out by that ID, before the up, so it never holds the
+	// volume compose is about to mount.
+	rm := slices.Index(got.calls, "docker container rm --force "+testProbeID)
+	require.GreaterOrEqual(t, rm, 0, "calls were %v", got.calls)
+	assert.Less(t, rm, callIndex(got.calls, " up "), "the probe is removed before the up")
+}
+
+// A probe an interrupted start left behind is found by its label and removed
+// before the next one is created, however many there are. Under a fixed name a
+// leftover would instead make the create collide, switching the check off.
+func TestLeftoverProbesAreFoundByLabelAndRemoved(t *testing.T) {
+	got := startWithVolume(t, &pgEngine{version: "12", createdAt: "x", leftovers: []string{"aaa111", "bbb222"}})
+
+	create := callIndex(got.calls, " container create ")
+	for _, id := range []string{"aaa111", "bbb222"} {
+		rm := slices.Index(got.calls, "docker container rm --force "+id)
+		require.GreaterOrEqual(t, rm, 0, "leftover %s was not removed; calls were %v", id, got.calls)
+		assert.Less(t, rm, create)
 	}
-	assert.Equal(t, 2, rms, "one leftover cleared before the create, and the probe itself after; calls were %v", got.calls)
+	assert.Contains(t, got.compose, "image: "+legacyPostgresImage+"\n")
 }
 
 // What was read is remembered for the volume, so the next start neither probes
@@ -278,7 +306,7 @@ func TestAnUnreadableVersionStartsOnTheLegacyImageAndSaysSo(t *testing.T) {
 	require.Len(t, warned, 1, "lines were %v", got.lines)
 	assert.Contains(t, warned[0], legacyPostgresImage)
 	assert.Contains(t, warned[0], "astro local reset")
-	assert.Equal(t, "docker container rm --force "+pgProbeName(got.name), got.calls[callIndex(got.calls, " container cp ")+1],
+	assert.Equal(t, "docker container rm --force "+testProbeID, got.calls[callIndex(got.calls, " container cp ")+1],
 		"a failed read still removes its probe")
 }
 
@@ -365,7 +393,10 @@ func TestACanceledProbeIsStillRemoved(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
-		if strings.Contains(call, " container cp ") {
+		switch {
+		case strings.Contains(call, " container create "):
+			return []byte(testProbeID + "\n"), nil
+		case strings.Contains(call, " container cp "):
 			cancel()
 			return nil, context.Canceled
 		}
@@ -375,24 +406,26 @@ func TestACanceledProbeIsStillRemoved(t *testing.T) {
 
 	_, err := e.readPGVersion(ctx, engineConn{bin: "docker"}, testComposeProject, "img")
 	require.Error(t, err)
-	assert.Equal(t, "docker container rm --force "+pgProbeName(testComposeProject), cmd.calls[len(cmd.calls)-1])
+	assert.Equal(t, "docker container rm --force "+testProbeID, cmd.calls[len(cmd.calls)-1])
 }
 
 // A probe an interrupted start left behind refers to the volume, and the engine
 // will not delete a volume in use. Compose does not see the probe — it lists
 // only containers it created — so a reset removes it by name before the down.
 func TestCleanRemovesALeftoverProbeBeforeTheVolume(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	e := testEngine(t, cmd)
 	project := t.TempDir()
-	composeMarker(t, project)
 	name, err := composeProjectName(project)
 	require.NoError(t, err)
+	cmd := &fakeCmd{output: leftoverProbe(name)}
+	// The engine first: it points the state directory at this test's cache,
+	// which is where the marker has to land.
+	e := testEngine(t, cmd)
+	composeMarker(t, project)
 
 	_, _, err = e.Clean(context.Background(), project)
 	require.NoError(t, err)
 
-	rm := callIndex(cmd.calls, "container rm --force "+pgProbeName(name))
+	rm := slices.Index(cmd.calls, "docker container rm --force aaa111")
 	down := callIndex(cmd.calls, " down ")
 	require.GreaterOrEqual(t, rm, 0, "calls were %v", cmd.calls)
 	assert.Less(t, rm, down)
@@ -405,11 +438,12 @@ func TestCleanTakesDownAVolumeThatOutlivedTheStateDirectory(t *testing.T) {
 	project := t.TempDir()
 	name, err := composeProjectName(project)
 	require.NoError(t, err)
+	probes := leftoverProbe(name)
 	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
 		if call == "docker volume ls --quiet --filter name="+metadataVolume(name) {
 			return []byte(metadataVolume(name) + "\n"), nil
 		}
-		return nil, nil
+		return probes(call)
 	}}
 	e := testEngine(t, cmd)
 
@@ -417,7 +451,7 @@ func TestCleanTakesDownAVolumeThatOutlivedTheStateDirectory(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, reached)
 	assert.Equal(t, name, got)
-	rm := callIndex(cmd.calls, "container rm --force "+pgProbeName(name))
+	rm := slices.Index(cmd.calls, "docker container rm --force aaa111")
 	down := callIndex(cmd.calls, " down --timeout 10 --volumes --remove-orphans")
 	require.GreaterOrEqual(t, rm, 0, "calls were %v", cmd.calls)
 	require.GreaterOrEqual(t, down, 0, "calls were %v", cmd.calls)
@@ -432,11 +466,23 @@ func TestACleanStopRemovesALeftoverProbeBeforeTheVolume(t *testing.T) {
 	name, err := composeProjectName(p.ProjectPath)
 	require.NoError(t, err)
 	cmd.calls = nil
+	cmd.output = leftoverProbe(name)
 
 	require.NoError(t, af.Stop(context.Background(), rt.StopOptions{Clean: true}))
 
-	rm := callIndex(cmd.calls, "container rm --force "+pgProbeName(name))
+	rm := slices.Index(cmd.calls, "docker container rm --force aaa111")
 	down := callIndex(cmd.calls, " down ")
 	require.GreaterOrEqual(t, rm, 0, "calls were %v", cmd.calls)
 	assert.Less(t, rm, down)
+}
+
+// leftoverProbe is an engine with one probe container, aaa111, that an
+// interrupted start left behind for composeProject, and nothing else.
+func leftoverProbe(composeProject string) func(string) ([]byte, error) {
+	return func(call string) ([]byte, error) {
+		if call == probeSweep(composeProject) {
+			return []byte("aaa111\n"), nil
+		}
+		return nil, nil
+	}
 }
