@@ -202,7 +202,6 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		{"cloud.api.token", "t0ken", "ASTRO_API_TOKEN"},
 		// Renamed: refused, naming the new name, as a renamed flag is.
 		{"page_size", "30", "was removed in Astro CLI v2: use apc.page_size"},
-		{"apc.show_warnings", "false", "was removed in Astro CLI v2: use show_warnings"},
 		{"auto_select", "true", "was removed in Astro CLI v2: use deployment.auto_select"},
 		{"local.core", "http://x", "was removed in Astro CLI v2: use internal.localhost.core_url"},
 		{"machine.cpu", "4", "podman machine set"},

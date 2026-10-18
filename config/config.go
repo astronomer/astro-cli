@@ -89,8 +89,8 @@ var (
 		Verbosity:     newCfg("verbosity", "warning"),
 		// Warnings and the confirmations that come with them, wherever a
 		// command has one: astro deploy, astro deployment update, astro apc
-		// deploy. A short-lived v2 build called it apc.show_warnings.
-		ShowWarnings:         newCfg("show_warnings", "true", "apc.show_warnings"),
+		// deploy.
+		ShowWarnings:         newCfg("show_warnings", "true"),
 		UpgradeMessage:       newCfg("upgrade_message", "true"),
 		TelemetryEnabled:     newCfg("telemetry.enabled", "true"),
 		TelemetryAnonymousID: newCfg("telemetry.anonymous_id", ""),

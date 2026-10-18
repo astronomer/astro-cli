@@ -18,8 +18,8 @@ type cfg struct {
 	// It is never registered with viper, so it is never written to a file:
 	// see initHome.
 	Default string
-	// Legacy are the names the setting had before it was renamed: 1.x's,
-	// which Astro CLI 1.x still reads and writes, or an earlier v2 build's. `astro config` refuses them
+	// Legacy are the names the setting had before v2 renamed it, which
+	// Astro CLI 1.x still reads and writes. `astro config` refuses them
 	// (removed.go); a file that sets one still sets the setting (compat1x.go).
 	Legacy    []string
 	validator ValidatorFunc

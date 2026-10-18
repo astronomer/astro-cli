@@ -32,6 +32,7 @@ var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Ex
 // not an agent's can still trip it, and the user needs a way past.
 func refuseAgentImage(ctx context.Context, engine imagebuild.Engine, image string) error {
 	if !config.CFG.ShowWarnings.GetBool() {
+		logger.Debugf("skipping the agent image check: show_warnings is false")
 		return nil
 	}
 	isAgent, err := engine.HasEnvPrefix(ctx, image, agentEnvVarPrefix)
