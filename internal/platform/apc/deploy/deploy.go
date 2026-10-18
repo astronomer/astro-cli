@@ -171,6 +171,10 @@ type Options struct {
 	// Yes answers the deploy's confirmations yes: an image tag that is not
 	// recommended, and a DAGs folder with no DAGs in it.
 	Yes bool
+	// WarnEmptyDags, when set, reports a DAGs folder with no DAGs in it
+	// instead of asking whether to upload it, as a pyproject.toml project's
+	// deploy does on Astro: the upload goes ahead.
+	WarnEmptyDags func(string)
 }
 
 func (o Options) progress() io.Writer {
@@ -767,7 +771,9 @@ func DagsOnlyDeploy(houstonClient houston.ClientInterface, wsID, deploymentID, d
 	}
 
 	// Alert the user if dags folder is empty
-	if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !opts.Yes {
+	if len(dagFiles) == 0 && opts.WarnEmptyDags != nil {
+		opts.WarnEmptyDags("no Dags found in the dags folder: the upload replaces the Deployment's Dags with none")
+	} else if len(dagFiles) == 0 && config.CFG.ShowWarnings.GetBool() && !opts.Yes {
 		i, err := confirmEmptyDags("Warning: No Dags found. This will delete any existing Dags. Are you sure you want to deploy?", input.AnsweredBy("--yes"))
 		if err != nil {
 			return deploymentID, err

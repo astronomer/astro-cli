@@ -900,6 +900,38 @@ func (s *Suite) TestUpdateDeploymentImage() {
 		s.Contains(err.Error(), "Internal Server Error")
 	})
 
+	// The deploy revision's description goes with the image from 0.36.0,
+	// declared by the query, and is not sent to a Houston before it.
+	s.Run("carries the deploy revision's description from 0.36.0", func() {
+		for _, tc := range []struct {
+			version string
+			carries bool
+		}{{"0.35.0", false}, {"0.36.0", true}, {"1.0.43", true}, {"2.1.0", true}} {
+			oldVersion := version
+			version = tc.version
+			var sent struct {
+				Query     string                 `json:"query"`
+				Variables map[string]interface{} `json:"variables"`
+			}
+			client := testUtil.NewTestClient(func(req *http.Request) *http.Response {
+				b, _ := io.ReadAll(req.Body)
+				s.NoError(json.Unmarshal(b, &sent))
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(bytes.NewBuffer(jsonResponse)), Header: make(http.Header)}
+			})
+			_, err := NewClient(client).UpdateDeploymentImage(UpdateDeploymentImageRequest{
+				ReleaseName: "rel", Image: "img", RuntimeVersion: "6.0.0", DeployRevisionDescription: "ship it",
+			})
+			version = oldVersion
+			s.NoError(err, tc.version)
+			got, sentIt := sent.Variables["deployRevisionDescription"]
+			s.Equal(tc.carries, sentIt, tc.version)
+			if tc.carries {
+				s.Equal("ship it", got, tc.version)
+			}
+			s.Equal(tc.carries, strings.Contains(sent.Query, "deployRevisionDescription: $deployRevisionDescription") || strings.Contains(sent.Query, "deployRevisionDescription:$deployRevisionDescription"), tc.version)
+		}
+	})
+
 	s.Run("Uses upsertDeployment API for Houston >= 2.1.0", func() {
 		oldVersion := version
 		version = "2.1.0"

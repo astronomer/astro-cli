@@ -155,6 +155,100 @@ func checkRuntimeVersion(currentVersion, tag string, allowed []string, raise fun
 	return checkAirflow3Floor(currentVersion, tag)
 }
 
+// CheckListed runs CheckBuiltListed's refusals on the runtime the image will
+// carry, before it is built. An exact version takes them as they are. A
+// series refuses only what no build of it can pass: a series older than the
+// Deployment's runtime, an Airflow 3 series where the list holds no Airflow 3
+// build, or one newer than the newest runtime listed. What the built image
+// carries is checked, and warned of, on its label.
+func (p *Plan) CheckListed(currentVersion string, listed []string) error {
+	if p.version == "" {
+		return nil
+	}
+	if !p.series {
+		_, err := checkListed(currentVersion, p.version, listed, p.raise)
+		return err
+	}
+	if current := runtimeSeries(currentVersion); current != "" && semver.Compare("v"+p.version, "v"+current) < 0 {
+		return downgradeError(p.version, currentVersion, p.raise)
+	}
+	if len(listed) > 0 {
+		if err := airflow3NotListed(p.version+"-0", listed); err != nil {
+			return err
+		}
+		if newest := slices.MaxFunc(listed, airflowversions.CompareRuntimeVersions); airflowversions.CompareRuntimeVersions(p.version+"-0", newest) > 0 {
+			return newerThanListedError(p.version, newest, listed)
+		}
+	}
+	return nil
+}
+
+// CheckBuiltListed holds the runtime the built image carries (its label) to
+// what an Astro Private Cloud deploy refuses before the push:
+//
+//   - a downgrade from the Deployment's current runtime, as Houston refuses
+//     one (houston-api validateRuntimeVersionForUpdateImage), only when the
+//     Deployment has a runtime. An Airflow 3 runtime is newer than every
+//     Airflow 2 one, so Airflow 3 to 2 is a downgrade;
+//   - an Airflow 3 runtime where the platform lists no Airflow 3 build for
+//     this Deployment: Airflow 3 is not enabled for it;
+//   - a runtime newer than the newest the platform lists for this
+//     Deployment. That list can stop below Houston's own ceiling (Airflow 3
+//     off at the Deployment's scope, its newest build yanked, a build not
+//     yet stable), so this refuses some runtimes Houston would take, rather
+//     than push an image the platform may drop where the deploy never sees.
+//
+// Airflow 2 to 3 is an upgrade like any other, with no floor: Houston has
+// none. Any other runtime the list does not hold is deployed, with a warning
+// saying so. The list is the newest build of each Airflow version (unless the
+// platform lists every runtime), while Houston takes any build it knows,
+// deprecated and yanked ones included (houston-api validateRuntimeVersion),
+// so an older build of a listed Airflow is not a refusal. listed empty (a
+// platform too old to list runtimes, or a list that could not be read)
+// checks the downgrade alone and warns of nothing.
+func (p *Plan) CheckBuiltListed(currentVersion, built string, listed []string) (warning string, err error) {
+	return checkListed(currentVersion, built, listed, p.raise)
+}
+
+func checkListed(currentVersion, tag string, listed []string, raise func(string) string) (warning string, err error) {
+	if currentVersion != "" && airflowversions.CompareRuntimeVersions(tag, currentVersion) < 0 {
+		return "", downgradeError(tag, currentVersion, raise)
+	}
+	if len(listed) == 0 || slices.ContainsFunc(listed, func(v string) bool { return airflowversions.CompareRuntimeVersions(tag, v) == 0 }) {
+		return "", nil
+	}
+	if err := airflow3NotListed(tag, listed); err != nil {
+		return "", err
+	}
+	newest := slices.MaxFunc(listed, airflowversions.CompareRuntimeVersions)
+	if airflowversions.CompareRuntimeVersions(tag, newest) > 0 {
+		return "", newerThanListedError(tag, newest, listed)
+	}
+	return fmt.Sprintf("Astro Runtime %s is not one the platform lists for this Deployment (%s). It deploys if the platform knows the build; "+
+		"if it does not, the platform drops the image after the push", tag, strings.Join(listed, ", ")), nil
+}
+
+// airflow3NotListed refuses an Airflow 3 runtime where the list holds no
+// Airflow 3 build: the platform lists them only where Airflow 3 is enabled.
+func airflow3NotListed(tag string, listed []string) error {
+	if !airflowversions.IsAirflow3(tag) || slices.ContainsFunc(listed, airflowversions.IsAirflow3) {
+		return nil
+	}
+	return fmt.Errorf("cannot deploy Astro Runtime %s: Airflow 3 is not enabled for this Deployment (the platform lists only %s). "+
+		"Ask the platform admin to enable Airflow 3 for it, or pin Airflow 2 in pyproject.toml", tag, strings.Join(listed, ", "))
+}
+
+func newerThanListedError(tag, newest string, listed []string) error {
+	return fmt.Errorf("cannot deploy Astro Runtime %s: it is newer than the newest the platform lists for this Deployment, %s; listed: %s", tag, newest, strings.Join(listed, ", "))
+}
+
+// Airflow3Upgrade reports whether deploying runtime version over the
+// Deployment's current one moves it from Airflow 2 to Airflow 3.
+func Airflow3Upgrade(currentVersion, version string) bool {
+	return airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion) == "2" &&
+		airflowversions.AirflowMajorVersionForRuntimeVersion(version) == "3"
+}
+
 func checkAirflow3Floor(currentVersion, tag string) error {
 	if airflowversions.AirflowMajorVersionForRuntimeVersion(currentVersion) == "2" &&
 		airflowversions.AirflowMajorVersionForRuntimeVersion(tag) == "3" &&

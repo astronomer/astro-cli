@@ -141,7 +141,7 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroHostedTree, args: []string{"deployment", "bundle", "delete"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
 	{tree: apcTree, args: []string{"deployment", "update", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "save", shorthand: "s", want: errDeploySaveRemoved},
-	{tree: apcTree, args: []string{"deploy", "dep-id"}, flag: "save", shorthand: "s", want: errAPCDeploySaveRemoved},
+	{tree: apcTree, args: []string{"deploy", "dep-id"}, flag: "save", shorthand: "s", want: errDeploySaveRemoved},
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "pytest", want: errDeployPytestRemoved},
 	{tree: astroHostedTree, args: []string{"deploy", "dep-id"}, flag: "test", value: "tests/test_dags.py", shorthand: "t", want: errDeployTestRemoved},
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "env", value: ".env.ci", shorthand: "e", want: errDeployEnvRemoved},

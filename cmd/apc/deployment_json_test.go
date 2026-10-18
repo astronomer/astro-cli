@@ -609,7 +609,7 @@ func inWorkingDir(t *testing.T, withDags bool) string {
 func inProject(t *testing.T, withDags bool) string {
 	t.Helper()
 	dir := inWorkingDir(t, withDags)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\n\n[tool.astro]\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\nname = \"demo\"\ndependencies = [\"apache-airflow==3.1.*\"]\n\n[tool.astro]\n"), 0o600))
 	return dir
 }
 
@@ -711,7 +711,7 @@ func TestDeployJSON(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, deployJSON{Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "image_and_dags", Image: pushed.Image, URL: pushed.URL}, got)
+		assert.Equal(t, deployJSON{Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "image-and-dag", Image: pushed.Image, URL: pushed.URL}, got)
 		assert.Contains(t, run.stderr, "Deploying: rel-ac", "the progress goes to stderr")
 	})
 
@@ -722,7 +722,7 @@ func TestDeployJSON(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, "image", got.Type)
+		assert.Equal(t, "image-only", got.Type)
 	})
 
 	// An image Deployment runs the DAGs in its image. A build from the project
@@ -742,7 +742,7 @@ func TestDeployJSON(t *testing.T) {
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
 		assert.Equal(t, deployJSON{
-			Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "image", Image: pushed.Image, URL: pushed.URL,
+			Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "image-only", Image: pushed.Image, URL: pushed.URL,
 			Warnings: []string{inImage("astro-package/proj:latest")},
 		}, got)
 		assert.Equal(t, 1, strings.Count(run.stderr, "Warning: "+inImage("astro-package/proj:latest")+"\n"), "once, with the progress on stderr:\n%s", run.stderr)
@@ -754,7 +754,7 @@ func TestDeployJSON(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, "image", got.Type)
+		assert.Equal(t, "image-only", got.Type)
 		assert.Equal(t, []string{inImage("registry/img:1")}, got.Warnings)
 		assert.Contains(t, run.stderr, "Warning: "+inImage("registry/img:1"))
 	})
@@ -830,7 +830,7 @@ func TestDeployJSON(t *testing.T) {
 				assert.Equal(t, 1, *uploads, "%v: asked", args)
 				var got deployJSON
 				decodeOne(t, run.stdout, &got)
-				assert.Equal(t, "image", got.Type, "%v", args)
+				assert.Equal(t, "image-only", got.Type, "%v", args)
 				assert.Equal(t, []string{noDags}, got.Warnings, "%v quiet=%v", args, quiet)
 				assert.Equal(t, 1, strings.Count(run.stderr, "Warning: "+noDags+"\n"), "%v quiet=%v:\n%s", args, quiet, run.stderr)
 			}
@@ -857,7 +857,7 @@ func TestDeployJSON(t *testing.T) {
 		assert.Equal(t, 1, seen.dagUploads)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, "image_and_dags", got.Type)
+		assert.Equal(t, "image-and-dag", got.Type)
 		assert.Empty(t, got.Warnings)
 
 		for _, refusal := range []error{deploy.ErrDagOnlyDeployNotEnabledForDeployment, deploy.ErrDagOnlyDeployDisabledInConfig} {
@@ -867,7 +867,7 @@ func TestDeployJSON(t *testing.T) {
 			assert.Equal(t, 1, seen.dagUploads, "%v", refusal)
 			var got deployJSON
 			decodeOne(t, run.stdout, &got)
-			assert.Equal(t, "image", got.Type, "%v", refusal)
+			assert.Equal(t, "image-only", got.Type, "%v", refusal)
 			assert.Empty(t, got.Warnings, "%v", refusal)
 		}
 
@@ -898,7 +898,7 @@ func TestDeployJSON(t *testing.T) {
 				assert.Equal(t, 1, *uploads, tc.name)
 				var got deployJSON
 				decodeOne(t, run.stdout, &got)
-				assert.Equal(t, "image", got.Type, tc.name)
+				assert.Equal(t, "image-only", got.Type, tc.name)
 				assert.Equal(t, tc.warnings, got.Warnings, "%s quiet=%v", tc.name, quiet)
 				if tc.warnings == nil {
 					assert.NotContains(t, run.stderr, "Warning", tc.name)
@@ -915,7 +915,7 @@ func TestDeployJSON(t *testing.T) {
 		assert.Equal(t, 1, seen.dagUploads)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, "image_and_dags", got.Type)
+		assert.Equal(t, "image-and-dag", got.Type)
 		assert.Empty(t, got.Warnings)
 	})
 
@@ -925,7 +925,7 @@ func TestDeployJSON(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, "image", got.Type)
+		assert.Equal(t, "image-only", got.Type)
 		assert.Contains(t, run.stderr, "Dags in the project will not be deployed")
 	})
 
@@ -937,20 +937,26 @@ func TestDeployJSON(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, deployJSON{Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "dags"}, got)
+		assert.Equal(t, deployJSON{Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "dag-only"}, got)
 	})
 
-	// The Deployment published is the one deployed to, not the argument:
-	// with none, the project's saved Deployment or the picker's choice.
-	t.Run("--dags with no argument publishes the Deployment it resolved", func(t *testing.T) {
-		deployMocks(t, pushed, nil)
+	// A project's deploy never picks for you: under json, one that names no
+	// Deployment is refused as a question it could not ask, naming the flag
+	// that answers it, and nothing is uploaded.
+	t.Run("--dags with no argument is input_required", func(t *testing.T) {
+		seen := deployMocks(t, pushed, nil)
 		houstonVersion = "1.0.0"
 		inProject(t, true)
 		run := runAPC(t, newAPCClient(), "", "deploy", "--dags", "-o", "json")
-		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-		var got deployJSON
+		require.Equal(t, 1, run.code, "stderr:\n%s", run.stderr)
+		var got struct {
+			Error string `json:"error"`
+			Kind  string `json:"kind"`
+		}
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, "dep-picked", got.Deployment)
+		assert.Equal(t, "input_required", got.Kind)
+		assert.Contains(t, got.Error, "--deployment")
+		assert.Zero(t, seen.dagUploads)
 	})
 
 	t.Run("--yes answers the deploy's confirmations", func(t *testing.T) {
@@ -971,7 +977,7 @@ func TestDeployJSON(t *testing.T) {
 		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 		var got deployJSON
 		decodeOne(t, run.stdout, &got)
-		assert.Equal(t, deployJSON{Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "image_and_dags", Image: "my/image:1", RuntimeVersion: "12.1.1"}, got)
+		assert.Equal(t, deployJSON{Deployment: "dep-ac", Workspace: "ck05r3bor07h40d02y2hw4n4v", Type: "image-and-dag", Image: "my/image:1", RuntimeVersion: "12.1.1"}, got)
 		assert.Contains(t, run.stderr, "Image successfully updated")
 	})
 
@@ -1076,7 +1082,7 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 				assert.Contains(t, run.stderr, "Image successfully updated")
 				var got deployJSON
 				decodeOne(t, run.stdout, &got)
-				assert.Equal(t, "image", got.Type)
+				assert.Equal(t, "image-only", got.Type)
 				assert.Equal(t, tc.uploads, *uploads)
 				want := append([]string(nil), tc.warnings...)
 				if quiet {

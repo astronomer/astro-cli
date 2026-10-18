@@ -3,6 +3,8 @@ package houston
 import (
 	"strings"
 	"time"
+
+	"golang.org/x/mod/semver"
 )
 
 // ListDeploymentsRequest - filters to list deployments according to set values
@@ -41,6 +43,10 @@ type UpdateDeploymentImageRequest struct {
 	Image          string `json:"image"`
 	AirflowVersion string `json:"airflowVersion,omitempty"`
 	RuntimeVersion string `json:"runtimeVersion"`
+	// DeployRevisionDescription names the deploy in the Deployment's
+	// history. Houston takes it from 0.36.0; the queries before that do not
+	// declare it, so it is not read there.
+	DeployRevisionDescription string `json:"deployRevisionDescription,omitempty"`
 }
 
 // DeleteDeploymentRequest - properties to delete a deployment
@@ -1036,17 +1042,44 @@ var (
 			}`,
 		},
 		{
+			// From 0.36.0 the mutation takes the deploy revision's
+			// description, as an image's label carries it on a push.
+			version: "0.36.0",
+			query: `
+			mutation updateDeploymentImage(
+				$releaseName:String!,
+				$image:String!,
+				$airflowVersion:String,
+				$runtimeVersion:String,
+				$deployRevisionDescription:String,
+			){
+				updateDeploymentImage(
+					releaseName:$releaseName,
+					image:$image,
+					airflowVersion:$airflowVersion,
+					runtimeVersion:$runtimeVersion,
+					deployRevisionDescription:$deployRevisionDescription
+				){
+					releaseName
+					airflowVersion
+					runtimeVersion
+				}
+			}`,
+		},
+		{
 			version: "1.0.1",
 			query: `
 			mutation updateDeploymentImage(
 				$releaseName:String!,
 				$image:String!,
 				$runtimeVersion:String!,
+				$deployRevisionDescription:String,
 			){
 				updateDeploymentImage(
 					releaseName:$releaseName,
 					image:$image,
-					runtimeVersion:$runtimeVersion
+					runtimeVersion:$runtimeVersion,
+					deployRevisionDescription:$deployRevisionDescription
 				){
 					releaseName
 					runtimeVersion
@@ -1060,11 +1093,13 @@ var (
 				$releaseName: String!,
 				$image: String!,
 				$runtimeVersion: String!,
+				$deployRevisionDescription: String,
 			){
 				upsertDeployment(
 					releaseName: $releaseName,
 					image: $image,
 					runtimeVersion: $runtimeVersion,
+					deployRevisionDescription: $deployRevisionDescription,
 				){
 					id
 					releaseName
@@ -1319,8 +1354,12 @@ func (h ClientImplementation) ListDeploymentLogs(filters ListDeploymentLogsReque
 	return r.Data.DeploymentLog, nil
 }
 
-func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) (interface{}, error) {
+func (h ClientImplementation) UpdateDeploymentImage(updateReq UpdateDeploymentImageRequest) (interface{}, error) { //nolint:gocritic // ClientInterface takes the request by value, as its callers and mocks do
 	reqQuery := DeploymentImageUpdateRequest.GreatestLowerBound(version)
+	if version != "" && semver.Compare(sanitiseVersionString(version), "v0.36.0") < 0 {
+		// The query chosen does not declare it.
+		updateReq.DeployRevisionDescription = ""
+	}
 	req := Request{
 		Query:     reqQuery,
 		Variables: updateReq,
