@@ -18,8 +18,8 @@ type cfg struct {
 	// It is never registered with viper, so it is never written to a file:
 	// see initHome.
 	Default string
-	// Legacy are the names the setting had before v2 renamed it, which
-	// Astro CLI 1.x still reads and writes. `astro config` refuses them
+	// Legacy are the names the setting had before it was renamed: 1.x's,
+	// which Astro CLI 1.x still reads and writes, or an earlier v2 build's. `astro config` refuses them
 	// (removed.go); a file that sets one still sets the setting (compat1x.go).
 	Legacy    []string
 	validator ValidatorFunc
@@ -149,7 +149,7 @@ func (c cfg) GetInt() int {
 // typed is value as the YAML type of c's default: a bool or an int when the
 // default is one and value parses as the same, the string otherwise. A config
 // set from the command line arrives as text, and stored as text it reads back
-// as `apc.show_warnings: "false"`. Either form reads the same, here and in Astro
+// as `show_warnings: "false"`. Either form reads the same, here and in Astro
 // CLI 1.x, which shares the file.
 //
 // A bool is the words true and false only. strconv.ParseBool also takes 1, 0,

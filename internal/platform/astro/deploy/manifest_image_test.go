@@ -405,11 +405,29 @@ func TestDeployManifestImage_RefusesAnAgentImage(t *testing.T) {
 			}, client)
 			require.ErrorIs(t, err, errAgentImageInHostedDeploy)
 			assert.ErrorContains(t, err, "astro remote deploy")
+			assert.ErrorContains(t, err, "astro config set show_warnings false -g", "the refusal names the way past a false positive")
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			assert.False(t, hasImageCall(cmd.calls, "push"), "nothing is pushed, got %v", cmd.calls)
 			client.AssertExpectations(t)
 		})
 	}
+}
+
+// With warnings off the check is skipped, as in Astro CLI 1.x: an image whose
+// variables only look like an agent's is the user's to deploy. The image is
+// not even inspected.
+func TestRefuseAgentImage_SkippedWithWarningsOff(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	cmd := withImageSeams(t, "3.1-2")
+	cmd.env = `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python"]`
+	engine := imagebuild.Engine{Cmd: newImageBuildCommander(), Bin: "docker"}
+
+	require.ErrorIs(t, refuseAgentImage(context.Background(), engine, "agent:1"), errAgentImageInHostedDeploy)
+
+	require.NoError(t, config.CFG.ShowWarnings.SetHomeString("false"))
+	calls := len(cmd.calls)
+	assert.NoError(t, refuseAgentImage(context.Background(), engine, "agent:1"))
+	assert.Len(t, cmd.calls, calls, "nothing is inspected with warnings off")
 }
 
 func TestDeployManifestImage_NoDockerFailsEarly(t *testing.T) {

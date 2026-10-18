@@ -83,10 +83,14 @@ var (
 	// the file.
 	CFG = cfgs{
 		// General.
-		Context:              newCfg("context", ""),
-		Contexts:             newCfg("contexts", ""),
-		DockerCommand:        newCfg("container.binary", ""),
-		Verbosity:            newCfg("verbosity", "warning"),
+		Context:       newCfg("context", ""),
+		Contexts:      newCfg("contexts", ""),
+		DockerCommand: newCfg("container.binary", ""),
+		Verbosity:     newCfg("verbosity", "warning"),
+		// Warnings and the confirmations that come with them, wherever a
+		// command has one: astro deploy, astro deployment update, astro apc
+		// deploy. A short-lived v2 build called it apc.show_warnings.
+		ShowWarnings:         newCfg("show_warnings", "true", "apc.show_warnings"),
 		UpgradeMessage:       newCfg("upgrade_message", "true"),
 		TelemetryEnabled:     newCfg("telemetry.enabled", "true"),
 		TelemetryAnonymousID: newCfg("telemetry.anonymous_id", ""),
@@ -101,7 +105,6 @@ var (
 		RemoteBaseImageRegistry: newCfg("deploy.remote_execution.base_image_registry", "images.astronomer.cloud", "remote.base_image_registry"),
 
 		// Astro Private Cloud.
-		ShowWarnings:         newCfg("apc.show_warnings", "true", "show_warnings"),
 		ShaAsTag:             newCfg("apc.sha_as_tag", "false", "sha_as_tag"),
 		PageSize:             newCfg("apc.page_size", "20", "page_size"),
 		Interactive:          newCfg("apc.interactive", "false", "interactive"),

@@ -153,7 +153,6 @@ Some 1.x flags still work but are hidden from help in favor of a new spelling. O
   | `cosmos_boost.pre_deploy` | `deploy.cosmos_boost` |
   | `remote.client_registry` | `deploy.remote_execution.client_registry` |
   | `remote.base_image_registry` | `deploy.remote_execution.base_image_registry` |
-  | `show_warnings` | `apc.show_warnings` |
   | `sha_as_tag` | `apc.sha_as_tag` |
   | `page_size` | `apc.page_size` |
   | `interactive` | `apc.interactive` |
