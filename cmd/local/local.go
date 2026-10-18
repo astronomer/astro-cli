@@ -238,7 +238,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
-	c.hintLegacy1xSettings(built.Plan, legacyOverrides{port: opts.RequestedPort > 0})
+	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
@@ -632,7 +632,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
-	c.hintLegacy1xSettings(built.Plan, legacyOverrides{port: true})
+	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err

@@ -187,9 +187,7 @@ func newRootCmd(o *rootOptions) *cobra.Command {
 	// A single positional argument is Otto's first message in an interactive
 	// session.
 	coreDeps.LaunchOtto = func(prompt string) error { return launchOtto([]string{prompt}, ottoMembership(astroV1Client)) }
-	coreDeps.Legacy1xSetting = func(key string) (value, file string) {
-		return config.Legacy1xHomeValue(key), config.HomeConfigFile
-	}
+	coreDeps.Legacy1xSetting = config.Legacy1xValue
 	rootCmd.AddCommand(local.AddCmds(coreDeps)...)
 
 	groupCommands(rootCmd)
