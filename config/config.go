@@ -78,43 +78,23 @@ var (
 		Contexts:                newCfg("contexts", ""),
 		DockerCommand:           newCfg("container.binary", ""),
 		LocalCore:               newCfg("local.core", "http://localhost:8888"),
-		LocalRegistry:           newCfg("local.registry", "localhost:5555"),
 		LocalHouston:            newCfg("local.houston", ""),
 		LocalPlatform:           newCfg("local.platform", CloudPlatform),
-		PostgresUser:            newCfg("postgres.user", "postgres"),
-		PostgresPassword:        newCfg("postgres.password", "postgres"),
-		PostgresHost:            newCfg("postgres.host", "postgres"),
-		PostgresPort:            newCfg("postgres.port", "5432"),
-		PostgresRepository:      newCfg("postgres.repository", "docker.io/postgres"),
-		PostgresTag:             newCfg("postgres.tag", "12.6"),
-		ProjectDeployment:       newCfg("project.deployment", ""),
-		ProjectName:             newCfg("project.name", ""),
-		ProjectWorkspace:        newCfg("project.workspace", ""),
-		WebserverPort:           newCfg("webserver.port", "8080"),
-		APIServerPort:           newCfg("api-server.port", "8080"),
-		AirflowExposePort:       newCfg("airflow.expose_port", "false"),
 		ShowWarnings:            newCfg("show_warnings", "true"),
 		Verbosity:               newCfg("verbosity", "warning"),
 		HoustonDialTimeout:      newCfg("houston.dial_timeout", "10"),
 		HoustonSkipVerifyTLS:    newCfg("houston.skip_verify_tls", "false"),
-		DuplicateImageVolumes:   newCfg("duplicate_volumes", "true"),
-		SkipParse:               newCfg("skip_parse", "false"),
 		Interactive:             newCfg("interactive", "false"),
 		PageSize:                newCfg("page_size", "20"),
 		UpgradeMessage:          newCfg("upgrade_message", "true"),
-		DisableAstroRun:         newCfg("disable_astro_run", "false"),
 		AutoSelect:              newCfg("auto_select", "false"),
 		ShaAsTag:                newCfg("sha_as_tag", "false"),
-		RuffImage:               newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
 		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
 		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
-		DevMode:                 newCfg("dev.mode", "docker"),
-		DevBuildSecrets:         newCfg("dev.build_secrets", ""),
 		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
 		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
 		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
-		ProxyPort:               newCfg("proxy.port", "6563"),
 		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
 		CosmosBoostPreDeploy:    newCfg("cosmos_boost.pre_deploy", "false"),
 	}
@@ -178,24 +158,27 @@ func initHome(fs afero.Fs) {
 	}
 	viperHome.SetConfigFile(HomeConfigFile)
 
-	for _, cfg := range CFGStrMap {
-		if cfg.Default != "" {
-			viperHome.SetDefault(cfg.Path, cfg.Default)
-		}
-	}
+	// No defaults are registered with viper: the cfg getters apply them (see
+	// cfg.Default). saveConfig writes AllSettings(), and with defaults
+	// registered that was every default this build knows, so one `astro
+	// config set` filled the file with some 45 keys — the 1.x settings v2
+	// refuses among them, and a value baked in that way never followed the
+	// default when a later release changed it. Without them, AllSettings() is
+	// the file as read plus what this process set: a save writes back what
+	// was there, the keys only Astro CLI 1.x reads included, and adds only
+	// the change.
 
 	// Reading the home config is not a reason to create one.
 	//
 	// CreateConfig wrote out AllSettings() of an object holding nothing but
-	// the defaults registered just above, so the file it left behind carried
-	// no value this process did not already have — but InitConfig runs
-	// unconditionally from main, before cobra has looked at argv. Every
-	// command that never touches the home config paid for it: `astro init` in a
-	// home with no .astro left a 54-line config.yaml and a config.yaml.lock
-	// behind it.
+	// the defaults, so the file it left behind carried no value this process
+	// did not already have — but InitConfig runs unconditionally from main,
+	// before cobra has looked at argv. Every command that never touches the
+	// home config paid for it: `astro init` in a home with no .astro left a
+	// 54-line config.yaml and a config.yaml.lock behind it.
 	//
-	// Nothing needs the file to exist. Its absence reads as those same
-	// defaults, the setters guard on ConfigFileUsed() which SetConfigFile
+	// Nothing needs the file to exist. Its absence reads as the defaults, the
+	// setters guard on ConfigFileUsed() which SetConfigFile
 	// above has already set, and saveConfig creates the parent directory
 	// before it writes the file — so the first `astro login` or `astro
 	// config set -g` still writes it.

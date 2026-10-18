@@ -78,9 +78,8 @@ func (s *Suite) TestInitHomeDoesNotCreateAConfig() {
 }
 
 // The values still resolve without a file, which is why not creating one
-// changes nothing downstream: CreateConfig only ever wrote out the defaults
-// registered in initHome, so the file it left carried no value the process
-// did not already hold.
+// changes nothing downstream: CreateConfig only ever wrote out the defaults,
+// so the file it left carried no value the process did not already hold.
 func (s *Suite) TestDefaultsResolveWithNoHomeConfig() {
 	fs := afero.NewMemMapFs()
 	const dir = "home-with-no-config"
@@ -88,7 +87,10 @@ func (s *Suite) TestDefaultsResolveWithNoHomeConfig() {
 
 	initHome(fs)
 
-	s.Equal(CFG.PageSize.Default, viperHome.GetString(CFG.PageSize.Path))
+	s.Equal(CFG.PageSize.Default, CFG.PageSize.GetHomeString())
+	s.Equal(20, CFG.PageSize.GetInt())
+	s.True(CFG.ShowWarnings.GetBool())
+	s.Empty(viperHome.AllSettings(), "the defaults are the getters', never viper's, so a save cannot write them")
 	s.True(configExists(viperHome), "the write target is set by SetConfigFile, not by the file being there")
 }
 

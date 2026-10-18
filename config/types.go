@@ -2,6 +2,7 @@ package config
 
 import (
 	"path/filepath"
+	"strconv"
 
 	"github.com/spf13/viper"
 )
@@ -11,7 +12,10 @@ type ValidatorFunc func(value string) error
 
 // cfg defines settings a single configuration setting can have
 type cfg struct {
-	Path      string
+	Path string
+	// Default is the value a getter returns when no config file sets Path.
+	// It is never registered with viper, so it is never written to a file:
+	// see initHome.
 	Default   string
 	validator ValidatorFunc
 }
@@ -25,47 +29,24 @@ type cfgs struct {
 	Context                 cfg
 	Contexts                cfg
 	DockerCommand           cfg
-	LocalAstro              cfg
 	LocalCore               cfg
-	LocalPublicAstro        cfg
-	LocalRegistry           cfg
 	LocalHouston            cfg
 	LocalPlatform           cfg
-	DuplicateImageVolumes   cfg
-	PostgresUser            cfg
-	PostgresPassword        cfg
-	PostgresHost            cfg
-	PostgresPort            cfg
-	PostgresRepository      cfg
-	PostgresTag             cfg
-	ProjectName             cfg
-	ProjectDeployment       cfg
-	ProjectWorkspace        cfg
-	WebserverPort           cfg
-	APIServerPort           cfg
-	AirflowExposePort       cfg
 	ShowWarnings            cfg
 	Verbosity               cfg
 	HoustonDialTimeout      cfg
 	HoustonSkipVerifyTLS    cfg
-	SkipParse               cfg
 	Interactive             cfg
 	PageSize                cfg
-	AuditLogs               cfg
 	UpgradeMessage          cfg
-	DisableAstroRun         cfg
 	AutoSelect              cfg
 	ShaAsTag                cfg
-	RuffImage               cfg
 	RemoteClientRegistry    cfg
 	RemoteBaseImageRegistry cfg
 	DeployGitMetadata       cfg
-	DevMode                 cfg
-	DevBuildSecrets         cfg
 	TelemetryEnabled        cfg
 	TelemetryAnonymousID    cfg
 	TelemetryNoticeShown    cfg
-	ProxyPort               cfg
 	OttoAutoUpdate          cfg
 	CosmosBoostPreDeploy    cfg
 }
@@ -85,7 +66,7 @@ func (c cfg) SetHomeString(value string) error {
 	if !configExists(viperHome) {
 		return nil
 	}
-	viperHome.Set(c.Path, value)
+	viperHome.Set(c.Path, c.typed(value))
 	err := saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
 		return err
@@ -98,7 +79,7 @@ func (c cfg) SetProjectString(value string) error {
 	if !configExists(viperProject) {
 		return nil
 	}
-	viperProject.Set(c.Path, value)
+	viperProject.Set(c.Path, c.typed(value))
 	err := saveConfig(viperProject, viperProject.ConfigFileUsed())
 	if err != nil {
 		return err
@@ -136,7 +117,11 @@ func (c cfg) GetBool() bool {
 	if configExists(viperProject) && viperProject.IsSet(c.Path) {
 		return viperProject.GetBool(c.Path)
 	}
-	return viperHome.GetBool(c.Path)
+	if viperHome != nil && viperHome.IsSet(c.Path) {
+		return viperHome.GetBool(c.Path)
+	}
+	b, _ := strconv.ParseBool(c.Default) //nolint:errcheck // an empty default is false
+	return b
 }
 
 // GetInt will return the integer value of requested config, check working dir and fallback to home
@@ -144,7 +129,31 @@ func (c cfg) GetInt() int {
 	if configExists(viperProject) && viperProject.IsSet(c.Path) {
 		return viperProject.GetInt(c.Path)
 	}
-	return viperHome.GetInt(c.Path)
+	if viperHome != nil && viperHome.IsSet(c.Path) {
+		return viperHome.GetInt(c.Path)
+	}
+	i, _ := strconv.Atoi(c.Default) //nolint:errcheck // an empty default is 0
+	return i
+}
+
+// typed is value as the YAML type of c's default: a bool or an int when the
+// default is one and value parses as the same, the string otherwise. A config
+// set from the command line arrives as text, and stored as text it reads back
+// as `show_warnings: "false"`. Either form reads the same, here and in Astro
+// CLI 1.x, which shares the file.
+//
+// A bool is the words true and false only. strconv.ParseBool also takes 1, 0,
+// t and f, which would make a setting that defaults to 0 a bool.
+func (c cfg) typed(value string) any {
+	if _, err := strconv.Atoi(c.Default); err == nil {
+		if i, err := strconv.Atoi(value); err == nil {
+			return i
+		}
+	}
+	if (c.Default == "true" || c.Default == "false") && (value == "true" || value == "false") {
+		return value == "true"
+	}
+	return value
 }
 
 // GetProjectString will return a project config
@@ -152,12 +161,16 @@ func (c cfg) GetProjectString() string {
 	return viperProject.GetString(c.Path)
 }
 
-// GetHomeString will return config from home string, or "" before InitConfig
-// has read one, so a caller like GetCurrentDomain reports no context (its
-// ErrGetHomeString) rather than panicking on a config that is not there yet.
+// GetHomeString will return config from home string, its default when the
+// home config does not set it, or "" before InitConfig has read one, so a
+// caller like GetCurrentDomain reports no context (its ErrGetHomeString)
+// rather than panicking on a config that is not there yet.
 func (c cfg) GetHomeString() string {
 	if viperHome == nil {
 		return ""
+	}
+	if !viperHome.IsSet(c.Path) {
+		return c.Default
 	}
 	return viperHome.GetString(c.Path)
 }

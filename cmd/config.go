@@ -25,18 +25,34 @@ const (
 )
 
 // unlistedConfigs are settings `astro config list` leaves out: contexts is a
-// map that `astro context` manages, and the other two are credentials.
+// map that `astro context` manages, and the API token is a credential.
 var unlistedConfigs = map[string]bool{
-	config.CFG.Contexts.Path:         true,
-	config.CFG.CloudAPIToken.Path:    true,
-	config.CFG.PostgresPassword.Path: true,
+	config.CFG.Contexts.Path:      true,
+	config.CFG.CloudAPIToken.Path: true,
 }
 
 // removedConfigKeys are the 1.x settings nothing in v2 reads, with what
-// replaces each. `astro config set` refuses them rather than writing a value
-// that would change nothing; a 1.x CLI sharing the config file still reads
-// what it wrote itself.
+// replaces each. They are not in config.CFGStrMap, and `astro config set` and
+// `get` refuse them rather than writing or showing a value that would change
+// nothing. A 1.x CLI sharing the config file still reads what it wrote
+// itself: v2 never writes these keys, and leaves them where they are.
 var removedConfigKeys = map[string]string{
+	"airflow.expose_port": "astro local has no setting for the interfaces local Airflow listens on.",
+	"dev.build_secrets": "Pass --build-secret to astro local start, or declare build-secrets under [tool.astro] in pyproject.toml " +
+		"for a project that builds its own Dockerfile.",
+	"disable_astro_run":   "astro run was removed: test a DAG with astro local run airflow dags test <dag>.",
+	"duplicate_volumes":   "astro local start --docker manages its own volumes and has no setting.",
+	"local.registry":      "astro local start --docker builds its image locally and pushes it nowhere.",
+	"postgres.host":       postgresRemoved,
+	"postgres.password":   postgresRemoved,
+	"postgres.port":       postgresRemoved,
+	"postgres.repository": postgresRemoved,
+	"postgres.tag":        postgresRemoved,
+	"postgres.user":       postgresRemoved,
+	"project.name":        "A project's name is [project] name in its pyproject.toml.",
+	"project.workspace":   "A project's default workspace is workspace under [tool.astro] in its pyproject.toml.",
+	"ruff.image":          "Nothing in v2 runs ruff in a container: run it with uv run ruff.",
+	"skip_parse":          "astro deploy does not parse DAGs first. Check them with astro local check.",
 	"dev.mode": "Local Airflow runs in standalone mode by default; start it in Docker with astro local start --docker. " +
 		"astro local restart keeps the mode it is running in.",
 	"proxy.port": "The local proxy listens on 6563, or on another free port when 6563 is taken, and has no setting.",
@@ -48,6 +64,10 @@ var removedConfigKeys = map[string]string{
 	"project.deployment": "Name the Deployment on each deploy, as the argument or with --deployment. " +
 		"On Astro, link a project's Deployments with astro link add, and mark one default = true to preselect it.",
 }
+
+// postgresRemoved replaces every 1.x postgres.* setting: the metadata
+// database a Docker-mode start runs is fixed, and a standalone one has none.
+const postgresRemoved = "astro local start --docker runs its own metadata database, which has no settings."
 
 // refuseRemovedConfigKey fails a set of a removed key the way the removed
 // commands fail: a usage error naming the replacement.
@@ -65,12 +85,12 @@ var (
   astro config get show_warnings -g
 
   # Get a setting from a 1.x project's .astro/config.yaml
-  astro config get project.name`
+  astro config get deploy.git_metadata`
 	configSetExample = `  # Turn off warnings for every project on this machine
   astro config set show_warnings false -g
 
   # Set a setting in a 1.x project's .astro/config.yaml
-  astro config set postgres.user postgres`
+  astro config set deploy.git_metadata false`
 )
 
 // configOutput is the -o of `astro config get`, `set` and `list`, registered
@@ -212,7 +232,9 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 // other; set says whether that scope sets the key. `config list` is where the
 // value in effect, and the scope it comes from, are published.
 func configGet(cmd *cobra.Command, args []string) error {
-	// get config struct
+	if err := refuseRemovedConfigKey(args[0]); err != nil {
+		return err
+	}
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
 		return errInvalidConfigPath
@@ -231,16 +253,14 @@ func configGet(cmd *cobra.Command, args []string) error {
 }
 
 func configSet(cmd *cobra.Command, args []string) error {
-	// get config struct
-	cfg, ok := config.CFGStrMap[args[0]]
-
-	if !ok {
-		return errInvalidConfigPath
-	}
 	// The pre-run refuses these first; this keeps the write itself from
-	// ever storing one.
+	// ever storing one. Ahead of the lookup, which does not know them.
 	if err := refuseRemovedConfigKey(args[0]); err != nil {
 		return err
+	}
+	cfg, ok := config.CFGStrMap[args[0]]
+	if !ok {
+		return errInvalidConfigPath
 	}
 
 	// Silence Usage as we have now validated command input
@@ -275,8 +295,7 @@ func configSet(cmd *cobra.Command, args []string) error {
 func configList(r cliout.Renderer) error {
 	list := configSettings{Settings: []configSetting{}}
 	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
-		// The removed keys too: get and set refuse them, so list agrees.
-		if _, removed := removedConfigKeys[key]; unlistedConfigs[key] || removed {
+		if unlistedConfigs[key] {
 			continue
 		}
 		cfg := config.CFGStrMap[key]
