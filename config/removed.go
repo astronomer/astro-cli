@@ -26,7 +26,7 @@ var removedSettings = map[string]removedSetting{
 		"for a project that builds its own Dockerfile.", nil},
 	"dev.mode": {"Local Airflow runs in standalone mode by default; start it in Docker with astro local start --docker. " +
 		"astro local restart keeps the mode it is running in.", []string{"docker"}},
-	"disable_astro_run":   {"astro run was removed: test a DAG with astro local run airflow dags test <dag>.", []string{"false"}},
+	"disable_astro_run":   {"astro run was removed: test a Dag with astro local run airflow dags test <dag>.", []string{"false"}},
 	"duplicate_volumes":   {"astro local start --docker manages its own volumes and has no setting.", []string{"true"}},
 	"local.registry":      {"astro local start --docker builds its image locally and pushes it nowhere.", []string{"localhost:5555"}},
 	"machine.cpu":         {machineRemoved, []string{"2"}},
@@ -45,7 +45,7 @@ var removedSettings = map[string]removedSetting{
 	"project.workspace": {"A project's default workspace is workspace under [tool.astro] in its pyproject.toml.", nil},
 	"proxy.port":        {"The local proxy listens on 6563, or on another free port when 6563 is taken, and has no setting.", []string{"6563"}},
 	"ruff.image":        {"Nothing in v2 runs ruff in a container: run it with uv run ruff.", []string{"ghcr.io/astral-sh/ruff:latest"}},
-	"skip_parse":        {"astro deploy does not parse DAGs first. Check them with astro local check.", []string{"false"}},
+	"skip_parse":        {"astro deploy does not parse Dags first. Check them with astro local check.", []string{"false"}},
 	"webserver.port":    {portRemoved, []string{"8080"}},
 }
 
