@@ -1223,54 +1223,87 @@ func captureStdout(t *testing.T, fn func()) string {
 	return <-outC
 }
 
-// buildImage refuses an agent image, which would crash-loop as a hosted
-// Deployment's scheduler, before asking the API anything; any other answer,
-// a failed inspect included, lets the deploy go on.
-func TestBuildImageAgentImageCheck(t *testing.T) {
-	inspect := func(t *testing.T, isAgent bool, inspectErr error) (*mocks.ImageHandler, *astrov1_mocks.ClientWithResponsesInterface) {
-		t.Helper()
-		testUtil.InitTestConfig(testUtil.LocalPlatform)
-		dockerfile = "Dockerfile"
-		mockImageHandler := new(mocks.ImageHandler)
-		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
-		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil).Once()
-		mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(isAgent, inspectErr).Once()
-		original := airflowImageHandler
-		t.Cleanup(func() { airflowImageHandler = original })
-		airflowImageHandler = func(string) airflow.ImageHandler { return mockImageHandler }
-		return mockImageHandler, new(astrov1_mocks.ClientWithResponsesInterface)
-	}
-
-	t.Run("refuses an agent image", func(t *testing.T) {
-		mockImageHandler, mockV1Client := inspect(t, true, nil)
-		_, err := buildImage("./testfiles/", "12.0.0", "", "", "", nil, false, false, mockV1Client)
-		assert.ErrorIs(t, err, errAgentImageInHostedDeploy)
-		assert.ErrorContains(t, err, "astro remote deploy")
-		mockImageHandler.AssertExpectations(t)
-		mockV1Client.AssertExpectations(t) // no API call
-	})
-
-	for name, inspectErr := range map[string]error{"a Runtime image": nil, "a failed inspect": errors.New("inspect failed")} {
-		t.Run("goes on after "+name, func(t *testing.T) {
-			mockImageHandler, mockV1Client := inspect(t, false, inspectErr)
-			mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
-			version, err := buildImage("./testfiles/", "12.0.0", "", "", "", nil, false, false, mockV1Client)
-			assert.NoError(t, err)
-			assert.Equal(t, "12.0.0", version)
+// refuseAgentImage refuses an agent image, which would crash-loop as a hosted
+// Deployment's scheduler; any other answer, a failed inspect included, lets
+// the deploy go on.
+func TestRefuseAgentImage(t *testing.T) {
+	for name, tc := range map[string]struct {
+		isAgent    bool
+		inspectErr error
+		want       error
+	}{
+		"an agent image":   {isAgent: true, want: errAgentImageInHostedDeploy},
+		"a Runtime image":  {},
+		"a failed inspect": {inspectErr: errors.New("inspect failed")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			mockImageHandler := new(mocks.ImageHandler)
+			mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(tc.isAgent, tc.inspectErr).Once()
+			err := refuseAgentImage(mockImageHandler)
+			if tc.want != nil {
+				assert.ErrorIs(t, err, tc.want)
+				assert.ErrorContains(t, err, "astro remote deploy")
+			} else {
+				assert.NoError(t, err)
+			}
 			mockImageHandler.AssertExpectations(t)
-			mockV1Client.AssertExpectations(t)
 		})
 	}
 
 	t.Run("is skipped with warnings off", func(t *testing.T) {
-		mockImageHandler, mockV1Client := inspect(t, true, nil)
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		config.CFG.ShowWarnings.SetHomeString("false")
 		t.Cleanup(func() { config.CFG.ShowWarnings.SetHomeString("true") })
-		mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
-		_, err := buildImage("./testfiles/", "12.0.0", "", "", "", nil, false, false, mockV1Client)
-		assert.NoError(t, err)
+		mockImageHandler := new(mocks.ImageHandler)
+		assert.NoError(t, refuseAgentImage(mockImageHandler))
 		mockImageHandler.AssertNotCalled(t, "HasEnvVarWithPrefix", mock.Anything, mock.Anything)
 	})
+}
+
+// An image deploy refuses an agent image before testing or pushing it.
+func TestImageDeployRefusesAgentImage(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Cleanup(func() { os.RemoveAll("./testfiles/dags/") })
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Maybe()
+	mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Maybe()
+	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Maybe()
+	mockV1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Maybe()
+
+	mockImageHandler := new(mocks.ImageHandler)
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+	mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(true, nil).Once()
+	original := airflowImageHandler
+	t.Cleanup(func() { airflowImageHandler = original })
+	airflowImageHandler = func(string) airflow.ImageHandler { return mockImageHandler }
+
+	defer testUtil.MockUserInput(t, "1")()
+	err := Deploy(InputDeploy{Path: "./testfiles/", EnvFile: "./testfiles/.env", WsID: ws, Prompt: true, Image: true, DagsPath: "./testfiles/dags"}, mockV1Client, nil)
+	assert.ErrorIs(t, err, errAgentImageInHostedDeploy)
+	mockImageHandler.AssertExpectations(t)
+	mockImageHandler.AssertNotCalled(t, "Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// buildImage does not check: a --dags --pytest deploy builds an image only to
+// test in, and an agent image, built FROM Runtime, serves for that.
+func TestBuildImageDoesNotRefuseAgentImage(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	dockerfile = "Dockerfile"
+	mockImageHandler := new(mocks.ImageHandler)
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil).Once()
+	mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	original := airflowImageHandler
+	t.Cleanup(func() { airflowImageHandler = original })
+	airflowImageHandler = func(string) airflow.ImageHandler { return mockImageHandler }
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
+
+	_, err := buildImage("./testfiles/", "12.0.0", "", "", "", nil, false, false, mockV1Client)
+	assert.NoError(t, err)
+	mockImageHandler.AssertNotCalled(t, "HasEnvVarWithPrefix", mock.Anything, mock.Anything)
 }
 
 func TestValidRuntimeVersion(t *testing.T) {

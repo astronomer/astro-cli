@@ -436,6 +436,12 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		if err != nil {
 			return err
 		}
+		// Here, not in buildImage: this is the image that ships. A --dags
+		// --pytest deploy builds one only to test in, which an agent image,
+		// built FROM Runtime, does as well as any.
+		if err := refuseAgentImage(airflowImageHandler(deployInfo.deployImage)); err != nil {
+			return err
+		}
 
 		if len(dagFiles) > 0 {
 			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecrets)
@@ -720,8 +726,8 @@ func isAgentImage(imageHandler airflow.ImageHandler) (isAgent, known bool) {
 	return found, true
 }
 
-// refuseAgentImage is the hosted deploy's check: an agent image passes the
-// Runtime check that follows it, since it is built FROM a Runtime image. Like
+// refuseAgentImage is the hosted deploy's check: an agent image passes
+// buildImage's Runtime check, since it is built FROM a Runtime image. Like
 // that check, it is skipped with warnings off.
 func refuseAgentImage(imageHandler airflow.ImageHandler) error {
 	if !config.CFG.ShowWarnings.GetBool() {
@@ -801,10 +807,6 @@ func buildImage(path, currentVersion, deployImage, imageName, organizationID str
 	version, err = imageHandler.GetLabel("", runtimeImageLabel)
 	if err != nil {
 		fmt.Println("unable get runtime version from image")
-	}
-
-	if err := refuseAgentImage(imageHandler); err != nil {
-		return "", err
 	}
 
 	if config.CFG.ShowWarnings.GetBool() && version == "" {
