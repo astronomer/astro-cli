@@ -24,6 +24,56 @@ const (
 	configUseWithManifestMsg      = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
 )
 
+// unknownSetting fails a get or set of a name that is no setting the way an
+// unknown flag fails: a usage error (exit 2), with the setting the name is
+// most likely a typo of, when one is close. It wraps errInvalidConfigPath.
+func unknownSetting(name string) error {
+	hint := " Run astro config list to see every setting."
+	if match := closestSetting(name); match != "" {
+		hint = " Did you mean " + match + "?" + hint
+	}
+	return cliout.Usage(fmt.Errorf("%w: %q.%s", errInvalidConfigPath, name, hint))
+}
+
+// closestSetting is the setting name nearest to name, by cobra's rule for
+// "Did you mean": within suggestionDistance edits, or name a prefix of it.
+// "" when none is. Every setting counts, the internal.* ones too, which set
+// takes although list leaves them out.
+func closestSetting(name string) string {
+	best, bestDist := "", suggestionDistance+1
+	for _, candidate := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
+		d := editDistance(strings.ToLower(name), candidate)
+		if strings.HasPrefix(candidate, strings.ToLower(name)) && d > suggestionDistance {
+			d = suggestionDistance
+		}
+		if d < bestDist {
+			best, bestDist = candidate, d
+		}
+	}
+	return best
+}
+
+// editDistance is the Levenshtein distance between a and b.
+func editDistance(a, b string) int {
+	prev := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur := make([]int, len(b)+1)
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(b)]
+}
+
 // refuseRemovedConfigKey fails a get or set of a 1.x setting v2 removed or
 // renamed the way a removed 1.x flag fails: a usage error naming what
 // replaces it.
@@ -190,7 +240,8 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 func configGet(cmd *cobra.Command, args []string) error {
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
-		return errInvalidConfigPath
+		cmd.SilenceUsage = true
+		return unknownSetting(args[0])
 	}
 
 	// Silence Usage as we have now validated command input
@@ -213,7 +264,8 @@ func configSet(cmd *cobra.Command, args []string) error {
 	}
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
-		return errInvalidConfigPath
+		cmd.SilenceUsage = true
+		return unknownSetting(args[0])
 	}
 
 	// Silence Usage as we have now validated command input

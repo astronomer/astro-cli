@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/afero"
 
@@ -41,8 +42,9 @@ func (s *CmdSuite) TestConfigGetCommandSuccess() {
 func (s *CmdSuite) TestConfigGetCommandFailure() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	_, err := executeCommand("config", "get", "-g", "test")
-	s.Error(err)
-	s.EqualError(err, errInvalidConfigPath.Error())
+	s.ErrorIs(err, errInvalidConfigPath)
+	s.True(cliout.IsUsage(err), "an unknown setting is a usage error, as an unknown flag is")
+	s.EqualError(err, `unknown setting: "test". Run astro config list to see every setting.`)
 
 	_, err = executeCommand("config", "get", "test")
 	s.Error(err)
@@ -283,4 +285,33 @@ webserver:
 	s.False(config.CFG.ShowWarnings.GetBool())
 	s.True(config.CFG.UpgradeMessage.GetBool(), "an unset setting reads as its default")
 	s.Equal("default", config.CFG.UpgradeMessage.HomeScope())
+}
+
+// A name that is no setting fails as an unknown flag does, exit 2, naming the
+// setting it is most likely a typo of when one is close.
+func (s *CmdSuite) TestConfigUnknownSettingSuggestsTheClosest() {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"config", "set", "apc.page_sise", "30", "-g"}, "Did you mean apc.page_size?"},
+		{[]string{"config", "get", "deploy.git_metdata", "-g"}, "Did you mean deploy.git_metadata?"},
+		{[]string{"config", "get", "telemetry.enable", "-g"}, "Did you mean telemetry.enabled?"},
+		{[]string{"config", "set", "internal.localhost.core", "x", "-g"}, "Did you mean internal.localhost.core_url?"},
+	} {
+		s.Run(strings.Join(tc.args, " "), func() {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			_, err := executeCommand(tc.args...)
+			s.ErrorIs(err, errInvalidConfigPath)
+			s.Equal(2, cliout.ExitCode(context.Background(), err))
+			s.ErrorContains(err, tc.want)
+		})
+	}
+
+	s.Run("no suggestion when nothing is close", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		_, err := executeCommand("config", "get", "xyzzy", "-g")
+		s.ErrorIs(err, errInvalidConfigPath)
+		s.NotContains(err.Error(), "Did you mean")
+	})
 }
