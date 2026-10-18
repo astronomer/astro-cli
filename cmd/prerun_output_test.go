@@ -64,7 +64,7 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 		// hold that flow to stderr, with its browser stubbed. The commands on this machine's own state need no login, so they
 		// run instead of starting one.
 		{name: "no login, telemetry", args: []string{"telemetry", "-o", "json"}, ok: true},
-		{name: "no login, config get", args: []string{"config", "get", "page_size", "-g", "-o", "json"}, ok: true},
+		{name: "no login, config get", args: []string{"config", "get", "apc.page_size", "-g", "-o", "json"}, ok: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
