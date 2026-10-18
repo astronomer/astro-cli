@@ -1199,6 +1199,14 @@ func TestBuildImageFailure(t *testing.T) {
 	mockImageHandler.AssertExpectations(t)
 }
 
+// The prefix matches what the published agent image sets (astro-agent's
+// Dockerfile.standalone), and is the namespace with its separator: the
+// tests below hand the constant to a mock, which would take any value.
+func TestAgentEnvVarPrefix(t *testing.T) {
+	assert.True(t, strings.HasPrefix("ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE", agentEnvVarPrefix))
+	assert.False(t, strings.HasPrefix("ASTRO_AGENT_CLIENTS", agentEnvVarPrefix))
+}
+
 // refuseAgentImage refuses an agent image, which would crash-loop as a hosted
 // Deployment's scheduler; any other answer, a failed inspect included, lets
 // the deploy go on.

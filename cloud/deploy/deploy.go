@@ -711,7 +711,7 @@ func buildImageWithoutDags(path string, buildSecrets []string, imageHandler airf
 // errAgentImageInHostedDeploy refuses a Remote Execution agent image on the
 // hosted deploy path, where it would run as the Deployment's scheduler and
 // crash-loop: the agent's entrypoint runs only its own components.
-var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Deploy an agent image with 'astro remote deploy'; for this Deployment, build FROM an Astro Runtime image, not the astro-remote-execution-agent one") //nolint:lll
+var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Deploy an agent image with 'astro remote deploy'; for this Deployment, build FROM an Astro Runtime image, not the astro-remote-execution-agent one. If it is not an agent image, 'astro config set show_warnings false' skips this check") //nolint:lll
 
 // refuseAgentImage is the hosted deploy's check: an agent image passes
 // buildImage's Runtime check, since it is built FROM a Runtime image. Like
