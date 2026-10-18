@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	iofs "io/fs"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -71,34 +68,53 @@ var (
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
 
+	// LegacySettingNames maps each name a setting had before v2 renamed it to
+	// the name it has now.
+	LegacySettingNames = make(map[string]string)
+
 	// CFG Houses configuration meta
+	//
+	// A setting is named for what it affects: deploy.* for `astro deploy`,
+	// deployment.* for every command that picks a Deployment, apc.* for
+	// `astro apc`, internal.* for overrides meant for Astronomer's own
+	// development, which `astro config list` leaves out. A setting v2 renamed
+	// keeps its 1.x name as a legacy name (see cfg.Legacy): a file that sets
+	// only the old name still sets it, which is what lets 1.x and v2 share
+	// the file.
 	CFG = cfgs{
-		CloudAPIProtocol:        newCfg("cloud.api.protocol", "https"),
-		CloudAPIPort:            newCfg("cloud.api.port", "443"),
-		CloudWSProtocol:         newCfg("cloud.api.ws_protocol", "wss"),
-		Context:                 newCfg("context", ""),
-		Contexts:                newCfg("contexts", ""),
-		DockerCommand:           newCfg("container.binary", ""),
-		LocalCore:               newCfg("local.core", "http://localhost:8888"),
-		LocalHouston:            newCfg("local.houston", ""),
-		LocalPlatform:           newCfg("local.platform", CloudPlatform),
-		ShowWarnings:            newCfg("show_warnings", "true"),
-		Verbosity:               newCfg("verbosity", "warning"),
-		HoustonDialTimeout:      newCfg("houston.dial_timeout", "10"),
-		HoustonSkipVerifyTLS:    newCfg("houston.skip_verify_tls", "false"),
-		Interactive:             newCfg("interactive", "false"),
-		PageSize:                newCfg("page_size", "20"),
-		UpgradeMessage:          newCfg("upgrade_message", "true"),
-		AutoSelect:              newCfg("auto_select", "false"),
-		ShaAsTag:                newCfg("sha_as_tag", "false"),
-		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
-		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
+		// General.
+		Context:              newCfg("context", ""),
+		Contexts:             newCfg("contexts", ""),
+		DockerCommand:        newCfg("container.binary", ""),
+		Verbosity:            newCfg("verbosity", "warning"),
+		UpgradeMessage:       newCfg("upgrade_message", "true"),
+		TelemetryEnabled:     newCfg("telemetry.enabled", "true"),
+		TelemetryAnonymousID: newCfg("telemetry.anonymous_id", ""),
+		TelemetryNoticeShown: newCfg("telemetry.notice_shown", ""),
+		OttoAutoUpdate:       newCfg("otto.auto_update", "true"),
+
+		// Astro: picking a Deployment, and deploying to it.
+		AutoSelect:              newCfg("deployment.auto_select", "false", "auto_select"),
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
-		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
-		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
-		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
-		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
-		CosmosBoostPreDeploy:    newCfg("cosmos_boost.pre_deploy", "false"),
+		CosmosBoostPreDeploy:    newCfg("deploy.cosmos_boost", "false", "cosmos_boost.pre_deploy"),
+		RemoteClientRegistry:    newCfg("deploy.remote_execution.client_registry", "", "remote.client_registry"),
+		RemoteBaseImageRegistry: newCfg("deploy.remote_execution.base_image_registry", "images.astronomer.cloud", "remote.base_image_registry"),
+
+		// Astro Private Cloud.
+		ShowWarnings:         newCfg("apc.show_warnings", "true", "show_warnings"),
+		ShaAsTag:             newCfg("apc.sha_as_tag", "false", "sha_as_tag"),
+		PageSize:             newCfg("apc.page_size", "20", "page_size"),
+		Interactive:          newCfg("apc.interactive", "false", "interactive"),
+		HoustonDialTimeout:   newCfg("apc.dial_timeout", "10", "houston.dial_timeout"),
+		HoustonSkipVerifyTLS: newCfg("apc.skip_verify_tls", "false", "houston.skip_verify_tls"),
+
+		// Overrides for Astronomer's own development.
+		CloudAPIProtocol: newCfg("internal.api.protocol", "https", "cloud.api.protocol"),
+		CloudAPIPort:     newCfg("internal.api.port", "443", "cloud.api.port"),
+		CloudWSProtocol:  newCfg("internal.api.ws_protocol", "wss", "cloud.api.ws_protocol"),
+		LocalCore:        newCfg("internal.localhost.core_url", "http://localhost:8888", "local.core"),
+		LocalHouston:     newCfg("internal.localhost.houston_url", "", "local.houston"),
+		LocalPlatform:    newCfg("internal.localhost.platform", CloudPlatform, "local.platform"),
 	}
 
 	// unreadableConfigs names config files that exist and could not be parsed.
@@ -306,6 +322,8 @@ func saveConfig(v *viper.Viper, file string) error {
 
 	home := v == viperHome && file == HomeConfigFile
 	if home {
+		// 1.x coexistence (compat1x.go).
+		//
 		// A home config this build creates has nothing to clean up, so it is
 		// born at the current version and migrateHomeConfig never scans it.
 		// Only a new one: stamping a file whose cleanup failed at startup
@@ -365,122 +383,4 @@ func lockConfig(file string) (unlock func(), err error) {
 		return nil, fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
 	}
 	return func() { _ = lock.Unlock() }, nil //nolint:errcheck // error deliberately ignored in this shell code
-}
-
-const (
-	// configVersionKey records which one-time cleanups the home config has
-	// been through. Astro CLI 1.x reads and writes it too, and the two share
-	// one sequence: 1 is 1.x's cleanup (astronomer/astro-cli#2255, in
-	// v1.46.0), 2 is this one. Each runs only against a file below its own
-	// number, so whichever line adds the next cleanup takes 3.
-	configVersionKey     = "config_version"
-	currentConfigVersion = 2
-)
-
-// shippedDefaults are the values a setting has shipped as its default, for
-// the settings this build does not register — the 1.x settings v2 refuses,
-// and ones an earlier v2 build had — and the defaults a registered setting
-// has since changed from. Together with each registered setting's Default,
-// they are what an older CLI wrote into the file without being asked.
-var shippedDefaults = map[string][]string{
-	"airflow.expose_port": {"false"},
-	"api-server.port":     {"8080"},
-	"beta.remote_cmd":     {"false"},
-	"dev.mode":            {"docker"},
-	"disable_astro_run":   {"false"},
-	"duplicate_volumes":   {"true"},
-	"local.registry":      {"localhost:5555"},
-	"machine.cpu":         {"2"},
-	"machine.memory":      {"4096"},
-	"postgres.host":       {"postgres"},
-	"postgres.password":   {"postgres"},
-	"postgres.port":       {"5432"},
-	"postgres.repository": {"docker.io/postgres"},
-	// 15 is 1.x's default today, 12.6 the one it had until v1.46.0.
-	"postgres.tag":   {"15", "12.6"},
-	"postgres.user":  {"postgres"},
-	"proxy.port":     {"6563"},
-	"ruff.image":     {"ghcr.io/astral-sh/ruff:latest"},
-	"skip_parse":     {"false"},
-	"webserver.port": {"8080"},
-}
-
-// migrateHomeConfig runs once against a home config written before either CLI
-// stopped writing its defaults into the file — every 1.x before v1.46.0 and
-// every v2 before this — which put some 45 of them there on the first save.
-// Those entries cannot be told from a deliberate choice, so they freeze the
-// default of the day the file was written: no later change to a default
-// reaches the user, and in 1.x, a postgres.tag frozen at 12.6 kept new
-// projects off Postgres 15.
-//
-// Removing an entry that still holds a shipped default changes nothing about
-// what either CLI does today, since the same value comes back as the default,
-// and lets the setting follow the default again. It covers 1.x's settings as
-// well as v2's: once this stamps the file, 1.x's own cleanup (version 1)
-// never runs against it. Anything set from then on is the user's for good.
-//
-// It works on the file as it is on disk, under the lock, rather than on what
-// this process read at startup, so a save another process made in between is
-// kept. A cleanup that cannot be written is not worth failing the command
-// for: it is tried again next time.
-func migrateHomeConfig() {
-	if viperHome.GetInt(configVersionKey) >= currentConfigVersion {
-		return
-	}
-	unlock, err := lockConfig(HomeConfigFile)
-	if err != nil {
-		return
-	}
-	defer unlock()
-
-	disk, ok := readHomeFromDisk()
-	if !ok || disk.GetInt(configVersionKey) >= currentConfigVersion {
-		return
-	}
-	settings := disk.AllSettings()
-	for path, values := range defaultsShipped() {
-		if disk.IsSet(path) && slices.Contains(values, disk.GetString(path)) {
-			deleteNested(settings, path)
-		}
-	}
-	settings[configVersionKey] = currentConfigVersion
-	data, err := yaml.Marshal(settings)
-	if err != nil {
-		return
-	}
-	if err := writeConfigFile(configFs, HomeConfigFile, data); err != nil {
-		return
-	}
-	// Hold what is on disk now, as a process starting after the cleanup would.
-	_ = readConfigFile(viperHome, configFs) //nolint:errcheck // the file was just written from a parse of itself
-}
-
-// defaultsShipped is shippedDefaults with each registered setting's Default.
-// An empty default was never written, so it is not one.
-func defaultsShipped() map[string][]string {
-	all := maps.Clone(shippedDefaults)
-	for path, cfg := range CFGStrMap {
-		if cfg.Default != "" {
-			all[path] = append(slices.Clone(all[path]), cfg.Default)
-		}
-	}
-	return all
-}
-
-// deleteNested removes a dotted key from a settings map, along with any parent
-// left empty by the removal.
-func deleteNested(settings map[string]any, path string) {
-	first, rest, nested := strings.Cut(path, ".")
-	if !nested {
-		delete(settings, first)
-		return
-	}
-	child, ok := settings[first].(map[string]any)
-	if !ok {
-		return
-	}
-	deleteNested(child, rest)
-	if len(child) == 0 {
-		delete(settings, first)
-	}
 }

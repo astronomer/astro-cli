@@ -238,6 +238,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
+	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
@@ -283,7 +284,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 // the local scheduler creates no runs of its own.
 const useJobSchedule = "AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE"
 
-const schedulesOffNote = "Schedules are off locally: DAGs run only when you trigger them. " +
+const schedulesOffNote = "Schedules are off locally: Dags run only when you trigger them. " +
 	"To run them on their schedules, set " + useJobSchedule + "=True in .env"
 
 // noteSchedulesOff tells a text-mode user that DAGs will not run on their
@@ -631,6 +632,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
+	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err

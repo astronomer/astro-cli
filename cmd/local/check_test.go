@@ -142,7 +142,7 @@ func TestTargetMWAAConstraintsConflictFails(t *testing.T) {
 	if !errors.As(err, &exit) || exit.Code != checks.ExitChecksFailed {
 		t.Fatalf("a constraints conflict should exit 1, got %v", err)
 	}
-	if want := "check failed for mwaa: dependencies conflict with MWAA's constraints; 1 DAGs, 0 errors, 0 warnings"; !strings.Contains(out.String(), want) {
+	if want := "check failed for mwaa: dependencies conflict with MWAA's constraints; 1 Dags, 0 errors, 0 warnings"; !strings.Contains(out.String(), want) {
 		t.Errorf("verdict should say the check failed and why, want %q in:\n%s", want, out.String())
 	}
 }
@@ -155,7 +155,7 @@ func TestTargetMWAAConstraintsSkipStillPasses(t *testing.T) {
 	if err := execute(t, d, "local", "check", "--target", "mwaa"); err != nil {
 		t.Fatalf("an offline constraints step is a skip, not a failure: %v", err)
 	}
-	if !strings.Contains(out.String(), "check passed for mwaa: 1 DAGs") {
+	if !strings.Contains(out.String(), "check passed for mwaa: 1 Dags") {
 		t.Errorf("verdict should pass with no reason attached:\n%s", out.String())
 	}
 }

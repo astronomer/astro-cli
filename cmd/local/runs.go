@@ -16,7 +16,7 @@ import (
 func newRunsCmd(d Deps, t target) *cobra.Command {
 	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "runs",
-		Short: "List, trigger, and clear DAG runs on an Airflow",
+		Short: "List, trigger, and clear Dag runs on an Airflow",
 		Long: "Work with the runs on " + t.which() + ": list them, read one, see what its " +
 			"tasks did, start one and optionally wait for it to finish, diagnose a failed one, and delete or " +
 			"clear one.",
@@ -85,11 +85,11 @@ func newRunsListCmd(q *query) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list [DAG_ID]",
 		Short: "List runs, most recent first",
-		Long:  "List runs, most recent first: those of one DAG when it is named, every DAG's otherwise.",
+		Long:  "List runs, most recent first: those of one Dag when it is named, every Dag's otherwise.",
 		Args:  cobra.MaximumNArgs(1),
 		Example: afExample(q.t,
-			"The latest runs of every DAG", "runs list",
-			"The failed runs of one DAG", "runs list <DAG_ID> -s failed",
+			"The latest runs of every Dag", "runs list",
+			"The failed runs of one Dag", "runs list <DAG_ID> -s failed",
 			"Runs that started on or after a time", "runs list --start-date-gte 2026-01-01T00:00:00Z",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -116,7 +116,7 @@ func newRunsListCmd(q *query) *cobra.Command {
 	// Most recent first without being asked: a bare `astro af runs list` is nearly
 	// always "what just happened", and Airflow's own default order is not that.
 	addListFlags(cmd, &list, "-start_date")
-	cmd.Flags().StringVar(&opts.dagID, "dag-id", "", "Only runs of this DAG, the same as naming it as the argument (default: every DAG)")
+	cmd.Flags().StringVar(&opts.dagID, "dag-id", "", "Only runs of this Dag, the same as naming it as the argument (default: every Dag)")
 	cmd.Flags().StringSliceVarP(&opts.states, "state", "s", nil, "Only runs in these states, such as running or failed (repeatable)")
 	cmd.Flags().StringVar(&opts.startDateGTE, "start-date-gte", "", "Only runs that started at or after this RFC 3339 time")
 	cmd.Flags().StringVar(&opts.startDateLTE, "start-date-lte", "", "Only runs that started at or before this RFC 3339 time")
@@ -130,7 +130,7 @@ func dagIDArg(args []string, flag string) (string, error) {
 		return flag, nil
 	}
 	if flag != "" && flag != args[0] {
-		return "", fmt.Errorf("the DAG_ID argument %q and --dag-id %q name different DAGs; give one", args[0], flag)
+		return "", fmt.Errorf("the DAG_ID argument %q and --dag-id %q name different Dags; give one", args[0], flag)
 	}
 	return args[0], nil
 }
@@ -292,7 +292,7 @@ func (f *triggerFlags) register(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&f.runID, "run-id", "", "Name the run instead of letting Airflow generate one")
 	cmd.Flags().StringVar(&f.logicalDate, "logical-date", "", "The run's logical date, as RFC 3339")
 	cmd.Flags().StringVar(&f.note, "note", "", "A note to attach to the run")
-	cmd.Flags().BoolVar(&f.noAutoUnpause, "no-auto-unpause", false, "Fail if the DAG is paused instead of unpausing it first")
+	cmd.Flags().BoolVar(&f.noAutoUnpause, "no-auto-unpause", false, "Fail if the Dag is paused instead of unpausing it first")
 }
 
 // options validates the flags into a trigger, before anything reaches Airflow.
@@ -318,16 +318,16 @@ func newRunsTriggerCmd(q *query) *cobra.Command {
 	var opts triggerFlags
 	cmd := &cobra.Command{
 		Use:   "trigger <DAG_ID>",
-		Short: "Start a run of a DAG",
-		Long: "Start a run of a DAG. Airflow names the run and dates it unless --run-id or --logical-date say " +
-			"otherwise.\n\nA paused DAG is unpaused first, because a run triggered on a paused DAG is never " +
+		Short: "Start a run of a Dag",
+		Long: "Start a run of a Dag. Airflow names the run and dates it unless --run-id or --logical-date say " +
+			"otherwise.\n\nA paused Dag is unpaused first, because a run triggered on a paused Dag is never " +
 			"scheduled and the command would look like it worked. The unpause is announced on stderr; pass " +
 			"--no-auto-unpause to fail instead.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
-			"Start a run, unpausing the DAG if it is paused", "runs trigger <DAG_ID>",
+			"Start a run, unpausing the Dag if it is paused", "runs trigger <DAG_ID>",
 			"With a run configuration", "runs trigger <DAG_ID> --conf '{\"date\": \"2026-01-01\"}'",
-			"Fail instead of unpausing a paused DAG", "runs trigger <DAG_ID> --no-auto-unpause",
+			"Fail instead of unpausing a paused Dag", "runs trigger <DAG_ID> --no-auto-unpause",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			trigger, err := opts.options()
@@ -398,7 +398,7 @@ func (q *query) ensureUnpaused(ctx context.Context, client *airflowapi.Client, d
 		return false, nil
 	}
 	if !auto {
-		return false, fmt.Errorf("DAG %q is paused, so a new run would never be scheduled; unpause it with %s, or drop --no-auto-unpause", dagID, q.t.suggest("dags unpause "+dagID))
+		return false, fmt.Errorf("Dag %q is paused, so a new run would never be scheduled; unpause it with %s, or drop --no-auto-unpause", dagID, q.t.suggest("dags unpause "+dagID))
 	}
 	if _, err := client.UnpauseDAG(ctx, dagID); err != nil {
 		return false, err

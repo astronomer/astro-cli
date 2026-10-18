@@ -196,7 +196,7 @@ func TestSaveLinkRefusesANewBundleLink(t *testing.T) {
 	err := SaveLink(dir, nil, Link{Name: BundleLinkName, Kind: manifest.KindAstro, Workspace: "W", Deployment: "d"})
 	require.ErrorIs(t, err, ErrBundleLinkName)
 	require.ErrorIs(t, err, ErrInvalidLink)
-	assert.Contains(t, err.Error(), "astro deploy bundle deploys a non-DAG bundle")
+	assert.Contains(t, err.Error(), "astro deploy bundle deploys a non-Dag bundle")
 	assert.Equal(t, linkFixture, readFile(t, path))
 
 	existing := linkFixture + "\n[tool.astro.deployments.bundle]\nworkspace = 'W'\ndeployment = 'old'\n"

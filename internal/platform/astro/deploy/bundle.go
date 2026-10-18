@@ -300,7 +300,7 @@ func UploadBundle(bundlePath, uploadURL string, prependBaseDir bool, currentRunt
 
 	// Cosmos Boost: its sidecars go into the tarball only, never into the
 	// tree. Ones an earlier CLI wrote into the tree are always left out (a
-	// stale one must not ship), and with cosmos_boost.pre_deploy on, fresh
+	// stale one must not ship), and with deploy.cosmos_boost on, fresh
 	// ones are generated into the bundle, best-effort (a missing one is safe).
 	overlay, err := cosmosboost.BundleOverlay(bundlePath, config.CFG.CosmosBoostPreDeploy.GetBool())
 	if err != nil {

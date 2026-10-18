@@ -343,7 +343,7 @@ func TestEmptyListingsSaySo(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"dags", "list"}, "No DAGs on this Airflow."},
+		{[]string{"dags", "list"}, "No Dags on this Airflow."},
 		{[]string{"pools", "list"}, "No pools on this Airflow."},
 	} {
 		out, _, err := runQuery(t, stub, tc.args...)

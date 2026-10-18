@@ -36,9 +36,9 @@ func TestDeployRefusesThe1xOnlyFlags(t *testing.T) {
 		says string
 	}{
 		{[]string{"--pytest"}, "run your tests before deploying"},
-		{[]string{"--parse"}, "check your DAGs before deploying"},
+		{[]string{"--parse"}, "check your Dags before deploying"},
 		{[]string{"--dags-path", "somewhere"}, "ships the project's dags directory"},
-		{[]string{"--dag-bundle-name", "bundle"}, "named DAG bundle is not supported yet"},
+		{[]string{"--dag-bundle-name", "bundle"}, "named Dag bundle is not supported yet"},
 		{[]string{"--test", "tests/"}, "run your tests before deploying"},
 		{[]string{"--env", ".env.test"}, "runs no tests"},
 		{[]string{"--save"}, "asks which Deployment to deploy to"},

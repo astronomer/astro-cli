@@ -244,7 +244,7 @@ func Preflight(ctx context.Context, target string, in PreflightInput, prov Provi
 
 	report, err := parser.ParseWith(ctx, pythonBin, ParseInput{ProjectPath: in.ProjectPath, DagsDir: in.DagsDir, Env: in.Env})
 	if err != nil {
-		rep.OpError = fmt.Sprintf("parsing DAGs for %s: %v", target, err)
+		rep.OpError = fmt.Sprintf("parsing Dags for %s: %v", target, err)
 		return rep
 	}
 	if report.Fatal != "" {

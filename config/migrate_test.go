@@ -92,7 +92,7 @@ func (s *Suite) TestMigrateHomeConfig() {
 
 		InitConfig(fs)
 
-		s.Equal(true, s.homeOnDisk(fs)["show_warnings"])
+		s.Equal(true, s.homeOnDisk(fs)["apc"].(map[string]any)["show_warnings"])
 		s.Equal("global", CFG.ShowWarnings.HomeScope())
 	})
 
@@ -102,7 +102,7 @@ func (s *Suite) TestMigrateHomeConfig() {
 		InitConfig(fs)
 		s.Require().NoError(CFG.PageSize.SetHomeString("30"))
 
-		s.Equal(map[string]any{"config_version": currentConfigVersion, "page_size": 30}, s.homeOnDisk(fs))
+		s.Equal(map[string]any{"config_version": currentConfigVersion, "apc": map[string]any{"page_size": 30}}, s.homeOnDisk(fs))
 	})
 
 	s.Run("an unwritable config is not fatal and is left as it was", func() {

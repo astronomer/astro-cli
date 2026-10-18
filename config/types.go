@@ -3,6 +3,7 @@ package config
 import (
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -16,7 +17,11 @@ type cfg struct {
 	// Default is the value a getter returns when no config file sets Path.
 	// It is never registered with viper, so it is never written to a file:
 	// see initHome.
-	Default   string
+	Default string
+	// Legacy are the names the setting had before v2 renamed it, which
+	// Astro CLI 1.x still reads and writes. `astro config` refuses them
+	// (removed.go); a file that sets one still sets the setting (compat1x.go).
+	Legacy    []string
 	validator ValidatorFunc
 }
 
@@ -51,12 +56,16 @@ type cfgs struct {
 }
 
 // Creates a new cfg struct
-func newCfg(path, dflt string) cfg {
+func newCfg(path, dflt string, legacy ...string) cfg {
 	ncfg := cfg{
 		Path:    path,
 		Default: dflt,
+		Legacy:  legacy,
 	}
 	CFGStrMap[path] = ncfg
+	for _, name := range legacy {
+		LegacySettingNames[name] = path
+	}
 	return ncfg
 }
 
@@ -65,7 +74,7 @@ func (c cfg) SetHomeString(value string) error {
 	if !configExists(viperHome) {
 		return nil
 	}
-	viperHome.Set(c.Path, c.typed(value))
+	c.set(viperHome, c.typed(value))
 	err := saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
 		return err
@@ -78,7 +87,7 @@ func (c cfg) SetProjectString(value string) error {
 	if !configExists(viperProject) {
 		return nil
 	}
-	viperProject.Set(c.Path, c.typed(value))
+	c.set(viperProject, c.typed(value))
 	err := saveConfig(viperProject, viperProject.ConfigFileUsed())
 	if err != nil {
 		return err
@@ -88,8 +97,8 @@ func (c cfg) SetProjectString(value string) error {
 
 // GetString will return the requested config, check working dir and fallback to home
 func (c cfg) GetString() string {
-	if configExists(viperProject) && viperProject.IsSet(c.Path) {
-		return c.GetProjectString()
+	if key := c.projectKey(); key != "" {
+		return viperProject.GetString(key)
 	}
 	return c.GetHomeString()
 }
@@ -104,8 +113,10 @@ func (c cfg) GetStringFor(projectDir string) string {
 		v := viper.New()
 		v.SetFs(configFs)
 		v.SetConfigFile(filepath.Join(projectDir, ConfigDir, ConfigFileNameWithExt))
-		if err := readConfigFile(v, configFs); err == nil && v.IsSet(c.Path) {
-			return v.GetString(c.Path)
+		if err := readConfigFile(v, configFs); err == nil {
+			if key := c.keyIn(v); key != "" {
+				return v.GetString(key)
+			}
 		}
 	}
 	return c.GetHomeString()
@@ -113,11 +124,11 @@ func (c cfg) GetStringFor(projectDir string) string {
 
 // GetBool will return the requested config, check working dir and fallback to home
 func (c cfg) GetBool() bool {
-	if configExists(viperProject) && viperProject.IsSet(c.Path) {
-		return viperProject.GetBool(c.Path)
+	if key := c.projectKey(); key != "" {
+		return viperProject.GetBool(key)
 	}
-	if viperHome != nil && viperHome.IsSet(c.Path) {
-		return viperHome.GetBool(c.Path)
+	if key := c.keyIn(viperHome); key != "" {
+		return viperHome.GetBool(key)
 	}
 	b, _ := strconv.ParseBool(c.Default) //nolint:errcheck // an empty default is false
 	return b
@@ -125,11 +136,11 @@ func (c cfg) GetBool() bool {
 
 // GetInt will return the integer value of requested config, check working dir and fallback to home
 func (c cfg) GetInt() int {
-	if configExists(viperProject) && viperProject.IsSet(c.Path) {
-		return viperProject.GetInt(c.Path)
+	if key := c.projectKey(); key != "" {
+		return viperProject.GetInt(key)
 	}
-	if viperHome != nil && viperHome.IsSet(c.Path) {
-		return viperHome.GetInt(c.Path)
+	if key := c.keyIn(viperHome); key != "" {
+		return viperHome.GetInt(key)
 	}
 	i, _ := strconv.Atoi(c.Default) //nolint:errcheck // an empty default is 0
 	return i
@@ -138,7 +149,7 @@ func (c cfg) GetInt() int {
 // typed is value as the YAML type of c's default: a bool or an int when the
 // default is one and value parses as the same, the string otherwise. A config
 // set from the command line arrives as text, and stored as text it reads back
-// as `show_warnings: "false"`. Either form reads the same, here and in Astro
+// as `apc.show_warnings: "false"`. Either form reads the same, here and in Astro
 // CLI 1.x, which shares the file.
 //
 // A bool is the words true and false only. strconv.ParseBool also takes 1, 0,
@@ -159,7 +170,11 @@ func (c cfg) typed(value string) any {
 
 // GetProjectString will return a project config
 func (c cfg) GetProjectString() string {
-	return viperProject.GetString(c.Path)
+	key := c.keyIn(viperProject)
+	if key == "" {
+		return ""
+	}
+	return viperProject.GetString(key)
 }
 
 // GetHomeString will return config from home string, its default when the
@@ -170,28 +185,37 @@ func (c cfg) GetHomeString() string {
 	if viperHome == nil {
 		return ""
 	}
-	if !viperHome.IsSet(c.Path) {
+	key := c.keyIn(viperHome)
+	if key == "" {
 		return c.Default
 	}
-	return viperHome.GetString(c.Path)
+	return viperHome.GetString(key)
 }
 
 // Scope names where GetString finds this setting: "project", "global", or
 // "default" when no config file sets it.
 func (c cfg) Scope() string {
-	if configExists(viperProject) && viperProject.IsSet(c.Path) {
+	if c.projectKey() != "" {
 		return "project"
 	}
 	return c.HomeScope()
 }
 
 // HomeScope names where GetHomeString finds this setting: "global", or
-// "default" when the home config does not set it.
+// "default" when the home config does not set it. The name it checks is the
+// one GetHomeString reads, so the two never describe different keys.
 func (c cfg) HomeScope() string {
-	if viperHome.InConfig(c.Path) {
+	if key := c.keyIn(viperHome); key != "" && viperHome.InConfig(key) {
 		return "global"
 	}
 	return "default"
+}
+
+// Listed reports whether `astro config list` shows the setting: not contexts,
+// which `astro context` manages, nor the internal.* overrides for
+// Astronomer's own development, which get and set still take.
+func (c cfg) Listed() bool {
+	return c.Path != contextsKey && !strings.HasPrefix(c.Path, "internal.")
 }
 
 // RegisterValidator registers a validation function for this config

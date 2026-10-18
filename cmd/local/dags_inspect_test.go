@@ -68,7 +68,7 @@ func TestDagsErrorsAndWarningsSayWhenThereAreNone(t *testing.T) {
 	stub.route(http.MethodGet, "/api/v2/dagWarnings", `{"dag_warnings":[],"total_entries":0}`)
 	for args, want := range map[string]struct{ text, key string }{
 		"errors":   {"No import errors on this Airflow.", "import_errors"},
-		"warnings": {"No DAG warnings on this Airflow.", "dag_warnings"},
+		"warnings": {"No Dag warnings on this Airflow.", "dag_warnings"},
 	} {
 		out, _, err := runQuery(t, stub, "dags", args)
 		if err != nil {

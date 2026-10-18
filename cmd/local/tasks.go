@@ -18,8 +18,8 @@ import (
 func newTasksCmd(d Deps, t target) *cobra.Command {
 	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "tasks",
-		Short: "Read a DAG's tasks, their runs, and their logs",
-		Long: "Work with tasks on " + t.which() + ": what a DAG defines, what one run " +
+		Short: "Read a Dag's tasks, their runs, and their logs",
+		Long: "Work with tasks on " + t.which() + ": what a Dag defines, what one run " +
 			"of a task did, its log, and clearing tasks so they run again.",
 	},
 		newTasksListCmd,
@@ -115,10 +115,10 @@ func newTaskInstanceRow(t airflowapi.TaskInstance) taskInstanceRow {
 func newTasksListCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list <DAG_ID>",
-		Short: "List the tasks a DAG defines",
+		Short: "List the tasks a Dag defines",
 		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
-			"List the tasks a DAG defines", "tasks list <DAG_ID>",
+			"List the tasks a Dag defines", "tasks list <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runTasksList(cmd.Context(), args[0])
@@ -140,7 +140,7 @@ func (q *query) runTasksList(ctx context.Context, dagID string) error {
 }
 
 func renderTaskTable(w io.Writer, rows []taskRow) error {
-	return renderTable(w, rows, "This DAG defines no tasks.",
+	return renderTable(w, rows, "This Dag defines no tasks.",
 		[]string{"TASK_ID", "OPERATOR", "OWNER", "TRIGGER_RULE", "DOWNSTREAM"},
 		func(row taskRow) []string {
 			return []string{row.TaskID, row.Operator, row.Owner, row.TriggerRule, strings.Join(row.DownstreamTasks, ",")}
