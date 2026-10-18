@@ -64,6 +64,30 @@ func TestEnsureEngine(t *testing.T) {
 	assert.NotContains(t, err.Error(), "Start Docker")
 }
 
+// ReachEngine hands back the engine it probed, and words no failure: the
+// caller does, so it reports only which kind of failure it was.
+func TestReachEngine(t *testing.T) {
+	cmd := &fakeCmd{}
+	engine, err := ReachEngine(context.Background(), cmd, func() (string, []string, error) { return "podman", []string{"X=1"}, nil })
+	require.NoError(t, err)
+	assert.Equal(t, imagebuild.Engine{Cmd: cmd, Bin: "podman", Env: []string{"X=1"}}, engine)
+	assert.Equal(t, []string{"podman info"}, cmd.calls)
+	assert.Equal(t, [][]string{{"X=1"}}, cmd.envs, "the probe reaches the daemon through the resolved env")
+
+	cmd = &fakeCmd{}
+	_, err = ReachEngine(context.Background(), cmd, func() (string, []string, error) { return "", nil, errors.New("none on PATH") })
+	require.ErrorIs(t, err, errEngineUnreachable)
+	assert.Empty(t, cmd.calls, "nothing runs without an engine")
+
+	_, err = ReachEngine(context.Background(), &fakeCmd{err: errors.New("daemon down")}, func() (string, []string, error) { return "docker", nil, nil })
+	require.ErrorIs(t, err, errEngineUnreachable)
+
+	machine := fmt.Errorf("%w; podman machine init --now", container.ErrMachineNotRunning)
+	_, err = ReachEngine(context.Background(), &fakeCmd{}, func() (string, []string, error) { return "", nil, machine })
+	require.ErrorIs(t, err, container.ErrMachineNotRunning)
+	assert.Equal(t, machine, err, "the resolver's own error, which names the podman fix")
+}
+
 // A nil resolver is the caller's mistake, refused rather than a panic.
 func TestEnsureEngineWithoutAResolver(t *testing.T) {
 	cmd := &fakeCmd{}
