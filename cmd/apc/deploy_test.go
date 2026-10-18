@@ -27,50 +27,11 @@ func execDeployCmd(args ...string) error {
 	return err
 }
 
-// A checkout with uncommitted changes is refused with an error, so the deploy
-// that did not happen exits non-zero, with no usage block under it. It used to
-// print a note and return nil: exit 0. --force deploys anyway.
-func (s *Suite) TestDeployRefusesUncommittedChanges() {
-	// A project deploy: the gate is for what it reads from the checkout.
-	inProject(s.T(), true)
-	appConfig = &houston.AppConfig{}
-	prev := hasUncommittedChanges
-	hasUncommittedChanges = func(string) bool { return true }
-	defer func() { hasUncommittedChanges = prev }()
-
-	deployed := 0
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-		deployed++
-		return deploy.Deployed{DeploymentID: deploymentID}, nil
-	}
-	prevDags := DagsOnlyDeploy
-	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-		return deploymentID, nil
-	}
-	defer func() { DagsOnlyDeploy = prevDags }()
-
-	cmd := NewDeployCmd(new(bytes.Buffer))
-	var printed bytes.Buffer
-	cmd.SetOut(&printed)
-	cmd.SetErr(&printed)
-	cmd.SetArgs([]string{"test-deployment-id", "--image-name", "img:1", "--workspace-id", "test-workspace-id"})
-	restore := testUtil.SetupOSArgsForGinkgo()
-	_, err := cmd.ExecuteC()
-	restore()
-	s.ErrorIs(err, errUncommittedChanges)
-	s.Equal(0, deployed, "a refused deploy ships nothing")
-	s.NotContains(printed.String(), "Usage:", "the refusal is not a usage mistake")
-
-	// Flags that conflict are reported first, not hidden behind the refusal.
-	s.ErrorIs(execDeployCmd("test-deployment-id", "--dags", "--image", "--workspace-id", "test-workspace-id"), ErrBothDagsOnlyAndImageOnlySet)
-
-	s.NoError(execDeployCmd("test-deployment-id", "--image-name", "img:1", "--workspace-id", "test-workspace-id", "--force"))
-	s.Equal(1, deployed, "--force deploys anyway")
-}
-
+// The old route's deploys: an image named on the command line, from outside
+// any project (where it ships alone) or already in a registry (--remote),
+// whose DAGs then follow it from a project to a Deployment that takes them.
 func (s *Suite) TestDeploy() {
-	// From a project, whose DAGs follow the image to a Deployment that takes them.
-	inProject(s.T(), true)
+	inWorkingDir(s.T(), true)
 	appConfig = &houston.AppConfig{
 		BYORegistryDomain: "test.registry.io",
 		Flags: houston.FeatureFlags{
@@ -90,12 +51,19 @@ func (s *Suite) TestDeploy() {
 	s.NoError(execDeployCmd("-f", "--image-name", "img:1"))
 	s.NoError(execDeployCmd("-f", "test-deployment-id", "--image-name", "img:1"))
 
-	// The description reaches the DAG upload that follows the image.
-	s.NoError(execDeployCmd("test-deployment-id", "--image-name", "img:1", "--description", "Initial deployment", "--force"))
+	// The description reaches the DAG upload that follows an image already
+	// in a registry, from a project.
+	inProject(s.T(), true)
+	UpdateDeploymentImage = func(_ houston.ClientInterface, deploymentID, _, _, _ string, _ deploy.Options) (deploy.Deployed, error) {
+		return deploy.Deployed{DeploymentID: deploymentID}, nil
+	}
+	remote := []string{"--image-name", "img:1", "--remote", "--runtime-version", "12.1.1"}
+	s.NoError(execDeployCmd(append([]string{"test-deployment-id", "--description", "Initial deployment"}, remote...)...))
 	s.Equal("Initial deployment", gotDescription)
 	description = ""
-	s.NoError(execDeployCmd("test-deployment-id", "--image-name", "img:1", "--force"))
+	s.NoError(execDeployCmd(append([]string{"test-deployment-id"}, remote...)...))
 	s.Equal("Deployed via <astro deploy>", gotDescription)
+	inWorkingDir(s.T(), true)
 
 	// Restore DagsOnlyDeploy to default behavior
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
@@ -114,11 +82,13 @@ func (s *Suite) TestDeploy() {
 	})
 
 	s.Run("error should be returned for astro deploy, if dags deploy throws error and the feature is enabled", func() {
+		inProject(s.T(), true)
 		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
 			return deploymentID, deploy.ErrNoWorkspaceID
 		}
-		err := execDeployCmd("-f", "--image-name", "img:1")
+		err := execDeployCmd("test-deployment-id", "--image-name", "img:1", "--remote", "--runtime-version", "12.1.1")
 		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
+		inWorkingDir(s.T(), true)
 	})
 
 	s.Run("Test for the flag --dags when the feature is disabled", func() {
@@ -134,6 +104,7 @@ func (s *Suite) TestDeploy() {
 		inProject(s.T(), true)
 		err := execDeployCmd("test-deployment-id", "--dags", "--image", "--force")
 		s.ErrorIs(err, ErrBothDagsOnlyAndImageOnlySet)
+		inWorkingDir(s.T(), true)
 	})
 
 	s.Run("Test for the flag --image for image deployment", func() {
@@ -218,6 +189,7 @@ func (s *Suite) TestDeploy() {
 		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
 			return deploymentID, deploy.ErrBYORegistryDomainNotSet
 		}
+		inProject(s.T(), true)
 		err := execDeployCmd("-f", "--image-name", "img:1")
 		s.ErrorIs(err, deploy.ErrBYORegistryDomainNotSet)
 	})
@@ -233,10 +205,10 @@ func in1xProject(t *testing.T) string {
 	return dir
 }
 
-// v2 builds no project for APC: a deploy that would build one is refused
-// before anything is asked or sent, saying to use Astro CLI 1.x, and a
-// project in the 1.x layout makes no deploy at all. --image-name and, from a
-// pyproject.toml project, --dags still deploy.
+// v2 builds only pyproject.toml projects for APC: a deploy that would build
+// with no project here is refused before anything is asked or sent, and a
+// project in the 1.x layout makes no deploy at all, saying to use Astro CLI
+// 1.x.
 func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
 	apc1x := utils.Deploy1xRefusedAPC("this project", "")
 	for _, tc := range []struct {
@@ -249,9 +221,7 @@ func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
 		// noProject is whether it is a no_project failure.
 		noProject bool
 	}{
-		{"a build outside any project", func(t *testing.T) string { return inWorkingDir(t, true) }, nil, errBuildDeployNoProject, false, true},
-		{"a build of a pyproject.toml project", func(t *testing.T) string { return inProject(t, true) }, nil, errBuildDeployManifest, true, false},
-		{"an empty --image-name= is a build", func(t *testing.T) string { return inProject(t, true) }, []string{"--image-name="}, errBuildDeployManifest, true, false},
+		{"a build outside any project", func(t *testing.T) string { return inWorkingDir(t, true) }, nil, "this is not an Astro project directory", false, true},
 		{"a build of a 1.x project", in1xProject, nil, apc1x, false, true},
 		{"--image-name from a 1.x project", in1xProject, []string{"--image-name", "img:1"}, apc1x, false, true},
 		{"--dags from a 1.x project", in1xProject, []string{"--dags"}, apc1x, false, true},

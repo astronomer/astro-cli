@@ -36,7 +36,7 @@ func TestDeployImageNameOutsideAProjectShipsTheImageAlone(t *testing.T) {
 			assert.Zero(t, seen.dagUploads, "no dags/ is uploaded from outside a project")
 			var got deployJSON
 			decodeOne(t, run.stdout, &got)
-			assert.Equal(t, "image", got.Type)
+			assert.Equal(t, "image-only", got.Type)
 			assert.Equal(t, []string{tc.want}, got.Warnings)
 		})
 	}
@@ -55,26 +55,6 @@ func TestDeployBelowAProjectRoot(t *testing.T) {
 	assert.Contains(t, run.err.Error(), "Run the deploy from the project directory, "+dir)
 }
 
-// The uncommitted-changes gate is for a deploy that reads the checkout. An
-// image deployed alone from outside any project reads nothing from the
-// directory, so a dirty one does not stop it; a project's deploy is held to
-// it as before.
-func TestDeployUncommittedChangesGateOnlyForAProject(t *testing.T) {
-	prev := hasUncommittedChanges
-	hasUncommittedChanges = func(string) bool { return true }
-	t.Cleanup(func() { hasUncommittedChanges = prev })
-
-	inWorkingDir(t, false)
-	deployMocks(t, deployPushed, nil)
-	run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-
-	inProject(t, true)
-	deployMocks(t, deployPushed, nil)
-	run = runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
-	require.ErrorIs(t, run.err, errUncommittedChanges)
-}
-
 // --dags with --image-name is refused in astro deploy's words, before
 // anything is asked: a deploy of DAGs alone has no use for an image.
 func TestDeployRefusesDagsWithImageName(t *testing.T) {
@@ -84,5 +64,19 @@ func TestDeployRefusesDagsWithImageName(t *testing.T) {
 	require.Error(t, run.err)
 	assert.EqualError(t, run.err, "--dags deploys only your DAGs; drop --image-name")
 	assert.True(t, cliout.IsUsage(run.err))
+	assert.Zero(t, seen.dagUploads)
+
+	// --remote names an image in a registry: the same mistake, said the same
+	// way, from a project's root, where it used to upload the DAGs alone.
+	for _, args := range [][]string{
+		{"deploy", "dep-ac", "--dags", "--remote", "-o", "json"},
+		{"deploy", "dep-ac", "--dags", "--remote", "--image-name", "img:1", "-o", "json"},
+	} {
+		run = runAPC(t, newAPCClient(), "", args...)
+		require.Error(t, run.err, "%v", args)
+		assert.True(t, cliout.IsUsage(run.err), "%v", args)
+		assert.Contains(t, run.err.Error(), "--dags deploys only your DAGs; drop ", "%v", args)
+		assert.Contains(t, run.err.Error(), "--remote", "%v", args)
+	}
 	assert.Zero(t, seen.dagUploads)
 }

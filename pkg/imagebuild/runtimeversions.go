@@ -67,7 +67,9 @@ var ErrNoRuntimeForAirflow = errors.New("no Astro Runtime carries this Airflow v
 // (the catalog's word on an Airflow 2 build's series, a yanked build) is
 // runtimeversions.CheckRuntime's, which the caller runs where it can say so.
 //
-// This is the local start path only. The deploy path stays on
+// Local start uses it, and so does a deploy to a platform that runs Airflow 2
+// too (the CLI's Astro Private Cloud deploy, through ForManifestWith, with
+// runtime set to a build that platform lists). Astro's deploy stays on
 // RuntimeImageForPython, which is Airflow 3 alone.
 func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime, requiresPython string, o runtimeversions.Options) (string, error) {
 	v := strings.TrimSpace(airflowVersion)

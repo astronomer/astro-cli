@@ -23,8 +23,8 @@ whose contents it carried across, saying so. So
 everything below shows up as a `git diff` you can read before you commit it.
 
 Astro CLI v2 deploys only a converted project. A 1.x project you have not
-converted keeps deploying with Astro CLI 1.x, and so does any project on Astro
-Private Cloud for now: v2 does not build and deploy projects there yet.
+converted keeps deploying with Astro CLI 1.x, and so, for now, does a 1.x
+project on Astro Private Cloud, which `init` does not convert there yet.
 
 ## Two things to ask about first
 
@@ -189,16 +189,17 @@ output ends with **Left to do**: what it found and could not carry. That list
 is the work. Take it one line at a time.
 
 There is one project format, and `init` converts the same way whichever
-platform you deploy to. The exception, for now, is Astro Private Cloud, which
-deploys the 1.x layout and not yet `pyproject.toml` projects. When the
+platform you deploy to. The exception, for now, is Astro Private Cloud: v2
+deploys `pyproject.toml` projects there, but `init` does not convert a 1.x
+project under an Astro Private Cloud context yet. When the
 current context is an Astro Private Cloud one, `init` refuses a 1.x project,
 or any directory inside one, and changes nothing: a project made inside it
 would be deployed with it. A 1.x project is what Astro CLI 1.x itself takes
 for one: a `Dockerfile` and a `.astro/config.yaml`, other than the CLI's own
 settings file in your home directory, so a stray `~/Dockerfile` does not make
 home a 1.x project. Leave the project as it is: Astro CLI 1.x keeps deploying
-it to Astro Private Cloud. Converting will be available once Astro Private
-Cloud deploys `pyproject.toml` projects. To convert anyway, for Astro or for
+it to Astro Private Cloud. Converting under an Astro Private Cloud context
+comes in a later release. To convert anyway, for Astro or for
 local development only, switch to an Astro context first (`astro context
 switch astronomer.io`, or `astro login astronomer.io`; a bare `astro login`
 logs back in to the current context; or change or unset `ASTRO_DOMAIN` if it

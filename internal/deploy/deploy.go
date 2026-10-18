@@ -110,6 +110,46 @@ type Request struct {
 	// offers it by name. cmd wires it to scaffold.SaveLink. nil links nothing:
 	// the deploy still ships to the picked Deployment, by id.
 	Link func(scaffold.Link) error
+	// Platform is the control plane the deploy ships to, as the kind of link
+	// that names one of its Deployments: manifest.KindAstro (and "", which
+	// reads as it) or manifest.KindAPC. Only links of that kind are offered,
+	// preselected or resolved; a link saved for a picked Deployment is of it.
+	Platform manifest.LinkKind
+	// Domain is the Astro Private Cloud base domain the deploy runs under,
+	// normalized as an apc link writes it (manifest.NormalizeAPCDomain). An
+	// apc deploy ships only to apc links on it, and the link it saves for a
+	// picked Deployment carries it. Unused by an astro deploy.
+	Domain string
+	// OtherDomain explains an apc link on a domain other than Domain, which
+	// this deploy cannot reach: the login to switch to, or to make. nil says
+	// only that the link is elsewhere.
+	OtherDomain func(link, domain string) error
+}
+
+// platform is the kind of link the deploy ships to.
+func (r *Request) platform() manifest.LinkKind {
+	if r.Platform == "" {
+		return manifest.KindAstro
+	}
+	return r.Platform
+}
+
+// deploysTo reports whether l is a link this deploy can ship to: one of its
+// platform's, and for Astro Private Cloud one on the domain it runs under.
+func (r *Request) deploysTo(l manifest.Link) bool {
+	kind := l.Kind()
+	if kind != r.platform() {
+		return false
+	}
+	return kind != manifest.KindAPC || l.Domain == r.Domain
+}
+
+// shipsTo names what the deploy ships to, for messages that turn a link away.
+func (r *Request) shipsTo() string {
+	if r.platform() == manifest.KindAPC {
+		return "Astro Private Cloud Deployments on " + r.Domain
+	}
+	return "Astro Deployments"
 }
 
 // Result is what a finished manifest deploy reports back to cmd for rendering. Text
@@ -235,6 +275,12 @@ type ImageResult struct {
 	// RemoteExecutionEnabled is whether the Deployment runs remote
 	// execution, read alongside it.
 	RemoteExecutionEnabled bool
+	// DagsNotShipped reports a "both" deploy that shipped the image and no
+	// DAGs, by neither an upload nor the image: the Deployment takes its
+	// DAGs from somewhere else (an Astro Private Cloud git-sync or volume
+	// Deployment), or there was no dags directory to upload. The transport
+	// warned why. The deploy is then reported as image-only.
+	DagsNotShipped bool
 }
 
 // Deployer is the seam onto the deploy transport. The CLI wires it to the
@@ -330,7 +376,8 @@ func saveNewLink(req Request, target Target, res *Result) {
 	if err := req.Link(*target.newLink); err != nil {
 		res.LinkName = ""
 		if req.Warn != nil {
-			req.Warn(fmt.Sprintf("deployed, but could not save a link to astro deployment %s: %v", target.DeploymentID, err))
+			req.Warn(fmt.Sprintf("deployed, but could not save a link to %s deployment %s: %v. Link it with astro link add %s --deployment %s",
+				req.platform(), target.DeploymentID, err, target.newLink.Name, target.DeploymentID))
 		}
 	}
 }
@@ -416,7 +463,7 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		return Result{}, err
 	}
 	kind := "image-only"
-	if includeDags {
+	if includeDags && !img.DagsNotShipped {
 		kind = "image-and-dag"
 	}
 	return Result{
@@ -494,7 +541,7 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		return target, err
 	}
 
-	deployable := DeployableLinks(links)
+	deployable := linkNames(links, req.deploysTo)
 	switch {
 	case len(links) == 0:
 		// A project that links nothing at all: the workspace-level flow, which
@@ -505,7 +552,11 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		// through to the workspace-level flow here would offer some unrelated
 		// Deployment, which is how one project's DAGs land on another
 		// project's Airflow.
-		return Target{}, fmt.Errorf("astro deploy ships to Astro Deployments, and this project links none%s", nonAstroLinks(links))
+		msg := fmt.Sprintf("astro deploy ships to %s, and this project links none%s", req.shipsTo(), describeLinks(links))
+		if req.platform() == manifest.KindAPC {
+			msg += ". Link one with astro link add, or name a Deployment id: astro deploy <deployment-id>"
+		}
+		return Target{}, errors.New(msg)
 	case !req.Interactive:
 		// The question an interactive run asks, refused: input_required under
 		// --output json, in deploy's own words.
@@ -515,13 +566,14 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 	}
 
 	pre := defaultLink(links, deployable)
+	where := string(req.platform()) + " deployment "
 	choices := make([]Choice, 0, len(deployable))
 	for _, name := range linksFirst(deployable, links) {
-		choices = append(choices, Choice{Name: name, Where: "astro deployment " + links[name].Deployment})
+		choices = append(choices, Choice{Name: name, Where: where + links[name].Deployment})
 	}
 	unlinked := unlinkedDeployments(req, d, links)
 	for _, name := range unlinked.names {
-		choices = append(choices, Choice{Name: name, Where: "astro deployment " + unlinked.byName[name].ID, Unlinked: true})
+		choices = append(choices, Choice{Name: name, Where: where + unlinked.byName[name].ID, Unlinked: true})
 	}
 	name, err := d.ConfirmTarget(choices, pre)
 	if err != nil {
@@ -531,7 +583,7 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		return Target{}, ErrAborted
 	}
 	if link, ok := links[name]; ok {
-		return astroTarget(req, name, link, links)
+		return linkTarget(req, name, link, links)
 	}
 	if dep, ok := unlinked.byName[name]; ok {
 		return linkedTarget(req, name, dep), nil
@@ -582,7 +634,7 @@ func unlinkedDeployments(req Request, d Deployer, links map[string]manifest.Link
 	}
 	linked := map[string]bool{}
 	for name := range links {
-		if l := links[name]; isAstroLink(l) {
+		if l := links[name]; req.deploysTo(l) {
 			linked[l.Deployment] = true
 		}
 	}
@@ -652,19 +704,26 @@ func linkedTarget(req Request, name string, dep Deployment) Target {
 	target.LinkName = name
 	target.newLink = &scaffold.Link{
 		Name:       name,
-		Kind:       manifest.KindAstro,
+		Kind:       req.platform(),
 		Workspace:  dep.WorkspaceID,
 		Deployment: dep.ID,
+	}
+	if req.platform() == manifest.KindAPC {
+		// An apc link names its own domain and workspace, and inherits
+		// neither: the workspace is the one the Deployment was listed from.
+		target.newLink.Domain = req.Domain
+		target.newLink.Workspace = target.WorkspaceID
 	}
 	return target
 }
 
 // listWorkspace is the workspace a deploy lists Deployments from, for the
 // prompt's unlinked entries and for a project that links nothing alike:
-// --workspace, else [tool.astro] workspace, else the login's.
+// --workspace, else [tool.astro] workspace, else the login's. [tool.astro]
+// workspace is an Astro workspace, so an Astro Private Cloud deploy skips it.
 func listWorkspace(req Request) string {
 	project := ""
-	if req.Manifest != nil {
+	if req.Manifest != nil && req.platform() == manifest.KindAstro {
 		project = req.Manifest.Astro.Workspace
 	}
 	return firstNonEmpty(req.WorkspaceID, project, req.ContextWorkspace)
@@ -703,7 +762,7 @@ func resolveNamed(req Request, links map[string]manifest.Link) (Target, bool, er
 // exactly that — so a CI job that passes an id keeps working.
 func namedTarget(req Request, name string, links map[string]manifest.Link) (Target, error) {
 	if link, ok := links[name]; ok {
-		return astroTarget(req, name, link, links)
+		return linkTarget(req, name, link, links)
 	}
 	return Target{
 		DeploymentID: name,
@@ -772,12 +831,21 @@ func defaultLink(links map[string]manifest.Link, deployable []string) string {
 	return ""
 }
 
-// astroTarget turns a resolved link into a target. Only an astro link can be
-// deployed to today: this command ships an image to an Astro Deployment, and an
-// mwaa or composer link has no deployment id to ship it to.
-func astroTarget(req Request, name string, link manifest.Link, links map[string]manifest.Link) (Target, error) {
-	if kind := link.Kind(); kind != manifest.KindAstro {
-		return Target{}, fmt.Errorf("link %q is %s, and astro deploy ships to Astro Deployments%s", name, kind, deployableLinks(links))
+// linkTarget turns a resolved link into a target. Only a link of the deploy's
+// platform can be deployed to: this command ships an image to an Astro
+// Deployment, or under an Astro Private Cloud context to one of that
+// platform's Deployments, and an mwaa or composer link has no deployment id
+// to ship it to. An apc link on another domain than the one the deploy runs
+// under is one this login does not reach.
+func linkTarget(req Request, name string, link manifest.Link, links map[string]manifest.Link) (Target, error) {
+	switch kind := link.Kind(); {
+	case kind != req.platform():
+		return Target{}, fmt.Errorf("link %q is %s, and astro deploy ships to %s%s", name, kind, req.shipsTo(), deployableLinks(req, links))
+	case kind == manifest.KindAPC && link.Domain != req.Domain:
+		if req.OtherDomain != nil {
+			return Target{}, req.OtherDomain(name, link.Domain)
+		}
+		return Target{}, fmt.Errorf("link %q is on %s, and this deploy runs under %s", name, link.Domain, req.Domain)
 	}
 	return Target{
 		DeploymentID: link.Deployment,
@@ -786,20 +854,23 @@ func astroTarget(req Request, name string, link manifest.Link, links map[string]
 	}, nil
 }
 
-// DeployableLinks names the links astro deploy can ship to, sorted.
+// DeployableLinks names the links astro deploy can ship to on Astro, sorted.
 func DeployableLinks(links map[string]manifest.Link) []string {
-	return linkNames(links, isAstroLink)
+	return linkNames(links, func(l manifest.Link) bool { return l.Kind() == manifest.KindAstro })
 }
 
-func isAstroLink(l manifest.Link) bool { return l.Kind() == manifest.KindAstro }
-
-// nonAstroLinks names what a project full of unshippable links actually
+// describeLinks names what a project full of unshippable links actually
 // declares, so the refusal above says what is there rather than only what is
-// not.
-func nonAstroLinks(links map[string]manifest.Link) string {
+// not. An apc link says which domain it is on.
+func describeLinks(links map[string]manifest.Link) string {
 	named := make([]string, 0, len(links))
 	for _, name := range linkNames(links, nil) {
-		named = append(named, fmt.Sprintf("%s is %s", name, links[name].Kind()))
+		l := links[name]
+		if l.Kind() == manifest.KindAPC {
+			named = append(named, fmt.Sprintf("%s is apc on %s", name, l.Domain))
+			continue
+		}
+		named = append(named, fmt.Sprintf("%s is %s", name, l.Kind()))
 	}
 	return " (" + strings.Join(named, ", ") + ")"
 }
@@ -813,12 +884,21 @@ func knownLinks(links map[string]manifest.Link) string {
 
 // deployableLinks lists the links this command can ship to, for the message
 // that turns one away.
-func deployableLinks(links map[string]manifest.Link) string {
-	astro := linkNames(links, func(l manifest.Link) bool { return l.Kind() == manifest.KindAstro })
-	if len(astro) == 0 {
-		return " (this project has no astro links)"
+func deployableLinks(req Request, links map[string]manifest.Link) string {
+	names := linkNames(links, req.deploysTo)
+	if len(names) == 0 {
+		return fmt.Sprintf(" (this project has no %s links%s)", req.platform(), onDomain(req))
 	}
-	return ", astro links: " + strings.Join(astro, ", ")
+	return fmt.Sprintf(", %s links%s: %s", req.platform(), onDomain(req), strings.Join(names, ", "))
+}
+
+// onDomain is " on <domain>" for an Astro Private Cloud deploy, whose links
+// count only on the domain it runs under, and "" for an astro one.
+func onDomain(req Request) string {
+	if req.platform() == manifest.KindAPC {
+		return " on " + req.Domain
+	}
+	return ""
 }
 
 // linkNames lists the links keep accepts, sorted; a nil keep takes all of them.

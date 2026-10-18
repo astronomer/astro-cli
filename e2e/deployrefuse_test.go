@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -320,6 +321,19 @@ func addAstroKey(t *testing.T, p *project, line string) {
 	write(t, path, strings.Replace(raw, anchor, anchor+line+"\n", 1))
 }
 
+// addAPCLink links the project to an apc Deployment on domain.
+func addAPCLink(t *testing.T, p *project, name, domain string) {
+	t.Helper()
+	addLink(t, p, fmt.Sprintf("[tool.astro.deployments.%s]\ntarget = \"apc\"\ndomain = %q\nworkspace = \"ws\"\ndeployment = \"dep-%s\"\n", name, domain, name))
+}
+
+// addLink appends a link's table to the project's manifest.
+func addLink(t *testing.T, p *project, table string) {
+	t.Helper()
+	path := filepath.Join(p.Dir, "pyproject.toml")
+	write(t, path, read(t, path)+"\n"+table)
+}
+
 // The runtime image's install step mounts a netrc secret, so a generated
 // build takes one without a declared Dockerfile.
 func TestDeployTakesANetrcBuildSecretWithoutADockerfile(t *testing.T) {
@@ -335,14 +349,19 @@ func TestDeployTakesANetrcBuildSecretWithoutADockerfile(t *testing.T) {
 	}
 }
 
-// On Astro Private Cloud v2 builds no project yet: a deploy that would build
-// one is refused, saying to use Astro CLI 1.x, before Houston is asked
-// anything, and a project in the 1.x layout makes no deploy at all. The
-// login is to a Houston that refuses every connection, so a refusal that
-// came after a request would read as a connection error instead.
-func TestAPCDeployRefusesToBuild(t *testing.T) {
+// On Astro Private Cloud a project in the 1.x layout makes no deploy at all,
+// saying to use Astro CLI 1.x, and a build with no project to build is
+// refused; a pyproject.toml project's deploy refuses, before Houston is
+// asked anything, to pick a Deployment for you or to reach a link on another
+// installation. The login is to a Houston that refuses every connection, so
+// a refusal that came after a request would read as a connection error
+// instead.
+func TestAPCDeployRefusesWhatItCannotDeploy(t *testing.T) {
 	tier(t, 0)
 
+	initProject := func(t *testing.T, p *project) {
+		p.forT(t).run("init", "--name", "deployable").requireSuccess()
+	}
 	for _, tc := range []struct {
 		name  string
 		setup func(t *testing.T, p *project)
@@ -353,10 +372,16 @@ func TestAPCDeployRefusesToBuild(t *testing.T) {
 		{"a 1.x project", make1xProject, []string{"deploy", "dep-id"}, []string{"Astro CLI 1.x layout", "Deploy it with Astro CLI 1.x"}, "no_project"},
 		{"--image-name from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--image-name", "img:1"}, []string{"Astro CLI 1.x layout"}, "no_project"},
 		{"--dags from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--dags"}, []string{"Astro CLI 1.x layout", "does not deploy to Astro Private Cloud"}, "no_project"},
-		{"a pyproject.toml project", func(t *testing.T, p *project) {
-			p.forT(t).run("init", "--name", "deployable").requireSuccess()
-		}, []string{"deploy", "dep-id"}, []string{"cannot build and deploy projects to Astro Private Cloud yet", "use Astro CLI 1.x", "pyproject.toml projects on Astro Private Cloud is coming"}, "usage"},
-		{"outside any project", func(*testing.T, *project) {}, []string{"deploy", "dep-id"}, []string{"cannot build and deploy projects to Astro Private Cloud yet", "--image-name"}, "no_project"},
+		{"a pyproject.toml project's deploy that names no Deployment", initProject, []string{"deploy"}, []string{"this project links no deployment and this run cannot be asked", "--deployment"}, "input_required"},
+		{"an apc link on another installation", func(t *testing.T, p *project) {
+			initProject(t, p)
+			addAPCLink(t, p, "elsewhere", "astro.other.example")
+		}, []string{"deploy", "elsewhere"}, []string{`link "elsewhere" is on astro.other.example`, "astro login astro.other.example"}, ""},
+		{"an astro link", func(t *testing.T, p *project) {
+			initProject(t, p)
+			addLink(t, p, "[tool.astro.deployments.cloud]\nworkspace = \"ws\"\ndeployment = \"dep-cloud\"\n")
+		}, []string{"deploy", "cloud"}, []string{`link "cloud" is astro, and astro deploy ships to Astro Private Cloud Deployments on localhost`}, ""},
+		{"outside any project", func(*testing.T, *project) {}, []string{"deploy", "dep-id"}, []string{"this is not an Astro project directory"}, "no_project"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// With the keyring stamped unavailable, as the json walk's

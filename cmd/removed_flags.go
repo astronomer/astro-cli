@@ -44,7 +44,6 @@ const (
 	// Astro CLI 1.x, flags and all.
 	errDeploySaveRemoved = "--save was removed in Astro CLI v2: astro deploy asks which Deployment to deploy to unless you name one, as the argument or with --deployment. " +
 		"To preselect one in that list, link it with astro link add and mark it default = true under [tool.astro.deployments]"
-	errAPCDeploySaveRemoved    = "--save was removed in Astro CLI v2: name the Deployment on each deploy, as the argument"
 	errDeployPytestRemoved     = "--pytest was removed in Astro CLI v2: run your tests before deploying, with uv run pytest && astro deploy"
 	errDeployTestRemoved       = "--test was removed in Astro CLI v2: run your tests before deploying, with uv run pytest <path> && astro deploy"
 	errDeployEnvRemoved        = "--env was removed in Astro CLI v2: astro deploy runs no tests, so it reads no test env file. Run your tests with uv run pytest before deploying"
@@ -59,8 +58,8 @@ const (
 	errDeployNonDagsMountPathRemoved  = "--non-dags-mount-path was removed in Astro CLI v2: use astro deploy bundle --mount-path"
 	errDeployNonDagsLocalPathRemoved  = "--non-dags-local-path was removed in Astro CLI v2: pass the bundle's directory as the argument, astro deploy bundle <PATH>"
 	errDeployNonDagsBundleTypeRemoved = "--non-dags-bundle-type was removed in Astro CLI v2: use astro deploy bundle --type, which detects a dbt project by itself"
-	errAPCDeployNoCache               = "--no-cache was removed in Astro CLI v2: Astro CLI v2 builds no image for Astro Private Cloud. " +
-		"Build and deploy the project with Astro CLI 1.x"
+	errAPCDeployNoCache               = "--no-cache was removed in Astro CLI v2: astro deploy builds on the container engine's cache, which a changed dependency or file invalidates. " +
+		"To build from nothing, clear the engine's build cache first, with docker builder prune"
 )
 
 // removedFlag is what a run passing a flag Astro CLI 1.x had and v2 dropped
@@ -130,7 +129,6 @@ var removedFlags = []removedFlag{
 	// astro deploy's 1.x-project flags. Astro's deploy has --deployment for
 	// --save to point at; APC's names its Deployment by the argument alone.
 	{name: "save", under: []string{"deploy"}, needs: has("deployment"), msg: errDeploySaveRemoved},
-	{name: "save", under: []string{"deploy"}, msg: errAPCDeploySaveRemoved},
 	{name: "pytest", under: []string{"deploy"}, msg: errDeployPytestRemoved},
 	{name: "test", under: []string{"deploy"}, msg: errDeployTestRemoved},
 	{name: "env", under: []string{"deploy"}, msg: errDeployEnvRemoved},
