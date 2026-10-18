@@ -115,12 +115,12 @@ var (
 
 	createExampleDagDeployment = `
 
-  # Create one that reads its DAGs from an NFS volume
+  # Create one that reads its Dags from an NFS volume
   astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
     --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
 	createExampleDagDeploymentAPCV1 = `
 
-  # Create one that reads its DAGs from an NFS volume
+  # Create one that reads its Dags from an NFS volume
   astro deployment create --label=my-deployment --executor=kubernetes --airflow-version=2.4.1 \
     --dag-deployment-type=volume --nfs-location=<IP>:/<PATH> --cluster-id=<CLUSTER_ID>`
 
@@ -403,7 +403,7 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
   astro deployment update <DEPLOYMENT_ID> --label=my-deployment`
 	updateExampleDagDeployment := `
 
-  # Read its DAGs from an NFS volume
+  # Read its Dags from an NFS volume
   astro deployment update <DEPLOYMENT_ID> --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
 	cmd := &cobra.Command{
 		Use:     "update <DEPLOYMENT_ID>",

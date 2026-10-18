@@ -334,7 +334,7 @@ func Run(req Request, d Deployer) (Result, error) {
 		if req.ImageName != "" {
 			passed = append(passed, "--image-name")
 		}
-		return Result{}, fmt.Errorf("--dags deploys only your DAGs; drop %s", strings.Join(passed, " and "))
+		return Result{}, fmt.Errorf("--dags deploys only your Dags; drop %s", strings.Join(passed, " and "))
 	}
 	// Also before anything is asked: a project whose image source is refused
 	// should not first make someone pick where to ship it.

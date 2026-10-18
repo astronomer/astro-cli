@@ -337,7 +337,7 @@ func TestDeployManifestTextUnchanged(t *testing.T) {
 	// stdout is this command's own output: the progress line, the summary, the
 	// URL — and nothing else.
 	want := "Building your project image, this can take a few minutes...\n" +
-		"Deployed image (tag deploy-2026-07-23T18-40) and DAGs (version 3-1690000000) to prod (deployment clx-dep).\n" +
+		"Deployed image (tag deploy-2026-07-23T18-40) and Dags (version 3-1690000000) to prod (deployment clx-dep).\n" +
 		"Deployment: https://cloud.astronomer.io/deployments/clx-dep\n"
 	assert.Equal(t, want, out)
 	// The target goes on stderr, the way every resolving command announces one.
@@ -356,8 +356,8 @@ func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
 	out, _, err := execDeployIO("", "prod")
 	require.NoError(t, err)
-	assert.Contains(t, out, "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep), with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.\n")
-	assert.NotContains(t, out, "DAGs (version")
+	assert.Contains(t, out, "Deployed image (tag deploy-2026-07-23T18-40) to prod (deployment clx-dep), with the Dags inside the image: its Dag deploys are off, so no Dags were uploaded.\n")
+	assert.NotContains(t, out, "Dags (version")
 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
 	out, err = execDeployCapture("prod", "--output", "json")
@@ -372,7 +372,7 @@ func TestDeployManifestSaysTheDagsAreInsideTheImage(t *testing.T) {
 // here the transport's warning for a prebuilt image deployed to a Deployment
 // with DAG deploys off (#2306).
 func TestDeployManifestJSONCarriesTheTransportsWarnings(t *testing.T) {
-	const w = "astro deployment clx-dep has DAG deploys off, so it will run the DAGs inside img:1; no DAGs are uploaded"
+	const w = "astro deployment clx-dep has Dag deploys off, so it will run the Dags inside img:1; no Dags are uploaded"
 	img := manifestdeploy.ImageResult{WorkspaceID: "clw-ws", ImageTag: "img-1", DagsInImage: true}
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img, warn: w})
 	out, errOut, err := execDeployIO("", "prod", "--image-name", "img:1", "--output", "json")
@@ -410,7 +410,7 @@ func TestDeployManifestSaysNoDagsWentToARemoteExecutionDeployment(t *testing.T) 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
 	out, _, err := execDeployIO("", "prod")
 	require.NoError(t, err)
-	assert.Contains(t, out, "Deployed image (tag deploy-2026) to prod (deployment clx-dep). It runs remote execution with DAG deploys off, so no DAGs were uploaded.\n")
+	assert.Contains(t, out, "Deployed image (tag deploy-2026) to prod (deployment clx-dep). It runs remote execution with Dag deploys off, so no Dags were uploaded.\n")
 
 	setupManifestDeploy(t, &fakeCmdDeployer{img: img})
 	out, err = execDeployCapture("prod", "--output", "json")

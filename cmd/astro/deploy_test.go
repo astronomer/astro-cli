@@ -160,7 +160,7 @@ func TestDeployImageNameOutsideAProject(t *testing.T) {
 		imageDeployer(t, fake)
 		deployIn(t, t.TempDir())
 		err := execDeployCmd(actionDeploymentID, "--image-name", "img:1", "--dags")
-		assert.EqualError(t, err, "--dags deploys only your DAGs; drop --image-name")
+		assert.EqualError(t, err, "--dags deploys only your Dags; drop --image-name")
 		assert.Nil(t, fake.imgInput)
 		assert.Nil(t, fake.dagInput)
 	})

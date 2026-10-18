@@ -118,11 +118,11 @@ func newAssetsEventsCmd(q *query) *cobra.Command {
 		Use:   "events",
 		Short: "List asset updates and the runs they started",
 		Long: "List the events that updated an asset. An event is what a task wrote, and it is what starts the " +
-			"DAGs scheduled on that asset — so this is the answer to why a data-aware DAG ran.",
+			"Dags scheduled on that asset — so this is the answer to why a data-aware Dag ran.",
 		Args: cobra.NoArgs,
 		Example: afExample(q.t,
 			"List the latest asset updates", "assets events",
-			"Only the updates one DAG produced", "assets events --dag-id <DAG_ID>",
+			"Only the updates one Dag produced", "assets events --dag-id <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return q.runAssetsEvents(cmd.Context(), airflowapi.ListAssetEventsOptions{
@@ -136,7 +136,7 @@ func newAssetsEventsCmd(q *query) *cobra.Command {
 	// Most recent first, for the same reason `astro af runs list` sorts that way:
 	// the question behind an event listing is nearly always "what just changed".
 	addListFlags(cmd, &list, "-timestamp")
-	cmd.Flags().StringVar(&source.dagID, "dag-id", "", "Only events produced by this DAG")
+	cmd.Flags().StringVar(&source.dagID, "dag-id", "", "Only events produced by this Dag")
 	cmd.Flags().StringVarP(&source.runID, "run-id", "r", "", "Only events produced by this run")
 	cmd.Flags().StringVar(&source.taskID, "task-id", "", "Only events produced by this task")
 	return cmd
@@ -193,7 +193,7 @@ func newAssetsTriggersCmd(q *query) *cobra.Command {
 		Use:   "triggers <DAG_ID> <RUN_ID>",
 		Short: "List the asset updates that started a run",
 		Long: "List the asset events a run was waiting on: the updates that made the scheduler start this run of " +
-			"a data-aware DAG. A run the schedule or a person started lists none.",
+			"a data-aware Dag. A run the schedule or a person started lists none.",
 		Args: cobra.ExactArgs(2),
 		Example: afExample(q.t,
 			"List the asset updates that started a run", "assets triggers <DAG_ID> <RUN_ID>",

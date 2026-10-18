@@ -26,7 +26,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		Use:     "bundle",
 		Aliases: []string{"bundles"},
 		Short:   "Manage the Dag and non-Dag bundles on an Astro Deployment",
-		Long:    "Manage the bundles registered on an Astro Deployment. Dag bundles carry Dags and are targeted by 'astro deploy --dag-bundle-name'; non-Dag bundles mount other content (e.g. dbt projects) at a path.",
+		Long:    "Manage the bundles registered on an Astro Deployment. Dag bundles carry Dags; Astro CLI v2 does not deploy to a named Dag bundle yet. Non-Dag bundles mount other content (e.g. dbt projects) at a path, and 'astro deploy bundle' deploys them.",
 	}
 	cmd.SetOut(out)
 	cliout.AddOutputFlag(cmd, &bundleOutput)

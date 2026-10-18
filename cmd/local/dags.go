@@ -17,8 +17,8 @@ import (
 func newDagsCmd(d Deps, t target) *cobra.Command {
 	return newQueryCmd(d, t, &cobra.Command{
 		Use:   "dags",
-		Short: "List and control the DAGs on an Airflow",
-		Long: "Read and control the DAGs on " + t.which() + ": list them, read one, " +
+		Short: "List and control the Dags on an Airflow",
+		Long: "Read and control the Dags on " + t.which() + ": list them, read one, " +
 			"print its source, explore it, count its runs by state, list the files that failed to parse and " +
 			"the scheduler's warnings, and pause or unpause it.",
 	},
@@ -94,12 +94,12 @@ func newDagsListCmd(q *query) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List the DAGs on this Airflow",
+		Short: "List the Dags on this Airflow",
 		Args:  cobra.NoArgs,
 		Example: afExample(q.t,
-			"List the DAGs", "dags list",
+			"List the Dags", "dags list",
 			"Only the paused ones, as JSON", "dags list --paused -o json",
-			"Only the DAGs tagged etl", "dags list -t etl",
+			"Only the Dags tagged etl", "dags list -t etl",
 		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			o := airflowapi.ListDAGsOptions{
@@ -132,15 +132,15 @@ func newDagsListCmd(q *query) *cobra.Command {
 		},
 	}
 	addListFlags(cmd, &list, "")
-	cmd.Flags().StringSliceVarP(&opts.tags, "tags", "t", nil, "Keep only DAGs carrying one of these tags (repeatable)")
-	cmd.Flags().StringVar(&opts.pattern, "dag-id-pattern", "", "Keep only DAGs whose id contains this")
-	cmd.Flags().BoolVar(&opts.paused, "paused", false, "Keep only paused DAGs")
-	cmd.Flags().BoolVar(&opts.notPaused, "not-paused", false, "Keep only DAGs that are not paused")
+	cmd.Flags().StringSliceVarP(&opts.tags, "tags", "t", nil, "Keep only Dags carrying one of these tags (repeatable)")
+	cmd.Flags().StringVar(&opts.pattern, "dag-id-pattern", "", "Keep only Dags whose id contains this")
+	cmd.Flags().BoolVar(&opts.paused, "paused", false, "Keep only paused Dags")
+	cmd.Flags().BoolVar(&opts.notPaused, "not-paused", false, "Keep only Dags that are not paused")
 	cmd.MarkFlagsMutuallyExclusive("paused", "not-paused")
 	cmd.Flags().BoolVar(&opts.onlyActive, "only-active", false,
-		"Keep only DAGs whose file the scheduler still sees (Airflow's default)")
+		"Keep only Dags whose file the scheduler still sees (Airflow's default)")
 	cmd.Flags().BoolVar(&opts.includeInactive, "include-inactive", false,
-		"Also list DAGs whose file is gone, which Airflow otherwise leaves out")
+		"Also list Dags whose file is gone, which Airflow otherwise leaves out")
 	cmd.MarkFlagsMutuallyExclusive("only-active", "include-inactive")
 	return cmd
 }
@@ -159,7 +159,7 @@ func (q *query) runDagsList(ctx context.Context, opts airflowapi.ListDAGsOptions
 }
 
 func renderDAGTable(w io.Writer, rows []dagRow) error {
-	return renderTable(w, rows, "No DAGs on this Airflow.",
+	return renderTable(w, rows, "No Dags on this Airflow.",
 		[]string{"DAG_ID", "PAUSED", "SCHEDULE", "OWNERS", "TAGS", "NEXT_RUN"},
 		func(row dagRow) []string {
 			return []string{
@@ -176,10 +176,10 @@ func renderDAGTable(w io.Writer, rows []dagRow) error {
 func newDagsGetCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <DAG_ID>",
-		Short: "Show one DAG's schedule, owners, tags, and file",
+		Short: "Show one Dag's schedule, owners, tags, and file",
 		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
-			"Show one DAG", "dags get <DAG_ID>",
+			"Show one Dag", "dags get <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsGet(cmd.Context(), args[0])
@@ -220,12 +220,12 @@ func dagFields(row dagRow) []field {
 func newDagsSourceCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "source <DAG_ID>",
-		Short: "Print a DAG's source file",
-		Long: "Print the Python source Airflow parsed for this DAG. It comes from that Airflow, not from your " +
+		Short: "Print a Dag's source file",
+		Long: "Print the Python source Airflow parsed for this Dag. It comes from that Airflow, not from your " +
 			"checkout, so it is what is actually running there.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
-			"Print the source Airflow parsed for a DAG", "dags source <DAG_ID>",
+			"Print the source Airflow parsed for a Dag", "dags source <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsSource(cmd.Context(), args[0])
@@ -259,20 +259,20 @@ func newDagsStatsCmd(q *query) *cobra.Command {
 	var dagIDs []string
 	cmd := &cobra.Command{
 		Use:   "stats [DAG_ID]...",
-		Short: "Count each DAG's runs by state",
-		Long: "Count the runs of each DAG by state, for the DAGs named as arguments or with --dag-id. With none " +
-			"named it covers every DAG, which on Airflow 2 means listing the DAGs first because that generation " +
+		Short: "Count each Dag's runs by state",
+		Long: "Count the runs of each Dag by state, for the Dags named as arguments or with --dag-id. With none " +
+			"named it covers every Dag, which on Airflow 2 means listing the Dags first because that generation " +
 			"refuses the endpoint without ids.",
 		Args: cobra.ArbitraryArgs,
 		Example: afExample(q.t,
-			"Count every DAG's runs by state", "dags stats",
-			"Only these two DAGs", "dags stats <DAG_ID> <OTHER_DAG_ID>",
+			"Count every Dag's runs by state", "dags stats",
+			"Only these two Dags", "dags stats <DAG_ID> <OTHER_DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runDagsStats(cmd.Context(), slices.Compact(slices.Sorted(slices.Values(append(dagIDs, args...)))))
 		},
 	}
-	cmd.Flags().StringSliceVar(&dagIDs, "dag-id", nil, "Count only these DAGs, the same as naming them as arguments (repeatable)")
+	cmd.Flags().StringSliceVar(&dagIDs, "dag-id", nil, "Count only these Dags, the same as naming them as arguments (repeatable)")
 	return cmd
 }
 
@@ -310,7 +310,7 @@ func (q *query) runDagsStats(ctx context.Context, dagIDs []string) error {
 	}
 	stats, err := client.DAGStats(ctx, dagIDs)
 	if err != nil {
-		return notServed("DAG run statistics", err)
+		return notServed("Dag run statistics", err)
 	}
 	rows := dagStatRows(stats)
 	return emitRows(r, rows, len(rows), newDAGStatList, renderDAGStatsTable)
@@ -344,7 +344,7 @@ func renderDAGStatsTable(w io.Writer, rows []dagStatRow) error {
 	}
 	sort.Strings(columns)
 	headers := append([]string{"DAG_ID"}, upperAll(columns)...)
-	return renderTable(w, rows, "No DAG run statistics on this Airflow.", headers,
+	return renderTable(w, rows, "No Dag run statistics on this Airflow.", headers,
 		func(row dagStatRow) []string {
 			cells := make([]string, 0, len(columns)+1)
 			cells = append(cells, row.DAGID)
@@ -367,10 +367,10 @@ func upperAll(values []string) []string {
 func newDagsPauseCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "pause <DAG_ID>",
-		Short: "Stop the scheduler from creating new runs of a DAG",
+		Short: "Stop the scheduler from creating new runs of a Dag",
 		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
-			"Stop the scheduler from creating runs of a DAG", "dags pause <DAG_ID>",
+			"Stop the scheduler from creating runs of a Dag", "dags pause <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runSetPaused(cmd.Context(), args[0], (*airflowapi.Client).PauseDAG)
@@ -381,10 +381,10 @@ func newDagsPauseCmd(q *query) *cobra.Command {
 func newDagsUnpauseCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "unpause <DAG_ID>",
-		Short: "Let the scheduler create runs of a DAG again",
+		Short: "Let the scheduler create runs of a Dag again",
 		Args:  cobra.ExactArgs(1),
 		Example: afExample(q.t,
-			"Let the scheduler create runs of a DAG again", "dags unpause <DAG_ID>",
+			"Let the scheduler create runs of a Dag again", "dags unpause <DAG_ID>",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return q.runSetPaused(cmd.Context(), args[0], (*airflowapi.Client).UnpauseDAG)

@@ -76,7 +76,7 @@ func newUpgradeAirflowCmd(c *cli) *cobra.Command {
 			"  astro local upgrade airflow\n\n" +
 			"  # Move to a given version\n" +
 			"  astro local upgrade airflow 3.1\n\n" +
-			"  # Upgrade, then start Otto to update the DAGs and providers for it\n" +
+			"  # Upgrade, then start Otto to update the Dags and providers for it\n" +
 			"  astro local upgrade airflow --with-otto",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

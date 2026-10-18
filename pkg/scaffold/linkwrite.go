@@ -42,7 +42,7 @@ const BundleLinkName = "bundle"
 
 // ErrBundleLinkName is SaveLink refusing BundleLinkName. It wraps
 // ErrInvalidLink.
-var ErrBundleLinkName = fmt.Errorf("%w: %s cannot name a link: astro deploy %s deploys a non-DAG bundle, "+
+var ErrBundleLinkName = fmt.Errorf("%w: %s cannot name a link: astro deploy %s deploys a non-Dag bundle, "+
 	"so astro deploy %s would never reach the link. Name the link something else", ErrInvalidLink, BundleLinkName, BundleLinkName, BundleLinkName)
 
 // ErrComposerProjectRequired and ErrComposerLocationRequired report a Composer

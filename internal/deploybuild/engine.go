@@ -13,7 +13,7 @@ import (
 // errNoDocker is the plain, actionable message for the no-Docker user
 // (docs/deploy.md, section 5). An image deploy needs a container builder;
 // dags-only does not.
-var errNoDocker = errors.New("an image deploy needs Docker, but no running container engine was found. Start Docker and try again, or run 'astro deploy --dags' to deploy just your DAGs (no Docker needed). Server-side builds are coming")
+var errNoDocker = errors.New("an image deploy needs Docker, but no running container engine was found. Start Docker and try again, or run 'astro deploy --dags' to deploy just your Dags (no Docker needed). Server-side builds are coming")
 
 // errNoResolver is a caller's mistake: EnsureEngine was given no way to pick
 // the container engine.
@@ -34,7 +34,7 @@ func EnsureEngine(ctx context.Context, cmd imagebuild.Commander, resolve func() 
 	}
 	bin, env, err = resolve()
 	if errors.Is(err, container.ErrMachineNotRunning) {
-		return "", nil, fmt.Errorf("an image deploy needs a running container engine, but %w. Or run 'astro deploy --dags' to deploy just your DAGs (no container engine needed)", err)
+		return "", nil, fmt.Errorf("an image deploy needs a running container engine, but %w. Or run 'astro deploy --dags' to deploy just your Dags (no container engine needed)", err)
 	}
 	if err != nil {
 		return "", nil, errNoDocker

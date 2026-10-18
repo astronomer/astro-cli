@@ -79,7 +79,7 @@ func TestDeployManifestImage_DagDeployOffRefusesImageOnly(t *testing.T) {
 				IncludeDags:  false,
 			}, client)
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "--image deploys the image and leaves the running DAGs in place")
+			assert.Contains(t, err.Error(), "--image deploys the image and leaves the running Dags in place")
 			assert.Contains(t, err.Error(), "astro deployment update test-deployment-id --dag-deploy enable")
 			assert.False(t, hasImageCall(cmd.calls, "build --tag"), "nothing is built, got %v", cmd.calls)
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -129,7 +129,7 @@ func TestDeployManifestImage_DagDeployOffRefusesAnImageWithoutDags(t *testing.T)
 			IncludeDags:  true,
 		}, client)
 		require.Error(t, err, rules)
-		assert.Contains(t, err.Error(), "leaves out every DAG file under dags/", rules)
+		assert.Contains(t, err.Error(), "leaves out every Dag file under dags/", rules)
 		assert.False(t, hasImageCall(cmd.calls, "build --tag"), "%q: nothing is built, got %v", rules, cmd.calls)
 		client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	}
@@ -179,7 +179,7 @@ func TestDeployManifestImage_DagDeployOffWarnsForAPrebuiltImage(t *testing.T) {
 	}, client)
 	require.NoError(t, err)
 	assert.True(t, res.DagsInImage)
-	assert.Equal(t, []string{"astro deployment test-deployment-id has DAG deploys off, so it will run the DAGs inside astro-package/demo:3.1-2-abc; no DAGs are uploaded"}, warned)
+	assert.Equal(t, []string{"astro deployment test-deployment-id has Dag deploys off, so it will run the Dags inside astro-package/demo:3.1-2-abc; no Dags are uploaded"}, warned)
 }
 
 // A declared Dockerfile whose ignore file drops dags/ may put DAGs in the
@@ -204,8 +204,8 @@ func TestDeployManifestImage_DagDeployOffWarnsForADeclaredDockerfileWithoutDags(
 	require.NoError(t, err)
 	assert.True(t, res.DagsInImage)
 	require.Len(t, warned, 1)
-	assert.Contains(t, warned[0], "leaves out every DAG file under dags/")
-	assert.Contains(t, warned[0], "whatever DAGs Dockerfile itself puts in the image")
+	assert.Contains(t, warned[0], "leaves out every Dag file under dags/")
+	assert.Contains(t, warned[0], "whatever Dags Dockerfile itself puts in the image")
 
 	// The same Dockerfile, its ignore file leaving dags/ in: nothing to say.
 	require.NoError(t, os.Remove(filepath.Join(dir, ".dockerignore")))
@@ -287,5 +287,5 @@ func TestDeployManifestImage_DagDeployOffReadsTheGivenSurvey(t *testing.T) {
 		IncludeDags:  true,
 		Survey:       &imagebuild.ProjectSurvey{DagsOnDisk: 1},
 	}, client)
-	require.ErrorContains(t, err, "leaves out every DAG file under dags/", "the given survey, which carries no DAGs, was read")
+	require.ErrorContains(t, err, "leaves out every Dag file under dags/", "the given survey, which carries no Dags, was read")
 }

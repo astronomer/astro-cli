@@ -54,8 +54,8 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 	var timeout, poll string
 	cmd := &cobra.Command{
 		Use:   "trigger-wait <DAG_ID>",
-		Short: "Start a run of a DAG and wait for it to finish",
-		Long: "Start a run of a DAG, as " + q.t.suggest("runs trigger") + " does, then check on it every --poll-interval until it " +
+		Short: "Start a run of a Dag and wait for it to finish",
+		Long: "Start a run of a Dag, as " + q.t.suggest("runs trigger") + " does, then check on it every --poll-interval until it " +
 			"succeeds, fails, or --timeout passes. A failed run is reported with the task instances that failed " +
 			"or never ran because something upstream did.\n\n" +
 			"--timeout and --poll-interval take a number of seconds (300) or a duration (5m, 1h30m).\n\n" +
@@ -63,7 +63,7 @@ func newRunsTriggerWaitCmd(q *query) *cobra.Command {
 			"command itself did), " + strconv.Itoa(exitWaitTimeout) + " when the wait timed out with the run " +
 			"still going. The run is reported in every case, and a timeout leaves it running: stopping the wait " +
 			"does not stop the run.\n\n" +
-			"A paused DAG is unpaused first, as " + q.t.suggest("runs trigger") + " does, or the wait would last until the timeout " +
+			"A paused Dag is unpaused first, as " + q.t.suggest("runs trigger") + " does, or the wait would last until the timeout " +
 			"for a run that is never scheduled.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,

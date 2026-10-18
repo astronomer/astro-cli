@@ -280,7 +280,7 @@ func includeWarning(projectDir string) string {
 	if !dirHasFiles(filepath.Join(projectDir, "include")) {
 		return ""
 	}
-	return "include/ has files but is not shipped: MWAA and Composer have no include/ folder, so a DAG that imports from it will break. Move shared modules under dags/."
+	return "include/ has files but is not shipped: MWAA and Composer have no include/ folder, so a Dag that imports from it will break. Move shared modules under dags/."
 }
 
 // envChecklist renders the manifest's declared environment values as a plain

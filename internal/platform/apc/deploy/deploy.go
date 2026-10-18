@@ -368,7 +368,7 @@ func remoteDagsFrom(houstonClient houston.ClientInterface, wsID, deploymentID st
 	appCfgWs := resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, deploymentInfo)
 	appConfig, err := houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: deploymentInfo.ClusterID, WorkspaceUUID: appCfgWs, DeploymentUUID: deploymentID})
 	if err != nil {
-		logger.Debugf("could not read the cluster config to place the Deployment's DAGs: %s", err.Error())
+		logger.Debugf("could not read the cluster config to place the Deployment's Dags: %s", err.Error())
 		return dagsFrom(deploymentInfo, nil)
 	}
 	return dagsFrom(deploymentInfo, appConfig)

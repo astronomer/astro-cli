@@ -62,7 +62,7 @@ func TestDeployRefusesDagsWithImageName(t *testing.T) {
 	seen := deployMocks(t, deployPushed, nil)
 	run := runAPC(t, newAPCClient(), "", "deploy", "dep-ac", "--dags", "--image-name", "img:1", "-o", "json")
 	require.Error(t, run.err)
-	assert.EqualError(t, run.err, "--dags deploys only your DAGs; drop --image-name")
+	assert.EqualError(t, run.err, "--dags deploys only your Dags; drop --image-name")
 	assert.True(t, cliout.IsUsage(run.err))
 	assert.Zero(t, seen.dagUploads)
 
@@ -75,7 +75,7 @@ func TestDeployRefusesDagsWithImageName(t *testing.T) {
 		run = runAPC(t, newAPCClient(), "", args...)
 		require.Error(t, run.err, "%v", args)
 		assert.True(t, cliout.IsUsage(run.err), "%v", args)
-		assert.Contains(t, run.err.Error(), "--dags deploys only your DAGs; drop ", "%v", args)
+		assert.Contains(t, run.err.Error(), "--dags deploys only your Dags; drop ", "%v", args)
 		assert.Contains(t, run.err.Error(), "--remote", "%v", args)
 	}
 	assert.Zero(t, seen.dagUploads)

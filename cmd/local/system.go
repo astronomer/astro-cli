@@ -70,7 +70,7 @@ func newProvidersCmd(d Deps, t target) *cobra.Command {
 			Use:   "providers",
 			Short: "List the provider packages an Airflow has installed",
 			Long: "List every provider distribution installed on " + t.which() + ", with its version. It is what " +
-				"that Airflow actually has, which is the thing to check when a DAG imports a provider that the " +
+				"that Airflow actually has, which is the thing to check when a Dag imports a provider that the " +
 				"project pins one version of and the Airflow runs another.",
 			Args: cobra.NoArgs,
 			Example: afExample(t,
