@@ -35,6 +35,7 @@ func TestListedRuntimeRules(t *testing.T) {
 		{name: "an older build of a listed Airflow warns", current: "3.0-9", built: "3.1-4", listed: listed, wantWarn: "Astro Runtime 3.1-4 is not one the platform lists for this Deployment (3.1-5, 3.0-9, 12.1.1, 11.9.0)"},
 		{name: "unlisted with no current runtime warns", current: "", built: "3.1-4", listed: listed, wantWarn: "is not one the platform lists"},
 		{name: "a downgrade with no current runtime is not one", current: "", built: "11.9.0", listed: listed},
+		{name: "Airflow 3 where none is listed", current: "12.1.1", built: "3.1-5", listed: []string{"12.1.1", "11.9.0"}, wantErr: "cannot deploy Astro Runtime 3.1-5: Airflow 3 is not enabled for this Deployment (the platform lists only 12.1.1, 11.9.0). Ask the platform admin to enable Airflow 3 for it, or pin Airflow 2 in pyproject.toml"},
 		{name: "no list checks the downgrade alone", current: "3.0-9", built: "3.9-1"},
 		{name: "no list still refuses a downgrade", current: "3.0-9", built: "12.1.1", wantErr: "downgrade"},
 	}
@@ -73,6 +74,12 @@ func TestListedRuntimeRulesBeforeTheBuild(t *testing.T) {
 	assert.ErrorContains(t, (&Plan{version: "3.0", series: true}).CheckListed("3.1-5", listed), "downgrade")
 	assert.ErrorContains(t, (&Plan{version: "3.2", series: true}).CheckListed("3.1-5", listed), "newer than the newest the platform lists for this Deployment, 3.1-5")
 	require.NoError(t, (&Plan{version: "3.2", series: true}).CheckListed("3.1-5", nil), "nothing listed to hold it to")
+
+	airflow2Only := []string{"12.1.1", "11.9.0"}
+	for _, p := range []*Plan{{version: "3.1", series: true}, {version: "3.1-5"}} {
+		assert.ErrorContains(t, p.CheckListed("12.1.1", airflow2Only), "Airflow 3 is not enabled for this Deployment", p.version)
+	}
+	require.NoError(t, (&Plan{version: "12.1.1"}).CheckListed("12.1.1", airflow2Only))
 
 	require.NoError(t, (&Plan{}).CheckListed("3.1-5", listed), "a plan with no version waits for the built image")
 }

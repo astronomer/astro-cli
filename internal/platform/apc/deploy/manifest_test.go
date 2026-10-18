@@ -3,6 +3,7 @@ package deploy
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -553,4 +554,65 @@ func TestNewestForPicksTheNewestBuild(t *testing.T) {
 	assert.Equal(t, "3.1-3", l.newestFor("3.1.0"))
 	assert.Equal(t, "12.1.1", l.newestFor("2.10"))
 	assert.Equal(t, "", l.newestFor("3.2"))
+}
+
+// airflow2Only is what a platform lists for a Deployment without Airflow 3.
+var airflow2Only = houston.RuntimeReleases{{Version: "12.1.1", AirflowVersion: "2.10.3"}}
+
+// An Airflow 3 project to a Deployment the platform lists no Airflow 3
+// runtime for is told Airflow 3 is not enabled for it: before the build when
+// the pin says so, and on the built label when only the image can.
+func TestDeployManifestImageRefusesAirflow3WhereItIsNotEnabled(t *testing.T) {
+	t.Run("before the build", func(t *testing.T) {
+		cmd := withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "12.1.1", listed: airflow2Only, version: "1.0.0"}).client(t)
+		var warnings []string
+		_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Airflow 3 is not enabled for this Deployment")
+		assert.Contains(t, err.Error(), "pin Airflow 2")
+		assert.False(t, cmd.called(" build "))
+	})
+	t.Run("on the built label", func(t *testing.T) {
+		cmd := withManifestEngine(t, "3.1-5")
+		client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "12.1.1", listed: airflow2Only, version: "1.0.0"}).client(t)
+		dir := projectWithDags(t)
+		// A FROM no reader can resolve: only the built image says its runtime.
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("ARG BASE\nFROM ${BASE}\n"), 0o600))
+		var warnings []string
+		_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{ProjectDir: dir, AirflowVersion: "3.1", Dockerfile: "Dockerfile"}, &warnings))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot deploy Astro Runtime 3.1-5: Airflow 3 is not enabled for this Deployment")
+		assert.True(t, cmd.called(" build "))
+		assert.False(t, cmd.called(" push "))
+	})
+}
+
+// A failed DAG upload after the push still is the upload's failure.
+func TestDagsAfterImageErrorUnwraps(t *testing.T) {
+	upload := errors.New("dag server said no")
+	err := error(&DagsAfterImageError{Image: "img", DeploymentID: "dep", Err: upload})
+	assert.ErrorIs(t, err, upload)
+}
+
+// The app config and the runtime list are asked for the workspace Houston
+// places the Deployment in, not the one the deploy was given.
+func TestDeployManifestImageAsksTheDeploymentsOwnWorkspace(t *testing.T) {
+	withManifestEngine(t, "3.1-5")
+	client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "2.1.0"}).client(t)
+	client.ExpectedCalls = slices.DeleteFunc(client.ExpectedCalls, func(c *mock.Call) bool {
+		return c.Method == "GetDeployment" || c.Method == "GetRuntimeReleases" || c.Method == "GetAppConfig"
+	})
+	client.On("GetDeployment", "dep").Return(&houston.Deployment{
+		ID: "dep", ReleaseName: "my-release", ClusterID: "cl", RuntimeVersion: "3.1-5",
+		Urls:          []houston.DeploymentURL{{Type: houston.RegistryURLType, URL: "registry.example.com"}},
+		DagDeployment: houston.DagDeploymentConfig{Type: houston.ImageDeploymentType}, DagDeploymentRead: true,
+		Workspace: houston.Workspace{ID: "ws-real"},
+	}, nil)
+	client.On("GetAppConfig", houston.GetAppConfigRequest{ClusterID: "cl", WorkspaceUUID: "ws-real", DeploymentUUID: "dep"}).Return(&houston.AppConfig{Version: "2.1.0"}, nil).Once()
+	client.On("GetRuntimeReleases", map[string]interface{}{"clusterId": "cl", "workspaceUuid": "ws-real", "deploymentUuid": "dep"}).Return(houstonLists, nil).Once()
+	var warnings []string
+	_, err := DeployManifestImage(client, manifestImageFor(t, &imagebuild.ManifestBuild{AirflowVersion: "3.1"}, &warnings))
+	require.NoError(t, err)
+	client.AssertExpectations(t)
 }
