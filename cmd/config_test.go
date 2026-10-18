@@ -201,7 +201,7 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 	} {
 		for _, scope := range []string{"outside a project", "global", "manifest project"} {
 			s.Run(tc.key+" "+scope, func() {
-				fs := s.initConfigFiles("page_size: 50\n", "")
+				fs := s.initConfigFiles("config_version: 2\npage_size: 50\n", "")
 				args := []string{"config", "set", tc.key, tc.value}
 				switch scope {
 				case "outside a project":
@@ -219,7 +219,7 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 				s.ErrorContains(err, tc.want)
 				after, err := afero.ReadFile(fs, config.HomeConfigFile)
 				s.Require().NoError(err)
-				s.Equal("page_size: 50\n", string(after), "the refused value was written")
+				s.Equal("config_version: 2\npage_size: 50\n", string(after), "the refused value was written")
 			})
 		}
 	}
@@ -238,13 +238,13 @@ func (s *CmdSuite) TestConfigGetRefusesRemovedKeys() {
 
 // configSet guards the write on its own, for a caller that skips the pre-run.
 func (s *CmdSuite) TestConfigSetNeverWritesARemovedKey() {
-	fs := s.initConfigFiles("page_size: 50\n", "")
+	fs := s.initConfigFiles("config_version: 2\npage_size: 50\n", "")
 	globalFlag = true
 	err := configSet(newConfigSetCmd(nil), []string{"dev.mode", "standalone"})
 	s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
 	after, err := afero.ReadFile(fs, config.HomeConfigFile)
 	s.Require().NoError(err)
-	s.Equal("page_size: 50\n", string(after))
+	s.Equal("config_version: 2\npage_size: 50\n", string(after))
 }
 
 // A save writes back what the file held, the settings only Astro CLI 1.x
@@ -261,6 +261,7 @@ func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
 	got, err := afero.ReadFile(fs, config.HomeConfigFile)
 	s.Require().NoError(err)
 	s.YAMLEq(`
+config_version: 2
 context: localhost
 page_size: 30
 postgres:

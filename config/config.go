@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	iofs "io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -182,7 +185,10 @@ func initHome(fs afero.Fs) {
 	// before it writes the file — so the first `astro login` or `astro
 	// config set -g` still writes it.
 	switch err := readConfigFile(viperHome, fs); {
-	case err == nil, errors.Is(err, iofs.ErrNotExist):
+	case err == nil:
+		delete(unreadableConfigs, HomeConfigFile)
+		migrateHomeConfig()
+	case errors.Is(err, iofs.ErrNotExist):
 		// A file that is not there cannot be destroyed by writing one, so a
 		// missing config is not an unreadable config.
 		delete(unreadableConfigs, HomeConfigFile)
@@ -292,29 +298,21 @@ func saveConfig(v *viper.Viper, file string) error {
 		return fmt.Errorf(configUnwritableMsg, file)
 	}
 
-	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
-	// dir hasn't been created yet, and the lock is held before the write — so
-	// create it upfront.
-	if err := os.MkdirAll(filepath.Dir(file), dirPerm); err != nil {
-		return fmt.Errorf("creating config dir: %w", err)
-	}
-
-	lockFile := file + ".lock"
-	lock := flock.New(lockFile)
-
-	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
-	defer cancel()
-	locked, err := lock.TryLockContext(ctx, lockRetryInterval)
+	unlock, err := lockConfig(file)
 	if err != nil {
-		return fmt.Errorf("acquiring config lock %s: %w", lockFile, err)
+		return err
 	}
-	if !locked {
-		return fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
-	}
-	defer func() { _ = lock.Unlock() }() //nolint:errcheck // error deliberately ignored in this shell code
+	defer unlock()
 
 	home := v == viperHome && file == HomeConfigFile
 	if home {
+		// A home config this build creates has nothing to clean up, so it is
+		// born at the current version and migrateHomeConfig never scans it.
+		// Only a new one: stamping a file whose cleanup failed at startup
+		// would excuse it from the cleanup for good.
+		if exists, err := afero.Exists(configFs, file); err == nil && !exists && !v.IsSet(configVersionKey) {
+			v.Set(configVersionKey, currentConfigVersion)
+		}
 		takeUnchangedLogins()
 	}
 	// What viper's WriteConfigAs wrote, which is its YAML codec — yaml.v3 —
@@ -343,3 +341,146 @@ const (
 	lockTimeout       = 10 * time.Second
 	lockRetryInterval = 100 * time.Millisecond
 )
+
+// lockConfig takes file's exclusive lock, the `<file>.lock` sidecar Astro CLI
+// 1.x takes too, and returns the func that releases it.
+func lockConfig(file string) (unlock func(), err error) {
+	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
+	// dir hasn't been created yet, and the lock is held before the write — so
+	// create it upfront.
+	if err := os.MkdirAll(filepath.Dir(file), dirPerm); err != nil {
+		return nil, fmt.Errorf("creating config dir: %w", err)
+	}
+
+	lockFile := file + ".lock"
+	lock := flock.New(lockFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+	defer cancel()
+	locked, err := lock.TryLockContext(ctx, lockRetryInterval)
+	if err != nil {
+		return nil, fmt.Errorf("acquiring config lock %s: %w", lockFile, err)
+	}
+	if !locked {
+		return nil, fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
+	}
+	return func() { _ = lock.Unlock() }, nil //nolint:errcheck // error deliberately ignored in this shell code
+}
+
+const (
+	// configVersionKey records which one-time cleanups the home config has
+	// been through. Astro CLI 1.x reads and writes it too, and the two share
+	// one sequence: 1 is 1.x's cleanup (astronomer/astro-cli#2255, in
+	// v1.46.0), 2 is this one. Each runs only against a file below its own
+	// number, so whichever line adds the next cleanup takes 3.
+	configVersionKey     = "config_version"
+	currentConfigVersion = 2
+)
+
+// shippedDefaults are the values a setting has shipped as its default, for
+// the settings this build does not register — the 1.x settings v2 refuses,
+// and ones an earlier v2 build had — and the defaults a registered setting
+// has since changed from. Together with each registered setting's Default,
+// they are what an older CLI wrote into the file without being asked.
+var shippedDefaults = map[string][]string{
+	"airflow.expose_port": {"false"},
+	"api-server.port":     {"8080"},
+	"beta.remote_cmd":     {"false"},
+	"dev.mode":            {"docker"},
+	"disable_astro_run":   {"false"},
+	"duplicate_volumes":   {"true"},
+	"local.registry":      {"localhost:5555"},
+	"machine.cpu":         {"2"},
+	"machine.memory":      {"4096"},
+	"postgres.host":       {"postgres"},
+	"postgres.password":   {"postgres"},
+	"postgres.port":       {"5432"},
+	"postgres.repository": {"docker.io/postgres"},
+	// 15 is 1.x's default today, 12.6 the one it had until v1.46.0.
+	"postgres.tag":   {"15", "12.6"},
+	"postgres.user":  {"postgres"},
+	"proxy.port":     {"6563"},
+	"ruff.image":     {"ghcr.io/astral-sh/ruff:latest"},
+	"skip_parse":     {"false"},
+	"webserver.port": {"8080"},
+}
+
+// migrateHomeConfig runs once against a home config written before either CLI
+// stopped writing its defaults into the file — every 1.x before v1.46.0 and
+// every v2 before this — which put some 45 of them there on the first save.
+// Those entries cannot be told from a deliberate choice, so they freeze the
+// default of the day the file was written: no later change to a default
+// reaches the user, and in 1.x, a postgres.tag frozen at 12.6 kept new
+// projects off Postgres 15.
+//
+// Removing an entry that still holds a shipped default changes nothing about
+// what either CLI does today, since the same value comes back as the default,
+// and lets the setting follow the default again. It covers 1.x's settings as
+// well as v2's: once this stamps the file, 1.x's own cleanup (version 1)
+// never runs against it. Anything set from then on is the user's for good.
+//
+// It works on the file as it is on disk, under the lock, rather than on what
+// this process read at startup, so a save another process made in between is
+// kept. A cleanup that cannot be written is not worth failing the command
+// for: it is tried again next time.
+func migrateHomeConfig() {
+	if viperHome.GetInt(configVersionKey) >= currentConfigVersion {
+		return
+	}
+	unlock, err := lockConfig(HomeConfigFile)
+	if err != nil {
+		return
+	}
+	defer unlock()
+
+	disk, ok := readHomeFromDisk()
+	if !ok || disk.GetInt(configVersionKey) >= currentConfigVersion {
+		return
+	}
+	settings := disk.AllSettings()
+	for path, values := range defaultsShipped() {
+		if disk.IsSet(path) && slices.Contains(values, disk.GetString(path)) {
+			deleteNested(settings, path)
+		}
+	}
+	settings[configVersionKey] = currentConfigVersion
+	data, err := yaml.Marshal(settings)
+	if err != nil {
+		return
+	}
+	if err := writeConfigFile(configFs, HomeConfigFile, data); err != nil {
+		return
+	}
+	// Hold what is on disk now, as a process starting after the cleanup would.
+	_ = readConfigFile(viperHome, configFs) //nolint:errcheck // the file was just written from a parse of itself
+}
+
+// defaultsShipped is shippedDefaults with each registered setting's Default.
+// An empty default was never written, so it is not one.
+func defaultsShipped() map[string][]string {
+	all := maps.Clone(shippedDefaults)
+	for path, cfg := range CFGStrMap {
+		if cfg.Default != "" {
+			all[path] = append(slices.Clone(all[path]), cfg.Default)
+		}
+	}
+	return all
+}
+
+// deleteNested removes a dotted key from a settings map, along with any parent
+// left empty by the removal.
+func deleteNested(settings map[string]any, path string) {
+	first, rest, nested := strings.Cut(path, ".")
+	if !nested {
+		delete(settings, first)
+		return
+	}
+	child, ok := settings[first].(map[string]any)
+	if !ok {
+		return
+	}
+	deleteNested(child, rest)
+	if len(child) == 0 {
+		delete(settings, first)
+	}
+}
