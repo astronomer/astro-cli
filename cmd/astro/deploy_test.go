@@ -83,7 +83,7 @@ func TestDeployRefusesA1xProject(t *testing.T) {
 	} {
 		err := execDeployCmd(args...)
 		require.Error(t, err, "%v", args)
-		assert.EqualError(t, err, utils.Deploy1xRefusedAstro("this project", ""), "%v", args)
+		assert.EqualError(t, err, utils.Deploy1xRefused("this project", ""), "%v", args)
 		var notFound *project.NotFoundError
 		assert.True(t, errors.As(err, &notFound), "%v: reported as no_project", args)
 	}

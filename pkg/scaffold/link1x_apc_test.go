@@ -1,7 +1,6 @@
 package scaffold
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,14 +67,57 @@ func TestTheAPCConversionLinkIsWhatSaveLinkWrites(t *testing.T) {
 	assert.Equal(t, string(linked), string(converted))
 }
 
-// DeploysToAPC still refuses a 1.x project before anything is read, with or
-// without a domain: the refusal is lifted once APC deploys pyproject.toml
-// projects, not by naming the domain.
-func TestDeploysToAPCStillRefusesWithADomain(t *testing.T) {
+// A saved deploy target that cannot become a link under APC is a note naming
+// the astro link add that links it under that context, not the Astro entry:
+// Astro CLI 1.x's APC deploy saved project.deployment and never
+// project.workspace, so this is what most APC conversions get. With a
+// workspace that is not an id, the command carries it as --workspace.
+func TestAnUnlinkableDeployTargetUnderAPCNamesTheAPCLink(t *testing.T) {
+	for _, tc := range []struct {
+		name, config, want string
+	}{
+		{
+			"no workspace",
+			"project:\n  name: orders\n  deployment: " + deploymentID1x + "\n",
+			".astro/config.yaml: " + deploymentID1x + " is this project's saved deploy target. If that is a Deployment " +
+				"on Astro Private Cloud astro.corp.example, link it under this context with astro link add prod " +
+				"--deployment " + deploymentID1x + ", then astro link default prod to preselect it",
+		},
+		{
+			"a workspace that is not an id",
+			"project:\n  name: orders\n  deployment: " + deploymentID1x + "\n  workspace: ws-1\n",
+			".astro/config.yaml: " + deploymentID1x + " is this project's saved deploy target. If that is a Deployment " +
+				"on Astro Private Cloud astro.corp.example, link it under this context with astro link add prod " +
+				"--deployment " + deploymentID1x + " --workspace ws-1, then astro link default prod to preselect it",
+		},
+		{
+			"a value that cannot be printed",
+			"project:\n  name: orders\n  deployment: \"a b\"\n",
+			".astro/config.yaml: project.deployment holds this project's saved deploy target. If that is a Deployment " +
+				"on Astro Private Cloud astro.corp.example, link it under this context with astro link add prod --deployment <id>",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := project1xWithConfig(t, tc.config, nil)
+			res, err := Run(dir, Options{APCDomain: "astro.corp.example"})
+			require.NoError(t, err)
+			assert.Contains(t, res.Notes, tc.want)
+			assert.NotContains(t, strings.Join(res.Notes, "\n"), "Astro Deployment")
+			m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			assert.Empty(t, m.Astro.Deployments)
+		})
+	}
+}
+
+// Setting the deprecated DeploysToAPC beside a domain converts as the domain
+// alone does: the field is read by nothing.
+func TestDeploysToAPCWithADomainConverts(t *testing.T) {
 	config := "project:\n  name: orders\n  deployment: " + deploymentID1x + "\n  workspace: " + workspaceID1x + "\n"
 	dir := project1xWithConfig(t, config, nil)
 	_, err := Run(dir, Options{DeploysToAPC: true, APCDomain: "astro.corp.example"})
-	require.True(t, errors.Is(err, ErrConvert1xUnderAPC), "err = %v", err)
-	_, statErr := os.Stat(filepath.Join(dir, manifest.Marker))
-	assert.True(t, os.IsNotExist(statErr), "nothing is written")
+	require.NoError(t, err)
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, manifest.KindAPC, m.Astro.Deployments[Link1xName].Kind())
 }

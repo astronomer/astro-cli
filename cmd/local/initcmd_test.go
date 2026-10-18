@@ -2,15 +2,15 @@ package local
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/project"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
@@ -53,12 +53,12 @@ func TestInitSuggestsDockerForAKeptDockerfile(t *testing.T) {
 	if err := execute(t, d, "init"); err != nil {
 		t.Fatalf("astro init: %v", err)
 	}
-	manifest, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
+	written, err := os.ReadFile(filepath.Join(dir, "pyproject.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(manifest), "dockerfile") {
-		t.Fatalf("the case needs init to keep and declare the Dockerfile:\n%s", manifest)
+	if !strings.Contains(string(written), "dockerfile") {
+		t.Fatalf("the case needs init to keep and declare the Dockerfile:\n%s", written)
 	}
 	if out := stdout.String(); !strings.HasSuffix(out, "Next: "+replaceStart+" --docker\n") {
 		t.Errorf("want the Docker-mode start suggested:\n%s", out)
@@ -255,7 +255,7 @@ func TestInitStillWorksAtTheRoot(t *testing.T) {
 
 // write1xProject lays out the 1.x shape scaffold.Is1xProject recognizes: a
 // Dockerfile beside .astro/config.yaml, with no manifest.
-func write1xProject(t *testing.T, dir string) map[string]string {
+func write1xProject(t *testing.T, dir string) {
 	t.Helper()
 	files := map[string]string{
 		"Dockerfile":         "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
@@ -271,313 +271,138 @@ func write1xProject(t *testing.T, dir string) map[string]string {
 			t.Fatal(err)
 		}
 	}
-	return files
 }
 
-// listTree is every path under dir, for asserting a run changed nothing.
-func listTree(t *testing.T, dir string) []string {
-	t.Helper()
-	var out []string
-	err := filepath.WalkDir(dir, func(path string, _ os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(dir, path)
-		out = append(out, filepath.ToSlash(rel))
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return out
+// underAPC is d with an Astro Private Cloud context on domain, as the root
+// wires it (withAPCLinking): astro init reads only the domain.
+func underAPC(d Deps, domain string) Deps {
+	d.APC = &APCLinking{Domain: domain}
+	return d
 }
 
-// APC deploys the 1.x layout (with Astro CLI 1.x), so under an APC context init
-// refuses to convert a 1.x project and writes nothing: the project keeps
-// deploying with Astro CLI 1.x until APC deploys pyproject.toml projects. The
-// refusal is no mistake in the command line, so it is not usage: kind
-// unsupported_on_platform, exit 1.
-func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
+// Ids in the shape Astro CLI 1.x saved, which Houston and Astro share.
+const (
+	savedDeployment1x = "cdeploy000000000000000001"
+	savedWorkspace1x  = "cworksp000000000000000001"
+)
+
+// Under an Astro Private Cloud context init converts a 1.x project exactly
+// as under Astro, in text and json: a pin-only Dockerfile is retired into the
+// manifest, and nothing is said about APC, on stdout or stderr.
+func TestInitConverts1xProjectUnderAPC(t *testing.T) {
 	for _, format := range []string{"text", "json"} {
 		t.Run(format, func(t *testing.T) {
 			d, dir, stdout := initDeps(t)
-			setUnderAPC(t)
-			files := write1xProject(t, dir)
-			before := listTree(t, dir)
-
+			stderr := &strings.Builder{}
+			d.Stderr = stderr
+			write1xProject(t, dir)
 			args := []string{"init"}
 			if format == "json" {
 				args = append(args, "-o", "json")
 			}
-			err := execute(t, d, args...)
-			requireRefused(t, err)
-			requireAPCAdvice(t, err, dir)
-			requireUnchanged(t, dir, before, files)
-			if format == "json" {
-				obj := errorObjectOf(t, stdout.String())
-				if obj.Kind != KindUnsupportedOnPlatform || obj.Code != 1 || obj.Error != project.Blocked1xMessage(project.BlockedUnderAPC, dir) {
-					t.Errorf("error object = %+v", obj)
-				}
+			if err := execute(t, underAPC(d, "astro.corp.example"), args...); err != nil {
+				t.Fatalf("astro init: %v", err)
+			}
+			m := loadManifest(t, filepath.Join(dir, manifest.Marker))
+			if !slices.Contains(m.Project.Dependencies, "pandas==2.1.0") {
+				t.Errorf("requirements.txt was not carried: %v", m.Project.Dependencies)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
+				t.Error("a pin-only Dockerfile is retired under APC, as under Astro")
+			}
+			if out := stdout.String() + stderr.String(); strings.Contains(out, "Private Cloud") || strings.Contains(out, "Note:") {
+				t.Errorf("a conversion under APC says something of APC:\n%s", out)
 			}
 		})
 	}
 }
 
-// requireRefused fails unless err is init's refusal of a 1.x project for the
-// platform: unsupported_on_platform, exit 1, not usage.
-func requireRefused(t *testing.T, err error) {
-	t.Helper()
-	if err == nil || !errors.Is(err, scaffold.ErrConvert1xUnderAPC) {
-		t.Fatalf("want the 1.x refusal, got %v", err)
-	}
-	if cliout.IsUsage(err) || ProblemKinds.Of(err) != KindUnsupportedOnPlatform {
-		t.Errorf("kind = %q, usage = %v", ProblemKinds.Of(err), cliout.IsUsage(err))
-	}
-}
-
-// errorObjectOf decodes the one error object stdout holds.
-func errorObjectOf(t *testing.T, stdout string) cliout.ErrorObject {
-	t.Helper()
-	var obj cliout.ErrorObject
-	if err := json.Unmarshal([]byte(stdout), &obj); err != nil {
-		t.Fatalf("stdout is not one error object: %v\n%s", err, stdout)
-	}
-	return obj
-}
-
-// requireAPCAdvice fails unless err is the one account every hint under APC
-// gives (project.Blocked1xMessage) of the 1.x project in dir: why it stays,
-// and how to convert anyway, in plain text.
-func requireAPCAdvice(t *testing.T, err error, dir string) {
-	t.Helper()
-	if want := project.Blocked1xMessage(project.BlockedUnderAPC, dir); err.Error() != want {
-		t.Errorf("error = %q\nwant    %q", err, want)
-	}
-	for _, want := range []string{
-		"the current context is Astro Private Cloud",
-		"Leave the project as it is for now: Astro CLI 1.x keeps deploying it to Astro Private Cloud",
-		"once Astro Private Cloud deploys pyproject.toml projects",
-		"switch to an Astro context first (astro context switch astronomer.io",
-	} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error missing %q:\n%v", want, err)
+// A conversion under APC writes what one under Astro writes, byte for byte,
+// for a project with no saved deploy target: the context decides nothing
+// else.
+func TestInitUnderAPCWritesWhatAstroWrites(t *testing.T) {
+	convert := func(apc bool) string {
+		d, base, _ := initDeps(t)
+		dir := filepath.Join(base, "orders")
+		write1xProject(t, dir)
+		if apc {
+			d = underAPC(d, "astro.corp.example")
 		}
-	}
-	if strings.Contains(err.Error(), "`") {
-		t.Errorf("the advice is plain text:\n%v", err)
-	}
-}
-
-// requireUnchanged fails unless dir holds exactly the paths before listed and
-// each of files with its contents as written.
-func requireUnchanged(t *testing.T, dir string, before []string, files map[string]string) {
-	t.Helper()
-	if after := listTree(t, dir); strings.Join(after, "\n") != strings.Join(before, "\n") {
-		t.Errorf("the tree changed:\nbefore %v\nafter  %v", before, after)
-	}
-	for name, body := range files {
-		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(name)))
-		if err != nil || string(got) != body {
-			t.Errorf("%s changed: %q, %v", name, got, err)
+		if err := execute(t, d, "init", dir); err != nil {
+			t.Fatalf("astro init (apc %v): %v", apc, err)
 		}
-	}
-}
-
-// Under an Astro context, or none, a 1.x project converts as it always has.
-func TestInitConverts1xProjectUnderAstro(t *testing.T) {
-	d, dir, stdout := initDeps(t)
-	write1xProject(t, dir)
-	if err := execute(t, d, "init"); err != nil {
-		t.Fatalf("astro init: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
-		t.Errorf("missing pyproject.toml: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, "Dockerfile")); err == nil {
-		t.Error("a pin-only Dockerfile is retired under Astro")
-	}
-	if strings.Contains(stdout.String(), "Astro Private Cloud") {
-		t.Errorf("an Astro conversion says nothing of APC:\n%s", stdout)
-	}
-}
-
-// A directory in no 1.x project is made a project under APC, or an
-// unresolved context, as anywhere. In text mode a notice on stderr says the
-// project does not deploy there yet, worded for the context and for whether
-// ASTRO_DOMAIN chose it; it is not one of the result's notes, which are what
-// is left to do, so json says nothing of it.
-func TestInitScaffoldsUnderAPC(t *testing.T) {
-	for _, ctx := range []string{"apc", "apc-env", "unresolved", "unresolved-env"} {
-		for _, format := range []string{"text", "json"} {
-			t.Run(ctx+" "+format, func(t *testing.T) {
-				d, dir, stdout := initDeps(t)
-				stderr := &strings.Builder{}
-				d.Stderr = stderr
-				setContextFor(t, ctx)
-				notice := requireNotice(t, strings.HasSuffix(ctx, "-env"))
-				args := []string{"init"}
-				if format == "json" {
-					args = append(args, "-o", "json")
-				}
-				if err := execute(t, d, args...); err != nil {
-					t.Fatalf("astro init: %v", err)
-				}
-				if _, err := os.Stat(filepath.Join(dir, "pyproject.toml")); err != nil {
-					t.Errorf("missing pyproject.toml: %v", err)
-				}
-				if strings.Contains(stdout.String(), "Note:") {
-					t.Errorf("stdout carries the notice:\n%s", stdout)
-				}
-				if got := strings.Contains(stderr.String(), notice); got != (format == "text") {
-					t.Errorf("the notice on stderr = %v in %s:\n%s", got, format, stderr)
-				}
-			})
-		}
-	}
-}
-
-// requireNotice is the new-project notice for the context a case set, which
-// names ASTRO_DOMAIN exactly when it chose the context, in plain text.
-func requireNotice(t *testing.T, env bool) string {
-	t.Helper()
-	notice := project.NewProjectNotice()
-	if notice == "" || strings.Contains(notice, "`") {
-		t.Fatalf("notice = %q", notice)
-	}
-	if strings.Contains(notice, "ASTRO_DOMAIN") != env {
-		t.Errorf("notice names ASTRO_DOMAIN = %v, want %v: %q", !env, env, notice)
-	}
-	return notice
-}
-
-// setUnderAPC records an APC context for one test, as the root does at
-// startup, and puts it back. Tests that call it do not run in parallel.
-func setUnderAPC(t *testing.T) {
-	t.Helper()
-	project.SetContext(project.Context{APC: true})
-	t.Cleanup(func() { project.SetContext(project.Context{}) })
-}
-
-// Under APC, a directory inside a 1.x project is refused too, existing or
-// new, naming the project: a project scaffolded there would be deployed with
-// it by Astro CLI 1.x.
-func TestInitUnderAPCRefusesInsideA1xProject(t *testing.T) {
-	d, root, _ := initDeps(t)
-	setUnderAPC(t)
-	files := write1xProject(t, root)
-	sub := filepath.Join(root, "dags")
-	if err := os.Mkdir(sub, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	d.WorkingDir = func() (string, error) { return sub, nil }
-	before := listTree(t, root)
-	for _, args := range [][]string{{"init"}, {"init", "fresh"}} {
-		err := execute(t, d, args...)
-		requireRefused(t, err)
-		requireAPCAdvice(t, err, root)
-	}
-	requireUnchanged(t, root, before, files)
-}
-
-// The check reads the directories themselves, whatever is around them: a
-// 1.x project in a monorepo whose root pyproject.toml only configures tools
-// is refused, and so is one that is the home directory, as in a 1.x image.
-func TestInitUnderAPCRefusesA1xProjectWhereverItIs(t *testing.T) {
-	t.Run("in a monorepo", func(t *testing.T) {
-		d, repo, _ := initDeps(t)
-		setUnderAPC(t)
-		if err := os.WriteFile(filepath.Join(repo, "pyproject.toml"), []byte("[tool.ruff]\nline-length = 100\n"), 0o600); err != nil {
+		data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+		if err != nil {
 			t.Fatal(err)
 		}
-		proj := filepath.Join(repo, "airflow")
-		files := write1xProject(t, proj)
-		before := listTree(t, proj)
-		err := execute(t, d, "init", "airflow")
-		requireRefused(t, err)
-		requireAPCAdvice(t, err, proj)
-		requireUnchanged(t, proj, before, files)
-	})
-	t.Run("as the home directory", func(t *testing.T) {
-		d, home, _ := initDeps(t)
-		setUnderAPC(t)
-		t.Setenv("HOME", home)
-		t.Setenv("USERPROFILE", home)
-		files := write1xProject(t, home)
-		before := listTree(t, home)
-		err := execute(t, d, "init")
-		requireRefused(t, err)
-		requireAPCAdvice(t, err, home)
-		requireUnchanged(t, home, before, files)
-	})
-}
-
-// A context the CLI cannot resolve may be APC's, so init refuses a 1.x
-// project there as well, saying to fix the context; a directory in no 1.x
-// project is made a project as anywhere.
-func TestInitRefusesA1xProjectUnderAnUnresolvedContext(t *testing.T) {
-	d, dir, stdout := initDeps(t)
-	project.SetContext(project.Context{Unresolved: true})
-	t.Cleanup(func() { project.SetContext(project.Context{}) })
-	files := write1xProject(t, dir)
-	before := listTree(t, dir)
-
-	err := execute(t, d, "init", "-o", "json")
-	requireRefused(t, err)
-	for _, want := range []string{"the current context cannot be resolved", "astro context switch", "run astro init in " + scaffold.ShellQuote(dir)} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error missing %q:\n%v", want, err)
-		}
+		return string(data)
 	}
-	if obj := errorObjectOf(t, stdout.String()); obj.Kind != KindUnsupportedOnPlatform {
-		t.Errorf("error object = %+v", obj)
-	}
-	requireUnchanged(t, dir, before, files)
-
-	fresh := filepath.Join(t.TempDir(), "fresh")
-	if err := execute(t, d, "init", fresh); err != nil {
-		t.Errorf("astro init %s: %v", fresh, err)
+	if astro, apc := convert(false), convert(true); astro != apc {
+		t.Errorf("the manifests differ:\nastro:\n%s\napc:\n%s", astro, apc)
 	}
 }
 
-// Under APC, every other hint about a 1.x project says what init's refusal
-// says rather than to run astro init, in text and json: a command that
-// discovers the project, and the astro dev stub. Under Astro they still say
-// to convert.
-func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
-	for _, apc := range []bool{true, false} {
-		t.Run(map[bool]string{true: "apc", false: "astro"}[apc], func(t *testing.T) {
-			d, dir, stdout := initDeps(t)
-			if apc {
-				setUnderAPC(t)
-			}
+// A Dockerfile FROM a mirror of Astro Runtime is adopted under APC as under
+// Astro: declared as the project's build and kept as written, since the mirror
+// keeps Runtime's repository name and tag.
+func TestInitAdoptsAMirroredBaseUnderAPC(t *testing.T) {
+	for _, from := range []string{
+		"registry.corp.example/astronomer/astro-runtime:12.1.0",
+		"mirror.corp.example/runtime:3.1-12",
+	} {
+		t.Run(from, func(t *testing.T) {
+			d, dir, _ := initDeps(t)
 			write1xProject(t, dir)
-			advice := project.Blocked1xMessage(project.BlockedUnderAPC, dir)
+			body := "FROM " + from + "\nENV TZ=UTC\n"
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := execute(t, underAPC(d, "astro.corp.example"), "init", "-o", "json"); err != nil {
+				t.Fatalf("astro init: %v", err)
+			}
+			if m := loadManifest(t, filepath.Join(dir, manifest.Marker)); m.Astro.Dockerfile != "Dockerfile" {
+				t.Errorf("[tool.astro] dockerfile = %q, want the mirrored-base Dockerfile declared", m.Astro.Dockerfile)
+			}
+			if got, err := os.ReadFile(filepath.Join(dir, "Dockerfile")); err != nil || string(got) != body {
+				t.Errorf("the Dockerfile changed: %q, %v", got, err)
+			}
+		})
+	}
+}
 
-			err := execute(t, d, "local", "status")
-			if err == nil {
-				t.Fatal("astro local status in a 1.x project must fail")
+// Under APC a 1.x project's saved deploy target becomes an apc link on the
+// context's domain, marked default; under Astro, the same ids become an Astro
+// link. The ids cannot say which: both platforms use cuids.
+func TestInitLinksTheSavedDeployTargetForTheContext(t *testing.T) {
+	config := "project:\n  name: orders\n  deployment: " + savedDeployment1x + "\n  workspace: " + savedWorkspace1x + "\n"
+	for _, tc := range []struct {
+		name, domain string
+		want         manifest.Link
+	}{
+		{"apc", "astro.corp.example", manifest.Link{
+			Target: "apc", Domain: "astro.corp.example", Workspace: savedWorkspace1x, Deployment: savedDeployment1x,
+			Auth: manifest.Auth{Method: manifest.AuthAPC}, Default: true,
+		}},
+		{"astro", "", manifest.Link{
+			Target: "astro", Workspace: savedWorkspace1x, Deployment: savedDeployment1x,
+			Auth: manifest.Auth{Method: manifest.AuthAstro}, Default: true,
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, dir, _ := initDeps(t)
+			write1xProject(t, dir)
+			if err := os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte(config), 0o600); err != nil {
+				t.Fatal(err)
 			}
-			if got := strings.Contains(err.Error(), advice); got != apc {
-				t.Errorf("discovery error carries the APC advice = %v, want %v:\n%v", got, apc, err)
+			if tc.domain != "" {
+				d = underAPC(d, tc.domain)
 			}
-			stdout.Reset()
-			if err := execute(t, d, "local", "status", "-o", "json"); err == nil {
-				t.Fatal("astro local status in a 1.x project must fail")
+			if err := execute(t, d, "init", "-o", "json"); err != nil {
+				t.Fatalf("astro init: %v", err)
 			}
-			obj := errorObjectOf(t, stdout.String())
-			if got := obj.Error == advice; got != apc {
-				t.Errorf("json error is the APC advice = %v, want %v: %+v", got, apc, obj)
-			}
-
-			err = execute(t, d, "dev", "start")
-			if err == nil {
-				t.Fatal("astro dev must fail")
-			}
-			if got := strings.Contains(err.Error(), advice); got != apc {
-				t.Errorf("dev stub carries the APC advice = %v, want %v:\n%v", got, apc, err)
-			}
-			if converts := strings.Contains(err.Error(), "to convert it in place"); converts == apc {
-				t.Errorf("dev stub says to convert = %v under apc = %v:\n%v", converts, apc, err)
+			m := loadManifest(t, filepath.Join(dir, manifest.Marker))
+			if got := m.Astro.Deployments[scaffold.Link1xName]; !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("link = %+v\nwant   %+v", got, tc.want)
 			}
 		})
 	}
@@ -586,137 +411,71 @@ func TestTheAPCAdviceOn1xProjectsIsOne(t *testing.T) {
 // devPayload is the part of the astro dev stub's json these tests read,
 // decoded by key rather than into the payload's Go type.
 type devPayload struct {
-	Replacement       string           `json:"replacement"`
-	Mapping           []devReplacement `json:"mapping"`
-	Is1xProject       bool             `json:"v1_project"`
-	Notes             []string         `json:"notes"`
-	V1Dir             string           `json:"v1_dir"`
-	Convert           string           `json:"convert"`
-	UnderAPC          bool             `json:"under_apc"`
-	ContextUnresolved bool             `json:"context_unresolved"`
+	Replacement string           `json:"replacement"`
+	Mapping     []devReplacement `json:"mapping"`
+	Is1xProject bool             `json:"v1_project"`
+	Notes       []string         `json:"notes"`
+	V1Dir       string           `json:"v1_dir"`
+	Convert     string           `json:"convert"`
 }
 
-// Under APC the astro dev stub in a 1.x project says in json what it says in
-// text: under_apc, the advice in notes, and no astro init, neither as the
-// replacement for astro dev init nor in the mapping. A build secret still
-// means the project builds in Docker mode once converted.
-func TestTheDevStubUnderAPC(t *testing.T) {
-	d, dir, stdout := initDeps(t)
-	setUnderAPC(t)
-	write1xProject(t, dir)
+// Every hint about a 1.x project says to convert it with astro init, under
+// APC as under Astro, and init then converts it: a command that discovers
+// the project, the astro dev stub wherever it runs in or below the project,
+// and the spellings that redirect to astro init.
+func TestEvery1xHintOffersAstroInitUnderAPC(t *testing.T) {
+	for _, where := range []string{"root", "subdir", "fresh"} {
+		t.Run(where, func(t *testing.T) {
+			d, root, stdout := initDeps(t)
+			d = underAPC(d, "astro.corp.example")
+			wd := layOut1x(t, root, where)
+			d.WorkingDir = func() (string, error) { return wd, nil }
 
-	err := execute(t, d, "dev", "init", "-o", "json")
-	if err == nil {
-		t.Fatal("astro dev must fail")
-	}
-	var p devPayload
-	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
-		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
-	}
-	if !p.UnderAPC || !p.Is1xProject || p.Convert != "" || p.Replacement != "" {
-		t.Errorf("payload = %+v", p)
-	}
-	if !slices.Contains(p.Notes, project.Blocked1xMessage(project.BlockedUnderAPC, dir)) {
-		t.Errorf("notes lack the APC advice: %q", p.Notes)
-	}
-	if len(p.Mapping) != 0 {
-		t.Errorf("the mapping names astro local commands under APC: %v", p.Mapping)
-	}
-	// The text is the notes and nothing else: no replacement, and no table
-	// of astro local commands, none of which runs in this project.
-	err = execute(t, d, "dev", "init")
-	if err == nil {
-		t.Fatal("astro dev must fail")
-	}
-	text := err.Error()
-	for _, n := range p.Notes {
-		if !strings.Contains(text, n) {
-			t.Errorf("text lacks the note %q:\n%s", n, text)
-		}
-	}
-	if strings.Contains(text, "Use ") || strings.Contains(text, "Convert with ") || strings.Contains(text, "# was: astro dev") {
-		t.Errorf("text names astro local commands under APC:\n%s", text)
-	}
+			requireStubOffersInit(t, devStubJSON(t, d, stdout), root, where)
+			if where != "fresh" {
+				err := execute(t, d, "local", "status")
+				if err == nil || !strings.Contains(err.Error(), "Run astro init in "+scaffold.ShellQuote(root)) {
+					t.Errorf("discovery's hint under APC: %v", err)
+				}
+			}
+			for _, args := range [][]string{{"local", "init"}, {"af", "init"}} {
+				if err := execute(t, d, args...); err == nil || !cliout.IsUsage(err) || !strings.Contains(err.Error(), replaceInit) {
+					t.Errorf("%v under APC: %v", args, err)
+				}
+			}
 
-	// With flags too: a build secret names no replacement here.
-	stdout.Reset()
-	err = execute(t, d, "dev", "start", "--build-secret", "id=mysecret,src=secret.txt", "-o", "json")
-	if err == nil {
-		t.Fatal("astro dev must fail")
-	}
-	p = devPayload{}
-	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
-		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
-	}
-	if p.Replacement != "" || !p.UnderAPC || !p.Is1xProject {
-		t.Errorf("payload with a build secret = %+v", p)
-	}
-
-	// Below the 1.x project the stub gives the advice it gives at the root,
-	// since init refuses there too.
-	sub := filepath.Join(dir, "dags")
-	if err := os.Mkdir(sub, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	d.WorkingDir = func() (string, error) { return sub, nil }
-	stdout.Reset()
-	if err := execute(t, d, "dev", "start", "-o", "json"); err == nil {
-		t.Fatal("astro dev must fail")
-	}
-	p = devPayload{}
-	if err := json.Unmarshal([]byte(stdout.String()), &p); err != nil {
-		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
-	}
-	if !p.Is1xProject || !p.UnderAPC || p.Replacement != "" || !slices.Contains(p.Notes, project.Blocked1xMessage(project.BlockedUnderAPC, dir)) {
-		t.Errorf("payload below the project = %+v", p)
+			if err := execute(t, d, "init", root); err != nil {
+				t.Fatalf("astro init %s under APC: %v", root, err)
+			}
+			if _, err := os.Stat(filepath.Join(root, manifest.Marker)); err != nil {
+				t.Errorf("missing pyproject.toml: %v", err)
+			}
+		})
 	}
 }
 
-// The astro dev stub and astro init give the same answer, in every context
-// (ASTRO_DOMAIN choosing it, or the saved one) and wherever they run: where
-// init refuses, the stub offers no astro init and gives init's own message;
-// where init goes ahead, the stub suggests it for the 1.x root it is in, or
-// nothing for a directory that is not in a 1.x project.
-func TestTheDevStubAndInitAgree(t *testing.T) {
-	for _, ctx := range []string{"apc", "apc-env", "astro", "unresolved", "unresolved-env"} {
-		for _, where := range []string{"root", "subdir", "fresh"} {
-			t.Run(ctx+" "+where, func(t *testing.T) {
-				d, root, stdout := initDeps(t)
-				setContextFor(t, ctx)
-				wd := layOut1x(t, root, where)
-				d.WorkingDir = func() (string, error) { return wd, nil }
-				p := devStubJSON(t, d, stdout)
-				blocked := ctx != "astro" && where != "fresh"
-				apc, unresolved := strings.HasPrefix(ctx, "apc"), strings.HasPrefix(ctx, "unresolved")
-				if p.UnderAPC != (blocked && apc) || p.ContextUnresolved != (blocked && unresolved) {
-					t.Errorf("stub reasons = apc %v, unresolved %v: %+v", p.UnderAPC, p.ContextUnresolved, p)
-				}
-				if where != "fresh" && p.V1Dir != root {
-					t.Errorf("v1_dir = %q, want the root %q", p.V1Dir, root)
-				}
-				// From below the root, the command converts the root, not a
-				// project inside it.
-				if want := replaceInit + " " + scaffold.ShellQuote(root); ctx == "astro" && where == "subdir" && p.Convert != want {
-					t.Errorf("convert = %q, want %q", p.Convert, want)
-				}
-				requireStubMatchesInit(t, p, execute(t, d, "init"))
-			})
-		}
-	}
-}
-
-// setContextFor records the context a case runs under, and puts it back.
-func setContextFor(t *testing.T, ctx string) {
+// requireStubOffersInit fails unless the astro dev stub's payload p, run where
+// layOut1x put it, offers astro init for the 1.x project at root (naming root
+// from below it) beside the usual replacement, or says nothing of one in a
+// fresh directory.
+func requireStubOffersInit(t *testing.T, p devPayload, root, where string) {
 	t.Helper()
-	c := project.Context{FromASTRODomain: strings.HasSuffix(ctx, "-env")}
-	switch {
-	case strings.HasPrefix(ctx, "apc"):
-		c.APC = true
-	case strings.HasPrefix(ctx, "unresolved"):
-		c.Unresolved = true
+	if where == "fresh" {
+		if p.Is1xProject || p.Convert != "" {
+			t.Errorf("a directory in no 1.x project: %+v", p)
+		}
+		return
 	}
-	project.SetContext(c)
-	t.Cleanup(func() { project.SetContext(project.Context{}) })
+	want := replaceInit
+	if where == "subdir" {
+		want += " " + scaffold.ShellQuote(root)
+	}
+	if !p.Is1xProject || p.V1Dir != root || p.Convert != want || p.Replacement != replaceStart {
+		t.Errorf("payload = %+v, want convert %q and v1_dir %q", p, want, root)
+	}
+	if len(p.Mapping) == 0 {
+		t.Error("the mapping is empty")
+	}
 }
 
 // layOut1x makes root a 1.x project unless where is fresh, and returns the
@@ -749,30 +508,6 @@ func devStubJSON(t *testing.T, d Deps, stdout *strings.Builder) devPayload {
 		t.Fatalf("stdout is not the payload: %v\n%s", err, stdout)
 	}
 	return p
-}
-
-// requireStubMatchesInit fails unless the stub refuses exactly where init
-// does (err), names no command where it does, and offers astro init for a
-// 1.x project where init converts it.
-func requireStubMatchesInit(t *testing.T, p devPayload, err error) {
-	t.Helper()
-	initRefuses := errors.Is(err, scaffold.ErrConvert1xUnderAPC)
-	if !initRefuses && err != nil {
-		t.Fatalf("astro init: %v", err)
-	}
-	stubRefuses := p.UnderAPC || p.ContextUnresolved
-	if stubRefuses != initRefuses {
-		t.Errorf("the stub refuses = %v, init refuses = %v", stubRefuses, initRefuses)
-	}
-	if stubRefuses && (p.Convert != "" || p.Replacement != "" || len(p.Mapping) != 0) {
-		t.Errorf("a refusing stub names a command: %+v", p)
-	}
-	if stubRefuses && !slices.Contains(p.Notes, err.Error()) {
-		t.Errorf("the stub's advice is not init's:\nstub %q\ninit %q", p.Notes, err)
-	}
-	if !stubRefuses && p.Is1xProject && !strings.HasPrefix(p.Convert, replaceInit) {
-		t.Errorf("a 1.x project where init converts is not offered astro init: %+v", p)
-	}
 }
 
 // From below a 1.x root, the command that converts it names the root, quoted
@@ -820,26 +555,5 @@ func TestTheDevStubConvertsTheRootFromBelow(t *testing.T) {
 	}
 	if n := strings.Count(err.Error(), want); n != 1 {
 		t.Errorf("the convert command is named %d times, want once:\n%v", n, err)
-	}
-}
-
-// astro local init and astro af init (and its airflow spelling) redirect to
-// astro init; where init refuses, they give init's refusal instead of
-// suggesting it, and elsewhere still name astro init.
-func TestInitRedirectsGiveTheRefusal(t *testing.T) {
-	for _, args := range [][]string{{"local", "init"}, {"af", "init"}, {"airflow", "init"}} {
-		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			d, dir, _ := initDeps(t)
-			write1xProject(t, dir)
-			err := execute(t, d, args...)
-			if err == nil || !strings.Contains(err.Error(), replaceInit) {
-				t.Errorf("under Astro: %v", err)
-			}
-
-			setUnderAPC(t)
-			err = execute(t, d, args...)
-			requireRefused(t, err)
-			requireAPCAdvice(t, err, dir)
-		})
 	}
 }

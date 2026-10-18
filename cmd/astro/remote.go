@@ -67,7 +67,7 @@ func newRemoteDeployCmd() *cobra.Command {
 				return nil
 			}
 			cmd.SilenceUsage = true
-			return utils.NoDeployableProject(where, utils.Deploy1xRefusedAstro)
+			return utils.NoDeployableProject(where)
 		},
 		RunE:    remoteDeploy,
 		Example: remoteDeployExample,

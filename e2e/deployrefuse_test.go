@@ -350,7 +350,7 @@ func TestDeployTakesANetrcBuildSecretWithoutADockerfile(t *testing.T) {
 }
 
 // On Astro Private Cloud a project in the 1.x layout makes no deploy at all,
-// saying to use Astro CLI 1.x, and a build with no project to build is
+// saying to convert it with astro init or use Astro CLI 1.x, and a build with no project to build is
 // refused; a pyproject.toml project's deploy refuses, before Houston is
 // asked anything, to pick a Deployment for you or to reach a link on another
 // installation. The login is to a Houston that refuses every connection, so
@@ -369,9 +369,9 @@ func TestAPCDeployRefusesWhatItCannotDeploy(t *testing.T) {
 		says  []string
 		kind  string
 	}{
-		{"a 1.x project", make1xProject, []string{"deploy", "dep-id"}, []string{"Astro CLI 1.x layout", "Deploy it with Astro CLI 1.x"}, "no_project"},
+		{"a 1.x project", make1xProject, []string{"deploy", "dep-id"}, []string{"Astro CLI 1.x layout", "Convert it with astro init, or deploy it with Astro CLI 1.x"}, "no_project"},
 		{"--image-name from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--image-name", "img:1"}, []string{"Astro CLI 1.x layout"}, "no_project"},
-		{"--dags from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--dags"}, []string{"Astro CLI 1.x layout", "does not deploy to Astro Private Cloud"}, "no_project"},
+		{"--dags from a 1.x project", make1xProject, []string{"deploy", "dep-id", "--dags"}, []string{"Astro CLI 1.x layout", "Astro CLI v2 deploys only pyproject.toml projects"}, "no_project"},
 		{"a pyproject.toml project's deploy that names no Deployment", initProject, []string{"deploy"}, []string{"this project links no deployment and this run cannot be asked", "--deployment"}, "input_required"},
 		{"an apc link on another installation", func(t *testing.T, p *project) {
 			initProject(t, p)

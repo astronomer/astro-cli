@@ -414,8 +414,7 @@ func TestInitReadsAirflowFromTheFinalStage(t *testing.T) {
 
 // A 1.x project's Dockerfile builds on Astro Runtime, and its conversion is
 // what it was: declared, with requirements.txt kept for the base's ONBUILD. A
-// 1.x layout on another base gets the same refusal as any directory, and is
-// still a 1.x project, so APC still refuses to convert it.
+// 1.x layout on another base gets the same note as any directory.
 func TestConvert1xDockerfileByBase(t *testing.T) {
 	t.Run("runtime", func(t *testing.T) {
 		dir, res, m := initWith(t, map[string]string{
@@ -439,11 +438,45 @@ func TestConvert1xDockerfileByBase(t *testing.T) {
 		require.Len(t, dockerfileNotes(res), 1)
 		assert.Contains(t, dockerfileNotes(res)[0], "apache/airflow:2.9.0, which is not an Astro Runtime image")
 	})
-	t.Run("another base under APC", func(t *testing.T) {
-		dir := t.TempDir()
-		writeTree(t, dir, foreign)
-		require.True(t, Is1xProject(dir))
-		_, err := Plan(dir, Options{DeploysToAPC: true})
-		require.ErrorIs(t, err, ErrConvert1xUnderAPC)
-	})
+}
+
+// Under an Astro Private Cloud context a 1.x project converts exactly as under
+// Astro: with no saved deploy target, APCDomain changes nothing in the plan.
+// A Dockerfile on a mirror of Runtime is adopted (declared, kept as written)
+// by its repository name, a pin-only one is retired, and one on another base
+// is kept and not declared, on either platform.
+func TestAConversionUnderAPCIsAstros(t *testing.T) {
+	for _, from := range []string{
+		"FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nENV TZ=UTC\n",
+		"FROM mirror.corp.example/runtime:3.1-12\nENV TZ=UTC\n",
+		"FROM mirror.corp.example/runtime:3.1-12\n",
+		"FROM apache/airflow:2.9.0\nUSER airflow\n",
+	} {
+		t.Run(from, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTree(t, dir, map[string]string{
+				fileDockerfile:       from,
+				".astro/config.yaml": "project:\n  name: orders\n",
+				"requirements.txt":   "pandas==2.1.0\n",
+				"packages.txt":       "git\n",
+			})
+			astro, err := Plan(dir, Options{})
+			require.NoError(t, err)
+			apc, err := Plan(dir, Options{APCDomain: "astro.corp.example"})
+			require.NoError(t, err)
+			assert.Equal(t, astro, apc)
+		})
+	}
+
+	dir := t.TempDir()
+	body := "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nENV TZ=UTC\n"
+	writeTree(t, dir, map[string]string{fileDockerfile: body, ".astro/config.yaml": "project:\n  name: orders\n"})
+	_, err := Run(dir, Options{APCDomain: "astro.corp.example"})
+	require.NoError(t, err)
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, fileDockerfile, m.Astro.Dockerfile, "a mirrored-base Dockerfile is adopted under APC")
+	got, err := os.ReadFile(filepath.Join(dir, fileDockerfile))
+	require.NoError(t, err)
+	assert.Equal(t, body, string(got))
 }

@@ -22,9 +22,9 @@ removes only the files of a project made by Astro CLI 1.x (a 1.x project)
 whose contents it carried across, saying so. So
 everything below shows up as a `git diff` you can read before you commit it.
 
-Astro CLI v2 deploys only a converted project. A 1.x project you have not
-converted keeps deploying with Astro CLI 1.x, and so, for now, does a 1.x
-project on Astro Private Cloud, which `init` does not convert there yet.
+Astro CLI v2 deploys only a converted project, to Astro and to Astro Private
+Cloud alike. A 1.x project you have not converted keeps deploying with Astro
+CLI 1.x.
 
 ## Two things to ask about first
 
@@ -189,27 +189,17 @@ output ends with **Left to do**: what it found and could not carry. That list
 is the work. Take it one line at a time.
 
 There is one project format, and `init` converts the same way whichever
-platform you deploy to. The exception, for now, is Astro Private Cloud: v2
-deploys `pyproject.toml` projects there, but `init` does not convert a 1.x
-project under an Astro Private Cloud context yet. When the
-current context is an Astro Private Cloud one, `init` refuses a 1.x project,
-or any directory inside one, and changes nothing: a project made inside it
-would be deployed with it. A 1.x project is what Astro CLI 1.x itself takes
-for one: a `Dockerfile` and a `.astro/config.yaml`, other than the CLI's own
-settings file in your home directory, so a stray `~/Dockerfile` does not make
-home a 1.x project. Leave the project as it is: Astro CLI 1.x keeps deploying
-it to Astro Private Cloud. Converting under an Astro Private Cloud context
-comes in a later release. To convert anyway, for Astro or for
-local development only, switch to an Astro context first (`astro context
-switch astronomer.io`, or `astro login astronomer.io`; a bare `astro login`
-logs back in to the current context; or change or unset `ASTRO_DOMAIN` if it
-names the context), then run `init` in the 1.x project's directory. `init`
-refuses the same way when a context is named but cannot be resolved (a config
-it cannot read, or `ASTRO_DOMAIN` naming a context that is not saved): fix the
-context or switch to one first. A machine with no context at all converts as
-for Astro. A new project `init` makes under an Astro Private Cloud context, or
-one it cannot resolve, prints a note on stderr saying how to deploy it;
-`--output json` leaves it out.
+platform you deploy to: Astro, or Astro Private Cloud, where `astro deploy`
+builds and ships a converted project as it does on Astro (see
+[deploy.md](deploy.md#astro-private-cloud)). The one thing the current context
+decides is the kind of link a saved deploy target becomes (the
+`.astro/config.yaml` row below). A Dockerfile on a mirror of Astro Runtime (a
+repository named `runtime` or `astro-runtime` on your own registry, with a
+Runtime tag) is kept and declared like one on Astro's own registry, which is
+how an air-gapped project keeps building from its mirror. A 1.x project is what
+Astro CLI 1.x itself takes for one: a `Dockerfile` and a `.astro/config.yaml`,
+other than the CLI's own settings file in your home directory, so a stray
+`~/Dockerfile` does not make home a 1.x project.
 
 What `init` converts:
 
@@ -219,7 +209,7 @@ What `init` converts:
 | `packages.txt` | Each line becomes an entry in `packages` under `[tool.astro]`. Removed, unless a kept Dockerfile still installs it. |
 | `airflow_settings.yaml` | Connection and variable values go to this machine's encrypted vault, and `[tool.astro.env]` declares them without their values. A variable with an empty value is declared optional, so `astro local start` runs without it, as v1 did. Pools go to `[tool.astro.pools]`, and `astro local start` creates them in Airflow. The file is removed once everything in it is carried. |
 | `Dockerfile` | Its `FROM` line is read for the Airflow version (below). A Dockerfile that only names a base image is removed, since the requirement now says the same thing. Any other Dockerfile is kept and declared as the project's build (`[tool.astro] dockerfile`), and `init` writes a `.dockerignore` for it. |
-| `.astro/config.yaml` | A saved deploy target (`project.deployment` with `project.workspace`) becomes a link named `default` under `[tool.astro.deployments]`, marked `default = true`, when both are ids (cuids, the shape Astro and APC ids share). `scaffold.Options.APCDomain` makes it an `apc` link on that domain instead, since the ids alone do not say which platform they are on. `astro init` does not set it yet: it will once APC deploys `pyproject.toml` projects. Anything else is listed as a note naming the entry to add by hand. |
+| `.astro/config.yaml` | A saved deploy target (`project.deployment` with `project.workspace`) becomes a link named `default` under `[tool.astro.deployments]`, marked `default = true`, when both are ids (cuids, the shape Astro and APC ids share). Under an Astro Private Cloud context it is an `apc` link on that context's domain instead (see [Astro Private Cloud links](manifest-reference.md#astro-private-cloud-links)), since the ids alone do not say which platform they are on; `astro deploy` there preselects it. Anything else is listed as a note: under Astro, naming the entry to add by hand; under Astro Private Cloud, the `astro link add` that links it there. Astro CLI 1.x's Astro Private Cloud deploy saved `project.deployment` but never `project.workspace`, so most projects converted there get that note rather than a link. |
 | `docker-compose.yml` | Nothing to do: `astro local start` replaces it. |
 | `docker-compose.override.yml` | Kept. `astro local start --docker` merges it over the services it generates, as 1.x did, and `astro local stop` and `reset` take its services down too. Standalone mode runs no containers, so there it does nothing, and `astro local start` says so. |
 

@@ -1,10 +1,10 @@
 package scaffold
 
 import (
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,80 +31,46 @@ func writeTree(t *testing.T, dir string, files map[string]string) {
 	}
 }
 
-// tree lists every path under dir with its contents, for asserting that a
-// refused run wrote nothing.
-func tree(t *testing.T, dir string) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	require.NoError(t, filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		data, err := os.ReadFile(path)
-		out[path] = string(data)
-		return err
-	}))
-	return out
-}
-
-// Under Options.DeploysToAPC, Plan and Run refuse a directory that is itself
-// a 1.x project, with the shared message and nothing written; Desktop and
-// astro init get the same refusal.
-func TestPlanAndRunRefuseA1xProjectUnderAPC(t *testing.T) {
-	for name, call := range map[string]func(string, Options) error{
-		"Plan": func(dir string, o Options) error { _, err := Plan(dir, o); return err },
-		"Run":  func(dir string, o Options) error { _, err := Run(dir, o); return err },
-	} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			write1x(t, dir)
-			before := tree(t, dir)
-
-			err := call(dir, Options{DeploysToAPC: true})
-			require.ErrorIs(t, err, ErrConvert1xUnderAPC)
-			var refused *Convert1xUnderAPCError
-			require.ErrorAs(t, err, &refused)
-			abs, _ := filepath.Abs(dir)
-			assert.Equal(t, abs, refused.Dir)
-			assert.Equal(t, Project1xUnderAPCMessage(abs), err.Error())
-			assert.NotContains(t, err.Error(), "`")
-			assert.Contains(t, err.Error(), "run astro init in "+ShellQuote(abs))
-			assert.Contains(t, err.Error(), "Astro CLI 1.x keeps deploying it to Astro Private Cloud")
-			assert.NotContains(t, err.Error(), "astro deploy keeps")
-			assert.Equal(t, before, tree(t, dir), "a refused run writes nothing")
-		})
+// A 1.x project converts the same way on every platform: DeploysToAPC, which
+// once refused it, is read by nothing, so Plan's changeset is the same with
+// it set or not, for the project's root and for a directory inside it, and
+// Run converts the root.
+func TestDeploysToAPCChangesNothing(t *testing.T) {
+	root := t.TempDir()
+	write1x(t, root)
+	for _, dir := range []string{root, filepath.Join(root, "dags"), filepath.Join(root, "fresh")} {
+		astro, err := Plan(dir, Options{})
+		require.NoError(t, err, dir)
+		apc, err := Plan(dir, Options{DeploysToAPC: true})
+		require.NoError(t, err, dir)
+		assert.Equal(t, astro, apc, dir)
 	}
+
+	res, err := Run(root, Options{DeploysToAPC: true})
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(root, "pyproject.toml"))
+	assert.True(t, slices.ContainsFunc(res.Deleted, func(d string) bool { return strings.HasPrefix(d, "Dockerfile (") }),
+		"the pin-only Dockerfile is retired as under Astro: %v", res.Deleted)
 }
 
-// A directory inside a 1.x project is refused too, existing or new, naming
-// the project: a project scaffolded there would be deployed with it. An
-// Astro project in between stops the walk, and without DeploysToAPC the 1.x
-// project converts as it always has.
-func TestAPCRefusesInsideA1xProject(t *testing.T) {
+// Find1xProject names the 1.x project a directory is in, from the root, from
+// existing and new directories below it, and stops at an Astro project in
+// between, whose own business the 1.x project above it is not.
+func TestFind1xProjectNamesTheRoot(t *testing.T) {
 	root := t.TempDir()
 	write1x(t, root)
 	require.NoError(t, os.MkdirAll(filepath.Join(root, "dags", "inner"), 0o755))
-	before := tree(t, root)
 	abs, err := filepath.Abs(root)
 	require.NoError(t, err)
 
-	for _, sub := range []string{"dags", filepath.Join("dags", "inner"), "fresh"} {
-		_, err := Run(filepath.Join(root, sub), Options{DeploysToAPC: true})
-		var refused *Convert1xUnderAPCError
-		require.ErrorAs(t, err, &refused, sub)
-		assert.Equal(t, abs, refused.Dir, sub)
+	for _, sub := range []string{".", "dags", filepath.Join("dags", "inner"), "fresh"} {
+		assert.Equal(t, abs, Find1xProject(filepath.Join(root, sub)), sub)
 	}
-	assert.Equal(t, before, tree(t, root), "a refused run writes nothing")
 
-	// An Astro project inside the 1.x one is its own business.
 	_, err = Run(filepath.Join(root, "dags"), Options{})
 	require.NoError(t, err)
-	_, err = Plan(filepath.Join(root, "dags", "inner"), Options{DeploysToAPC: true})
-	require.NoError(t, err, "a project in between stops the walk")
-
-	_, err = Run(root, Options{})
-	require.NoError(t, err, "under Astro")
-	assert.FileExists(t, filepath.Join(root, "pyproject.toml"))
+	assert.Empty(t, Find1xProject(filepath.Join(root, "dags", "inner")), "a project in between stops the walk")
+	assert.Empty(t, Find1xProject(t.TempDir()))
 }
 
 // A 1.x project is what Astro CLI 1.x itself takes for one: a Dockerfile and
@@ -113,7 +79,7 @@ func TestAPCRefusesInsideA1xProject(t *testing.T) {
 // with no config.yaml, does not make home a 1.x project; a config.yaml that
 // is empty or does not parse counts, as it does for 1.x, failing closed; and
 // a home directory that holds a 1.x project (HOME=/usr/local/airflow in a 1.x
-// image) is one, and is refused from below. Nothing compares paths.
+// image) is one, and is found from below. Nothing compares paths.
 func TestTheCLIHomeIsA1xProjectOnlyWhenItSaysSo(t *testing.T) {
 	for _, tc := range []struct {
 		name, config string
@@ -135,8 +101,9 @@ func TestTheCLIHomeIsA1xProjectOnlyWhenItSaysSo(t *testing.T) {
 			writeTree(t, home, files)
 			t.Setenv("HOME", home)
 			assert.Equal(t, tc.is1x, Is1xProject(home))
-			_, err := Plan(filepath.Join(home, "dags"), Options{DeploysToAPC: true})
-			assert.Equal(t, tc.is1x, errors.Is(err, ErrConvert1xUnderAPC), "%v", err)
+			abs, err := filepath.Abs(home)
+			require.NoError(t, err)
+			assert.Equal(t, tc.is1x, Find1xProject(filepath.Join(home, "dags")) == abs)
 		})
 	}
 }
@@ -148,9 +115,7 @@ func TestTheWalkStopsAtAnyManifest(t *testing.T) {
 	write1x(t, root)
 	writeTree(t, root, map[string]string{"sub/pyproject.toml": "[project]\nname = 'x'\n\n[tool.astro]\nnot-a-key = 1\n"})
 	assert.Empty(t, Find1xProject(filepath.Join(root, "sub", "dags")))
-	_, err := Plan(filepath.Join(root, "sub"), Options{DeploysToAPC: true})
-	require.Error(t, err)
-	assert.NotErrorIs(t, err, ErrConvert1xUnderAPC)
+	assert.Empty(t, Find1xProject(filepath.Join(root, "sub")))
 }
 
 func TestIs1xProject(t *testing.T) {

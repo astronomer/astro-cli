@@ -61,25 +61,22 @@ type Options struct {
 	// airflow_settings.yaml carries, at the project scope the writer itself
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
-	// DeploysToAPC is set by a caller whose current context or platform is
-	// Astro Private Cloud. APC deploys the 1.x layout, with Astro CLI 1.x,
-	// and not yet pyproject.toml projects, so Plan and Run then refuse a
-	// directory that is a 1.x project (Is1xProject) or lies inside one, with
-	// a *Convert1xUnderAPCError naming that project, before anything is
-	// written: a project scaffolded inside one would be deployed with it.
-	// false, the default, is Astro and refuses nothing. Astro Desktop's
-	// conversions are refused only if it sets this.
+	// DeploysToAPC is read by nothing. It once made Plan and Run refuse a 1.x
+	// project under an Astro Private Cloud context, while APC deployed only
+	// the 1.x layout. APC deploys pyproject.toml projects now, so a 1.x
+	// project converts the same way on every platform; the field stays so a
+	// caller that sets it still compiles.
+	//
+	// Deprecated: set APCDomain for an APC context instead.
 	DeploysToAPC bool
 	// APCDomain is the Astro Private Cloud domain of the caller's current
 	// context, set when that context is APC's. A 1.x project's saved deploy
 	// target (.astro/config.yaml project.deployment, with project.workspace)
-	// then becomes an apc link on this domain rather than an astro link. The
-	// context decides, because the ids cannot: Houston's and Astro's are both
-	// cuids. Empty, the default, writes an astro link.
-	//
-	// DeploysToAPC refuses a directory in a 1.x project before this is read,
-	// so a caller that sets both converts nothing. astro init does not set it
-	// yet; it will once APC deploys pyproject.toml projects.
+	// then becomes an apc link on this domain rather than an astro link, and
+	// one that cannot become a link is a note naming the astro link add that
+	// links it under that context. The context decides, because the ids
+	// cannot: Houston's and Astro's are both cuids. Empty, the default, is
+	// Astro. Nothing else in a conversion depends on the platform.
 	APCDomain string
 }
 
@@ -331,24 +328,16 @@ func Run(dir string, opts Options) (*Result, error) {
 // let it happen. Plan reads the project (it has to: an adopted manifest is
 // computed from the one already there) and writes nothing.
 //
-// Under Options.DeploysToAPC it first refuses a directory that is, or is
-// inside, a 1.x project (Convert1xUnderAPCError), having read nothing else.
-//
 //nolint:gocritic // hugeParam: by value on purpose, as Astro Desktop calls it
 func Plan(dir string, opts Options) (*Changeset, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
 	}
-	if opts.DeploysToAPC {
-		if in := Find1xProject(abs); in != "" {
-			return nil, &Convert1xUnderAPCError{Dir: in}
-		}
-	}
 	return plan(abs, &opts)
 }
 
-// plan is Plan for the absolute dir it resolved, once nothing refuses it.
+// plan is Plan for the absolute dir it resolved.
 func plan(abs string, opts *Options) (*Changeset, error) {
 	goos := opts.GOOS
 	if goos == "" {
@@ -1175,7 +1164,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	// A target the conversion linked (setDeployLink) is carried, so it is an
 	// advisory rather than a note; only one it could not link is left to do.
 	if _, linked := from1x.deployLink(); from1x.deployment != "" && !linked {
-		deployNote = config1xRelPath + ": " + deployTargetNote(from1x.deployment, from1x.workspace)
+		deployNote = config1xRelPath + ": " + deployTargetNote(from1x.deployment, from1x.workspace, from1x.apcDomain)
 		out = append(out, deployNote)
 	}
 	// Kept out of forRetirement for the reason deployNote is: planRetirements
@@ -1273,7 +1262,27 @@ func instancesNote(instances []instance1x) string {
 // value carrying a newline would put a second, unindented line under "Left to
 // do:" and a multi-line string into the json notes array a consumer groups by
 // the file name each note starts with.
-func deployTargetNote(deployment, workspace string) string {
+//
+// Under an Astro Private Cloud context (apcDomain) the target is a Houston
+// Deployment, and the note names the astro link add that links it there: an
+// apc link needs the context's domain, which astro link add writes from the
+// context, and a workspace, which it takes from --workspace or the context.
+// Astro CLI 1.x's APC deploy never wrote project.workspace, so this, not a
+// link, is what most APC conversions get.
+func deployTargetNote(deployment, workspace, apcDomain string) string {
+	if apcDomain != "" {
+		const link = "astro link add prod --deployment "
+		if !plainDeployID(deployment) {
+			return "project.deployment holds this project's saved deploy target. If that is a Deployment on " +
+				"Astro Private Cloud " + apcDomain + ", link it under this context with " + link + "<id>"
+		}
+		cmd := link + deployment
+		if plainDeployID(workspace) {
+			cmd += " --workspace " + workspace
+		}
+		return deployment + " is this project's saved deploy target. If that is a Deployment on Astro Private Cloud " +
+			apcDomain + ", link it under this context with " + cmd + ", then astro link default prod to preselect it"
+	}
 	const entry = ". If that is an Astro Deployment, give it a name under " +
 		"[tool.astro.deployments], say [tool.astro.deployments.prod], with "
 	if !plainDeployID(deployment) {

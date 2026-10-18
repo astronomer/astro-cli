@@ -38,15 +38,9 @@ type NotFoundError struct {
 	// marker, so without this the error would only say what is missing, not
 	// that `astro init` upgrades what is there.
 	Project1xDir string
-	// blocked is why astro init refuses Project1xDir (blockedFor), decided
-	// when the error is made.
-	blocked Block
 }
 
 func (e *NotFoundError) Error() string {
-	if e.blocked != NotBlocked && e.Project1xDir != "" {
-		return Blocked1xMessage(e.blocked, e.Project1xDir)
-	}
 	if e.Project1xDir != "" {
 		return project1xMessage(e.Project1xDir)
 	}
@@ -63,22 +57,15 @@ type NoAstroSectionError struct {
 	Start string
 	Dir   string
 	// Has1xProject is whether a 1.x project lies between Start and Dir, Dir
-	// included, or, where astro init refuses one (an APC or unresolved
-	// context), anywhere Start is in; Project1xDir names it.
+	// included; Project1xDir names it.
 	Has1xProject bool
 	Project1xDir string
-	// blocked is why astro init refuses Project1xDir, decided when the error
-	// is made.
-	blocked Block
 }
 
 func (e *NoAstroSectionError) Error() string {
 	root := e.Project1xDir
 	if root == "" {
 		root = e.Dir
-	}
-	if e.blocked != NotBlocked {
-		return Blocked1xMessage(e.blocked, root)
 	}
 	if e.Has1xProject {
 		return project1xMessage(root)
@@ -107,14 +94,10 @@ func LoadError(start, dir string, err error) error {
 	if abs, absErr := filepath.Abs(start); absErr == nil {
 		start = abs
 	}
-	// Where astro init refuses, the 1.x project is the one its own walk finds
-	// (Convert1xBlocked), so this error says what init would. Elsewhere it is
-	// one between start and dir: a tools-only pyproject.toml above a 1.x
-	// project (a monorepo root) does not hide it, while a plain package's
-	// pyproject.toml inside a 1.x tree gets the add-[tool.astro] hint.
-	if why, root := Convert1xBlocked(start); why != NotBlocked {
-		return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: true, Project1xDir: root, blocked: why}
-	}
+	// The 1.x project is one between start and dir: a tools-only
+	// pyproject.toml above a 1.x project (a monorepo root) does not hide it,
+	// while a plain package's pyproject.toml inside a 1.x tree gets the
+	// add-[tool.astro] hint.
 	root := find1xBetween(start, dir)
 	return &NoAstroSectionError{Start: start, Dir: dir, Has1xProject: root != "", Project1xDir: root}
 }
@@ -176,7 +159,7 @@ func Discover(startDir string) (*Project, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return nil, &NotFoundError{Start: abs, Project1xDir: project1xDir, blocked: blockedFor(project1xDir)}
+			return nil, &NotFoundError{Start: abs, Project1xDir: project1xDir}
 		}
 		dir = parent
 	}

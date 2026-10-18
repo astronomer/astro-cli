@@ -54,7 +54,7 @@ func TestNoDeployableProject(t *testing.T) {
 		dir := t.TempDir()
 		make1x(t, dir)
 		deployIn(t, dir)
-		err := refuse(Deploy1xRefusedAstro)
+		err := refuse()
 		assert.EqualError(t, err, "this project uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x")
 		assert.True(t, isNoProject(err))
 	})
@@ -65,15 +65,11 @@ func TestNoDeployableProject(t *testing.T) {
 		sub := filepath.Join(dir, "dags")
 		require.NoError(t, os.MkdirAll(sub, 0o755))
 		deployIn(t, sub)
-		err := refuse(Deploy1xRefusedAstro)
+		err := refuse()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "this directory is inside a project at "+dir+" that uses the Astro CLI 1.x layout")
 		assert.Contains(t, err.Error(), "Convert it with astro init in "+dir+",")
 		assert.True(t, isNoProject(err))
-
-		err = refuse(Deploy1xRefusedAPC)
-		assert.Contains(t, err.Error(), "which Astro CLI v2 does not deploy to Astro Private Cloud. Deploy it with Astro CLI 1.x")
-		assert.NotContains(t, err.Error(), "astro init")
 	})
 
 	t.Run("a 1.x project keeping a pyproject.toml for its tools", func(t *testing.T) {
@@ -81,7 +77,7 @@ func TestNoDeployableProject(t *testing.T) {
 		make1x(t, dir)
 		writeFile(t, dir, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
 		deployIn(t, dir)
-		err := refuse(Deploy1xRefusedAstro)
+		err := refuse()
 		assert.Contains(t, err.Error(), "this project uses the Astro CLI 1.x layout")
 	})
 
@@ -91,14 +87,14 @@ func TestNoDeployableProject(t *testing.T) {
 		sub := filepath.Join(dir, "dags")
 		require.NoError(t, os.MkdirAll(sub, 0o755))
 		deployIn(t, sub)
-		err := refuse(Deploy1xRefusedAstro)
+		err := refuse()
 		assert.EqualError(t, err, "this directory is inside the project at "+dir+". Run the deploy from the project directory, "+dir)
 		assert.True(t, isNoProject(err))
 	})
 
 	t.Run("no project", func(t *testing.T) {
 		deployIn(t, t.TempDir())
-		err := refuse(Deploy1xRefusedAstro)
+		err := refuse()
 		assert.EqualError(t, err, notProjectAdvice)
 		assert.True(t, isNoProject(err))
 	})
@@ -107,7 +103,7 @@ func TestNoDeployableProject(t *testing.T) {
 		dir := t.TempDir()
 		writeFile(t, dir, filepath.Join(".astro", "config.yaml"), "project:\n  name: demo\n")
 		deployIn(t, dir)
-		assert.EqualError(t, refuse(Deploy1xRefusedAstro), notProjectAdvice)
+		assert.EqualError(t, refuse(), notProjectAdvice)
 	})
 }
 
@@ -127,7 +123,7 @@ func TestNoDeployableProjectInTheHomeDirectory(t *testing.T) {
 	writeFile(t, home, "pyproject.toml", "[tool.ruff]\nline-length = 100\n")
 	for _, dir := range []string{home, home + string(filepath.Separator), filepath.Join(home, ".")} {
 		deployIn(t, dir)
-		err := refuse(Deploy1xRefusedAstro)
+		err := refuse()
 		assert.EqualError(t, err, homeDirRefusal)
 		assert.True(t, isNoProject(err))
 		assert.Equal(t, Where{}, Locate(dir))
@@ -136,7 +132,7 @@ func TestNoDeployableProjectInTheHomeDirectory(t *testing.T) {
 	link := filepath.Join(t.TempDir(), "home")
 	if err := os.Symlink(home, link); err == nil {
 		deployIn(t, link)
-		assert.EqualError(t, refuse(Deploy1xRefusedAstro), homeDirRefusal)
+		assert.EqualError(t, refuse(), homeDirRefusal)
 	}
 }
 
@@ -152,7 +148,7 @@ func TestAHomeDirectoryThatIsA1xProject(t *testing.T) {
 	assert.Equal(t, Where{Project1xDir: home}, Locate(home))
 	assert.True(t, scaffold.Is1xProject(home), "the deploy and astro init agree")
 	deployIn(t, home)
-	assert.Contains(t, refuse(Deploy1xRefusedAstro).Error(), "this project uses the Astro CLI 1.x layout")
+	assert.Contains(t, refuse().Error(), "this project uses the Astro CLI 1.x layout")
 	sub := filepath.Join(home, "dags")
 	require.NoError(t, os.MkdirAll(sub, 0o755))
 	assert.Equal(t, Where{Project1xDir: home}, Locate(sub))
@@ -190,7 +186,7 @@ func TestLocate(t *testing.T) {
 		require.NoError(t, os.MkdirAll(sub, 0o755))
 		assert.Equal(t, Where{Project1xDir: oneX}, Locate(sub))
 		deployIn(t, oneX)
-		assert.Contains(t, refuse(Deploy1xRefusedAstro).Error(), "this project uses the Astro CLI 1.x layout")
+		assert.Contains(t, refuse().Error(), "this project uses the Astro CLI 1.x layout")
 	})
 
 	t.Run("a Dockerfile beside a .astro with no config.yaml is no 1.x project", func(t *testing.T) {
@@ -352,8 +348,8 @@ func isRoot(dir string) bool {
 }
 
 // refuse is NoDeployableProject for the working directory, as a deploy calls it.
-func refuse(r Refusal1x) error {
-	return NoDeployableProject(Locate(config.WorkingPath), r)
+func refuse() error {
+	return NoDeployableProject(Locate(config.WorkingPath))
 }
 
 func TestGetDefaultDeployDescription(t *testing.T) {

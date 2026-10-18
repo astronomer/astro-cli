@@ -207,10 +207,10 @@ func in1xProject(t *testing.T) string {
 
 // v2 builds only pyproject.toml projects for APC: a deploy that would build
 // with no project here is refused before anything is asked or sent, and a
-// project in the 1.x layout makes no deploy at all, saying to use Astro CLI
-// 1.x.
+// project in the 1.x layout makes no deploy at all, saying to convert it with
+// astro init or deploy it with Astro CLI 1.x, as on Astro.
 func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
-	apc1x := utils.Deploy1xRefusedAPC("this project", "")
+	apc1x := utils.Deploy1xRefused("this project", "")
 	for _, tc := range []struct {
 		name  string
 		setup func(t *testing.T) string
