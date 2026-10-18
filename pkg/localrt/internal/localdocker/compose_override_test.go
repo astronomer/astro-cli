@@ -34,7 +34,7 @@ func TestStartMergesTheProjectsComposeOverride(t *testing.T) {
 	stateDir, err := rt.StateDir(p.ProjectPath)
 	require.NoError(t, err)
 	generated := filepath.Join(stateDir, composeFileName)
-	assert.Equal(t, fmt.Sprintf("docker compose --file %s --file %s --project-directory %s --project-name %s up --detach --quiet-pull",
+	assert.Equal(t, fmt.Sprintf("docker compose --file %s --file %s --project-directory %s --project-name %s up --detach",
 		generated, override, p.ProjectPath, name), cmd.calls[len(cmd.calls)-1],
 		"the override goes after the generated file, so compose lets it extend and replace what that file sets")
 

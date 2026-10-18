@@ -97,7 +97,8 @@ func (e *Engine) SetContainerBinary(f func(projectPath string) string) {
 	}
 }
 
-// SetHealthTimeout bounds how long a start waits for the api-server to answer.
+// SetHealthTimeout bounds how long a start waits for its containers to come up
+// and the api-server to answer, together. See updeadline.go.
 //
 // A setter rather than another parameter on New, which already takes three and
 // would take a fourth that almost every caller leaves at its default. See
@@ -380,7 +381,8 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		projectDir: projectPath,
 		extraEnv:   secretEnviron(p.SecretEnv),
 	}
-	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
+	deadline, err := e.bringUp(ctx, &up, mayCleanUp, cb)
+	if err != nil {
 		return nil, err
 	}
 
@@ -389,7 +391,12 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		return nil, err
 	}
 
-	if err := e.health(ctx, healthURLs(webPort, major), e.healthTimeout); err != nil {
+	// What the up left of the budget. The wait is still told the whole of it,
+	// which is what its message reports; the context's earlier deadline is the
+	// one that applies.
+	healthCtx, cancelHealth := context.WithDeadline(ctx, deadline)
+	defer cancelHealth()
+	if err := e.health(healthCtx, healthURLs(webPort, major), e.healthTimeout); err != nil {
 		rt.OnState(cb, rt.StateError, err)
 		return nil, err
 	}
@@ -405,14 +412,38 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 // Its own function because Start is already at the complexity limit, and because
 // the decision it carries — whether a failure is this start's to clean up — is
 // worth reading in one place.
-func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) error {
-	if err := e.runCompose(ctx, *up, cb, "up", "--detach", "--quiet-pull"); err != nil {
+//
+// It returns the deadline the rest of the start runs under: the health timeout
+// is one budget for the up and the health wait together, started once the
+// images are in place. See updeadline.go.
+func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) (time.Time, error) {
+	// Pull what is missing and create the containers, without starting any.
+	// Unbounded but for ctx: this is where a cold start spends its minutes,
+	// and none of them are Airflow failing to come up. `up --no-start` rather
+	// than `pull`, because it pulls only what is missing — the same policy the
+	// up always had — so an offline start with cached images still works, and
+	// the locally built image is not looked for in a registry.
+	err := e.runCompose(ctx, *up, cb, "up", "--no-start", "--quiet-pull")
+	var deadline time.Time
+	if err == nil {
+		deadline = time.Now().Add(e.healthTimeout)
+		upCtx, cancel := context.WithDeadline(ctx, deadline)
+		err = e.runCompose(upCtx, *up, cb, "up", "--detach")
+		if err != nil && ctx.Err() == nil && upCtx.Err() != nil {
+			// The budget ran out, not the caller's patience: a Ctrl-C keeps
+			// the plain error, which the rollback below cleans up after just
+			// the same.
+			err = e.upTimedOut(context.WithoutCancel(ctx), up)
+		}
+		cancel()
+	}
+	if err != nil {
 		startErr := fmt.Errorf("starting project containers: %w", err)
 		if !mayCleanUp {
 			// Containers were here before this start, or we could not tell —
 			// either way they are not ours to remove. Name the project so the
 			// user can clean up by hand if they were in fact ours.
-			return fmt.Errorf("%w (containers may remain under compose project %s)", startErr, up.name)
+			return time.Time{}, fmt.Errorf("%w (containers may remain under compose project %s)", startErr, up.name)
 		}
 		// Joined rather than logged: a cleanup report gated on cb.OnLine, which
 		// the contract makes optional, would let a consumer passing
@@ -425,9 +456,9 @@ func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, 
 			// "exit status 1" rather than riding beside it.
 			startErr = databaseNewerError(revision)
 		}
-		return errors.Join(startErr, cleanup)
+		return time.Time{}, errors.Join(startErr, cleanup)
 	}
-	return nil
+	return deadline, nil
 }
 
 // databaseNewerError reports a metadata database the project's Airflow cannot
