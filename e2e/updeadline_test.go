@@ -25,9 +25,9 @@ const upDeadlineBudget = "45s"
 // what this bound catches is the bug itself.
 const upDeadlineBound = 5 * time.Minute
 
-// A docker start whose metadata database never comes up fails at the health
-// timeout, says which service is stuck and what it said, and takes down what it
-// created.
+// A docker start whose metadata database never comes up gives up at the health
+// timeout, says which service was failing and what it said, and takes down
+// what it created.
 //
 // It used to hang. The Airflow services wait on the migration completing, so
 // `compose up --detach` waits inside itself; the runtime image's entrypoint
@@ -51,19 +51,23 @@ func TestADockerStartWhoseDatabaseNeverComesUpFailsInTime(t *testing.T) {
 		map[string]string{"ASTRO_LOCAL_HEALTH_TIMEOUT": upDeadlineBudget},
 		"local", "start", "--docker").requireFailure()
 
-	// Classified as the health timeout, so the CLI names the knob; what was
-	// pending; and the stuck service's own last words, which are the
-	// diagnosis — the containers that held them are gone by now.
+	// What gave up and when; which service was failing; and its own last
+	// words, which are the diagnosis — the containers that held them are gone
+	// by now.
 	for _, want := range []string{
-		"timed out after " + upDeadlineBudget,
-		"before the containers finished starting",
+		"gave up after " + upDeadlineBudget,
 		"Last output from postgres",
 		pgRefusal,
-		"ASTRO_LOCAL_HEALTH_TIMEOUT",
 	} {
 		if !strings.Contains(r.Stderr, want) {
 			t.Errorf("stderr does not carry %q\n%s", want, r.output())
 		}
+	}
+	// And not as a health timeout. A crash loop is not slow: advice to wait
+	// longer, which the CLI adds to a timeout, would send the reader the wrong
+	// way.
+	if strings.Contains(r.Stderr, "ASTRO_LOCAL_HEALTH_TIMEOUT") {
+		t.Errorf("a failing service was reported as a timeout to wait out\n%s", r.output())
 	}
 
 	// Nothing published: the record and route are written after the up.

@@ -385,7 +385,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		projectDir: projectPath,
 		extraEnv:   secretEnviron(p.SecretEnv),
 	}
-	deadline, err := e.bringUp(ctx, &up, mayCleanUp, cb)
+	remaining, err := e.bringUp(ctx, &up, mayCleanUp, cb)
 	if err != nil {
 		return nil, err
 	}
@@ -395,12 +395,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		return nil, err
 	}
 
-	// What the up left of the budget. The wait is still told the whole of it,
-	// which is what its message reports; the context's earlier deadline is the
-	// one that applies.
-	healthCtx, cancelHealth := context.WithDeadline(ctx, deadline)
-	defer cancelHealth()
-	if err := e.health(healthCtx, healthURLs(webPort, major), e.healthTimeout); err != nil {
+	if err := e.awaitHealth(ctx, healthURLs(webPort, major), remaining); err != nil {
 		rt.OnState(cb, rt.StateError, err)
 		return nil, err
 	}
@@ -417,10 +412,10 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 // the decision it carries — whether a failure is this start's to clean up — is
 // worth reading in one place.
 //
-// It returns the deadline the rest of the start runs under: the health timeout
-// is one budget for the up and the health wait together, started once the
+// It returns what the up left of the budget for the health wait: the health
+// timeout is one budget for the up and the wait together, started once the
 // images are in place. See updeadline.go.
-func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) (time.Time, error) {
+func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) (time.Duration, error) {
 	// Pull what is missing and create the containers, without starting any.
 	// Unbounded but for ctx: this is where a cold start spends its minutes,
 	// and none of them are Airflow failing to come up. `up --no-start` rather
@@ -428,41 +423,86 @@ func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, 
 	// up always had — so an offline start with cached images still works, and
 	// the locally built image is not looked for in a registry.
 	err := e.runCompose(ctx, *up, cb, "up", "--no-start", "--quiet-pull")
-	var deadline time.Time
+	var (
+		remaining time.Duration
+		timedOut  *upFailure
+	)
 	if err == nil {
-		deadline = time.Now().Add(e.healthTimeout)
-		upCtx, cancel := context.WithDeadline(ctx, deadline)
-		err = e.runCompose(upCtx, *up, cb, "up", "--detach")
+		began := e.now()
+		upCtx, cancel := context.WithTimeout(ctx, e.healthTimeout)
+		// --quiet-pull here too: nothing should be left to pull, but a
+		// pull_policy in an override, or an image removed between the two
+		// steps, would otherwise stream progress bars through cb.OnLine.
+		err = e.runCompose(upCtx, *up, cb, "up", "--detach", "--quiet-pull")
 		if err != nil && ctx.Err() == nil && upCtx.Err() != nil {
 			// The budget ran out, not the caller's patience: a Ctrl-C keeps
 			// the plain error, which the rollback below cleans up after just
 			// the same.
-			err = e.upTimedOut(context.WithoutCancel(ctx), up)
+			f := e.upTimedOut(context.WithoutCancel(ctx), up)
+			timedOut, err = &f, f.err
 		}
 		cancel()
+		remaining = e.healthTimeout - e.now().Sub(began)
 	}
-	if err != nil {
-		startErr := fmt.Errorf("starting project containers: %w", err)
-		if !mayCleanUp {
-			// Containers were here before this start, or we could not tell —
-			// either way they are not ours to remove. Name the project so the
-			// user can clean up by hand if they were in fact ours.
-			return time.Time{}, fmt.Errorf("%w (containers may remain under compose project %s)", startErr, up.name)
-		}
-		// Joined rather than logged: a cleanup report gated on cb.OnLine, which
-		// the contract makes optional, would let a consumer passing
-		// rt.Callbacks{} leak containers with no signal anywhere. Joining keeps
-		// errors.Is on the start error intact, and Start's deferred StateError
-		// reports the joined value.
-		revision, cleanup := e.rollback(ctx, up.conn, up.name, cb)
-		if revision != "" {
+	if err == nil {
+		return remaining, nil
+	}
+	startErr := fmt.Errorf("starting project containers: %w", err)
+	if !mayCleanUp {
+		return 0, e.leaveContainers(ctx, up, startErr, timedOut, cb)
+	}
+	// Joined rather than logged: a cleanup report gated on cb.OnLine, which
+	// the contract makes optional, would let a consumer passing
+	// rt.Callbacks{} leak containers with no signal anywhere. Joining keeps
+	// errors.Is on the start error intact, and Start's deferred StateError
+	// reports the joined value.
+	//
+	// After a timed-out up the stuck services' logs were just read, and
+	// reading every service's again would repeat them in the error of a
+	// caller with no OnLine, and spend a second capture budget on a daemon
+	// that may be the reason the up hung.
+	readLogs := timedOut == nil || !timedOut.logsRead
+	revision, cleanup := e.rollback(ctx, up.conn, up.name, cb, readLogs)
+	if timedOut != nil && revision == "" {
+		revision = timedOut.revision
+	}
+	if revision != "" {
+		if timedOut != nil {
+			// Beside the diagnosis rather than instead of it: what was pending
+			// and what it said is worth keeping, and so is its sentinel.
+			startErr = errors.Join(databaseNewerError(revision), startErr)
+		} else {
 			// The one failure the logs can name precisely, so it replaces
 			// "exit status 1" rather than riding beside it.
 			startErr = databaseNewerError(revision)
 		}
-		return time.Time{}, errors.Join(startErr, cleanup)
 	}
-	return deadline, nil
+	return 0, errors.Join(startErr, cleanup)
+}
+
+// leaveContainers reports a failed up whose containers are not this start's
+// to remove: they were there before it, or the probe could not tell.
+//
+// Not removed, but after a timed-out up, stopped. Left running, a
+// crash-looping postgres restarts for as long as the engine runs, with no
+// record for `astro local stop` to find it by. A stop keeps the containers and
+// the database for whoever they belong to; compose start brings them back.
+func (e *Engine) leaveContainers(ctx context.Context, up *composeLine, startErr error, timedOut *upFailure, cb rt.Callbacks) error {
+	if timedOut == nil {
+		// Name the project so the user can clean up by hand if they were in
+		// fact ours.
+		return fmt.Errorf("%w (containers may remain under compose project %s)", startErr, up.name)
+	}
+	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+	defer cancel()
+	line := composeLine{conn: up.conn, name: up.name}
+	if err := e.runCompose(stopCtx, line, cb, "stop", "--timeout", strconv.Itoa(gracefulStopTimeout)); err != nil {
+		return errors.Join(
+			fmt.Errorf("%w (containers remain under compose project %s)", startErr, up.name),
+			fmt.Errorf("stopping them: %w", err))
+	}
+	return fmt.Errorf("%w (the containers of compose project %s were there before this start, so they were stopped, not removed)",
+		startErr, up.name)
 }
 
 // databaseNewerError reports a metadata database the project's Airflow cannot
@@ -587,8 +627,9 @@ var logCaptureTimeout = 20 * time.Second
 //
 // It also reports the migration revision the logs say Airflow could not find,
 // or "" when they do not, so the caller can name that failure; see
-// captureFailureLogs.
-func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb rt.Callbacks) (string, error) {
+// captureFailureLogs. readLogs false skips that read, for a caller that has
+// just read them itself.
+func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb rt.Callbacks, readLogs bool) (string, error) {
 	// Detached from the caller's context, which is the difference between this
 	// running and not. The failure this exists for is a wedged daemon or a stalled
 	// pull, and the desktop drives every docker action under a deadline — so the
@@ -603,7 +644,13 @@ func (e *Engine) rollback(ctx context.Context, conn engineConn, name string, cb 
 	// migration, so a failing `airflow db migrate` surfaces as nothing more than
 	// "dependency failed to start ... exited (1)" while the traceback sits in that
 	// container. Removing it first makes the error unrecoverable.
-	revision, tail := e.captureFailureLogs(ctx, conn, name, cb)
+	var (
+		revision string
+		tail     error
+	)
+	if readLogs {
+		revision, tail = e.captureFailureLogs(ctx, conn, name, cb)
+	}
 
 	// cb is threaded through so the teardown is not silent. It can take most of a
 	// minute on a slow daemon, and a consumer rendering the event stream would

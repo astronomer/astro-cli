@@ -236,7 +236,7 @@ func TestStartBringsProjectUp(t *testing.T) {
 		"the pre-flight probe must ask about the project the teardown would remove")
 	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --no-start --quiet-pull",
 		composeFile, p.ProjectPath, name), cmd.calls[2])
-	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach",
+	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach --quiet-pull",
 		composeFile, p.ProjectPath, name), cmd.calls[3])
 	assert.FileExists(t, composeFile)
 

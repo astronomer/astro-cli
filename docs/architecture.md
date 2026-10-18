@@ -188,6 +188,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `locked` | another start of this project is in progress; try again (Unix only) |
 | `unsupported_base` | the image base is not one this mode can run |
 | `database_newer_than_airflow` | the metadata database was migrated by a newer Airflow (Docker mode) |
+| `service_failed` | a container kept failing while the project was starting, so a longer wait would not help (Docker mode) |
 | `not_running` | nothing is running for this project |
 | `deployment_hibernating`, `deployment_deploying`, `deployment_unhealthy`, `airflow_unavailable` | an Astro Deployment's Airflow did not answer (see [instances.md](instances.md#when-a-deployments-airflow-does-not-answer)); `deployment_deploying` and `airflow_unavailable` mean try again |
 | `unauthenticated` | no usable Astro login: none was made, the API refused the token (401), or one was needed and a run under `--output json` may not start a browser login |

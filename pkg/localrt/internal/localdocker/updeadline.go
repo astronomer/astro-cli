@@ -4,10 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
 // Why `compose up --detach` needs a deadline of its own.
@@ -29,31 +34,91 @@ import (
 // failure the knob is about, and charging it to the budget would fail a first
 // start that was making progress the whole time.
 
-// upTimedOut is the error for an up that ran out the budget: ErrHealthTimeout,
-// so every caller that classifies the health timeout — `--output json`'s
-// problem kind, the CLI's advice naming the variable — classifies this one the
-// same, with what was still pending and what the stuck service last said.
+// minHealthWait is the least the health wait is given, so an up that finished
+// at the very end of the budget still gets a probe or two rather than a
+// timeout that never asked.
+const minHealthWait = time.Second
+
+// awaitHealth waits for Airflow to answer with what the up left of the budget.
+//
+// The wait is told the time it actually has, so its message reports that, and
+// a timeout says where the rest of the budget went: "timed out after 12s" from
+// a start given 45s otherwise reads as the setting not taking.
+func (e *Engine) awaitHealth(ctx context.Context, urls []string, remaining time.Duration) error {
+	wait := max(remaining, minHealthWait)
+	if wait > time.Second {
+		wait = wait.Round(time.Second)
+	}
+	err := e.health(ctx, urls, wait)
+	if err != nil && errors.Is(err, ErrHealthTimeout) && wait < e.healthTimeout {
+		return fmt.Errorf("%w (what was left of the %s budget: the containers took %s of it to start)",
+			err, e.healthTimeout, (e.healthTimeout - remaining).Round(time.Second))
+	}
+	return err
+}
+
+// ErrServiceFailed is a start whose containers did not come up because one of
+// them kept failing, as distinct from one that was merely slow.
+var ErrServiceFailed = rt.ErrServiceFailed
+
+// upFailure is what upTimedOut found out about an up that ran out the budget.
+type upFailure struct {
+	// err is the error to report.
+	err error
+	// failing reports that a service kept failing, rather than the up being
+	// slow.
+	failing bool
+	// revision is the migration revision the stuck services' logs say Airflow
+	// could not find, or "" (see captureFailureLogs).
+	revision string
+	// logsRead reports that the stuck services' logs were read, so the
+	// rollback need not read them again.
+	logsRead bool
+}
+
+// upTimedOut diagnoses an up that ran out the budget, from what compose says
+// about the project's containers.
+//
+// Two answers, because they call for opposite advice. A service that kept
+// exiting non-zero — postgres crash-looping on a data directory it refuses —
+// is ErrServiceFailed: no budget would have been enough, so the error must not
+// say to wait longer, and --output json must not say Airflow may still be
+// coming up. Anything else — the migration still running, nothing failed — is
+// ErrHealthTimeout: slow, and a longer budget is the remedy.
 //
 // Diagnosis is best effort and bounded: ctx must not be the expired up
 // context, or neither query could even be spawned.
-func (e *Engine) upTimedOut(ctx context.Context, up *composeLine) error {
+func (e *Engine) upTimedOut(ctx context.Context, up *composeLine) upFailure {
 	ctx, cancel := context.WithTimeout(ctx, logCaptureTimeout)
 	defer cancel()
 
-	var detail strings.Builder
+	var (
+		detail strings.Builder
+		out    upFailure
+	)
 	if services, err := e.composeServices(ctx, *up); err == nil {
-		pending, stuck := pendingServices(services)
+		var pending, stuck []string
+		pending, stuck, out.failing = pendingServices(services)
 		if len(pending) > 0 {
 			detail.WriteString(": " + strings.Join(pending, "; "))
 		}
-		for _, svc := range stuck {
-			if tail := e.serviceTail(ctx, up, svc); tail != "" {
-				fmt.Fprintf(&detail, ". Last output from %s: %s", svc, tail)
+		if len(stuck) > 0 {
+			var tails map[string]string
+			tails, out.revision, out.logsRead = e.serviceTails(ctx, up, stuck)
+			for _, svc := range stuck {
+				if tail := tails[svc]; tail != "" {
+					fmt.Fprintf(&detail, ". Last output from %s: %s", svc, tail)
+				}
 			}
 		}
 	}
-	return fmt.Errorf("%w after %s, before the containers finished starting%s",
-		ErrHealthTimeout, e.healthTimeout, detail.String())
+	if out.failing {
+		out.err = fmt.Errorf("%w, so the start gave up after %s%s", ErrServiceFailed, e.healthTimeout, detail.String())
+	} else {
+		out.err = fmt.Errorf("%w after %s, before the containers finished starting%s",
+			ErrHealthTimeout, e.healthTimeout, detail.String())
+	}
+	return out
 }
 
 // composeService is the part of one `compose ps --format json` entry this
@@ -95,54 +160,63 @@ func (e *Engine) composeServices(ctx context.Context, up composeLine) ([]compose
 	return services, nil
 }
 
-// pendingServices describes what the up was still waiting on, and names the
-// services whose own output is the likeliest explanation.
+// migrationService is the one-shot service the components wait on.
+const migrationService = "db-migration"
+
+// pendingServices describes what the up was still waiting on, names the
+// services whose own output is the likeliest explanation, and reports whether
+// any of them is failing rather than slow.
 //
-// A service is done when it exited 0 (the one-shot migration), in progress
-// when it is running, and waiting on a dependency when it is only created —
-// one of those has said nothing worth quoting. Everything else is failing,
-// and its logs say why.
+// A service is done when it exited 0: the one-shot migration. It is waiting on
+// a dependency when it is only created, which says nothing worth quoting, and
+// in progress when it is running. It is failing when it has a non-zero exit
+// code whatever its state, or is restarting or dead — and its logs say why.
 //
-// "Everything else" rather than a list of failure states, because the engines
-// do not agree on how a crash loop looks. Docker shows the container
+// By exit code rather than a list of failure states, because the engines do
+// not agree on how a crash loop looks. Docker shows the container
 // "restarting" between attempts. Podman restarts it at once and has no such
 // state: sampled mid-loop, `podman compose ps -a` reported it "running" with
 // the last exit code (1) about half the time and "stopped" the rest, with
 // code 1 or, mid-transition, 0. A list naming docker's spellings missed all
 // of those, and quoted the migration waiting on postgres instead of postgres.
-// Hence also "running" with a non-zero exit code: up again, but only after
-// crashing.
-func pendingServices(services []composeService) (pending, stuck []string) {
+// Hence "running" with a non-zero exit code is failing: up again, but only
+// after crashing. And "stopped" with 0 is not: it is podman's word for a
+// finished one-shot as well as for that transition, so it counts as done for
+// the migration and as still in progress for anything else.
+func pendingServices(services []composeService) (pending, stuck []string, failing bool) {
 	slices.SortFunc(services, func(a, b composeService) int { return strings.Compare(a.Service, b.Service) })
-	var waiting, running []string
+	var waiting, inProgress, slow []string
 	for _, s := range services {
 		switch {
-		case s.State == "exited" && s.ExitCode == 0:
+		case s.ExitCode == 0 && (s.State == "exited" || (s.State == "stopped" && s.Service == migrationService)):
+			// Done.
 		case s.State == "created":
 			waiting = append(waiting, s.Service)
-		case s.State == "running" && s.ExitCode == 0:
-			running = append(running, s.Service)
+		case s.ExitCode == 0 && s.State != "restarting" && s.State != "dead":
+			slow = append(slow, s.Service)
+			if s.State == "running" {
+				inProgress = append(inProgress, s.Service)
+			} else {
+				inProgress = append(inProgress, s.Service+" ("+s.State+")")
+			}
 		default:
 			pending = append(pending, s.Service+" "+describeFailure(s))
 			stuck = append(stuck, s.Service)
 		}
 	}
-	if len(waiting) == 0 {
-		// Nothing is held back, so whatever compose was waiting for is not a
-		// dependency; the failing services, if any, are the whole story.
-		return pending, stuck
+	failing = len(stuck) > 0
+	if len(waiting) > 0 {
+		pending = append(pending, "never started, waiting on a dependency: "+strings.Join(waiting, ", "))
 	}
-	pending = append(pending, "never started, waiting on a dependency: "+strings.Join(waiting, ", "))
-	if len(stuck) == 0 {
-		// Nothing failed outright, so something running is taking too long.
-		// Every running service is a candidate; there are at most two (the
-		// database and the migration) before the components start.
-		stuck = running
-		if len(running) > 0 {
-			pending = append(pending, "still running: "+strings.Join(running, ", "))
-		}
+	if !failing && len(waiting) > 0 && len(slow) > 0 {
+		// Nothing failed outright and something is held back, so what is
+		// running is taking too long. There are at most two (the database and
+		// the migration) before the components start. With nothing held back,
+		// a running service is just running, and naming it would accuse it.
+		pending = append(pending, "still running: "+strings.Join(inProgress, ", "))
+		stuck = slow
 	}
-	return pending, stuck
+	return pending, stuck, failing
 }
 
 // describeFailure says how a failing service looks, with its exit code when
@@ -169,24 +243,50 @@ const (
 	serviceTailRead  = 50
 )
 
-// serviceTail is the last few distinct lines one service printed, joined into
-// one line, or "" when they cannot be read.
-func (e *Engine) serviceTail(ctx context.Context, up *composeLine, service string) string {
-	out, err := e.cmd.Output(ctx, up.conn.env, up.conn.bin, "compose", "-p", up.name, "logs",
-		"--no-color", "--no-log-prefix", "--tail", strconv.Itoa(serviceTailRead), service)
+// serviceTails reads the stuck services' recent output in one `compose logs`,
+// and returns each one's last few distinct lines joined into one line, the
+// migration revision those lines say Airflow could not find, and whether the
+// logs could be read at all.
+//
+// One call for every service rather than one each: on a wedged daemon each
+// call can take the whole capture budget. Split by compose's per-container
+// prefix, the same parse Logs uses.
+func (e *Engine) serviceTails(ctx context.Context, up *composeLine, services []string) (tails map[string]string, revision string, read bool) {
+	args := append([]string{"compose", "-p", up.name, "logs", "--no-color", "--tail", strconv.Itoa(serviceTailRead)}, services...)
+	out, err := e.cmd.Output(ctx, up.conn.env, up.conn.bin, args...)
 	if err != nil {
-		return ""
+		return nil, "", false
 	}
-	var lines []string
+	byService := map[string][]string{}
 	for line := range strings.Lines(string(out)) {
-		line = strings.TrimSpace(line)
-		if line == "" || slices.Contains(lines, line) {
+		l := parseLogLine(strings.TrimRight(line, "\r\n"), e.now)
+		text := strings.TrimSpace(l.Text)
+		if text == "" {
 			continue
 		}
-		lines = append(lines, line)
+		if revision == "" {
+			revision, _ = airflowrt.UnknownMigrationRevision(text)
+		}
+		byService[l.Component] = append(byService[l.Component], text)
 	}
-	if len(lines) > serviceTailLines {
-		lines = lines[len(lines)-serviceTailLines:]
+	tails = make(map[string]string, len(byService))
+	for svc, lines := range byService {
+		tails[svc] = strings.Join(lastDistinct(lines, serviceTailLines), " | ")
 	}
-	return strings.Join(lines, " | ")
+	return tails, revision, true
+}
+
+// lastDistinct is the last n distinct lines, in the order they were printed,
+// each at its LAST occurrence. Keeping the first occurrence instead placed a
+// crash loop's repeated FATAL at its earliest position, where the cut to n
+// could drop it in favor of older, less useful lines.
+func lastDistinct(lines []string, n int) []string {
+	var picked []string
+	for i := len(lines) - 1; i >= 0 && len(picked) < n; i-- {
+		if !slices.Contains(picked, lines[i]) {
+			picked = append(picked, lines[i])
+		}
+	}
+	slices.Reverse(picked)
+	return picked
 }
