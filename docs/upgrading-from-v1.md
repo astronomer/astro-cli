@@ -12,7 +12,7 @@ astro init
 
 `astro init` converts a 1.x project in place (see [A project is a `pyproject.toml`](#a-project-is-a-pyprojecttoml) and [install.md](install.md#step-4-check-the-conversion-and-finish-it)). Until a project is converted, `astro deploy` in it fails with `this project uses the Astro CLI 1.x layout …, and Astro CLI v2 deploys only pyproject.toml projects. Convert it with astro init, or deploy it with Astro CLI 1.x`, and `astro dev` commands point at `astro init` too. `astro deploy --image-name` too: a prebuilt image deployed from a 1.x checkout would leave its DAGs stale. Outside any project, `--image-name` deploys an image you already built, alone, with no DAGs.
 
-On Astro Private Cloud, v2 builds and deploys `pyproject.toml` projects, Airflow 2 and 3, to the `apc` links a project names, as it does on Astro (see [deploy.md](deploy.md#astro-private-cloud)). A deploy names its Deployment, as the argument or with `--deployment`, or asks: a 1.x CI job that ran a bare `astro deploy` against the Deployment `--save` remembered fails until it names one. `astro init` does not convert a 1.x project under an Astro Private Cloud context yet, so a project kept in the 1.x layout there deploys with Astro CLI 1.x for now. v2 also deploys an image you built (`astro deploy --image-name`, from a converted project or outside any project).
+On Astro Private Cloud, v2 builds and deploys `pyproject.toml` projects, Airflow 2 and 3, to the `apc` links a project names, as it does on Astro (see [deploy.md](deploy.md#astro-private-cloud)). A deploy names its Deployment, as the argument or with `--deployment`, or asks: a 1.x CI job that ran a bare `astro deploy` against the Deployment `--save` remembered fails until it names one. A 1.x project on Astro Private Cloud converts with `astro init` exactly as one on Astro does, and then deploys from its `pyproject.toml`; a Dockerfile on a mirror of Astro Runtime is kept as the project's build, so an air-gapped project keeps building from its mirror. v2 also deploys an image you built (`astro deploy --image-name`, from a converted project or outside any project).
 
 ## What's new
 
@@ -23,7 +23,7 @@ A v2 project is a directory whose `pyproject.toml` has a `[tool.astro]` table. T
 `astro init` creates a new project, or converts a 1.x project in place:
 - `requirements.txt` becomes `[project] dependencies`, and `packages.txt` becomes `packages`;
 - `airflow_settings.yaml` connections and variables go into the encrypted vault, and its pools go into `[tool.astro.pools]`;
-- a deploy target saved in `.astro/config.yaml` becomes a linked Deployment when the file holds both an Astro Deployment id (`project.deployment`) and its workspace (`project.workspace`). `astro deploy --save` writes only the first, so usually `init` leaves a note naming the Deployment instead. Link it yourself with `astro link add <name> --deployment <id>`, or add it under `[tool.astro.deployments]`.
+- a deploy target saved in `.astro/config.yaml` becomes a linked Deployment when the file holds both a Deployment id (`project.deployment`) and its workspace (`project.workspace`): an Astro link, or under an Astro Private Cloud context an `apc` link on that context's domain. `astro deploy --save` writes only the first. Under an Astro Private Cloud context `init` takes the workspace from the context's current one, where 1.x looked the saved id up, and links it (if that is the wrong workspace, `astro deploy` says the Deployment is not in it, and `astro link add default --deployment <id> --workspace <workspace-id> --replace` fixes the link); on Astro, and with no current workspace, `init` leaves a note saying the Deployment was not linked, with the `astro link add` and `astro link default` commands that link it.
 
 A Dockerfile that only picks a base image is dropped, and any other Dockerfile is kept as the project's build. `init` ends by listing anything it could not carry. Step by step: [install.md](install.md).
 
@@ -137,12 +137,30 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--non-dags-local-path` | the PATH argument of `astro deploy bundle` | `astro deploy` |
 | `--non-dags-mount-path` | `astro deploy bundle --mount-path` | `astro deploy` |
 | `--non-dags-bundle-type` | `astro deploy bundle --type` | `astro deploy` |
+| `--build-secrets` | `--build-secret`, repeated once for each secret | `astro deploy`, `astro remote deploy` |
 
 Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands and `astro env`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them.
 
 ### Behavior
 
 - **`project.deployment` is gone.** `astro deploy --save` wrote it into a 1.x project's `.astro/config.yaml`, and nothing in v2 reads it: `astro config set` and `get` of it say it was removed. Name the Deployment on each deploy, as the argument or with `--deployment`, or link it with `astro link add`.
+- **Other 1.x-only settings are refused too.** `astro config set` and `get` refuse the settings only 1.x reads (`dev.mode`, `webserver.port`, `postgres.*`, `skip_parse` and the rest), naming what replaces each, and `astro config list` leaves them out. 1.x and v2 share `~/.astro/config.yaml`, so v2 leaves those settings where they are for 1.x and only ever writes the ones you set. Once, the first time it runs, v2 removes from that file the defaults older versions of either CLI wrote into it without being asked (every setting still at the value it shipped with, such as a `postgres.tag` of `12.6`), as Astro CLI 1.46 does, so each setting follows its default again. To run 1.x next to v2, use 1.x v1.46.0 or later: earlier versions write their defaults back into the shared config every time they save, and this cleanup runs only once.
+- **Some settings have new names.** Each is named for what it affects. `astro config get` and `set` take only the new name: the 1.x name is refused, naming the new one, as a removed flag is. A value already saved under the 1.x name still applies, and while 1.x and v2 share `~/.astro/config.yaml` they keep each other's changes: v2 reads the 1.x name first, and when the file holds it, a `set` writes both names.
+
+  | 1.x | v2 |
+  | --- | --- |
+  | `auto_select` | `deployment.auto_select` |
+  | `cosmos_boost.pre_deploy` | `deploy.cosmos_boost` |
+  | `remote.client_registry` | `deploy.remote_execution.client_registry` |
+  | `remote.base_image_registry` | `deploy.remote_execution.base_image_registry` |
+  | `show_warnings` | `apc.show_warnings` |
+  | `sha_as_tag` | `apc.sha_as_tag` |
+  | `page_size` | `apc.page_size` |
+  | `interactive` | `apc.interactive` |
+  | `houston.dial_timeout` | `apc.dial_timeout` |
+  | `houston.skip_verify_tls` | `apc.skip_verify_tls` |
+
+  The overrides for Astronomer's own development (`cloud.api.*`, `local.core`, `local.houston`, `local.platform`) moved under `internal.` and are left out of `astro config list`.
 - **An `astro api airflow` request needs a target.** 1.x defaulted to `localhost:8080`. v2 needs `-d <link or Deployment>` or `--url`. For the Airflow on your machine, use `astro local api`. `ls` and `describe` only read the API spec, so they run without a target.
 - **Local Airflow runs without Docker by default.** Add `--docker` to `astro local start` for containers. uv 0.9.25 or later must be on your PATH. Windows needs `--docker`.
 - **`astro deployment bundle delete` says the deletion was requested.** 1.x printed `Deleted bundle <id> from deployment <id>`. v2 prints `Requested deletion of bundle <id> from deployment <id>`, because the API removes a bundle in the background, and `bundle list` shows it with `deletion_is_pending` until it is gone. A script matching the old line should match the new one, or use `-o json`, whose `action` is `deletion_requested`.

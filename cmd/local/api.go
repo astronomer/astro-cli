@@ -62,7 +62,7 @@ func newAPICmd(c *cli) *cobra.Command {
 			"The ls command lists the endpoints this Airflow serves and spec prints its OpenAPI document, both read from " +
 			"the Airflow itself. For a deployment, astro api airflow is the same idea with the published API spec " +
 			"behind it.",
-		Example: "  # Every DAG, as Airflow itself reports them\n" +
+		Example: "  # Every Dag, as Airflow itself reports them\n" +
 			"  astro local api /dags\n\n" +
 			"  # Typed fields become the query string on a GET\n" +
 			"  astro local api dags -F limit=10 -F only_active=true\n\n" +

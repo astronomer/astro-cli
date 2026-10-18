@@ -21,9 +21,9 @@ func newHealthCmd(d Deps, t target) *cobra.Command {
 	q := &query{cli: &cli{d: d}, t: t}
 	cmd := &cobra.Command{
 		Use:   "health",
-		Short: "Report an Airflow's version, import errors, DAG warnings, and run counts",
+		Short: "Report an Airflow's version, import errors, Dag warnings, and run counts",
 		Long: "Read the four things that answer \"is this Airflow in good shape\" on " + t.which() + ": what " +
-			"version it runs, which DAG files failed to parse, what the scheduler is warning about, and how its " +
+			"version it runs, which Dag files failed to parse, what the scheduler is warning about, and how its " +
 			"runs are distributed across states.\n\nEach part is read on its own and a part that fails is reported " +
 			"as failed rather than ending the command, so an Airflow that serves three of the four still gives " +
 			"you three. The command itself succeeds whenever it could produce a report; overall_status is the " +
@@ -275,7 +275,7 @@ func readHealthDAGStats(ctx context.Context, client *airflowapi.Client) healthDA
 	if errors.Is(err, airflowapi.ErrNotServed) {
 		// Not every Airflow has this endpoint, and the rest of the report is
 		// worth having without it.
-		return healthDAGStats{Note: notServedMessage("DAG run statistics")}
+		return healthDAGStats{Note: notServedMessage("Dag run statistics")}
 	}
 	if err != nil {
 		return healthDAGStats{Error: sectionFailure(err)}
@@ -306,13 +306,13 @@ func (r healthReport) verdict() (status, reason string) {
 	switch {
 	case r.ImportErrors.Count > 0:
 		status = healthUnhealthy
-		reason = fmt.Sprintf("%d DAG file(s) failed to parse", r.ImportErrors.Count)
+		reason = fmt.Sprintf("%d Dag file(s) failed to parse", r.ImportErrors.Count)
 	case r.DAGWarnings.Count > 0:
 		status = healthWarning
-		reason = fmt.Sprintf("%d DAG warning(s)", r.DAGWarnings.Count)
+		reason = fmt.Sprintf("%d Dag warning(s)", r.DAGWarnings.Count)
 	default:
 		status = healthHealthy
-		reason = "no import errors or DAG warnings"
+		reason = "no import errors or Dag warnings"
 	}
 	unread := r.unread()
 	if len(unread) == 0 {
@@ -330,7 +330,7 @@ func (r healthReport) verdict() (status, reason string) {
 // errHealthUnreadable reports that every section failed. A report of nothing is
 // not a report, so the command fails rather than printing four errors under a
 // verdict it had no evidence for.
-var errHealthUnreadable = errors.New("could not read anything from this Airflow: no version, import errors, DAG warnings, or run statistics")
+var errHealthUnreadable = errors.New("could not read anything from this Airflow: no version, import errors, Dag warnings, or run statistics")
 
 // countedLine is one section's summary line: a label, its count, and the
 // per-item lines under it.
@@ -380,8 +380,8 @@ func (r healthReport) sections() []struct{ name, err string } {
 	return []struct{ name, err string }{
 		{"version", r.Version.Error},
 		{"import errors", r.ImportErrors.Error},
-		{"DAG warnings", r.DAGWarnings.Error},
-		{"DAG statistics", r.DAGStats.Error},
+		{"Dag warnings", r.DAGWarnings.Error},
+		{"Dag statistics", r.DAGStats.Error},
 	}
 }
 
@@ -478,5 +478,5 @@ func dagStatsDetail(section healthDAGStats) string {
 	}
 	// DAGsWithRuns rather than len(section.DAGs): see the field's comment for
 	// why the length is not reportable as either reading.
-	return fmt.Sprintf("%d DAG(s) with runs, %s", section.DAGsWithRuns, strings.Join(parts, " "))
+	return fmt.Sprintf("%d Dag(s) with runs, %s", section.DAGsWithRuns, strings.Join(parts, " "))
 }

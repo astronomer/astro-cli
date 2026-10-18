@@ -9,23 +9,14 @@ import (
 
 // registerValidator is a helper to register a validator for a config option
 func registerValidator(configPath string, validator ValidatorFunc) {
-	cfg := CFGStrMap[configPath]
-	cfg.RegisterValidator(validator)
-	CFGStrMap[configPath] = cfg
+	c := CFGStrMap[configPath]
+	c.RegisterValidator(validator)
+	CFGStrMap[configPath] = c
 }
 
 // registerValidators registers validation functions for config options
 func registerValidators() {
-	registerValidator("remote.client_registry", ValidateRegistryEndpoint)
-	registerValidator("dev.mode", ValidateDevMode)
-}
-
-// ValidateDevMode validates that the dev.mode config value is either "docker" or "standalone"
-func ValidateDevMode(value string) error {
-	if value != "docker" && value != "standalone" {
-		return fmt.Errorf("dev.mode must be \"docker\" or \"standalone\", got %q", value)
-	}
-	return nil
+	registerValidator(CFG.RemoteClientRegistry.Path, ValidateRegistryEndpoint)
 }
 
 // ValidateRegistryEndpoint validates a registry endpoint format
@@ -72,7 +63,8 @@ func ValidateRegistryEndpoint(endpoint string) error {
 	return nil
 }
 
-// ClientRegistry is remote.client_registry as the CLI uses it: the project
+// ClientRegistry is deploy.remote_execution.client_registry (1.x's
+// remote.client_registry) as the CLI uses it: the project
 // config's when it sets one, else the global config's; "" when neither does.
 // A saved value is checked as a new one is, since it may predate the check or
 // have been written into the file by hand, and one that is not a registry
@@ -85,26 +77,42 @@ func ClientRegistry() (string, error) {
 	}
 	if err := ValidateRegistryEndpoint(value); err != nil {
 		where, fix := clientRegistryScope()
-		return "", fmt.Errorf("remote.client_registry in %s is not a usable registry endpoint: %w. Fix it with: '%s'", where, err, fix)
+		return "", fmt.Errorf("%s in %s is not a usable registry endpoint: %w. Fix it with: '%s'", clientRegistryKey(), where, err, fix)
 	}
 	return value, nil
 }
 
-// ClientRegistryFix is the command that sets remote.client_registry where the
+// ClientRegistryFix is the command that sets the client registry where the
 // CLI reads it from, for an error that says to set it.
 func ClientRegistryFix() string {
 	_, fix := clientRegistryScope()
 	return fix
 }
 
-// clientRegistryScope names the config remote.client_registry is read from
-// and the command that changes it there: the project's when it sets the key,
+// clientRegistryScope names the config the client registry is read from and
+// the command that changes it there: the project's when it sets the key,
 // even to "", since that shadows the global one; else the global one, which
 // takes -g from anywhere: without it, `astro config set` writes the project's
-// config inside a project and refuses outside one.
+// config inside a project and refuses outside one. The command names the
+// current key, which wins over the 1.x one it was read from.
 func clientRegistryScope() (where, fix string) {
-	if c := CFG.RemoteClientRegistry; configExists(viperProject) && viperProject.IsSet(c.Path) {
-		return "this project's config", "astro config set remote.client_registry <registry>/<repository>"
+	c := CFG.RemoteClientRegistry
+	if c.projectKey() != "" {
+		return "this project's config", "astro config set " + c.Path + " <registry>/<repository>"
 	}
-	return "your global config", "astro config set -g remote.client_registry <registry>/<repository>"
+	return "your global config", "astro config set -g " + c.Path + " <registry>/<repository>"
+}
+
+// clientRegistryKey is the name the config holding the client registry sets
+// it under, as the user would find it in the file: the current name, or the
+// 1.x one.
+func clientRegistryKey() string {
+	c := CFG.RemoteClientRegistry
+	if key := c.projectKey(); key != "" {
+		return key
+	}
+	if key := c.keyIn(viperHome); key != "" {
+		return key
+	}
+	return c.Path
 }

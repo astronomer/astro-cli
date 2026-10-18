@@ -132,9 +132,6 @@ func NewLocalCmd(d Deps) *cobra.Command {
 			// Spellings that used to work here, or that someone reaches for
 			// out of v1 habit, get named rather than refused: `init` moved up
 			// to `astro init`, and `ps` was always `status`.
-			if err := c.blockedInitHint(args[0]); err != nil {
-				return err
-			}
 			if replacement, ok := devReplacementFor(args[0]); ok {
 				return cliout.Usage(fmt.Errorf("unknown command %q for %q. Use %s", args[0], cmd.CommandPath(), replacement))
 			}
@@ -238,6 +235,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
+	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err
@@ -283,7 +281,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 // the local scheduler creates no runs of its own.
 const useJobSchedule = "AIRFLOW__SCHEDULER__USE_JOB_SCHEDULE"
 
-const schedulesOffNote = "Schedules are off locally: DAGs run only when you trigger them. " +
+const schedulesOffNote = "Schedules are off locally: Dags run only when you trigger them. " +
 	"To run them on their schedules, set " + useJobSchedule + "=True in .env"
 
 // noteSchedulesOff tells a text-mode user that DAGs will not run on their
@@ -631,6 +629,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	}
 	warnManifest(r, built.ManifestWarnings)
 	warnPython(r, built.PythonNote)
+	c.warnLegacy1xSettings(r, built.Plan)
 	warnStandaloneOmissions(r, built.Plan)
 	if err := checkBuildSecrets(r, buildSecretFlag, built.Plan); err != nil {
 		return err

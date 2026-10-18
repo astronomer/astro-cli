@@ -45,11 +45,11 @@ func newCheckCmd(c *cli) *cobra.Command {
 	var targets []string
 	cmd := &cobra.Command{
 		Use:   nameCheck,
-		Short: "Validate this project's DAGs without starting Airflow",
-		Long: "Parse the project's DAGs in its own environment and report import errors, duplicate DAG ids, and slow parses. Runs offline; starts no Airflow.\n\n" +
+		Short: "Validate this project's Dags without starting Airflow",
+		Long: "Parse the project's Dags in its own environment and report import errors, duplicate Dag ids, and slow parses. Runs offline; starts no Airflow.\n\n" +
 			"It also checks [tool.astro.env] the way astro local start does: a required value with no source on this machine is an error, and a value that is not what its declaration says is a warning. A source = 'workspace' value nothing local holds is not checked, since the Environment Manager is not asked.\n\n" +
-			"With --target, check the project against the Airflow a managed platform actually runs, before you upload. mwaa and composer map the manifest's Airflow pin to the closest version that platform offers, build a scratch venv with that Airflow plus the project's dependencies, and parse the DAGs inside it; mwaa also resolves the dependencies against MWAA's published constraints file (a conflict fails the check; the step needs the network and is skipped, not failed, offline). astro is the default check under a name, so --target astro is an alias for a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
-		Example: "  # Parse the project's DAGs and check its environment values\n" +
+			"With --target, check the project against the Airflow a managed platform actually runs, before you upload. mwaa and composer map the manifest's Airflow pin to the closest version that platform offers, build a scratch venv with that Airflow plus the project's dependencies, and parse the Dags inside it; mwaa also resolves the dependencies against MWAA's published constraints file (a conflict fails the check; the step needs the network and is skipped, not failed, offline). astro is the default check under a name, so --target astro is an alias for a plain check. The flag repeats and takes a comma list: --target mwaa --target composer or --target mwaa,composer.",
+		Example: "  # Parse the project's Dags and check its environment values\n" +
 			"  astro local check\n\n" +
 			"  # Fail on warnings too\n" +
 			"  astro local check --strict\n\n" +
@@ -820,7 +820,7 @@ func checkSummaryLine(s checkSummary) string {
 	if s.Strict {
 		tail = " (strict)"
 	}
-	return fmt.Sprintf("checks %s%s: %d DAGs, %d errors, %d warnings", verdict, tail, s.Dags, s.Errors, s.Warnings)
+	return fmt.Sprintf("checks %s%s: %d Dags, %d errors, %d warnings", verdict, tail, s.Dags, s.Errors, s.Warnings)
 }
 
 // blocked reports an outcome where check reached no verdict at all — not in a
@@ -909,7 +909,7 @@ func renderTargetReport(w io.Writer, rep *checks.TargetReport, strict bool, budg
 		}
 	}
 	if len(rep.Findings) == 0 {
-		if _, err := fmt.Fprintln(w, "no DAG findings"); err != nil {
+		if _, err := fmt.Fprintln(w, "no Dag findings"); err != nil {
 			return err
 		}
 	} else {
@@ -964,7 +964,7 @@ func targetVerdictLine(rep *checks.TargetReport, strict bool) string {
 	if rep.Constraints.Conflicted() {
 		why = "dependencies conflict with MWAA's constraints; "
 	}
-	return fmt.Sprintf("check %s%s for %s: %s%d DAGs, %d errors, %d warnings", verdict, tail, rep.Target, why, rep.DagCount, rep.Errors, rep.Warnings)
+	return fmt.Sprintf("check %s%s for %s: %s%d Dags, %d errors, %d warnings", verdict, tail, rep.Target, why, rep.DagCount, rep.Errors, rep.Warnings)
 }
 
 // verdictFailed is a check's verdict when it did not pass.

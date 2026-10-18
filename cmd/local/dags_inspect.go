@@ -23,13 +23,13 @@ func newDagsErrorsCmd(q *query) *cobra.Command {
 	var list listFlags
 	cmd := &cobra.Command{
 		Use:   "errors",
-		Short: "List the DAG files that failed to parse, with their tracebacks",
-		Long: "List the import errors on this Airflow: every DAG file the DAG processor could not parse, and the " +
-			"traceback it raised. A DAG missing from dags list is nearly always here.\n\nThe command succeeds " +
+		Short: "List the Dag files that failed to parse, with their tracebacks",
+		Long: "List the import errors on this Airflow: every Dag file the Dag processor could not parse, and the " +
+			"traceback it raised. A Dag missing from dags list is nearly always here.\n\nThe command succeeds " +
 			"whether or not there are errors; an empty listing is the good news.",
 		Args: cobra.NoArgs,
 		Example: afExample(q.t,
-			"List the DAG files that failed to parse", "dags errors",
+			"List the Dag files that failed to parse", "dags errors",
 			"As JSON, tracebacks included", "dags errors -o json",
 		),
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -92,9 +92,9 @@ func newDagsWarningsCmd(q *query) *cobra.Command {
 	var list listFlags
 	cmd := &cobra.Command{
 		Use:   "warnings",
-		Short: "List what the scheduler warns about in DAGs that did parse",
-		Long: "List the DAG warnings on this Airflow: problems the scheduler noticed in DAGs that parsed, such as " +
-			"a pool that does not exist or a deprecated argument. Unlike import errors, these DAGs still run.",
+		Short: "List what the scheduler warns about in Dags that did parse",
+		Long: "List the Dag warnings on this Airflow: problems the scheduler noticed in Dags that parsed, such as " +
+			"a pool that does not exist or a deprecated argument. Unlike import errors, these Dags still run.",
 		Args: cobra.NoArgs,
 		Example: afExample(q.t,
 			"List what the scheduler warns about", "dags warnings",
@@ -112,14 +112,14 @@ func (q *query) runDagsWarnings(ctx context.Context, opts airflowapi.ListOptions
 	if err != nil {
 		return err
 	}
-	return notServed("DAG warnings", emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.DAGWarning, int, error) {
+	return notServed("Dag warnings", emitList(q, r, opts, func(page airflowapi.ListOptions) ([]airflowapi.DAGWarning, int, error) {
 		list, err := client.ListDAGWarnings(ctx, page)
 		return list.DAGWarnings, list.TotalEntries, err
 	}, newDAGWarningRow, newDAGWarningList, renderDAGWarningTable))
 }
 
 func renderDAGWarningTable(w io.Writer, rows []dagWarningRow) error {
-	return renderTable(w, rows, "No DAG warnings on this Airflow.",
+	return renderTable(w, rows, "No Dag warnings on this Airflow.",
 		[]string{"DAG_ID", "TYPE", "TIMESTAMP", "MESSAGE"},
 		func(row dagWarningRow) []string {
 			return []string{row.DAGID, row.WarningType, row.Timestamp, firstLine(row.Message)}
@@ -129,14 +129,14 @@ func renderDAGWarningTable(w io.Writer, rows []dagWarningRow) error {
 func newDagsExploreCmd(q *query) *cobra.Command {
 	return &cobra.Command{
 		Use:   "explore <DAG_ID>",
-		Short: "Show one DAG's definition, its tasks, and its source together",
-		Long: "Read everything there is to know about one DAG in one go: what " + q.t.suggest("dags get") + " shows, the tasks it " +
+		Short: "Show one Dag's definition, its tasks, and its source together",
+		Long: "Read everything there is to know about one Dag in one go: what " + q.t.suggest("dags get") + " shows, the tasks it " +
 			"defines as " + q.t.suggest("tasks list") + " shows them, and the source Airflow parsed.\n\nEach part is read on its own, " +
 			"and one that fails is reported in its place rather than ending the command. It fails only when none " +
-			"of the three could be read, which is what a DAG id Airflow does not know looks like.",
+			"of the three could be read, which is what a Dag id Airflow does not know looks like.",
 		Args: cobra.ExactArgs(1),
 		Example: afExample(q.t,
-			"Read a DAG's definition, tasks, and source in one go", "dags explore <DAG_ID>",
+			"Read a Dag's definition, tasks, and source in one go", "dags explore <DAG_ID>",
 			"As JSON, for a script or an agent", "dags explore <DAG_ID> -o json",
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {

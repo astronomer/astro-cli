@@ -190,7 +190,7 @@ func TestDagsStatsWithNothingToCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "No DAG run statistics on this Airflow.") {
+	if !strings.Contains(out, "No Dag run statistics on this Airflow.") {
 		t.Errorf("text = %q", out)
 	}
 }
@@ -229,7 +229,7 @@ func TestDagsStatsSaysSoWhenNotServed(t *testing.T) {
 	if err == nil {
 		t.Fatal("dags stats against an Airflow without the endpoint must fail")
 	}
-	if !strings.Contains(err.Error(), "does not serve DAG run statistics") {
+	if !strings.Contains(err.Error(), "does not serve Dag run statistics") {
 		t.Errorf("err = %q, want the plain sentence", err)
 	}
 	if strings.Contains(err.Error(), "404") {

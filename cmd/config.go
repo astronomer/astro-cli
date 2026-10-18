@@ -24,53 +24,29 @@ const (
 	configUseWithManifestMsg      = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
 )
 
-// unlistedConfigs are settings `astro config list` leaves out: contexts is a
-// map that `astro context` manages, and the other two are credentials.
-var unlistedConfigs = map[string]bool{
-	config.CFG.Contexts.Path:         true,
-	config.CFG.CloudAPIToken.Path:    true,
-	config.CFG.PostgresPassword.Path: true,
-}
-
-// removedConfigKeys are the 1.x settings nothing in v2 reads, with what
-// replaces each. `astro config set` refuses them rather than writing a value
-// that would change nothing; a 1.x CLI sharing the config file still reads
-// what it wrote itself.
-var removedConfigKeys = map[string]string{
-	"dev.mode": "Local Airflow runs in standalone mode by default; start it in Docker with astro local start --docker. " +
-		"astro local restart keeps the mode it is running in.",
-	"proxy.port": "The local proxy listens on 6563, or on another free port when 6563 is taken, and has no setting.",
-	"api-server.port": "Pick the local Airflow port with astro local start --port <port>; " +
-		"without it a free port is chosen.",
-	"webserver.port": "Pick the local Airflow port with astro local start --port <port>; " +
-		"without it a free port is chosen.",
-	// astro deploy --save wrote it into a 1.x project's .astro/config.yaml.
-	"project.deployment": "Name the Deployment on each deploy, as the argument or with --deployment. " +
-		"On Astro, link a project's Deployments with astro link add, and mark one default = true to preselect it.",
-}
-
-// refuseRemovedConfigKey fails a set of a removed key the way the removed
-// commands fail: a usage error naming the replacement.
+// refuseRemovedConfigKey fails a get or set of a 1.x setting v2 removed or
+// renamed the way a removed 1.x flag fails: a usage error naming what
+// replaces it.
 func refuseRemovedConfigKey(key string) error {
-	replacement, ok := removedConfigKeys[key]
+	reason, ok := config.RemovedSetting(key)
 	if !ok {
 		return nil
 	}
-	return cliout.Usage(fmt.Errorf("%s was removed in Astro CLI v2: nothing reads it. %s", key, replacement))
+	return cliout.Usage(fmt.Errorf("%s was removed in Astro CLI v2: %s", key, reason))
 }
 
 var (
 	globalFlag       bool
 	configGetExample = `  # Get a global setting
-  astro config get show_warnings -g
+  astro config get upgrade_message -g
 
   # Get a setting from a 1.x project's .astro/config.yaml
-  astro config get project.name`
-	configSetExample = `  # Turn off warnings for every project on this machine
-  astro config set show_warnings false -g
+  astro config get deploy.git_metadata`
+	configSetExample = `  # Turn off the upgrade notice on this machine
+  astro config set upgrade_message false -g
 
   # Set a setting in a 1.x project's .astro/config.yaml
-  astro config set postgres.user postgres`
+  astro config set deploy.git_metadata false`
 )
 
 // configOutput is the -o of `astro config get`, `set` and `list`, registered
@@ -212,7 +188,6 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 // other; set says whether that scope sets the key. `config list` is where the
 // value in effect, and the scope it comes from, are published.
 func configGet(cmd *cobra.Command, args []string) error {
-	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
 		return errInvalidConfigPath
@@ -231,16 +206,14 @@ func configGet(cmd *cobra.Command, args []string) error {
 }
 
 func configSet(cmd *cobra.Command, args []string) error {
-	// get config struct
-	cfg, ok := config.CFGStrMap[args[0]]
-
-	if !ok {
-		return errInvalidConfigPath
-	}
 	// The pre-run refuses these first; this keeps the write itself from
-	// ever storing one.
+	// ever storing one. Ahead of the lookup, which does not know them.
 	if err := refuseRemovedConfigKey(args[0]); err != nil {
 		return err
+	}
+	cfg, ok := config.CFGStrMap[args[0]]
+	if !ok {
+		return errInvalidConfigPath
 	}
 
 	// Silence Usage as we have now validated command input
@@ -275,11 +248,10 @@ func configSet(cmd *cobra.Command, args []string) error {
 func configList(r cliout.Renderer) error {
 	list := configSettings{Settings: []configSetting{}}
 	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
-		// The removed keys too: get and set refuse them, so list agrees.
-		if _, removed := removedConfigKeys[key]; unlistedConfigs[key] || removed {
+		cfg := config.CFGStrMap[key]
+		if !cfg.Listed() {
 			continue
 		}
-		cfg := config.CFGStrMap[key]
 		setting := configSetting{Key: key, Value: cfg.GetString(), Scope: cfg.Scope()}
 		if globalFlag {
 			setting = configSetting{Key: key, Value: cfg.GetHomeString(), Scope: cfg.HomeScope()}

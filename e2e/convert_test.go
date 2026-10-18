@@ -444,9 +444,9 @@ func cases1x() []case1x {
 		},
 		{
 			// The same file after `astro deploy --save`. The saved target is
-			// the one thing here a project wants, so the note states the
-			// whole manifest entry for it, table name included, rather than
-			// pointing at the section it belongs in.
+			// the one thing here a project wants, and these are not ids it
+			// can link itself, so the note says it was not linked and gives
+			// the commands that link it.
 			name: "a 1.x project with a saved deploy target",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
@@ -457,8 +457,8 @@ func cases1x() []case1x {
 			projectName: "orders-pipeline",
 			kept:        []string{"Dockerfile", ".astro/config.yaml"},
 			notes: []string{
-				"cm1orders in workspace cm1ws is this project's saved deploy target",
-				"[tool.astro.deployments.prod]",
+				"saved deploy target cm1orders was not linked",
+				"astro link add prod --deployment cm1orders --workspace cm1ws, then: astro link default prod",
 			},
 		},
 		{
@@ -477,7 +477,7 @@ func cases1x() []case1x {
 			manifestHas: []string{
 				"[tool.astro.deployments]\ndefault = {deployment = 'cm1ordersdeployment000001', workspace = 'cm1ordersworkspace0000001', default = true}",
 			},
-			advisories: []string{"its saved deploy target is now the default link"},
+			advisories: []string{`linked Deployment cm1ordersdeployment000001 as "default" in pyproject.toml (workspace cm1ordersworkspace0000001)`},
 		},
 		{
 			// The `instances:` list an early v2 build wrote, which keeps each
@@ -719,62 +719,79 @@ func TestInitKeepsStdoutParseableWhenThe1xConfigWillNot(t *testing.T) {
 	}
 }
 
-// Under an Astro Private Cloud context, which deploys the 1.x layout (with
-// Astro CLI 1.x), init refuses to convert a 1.x project and leaves every file as
-// it was, as does a directory inside one: kind unsupported_on_platform, exit
-// 1, published as the one error object under json. A directory in no 1.x
-// project is still made a project there.
-func TestInitRefusesA1xProjectUnderAPC(t *testing.T) {
+// Under an Astro Private Cloud context init converts a 1.x project exactly as
+// under Astro, since APC deploys pyproject.toml projects: a pin-only
+// Dockerfile is retired into the manifest, and nothing said is about APC. The
+// one thing the context decides is the kind of link the saved deploy target
+// becomes: an apc link on the context's domain, marked default, where under
+// Astro it would be an Astro one. A Dockerfile FROM a mirror of Astro Runtime
+// is adopted there as anywhere, declared and kept as written.
+func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 	tier(t, 0)
 
+	const deployment, workspace = "cdeploy000000000000000001", "cworksp000000000000000001"
 	p := newProject(t)
 	writeContext(t, p, "software")
-	files := map[string]string{
-		filepath.Join(".astro", "config.yaml"): "project:\n  name: orders-pipeline\n",
-		"Dockerfile":                           "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n",
-		"requirements.txt":                     "pandas==2.1.0\n",
-	}
 	mkdir(t, filepath.Join(p.Dir, ".astro"))
-	for name, body := range files {
-		write(t, filepath.Join(p.Dir, name), body)
-	}
+	write(t, filepath.Join(p.Dir, ".astro", "config.yaml"),
+		"project:\n  name: orders-pipeline\n  deployment: "+deployment+"\n  workspace: "+workspace+"\n")
+	write(t, filepath.Join(p.Dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n")
+	write(t, filepath.Join(p.Dir, "requirements.txt"), "pandas==2.1.0\n")
 
-	for _, args := range [][]string{{"init", "--output", "json"}, {"init", "dags", "--output", "json"}} {
-		requireAPCRefusal(t, p.run(args...).requireFailure())
-	}
-	for name, body := range files {
-		got, err := os.ReadFile(filepath.Join(p.Dir, name))
-		if err != nil || string(got) != body {
-			t.Errorf("%s changed: %q, %v", name, got, err)
-		}
-	}
-	for _, name := range []string{"pyproject.toml", ".gitignore", "AGENTS.md", "dags"} {
-		if _, err := os.Lstat(filepath.Join(p.Dir, name)); err == nil {
-			t.Errorf("a refused run wrote %s", name)
-		}
-	}
-
-	fresh := newProject(t)
-	writeContext(t, fresh, "software")
 	var res initResult
-	fresh.run("init", "--output", "json").requireSuccess().requireJSON(&res)
-	if reports(res.Notes, "Astro Private Cloud") {
-		t.Errorf("a new project's notes speak of APC: %q", res.Notes)
+	r := p.run("init", "--output", "json").requireSuccess()
+	r.requireJSON(&res)
+	if _, err := os.Stat(filepath.Join(p.Dir, "Dockerfile")); err == nil {
+		t.Error("a pin-only Dockerfile is retired under APC, as under Astro")
 	}
-}
+	manifest := read(t, filepath.Join(p.Dir, "pyproject.toml"))
+	for _, want := range []string{
+		"pandas==2.1.0", "[tool.astro.deployments]", "target = 'apc'", "domain = 'localhost'",
+		"deployment = '" + deployment + "'", "workspace = '" + workspace + "'", "default = true",
+	} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("pyproject.toml lacks %q:\n%s", want, manifest)
+		}
+	}
+	if !reports(res.Advisory, "(Astro Private Cloud localhost, workspace "+workspace+")") {
+		t.Errorf("the advisories do not say the saved target is an APC link: %q", res.Advisory)
+	}
+	if reports(res.Notes, "Private Cloud") || strings.Contains(r.Stderr, "Private Cloud") {
+		t.Errorf("a conversion under APC has something to say about APC:\n%s\nnotes %q", r.output(), res.Notes)
+	}
 
-// requireAPCRefusal fails unless r is init's refusal of a 1.x project under
-// APC: exit 1 and one unsupported_on_platform error object naming APC.
-func requireAPCRefusal(t *testing.T, r *result) {
-	t.Helper()
-	if r.ExitCode != 1 {
-		t.Errorf("exit code %d, want 1\n%s", r.ExitCode, r.output())
+	// Astro CLI 1.x's APC deploy saved the Deployment alone, and looked it up
+	// in the context's current workspace, which the link takes. The context
+	// here has a workspace and no login, and init reads the workspace from
+	// the config, not from a login.
+	saved := newProject(t)
+	writeHomeContext(t, saved, "software", "    workspace: "+workspace+"\n")
+	mkdir(t, filepath.Join(saved.Dir, ".astro"))
+	write(t, filepath.Join(saved.Dir, ".astro", "config.yaml"), "project:\n  name: saved\n  deployment: "+deployment+"\n")
+	write(t, filepath.Join(saved.Dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n")
+	var savedRes initResult
+	saved.run("init", "--output", "json").requireSuccess().requireJSON(&savedRes)
+	if m := read(t, filepath.Join(saved.Dir, "pyproject.toml")); !strings.Contains(m, "workspace = '"+workspace+"'") ||
+		!strings.Contains(m, "target = 'apc'") {
+		t.Errorf("the saved Deployment is not linked in the context's workspace:\n%s", m)
 	}
-	e := lastErrorObject(r.Stdout)
-	if e == nil || e.Kind != "unsupported_on_platform" || !strings.Contains(e.Error, "Astro Private Cloud") ||
-		!strings.Contains(e.Error, "Leave the project as it is for now") ||
-		!strings.Contains(e.Error, "astro context switch astronomer.io") {
-		t.Errorf("want one unsupported_on_platform error object naming APC on stdout:\n%s", r.output())
+	if !reports(savedRes.Advisory, "It saved no workspace, so this uses your current one") {
+		t.Errorf("the advisory does not say where the workspace came from: %q", savedRes.Advisory)
+	}
+	checkVaultUntouched(t, saved)
+
+	mirrored := newProject(t)
+	writeContext(t, mirrored, "software")
+	mkdir(t, filepath.Join(mirrored.Dir, ".astro"))
+	write(t, filepath.Join(mirrored.Dir, ".astro", "config.yaml"), "project:\n  name: mirrored\n")
+	const dockerfile = "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\nENV TZ=UTC\n"
+	write(t, filepath.Join(mirrored.Dir, "Dockerfile"), dockerfile)
+	mirrored.run("init", "--output", "json").requireSuccess()
+	if got := read(t, filepath.Join(mirrored.Dir, "Dockerfile")); got != dockerfile {
+		t.Errorf("the mirrored-base Dockerfile changed: %q", got)
+	}
+	if m := read(t, filepath.Join(mirrored.Dir, "pyproject.toml")); !strings.Contains(m, "dockerfile = ") {
+		t.Errorf("the mirrored-base Dockerfile is not declared under APC:\n%s", m)
 	}
 }
 

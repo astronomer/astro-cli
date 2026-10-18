@@ -134,7 +134,7 @@ func refuseUndeployable(where utils.Where) (inProject bool, err error) {
 	if !inProject && !where.None() {
 		// In or below a 1.x project, or below a pyproject.toml project's
 		// root: every mode is refused, --image-name included, as on Astro.
-		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+		return false, utils.NoDeployableProject(where)
 	}
 	switch {
 	case isDagOnlyDeploy && (imageName != "" || imagePresentOnRemote):
@@ -144,14 +144,14 @@ func refuseUndeployable(where utils.Where) (inProject bool, err error) {
 	case isDagOnlyDeploy:
 		// --dags at a project's root is the manifest deploy's, so this is
 		// --dags with no project here to upload the DAGs of.
-		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+		return false, utils.NoDeployableProject(where)
 	case imagePresentOnRemote && imageName == "":
 		return inProject, ErrImageNameNotPassedForRemoteFlag
 	case imageName == "":
 		// The value, not whether the flag was given: an empty --image-name=
 		// names no image, so this would be a build, and there is no project
 		// here to build.
-		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+		return false, utils.NoDeployableProject(where)
 	}
 	return inProject, nil
 }
@@ -166,7 +166,7 @@ func errDagsWithImageSource() error {
 	if imagePresentOnRemote {
 		passed = append(passed, "--remote")
 	}
-	return fmt.Errorf("--dags deploys only your DAGs; drop %s", strings.Join(passed, " and "))
+	return fmt.Errorf("--dags deploys only your Dags; drop %s", strings.Join(passed, " and "))
 }
 
 // The kinds of deploy deployJSON.Type names, spelled as astro deploy on Astro
@@ -203,7 +203,7 @@ type deployJSON struct {
 	URL string `json:"url,omitempty"`
 	// Warnings are what the deploy warned about without failing, as text
 	// prints them (less the "Warning: " prefix): an --image-name image that
-	// is all an image Deployment's DAGs (not when show_warnings is off), a
+	// is all an image Deployment's DAGs (not when apc.show_warnings is off), a
 	// DAG upload that did not happen (always): skipped for want of a dags
 	// directory, to a Deployment that takes DAG uploads, or because whether
 	// the Deployment takes them could not be read; and a project's deploy's
@@ -341,7 +341,7 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 		// No project here: the working directory's dags/ belongs to no
 		// project this deploy knows, so the image ships alone, and an
 		// upload that a Deployment taking them would want is said not to
-		// have happened, whatever show_warnings is.
+		// have happened, whatever apc.show_warnings is.
 		msg := noticeImageAlone
 		if a.dags == deploy.DagsFromUnknown {
 			msg = noticeImageAloneUnplaced
@@ -359,14 +359,14 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 	case errors.Is(err, deploy.ErrNoDagsDirectory):
 		// DagsOnlyDeploy refuses before it looks for the directory, so the
 		// Deployment takes uploads: one was due and did not happen, which is
-		// said whatever show_warnings is.
+		// said whatever apc.show_warnings is.
 		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path))
 		return nil
 	case a.dags == deploy.DagsFromUnknown && errors.Is(err, deploy.ErrAppConfigUnread):
 		// Whether the Deployment takes uploads at all could not be read,
 		// after its image was deployed: the deploy stands, and an upload
 		// that may have been due did not happen, which is said whatever
-		// show_warnings is.
+		// apc.show_warnings is.
 		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeDagsUndecided, err, a.deployment))
 		return nil
 	case err != nil:
@@ -377,7 +377,7 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 }
 
 // warn prints a deploy warning with the deploy's progress (stdout in text,
-// stderr under json) and records it in the json result, unless show_warnings
+// stderr under json) and records it in the json result, unless apc.show_warnings
 // is off, which silences the deploy's other warnings too.
 func warn(result *deployJSON, progress io.Writer, msg string) {
 	if !config.CFG.ShowWarnings.GetBool() {
@@ -387,7 +387,7 @@ func warn(result *deployJSON, progress io.Writer, msg string) {
 }
 
 // alwaysWarn prints a deploy warning and records it in the json result, as
-// warn does, whatever show_warnings is: for a part of the deploy that was
+// warn does, whatever apc.show_warnings is: for a part of the deploy that was
 // asked for and did not happen.
 func alwaysWarn(result *deployJSON, progress io.Writer, msg string) {
 	fmt.Fprintln(progress, "Warning: "+msg)

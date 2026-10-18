@@ -51,13 +51,13 @@ var (
   # Deploy to a given Deployment
   astro deploy <DEPLOYMENT_ID>
 
-  # Deploy only the DAGs
+  # Deploy only the Dags
   astro deploy <DEPLOYMENT_ID> --dags
 
   # Deploy an image built on this machine, from any directory
   astro deploy <DEPLOYMENT_ID> --image-name <IMAGE_NAME>
 
-  # Deploy a dbt project, or another non-DAG bundle, from its own directory
+  # Deploy a dbt project, or another non-Dag bundle, from its own directory
   astro deploy bundle <PATH> --deployment <DEPLOYMENT_ID>`
 
 	buildSecrets = []string{}
@@ -73,7 +73,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "deploy [DEPLOYMENT_ID]",
 		Short:   "Ship this project's code to a Deployment",
-		Long:    "Deploy your project to a Deployment on Astro. Run it in a project with a pyproject.toml ([tool.astro]): it builds the project into a Docker image and pushes that image, with the project's DAGs, to Astronomer. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) is converted with astro init, or deployed with Astro CLI 1.x. With --image-name it deploys an image built on this machine, from any directory. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use astro remote deploy instead. It does not include any metadata associated with your local Airflow environment. To deploy a dbt project or another non-DAG bundle, use astro deploy bundle.",
+		Long:    "Deploy your project to a Deployment on Astro. Run it in a project with a pyproject.toml ([tool.astro]): it builds the project into a Docker image and pushes that image, with the project's Dags, to Astronomer. A project in the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml) is converted with astro init, or deployed with Astro CLI 1.x. With --image-name it deploys an image built on this machine, from any directory. In Deployments with Remote Execution enabled, this only updates the Orchestration Plane components (the API Server and Scheduler). For all other components, use astro remote deploy instead. It does not include any metadata associated with your local Airflow environment. To deploy a dbt project or another non-Dag bundle, use astro deploy bundle.",
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    deploy,
 		Example: deployExample,
@@ -151,7 +151,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 	// Not a usage mistake, so no usage block under the error.
 	cmd.SilenceUsage = true
-	return utils.NoDeployableProject(where, utils.Deploy1xRefusedAstro)
+	return utils.NoDeployableProject(where)
 }
 
 // refuseFlagCombinations stops a deploy given flags that cannot all apply,
@@ -170,9 +170,9 @@ func refuseFlagCombinations(cmd *cobra.Command, inProject bool) error {
 	if cmd.Flags().Changed("no-dags-base-dir") {
 		switch {
 		case image:
-			return cliout.Usage(errors.New("cannot use --no-dags-base-dir with --image: an image-only deploy ships no DAGs"))
+			return cliout.Usage(errors.New("cannot use --no-dags-base-dir with --image: an image-only deploy ships no Dags"))
 		case imageName != "" && !inProject:
-			return cliout.Usage(errors.New("cannot use --no-dags-base-dir with --image-name outside a pyproject.toml project: the image ships alone, with no DAGs"))
+			return cliout.Usage(errors.New("cannot use --no-dags-base-dir with --image-name outside a pyproject.toml project: the image ships alone, with no Dags"))
 		}
 	}
 	return nil
@@ -458,13 +458,13 @@ type deployJSON struct {
 // warningDagsNotUpdated is the warning for an --image-name deploy outside a
 // project to a Deployment that takes DAG deploys: the image changed, its DAGs
 // did not.
-const warningDagsNotUpdated = "this deploy shipped the image alone, so Deployment %s keeps the DAGs it had. " +
+const warningDagsNotUpdated = "this deploy shipped the image alone, so Deployment %s keeps the Dags it had. " +
 	"To update them, run astro deploy %s --dags from the project directory"
 
 // warningDagsInImage is the same deploy to a Deployment that takes no DAG
 // deploys: it runs the DAGs inside the image, which no project here put
 // there. APC's deploy warns the same (warningImageNameDagsInImage).
-const warningDagsInImage = "Deployment %s runs the DAGs inside the image %s; no dags folder was deployed. " +
+const warningDagsInImage = "Deployment %s runs the Dags inside the image %s; no dags folder was deployed. " +
 	"An image astro package built without a dockerfile declared under [tool.astro] contains none"
 
 // imageAloneWarning is the warning an --image-name deploy outside a project
@@ -486,8 +486,8 @@ func imageAloneWarning(res *manifestdeploy.Result, imageName string) string {
 // warningRemoteDagsNotUpdated is the same deploy to a remote-execution
 // Deployment with DAG deploys off: the image updates its orchestration plane,
 // and its DAGs are where its remote agents keep them.
-const warningRemoteDagsNotUpdated = "this deploy shipped the image alone, and Deployment %s runs remote execution with DAG deploys off, " +
-	"so its DAGs are the ones its remote agents run, which this deploy did not change"
+const warningRemoteDagsNotUpdated = "this deploy shipped the image alone, and Deployment %s runs remote execution with Dag deploys off, " +
+	"so its Dags are the ones its remote agents run, which this deploy did not change"
 
 type deployGitJSON struct {
 	CommitSHA string `json:"commit_sha"`
@@ -524,21 +524,21 @@ func renderManifestDeploy(w io.Writer, format cliout.Format, res *manifestdeploy
 		target := deployTargetName(res)
 		switch res.Type {
 		case "dag-only":
-			fmt.Fprintf(b, "Deployed DAGs (version %s) to %s.\n", res.DagTarballVersion, target)
+			fmt.Fprintf(b, "Deployed Dags (version %s) to %s.\n", res.DagTarballVersion, target)
 		case "image-only":
 			fmt.Fprintf(b, "Deployed image (tag %s) to %s.\n", res.ImageTag, target)
 		case "image-and-dag":
 			if res.DagsInImage {
-				fmt.Fprintf(b, "Deployed image (tag %s) to %s, with the DAGs inside the image: its DAG deploys are off, so no DAGs were uploaded.\n", res.ImageTag, target)
+				fmt.Fprintf(b, "Deployed image (tag %s) to %s, with the Dags inside the image: its Dag deploys are off, so no Dags were uploaded.\n", res.ImageTag, target)
 				break
 			}
 			if res.RemoteExecution {
-				fmt.Fprintf(b, "Deployed image (tag %s) to %s. It runs remote execution with DAG deploys off, so no DAGs were uploaded.\n", res.ImageTag, target)
+				fmt.Fprintf(b, "Deployed image (tag %s) to %s. It runs remote execution with Dag deploys off, so no Dags were uploaded.\n", res.ImageTag, target)
 				break
 			}
 			fallthrough
 		default:
-			fmt.Fprintf(b, "Deployed image (tag %s) and DAGs (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
+			fmt.Fprintf(b, "Deployed image (tag %s) and Dags (version %s) to %s.\n", res.ImageTag, res.DagTarballVersion, target)
 		}
 		if res.URL != "" {
 			fmt.Fprintf(b, "Deployment: %s\n", res.URL)

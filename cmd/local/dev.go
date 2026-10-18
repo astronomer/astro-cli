@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
@@ -45,24 +44,14 @@ type DevRemoved struct {
 	// flag in the replacement.
 	Notes []string `json:"notes,omitempty"`
 	// Convert is the command that converts a 1.x project in place, set with
-	// Is1xProject unless astro init refuses that project here.
+	// Is1xProject.
 	Convert string `json:"convert,omitempty"`
-	// UnderAPC and ContextUnresolved say astro init refuses the 1.x project
-	// the working directory is in or below: the current context is Astro
-	// Private Cloud, or one the CLI cannot resolve (project.Convert1xBlocked,
-	// which names the project only then).
-	// Notes then say why and what to do instead, and the mapping is empty and
-	// there is no Replacement or Convert, as the text names no astro local
-	// command: none runs in that project.
-	UnderAPC          bool `json:"under_apc,omitempty"`
-	ContextUnresolved bool `json:"context_unresolved,omitempty"`
 }
 
 // devContext is what the stub reads about the directory it runs in and the
 // command tree it points into.
 type devContext struct {
-	// in is the 1.x project the stub speaks of, if any, and why astro
-	// init refuses it here, if it does (devProject).
+	// in is the 1.x project the stub speaks of, if any (devProject).
 	in project1x
 	// dockerfile is set when the current project declares [tool.astro]
 	// dockerfile, which only Docker mode builds.
@@ -163,16 +152,11 @@ func buildDevRemoved(typed string, args []string, dc devContext) DevRemoved {
 		Is1xProject: dc.in.dir1x != "",
 		V1Dir:       dc.in.dir1x,
 	}
-	// Where astro init refuses the 1.x project (project.Convert1xBlocked) it
-	// stays as it is, so nothing offers astro init.
-	stays := dc.in.dir1x != "" && dc.in.blocked != project.NotBlocked
 	if dc.in.dir1x != "" {
-		if !stays {
-			// From below the root, the convert command names the root. astro
-			// dev init's replacement stays astro init, which makes a project
-			// in the working directory, as 1.x's did.
-			p.Convert = dc.in.convert()
-		}
+		// From below the root, the convert command names the root. astro dev
+		// init's replacement stays astro init, which makes a project in the
+		// working directory, as 1.x's did.
+		p.Convert = dc.in.convert()
 		// astro init keeps a Dockerfile that does more than pick a base image,
 		// and one that mounts a build secret always does, so the converted
 		// project builds it in Docker mode.
@@ -180,21 +164,11 @@ func buildDevRemoved(typed string, args []string, dc devContext) DevRemoved {
 			dc.dockerfile = true
 		}
 	}
-	if stays {
-		// No astro local command runs in this project, so none is named as
-		// the replacement; the notes say why and what to do instead.
-		p.UnderAPC, p.ContextUnresolved = dc.in.blocked == project.BlockedUnderAPC, dc.in.blocked == project.BlockedUnresolved
-		p.Mapping = []devReplacement{}
-		p.Notes = []string{
-			project.Blocked1xMessage(dc.in.blocked, dc.in.dir1x),
-			"The astro local commands work only in a converted project",
-		}
-	}
 	if typed == "" {
 		p.Error = "astro dev was removed in Astro CLI v2"
 		return p
 	}
-	if replacement, ok := devReplacementFor(typed); ok && !stays {
+	if replacement, ok := devReplacementFor(typed); ok {
 		p.Replacement = replacement
 		switch replacement {
 		case replaceStart, replaceRestart:
@@ -335,19 +309,12 @@ func renderDevRemoved(p DevRemoved) string {
 		fmt.Fprintf(&b, ". Convert with %s, then use %s", p.Convert, p.Replacement)
 	case p.Replacement != "":
 		fmt.Fprintf(&b, ". Use %s instead", p.Replacement)
-	case p.UnderAPC || p.ContextUnresolved:
-		// The notes below say what to do instead.
 	case p.Typed != "astro dev":
 		b.WriteString(" and has no direct replacement")
 	}
 	b.WriteString(".")
 	for _, n := range p.Notes {
 		b.WriteString("\n" + n)
-	}
-	// Under APC, in a 1.x project no astro local command runs, so the notes
-	// are the whole answer.
-	if p.UnderAPC || p.ContextUnresolved {
-		return b.String()
 	}
 	b.WriteString("\nLocal Airflow now lives under astro local:\n\n")
 	examples := []devReplacement{
@@ -380,10 +347,9 @@ func renderDevRemoved(p DevRemoved) string {
 }
 
 // project1x is a 1.x project the stub speaks of: its directory, "" for
-// none, and why astro init refuses it here, if it does.
+// none.
 type project1x struct {
-	dir1x   string
-	blocked project.Block
+	dir1x string
 	// below is set when the working directory is below dir1x rather than
 	// dir1x itself, so the command that converts it names dir1x.
 	below bool
@@ -400,25 +366,16 @@ func (p project1x) convert() string {
 }
 
 // devProject is the 1.x project the stub speaks of: the nearest one the
-// working directory is in or below, and why astro init refuses it there, if
-// it does. Under an APC or unresolved context both come from init's own
-// decision (project.Convert1xBlocked); elsewhere, where that decision walks
-// nothing, the stub walks once for the root it names (scaffold.Find1xProject).
+// working directory is in or below (scaffold.Find1xProject).
 func (c *cli) devProject() project1x {
 	wd, err := c.d.WorkingDir()
 	if err != nil {
 		return project1x{}
 	}
-	var why project.Block
-	var root string
-	if project.BlockingContext() {
-		why, root = project.Convert1xBlocked(wd)
-	} else {
-		root = scaffold.Find1xProject(wd)
-	}
+	root := scaffold.Find1xProject(wd)
 	abs, err := filepath.Abs(wd)
 	if err != nil {
 		abs = wd
 	}
-	return project1x{dir1x: root, blocked: why, below: root != "" && root != filepath.Clean(abs)}
+	return project1x{dir1x: root, below: root != "" && root != filepath.Clean(abs)}
 }

@@ -61,26 +61,33 @@ type Options struct {
 	// airflow_settings.yaml carries, at the project scope the writer itself
 	// decides. Without one, Plan leaves the values in the file and says so.
 	SecretWriter SecretWriter
-	// DeploysToAPC is set by a caller whose current context or platform is
-	// Astro Private Cloud. APC deploys the 1.x layout, with Astro CLI 1.x,
-	// and not yet pyproject.toml projects, so Plan and Run then refuse a
-	// directory that is a 1.x project (Is1xProject) or lies inside one, with
-	// a *Convert1xUnderAPCError naming that project, before anything is
-	// written: a project scaffolded inside one would be deployed with it.
-	// false, the default, is Astro and refuses nothing. Astro Desktop's
-	// conversions are refused only if it sets this.
+	// DeploysToAPC is read by nothing. It once made Plan and Run refuse a 1.x
+	// project under an Astro Private Cloud context, while APC deployed only
+	// the 1.x layout. APC deploys pyproject.toml projects now, so a 1.x
+	// project converts the same way on every platform; the field stays so a
+	// caller that sets it still compiles.
+	//
+	// Deprecated: set APCDomain for an APC context instead.
 	DeploysToAPC bool
 	// APCDomain is the Astro Private Cloud domain of the caller's current
 	// context, set when that context is APC's. A 1.x project's saved deploy
 	// target (.astro/config.yaml project.deployment, with project.workspace)
-	// then becomes an apc link on this domain rather than an astro link. The
-	// context decides, because the ids cannot: Houston's and Astro's are both
-	// cuids. Empty, the default, writes an astro link.
-	//
-	// DeploysToAPC refuses a directory in a 1.x project before this is read,
-	// so a caller that sets both converts nothing. astro init does not set it
-	// yet; it will once APC deploys pyproject.toml projects.
+	// then becomes an apc link on this domain rather than an astro link, and
+	// one that cannot become a link is a note naming the astro link add that
+	// links it under that context. The context decides, because the ids
+	// cannot: Houston's and Astro's are both cuids. Empty, the default, is
+	// Astro. Nothing else in a conversion depends on the platform.
 	APCDomain string
+	// APCWorkspace is the current workspace of the Astro Private Cloud context
+	// APCDomain names, or "" when there is none or it cannot be read. It is
+	// called at most once, and only when it decides something: under
+	// APCDomain, for a 1.x project that saved a Deployment id
+	// (project.deployment) and no project.workspace. Astro CLI 1.x's APC
+	// deploy looked that saved id up in this same workspace and never wrote
+	// project.workspace, so the pair becomes the apc link rather than a note.
+	// It is a func so it is asked only when the link is decided, after a rerun
+	// on a converted project has been refused. nil, or "", keeps the note.
+	APCWorkspace func() string
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -331,24 +338,16 @@ func Run(dir string, opts Options) (*Result, error) {
 // let it happen. Plan reads the project (it has to: an adopted manifest is
 // computed from the one already there) and writes nothing.
 //
-// Under Options.DeploysToAPC it first refuses a directory that is, or is
-// inside, a 1.x project (Convert1xUnderAPCError), having read nothing else.
-//
 //nolint:gocritic // hugeParam: by value on purpose, as Astro Desktop calls it
 func Plan(dir string, opts Options) (*Changeset, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("resolving %s: %w", dir, err)
 	}
-	if opts.DeploysToAPC {
-		if in := Find1xProject(abs); in != "" {
-			return nil, &Convert1xUnderAPCError{Dir: in}
-		}
-	}
 	return plan(abs, &opts)
 }
 
-// plan is Plan for the absolute dir it resolved, once nothing refuses it.
+// plan is Plan for the absolute dir it resolved.
 func plan(abs string, opts *Options) (*Changeset, error) {
 	goos := opts.GOOS
 	if goos == "" {
@@ -370,6 +369,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 		return nil, err
 	}
 	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
+	from1x.apcWorkspace = opts.APCWorkspace
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
@@ -1175,7 +1175,7 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	// A target the conversion linked (setDeployLink) is carried, so it is an
 	// advisory rather than a note; only one it could not link is left to do.
 	if _, linked := from1x.deployLink(); from1x.deployment != "" && !linked {
-		deployNote = config1xRelPath + ": " + deployTargetNote(from1x.deployment, from1x.workspace)
+		deployNote = config1xRelPath + ": " + deployTargetNote(from1x.deployment, from1x.workspace, from1x.apcDomain)
 		out = append(out, deployNote)
 	}
 	// Kept out of forRetirement for the reason deployNote is: planRetirements
@@ -1262,30 +1262,39 @@ func instancesNote(instances []instance1x) string {
 		". Link each one with " + strings.Join(cmds, "; ")
 }
 
-// deployTargetNote says what .astro/config.yaml saved and what a manifest entry
-// for it looks like, including the table NAME that entry needs. An earlier
-// wording said only "under [tool.astro.deployments]"; written out literally
-// that is `deployment = '...'` as a bare key of the deployments table, which
-// manifest.Parse rejects with CodeExpectedTable. A hand-off that produces an
-// unparseable manifest when followed is worse than no hand-off.
+// deployTargetNote says that .astro/config.yaml's saved deploy target was not
+// linked, then the commands that link it and preselect it: astro link add
+// writes the link as the manifest parses it, which a hand-written entry
+// described in prose did not always do (a bare key of [tool.astro.deployments]
+// is CodeExpectedTable). It says "if it is" because the key can hold what is
+// not a Deployment id, such as a release name.
 //
 // The value is printed only when it is a plain id. planRetirements aside, a
 // value carrying a newline would put a second, unindented line under "Left to
 // do:" and a multi-line string into the json notes array a consumer groups by
-// the file name each note starts with.
-func deployTargetNote(deployment, workspace string) string {
-	const entry = ". If that is an Astro Deployment, give it a name under " +
-		"[tool.astro.deployments], say [tool.astro.deployments.prod], with "
-	if !plainDeployID(deployment) {
-		return "project.deployment holds this project's saved deploy target" + entry +
-			"deployment set to it and the workspace it lives in"
+// the file name each note starts with. A workspace it does not know is a
+// placeholder.
+//
+// Under an Astro Private Cloud context (apcDomain) the target is a Houston
+// Deployment, and astro link add run under that context links it there. A
+// saved id with no workspace is linked in the context's current workspace
+// when the caller can give one (Options.APCWorkspace), so this is for the
+// rest: no workspace there either, or a saved value that is not an id.
+func deployTargetNote(deployment, workspace, apcDomain string) string {
+	target, id := "the saved deploy target (project.deployment)", "<id>"
+	if plainDeployID(deployment) {
+		target, id = "saved deploy target "+deployment, deployment
 	}
+	ws := "<workspace-id>"
 	if plainDeployID(workspace) {
-		return deployment + " in workspace " + workspace + " is this project's saved deploy target" +
-			entry + "deployment = '" + deployment + "' and workspace = '" + workspace + "'"
+		ws = workspace
 	}
-	return deployment + " is this project's saved deploy target" + entry +
-		"deployment = '" + deployment + "' and the workspace it lives in"
+	kind := "an Astro Deployment"
+	if apcDomain != "" {
+		kind = "a Deployment on Astro Private Cloud " + apcDomain
+	}
+	return target + " was not linked. If it is " + kind + ", link it with: astro link add prod --deployment " + id +
+		" --workspace " + ws + ", then: astro link default prod"
 }
 
 // plainDeployID reports a value safe to read at the end of a note: one line, no

@@ -47,18 +47,21 @@ const (
 	errDeployPytestRemoved     = "--pytest was removed in Astro CLI v2: run your tests before deploying, with uv run pytest && astro deploy"
 	errDeployTestRemoved       = "--test was removed in Astro CLI v2: run your tests before deploying, with uv run pytest <path> && astro deploy"
 	errDeployEnvRemoved        = "--env was removed in Astro CLI v2: astro deploy runs no tests, so it reads no test env file. Run your tests with uv run pytest before deploying"
-	errDeployParseRemoved      = "--parse was removed in Astro CLI v2: check your DAGs before deploying, with astro local check && astro deploy"
+	errDeployParseRemoved      = "--parse was removed in Astro CLI v2: check your Dags before deploying, with astro local check && astro deploy"
 	errDeployDagsPathRemoved   = "--dags-path was removed in Astro CLI v2: astro deploy --dags ships the project's dags directory, so run it from the project"
-	errDeployBundleNameRemoved = "--dag-bundle-name was removed in Astro CLI v2: deploying to a named DAG bundle is not supported yet. Use Astro CLI 1.x for it"
+	errDeployBundleNameRemoved = "--dag-bundle-name was removed in Astro CLI v2: deploying to a named Dag bundle is not supported yet. Use Astro CLI 1.x for it"
 	errDeployNameRemoved       = "--deployment-name was removed in Astro CLI v2: name the Deployment as the argument or with --deployment, which take a link name or a Deployment id"
 	// astro deploy --non-dags became astro deploy bundle, a subcommand of
 	// its own with the bundle's directory as its argument.
 	errDeployNonDagsRemoved = "--non-dags was removed in Astro CLI v2: use astro deploy bundle [PATH] --deployment <Deployment id, name or link name>, " +
-		"which deploys a non-DAG bundle such as a dbt project from its directory"
+		"which deploys a non-Dag bundle such as a dbt project from its directory"
 	errDeployNonDagsMountPathRemoved  = "--non-dags-mount-path was removed in Astro CLI v2: use astro deploy bundle --mount-path"
 	errDeployNonDagsLocalPathRemoved  = "--non-dags-local-path was removed in Astro CLI v2: pass the bundle's directory as the argument, astro deploy bundle <PATH>"
 	errDeployNonDagsBundleTypeRemoved = "--non-dags-bundle-type was removed in Astro CLI v2: use astro deploy bundle --type, which detects a dbt project by itself"
-	errAPCDeployNoCache               = "--no-cache was removed in Astro CLI v2: astro deploy builds on the container engine's cache, which a changed dependency or file invalidates. " +
+	// 1.x kept --build-secrets, hidden and deprecated, as an alias of the
+	// repeatable --build-secret that replaced it.
+	errBuildSecretsRemoved = "--build-secrets was removed in Astro CLI v2: use --build-secret, once for each secret"
+	errAPCDeployNoCache    = "--no-cache was removed in Astro CLI v2: astro deploy builds on the container engine's cache, which a changed dependency or file invalidates. " +
 		"To build from nothing, clear the engine's build cache first, with docker builder prune"
 )
 
@@ -141,6 +144,7 @@ var removedFlags = []removedFlag{
 	{name: "non-dags-mount-path", under: []string{"deploy"}, msg: errDeployNonDagsMountPathRemoved},
 	{name: "non-dags-local-path", under: []string{"deploy"}, msg: errDeployNonDagsLocalPathRemoved},
 	{name: "non-dags-bundle-type", under: []string{"deploy"}, msg: errDeployNonDagsBundleTypeRemoved},
+	{name: "build-secrets", needs: has("build-secret"), msg: errBuildSecretsRemoved},
 }
 
 // removedFlagErr is a run refused for passing a removed 1.x flag.

@@ -87,7 +87,7 @@ func TestRunsListTakesTheDAGAsAnArgument(t *testing.T) {
 
 	before := len(stub.requests())
 	_, _, err = runQuery(t, stub, "runs", "list", "orders_etl", "--dag-id", "billing")
-	if err == nil || !strings.Contains(err.Error(), "different DAGs") {
+	if err == nil || !strings.Contains(err.Error(), "different Dags") {
 		t.Fatalf("err = %v, want the two DAGs refused", err)
 	}
 	if len(stub.requests()) != before {

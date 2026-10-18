@@ -68,55 +68,53 @@ var (
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
 
+	// LegacySettingNames maps each name a setting had before v2 renamed it to
+	// the name it has now.
+	LegacySettingNames = make(map[string]string)
+
 	// CFG Houses configuration meta
+	//
+	// A setting is named for what it affects: deploy.* for `astro deploy`,
+	// deployment.* for every command that picks a Deployment, apc.* for
+	// `astro apc`, internal.* for overrides meant for Astronomer's own
+	// development, which `astro config list` leaves out. A setting v2 renamed
+	// keeps its 1.x name as a legacy name (see cfg.Legacy): a file that sets
+	// only the old name still sets it, which is what lets 1.x and v2 share
+	// the file.
 	CFG = cfgs{
-		CloudAPIProtocol:        newCfg("cloud.api.protocol", "https"),
-		CloudAPIPort:            newCfg("cloud.api.port", "443"),
-		CloudWSProtocol:         newCfg("cloud.api.ws_protocol", "wss"),
-		CloudAPIToken:           newCfg("cloud.api.token", ""),
-		Context:                 newCfg("context", ""),
-		Contexts:                newCfg("contexts", ""),
-		DockerCommand:           newCfg("container.binary", ""),
-		LocalCore:               newCfg("local.core", "http://localhost:8888"),
-		LocalRegistry:           newCfg("local.registry", "localhost:5555"),
-		LocalHouston:            newCfg("local.houston", ""),
-		LocalPlatform:           newCfg("local.platform", CloudPlatform),
-		PostgresUser:            newCfg("postgres.user", "postgres"),
-		PostgresPassword:        newCfg("postgres.password", "postgres"),
-		PostgresHost:            newCfg("postgres.host", "postgres"),
-		PostgresPort:            newCfg("postgres.port", "5432"),
-		PostgresRepository:      newCfg("postgres.repository", "docker.io/postgres"),
-		PostgresTag:             newCfg("postgres.tag", "12.6"),
-		ProjectDeployment:       newCfg("project.deployment", ""),
-		ProjectName:             newCfg("project.name", ""),
-		ProjectWorkspace:        newCfg("project.workspace", ""),
-		WebserverPort:           newCfg("webserver.port", "8080"),
-		APIServerPort:           newCfg("api-server.port", "8080"),
-		AirflowExposePort:       newCfg("airflow.expose_port", "false"),
-		ShowWarnings:            newCfg("show_warnings", "true"),
-		Verbosity:               newCfg("verbosity", "warning"),
-		HoustonDialTimeout:      newCfg("houston.dial_timeout", "10"),
-		HoustonSkipVerifyTLS:    newCfg("houston.skip_verify_tls", "false"),
-		DuplicateImageVolumes:   newCfg("duplicate_volumes", "true"),
-		SkipParse:               newCfg("skip_parse", "false"),
-		Interactive:             newCfg("interactive", "false"),
-		PageSize:                newCfg("page_size", "20"),
-		UpgradeMessage:          newCfg("upgrade_message", "true"),
-		DisableAstroRun:         newCfg("disable_astro_run", "false"),
-		AutoSelect:              newCfg("auto_select", "false"),
-		ShaAsTag:                newCfg("sha_as_tag", "false"),
-		RuffImage:               newCfg("ruff.image", "ghcr.io/astral-sh/ruff:latest"),
-		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
-		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
+		// General.
+		Context:              newCfg("context", ""),
+		Contexts:             newCfg("contexts", ""),
+		DockerCommand:        newCfg("container.binary", ""),
+		Verbosity:            newCfg("verbosity", "warning"),
+		UpgradeMessage:       newCfg("upgrade_message", "true"),
+		TelemetryEnabled:     newCfg("telemetry.enabled", "true"),
+		TelemetryAnonymousID: newCfg("telemetry.anonymous_id", ""),
+		TelemetryNoticeShown: newCfg("telemetry.notice_shown", ""),
+		OttoAutoUpdate:       newCfg("otto.auto_update", "true"),
+
+		// Astro: picking a Deployment, and deploying to it.
+		AutoSelect:              newCfg("deployment.auto_select", "false", "auto_select"),
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
-		DevMode:                 newCfg("dev.mode", "docker"),
-		DevBuildSecrets:         newCfg("dev.build_secrets", ""),
-		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
-		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
-		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
-		ProxyPort:               newCfg("proxy.port", "6563"),
-		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
-		CosmosBoostPreDeploy:    newCfg("cosmos_boost.pre_deploy", "false"),
+		CosmosBoostPreDeploy:    newCfg("deploy.cosmos_boost", "false", "cosmos_boost.pre_deploy"),
+		RemoteClientRegistry:    newCfg("deploy.remote_execution.client_registry", "", "remote.client_registry"),
+		RemoteBaseImageRegistry: newCfg("deploy.remote_execution.base_image_registry", "images.astronomer.cloud", "remote.base_image_registry"),
+
+		// Astro Private Cloud.
+		ShowWarnings:         newCfg("apc.show_warnings", "true", "show_warnings"),
+		ShaAsTag:             newCfg("apc.sha_as_tag", "false", "sha_as_tag"),
+		PageSize:             newCfg("apc.page_size", "20", "page_size"),
+		Interactive:          newCfg("apc.interactive", "false", "interactive"),
+		HoustonDialTimeout:   newCfg("apc.dial_timeout", "10", "houston.dial_timeout"),
+		HoustonSkipVerifyTLS: newCfg("apc.skip_verify_tls", "false", "houston.skip_verify_tls"),
+
+		// Overrides for Astronomer's own development.
+		CloudAPIProtocol: newCfg("internal.api.protocol", "https", "cloud.api.protocol"),
+		CloudAPIPort:     newCfg("internal.api.port", "443", "cloud.api.port"),
+		CloudWSProtocol:  newCfg("internal.api.ws_protocol", "wss", "cloud.api.ws_protocol"),
+		LocalCore:        newCfg("internal.localhost.core_url", "http://localhost:8888", "local.core"),
+		LocalHouston:     newCfg("internal.localhost.houston_url", "", "local.houston"),
+		LocalPlatform:    newCfg("internal.localhost.platform", CloudPlatform, "local.platform"),
 	}
 
 	// unreadableConfigs names config files that exist and could not be parsed.
@@ -178,29 +176,35 @@ func initHome(fs afero.Fs) {
 	}
 	viperHome.SetConfigFile(HomeConfigFile)
 
-	for _, cfg := range CFGStrMap {
-		if cfg.Default != "" {
-			viperHome.SetDefault(cfg.Path, cfg.Default)
-		}
-	}
+	// No defaults are registered with viper: the cfg getters apply them (see
+	// cfg.Default). saveConfig writes AllSettings(), and with defaults
+	// registered that was every default this build knows, so one `astro
+	// config set` filled the file with some 45 keys — the 1.x settings v2
+	// refuses among them, and a value baked in that way never followed the
+	// default when a later release changed it. Without them, AllSettings() is
+	// the file as read plus what this process set: a save writes back what
+	// was there, the keys only Astro CLI 1.x reads included, and adds only
+	// the change.
 
 	// Reading the home config is not a reason to create one.
 	//
 	// CreateConfig wrote out AllSettings() of an object holding nothing but
-	// the defaults registered just above, so the file it left behind carried
-	// no value this process did not already have — but InitConfig runs
-	// unconditionally from main, before cobra has looked at argv. Every
-	// command that never touches the home config paid for it: `astro init` in a
-	// home with no .astro left a 54-line config.yaml and a config.yaml.lock
-	// behind it.
+	// the defaults, so the file it left behind carried no value this process
+	// did not already have — but InitConfig runs unconditionally from main,
+	// before cobra has looked at argv. Every command that never touches the
+	// home config paid for it: `astro init` in a home with no .astro left a
+	// 54-line config.yaml and a config.yaml.lock behind it.
 	//
-	// Nothing needs the file to exist. Its absence reads as those same
-	// defaults, the setters guard on ConfigFileUsed() which SetConfigFile
+	// Nothing needs the file to exist. Its absence reads as the defaults, the
+	// setters guard on ConfigFileUsed() which SetConfigFile
 	// above has already set, and saveConfig creates the parent directory
 	// before it writes the file — so the first `astro login` or `astro
 	// config set -g` still writes it.
 	switch err := readConfigFile(viperHome, fs); {
-	case err == nil, errors.Is(err, iofs.ErrNotExist):
+	case err == nil:
+		delete(unreadableConfigs, HomeConfigFile)
+		migrateHomeConfig()
+	case errors.Is(err, iofs.ErrNotExist):
 		// A file that is not there cannot be destroyed by writing one, so a
 		// missing config is not an unreadable config.
 		delete(unreadableConfigs, HomeConfigFile)
@@ -248,12 +252,6 @@ func initProject(fs afero.Fs) {
 		unreadableConfigs[workingConfigFile] = true
 		fmt.Fprintf(os.Stderr, configReadProjectErrorMsg, workingConfigFile, readErr)
 	}
-}
-
-// HomeConfigUnreadable reports that the home config file exists and could not
-// be parsed, so which context is current cannot be known from it.
-func HomeConfigUnreadable() bool {
-	return unreadableConfigs[HomeConfigFile]
 }
 
 // configExists returns a boolean indicating if the config is backed by a file
@@ -310,29 +308,23 @@ func saveConfig(v *viper.Viper, file string) error {
 		return fmt.Errorf(configUnwritableMsg, file)
 	}
 
-	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
-	// dir hasn't been created yet, and the lock is held before the write — so
-	// create it upfront.
-	if err := os.MkdirAll(filepath.Dir(file), dirPerm); err != nil {
-		return fmt.Errorf("creating config dir: %w", err)
-	}
-
-	lockFile := file + ".lock"
-	lock := flock.New(lockFile)
-
-	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
-	defer cancel()
-	locked, err := lock.TryLockContext(ctx, lockRetryInterval)
+	unlock, err := lockConfig(file)
 	if err != nil {
-		return fmt.Errorf("acquiring config lock %s: %w", lockFile, err)
+		return err
 	}
-	if !locked {
-		return fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
-	}
-	defer func() { _ = lock.Unlock() }() //nolint:errcheck // error deliberately ignored in this shell code
+	defer unlock()
 
 	home := v == viperHome && file == HomeConfigFile
 	if home {
+		// 1.x coexistence (compat1x.go).
+		//
+		// A home config this build creates has nothing to clean up, so it is
+		// born at the current version and migrateHomeConfig never scans it.
+		// Only a new one: stamping a file whose cleanup failed at startup
+		// would excuse it from the cleanup for good.
+		if exists, err := afero.Exists(configFs, file); err == nil && !exists && !v.IsSet(configVersionKey) {
+			v.Set(configVersionKey, currentConfigVersion)
+		}
 		takeUnchangedLogins()
 	}
 	// What viper's WriteConfigAs wrote, which is its YAML codec — yaml.v3 —
@@ -361,3 +353,28 @@ const (
 	lockTimeout       = 10 * time.Second
 	lockRetryInterval = 100 * time.Millisecond
 )
+
+// lockConfig takes file's exclusive lock, the `<file>.lock` sidecar Astro CLI
+// 1.x takes too, and returns the func that releases it.
+func lockConfig(file string) (unlock func(), err error) {
+	// flock.Lock opens the sidecar file, which fails with ENOENT if the parent
+	// dir hasn't been created yet, and the lock is held before the write — so
+	// create it upfront.
+	if err := os.MkdirAll(filepath.Dir(file), dirPerm); err != nil {
+		return nil, fmt.Errorf("creating config dir: %w", err)
+	}
+
+	lockFile := file + ".lock"
+	lock := flock.New(lockFile)
+
+	ctx, cancel := context.WithTimeout(context.Background(), lockTimeout)
+	defer cancel()
+	locked, err := lock.TryLockContext(ctx, lockRetryInterval)
+	if err != nil {
+		return nil, fmt.Errorf("acquiring config lock %s: %w", lockFile, err)
+	}
+	if !locked {
+		return nil, fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
+	}
+	return func() { _ = lock.Unlock() }, nil //nolint:errcheck // error deliberately ignored in this shell code
+}

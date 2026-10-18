@@ -83,7 +83,7 @@ func TestDeployRefusesA1xProject(t *testing.T) {
 	} {
 		err := execDeployCmd(args...)
 		require.Error(t, err, "%v", args)
-		assert.EqualError(t, err, utils.Deploy1xRefusedAstro("this project", ""), "%v", args)
+		assert.EqualError(t, err, utils.Deploy1xRefused("this project", ""), "%v", args)
 		var notFound *project.NotFoundError
 		assert.True(t, errors.As(err, &notFound), "%v: reported as no_project", args)
 	}
@@ -160,7 +160,7 @@ func TestDeployImageNameOutsideAProject(t *testing.T) {
 		imageDeployer(t, fake)
 		deployIn(t, t.TempDir())
 		err := execDeployCmd(actionDeploymentID, "--image-name", "img:1", "--dags")
-		assert.EqualError(t, err, "--dags deploys only your DAGs; drop --image-name")
+		assert.EqualError(t, err, "--dags deploys only your Dags; drop --image-name")
 		assert.Nil(t, fake.imgInput)
 		assert.Nil(t, fake.dagInput)
 	})
