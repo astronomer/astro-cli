@@ -177,13 +177,14 @@ func TestDeployClientImageRunsOnOneEngine(t *testing.T) {
 			captureStdout(t, func() { got, err = DeployClientImage(InputClientDeploy{Path: dir}, nil) })
 			require.NoError(t, err)
 
-			require.Len(t, cmd.calls, 5, "%v", cmd.calls)
+			require.Len(t, cmd.calls, 6, "%v", cmd.calls)
 			assert.Equal(t, bin+" login images.astronomer.cloud -u cli --password-stdin", cmd.calls[0])
 			assert.Equal(t, "ctx-token", cmd.stdins[0], "the token goes on stdin")
 			assert.True(t, strings.HasPrefix(cmd.calls[1], bin+" build --tag "+got.Image+" "), cmd.calls[1])
-			assert.Equal(t, bin+" --version", cmd.calls[2], "the push asks which engine it is, for where its progress is")
-			assert.Equal(t, bin+" push "+got.Image, cmd.calls[3])
-			assert.Equal(t, bin+" rmi "+got.Image, cmd.calls[4])
+			assert.Equal(t, bin+" image inspect --format {{json .Config.Env}} "+got.Image, cmd.calls[2], "the agent image check, on the same engine")
+			assert.Equal(t, bin+" --version", cmd.calls[3], "the push asks which engine it is, for where its progress is")
+			assert.Equal(t, bin+" push "+got.Image, cmd.calls[4])
+			assert.Equal(t, bin+" rmi "+got.Image, cmd.calls[5])
 			for i, env := range cmd.envs {
 				if bin == "podman" {
 					assert.Equal(t, podmanEnv, env, cmd.calls[i])

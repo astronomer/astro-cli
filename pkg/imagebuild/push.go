@@ -123,6 +123,27 @@ func (e Engine) Label(ctx context.Context, image, label string) (string, error) 
 	return strings.TrimSpace(out.String()), nil
 }
 
+// HasEnvPrefix reports whether a local image's config sets an environment
+// variable whose name starts with prefix. Only that answer leaves it: an
+// image's environment can hold a value baked in by mistake, a secret among
+// them. It errors as Label does.
+func (e Engine) HasEnvPrefix(ctx context.Context, image, prefix string) (bool, error) {
+	var out, stderr bytes.Buffer
+	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Out: &out, Err: &stderr}, e.Bin, "image", "inspect", "--format", "{{json .Config.Env}}", image); err != nil {
+		return false, commandError(e.Bin+" image inspect "+image, err, stderr.String())
+	}
+	var env []string // null, for an image with no environment, leaves it empty
+	if err := json.Unmarshal(out.Bytes(), &env); err != nil {
+		return false, fmt.Errorf("reading the environment of %s: %w", image, err)
+	}
+	for _, kv := range env {
+		if name, _, _ := strings.Cut(kv, "="); strings.HasPrefix(name, prefix) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // PushRequest is one image pushed to a registry.
 type PushRequest struct {
 	// Source is the local image to push. It is tagged Image first; empty

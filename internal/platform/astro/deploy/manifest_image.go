@@ -377,11 +377,25 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 	return tarballVersion, nil
 }
 
-// prepareDeployImage returns the local image to push and its runtime version.
+// prepareDeployImage returns the local image to push and its runtime version,
+// refusing a Remote Execution agent image: one is built FROM Runtime, so it
+// carries the runtime label all the same.
+func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *imagebuild.Request, engine imagebuild.Engine) (localImage, runtimeVersion string, err error) {
+	localImage, runtimeVersion, err = buildOrAdoptImage(ctx, in, req, engine)
+	if err != nil {
+		return "", "", err
+	}
+	if err := refuseAgentImage(ctx, engine, localImage); err != nil {
+		return "", "", err
+	}
+	return localImage, runtimeVersion, nil
+}
+
+// buildOrAdoptImage returns the local image to push and its runtime version.
 // With a prebuilt image (--image-name) it validates the image exists locally and
 // carries a runtime label; otherwise it builds req, ForManifest's request, at
 // linux/amd64 (deploybuild.BuildImage).
-func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *imagebuild.Request, engine imagebuild.Engine) (localImage, runtimeVersion string, err error) {
+func buildOrAdoptImage(ctx context.Context, in *ManifestImageDeployInput, req *imagebuild.Request, engine imagebuild.Engine) (localImage, runtimeVersion string, err error) {
 	readLabel := func(image, label string) (string, error) {
 		return engine.Label(ctx, image, label)
 	}

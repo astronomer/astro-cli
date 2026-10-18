@@ -187,14 +187,16 @@ func TestDeployClientImage(t *testing.T) {
 		require.NoError(t, err)
 		// The base image registry is logged in to as the CLI user with the
 		// context's token on stdin, then the image is built under the
-		// reference it is pushed as, pushed, and its tag dropped.
-		require.Len(t, cmd.calls, 5, "%v", cmd.calls)
+		// reference it is pushed as, checked for the agent image's environment,
+		// pushed, and its tag dropped.
+		require.Len(t, cmd.calls, 6, "%v", cmd.calls)
 		assert.Equal(t, "docker login images.astronomer.cloud -u cli --password-stdin", cmd.calls[0])
 		assert.Equal(t, "test-token", cmd.stdins[0])
 		assert.True(t, strings.HasPrefix(cmd.calls[1], "docker build --tag "+got.Image+" "), cmd.calls[1])
-		assert.Equal(t, "docker --version", cmd.calls[2], "the push asks which engine it is, for where its progress is")
-		assert.Equal(t, "docker push "+got.Image, cmd.calls[3])
-		assert.Equal(t, "docker rmi "+got.Image, cmd.calls[4])
+		assert.Equal(t, "docker image inspect --format {{json .Config.Env}} "+got.Image, cmd.calls[2])
+		assert.Equal(t, "docker --version", cmd.calls[3], "the push asks which engine it is, for where its progress is")
+		assert.Equal(t, "docker push "+got.Image, cmd.calls[4])
+		assert.Equal(t, "docker rmi "+got.Image, cmd.calls[5])
 	})
 
 	t.Run("no token, no login", func(t *testing.T) {
@@ -305,11 +307,37 @@ func TestDeployClientImage(t *testing.T) {
 		assert.True(t, strings.HasPrefix(got.Image, "test-registry.io/acme/client-image:deploy-"), got.Image)
 		assert.Equal(t, []string{
 			"docker tag custom-image:tag " + got.Image,
+			"docker image inspect --format {{json .Config.Env}} " + got.Image,
 			"docker --version",
 			"docker push " + got.Image,
 			"docker rmi " + got.Image,
 		}, cmd.calls)
 	})
+
+	// An image that does not look like an agent image is only warned about,
+	// and pushed all the same; a failed inspect warns of nothing.
+	for name, tc := range map[string]struct {
+		env  string
+		warn bool
+	}{
+		"not an agent image": {env: `["PATH=/bin"]`, warn: true},
+		"an agent image":     {env: `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python"]`},
+		"a failed inspect":   {env: ""},
+	} {
+		t.Run("agent image check: "+name, func(t *testing.T) {
+			clientDeployProject(t, "test-token", "test-registry.io/acme/client-image")
+			cmd := withClientBuild(t, "docker")
+			cmd.env = tc.env
+
+			var err error
+			out := captureStdout(t, func() {
+				_, err = DeployClientImage(InputClientDeploy{Path: t.TempDir(), ImageName: "custom-image:tag"}, nil)
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.warn, strings.Contains(out, "does not look like a Remote Execution agent image"), out)
+			assert.True(t, hasImageCall(cmd.calls, "docker push "), "pushed regardless, got %v", cmd.calls)
+		})
+	}
 }
 
 func TestPrepareClientBuildContext(t *testing.T) {

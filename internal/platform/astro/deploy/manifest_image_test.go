@@ -44,6 +44,9 @@ type fakeImageCmd struct {
 	errs map[string]error
 	// label is the value a label read of image answers; nil answers "".
 	label func(image string) string
+	// env is what an environment read answers, a JSON list; "" answers
+	// nothing, which the read cannot parse.
+	env string
 	// pushOut is what a push writes to its stdout: its progress.
 	pushOut string
 	// pushAuth is the content of the --authfile the last push was given.
@@ -78,6 +81,9 @@ func (f *fakeImageCmd) Run(_ context.Context, env []string, stdio localrt.Stdio,
 	}
 	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Labels") && f.label != nil && stdio.Out != nil {
 		fmt.Fprintln(stdio.Out, f.label(args[len(args)-1]))
+	}
+	if len(args) > 3 && args[0] == "image" && args[1] == "inspect" && strings.Contains(args[3], ".Config.Env") && stdio.Out != nil {
+		fmt.Fprintln(stdio.Out, f.env)
 	}
 	if len(args) == 1 && args[0] == "--version" && stdio.Out != nil {
 		fmt.Fprintf(stdio.Out, "%s version 5.6.0\n", name)
@@ -366,6 +372,38 @@ func TestDeployManifestImage_RuntimeVersionRejected(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
+// An agent image is built FROM Runtime and passes the label check, but would
+// crash-loop as the Deployment's scheduler: it is refused before the deploy
+// is created, whether built or named with --image-name.
+func TestDeployManifestImage_RefusesAnAgentImage(t *testing.T) {
+	for name, imageName := range map[string]string{"built": "", "--image-name": "agent:1"} {
+		t.Run(name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			client := new(astrov1_mocks.ClientWithResponsesInterface)
+			mockManifestDeploymentAt(client, "3.1-2", true, false)
+			mockDeploymentOptions(client, "3.1-2")
+
+			cmd := withImageSeams(t, "3.1-2")
+			cmd.env = `["PATH=/bin","ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python"]`
+
+			_, err := DeployManifestImage(ManifestImageDeployInput{
+				Build: imagebuild.ManifestBuild{
+					ProjectDir:     manifestProjectDir(t),
+					AirflowVersion: "3.1",
+					Dependencies:   []string{"pandas"},
+				},
+				DeploymentID: "test-deployment-id",
+				ImageName:    imageName,
+			}, client)
+			require.ErrorIs(t, err, errAgentImageInHostedDeploy)
+			assert.ErrorContains(t, err, "astro remote deploy")
+			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			assert.False(t, hasImageCall(cmd.calls, "push"), "nothing is pushed, got %v", cmd.calls)
+			client.AssertExpectations(t)
+		})
+	}
+}
+
 func TestDeployManifestImage_NoDockerFailsEarly(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
@@ -645,7 +683,7 @@ func TestDeployManifestImage_RunsOnOneEngine(t *testing.T) {
 		assert.NotContains(t, call, "ctx-token", "the token is never an argument")
 		verbs = append(verbs, strings.Fields(call)[1])
 	}
-	assert.Equal(t, []string{"info", "build", "image", "tag", "--version", "push", "rmi"}, verbs, "%v", cmd.calls)
+	assert.Equal(t, []string{"info", "build", "image", "image", "tag", "--version", "push", "rmi"}, verbs, "%v", cmd.calls)
 	assert.Contains(t, cmd.calls, "podman tag "+tag+" "+remote)
 	push := slices.IndexFunc(cmd.calls, func(c string) bool { return strings.HasPrefix(c, "podman push --authfile ") })
 	require.NotEqual(t, -1, push, "%v", cmd.calls)

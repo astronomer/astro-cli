@@ -142,6 +142,40 @@ func TestLabelOfAMissingImageFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "No such image: gone:1")
 }
 
+// HasEnvPrefix matches a variable's name, never its value, and an image with
+// no environment at all has none to match.
+func TestHasEnvPrefix(t *testing.T) {
+	for name, tc := range map[string]struct {
+		env  string
+		want bool
+	}{
+		"a name with the prefix":       {`["PATH=/bin","ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python"]`, true},
+		"only a value with the prefix": {`["PATH=/bin","X=ASTRO_AGENT_CLIENT_PROCESS_SPAWNER"]`, false},
+		"no environment":               {"null\n", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
+				"image": func(_ []string, s rt.Stdio) error { fmt.Fprint(s.Out, tc.env); return nil },
+			}}
+			got, err := testEngine(cmd, "docker").HasEnvPrefix(context.Background(), "local:1", "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER")
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+			assert.Equal(t, []string{"docker image inspect --format {{json .Config.Env}} local:1"}, cmd.commands())
+		})
+	}
+
+	t.Run("a missing image fails", func(t *testing.T) {
+		cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
+			"image": func(_ []string, s rt.Stdio) error {
+				fmt.Fprint(s.Err, "Error: No such image: gone:1\n")
+				return errors.New("exit status 1")
+			},
+		}}
+		_, err := testEngine(cmd, "docker").HasEnvPrefix(context.Background(), "gone:1", "X")
+		require.ErrorContains(t, err, "No such image: gone:1")
+	})
+}
+
 func TestTagFailureCarriesTheEngineOutput(t *testing.T) {
 	cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
 		"tag": func(_ []string, s rt.Stdio) error {
