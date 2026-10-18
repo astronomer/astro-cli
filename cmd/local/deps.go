@@ -404,7 +404,7 @@ func adviseStart(err error) error {
 // silently.
 //
 // "600" is the spelling to expect, meaning ten minutes, because that is what
-// houston.dial_timeout takes and what a reader assumes. ParseDuration refuses
+// apc.dial_timeout takes and what a reader assumes. ParseDuration refuses
 // it for want of a unit, and without a word here the start runs its default
 // five minutes and then advises setting the very variable that was set. The
 // warning is the only thing that tells "unset" from "rejected" apart.

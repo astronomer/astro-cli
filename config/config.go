@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	iofs "io/fs"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -71,34 +70,53 @@ var (
 	// CFGStrMap maintains string to cfg mapping
 	CFGStrMap = make(map[string]cfg)
 
+	// LegacySettingNames maps each name a setting had before v2 renamed it to
+	// the name it has now.
+	LegacySettingNames = make(map[string]string)
+
 	// CFG Houses configuration meta
+	//
+	// A setting is named for what it affects: deploy.* for `astro deploy`,
+	// deployment.* for every command that picks a Deployment, apc.* for
+	// `astro apc`, internal.* for overrides meant for Astronomer's own
+	// development, which `astro config list` leaves out. A setting v2 renamed
+	// keeps its 1.x name as a legacy name (see cfg.Legacy): a file that sets
+	// only the old name still sets it, which is what lets 1.x and v2 share
+	// the file.
 	CFG = cfgs{
-		CloudAPIProtocol:        newCfg("cloud.api.protocol", "https"),
-		CloudAPIPort:            newCfg("cloud.api.port", "443"),
-		CloudWSProtocol:         newCfg("cloud.api.ws_protocol", "wss"),
-		Context:                 newCfg("context", ""),
-		Contexts:                newCfg("contexts", ""),
-		DockerCommand:           newCfg("container.binary", ""),
-		LocalCore:               newCfg("local.core", "http://localhost:8888"),
-		LocalHouston:            newCfg("local.houston", ""),
-		LocalPlatform:           newCfg("local.platform", CloudPlatform),
-		ShowWarnings:            newCfg("show_warnings", "true"),
-		Verbosity:               newCfg("verbosity", "warning"),
-		HoustonDialTimeout:      newCfg("houston.dial_timeout", "10"),
-		HoustonSkipVerifyTLS:    newCfg("houston.skip_verify_tls", "false"),
-		Interactive:             newCfg("interactive", "false"),
-		PageSize:                newCfg("page_size", "20"),
-		UpgradeMessage:          newCfg("upgrade_message", "true"),
-		AutoSelect:              newCfg("auto_select", "false"),
-		ShaAsTag:                newCfg("sha_as_tag", "false"),
-		RemoteClientRegistry:    newCfg("remote.client_registry", ""),
-		RemoteBaseImageRegistry: newCfg("remote.base_image_registry", "images.astronomer.cloud"),
+		// General.
+		Context:              newCfg("context", ""),
+		Contexts:             newCfg("contexts", ""),
+		DockerCommand:        newCfg("container.binary", ""),
+		Verbosity:            newCfg("verbosity", "warning"),
+		UpgradeMessage:       newCfg("upgrade_message", "true"),
+		TelemetryEnabled:     newCfg("telemetry.enabled", "true"),
+		TelemetryAnonymousID: newCfg("telemetry.anonymous_id", ""),
+		TelemetryNoticeShown: newCfg("telemetry.notice_shown", ""),
+		OttoAutoUpdate:       newCfg("otto.auto_update", "true"),
+
+		// Astro: picking a Deployment, and deploying to it.
+		AutoSelect:              newCfg("deployment.auto_select", "false", "auto_select"),
 		DeployGitMetadata:       newCfg("deploy.git_metadata", "true"),
-		TelemetryEnabled:        newCfg("telemetry.enabled", "true"),
-		TelemetryAnonymousID:    newCfg("telemetry.anonymous_id", ""),
-		TelemetryNoticeShown:    newCfg("telemetry.notice_shown", ""),
-		OttoAutoUpdate:          newCfg("otto.auto_update", "true"),
-		CosmosBoostPreDeploy:    newCfg("cosmos_boost.pre_deploy", "false"),
+		CosmosBoostPreDeploy:    newCfg("deploy.cosmos_boost", "false", "cosmos_boost.pre_deploy"),
+		RemoteClientRegistry:    newCfg("deploy.remote_execution.client_registry", "", "remote.client_registry"),
+		RemoteBaseImageRegistry: newCfg("deploy.remote_execution.base_image_registry", "images.astronomer.cloud", "remote.base_image_registry"),
+
+		// Astro Private Cloud.
+		ShowWarnings:         newCfg("apc.show_warnings", "true", "show_warnings"),
+		ShaAsTag:             newCfg("apc.sha_as_tag", "false", "sha_as_tag"),
+		PageSize:             newCfg("apc.page_size", "20", "page_size"),
+		Interactive:          newCfg("apc.interactive", "false", "interactive"),
+		HoustonDialTimeout:   newCfg("apc.dial_timeout", "10", "houston.dial_timeout"),
+		HoustonSkipVerifyTLS: newCfg("apc.skip_verify_tls", "false", "houston.skip_verify_tls"),
+
+		// Overrides for Astronomer's own development.
+		CloudAPIProtocol: newCfg("internal.api.protocol", "https", "cloud.api.protocol"),
+		CloudAPIPort:     newCfg("internal.api.port", "443", "cloud.api.port"),
+		CloudWSProtocol:  newCfg("internal.api.ws_protocol", "wss", "cloud.api.ws_protocol"),
+		LocalCore:        newCfg("internal.localhost.core_url", "http://localhost:8888", "local.core"),
+		LocalHouston:     newCfg("internal.localhost.houston_url", "", "local.houston"),
+		LocalPlatform:    newCfg("internal.localhost.platform", CloudPlatform, "local.platform"),
 	}
 
 	// unreadableConfigs names config files that exist and could not be parsed.
@@ -377,34 +395,6 @@ const (
 	currentConfigVersion = 2
 )
 
-// shippedDefaults are the values a setting has shipped as its default, for
-// the settings this build does not register — the 1.x settings v2 refuses,
-// and ones an earlier v2 build had — and the defaults a registered setting
-// has since changed from. Together with each registered setting's Default,
-// they are what an older CLI wrote into the file without being asked.
-var shippedDefaults = map[string][]string{
-	"airflow.expose_port": {"false"},
-	"api-server.port":     {"8080"},
-	"beta.remote_cmd":     {"false"},
-	"dev.mode":            {"docker"},
-	"disable_astro_run":   {"false"},
-	"duplicate_volumes":   {"true"},
-	"local.registry":      {"localhost:5555"},
-	"machine.cpu":         {"2"},
-	"machine.memory":      {"4096"},
-	"postgres.host":       {"postgres"},
-	"postgres.password":   {"postgres"},
-	"postgres.port":       {"5432"},
-	"postgres.repository": {"docker.io/postgres"},
-	// 15 is 1.x's default today, 12.6 the one it had until v1.46.0.
-	"postgres.tag":   {"15", "12.6"},
-	"postgres.user":  {"postgres"},
-	"proxy.port":     {"6563"},
-	"ruff.image":     {"ghcr.io/astral-sh/ruff:latest"},
-	"skip_parse":     {"false"},
-	"webserver.port": {"8080"},
-}
-
 // migrateHomeConfig runs once against a home config written before either CLI
 // stopped writing its defaults into the file — every 1.x before v1.46.0 and
 // every v2 before this — which put some 45 of them there on the first save.
@@ -455,13 +445,24 @@ func migrateHomeConfig() {
 	_ = readConfigFile(viperHome, configFs) //nolint:errcheck // the file was just written from a parse of itself
 }
 
-// defaultsShipped is shippedDefaults with each registered setting's Default.
-// An empty default was never written, so it is not one.
+// defaultsShipped is every value an older CLI wrote into the home config
+// without being asked, by setting name: each removed setting's defaults, and
+// each registered setting's Default under its current name and every legacy
+// one, as an older CLI wrote it under the name it had then. An empty default
+// was never written, so it is not one.
 func defaultsShipped() map[string][]string {
-	all := maps.Clone(shippedDefaults)
-	for path, cfg := range CFGStrMap {
-		if cfg.Default != "" {
-			all[path] = append(slices.Clone(all[path]), cfg.Default)
+	all := map[string][]string{}
+	for name, s := range removedSettings {
+		if len(s.defaults) > 0 {
+			all[name] = slices.Clone(s.defaults)
+		}
+	}
+	for _, cfg := range CFGStrMap {
+		if cfg.Default == "" {
+			continue
+		}
+		for _, name := range append([]string{cfg.Path}, cfg.Legacy...) {
+			all[name] = append(slices.Clone(all[name]), cfg.Default)
 		}
 	}
 	return all

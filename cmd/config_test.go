@@ -122,11 +122,13 @@ func (s *CmdSuite) TestConfigListShowsValueAndScope() {
 	buf := new(bytes.Buffer)
 	s.NoError(configList(textTo(buf)))
 	out := buf.String()
-	s.Regexp(`(?m)^\s*page_size\s+50\s+global\s*$`, out)
-	s.Regexp(`(?m)^\s*show_warnings\s+true\s+default\s*$`, out)
+	s.Regexp(`(?m)^\s*apc\.page_size\s+50\s+global\s*$`, out, "set under its 1.x name")
+	s.Regexp(`(?m)^\s*apc\.show_warnings\s+true\s+default\s*$`, out)
 	s.NotContains(out, "contexts")
 	s.NotContains(out, "t0ken-value")
 	s.NotContains(out, "postgres", "a removed setting is not listed")
+	s.NotContains(out, "internal.", "nor an internal override")
+	s.NotRegexp(`(?m)^\s*page_size\s`, out, "nor a 1.x name")
 }
 
 func (s *CmdSuite) TestConfigListReadsA1xProjectUnlessGlobal() {
@@ -134,12 +136,12 @@ func (s *CmdSuite) TestConfigListReadsA1xProjectUnlessGlobal() {
 
 	buf := new(bytes.Buffer)
 	s.NoError(configList(textTo(buf)))
-	s.Regexp(`(?m)^\s*page_size\s+70\s+project\s*$`, buf.String())
+	s.Regexp(`(?m)^\s*apc\.page_size\s+70\s+project\s*$`, buf.String())
 
 	globalFlag = true
 	buf.Reset()
 	s.NoError(configList(textTo(buf)))
-	s.Regexp(`(?m)^\s*page_size\s+50\s+global\s*$`, buf.String())
+	s.Regexp(`(?m)^\s*apc\.page_size\s+50\s+global\s*$`, buf.String())
 }
 
 // A bare `astro config set` panicked: ensureGlobalFlag runs as a
@@ -251,7 +253,8 @@ func (s *CmdSuite) TestConfigSetNeverWritesARemovedKey() {
 
 // A save writes back what the file held, the settings only Astro CLI 1.x
 // reads included, plus the one change: never the defaults, which would pin
-// every one of them at this build's value, and never a removed key.
+// every one of them at this build's value, and never a removed key. A set
+// under a setting's 1.x name writes its current one.
 func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
 	fs := s.initConfigFiles("postgres:\n  user: me\nwebserver:\n  port: \"8081\"\ncontext: localhost\n", "")
 
@@ -263,12 +266,13 @@ func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
 	got, err := afero.ReadFile(fs, config.HomeConfigFile)
 	s.Require().NoError(err)
 	s.YAMLEq(`
+apc:
+  page_size: 30
+  show_warnings: false
 config_version: 2
 context: localhost
-page_size: 30
 postgres:
   user: me
-show_warnings: false
 webserver:
   port: "8081"
 `, string(got))

@@ -188,7 +188,7 @@ type deployJSON struct {
 	URL string `json:"url,omitempty"`
 	// Warnings are what the deploy warned about without failing, as text
 	// prints them (less the "Warning: " prefix): an --image-name image that
-	// is all an image Deployment's DAGs (not when show_warnings is off), or
+	// is all an image Deployment's DAGs (not when apc.show_warnings is off), or
 	// a DAG upload that did not happen (always): skipped for want of a dags
 	// directory, to a Deployment that takes DAG uploads, or because whether
 	// the Deployment takes them could not be read.
@@ -339,7 +339,7 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 		// No project here: the working directory's dags/ belongs to no
 		// project this deploy knows, so the image ships alone, and an
 		// upload that a Deployment taking them would want is said not to
-		// have happened, whatever show_warnings is.
+		// have happened, whatever apc.show_warnings is.
 		msg := noticeImageAlone
 		if a.dags == deploy.DagsFromUnknown {
 			msg = noticeImageAloneUnplaced
@@ -357,14 +357,14 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 	case errors.Is(err, deploy.ErrNoDagsDirectory):
 		// DagsOnlyDeploy refuses before it looks for the directory, so the
 		// Deployment takes uploads: one was due and did not happen, which is
-		// said whatever show_warnings is.
+		// said whatever apc.show_warnings is.
 		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeNoDagsDir, a.path))
 		return nil
 	case a.dags == deploy.DagsFromUnknown && errors.Is(err, deploy.ErrAppConfigUnread):
 		// Whether the Deployment takes uploads at all could not be read,
 		// after its image was deployed: the deploy stands, and an upload
 		// that may have been due did not happen, which is said whatever
-		// show_warnings is.
+		// apc.show_warnings is.
 		alwaysWarn(result, opts.Progress, fmt.Sprintf(noticeDagsUndecided, err, a.deployment))
 		return nil
 	case err != nil:
@@ -375,7 +375,7 @@ func deployDagsAfterImage(a *dagsAfterImage, opts deploy.Options, result *deploy
 }
 
 // warn prints a deploy warning with the deploy's progress (stdout in text,
-// stderr under json) and records it in the json result, unless show_warnings
+// stderr under json) and records it in the json result, unless apc.show_warnings
 // is off, which silences the deploy's other warnings too.
 func warn(result *deployJSON, progress io.Writer, msg string) {
 	if !config.CFG.ShowWarnings.GetBool() {
@@ -385,7 +385,7 @@ func warn(result *deployJSON, progress io.Writer, msg string) {
 }
 
 // alwaysWarn prints a deploy warning and records it in the json result, as
-// warn does, whatever show_warnings is: for a part of the deploy that was
+// warn does, whatever apc.show_warnings is: for a part of the deploy that was
 // asked for and did not happen.
 func alwaysWarn(result *deployJSON, progress io.Writer, msg string) {
 	fmt.Fprintln(progress, "Warning: "+msg)
