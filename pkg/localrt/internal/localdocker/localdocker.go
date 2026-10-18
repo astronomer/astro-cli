@@ -303,9 +303,10 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	}
 
 	// Before anything is created, since "does this project have a volume of its
-	// own yet" is the question the note turns on and the up is what makes one.
-	// See legacydb.go.
-	e.noteLegacyDatabase(ctx, conn, projectPath, name, cb)
+	// own yet" is the question both the note and the Postgres choice turn on,
+	// and the up is what makes one. See legacydb.go and pgversion.go.
+	own := e.lookupVolume(ctx, conn, metadataVolume(name))
+	e.noteLegacyDatabase(ctx, conn, projectPath, own, cb)
 
 	stateDir, err := e.stateDir(projectPath)
 	if err != nil {
@@ -331,16 +332,19 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 
 	env := airflowEnv(name, webPort, major, p.Env, p.SecretEnv)
 	composePath, err := e.writeComposeFile(stateDir, composeInput{
-		ProjectName:   name,
-		Image:         image,
-		PostgresImage: postgresImage,
-		WebPort:       webPort,
-		PostgresPort:  pgPort,
-		Env:           env,
-		PassEnv:       passEnv(p.PassthroughEnv, p.SecretEnv, env),
-		Mounts:        projectMounts(projectPath),
-		DBCommand:     dbCommand(major),
-		Services:      airflowServices(major),
+		ProjectName: name,
+		Image:       image,
+		PostgresImage: e.metadataPostgresImage(ctx, pgChoice{
+			conn: conn, stateDir: stateDir, projectPath: projectPath,
+			composeProject: name, probeImage: image, own: own,
+		}, cb),
+		WebPort:      webPort,
+		PostgresPort: pgPort,
+		Env:          env,
+		PassEnv:      passEnv(p.PassthroughEnv, p.SecretEnv, env),
+		Mounts:       projectMounts(projectPath),
+		DBCommand:    dbCommand(major),
+		Services:     airflowServices(major),
 	})
 	if err != nil {
 		return nil, err
@@ -686,10 +690,18 @@ func (e *Engine) Clean(ctx context.Context, projectPath string) (composeProject 
 	}
 	composeFile := filepath.Join(dir, composeFileName)
 	if _, serr := os.Stat(composeFile); serr != nil {
-		if errors.Is(serr, os.ErrNotExist) {
+		if !errors.Is(serr, os.ErrNotExist) {
+			return "", false, serr
+		}
+		// The state directory lives in a cache anything may clear, and the
+		// metadata volume outlives it. A project whose compose file is gone
+		// but whose volume is still there is taken down all the same — the
+		// database is what a reset is run for.
+		conn, name, ok := e.orphanedVolume(ctx, projectPath)
+		if !ok {
 			return "", true, nil
 		}
-		return "", false, serr
+		return e.teardown(ctx, conn, name, "")
 	}
 
 	conn, name, reached := e.probeEngines(ctx, projectPath)
@@ -710,6 +722,17 @@ func (e *Engine) Clean(ctx context.Context, projectPath string) (composeProject 
 			return "", false, err
 		}
 	}
+	return e.teardown(ctx, conn, name, composeFile)
+}
+
+// teardown is Clean's removal once it knows the compose project: containers,
+// volumes, the built image, and composeFile when there is one.
+func (e *Engine) teardown(ctx context.Context, conn engineConn, name, composeFile string) (composeProject string, dockerReached bool, err error) {
+	// A Postgres version probe an interrupted start left behind still refers
+	// to the volume, and the engine will not remove a volume in use. Compose
+	// does not count it among the project's containers (see readPGVersion), so
+	// --remove-orphans does not reach it.
+	e.removePGProbes(ctx, conn, name)
 	// The same graceful window Stop gives containers. A reset with no record
 	// still finds a live project when the record was lost rather than removed,
 	// and there is no reason for that one to be killed harder than a stop.
@@ -721,10 +744,36 @@ func (e *Engine) Clean(ctx context.Context, projectPath string) (composeProject 
 		return "", true, fmt.Errorf("taking down %s: %w", name, derr)
 	}
 	e.removeBuiltImage(ctx, conn, name)
+	if composeFile == "" {
+		return name, true, nil
+	}
 	if rerr := os.Remove(composeFile); rerr != nil && !errors.Is(rerr, os.ErrNotExist) {
 		return name, true, rerr
 	}
 	return name, true, nil
+}
+
+// orphanedVolume reports whether the preferred engine holds this project's
+// metadata volume, for a project with no compose file left to say it ever ran
+// in docker mode.
+//
+// One bounded lookup, and only on the engine the project would start on. A
+// project that only ever ran standalone pays that lookup and nothing else: an
+// engine that is absent, down or slow is read as "nothing here", which is what
+// it was before this asked at all, so a standalone reset never warns about an
+// engine it has no use for.
+func (e *Engine) orphanedVolume(ctx context.Context, projectPath string) (engineConn, string, bool) {
+	conn, err := e.preferred(projectPath)
+	if err != nil {
+		return engineConn{}, "", false
+	}
+	name, err := composeProjectName(projectPath)
+	if err != nil {
+		return engineConn{}, "", false
+	}
+	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
+	defer cancel()
+	return conn, name, e.lookupVolume(ctx, conn, metadataVolume(name)) == volumePresent
 }
 
 // Attach returns a handle to a running docker-mode Airflow from its state
@@ -881,6 +930,8 @@ func (a *airflow) Stop(ctx context.Context, opts rt.StopOptions) error {
 	var extra []string
 	if opts.Clean {
 		extra = []string{"--volumes", "--remove-orphans"}
+		// See Clean: a leftover version probe would keep the volume.
+		a.eng.removePGProbes(ctx, conn, name)
 	}
 	if err := a.eng.downProject(ctx, conn, name, timeout, rt.Callbacks{}, extra...); err != nil {
 		return fmt.Errorf("stopping project containers: %w", err)
