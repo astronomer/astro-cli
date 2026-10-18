@@ -24,6 +24,109 @@ const (
 	configUseWithManifestMsg      = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
 )
 
+// unknownSetting fails a get or set of a name that is no setting the way an
+// unknown flag fails: a usage error (exit 2), naming the settings the name is
+// most likely a typo of, when any are close. It wraps errInvalidConfigPath.
+func unknownSetting(name string) error {
+	return cliout.Usage(fmt.Errorf("%w: %q.%s Run astro config list to see every setting.",
+		errInvalidConfigPath, name, suggestSettings(name)))
+}
+
+// suggestSettings is the "Did you mean" for a name that is no setting, or ""
+// when nothing is close. It suggests only what `astro config list` shows, so
+// never contexts (a set of it would replace every saved login) nor the
+// internal.* overrides. A typo of a renamed setting's 1.x name suggests the
+// current name; a typo of a removed one says it was removed and what replaces
+// it, since suggesting a name get and set refuse would only lead to a second
+// error.
+func suggestSettings(name string) string {
+	current, removed := closestSettings(name)
+	switch {
+	case len(current) == 1:
+		return " Did you mean " + current[0] + "?"
+	case len(current) > 1:
+		return " Did you mean one of: " + strings.Join(current, ", ") + "?"
+	case len(removed) > 0:
+		reason, _ := config.RemovedSetting(removed[0])
+		return " Did you mean " + removed[0] + "? It was removed in Astro CLI v2: " + reason
+	}
+	return ""
+}
+
+// closestSettings are the names nearest to name by cobra's rule for "Did you
+// mean": within suggestionDistance edits, or name a prefix of them. Every
+// name at the nearest distance, not one picked by sort order, since a partial
+// name such as "telemetry" is equally close to each setting under it. current
+// holds listed settings, with a renamed setting's 1.x name mapped to its
+// current one; removed holds the removed settings. Both sorted, and both
+// empty for an empty name, which is a prefix of everything.
+func closestSettings(name string) (current, removed []string) {
+	name = strings.ToLower(name)
+	if name == "" {
+		return nil, nil
+	}
+	distance := func(candidate string) int {
+		d := editDistance(name, candidate)
+		if strings.HasPrefix(candidate, name) && d > suggestionDistance {
+			d = suggestionDistance
+		}
+		return d
+	}
+	best := suggestionDistance + 1
+	var matches []string
+	consider := func(candidate string) {
+		switch d := distance(candidate); {
+		case d < best:
+			best, matches = d, []string{candidate}
+		case d == best:
+			matches = append(matches, candidate)
+		}
+	}
+	for path, cfg := range config.CFGStrMap {
+		if cfg.Listed() {
+			consider(path)
+		}
+	}
+	for _, old := range config.RemovedSettingNames() {
+		consider(old)
+	}
+	for _, match := range matches {
+		if renamed, ok := config.LegacySettingNames[match]; ok {
+			current = append(current, renamed)
+		} else if _, ok := config.CFGStrMap[match]; ok {
+			current = append(current, match)
+		} else {
+			removed = append(removed, match)
+		}
+	}
+	slices.Sort(current)
+	slices.Sort(removed)
+	return slices.Compact(current), removed
+}
+
+// editDistance is the Levenshtein distance between a and b, by character
+// rather than byte, so an accented letter is one edit, not two.
+func editDistance(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	prev := make([]int, len(rb)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(ra); i++ {
+		cur := make([]int, len(rb)+1)
+		cur[0] = i
+		for j := 1; j <= len(rb); j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			cur[j] = min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev = cur
+	}
+	return prev[len(rb)]
+}
+
 // refuseRemovedConfigKey fails a get or set of a 1.x setting v2 removed or
 // renamed the way a removed 1.x flag fails: a usage error naming what
 // replaces it.
@@ -159,6 +262,13 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return err
 		}
+		// An unknown name too, for the same reason: the scope checks below
+		// would otherwise answer it with advice to run it with -g, which
+		// then fails.
+		if _, ok := config.CFGStrMap[args[0]]; !ok {
+			cmd.SilenceUsage = true
+			return unknownSetting(args[0])
+		}
 	}
 	if globalFlag {
 		return nil
@@ -188,13 +298,13 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 // other; set says whether that scope sets the key. `config list` is where the
 // value in effect, and the scope it comes from, are published.
 func configGet(cmd *cobra.Command, args []string) error {
+	// Cobra has checked the argument count, so what can fail from here is
+	// the name or the value, which the usage text does not help with.
+	cmd.SilenceUsage = true
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
-		return errInvalidConfigPath
+		return unknownSetting(args[0])
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	setting := configSetting{Key: cfg.Path, Value: cfg.GetProjectString(), Scope: projectScope, Set: cfg.Scope() == projectScope}
 	if globalFlag {
@@ -211,13 +321,11 @@ func configSet(cmd *cobra.Command, args []string) error {
 	if err := refuseRemovedConfigKey(args[0]); err != nil {
 		return err
 	}
+	cmd.SilenceUsage = true
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
-		return errInvalidConfigPath
+		return unknownSetting(args[0])
 	}
-
-	// Silence Usage as we have now validated command input
-	cmd.SilenceUsage = true
 
 	// Validate the value using the registered validator (if any)
 	if err := cfg.Validate(args[1]); err != nil {

@@ -78,7 +78,9 @@ func (s *CmdSuite) TestConfigGetOutput() {
 		stdout, stderr, err := runConfigCmd("get", "nope", "-g", "-o", "json")
 		s.ErrorIs(err, errInvalidConfigPath)
 		s.Empty(stderr)
-		s.Equal(1, decodeOne[cliout.ErrorObject](s, stdout).Code)
+		failure := decodeOne[cliout.ErrorObject](s, stdout)
+		s.Equal(2, failure.Code)
+		s.Equal(cliout.KindUsage, failure.Kind)
 	})
 }
 

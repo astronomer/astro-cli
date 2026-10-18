@@ -61,6 +61,19 @@ const (
 	machineRemoved = "Size a Podman machine with podman machine set --cpus and --memory."
 )
 
+// RemovedSettingNames is every name RemovedSetting refuses: the removed
+// settings, and the 1.x names of the renamed ones.
+func RemovedSettingNames() []string {
+	names := make([]string, 0, len(removedSettings)+len(LegacySettingNames))
+	for name := range removedSettings {
+		names = append(names, name)
+	}
+	for name := range LegacySettingNames {
+		names = append(names, name)
+	}
+	return names
+}
+
 // RemovedSetting reports whether `astro config` refuses name, a 1.x setting
 // v2 removed or renamed, and what to say after "was removed in Astro CLI
 // v2: ", as the removed 1.x flags say it: what replaces a removed setting,

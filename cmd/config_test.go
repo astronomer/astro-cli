@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/afero"
 
@@ -41,15 +42,24 @@ func (s *CmdSuite) TestConfigGetCommandSuccess() {
 func (s *CmdSuite) TestConfigGetCommandFailure() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	_, err := executeCommand("config", "get", "-g", "test")
-	s.Error(err)
-	s.EqualError(err, errInvalidConfigPath.Error())
+	s.ErrorIs(err, errInvalidConfigPath)
+	s.True(cliout.IsUsage(err), "an unknown setting is a usage error, as an unknown flag is")
+	s.EqualError(err, `unknown setting: "test". Run astro config list to see every setting.`)
 
+	// Outside a project and without -g, an unknown name is still an unknown
+	// name, not advice to retry with -g, which would only fail again.
+	s.useWorkingPath(s.T().TempDir())
 	_, err = executeCommand("config", "get", "test")
+	s.ErrorIs(err, errInvalidConfigPath)
+	s.Equal(2, cliout.ExitCode(context.Background(), err))
+	s.NotContains(err.Error(), "outside of a project directory")
+
+	_, err = executeCommand("config", "get", "upgrade_message")
 	s.Error(err)
 	s.Contains(err.Error(), "You are attempting to get a project config outside of a project directory")
 	// The suggested command has to be runnable. It used to interpolate the
 	// argument placeholder alongside the real argument.
-	s.Contains(err.Error(), "astro config get test -g")
+	s.Contains(err.Error(), "astro config get upgrade_message -g")
 	s.NotContains(err.Error(), "[setting-name]")
 }
 
@@ -283,4 +293,61 @@ webserver:
 	s.False(config.CFG.ShowWarnings.GetBool())
 	s.True(config.CFG.UpgradeMessage.GetBool(), "an unset setting reads as its default")
 	s.Equal("default", config.CFG.UpgradeMessage.HomeScope())
+}
+
+// A name that is no setting fails as an unknown flag does, exit 2, naming the
+// setting it is most likely a typo of when one is close.
+func (s *CmdSuite) TestConfigUnknownSettingSuggestsTheClosest() {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"a typo", []string{"config", "set", "apc.page_sise", "30", "-g"}, " Did you mean apc.page_size? "},
+		{"a typo", []string{"config", "get", "deploy.git_metdata", "-g"}, " Did you mean deploy.git_metadata? "},
+		{"an accented letter is one edit", []string{"config", "get", "apc.page_sizé", "-g"}, " Did you mean apc.page_size? "},
+		{
+			"every setting under a partial name",
+			[]string{"config", "get", "telemetry", "-g"},
+			" Did you mean one of: telemetry.anonymous_id, telemetry.enabled, telemetry.notice_shown? ",
+		},
+		{"a typo of a renamed 1.x name suggests the current one", []string{"config", "get", "page_sise", "-g"}, " Did you mean apc.page_size? "},
+		{
+			"a typo of a removed 1.x name says it was removed",
+			[]string{"config", "set", "webserver.prot", "8081", "-g"},
+			"Did you mean webserver.port? It was removed in Astro CLI v2: nothing reads it. Pick the local Airflow port",
+		},
+		{"outside a project without -g", []string{"config", "get", "apc.page_sise"}, " Did you mean apc.page_size? "},
+	} {
+		s.Run(tc.name+": "+strings.Join(tc.args, " "), func() {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			s.useWorkingPath(s.T().TempDir())
+			_, err := executeCommand(tc.args...)
+			s.ErrorIs(err, errInvalidConfigPath)
+			s.Equal(2, cliout.ExitCode(context.Background(), err))
+			s.ErrorContains(err, tc.want)
+		})
+	}
+
+	// Never a name list leaves out: contexts, whose set would replace every
+	// saved login, nor the internal.* overrides. And not every setting for an
+	// empty name, which is a prefix of all of them.
+	s.Run("never contexts", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		_, err := executeCommand("config", "set", "contxts", "x", "-g")
+		s.ErrorIs(err, errInvalidConfigPath)
+		s.NotContains(err.Error(), "contexts")
+	})
+	for _, args := range [][]string{
+		{"config", "set", "internal.localhost.core", "x", "-g"},
+		{"config", "get", "", "-g"},
+		{"config", "get", "xyzzy", "-g"},
+	} {
+		s.Run("no suggestion: "+strings.Join(args, " "), func() {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			_, err := executeCommand(args...)
+			s.ErrorIs(err, errInvalidConfigPath)
+			s.NotContains(err.Error(), "Did you mean")
+		})
+	}
 }
