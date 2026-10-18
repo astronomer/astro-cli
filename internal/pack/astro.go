@@ -1,7 +1,6 @@
 package pack
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/internal/deploybuild"
 	"github.com/astronomer/astro-cli/internal/shipcheck"
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/container"
@@ -143,14 +143,14 @@ func checkSecrets(req Request, cb localrt.Callbacks) (imagebuild.MissingSecrets,
 // check of what it carries (shipcheck.Survey). The check waits for the engine
 // because its kind decides the ignore file a declared Dockerfile's build
 // reads.
-func (t *AstroTarget) reachEngineAndCheck(ctx context.Context, req Request, cb localrt.Callbacks) (engineCLI, error) {
-	cli, err := t.reachEngine(ctx, req.ProjectDir)
+func (t *AstroTarget) reachEngineAndCheck(ctx context.Context, req Request, cb localrt.Callbacks) (imagebuild.Engine, error) {
+	engine, err := t.reachEngine(ctx, req.ProjectDir)
 	if err != nil {
-		return engineCLI{}, err
+		return imagebuild.Engine{}, err
 	}
 	warn := func(w string) { emit(cb, "warning: "+w) }
-	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, cli.run, cli.bin, cli.env), warn)
-	return cli, err
+	_, err = shipcheck.Survey(req.ProjectDir, req.Manifest.Astro.Dockerfile, imagebuild.IsPodman(ctx, engine.Cmd, engine.Bin, engine.Env), warn)
+	return engine, err
 }
 
 // Build resolves the runtime base, builds the image, reads its runtime-version
@@ -184,7 +184,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	}
 
 	// The astro artifact is an image, so a container engine is required.
-	cli, err := t.reachEngineAndCheck(ctx, req, cb)
+	engine, err := t.reachEngineAndCheck(ctx, req, cb)
 	if err != nil {
 		return Result{}, err
 	}
@@ -215,18 +215,21 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	breq.Tag = workingTag
 	breq.Platform = req.Platform
 	breq.Secrets = req.BuildSecrets
-	breq.Bin = cli.bin
-	breq.Env = cli.env
+	breq.Bin = engine.Bin
+	breq.Env = engine.Env
 	built, err := t.builder.BuildLocal(ctx, breq, cb)
 	if err != nil {
 		return Result{}, missingSecrets.Explain(err)
 	}
 	// Drop the working tag once the final names point at the image, so package
-	// leaves a clean set of tags. Best effort; an orphaned tag is harmless.
+	// leaves a clean set of tags. It removes only the name, not the image, which
+	// the final tags still point at. Best effort; an orphaned tag is harmless.
 	// Compared rather than assumed, so a builder that returns another reference
 	// never has that reference untagged.
 	if built == workingTag {
-		defer cli.untag(ctx, workingTag)
+		defer func() {
+			engine.Untag(ctx, workingTag) //nolint:errcheck // best-effort cleanup; a leftover tag changes nothing
+		}()
 	}
 
 	// The exact runtime version comes off the built image's label, the same value
@@ -243,7 +246,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// The fallback stays for a GENERATED build, where it is defensive rather than
 	// load-bearing: that base is an Astro runtime by construction, so a missing
 	// label means something odd about the image rather than a choice the user made.
-	runtimeV, airflowLabel, inspected := cli.readVersionLabels(ctx, built)
+	runtimeV, airflowLabel, inspected := readVersionLabels(ctx, engine, built)
 	runtimeVersion := runtimeV
 	if runtimeVersion == "" {
 		runtimeVersion = airflowLabel
@@ -282,13 +285,13 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if finalTag == "" {
 		finalTag = fmt.Sprintf("astro-package/%s:%s-%s", name, tagSafe(runtimeVersion), hash)
 	}
-	if err := cli.tag(ctx, built, finalTag); err != nil {
+	if err := engine.Tag(ctx, built, finalTag); err != nil {
 		return Result{}, err
 	}
 	// The moving :latest tag is part of the default scheme; a caller that pins
 	// its own --tag owns its naming, so skip it there.
 	if req.Tag == "" {
-		if err := cli.tag(ctx, built, fmt.Sprintf("astro-package/%s:latest", name)); err != nil {
+		if err := engine.Tag(ctx, built, fmt.Sprintf("astro-package/%s:latest", name)); err != nil {
 			return Result{}, err
 		}
 	}
@@ -301,7 +304,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		Warnings:       warnings,
 	}
 	if req.Save != "" {
-		if err := cli.save(ctx, finalTag, req.Save, cb); err != nil {
+		if err := save(ctx, engine, finalTag, req.Save, cb); err != nil {
 			return Result{}, err
 		}
 		res.SavedPath = req.Save
@@ -313,39 +316,22 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 }
 
 // reachEngine resolves the container engine for the project and probes it up
-// front, so an engine that is missing or down is a plain ErrNoDocker rather
-// than an opaque build failure — or, for podman with no machine up, the podman
-// command that brings one up, which "start Docker" would not be.
-func (t *AstroTarget) reachEngine(ctx context.Context, projectDir string) (engineCLI, error) {
-	bin, env, err := t.engine(projectDir)
+// front (deploybuild.ReachEngine, the check an image deploy makes), so an
+// engine that is missing or down is a plain ErrNoDocker rather than an opaque
+// build failure — or, for podman with no machine up, the podman command that
+// brings one up, which "start Docker" would not be.
+//
+// The engine is a value per Build rather than a field on the target, so a
+// target never carries one project's engine into another's build.
+func (t *AstroTarget) reachEngine(ctx context.Context, projectDir string) (imagebuild.Engine, error) {
+	engine, err := deploybuild.ReachEngine(ctx, t.docker, func() (string, []string, error) { return t.engine(projectDir) })
 	if errors.Is(err, container.ErrMachineNotRunning) {
-		return engineCLI{}, fmt.Errorf("building the astro package image needs a running container engine, but %w", err)
+		return imagebuild.Engine{}, fmt.Errorf("building the astro package image needs a running container engine, but %w", err)
 	}
 	if err != nil {
-		return engineCLI{}, ErrNoDocker
+		return imagebuild.Engine{}, ErrNoDocker
 	}
-	cli := engineCLI{run: t.docker, bin: bin, env: env}
-	if err := cli.probe(ctx); err != nil {
-		return engineCLI{}, ErrNoDocker
-	}
-	return cli, nil
-}
-
-// engineCLI runs container commands against the engine resolved for one
-// build: the commander, the CLI it shells out to, and the env reaching its
-// daemon. A value per Build rather than fields on the target, so a target
-// never carries one project's engine into another's build.
-type engineCLI struct {
-	run imagebuild.Commander
-	bin string
-	env []string
-}
-
-// probe reports whether a container engine is reachable. `docker version`
-// (`podman version` alike) contacts the daemon and returns non-zero when it is
-// down, so a failure here (or a missing binary) means no engine.
-func (c engineCLI) probe(ctx context.Context) error {
-	return c.run.Run(ctx, c.env, localrt.Stdio{}, c.bin, "version")
+	return engine, nil
 }
 
 // readVersionLabels reads both version labels off an image, keeping them apart.
@@ -357,17 +343,19 @@ func (c engineCLI) probe(ctx context.Context) error {
 // built on a combined runtime-or-airflow answer passes a
 // `FROM astronomerinc/ap-airflow:...-onbuild` image that deploy then refuses.
 //
-// The third return distinguishes "the label is absent" from "the inspect
+// The third return distinguishes "the label is absent" from "an inspect
 // failed", which the combined form flattens into "". A daemon restart mid-build
 // is not a statement about the image's base, and reporting it as one is a
-// confident wrong diagnosis.
-func (c engineCLI) readVersionLabels(ctx context.Context, image string) (runtimeV, airflowV string, ok bool) {
-	var out bytes.Buffer
-	format := fmt.Sprintf("{{ index .Config.Labels %q }}\t{{ index .Config.Labels %q }}", airflowrt.RuntimeVersionLabel, airflowVersionLabel)
-	if err := c.run.Run(ctx, c.env, localrt.Stdio{Out: &out}, c.bin, "image", "inspect", "--format", format, image); err != nil {
+// confident wrong diagnosis. Either read failing reports both as unread.
+func readVersionLabels(ctx context.Context, engine imagebuild.Engine, image string) (runtimeV, airflowV string, ok bool) {
+	rawRuntime, err := engine.Label(ctx, image, airflowrt.RuntimeVersionLabel)
+	if err != nil {
 		return "", "", false
 	}
-	rawRuntime, rawAirflow, _ := strings.Cut(strings.TrimSpace(out.String()), "\t")
+	rawAirflow, err := engine.Label(ctx, image, airflowVersionLabel)
+	if err != nil {
+		return "", "", false
+	}
 	return cleanLabel(rawRuntime), cleanLabel(rawAirflow), true
 }
 
@@ -401,31 +389,15 @@ func tagSafe(v string) string {
 	return out
 }
 
-// tag points dst at the same image as src.
-func (c engineCLI) tag(ctx context.Context, src, dst string) error {
-	if err := c.run.Run(ctx, c.env, localrt.Stdio{}, c.bin, "tag", src, dst); err != nil {
-		return fmt.Errorf("tagging %s as %s: %w", src, dst, err)
-	}
-	return nil
-}
-
-// untag drops a tag reference. It runs after the final tags point at the image,
-// so it removes only the name, not the image. Failure is ignored: a leftover
-// working tag is harmless.
-func (c engineCLI) untag(ctx context.Context, ref string) {
-	//nolint:errcheck // best-effort cleanup; a leftover tag changes nothing
-	c.run.Run(ctx, c.env, localrt.Stdio{}, c.bin, "image", "rm", "--no-prune", ref)
-}
-
-// save writes the image to a tarball with `docker save`, streaming its output
-// (progress lands on stderr) through cb under the "package" component.
-func (c engineCLI) save(ctx context.Context, image, path string, cb localrt.Callbacks) error {
+// save writes the image to a tarball (Engine.Save), streaming the engine's
+// progress through cb under the "package" component.
+func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb localrt.Callbacks) error {
 	w := &localrt.LineWriter{Emit: func(line string) {
 		if cb.OnLine != nil {
 			cb.OnLine(localrt.LogLine{Component: "package", Time: time.Now(), Text: line})
 		}
 	}}
-	err := c.run.Run(ctx, c.env, localrt.Stdio{Err: w}, c.bin, "save", "--output", path, image)
+	err := engine.Save(ctx, image, path, w)
 	w.Flush()
 	if err != nil {
 		return fmt.Errorf("saving %s to %s: %w", image, path, err)

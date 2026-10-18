@@ -22,7 +22,8 @@
 //
 // The rest of an image's life on the container engine is here too, so every
 // image action runs on one engine: Engine logs in to a registry, tags, pushes
-// (returning the pushed digest when asked) and reads a label, through the same
+// (returning the pushed digest when asked), saves to a tarball and reads a
+// label, through the same
 // Commander, Bin and Env a build takes. Which registry, which credential and
 // which tag scheme stay with the caller.
 //

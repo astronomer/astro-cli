@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -63,6 +64,8 @@ type fakeDocker struct {
 	failErr    error
 	containerd bool
 	built      map[string]bool
+	// saveSays is what a save writes to stderr, its progress.
+	saveSays string
 }
 
 func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name string, args ...string) error {
@@ -98,18 +101,41 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 		f.mu.Unlock()
 		if s.Out != nil {
 			if readable {
-				io.WriteString(s.Out, f.inspectOut)
+				io.WriteString(s.Out, f.label(args))
 			} else {
-				io.WriteString(s.Out, "<no value>\t<no value>")
+				io.WriteString(s.Out, "<no value>")
 			}
 		}
 	case verb == "save":
+		if f.saveSays != "" && s.Err != nil {
+			io.WriteString(s.Err, f.saveSays)
+		}
 		// args: save --output <path> <ref>
 		if len(args) >= 3 {
 			os.WriteFile(args[2], []byte("tarball"), 0o600)
 		}
 	}
 	return nil
+}
+
+// label answers an `image inspect --format` for one label out of inspectOut,
+// which holds "<runtime label>\t<airflow label>": the runtime label's value
+// before the tab, the airflow label's after it, and docker's "<no value>" for
+// one inspectOut leaves out.
+func (f *fakeDocker) label(args []string) string {
+	runtimeV, airflowV, hasAirflow := strings.Cut(strings.TrimRight(f.inspectOut, "\n"), "\t")
+	format := ""
+	if len(args) > 3 {
+		format = args[3]
+	}
+	switch {
+	case strings.Contains(format, airflowrt.RuntimeVersionLabel):
+		return runtimeV + "\n"
+	case strings.Contains(format, airflowVersionLabel) && hasAirflow:
+		return airflowV + "\n"
+	default:
+		return "<no value>\n"
+	}
 }
 
 func (f *fakeDocker) callStrings() []string {
@@ -168,7 +194,7 @@ func TestAstroBuildTagShape(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(`^astro-package/my-project:3\.1-2-[0-9a-f]{7}$`), res.Image)
 
 	calls := docker.callStrings()
-	assert.True(t, hasCall(calls, "version"), "probes the daemon: %v", calls)
+	assert.True(t, hasCall(calls, "info"), "probes the daemon: %v", calls)
 	assert.True(t, hasCall(calls, "tag "+strings.Split(builder.gotReq.Tag, " ")[0]+" "+res.Image), "retags to final: %v", calls)
 	assert.True(t, hasCall(calls, "astro-package/my-project:latest"), "adds the moving latest tag: %v", calls)
 	// The builder started FROM the resolved runtime base and pinned the platform.
@@ -307,7 +333,7 @@ func TestAstroBuildNoSaveOmitsPathAndSize(t *testing.T) {
 func TestAstroBuildNoDockerError(t *testing.T) {
 	// The daemon probe fails, so the build stops with the plain no-Docker error
 	// before it builds anything.
-	docker := &fakeDocker{failVerb: "version"}
+	docker := &fakeDocker{failVerb: "info"}
 	_, err := newAstro(&fakeBuilder{}, docker).Build(context.Background(), testRequest(t), localrt.Callbacks{})
 	require.ErrorIs(t, err, ErrNoDocker)
 }
@@ -499,8 +525,7 @@ func TestAstroBuildWarnsForAnAirflowLabelledImageToo(t *testing.T) {
 	var lines []string
 	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
 
-	// One inspect returns both labels, tab-separated: no runtime label, and the
-	// airflow label answering in its place.
+	// No runtime label, and the airflow label answering in its place.
 	docker := &fakeDocker{inspectOut: "<no value>\t2.7.1"}
 	_, err := newAstro(&fakeBuilder{}, docker).Build(context.Background(), req, cb)
 	require.NoError(t, err)
