@@ -147,7 +147,7 @@ func ParseEnvironment(airflowHome, dagsDir, resultFile string) map[string]string
 func DecodeParseReport(raw []byte) (ParseReport, error) {
 	var report ParseReport
 	if err := json.Unmarshal(bytes.TrimSpace(raw), &report); err != nil {
-		return ParseReport{}, fmt.Errorf("decoding the DAG parse output: %w", err)
+		return ParseReport{}, fmt.Errorf("decoding the Dag parse output: %w", err)
 	}
 	return report, nil
 }
@@ -277,7 +277,7 @@ func (r *VenvRunner) parseWith(ctx context.Context, python string, in ParseInput
 	args := ParseArgs(in.ProjectPath, in.DagsDir)
 	stdout, err := r.Exec.Run(ctx, in.ProjectPath, env, python, args, ParseProgram())
 	if err != nil {
-		return ParseReport{}, fmt.Errorf("running the DAG parse: %w", err)
+		return ParseReport{}, fmt.Errorf("running the Dag parse: %w", err)
 	}
 
 	// Prefer the result file; fall back to stdout for a script that ignored the

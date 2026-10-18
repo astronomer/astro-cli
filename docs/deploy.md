@@ -56,7 +56,7 @@ Under an Astro Private Cloud (APC) context, `astro deploy` at a `pyproject.toml`
 - **`-o json`** publishes `{deployment, link, workspace, type, image, dags_in_image, runtime_version, url, warnings}`, `type` spelled as Astro's: `image-and-dag`, `image-only` (`--image`, or a deploy whose Deployment took no DAGs from it) or `dag-only`.
 - **Flags.** As on Astro: the argument, `--deployment`, `--workspace`, `--dags`, `--image`, `--image-name`, `--description`, `--build-secret`, `-o`. `--force` and `--prompt` are accepted, hidden and read by nothing (there is no uncommitted-changes check, and the deploy asks whenever no Deployment is named). There is no `--wait`: Astro CLI 1.x's APC deploy had none. `--save` and `--no-cache` are removed flags.
 
-The deploys of an image named on the command line keep APC's own route, from anywhere: **`--image-name <ref>`** (with `--remote`, an image already in a registry, `--runtime-version` naming its runtime) deploys at a project's root, where the project's `dags/` then goes to a Deployment that takes DAG uploads, and outside any project, where the image ships alone: no `dags/` is uploaded, and when the Deployment takes DAG uploads (or what it takes could not be read) the deploy says its DAGs were not updated, whatever `show_warnings` is. Its Deployment is the argument or `--deployment`, an id, or the one picked from the workspace's (`--prompt` forces that list), and its runtime check asks for confirmation, which `--yes` answers. With `--dags` it is refused, in `astro deploy`'s words: `--dags deploys only your Dags; drop --image-name` (and `--remote`, which is refused with `--dags` on its own too).
+The deploys of an image named on the command line keep APC's own route, from anywhere: **`--image-name <ref>`** (with `--remote`, an image already in a registry, `--runtime-version` naming its runtime) deploys at a project's root, where the project's `dags/` then goes to a Deployment that takes Dag uploads, and outside any project, where the image ships alone: no `dags/` is uploaded, and when the Deployment takes Dag uploads (or what it takes could not be read) the deploy says its Dags were not updated, whatever `show_warnings` is. Its Deployment is the argument or `--deployment`, an id, or the one picked from the workspace's (`--prompt` forces that list), and its runtime check asks for confirmation, which `--yes` answers. With `--dags` it is refused, in `astro deploy`'s words: `--dags deploys only your Dags; drop --image-name` (and `--remote`, which is refused with `--dags` on its own too).
 
 **In or below a project in the 1.x layout every deploy is refused**, `--image-name` and `--dags` included: `… uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), which Astro CLI v2 does not deploy to Astro Private Cloud. Deploy it with Astro CLI 1.x` (kind `no_project`). It does not suggest `astro init`, which still refuses to convert a project under an APC context. Below a `pyproject.toml` project's root, the deploy is told to run from the root, and outside any project a deploy with nothing to build is kind `no_project`, as on Astro.
 
@@ -99,23 +99,23 @@ This is the one limit on a declared Dockerfile. It builds and runs locally on an
 
 `--image-name <ref>` deploys a prebuilt local image and skips the build. It is how CI deploys an image `astro package` built (see [The Astro target](#the-astro-target)).
 
-### DAG deploys off
+### Dag deploys off
 
-A Deployment with DAG deploys off takes no DAG upload, so the image is the only way DAGs reach it. A default deploy there ships the image alone, with the DAGs inside it, as the 1.x CLI did: the generated image carries `dags/` with the rest of the project, the deploy is created as `IMAGE_AND_DAG` and finalized without a tarball, and nothing is uploaded. The summary says so (`Deployed image (tag …) to …, with the Dags inside the image: its Dag deploys are off, so no Dags were uploaded.`), and `-o json` adds `"dags_in_image": true`.
+A Deployment with Dag deploys off takes no Dag upload, so the image is the only way Dags reach it. A default deploy there ships the image alone, with the Dags inside it, as the 1.x CLI did: the generated image carries `dags/` with the rest of the project, the deploy is created as `IMAGE_AND_DAG` and finalized without a tarball, and nothing is uploaded. The summary says so (`Deployed image (tag …) to …, with the Dags inside the image: its Dag deploys are off, so no Dags were uploaded.`), and `-o json` adds `"dags_in_image": true`.
 
-A remote-execution Deployment runs its DAGs on its remote agents. With DAG deploys off, a default deploy uploads nothing and holds the image to nothing about DAGs, as the 1.x CLI uploaded none there; the summary says `It runs remote execution with DAG deploys off, so no DAGs were uploaded.`, and `-o json` adds `"remote_execution": true`. With DAG deploys on, it uploads them like any other Deployment.
+A remote-execution Deployment runs its Dags on its remote agents. With Dag deploys off, a default deploy uploads nothing and holds the image to nothing about Dags, as the 1.x CLI uploaded none there; the summary says `It runs remote execution with Dag deploys off, so no Dags were uploaded.`, and `-o json` adds `"remote_execution": true`. With Dag deploys on, it uploads them like any other Deployment.
 
 | Deployment / flags | what ships |
 | --- | --- |
-| DAG deploys on (remote execution or not), default | the image (which carries `dags/` too), and the DAGs uploaded beside it |
-| DAG deploys off, default, generated build | the image with the DAGs inside; refused when the project's `.dockerignore` leaves out every `.py` file under `dags/`, since the Deployment would run none |
-| DAG deploys off, default, declared Dockerfile | the image as the Dockerfile builds it; a warning when its ignore file leaves out every DAG, since its own steps may put DAGs in the image |
-| DAG deploys off, default, `--image-name` | the prebuilt image, with a warning that the Deployment runs the DAGs inside it |
-| DAG deploys off, `--image` (with or without `--image-name`), in a project | refused, as in 1.x: `--image` leaves the running DAGs in place, and there they are the image's |
-| DAG deploys off, `--image-name` outside any project | the prebuilt image alone, with the warning above that the Deployment runs the DAGs inside it; not refused, since no project's DAGs are left stale |
-| remote execution, DAG deploys off, default | the image; no DAGs uploaded, and a `.dockerignore` dropping them is not refused |
-| remote execution, DAG deploys off, `--image` | the image, as an image-only deploy |
-| DAG deploys off, `--dags` | refused |
+| Dag deploys on (remote execution or not), default | the image (which carries `dags/` too), and the Dags uploaded beside it |
+| Dag deploys off, default, generated build | the image with the Dags inside; refused when the project's `.dockerignore` leaves out every `.py` file under `dags/`, since the Deployment would run none |
+| Dag deploys off, default, declared Dockerfile | the image as the Dockerfile builds it; a warning when its ignore file leaves out every Dag, since its own steps may put Dags in the image |
+| Dag deploys off, default, `--image-name` | the prebuilt image, with a warning that the Deployment runs the Dags inside it |
+| Dag deploys off, `--image` (with or without `--image-name`), in a project | refused, as in 1.x: `--image` leaves the running Dags in place, and there they are the image's |
+| Dag deploys off, `--image-name` outside any project | the prebuilt image alone, with the warning above that the Deployment runs the Dags inside it; not refused, since no project's Dags are left stale |
+| remote execution, Dag deploys off, default | the image; no Dags uploaded, and a `.dockerignore` dropping them is not refused |
+| remote execution, Dag deploys off, `--image` | the image, as an image-only deploy |
+| Dag deploys off, `--dags` | refused |
 
 ### Gitignored files and credentials
 
@@ -228,7 +228,7 @@ The next steps it prints: `gcloud composer environments storage dags import --en
 An image deploy needs a container engine (the `container.binary` setting picks Docker or Podman). Without one, `astro deploy` stops before any transport work:
 
 ```
-an image deploy needs Docker, but no running container engine was found. Start Docker and try again, or run 'astro deploy --dags' to deploy just your DAGs (no Docker needed). Server-side builds are coming
+an image deploy needs Docker, but no running container engine was found. Start Docker and try again, or run 'astro deploy --dags' to deploy just your Dags (no Docker needed). Server-side builds are coming
 ```
 
 The check runs for `--image-name` too. A dags-only deploy never needs Docker, and neither do the `mwaa` and `composer` package targets. `astro package astro` refuses the same way. A server-side build, where the CLI uploads the context and the control plane builds, is the long-term answer for users without Docker and is not built.
