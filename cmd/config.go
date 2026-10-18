@@ -37,7 +37,10 @@ var unlistedConfigs = map[string]bool{
 // itself: v2 never writes these keys, and leaves them where they are.
 var removedConfigKeys = map[string]string{ //nolint:gosec // setting names and help text; cloud.api.token is a key, not a credential
 	"airflow.expose_port": "astro local has no setting for the interfaces local Airflow listens on.",
+	"beta.remote_cmd":     "It was a beta flag, and nothing is gated on it any more.",
 	"cloud.api.token":     "Log in with astro login, or set ASTRO_API_TOKEN to use an API token.",
+	"machine.cpu":         machineRemoved,
+	"machine.memory":      machineRemoved,
 	"dev.build_secrets": "Pass --build-secret to astro local start, or declare build-secrets under [tool.astro] in pyproject.toml " +
 		"for a project that builds its own Dockerfile.",
 	"disable_astro_run":   "astro run was removed: test a DAG with astro local run airflow dags test <dag>.",
@@ -68,6 +71,10 @@ var removedConfigKeys = map[string]string{ //nolint:gosec // setting names and h
 // postgresRemoved replaces every 1.x postgres.* setting: the metadata
 // database a Docker-mode start runs is fixed, and a standalone one has none.
 const postgresRemoved = "astro local start --docker runs its own metadata database, which has no settings."
+
+// machineRemoved replaces 1.x's machine.cpu and machine.memory, the size of
+// the Podman machine 1.x ran the project in.
+const machineRemoved = "Size a Podman machine with podman machine set --cpus and --memory."
 
 // refuseRemovedConfigKey fails a set of a removed key the way the removed
 // commands fail: a usage error naming the replacement.
@@ -232,9 +239,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 // other; set says whether that scope sets the key. `config list` is where the
 // value in effect, and the scope it comes from, are published.
 func configGet(cmd *cobra.Command, args []string) error {
-	if err := refuseRemovedConfigKey(args[0]); err != nil {
-		return err
-	}
+	// get config struct
 	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
 		return errInvalidConfigPath

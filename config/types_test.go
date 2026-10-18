@@ -16,6 +16,23 @@ func (s *Suite) TestSettingNamesAreDottedSnakeCase() {
 	}
 }
 
+// A set value is stored as its default's type only when it reads back as
+// what was typed.
+func (s *Suite) TestTypedKeepsWhatWasTyped() {
+	port := cfg{Default: "443"}
+	s.Equal(8443, port.typed("8443"))
+	s.Equal("0443", port.typed("0443"))
+	s.Equal("+443", port.typed("+443"))
+	s.Equal("https", port.typed("https"))
+
+	flag := cfg{Default: "false"}
+	s.Equal(true, flag.typed("true"))
+	s.Equal("1", flag.typed("1"))
+
+	zero := cfg{Default: "0"}
+	s.Equal(1, zero.typed("1"), "a default of 0 is a number, not a bool")
+}
+
 func (s *Suite) TestNewCfg() {
 	cfg := newCfg("foo", "bar")
 	s.NotNil(cfg)

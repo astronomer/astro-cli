@@ -198,6 +198,8 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		{"project.name", "p", "[project] name in its pyproject.toml"},
 		{"skip_parse", "true", "astro local check"},
 		{"cloud.api.token", "t0ken", "ASTRO_API_TOKEN"},
+		{"machine.cpu", "4", "podman machine set"},
+		{"beta.remote_cmd", "true", "beta flag"},
 	} {
 		for _, scope := range []string{"outside a project", "global", "manifest project"} {
 			s.Run(tc.key+" "+scope, func() {

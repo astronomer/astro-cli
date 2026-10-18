@@ -144,8 +144,10 @@ func (c cfg) GetInt() int {
 // A bool is the words true and false only. strconv.ParseBool also takes 1, 0,
 // t and f, which would make a setting that defaults to 0 a bool.
 func (c cfg) typed(value string) any {
+	// Only a number that reads back as what was typed: 0443 or +443 would be
+	// stored as 443 while set echoed what the user typed, and get disagreed.
 	if _, err := strconv.Atoi(c.Default); err == nil {
-		if i, err := strconv.Atoi(value); err == nil {
+		if i, err := strconv.Atoi(value); err == nil && strconv.Itoa(i) == value {
 			return i
 		}
 	}

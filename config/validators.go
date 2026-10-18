@@ -9,9 +9,9 @@ import (
 
 // registerValidator is a helper to register a validator for a config option
 func registerValidator(configPath string, validator ValidatorFunc) {
-	cfg := CFGStrMap[configPath]
-	cfg.RegisterValidator(validator)
-	CFGStrMap[configPath] = cfg
+	c := CFGStrMap[configPath]
+	c.RegisterValidator(validator)
+	CFGStrMap[configPath] = c
 }
 
 // registerValidators registers validation functions for config options
