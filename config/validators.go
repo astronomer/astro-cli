@@ -100,8 +100,8 @@ func ClientRegistryFix() string {
 // clientRegistryScope names the config remote.client_registry is read from
 // and the command that changes it there: the project's when it sets the key,
 // even to "", since that shadows the global one; else the global one, which
-// needs -g, since outside a project `astro config set` without it saves
-// nothing and still reports success.
+// takes -g from anywhere: without it, `astro config set` writes the project's
+// config inside a project and refuses outside one.
 func clientRegistryScope() (where, fix string) {
 	if c := CFG.RemoteClientRegistry; configExists(viperProject) && viperProject.IsSet(c.Path) {
 		return "this project's config", "astro config set remote.client_registry <registry>/<repository>"
