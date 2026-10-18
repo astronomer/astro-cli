@@ -220,21 +220,24 @@ func TestStartBringsProjectUp(t *testing.T) {
 	stateDir, err := rt.StateDir(p.ProjectPath)
 	require.NoError(t, err)
 	composeFile := filepath.Join(stateDir, composeFileName)
-	// Three calls. First `compose -p <name> ps -aq`, asking whether THIS compose
-	// project already has containers (so a failed start knows whether the
-	// cleanup is its to do) — scoped to the name the teardown would use, and
+	// Four calls. First whether the project has a metadata volume yet, which
+	// decides the Postgres image (pgversion.go); this one has none, so there is
+	// no version to read. Then `compose -p <name> ps -aq`, asking whether THIS
+	// compose project already has containers (so a failed start knows whether
+	// the cleanup is its to do) — scoped to the name the teardown would use, and
 	// --all so stopped containers count. Then the up, in two steps: one that
 	// pulls and creates outside the health budget, and one that starts under it
-	// (see updeadline.go). The `astro dev` note makes no call here: nothing is
-	// listening for lines, so there is no one to tell (see legacydb.go, and
-	// TestAStartTellsAProjectArrivingFromAstroDev).
-	require.Len(t, cmd.calls, 3)
-	assert.Equal(t, "docker compose -p "+name+" ps -aq", cmd.calls[0],
+	// (see updeadline.go). The `astro dev` note makes no call of its own:
+	// nothing is listening for lines, so there is no one to tell (see
+	// legacydb.go, and TestAStartTellsAProjectArrivingFromAstroDev).
+	require.Len(t, cmd.calls, 4)
+	assert.Equal(t, "docker volume ls --quiet --filter name="+metadataVolume(name), cmd.calls[0])
+	assert.Equal(t, "docker compose -p "+name+" ps -aq", cmd.calls[1],
 		"the pre-flight probe must ask about the project the teardown would remove")
 	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --no-start --quiet-pull",
-		composeFile, p.ProjectPath, name), cmd.calls[1])
-	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach",
 		composeFile, p.ProjectPath, name), cmd.calls[2])
+	assert.Equal(t, fmt.Sprintf("docker compose --file %s --project-directory %s --project-name %s up --detach",
+		composeFile, p.ProjectPath, name), cmd.calls[3])
 	assert.FileExists(t, composeFile)
 
 	// The state record captures what other tools need to reconnect.

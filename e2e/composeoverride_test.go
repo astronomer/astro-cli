@@ -22,7 +22,7 @@ func TestDockerModeMergesTheComposeOverride(t *testing.T) {
 	needsDocker(t, p)
 	write(t, filepath.Join(p.Dir, "docker-compose.override.yml"), `services:
   sidecar:
-    image: docker.io/postgres:12.6
+    image: docker.io/postgres:15
     entrypoint: ["sleep", "infinity"]
     networks: [airflow]
     volumes:

@@ -26,8 +26,8 @@ func composeMarker(t *testing.T, projectPath string) string {
 	return path
 }
 
-// A project that never ran in docker mode is left entirely alone — no engine is
-// even asked.
+// A project that never ran in docker mode is left alone: one lookup for a
+// metadata volume that outlived the state directory, and nothing else.
 //
 // Without the gate a standalone-only project reported "removed compose project
 // astro-orders-demo-298a15 and its volumes": a removal of something that never
@@ -35,12 +35,30 @@ func composeMarker(t *testing.T, projectPath string) string {
 func TestCleanSkipsAProjectThatNeverRanInDockerMode(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-
-	name, reached, err := e.Clean(context.Background(), t.TempDir())
+	project := t.TempDir()
+	name, err := composeProjectName(project)
 	require.NoError(t, err)
-	assert.Empty(t, name, "no compose project may be claimed for a project that never ran one")
+
+	got, reached, err := e.Clean(context.Background(), project)
+	require.NoError(t, err)
+	assert.Empty(t, got, "no compose project may be claimed for a project that never ran one")
 	assert.True(t, reached, "nothing to ask about is not the same as docker being unreachable")
-	assert.Empty(t, cmd.calls, "the gate must short-circuit before any engine is probed")
+	assert.Equal(t, []string{"docker volume ls --quiet --filter name=" + metadataVolume(name)}, cmd.calls,
+		"the gate asks only whether a volume outlived the state directory")
+}
+
+// An engine that will not answer that lookup reads as "nothing here", as it did
+// before the lookup existed: a standalone reset must not warn about an engine
+// it has no use for.
+func TestCleanOfAStandaloneProjectIgnoresAnEngineThatIsDown(t *testing.T) {
+	cmd := &fakeCmd{output: func(string) ([]byte, error) { return nil, errors.New("cannot connect to the daemon") }}
+	e := testEngine(t, cmd)
+
+	got, reached, err := e.Clean(context.Background(), t.TempDir())
+	require.NoError(t, err)
+	assert.Empty(t, got)
+	assert.True(t, reached)
+	assert.False(t, hasCall(cmd.calls, " down "), "calls were %v", cmd.calls)
 }
 
 // The case the whole path exists for: containers already gone, volume still

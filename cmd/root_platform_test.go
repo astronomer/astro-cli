@@ -2,15 +2,56 @@ package cmd
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/config"
+	astrocontext "github.com/astronomer/astro-cli/context"
 	houston_mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
+
+// Which platform the root builds is decided from the current context's domain,
+// never its login: resolving a login can read the keyring or the vault,
+// rewrite the config and warn on stderr, and every command, `astro version`
+// and the offline core tree included, decides the platform first. A command
+// that needs the login reads it for itself.
+func TestTheRootDecidesThePlatformWithoutTheLogin(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, tc := range []struct {
+		config, platform string
+	}{
+		{testUtil.CloudPlatform, cloudPlatform},
+		{testUtil.SoftwarePlatform, apcPlatform},
+	} {
+		t.Run(tc.platform, func(t *testing.T) {
+			testUtil.InitTestConfig(tc.config)
+			resolved, restore := config.CountLoginResolutions()
+			defer restore()
+
+			o := detectRootOptions()
+			require.Equal(t, tc.platform, o.platform)
+			require.Zero(t, resolved(), "detecting the root's options resolved the login")
+
+			for _, args := range [][]string{{"version"}, {"local", "ps", "-o", "json"}} {
+				o.out, o.args = new(bytes.Buffer), args
+				// Executed only for what the root reaches on the way: the core
+				// command fails, with no project here.
+				_, _, _ = executeRoot(newRootCmd(&o), args...)
+				require.Zero(t, resolved(), "astro %s resolved the login", strings.Join(args, " "))
+			}
+
+			// The control: the counter sees a command that reads the login.
+			_, err := astrocontext.GetCurrentContext()
+			require.NoError(t, err)
+			require.Equal(t, 1, resolved())
+		})
+	}
+}
 
 // An APC root asks Houston for the platform's version and feature flags only
 // when the line runs an APC command. A host that does not answer used to hold

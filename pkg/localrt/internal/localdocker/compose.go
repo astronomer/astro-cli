@@ -31,8 +31,6 @@ import (
 var composeTemplate string
 
 const (
-	// postgresImage matches v1's default metadata database image.
-	postgresImage = "docker.io/postgres:12.6"
 	// airflowHomeInImage is where the runtime image keeps AIRFLOW_HOME. It is
 	// rt's exported constant because a RunInImage caller builds container-side
 	// paths from it, and two spellings of the mount root would put a caller's
@@ -83,8 +81,10 @@ type service struct {
 // here derives from the Plan; no config or manifest reads happen at
 // generation time.
 type composeInput struct {
-	ProjectName   string
-	Image         string
+	ProjectName string
+	Image       string
+	// PostgresImage runs the metadata database: see metadataPostgresImage
+	// for why it is not always the same one.
 	PostgresImage string
 	// WebPort is the host port the UI and the API are published on — the
 	// api-server on Airflow 3, the webserver on Airflow 2. In the container
