@@ -43,12 +43,28 @@ var (
 	manifestBuildNow = time.Now
 )
 
-// ManifestImage is a pyproject.toml project's image deploy to an Astro
-// Private Cloud Deployment, the Deployment already settled
-// (internal/deploy's target resolution, with apc links).
+// ManifestImage is an image deploy to an Astro Private Cloud Deployment,
+// the Deployment already settled (internal/deploy's target resolution, with
+// apc links): a pyproject.toml project's image, built from its manifest, or
+// a prebuilt one (ImageName).
 type ManifestImage struct {
 	DeploymentID string
 	WorkspaceID  string
+	// ImageName is a prebuilt image to deploy instead of building one
+	// (--image-name): a local image, pushed as a built one is, or, with
+	// InRegistry, one already in a registry, which the Deployment is pointed
+	// at as it is. "" builds from Build.
+	ImageName string
+	// InRegistry is an ImageName already in a registry (--remote): nothing
+	// is built, read or pushed, and Houston's updateDeploymentImage points
+	// the Deployment at it.
+	InRegistry bool
+	// RuntimeVersion is the Astro Runtime an InRegistry image carries
+	// (--runtime-version): no local label can say.
+	RuntimeVersion string
+	// ImageAlone is a prebuilt image deployed from outside any project: no
+	// DAGs go with it, and the deploy says what that leaves the Deployment.
+	ImageAlone bool
 	// Build is the project's root and the manifest's image-deciding fields
 	// (imagebuild.ManifestBuildOf).
 	Build imagebuild.ManifestBuild
@@ -144,14 +160,18 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 		warn = func(string) {}
 	}
 
+	if in.InRegistry {
+		return deployRegistryImage(client, in, progress, warn)
+	}
+
 	// The Deployment is read first: a deploy it refuses outright needs no
 	// container engine to be told so.
 	t, err := lookUpManifestTarget(client, in.WorkspaceID, in.DeploymentID)
 	if err != nil {
 		return ManifestImageResult{}, err
 	}
-	if !in.IncludeDags && t.dags == DagsFromImage {
-		return ManifestImageResult{}, fmt.Errorf("%w: Deployment %s runs the Dags inside its image, so an image without them would leave it none. Run astro deploy without --image to deploy the image with the project's Dags inside it", ErrDeploymentTypeIncorrectForImageOnly, in.DeploymentID)
+	if err := refuseImageOnly(in, t); err != nil {
+		return ManifestImageResult{}, err
 	}
 
 	cmd := newManifestCommander()
@@ -161,45 +181,39 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 	}
 
 	listed := listedRuntimes(client, t.info.ClusterID, t.workspace, in.DeploymentID)
-	req, err := imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog))
-	if err != nil {
-		return ManifestImageResult{}, err
+	// A prebuilt image is not built, so it has no request: its runtime is
+	// its label's, read below.
+	var req imagebuild.Request
+	if in.ImageName == "" {
+		if req, err = imagebuild.ForManifestWith(ctx, in.Build, houstonBase(listed, in.Catalog)); err != nil {
+			return ManifestImageResult{}, err
+		}
 	}
-	planned := deploybuild.PlanRuntime("", &req, &in.Build)
+	planned := deploybuild.PlanRuntime(in.ImageName, &req, &in.Build)
 	allowed := listed.versions()
 	current := t.info.RuntimeVersion
 	if err := planned.CheckListed(current, allowed); err != nil {
 		return ManifestImageResult{}, err
 	}
-	if in.IncludeDags && t.dags == DagsFromImage {
+	if in.ImageName == "" && in.IncludeDags && t.dags == DagsFromImage {
 		if err := checkDagsInImage(in, &req, func() bool { return imagebuild.IsPodman(ctx, cmd, bin, env) }, warn); err != nil {
 			return ManifestImageResult{}, err
 		}
 	}
 
-	if in.OnBuild != nil {
-		in.OnBuild()
-	}
 	engine := imagebuild.Engine{Cmd: cmd, Bin: bin, Env: env}
-	localImage, runtimeVersion, err := buildManifestImage(ctx, in, &req, engine, progress)
+	localImage, runtimeVersion, err := manifestDeployImage(ctx, in, &req, engine, progress)
 	if err != nil {
 		return ManifestImageResult{}, err
 	}
-	unlisted, err := planned.CheckBuiltListed(current, runtimeVersion, allowed)
+	upgrade, err := checkRuntime(in, &planned, current, runtimeVersion, allowed, warn)
 	if err != nil {
 		return ManifestImageResult{}, err
-	}
-	if unlisted != "" {
-		warn(unlisted)
-	}
-	upgrade := deploybuild.Airflow3Upgrade(current, runtimeVersion)
-	if upgrade {
-		warn(fmt.Sprintf("this deploy upgrades Deployment %s from Airflow 2 to Airflow 3 (Astro Runtime %s to %s)", in.DeploymentID, current, runtimeVersion))
 	}
 
 	fmt.Fprintf(progress, houstonDeploymentPrompt, t.release)
 	c, _ := config.GetCurrentContext() //nolint:errcheck // the target lookup has already read it
-	pushed, err := pushManifestImage(ctx, client, &c, t, engine, localImage, runtimeVersion, in.Description, progress)
+	pushed, err := pushManifestImage(ctx, client, &c, t, engine, &pushedImage{local: localImage, named: in.ImageName, runtime: runtimeVersion}, in.Description, progress)
 	if err != nil {
 		return ManifestImageResult{}, err
 	}
@@ -211,11 +225,116 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 		URL:             getAirflowUILink(in.DeploymentID, t.info.Urls),
 		Airflow3Upgrade: upgrade,
 	}
-	if !in.IncludeDags {
-		return res, nil
-	}
-	err = deliverDags(client, in, t, &res, progress, warn)
+	err = dagsAfterImage(client, in, t, &res, progress, warn)
 	return res, err
+}
+
+// refuseImageOnly refuses --image to a Deployment whose DAGs are its
+// image's: the image is all the DAGs it would have. An image deployed alone,
+// from outside any project, is not refused, as on Astro: no project's DAGs
+// are left stale, and the deploy warns that the Deployment runs the image's.
+func refuseImageOnly(in *ManifestImage, t *manifestTarget) error {
+	if in.IncludeDags || in.ImageAlone || t.dags != DagsFromImage {
+		return nil
+	}
+	return fmt.Errorf("%w: Deployment %s runs the Dags inside its image, so an image without them would leave it none. Run astro deploy without --image to deploy the image with the project's Dags inside it", ErrDeploymentTypeIncorrectForImageOnly, in.DeploymentID)
+}
+
+// manifestDeployImage is the local image a deploy pushes, and the runtime
+// its label carries: the prebuilt one named, or the one built from the
+// manifest, OnBuild called first.
+func manifestDeployImage(ctx context.Context, in *ManifestImage, req *imagebuild.Request, engine imagebuild.Engine, progress io.Writer) (localImage, runtimeVersion string, err error) {
+	if in.ImageName != "" {
+		runtimeVersion, err = deploybuild.PrebuiltRuntime(in.ImageName, func(image, label string) (string, error) {
+			return engine.Label(ctx, image, label)
+		})
+		return in.ImageName, runtimeVersion, err
+	}
+	if in.OnBuild != nil {
+		in.OnBuild()
+	}
+	return buildManifestImage(ctx, in, req, engine, progress)
+}
+
+// checkRuntime holds the runtime the image carries to what Houston refuses
+// of it after the push (deploybuild's CheckBuiltListed: a downgrade, Airflow
+// 3 where it is not enabled, a runtime newer than the newest listed), warns
+// of one the platform does not list and of an Airflow 2 to 3 upgrade, and
+// reports the upgrade.
+func checkRuntime(in *ManifestImage, planned *deploybuild.Plan, current, runtimeVersion string, allowed []string, warn func(string)) (upgrade bool, err error) {
+	unlisted, err := planned.CheckBuiltListed(current, runtimeVersion, allowed)
+	if err != nil {
+		return false, err
+	}
+	if unlisted != "" {
+		warn(unlisted)
+	}
+	upgrade = deploybuild.Airflow3Upgrade(current, runtimeVersion)
+	if upgrade {
+		warn(fmt.Sprintf("this deploy upgrades Deployment %s from Airflow 2 to Airflow 3 (Astro Runtime %s to %s)", in.DeploymentID, current, runtimeVersion))
+	}
+	return upgrade, nil
+}
+
+// dagsAfterImage gets DAGs to a Deployment whose image was just deployed:
+// the project's, as deliverDags delivers them, for a deploy of the image and
+// the DAGs; none for --image; and none for an image deployed alone, which
+// says what that leaves the Deployment.
+func dagsAfterImage(client houston.ClientInterface, in *ManifestImage, t *manifestTarget, res *ManifestImageResult, progress io.Writer, warn func(string)) error {
+	switch {
+	case in.ImageAlone:
+		warnImageAlone(in, t, warn)
+		return nil
+	case !in.IncludeDags:
+		return nil
+	}
+	return deliverDags(client, in, t, res, progress, warn)
+}
+
+// The warnings a prebuilt image's deploy gives about the Deployment's DAGs.
+const (
+	// warningPrebuiltDagsInImage: the Deployment runs the DAGs inside its
+	// image, and nothing here put any there: a prebuilt image was not built
+	// from the project, if there is one. The image may well carry DAGs (one
+	// built from a Dockerfile that copies them does); one astro package
+	// generated the build for does not.
+	warningPrebuiltDagsInImage = "this Deployment runs the Dags inside the image %s; the dags folder is not uploaded. An image astro package built without a dockerfile declared under [tool.astro] contains none."
+	// noticeImageAlone: an image deployed from outside any project ships
+	// alone, to a Deployment that takes DAG uploads, so its DAGs are as they
+	// were.
+	noticeImageAlone = "Dags were not updated: this deploy ran outside a pyproject.toml project, so it shipped the image alone, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
+	// noticeImageAloneUnplaced: the same, to a Deployment whose DAG source
+	// could not be read.
+	noticeImageAloneUnplaced = "this deploy ran outside a pyproject.toml project, so it shipped the image alone. If this Deployment takes Dag uploads, it keeps the Dags it had: to upload them, run astro deploy %s --dags from the project directory."
+	// noticeDagsUndecided: the image was deployed, and the cluster config
+	// that says whether the Deployment takes DAG uploads could not be read,
+	// so an upload that may have been due did not happen.
+	noticeDagsUndecided = "Dags were NOT updated: whether this Deployment takes Dag uploads could not be read (%v). The image was deployed, and the Deployment keeps the Dags it had. To upload them, run astro deploy %s --dags from the project directory."
+)
+
+// warnImageAlone says what an image deployed from outside any project leaves
+// the Deployment's DAGs: those inside the image, for an image Deployment
+// (unless apc.show_warnings is off), and the ones it had, for one that takes
+// DAG uploads or may, which is said whatever apc.show_warnings is: an upload
+// the Deployment would take did not happen.
+func warnImageAlone(in *ManifestImage, t *manifestTarget, warn func(string)) {
+	switch t.dags {
+	case DagsFromImage:
+		warnPrebuiltDagsInImage(in, warn)
+	case DagsFromUpload:
+		warn(fmt.Sprintf(noticeImageAlone, in.DeploymentID))
+	case DagsFromUnknown:
+		warn(fmt.Sprintf(noticeImageAloneUnplaced, in.DeploymentID))
+	case DagsFromElsewhere:
+	}
+}
+
+// warnPrebuiltDagsInImage warns that an image Deployment runs only the DAGs
+// a prebuilt image carries, unless apc.show_warnings is off.
+func warnPrebuiltDagsInImage(in *ManifestImage, warn func(string)) {
+	if config.CFG.ShowWarnings.GetBool() {
+		warn(fmt.Sprintf(warningPrebuiltDagsInImage, in.ImageName))
+	}
 }
 
 // deliverDags gets the project's DAGs to a Deployment whose image was just
@@ -224,6 +343,11 @@ func deliverDags(client houston.ClientInterface, in *ManifestImage, t *manifestT
 	switch t.dags {
 	case DagsFromImage:
 		res.DagsInImage = true
+		if in.ImageName != "" {
+			// A built image carries the project's DAGs; a prebuilt one
+			// carries whatever it carries.
+			warnPrebuiltDagsInImage(in, warn)
+		}
 		return nil
 	case DagsFromElsewhere:
 		res.DagsNotShipped = true
@@ -245,6 +369,13 @@ func deliverDags(client houston.ClientInterface, in *ManifestImage, t *manifestT
 	case errors.Is(err, ErrNoDagsDirectory):
 		res.DagsNotShipped = true
 		warn(fmt.Sprintf("no Dags were uploaded: there is no dags directory in %s, and the Deployment keeps the Dags it had", in.Build.ProjectDir))
+		return nil
+	case t.dags == DagsFromUnknown && errors.Is(err, ErrAppConfigUnread):
+		// Whether the Deployment takes uploads at all could not be read,
+		// after its image was deployed: the deploy stands, and an upload
+		// that may have been due did not happen.
+		res.DagsNotShipped = true
+		warn(fmt.Sprintf(noticeDagsUndecided, err, in.DeploymentID))
 		return nil
 	}
 	return &DagsAfterImageError{Image: res.Image, DeploymentID: in.DeploymentID, Err: err}
@@ -286,10 +417,33 @@ func dagsSource(info *houston.Deployment, appConfig *houston.AppConfig) string {
 // it is in the workspace, its release name and next registry tag, its
 // cluster config, and where it takes its DAGs from.
 func lookUpManifestTarget(client houston.ClientInterface, wsID, deploymentID string) (*manifestTarget, error) {
+	t, err := lookUpDeployment(client, wsID, deploymentID)
+	if err != nil {
+		return nil, err
+	}
+	t.appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: t.info.ClusterID, WorkspaceUUID: t.workspace, DeploymentUUID: deploymentID})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrAppConfigUnread, err)
+	}
+	if t.appConfig != nil && t.appConfig.Flags.BYORegistryEnabled {
+		if t.appConfig.BYORegistryDomain == "" {
+			return nil, ErrBYORegistryDomainNotSet
+		}
+		// Houston keeps no next tag for a BYO registry.
+		t.byo, t.nextTag = true, "deploy-"+time.Now().UTC().Format("2006-01-02T15-04")
+	}
+	t.dags = dagsFrom(t.info, t.appConfig)
+	return t, nil
+}
+
+// lookUpDeployment reads what every image deploy needs of its Deployment:
+// that it is in the workspace, its release name and next registry tag, and
+// the Deployment itself, with the workspace Houston places it in.
+func lookUpDeployment(client houston.ClientInterface, wsID, deploymentID string) (*manifestTarget, error) {
 	if deploymentID == "" {
 		return nil, errInvalidDeploymentID
 	}
-	_, deployments, err := getDeploymentIDForCurrentCommand(client, wsID, deploymentID, false)
+	deployments, err := workspaceDeployments(client, wsID, deploymentID)
 	if errors.Is(err, errInvalidDeploymentID) {
 		return nil, fmt.Errorf("no Deployment %s in workspace %s: name a Deployment of the workspace, or the workspace it is in with --workspace", deploymentID, wsID)
 	}
@@ -307,18 +461,6 @@ func lookUpManifestTarget(client houston.ClientInterface, wsID, deploymentID str
 		return nil, fmt.Errorf("failed to get deployment info: %w", err)
 	}
 	t.workspace = resolvedWorkspaceUUIDForAppConfig(wsID, deploymentID, deployments, t.info)
-	t.appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: t.info.ClusterID, WorkspaceUUID: t.workspace, DeploymentUUID: deploymentID})
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrAppConfigUnread, err)
-	}
-	if t.appConfig != nil && t.appConfig.Flags.BYORegistryEnabled {
-		if t.appConfig.BYORegistryDomain == "" {
-			return nil, ErrBYORegistryDomainNotSet
-		}
-		// Houston keeps no next tag for a BYO registry.
-		t.byo, t.nextTag = true, "deploy-"+time.Now().UTC().Format("2006-01-02T15-04")
-	}
-	t.dags = dagsFrom(t.info, t.appConfig)
 	return t, nil
 }
 
@@ -455,12 +597,18 @@ func checkDagsInImage(in *ManifestImage, req *imagebuild.Request, podman func() 
 // user's container config. A BYO registry takes the push on the engine's own
 // login, and the image by the updateDeploymentImage mutation, which reads no
 // labels, so the runtime and the deploy's description go with it.
-func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *config.Context, t *manifestTarget, engine imageEngine, localImage, runtimeVersion, description string, progress io.Writer) (string, error) {
+func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *config.Context, t *manifestTarget, engine imageEngine, img *pushedImage, description string, progress io.Writer) (string, error) {
 	var registry, remoteImage string
-	push := imagebuild.PushRequest{Source: localImage, Digest: config.CFG.ShaAsTag.GetBool(), Out: progress}
+	push := imagebuild.PushRequest{Source: img.local, Digest: config.CFG.ShaAsTag.GetBool(), Out: progress}
 	if t.byo {
 		registry = t.appConfig.BYORegistryDomain
 		remoteImage = fmt.Sprintf("%s:%s-%s", registry, t.release, t.nextTag)
+		// A prebuilt image keeps its own tag in a BYO registry, as Astro CLI
+		// 1.x pushed it: the mutation names the image, so the tag need not
+		// be Houston's.
+		if tag := getGetTagFromImageName(img.named); tag != "" {
+			remoteImage = registry + ":" + tag
+		}
 	} else {
 		platformVersion, _ := client.GetPlatformVersion(nil) //nolint:errcheck // an unread version is a pre-1.0 platform, as APC deploy has always taken it
 		if versions.GreaterThanOrEqualTo(platformVersion, "1.0.0") {
@@ -486,10 +634,17 @@ func pushManifestImage(ctx context.Context, client houston.ClientInterface, c *c
 	if push.Digest {
 		remoteImage = registry + "@" + sha
 	}
-	airflowVersion, _ := engine.Label(ctx, localImage, airflowImageLabel) //nolint:errcheck // the mutation takes an empty one, as APC deploy has always sent it
-	req := houston.UpdateDeploymentImageRequest{ReleaseName: t.release, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: runtimeVersion, DeployRevisionDescription: description}
+	airflowVersion, _ := engine.Label(ctx, img.local, airflowImageLabel) //nolint:errcheck // the mutation takes an empty one, as APC deploy has always sent it
+	req := houston.UpdateDeploymentImageRequest{ReleaseName: t.release, Image: remoteImage, AirflowVersion: airflowVersion, RuntimeVersion: img.runtime, DeployRevisionDescription: description}
 	if _, err := houston.Call(client.UpdateDeploymentImage)(req); err != nil {
-		return "", err
+		return "", explainUpdateImageErr(err, t.appConfig, false)
 	}
 	return remoteImage, nil
+}
+
+// pushedImage is the image pushManifestImage pushes: the local image, the
+// prebuilt image it is when one was named ("" for one built), and the
+// runtime its label carries.
+type pushedImage struct {
+	local, named, runtime string
 }
