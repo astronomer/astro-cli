@@ -58,7 +58,8 @@ func TestASavedDeployTargetBecomesALink(t *testing.T) {
 			for _, n := range res.Notes {
 				assert.NotContains(t, n, "saved deploy target", "a linked target is not left to do")
 			}
-			assert.Contains(t, strings.Join(res.Advisories, "\n"), "[tool.astro.deployments."+Link1xName+"]")
+			assert.Contains(t, res.Advisories, ".astro/config.yaml: linked Deployment "+deploymentID1x+
+				" as \"default\" in pyproject.toml (workspace "+workspaceID1x+")")
 		})
 	}
 }

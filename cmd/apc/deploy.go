@@ -134,7 +134,7 @@ func refuseUndeployable(where utils.Where) (inProject bool, err error) {
 	if !inProject && !where.None() {
 		// In or below a 1.x project, or below a pyproject.toml project's
 		// root: every mode is refused, --image-name included, as on Astro.
-		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+		return false, utils.NoDeployableProject(where)
 	}
 	switch {
 	case isDagOnlyDeploy && (imageName != "" || imagePresentOnRemote):
@@ -144,14 +144,14 @@ func refuseUndeployable(where utils.Where) (inProject bool, err error) {
 	case isDagOnlyDeploy:
 		// --dags at a project's root is the manifest deploy's, so this is
 		// --dags with no project here to upload the DAGs of.
-		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+		return false, utils.NoDeployableProject(where)
 	case imagePresentOnRemote && imageName == "":
 		return inProject, ErrImageNameNotPassedForRemoteFlag
 	case imageName == "":
 		// The value, not whether the flag was given: an empty --image-name=
 		// names no image, so this would be a build, and there is no project
 		// here to build.
-		return false, utils.NoDeployableProject(where, utils.Deploy1xRefusedAPC)
+		return false, utils.NoDeployableProject(where)
 	}
 	return inProject, nil
 }

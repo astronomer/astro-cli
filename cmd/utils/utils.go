@@ -26,28 +26,17 @@ func ChainRunEs(runEs ...RunE) RunE {
 	}
 }
 
-// Refusal1x is what a deploy says when the working directory is in a
-// project in the Astro CLI 1.x layout, at dir: where is "this project" when
-// the deploy ran in it, and names dir when it ran below it.
-type Refusal1x func(where, dir string) string
-
-// What a deploy from a project in the Astro CLI 1.x layout is told. v2
-// deploys only pyproject.toml projects, and Astro CLI 1.x keeps deploying the
-// 1.x layout, so nobody has to convert a project to keep shipping it.
-//
-// On Astro Private Cloud the advice is Astro CLI 1.x alone: v2 builds no
-// project there yet, and astro init refuses to convert a project under an
-// APC context, to keep its 1.x deploys working.
-var (
-	Deploy1xRefusedAstro Refusal1x = func(where, dir string) string {
-		return where + " uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), and Astro CLI v2 deploys only pyproject.toml projects. " +
-			"Convert it with astro init" + in(dir) + ", or deploy it with Astro CLI 1.x"
-	}
-	Deploy1xRefusedAPC Refusal1x = func(where, _ string) string {
-		return where + " uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), which Astro CLI v2 does not deploy to Astro Private Cloud. " +
-			"Deploy it with Astro CLI 1.x"
-	}
-)
+// Deploy1xRefused is what a deploy is told when the working directory is in
+// a project in the Astro CLI 1.x layout, at dir: where is "this project" when
+// the deploy ran in it, and names dir when it ran below it. v2 deploys only
+// pyproject.toml projects, on Astro and on Astro Private Cloud alike, and
+// astro init converts a 1.x project the same way for both; Astro CLI 1.x
+// keeps deploying the 1.x layout, so nobody has to convert a project to keep
+// shipping it.
+func Deploy1xRefused(where, dir string) string {
+	return where + " uses the Astro CLI 1.x layout (a Dockerfile and .astro/config.yaml), and Astro CLI v2 deploys only pyproject.toml projects. " +
+		"Convert it with astro init" + in(dir) + ", or deploy it with Astro CLI 1.x"
+}
 
 func in(dir string) string {
 	if dir == "" {
@@ -97,9 +86,9 @@ func (w Where) Loaded(dir string) *manifest.Manifest {
 
 // Locate walks up from dir to the nearest project, the one rule astro
 // deploy, astro remote deploy, APC's deploy and the bundle deploys'
-// containment checks decide by, routing included. It is astro init's walk
-// (scaffold.Find1xProject), so the deploy refuses as 1.x exactly where init
-// and the local commands' advice say a 1.x project is. At each directory:
+// containment checks decide by, routing included. It is the astro dev stub's
+// walk (scaffold.Find1xProject), so the deploy refuses as 1.x exactly where
+// the local commands' advice says a 1.x project is. At each directory:
 //
 //   - a pyproject.toml that is a project's (manifestRoot: scaffold's
 //     ManifestPresent) stops the walk, whether its manifest loads or not, so
@@ -148,7 +137,7 @@ func manifestRoot(dir string) (root bool, m *manifest.Manifest, loadErr error) {
 // the root of a pyproject.toml project, from Locate's answer where (for the
 // working directory):
 //
-//   - in or below a project in the Astro CLI 1.x layout, refused1x, naming
+//   - in or below a project in the Astro CLI 1.x layout, Deploy1xRefused, naming
 //     that project's directory when the deploy ran below it;
 //   - below a pyproject.toml project, to run the deploy from its root;
 //   - anywhere else, the no-project advice, which in the home directory does
@@ -156,7 +145,7 @@ func manifestRoot(dir string) (root bool, m *manifest.Manifest, loadErr error) {
 //
 // Every one of these is reported under the kind no_project: it unwraps to a
 // *project.NotFoundError.
-func NoDeployableProject(where Where, refused1x Refusal1x) error {
+func NoDeployableProject(where Where) error {
 	wd := config.WorkingPath
 	switch {
 	case where.Project1xDir != "":
@@ -164,7 +153,7 @@ func NoDeployableProject(where Where, refused1x Refusal1x) error {
 		if !sameDir(where.Project1xDir, wd) {
 			says, dir = "this directory is inside a project at "+where.Project1xDir+" that", where.Project1xDir
 		}
-		return &noProjectError{msg: refused1x(says, dir), cause: &project.NotFoundError{Start: wd, Project1xDir: where.Project1xDir}}
+		return &noProjectError{msg: Deploy1xRefused(says, dir), cause: &project.NotFoundError{Start: wd, Project1xDir: where.Project1xDir}}
 	case where.ManifestDir != "" && !sameDir(where.ManifestDir, wd):
 		return NoProject(fmt.Sprintf("this directory is inside the project at %s. Run the deploy from the project directory, %s", where.ManifestDir, where.ManifestDir))
 	case config.IsHomeDir(wd):

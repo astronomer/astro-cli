@@ -10,7 +10,6 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
-	"github.com/astronomer/astro-cli/internal/platform/apc/workspace"
 	"github.com/astronomer/astro-cli/pkg/input"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/picker"
@@ -46,12 +45,12 @@ func withAPCLinking(d *local.Deps, client houston.ClientInterface) {
 	}
 	d.APC = &local.APCLinking{
 		Domain: manifest.NormalizeAPCDomain(domain),
+		// A config field, read without resolving the login, which can reach
+		// the keyring or the vault and rewrite the config: astro init asks for
+		// it while converting a project, and nothing here needs the token.
 		CurrentWorkspace: func() (string, error) {
-			ws, err := workspace.GetCurrentWorkspace()
-			switch {
-			case errors.Is(err, workspace.ErrWorkspaceContextNotSet):
-				return "", nil
-			case err != nil:
+			ws, err := config.CurrentWorkspace()
+			if err != nil {
 				return "", local.APCWorkspaceUnreadable(err)
 			}
 			return ws, nil

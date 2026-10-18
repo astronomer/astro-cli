@@ -21,13 +21,16 @@ var astroIDRe = regexp.MustCompile(`^c[a-z0-9]{24}$`)
 // It can when .astro/config.yaml names both an Astro Deployment id and the
 // workspace it lives in. The key also holds a Software release name, which
 // cmd/apc/deploy.go saves there, and the id shape is what tells the two apart.
-// A link needs a workspace to parse, and the conversion has no login to look
-// one up with, so a saved target without one stays a note.
+// A link needs a workspace to parse. Under Astro, a saved target without one
+// stays a note: the conversion reads no Astro login to look one up.
 //
 // Under an Astro Private Cloud context (Options.APCDomain) the target is a
 // Houston Deployment in a Houston workspace, also cuids, and becomes an apc
-// link on that context's domain.
+// link on that context's domain. A saved id without a workspace takes the
+// context's current one (fillAPCWorkspace), asked for here, when the link is
+// decided, so a run refused before that never asks.
 func (from1x *project1x) deployLink() (Link, bool) {
+	from1x.fillAPCWorkspace()
 	if !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
 		return Link{}, false
 	}
@@ -38,6 +41,23 @@ func (from1x *project1x) deployLink() (Link, bool) {
 		}, true
 	}
 	return Link{Name: Link1xName, Kind: manifest.KindAstro, Deployment: from1x.deployment, Workspace: from1x.workspace}, true
+}
+
+// fillAPCWorkspace takes the workspace of a saved APC deploy target that
+// .astro/config.yaml did not save from the APC context's current workspace
+// (Options.APCWorkspace), which is where Astro CLI 1.x's deploy looked the
+// saved id up. It asks at most once, and only when that decides something:
+// under an APC context, for a saved Deployment id with no workspace beside
+// it. A workspace that is not an id keeps the note.
+func (from1x *project1x) fillAPCWorkspace() {
+	current := from1x.apcWorkspace
+	if current == nil || from1x.apcDomain == "" || from1x.workspace != "" || !astroIDRe.MatchString(from1x.deployment) {
+		return
+	}
+	from1x.apcWorkspace = nil
+	if ws := current(); astroIDRe.MatchString(ws) {
+		from1x.workspace, from1x.workspaceFromContext = ws, true
+	}
 }
 
 // setDeployLink writes the saved deploy target as a link marked default, with
@@ -61,16 +81,24 @@ func setDeployLink(ed tomledit.Editor, from1x *project1x) error {
 	return ed.Set(append(linkKey(l.Name), "default"), true)
 }
 
-// deployLinkAdvisory says what setDeployLink wrote, or "" when it wrote nothing.
+// deployLinkAdvisory says what setDeployLink wrote, or "" when it wrote nothing:
+// what was linked first, then, for a workspace taken from the context, what
+// to run if it is the wrong one. One line, as every entry is: the text
+// renderer indents each entry once, and a consumer reads each as a whole.
 func (from1x *project1x) deployLinkAdvisory() string {
 	l, ok := from1x.deployLink()
 	if !ok {
 		return ""
 	}
-	where := ""
+	where := "workspace " + l.Workspace
 	if l.Kind == manifest.KindAPC {
-		where = " on Astro Private Cloud " + l.Domain
+		where = "Astro Private Cloud " + l.Domain + ", " + where
 	}
-	return config1xRelPath + ": its saved deploy target is now the " + l.Name + " link in " + manifest.Marker +
-		" ([tool.astro.deployments." + l.Name + "], deployment " + l.Deployment + " in workspace " + l.Workspace + where + ")"
+	out := config1xRelPath + ": linked Deployment " + l.Deployment + " as \"" + l.Name + "\" in " + manifest.Marker +
+		" (" + where + ")"
+	if from1x.workspaceFromContext {
+		out += ". It saved no workspace, so this uses your current one. If the Deployment is in another workspace, " +
+			"relink it with: astro link add " + l.Name + " --deployment " + l.Deployment + " --workspace <workspace-id> --replace"
+	}
+	return out
 }

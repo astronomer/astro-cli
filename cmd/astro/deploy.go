@@ -151,7 +151,7 @@ func deploy(cmd *cobra.Command, args []string) error {
 	}
 	// Not a usage mistake, so no usage block under the error.
 	cmd.SilenceUsage = true
-	return utils.NoDeployableProject(where, utils.Deploy1xRefusedAstro)
+	return utils.NoDeployableProject(where)
 }
 
 // refuseFlagCombinations stops a deploy given flags that cannot all apply,
