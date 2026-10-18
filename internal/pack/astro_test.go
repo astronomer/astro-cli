@@ -61,6 +61,8 @@ type fakeDocker struct {
 	calls      [][]string
 	inspectOut string
 	failVerb   string
+	// failArg narrows failVerb to the calls whose arguments contain it.
+	failArg    string
 	failErr    error
 	containerd bool
 	built      map[string]bool
@@ -76,7 +78,7 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 	if len(args) > 0 {
 		verb = args[0]
 	}
-	if f.failVerb != "" && verb == f.failVerb {
+	if f.failVerb != "" && verb == f.failVerb && strings.Contains(strings.Join(args, " "), f.failArg) {
 		if f.failErr != nil {
 			return f.failErr
 		}
@@ -103,7 +105,7 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 			if readable {
 				io.WriteString(s.Out, f.label(args))
 			} else {
-				io.WriteString(s.Out, "<no value>")
+				io.WriteString(s.Out, "\n")
 			}
 		}
 	case verb == "save":
@@ -120,7 +122,7 @@ func (f *fakeDocker) Run(_ context.Context, _ []string, s localrt.Stdio, name st
 
 // label answers an `image inspect --format` for one label out of inspectOut,
 // which holds "<runtime label>\t<airflow label>": the runtime label's value
-// before the tab, the airflow label's after it, and docker's "<no value>" for
+// before the tab, the airflow label's after it, and "" for
 // one inspectOut leaves out.
 func (f *fakeDocker) label(args []string) string {
 	runtimeV, airflowV, hasAirflow := strings.Cut(strings.TrimRight(f.inspectOut, "\n"), "\t")
@@ -134,7 +136,7 @@ func (f *fakeDocker) label(args []string) string {
 	case strings.Contains(format, airflowVersionLabel) && hasAirflow:
 		return airflowV + "\n"
 	default:
-		return "<no value>\n"
+		return "\n"
 	}
 }
 
@@ -339,9 +341,9 @@ func TestAstroBuildNoDockerError(t *testing.T) {
 }
 
 func TestAstroBuildFallsBackToManifestVersionWhenLabelMissing(t *testing.T) {
-	// docker prints "<no value>" for an absent label; the tag falls back to the
-	// manifest Airflow pin.
-	docker := &fakeDocker{inspectOut: "<no value>"}
+	// An absent label reads as ""; the tag falls back to the manifest Airflow
+	// pin.
+	docker := &fakeDocker{inspectOut: ""}
 	res, err := newAstro(&fakeBuilder{}, docker).Build(context.Background(), testRequest(t), localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.Equal(t, "3.1", res.RuntimeVersion)
@@ -526,7 +528,7 @@ func TestAstroBuildWarnsForAnAirflowLabelledImageToo(t *testing.T) {
 	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
 
 	// No runtime label, and the airflow label answering in its place.
-	docker := &fakeDocker{inspectOut: "<no value>\t2.7.1"}
+	docker := &fakeDocker{inspectOut: "\t2.7.1"}
 	_, err := newAstro(&fakeBuilder{}, docker).Build(context.Background(), req, cb)
 	require.NoError(t, err)
 	assert.Contains(t, strings.Join(lines, "\n"), "not based on Astro Runtime",

@@ -19,10 +19,10 @@ var errNoDocker = errors.New("an image deploy needs Docker, but no running conta
 // the container engine.
 var errNoResolver = errors.New("an image deploy could not pick a container engine: no engine resolver was given")
 
-// ErrEngineUnreachable reports that ReachEngine found no container engine to
+// errEngineUnreachable reports that ReachEngine found no container engine to
 // use: none is installed, or its daemon does not answer. What to tell the
 // user is the caller's, so it carries no advice.
-var ErrEngineUnreachable = errors.New("no running container engine was found")
+var errEngineUnreachable = errors.New("no running container engine was found")
 
 // ReachEngine resolves the container CLI through resolve and confirms its
 // daemon is reachable through cmd, returning the engine every later image
@@ -31,19 +31,20 @@ var ErrEngineUnreachable = errors.New("no running container engine was found")
 //
 // It fails with resolve's own error when that is container.ErrMachineNotRunning
 // (podman with no machine up, whose message names the command that brings one
-// up), and with ErrEngineUnreachable for any other way of finding no engine.
+// up), and with one unadorned error of its own (errEngineUnreachable) for any
+// other way of finding no engine, which the caller replaces with its wording.
 func ReachEngine(ctx context.Context, cmd imagebuild.Commander, resolve func() (string, []string, error)) (imagebuild.Engine, error) {
 	bin, env, err := resolve()
 	if errors.Is(err, container.ErrMachineNotRunning) {
 		return imagebuild.Engine{}, err
 	}
 	if err != nil {
-		return imagebuild.Engine{}, ErrEngineUnreachable
+		return imagebuild.Engine{}, errEngineUnreachable
 	}
 	// `info` needs the daemon, so it fails fast when the engine is installed but
 	// not running.
 	if err := cmd.Run(ctx, env, localrt.Stdio{}, bin, "info"); err != nil {
-		return imagebuild.Engine{}, ErrEngineUnreachable
+		return imagebuild.Engine{}, errEngineUnreachable
 	}
 	return imagebuild.Engine{Cmd: cmd, Bin: bin, Env: env}, nil
 }

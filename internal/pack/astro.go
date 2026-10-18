@@ -221,17 +221,6 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if err != nil {
 		return Result{}, missingSecrets.Explain(err)
 	}
-	// Drop the working tag once the final names point at the image, so package
-	// leaves a clean set of tags. It removes only the name, not the image, which
-	// the final tags still point at. Best effort; an orphaned tag is harmless.
-	// Compared rather than assumed, so a builder that returns another reference
-	// never has that reference untagged.
-	if built == workingTag {
-		defer func() {
-			engine.Untag(ctx, workingTag) //nolint:errcheck // best-effort cleanup; a leftover tag changes nothing
-		}()
-	}
-
 	// The exact runtime version comes off the built image's label, the same value
 	// the deploy path validates against.
 	//
@@ -295,6 +284,17 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 			return Result{}, err
 		}
 	}
+	// Drop the working tag now that the final names point at the image, so
+	// package leaves a clean set of tags. Only here, after every Tag succeeded:
+	// rmi of an image's last name removes the image and can prune its dangling
+	// parent layers (podman; docker without BuildKit), so a failed tag leaves
+	// the working tag and the image in place instead. With another name on the
+	// image, rmi drops only the name. Best effort; an orphaned tag is harmless.
+	// Compared rather than assumed, so a builder that returns another reference
+	// never has that reference untagged.
+	if built == workingTag {
+		engine.Untag(ctx, workingTag) //nolint:errcheck // best-effort cleanup; a leftover tag changes nothing
+	}
 
 	res := Result{
 		Target:         TargetAstro,
@@ -346,21 +346,27 @@ func (t *AstroTarget) reachEngine(ctx context.Context, projectDir string) (image
 // The third return distinguishes "the label is absent" from "an inspect
 // failed", which the combined form flattens into "". A daemon restart mid-build
 // is not a statement about the image's base, and reporting it as one is a
-// confident wrong diagnosis. Either read failing reports both as unread.
+// confident wrong diagnosis. ok is whether the RUNTIME label was read, the one
+// the base check rests on: a failed runtime read reports both as unread, while
+// a failed airflow read after a good runtime one keeps the runtime value and
+// reports the airflow label as absent.
 func readVersionLabels(ctx context.Context, engine imagebuild.Engine, image string) (runtimeV, airflowV string, ok bool) {
 	rawRuntime, err := engine.Label(ctx, image, airflowrt.RuntimeVersionLabel)
 	if err != nil {
 		return "", "", false
 	}
+	runtimeV = cleanLabel(rawRuntime)
 	rawAirflow, err := engine.Label(ctx, image, airflowVersionLabel)
 	if err != nil {
-		return "", "", false
+		return runtimeV, "", true
 	}
-	return cleanLabel(rawRuntime), cleanLabel(rawAirflow), true
+	return runtimeV, cleanLabel(rawAirflow), true
 }
 
-// cleanLabel normalizes one label value: docker prints "<no value>" for an
-// absent label, which reads as empty.
+// cleanLabel normalizes one label value. imagebuild.Engine.Label's
+// `index .Config.Labels` format prints "" for an absent label on docker and
+// podman; the "<no value>" branch is defensive, for an engine that renders a
+// missing map key the way Go's templates do by default.
 func cleanLabel(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "<no value>" {

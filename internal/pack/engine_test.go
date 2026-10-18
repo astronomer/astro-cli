@@ -133,8 +133,42 @@ func TestAstroBuildSaveStreamsProgressAndNamesAFailure(t *testing.T) {
 	assert.ErrorContains(t, err, " to "+req.Save+": docker save ")
 }
 
-// A tag that fails stops the package with the engine's own failure.
+// A tag that fails stops the package with the engine's own failure, and
+// leaves the working tag in place: an rmi of an image's only name would remove
+// the image and can prune its dangling parent layers with it.
 func TestAstroBuildTagFailureIsTheEngines(t *testing.T) {
-	_, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2", failVerb: "tag"}).Build(context.Background(), testRequest(t), localrt.Callbacks{})
+	docker := &fakeDocker{inspectOut: "3.1-2", failVerb: "tag"}
+	_, err := newAstro(&fakeBuilder{}, docker).Build(context.Background(), testRequest(t), localrt.Callbacks{})
 	require.ErrorContains(t, err, "docker tag astro-package/my-project:src-")
+	assert.False(t, hasCall(docker.callStrings(), "rmi"), "%v", docker.callStrings())
+
+	// The same when only the second tag, :latest, fails.
+	docker = &fakeDocker{inspectOut: "3.1-2", failVerb: "tag", failArg: ":latest"}
+	_, err = newAstro(&fakeBuilder{}, docker).Build(context.Background(), testRequest(t), localrt.Callbacks{})
+	require.ErrorContains(t, err, "astro-package/my-project:latest")
+	assert.True(t, hasCall(docker.callStrings(), "docker tag astro-package/my-project:src-"), "%v", docker.callStrings())
+	assert.False(t, hasCall(docker.callStrings(), "rmi"), "%v", docker.callStrings())
+}
+
+// A failed read of the airflow label after a good runtime one keeps the
+// runtime label: the tag carries it, and the base check still has its answer.
+func TestAstroBuildKeepsTheRuntimeLabelWhenOnlyTheAirflowReadFails(t *testing.T) {
+	req := declaringRequest(t, "Dockerfile", "FROM python:3.12-slim\n")
+	var lines []string
+	cb := localrt.Callbacks{OnLine: func(l localrt.LogLine) { lines = append(lines, l.Text) }}
+
+	docker := &fakeDocker{inspectOut: "3.1-2\t3.1.0", failVerb: "image", failArg: airflowVersionLabel}
+	res, err := newAstro(&fakeBuilder{}, docker).Build(context.Background(), req, cb)
+	require.NoError(t, err)
+	assert.Equal(t, "3.1-2", res.RuntimeVersion)
+	assert.Contains(t, res.Image, ":3.1-2-")
+	assert.NotContains(t, strings.Join(lines, "\n"), "not based on Astro Runtime")
+
+	// With no runtime label, the failed airflow read is an absent one: the base
+	// check answers, and the tag falls back to the manifest pin.
+	docker = &fakeDocker{inspectOut: "\t3.1.0", failVerb: "image", failArg: airflowVersionLabel}
+	res, err = newAstro(&fakeBuilder{}, docker).Build(context.Background(), req, cb)
+	require.NoError(t, err)
+	assert.Equal(t, req.Manifest.Airflow().Pin, res.RuntimeVersion)
+	assert.Contains(t, strings.Join(lines, "\n"), "not based on Astro Runtime")
 }

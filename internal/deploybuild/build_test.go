@@ -76,11 +76,11 @@ func TestReachEngine(t *testing.T) {
 
 	cmd = &fakeCmd{}
 	_, err = ReachEngine(context.Background(), cmd, func() (string, []string, error) { return "", nil, errors.New("none on PATH") })
-	require.ErrorIs(t, err, ErrEngineUnreachable)
+	require.ErrorIs(t, err, errEngineUnreachable)
 	assert.Empty(t, cmd.calls, "nothing runs without an engine")
 
 	_, err = ReachEngine(context.Background(), &fakeCmd{err: errors.New("daemon down")}, func() (string, []string, error) { return "docker", nil, nil })
-	require.ErrorIs(t, err, ErrEngineUnreachable)
+	require.ErrorIs(t, err, errEngineUnreachable)
 
 	machine := fmt.Errorf("%w; podman machine init --now", container.ErrMachineNotRunning)
 	_, err = ReachEngine(context.Background(), &fakeCmd{}, func() (string, []string, error) { return "", nil, machine })
