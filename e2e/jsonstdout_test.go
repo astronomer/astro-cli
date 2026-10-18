@@ -135,8 +135,8 @@ func checkExceptionsExist(t *testing.T, seen map[string]bool) {
 // jsonState is one machine the commands run against.
 type jsonState struct {
 	name string
-	// platform is the local.platform of a login written to the home config,
-	// "cloud" or "software"; empty for no login.
+	// platform is the internal.localhost.platform of a login written to the
+	// home config, "cloud" or "software"; empty for no login.
 	platform string
 	// initProject runs the commands in a project `astro init` made.
 	initProject bool
@@ -274,12 +274,12 @@ func copyTree(t *testing.T, src, dst string) {
 }
 
 // writeLogin gives p's home a current context, logged in to an API that
-// refuses every connection. platform is the config's local.platform: "cloud"
-// for Astro, "software" for APC.
+// refuses every connection. platform is the config's
+// internal.localhost.platform: "cloud" for Astro, "software" for APC.
 //
 // The domain is "localhost" because it is the one domain whose API address the
-// config gives rather than the domain: local.core for Astro's, local.houston
-// for APC's. Any other would have the CLI look up api.<domain>, and a DNS
+// config gives rather than the domain: internal.localhost.core_url for
+// Astro's, internal.localhost.houston_url for APC's. Any other would have the CLI look up api.<domain>, and a DNS
 // query is the network too.
 //
 // The login does not expire, so the pre-run takes it without renewing it, and
@@ -311,10 +311,11 @@ func writeContext(t *testing.T, p *project, platform string) {
 func writeHomeContext(t *testing.T, p *project, platform, login string) {
 	t.Helper()
 	cfg := fmt.Sprintf(`context: localhost
-local:
-  core: %[1]s
-  houston: %[1]s/v1
-  platform: %[2]s
+internal:
+  localhost:
+    core_url: %[1]s
+    houston_url: %[1]s/v1
+    platform: %[2]s
 contexts:
   localhost:
     domain: localhost

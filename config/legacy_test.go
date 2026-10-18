@@ -1,6 +1,8 @@
 package config
 
 import (
+	"strings"
+
 	"github.com/spf13/afero"
 )
 
@@ -17,21 +19,50 @@ func (s *Suite) TestLegacySettingNames() {
 		s.Equal("default", CFG.ShaAsTag.HomeScope())
 	})
 
-	s.Run("the current name wins over the 1.x one", func() {
-		s.startWithHomeConfig("config_version: 2\npage_size: \"50\"\napc:\n    page_size: 70\n")
+	// 1.x reads only the old name, so a value it saved after v2 last wrote
+	// the setting is there and nowhere else.
+	s.Run("the 1.x name wins while the file holds it", func() {
+		s.startWithHomeConfig("config_version: 2\npage_size: \"30\"\napc:\n    page_size: 70\n")
 
-		s.Equal(70, CFG.PageSize.GetInt())
+		s.Equal(30, CFG.PageSize.GetInt())
+		s.Equal("global", CFG.PageSize.HomeScope())
 	})
 
-	s.Run("a set writes the current name and leaves the 1.x one for 1.x", func() {
+	s.Run("a set writes both names while the file holds the 1.x one, so 1.x sees it", func() {
 		fs := s.startWithHomeConfig("config_version: 2\npage_size: \"50\"\n")
 
 		s.Require().NoError(CFG.PageSize.SetHomeString("70"))
 
 		got := s.homeOnDisk(fs)
-		s.Equal("50", got["page_size"])
+		s.Equal(70, got["page_size"])
 		s.Equal(map[string]any{"page_size": 70}, got["apc"])
 		s.Equal(70, CFG.PageSize.GetInt())
+	})
+
+	s.Run("a set adds no 1.x name the file does not hold", func() {
+		fs := s.startWithHomeConfig("config_version: 2\n")
+
+		s.Require().NoError(CFG.PageSize.SetHomeString("70"))
+
+		got := s.homeOnDisk(fs)
+		s.NotContains(got, "page_size")
+		s.Equal(map[string]any{"page_size": 70}, got["apc"])
+	})
+
+	// v2 writes, 1.x writes after it, v2 reads: 1.x's value, not v2's older one.
+	s.Run("a change 1.x makes after a v2 set is read", func() {
+		fs := s.startWithHomeConfig("config_version: 2\npage_size: \"50\"\n")
+		s.Require().NoError(CFG.PageSize.SetHomeString("70"))
+		data, err := afero.ReadFile(fs, HomeConfigFile)
+		s.Require().NoError(err)
+		// What 1.x's own set would do: change the top-level page_size, carry
+		// the rest, apc.page_size included.
+		s.Require().Contains(string(data), "\npage_size: 70\n")
+		s.Require().NoError(afero.WriteFile(fs, HomeConfigFile, []byte(strings.Replace(string(data), "\npage_size: 70\n", "\npage_size: 30\n", 1)), 0o600))
+
+		InitConfig(fs)
+
+		s.Equal(30, CFG.PageSize.GetInt())
 	})
 
 	s.Run("a 1.x project config read by its path takes the 1.x name", func() {
@@ -59,8 +90,11 @@ func (s *Suite) TestLegacySettingNamesAreUnambiguous() {
 		s.True(registered, "%s maps to %s, which is not a setting", legacy, current)
 		_, clash := CFGStrMap[legacy]
 		s.False(clash, "%s is both a legacy name and a current one", legacy)
-		_, removed := RemovedSetting(legacy)
+		_, removed := removedSettings[legacy]
 		s.False(removed, "%s is both a legacy name and a removed setting", legacy)
+		reason, refused := RemovedSetting(legacy)
+		s.True(refused, "astro config takes %s, a 1.x name", legacy)
+		s.Equal("use "+current, reason)
 	}
 	for name := range removedSettings {
 		_, clash := CFGStrMap[name]

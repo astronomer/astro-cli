@@ -7,8 +7,6 @@ import (
 	iofs "io/fs"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -324,6 +322,8 @@ func saveConfig(v *viper.Viper, file string) error {
 
 	home := v == viperHome && file == HomeConfigFile
 	if home {
+		// 1.x coexistence (compat1x.go).
+		//
 		// A home config this build creates has nothing to clean up, so it is
 		// born at the current version and migrateHomeConfig never scans it.
 		// Only a new one: stamping a file whose cleanup failed at startup
@@ -383,105 +383,4 @@ func lockConfig(file string) (unlock func(), err error) {
 		return nil, fmt.Errorf("timed out after %s waiting for config lock %s — another astro process is holding it; wait for it to finish or kill it", lockTimeout, lockFile)
 	}
 	return func() { _ = lock.Unlock() }, nil //nolint:errcheck // error deliberately ignored in this shell code
-}
-
-const (
-	// configVersionKey records which one-time cleanups the home config has
-	// been through. Astro CLI 1.x reads and writes it too, and the two share
-	// one sequence: 1 is 1.x's cleanup (astronomer/astro-cli#2255, in
-	// v1.46.0), 2 is this one. Each runs only against a file below its own
-	// number, so whichever line adds the next cleanup takes 3.
-	configVersionKey     = "config_version"
-	currentConfigVersion = 2
-)
-
-// migrateHomeConfig runs once against a home config written before either CLI
-// stopped writing its defaults into the file — every 1.x before v1.46.0 and
-// every v2 before this — which put some 45 of them there on the first save.
-// Those entries cannot be told from a deliberate choice, so they freeze the
-// default of the day the file was written: no later change to a default
-// reaches the user, and in 1.x, a postgres.tag frozen at 12.6 kept new
-// projects off Postgres 15.
-//
-// Removing an entry that still holds a shipped default changes nothing about
-// what either CLI does today, since the same value comes back as the default,
-// and lets the setting follow the default again. It covers 1.x's settings as
-// well as v2's: once this stamps the file, 1.x's own cleanup (version 1)
-// never runs against it. Anything set from then on is the user's for good.
-//
-// It works on the file as it is on disk, under the lock, rather than on what
-// this process read at startup, so a save another process made in between is
-// kept. A cleanup that cannot be written is not worth failing the command
-// for: it is tried again next time.
-func migrateHomeConfig() {
-	if viperHome.GetInt(configVersionKey) >= currentConfigVersion {
-		return
-	}
-	unlock, err := lockConfig(HomeConfigFile)
-	if err != nil {
-		return
-	}
-	defer unlock()
-
-	disk, ok := readHomeFromDisk()
-	if !ok || disk.GetInt(configVersionKey) >= currentConfigVersion {
-		return
-	}
-	settings := disk.AllSettings()
-	for path, values := range defaultsShipped() {
-		if disk.IsSet(path) && slices.Contains(values, disk.GetString(path)) {
-			deleteNested(settings, path)
-		}
-	}
-	settings[configVersionKey] = currentConfigVersion
-	data, err := yaml.Marshal(settings)
-	if err != nil {
-		return
-	}
-	if err := writeConfigFile(configFs, HomeConfigFile, data); err != nil {
-		return
-	}
-	// Hold what is on disk now, as a process starting after the cleanup would.
-	_ = readConfigFile(viperHome, configFs) //nolint:errcheck // the file was just written from a parse of itself
-}
-
-// defaultsShipped is every value an older CLI wrote into the home config
-// without being asked, by setting name: each removed setting's defaults, and
-// each registered setting's Default under its current name and every legacy
-// one, as an older CLI wrote it under the name it had then. An empty default
-// was never written, so it is not one.
-func defaultsShipped() map[string][]string {
-	all := map[string][]string{}
-	for name, s := range removedSettings {
-		if len(s.defaults) > 0 {
-			all[name] = slices.Clone(s.defaults)
-		}
-	}
-	for _, cfg := range CFGStrMap {
-		if cfg.Default == "" {
-			continue
-		}
-		for _, name := range append([]string{cfg.Path}, cfg.Legacy...) {
-			all[name] = append(slices.Clone(all[name]), cfg.Default)
-		}
-	}
-	return all
-}
-
-// deleteNested removes a dotted key from a settings map, along with any parent
-// left empty by the removal.
-func deleteNested(settings map[string]any, path string) {
-	first, rest, nested := strings.Cut(path, ".")
-	if !nested {
-		delete(settings, first)
-		return
-	}
-	child, ok := settings[first].(map[string]any)
-	if !ok {
-		return
-	}
-	deleteNested(child, rest)
-	if len(child) == 0 {
-		delete(settings, first)
-	}
 }

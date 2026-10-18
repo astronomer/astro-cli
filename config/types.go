@@ -3,6 +3,7 @@ package config
 import (
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -18,10 +19,8 @@ type cfg struct {
 	// see initHome.
 	Default string
 	// Legacy are the names the setting had before v2 renamed it, which
-	// Astro CLI 1.x still reads and writes. A file that sets only a legacy
-	// name sets the setting; one that sets both reads the current name. A
-	// write goes to the current name and leaves a legacy one where it is, for
-	// 1.x.
+	// Astro CLI 1.x still reads and writes. `astro config` refuses them
+	// (removed.go); a file that sets one still sets the setting (compat1x.go).
 	Legacy    []string
 	validator ValidatorFunc
 }
@@ -70,34 +69,12 @@ func newCfg(path, dflt string, legacy ...string) cfg {
 	return ncfg
 }
 
-// keyIn is the name v sets c under: its path, else the first legacy name v
-// sets, else "" when v does not set it (or there is no v).
-func (c cfg) keyIn(v *viper.Viper) string {
-	if v == nil {
-		return ""
-	}
-	for _, name := range append([]string{c.Path}, c.Legacy...) {
-		if v.IsSet(name) {
-			return name
-		}
-	}
-	return ""
-}
-
-// projectKey is keyIn for the 1.x project config, "" when there is none.
-func (c cfg) projectKey() string {
-	if !configExists(viperProject) {
-		return ""
-	}
-	return c.keyIn(viperProject)
-}
-
 // SetHomeString sets a string value in home config
 func (c cfg) SetHomeString(value string) error {
 	if !configExists(viperHome) {
 		return nil
 	}
-	viperHome.Set(c.Path, c.typed(value))
+	c.set(viperHome, c.typed(value))
 	err := saveConfig(viperHome, HomeConfigFile)
 	if err != nil {
 		return err
@@ -110,7 +87,7 @@ func (c cfg) SetProjectString(value string) error {
 	if !configExists(viperProject) {
 		return nil
 	}
-	viperProject.Set(c.Path, c.typed(value))
+	c.set(viperProject, c.typed(value))
 	err := saveConfig(viperProject, viperProject.ConfigFileUsed())
 	if err != nil {
 		return err
@@ -120,8 +97,8 @@ func (c cfg) SetProjectString(value string) error {
 
 // GetString will return the requested config, check working dir and fallback to home
 func (c cfg) GetString() string {
-	if c.projectKey() != "" {
-		return c.GetProjectString()
+	if key := c.projectKey(); key != "" {
+		return viperProject.GetString(key)
 	}
 	return c.GetHomeString()
 }
@@ -225,14 +202,20 @@ func (c cfg) Scope() string {
 }
 
 // HomeScope names where GetHomeString finds this setting: "global", or
-// "default" when the home config does not set it.
+// "default" when the home config does not set it. The name it checks is the
+// one GetHomeString reads, so the two never describe different keys.
 func (c cfg) HomeScope() string {
-	for _, name := range append([]string{c.Path}, c.Legacy...) {
-		if viperHome.InConfig(name) {
-			return "global"
-		}
+	if key := c.keyIn(viperHome); key != "" && viperHome.InConfig(key) {
+		return "global"
 	}
 	return "default"
+}
+
+// Listed reports whether `astro config list` shows the setting: not contexts,
+// which `astro context` manages, nor the internal.* overrides for
+// Astronomer's own development, which get and set still take.
+func (c cfg) Listed() bool {
+	return c.Path != contextsKey && !strings.HasPrefix(c.Path, "internal.")
 }
 
 // RegisterValidator registers a validation function for this config

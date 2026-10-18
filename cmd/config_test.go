@@ -34,7 +34,7 @@ func (s *CmdSuite) TestConfigRootCommand() {
 
 func (s *CmdSuite) TestConfigGetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "get", "show_warnings", "-g")
+	_, err := executeCommand("config", "get", "apc.show_warnings", "-g")
 	s.NoError(err)
 }
 
@@ -56,20 +56,20 @@ func (s *CmdSuite) TestConfigGetCommandFailure() {
 func (s *CmdSuite) TestConfigSetOutsideProjectSuggestsTheValueToo() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useWorkingPath(s.T().TempDir())
-	_, err := executeCommand("config", "set", "show_warnings", "false")
+	_, err := executeCommand("config", "set", "apc.show_warnings", "false")
 	s.ErrorContains(err, "outside of a project directory")
-	s.ErrorContains(err, "astro config set show_warnings false -g")
+	s.ErrorContains(err, "astro config set apc.show_warnings false -g")
 }
 
 func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
 
-	_, err := executeCommand("config", "set", "show_warnings", "false")
+	_, err := executeCommand("config", "set", "apc.show_warnings", "false")
 	s.Error(err)
 	s.NotContains(err.Error(), "outside of a project directory")
 	s.Contains(err.Error(), "pyproject.toml under [tool.astro]")
-	s.Contains(err.Error(), "astro config set show_warnings false -g")
+	s.Contains(err.Error(), "astro config set apc.show_warnings false -g")
 	s.Equal("true", config.CFG.ShowWarnings.GetHomeString())
 
 	_, err = executeCommand("config", "get", "deploy.git_metadata")
@@ -77,7 +77,7 @@ func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 	s.Contains(err.Error(), "pyproject.toml under [tool.astro]")
 	s.Contains(err.Error(), "astro config get deploy.git_metadata -g")
 
-	_, err = executeCommand("config", "set", "show_warnings", "false", "-g")
+	_, err = executeCommand("config", "set", "apc.show_warnings", "false", "-g")
 	s.NoError(err)
 	s.Equal("false", config.CFG.ShowWarnings.GetHomeString())
 }
@@ -85,8 +85,8 @@ func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 func (s *CmdSuite) TestConfigSuggestionQuotesAValueWithSpaces() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
-	_, err := executeCommand("config", "set", "local.core", "http://my host")
-	s.ErrorContains(err, "astro config set local.core 'http://my host' -g")
+	_, err := executeCommand("config", "set", "internal.localhost.core_url", "http://my host")
+	s.ErrorContains(err, "astro config set internal.localhost.core_url 'http://my host' -g")
 }
 
 func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
@@ -94,7 +94,7 @@ func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
 	s.useManifestProject()
 	s.Require().NoError(os.Mkdir(filepath.Join(config.WorkingPath, config.ConfigDir), 0o755))
 	s.Require().NoError(os.WriteFile(filepath.Join(config.WorkingPath, config.ConfigDir, config.ConfigFileNameWithExt), nil, 0o600))
-	_, err := executeCommand("config", "get", "page_size")
+	_, err := executeCommand("config", "get", "apc.page_size")
 	s.NoError(err)
 }
 
@@ -181,7 +181,7 @@ func (s *CmdSuite) TestConfigSetWithOneArgumentOutsideAProjectIsAUsageError() {
 
 func (s *CmdSuite) TestConfigSetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "set", "-g", "page_size", "30")
+	_, err := executeCommand("config", "set", "-g", "apc.page_size", "30")
 	s.NoError(err)
 }
 
@@ -200,6 +200,10 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		{"project.name", "p", "[project] name in its pyproject.toml"},
 		{"skip_parse", "true", "astro local check"},
 		{"cloud.api.token", "t0ken", "ASTRO_API_TOKEN"},
+		// Renamed: refused, naming the new name, as a renamed flag is.
+		{"page_size", "30", "was removed in Astro CLI v2: use apc.page_size"},
+		{"auto_select", "true", "was removed in Astro CLI v2: use deployment.auto_select"},
+		{"local.core", "http://x", "was removed in Astro CLI v2: use internal.localhost.core_url"},
 		{"machine.cpu", "4", "podman machine set"},
 		{"beta.remote_cmd", "true", "beta flag"},
 	} {
@@ -253,14 +257,13 @@ func (s *CmdSuite) TestConfigSetNeverWritesARemovedKey() {
 
 // A save writes back what the file held, the settings only Astro CLI 1.x
 // reads included, plus the one change: never the defaults, which would pin
-// every one of them at this build's value, and never a removed key. A set
-// under a setting's 1.x name writes its current one.
+// every one of them at this build's value, and never a removed key.
 func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
 	fs := s.initConfigFiles("postgres:\n  user: me\nwebserver:\n  port: \"8081\"\ncontext: localhost\n", "")
 
-	_, err := executeCommand("config", "set", "show_warnings", "false", "-g")
+	_, err := executeCommand("config", "set", "apc.show_warnings", "false", "-g")
 	s.Require().NoError(err)
-	_, err = executeCommand("config", "set", "page_size", "30", "-g")
+	_, err = executeCommand("config", "set", "apc.page_size", "30", "-g")
 	s.Require().NoError(err)
 
 	got, err := afero.ReadFile(fs, config.HomeConfigFile)

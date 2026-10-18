@@ -24,36 +24,15 @@ const (
 	configUseWithManifestMsg      = "This project keeps its settings in pyproject.toml under [tool.astro], so it has no per-project CLI settings such as %s. CLI settings are global: one value for every project on this machine.\nTo %s the global value, run:\n  %s\n"
 )
 
-// unlistedConfigs are settings `astro config list` leaves out: contexts is a
-// map that `astro context` manages. The internal.* settings are left out too
-// (internalSettings): they are overrides for Astronomer's own development.
-var unlistedConfigs = map[string]bool{
-	config.CFG.Contexts.Path: true,
-}
-
-// internalSettings prefixes the settings `astro config list` leaves out
-// although get and set take them.
-const internalSettings = "internal."
-
-// settingName is the current name of the setting name names: name itself, or
-// for a setting v2 renamed, the name it has now. get and set take the 1.x
-// name, as v2 keeps renamed 1.x flags working, and answer under the current
-// one, which is where set writes.
-func settingName(name string) string {
-	if current, ok := config.LegacySettingNames[name]; ok {
-		return current
-	}
-	return name
-}
-
-// refuseRemovedConfigKey fails a set of a removed key the way the removed
-// commands fail: a usage error naming the replacement.
+// refuseRemovedConfigKey fails a get or set of a 1.x setting v2 removed or
+// renamed the way a removed 1.x flag fails: a usage error naming what
+// replaces it.
 func refuseRemovedConfigKey(key string) error {
-	replacement, ok := config.RemovedSetting(key)
+	reason, ok := config.RemovedSetting(key)
 	if !ok {
 		return nil
 	}
-	return cliout.Usage(fmt.Errorf("%s was removed in Astro CLI v2: nothing reads it. %s", key, replacement))
+	return cliout.Usage(fmt.Errorf("%s was removed in Astro CLI v2: %s", key, reason))
 }
 
 var (
@@ -209,7 +188,7 @@ func ensureGlobalFlag(cmd *cobra.Command, args []string) error {
 // other; set says whether that scope sets the key. `config list` is where the
 // value in effect, and the scope it comes from, are published.
 func configGet(cmd *cobra.Command, args []string) error {
-	cfg, ok := config.CFGStrMap[settingName(args[0])]
+	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
 		return errInvalidConfigPath
 	}
@@ -232,7 +211,7 @@ func configSet(cmd *cobra.Command, args []string) error {
 	if err := refuseRemovedConfigKey(args[0]); err != nil {
 		return err
 	}
-	cfg, ok := config.CFGStrMap[settingName(args[0])]
+	cfg, ok := config.CFGStrMap[args[0]]
 	if !ok {
 		return errInvalidConfigPath
 	}
@@ -269,10 +248,10 @@ func configSet(cmd *cobra.Command, args []string) error {
 func configList(r cliout.Renderer) error {
 	list := configSettings{Settings: []configSetting{}}
 	for _, key := range slices.Sorted(maps.Keys(config.CFGStrMap)) {
-		if unlistedConfigs[key] || strings.HasPrefix(key, internalSettings) {
+		cfg := config.CFGStrMap[key]
+		if !cfg.Listed() {
 			continue
 		}
-		cfg := config.CFGStrMap[key]
 		setting := configSetting{Key: key, Value: cfg.GetString(), Scope: cfg.Scope()}
 		if globalFlag {
 			setting = configSetting{Key: key, Value: cfg.GetHomeString(), Scope: cfg.HomeScope()}

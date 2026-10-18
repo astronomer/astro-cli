@@ -61,9 +61,20 @@ const (
 	machineRemoved = "Size a Podman machine with podman machine set --cpus and --memory."
 )
 
-// RemovedSetting reports whether name is a setting v2 refuses, and what
-// replaces it.
-func RemovedSetting(name string) (replacement string, removed bool) {
-	s, ok := removedSettings[name]
-	return s.replacement, ok
+// RemovedSetting reports whether `astro config` refuses name, a 1.x setting
+// v2 removed or renamed, and what to say after "was removed in Astro CLI
+// v2: ", as the removed 1.x flags say it: what replaces a removed setting,
+// and the current name of a renamed one.
+//
+// These are tombstones, and stay after 1.x coexistence ends. A renamed
+// setting's 1.x name is refused here but still read from a file
+// (compat1x.go), which is the part that goes.
+func RemovedSetting(name string) (reason string, removed bool) {
+	if s, ok := removedSettings[name]; ok {
+		return "nothing reads it. " + s.replacement, true
+	}
+	if current, ok := LegacySettingNames[name]; ok {
+		return "use " + current, true
+	}
+	return "", false
 }
