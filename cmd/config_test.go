@@ -197,6 +197,7 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		{"postgres.user", "me", "runs its own metadata database"},
 		{"project.name", "p", "[project] name in its pyproject.toml"},
 		{"skip_parse", "true", "astro local check"},
+		{"cloud.api.token", "t0ken", "ASTRO_API_TOKEN"},
 	} {
 		for _, scope := range []string{"outside a project", "global", "manifest project"} {
 			s.Run(tc.key+" "+scope, func() {

@@ -2,7 +2,19 @@ package config
 
 import (
 	"os"
+	"regexp"
 )
+
+// Setting names are dot-separated namespaces of snake_case words, as `astro
+// config set` takes them: deploy.git_metadata, cosmos_boost.pre_deploy.
+// api-server.port, removed, was the one exception; a new setting is held to
+// it here rather than in review.
+func (s *Suite) TestSettingNamesAreDottedSnakeCase() {
+	name := regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*(\.[a-z][a-z0-9]*(_[a-z0-9]+)*)*$`)
+	for path := range CFGStrMap {
+		s.Regexp(name, path)
+	}
+}
 
 func (s *Suite) TestNewCfg() {
 	cfg := newCfg("foo", "bar")

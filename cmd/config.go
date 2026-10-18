@@ -25,10 +25,9 @@ const (
 )
 
 // unlistedConfigs are settings `astro config list` leaves out: contexts is a
-// map that `astro context` manages, and the API token is a credential.
+// map that `astro context` manages.
 var unlistedConfigs = map[string]bool{
-	config.CFG.Contexts.Path:      true,
-	config.CFG.CloudAPIToken.Path: true,
+	config.CFG.Contexts.Path: true,
 }
 
 // removedConfigKeys are the 1.x settings nothing in v2 reads, with what
@@ -36,8 +35,9 @@ var unlistedConfigs = map[string]bool{
 // `get` refuse them rather than writing or showing a value that would change
 // nothing. A 1.x CLI sharing the config file still reads what it wrote
 // itself: v2 never writes these keys, and leaves them where they are.
-var removedConfigKeys = map[string]string{
+var removedConfigKeys = map[string]string{ //nolint:gosec // setting names and help text; cloud.api.token is a key, not a credential
 	"airflow.expose_port": "astro local has no setting for the interfaces local Airflow listens on.",
+	"cloud.api.token":     "Log in with astro login, or set ASTRO_API_TOKEN to use an API token.",
 	"dev.build_secrets": "Pass --build-secret to astro local start, or declare build-secrets under [tool.astro] in pyproject.toml " +
 		"for a project that builds its own Dockerfile.",
 	"disable_astro_run":   "astro run was removed: test a DAG with astro local run airflow dags test <dag>.",
