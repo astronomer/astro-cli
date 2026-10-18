@@ -1,12 +1,13 @@
 # Every visible flag on every visible, runnable command of Astro CLI 1.x
 # (main at 7aa23cdc), its own and those it inherits, the root's (--verbosity)
-# and --help left out, plus --build-secrets, which 1.x still accepted, hidden
-# as deprecated, on every command that had --build-secret (#2212). One line
-# per flag: the trees that had it, the command path without "astro", the
-# flag, its shorthand, and bool when it took no value (string otherwise).
-# The trees are 1.x's Astro tree for a non-hosted organization (astro) and a
-# hosted one (astro-hosted), whose deployment create and update had flags of
-# their own, and its APC tree (apc).
+# and --help left out. One line per flag: the trees that had it, the command
+# path without "astro", the flag, its shorthand, and bool when it took no
+# value (string otherwise). The trees are 1.x's Astro tree for a non-hosted
+# organization (astro) and a hosted one (astro-hosted), whose deployment
+# create and update had flags of their own, and its APC tree (apc).
+#
+# One hidden flag is listed too: --build-secrets, which 1.x still accepted
+# beside --build-secret.
 #
 # It records 1.x, so nothing in v2 changes it. The CLI embeds it: a flag v2
 # does not have is reported by what replaced it (removedFlags) only on a
