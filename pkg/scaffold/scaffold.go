@@ -78,6 +78,17 @@ type Options struct {
 	// cannot: Houston's and Astro's are both cuids. Empty, the default, is
 	// Astro. Nothing else in a conversion depends on the platform.
 	APCDomain string
+	// APCWorkspace is the current workspace of the Astro Private Cloud context
+	// APCDomain names, or "" when there is none or it cannot be read. It is
+	// called at most once, and only when it decides something: under
+	// APCDomain, for a 1.x project that saved a Deployment id
+	// (project.deployment) and no project.workspace. Astro CLI 1.x's APC
+	// deploy looked that saved id up in this same workspace and never wrote
+	// project.workspace, so the pair becomes the apc link rather than a note.
+	// It is a func because reading the workspace can mean reading a login,
+	// which a conversion with nothing to link should not do. nil, or "", keeps
+	// the note.
+	APCWorkspace func() string
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -359,6 +370,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 		return nil, err
 	}
 	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
+	from1x.fillAPCWorkspace(opts.APCWorkspace)
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.
@@ -1267,8 +1279,9 @@ func instancesNote(instances []instance1x) string {
 // Deployment, and the note names the astro link add that links it there: an
 // apc link needs the context's domain, which astro link add writes from the
 // context, and a workspace, which it takes from --workspace or the context.
-// Astro CLI 1.x's APC deploy never wrote project.workspace, so this, not a
-// link, is what most APC conversions get.
+// A saved id with no workspace is linked in the context's current workspace
+// when the caller can give one (Options.APCWorkspace), so this is for the
+// rest: no workspace there either, or a saved value that is not an id.
 func deployTargetNote(deployment, workspace, apcDomain string) string {
 	if apcDomain != "" {
 		const link = "astro link add prod --deployment "

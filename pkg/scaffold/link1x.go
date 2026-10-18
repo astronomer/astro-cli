@@ -40,6 +40,21 @@ func (from1x *project1x) deployLink() (Link, bool) {
 	return Link{Name: Link1xName, Kind: manifest.KindAstro, Deployment: from1x.deployment, Workspace: from1x.workspace}, true
 }
 
+// fillAPCWorkspace takes the workspace of a saved APC deploy target that
+// .astro/config.yaml did not save from current, the APC context's current
+// workspace (Options.APCWorkspace), which is where Astro CLI 1.x's deploy
+// looked the saved id up. current is called only when that decides
+// something: under an APC context, for a saved Deployment id with no
+// workspace beside it. A workspace that is not an id keeps the note.
+func (from1x *project1x) fillAPCWorkspace(current func() string) {
+	if current == nil || from1x.apcDomain == "" || from1x.workspace != "" || !astroIDRe.MatchString(from1x.deployment) {
+		return
+	}
+	if ws := current(); astroIDRe.MatchString(ws) {
+		from1x.workspace, from1x.workspaceFromContext = ws, true
+	}
+}
+
 // setDeployLink writes the saved deploy target as a link marked default, with
 // SaveLink's own edit, so it reads as `astro link add` would have written it.
 //
@@ -71,6 +86,12 @@ func (from1x *project1x) deployLinkAdvisory() string {
 	if l.Kind == manifest.KindAPC {
 		where = " on Astro Private Cloud " + l.Domain
 	}
-	return config1xRelPath + ": its saved deploy target is now the " + l.Name + " link in " + manifest.Marker +
+	out := config1xRelPath + ": its saved deploy target is now the " + l.Name + " link in " + manifest.Marker +
 		" ([tool.astro.deployments." + l.Name + "], deployment " + l.Deployment + " in workspace " + l.Workspace + where + ")"
+	if from1x.workspaceFromContext {
+		out += ". The workspace is this context's current one, where Astro CLI 1.x looked the Deployment up, since " +
+			config1xRelPath + " saved none; if the Deployment is not in it, astro deploy says so, and astro link add " +
+			l.Name + " --deployment " + l.Deployment + " --workspace <id> --replace relinks it"
+	}
+	return out
 }

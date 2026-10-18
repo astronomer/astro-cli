@@ -350,10 +350,10 @@ func TestDeployTakesANetrcBuildSecretWithoutADockerfile(t *testing.T) {
 }
 
 // On Astro Private Cloud a project in the 1.x layout makes no deploy at all,
-// saying to convert it with astro init or use Astro CLI 1.x, and a build with no project to build is
-// refused; a pyproject.toml project's deploy refuses, before Houston is
-// asked anything, to pick a Deployment for you or to reach a link on another
-// installation. The login is to a Houston that refuses every connection, so
+// saying to convert it with astro init or use Astro CLI 1.x, and a build
+// with no project to build is refused; a pyproject.toml project's deploy
+// refuses, before Houston is asked anything, to pick a Deployment for you or
+// to reach a link on another installation. The login is to a Houston that refuses every connection, so
 // a refusal that came after a request would read as a connection error
 // instead.
 func TestAPCDeployRefusesWhatItCannotDeploy(t *testing.T) {

@@ -2,6 +2,7 @@ package local
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -403,6 +404,56 @@ func TestInitLinksTheSavedDeployTargetForTheContext(t *testing.T) {
 			m := loadManifest(t, filepath.Join(dir, manifest.Marker))
 			if got := m.Astro.Deployments[scaffold.Link1xName]; !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("link = %+v\nwant   %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// Astro CLI 1.x's APC deploy saved project.deployment and never
+// project.workspace, and looked the id up in the context's current
+// workspace. So under APC init links that pair, asking the context for its
+// workspace only then; a workspace it cannot read keeps the note.
+func TestInitLinksASavedDeploymentInTheAPCContextsWorkspace(t *testing.T) {
+	deploymentOnly := "project:\n  name: orders\n  deployment: " + savedDeployment1x + "\n"
+	for _, tc := range []struct {
+		name, config string
+		ws           string
+		wsErr        error
+		wantCalls    int
+		wantLink     bool
+	}{
+		{"the context's workspace", deploymentOnly, savedWorkspace1x, nil, 1, true},
+		{"an unreadable workspace", deploymentOnly, "", errors.New("no context"), 1, false},
+		{"no current workspace", deploymentOnly, "", nil, 1, false},
+		{"a saved workspace", "project:\n  name: orders\n  deployment: " + savedDeployment1x + "\n  workspace: " + savedWorkspace1x + "\n", "", nil, 0, true},
+		{"nothing saved", "project:\n  name: orders\n", savedWorkspace1x, nil, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, dir, stdout := initDeps(t)
+			write1xProject(t, dir)
+			if err := os.WriteFile(filepath.Join(dir, ".astro", "config.yaml"), []byte(tc.config), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			d.APC = &APCLinking{Domain: "astro.corp.example", CurrentWorkspace: func() (string, error) {
+				calls++
+				return tc.ws, tc.wsErr
+			}}
+			if err := execute(t, d, "init", "-o", "json"); err != nil {
+				t.Fatalf("astro init: %v", err)
+			}
+			if calls != tc.wantCalls {
+				t.Errorf("the context's workspace was read %d times, want %d", calls, tc.wantCalls)
+			}
+			link, linked := loadManifest(t, filepath.Join(dir, manifest.Marker)).Astro.Deployments[scaffold.Link1xName]
+			if linked != tc.wantLink {
+				t.Fatalf("linked = %v, want %v: %s", linked, tc.wantLink, stdout)
+			}
+			if linked && (link.Target != "apc" || link.Workspace != savedWorkspace1x || link.Deployment != savedDeployment1x || !link.Default) {
+				t.Errorf("link = %+v", link)
+			}
+			if tc.wsErr != nil && !strings.Contains(stdout.String(), "astro link add prod --deployment "+savedDeployment1x) {
+				t.Errorf("an unreadable workspace keeps the note:\n%s", stdout)
 			}
 		})
 	}

@@ -113,6 +113,9 @@ type project1x struct {
 	// domain a saved deploy target is linked on, or empty to link it as an
 	// Astro Deployment. Not read from the 1.x files, which do not say.
 	apcDomain string
+	// workspaceFromContext is set when workspace was not in the file and came
+	// from Options.APCWorkspace, the APC context's current workspace.
+	workspaceFromContext bool
 	// instances are the entries of the same file's top-level `instances:`
 	// list, the deployment links an early v2 build kept there. Reported, not
 	// converted.

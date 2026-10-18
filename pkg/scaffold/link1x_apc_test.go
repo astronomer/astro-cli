@@ -121,3 +121,65 @@ func TestDeploysToAPCWithADomainConverts(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, manifest.KindAPC, m.Astro.Deployments[Link1xName].Kind())
 }
+
+// A saved Deployment id with no workspace takes the APC context's current
+// workspace, where Astro CLI 1.x's deploy looked it up, and becomes the apc
+// link, saying where the workspace came from. APCWorkspace is called once,
+// and only then: not for a saved workspace, outside APC, or for a saved value
+// that is not an id. A workspace it cannot give keeps the note.
+func TestASavedDeploymentTakesTheAPCContextsWorkspace(t *testing.T) {
+	deploymentOnly := "project:\n  name: orders\n  deployment: " + deploymentID1x + "\n"
+	calls := 0
+	current := func(ws string) func() string {
+		return func() string { calls++; return ws }
+	}
+
+	dir := project1xWithConfig(t, deploymentOnly, nil)
+	res, err := Run(dir, Options{APCDomain: "astro.corp.example", APCWorkspace: current(workspaceID1x)})
+	require.NoError(t, err)
+	assert.Equal(t, 1, calls)
+	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, manifest.Link{
+		Target: "apc", Domain: "astro.corp.example",
+		Workspace: workspaceID1x, Deployment: deploymentID1x,
+		Auth: manifest.Auth{Method: manifest.AuthAPC}, Default: true,
+	}, m.Astro.Deployments[Link1xName])
+	advisories := strings.Join(res.Advisories, "\n")
+	assert.Contains(t, advisories, "The workspace is this context's current one")
+	assert.Contains(t, advisories, "--workspace <id> --replace")
+	assert.NotContains(t, strings.Join(res.Notes, "\n"), "saved deploy target")
+
+	for name, tc := range map[string]struct {
+		config string
+		opts   Options
+	}{
+		"a saved workspace": {
+			"project:\n  name: orders\n  deployment: " + deploymentID1x + "\n  workspace: " + workspaceID1x + "\n",
+			Options{APCDomain: "astro.corp.example"},
+		},
+		"under Astro":             {deploymentOnly, Options{}},
+		"a saved value not an id": {"project:\n  name: orders\n  deployment: my-release\n", Options{APCDomain: "astro.corp.example"}},
+		"no saved target at all":  {"project:\n  name: orders\n", Options{APCDomain: "astro.corp.example"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			calls = 0
+			tc.opts.APCWorkspace = current(workspaceID1x)
+			_, err := Plan(project1xWithConfig(t, tc.config, nil), tc.opts)
+			require.NoError(t, err)
+			assert.Zero(t, calls, "APCWorkspace is read only when it decides something")
+		})
+	}
+
+	for name, ws := range map[string]string{"none": "", "not an id": "my workspace"} {
+		t.Run("a workspace that is "+name, func(t *testing.T) {
+			dir := project1xWithConfig(t, deploymentOnly, nil)
+			res, err := Run(dir, Options{APCDomain: "astro.corp.example", APCWorkspace: current(ws)})
+			require.NoError(t, err)
+			m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+			require.NoError(t, err)
+			assert.Empty(t, m.Astro.Deployments)
+			assert.Contains(t, strings.Join(res.Notes, "\n"), "astro link add prod --deployment "+deploymentID1x)
+		})
+	}
+}

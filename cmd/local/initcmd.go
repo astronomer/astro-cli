@@ -77,8 +77,20 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// kind of link a 1.x project's saved deploy target becomes: Houston's ids
 	// and Astro's are both cuids, so under an APC context it is an apc link on
 	// that context's domain, the one astro link add would write there.
-	if c.d.APC != nil {
-		opts.APCDomain = c.d.APC.Domain
+	// A saved Deployment id with no workspace beside it was looked up, by
+	// Astro CLI 1.x's deploy, in the context's current workspace, so that is
+	// the link's. Read only when scaffold asks: it can reach the login.
+	if apc := c.d.APC; apc != nil {
+		opts.APCDomain = apc.Domain
+		if apc.CurrentWorkspace != nil {
+			opts.APCWorkspace = func() string {
+				ws, err := apc.CurrentWorkspace()
+				if err != nil {
+					return ""
+				}
+				return ws
+			}
+		}
 	}
 
 	res, err := scaffold.Run(dir, opts)
