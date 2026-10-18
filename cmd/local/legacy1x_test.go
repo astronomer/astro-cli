@@ -15,7 +15,12 @@ import (
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
-const legacyConfigFile = "/home/me/.astro/config.yaml"
+const (
+	legacyConfigFile = "/home/me/.astro/config.yaml"
+	// fakeReplacement stands in for config's advice on a removed setting,
+	// which the warning repeats where it has nothing more specific to say.
+	fakeReplacement = "Do the v2 thing instead."
+)
 
 // runningOn is planRecorder with the port of the running Airflow restart
 // finds, which a real status always carries.
@@ -33,10 +38,10 @@ func (s runningOn) ReadStatus(dir string) (localrt.Status, error) {
 }
 
 const (
-	portReason3 = "set to 8099, but it is an Astro CLI 1.x setting v2 does not read. To start on 8099, run astro local start --port 8099"
+	portReason3 = "set to 8099, but it is an Astro CLI 1.x setting v2 does not read. To start on 8099, run astro local start --port 8099."
 	portWarning = "warning: " + legacyConfigFile + ": api-server.port: " + portReason3 + "\n"
 	secretsNote = "warning: " + legacyConfigFile + ": dev.build_secrets: set, but it is an Astro CLI 1.x setting v2 does not apply. " +
-		"Pass --build-secret, or declare build-secrets under [tool.astro] in pyproject.toml\n"
+		fakeReplacement + "\n"
 )
 
 type legacyCase struct {
@@ -64,7 +69,7 @@ func TestStartWarnsOf1xPort(t *testing.T) {
 			name:       "airflow 2",
 			legacyCase: legacyCase{args: []string{"local", "start"}, airflow: "2.10", settings: both},
 			want: "warning: " + legacyConfigFile + ": webserver.port: set to 8100, but it is an Astro CLI 1.x setting v2 does not read. " +
-				"To start on 8100, run astro local start --port 8100\n",
+				"To start on 8100, run astro local start --port 8100.\n",
 		},
 		{name: "the other generation's key", legacyCase: legacyCase{args: []string{"local", "start"}, settings: map[string]string{legacyWebserverPort: "8100"}}},
 		{name: "unset or default", legacyCase: legacyCase{args: []string{"local", "start"}, settings: map[string]string{}}},
@@ -73,7 +78,7 @@ func TestStartWarnsOf1xPort(t *testing.T) {
 			name:       "not a port",
 			legacyCase: legacyCase{args: []string{"local", "start"}, settings: map[string]string{legacyAPIServerPort: "99999"}},
 			want: "warning: " + legacyConfigFile + `: api-server.port: set to "99999", which is not a valid port, and it is an Astro CLI 1.x setting v2 does not read. ` +
-				"Pick the port with astro local start --port <port>\n",
+				fakeReplacement + "\n",
 		},
 		{name: "overridden by --port", legacyCase: legacyCase{args: []string{"local", "start", "--port", "8099"}, settings: both}},
 		{name: "a port the project kept", legacyCase: legacyCase{args: []string{"local", "start"}, kept: 8099, settings: both}},
@@ -158,9 +163,9 @@ func TestThe1xSettingIsReadForTheProject(t *testing.T) {
 	wiringProject(t, &d, "", "")
 	want, _ := d.WorkingDir()
 	var asked []string
-	d.Legacy1xSetting = func(dir, _ string) (string, string) {
+	d.Legacy1xSetting = func(dir, _ string) (string, string, string) {
 		asked = append(asked, dir)
-		return "", ""
+		return "", "", ""
 	}
 	_ = execute(t, d, "local", "start")
 	if len(asked) == 0 {
@@ -208,7 +213,9 @@ func runWithLegacySettings(t *testing.T, tc legacyCase) (stdout, stderr string) 
 		}
 	}
 	if tc.settings != nil {
-		d.Legacy1xSetting = func(_, key string) (string, string) { return tc.settings[key], legacyConfigFile }
+		d.Legacy1xSetting = func(_, key string) (string, string, string) {
+			return tc.settings[key], legacyConfigFile, fakeReplacement
+		}
 	}
 	_ = execute(t, d, tc.args...)
 	if len(plans) != 1 {

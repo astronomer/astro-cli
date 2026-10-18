@@ -38,8 +38,8 @@ func (c *cli) warnLegacy1xSettings(r cliout.Renderer, p localrt.Plan) {
 	// for the 1.x one.
 	if p.RequestedPort <= 0 {
 		key := legacyPortKey(p.AirflowVersion)
-		if v, file := c.d.Legacy1xSetting(p.ProjectPath, key); v != "" && v != "0" {
-			warnLegacy1x(r, file, key, portReason(v))
+		if v, file, replacement := c.d.Legacy1xSetting(p.ProjectPath, key); v != "" && v != "0" {
+			warnLegacy1x(r, file, key, portReason(v, replacement))
 		}
 	}
 	// 1.x handed it to the image build. In v2 only a project's own
@@ -49,9 +49,8 @@ func (c *cli) warnLegacy1xSettings(r cliout.Renderer, p localrt.Plan) {
 	if p.Mode != localrt.ModeDocker || p.Dockerfile == "" || len(p.BuildSecrets) > 0 {
 		return
 	}
-	if v, file := c.d.Legacy1xSetting(p.ProjectPath, legacyBuildSecrets); v != "" {
-		warnLegacy1x(r, file, legacyBuildSecrets, "set, but it is an Astro CLI 1.x setting v2 does not apply. "+
-			"Pass --build-secret, or declare build-secrets under [tool.astro] in pyproject.toml")
+	if v, file, replacement := c.d.Legacy1xSetting(p.ProjectPath, legacyBuildSecrets); v != "" {
+		warnLegacy1x(r, file, legacyBuildSecrets, "set, but it is an Astro CLI 1.x setting v2 does not apply. "+replacement)
 	}
 }
 
@@ -64,13 +63,14 @@ func legacyPortKey(airflowVersion string) string {
 	return legacyAPIServerPort
 }
 
-// portReason names --port with the 1.x value, when that value is a port.
-func portReason(v string) string {
+// portReason names --port with the 1.x value, when that value is a port, and
+// otherwise gives replacement, the advice `astro config` refuses the setting
+// with.
+func portReason(v, replacement string) string {
 	if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 65535 {
-		return fmt.Sprintf("set to %s, but it is an Astro CLI 1.x setting v2 does not read. To start on %s, run astro local start --port %s", v, v, v)
+		return fmt.Sprintf("set to %s, but it is an Astro CLI 1.x setting v2 does not read. To start on %s, run astro local start --port %s.", v, v, v)
 	}
-	return fmt.Sprintf("set to %q, which is not a valid port, and it is an Astro CLI 1.x setting v2 does not read. "+
-		"Pick the port with astro local start --port <port>", v)
+	return fmt.Sprintf("set to %q, which is not a valid port, and it is an Astro CLI 1.x setting v2 does not read. %s", v, replacement)
 }
 
 func warnLegacy1x(r cliout.Renderer, file, key, reason string) {
