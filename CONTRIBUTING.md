@@ -64,7 +64,7 @@ The short version of [docs/architecture.md](docs/architecture.md): `cmd/` parses
 
 Every pull request runs [.github/workflows/ci.yaml](.github/workflows/ci.yaml):
 
-- **lint** — `make fmt` with no resulting diff, then `make lint`, `make lint-submodules` and `make lint-e2e`.
+- **lint** — `make fmt` with no resulting diff, then `make lint`, `make lint-submodules`, `make lint-e2e`, and `make tidy-check` (every module's `go.mod` and `go.sum` as `go mod tidy` would leave them).
 - **test** — `make test` and the sub-module tests on Linux, then the e2e suite through tier 1: it builds the CLI and drives it through argv, including a real Airflow environment built with uv.
 - **test-windows** — the same unit and sub-module tests, plus e2e tier 0, which needs no tools.
 
