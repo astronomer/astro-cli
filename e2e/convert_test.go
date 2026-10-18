@@ -760,6 +760,26 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 		t.Errorf("a conversion under APC has something to say about APC:\n%s\nnotes %q", r.output(), res.Notes)
 	}
 
+	// Astro CLI 1.x's APC deploy saved the Deployment alone, and looked it up
+	// in the context's current workspace, which the link takes. The context
+	// here has a workspace and no login: the workspace is read from the
+	// config without resolving one, so nothing reaches the keyring.
+	saved := newProject(t)
+	writeHomeContext(t, saved, "software", "    workspace: "+workspace+"\n")
+	mkdir(t, filepath.Join(saved.Dir, ".astro"))
+	write(t, filepath.Join(saved.Dir, ".astro", "config.yaml"), "project:\n  name: saved\n  deployment: "+deployment+"\n")
+	write(t, filepath.Join(saved.Dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-12\n")
+	var savedRes initResult
+	saved.run("init", "--output", "json").requireSuccess().requireJSON(&savedRes)
+	if m := read(t, filepath.Join(saved.Dir, "pyproject.toml")); !strings.Contains(m, "workspace = '"+workspace+"'") ||
+		!strings.Contains(m, "target = 'apc'") {
+		t.Errorf("the saved Deployment is not linked in the context's workspace:\n%s", m)
+	}
+	if !reports(savedRes.Advisory, "this context's current one") {
+		t.Errorf("the advisory does not say where the workspace came from: %q", savedRes.Advisory)
+	}
+	checkVaultUntouched(t, saved)
+
 	mirrored := newProject(t)
 	writeContext(t, mirrored, "software")
 	mkdir(t, filepath.Join(mirrored.Dir, ".astro"))
