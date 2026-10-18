@@ -145,6 +145,22 @@ Some 1.x flags still work but are hidden from help in favor of a new spelling. O
 
 - **`project.deployment` is gone.** `astro deploy --save` wrote it into a 1.x project's `.astro/config.yaml`, and nothing in v2 reads it: `astro config set` and `get` of it say it was removed. Name the Deployment on each deploy, as the argument or with `--deployment`, or link it with `astro link add`.
 - **Other 1.x-only settings are refused too.** `astro config set` and `get` refuse the settings only 1.x reads (`dev.mode`, `webserver.port`, `postgres.*`, `skip_parse` and the rest), naming what replaces each, and `astro config list` leaves them out. 1.x and v2 share `~/.astro/config.yaml`, so v2 leaves those settings where they are for 1.x and only ever writes the ones you set. Once, the first time it runs, v2 removes from that file the defaults older versions of either CLI wrote into it without being asked (every setting still at the value it shipped with, such as a `postgres.tag` of `12.6`), as Astro CLI 1.46 does, so each setting follows its default again. To run 1.x next to v2, use 1.x v1.46.0 or later: earlier versions write their defaults back into the shared config every time they save, and this cleanup runs only once.
+- **Some settings have new names.** Each is named for what it affects. `astro config get` and `set` take only the new name: the 1.x name is refused, naming the new one, as a removed flag is. A value already saved under the 1.x name still applies, and while 1.x and v2 share `~/.astro/config.yaml` they keep each other's changes: v2 reads the 1.x name first, and when the file holds it, a `set` writes both names.
+
+  | 1.x | v2 |
+  | --- | --- |
+  | `auto_select` | `deployment.auto_select` |
+  | `cosmos_boost.pre_deploy` | `deploy.cosmos_boost` |
+  | `remote.client_registry` | `deploy.remote_execution.client_registry` |
+  | `remote.base_image_registry` | `deploy.remote_execution.base_image_registry` |
+  | `show_warnings` | `apc.show_warnings` |
+  | `sha_as_tag` | `apc.sha_as_tag` |
+  | `page_size` | `apc.page_size` |
+  | `interactive` | `apc.interactive` |
+  | `houston.dial_timeout` | `apc.dial_timeout` |
+  | `houston.skip_verify_tls` | `apc.skip_verify_tls` |
+
+  The overrides for Astronomer's own development (`cloud.api.*`, `local.core`, `local.houston`, `local.platform`) moved under `internal.` and are left out of `astro config list`.
 - **An `astro api airflow` request needs a target.** 1.x defaulted to `localhost:8080`. v2 needs `-d <link or Deployment>` or `--url`. For the Airflow on your machine, use `astro local api`. `ls` and `describe` only read the API spec, so they run without a target.
 - **Local Airflow runs without Docker by default.** Add `--docker` to `astro local start` for containers. uv 0.9.25 or later must be on your PATH. Windows needs `--docker`.
 - **`astro deployment bundle delete` says the deletion was requested.** 1.x printed `Deleted bundle <id> from deployment <id>`. v2 prints `Requested deletion of bundle <id> from deployment <id>`, because the API removes a bundle in the background, and `bundle list` shows it with `deletion_is_pending` until it is gone. A script matching the old line should match the new one, or use `-o json`, whose `action` is `deletion_requested`.

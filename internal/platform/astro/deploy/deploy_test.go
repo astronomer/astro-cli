@@ -231,7 +231,7 @@ func TestDeployClientImage(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a usable registry endpoint")
 		assert.Contains(t, err.Error(), "must not include an image tag")
-		assert.Contains(t, err.Error(), "astro config set -g remote.client_registry")
+		assert.Contains(t, err.Error(), "astro config set -g deploy.remote_execution.client_registry")
 		assert.False(t, hasImageCall(cmd.calls, " build "), "nothing is built: %v", cmd.calls)
 	})
 
