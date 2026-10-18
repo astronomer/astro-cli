@@ -85,9 +85,8 @@ type Options struct {
 	// (project.deployment) and no project.workspace. Astro CLI 1.x's APC
 	// deploy looked that saved id up in this same workspace and never wrote
 	// project.workspace, so the pair becomes the apc link rather than a note.
-	// It is a func because reading the workspace can mean reading a login,
-	// which a conversion with nothing to link should not do. nil, or "", keeps
-	// the note.
+	// It is a func so it is asked only when the link is decided, after a rerun
+	// on a converted project has been refused. nil, or "", keeps the note.
 	APCWorkspace func() string
 }
 
@@ -370,7 +369,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 		return nil, err
 	}
 	from1x.apcDomain = manifest.NormalizeAPCDomain(opts.APCDomain)
-	from1x.fillAPCWorkspace(opts.APCWorkspace)
+	from1x.apcWorkspace = opts.APCWorkspace
 
 	// A manifest already there is adopted; its absence is the greenfield path.
 	// Both arms settle the manifest and write nothing.

@@ -424,6 +424,7 @@ func TestInitLinksASavedDeploymentInTheAPCContextsWorkspace(t *testing.T) {
 	}{
 		{"the context's workspace", deploymentOnly, savedWorkspace1x, nil, 1, true},
 		{"an unreadable workspace", deploymentOnly, "", errors.New("no context"), 1, false},
+		{"a workspace beside an error", deploymentOnly, savedWorkspace1x, errors.New("half read"), 1, false},
 		{"no current workspace", deploymentOnly, "", nil, 1, false},
 		{"a saved workspace", "project:\n  name: orders\n  deployment: " + savedDeployment1x + "\n  workspace: " + savedWorkspace1x + "\n", "", nil, 0, true},
 		{"nothing saved", "project:\n  name: orders\n", savedWorkspace1x, nil, 0, false},

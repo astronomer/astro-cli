@@ -58,6 +58,37 @@ func GetCurrentContext() (Context, error) {
 	return c.GetContext()
 }
 
+// resolveContextLogin is how GetContext fills a context's login, which can
+// read the keyring or the vault and rewrite the config (resolveLogin). A var
+// so a test can show a reader never reaches it.
+var resolveContextLogin = resolveLogin
+
+// CurrentWorkspace is the current context's workspace, read from the home
+// config alone, with an environment login's own workspace over it, as
+// GetCurrentContext gives it. Unlike GetCurrentContext it never resolves the
+// login (resolveContextLogin): it reads no keyring or vault, rewrites no
+// config and prints nothing. "" with no error when the context sets none.
+func CurrentWorkspace() (string, error) {
+	c := Context{}
+	var err error
+	if c.Domain, err = GetCurrentDomain(); err != nil {
+		return "", err
+	}
+	key, err := c.GetContextKey()
+	if err != nil {
+		return "", err
+	}
+	if !c.ContextExists() {
+		return "", ErrNotConnected
+	}
+	if l, ok := envLogin(key); ok {
+		if ws, ok := l.fields["workspace"]; ok {
+			return ws, nil
+		}
+	}
+	return viperHome.GetString(contextsKey + "." + key + ".workspace"), nil
+}
+
 // Get CurrentDonain returns the currently configured astro domain, or an error if one is not set
 func GetCurrentDomain() (string, error) {
 	var domain string
@@ -130,7 +161,7 @@ func (c *Context) GetContext() (Context, error) {
 		applyEnvironmentLogin(&l, c)
 		return *c, nil
 	}
-	resolveLogin(key, c)
+	resolveContextLogin(key, c)
 	return *c, nil
 }
 

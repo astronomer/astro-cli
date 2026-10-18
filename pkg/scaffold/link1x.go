@@ -21,13 +21,16 @@ var astroIDRe = regexp.MustCompile(`^c[a-z0-9]{24}$`)
 // It can when .astro/config.yaml names both an Astro Deployment id and the
 // workspace it lives in. The key also holds a Software release name, which
 // cmd/apc/deploy.go saves there, and the id shape is what tells the two apart.
-// A link needs a workspace to parse, and the conversion has no login to look
-// one up with, so a saved target without one stays a note.
+// A link needs a workspace to parse. Under Astro, a saved target without one
+// stays a note: the conversion reads no Astro login to look one up.
 //
 // Under an Astro Private Cloud context (Options.APCDomain) the target is a
 // Houston Deployment in a Houston workspace, also cuids, and becomes an apc
-// link on that context's domain.
+// link on that context's domain. A saved id without a workspace takes the
+// context's current one (fillAPCWorkspace), asked for here, when the link is
+// decided, so a run refused before that never asks.
 func (from1x *project1x) deployLink() (Link, bool) {
+	from1x.fillAPCWorkspace()
 	if !astroIDRe.MatchString(from1x.deployment) || !astroIDRe.MatchString(from1x.workspace) {
 		return Link{}, false
 	}
@@ -41,15 +44,17 @@ func (from1x *project1x) deployLink() (Link, bool) {
 }
 
 // fillAPCWorkspace takes the workspace of a saved APC deploy target that
-// .astro/config.yaml did not save from current, the APC context's current
-// workspace (Options.APCWorkspace), which is where Astro CLI 1.x's deploy
-// looked the saved id up. current is called only when that decides
-// something: under an APC context, for a saved Deployment id with no
-// workspace beside it. A workspace that is not an id keeps the note.
-func (from1x *project1x) fillAPCWorkspace(current func() string) {
+// .astro/config.yaml did not save from the APC context's current workspace
+// (Options.APCWorkspace), which is where Astro CLI 1.x's deploy looked the
+// saved id up. It asks at most once, and only when that decides something:
+// under an APC context, for a saved Deployment id with no workspace beside
+// it. A workspace that is not an id keeps the note.
+func (from1x *project1x) fillAPCWorkspace() {
+	current := from1x.apcWorkspace
 	if current == nil || from1x.apcDomain == "" || from1x.workspace != "" || !astroIDRe.MatchString(from1x.deployment) {
 		return
 	}
+	from1x.apcWorkspace = nil
 	if ws := current(); astroIDRe.MatchString(ws) {
 		from1x.workspace, from1x.workspaceFromContext = ws, true
 	}

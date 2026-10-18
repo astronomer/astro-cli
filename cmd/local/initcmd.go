@@ -79,7 +79,7 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// that context's domain, the one astro link add would write there.
 	// A saved Deployment id with no workspace beside it was looked up, by
 	// Astro CLI 1.x's deploy, in the context's current workspace, so that is
-	// the link's. Read only when scaffold asks: it can reach the login.
+	// the link's, read from the config without resolving the login.
 	if apc := c.d.APC; apc != nil {
 		opts.APCDomain = apc.Domain
 		if apc.CurrentWorkspace != nil {

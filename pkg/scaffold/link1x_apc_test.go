@@ -171,7 +171,20 @@ func TestASavedDeploymentTakesTheAPCContextsWorkspace(t *testing.T) {
 		})
 	}
 
-	for name, ws := range map[string]string{"none": "", "not an id": "my workspace"} {
+	// A rerun on the converted project, whose 1.x config still saves the
+	// Deployment alone, is refused before the link is decided, so it asks
+	// nothing.
+	t.Run("a refused rerun", func(t *testing.T) {
+		dir := project1xWithConfig(t, deploymentOnly, nil)
+		_, err := Run(dir, Options{APCDomain: "astro.corp.example"})
+		require.NoError(t, err)
+		calls = 0
+		_, err = Run(dir, Options{APCDomain: "astro.corp.example", APCWorkspace: current(workspaceID1x)})
+		require.ErrorIs(t, err, ErrAlreadyAstroProject)
+		assert.Zero(t, calls, "a refused run read the context's workspace")
+	})
+
+	for name, ws := range map[string]string{"none": "", "not an id": "myworkspace"} {
 		t.Run("a workspace that is "+name, func(t *testing.T) {
 			dir := project1xWithConfig(t, deploymentOnly, nil)
 			res, err := Run(dir, Options{APCDomain: "astro.corp.example", APCWorkspace: current(ws)})
@@ -179,7 +192,8 @@ func TestASavedDeploymentTakesTheAPCContextsWorkspace(t *testing.T) {
 			m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 			require.NoError(t, err)
 			assert.Empty(t, m.Astro.Deployments)
-			assert.Contains(t, strings.Join(res.Notes, "\n"), "astro link add prod --deployment "+deploymentID1x)
+			assert.Contains(t, strings.Join(res.Notes, "\n"), "astro link add prod --deployment "+deploymentID1x+", then")
+			assert.NotContains(t, strings.Join(res.Notes, "\n"), "--workspace", "a workspace that is not an id is not taken")
 		})
 	}
 }
