@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/astronomer/astro-cli/pkg/secrets"
 )
@@ -42,7 +43,8 @@ func UseLoginsForTesting(l *secrets.Logins) (restore func()) {
 // with the config rewritten, perhaps with a warning on stderr. count says how
 // many so far; restore stops counting.
 func CountLoginResolutions() (count func() int, restore func()) {
-	n, prev := 0, loginResolved
-	loginResolved = func() { n++ }
-	return func() int { return n }, func() { loginResolved = prev }
+	var n atomic.Int64
+	prev := loginResolved
+	loginResolved = func() { n.Add(1) }
+	return func() int { return int(n.Load()) }, func() { loginResolved = prev }
 }
