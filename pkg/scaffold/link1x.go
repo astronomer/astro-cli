@@ -81,22 +81,24 @@ func setDeployLink(ed tomledit.Editor, from1x *project1x) error {
 	return ed.Set(append(linkKey(l.Name), "default"), true)
 }
 
-// deployLinkAdvisory says what setDeployLink wrote, or "" when it wrote nothing.
+// deployLinkAdvisory says what setDeployLink wrote, or "" when it wrote nothing:
+// what was linked first, then, for a workspace taken from the context, what
+// to run if it is the wrong one. One line, as every entry is: the text
+// renderer indents each entry once, and a consumer reads each as a whole.
 func (from1x *project1x) deployLinkAdvisory() string {
 	l, ok := from1x.deployLink()
 	if !ok {
 		return ""
 	}
-	where := ""
+	where := "workspace " + l.Workspace
 	if l.Kind == manifest.KindAPC {
-		where = " on Astro Private Cloud " + l.Domain
+		where = "Astro Private Cloud " + l.Domain + ", " + where
 	}
-	out := config1xRelPath + ": its saved deploy target is now the " + l.Name + " link in " + manifest.Marker +
-		" ([tool.astro.deployments." + l.Name + "], deployment " + l.Deployment + " in workspace " + l.Workspace + where + ")"
+	out := config1xRelPath + ": linked Deployment " + l.Deployment + " as \"" + l.Name + "\" in " + manifest.Marker +
+		" (" + where + ")"
 	if from1x.workspaceFromContext {
-		out += ". The workspace is this context's current one, where Astro CLI 1.x looked the Deployment up, since " +
-			config1xRelPath + " saved none; if the Deployment is not in it, astro deploy says so, and astro link add " +
-			l.Name + " --deployment " + l.Deployment + " --workspace <id> --replace relinks it"
+		out += ". It saved no workspace, so this uses your current one. If the Deployment is in another workspace, " +
+			"relink it with: astro link add " + l.Name + " --deployment " + l.Deployment + " --workspace <workspace-id> --replace"
 	}
 	return out
 }

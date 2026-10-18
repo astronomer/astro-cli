@@ -65,8 +65,8 @@ func TestConfigNoteFollowsTheDeploymentNotTheFile(t *testing.T) {
 		_, about := convertWithConfig(t,
 			"project:\n  name: orders\n  deployment: cm1orders\n  workspace: cm1ws\n")
 		require.Len(t, about, 1)
-		assert.Contains(t, about[0], "workspace = 'cm1ws'",
-			"both halves of a link are here, so the note states the whole entry")
+		assert.Contains(t, about[0], "--deployment cm1orders --workspace cm1ws",
+			"both halves of a link are here, so the command carries both")
 	})
 
 	t.Run("an empty key is not a deploy target", func(t *testing.T) {
@@ -123,26 +123,25 @@ func TestADeployTargetNamedLikeAFileStillRetiresIt(t *testing.T) {
 
 // Following the note produces a manifest that parses.
 //
-// The wording this replaced did not. "Add it under [tool.astro.deployments]"
-// written out literally is a bare key of that table, and every entry there is a
-// named sub-table, so Parse rejects it with CodeExpectedTable. A hand-off that
-// produces an unparseable manifest when followed is worse than no hand-off.
-func TestTheDeployTargetNoteDescribesAManifestThatParses(t *testing.T) {
-	const head = "[project]\nname = 'orders'\ndependencies = ['apache-airflow==3.1.*']\n\n[tool.astro]\n\n"
-	named := head + "[tool.astro.deployments.prod]\ndeployment = 'cm1orders'\nworkspace = 'cm1ws'\n"
-	bare := head + "[tool.astro.deployments]\ndeployment = 'cm1orders'\nworkspace = 'cm1ws'\n"
-
-	m, err := manifest.Parse([]byte(named))
-	require.NoError(t, err, "the shape the note describes")
-	assert.Contains(t, m.Astro.Deployments, "prod")
-
-	_, err = manifest.Parse([]byte(bare))
-	require.Error(t, err, "the shape the old wording described")
-
+// An earlier wording described an entry to write by hand, and "add it under
+// [tool.astro.deployments]" written out literally is a bare key of that table,
+// which Parse rejects with CodeExpectedTable. The note now names the commands
+// instead, leading with what was not linked; what they write (SaveLink, then
+// SetDefaultLink, as astro link add and astro link default do) parses as the
+// link the note names.
+func TestTheDeployTargetNoteNamesCommandsThatLinkIt(t *testing.T) {
 	note := deployTargetNote("cm1orders", "cm1ws", "")
-	assert.Contains(t, note, "[tool.astro.deployments.prod]",
-		"the note has to name the table, not just the section it sits in")
-	assert.Contains(t, note, "deployment = 'cm1orders'")
+	assert.Equal(t, "saved deploy target cm1orders was not linked. If it is an Astro Deployment, link it with: "+
+		"astro link add prod --deployment cm1orders --workspace cm1ws, then: astro link default prod", note)
+	assert.NotContains(t, note, "[tool.astro")
+
+	res, _ := convertWithConfig(t, "project:\n  name: orders\n")
+	require.NoError(t, SaveLink(res.Dir, nil, Link{Name: "prod", Kind: manifest.KindAstro, Deployment: "cm1orders", Workspace: "cm1ws"}))
+	require.NoError(t, SetDefaultLink(res.Dir, nil, "prod"))
+	m, err := manifest.Load(filepath.Join(res.Dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, "cm1orders", m.Astro.Deployments["prod"].Deployment)
+	assert.True(t, m.Astro.Deployments["prod"].Default)
 }
 
 // The instances list an early v2 build kept in .astro/config.yaml is named,

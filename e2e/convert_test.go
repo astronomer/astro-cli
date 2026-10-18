@@ -444,9 +444,9 @@ func cases1x() []case1x {
 		},
 		{
 			// The same file after `astro deploy --save`. The saved target is
-			// the one thing here a project wants, so the note states the
-			// whole manifest entry for it, table name included, rather than
-			// pointing at the section it belongs in.
+			// the one thing here a project wants, and these are not ids it
+			// can link itself, so the note says it was not linked and gives
+			// the commands that link it.
 			name: "a 1.x project with a saved deploy target",
 			files: map[string]string{
 				".astro/config.yaml": "project:\n  name: orders-pipeline\n" +
@@ -457,8 +457,8 @@ func cases1x() []case1x {
 			projectName: "orders-pipeline",
 			kept:        []string{"Dockerfile", ".astro/config.yaml"},
 			notes: []string{
-				"cm1orders in workspace cm1ws is this project's saved deploy target",
-				"[tool.astro.deployments.prod]",
+				"saved deploy target cm1orders was not linked",
+				"astro link add prod --deployment cm1orders --workspace cm1ws, then: astro link default prod",
 			},
 		},
 		{
@@ -477,7 +477,7 @@ func cases1x() []case1x {
 			manifestHas: []string{
 				"[tool.astro.deployments]\ndefault = {deployment = 'cm1ordersdeployment000001', workspace = 'cm1ordersworkspace0000001', default = true}",
 			},
-			advisories: []string{"its saved deploy target is now the default link"},
+			advisories: []string{`linked Deployment cm1ordersdeployment000001 as "default" in pyproject.toml (workspace cm1ordersworkspace0000001)`},
 		},
 		{
 			// The `instances:` list an early v2 build wrote, which keeps each
@@ -753,7 +753,7 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 			t.Errorf("pyproject.toml lacks %q:\n%s", want, manifest)
 		}
 	}
-	if !reports(res.Advisory, "on Astro Private Cloud localhost") {
+	if !reports(res.Advisory, "(Astro Private Cloud localhost, workspace "+workspace+")") {
 		t.Errorf("the advisories do not say the saved target is an APC link: %q", res.Advisory)
 	}
 	if reports(res.Notes, "Private Cloud") || strings.Contains(r.Stderr, "Private Cloud") {
@@ -762,8 +762,8 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 
 	// Astro CLI 1.x's APC deploy saved the Deployment alone, and looked it up
 	// in the context's current workspace, which the link takes. The context
-	// here has a workspace and no login: the workspace is read from the
-	// config without resolving one, so nothing reaches the keyring.
+	// here has a workspace and no login, and init reads the workspace from
+	// the config, not from a login.
 	saved := newProject(t)
 	writeHomeContext(t, saved, "software", "    workspace: "+workspace+"\n")
 	mkdir(t, filepath.Join(saved.Dir, ".astro"))
@@ -775,7 +775,7 @@ func TestInitConvertsA1xProjectUnderAPC(t *testing.T) {
 		!strings.Contains(m, "target = 'apc'") {
 		t.Errorf("the saved Deployment is not linked in the context's workspace:\n%s", m)
 	}
-	if !reports(savedRes.Advisory, "this context's current one") {
+	if !reports(savedRes.Advisory, "It saved no workspace, so this uses your current one") {
 		t.Errorf("the advisory does not say where the workspace came from: %q", savedRes.Advisory)
 	}
 	checkVaultUntouched(t, saved)

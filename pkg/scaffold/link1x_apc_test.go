@@ -37,9 +37,8 @@ func TestASavedDeployTargetUnderAPCBecomesAnAPCLink(t *testing.T) {
 			// [tool.astro] stays Astro's: the Houston workspace is the link's own.
 			assert.Empty(t, m.Astro.Workspace)
 			assert.Empty(t, m.Astro.Domain)
-			advisories := strings.Join(res.Advisories, "\n")
-			assert.Contains(t, advisories, "[tool.astro.deployments."+Link1xName+"]")
-			assert.Contains(t, advisories, "on Astro Private Cloud astro.corp.example")
+			assert.Contains(t, res.Advisories, ".astro/config.yaml: linked Deployment "+deploymentID1x+
+				" as \"default\" in pyproject.toml (Astro Private Cloud astro.corp.example, workspace "+workspaceID1x+")")
 		})
 	}
 }
@@ -79,22 +78,23 @@ func TestAnUnlinkableDeployTargetUnderAPCNamesTheAPCLink(t *testing.T) {
 		{
 			"no workspace",
 			"project:\n  name: orders\n  deployment: " + deploymentID1x + "\n",
-			".astro/config.yaml: " + deploymentID1x + " is this project's saved deploy target. If that is a Deployment " +
-				"on Astro Private Cloud astro.corp.example, link it under this context with astro link add prod " +
-				"--deployment " + deploymentID1x + ", then astro link default prod to preselect it",
+			".astro/config.yaml: saved deploy target " + deploymentID1x + " was not linked. If it is a Deployment on " +
+				"Astro Private Cloud astro.corp.example, link it with: astro link add prod --deployment " + deploymentID1x +
+				" --workspace <workspace-id>, then: astro link default prod",
 		},
 		{
 			"a workspace that is not an id",
 			"project:\n  name: orders\n  deployment: " + deploymentID1x + "\n  workspace: ws-1\n",
-			".astro/config.yaml: " + deploymentID1x + " is this project's saved deploy target. If that is a Deployment " +
-				"on Astro Private Cloud astro.corp.example, link it under this context with astro link add prod " +
-				"--deployment " + deploymentID1x + " --workspace ws-1, then astro link default prod to preselect it",
+			".astro/config.yaml: saved deploy target " + deploymentID1x + " was not linked. If it is a Deployment on " +
+				"Astro Private Cloud astro.corp.example, link it with: astro link add prod --deployment " + deploymentID1x +
+				" --workspace ws-1, then: astro link default prod",
 		},
 		{
 			"a value that cannot be printed",
 			"project:\n  name: orders\n  deployment: \"a b\"\n",
-			".astro/config.yaml: project.deployment holds this project's saved deploy target. If that is a Deployment " +
-				"on Astro Private Cloud astro.corp.example, link it under this context with astro link add prod --deployment <id>",
+			".astro/config.yaml: the saved deploy target (project.deployment) was not linked. If it is a Deployment on " +
+				"Astro Private Cloud astro.corp.example, link it with: astro link add prod --deployment <id> " +
+				"--workspace <workspace-id>, then: astro link default prod",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -145,9 +145,10 @@ func TestASavedDeploymentTakesTheAPCContextsWorkspace(t *testing.T) {
 		Workspace: workspaceID1x, Deployment: deploymentID1x,
 		Auth: manifest.Auth{Method: manifest.AuthAPC}, Default: true,
 	}, m.Astro.Deployments[Link1xName])
-	advisories := strings.Join(res.Advisories, "\n")
-	assert.Contains(t, advisories, "The workspace is this context's current one")
-	assert.Contains(t, advisories, "--workspace <id> --replace")
+	assert.Contains(t, res.Advisories, ".astro/config.yaml: linked Deployment "+deploymentID1x+
+		" as \"default\" in pyproject.toml (Astro Private Cloud astro.corp.example, workspace "+workspaceID1x+
+		"). It saved no workspace, so this uses your current one. If the Deployment is in another workspace, "+
+		"relink it with: astro link add default --deployment "+deploymentID1x+" --workspace <workspace-id> --replace")
 	assert.NotContains(t, strings.Join(res.Notes, "\n"), "saved deploy target")
 
 	for name, tc := range map[string]struct {
@@ -192,8 +193,9 @@ func TestASavedDeploymentTakesTheAPCContextsWorkspace(t *testing.T) {
 			m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 			require.NoError(t, err)
 			assert.Empty(t, m.Astro.Deployments)
-			assert.Contains(t, strings.Join(res.Notes, "\n"), "astro link add prod --deployment "+deploymentID1x+", then")
-			assert.NotContains(t, strings.Join(res.Notes, "\n"), "--workspace", "a workspace that is not an id is not taken")
+			assert.Contains(t, strings.Join(res.Notes, "\n"),
+				"astro link add prod --deployment "+deploymentID1x+" --workspace <workspace-id>, then",
+				"a workspace that is not an id is not taken")
 		})
 	}
 }

@@ -1262,51 +1262,39 @@ func instancesNote(instances []instance1x) string {
 		". Link each one with " + strings.Join(cmds, "; ")
 }
 
-// deployTargetNote says what .astro/config.yaml saved and what a manifest entry
-// for it looks like, including the table NAME that entry needs. An earlier
-// wording said only "under [tool.astro.deployments]"; written out literally
-// that is `deployment = '...'` as a bare key of the deployments table, which
-// manifest.Parse rejects with CodeExpectedTable. A hand-off that produces an
-// unparseable manifest when followed is worse than no hand-off.
+// deployTargetNote says that .astro/config.yaml's saved deploy target was not
+// linked, then the commands that link it and preselect it: astro link add
+// writes the link as the manifest parses it, which a hand-written entry
+// described in prose did not always do (a bare key of [tool.astro.deployments]
+// is CodeExpectedTable). It says "if it is" because the key can hold what is
+// not a Deployment id, such as a release name.
 //
 // The value is printed only when it is a plain id. planRetirements aside, a
 // value carrying a newline would put a second, unindented line under "Left to
 // do:" and a multi-line string into the json notes array a consumer groups by
-// the file name each note starts with.
+// the file name each note starts with. A workspace it does not know is a
+// placeholder.
 //
 // Under an Astro Private Cloud context (apcDomain) the target is a Houston
-// Deployment, and the note names the astro link add that links it there: an
-// apc link needs the context's domain, which astro link add writes from the
-// context, and a workspace, which it takes from --workspace or the context.
-// A saved id with no workspace is linked in the context's current workspace
+// Deployment, and astro link add run under that context links it there. A
+// saved id with no workspace is linked in the context's current workspace
 // when the caller can give one (Options.APCWorkspace), so this is for the
 // rest: no workspace there either, or a saved value that is not an id.
 func deployTargetNote(deployment, workspace, apcDomain string) string {
-	if apcDomain != "" {
-		const link = "astro link add prod --deployment "
-		if !plainDeployID(deployment) {
-			return "project.deployment holds this project's saved deploy target. If that is a Deployment on " +
-				"Astro Private Cloud " + apcDomain + ", link it under this context with " + link + "<id>"
-		}
-		cmd := link + deployment
-		if plainDeployID(workspace) {
-			cmd += " --workspace " + workspace
-		}
-		return deployment + " is this project's saved deploy target. If that is a Deployment on Astro Private Cloud " +
-			apcDomain + ", link it under this context with " + cmd + ", then astro link default prod to preselect it"
+	target, id := "the saved deploy target (project.deployment)", "<id>"
+	if plainDeployID(deployment) {
+		target, id = "saved deploy target "+deployment, deployment
 	}
-	const entry = ". If that is an Astro Deployment, give it a name under " +
-		"[tool.astro.deployments], say [tool.astro.deployments.prod], with "
-	if !plainDeployID(deployment) {
-		return "project.deployment holds this project's saved deploy target" + entry +
-			"deployment set to it and the workspace it lives in"
-	}
+	ws := "<workspace-id>"
 	if plainDeployID(workspace) {
-		return deployment + " in workspace " + workspace + " is this project's saved deploy target" +
-			entry + "deployment = '" + deployment + "' and workspace = '" + workspace + "'"
+		ws = workspace
 	}
-	return deployment + " is this project's saved deploy target" + entry +
-		"deployment = '" + deployment + "' and the workspace it lives in"
+	kind := "an Astro Deployment"
+	if apcDomain != "" {
+		kind = "a Deployment on Astro Private Cloud " + apcDomain
+	}
+	return target + " was not linked. If it is " + kind + ", link it with: astro link add prod --deployment " + id +
+		" --workspace " + ws + ", then: astro link default prod"
 }
 
 // plainDeployID reports a value safe to read at the end of a note: one line, no
