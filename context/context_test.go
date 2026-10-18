@@ -85,12 +85,35 @@ func (s *Suite) TestIsCloudContext() {
 			s.Equal(tt.expectedOutput, output, fmt.Sprintf("input: %+v", tt))
 		}
 	})
+	s.Run("returns true for a current domain the config holds no context for", func() {
+		testUtil.InitTestConfig(testUtil.SoftwarePlatform)
+		s.False(IsCloudContext(), "the control: the test config's context is APC")
+		s.T().Setenv("ASTRO_DOMAIN", "apc.example.com")
+		s.True(IsCloudContext())
+	})
 	s.Run("returns true when no current context is set", func() {
 		// Case when no current context is set
 		config.ResetCurrentContext()
 		output := IsCloudContext()
 		s.Equal(true, output)
 	})
+}
+
+// Deciding the platform reads the context's domain, never its login: the root
+// decides it on every command, and resolving a login can reach the keyring or
+// the vault.
+func (s *Suite) TestIsCloudContextNeverResolvesTheLogin() {
+	resolved, restore := config.CountLoginResolutions()
+	defer restore()
+	for _, platform := range []string{testUtil.CloudPlatform, testUtil.SoftwarePlatform} {
+		testUtil.InitTestConfig(platform)
+		s.Equal(platform == testUtil.CloudPlatform, IsCloudContext(), platform)
+	}
+	s.Zero(resolved(), "IsCloudContext resolved the login")
+
+	_, err := GetCurrentContext()
+	s.NoError(err)
+	s.Equal(1, resolved(), "the control: reading the whole context resolves it")
 }
 
 func (s *Suite) TestDelete() {

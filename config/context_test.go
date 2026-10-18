@@ -123,12 +123,11 @@ contexts:
 
 // CurrentWorkspace reads the current context's workspace without resolving
 // its login, which GetCurrentContext does: no keyring, vault or config
-// rewrite. "" when the context sets none, and an error with no context.
+// rewrite. "" when the context sets none, and an error with no context or
+// one that cannot be read.
 func (s *Suite) TestCurrentWorkspaceNeverResolvesTheLogin() {
-	resolved := 0
-	prev := resolveContextLogin
-	resolveContextLogin = func(string, *Context) { resolved++ }
-	defer func() { resolveContextLogin = prev }()
+	resolved, restore := CountLoginResolutions()
+	defer restore()
 
 	fs := afero.NewMemMapFs()
 	s.NoError(afero.WriteFile(fs, HomeConfigFile, []byte(`context: example_com
@@ -139,16 +138,17 @@ contexts:
     workspace: ck05r3bor07h40d02y2hw4n4v
   other_com:
     domain: other.com
+  scalar_com: not-a-context
 `), 0o777))
 	InitConfig(fs)
 	ws, err := CurrentWorkspace()
 	s.NoError(err)
 	s.Equal("ck05r3bor07h40d02y2hw4n4v", ws)
-	s.Zero(resolved, "CurrentWorkspace resolved the login")
+	s.Zero(resolved(), "CurrentWorkspace resolved the login")
 
 	_, err = GetCurrentContext()
 	s.NoError(err)
-	s.Equal(1, resolved, "the seam is the one GetCurrentContext resolves through")
+	s.Equal(1, resolved(), "the counter sees the resolution GetCurrentContext makes")
 
 	s.T().Setenv("ASTRO_DOMAIN", "other.com")
 	ws, err = CurrentWorkspace()
@@ -157,7 +157,12 @@ contexts:
 	s.T().Setenv("ASTRO_DOMAIN", "missing.com")
 	_, err = CurrentWorkspace()
 	s.ErrorIs(err, ErrNotConnected)
-	s.Equal(1, resolved)
+	// An entry that is not a context cannot be read, as GetCurrentContext
+	// cannot read it, rather than read as one that sets no workspace.
+	s.T().Setenv("ASTRO_DOMAIN", "scalar.com")
+	_, err = CurrentWorkspace()
+	s.Error(err)
+	s.Equal(1, resolved())
 }
 
 func (s *Suite) TestGetCurrentContext_WithDomainOverride() {

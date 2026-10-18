@@ -198,15 +198,21 @@ func Delete(domain string, noPrompt bool, out io.Writer) (*Removal, error) {
 	return &Removal{Domain: domain, Action: "deleted"}, nil
 }
 
-// IsCloudContext returns whether current context domain is related to cloud platform or not
+// IsCloudContext reports whether the current context is on Astro rather than
+// Astro Private Cloud: whether its domain is Astro's (IsCloudDomain). With no
+// current context, or one the config does not hold or cannot read, it is
+// Astro, as on a fresh machine.
+//
+// It never reads the login (config.CurrentContextWithoutLogin). The root asks
+// it on every command, to choose which tree to build, and resolving a login
+// can read the keyring or the vault, rewrite the config and warn on stderr. A
+// command that needs the login reads it itself.
 func IsCloudContext() bool {
-	currContext, err := GetCurrentContext()
-	if err != nil { // Case when context is not set or something wrong when trying to pick up current context
-		// TODO: Handle this error and possible add this to a debug log
+	c, err := config.CurrentContextWithoutLogin()
+	if err != nil {
 		return true
 	}
-
-	return IsCloudDomain(currContext.Domain)
+	return IsCloudDomain(c.Domain)
 }
 
 // IsCloudDomain returns whether the given domain is related to cloud platform or not

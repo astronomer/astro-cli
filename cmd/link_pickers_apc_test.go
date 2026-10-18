@@ -72,7 +72,7 @@ func TestAPCLinkingAddsNoLoginRead(t *testing.T) {
 		}
 		if sel, ok := n.(*ast.SelectorExpr); ok {
 			switch sel.Sel.Name {
-			case "GetCurrentContext", "GetContext", "ListContexts", "IsCloudContext", "GetCurrentWorkspace":
+			case "GetCurrentContext", "GetContext", "ListContexts", "GetCurrentWorkspace":
 				t.Errorf("withAPCLinking calls %s as the root is built, which reads a login", sel.Sel.Name)
 			}
 		}
