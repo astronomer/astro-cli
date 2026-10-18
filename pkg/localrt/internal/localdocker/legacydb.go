@@ -159,7 +159,7 @@ func legacyComposeProject(projectPath, projectName string) string {
 
 // legacyMetadataVolume is the volume `astro dev` would have used.
 func legacyMetadataVolume(projectPath, projectName string) string {
-	return legacyComposeProject(projectPath, projectName) + "_" + metadataVolumeKey
+	return metadataVolume(legacyComposeProject(projectPath, projectName))
 }
 
 // legacyPathSpellings are the spellings of a project path that could have been
@@ -272,10 +272,6 @@ func (e *Engine) noteLegacyDatabase(ctx context.Context, conn engineConn, projec
 	if found != volumePresent {
 		return
 	}
-	cb.OnLine(rt.LogLine{
-		Component: "system",
-		Time:      e.now(),
-		Text: fmt.Sprintf("starting with a new local Airflow database. The one astro dev used is left untouched in the %s volume %s, "+
-			"and Astro CLI 1.x can still start it", legacyConn.bin, legacy),
-	})
+	e.systemLine(cb, fmt.Sprintf("starting with a new local Airflow database. The one astro dev used is left untouched in the %s volume %s, "+
+		"and Astro CLI 1.x can still start it", legacyConn.bin, legacy))
 }

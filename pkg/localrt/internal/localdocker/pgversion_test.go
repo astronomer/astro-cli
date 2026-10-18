@@ -77,19 +77,34 @@ func TestFirstFileInTar(t *testing.T) {
 }
 
 // pgEngine scripts a fake engine whose metadata volume for any project exists
-// and holds a database PG_VERSION says version created. cpErr makes the copy
-// fail instead.
+// and holds a database PG_VERSION says version created.
 type pgEngine struct {
-	version string
-	cpErr   error
 	t       *testing.T
+	version string
+	// createdAt is what `volume inspect` reports; "" makes it fail.
+	createdAt string
+	// cpErr makes the copy fail.
+	cpErr error
+	// imageMissing makes `image inspect` fail, and pullErr the pull after it.
+	imageMissing bool
+	pullErr      error
 }
 
-func (s pgEngine) output(call string) ([]byte, error) {
+func (s *pgEngine) output(call string) ([]byte, error) {
 	switch {
 	case strings.Contains(call, " volume ls ") && strings.HasSuffix(call, "_"+metadataVolumeKey):
 		_, vol, _ := strings.Cut(call, "name=")
 		return []byte(vol + "\n"), nil
+	case strings.Contains(call, " volume inspect "):
+		if s.createdAt == "" {
+			return nil, errors.New("exit status 1")
+		}
+		return []byte(s.createdAt + "\n"), nil
+	case strings.Contains(call, " image inspect "):
+		if s.imageMissing {
+			return nil, errors.New("exit status 1")
+		}
+		return []byte("sha256:abc\n"), nil
 	case strings.Contains(call, " container cp "):
 		if s.cpErr != nil {
 			return nil, s.cpErr
@@ -99,100 +114,220 @@ func (s pgEngine) output(call string) ([]byte, error) {
 	return nil, nil
 }
 
-// startWithVolume starts a project whose metadata volume already exists and
-// returns the compose file it wrote, the calls it made and the lines it said.
-func startWithVolume(t *testing.T, s pgEngine) (name, compose string, calls, lines []string) {
+func (s *pgEngine) run(call string, _ rt.Stdio) error {
+	if strings.HasPrefix(call, "docker pull ") {
+		return s.pullErr
+	}
+	return nil
+}
+
+// pgStart is one start against a pgEngine, and what came of it.
+type pgStart struct {
+	name, compose string
+	calls, lines  []string
+}
+
+// startOn starts the project at projectPath on e, and returns the compose
+// file it wrote, the calls it made and the lines it said.
+func startOn(t *testing.T, e *Engine, cmd *fakeCmd, projectPath string) pgStart {
 	t.Helper()
-	s.t = t
-	cmd := &fakeCmd{output: s.output}
-	e := testEngine(t, cmd)
+	cmd.calls = nil
 	p := testPlan(t)
-	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
+	p.ProjectPath = projectPath
+	var out pgStart
+	_, err := e.Start(context.Background(), p, rt.Callbacks{OnLine: func(l rt.LogLine) { out.lines = append(out.lines, l.Text) }})
 	require.NoError(t, err)
 
-	name, err = composeProjectName(p.ProjectPath)
+	out.name, err = composeProjectName(projectPath)
 	require.NoError(t, err)
-	dir, err := rt.StateDir(p.ProjectPath)
+	dir, err := rt.StateDir(projectPath)
 	require.NoError(t, err)
 	b, err := os.ReadFile(filepath.Join(dir, composeFileName))
 	require.NoError(t, err)
-	return name, string(b), cmd.calls, lines
+	out.compose = string(b)
+	out.calls = cmd.calls
+	return out
+}
+
+// newPGEngine is an engine over s, and a project directory to start.
+func newPGEngine(t *testing.T, s *pgEngine) (*Engine, *fakeCmd, string) {
+	t.Helper()
+	s.t = t
+	cmd := &fakeCmd{output: s.output, run: s.run}
+	e := testEngine(t, cmd)
+	return e, cmd, testPlan(t).ProjectPath
+}
+
+// startWithVolume starts a project whose metadata volume already exists.
+func startWithVolume(t *testing.T, s *pgEngine) pgStart {
+	t.Helper()
+	e, cmd, project := newPGEngine(t, s)
+	return startOn(t, e, cmd, project)
 }
 
 func callIndex(calls []string, substr string) int {
 	return slices.IndexFunc(calls, func(c string) bool { return strings.Contains(c, substr) })
 }
 
+func linesWith(lines []string, substr string) []string {
+	var out []string
+	for _, l := range lines {
+		if strings.Contains(l, substr) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
 // The case the whole change is for: a project whose database Postgres 12
 // created keeps running on 12, because 15 refuses to start on it.
 func TestAnExistingPostgres12DatabaseKeepsRunningOn12(t *testing.T) {
-	name, compose, calls, lines := startWithVolume(t, pgEngine{version: "12"})
+	got := startWithVolume(t, &pgEngine{version: "12", createdAt: "2026-01-02T03:04:05Z"})
 
-	assert.Contains(t, compose, "image: "+legacyPostgresImage+"\n")
-	assert.NotContains(t, compose, "image: "+postgresImage+"\n")
+	assert.Contains(t, got.compose, "image: "+legacyPostgresImage+"\n")
+	assert.NotContains(t, got.compose, "image: "+postgresImage+"\n")
 
-	var said string
-	for _, l := range lines {
-		if strings.Contains(l, "PostgreSQL 12") {
-			said = l
-		}
-	}
-	require.NotEmpty(t, said, "a project pinned to an old Postgres is told so; lines were %v", lines)
-	assert.Contains(t, said, legacyPostgresImage)
-	assert.Contains(t, said, "astro local reset", "and how to move it to the new default")
+	said := linesWith(got.lines, "created by PostgreSQL 12")
+	require.Len(t, said, 1, "a project pinned to an old Postgres is told so; lines were %v", got.lines)
+	assert.Contains(t, said[0], legacyPostgresImage)
+	assert.Contains(t, said[0], "astro local reset", "and how to move it to the new default")
 
 	// Read through a container that is created and never started, with the
 	// volume read-only, from the image the project runs, so a project on 12
 	// pulls nothing it would not otherwise need.
-	create := callIndex(calls, " container create ")
-	require.GreaterOrEqual(t, create, 0, "calls were %v", calls)
-	assert.Contains(t, calls[create], "--volume "+metadataVolume(name)+":"+pgDataDir+":ro")
-	assert.Contains(t, calls[create], "--name "+pgProbeName(name))
+	create := callIndex(got.calls, " container create ")
+	require.GreaterOrEqual(t, create, 0, "calls were %v", got.calls)
+	assert.Contains(t, got.calls[create], "--volume "+metadataVolume(got.name)+":"+pgDataDir+":ro")
+	assert.Contains(t, got.calls[create], "--name "+pgProbeName(got.name))
+	// Labeled as the project's, so whatever counts a project's containers
+	// counts this one.
+	assert.Contains(t, got.calls[create], "--label "+composeProjectLabel+"="+got.name)
 	// testPlan adds no dependencies, so the image the project runs is the
 	// stub's runtime base as-is.
-	assert.True(t, strings.HasSuffix(calls[create], " "+newStubImages().base),
-		"the probe is created from the project's own image, got %s", calls[create])
-	assert.False(t, hasCall(calls, " start "+pgProbeName(name)), "the probe must never run")
+	assert.True(t, strings.HasSuffix(got.calls[create], " "+newStubImages().base),
+		"the probe is created from the project's own image, got %s", got.calls[create])
+	assert.Equal(t, -1, callIndex(got.calls, " pull "), "an image the engine has is not pulled")
 
 	// And taken back out, before the up, so it never holds the volume compose
 	// is about to mount.
-	up := callIndex(calls, " up ")
+	up := callIndex(got.calls, " up ")
 	rms := 0
-	for i, c := range calls {
-		if c == "docker container rm --force "+pgProbeName(name) {
+	for i, c := range got.calls {
+		if c == "docker container rm --force "+pgProbeName(got.name) {
 			rms++
 			assert.Less(t, i, up, "the probe is removed before the up")
 		}
 	}
-	assert.Equal(t, 2, rms, "one leftover cleared before the create, and the probe itself after; calls were %v", calls)
+	assert.Equal(t, 2, rms, "one leftover cleared before the create, and the probe itself after; calls were %v", got.calls)
+}
+
+// What was read is remembered for the volume, so the next start neither probes
+// nor repeats the note: the user decided the note is said once per project.
+func TestTheVersionIsReadAndNotedOncePerVolume(t *testing.T) {
+	s := &pgEngine{version: "12", createdAt: "2026-01-02T03:04:05Z"}
+	e, cmd, project := newPGEngine(t, s)
+	first := startOn(t, e, cmd, project)
+	require.Len(t, linesWith(first.lines, "created by PostgreSQL 12"), 1)
+
+	second := startOn(t, e, cmd, project)
+	assert.Contains(t, second.compose, "image: "+legacyPostgresImage+"\n", "the remembered version still decides the image")
+	assert.Empty(t, linesWith(second.lines, "PostgreSQL"), "said once, not every start")
+	assert.False(t, hasCall(second.calls, " container "), "a remembered volume is not probed; calls were %v", second.calls)
+}
+
+// A reset deletes the volume and a start makes a new one under the same name.
+// The record must not hand the new database the old one's version.
+func TestARecreatedVolumeIsReadAgain(t *testing.T) {
+	s := &pgEngine{version: "12", createdAt: "2026-01-02T03:04:05Z"}
+	e, cmd, project := newPGEngine(t, s)
+	startOn(t, e, cmd, project)
+
+	s.version, s.createdAt = "15", "2026-02-03T04:05:06Z"
+	again := startOn(t, e, cmd, project)
+	assert.True(t, hasCall(again.calls, " container create "), "calls were %v", again.calls)
+	assert.Contains(t, again.compose, "image: "+postgresImage+"\n")
+}
+
+// Without a creation time there is nothing to key a record by, so every start
+// reads the volume.
+func TestAVolumeWithoutACreationTimeIsReadEveryStart(t *testing.T) {
+	s := &pgEngine{version: "12"}
+	e, cmd, project := newPGEngine(t, s)
+	startOn(t, e, cmd, project)
+	again := startOn(t, e, cmd, project)
+	assert.True(t, hasCall(again.calls, " container create "), "calls were %v", again.calls)
+	assert.Contains(t, again.compose, "image: "+legacyPostgresImage+"\n")
 }
 
 func TestAnExistingPostgres15DatabaseRunsTheDefaultQuietly(t *testing.T) {
-	_, compose, _, lines := startWithVolume(t, pgEngine{version: "15"})
+	got := startWithVolume(t, &pgEngine{version: "15", createdAt: "2026-01-02T03:04:05Z"})
 
-	assert.Contains(t, compose, "image: "+postgresImage+"\n")
-	for _, l := range lines {
-		assert.NotContains(t, l, "PostgreSQL", "a database on the default has nothing to be told")
-	}
+	assert.Contains(t, got.compose, "image: "+postgresImage+"\n")
+	assert.Empty(t, linesWith(got.lines, "PostgreSQL"), "a database on the default has nothing to be told")
 }
 
-// A version that cannot be read is not a reason to refuse the start, but it is
-// said, because when the guess is wrong the database will not start and nothing
-// else explains why.
-func TestAnUnreadableVersionStartsOnTheDefaultAndSaysSo(t *testing.T) {
-	name, compose, calls, lines := startWithVolume(t, pgEngine{cpErr: errors.New("exit status 1")})
+// An existing volume whose version cannot be read runs 12.6, not the default:
+// every volume made before 15 became the default holds a 12 database, and 15
+// on one of those never comes up. It is said, because when the guess is wrong
+// nothing else explains why.
+func TestAnUnreadableVersionStartsOnTheLegacyImageAndSaysSo(t *testing.T) {
+	got := startWithVolume(t, &pgEngine{cpErr: errors.New("exit status 1"), createdAt: "2026-01-02T03:04:05Z"})
 
-	assert.Contains(t, compose, "image: "+postgresImage+"\n")
-	var warned bool
-	for _, l := range lines {
-		if strings.Contains(l, "could not read which PostgreSQL version") {
-			warned = true
-			assert.Contains(t, l, "astro local reset")
-		}
-	}
-	assert.True(t, warned, "lines were %v", lines)
-	assert.Equal(t, "docker container rm --force "+pgProbeName(name), calls[callIndex(calls, " container cp ")+1],
+	assert.Contains(t, got.compose, "image: "+legacyPostgresImage+"\n")
+	warned := linesWith(got.lines, "could not read which PostgreSQL version")
+	require.Len(t, warned, 1, "lines were %v", got.lines)
+	assert.Contains(t, warned[0], legacyPostgresImage)
+	assert.Contains(t, warned[0], "astro local reset")
+	assert.Equal(t, "docker container rm --force "+pgProbeName(got.name), got.calls[callIndex(got.calls, " container cp ")+1],
 		"a failed read still removes its probe")
+}
+
+// A probe image that is not there and cannot be pulled is a network problem,
+// and says so, rather than sending someone to look at their database.
+func TestAPullThatFailsIsReportedAsOne(t *testing.T) {
+	got := startWithVolume(t, &pgEngine{imageMissing: true, pullErr: errors.New("no route to host"), createdAt: "x"})
+
+	assert.Contains(t, got.compose, "image: "+legacyPostgresImage+"\n")
+	warned := linesWith(got.lines, "could not pull "+newStubImages().base)
+	require.Len(t, warned, 1, "lines were %v", got.lines)
+	assert.Contains(t, warned[0], "no route to host")
+	assert.Empty(t, linesWith(got.lines, "could not read which"))
+	assert.False(t, hasCall(got.calls, " container create "), "nothing to create a probe from; calls were %v", got.calls)
+}
+
+// A missing image that does pull goes on to be read.
+func TestAMissingProbeImageIsPulledFirst(t *testing.T) {
+	got := startWithVolume(t, &pgEngine{version: "12", imageMissing: true, createdAt: "x"})
+
+	pull := callIndex(got.calls, " pull ")
+	create := callIndex(got.calls, " container create ")
+	require.GreaterOrEqual(t, pull, 0, "calls were %v", got.calls)
+	assert.Less(t, pull, create)
+	assert.Contains(t, got.compose, "image: "+legacyPostgresImage+"\n")
+}
+
+// When the project's compose override gives postgres its own image, that image
+// is what runs: nothing is probed, and nothing is promised about a reset.
+func TestAnOverridePostgresImageIsLeftToTheOverride(t *testing.T) {
+	s := &pgEngine{version: "12", createdAt: "x"}
+	e, cmd, project := newPGEngine(t, s)
+	require.NoError(t, os.WriteFile(filepath.Join(project, rt.ComposeOverrideFile),
+		[]byte("services:\n  postgres:\n    image: docker.io/postgres:16\n"), 0o600))
+
+	got := startOn(t, e, cmd, project)
+	assert.False(t, hasCall(got.calls, " container "), "calls were %v", got.calls)
+	assert.Empty(t, linesWith(got.lines, "PostgreSQL"), "lines were %v", got.lines)
+}
+
+// An override that leaves postgres alone changes nothing about the choice.
+func TestAnOverrideOfOtherServicesStillPins(t *testing.T) {
+	s := &pgEngine{version: "12", createdAt: "x"}
+	e, cmd, project := newPGEngine(t, s)
+	require.NoError(t, os.WriteFile(filepath.Join(project, rt.ComposeOverrideFile),
+		[]byte("services:\n  scheduler:\n    environment:\n      A: b\n"), 0o600))
+
+	got := startOn(t, e, cmd, project)
+	assert.Contains(t, got.compose, "image: "+legacyPostgresImage+"\n")
 }
 
 // A new project has no volume, and creating a container that mounts one would
@@ -200,32 +335,28 @@ func TestAnUnreadableVersionStartsOnTheDefaultAndSaysSo(t *testing.T) {
 func TestANewProjectGetsTheDefaultWithoutAProbe(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
-	p := testPlan(t)
-	_, err := e.Start(context.Background(), p, rt.Callbacks{})
-	require.NoError(t, err)
+	got := startOn(t, e, cmd, testPlan(t).ProjectPath)
 
-	assert.False(t, hasCall(cmd.calls, " container "), "calls were %v", cmd.calls)
-	dir, err := rt.StateDir(p.ProjectPath)
-	require.NoError(t, err)
-	b, err := os.ReadFile(filepath.Join(dir, composeFileName))
-	require.NoError(t, err)
-	assert.Contains(t, string(b), "image: "+postgresImage+"\n")
+	assert.False(t, hasCall(got.calls, " container "), "calls were %v", got.calls)
+	assert.False(t, hasCall(got.calls, " volume inspect "), "calls were %v", got.calls)
+	assert.Contains(t, got.compose, "image: "+postgresImage+"\n")
 }
 
 // An engine that cannot say whether the volume is there is not asked to mount
-// it either: the probe could create it, and the up is about to fail anyway.
-func TestAnUnknownVolumeIsNotProbed(t *testing.T) {
-	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
-		if strings.Contains(call, " volume ls ") {
-			return nil, errors.New("cannot connect to the daemon")
-		}
-		return nil, nil
-	}}
+// it — the probe could create it — and is not given 15 either, which an
+// existing volume would refuse.
+func TestAnUnknownVolumeIsNotProbedAndRunsTheLegacyImage(t *testing.T) {
+	cmd := &fakeCmd{}
 	e := testEngine(t, cmd)
-	got := e.metadataPostgresImage(context.Background(), engineConn{bin: "docker"}, testComposeProject, "img",
-		e.lookupVolume(context.Background(), engineConn{bin: "docker"}, metadataVolume(testComposeProject)), rt.Callbacks{})
-	assert.Equal(t, postgresImage, got)
-	assert.False(t, hasCall(cmd.calls, " container "), "calls were %v", cmd.calls)
+	var lines []string
+	got := e.metadataPostgresImage(context.Background(), pgChoice{
+		conn: engineConn{bin: "docker"}, stateDir: t.TempDir(), projectPath: t.TempDir(),
+		composeProject: testComposeProject, probeImage: "img", own: volumeUnknown,
+	}, rt.Callbacks{OnLine: func(l rt.LogLine) { lines = append(lines, l.Text) }})
+	assert.Equal(t, legacyPostgresImage, got)
+	assert.Empty(t, cmd.calls)
+	require.Len(t, lines, 1)
+	assert.Contains(t, lines[0], "could not tell whether this project already has a database")
 }
 
 // A start canceled mid-probe still takes the probe back out: left behind, it
@@ -248,7 +379,8 @@ func TestACanceledProbeIsStillRemoved(t *testing.T) {
 }
 
 // A probe an interrupted start left behind refers to the volume, and the engine
-// will not delete a volume in use: a reset clears it before the down.
+// will not delete a volume in use. Compose does not see the probe — it lists
+// only containers it created — so a reset removes it by name before the down.
 func TestCleanRemovesALeftoverProbeBeforeTheVolume(t *testing.T) {
 	cmd := &fakeCmd{output: noProjects}
 	e := testEngine(t, cmd)
@@ -263,6 +395,32 @@ func TestCleanRemovesALeftoverProbeBeforeTheVolume(t *testing.T) {
 	rm := callIndex(cmd.calls, "container rm --force "+pgProbeName(name))
 	down := callIndex(cmd.calls, " down ")
 	require.GreaterOrEqual(t, rm, 0, "calls were %v", cmd.calls)
+	assert.Less(t, rm, down)
+}
+
+// The state directory is a cache and the volume outlives it: a reset whose
+// compose file is gone still removes a volume that is there, and a probe with
+// it.
+func TestCleanTakesDownAVolumeThatOutlivedTheStateDirectory(t *testing.T) {
+	project := t.TempDir()
+	name, err := composeProjectName(project)
+	require.NoError(t, err)
+	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
+		if call == "docker volume ls --quiet --filter name="+metadataVolume(name) {
+			return []byte(metadataVolume(name) + "\n"), nil
+		}
+		return nil, nil
+	}}
+	e := testEngine(t, cmd)
+
+	got, reached, err := e.Clean(context.Background(), project)
+	require.NoError(t, err)
+	assert.True(t, reached)
+	assert.Equal(t, name, got)
+	rm := callIndex(cmd.calls, "container rm --force "+pgProbeName(name))
+	down := callIndex(cmd.calls, " down --timeout 10 --volumes --remove-orphans")
+	require.GreaterOrEqual(t, rm, 0, "calls were %v", cmd.calls)
+	require.GreaterOrEqual(t, down, 0, "calls were %v", cmd.calls)
 	assert.Less(t, rm, down)
 }
 

@@ -60,6 +60,20 @@ func TestAnExistingPostgres12DatabaseKeepsItsVersion(t *testing.T) {
 	} else if len(left) != 0 {
 		t.Errorf("the start left its Postgres version probe behind: %v", left)
 	}
+
+	// The next start of the same volume remembers what was read: still 12,
+	// and the note is not repeated, since it is said once per project.
+	p.runSlow("local", "stop").requireSuccess()
+	waitFor(t, "the stopped project's containers to go", func() bool {
+		return len(containersFor(t, project)) == 0
+	})
+	again := p.runSlow("local", "start", "--docker").requireSuccess()
+	if img := postgresImageOf(t, project); !strings.HasSuffix(img, "postgres:12.6") {
+		t.Fatalf("the second start of the Postgres 12 database runs %s, want postgres:12.6\n%s", img, again.output())
+	}
+	if strings.Contains(again.output(), "created by PostgreSQL 12") {
+		t.Errorf("the note about Postgres 12 was repeated; it is said once:\n%s", again.output())
+	}
 }
 
 // postgresImageOf is the image the project's postgres service runs, asked of
