@@ -38,6 +38,47 @@ func stuckOutput(call string) ([]byte, error) {
 	return nil, nil
 }
 
+// podmanStuckStack is the same stack as rootless podman 5.8 reports it
+// (fields trimmed to the ones read, values as sampled): no "restarting" — the
+// crash-looping postgres shows as running with the code it last exited with,
+// or as stopped.
+const podmanStuckStack = `{"ExitCode":0,"Name":"astro-p-api-server-1","Service":"api-server","State":"created","Status":"Created"}
+{"ExitCode":0,"Name":"astro-p-db-migration-1","Service":"db-migration","State":"running","Status":"Up 2 seconds"}
+{"ExitCode":1,"Name":"astro-p-postgres-1","Service":"postgres","State":"running","Status":"Up Less than a second"}
+{"ExitCode":0,"Name":"astro-p-scheduler-1","Service":"scheduler","State":"created","Status":"Created"}
+`
+
+// On podman too, the timeout names the crashing service and quotes it, rather
+// than the migration waiting on it — which is what it did before podman's
+// spelling of a crash loop was recognized.
+func TestAnUpThatOutlivesTheBudgetOnPodmanNamesTheCrashingService(t *testing.T) {
+	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
+		switch {
+		case strings.Contains(call, " ps -a --format json"):
+			return []byte(podmanStuckStack), nil
+		case strings.Contains(call, " logs ") && strings.HasSuffix(call, " db-migration"):
+			return []byte(`nc: getaddrinfo for host "postgres" port 5432: Name or service not known` + "\n"), nil
+		}
+		return stuckOutput(call)
+	}}
+	cmd.delayFor = func(call string) time.Duration {
+		if strings.HasSuffix(call, " up --detach") {
+			return time.Hour
+		}
+		return 0
+	}
+	e := testEngine(t, cmd)
+	e.SetHealthTimeout(50 * time.Millisecond)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.ErrorIs(t, err, ErrHealthTimeout)
+	msg := err.Error()
+	assert.Contains(t, msg, "postgres keeps exiting (last exit code 1)")
+	assert.Contains(t, msg, "Last output from postgres: FATAL:  database files are incompatible with server")
+	assert.NotContains(t, msg, "Last output from db-migration")
+	assert.NotContains(t, msg, "still running: db-migration")
+}
+
 // An up that never returns fails at the health timeout, says what it was
 // waiting on, and takes down what it created.
 //
@@ -218,7 +259,7 @@ func TestPendingServices(t *testing.T) {
 			{Service: "postgres", State: "exited", ExitCode: 3},
 			{Service: "db-migration", State: "running"},
 		})
-		assert.Equal(t, []string{"postgres is exited with code 3", "never started, waiting on a dependency: scheduler"}, pending)
+		assert.Equal(t, []string{"postgres exited (3)", "never started, waiting on a dependency: scheduler"}, pending)
 		assert.Equal(t, []string{"postgres"}, stuck)
 	})
 	t.Run("with nothing failing, what is still running is what is slow", func(t *testing.T) {
@@ -232,6 +273,32 @@ func TestPendingServices(t *testing.T) {
 			"still running: db-migration, postgres",
 		}, pending)
 		assert.Equal(t, []string{"db-migration", "postgres"}, stuck)
+	})
+	t.Run("podman's crash loop: running with the last exit code", func(t *testing.T) {
+		// Podman has no "restarting": it restarts at once, and mid-loop ps
+		// reports the container running with the code it last exited with.
+		pending, stuck := pendingServices([]composeService{
+			{Service: "scheduler", State: "created"},
+			{Service: "postgres", State: "running", ExitCode: 1},
+			{Service: "db-migration", State: "running"},
+		})
+		assert.Equal(t, []string{
+			"postgres keeps exiting (last exit code 1)",
+			"never started, waiting on a dependency: scheduler",
+		}, pending)
+		assert.Equal(t, []string{"postgres"}, stuck, "the crashing service's logs, not the migration waiting on it")
+	})
+	t.Run("podman's crash loop: stopped between attempts", func(t *testing.T) {
+		// The other half of the samples, with code 1 or, mid-transition, 0.
+		for _, code := range []int{1, 0} {
+			pending, stuck := pendingServices([]composeService{
+				{Service: "scheduler", State: "created"},
+				{Service: "postgres", State: "stopped", ExitCode: code},
+				{Service: "db-migration", State: "running"},
+			})
+			assert.Contains(t, pending[0], "postgres is stopped")
+			assert.Equal(t, []string{"postgres"}, stuck)
+		}
 	})
 	t.Run("a completed migration is done, not pending", func(t *testing.T) {
 		pending, stuck := pendingServices([]composeService{

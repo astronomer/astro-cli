@@ -98,23 +98,33 @@ func (e *Engine) composeServices(ctx context.Context, up composeLine) ([]compose
 // pendingServices describes what the up was still waiting on, and names the
 // services whose own output is the likeliest explanation.
 //
-// A service is done when it is running or exited 0 (the one-shot migration).
-// Of the rest, one that is restarting or exited non-zero is failing, and its
-// logs say why; one still running that others wait on is in progress, and its
-// logs are the next best thing; one only created is waiting on a dependency
-// and has said nothing.
+// A service is done when it exited 0 (the one-shot migration), in progress
+// when it is running, and waiting on a dependency when it is only created —
+// one of those has said nothing worth quoting. Everything else is failing,
+// and its logs say why.
+//
+// "Everything else" rather than a list of failure states, because the engines
+// do not agree on how a crash loop looks. Docker shows the container
+// "restarting" between attempts. Podman restarts it at once and has no such
+// state: sampled mid-loop, `podman compose ps -a` reported it "running" with
+// the last exit code (1) about half the time and "stopped" the rest, with
+// code 1 or, mid-transition, 0. A list naming docker's spellings missed all
+// of those, and quoted the migration waiting on postgres instead of postgres.
+// Hence also "running" with a non-zero exit code: up again, but only after
+// crashing.
 func pendingServices(services []composeService) (pending, stuck []string) {
 	slices.SortFunc(services, func(a, b composeService) int { return strings.Compare(a.Service, b.Service) })
 	var waiting, running []string
 	for _, s := range services {
 		switch {
-		case s.State == "restarting" || s.State == "dead" || (s.State == "exited" && s.ExitCode != 0):
-			pending = append(pending, fmt.Sprintf("%s is %s", s.Service, describeState(s)))
-			stuck = append(stuck, s.Service)
+		case s.State == "exited" && s.ExitCode == 0:
 		case s.State == "created":
 			waiting = append(waiting, s.Service)
-		case s.State == "running":
+		case s.State == "running" && s.ExitCode == 0:
 			running = append(running, s.Service)
+		default:
+			pending = append(pending, s.Service+" "+describeFailure(s))
+			stuck = append(stuck, s.Service)
 		}
 	}
 	if len(waiting) == 0 {
@@ -135,11 +145,19 @@ func pendingServices(services []composeService) (pending, stuck []string) {
 	return pending, stuck
 }
 
-func describeState(s composeService) string {
-	if s.State == "exited" {
-		return fmt.Sprintf("exited with code %d", s.ExitCode)
+// describeFailure says how a failing service looks, with its exit code when
+// it has one: the code is the same fact on either engine, where the state is
+// not.
+func describeFailure(s composeService) string {
+	switch {
+	case s.State == "exited":
+		return fmt.Sprintf("exited (%d)", s.ExitCode)
+	case s.State == "running":
+		return fmt.Sprintf("keeps exiting (last exit code %d)", s.ExitCode)
+	case s.ExitCode != 0:
+		return fmt.Sprintf("is %s (last exit code %d)", s.State, s.ExitCode)
 	}
-	return s.State
+	return "is " + s.State
 }
 
 // serviceTailLines bounds the output quoted per service: enough for a FATAL
