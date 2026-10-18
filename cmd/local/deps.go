@@ -163,6 +163,16 @@ type Deps struct {
 	// root wires it, because Otto reads config/, which this tree never
 	// imports. nil means Otto cannot be started from here.
 	LaunchOtto func(prompt string) error
+
+	// Legacy1xSetting reads key, an Astro CLI 1.x setting v2 does not apply,
+	// for the project at projectDir as 1.x did (its .astro/config.yaml over
+	// the home config): its value when the user chose one (not 1.x's
+	// default), "" otherwise; the file that sets it; and what replaces it, as
+	// `astro config` says when it refuses the setting. A start reads it only
+	// to say what replaces the setting (warnLegacy1xSettings). The root wires
+	// it, because the read touches config/, which this tree never imports.
+	// nil reads as nothing set.
+	Legacy1xSetting func(projectDir, key string) (value, file, replacement string)
 }
 
 // Runtime mirrors the package-level functions of pkg/localrt as an
