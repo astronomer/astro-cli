@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
-	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
 	"github.com/astronomer/astro-cli/internal/platform/astro/organization"
@@ -242,8 +241,6 @@ func TestOrganizationSwitch(t *testing.T) {
 }
 
 func TestOrganizationExportAuditLogs(t *testing.T) {
-	// turn on audit logs
-	config.CFG.AuditLogs.SetHomeString("true")
 	orig := orgExportAuditLogs
 	t.Cleanup(func() { orgExportAuditLogs = orig })
 	orgExportAuditLogs = func(astroV1Client astrov1.APIClient, orgName, filePath string, earliest int) (*organization.AuditLogExport, error) {

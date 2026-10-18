@@ -9,23 +9,14 @@ import (
 
 // registerValidator is a helper to register a validator for a config option
 func registerValidator(configPath string, validator ValidatorFunc) {
-	cfg := CFGStrMap[configPath]
-	cfg.RegisterValidator(validator)
-	CFGStrMap[configPath] = cfg
+	c := CFGStrMap[configPath]
+	c.RegisterValidator(validator)
+	CFGStrMap[configPath] = c
 }
 
 // registerValidators registers validation functions for config options
 func registerValidators() {
 	registerValidator("remote.client_registry", ValidateRegistryEndpoint)
-	registerValidator("dev.mode", ValidateDevMode)
-}
-
-// ValidateDevMode validates that the dev.mode config value is either "docker" or "standalone"
-func ValidateDevMode(value string) error {
-	if value != "docker" && value != "standalone" {
-		return fmt.Errorf("dev.mode must be \"docker\" or \"standalone\", got %q", value)
-	}
-	return nil
 }
 
 // ValidateRegistryEndpoint validates a registry endpoint format

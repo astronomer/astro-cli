@@ -34,7 +34,7 @@ func (s *CmdSuite) TestConfigRootCommand() {
 
 func (s *CmdSuite) TestConfigGetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "get", "project.name", "-g")
+	_, err := executeCommand("config", "get", "show_warnings", "-g")
 	s.NoError(err)
 }
 
@@ -85,8 +85,8 @@ func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 func (s *CmdSuite) TestConfigSuggestionQuotesAValueWithSpaces() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
-	_, err := executeCommand("config", "set", "dev.build_secrets", "id=a,src=/my path")
-	s.ErrorContains(err, "astro config set dev.build_secrets 'id=a,src=/my path' -g")
+	_, err := executeCommand("config", "set", "local.core", "http://my host")
+	s.ErrorContains(err, "astro config set local.core 'http://my host' -g")
 }
 
 func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
@@ -99,8 +99,9 @@ func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
 }
 
 // initConfigFiles loads config from an in-memory home config and, when
-// project is not empty, a 1.x project config in a fresh working directory.
-func (s *CmdSuite) initConfigFiles(home, project string) {
+// project is not empty, a 1.x project config in a fresh working directory. It
+// returns the filesystem, for a test that reads back what was written.
+func (s *CmdSuite) initConfigFiles(home, project string) afero.Fs {
 	fs := afero.NewMemMapFs()
 	projectDir := filepath.Join(s.T().TempDir(), "proj")
 	s.useWorkingPath(projectDir)
@@ -112,6 +113,7 @@ func (s *CmdSuite) initConfigFiles(home, project string) {
 	s.T().Cleanup(func() { testUtil.InitTestConfig(testUtil.LocalPlatform) })
 	globalFlag = false
 	s.T().Cleanup(func() { globalFlag = false })
+	return fs
 }
 
 func (s *CmdSuite) TestConfigListShowsValueAndScope() {
@@ -124,7 +126,7 @@ func (s *CmdSuite) TestConfigListShowsValueAndScope() {
 	s.Regexp(`(?m)^\s*show_warnings\s+true\s+default\s*$`, out)
 	s.NotContains(out, "contexts")
 	s.NotContains(out, "t0ken-value")
-	s.NotContains(out, config.CFG.PostgresPassword.Path)
+	s.NotContains(out, "postgres", "a removed setting is not listed")
 }
 
 func (s *CmdSuite) TestConfigListReadsA1xProjectUnlessGlobal() {
@@ -177,7 +179,7 @@ func (s *CmdSuite) TestConfigSetWithOneArgumentOutsideAProjectIsAUsageError() {
 
 func (s *CmdSuite) TestConfigSetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "set", "-g", "project.name", "testing")
+	_, err := executeCommand("config", "set", "-g", "page_size", "30")
 	s.NoError(err)
 }
 
@@ -192,10 +194,16 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		{"api-server.port", "8099", "astro local start --port <port>"},
 		{"webserver.port", "8099", "astro local start --port <port>"},
 		{"project.deployment", "clx-old", "as the argument or with --deployment"},
+		{"postgres.user", "me", "runs its own metadata database"},
+		{"project.name", "p", "[project] name in its pyproject.toml"},
+		{"skip_parse", "true", "astro local check"},
+		{"cloud.api.token", "t0ken", "ASTRO_API_TOKEN"},
+		{"machine.cpu", "4", "podman machine set"},
+		{"beta.remote_cmd", "true", "beta flag"},
 	} {
 		for _, scope := range []string{"outside a project", "global", "manifest project"} {
 			s.Run(tc.key+" "+scope, func() {
-				testUtil.InitTestConfig(testUtil.LocalPlatform)
+				fs := s.initConfigFiles("config_version: 2\npage_size: 50\n", "")
 				args := []string{"config", "set", tc.key, tc.value}
 				switch scope {
 				case "outside a project":
@@ -205,14 +213,15 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 				case "manifest project":
 					s.useManifestProject()
 				}
-				before := config.CFGStrMap[tc.key].GetHomeString()
 
 				_, err := executeCommand(args...)
 				s.Require().Error(err)
 				s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
 				s.ErrorContains(err, tc.key+" was removed in Astro CLI v2")
 				s.ErrorContains(err, tc.want)
-				s.Equal(before, config.CFGStrMap[tc.key].GetHomeString(), "the refused value was written")
+				after, err := afero.ReadFile(fs, config.HomeConfigFile)
+				s.Require().NoError(err)
+				s.Equal("config_version: 2\npage_size: 50\n", string(after), "the refused value was written")
 			})
 		}
 	}
@@ -231,11 +240,40 @@ func (s *CmdSuite) TestConfigGetRefusesRemovedKeys() {
 
 // configSet guards the write on its own, for a caller that skips the pre-run.
 func (s *CmdSuite) TestConfigSetNeverWritesARemovedKey() {
-	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	fs := s.initConfigFiles("config_version: 2\npage_size: 50\n", "")
 	globalFlag = true
-	s.T().Cleanup(func() { globalFlag = false })
-	before := config.CFG.DevMode.GetHomeString()
 	err := configSet(newConfigSetCmd(nil), []string{"dev.mode", "standalone"})
 	s.True(cliout.IsUsage(err), "want a usage error, got %v", err)
-	s.Equal(before, config.CFG.DevMode.GetHomeString())
+	after, err := afero.ReadFile(fs, config.HomeConfigFile)
+	s.Require().NoError(err)
+	s.Equal("config_version: 2\npage_size: 50\n", string(after))
+}
+
+// A save writes back what the file held, the settings only Astro CLI 1.x
+// reads included, plus the one change: never the defaults, which would pin
+// every one of them at this build's value, and never a removed key.
+func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
+	fs := s.initConfigFiles("postgres:\n  user: me\nwebserver:\n  port: \"8081\"\ncontext: localhost\n", "")
+
+	_, err := executeCommand("config", "set", "show_warnings", "false", "-g")
+	s.Require().NoError(err)
+	_, err = executeCommand("config", "set", "page_size", "30", "-g")
+	s.Require().NoError(err)
+
+	got, err := afero.ReadFile(fs, config.HomeConfigFile)
+	s.Require().NoError(err)
+	s.YAMLEq(`
+config_version: 2
+context: localhost
+page_size: 30
+postgres:
+  user: me
+show_warnings: false
+webserver:
+  port: "8081"
+`, string(got))
+	s.Equal(30, config.CFG.PageSize.GetInt())
+	s.False(config.CFG.ShowWarnings.GetBool())
+	s.True(config.CFG.UpgradeMessage.GetBool(), "an unset setting reads as its default")
+	s.Equal("default", config.CFG.UpgradeMessage.HomeScope())
 }

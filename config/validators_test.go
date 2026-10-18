@@ -114,24 +114,3 @@ func (s *Suite) TestClientRegistry() {
 		s.Equal("astro config set remote.client_registry <registry>/<repository>", ClientRegistryFix())
 	})
 }
-
-func (s *Suite) Test_validateDevMode() {
-	s.Run("accepts docker", func() {
-		err := ValidateDevMode("docker")
-		s.NoError(err)
-	})
-
-	s.Run("accepts standalone", func() {
-		err := ValidateDevMode("standalone")
-		s.NoError(err)
-	})
-
-	s.Run("rejects invalid values", func() {
-		invalidValues := []string{"", "invalid", "Docker", "STANDALONE", "local", "compose"}
-		for _, v := range invalidValues {
-			err := ValidateDevMode(v)
-			s.Error(err, "Expected value %q to be invalid", v)
-			s.Contains(err.Error(), "dev.mode must be")
-		}
-	})
-}
