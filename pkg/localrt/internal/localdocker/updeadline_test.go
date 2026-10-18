@@ -155,10 +155,52 @@ func TestAnUpStuckOnAFailingServiceOnPodmanNamesIt(t *testing.T) {
 	assert.NotContains(t, msg, "db-migration")
 }
 
+// shortSampleGap keeps a test from waiting out the gap between looks.
+func shortSampleGap(t *testing.T) {
+	t.Helper()
+	prev := serviceSampleGap
+	serviceSampleGap = time.Millisecond
+	t.Cleanup(func() { serviceSampleGap = prev })
+}
+
+// One look that lands on podman's mid-restart "stopped" with 0 does not make a
+// crash loop slow: the next look sees the exit code. Measured on podman 5.8
+// before the resampling: a start reported a crash-looping postgres as a health
+// timeout and advised waiting longer.
+func TestACrashLoopCaughtBetweenRestartsIsStillAFailure(t *testing.T) {
+	shortSampleGap(t)
+	between := strings.Replace(podmanStuckStack, `"ExitCode":1,"Name":"astro-p-postgres-1","Service":"postgres","State":"running"`,
+		`"ExitCode":0,"Name":"astro-p-postgres-1","Service":"postgres","State":"stopped"`, 1)
+	require.NotEqual(t, podmanStuckStack, between)
+	var looks int
+	cmd := &fakeCmd{output: func(call string) ([]byte, error) {
+		switch {
+		case strings.Contains(call, " ps -a --format json"):
+			looks++
+			if looks == 1 {
+				return []byte(between), nil
+			}
+			return []byte(podmanStuckStack), nil
+		case strings.Contains(call, " logs "):
+			return []byte(postgresLogs), nil
+		}
+		return nil, nil
+	}, delayFor: hangingUp}
+	e := testEngine(t, cmd)
+	e.SetHealthTimeout(50 * time.Millisecond)
+
+	_, err := e.Start(context.Background(), testPlan(t), rt.Callbacks{})
+	require.ErrorIs(t, err, ErrServiceFailed)
+	assert.NotErrorIs(t, err, ErrHealthTimeout)
+	assert.Equal(t, 2, looks, "looked again, and stopped looking once it saw the failure")
+	assert.Contains(t, err.Error(), "postgres keeps exiting (last exit code 1)")
+}
+
 // An up that ran out of time with nothing failing IS a health timeout: slow,
 // and a longer budget is the remedy. It names what was still running and
 // quotes all of it, in one read.
 func TestASlowUpFailsAsAHealthTimeout(t *testing.T) {
+	shortSampleGap(t)
 	logs := "db-migration-1  | Running upgrade a -> b\n" +
 		"postgres-1  | database system is ready to accept connections\n"
 	cmd := &fakeCmd{output: stackOutput(slowStack, logs), delayFor: hangingUp}

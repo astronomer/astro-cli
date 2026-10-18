@@ -96,7 +96,7 @@ func (e *Engine) upTimedOut(ctx context.Context, up *composeLine) upFailure {
 		detail strings.Builder
 		out    upFailure
 	)
-	if services, err := e.composeServices(ctx, *up); err == nil {
+	if services, err := e.sampleServices(ctx, *up); err == nil {
 		var pending, stuck []string
 		pending, stuck, out.failing = pendingServices(services)
 		if len(pending) > 0 {
@@ -119,6 +119,72 @@ func (e *Engine) upTimedOut(ctx context.Context, up *composeLine) upFailure {
 			ErrHealthTimeout, e.healthTimeout, detail.String())
 	}
 	return out
+}
+
+// serviceSamples and serviceSampleGap bound how many times, and how far
+// apart, an up with nothing failing is looked at again before it is called
+// slow. A var so a test need not wait out the gap.
+var (
+	serviceSamples   = 4
+	serviceSampleGap = 500 * time.Millisecond
+)
+
+// sampleServices is composeServices asked until something is seen failing, up
+// to serviceSamples times, keeping for each service its worst sighting.
+//
+// Once is not enough on podman. It restarts a crashed container at once, so
+// a crash loop is "running" with exit code 1 or "stopped" with 1 at most
+// instants — but "stopped" with 0 at some, mid-transition, which is
+// indistinguishable from a service still on its way. Measured: a start whose
+// one look landed there reported postgres as slow and advised waiting longer.
+// A loop that restarts several times a second shows its exit code within a
+// couple of looks; docker shows "restarting" for the whole backoff, so it is
+// caught by the first.
+func (e *Engine) sampleServices(ctx context.Context, up composeLine) ([]composeService, error) {
+	worst := map[string]composeService{}
+	var order []string
+	for i := range serviceSamples {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return mergedServices(worst, order), nil
+			case <-time.After(serviceSampleGap):
+			}
+		}
+		services, err := e.composeServices(ctx, up)
+		if err != nil {
+			if i == 0 {
+				return nil, err
+			}
+			break
+		}
+		for _, s := range services {
+			prev, seen := worst[s.Service]
+			if !seen {
+				order = append(order, s.Service)
+			}
+			if !seen || (failingState(s) && !failingState(prev)) {
+				worst[s.Service] = s
+			}
+		}
+		if _, _, failing := pendingServices(mergedServices(worst, order)); failing {
+			break
+		}
+	}
+	return mergedServices(worst, order), nil
+}
+
+func mergedServices(worst map[string]composeService, order []string) []composeService {
+	out := make([]composeService, 0, len(order))
+	for _, name := range order {
+		out = append(out, worst[name])
+	}
+	return out
+}
+
+// failingState is pendingServices' test for a failing service, on one entry.
+func failingState(s composeService) bool {
+	return s.ExitCode != 0 || s.State == "restarting" || s.State == "dead"
 }
 
 // composeService is the part of one `compose ps --format json` entry this
