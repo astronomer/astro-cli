@@ -95,8 +95,8 @@ func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 func (s *CmdSuite) TestConfigSuggestionQuotesAValueWithSpaces() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
-	_, err := executeCommand("config", "set", "internal.localhost.core_url", "http://my host")
-	s.ErrorContains(err, "astro config set internal.localhost.core_url 'http://my host' -g")
+	_, err := executeCommand("config", "set", "internal.astro.localhost.core_url", "http://my host")
+	s.ErrorContains(err, "astro config set internal.astro.localhost.core_url 'http://my host' -g")
 }
 
 func (s *CmdSuite) TestConfigIn1xProjectWithPyprojectKeepsProjectScope() {
@@ -213,7 +213,8 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		// Renamed: refused, naming the new name, as a renamed flag is.
 		{"page_size", "30", "was removed in Astro CLI v2: use apc.page_size"},
 		{"auto_select", "true", "was removed in Astro CLI v2: use deployment.auto_select"},
-		{"local.core", "http://x", "was removed in Astro CLI v2: use internal.localhost.core_url"},
+		{"local.core", "http://x", "was removed in Astro CLI v2: use internal.astro.localhost.core_url"},
+		{"cloud.api.port", "8443", "was removed in Astro CLI v2: use internal.apc.api.port"},
 		{"machine.cpu", "4", "podman machine set"},
 		{"beta.remote_cmd", "true", "beta flag"},
 	} {
@@ -339,7 +340,7 @@ func (s *CmdSuite) TestConfigUnknownSettingSuggestsTheClosest() {
 		s.NotContains(err.Error(), "contexts")
 	})
 	for _, args := range [][]string{
-		{"config", "set", "internal.localhost.core", "x", "-g"},
+		{"config", "set", "internal.astro.localhost.core", "x", "-g"},
 		{"config", "get", "", "-g"},
 		{"config", "get", "xyzzy", "-g"},
 	} {

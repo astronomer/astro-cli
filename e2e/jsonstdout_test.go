@@ -278,9 +278,9 @@ func copyTree(t *testing.T, src, dst string) {
 // internal.localhost.platform: "cloud" for Astro, "software" for APC.
 //
 // The domain is "localhost" because it is the one domain whose API address the
-// config gives rather than the domain: internal.localhost.core_url for
-// Astro's, internal.localhost.houston_url for APC's. Any other would have the CLI look up api.<domain>, and a DNS
-// query is the network too.
+// config gives rather than the domain: internal.astro.localhost.core_url
+// for Astro's, internal.apc.localhost.houston_url for APC's. Any other would
+// have the CLI look up api.<domain>, and a DNS query is the network too.
 //
 // The login does not expire, so the pre-run takes it without renewing it, and
 // the command goes on to its request, which fails. A note printed along the
@@ -312,9 +312,13 @@ func writeHomeContext(t *testing.T, p *project, platform, login string) {
 	t.Helper()
 	cfg := fmt.Sprintf(`context: localhost
 internal:
+  astro:
+    localhost:
+      core_url: %[1]s
+  apc:
+    localhost:
+      houston_url: %[1]s/v1
   localhost:
-    core_url: %[1]s
-    houston_url: %[1]s/v1
     platform: %[2]s
 contexts:
   localhost:
