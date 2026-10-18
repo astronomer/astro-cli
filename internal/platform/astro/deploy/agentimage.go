@@ -19,7 +19,7 @@ const agentEnvVarPrefix = "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER"
 // errAgentImageInHostedDeploy refuses a Remote Execution agent image on the
 // hosted deploy, where it would run as the Deployment's scheduler and
 // crash-loop: the agent's entrypoint runs only its own components.
-var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Build it FROM an Astro Runtime image, or deploy an agent image with 'astro remote deploy'")
+var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Deploy an agent image with 'astro remote deploy'; for this Deployment, build FROM an Astro Runtime image, not the astro-remote-execution-agent one")
 
 // isAgentImage reports whether the image sets agentEnvVarPrefix, and whether
 // it could tell: a failed inspect is not a verdict either way, so neither
