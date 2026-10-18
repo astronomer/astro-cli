@@ -283,7 +283,7 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 
 // imageOnlyNeedsDagDeployMsg refuses --image to a Deployment with DAG deploys
 // off.
-const imageOnlyNeedsDagDeployMsg = "--image deploys the image and leaves the running DAGs in place, but astro deployment %[1]s has DAG deploys off, so its DAGs are the ones inside the image. Run 'astro deploy' without --image to deploy the image with the project's DAGs inside it, or enable DAG deploys with 'astro deployment update %[1]s --dag-deploy enable'"
+const imageOnlyNeedsDagDeployMsg = "--image deploys the image and leaves the running Dags in place, but astro deployment %[1]s has Dag deploys off, so its Dags are the ones inside the image. Run 'astro deploy' without --image to deploy the image with the project's Dags inside it, or enable Dag deploys with 'astro deployment update %[1]s --dag-deploy enable'"
 
 // dagsPlan is how a deploy's DAGs reach the Deployment.
 type dagsPlan struct {
@@ -327,7 +327,7 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, pod
 		warn = func(string) {}
 	}
 	if in.ImageName != "" {
-		warn(fmt.Sprintf("astro deployment %s has DAG deploys off, so it will run the DAGs inside %s; no DAGs are uploaded", in.DeploymentID, in.ImageName))
+		warn(fmt.Sprintf("astro deployment %s has Dag deploys off, so it will run the Dags inside %s; no Dags are uploaded", in.DeploymentID, in.ImageName))
 		return nil
 	}
 	survey := in.Survey
@@ -342,11 +342,11 @@ func checkDagsInImage(in *ManifestImageDeployInput, req *imagebuild.Request, pod
 		return nil
 	}
 	if req.FromDeclaredDockerfile() {
-		warn(fmt.Sprintf("astro deployment %s has DAG deploys off, so it will run only the DAGs inside the image, and the ignore file %s's build reads leaves out every DAG file under dags/. The Deployment will run whatever DAGs %s itself puts in the image",
+		warn(fmt.Sprintf("astro deployment %s has Dag deploys off, so it will run only the Dags inside the image, and the ignore file %s's build reads leaves out every Dag file under dags/. The Deployment will run whatever Dags %s itself puts in the image",
 			in.DeploymentID, in.Build.Dockerfile, in.Build.Dockerfile))
 		return nil
 	}
-	return fmt.Errorf("astro deployment %[1]s has DAG deploys off, so its DAGs have to be inside the image, but the project's .dockerignore leaves out every DAG file under dags/. Remove the rule that drops them, or enable DAG deploys with 'astro deployment update %[1]s --dag-deploy enable'", in.DeploymentID)
+	return fmt.Errorf("astro deployment %[1]s has Dag deploys off, so its Dags have to be inside the image, but the project's .dockerignore leaves out every Dag file under dags/. Remove the rule that drops them, or enable Dag deploys with 'astro deployment update %[1]s --dag-deploy enable'", in.DeploymentID)
 }
 
 // uploadDeployDags tars and uploads a project's dags/ directory to the
@@ -359,7 +359,7 @@ func uploadDeployDags(c *config.Context, projectDir, deploymentID string, dep *a
 		uploadURL = *created.DagsUploadUrl
 	}
 	if uploadURL == "" {
-		return "", errors.New("no DAG upload URL received from Astro")
+		return "", errors.New("no Dag upload URL received from Astro")
 	}
 	var deploymentType astrov1.DeploymentType
 	if dep.Type != nil {

@@ -74,7 +74,7 @@ func (t *MWAATarget) Build(_ context.Context, req Request, cb localrt.Callbacks)
 	}
 
 	checklist, err := envChecklist(m.Project.Name, m.Astro.Env,
-		"MWAA does not read this project's [tool.astro.env] section. Set these on the environment before your DAGs run.",
+		"MWAA does not read this project's [tool.astro.env] section. Set these on the environment before your Dags run.",
 		"Set plain values as Apache Airflow configuration options on the environment; add connections and variables through the Airflow UI or CLI.")
 	if err != nil {
 		return Result{}, fmt.Errorf("building the env checklist: %w", err)

@@ -41,7 +41,7 @@ func TestCheckPassesOnAScaffoldedProject(t *testing.T) {
 	if !strings.Contains(r.Stdout, "checks passed") {
 		t.Errorf("expected a passing summary\n%s", r.output())
 	}
-	if !strings.Contains(r.Stdout, "1 DAGs") {
+	if !strings.Contains(r.Stdout, "1 Dags") {
 		t.Errorf("expected the starter DAG to be counted\n%s", r.output())
 	}
 }

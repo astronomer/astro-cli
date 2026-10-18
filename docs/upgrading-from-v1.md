@@ -137,6 +137,7 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--non-dags-local-path` | the PATH argument of `astro deploy bundle` | `astro deploy` |
 | `--non-dags-mount-path` | `astro deploy bundle --mount-path` | `astro deploy` |
 | `--non-dags-bundle-type` | `astro deploy bundle --type` | `astro deploy` |
+| `--build-secrets` | `--build-secret`, repeated once for each secret | `astro deploy`, `astro remote deploy` |
 
 Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands and `astro env`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them.
 

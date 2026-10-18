@@ -1,10 +1,12 @@
 # Every visible flag on every visible, runnable command of Astro CLI 1.x
 # (main at 7aa23cdc), its own and those it inherits, the root's (--verbosity)
-# and --help left out. One line per flag: the trees that had it, the command
-# path without "astro", the flag, its shorthand, and bool when it took no
-# value (string otherwise). The trees are 1.x's Astro tree for a non-hosted
-# organization (astro) and a hosted one (astro-hosted), whose deployment
-# create and update had flags of their own, and its APC tree (apc).
+# and --help left out, plus --build-secrets, which 1.x still accepted, hidden
+# as deprecated, on every command that had --build-secret (#2212). One line
+# per flag: the trees that had it, the command path without "astro", the
+# flag, its shorthand, and bool when it took no value (string otherwise).
+# The trees are 1.x's Astro tree for a non-hosted organization (astro) and a
+# hosted one (astro-hosted), whose deployment create and update had flags of
+# their own, and its APC tree (apc).
 #
 # It records 1.x, so nothing in v2 changes it. The CLI embeds it: a flag v2
 # does not have is reported by what replaced it (removedFlags) only on a
@@ -126,6 +128,7 @@ astro,astro-hosted	dbt deploy	wait	w	bool
 astro,astro-hosted	dbt deploy	wait-time	t	string
 astro,astro-hosted	dbt deploy	workspace-id		string
 astro,astro-hosted	deploy	build-secret		string
+astro,astro-hosted	deploy	build-secrets		string
 astro,astro-hosted	deploy	dag-bundle-name		string
 astro,astro-hosted,apc	deploy	dags	d	bool
 astro,astro-hosted	deploy	dags-path		string
@@ -512,6 +515,7 @@ astro,astro-hosted,apc	dev bash	standalone		bool
 astro,astro-hosted,apc	dev bash	triggerer	t	bool
 astro,astro-hosted,apc	dev bash	webserver	w	bool
 astro,astro-hosted,apc	dev build	build-secret		string
+astro,astro-hosted,apc	dev build	build-secrets		string
 astro,astro-hosted,apc	dev build	docker		bool
 astro,astro-hosted,apc	dev build	image-name	i	string
 astro,astro-hosted,apc	dev build	no-cache		bool
@@ -553,6 +557,7 @@ astro,astro-hosted,apc	dev object import	settings-file	s	string
 astro,astro-hosted,apc	dev object import	standalone		bool
 astro,astro-hosted,apc	dev object import	variables	v	bool
 astro,astro-hosted,apc	dev parse	build-secret		string
+astro,astro-hosted,apc	dev parse	build-secrets		string
 astro,astro-hosted,apc	dev parse	docker		bool
 astro,astro-hosted,apc	dev parse	env	e	string
 astro,astro-hosted,apc	dev parse	image-name	i	string
@@ -568,11 +573,13 @@ astro,astro-hosted,apc	dev ps	standalone		bool
 astro,astro-hosted,apc	dev ps	template		string
 astro,astro-hosted,apc	dev pytest	args	a	string
 astro,astro-hosted,apc	dev pytest	build-secret		string
+astro,astro-hosted,apc	dev pytest	build-secrets		string
 astro,astro-hosted,apc	dev pytest	docker		bool
 astro,astro-hosted,apc	dev pytest	env	e	string
 astro,astro-hosted,apc	dev pytest	image-name	i	string
 astro,astro-hosted,apc	dev pytest	standalone		bool
 astro,astro-hosted,apc	dev restart	build-secret		string
+astro,astro-hosted,apc	dev restart	build-secrets		string
 astro,astro-hosted,apc	dev restart	deployment-id	d	string
 astro,astro-hosted,apc	dev restart	docker		bool
 astro,astro-hosted,apc	dev restart	env	e	string
@@ -589,6 +596,7 @@ astro,astro-hosted,apc	dev restart	workspace-id	w	string
 astro,astro-hosted,apc	dev run	docker		bool
 astro,astro-hosted,apc	dev run	standalone		bool
 astro,astro-hosted,apc	dev start	build-secret		string
+astro,astro-hosted,apc	dev start	build-secrets		string
 astro,astro-hosted,apc	dev start	compose-file		string
 astro,astro-hosted,apc	dev start	deployment-id	d	string
 astro,astro-hosted,apc	dev start	docker		bool
@@ -607,6 +615,7 @@ astro,astro-hosted,apc	dev stop	docker		bool
 astro,astro-hosted,apc	dev stop	standalone		bool
 astro,astro-hosted,apc	dev upgrade-test	airflow-version	a	string
 astro,astro-hosted,apc	dev upgrade-test	build-secret		string
+astro,astro-hosted,apc	dev upgrade-test	build-secrets		string
 astro,astro-hosted,apc	dev upgrade-test	dag-test	d	bool
 astro,astro-hosted,apc	dev upgrade-test	deployment-id	i	string
 astro,astro-hosted,apc	dev upgrade-test	docker		bool
@@ -862,6 +871,7 @@ astro,astro-hosted	organization user list	output	o	string
 astro,astro-hosted	organization user list	template		string
 astro,astro-hosted	organization user update	role	r	string
 astro,astro-hosted	remote deploy	build-secret		string
+astro,astro-hosted	remote deploy	build-secrets		string
 astro,astro-hosted	remote deploy	deployment-id		string
 astro,astro-hosted	remote deploy	image-name	i	string
 astro,astro-hosted	remote deploy	platform		string

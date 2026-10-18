@@ -166,7 +166,7 @@ func errDagsWithImageSource() error {
 	if imagePresentOnRemote {
 		passed = append(passed, "--remote")
 	}
-	return fmt.Errorf("--dags deploys only your DAGs; drop %s", strings.Join(passed, " and "))
+	return fmt.Errorf("--dags deploys only your Dags; drop %s", strings.Join(passed, " and "))
 }
 
 // The kinds of deploy deployJSON.Type names, spelled as astro deploy on Astro

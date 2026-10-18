@@ -13,7 +13,7 @@ import (
 // out the old ones from what it ships.
 const (
 	errDbtRemoved = "astro dbt was removed in Astro CLI v2: use astro deploy bundle, which deploys a dbt project " +
-		"(or any other non-DAG bundle) from its directory, and astro deploy bundle --delete, which removes one"
+		"(or any other non-Dag bundle) from its directory, and astro deploy bundle --delete, which removes one"
 	errDbtDeployRemoved = "astro dbt deploy was removed in Astro CLI v2: use astro deploy bundle [PATH] --deployment <Deployment id, name or link name>. " +
 		"PATH replaces --project-path, --deployment replaces the argument and --deployment-name, and --workspace replaces --workspace-id; " +
 		"--mount-path, --description, --wait and --wait-time are unchanged"

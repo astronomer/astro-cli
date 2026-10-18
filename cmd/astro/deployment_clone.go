@@ -21,7 +21,7 @@ import (
 // cloneSource is --clone: the Deployment id or name to copy.
 var cloneSource string
 
-const cloneFlagUsage = "Copy an existing Deployment, given by id or by name in the Workspace: its type, cluster or region, runtime version, executor, worker queues, resources, settings and plain environment variables. Not copied: secret environment variable values, a custom workload identity, Remote Execution agents, low latency, API server and event scheduler autoscaling, alerts, tokens, roles, and the image and DAGs. Takes --name, and optionally --workspace, --description and --wait"
+const cloneFlagUsage = "Copy an existing Deployment, given by id or by name in the Workspace: its type, cluster or region, runtime version, executor, worker queues, resources, settings and plain environment variables. Not copied: secret environment variable values, a custom workload identity, Remote Execution agents, low latency, API server and event scheduler autoscaling, alerts, tokens, roles, and the image and Dags. Takes --name, and optionally --workspace, --description and --wait"
 
 const deploymentCreateExample = `  # Create a Deployment in the current Workspace
   astro deployment create --name etl

@@ -54,17 +54,17 @@ func newDeployBundleCmd() *cobra.Command {
 	types := strings.Join(astrodeploy.BundleTypeNames(), ", ")
 	cmd := &cobra.Command{
 		Use:   manifestdeploy.BundleCommand + " [PATH]",
-		Short: "Deploy a non-DAG bundle (for example a dbt project) to a Deployment",
-		Long: "Deploy a non-DAG bundle (for example a dbt project) to a Deployment on Astro. " +
+		Short: "Deploy a non-Dag bundle (for example a dbt project) to a Deployment",
+		Long: "Deploy a non-Dag bundle (for example a dbt project) to a Deployment on Astro. " +
 			"The bundle is a directory of its own, outside any Astro project: PATH, or the current directory. " +
-			"It is uploaded as it is and mounted at --mount-path in Airflow, for your DAGs to read; it carries no DAGs. " +
+			"It is uploaded as it is and mounted at --mount-path in Airflow, for your Dags to read; it carries no Dags. " +
 			"With --delete it removes the bundle mounted at that path instead.\n\n" +
 			"A bundle's type decides its defaults. With no --type, the type is the first one PATH looks like (" + types + "), else none. " +
 			"A dbt project (a directory holding dbt_project.yml) mounts at " + astrodeploy.DbtDefaultMountPathPrefix + "<project name> unless --mount-path says otherwise. " +
 			"Any other --type is recorded as a label, with no defaults, so it needs --mount-path. " +
 			"With --delete and no bundle at PATH, a mount path below a type's default directory says the type.\n\n" +
 			"--deployment takes a link name of the project in the current directory, a Deployment id, or the name of a Deployment in the workspace. " +
-			"This deploys the bundle's files; astro deploy deploys the project and its DAGs. " +
+			"This deploys the bundle's files; astro deploy deploys the project and its Dags. " +
 			"To list or change the bundles a Deployment has registered, use astro deployment bundle. " +
 			"A project link called bundle is not reachable as astro deploy bundle: deploy the project to it with astro deploy --deployment bundle.",
 		Args: cobra.MaximumNArgs(1),
@@ -136,7 +136,7 @@ func deployBundle(cmd *cobra.Command, out io.Writer, path string, o *deployBundl
 	// The walk every deploy decides by: a pyproject.toml project or a 1.x one
 	// at or above the bundle path.
 	if !utils.Locate(path).None() {
-		return fmt.Errorf("bundle path %s is within an Astro project: a non-DAG bundle is a directory of its own. To deploy the project, run astro deploy", path)
+		return fmt.Errorf("bundle path %s is within an Astro project: a non-Dag bundle is a directory of its own. To deploy the project, run astro deploy", path)
 	}
 	b, err := resolveBundle(cmd, path, o)
 	if err != nil {
