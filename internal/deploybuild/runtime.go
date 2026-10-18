@@ -210,6 +210,35 @@ func (p *Plan) CheckBuiltListed(currentVersion, built string, listed []string) (
 	return checkListed(currentVersion, built, listed, p.raise)
 }
 
+// CheckPrebuiltListed holds a prebuilt image's runtime (its label, or the
+// version given for an image already in a registry) to an Astro Private
+// Cloud Deployment more loosely than CheckBuiltListed holds a build. Only a
+// downgrade is refused, as Houston refuses one. An Airflow 3 runtime where the
+// platform lists no Airflow 3 build, and one newer than the newest it lists,
+// are warned of and deployed: the list can stop below what Houston takes
+// (houston-api validateRuntimeVersionForUpdateImage's ceiling includes
+// Airflow 3), and Astro CLI 1.x deployed a prebuilt image whatever it
+// carried, asking first at most. Any other unlisted runtime is warned of as
+// CheckBuiltListed warns of it.
+func (p *Plan) CheckPrebuiltListed(currentVersion, tag string, listed []string) (warning string, err error) {
+	if currentVersion != "" && airflowversions.CompareRuntimeVersions(tag, currentVersion) < 0 {
+		return "", downgradeError(tag, currentVersion, p.raise)
+	}
+	if len(listed) == 0 || slices.ContainsFunc(listed, func(v string) bool { return airflowversions.CompareRuntimeVersions(tag, v) == 0 }) {
+		return "", nil
+	}
+	const deploys = ". It deploys anyway, as a prebuilt image always has: if the platform does not take the runtime, it refuses the image or drops it"
+	if err := airflow3NotListed(tag, listed); err != nil {
+		return fmt.Sprintf("Astro Runtime %s is Airflow 3, and the platform lists no Airflow 3 build for this Deployment (it lists %s), so Airflow 3 may not be enabled for it%s",
+			tag, strings.Join(listed, ", "), deploys), nil
+	}
+	if newest := slices.MaxFunc(listed, airflowversions.CompareRuntimeVersions); airflowversions.CompareRuntimeVersions(tag, newest) > 0 {
+		return fmt.Sprintf("Astro Runtime %s is newer than the newest the platform lists for this Deployment, %s (it lists %s)%s",
+			tag, newest, strings.Join(listed, ", "), deploys), nil
+	}
+	return checkListed(currentVersion, tag, listed, p.raise)
+}
+
 func checkListed(currentVersion, tag string, listed []string, raise func(string) string) (warning string, err error) {
 	if currentVersion != "" && airflowversions.CompareRuntimeVersions(tag, currentVersion) < 0 {
 		return "", downgradeError(tag, currentVersion, raise)

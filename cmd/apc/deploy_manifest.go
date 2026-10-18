@@ -114,6 +114,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		ImageAlone:   m == nil,
 		Description:  description,
 		Interactive:  interactive,
+		Prompt:       deployPrompt,
 		BuildSecrets: util.ResolveProjectBuildSecrets(deploySecrets, buildSecretSpecs(m)),
 		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)

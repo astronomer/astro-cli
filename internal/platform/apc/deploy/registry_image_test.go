@@ -55,10 +55,11 @@ func TestDeployRegistryImage(t *testing.T) {
 	client.AssertExpectations(t)
 }
 
-// --runtime-version is held to the rules an image's label is, before the
-// mutation: a downgrade, Airflow 3 where it is not enabled and a runtime
-// newer than the newest listed are refused, and nothing is sent; an
-// unlisted runtime and an Airflow 2 to 3 upgrade deploy, warned of.
+// --runtime-version is held to the rules a prebuilt image's label is, before
+// the mutation: a downgrade is refused, as Houston refuses one, and nothing
+// is sent; Airflow 3 where the platform lists none, a runtime newer than the
+// newest listed, any other unlisted runtime and an Airflow 2 to 3 upgrade
+// deploy, warned of.
 func TestDeployRegistryImageRuntimeRules(t *testing.T) {
 	for _, tc := range []struct {
 		name, runtime, current string
@@ -67,8 +68,8 @@ func TestDeployRegistryImageRuntimeRules(t *testing.T) {
 	}{
 		{name: "a downgrade", runtime: "3.0-9", current: "3.1-5", listed: houstonLists, wantErr: "cannot deploy Astro Runtime 3.0-9: it is a downgrade from the deployment's current 3.1-5; to deploy, rebuild quay.example.com/team/airflow:v9 FROM Astro Runtime 3.1-5 or newer"},
 		{name: "Airflow 3 to 2", runtime: "12.1.1", current: "3.0-9", listed: houstonLists, wantErr: "cannot deploy Astro Runtime 12.1.1: it is a downgrade from the deployment's current 3.0-9"},
-		{name: "Airflow 3 not enabled", runtime: "3.1-5", current: "12.1.1", listed: airflow2Only, wantErr: "cannot deploy Astro Runtime 3.1-5: Airflow 3 is not enabled for this Deployment"},
-		{name: "newer than listed", runtime: "3.2-1", current: "3.0-9", listed: houstonLists, wantErr: "cannot deploy Astro Runtime 3.2-1: it is newer than the newest the platform lists for this Deployment, 3.1-5"},
+		{name: "Airflow 3 not listed", runtime: "3.1-5", current: "12.1.1", listed: airflow2Only, wantWarning: "Astro Runtime 3.1-5 is Airflow 3, and the platform lists no Airflow 3 build for this Deployment (it lists 12.1.1), so Airflow 3 may not be enabled for it. It deploys anyway"},
+		{name: "newer than listed", runtime: "3.2-1", current: "3.0-9", listed: houstonLists, wantWarning: "Astro Runtime 3.2-1 is newer than the newest the platform lists for this Deployment, 3.1-5 (it lists 3.1-5, 3.0-9, 12.1.1). It deploys anyway"},
 		{name: "unlisted", runtime: "3.1-4", current: "3.0-9", listed: houstonLists, wantWarning: "Astro Runtime 3.1-4 is not one the platform lists for this Deployment"},
 		{name: "Airflow 2 to 3", runtime: "3.1-5", current: "12.1.1", listed: houstonLists, wantWarning: "this deploy upgrades Deployment dep from Airflow 2 to Airflow 3 (Astro Runtime 12.1.1 to 3.1-5)"},
 	} {
@@ -88,7 +89,7 @@ func TestDeployRegistryImageRuntimeRules(t *testing.T) {
 			res, err := DeployManifestImage(client, registryImage(t, tc.runtime, &warnings))
 			require.NoError(t, err)
 			assert.Equal(t, tc.runtime, res.RuntimeVersion)
-			require.Len(t, warnings, 1)
+			require.NotEmpty(t, warnings)
 			assert.Contains(t, warnings[0], tc.wantWarning)
 			client.AssertExpectations(t)
 		})

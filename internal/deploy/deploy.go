@@ -87,6 +87,11 @@ type Request struct {
 	// (stdin is a TTY, and the output is not json). A run that cannot be asked
 	// must name its target on the command line.
 	Interactive bool
+	// Prompt asks which deployment to ship to even when one is named, with
+	// the one named preselected (Astro Private Cloud's --prompt, as Astro CLI
+	// 1.x had it). It applies only to a run that may ask: one that cannot
+	// ships to the one named, or is refused for naming none, as without it.
+	Prompt bool
 	// Announce runs once the target is settled and before anything is built or
 	// uploaded. It is how "building your project image" lands after the
 	// question rather than before it: a deploy refused at the prompt says
@@ -522,6 +527,9 @@ type Choice struct {
 	// Unlinked marks a Deployment the project does not link yet: picking it
 	// links it.
 	Unlinked bool
+	// Preselected marks the entry the prompt starts on, in place of the
+	// default link: the one a --prompt deploy named.
+	Preselected bool
 }
 
 // Deployment is an Astro Deployment as a workspace lists it.
@@ -550,6 +558,12 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		links = req.Manifest.Astro.Deployments
 	}
 
+	named := firstNonEmpty(req.LinkName, req.Deployment)
+	if req.Prompt && req.Interactive {
+		if target, asked, err := promptTarget(req, d, links, named); asked || err != nil {
+			return target, err
+		}
+	}
 	if target, named, err := resolveNamed(req, links); named || err != nil {
 		return target, err
 	}
@@ -602,6 +616,68 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 		return linkedTarget(req, name, dep), nil
 	}
 	return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
+}
+
+// promptTarget asks which deployment to ship to, as an interactive deploy
+// that names none is asked, though one is named (--prompt): the project's
+// deployable links, then the workspace's Deployments no link names, starting
+// on the one named, whether as a link name or as the id a choice points at,
+// else on the default link. asked is false when there is nothing to offer
+// (no links this command ships to, and no workspace Deployments listed): the
+// deploy then resolves as it would without --prompt.
+func promptTarget(req Request, d Deployer, links map[string]manifest.Link, named string) (target Target, asked bool, err error) {
+	if req.LinkName != "" && req.Deployment != "" && req.LinkName != req.Deployment {
+		return Target{}, true, fmt.Errorf("this deploy names two targets, %q and --deployment %q: name one", req.LinkName, req.Deployment)
+	}
+	deployable := linkNames(links, req.deploysTo)
+	where := string(req.platform()) + " deployment "
+	choices := make([]Choice, 0, len(deployable))
+	for _, name := range linksFirst(deployable, links) {
+		choices = append(choices, Choice{Name: name, Where: where + links[name].Deployment})
+	}
+	unlinked := unlinkedDeployments(req, d, links)
+	for _, name := range unlinked.names {
+		choices = append(choices, Choice{Name: name, Where: where + unlinked.byName[name].ID, Unlinked: true})
+	}
+	if len(choices) == 0 {
+		return Target{}, false, nil
+	}
+	preselect(choices, named)
+	name, err := d.ConfirmTarget(choices, defaultLink(links, deployable))
+	if err != nil {
+		return Target{}, true, err
+	}
+	if name == "" {
+		return Target{}, true, ErrAborted
+	}
+	if link, ok := links[name]; ok {
+		target, err := linkTarget(req, name, link, links)
+		return target, true, err
+	}
+	if dep, ok := unlinked.byName[name]; ok {
+		return linkedTarget(req, name, dep), true, nil
+	}
+	return Target{}, true, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
+}
+
+// preselect marks the choice named, as a link name or by the id it points
+// at, as the one the prompt starts on. Nothing is marked when none is.
+func preselect(choices []Choice, named string) {
+	if named == "" {
+		return
+	}
+	for i := range choices {
+		if choices[i].Name == named {
+			choices[i].Preselected = true
+			return
+		}
+	}
+	for i := range choices {
+		if strings.HasSuffix(choices[i].Where, " "+named) {
+			choices[i].Preselected = true
+			return
+		}
+	}
 }
 
 // linksFirst orders the project's links for the prompt: the manifest's default

@@ -165,11 +165,12 @@ func TestDeployPrebuiltImageBelow1(t *testing.T) {
 	assert.True(t, cmd.called("docker push registry."+c.Domain+"/my-release/airflow:deploy-7"), "%v", cmd.calls)
 }
 
-// A prebuilt image is held to the rules a built one is, on its label, before
-// anything is pushed: a downgrade, Airflow 3 where it is not enabled, and a
-// runtime newer than the newest listed are refused, naming the image to
-// rebuild; an unlisted runtime no newer than the newest deploys, warned of;
-// and an image with no runtime label is not an Astro Runtime image.
+// A prebuilt image is held to its label before anything is pushed: a
+// downgrade is refused, as Houston refuses one, naming the image to rebuild.
+// Airflow 3 where the platform lists none, a runtime newer than the newest
+// listed, and any other unlisted runtime deploy, warned of: the platform may
+// take a runtime its list does not hold, where a build is refused. An image
+// with no runtime label is not an Astro Runtime image.
 func TestDeployPrebuiltImageRuntimeRules(t *testing.T) {
 	for _, tc := range []struct {
 		name, label, current string
@@ -177,8 +178,8 @@ func TestDeployPrebuiltImageRuntimeRules(t *testing.T) {
 		wantErr, wantWarning string
 	}{
 		{name: "a downgrade", label: "3.0-9", current: "3.1-5", listed: houstonLists, wantErr: "cannot deploy Astro Runtime 3.0-9: it is a downgrade from the deployment's current 3.1-5; to deploy, rebuild my-image:v7 FROM Astro Runtime 3.1-5 or newer"},
-		{name: "Airflow 3 not enabled", label: "3.1-5", current: "12.1.1", listed: airflow2Only, wantErr: "cannot deploy Astro Runtime 3.1-5: Airflow 3 is not enabled for this Deployment"},
-		{name: "newer than listed", label: "3.2-1", current: "3.0-9", listed: houstonLists, wantErr: "cannot deploy Astro Runtime 3.2-1: it is newer than the newest the platform lists for this Deployment, 3.1-5"},
+		{name: "Airflow 3 not listed", label: "3.1-5", current: "12.1.1", listed: airflow2Only, wantWarning: "Astro Runtime 3.1-5 is Airflow 3, and the platform lists no Airflow 3 build for this Deployment (it lists 12.1.1), so Airflow 3 may not be enabled for it. It deploys anyway"},
+		{name: "newer than listed", label: "3.2-1", current: "3.0-9", listed: houstonLists, wantWarning: "Astro Runtime 3.2-1 is newer than the newest the platform lists for this Deployment, 3.1-5 (it lists 3.1-5, 3.0-9, 12.1.1). It deploys anyway"},
 		{name: "no runtime label", label: "", current: "3.0-9", listed: houstonLists, wantErr: `image "my-image:v7" is not based on Astro Runtime`},
 		{name: "unlisted", label: "3.1-4", current: "3.0-9", listed: houstonLists, wantWarning: "Astro Runtime 3.1-4 is not one the platform lists for this Deployment"},
 	} {
@@ -195,7 +196,7 @@ func TestDeployPrebuiltImageRuntimeRules(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Len(t, warnings, 1)
+			require.NotEmpty(t, warnings)
 			assert.Contains(t, warnings[0], tc.wantWarning)
 			assert.True(t, cmd.called(" push "))
 		})

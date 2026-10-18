@@ -3,6 +3,8 @@ package apc
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,6 +105,22 @@ const deployWorkspace = "ck05r3bor07h40d02y2hw4n4v"
 // type typ, read with its type or not (as before 0.29.0).
 func dagsDeployment(typ string, read bool) *houston.Deployment {
 	return &houston.Deployment{ID: "dep-ac", ReleaseName: "rel-ac", ClusterID: "cl-1", RuntimeVersion: "12.0.0", DagDeployment: houston.DagDeploymentConfig{Type: typ}, DagDeploymentRead: read}
+}
+
+// noDagUploads is dep with its DAG uploads pointed at a server on this machine that
+// fails the test on any request, and answers it at once: a deploy that
+// uploads where it must not fails fast, rather than reaching for a DAG
+// server it derives from the context's domain.
+func noDagUploads(t *testing.T, dep *houston.Deployment) *houston.Deployment {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected DAG upload: %s %s", r.Method, r.URL)
+		w.WriteHeader(http.StatusTeapot)
+	}))
+	t.Cleanup(server.Close)
+	copied := *dep
+	copied.Urls = append(append([]houston.DeploymentURL(nil), dep.Urls...), houston.DeploymentURL{Type: houston.DagServerURLType, URL: server.URL})
+	return &copied
 }
 
 // takesDagUploads is the cluster config of a cluster with DAG-only deploys.
@@ -360,7 +378,7 @@ func TestDeployRemoteDagsJSON(t *testing.T) {
 				if cfgs == nil {
 					cfgs = []func() (*houston.AppConfig, error){cfgOf(takesDagUploads)}
 				}
-				api := dagsAPI(tc.dep, cfgs...)
+				api := dagsAPI(noDagUploads(t, tc.dep), cfgs...)
 				if quiet {
 					quietFromTheStart(t, api)
 				}
@@ -405,7 +423,7 @@ func TestDeployRemoteOutsideAProjectShipsTheImageAlone(t *testing.T) {
 				inWorkingDir(t, true)
 				realImageDeploy(t)
 				uploads := realDagsOnlyDeploy(t)
-				api := dagsAPI(tc.dep, tc.cfg)
+				api := dagsAPI(noDagUploads(t, tc.dep), tc.cfg)
 				if quiet {
 					quietFromTheStart(t, api)
 				}
@@ -432,4 +450,33 @@ func TestDeployRemoteHoldsItsRuntimeToThePlatformsRules(t *testing.T) {
 	require.Equal(t, 1, run.code, "stderr:\n%s", run.stderr)
 	assert.Contains(t, run.stdout, "cannot deploy Astro Runtime 11.0.0: it is a downgrade from the deployment's current 12.0.0; to deploy, rebuild img:1 FROM Astro Runtime 12.0.0 or newer")
 	api.AssertNotCalled(t, "UpdateDeploymentImage", mock.Anything)
+}
+
+// A runtime --runtime-version names that the platform lists nothing as new
+// as, or no Airflow 3 build of, is warned of and deployed: the platform may
+// take it. The warning is on stderr and in the result under json, and with
+// the progress on stdout in text.
+func TestDeployRemoteWarnsOfARuntimeThePlatformDoesNotList(t *testing.T) {
+	for _, tc := range []struct{ runtime, says string }{
+		{"12.2.0", "Astro Runtime 12.2.0 is newer than the newest the platform lists for this Deployment, 12.1.1"},
+		{"3.1-5", "Astro Runtime 3.1-5 is Airflow 3, and the platform lists no Airflow 3 build for this Deployment"},
+	} {
+		t.Run(tc.runtime, func(t *testing.T) {
+			inProject(t, true)
+			realImageDeploy(t)
+			api := dagsAPI(noDagUploads(t, dagsDeployment(houston.ImageDeploymentType, true)), cfgOf(takesDagUploads))
+			run := runAPC(t, api, "", "deploy", "dep-ac", "--image-name", "img:1", "--remote", "--runtime-version", tc.runtime, "-o", "json")
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			api.AssertCalled(t, "UpdateDeploymentImage", mock.Anything)
+			var got deployJSON
+			decodeOne(t, run.stdout, &got)
+			require.NotEmpty(t, got.Warnings)
+			assert.Contains(t, got.Warnings[0], tc.says)
+			assert.Contains(t, run.stderr, "Warning: "+tc.says)
+
+			run = runAPC(t, api, "", "deploy", "dep-ac", "--image-name", "img:1", "--remote", "--runtime-version", tc.runtime)
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			assert.Contains(t, run.stdout, "Warning: "+tc.says)
+		})
+	}
 }

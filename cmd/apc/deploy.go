@@ -63,14 +63,14 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 		Example: deployExample,
 	}
 	// --force answered 1.x's uncommitted-changes check, which v2's deploy
-	// does not make, and --prompt asked for the Deployment list with one
-	// named, which v2 offers whenever none is: to be asked, name none. Both
-	// stay, accepted, hidden and read by nothing, as on Astro, because
-	// astronomer/deploy-action passes --force on every deploy.
+	// does not make. It stays, accepted, hidden and read by nothing, as on
+	// Astro, because astronomer/deploy-action passes --force on every deploy.
 	cmd.Flags().BoolVarP(&deployForce, "force", "f", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
-	cmd.Flags().BoolVarP(&deployPrompt, "prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
-	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
+	// --prompt asks for the Deployment list with one named, as 1.x's did, the
+	// one named preselected. It is shown, as it does something here; a run
+	// that cannot ask deploys to the one named.
+	cmd.Flags().BoolVarP(&deployPrompt, "prompt", "p", false, "Ask which Deployment to deploy to even when one is named, starting on it. A run that cannot ask deploys to the one named")
 	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	cmd.Flags().StringVar(&workspaceFlag, "workspace", "", "Workspace for the deploy, overriding the context")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace assigned to the Deployment")

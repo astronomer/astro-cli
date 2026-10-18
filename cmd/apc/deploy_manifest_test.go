@@ -3,6 +3,7 @@ package apc
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -253,20 +254,27 @@ func TestDeployManifestWarnings(t *testing.T) {
 	assert.Contains(t, run.stderr, "Warning: this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3")
 }
 
-// --force and --prompt answered 1.x's questions, which a project's deploy
-// does not ask: accepted, so deploy-action keeps working, hidden, and read
-// by nothing.
+// --force answered 1.x's uncommitted-changes question, which a project's
+// deploy does not ask: accepted, so deploy-action keeps working, hidden, and
+// read by nothing. --prompt does what 1.x's did, so it is shown; a run that
+// cannot ask, as this one cannot, deploys to the one named.
 func TestDeployManifestTakesForceAndPrompt(t *testing.T) {
 	linkedProject(t)
 	asked := manifestDeploys(t, builtAndPushed)
 	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--force", "-p", "-o", "json")
 	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	assert.Len(t, *asked, 1)
+	require.Len(t, *asked, 1)
+	assert.Equal(t, "dep-prod", (*asked)[0].DeploymentID)
+
+	run = runAPC(t, newAPCClient(), "", "deploy", "--prompt", "-o", "json")
+	require.Equal(t, 1, run.code)
+	assert.Contains(t, run.stdout, "input_required", "naming none still cannot be answered without a question")
 
 	cmd := NewDeployCmd(os.Stdout)
-	for _, name := range []string{"force", "prompt", "workspace-id"} {
+	for _, name := range []string{"force", "workspace-id"} {
 		assert.True(t, cmd.Flags().Lookup(name).Hidden, name)
 	}
+	assert.False(t, cmd.Flags().Lookup("prompt").Hidden, "prompt")
 	for _, name := range []string{"save", "no-cache", "wait"} {
 		assert.Nil(t, cmd.Flags().Lookup(name), name)
 	}
@@ -312,4 +320,54 @@ func TestDeployManifestRefusesDagsWithImage(t *testing.T) {
 	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--dags", "--image", "-o", "json")
 	assert.Equal(t, 2, run.code)
 	assert.True(t, cliout.IsUsage(run.err))
+}
+
+// asking is a terminal for one test: the deploy may ask.
+func asking(t *testing.T) {
+	t.Helper()
+	prev := stdinIsTerminal
+	stdinIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stdinIsTerminal = prev })
+}
+
+// --prompt asks, as 1.x's did, though a Deployment is named: the list starts
+// on the one named, as a link or by its id, and Enter takes it; another may
+// be picked instead. A prebuilt image's deploy asks the same way, from a
+// project and from outside one, where the list is the workspace's.
+func TestDeployPromptAsksThoughOneIsNamed(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		setup   func(t *testing.T) string
+		args    []string
+		answer  string
+		want    string
+		started string
+	}{
+		{"a link named", linkedProject, []string{"deploy", "stage", "--prompt"}, "\n", "dep-stage", "stage"},
+		{"a link named by --deployment", linkedProject, []string{"deploy", "--deployment", "stage", "-p"}, "\n", "dep-stage", "stage"},
+		{"a link's id named", linkedProject, []string{"deploy", "dep-stage", "--prompt"}, "\n", "dep-stage", "stage"},
+		{"another picked", linkedProject, []string{"deploy", "stage", "--prompt"}, "prod\n", "dep-prod", "stage"},
+		{"nothing named starts on the default", linkedProject, []string{"deploy", "--prompt"}, "\n", "dep-prod", "prod"},
+		{"--image-name --remote", linkedProject, []string{"deploy", "stage", "--prompt", "--image-name", "q/img:1", "--remote", "--runtime-version", "3.1-5"}, "\n", "dep-stage", "stage"},
+		{"--image-name outside a project, by id", func(t *testing.T) string { return inWorkingDir(t, true) }, []string{"deploy", "dep-new", "--prompt", "--image-name", "img:1"}, "\n", "dep-new", "new-one"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.setup(t)
+			asking(t)
+			asked := manifestDeploys(t, builtAndPushed)
+			api := newAPCClient()
+			api.On("ListDeployments", houston.ListDeploymentsRequest{WorkspaceID: "ck05r3bor07h40d02y2hw4n4v"}).Return([]houston.Deployment{
+				{ID: "dep-old", Label: "Old One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
+				{ID: "dep-new", Label: "New One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
+			}, nil)
+			run := runAPC(t, api, tc.answer, tc.args...)
+			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+			assert.True(t, run.stdinRead, "it asked")
+			require.Len(t, *asked, 1)
+			assert.Equal(t, tc.want, (*asked)[0].DeploymentID)
+			row := regexp.MustCompile(`(\d+)\s+` + tc.started + `\s`).FindStringSubmatch(run.stderr)
+			require.Len(t, row, 2, "%s is offered:\n%s", tc.started, run.stderr)
+			assert.Contains(t, run.stderr, "> ["+row[1]+"]", "the list starts on %s", tc.started)
+		})
+	}
 }

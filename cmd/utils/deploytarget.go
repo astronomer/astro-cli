@@ -39,6 +39,9 @@ func OnceEngine(resolve func() (string, []string, error)) func() (string, []stri
 // picking would link. The words are the ones `astro use` and the `astro link`
 // pickers mark the default with.
 //
+// A choice marked Preselected (the Deployment a --prompt deploy named) is
+// highlighted in the default link's place; the default keeps its mark.
+//
 // It takes a name or a number, names first: a link may legally be called "2",
 // and what the user typed is what they meant. Enter takes the highlighted entry
 // when there is one. With nothing highlighted there is no default on Enter: the
@@ -75,12 +78,18 @@ func ConfirmDeployTarget(choices []manifestdeploy.Choice, defaultLink string, in
 		ByName:  true,
 		Ended:   input.Required(errors.New("a deploy must name the deployment it ships to: astro deploy <name> or --deployment <name>")),
 	}
+	start := defaultLink
+	for _, choice := range choices {
+		if choice.Preselected {
+			start = choice.Name
+		}
+	}
 	for i, choice := range choices {
 		cells := []string{choice.Name, choice.Where}
 		if anyNote {
 			cells = append(cells, notes[i])
 		}
-		chosen := defaultLink != "" && choice.Name == defaultLink
+		chosen := start != "" && choice.Name == start
 		if chosen {
 			l.Default = i + 1
 		}

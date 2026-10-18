@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -168,7 +169,7 @@ func DeployManifestImage(client houston.ClientInterface, in *ManifestImage) (Man
 	// container engine to be told so.
 	t, err := lookUpManifestTarget(client, in.WorkspaceID, in.DeploymentID)
 	if err != nil {
-		return ManifestImageResult{}, err
+		return ManifestImageResult{}, hintLinkOutsideAProject(in, err)
 	}
 	if err := refuseImageOnly(in, t); err != nil {
 		return ManifestImageResult{}, err
@@ -257,12 +258,19 @@ func manifestDeployImage(ctx context.Context, in *ManifestImage, req *imagebuild
 }
 
 // checkRuntime holds the runtime the image carries to what Houston refuses
-// of it after the push (deploybuild's CheckBuiltListed: a downgrade, Airflow
-// 3 where it is not enabled, a runtime newer than the newest listed), warns
-// of one the platform does not list and of an Airflow 2 to 3 upgrade, and
-// reports the upgrade.
+// of it after the push, and reports an Airflow 2 to 3 upgrade, which it warns
+// of. A build is held to deploybuild's CheckBuiltListed: a downgrade, Airflow
+// 3 where the platform lists none, and a runtime newer than the newest
+// listed are refused, and any other runtime the platform does not list is
+// warned of. A prebuilt image (ImageName, local or in a registry) is held to
+// CheckPrebuiltListed, which refuses only the downgrade and warns of the
+// rest: its runtime is what it is, and the platform may take it.
 func checkRuntime(in *ManifestImage, planned *deploybuild.Plan, current, runtimeVersion string, allowed []string, warn func(string)) (upgrade bool, err error) {
-	unlisted, err := planned.CheckBuiltListed(current, runtimeVersion, allowed)
+	check := planned.CheckBuiltListed
+	if in.ImageName != "" {
+		check = planned.CheckPrebuiltListed
+	}
+	unlisted, err := check(current, runtimeVersion, allowed)
 	if err != nil {
 		return false, err
 	}
@@ -436,6 +444,30 @@ func lookUpManifestTarget(client houston.ClientInterface, wsID, deploymentID str
 	return t, nil
 }
 
+// notInWorkspaceError is a deploy to a Deployment the workspace does not
+// hold.
+type notInWorkspaceError struct{ deployment, workspace string }
+
+func (e *notInWorkspaceError) Error() string {
+	return fmt.Sprintf("no Deployment %s in workspace %s: name a Deployment of the workspace, or the workspace it is in with --workspace", e.deployment, e.workspace)
+}
+
+// houstonID is the shape of a Houston id: a cuid, "c" and 24 more lowercase
+// letters and digits.
+var houstonID = regexp.MustCompile(`^c[a-z0-9]{24}$`)
+
+// hintLinkOutsideAProject adds to a Deployment the workspace does not hold,
+// named from outside any project in a shape no Houston id has, that it was
+// read as an id: there are no links to resolve without a project, so a link
+// name works only from the project's directory.
+func hintLinkOutsideAProject(in *ManifestImage, err error) error {
+	var notIn *notInWorkspaceError
+	if !in.ImageAlone || !errors.As(err, &notIn) || houstonID.MatchString(in.DeploymentID) {
+		return err
+	}
+	return fmt.Errorf("%w. %q is not shaped like a Deployment id: outside a pyproject.toml project there are no links, so a link name resolves only when the deploy runs from the project's directory", err, in.DeploymentID)
+}
+
 // lookUpDeployment reads what every image deploy needs of its Deployment:
 // that it is in the workspace, its release name and next registry tag, and
 // the Deployment itself, with the workspace Houston places it in.
@@ -445,7 +477,7 @@ func lookUpDeployment(client houston.ClientInterface, wsID, deploymentID string)
 	}
 	deployments, err := workspaceDeployments(client, wsID, deploymentID)
 	if errors.Is(err, errInvalidDeploymentID) {
-		return nil, fmt.Errorf("no Deployment %s in workspace %s: name a Deployment of the workspace, or the workspace it is in with --workspace", deploymentID, wsID)
+		return nil, &notInWorkspaceError{deployment: deploymentID, workspace: wsID}
 	}
 	if err != nil {
 		return nil, err

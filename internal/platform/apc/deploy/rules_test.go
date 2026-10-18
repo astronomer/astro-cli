@@ -66,3 +66,45 @@ func TestWorkspaceDeployments(t *testing.T) {
 	_, err = workspaceDeployments(failing, "ws", "dep")
 	assert.ErrorIs(t, err, errMockHouston)
 }
+
+// From outside any project a name is read as a Deployment id, as there are no
+// links: one the workspace does not hold, in no shape a Houston id has, says
+// a link name resolves only from the project's directory. An id-shaped one,
+// and any from a project, is told only that the workspace does not hold it.
+func TestALinkNameOutsideAProjectIsHinted(t *testing.T) {
+	const hint = "outside a pyproject.toml project there are no links, so a link name resolves only when the deploy runs from the project's directory"
+	for _, tc := range []struct {
+		name  string
+		id    string
+		alone bool
+		hint  bool
+	}{
+		{"a link name outside a project", "prod", true, true},
+		{"an id outside a project", "ckn4phn1k0104v5xtrer5lpli", true, false},
+		{"a link name from a project", "prod", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, remote := range []bool{false, true} {
+				withManifestEngine(t, "3.1-5")
+				client := (&apcTarget{dagType: houston.ImageDeploymentType, current: "3.1-5", listed: houstonLists, version: "1.0.0"}).client(t)
+				var warnings []string
+				in := prebuiltFor(t, "my-image:v7", &warnings)
+				if remote {
+					in.InRegistry, in.RuntimeVersion = true, "3.1-5"
+				}
+				in.DeploymentID = tc.id
+				if tc.alone {
+					in.IncludeDags, in.ImageAlone = false, true
+				}
+				_, err := DeployManifestImage(client, in)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "no Deployment "+tc.id+" in workspace ws", "remote=%v", remote)
+				if tc.hint {
+					assert.Contains(t, err.Error(), hint, "remote=%v", remote)
+				} else {
+					assert.NotContains(t, err.Error(), hint, "remote=%v", remote)
+				}
+			}
+		})
+	}
+}

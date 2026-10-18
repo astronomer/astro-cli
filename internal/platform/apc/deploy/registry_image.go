@@ -45,7 +45,7 @@ func deployRegistryImage(client houston.ClientInterface, in *ManifestImage, prog
 	}
 	t, err := lookUpDeployment(client, in.WorkspaceID, in.DeploymentID)
 	if err != nil {
-		return ManifestImageResult{}, err
+		return ManifestImageResult{}, hintLinkOutsideAProject(in, err)
 	}
 	t.appConfig, err = houston.Call(client.GetAppConfig)(houston.GetAppConfigRequest{ClusterID: t.info.ClusterID, WorkspaceUUID: t.workspace, DeploymentUUID: in.DeploymentID})
 	if err != nil {
