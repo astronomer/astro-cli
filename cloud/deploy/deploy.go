@@ -47,6 +47,15 @@ const (
 	warningInvalidImageNameMsg         = "WARNING! The image in your Dockerfile '%s' is not based on Astro Runtime and is not supported. Change your Dockerfile with an image that pulls from 'quay.io/astronomer/astro-runtime' to proceed.\n"
 	warningInvalidPrebuiltImageNameMsg = "WARNING! The image '%s' does not appear to be based on Astro Runtime (the '%s' label is missing). Ensure your image is built FROM quay.io/astronomer/astro-runtime to proceed.\n"
 
+	// agentEnvVarPrefix starts an environment variable that the Remote
+	// Execution agent image sets and an Astro Runtime image does not: the
+	// agent image is built FROM a Runtime image and adds no label of its own,
+	// so its ENV lines are what tell the two apart (astro-agent's
+	// packages/astro-agent-client/image/Dockerfile*).
+	agentEnvVarPrefix = "ASTRO_AGENT_CLIENT_PROCESS_SPAWNER"
+
+	warningNonAgentImageInClientDeployMsg = "WARNING! The client image does not look like a Remote Execution agent image: it sets no %s* environment variable. Check that Dockerfile.client builds FROM an astro-remote-execution-agent image.\n"
+
 	allTests                 = "all-tests"
 	parseAndPytest           = "parse-and-all-tests"
 	enableDagDeployMsg       = "Dag-only deploys are not enabled for this Deployment. Run 'astro deployment update %s --dag-deploy enable' to enable Dag-only deploys"
@@ -427,6 +436,12 @@ func Deploy(deployInput InputDeploy, astroV1Client astrov1.APIClient, astroV1Alp
 		if err != nil {
 			return err
 		}
+		// Here, not in buildImage: this is the image that ships. A --dags
+		// --pytest deploy builds one only to test in, which an agent image,
+		// built FROM Runtime, does as well as any.
+		if err := refuseAgentImage(airflowImageHandler(deployInfo.deployImage)); err != nil {
+			return err
+		}
 
 		if len(dagFiles) > 0 {
 			err = parseOrPytestDAG(deployInput.Pytest, runtimeVersion, deployInput.EnvFile, deployInfo.deployImage, deployInfo.namespace, deployInput.BuildSecrets)
@@ -692,6 +707,48 @@ func buildImageWithoutDags(path string, buildSecrets []string, imageHandler airf
 	}
 
 	return imageHandler.Build("", buildSecrets, types.ImageBuildConfig{Path: path, TargetPlatforms: deployImagePlatformSupport})
+}
+
+// errAgentImageInHostedDeploy refuses a Remote Execution agent image on the
+// hosted deploy path, where it would run as the Deployment's scheduler and
+// crash-loop: the agent's entrypoint runs only its own components.
+var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Build it FROM an Astro Runtime image, or deploy an agent image with 'astro remote deploy'") //nolint:lll
+
+// isAgentImage reports whether the image sets agentEnvVarPrefix, and whether
+// it could tell: a failed inspect is not a verdict either way, so neither
+// check acts on one.
+func isAgentImage(imageHandler airflow.ImageHandler) (isAgent, known bool) {
+	found, err := imageHandler.HasEnvVarWithPrefix("", agentEnvVarPrefix)
+	if err != nil {
+		logger.Debugf("skipping the agent image check: %s", err)
+		return false, false
+	}
+	return found, true
+}
+
+// refuseAgentImage is the hosted deploy's check: an agent image passes
+// buildImage's Runtime check, since it is built FROM a Runtime image. Like
+// that check, it is skipped with warnings off.
+func refuseAgentImage(imageHandler airflow.ImageHandler) error {
+	if !config.CFG.ShowWarnings.GetBool() {
+		return nil
+	}
+	if isAgent, _ := isAgentImage(imageHandler); isAgent {
+		return errAgentImageInHostedDeploy
+	}
+	return nil
+}
+
+// warnIfNotAgentImage is the client deploy's check, and only a warning: a
+// failed inspect says nothing either way, and the image may be one the user
+// means to run as an agent all the same.
+func warnIfNotAgentImage(imageHandler airflow.ImageHandler) {
+	if !config.CFG.ShowWarnings.GetBool() {
+		return
+	}
+	if isAgent, known := isAgentImage(imageHandler); known && !isAgent {
+		fmt.Printf(warningNonAgentImageInClientDeployMsg, agentEnvVarPrefix)
+	}
 }
 
 // dockerignoreContainsDags reports whether content has a line equal to "dags/".
@@ -1165,6 +1222,8 @@ func DeployClientImage(deployInput InputClientDeploy, astroV1Client astrov1.APIC
 			return fmt.Errorf("failed to build client image: %w", err)
 		}
 	}
+
+	warnIfNotAgentImage(imageHandler)
 
 	// Push the image to the remote registry (assumes docker login was done externally)
 	fmt.Println("Pushing client image to configured remote registry")
