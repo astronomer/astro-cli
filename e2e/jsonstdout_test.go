@@ -280,7 +280,7 @@ func copyTree(t *testing.T, src, dst string) {
 //
 // The domain is "localhost" because it is the one domain whose API address the
 // config gives rather than the domain: internal.astro.localhost.core_url
-// for Astro's, internal.apc.localhost.houston_url for APC's. Any other would
+// for Astro's, internal.apc.houston_url for APC's. Any other would
 // have the CLI look up api.<domain>, and a DNS query is the network too.
 //
 // The login does not expire, so the pre-run takes it without renewing it, and
@@ -317,8 +317,7 @@ internal:
     localhost:
       core_url: %[1]s
   apc:
-    localhost:
-      houston_url: %[1]s/v1
+    houston_url: %[1]s/v1
   localhost:
     platform: %[2]s
 contexts:

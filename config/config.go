@@ -114,12 +114,13 @@ var (
 		// Overrides for Astronomer's own development. One that only one
 		// product reads sits under that product, internal.astro.* or
 		// internal.apc.*, as the public settings sit under apc.*.
-		CloudAPIProtocol: newCfg("internal.api.protocol", "https", "cloud.api.protocol"),
-		CloudAPIPort:     newCfg("internal.apc.api.port", "443", "cloud.api.port"),
-		CloudWSProtocol:  newCfg("internal.apc.api.ws_protocol", "wss", "cloud.api.ws_protocol"),
-		LocalCore:        newCfg("internal.astro.localhost.core_url", "http://localhost:8888", "local.core"),
-		LocalHouston:     newCfg("internal.apc.localhost.houston_url", "", "local.houston"),
-		LocalPlatform:    newCfg("internal.localhost.platform", CloudPlatform, "local.platform"),
+		CloudAPIProtocol:  newCfg("internal.api.protocol", "https", "cloud.api.protocol"),
+		APCAPIPort:        newCfg("internal.apc.api.port", "443", "cloud.api.port"),
+		APCWSProtocol:     newCfg("internal.apc.api.ws_protocol", "wss", "cloud.api.ws_protocol"),
+		AstroLocalCoreURL: newCfg("internal.astro.localhost.core_url", "http://localhost:8888", "local.core"),
+		// For a context whose domain is localhost or houston.
+		APCHoustonURL: newCfg("internal.apc.houston_url", "", "local.houston"),
+		LocalPlatform: newCfg("internal.localhost.platform", CloudPlatform, "local.platform"),
 	}
 
 	// unreadableConfigs names config files that exist and could not be parsed.

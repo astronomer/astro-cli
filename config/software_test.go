@@ -6,9 +6,9 @@ import (
 
 func (s *Suite) TestContextGetSoftwareAPIURL() {
 	initTestConfig()
-	CFG.LocalHouston.SetHomeString("http://localhost/v1")
+	CFG.APCHoustonURL.SetHomeString("http://localhost/v1")
 	CFG.CloudAPIProtocol.SetHomeString("https")
-	CFG.CloudAPIPort.SetHomeString("8080")
+	CFG.APCAPIPort.SetHomeString("8080")
 	type fields struct {
 		Domain string
 	}
@@ -42,7 +42,7 @@ func (s *Suite) TestContextGetSoftwareAPIURL() {
 
 func (s *Suite) TestContextGetSoftwareAppURL() {
 	initTestConfig()
-	CFG.LocalHouston.SetHomeString("http://localhost/v1")
+	CFG.APCHoustonURL.SetHomeString("http://localhost/v1")
 	CFG.CloudAPIProtocol.SetHomeString("https")
 	type fields struct {
 		Domain string
@@ -77,8 +77,8 @@ func (s *Suite) TestContextGetSoftwareAppURL() {
 
 func (s *Suite) TestContextGetSoftwareWebsocketURL() {
 	initTestConfig()
-	CFG.LocalHouston.SetHomeString("http://localhost/v1")
-	CFG.CloudAPIPort.SetHomeString("8080")
+	CFG.APCHoustonURL.SetHomeString("http://localhost/v1")
+	CFG.APCAPIPort.SetHomeString("8080")
 	type fields struct {
 		Domain string
 	}
