@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -350,7 +351,22 @@ var offline = map[string]string{
 	"no_proxy":    "",
 	// And Docker, which is tier 3: a command that would build or run a
 	// container fails at once rather than use the developer's engine.
-	"DOCKER_HOST": "tcp://127.0.0.1:1",
+	"DOCKER_HOST": offlineDockerHost(),
+}
+
+// offlineDockerHost is a Docker endpoint that fails at once.
+//
+// Not the refusing TCP port on Windows: there a connect to a closed localhost
+// port is retried for about two seconds before it is refused, and `docker
+// info` connects several times, which put an image deploy that only had to
+// fail at the engine check right at runBound — `astro deploy --image-name`
+// outside a project failed CI there at 31s. A named pipe nobody created fails
+// as fast as the refused port does elsewhere.
+func offlineDockerHost() string {
+	if runtime.GOOS == "windows" {
+		return "npipe:////./pipe/astro-e2e-no-docker"
+	}
+	return "tcp://127.0.0.1:1"
 }
 
 // runBound is how long one command may take. Each works on local files or
