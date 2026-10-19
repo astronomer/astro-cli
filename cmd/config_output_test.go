@@ -144,7 +144,7 @@ func (s *CmdSuite) TestConfigListOutput() {
 			s.False(refused, key)
 		}
 		s.NotContains(keys, config.CFG.Contexts.Path)
-		s.NotContains(keys, config.CFG.LocalCore.Path)
+		s.NotContains(keys, config.CFG.AstroLocalCoreURL.Path)
 		s.NotContains(stdout, "t0ken-value")
 	})
 

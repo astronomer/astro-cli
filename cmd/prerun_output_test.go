@@ -78,7 +78,7 @@ func TestPreRunLeavesJSONStdoutAlone(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			}))
 			t.Cleanup(api.Close)
-			require.NoError(t, config.CFG.LocalCore.SetHomeString(api.URL))
+			require.NoError(t, config.CFG.AstroLocalCoreURL.SetHomeString(api.URL))
 			require.NoError(t, config.CFG.UpgradeMessage.SetHomeString("false"))
 			t.Setenv("ASTRO_TELEMETRY_DISABLED", "1")
 			t.Setenv("ASTRO_API_TOKEN", "")

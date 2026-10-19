@@ -28,13 +28,13 @@ type cfg struct {
 // cfgs houses all configurations for an astro project
 type cfgs struct {
 	CloudAPIProtocol        cfg
-	CloudAPIPort            cfg
-	CloudWSProtocol         cfg
+	APCAPIPort              cfg
+	APCWSProtocol           cfg
 	Context                 cfg
 	Contexts                cfg
 	DockerCommand           cfg
-	LocalCore               cfg
-	LocalHouston            cfg
+	AstroLocalCoreURL       cfg
+	APCHoustonURL           cfg
 	LocalPlatform           cfg
 	ShowWarnings            cfg
 	Verbosity               cfg

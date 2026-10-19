@@ -160,7 +160,7 @@ Some 1.x flags still work but are hidden from help in favor of a new spelling. O
   | `houston.dial_timeout` | `apc.dial_timeout` |
   | `houston.skip_verify_tls` | `apc.skip_verify_tls` |
 
-  The overrides for Astronomer's own development (`cloud.api.*`, `local.core`, `local.houston`, `local.platform`) moved under `internal.`, under the product they apply to when only one reads them (`internal.astro.*`, `internal.apc.*`), and are left out of `astro config list`.
+  The overrides for Astronomer's own development (`cloud.api.protocol`, `cloud.api.port`, `cloud.api.ws_protocol`, `local.core`, `local.houston`, `local.platform`) moved under `internal.`, under the product they apply to when only one reads them (`internal.astro.*`, `internal.apc.*`), and are left out of `astro config list`. `cloud.api.token` was removed: log in with `astro login`, or set `ASTRO_API_TOKEN`.
 - **An `astro api airflow` request needs a target.** 1.x defaulted to `localhost:8080`. v2 needs `-d <link or Deployment>` or `--url`. For the Airflow on your machine, use `astro local api`. `ls` and `describe` only read the API spec, so they run without a target.
 - **Local Airflow runs without Docker by default.** Add `--docker` to `astro local start` for containers. uv 0.9.25 or later must be on your PATH. Windows needs `--docker`.
 - **`astro deployment bundle delete` says the deletion was requested.** 1.x printed `Deleted bundle <id> from deployment <id>`. v2 prints `Requested deletion of bundle <id> from deployment <id>`, because the API removes a bundle in the background, and `bundle list` shows it with `deletion_is_pending` until it is gone. A script matching the old line should match the new one, or use `-o json`, whose `action` is `deletion_requested`.

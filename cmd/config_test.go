@@ -215,6 +215,8 @@ func (s *CmdSuite) TestConfigSetRefusesRemovedKeys() {
 		{"auto_select", "true", "was removed in Astro CLI v2: use deployment.auto_select"},
 		{"local.core", "http://x", "was removed in Astro CLI v2: use internal.astro.localhost.core_url"},
 		{"cloud.api.port", "8443", "was removed in Astro CLI v2: use internal.apc.api.port"},
+		{"cloud.api.ws_protocol", "ws", "was removed in Astro CLI v2: use internal.apc.api.ws_protocol"},
+		{"local.houston", "http://x", "was removed in Astro CLI v2: use internal.apc.houston_url"},
 		{"machine.cpu", "4", "podman machine set"},
 		{"beta.remote_cmd", "true", "beta flag"},
 	} {
