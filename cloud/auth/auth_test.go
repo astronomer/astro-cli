@@ -1019,6 +1019,12 @@ func TestLogout(t *testing.T) {
 		})
 	}
 
+	t.Run("an unknown domain is reported as the user typed it", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		err := Logout("cloud.never-logged-in.io", new(bytes.Buffer))
+		assert.ErrorContains(t, err, "failed to find a login for cloud.never-logged-in.io")
+	})
+
 	t.Run("an unknown domain fails without reporting success", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		current, err := config.GetCurrentContext()
