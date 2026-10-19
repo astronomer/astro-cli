@@ -256,9 +256,25 @@ func TestDeployManifestImage_Airflow2(t *testing.T) {
 		mockDeploymentOptions(client, "12.9.0", "13.1.0")
 		cmd := withImageSeams(t, "12.9.0")
 
+		// The pin names 2.10, which runtime 13 does not carry, so the fix is
+		// the pin rather than a runtime the pin would then refuse.
 		_, err := DeployManifestImage(in(t), client)
-		require.ErrorContains(t, err, "cannot deploy Astro Runtime 12.9.0: it is a downgrade from the deployment's current 13.1.0")
+		require.EqualError(t, err, "cannot deploy Astro Runtime 12.9.0: it is a downgrade from the deployment's current 13.1.0; "+
+			"to deploy, pin apache-airflow in pyproject.toml to the Airflow release Astro Runtime 13.1.0 or newer carries")
 		assert.False(t, hasImageCall(cmd.calls, "build --tag"), "nothing should be built, got %v", cmd.calls)
+	})
+
+	t.Run("a bare Airflow 2 pin is moved by its runtime", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockManifestDeploymentAt(client, "13.1.0", true, false)
+		mockDeploymentOptions(client, "12.9.0", "13.1.0")
+		withImageSeams(t, "12.9.0")
+
+		bare := in(t)
+		bare.Build.AirflowVersion = "2"
+		_, err := DeployManifestImage(bare, client)
+		require.ErrorContains(t, err, "to deploy, set [tool.astro] runtime to 13.1.0 or newer in pyproject.toml")
 	})
 }
 

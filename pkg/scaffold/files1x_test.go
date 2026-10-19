@@ -463,6 +463,12 @@ func TestPlanRetiresOnlyAPinOnlyDockerfile(t *testing.T) {
 			why:     "the pin becomes \"2\" and the build [tool.astro] runtime, so the manifest carries all the tag said",
 		},
 		{
+			name:    "an Airflow 2 build below the 2.7 floor",
+			body:    "FROM astrocrpublic.azurecr.io/runtime:8.8.0\n",
+			retired: false,
+			why:     "no image is built FROM runtime 8, so it is not recorded, the pin \"2\" moves past it, and this is its only record",
+		},
+		{
 			name:    "a floating Airflow 2 tag",
 			body:    "FROM astrocrpublic.azurecr.io/runtime:12\n",
 			retired: false,

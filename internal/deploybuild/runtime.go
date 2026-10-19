@@ -32,8 +32,9 @@ type Plan struct {
 // runtime base of a generated build, or the final FROM of a declared
 // Dockerfile. imageName is a prebuilt image (--image-name), "" for one built
 // from the manifest build; req is the image the manifest builds
-// (imagebuild.ForManifest's). A prebuilt image, an Airflow 2 base and a FROM
-// this cannot read plan no version.
+// (imagebuild.ForManifest's). A prebuilt image, a declared Dockerfile FROM an
+// Airflow 2 base and a FROM this cannot read plan no version; a generated
+// Airflow 2 base plans the exact runtime build it names.
 //
 // A runtime build and a FROM have to agree with the apache-airflow pin's
 // series, so a fix that moves either to another series names the pin too.
@@ -69,7 +70,21 @@ func PlanRuntime(imageName string, req *imagebuild.Request, build *imagebuild.Ma
 		_, ref, _ := strings.Cut(req.BaseImage, ":")
 		tag, _ := airflowrt.ParseRuntimeTagPython(ref)
 		parsed, _ := manifest.ParseRuntimeTag(tag)
+		var pin string
+		if build != nil {
+			pin = strings.TrimSpace(build.AirflowVersion)
+		}
 		return Plan{version: tag, series: !parsed.Build, raise: func(minimum string) string {
+			// An Airflow 2 runtime names no Airflow series, so whether the
+			// pin has to move is the pin's to say: a bare "2" covers every
+			// Airflow 2 build, and one naming a minor ("2.9") covers only
+			// that minor's, which a newer runtime may not carry.
+			if m, _ := manifest.ParseRuntimeTag(minimum); parsed.Major == "2" && m.Major == "2" {
+				if strings.Contains(pin, ".") {
+					return fmt.Sprintf("pin apache-airflow in pyproject.toml to the Airflow release Astro Runtime %s or newer carries", minimum)
+				}
+				return fmt.Sprintf("set [tool.astro] runtime to %s or newer in pyproject.toml", minimum)
+			}
 			s := runtimeSeries(minimum)
 			if s == runtimeSeries(tag) {
 				// The pin is already the deployment's series; only the build

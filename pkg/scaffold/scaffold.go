@@ -717,14 +717,13 @@ func setDockerfileDeclaration(ed tomledit.Editor, from1x *project1x) error {
 // 1.x project built rather than the newest Airflow 2. Only when the manifest's
 // pin is the one that tag gave: a pin from --airflow-version or an existing
 // requirement won, and the Dockerfile stays behind as the record of what it
-// was (dockerfileIsSpent). A runtime the manifest already names is the
-// user's, and kept.
+// was (dockerfileIsSpent).
 //
 // This is the one runtime line a conversion writes. An Airflow 3 tag needs
 // none, its series being the pin, and a declared Dockerfile picks its own
 // base.
 func setRuntimeDeclaration(ed tomledit.Editor, from1x *project1x, pinned string) error {
-	if from1x.runtime == "" || pinned != from1x.airflow || mustGet(ed, runtimePath...) != nil {
+	if from1x.runtime == "" || pinned != from1x.airflow {
 		return nil
 	}
 	return ed.Set(runtimePath, from1x.runtime)

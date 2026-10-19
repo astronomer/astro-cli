@@ -37,6 +37,11 @@ const (
 	// maintenance since 2023, so this refuses nothing that is still supported,
 	// locally or on a platform.
 	minAirflow2Minor = 7
+	// minAirflow2Runtime is the first runtime major carrying Airflow 2.7
+	// (runtime 9.0.0 is Airflow 2.7.0), the same floor for a build named in
+	// [tool.astro] runtime, whose pin can be a bare "2" that says nothing
+	// about the minor.
+	minAirflow2Runtime = 9
 	// pythonCatalogTimeout bounds the catalog fetch an Airflow 3 start makes to
 	// pick the image's Python. That choice has a fallback (the runtime's
 	// default Python), so it waits seconds, as the CLI's runtimecatalog.Catalog
@@ -116,6 +121,11 @@ func airflow2Image(pin, runtime string, load func() (*runtimeversions.Catalog, e
 		return "", err
 	}
 	if runtime != "" {
+		majorText, _, _ := strings.Cut(runtime, ".")
+		if major, err := strconv.Atoi(majorText); err == nil && major < minAirflow2Runtime {
+			return "", fmt.Errorf("an image needs Airflow 2.%d or later, and [tool.astro] runtime names Astro Runtime %s, which carries an older Airflow 2: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d. Set runtime to %d.0.0 or newer, or remove it to build from the newest runtime for the pin",
+				minAirflow2Minor, runtime, minAirflow2Minor, minAirflow2Runtime)
+		}
 		return airflow2ImageRepo + ":" + runtime, nil
 	}
 	catalog, err := load()
@@ -228,6 +238,9 @@ func RuntimeImageForPython(airflowVersion, runtime, requiresPython string, catal
 			}
 			return c, nil
 		})
+	}
+	if v := strings.TrimSpace(airflowVersion); v != "" && v != "3" && !strings.HasPrefix(v, "3.") {
+		return "", fmt.Errorf("an image is built for Airflow 2 (from 2.%d) or Airflow 3, not %q", minAirflow2Minor, v)
 	}
 	base, err := RuntimeImageFor(airflowVersion, runtime)
 	if err != nil {

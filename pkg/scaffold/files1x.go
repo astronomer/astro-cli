@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -290,9 +291,12 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		// A pin-only Dockerfile on one Airflow 2 build has that build to give
 		// the manifest, and once it is there the file has nothing left to say
 		// and its note nothing left to do. A flavor ("12.6.0-python-3.11") or
-		// a floating tag ("12") is no one build, and stays as it was.
+		// a floating tag ("12") is no one build, and stays as it was. Nor does
+		// a build older than runtime 9 (Airflow 2.7), which no image is built
+		// FROM: the pin "2" moves it to the newest Airflow 2, and the note
+		// says the minor was not read.
 		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly {
-			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build {
+			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build && runtimeMajor(bare) >= minAirflow2Runtime {
 				from1x.runtime = bare
 				notes = nil
 			}
@@ -642,6 +646,22 @@ func stripComment(line string) string {
 		}
 	}
 	return line
+}
+
+// minAirflow2Runtime is the oldest Airflow 2 runtime a conversion records as
+// [tool.astro] runtime: runtime 9 carries Airflow 2.7, the floor below which
+// pkg/imagebuild builds no image (a copy, as runtimeTagRe is, since this
+// module does not import that one).
+const minAirflow2Runtime = 9
+
+// runtimeMajor is the leading number of a runtime version, or 0.
+func runtimeMajor(tag string) int {
+	head, _, _ := strings.Cut(tag, ".")
+	n, err := strconv.Atoi(head)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // runtimeTagRe is the Astro Runtime tag format introduced with Airflow 3:

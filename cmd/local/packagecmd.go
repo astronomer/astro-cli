@@ -126,7 +126,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		BuildSecrets:   util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
 		OutDir:         opts.outDir,
 		CheckRuntime:   c.d.RuntimeCheck,
-		RuntimeCatalog: c.d.RuntimeCatalog,
+		RuntimeCatalog: c.d.ImageCatalog,
 	}, c.callbacks(r))
 	if err != nil {
 		return err

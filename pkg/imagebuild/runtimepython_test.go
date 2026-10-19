@@ -204,6 +204,18 @@ func TestRuntimeImageForPythonBuildsAirflow2(t *testing.T) {
 	assert.ErrorContains(t, err, "Airflow 2.7 or later")
 	assert.Zero(t, calls, "a pin below the floor is refused before the lookup")
 
+	// A bare "2" says nothing of the minor, so a named build below runtime 9
+	// is held to the floor by its own number.
+	_, err = RuntimeImageForPython("2", "8.8.0", "", catalog)
+	assert.ErrorContains(t, err, "Astro Runtime 8.8.0, which carries an older Airflow 2")
+	ref, err = RuntimeImageForPython("2", "9.0.0", "", catalog)
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:9.0.0", ref)
+
+	// Neither generation is a sentence that names both.
+	_, err = RuntimeImageForPython("1.10", "", "", catalog)
+	assert.ErrorContains(t, err, "Airflow 2 (from 2.7) or Airflow 3, not \"1.10\"")
+
 	_, err = RuntimeImageForPython("2.9.0", "", "", catalog)
 	require.ErrorIs(t, err, ErrNoRuntimeForAirflow)
 	assert.ErrorContains(t, err, "pin apache-airflow==2.9.*")

@@ -62,11 +62,24 @@ func CheckRuntime(ctx context.Context, runtime, airflowPin string) ([]runtimever
 // missing catalog, so it waits seconds, as init does.
 const catalogTimeout = 3 * time.Second
 
-// Catalog reads the catalog for an edit that moves the Airflow pin, and for an
-// image build about to choose its Python: a fresh cache, a fetch, a stale
-// cache, in that order. nil when none of those works, which the edit takes as
-// "no catalog" and the build as "run the runtime's default Python", rather
-// than a failure.
+// ImageCatalog reads the catalog for a deploy or `astro package astro` about
+// to build a generated image, at the catalog's default timeout: an Airflow 2
+// base with no [tool.astro] runtime is named only by the catalog, and has no
+// fallback, and the build it precedes takes far longer than the wait. nil
+// when no fresh cache, fetch or stale cache works, as Catalog.
+func ImageCatalog(ctx context.Context) *runtimeversions.Catalog {
+	c, _, err := runtimeversions.Load(ctx, Options(0))
+	if err != nil {
+		return nil
+	}
+	return c
+}
+
+// Catalog reads the catalog for an edit that moves the Airflow pin, and for a
+// standalone plan choosing its Python: a fresh cache, a fetch, a stale cache,
+// in that order. nil when none of those works, which the edit takes as "no
+// catalog" and the plan as the built-in Python rule, rather than a failure.
+// A generated image build reads it through ImageCatalog.
 func Catalog(ctx context.Context) *runtimeversions.Catalog {
 	c, _, err := runtimeversions.Load(ctx, Options(catalogTimeout))
 	if err != nil {
