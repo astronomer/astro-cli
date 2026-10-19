@@ -76,16 +76,31 @@ func TestForLocalManifestResolvesNoBaseForADeclaredDockerfile(t *testing.T) {
 	assert.Empty(t, req.BaseImage)
 }
 
-// The one difference is deliberate: deploy refuses Airflow 2, and local Docker
-// mode runs it. A named runtime build needs no catalog lookup.
-func TestForLocalManifestAlsoRunsAirflow2(t *testing.T) {
+// Local Docker mode and deploy pick the same Airflow 2 base too: the named
+// runtime build with no catalog lookup, and otherwise the catalog's newest
+// runtime for the pin.
+func TestForLocalManifestPicksWhatForManifestPicksForAirflow2(t *testing.T) {
 	m := ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.10.5", Runtime: "12.9.0"}
-	_, err := ForManifest(m, nil)
-	assert.ErrorContains(t, err, "only Airflow 3")
-
-	req, err := ForLocalManifest(context.Background(), m, noCatalog)
+	req, err := ForManifest(m, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", req.BaseImage)
+
+	req, err = ForLocalManifest(context.Background(), m, noCatalog)
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", req.BaseImage)
+
+	_, cache := withService(t, releasesJSON, false)
+	catalog, _, err := runtimeversions.Load(t.Context(), runtimeversions.Options{CacheDir: cache})
+	require.NoError(t, err)
+	m = ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.9"}
+	req, err = ForManifest(m, func() *runtimeversions.Catalog { return catalog })
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:11.12.0", req.BaseImage)
+	assert.Equal(t, m.ProjectDir, req.ProjectFiles, "a deployed Airflow 2 image carries the project's files, as an Airflow 3 one does")
+
+	req, err = ForLocalManifest(t.Context(), m, runtimeversions.Options{CacheDir: cache})
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:11.12.0", req.BaseImage)
 }
 
 // A pin the local rule refuses stops the pick, as deploy's does.

@@ -25,7 +25,7 @@ A v2 project is a directory whose `pyproject.toml` has a `[tool.astro]` table. T
 - `airflow_settings.yaml` connections and variables go into the encrypted vault, and its pools go into `[tool.astro.pools]`;
 - a deploy target saved in `.astro/config.yaml` becomes a linked Deployment when the file holds both a Deployment id (`project.deployment`) and its workspace (`project.workspace`): an Astro link, or under an Astro Private Cloud context an `apc` link on that context's domain. `astro deploy --save` writes only the first. Under an Astro Private Cloud context `init` takes the workspace from the context's current one, where 1.x looked the saved id up, and links it (if that is the wrong workspace, `astro deploy` says the Deployment is not in it, and `astro link add default --deployment <id> --workspace <workspace-id> --replace` fixes the link); on Astro, and with no current workspace, `init` leaves a note saying the Deployment was not linked, with the `astro link add` and `astro link default` commands that link it.
 
-A Dockerfile that only picks a base image is dropped, and any other Dockerfile is kept as the project's build. `init` ends by listing anything it could not carry. Step by step: [install.md](install.md).
+A Dockerfile that only picks a base image is dropped (an Airflow 2 build such as `astro-runtime:12.6.0` is kept as `[tool.astro] runtime`), and any other Dockerfile is kept as the project's build. `init` ends by listing anything it could not carry. Step by step: [install.md](install.md).
 
 ### Local Airflow without Docker: `astro local`
 

@@ -17,7 +17,7 @@ import (
 // its images are tagged by runtime version (11.12.0), and the Airflow release
 // each one carries is only knowable from Astronomer's runtime catalog. So an
 // Airflow 2 base image needs a lookup, and a lookup needs the network — which
-// is why local Docker mode resolves through here and the pure RuntimeImage
+// is why an Airflow 2 base resolves through here and the pure RuntimeImage
 // stays as it is. The catalog itself, its cache and its fallback to a stale
 // copy belong to pkg/runtimeversions.
 //
@@ -28,12 +28,14 @@ import (
 const (
 	// airflow2ImageRepo hosts the Astro Runtime images for Airflow 2.
 	airflow2ImageRepo = "quay.io/astronomer/astro-runtime"
-	// minAirflow2Minor is the oldest Airflow 2 local Docker mode runs. The
-	// compose file's database service runs `airflow db migrate`, which arrived
-	// in Airflow 2.7 and replaced `db upgrade`; below that the service exits 2
-	// and every component then waits forever on a migration that never
-	// completed. Everything under the floor is Astro Runtime 8 or older, out of
-	// maintenance since 2023, so this refuses nothing that is still supported.
+	// minAirflow2Minor is the oldest Airflow 2 an image is built for, by local
+	// Docker mode, deploy and `astro package astro` alike. The compose file's
+	// database service runs `airflow db migrate`, which arrived in Airflow 2.7
+	// and replaced `db upgrade`; below that the service exits 2 and every
+	// component then waits forever on a migration that never completed.
+	// Everything under the floor is Astro Runtime 8 or older, out of
+	// maintenance since 2023, so this refuses nothing that is still supported,
+	// locally or on a platform.
 	minAirflow2Minor = 7
 	// pythonCatalogTimeout bounds the catalog fetch an Airflow 3 start makes to
 	// pick the image's Python. That choice has a fallback (the runtime's
@@ -67,10 +69,11 @@ var ErrNoRuntimeForAirflow = errors.New("no Astro Runtime carries this Airflow v
 // (the catalog's word on an Airflow 2 build's series, a yanked build) is
 // runtimeversions.CheckRuntime's, which the caller runs where it can say so.
 //
-// Local start uses it, and so does a deploy to a platform that runs Airflow 2
-// too (the CLI's Astro Private Cloud deploy, through ForManifestWith, with
-// runtime set to a build that platform lists). Astro's deploy stays on
-// RuntimeImageForPython, which is Airflow 3 alone.
+// Local start uses it, and so does the CLI's Astro Private Cloud deploy,
+// through ForManifestWith, with runtime set to a build that platform lists.
+// Astro's deploy and `astro package astro` resolve through
+// RuntimeImageForPython, which picks the same Airflow 2 base (airflow2Image)
+// from the catalog its caller hands it.
 func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime, requiresPython string, o runtimeversions.Options) (string, error) {
 	v := strings.TrimSpace(airflowVersion)
 	if v == "" {
@@ -93,30 +96,44 @@ func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime, require
 			return catalog
 		})
 	case "2":
-		if err := checkAirflow2Floor(v); err != nil {
-			return "", err
-		}
-		if runtime != "" {
-			return airflow2ImageRepo + ":" + runtime, nil
-		}
-		catalog, _, err := runtimeversions.Load(ctx, o)
-		if err != nil {
-			return "", err
-		}
-		runtime, ok := catalog.NewestRuntimeFor(v)
-		if !ok {
-			return "", fmt.Errorf("%w: %s%s", ErrNoRuntimeForAirflow, v, seriesHint(v))
-		}
-		return airflow2ImageRepo + ":" + runtime, nil
+		return airflow2Image(v, runtime, func() (*runtimeversions.Catalog, error) {
+			catalog, _, err := runtimeversions.Load(ctx, o)
+			return catalog, err
+		})
 	default:
 		return "", fmt.Errorf("Docker mode runs Airflow 2 or Airflow 3, not %q", v)
 	}
 }
 
-// checkAirflow2Floor refuses an Airflow 2 pin older than Docker mode runs,
-// before the lookup, so the answer is a sentence rather than a database service
-// that exits 2 in a container. A pin that names no minor ("2") is not refused:
-// it means the newest Airflow 2, which is well above the floor.
+// airflow2Image is the base of an Airflow 2 build: runtime's image when the
+// manifest names a build, which needs no lookup, and otherwise the newest
+// runtime the catalog lists for the pin, yanked builds skipped. The pin is
+// held to the 2.7 floor first either way. load reads the catalog, and is
+// called only when there is something to look up; its error is returned as
+// it stands, so the caller words it.
+func airflow2Image(pin, runtime string, load func() (*runtimeversions.Catalog, error)) (string, error) {
+	if err := checkAirflow2Floor(pin); err != nil {
+		return "", err
+	}
+	if runtime != "" {
+		return airflow2ImageRepo + ":" + runtime, nil
+	}
+	catalog, err := load()
+	if err != nil {
+		return "", err
+	}
+	tag, ok := catalog.NewestRuntimeFor(pin)
+	if !ok {
+		return "", fmt.Errorf("%w: %s%s", ErrNoRuntimeForAirflow, pin, seriesHint(pin))
+	}
+	return airflow2ImageRepo + ":" + tag, nil
+}
+
+// checkAirflow2Floor refuses an Airflow 2 pin older than an image is built
+// for, before the lookup, so the answer is a sentence rather than a database
+// service that exits 2 in a container or a deploy of a runtime long out of
+// maintenance. A pin that names no minor ("2") is not refused: it means the
+// newest Airflow 2, which is well above the floor.
 func checkAirflow2Floor(version string) error {
 	_, rest, found := strings.Cut(version, ".")
 	if !found {
@@ -127,7 +144,7 @@ func checkAirflow2Floor(version string) error {
 	if err != nil || minor >= minAirflow2Minor {
 		return nil
 	}
-	return fmt.Errorf("Docker mode needs Airflow 2.%d or later, and this project pins %s: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d%s",
+	return fmt.Errorf("an image needs Airflow 2.%d or later, and this project pins %s: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d%s",
 		minAirflow2Minor, version, minAirflow2Minor, seriesHint(version))
 }
 
@@ -188,9 +205,30 @@ func StandalonePython(airflowVersion, runtime, requiresPython string, catalog fu
 // runs the default Python, as it did before this looked. A build that ships no
 // Python requires-python admits is refused before anything is built.
 //
+// An Airflow 2 pin builds as LocalRuntimeImageWith builds it (airflow2Image):
+// from 2.7, on quay.io/astronomer/astro-runtime:<runtime> when the manifest
+// names a build, and otherwise on the newest runtime the catalog lists for the
+// pin. Airflow 2 images are tagged by runtime version, so with no build named
+// that lookup is the only way to a base, and a catalog that cannot be read
+// refuses the build, naming [tool.astro] runtime as the way past it. Airflow 2
+// builds list no Python, so the image runs its runtime's default.
+//
 // catalog reads the runtime catalog, and returns nil when it cannot. It is
-// called only when requires-python is set.
+// called when requires-python is set, and for an Airflow 2 pin with no build
+// named.
 func RuntimeImageForPython(airflowVersion, runtime, requiresPython string, catalog func() *runtimeversions.Catalog) (string, error) {
+	if v := strings.TrimSpace(airflowVersion); v == "2" || strings.HasPrefix(v, "2.") {
+		return airflow2Image(v, strings.TrimSpace(runtime), func() (*runtimeversions.Catalog, error) {
+			var c *runtimeversions.Catalog
+			if catalog != nil {
+				c = catalog()
+			}
+			if c == nil {
+				return nil, fmt.Errorf("the Astro Runtime catalog could not be read, and Airflow 2 images are tagged by runtime version, so there is no base to build Airflow %s from. Try again when the catalog can be reached, or name the build in pyproject.toml's [tool.astro] runtime (runtime = '12.6.0', say)", v)
+			}
+			return c, nil
+		})
+	}
 	base, err := RuntimeImageFor(airflowVersion, runtime)
 	if err != nil {
 		return base, err

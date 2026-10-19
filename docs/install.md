@@ -213,7 +213,7 @@ What `init` converts:
 | `requirements.txt` | Each requirement becomes an entry in `[project] dependencies`; an `apache-airflow` pin becomes the project's Airflow version. Lines a dependency list cannot hold (`-r`, `-c`, `-e`, index options, hashes, bare URLs, local paths) are listed under Left to do. The file is removed, unless a kept Dockerfile still installs it. |
 | `packages.txt` | Each line becomes an entry in `packages` under `[tool.astro]`. Removed, unless a kept Dockerfile still installs it. |
 | `airflow_settings.yaml` | Connection and variable values go to this machine's encrypted vault, and `[tool.astro.env]` declares them without their values. A variable with an empty value is declared optional, so `astro local start` runs without it, as v1 did. Pools go to `[tool.astro.pools]`, and `astro local start` creates them in Airflow. The file is removed once everything in it is carried. |
-| `Dockerfile` | Its `FROM` line is read for the Airflow version (below). A Dockerfile that only names a base image is removed, since the requirement now says the same thing. Any other Dockerfile is kept and declared as the project's build (`[tool.astro] dockerfile`), and `init` writes a `.dockerignore` for it. |
+| `Dockerfile` | Its `FROM` line is read for the Airflow version (below). A Dockerfile that only names a base image is removed when the manifest now says the same thing: the requirement, plus `[tool.astro] runtime` for an Airflow 2 build. One on a floating Airflow 2 tag such as `astro-runtime:9` is kept, with a note. Any other Dockerfile is kept and declared as the project's build (`[tool.astro] dockerfile`), and `init` writes a `.dockerignore` for it. |
 | `.astro/config.yaml` | A saved deploy target (`project.deployment` with `project.workspace`) becomes a link named `default` under `[tool.astro.deployments]`, marked `default = true`, when both are ids (cuids, the shape Astro and APC ids share). Under an Astro Private Cloud context it is an `apc` link on that context's domain instead (see [Astro Private Cloud links](manifest-reference.md#astro-private-cloud-links)), since the ids alone do not say which platform they are on; `astro deploy` there preselects it. Astro CLI 1.x's Astro Private Cloud deploy saved `project.deployment` but never `project.workspace`, and looked the saved id up in the context's current workspace, so under an Astro Private Cloud context a saved id with no workspace is linked in that current workspace, and the conversion says so. If the Deployment is in another workspace, `astro deploy` says there is no such Deployment in that workspace; relink it with `astro link add default --deployment <id> --workspace <workspace-id> --replace`, as the conversion says. Anything it cannot link (no workspace saved on Astro, no current workspace on Astro Private Cloud, or a saved value that is not an id) is a note saying it was not linked, with the `astro link add` and `astro link default` commands that link it. |
 | `docker-compose.yml` | Nothing to do: `astro local start` replaces it. |
 | `docker-compose.override.yml` | Kept. `astro local start --docker` merges it over the services it generates, as 1.x did, and `astro local stop` and `reset` take its services down too. Standalone mode runs no containers, so there it does nothing, and `astro local start` says so. |
@@ -228,8 +228,11 @@ the first of:
 3. the Dockerfile's `FROM`, when a stage builds on an Astro Runtime image. A
    tag like `runtime:3.3-2` names Airflow 3.3. An older tag like
    `astro-runtime:9.1.0` is a *runtime* version that does not name the
-   Airflow minor, so `init` pins `apache-airflow==2.*` and says so under Left
-   to do;
+   Airflow minor, so `init` pins `apache-airflow==2.*`. When the Dockerfile
+   is only that `FROM`, `init` also writes the build as `[tool.astro] runtime
+   = '9.1.0'`, so a deploy builds on the runtime the project ran rather than
+   the newest Airflow 2; for a floating tag (`astro-runtime:9`), a flavor, or
+   a Dockerfile that does more, it says so under Left to do instead;
 4. an `apache-airflow==` pin in `requirements.txt`;
 5. the newest supported series from the runtime catalog.
 

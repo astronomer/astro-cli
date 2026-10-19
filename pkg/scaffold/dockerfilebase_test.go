@@ -353,6 +353,24 @@ func TestInitReadsAirflowFromALiteralTagBehindABuildArgument(t *testing.T) {
 	})
 }
 
+// A pin-only Dockerfile on one Airflow 2 build keeps that build: its tag names
+// no Airflow minor, so the pin is "2", and the build is what holds a deploy of
+// the project to the Airflow it ran rather than the newest Airflow 2. With it
+// recorded, the file says nothing the manifest does not, and is retired.
+func TestInitKeepsTheAirflow2BuildOfAPinOnlyDockerfile(t *testing.T) {
+	dir, res, m := initWith(t, map[string]string{
+		fileDockerfile:     "FROM quay.io/astronomer/astro-runtime:12.6.0\n",
+		"requirements.txt": "pandas>=2\n",
+	})
+
+	assert.Equal(t, "12.6.0", m.Astro.Runtime)
+	assert.Equal(t, "2", m.Airflow().Pin)
+	assert.Empty(t, m.Astro.Dockerfile)
+	assert.Contains(t, m.Project.Dependencies, "pandas>=2")
+	assert.NoFileExists(t, filepath.Join(dir, fileDockerfile))
+	assert.Empty(t, dockerfileNotes(res), "nothing about the Dockerfile is left to do")
+}
+
 // A pin-only Dockerfile on a Runtime base whose pin did not win is kept, not
 // declared, and said so, rather than left behind without a word.
 func TestInitKeepsAPinOnlyDockerfileWhosePinLostWithANote(t *testing.T) {
@@ -368,9 +386,29 @@ func TestInitKeepsAPinOnlyDockerfileWhosePinLostWithANote(t *testing.T) {
 	assert.Contains(t, notes[0], "Airflow 3.1")
 	assert.Contains(t, notes[0], "Airflow 3.0")
 
-	t.Run("one note when the reader already gave one", func(t *testing.T) {
+	// An Airflow 2 build would have become [tool.astro] runtime, so its reader
+	// says nothing, and the note that it was kept names the build.
+	t.Run("an Airflow 2 build whose pin lost", func(t *testing.T) {
 		dir := t.TempDir()
 		writeTree(t, dir, map[string]string{fileDockerfile: "FROM quay.io/astronomer/astro-runtime:12.1.0\n"})
+		res, err := Run(dir, Options{AirflowVersion: "3.0"})
+		require.NoError(t, err)
+
+		assert.FileExists(t, filepath.Join(dir, fileDockerfile))
+		notes := dockerfileNotes(res)
+		require.Len(t, notes, 1, "notes: %q", notes)
+		assert.Contains(t, notes[0], "kept and not declared")
+		assert.Contains(t, notes[0], "Astro Runtime 12.1.0 (Airflow 2)")
+		data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+		require.NoError(t, err)
+		m, err := manifest.Parse(data)
+		require.NoError(t, err)
+		assert.Empty(t, m.Astro.Runtime, "the build is not the one the pin names")
+	})
+
+	t.Run("one note when the reader already gave one", func(t *testing.T) {
+		dir := t.TempDir()
+		writeTree(t, dir, map[string]string{fileDockerfile: "FROM quay.io/astronomer/astro-runtime:12\n"})
 		res, err := Run(dir, Options{AirflowVersion: "3.0"})
 		require.NoError(t, err)
 

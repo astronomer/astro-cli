@@ -58,8 +58,10 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // Dependencies and Packages are carried in both cases, since Build ignores
 // them in Dockerfile mode rather than rejecting them.
 //
-// Deploy and `astro package astro` call this. Local Docker mode calls
-// ForLocalManifest, the same rule over a base that also takes Airflow 2.
+// Deploy and `astro package astro` call this, for Airflow 2 (from 2.7) and
+// Airflow 3; an Airflow 2 base with no [tool.astro] runtime is looked up in
+// catalog, so a nil catalog refuses it. Local Docker mode calls
+// ForLocalManifest, the same rule over a base it reads the catalog for itself.
 //
 // The caller fills the rest: WorkDir, Tag, Platform ("linux/amd64" for a
 // deploy), Bin, Env, and Secrets. A generated build reads only the
@@ -88,11 +90,9 @@ const (
 
 // ForLocalManifest is ForManifest for local Docker mode. The one difference is
 // the base a generated build starts FROM: LocalRuntimeImageWith, which resolves
-// an Airflow 3 pin exactly as ForManifest does (RuntimeImageForPython, its
-// Python read from the runtime catalog o describes) and also runs Airflow 2,
-// looking it up in that catalog. So an Airflow 3 project
-// starts from the image it deploys, and an Airflow 2 one, which deploy refuses,
-// still starts.
+// a pin exactly as ForManifest does, reading the runtime catalog o describes,
+// and, for Airflow 2, waiting as long as o says and reporting why a catalog
+// could not be read. So a project starts from the base it deploys.
 func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Options) (Request, error) {
 	// Local start runs the project mounted, so its image holds the
 	// dependencies alone.

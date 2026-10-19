@@ -53,6 +53,12 @@ type project1x struct {
 	// airflow is the Airflow version the Dockerfile's runtime tag names, or ""
 	// when there was no Dockerfile or its tag said nothing usable.
 	airflow string
+	// runtime is the Airflow 2 runtime build a pin-only Dockerfile is FROM
+	// ("12.6.0"), which the manifest records as [tool.astro] runtime, or "".
+	// An Airflow 2 tag names no Airflow minor, so without it the project's
+	// pin is "2" and the next image build would move it to the newest
+	// Airflow 2. An Airflow 3 tag needs none: the pin names its series.
+	runtime string
 	// basePython is the Python the Dockerfile's Astro Runtime base runs, when
 	// its tag names one ("3.13" from runtime:3.3-2-python-3.13), or "".
 	basePython string
@@ -280,6 +286,16 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		from1x.airflow = version
 		if stated {
 			from1x.statedVersion = true
+		}
+		// A pin-only Dockerfile on one Airflow 2 build has that build to give
+		// the manifest, and once it is there the file has nothing left to say
+		// and its note nothing left to do. A flavor ("12.6.0-python-3.11") or
+		// a floating tag ("12") is no one build, and stays as it was.
+		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly {
+			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build {
+				from1x.runtime = bare
+				notes = nil
+			}
 		}
 	}
 	build := buildStepsNote(data)

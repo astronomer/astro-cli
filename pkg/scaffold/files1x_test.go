@@ -457,10 +457,22 @@ func TestPlanRetiresOnlyAPinOnlyDockerfile(t *testing.T) {
 			why:     "a builder stage is real even when it carries no RUN of its own",
 		},
 		{
-			name:    "an Airflow 2 tag",
+			name:    "an Airflow 2 build",
 			body:    "FROM astrocrpublic.azurecr.io/runtime:12.1.0\n",
+			retired: true,
+			why:     "the pin becomes \"2\" and the build [tool.astro] runtime, so the manifest carries all the tag said",
+		},
+		{
+			name:    "a floating Airflow 2 tag",
+			body:    "FROM astrocrpublic.azurecr.io/runtime:12\n",
 			retired: false,
-			why:     "the pin becomes \"2\", so the tag is more specific than what the manifest holds and this is its only record",
+			why:     "no one build to record, so the pin is \"2\", the tag is more specific than what the manifest holds and this is its only record",
+		},
+		{
+			name:    "an Airflow 2 build's Python flavor",
+			body:    "FROM astrocrpublic.azurecr.io/runtime:12.1.0-python-3.11\n",
+			retired: false,
+			why:     "a flavor is not a [tool.astro] runtime value, so the tag is still this file's alone",
 		},
 		{
 			name:    "a tag that is not a runtime version",

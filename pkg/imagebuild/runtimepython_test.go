@@ -173,3 +173,52 @@ func TestStandalonePythonReportsWhatAnImageRefuses(t *testing.T) {
 	assert.Equal(t, "3.3-8", notShipped.Build)
 	assert.Empty(t, python, "uv picks within requires-python")
 }
+
+// Deploy and `astro package astro` build Airflow 2 as local Docker mode does:
+// the named build, else the catalog's newest runtime for the pin, from 2.7.
+// requires-python does not move an Airflow 2 base, whose builds list no Python.
+func TestRuntimeImageForPythonBuildsAirflow2(t *testing.T) {
+	c, err := runtimeversions.Parse([]byte(releasesJSON))
+	require.NoError(t, err)
+	calls := 0
+	catalog := func() *runtimeversions.Catalog { calls++; return c }
+
+	for _, tt := range []struct{ pin, requires, want string }{
+		{"2.9.3", "", "11.12.0"},
+		{"2.9", ">=3.12", "11.12.0"},
+		{"2", "", "13.9.0"},
+		{"2.9.2", "", "11.9.0"},
+	} {
+		ref, err := RuntimeImageForPython(tt.pin, "", tt.requires, catalog)
+		require.NoError(t, err, tt.pin)
+		assert.Equal(t, "quay.io/astronomer/astro-runtime:"+tt.want, ref, tt.pin)
+	}
+
+	calls = 0
+	ref, err := RuntimeImageForPython("2.10", " 12.6.0 ", "", catalog)
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0", ref)
+	assert.Zero(t, calls, "a named build needs no catalog")
+
+	_, err = RuntimeImageForPython("2.6.3", "", "", catalog)
+	assert.ErrorContains(t, err, "Airflow 2.7 or later")
+	assert.Zero(t, calls, "a pin below the floor is refused before the lookup")
+
+	_, err = RuntimeImageForPython("2.9.0", "", "", catalog)
+	require.ErrorIs(t, err, ErrNoRuntimeForAirflow)
+	assert.ErrorContains(t, err, "pin apache-airflow==2.9.*")
+}
+
+// With no build named, an Airflow 2 base has nothing to fall back to, unlike
+// an Airflow 3 one's Python: no catalog is a refusal that names the fix.
+func TestRuntimeImageForPythonRefusesAirflow2WithNoCatalog(t *testing.T) {
+	for name, catalog := range map[string]func() *runtimeversions.Catalog{
+		"no reader":     nil,
+		"reader failed": func() *runtimeversions.Catalog { return nil },
+	} {
+		_, err := RuntimeImageForPython("2.10", "", "", catalog)
+		require.Error(t, err, name)
+		assert.ErrorContains(t, err, "catalog could not be read", name)
+		assert.ErrorContains(t, err, "[tool.astro] runtime", name)
+	}
+}
