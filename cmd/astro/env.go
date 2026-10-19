@@ -42,10 +42,8 @@ const formatDotenv cliout.Format = "dotenv"
 // subroot. Used by every `astro env <type>` subroot so the scope semantics
 // are uniform across types.
 func addScopePersistentFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
-	cmd.PersistentFlags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
-	addWorkspaceFlag(cmd.PersistentFlags(), "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
+	addWorkspaceFlag(cmd.PersistentFlags(), &envWorkspaceID, "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml", deploymentTargets{id: &envDeploymentID})
 	cmd.PersistentFlags().BoolVar(&envIncludeSecrets, "include-secrets", false, "Show secret values (org policy must allow it)")
 	cmd.PersistentFlags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 }
@@ -157,10 +155,8 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	//
 	// --include-secrets is deliberately absent: it asks the platform to unmask
 	// values, and this listing has no column to put one in.
-	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
-	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
-	addWorkspaceFlag(cmd.Flags(), "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
-	addDeploymentFlag(cmd.Flags(), "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
+	addWorkspaceFlag(cmd.Flags(), &envWorkspaceID, "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
+	addDeploymentFlag(cmd.Flags(), "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml", deploymentTargets{id: &envDeploymentID})
 	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 	return cmd
 }

@@ -354,8 +354,9 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 	t.Run("deployment name", func(t *testing.T) {
 		inProject(t, testProjectManifest)
 		cmd := &cobra.Command{Use: "logs"}
-		cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "")
+		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName, nameShort: "n"})
 		require.NoError(t, cmd.ParseFlags([]string{"-n", "test"}))
+		require.NoError(t, applyPreferredFlags(cmd, nil))
 		pick, err := followProject(cmd, nil)
 		require.NoError(t, err)
 		assert.Equal(t, projectDep, deploymentID)
@@ -366,8 +367,9 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 	t.Run("a deployment name that is no link stays a name", func(t *testing.T) {
 		inProject(t, testProjectManifest)
 		cmd := &cobra.Command{Use: "logs"}
-		cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "")
+		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName, nameShort: "n"})
 		require.NoError(t, cmd.ParseFlags([]string{"-n", "my deployment"}))
+		require.NoError(t, applyPreferredFlags(cmd, nil))
 		pick, err := followProject(cmd, nil)
 		require.NoError(t, err)
 		assert.Equal(t, "my deployment", deploymentName)
@@ -377,12 +379,15 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 
 	t.Run("an explicit workspace keeps the context", func(t *testing.T) {
 		inProject(t, testProjectManifest)
-		cmd := &cobra.Command{Use: "list"}
-		cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "")
-		require.NoError(t, cmd.ParseFlags([]string{"--workspace-id", "clexplicitworkspace000001"}))
-		pick, err := followProject(cmd, nil)
-		require.NoError(t, err)
-		assert.Equal(t, projectPick{}, pick)
+		for _, flag := range []string{"--workspace", "--workspace-id"} {
+			cmd := &cobra.Command{Use: "list"}
+			addWorkspaceFlag(cmd.Flags(), &workspaceID, "", "")
+			require.NoError(t, cmd.ParseFlags([]string{flag, "clexplicitworkspace000001"}))
+			require.NoError(t, applyPreferredFlags(cmd, nil))
+			pick, err := followProject(cmd, nil)
+			require.NoError(t, err)
+			assert.Equal(t, projectPick{}, pick, flag)
+		}
 	})
 
 	t.Run("a project with no workspace keeps the context", func(t *testing.T) {

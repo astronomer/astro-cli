@@ -36,8 +36,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleUpdateCmd(out),
 		newDeploymentBundleDeleteCmd(out),
 	)
-	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "The Deployment whose bundles you'd like to manage. Run 'astro deployment list' to find valid IDs")
-	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose bundles you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs")
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose bundles you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID})
 	return cmd
 }
 

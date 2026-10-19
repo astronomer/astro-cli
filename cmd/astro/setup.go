@@ -642,7 +642,7 @@ func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) 
 }
 
 func workspaceOrDeploymentIDFlagSet(cmd *cobra.Command) bool {
-	wsID, _ := cmd.Flags().GetString("workspace-id")   //nolint:errcheck // error deliberately ignored in this shell code
-	depID, _ := cmd.Flags().GetString("deployment-id") //nolint:errcheck // error deliberately ignored in this shell code
+	wsID, _ := cmd.Flags().GetString("workspace")   //nolint:errcheck // error deliberately ignored in this shell code
+	depID, _ := cmd.Flags().GetString("deployment") //nolint:errcheck // error deliberately ignored in this shell code
 	return wsID != "" || depID != ""
 }

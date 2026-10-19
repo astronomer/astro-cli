@@ -40,8 +40,7 @@ func newDeploymentInspectCmd(out io.Writer) *cobra.Command {
 			return deploymentInspect(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentName, "deployment-name", "n", "", "Name of the deployment to inspect")
-	addDeploymentFlag(cmd.Flags(), "Deployment to inspect: a link name from pyproject.toml, a Deployment id, or a Deployment name")
+	addDeploymentFlag(cmd.Flags(), "Deployment to inspect: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName, nameShort: "n"})
 	cliout.AddOutputFlag(cmd, &outputFormat, formatYAML)
 	cmd.PersistentFlags().Lookup("output").Usage += " (text prints the deployment as YAML, the same as yaml)"
 	cmd.Flags().StringVarP(&requestedField, "key", "k", "", "Print only this key of the configuration, such as configuration.cluster_id")

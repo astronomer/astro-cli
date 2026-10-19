@@ -97,6 +97,25 @@ func TestAirflowCmdFlags(t *testing.T) {
 	assert.NotNil(t, cmd.Flags().Lookup("generate"))
 }
 
+// --workspace-id is 1.x's spelling of --workspace: it reaches --workspace, the
+// one the command reads, and the two naming different workspaces is refused.
+func TestAirflowWorkspaceIDIsAnAliasOfWorkspace(t *testing.T) {
+	apply := func(args ...string) (string, error) {
+		cmd := NewAirflowCmd(new(bytes.Buffer))
+		require.NoError(t, cmd.ParseFlags(args))
+		err := cmd.Args(cmd, cmd.Flags().Args())
+		return cmd.Flags().Lookup("workspace").Value.String(), err
+	}
+	for _, args := range [][]string{{"--workspace", "ws"}, {"--workspace-id", "ws"}, {"-W", "ws", "--workspace-id", "ws"}} {
+		got, err := apply(args...)
+		require.NoError(t, err, args)
+		assert.Equal(t, "ws", got, args)
+	}
+	_, err := apply("--workspace", "a", "--workspace-id", "b")
+	require.EqualError(t, err, `--workspace "a" and --workspace-id "b" disagree: pass only --workspace`)
+	assert.True(t, NewAirflowCmd(new(bytes.Buffer)).PersistentFlags().Lookup("workspace-id").Hidden)
+}
+
 func TestNewAirflowListCmd(t *testing.T) {
 	out := new(bytes.Buffer)
 	parentOpts := &AirflowOptions{}

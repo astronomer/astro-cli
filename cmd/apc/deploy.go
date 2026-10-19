@@ -19,7 +19,6 @@ import (
 var (
 	deployOutput     cliout.Format
 	deployDeployment string
-	workspaceFlag    string
 	deployForce      bool
 	deploySecrets    = []string{}
 
@@ -72,9 +71,8 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolP("prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
-	cmd.Flags().StringVar(&workspaceFlag, "workspace", "", "Workspace for the deploy, overriding the context")
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace assigned to the Deployment")
-	utils.MarkPreferredFlag(cmd.Flags(), "workspace", "workspace-id")
+	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Workspace for the deploy, overriding the context")
+	utils.AddAlias(cmd.Flags(), "workspace-id", "", "workspace")
 	cmd.Flags().StringVar(&description, "description", "", "Description to attach to the deploy, for traceability (default: one based on the deploy type)")
 	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a prebuilt image to deploy instead of building one: an image on this machine, or with --remote one already in a registry. Outside a pyproject.toml project it deploys the image alone")
@@ -180,8 +178,8 @@ type deployJSON struct {
 //     pick. --dags there has no project to upload the DAGs of, and a build
 //     has nothing to build (kind no_project), as astro deploy on Astro says.
 func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
-	// --workspace and its older spelling --workspace-id must agree.
-	if err := utils.ApplyPreferredFlags(cmd.Flags(), nil); err != nil {
+	// --workspace and its 1.x spelling --workspace-id must agree.
+	if err := utils.ApplyAliases(cmd.Flags()); err != nil {
 		return err
 	}
 	if len(args) > 0 && deployDeployment != "" && args[0] != deployDeployment {

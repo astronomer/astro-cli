@@ -43,10 +43,11 @@ func TestRemoteDeployCmd(t *testing.T) {
 	assert.Equal(t, "", imageNameFlag.DefValue)
 	assert.Contains(t, imageNameFlag.Usage, "Name of a custom image to deploy")
 
-	deploymentIDFlag := cmd.Flags().Lookup("deployment-id")
-	assert.NotNil(t, deploymentIDFlag)
-	assert.Equal(t, "", deploymentIDFlag.DefValue)
-	assert.Contains(t, deploymentIDFlag.Usage, "Deployment ID to validate client image runtime version")
+	deploymentFlag := cmd.Flags().Lookup("deployment")
+	assert.NotNil(t, deploymentFlag)
+	assert.Equal(t, "", deploymentFlag.DefValue)
+	assert.Contains(t, deploymentFlag.Usage, "Deployment whose runtime version the client image is validated against")
+	assert.True(t, cmd.Flags().Lookup("deployment-id").Hidden, "--deployment-id is 1.x's spelling of --deployment")
 }
 
 func TestRemoteDeployCommandFlags(t *testing.T) {
@@ -190,13 +191,13 @@ func TestRemoteDeployFlags(t *testing.T) {
 		assert.Contains(t, buildSecretFlag.Usage, "Secret to expose to the build")
 	})
 
-	t.Run("deployment-id flag configuration", func(t *testing.T) {
-		deploymentIDFlag := cmd.Flags().Lookup("deployment-id")
-		assert.NotNil(t, deploymentIDFlag)
-		assert.Equal(t, "string", deploymentIDFlag.Value.Type())
-		assert.Equal(t, "", deploymentIDFlag.DefValue)
-		assert.Contains(t, deploymentIDFlag.Usage, "Deployment ID to validate")
-		assert.Contains(t, deploymentIDFlag.Usage, "runtime version")
+	t.Run("deployment flag configuration", func(t *testing.T) {
+		deploymentFlag := cmd.Flags().Lookup("deployment")
+		assert.NotNil(t, deploymentFlag)
+		assert.Equal(t, "string", deploymentFlag.Value.Type())
+		assert.Equal(t, "", deploymentFlag.DefValue)
+		assert.Contains(t, deploymentFlag.Usage, "runtime version")
+		assert.Equal(t, "string", cmd.Flags().Lookup("deployment-id").Value.Type())
 	})
 }
 
@@ -204,17 +205,20 @@ func TestRemoteDeployFlags(t *testing.T) {
 func TestRemoteDeployDeploymentValidation(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 
-	t.Run("deployment-id flag sets global variable", func(t *testing.T) {
-		// Reset global variable
-		remoteDeploymentID = ""
+	for _, flag := range []string{"--deployment", "--deployment-id"} {
+		t.Run(flag+" sets global variable", func(t *testing.T) {
+			// Reset global variable
+			remoteDeploymentID = ""
 
-		cmd := newRemoteDeployCmd()
-		err := cmd.ParseFlags([]string{"--deployment-id", "validation-test-deployment"})
-		assert.NoError(t, err)
+			cmd := newRemoteDeployCmd()
+			err := cmd.ParseFlags([]string{flag, "validation-test-deployment"})
+			assert.NoError(t, err)
+			assert.NoError(t, applyPreferredFlags(cmd, nil))
 
-		// Verify the global variable was set
-		assert.Equal(t, "validation-test-deployment", remoteDeploymentID)
-	})
+			// Verify the global variable was set
+			assert.Equal(t, "validation-test-deployment", remoteDeploymentID)
+		})
+	}
 
 	t.Run("empty deployment-id works", func(t *testing.T) {
 		// Reset global variable
@@ -243,6 +247,7 @@ func TestRemoteDeployDeploymentValidation(t *testing.T) {
 			"--build-secret", "id=secret1,src=file1.txt",
 		})
 		assert.NoError(t, err)
+		assert.NoError(t, applyPreferredFlags(cmd, nil))
 
 		// Verify all global variables were set correctly
 		assert.Equal(t, "full-test-deployment", remoteDeploymentID)
