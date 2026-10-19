@@ -115,6 +115,7 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "image", deployGroupImage)
 	annotateDeployFlag(cmd, imageNameFlag, deployGroupImage)
 	annotateDeployFlag(cmd, "build-secret", deployGroupImage)
+	annotateDeployFlag(cmd, "skip-agent-image-check", deployGroupImage)
 	annotateDeployFlag(cmd, "dags", deployGroupDAG)
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
 	orderDeployFlagGroups(cmd)
@@ -172,6 +173,9 @@ func deploy(cmd *cobra.Command, args []string) error {
 func refuseFlagCombinations(cmd *cobra.Command, inProject bool) error {
 	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
 		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
+	}
+	if skipAgentImageCheck && dags {
+		return cliout.Usage(errors.New("cannot use --skip-agent-image-check with --dags: a Dag-only deploy ships no image to check"))
 	}
 	if cmd.Flags().Changed("no-dags-base-dir") {
 		switch {

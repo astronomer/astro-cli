@@ -253,6 +253,7 @@ astro deploy [LINK-NAME | DEPLOYMENT-ID] [flags]
   --no-dags-base-dir      put DAG files at the bundle root rather than under dags/
   --description <text>    description recorded on the deploy
   --build-secret <spec>   a build secret, repeatable (not with --dags or --image-name)
+  --skip-agent-image-check  deploy an image even if it looks like a Remote Execution agent's (not with --dags)
   -w, --wait              wait for the Deployment to report healthy
   --wait-time <dur>       how long --wait waits (default 5m)
   --output text|json

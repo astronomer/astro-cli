@@ -20,22 +20,36 @@ const agentEnvVarPrefix = "ASTRO_AGENT_CLIENT_"
 // errAgentImageInHostedDeploy refuses a Remote Execution agent image on the
 // hosted deploy, where it would run as the Deployment's scheduler and
 // crash-loop: the agent's entrypoint runs only its own components.
-var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Deploy an agent image with 'astro remote deploy'; for this Deployment, build FROM an Astro Runtime image, not the astro-remote-execution-agent one. If it is not an agent image, deploy it with --skip-agent-image-check")
+var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Deploy an agent image with 'astro remote deploy'; for this Deployment, build FROM an Astro Runtime image, not the astro-remote-execution-agent one. If it is not an agent image, deploy it with astro deploy --skip-agent-image-check")
+
+// checkAgentImage is the one place that decides whether the deploy checks
+// for an agent image (refuseAgentImage), and runs the check when it does.
+//
+// The check reads environment variable names, so an image that is not an
+// agent's can still trip it, and the user needs a way past: the refusal
+// names --skip-agent-image-check, which skips it for one deploy and says so,
+// as a warning, so a job that keeps the flag is told on every deploy.
+// show_warnings false skips it too, as it did in Astro CLI 1.x, and quietly,
+// warnings being what that setting turns off.
+func checkAgentImage(ctx context.Context, in *ManifestImageDeployInput, engine imagebuild.Engine, image string) error {
+	switch {
+	case in.SkipAgentImageCheck:
+		if in.Warn != nil {
+			in.Warn("the Remote Execution agent-image check was skipped (--skip-agent-image-check)")
+		}
+		return nil
+	case !config.CFG.ShowWarnings.GetBool():
+		logger.Debugf("skipping the agent image check: show_warnings is false")
+		return nil
+	}
+	return refuseAgentImage(ctx, engine, image)
+}
 
 // refuseAgentImage is the hosted deploy's check, on the image it ships: an
 // agent image passes the Runtime label check, since it is built FROM a
 // Runtime image. A failed inspect is not a verdict, so it lets the deploy go
 // on.
-//
-// The check reads environment variable names, so an image that is not an
-// agent's can still trip it, and the user needs a way past: the refusal
-// names --skip-agent-image-check, which skips it for one deploy. show_warnings
-// false skips it too, as it did in Astro CLI 1.x.
 func refuseAgentImage(ctx context.Context, engine imagebuild.Engine, image string) error {
-	if !config.CFG.ShowWarnings.GetBool() {
-		logger.Debugf("skipping the agent image check: show_warnings is false")
-		return nil
-	}
 	isAgent, err := engine.HasEnvPrefix(ctx, image, agentEnvVarPrefix)
 	if err != nil {
 		logger.Debugf("skipping the agent image check: %s", err)

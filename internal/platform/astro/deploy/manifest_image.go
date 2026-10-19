@@ -388,10 +388,8 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 	if err != nil {
 		return "", "", err
 	}
-	if !in.SkipAgentImageCheck {
-		if err := refuseAgentImage(ctx, engine, localImage); err != nil {
-			return "", "", err
-		}
+	if err := checkAgentImage(ctx, in, engine, localImage); err != nil {
+		return "", "", err
 	}
 	return localImage, runtimeVersion, nil
 }

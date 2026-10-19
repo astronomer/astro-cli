@@ -1051,8 +1051,8 @@ func TestDeployManifestPositionalAndFlagMustAgree(t *testing.T) {
 	assert.Contains(t, err.Error(), "name one")
 }
 
-// Each shape astronomer/deploy-action v0.16.0 runs, against a project.
-// --skip-agent-image-check reaches the transport, for this deploy only.
+// --skip-agent-image-check reaches the transport, for this deploy only, and
+// is refused with --dags, which ships no image to check.
 func TestDeployManifestSkipAgentImageCheck(t *testing.T) {
 	fake := &fakeCmdDeployer{}
 	setupManifestDeployWith(t, fake, manifestWithDefaultLink)
@@ -1061,8 +1061,16 @@ func TestDeployManifestSkipAgentImageCheck(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, fake.imgInput)
 	assert.True(t, fake.imgInput.SkipAgentImageCheck)
+
+	resetDeployFlagVars()
+	skipAgentImageCheck = false
+	_, err = execDeployCapture(actionDeploymentID, "--dags", "--skip-agent-image-check")
+	require.Error(t, err)
+	assert.True(t, cliout.IsUsage(err), "want a usage error, got %v", err)
+	assert.ErrorContains(t, err, "cannot use --skip-agent-image-check with --dags")
 }
 
+// Each shape astronomer/deploy-action v0.16.0 runs, against a project.
 func TestDeployManifestDeployActionInvocations(t *testing.T) {
 	withDockerfile := strings.Replace(manifestWithDefaultLink, "[tool.astro]\n", "[tool.astro]\ndockerfile = \"Dockerfile\"\n", 1)
 	for _, tc := range []struct {
