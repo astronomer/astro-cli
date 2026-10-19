@@ -10,8 +10,10 @@ release:
   # "auto" marks prerelease tags (e.g. v1.43.0-rc.1, v1.43.0-nightly.20260522) as prerelease,
   # and clean semver tags (e.g. v1.43.0) as full releases.
   prerelease: auto
-  # Only the stable major (STABLE_MAJOR in the release workflows) becomes GitHub's "latest" release.
-  make_latest: '{{ eq (print .Major) .Env.STABLE_MAJOR }}'
+  # Only a full release of the stable major (STABLE_MAJOR in the release workflows) becomes
+  # GitHub's "latest" release. GitHub refuses to make a prerelease latest, and goreleaser
+  # fails the publish when asked to.
+  make_latest: '{{ if and (eq (print .Major) .Env.STABLE_MAJOR) (eq .Prerelease "") }}true{{ else }}false{{ end }}'
   # install.sh is godownloader.sh with LATEST_VERSION set to this release, so
   # the asset installs the release it ships with and nothing else.
   extra_files:
