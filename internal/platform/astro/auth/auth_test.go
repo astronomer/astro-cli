@@ -1979,6 +1979,31 @@ func TestLogout(t *testing.T) {
 		assert.Empty(t, config.CFG.Context.GetHomeString(), "a logout from the saved domain left it selected")
 	})
 
+	// Login stores cloud.astronomer.io under astronomer.io: a logout of the
+	// domain as it was given to login finds that login and clears it.
+	for _, given := range []string{"cloud.astronomer.io", "https://cloud.astronomer.io/"} {
+		t.Run("the domain as given to login: "+given, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			c, err := config.GetCurrentContext()
+			assert.NoError(t, err)
+			assert.Equal(t, "astronomer.io", c.Domain)
+			assert.NoError(t, c.SetContextKey("refreshtoken", "saved-refresh"))
+
+			assert.NoError(t, Logout(given, io.Discard))
+
+			after, err := context.GetContext(c.Domain)
+			assert.NoError(t, err)
+			assert.Empty(t, after.Token)
+			assert.Empty(t, after.RefreshToken)
+		})
+	}
+
+	t.Run("an unknown domain is reported as the user typed it", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		err := Logout("cloud.never-logged-in.io", io.Discard)
+		assert.ErrorContains(t, err, "failed to find a login for cloud.never-logged-in.io")
+	})
+
 	t.Run("an unknown domain fails without reporting success", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		current, err := config.GetCurrentContext()

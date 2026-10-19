@@ -763,10 +763,13 @@ func completeLogin(domain string, authConfig Config, res Result, astroV1Client a
 // that domain was the current one. A domain with no login is an error rather
 // than a stub context written for it and a success reported.
 func Logout(domain string, out io.Writer) error {
+	// Login stores cloud.astronomer.io under astronomer.io, so look it up the
+	// same way, and name what the user typed when there is none.
+	given := domain
 	domain = domainutil.FormatDomain(domain)
 	c, err := context.GetContext(domain)
 	if err != nil {
-		return fmt.Errorf("failed to find a login for %s: %w", domain, err)
+		return fmt.Errorf("failed to find a login for %s: %w", given, err)
 	}
 
 	if err := c.SignOut(); err != nil {
