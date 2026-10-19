@@ -63,6 +63,52 @@ const (
 	errBuildSecretsRemoved = "--build-secrets was removed in Astro CLI v2: use --build-secret, once for each secret"
 	errAPCDeployNoCache    = "--no-cache was removed in Astro CLI v2: astro deploy builds on the container engine's cache, which a changed dependency or file invalidates. " +
 		"To build from nothing, clear the engine's build cache first, with docker builder prune"
+
+	// The flags 1.x marked deprecated, hidden but accepted, which v2 dropped.
+	errEnforceCICDRemoved      = "--enforce-cicd was removed in Astro CLI v2: use --cicd-enforcement enable, or --cicd-enforcement disable"
+	errClusterTypeRemoved      = "--cluster-type was removed in Astro CLI v2: use --type, which takes the same standard or dedicated"
+	errForceUpgradeToAF3Remove = "--force-upgrade-to-af3 was removed in Astro CLI v2: a deploy that moves a Deployment from Airflow 2 to Airflow 3 needs no flag, " +
+		"as it needed none in 1.x, which ignored this one, so drop it"
+	errHardDeleteRemoved = "--hard was removed in Astro CLI v2: deleting a Deployment always removes all of its infrastructure and records, " +
+		"as it did in 1.x, which ignored --hard, so drop it"
+
+	// astro dev init's flags, on astro init.
+	errInitForceRemoved    = "--force was removed in Astro CLI v2: astro init asks nothing before it writes, in an empty directory or not, so drop it"
+	errInitTemplateRemoved = "--from-template was removed in Astro CLI v2: there are no templates to choose from, and astro init writes one starter project, with an example Dag in dags/"
+	errInitRuntimeRemoved  = "--runtime-version was removed in Astro CLI v2: a project pins Airflow, with --airflow-version or the apache-airflow requirement in pyproject.toml, " +
+		"and Docker mode builds on the newest Astro Runtime for it. To pin one Runtime build, set runtime = \"<version>\" under [tool.astro] in pyproject.toml"
+	errInitRemoteExecRemoved = "--remote-execution-enabled was removed in Astro CLI v2: astro init writes no client image files. " +
+		"To deploy a client image for remote execution, add a Dockerfile.client to the project and use astro remote deploy"
+	errInitRemoteRepoRemoved = "--remote-image-repository was removed in Astro CLI v2: set the repository astro remote deploy pushes the client image to with " +
+		"astro config set deploy.remote_execution.client_registry <registry>/<repository>"
+	errInitACRemoved = "--use-astronomer-certified was removed in Astro CLI v2: a project runs Apache Airflow, on Astro Runtime in Docker mode, " +
+		"and there is no Astronomer Certified image to choose. Pin Airflow with --airflow-version"
+	errInitDockerRemoved     = "--docker was removed in Astro CLI v2: astro init makes one project for both modes. Choose Docker when you start it, with astro local start --docker"
+	errInitStandaloneRemoved = "--standalone was removed in Astro CLI v2: astro init makes one project for both modes, and astro local start runs it standalone by default, so drop it"
+
+	// astro dev start's and restart's flags, on astro local start and
+	// restart (and the root's astro start).
+	errStartStandaloneRemoved  = "--standalone was removed in Astro CLI v2: standalone is the default mode, so drop it"
+	errStartComposeFileRemoved = "--compose-file was removed in Astro CLI v2: Docker mode writes its own compose file, and merges a docker-compose.override.yml " +
+		"at the project root over it. Put your changes there"
+	errStartDeploymentIDRemoved = "--deployment-id was removed in Astro CLI v2: a start reads no Deployment's values. " +
+		"It reads the Environment Manager of the workspace pyproject.toml names, with workspace = \"<workspace id>\" under [tool.astro]"
+	errStartWorkspaceIDRemoved = "--workspace-id was removed in Astro CLI v2: a start reads the Environment Manager of the workspace pyproject.toml names, " +
+		"with workspace = \"<workspace id>\" under [tool.astro]"
+	errStartImageNameRemoved = "--image-name was removed in Astro CLI v2: Docker mode builds the project's image itself, from pyproject.toml, " +
+		"or from the Dockerfile that dockerfile = \"<path>\" under [tool.astro] names"
+	errStartNoBrowserRemoved = "--no-browser was removed in Astro CLI v2: a start opens no browser, so drop it. To open the Airflow UI, use astro local open"
+	errStartNoProxyRemoved   = "--no-proxy was removed in Astro CLI v2: Airflow always answers on its own port on localhost too, the URL astro local status shows as direct. " +
+		"To choose that port, use astro local start --port"
+	errStartSettingsRemoved = "--settings-file was removed in Astro CLI v2: a start sets the connections, variables and pools pyproject.toml declares, " +
+		"in [tool.astro.env] and [tool.astro.pools]. astro init carries an airflow_settings.yaml into them"
+	errRestartPortRemoved = "--port was removed in Astro CLI v2: astro local restart keeps the port Airflow is running on. " +
+		"To change it, use astro local stop, then astro local start --port <port>"
+	errRestartKillRemoved = "--kill was removed in Astro CLI v2: to wipe the local database and logs first, use astro local reset --yes, then astro local start"
+
+	// astro dev build's, on astro package.
+	errPackageImageNameRemoved = "--image-name was removed in Astro CLI v2: astro package always builds the image, from pyproject.toml, " +
+		"or from the Dockerfile that dockerfile = \"<path>\" under [tool.astro] names. To name the image it builds, use --tag"
 )
 
 // removedFlag is what a run passing a flag Astro CLI 1.x had and v2 dropped
@@ -80,11 +126,17 @@ type removedFlag struct {
 	// depends on cmd or on how the flag was typed ("-f" or "--force").
 	msg    string
 	msgFor func(cmd *cobra.Command, typed string) string
+	// named, when set, builds it from cmd and the flag's name instead, for
+	// one message several entries share.
+	named func(cmd *cobra.Command, name string) string
 }
 
 func (f *removedFlag) message(cmd *cobra.Command, typed string) string {
-	if f.msgFor != nil {
+	switch {
+	case f.msgFor != nil:
 		return f.msgFor(cmd, typed)
+	case f.named != nil:
+		return f.named(cmd, f.name)
 	}
 	return f.msg
 }
@@ -95,10 +147,14 @@ func (f *removedFlag) message(cmd *cobra.Command, typed string) string {
 //
 // It is consulted only when cobra reports a flag the invoked command does not
 // have (removedFlagError, from the root's flag error func), and only for a
-// flag v1_flags.tsv says 1.x had on that command, its own or inherited. So a
-// command that still has a flag of the same name (`astro deploy --force`) is
-// untouched, a command 1.x did not have, or had without the flag, gets
-// cobra's error, and no command carries a hidden flag for it (except while
+// flag v1_flags.tsv says 1.x had on that command, its own or inherited, or on
+// the 1.x command it replaced under another name (v1Predecessors: astro dev
+// start's flags on astro local start). So a command that still has a flag of
+// the same name (`astro deploy --force`) is untouched, a command 1.x did not
+// have and that replaced none, or had without the flag, gets cobra's error
+// (`astro local reset --force`: astro dev kill had no --force), and a
+// shorthand 1.x gave a flag the command still has under its long name alone
+// names that (shorthandRemoved). No command carries a hidden flag for it (except while
 // a shell asks for completions: acceptRemovedFlags). An entry is keyed by the
 // flag's name, and a shorthand 1.x gave it reaches it through v1_flags.tsv:
 // 1.x's --force (-f) became --yes on every command that asks first, so the
@@ -145,6 +201,163 @@ var removedFlags = []removedFlag{
 	{name: "non-dags-local-path", under: []string{"deploy"}, msg: errDeployNonDagsLocalPathRemoved},
 	{name: "non-dags-bundle-type", under: []string{"deploy"}, msg: errDeployNonDagsBundleTypeRemoved},
 	{name: "build-secrets", needs: has("build-secret"), msg: errBuildSecretsRemoved},
+	// The flags 1.x kept hidden and deprecated.
+	{name: "enforce-cicd", needs: has("cicd-enforcement"), msg: errEnforceCICDRemoved},
+	{name: "cluster-type", under: []string{"deployment create"}, needs: has("type"), msg: errClusterTypeRemoved},
+	{name: "force-upgrade-to-af3", under: []string{"deploy"}, msg: errForceUpgradeToAF3Remove},
+	{name: "hard", under: []string{"deployment delete"}, msg: errHardDeleteRemoved},
+
+	// The astro dev commands' flags, on the commands that replaced them
+	// (v1Predecessors).
+	{name: "force", under: initPaths, msg: errInitForceRemoved},
+	{name: "from-template", under: initPaths, msg: errInitTemplateRemoved},
+	{name: "runtime-version", under: initPaths, msg: errInitRuntimeRemoved},
+	{name: "remote-execution-enabled", under: initPaths, msg: errInitRemoteExecRemoved},
+	{name: "remote-image-repository", under: initPaths, msg: errInitRemoteRepoRemoved},
+	{name: "use-astronomer-certified", under: initPaths, msg: errInitACRemoved},
+	{name: "docker", under: initPaths, msg: errInitDockerRemoved},
+	{name: "standalone", under: initPaths, msg: errInitStandaloneRemoved},
+
+	{name: "standalone", under: startPaths, msg: errStartStandaloneRemoved},
+	{name: "docker", under: restartPaths, named: restartModeRemoved},
+	{name: "standalone", under: restartPaths, named: restartModeRemoved},
+	{name: "port", under: restartPaths, msg: errRestartPortRemoved},
+	{name: "kill", under: restartPaths, msg: errRestartKillRemoved},
+	{name: "compose-file", under: startLikePaths, msg: errStartComposeFileRemoved},
+	{name: "deployment-id", under: startLikePaths, msg: errStartDeploymentIDRemoved},
+	{name: "workspace-id", under: startLikePaths, msg: errStartWorkspaceIDRemoved},
+	{name: "foreground", under: startLikePaths, msgFor: foregroundRemoved},
+	{name: "image-name", under: startLikePaths, msg: errStartImageNameRemoved},
+	{name: "no-browser", under: startLikePaths, msg: errStartNoBrowserRemoved},
+	{name: "no-proxy", under: startLikePaths, msg: errStartNoProxyRemoved},
+	{name: "settings-file", under: startLikePaths, msg: errStartSettingsRemoved},
+	{name: "wait", under: startLikePaths, msgFor: waitRemoved},
+	{name: "env", under: append(slices.Clone(startLikePaths), checkPaths...), msgFor: envFileRemoved},
+	{name: "no-cache", under: append(slices.Clone(startLikePaths), packagePaths...), msgFor: noCacheRemoved},
+
+	// astro local check builds no image, in either mode.
+	{name: "docker", under: checkPaths, named: checkBuildsNoImage},
+	{name: "standalone", under: checkPaths, named: checkBuildsNoImage},
+	{name: "image-name", under: checkPaths, named: checkBuildsNoImage},
+	{name: "build-secret", under: checkPaths, named: checkBuildsNoImage},
+	{name: "build-secrets", under: checkPaths, named: checkBuildsNoImage},
+
+	{name: "docker", under: packagePaths, named: packageEitherMode},
+	{name: "standalone", under: packagePaths, named: packageEitherMode},
+	{name: "image-name", under: packagePaths, msg: errPackageImageNameRemoved},
+
+	// The commands that act on whatever is running, or was.
+	{name: "docker", under: eitherModePaths, named: eitherModeRemoved},
+	{name: "standalone", under: eitherModePaths, named: eitherModeRemoved},
+
+	// astro dev logs picked a component with a flag of its own, and astro
+	// dev bash a container.
+	{name: "api-server", under: logsPaths, named: componentFlagRemoved},
+	{name: "dag-processor", under: logsPaths, named: componentFlagRemoved},
+	{name: "scheduler", under: logsPaths, named: componentFlagRemoved},
+	{name: "triggerer", under: logsPaths, named: componentFlagRemoved},
+	{name: "webserver", under: logsPaths, named: componentFlagRemoved},
+	{name: "api-server", under: shellPaths, named: shellComponentRemoved},
+	{name: "dag-processor", under: shellPaths, named: shellComponentRemoved},
+	{name: "postgres", under: shellPaths, named: shellComponentRemoved},
+	{name: "scheduler", under: shellPaths, named: shellComponentRemoved},
+	{name: "triggerer", under: shellPaths, named: shellComponentRemoved},
+	{name: "webserver", under: shellPaths, named: shellComponentRemoved},
+}
+
+// The v2 commands that replaced astro dev commands, as under lists them.
+var (
+	initPaths       = []string{"init"}
+	startPaths      = []string{"local start", "start"}
+	restartPaths    = []string{"local restart"}
+	startLikePaths  = append(slices.Clone(startPaths), restartPaths...)
+	logsPaths       = []string{"local logs", "logs"}
+	shellPaths      = []string{"local shell"}
+	checkPaths      = []string{"local check"}
+	packagePaths    = []string{"package"}
+	eitherModePaths = []string{"local stop", "stop", "local status", "local logs", "logs", "local shell", "local reset"}
+)
+
+// v1Predecessors maps a v2 command that replaced a 1.x command of another
+// name, without keeping that name as an alias, to the 1.x command's path, so
+// the flags 1.x had there are reported on it as a renamed command's are:
+// `astro init --runtime-version` says what replaced it. They are the astro dev
+// commands scaffold.DevReplacements maps to an astro command, and the root's
+// start, stop and logs, which are astro local's
+// (TestV1PredecessorsFollowTheDevMapping keeps the two in step). Left out:
+//
+//   - astro dev run, which parsed no flags of its own in 1.x;
+//   - astro dev pytest, whose replacement is uv run pytest, not an astro
+//     command;
+//   - astro dev object export and import, whose flags picked what to move
+//     between airflow_settings.yaml and a running Airflow, which no flag of
+//     astro local env does: the astro dev stub's guidance is the answer there.
+var v1Predecessors = map[string]string{
+	"init":          "dev init",
+	"local start":   "dev start",
+	"start":         "dev start",
+	"local restart": "dev restart",
+	"local stop":    "dev stop",
+	"stop":          "dev stop",
+	"local status":  "dev ps",
+	"local logs":    "dev logs",
+	"logs":          "dev logs",
+	"local shell":   "dev bash",
+	"local check":   "dev parse",
+	"package":       "dev build",
+	"local reset":   "dev kill",
+}
+
+func restartModeRemoved(_ *cobra.Command, name string) string {
+	start := "astro local start"
+	if name == "docker" {
+		start += " --docker"
+	}
+	return "--" + name + " was removed in Astro CLI v2: astro local restart keeps the mode Airflow is running in. To change it, use astro local stop, then " + start
+}
+
+func foregroundRemoved(cmd *cobra.Command, _ string) string {
+	return "--foreground was removed in Astro CLI v2: " + cmd.CommandPath() + " returns once Airflow is up, and leaves it running. " +
+		"Follow its logs with astro local logs -f, and stop it with astro local stop"
+}
+
+func waitRemoved(cmd *cobra.Command, _ string) string {
+	return "--wait was removed in Astro CLI v2: set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in " +
+		"ASTRO_LOCAL_HEALTH_TIMEOUT=10m " + cmd.CommandPath()
+}
+
+func envFileRemoved(cmd *cobra.Command, _ string) string {
+	return "--env was removed in Astro CLI v2: " + cmd.CommandPath() + " reads the .env at the project root. " +
+		"To set a value there, use astro local env variable set <NAME> --plain"
+}
+
+func noCacheRemoved(cmd *cobra.Command, _ string) string {
+	return "--no-cache was removed in Astro CLI v2: " + cmd.CommandPath() + " builds on the container engine's cache, which a changed dependency or file invalidates. " +
+		"To build from nothing, clear the engine's build cache first, with docker builder prune"
+}
+
+func checkBuildsNoImage(_ *cobra.Command, name string) string {
+	return "--" + name + " was removed in Astro CLI v2: astro local check parses the Dags in the project's own environment and builds no image, so drop it"
+}
+
+func packageEitherMode(_ *cobra.Command, name string) string {
+	return "--" + name + " was removed in Astro CLI v2: astro package builds the same image whichever mode Airflow runs in locally, so drop it"
+}
+
+func eitherModeRemoved(cmd *cobra.Command, name string) string {
+	return "--" + name + " was removed in Astro CLI v2: " + cmd.CommandPath() + " works in either mode, so drop it"
+}
+
+func componentFlagRemoved(_ *cobra.Command, name string) string {
+	return "--" + name + " was removed in Astro CLI v2: use --component " + name
+}
+
+func shellComponentRemoved(_ *cobra.Command, name string) string {
+	const where = "astro local shell opens its shell in the scheduler's container in Docker mode, and in the project's environment in standalone mode"
+	if name == "scheduler" {
+		return "--scheduler was removed in Astro CLI v2: " + where + ", so drop it"
+	}
+	return "--" + name + " was removed in Astro CLI v2: " + where + ", and has no flag for another component"
 }
 
 // removedFlagErr is a run refused for passing a removed 1.x flag.
@@ -166,11 +379,22 @@ func removedFlagError(cmd *cobra.Command, err error) error {
 	if v1 == nil {
 		return nil
 	}
+	// The flag is still there, without the letter 1.x gave it (astro init
+	// -n, astro local start -p).
+	if isShorthand && cmd.Flag(v1.name) != nil {
+		return cliout.Usage(&removedFlagErr{shorthandRemoved(spelling, v1.name)})
+	}
 	f := findRemovedFlag(cmd, v1.name)
 	if f == nil {
 		return nil
 	}
 	return cliout.Usage(&removedFlagErr{f.message(cmd, spelling)})
+}
+
+// shorthandRemoved is what a run is told for a shorthand 1.x had, of a flag
+// the command still has under its long name alone.
+func shorthandRemoved(spelling, name string) string {
+	return spelling + " was removed in Astro CLI v2: use --" + name
 }
 
 // findRemovedFlag returns the entry for the flag called name that applies on
@@ -323,10 +547,15 @@ func parseV1Flags(file string) ([]v1Flag, error) {
 	return flags, nil
 }
 
-// v1FlagsOn is every flag 1.x had on the command at cmd's path, in the tree
-// cmd's root was built for.
+// v1FlagsOn is every flag 1.x had on the command at cmd's path, or on the
+// 1.x command it replaced (v1Predecessors), in the tree cmd's root was built
+// for.
 func v1FlagsOn(cmd *cobra.Command) []v1Flag {
-	return v1FlagsAt(v1Flags(), v1TreeOf(cmd.Root()), pathSpellings(cmd))
+	paths := pathSpellings(cmd)
+	if was, ok := v1Predecessors[pathBelowRoot(cmd)]; ok && cmd.HasParent() {
+		paths = append(paths, was)
+	}
+	return v1FlagsAt(v1Flags(), v1TreeOf(cmd.Root()), paths)
 }
 
 // v1FlagsAt is every flag in flags that tree had on a command at one of paths.

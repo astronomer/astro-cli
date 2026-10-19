@@ -6,8 +6,10 @@
 # organization (astro) and a hosted one (astro-hosted), whose deployment
 # create and update had flags of their own, and its APC tree (apc).
 #
-# One hidden flag is listed too: --build-secrets, which 1.x still accepted
-# beside --build-secret.
+# The hidden flags 1.x still accepted, as deprecated, are listed too:
+# --build-secrets beside --build-secret, deploy's --force-upgrade-to-af3,
+# deployment create's --cluster-type and create and update's --enforce-cicd,
+# and APC deployment delete's --hard.
 #
 # It records 1.x, so nothing in v2 changes it. The CLI embeds it: a flag v2
 # does not have is reported by what replaced it (removedFlags) only on a
@@ -137,6 +139,7 @@ astro,astro-hosted	deploy	deployment-name	n	string
 astro,astro-hosted,apc	deploy	description		string
 astro,astro-hosted	deploy	env	e	string
 astro,astro-hosted,apc	deploy	force	f	bool
+astro,astro-hosted	deploy	force-upgrade-to-af3		bool
 astro,astro-hosted,apc	deploy	image		bool
 astro,astro-hosted,apc	deploy	image-name	i	string
 apc	deploy	no-cache		bool
@@ -242,12 +245,14 @@ astro-hosted	deployment create	cloud-provider	p	string
 apc	deployment create	cloud-role	c	string
 apc	deployment create	cluster-id		string
 astro,astro-hosted	deployment create	cluster-id	c	string
+astro-hosted	deployment create	cluster-type		string
 astro,astro-hosted	deployment create	dag-deploy		string
 astro-hosted	deployment create	default-task-pod-cpu		string
 astro-hosted	deployment create	default-task-pod-memory		string
 astro,astro-hosted	deployment create	deployment-file		string
 astro,astro-hosted	deployment create	description	d	string
 astro-hosted	deployment create	development-mode	m	string
+astro,astro-hosted	deployment create	enforce-cicd		bool
 astro,astro-hosted,apc	deployment create	executor	e	string
 astro,astro-hosted,apc	deployment create	force	f	bool
 astro-hosted	deployment create	high-availability	a	string
@@ -272,6 +277,7 @@ apc	deployment create	workspace-id		string
 astro,astro-hosted	deployment create	workspace-id	w	string
 astro,astro-hosted	deployment delete	deployment-name	n	string
 astro,astro-hosted	deployment delete	force	f	bool
+apc	deployment delete	hard		bool
 astro,astro-hosted,apc	deployment delete	workspace-id		string
 astro,astro-hosted	deployment hibernate	deployment-name	n	string
 astro,astro-hosted	deployment hibernate	for	d	string
@@ -427,6 +433,7 @@ astro,astro-hosted	deployment update	deployment-file		string
 astro,astro-hosted	deployment update	deployment-name		string
 astro,astro-hosted,apc	deployment update	description	d	string
 astro-hosted	deployment update	development-mode	m	string
+astro,astro-hosted	deployment update	enforce-cicd		bool
 astro,astro-hosted,apc	deployment update	executor	e	string
 astro,astro-hosted,apc	deployment update	force	f	bool
 astro-hosted	deployment update	high-availability	a	string

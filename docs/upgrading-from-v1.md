@@ -138,6 +138,39 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--non-dags-mount-path` | `astro deploy bundle --mount-path` | `astro deploy` |
 | `--non-dags-bundle-type` | `astro deploy bundle --type` | `astro deploy` |
 | `--build-secrets` | `--build-secret`, repeated once for each secret | `astro deploy`, `astro remote deploy` |
+| `--enforce-cicd` | `--cicd-enforcement enable`, or `disable` | `astro deployment create` / `update` |
+| `--cluster-type` | `--type` | `astro deployment create` |
+| `--force-upgrade-to-af3` | drop it: 1.x ignored it too | `astro deploy` |
+| `--hard` | drop it: a delete always removes everything, as it did in 1.x | `astro deployment delete` on Astro Private Cloud |
+| `--runtime-version`, `-v` | `--airflow-version`, or the `apache-airflow` requirement in `pyproject.toml`; to pin one Astro Runtime build, `runtime` under `[tool.astro]` | `astro init` |
+| `--from-template`, `-t` | no replacement: `astro init` writes one starter project | `astro init` |
+| `--force`, `-f` | drop it: `astro init` asks nothing | `astro init` |
+| `--remote-execution-enabled` | add a `Dockerfile.client` and use `astro remote deploy`; `astro init` writes no client image files | `astro init` |
+| `--remote-image-repository` | `astro config set deploy.remote_execution.client_registry <registry>/<repository>` | `astro init` |
+| `--use-astronomer-certified` | no replacement: there is no Astronomer Certified image; pin Airflow with `--airflow-version` | `astro init` on Astro Private Cloud |
+| `--docker`, `--standalone` | choose the mode when you start: `astro local start` (standalone, the default) or `astro local start --docker` | `astro init` |
+| `-n`, `-a` | `--name`, `--airflow-version` | `astro init` |
+| `--no-browser`, `-n` | drop it: a start opens no browser; `astro local open` does | `astro local start`, `astro start` |
+| `-p` | `--port` | `astro local start`, `astro start` |
+| `--standalone` | drop it: standalone is the default mode | `astro local start`, `astro start` |
+| `--wait` | the `ASTRO_LOCAL_HEALTH_TIMEOUT` environment variable, a Go duration: `ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start` | `astro local start` / `restart`, `astro start` |
+| `--foreground`, `-f` | drop it: a start returns once Airflow is up and leaves it running; `astro local logs -f` follows it | `astro local start` / `restart`, `astro start` |
+| `--compose-file` | a `docker-compose.override.yml` at the project root, which Docker mode merges over the compose file it writes | `astro local start` / `restart`, `astro start` |
+| `--settings-file`, `-s` | the connections, variables and pools `pyproject.toml` declares (`[tool.astro.env]`, `[tool.astro.pools]`), which `astro init` carries from `airflow_settings.yaml` | `astro local start` / `restart`, `astro start` |
+| `--env`, `-e` | the `.env` at the project root, which `astro local env variable set <NAME> --plain` writes | `astro local start` / `restart` / `check`, `astro start` |
+| `--workspace-id`, `-w`; `--deployment-id`, `-d` | the workspace `pyproject.toml` names (`workspace` under `[tool.astro]`), whose Environment Manager a start reads; no Deployment's values are read | `astro local start` / `restart`, `astro start` |
+| `--image-name`, `-i` | the project's own build, from `pyproject.toml` or the Dockerfile `dockerfile` under `[tool.astro]` names; `astro package --tag` names the image it builds | `astro local start` / `restart` / `check`, `astro start`, `astro package` |
+| `--no-cache` | no replacement: the build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro local start` / `restart`, `astro start`, `astro package` |
+| `--no-proxy` | the direct `localhost` URL `astro local status` shows, on the port `astro local start --port` picks | `astro local start` / `restart`, `astro start` |
+| `--port` (`-p`), `--docker`, `--standalone` | `astro local stop`, then `astro local start` with them: a restart keeps the port and mode Airflow is running with | `astro local restart` |
+| `--kill`, `-k` | `astro local reset --yes`, then `astro local start` | `astro local restart` |
+| `--docker`, `--standalone` | drop them: these work in either mode | `astro local stop` / `status` / `logs` / `shell` / `reset`, `astro stop` / `logs` |
+| `--docker`, `--standalone`, `--image-name`, `--build-secret`, `--build-secrets` | drop them: `astro local check` builds no image | `astro local check` |
+| `--docker`, `--standalone` | drop them: the image is the same in either mode | `astro package` |
+| `--scheduler` (`-s`), `--webserver` (`-w`), `--api-server` (`-a`), `--triggerer` (`-t`), `--dag-processor` (`-d`) | `--component <name>` | `astro local logs`, `astro logs` |
+| `--scheduler` (`-s`), `--webserver` (`-w`), `--api-server` (`-a`), `--triggerer` (`-t`), `--dag-processor` (`-d`), `--postgres` (`-p`) | no replacement: the shell opens in the scheduler's container in Docker mode, and in the project's environment in standalone mode | `astro local shell` |
+
+The `astro dev` flags are refused this way on the command that replaced each `astro dev` command (`astro init`, `astro local start` and the rest, `astro package`, and the `astro start`, `stop` and `logs` shorthands), which is where a 1.x script that only renames the command passes them. `astro dev run`, `pytest` and `object` have no such row: their replacements take none of their flags, and the `astro dev` stub names what replaces each.
 
 Some 1.x flags still work but are hidden from help in favor of a new spelling. On the `astro deployment` subcommands and `astro env`, `--deployment-name` (`-n`) and `--deployment-id`, whichever the command has, give way to `--deployment`. `--workspace-id` gives way to `--workspace` on those commands and the other commands that have both, `astro deploy` among them.
 
