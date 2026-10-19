@@ -405,7 +405,7 @@ func TestDeployManifestImage_RefusesAnAgentImage(t *testing.T) {
 			}, client)
 			require.ErrorIs(t, err, errAgentImageInHostedDeploy)
 			assert.ErrorContains(t, err, "astro remote deploy")
-			assert.ErrorContains(t, err, "astro config set show_warnings false -g", "the refusal names the way past a false positive")
+			assert.ErrorContains(t, err, "--skip-agent-image-check", "the refusal names the way past a false positive")
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			assert.False(t, hasImageCall(cmd.calls, "push"), "nothing is pushed, got %v", cmd.calls)
 			client.AssertExpectations(t)
@@ -418,6 +418,8 @@ func TestDeployManifestImage_RefusesAnAgentImage(t *testing.T) {
 // not even inspected.
 func TestRefuseAgentImage_SkippedWithWarningsOff(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// The setting below is package state: put it back for the tests after.
+	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.LocalPlatform) })
 	cmd := withImageSeams(t, "3.1-2")
 	cmd.env = `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python"]`
 	engine := imagebuild.Engine{Cmd: newImageBuildCommander(), Bin: "docker"}
@@ -428,6 +430,30 @@ func TestRefuseAgentImage_SkippedWithWarningsOff(t *testing.T) {
 	calls := len(cmd.calls)
 	assert.NoError(t, refuseAgentImage(context.Background(), engine, "agent:1"))
 	assert.Len(t, cmd.calls, calls, "nothing is inspected with warnings off")
+}
+
+// --skip-agent-image-check deploys an image the check would refuse, for that
+// one deploy: the image is pushed, with warnings on.
+func TestDeployManifestImage_SkipAgentImageCheckDeploysIt(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockManifestDeploymentAt(client, "3.1-2", true, false)
+	mockDeploymentOptions(client, "3.1-2")
+	mockCreateImageDeploy(client, "")
+	mockFinalizeDeploy(client)
+
+	cmd := withImageSeams(t, "3.1-2")
+	cmd.env = `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python"]`
+
+	_, err := DeployManifestImage(ManifestImageDeployInput{
+		Build:               imagebuild.ManifestBuild{ProjectDir: manifestProjectDir(t)},
+		DeploymentID:        "test-deployment-id",
+		ImageName:           "agent:1",
+		SkipAgentImageCheck: true,
+	}, client)
+	require.NoError(t, err)
+	assert.True(t, hasImageCall(cmd.calls, "push"), "the image is pushed, got %v", cmd.calls)
+	client.AssertExpectations(t)
 }
 
 func TestDeployManifestImage_NoDockerFailsEarly(t *testing.T) {
