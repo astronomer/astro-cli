@@ -156,7 +156,7 @@ type deployJSON struct {
 	URL string `json:"url,omitempty"`
 	// Warnings are what the deploy warned about without failing, as text
 	// prints them (less the "Warning: " prefix): a prebuilt image that is all
-	// an image Deployment's DAGs (not when apc.show_warnings is off), a DAG
+	// an image Deployment's DAGs (not when show_warnings is off), a DAG
 	// upload that did not happen (always): an image deployed alone, to a
 	// Deployment that takes DAG uploads, skipped for want of a dags
 	// directory, or because whether the Deployment takes them could not be

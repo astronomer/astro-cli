@@ -322,8 +322,8 @@ const (
 
 // warnImageAlone says what an image deployed from outside any project leaves
 // the Deployment's DAGs: those inside the image, for an image Deployment
-// (unless apc.show_warnings is off), and the ones it had, for one that takes
-// DAG uploads or may, which is said whatever apc.show_warnings is: an upload
+// (unless show_warnings is off), and the ones it had, for one that takes
+// DAG uploads or may, which is said whatever show_warnings is: an upload
 // the Deployment would take did not happen.
 func warnImageAlone(in *ManifestImage, t *manifestTarget, warn func(string)) {
 	switch t.dags {
@@ -338,7 +338,7 @@ func warnImageAlone(in *ManifestImage, t *manifestTarget, warn func(string)) {
 }
 
 // warnPrebuiltDagsInImage warns that an image Deployment runs only the DAGs
-// a prebuilt image carries, unless apc.show_warnings is off.
+// a prebuilt image carries, unless show_warnings is off.
 func warnPrebuiltDagsInImage(in *ManifestImage, warn func(string)) {
 	if config.CFG.ShowWarnings.GetBool() {
 		warn(fmt.Sprintf(warningPrebuiltDagsInImage, in.ImageName))

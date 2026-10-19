@@ -36,7 +36,7 @@ func imageAlone(t *testing.T, image string, warnings *[]string) *ManifestImage {
 	return in
 }
 
-// withShowWarnings sets apc.show_warnings for one test. It goes after
+// withShowWarnings sets show_warnings for one test. It goes after
 // apcTarget.client, which loads the test config afresh.
 func withShowWarnings(t *testing.T, on bool) {
 	t.Helper()
@@ -104,7 +104,7 @@ func TestDeployPrebuiltImageUploadsTheProjectsDags(t *testing.T) {
 }
 
 // From a project's root, a prebuilt image to an image Deployment is all the
-// DAGs it runs, which the deploy says unless apc.show_warnings is off: the
+// DAGs it runs, which the deploy says unless show_warnings is off: the
 // image was not built from the project, and may carry none.
 func TestDeployPrebuiltImageToAnImageDeploymentWarns(t *testing.T) {
 	for _, show := range []bool{true, false} {
@@ -220,9 +220,9 @@ func TestDeployPrebuiltImageWithoutAnEngine(t *testing.T) {
 
 // From outside any project the image ships alone, with no DAGs: the deploy
 // says what that leaves each kind of Deployment. An image Deployment runs
-// the image's DAGs (said unless apc.show_warnings is off, and not refused,
+// the image's DAGs (said unless show_warnings is off, and not refused,
 // as --image is from a project); one that takes uploads keeps the DAGs it
-// had, which is said whatever apc.show_warnings is; one whose DAG source
+// had, which is said whatever show_warnings is; one whose DAG source
 // could not be placed may; and a git-sync one is as it always is.
 func TestDeployPrebuiltImageAlone(t *testing.T) {
 	for _, tc := range []struct {

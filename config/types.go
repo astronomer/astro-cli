@@ -149,7 +149,7 @@ func (c cfg) GetInt() int {
 // typed is value as the YAML type of c's default: a bool or an int when the
 // default is one and value parses as the same, the string otherwise. A config
 // set from the command line arrives as text, and stored as text it reads back
-// as `apc.show_warnings: "false"`. Either form reads the same, here and in Astro
+// as `show_warnings: "false"`. Either form reads the same, here and in Astro
 // CLI 1.x, which shares the file.
 //
 // A bool is the words true and false only. strconv.ParseBool also takes 1, 0,

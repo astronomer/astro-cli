@@ -159,7 +159,7 @@ func cfgFails(err error) func() (*houston.AppConfig, error) {
 	return func() (*houston.AppConfig, error) { return nil, err }
 }
 
-// quietFromTheStart turns apc.show_warnings off once the deploy runs:
+// quietFromTheStart turns show_warnings off once the deploy runs:
 // runAPC loads the config afresh before it runs the tree, so it is turned
 // off on the deploy's first question to Houston.
 func quietFromTheStart(t *testing.T, api *mocks.ClientInterface) {

@@ -92,7 +92,7 @@ func (s *Suite) TestMigrateHomeConfig() {
 
 		InitConfig(fs)
 
-		s.Equal(true, s.homeOnDisk(fs)["apc"].(map[string]any)["show_warnings"])
+		s.Equal(true, s.homeOnDisk(fs)["show_warnings"])
 		s.Equal("global", CFG.ShowWarnings.HomeScope())
 	})
 
