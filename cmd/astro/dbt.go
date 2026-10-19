@@ -23,7 +23,7 @@ const (
 	errDbtCleanupRemoved = "astro dbt cleanup was removed in Astro CLI v2, with no replacement: " +
 		"Astro CLI v2 no longer writes Cosmos Boost files into the project, and leaves out the ones earlier versions wrote " +
 		"from every bundle it deploys and every image it generates. " +
-		"Delete any old .astro/dbt_metadata.json and .astro/manifest.slim.json files by hand: " +
+		"Delete any old .astro/dbt_metadata.json and .astro/*.slim.json files by hand: " +
 		"a local Airflow running the Cosmos Boost plugin, or the build of a declared Dockerfile, may still read them"
 )
 

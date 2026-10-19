@@ -38,17 +38,25 @@ var (
 
 // deployManifest deploys the pyproject.toml project the working directory is
 // the root of to an Astro Private Cloud Deployment: the image built from the
-// manifest (or --image-name's), with the DAGs as the Deployment takes them,
-// or the DAGs alone (--dags). Which Deployment, and every rule about it, is
-// internal/deploy's, which Astro's deploy runs too, fed the project's apc
-// links on this context's domain; what only APC knows (Houston, its registry,
-// its runtime list, how DAGs reach a Deployment) is
+// manifest, or the prebuilt one --image-name names (on this machine, or with
+// --remote already in a registry), with the DAGs as the Deployment takes
+// them, or the DAGs alone (--dags). Which Deployment, and every rule about
+// it, is internal/deploy's, which Astro's deploy runs too, fed the project's
+// apc links on this context's domain; what only APC knows (Houston, its
+// registry, its runtime list, how DAGs reach a Deployment) is
 // internal/platform/apc/deploy's.
+//
+// root is nil for an --image-name deploy outside any project: there is no
+// manifest, so the target is a Deployment id (the argument or --deployment)
+// or the workspace's pick, and the image ships alone, with no DAGs.
 func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io.Writer) error {
-	if root.LoadErr != nil {
-		return root.LoadErr
+	var m *manifest.Manifest
+	if root != nil {
+		if root.LoadErr != nil {
+			return root.LoadErr
+		}
+		m = root.Manifest
 	}
-	m := root.Manifest
 	// Flags that cannot go together are a usage mistake, said as APC's
 	// deploy always said it, before anything is read or asked.
 	if isDagOnlyDeploy && isImageOnlyDeploy {
@@ -84,6 +92,11 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 	}
 	interactive := deployOutput == cliout.FormatText && stdinIsTerminal()
 	engine := utils.OnceEngine(func() (string, []string, error) { return containercfg.Engine(config.WorkingPath) })
+	if runtimeVersionForImageName != "" && !imagePresentOnRemote {
+		// Astro CLI 1.x took it here and read nothing of it, so it is still
+		// taken, and said to do nothing.
+		warnf("--runtime-version has no effect without --remote: the runtime of an image on this machine, or of one built, is read from its label")
+	}
 
 	res, err := manifestdeploy.Run(manifestdeploy.Request{
 		ProjectDir:       config.WorkingPath,
@@ -94,9 +107,14 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		ContextWorkspace: c.Workspace,
 		DagsOnly:         isDagOnlyDeploy,
 		Image:            isImageOnlyDeploy,
-		Description:      description,
-		Interactive:      interactive,
-		BuildSecrets:     util.ResolveProjectBuildSecrets(deploySecrets, m.Astro.BuildSecretSpecs()),
+		ImageName:        imageName,
+		ImageInRegistry:  imagePresentOnRemote,
+		ImageRuntime:     remoteRuntime(),
+		// Outside a project the image ships alone: there are no DAGs here.
+		ImageAlone:   m == nil,
+		Description:  description,
+		Interactive:  interactive,
+		BuildSecrets: util.ResolveProjectBuildSecrets(deploySecrets, buildSecretSpecs(m)),
 		CheckRuntime: func(runtime, airflowPin string) ([]runtimeversions.Finding, error) {
 			return runtimecatalog.CheckRuntime(cmd.Context(), runtime, airflowPin)
 		},
@@ -118,14 +136,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		Domain:      domain,
 		OtherDomain: otherDomain,
 		Announce: func(target manifestdeploy.Target) {
-			if deployOutput != cliout.FormatText {
-				return
-			}
-			if target.LinkName == "" {
-				fmt.Fprintf(errOut, "→ %s\n", target.DeploymentID)
-				return
-			}
-			fmt.Fprintf(errOut, "→ %s (apc deployment %s)\n", target.LinkName, target.DeploymentID)
+			announceDeploy(target, errOut, progress)
 		},
 		OnBuild: func() {
 			fmt.Fprintln(progress, "Building your project image, this can take a few minutes...")
@@ -151,6 +162,8 @@ func refuseBuildSecret(cmd *cobra.Command, m *manifest.Manifest) error {
 		return nil
 	}
 	switch {
+	case imageName != "":
+		return errors.New("--build-secret has no effect with --image-name: the image is already built")
 	case isDagOnlyDeploy:
 		return errors.New("--build-secret has no effect with --dags: a dags-only deploy builds no image")
 	case m.Astro.Dockerfile == "":
@@ -282,21 +295,26 @@ func (d *apcManifestDeployer) DeployDags(in *manifestdeploy.DagDeploy) (manifest
 	return manifestdeploy.DagResult{WorkspaceID: in.WorkspaceID}, nil
 }
 
-// DeployImage builds (or takes) the project's image and ships it.
+// DeployImage builds the project's image, or takes a prebuilt one, and
+// ships it.
 func (d *apcManifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestdeploy.ImageResult, error) {
 	res, err := DeployManifestImage(d.client, &deploy.ManifestImage{
-		DeploymentID: in.DeploymentID,
-		WorkspaceID:  in.WorkspaceID,
-		Build:        in.Build,
-		BuildSecrets: in.BuildSecrets,
-		IncludeDags:  in.IncludeDags,
-		OnBuild:      in.OnBuild,
-		Warn:         in.Warn,
-		Survey:       in.Survey,
-		Engine:       in.Engine,
-		Description:  in.Description,
-		Progress:     d.progress,
-		Catalog:      runtimecatalog.Options(0),
+		DeploymentID:   in.DeploymentID,
+		WorkspaceID:    in.WorkspaceID,
+		ImageName:      in.ImageName,
+		InRegistry:     in.ImageInRegistry,
+		RuntimeVersion: in.ImageRuntime,
+		ImageAlone:     in.ImageAlone,
+		Build:          in.Build,
+		BuildSecrets:   in.BuildSecrets,
+		IncludeDags:    in.IncludeDags,
+		OnBuild:        in.OnBuild,
+		Warn:           in.Warn,
+		Survey:         in.Survey,
+		Engine:         in.Engine,
+		Description:    in.Description,
+		Progress:       d.progress,
+		Catalog:        runtimecatalog.Options(0),
 	})
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err
@@ -319,4 +337,39 @@ func firstNonEmpty(vals ...string) string {
 		}
 	}
 	return ""
+}
+
+// remoteRuntime is --runtime-version, which only --remote reads: an image on
+// this machine, or one built, carries its runtime in its label.
+func remoteRuntime() string {
+	if !imagePresentOnRemote {
+		return ""
+	}
+	return runtimeVersionForImageName
+}
+
+// buildSecretSpecs are the build secrets the manifest declares, none when
+// there is no manifest: an --image-name deploy outside any project.
+func buildSecretSpecs(m *manifest.Manifest) []string {
+	if m == nil {
+		return nil
+	}
+	return m.Astro.BuildSecretSpecs()
+}
+
+// announceDeploy says, in text, where a deploy is going once that is settled
+// (on stderr, as every resolving command does), and that a prebuilt image
+// is what it ships (with its progress).
+func announceDeploy(target manifestdeploy.Target, errOut, progress io.Writer) {
+	if deployOutput != cliout.FormatText {
+		return
+	}
+	if target.LinkName == "" {
+		fmt.Fprintf(errOut, "→ %s\n", target.DeploymentID)
+	} else {
+		fmt.Fprintf(errOut, "→ %s (apc deployment %s)\n", target.LinkName, target.DeploymentID)
+	}
+	if !isDagOnlyDeploy && imageName != "" {
+		fmt.Fprintf(progress, "Deploying prebuilt image %s...\n", imageName)
+	}
 }

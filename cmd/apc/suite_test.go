@@ -33,7 +33,6 @@ func (s *Suite) SetupSubTest() {
 
 func (s *Suite) TearDownSuite() {
 	DagsOnlyDeploy = deploy.DagsOnlyDeploy
-	UpdateDeploymentImage = deploy.UpdateDeploymentImage
 }
 
 var (

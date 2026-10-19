@@ -1250,3 +1250,16 @@ func TestDeployManifestListDeploymentsGivesUp(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no answer after")
 }
+
+// An interactive deploy that names its Deployment is not asked: naming it is
+// the answer. (Astro's --prompt asks nothing either.)
+func TestDeployManifestNamedIsNotAsked(t *testing.T) {
+	interactiveDeploy(t)
+	newPromptDeploy(t, &manifestdeploy.ImageResult{ImageTag: "tag", DagTarballVersion: "3-1"})
+	for _, args := range [][]string{{"prod"}, {"prod", "--prompt"}} {
+		out, errOut, err := execDeployIO("dev\n", args...)
+		require.NoError(t, err, "%v", args)
+		assert.NotContains(t, errOut, "Deploy to which deployment?", "%v", args)
+		assert.Contains(t, out, "to prod (deployment clx-dep).", "%v", args)
+	}
+}

@@ -1,7 +1,6 @@
 package apc
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
@@ -16,182 +16,120 @@ import (
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/internal/project"
-	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
-func execDeployCmd(args ...string) error {
-	cmd := NewDeployCmd(new(bytes.Buffer))
-	cmd.SetArgs(args)
-	defer testUtil.SetupOSArgsForGinkgo()()
-	_, err := cmd.ExecuteC()
-	return err
+// A prebuilt image's deploy, from a project's root or from outside any
+// project, hands the image deploy what the flags say, and fails as it fails.
+func TestDeployImageNameHandsOverTheImage(t *testing.T) {
+	t.Run("--image-name, from outside any project, to a Deployment by id", func(t *testing.T) {
+		inWorkingDir(t, true)
+		seen := deployMocks(t, deployPushed, nil)
+		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--image-name", "img:1", "-f", "-o", "json")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		require.Len(t, seen.images, 1)
+		in := seen.images[0]
+		assert.Equal(t, "test-deployment-id", in.DeploymentID)
+		assert.Equal(t, deployWorkspace, in.WorkspaceID)
+		assert.Equal(t, "img:1", in.ImageName)
+		assert.True(t, in.ImageAlone, "outside a project the image ships alone")
+		assert.False(t, in.IncludeDags)
+		assert.Equal(t, "Deployed via <astro deploy>", in.Description)
+	})
+
+	t.Run("--workspace-id names the workspace", func(t *testing.T) {
+		inWorkingDir(t, true)
+		seen := deployMocks(t, deployPushed, nil)
+		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--image-name=test-image-name", "--workspace-id=ws-flag", "-o", "json")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		require.Len(t, seen.images, 1)
+		assert.Equal(t, "ws-flag", seen.images[0].WorkspaceID)
+		assert.Equal(t, "test-image-name", seen.images[0].ImageName)
+	})
+
+	t.Run("--remote, from a project, with a description", func(t *testing.T) {
+		inProject(t, true)
+		seen := deployMocks(t, deployPushed, nil)
+		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--image-name", "img:1", "--remote", "--runtime-version", "12.1.1", "--description", "Initial deployment", "-o", "json")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		require.Len(t, seen.images, 1)
+		in := seen.images[0]
+		assert.True(t, in.InRegistry)
+		assert.Equal(t, "12.1.1", in.RuntimeVersion)
+		assert.True(t, in.IncludeDags, "from a project, the DAGs follow the image")
+		assert.False(t, in.ImageAlone)
+		assert.Equal(t, "Initial deployment", in.Description)
+	})
+
+	t.Run("the image deploy's failure is the deploy's", func(t *testing.T) {
+		inProject(t, true)
+		for _, want := range []error{deploy.ErrNoWorkspaceID, deploy.ErrDeploymentTypeIncorrectForImageOnly, deploy.ErrBYORegistryDomainNotSet} {
+			deployMocks(t, deployPushed, nil)
+			DeployManifestImage = func(houston.ClientInterface, *deploy.ManifestImage) (deploy.ManifestImageResult, error) {
+				return deploy.ManifestImageResult{}, want
+			}
+			run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--image-name", "img:1", "-o", "json")
+			assert.Equal(t, 1, run.code)
+			assert.ErrorIs(t, run.err, want)
+		}
+	})
+
+	t.Run("--dags and --image together", func(t *testing.T) {
+		inProject(t, true)
+		deployMocks(t, deployPushed, nil)
+		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--dags", "--image", "-o", "json")
+		assert.ErrorIs(t, run.err, ErrBothDagsOnlyAndImageOnlySet)
+	})
+
+	t.Run("--dags on a cluster without DAG-only deploys", func(t *testing.T) {
+		inProject(t, true)
+		deployMocks(t, deployPushed, deploy.ErrDagOnlyDeployDisabledInConfig)
+		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--dags", "--force", "-o", "json")
+		assert.ErrorIs(t, run.err, deploy.ErrDagOnlyDeployDisabledInConfig)
+	})
 }
 
-// The old route's deploys: an image named on the command line, from outside
-// any project (where it ships alone) or already in a registry (--remote),
-// whose DAGs then follow it from a project to a Deployment that takes them.
-func (s *Suite) TestDeploy() {
-	inWorkingDir(s.T(), true)
-	appConfig = &houston.AppConfig{
-		BYORegistryDomain: "test.registry.io",
-		Flags: houston.FeatureFlags{
-			BYORegistryEnabled: true,
-		},
+// The image flags that cannot go together are refused before anything is
+// read or asked: --remote names no image of its own, and an image in a
+// registry has no label to read its runtime from. --runtime-version without
+// --remote, which 1.x took and read nothing of, is taken, and said to do
+// nothing.
+func TestDeployImageFlagRefusals(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want error
+	}{
+		{"--remote without --image-name", []string{"--remote", "--runtime-version", "12.1.1"}, ErrImageNameNotPassedForRemoteFlag},
+		{"--remote with an empty --image-name", []string{"--remote", "--image-name=", "--runtime-version", "12.1.1"}, ErrImageNameNotPassedForRemoteFlag},
+		{"--remote without --runtime-version", []string{"--remote", "--image-name", "img:1"}, deploy.ErrRuntimeVersionNotPassedForRemoteImage},
+	} {
+		for _, where := range []func(*testing.T, bool) string{inProject, inWorkingDir} {
+			t.Run(tc.name, func(t *testing.T) {
+				where(t, true)
+				seen := deployMocks(t, deployPushed, nil)
+				api := newAPCClient()
+				run := runAPC(t, api, "", append([]string{"deploy", "test-deployment-id", "-o", "json"}, tc.args...)...)
+				assert.Equal(t, 1, run.code)
+				assert.ErrorIs(t, run.err, tc.want)
+				assert.Empty(t, seen.images)
+				for _, method := range []string{"GetWorkspace", "ListDeployments", "GetDeployment", "UpdateDeploymentImage"} {
+					api.AssertNotCalled(t, method, mock.Anything)
+				}
+			})
+		}
 	}
-	DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-		return deploy.Deployed{DeploymentID: deploymentID}, nil
-	}
 
-	var gotDescription string
-	DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-		gotDescription = description
-		return deploymentID, nil
-	}
-
-	s.NoError(execDeployCmd("-f", "--image-name", "img:1"))
-	s.NoError(execDeployCmd("-f", "test-deployment-id", "--image-name", "img:1"))
-
-	// The description reaches the DAG upload that follows an image already
-	// in a registry, from a project.
-	inProject(s.T(), true)
-	UpdateDeploymentImage = func(_ houston.ClientInterface, deploymentID, _, _, _ string, _ deploy.Options) (deploy.Deployed, error) {
-		return deploy.Deployed{DeploymentID: deploymentID}, nil
-	}
-	remote := []string{"--image-name", "img:1", "--remote", "--runtime-version", "12.1.1"}
-	s.NoError(execDeployCmd(append([]string{"test-deployment-id", "--description", "Initial deployment"}, remote...)...))
-	s.Equal("Initial deployment", gotDescription)
-	description = ""
-	s.NoError(execDeployCmd(append([]string{"test-deployment-id"}, remote...)...))
-	s.Equal("Deployed via <astro deploy>", gotDescription)
-	inWorkingDir(s.T(), true)
-
-	// Restore DagsOnlyDeploy to default behavior
-	DagsOnlyDeploy = deploy.DagsOnlyDeploy
-
-	s.Run("error should be returned for astro deploy, if DeployAirflowImage throws error", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{DeploymentID: deploymentID}, deploy.ErrNoWorkspaceID
-		}
-
-		err := execDeployCmd("-f", "--image-name", "img:1")
-		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
-
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
-		}
-	})
-
-	s.Run("error should be returned for astro deploy, if dags deploy throws error and the feature is enabled", func() {
-		inProject(s.T(), true)
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-			return deploymentID, deploy.ErrNoWorkspaceID
-		}
-		err := execDeployCmd("test-deployment-id", "--image-name", "img:1", "--remote", "--runtime-version", "12.1.1")
-		s.ErrorIs(err, deploy.ErrNoWorkspaceID)
-		inWorkingDir(s.T(), true)
-	})
-
-	s.Run("Test for the flag --dags when the feature is disabled", func() {
-		inProject(s.T(), true)
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-			return deploymentID, deploy.ErrDagOnlyDeployDisabledInConfig
-		}
-		err := execDeployCmd("test-deployment-id", "--dags", "--force")
-		s.ErrorIs(err, deploy.ErrDagOnlyDeployDisabledInConfig)
-	})
-
-	s.Run("Test when both the flags --dags and --image are passed", func() {
-		inProject(s.T(), true)
-		err := execDeployCmd("test-deployment-id", "--dags", "--image", "--force")
-		s.ErrorIs(err, ErrBothDagsOnlyAndImageOnlySet)
-		inWorkingDir(s.T(), true)
-	})
-
-	s.Run("Test for the flag --image for image deployment", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{DeploymentID: deploymentID}, deploy.ErrDeploymentTypeIncorrectForImageOnly
-		}
-		err := execDeployCmd("test-deployment-id", "--image", "--image-name", "img:1", "--force")
-		s.ErrorIs(err, deploy.ErrDeploymentTypeIncorrectForImageOnly)
-	})
-
-	s.Run("Test for the flag --image for dags-only deployment", func() {
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
-		}
-		// This function is not called since --image is passed
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-			return deploymentID, deploy.ErrNoWorkspaceID
-		}
-		err := execDeployCmd("test-deployment-id", "--image", "--image-name", "img:1", "--force")
-		s.ErrorIs(err, nil)
-	})
-
-	s.Run("Test for the flag --image-name", func() {
-		var capturedImageName string
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			capturedImageName = imageName // Capture the imageName
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
-		}
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-			return deploymentID, nil
-		}
-		testImageName := "test-image-name" // Set the expected image name
-		err := execDeployCmd("test-deployment-id", "--image-name="+testImageName, "--force", "--workspace-id="+mockWorkspace.ID)
-
-		s.ErrorIs(err, nil)
-		s.Equal(testImageName, capturedImageName, "The imageName passed to DeployAirflowImage is incorrect")
-	})
-
-	s.Run("Test for the flag --image-name with --remote. Dags should be deployed but DeployAirflowImage shouldn't be called", func() {
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-			return deploymentID, nil
-		}
-		// Create a flag to track if DeployAirflowImage is called
-		deployAirflowImageCalled := false
-
-		// Mock function for DeployAirflowImage
-		DeployAirflowImage = func(houstonClient houston.ClientInterface, deploymentID, wsID string, prompt, isImageOnlyDeploy bool, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			deployAirflowImageCalled = true // Set the flag if this function is called
-			return deploy.Deployed{DeploymentID: deploymentID}, nil
-		}
-		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{}, nil
-		}
-		testImageName := "test-image-name" // Set the expected image name
-		err := execDeployCmd("test-deployment-id", "--image-name="+testImageName, "--force", "--remote", "--workspace-id="+mockWorkspace.ID)
-		s.ErrorIs(err, nil)
-		// Assert that DeployAirflowImage was NOT called
-		s.False(deployAirflowImageCalled, "DeployAirflowImage should not be called when --remote is specified")
-	})
-
-	s.Run("Test for the flag --image-name with --remote. Dags should not be deployed if UpdateDeploymentImage throws an error", func() {
-		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{}, errNoWorkspaceFound
-		}
-		testImageName := "test-image-name" // Set the expected image name
-		err := execDeployCmd("test-deployment-id", "--image-name="+testImageName, "--force", "--remote", "--workspace-id="+mockWorkspace.ID)
-		s.ErrorIs(err, errNoWorkspaceFound)
-	})
-
-	s.Run("Test for the flag --remote without --image-name. It should throw an error", func() {
-		UpdateDeploymentImage = func(houstonClient houston.ClientInterface, deploymentID, wsID, runtimeVersion, imageName string, _ deploy.Options) (deploy.Deployed, error) {
-			return deploy.Deployed{}, errNoWorkspaceFound
-		}
-		err := execDeployCmd("test-deployment-id", "--force", "--remote", "--workspace-id="+mockWorkspace.ID)
-		s.ErrorIs(err, ErrImageNameNotPassedForRemoteFlag)
-		// An empty --image-name= names no image either.
-		err = execDeployCmd("test-deployment-id", "--force", "--remote", "--image-name=", "--workspace-id="+mockWorkspace.ID)
-		s.ErrorIs(err, ErrImageNameNotPassedForRemoteFlag)
-	})
-
-	s.Run("error should be returned if BYORegistryEnabled is true but BYORegistryDomain is empty", func() {
-		DagsOnlyDeploy = func(houstonClient houston.ClientInterface, wsID, deploymentID, dagsParentPath string, dagDeployURL *string, cleanUpFiles bool, description string, _ deploy.Options) (string, error) {
-			return deploymentID, deploy.ErrBYORegistryDomainNotSet
-		}
-		inProject(s.T(), true)
-		err := execDeployCmd("-f", "--image-name", "img:1")
-		s.ErrorIs(err, deploy.ErrBYORegistryDomainNotSet)
+	t.Run("--runtime-version without --remote", func(t *testing.T) {
+		inProject(t, true)
+		seen := deployMocks(t, deployPushed, nil)
+		run := runAPC(t, newAPCClient(), "", "deploy", "test-deployment-id", "--image-name", "img:1", "--runtime-version", "12.1.1", "-o", "json")
+		require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+		var got deployJSON
+		decodeOne(t, run.stdout, &got)
+		assert.Equal(t, []string{"--runtime-version has no effect without --remote: the runtime of an image on this machine, or of one built, is read from its label"}, got.Warnings)
+		require.Len(t, seen.images, 1)
+		assert.Empty(t, seen.images[0].RuntimeVersion)
+		assert.False(t, seen.images[0].InRegistry)
 	})
 }
 
@@ -224,16 +162,12 @@ func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
 		{"a build outside any project", func(t *testing.T) string { return inWorkingDir(t, true) }, nil, "this is not an Astro project directory", false, true},
 		{"a build of a 1.x project", in1xProject, nil, apc1x, false, true},
 		{"--image-name from a 1.x project", in1xProject, []string{"--image-name", "img:1"}, apc1x, false, true},
+		{"--image-name --remote from a 1.x project", in1xProject, []string{"--image-name", "img:1", "--remote", "--runtime-version", "12.1.1"}, apc1x, false, true},
 		{"--dags from a 1.x project", in1xProject, []string{"--dags"}, apc1x, false, true},
 		{"--dags outside any project", func(t *testing.T) string { return inWorkingDir(t, true) }, []string{"--dags"}, "this is not an Astro project directory", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			seen := deployMocks(t, deployPushed, nil)
-			imageDeploys := 0
-			DeployAirflowImage = func(houston.ClientInterface, string, string, bool, bool, string, deploy.Options) (deploy.Deployed, error) {
-				imageDeploys++
-				return deployPushed, nil
-			}
 			tc.setup(t)
 			for _, format := range []string{"text", "json"} {
 				args := append(append([]string{"deploy", "dep-ac"}, tc.args...), "-o", format)
@@ -243,7 +177,7 @@ func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
 				assert.Equal(t, tc.usage, cliout.IsUsage(run.err), format)
 				var notFound *project.NotFoundError
 				assert.Equal(t, tc.noProject, errors.As(run.err, &notFound), format)
-				assert.Zero(t, imageDeploys, "%s: nothing is deployed", format)
+				assert.Empty(t, seen.images, "%s: nothing is deployed", format)
 				assert.Zero(t, seen.dagUploads, "%s: nothing is uploaded", format)
 				if format == "json" {
 					var obj struct {
@@ -257,8 +191,8 @@ func TestDeployRefusesWhatV2DoesNotDeploy(t *testing.T) {
 	}
 }
 
-// The deploys v2 keeps on APC need no 1.x project: --image-name from
-// anywhere else, and --dags from a pyproject.toml project.
+// The deploys v2 keeps on APC need no 1.x project: --image-name, local or
+// --remote, from anywhere else, and --dags from a pyproject.toml project.
 func TestDeployKeepsImageNameAndDags(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -268,6 +202,7 @@ func TestDeployKeepsImageNameAndDags(t *testing.T) {
 		{"--image-name outside any project", func(t *testing.T) string { return inWorkingDir(t, false) }, []string{"--image-name", "img:1"}},
 		{"--image-name from a pyproject.toml project", func(t *testing.T) string { return inProject(t, true) }, []string{"--image-name", "img:1"}},
 		{"--image-name --remote outside any project", func(t *testing.T) string { return inWorkingDir(t, false) }, []string{"--image-name", "img:1", "--remote", "--runtime-version", "12.1.1"}},
+		{"--image-name --remote from a pyproject.toml project", func(t *testing.T) string { return inProject(t, true) }, []string{"--image-name", "img:1", "--remote", "--runtime-version", "12.1.1"}},
 		{"--dags from a pyproject.toml project", func(t *testing.T) string { return inProject(t, true) }, []string{"--dags"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -63,6 +63,13 @@ type Request struct {
 	// ImageName is --image-name: a prebuilt local image to deploy instead of
 	// building from the manifest. "" means build.
 	ImageName string
+	// ImageInRegistry is an ImageName already in a registry (--image-name
+	// --remote on Astro Private Cloud): nothing is built, read or pushed,
+	// and the transport points the Deployment at the reference as it is.
+	ImageInRegistry bool
+	// ImageRuntime is the Astro Runtime version an ImageInRegistry image
+	// carries (--runtime-version), which no local label can say.
+	ImageRuntime string
 	// BuildSecrets are docker build --secret specs forwarded to the image
 	// build: --build-secret, BUILD_SECRET_INPUT or the manifest's
 	// build-secrets, as util.ResolveProjectBuildSecrets picked them.
@@ -239,6 +246,10 @@ type ImageDeploy struct {
 	// RUN of the project's own to consume one; a generated build drops them.
 	BuildSecrets []string
 	ImageName    string
+	// ImageInRegistry and ImageRuntime are Request's: ImageName is already
+	// in a registry, carrying Astro Runtime ImageRuntime.
+	ImageInRegistry bool
+	ImageRuntime    string
 	// OnBuild is Request.OnBuild, for the transport to call.
 	OnBuild func()
 	// IncludeDags marks a "both" deploy. To a Deployment with DAG deploys
@@ -456,6 +467,8 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 		Build:               imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
 		BuildSecrets:        req.BuildSecrets,
 		ImageName:           req.ImageName,
+		ImageInRegistry:     req.ImageInRegistry,
+		ImageRuntime:        req.ImageRuntime,
 		OnBuild:             req.OnBuild,
 		IncludeDags:         includeDags,
 		ImageAlone:          req.ImageAlone,

@@ -140,7 +140,7 @@ func TestBundleEnabledAddsSidecars(t *testing.T) {
 		} `json:"generated_by"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(entries[sidecarRel]), &meta))
-	require.Equal(t, 1, meta.Schema, "schema is the plugin's compatibility gate and must stay 1")
+	require.Equal(t, 2, meta.Schema, "schema is the plugin's compatibility gate - bump deliberately, not by accident")
 	require.Equal(t, "sha256-tree-v2", meta.Version.Algo)
 	for _, r := range summary.Results {
 		if r.Path == dir {
@@ -161,6 +161,18 @@ func TestBundleRespectsSlimManifestEnvVar(t *testing.T) {
 	entries, err := bundle(t, dir, true)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"manifest.json", sidecarRel}, keys(entries))
+}
+
+// TestBundleDiscoversCustomNamedManifest: a manifest not literally named
+// manifest.json is found and stamped automatically - by name and content,
+// with nothing to configure - and its slim manifest is named after it.
+func TestBundleDiscoversCustomNamedManifest(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"manifest_full.json": dbtManifest})
+
+	entries, err := bundle(t, dir, true)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"manifest_full.json", sidecarRel, ".astro/manifest_full.slim.json"}, keys(entries))
 }
 
 // TestSlimManifestEnabled: unset leaves the optimization on; otherwise only a
@@ -193,10 +205,11 @@ func TestBundleLeavesOutStaleSidecars(t *testing.T) {
 		dir := t.TempDir()
 		writeDbtProject(t, dir)
 		writeFiles(t, dir, map[string]string{
-			sidecarRel:                      oursSidecar,
-			"removed-project/" + sidecarRel: oursSidecar,
-			"removed-project/" + slimRel:    oursSlim,
-			"logs/" + sidecarRel:            oursSidecar,
+			sidecarRel:                                       oursSidecar,
+			"removed-project/" + sidecarRel:                  oursSidecar,
+			"removed-project/" + slimRel:                     oursSlim,
+			"removed-project/.astro/manifest_full.slim.json": oursSlim,
+			"logs/" + sidecarRel:                             oursSidecar,
 		})
 		before := snapshot(t, dir)
 
@@ -204,7 +217,7 @@ func TestBundleLeavesOutStaleSidecars(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, before, snapshot(t, dir), "enabled=%v: the tree must not be written", enabled)
-		for _, gone := range []string{"removed-project/" + sidecarRel, "removed-project/" + slimRel, "logs/" + sidecarRel} {
+		for _, gone := range []string{"removed-project/" + sidecarRel, "removed-project/" + slimRel, "removed-project/.astro/manifest_full.slim.json", "logs/" + sidecarRel} {
 			require.NotContains(t, entries, gone, "enabled=%v", enabled)
 		}
 		if enabled {
