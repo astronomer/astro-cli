@@ -185,6 +185,7 @@ The command-specific 2s predate the usage 2. A script that runs one of those com
 | `foreign_mode` | the project is running in the other mode |
 | `already_running` | the project is already running |
 | `health_timeout` | Airflow did not become healthy in time |
+| `start_timed_out` | the containers did not finish starting in time, so the start gave up on them; nothing is still coming up (Docker mode) |
 | `locked` | another start of this project is in progress; try again (Unix only) |
 | `unsupported_base` | the image base is not one this mode can run |
 | `database_newer_than_airflow` | the metadata database was migrated by a newer Airflow (Docker mode) |

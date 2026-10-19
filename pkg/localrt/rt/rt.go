@@ -290,6 +290,12 @@ type ImageRun struct {
 // a project that is merely not running, which still has one.
 var ErrImageNotBuilt = errors.New("this project has no image yet")
 
+// ErrStartTimedOut reports a start whose containers did not finish starting in
+// the time allowed, so it was given up on and handled like any failed start.
+// Not ErrHealthTimeout: that one means Airflow may still be coming up, and
+// here nothing is.
+var ErrStartTimedOut = errors.New("the containers did not finish starting in time")
+
 // Airflow is a handle to a running local Airflow, obtained from Start or
 // Attach — so every method on it is always valid.
 type Airflow interface {

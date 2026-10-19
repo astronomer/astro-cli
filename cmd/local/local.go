@@ -187,7 +187,7 @@ func newStartCmd(c *cli) *cobra.Command {
 			"  astro local start --docker\n\n" +
 			"  # On a port of your choosing\n" +
 			"  astro local start --port 8081\n\n" +
-			"  # Wait up to ten minutes for Airflow, over a slow link or a cold image pull\n" +
+			"  # Wait up to ten minutes for Airflow, on a slow machine\n" +
 			"  ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

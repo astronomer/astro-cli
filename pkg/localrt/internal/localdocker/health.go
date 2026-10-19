@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	// defaultHealthTimeout bounds the wait for the api-server to come up.
-	// First runs pull the runtime image, so this is generous.
+	// defaultHealthTimeout bounds the wait for the api-server to come up, and
+	// separately the `compose up` before it. A first run migrates an empty
+	// database, so this is generous.
 	defaultHealthTimeout = 5 * time.Minute
 	healthPollInterval   = time.Second
 	healthRequestTimeout = 5 * time.Second
@@ -20,7 +21,8 @@ const (
 
 // ErrHealthTimeout reports that Airflow did not become healthy in time.
 // The containers keep starting in the background: the project is still up,
-// registered, and stoppable.
+// registered, and stoppable. A `compose up` that runs out of time is not this
+// but ErrStartTimedOut: it is given up on, and nothing keeps starting.
 //
 // airflowrt's, not one of this package's own, so a caller holding an error from
 // either engine asks once. Which engine ran is the runtime's business, and the
