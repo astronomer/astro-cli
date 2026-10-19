@@ -218,7 +218,7 @@ func newEnvLinkSetCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Command {
     --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
-	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &f.deploymentID})
+	addDeploymentFlag(cmd.Flags(), "Deployment to link: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &f.deploymentID}, oneXDeploymentID(""))
 	cmd.Flags().BoolVar(&f.exclude, "exclude", false, "Opt the deployment out of an auto-linked "+n.what+" instead")
 	cmd.Flags().BoolVar(&f.noCreate, "no-create", false, "Fail if the deployment is not already linked")
 	// --exclude takes a different path entirely (the platform's exclude-linking
@@ -246,7 +246,7 @@ func newEnvLinkDeleteCmd(out io.Writer, n *linkNoun, f *linkFlags) *cobra.Comman
     --deployment <DEPLOYMENT_ID> --exclude`, n.what, n.noun),
 	}
 	addLinkObjectFlags(cmd, n, f)
-	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &f.deploymentID})
+	addDeploymentFlag(cmd.Flags(), "Deployment to unlink: an id, or a link name inside a project with a pyproject.toml (required)", deploymentTargets{id: &f.deploymentID}, oneXDeploymentID(""))
 	cmd.Flags().BoolVar(&f.exclude, "exclude", false, "Remove an exclude instead of a link")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	return cmd

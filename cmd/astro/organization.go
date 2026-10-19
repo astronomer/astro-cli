@@ -115,7 +115,7 @@ func newOrganizationSwitchCmd(out io.Writer) *cobra.Command {
 	}
 	cliout.AddOutputFlag(cmd, &organizationSwitchOutput)
 
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace to make current after the switch")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "Workspace to make current after the switch", oneXWorkspaceID)
 
 	return cmd
 }

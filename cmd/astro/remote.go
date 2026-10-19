@@ -76,7 +76,7 @@ func newRemoteDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&remotePlatform, "platform", "", "Target platform for client image build (e.g., linux/amd64,linux/arm64). Defaults to host machine platform")
 	cmd.Flags().StringVarP(&remoteImageName, "image-name", "i", "", "Name of a custom image to deploy, or image name with custom tag; the image must be present on this machine")
 	utils.AddBuildSecretFlag(cmd.Flags(), &remoteBuildSecrets)
-	addDeploymentFlag(cmd.Flags(), "Deployment whose runtime version the client image is validated against", deploymentTargets{id: &remoteDeploymentID})
+	addDeploymentFlag(cmd.Flags(), "Deployment whose runtime version the client image is validated against", deploymentTargets{id: &remoteDeploymentID}, oneXDeploymentID(""))
 	cliout.AddOutputFlag(cmd, &remoteOutput)
 
 	return cmd

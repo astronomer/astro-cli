@@ -207,7 +207,7 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUserRemoveCmd(out),
 		newWorkspaceUserAddCmd(out),
 	)
-	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace whose users you'd like to manage")
+	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace whose users you'd like to manage", oneXWorkspaceID)
 	cliout.AddOutputFlag(cmd, &workspaceUserOutput)
 
 	return cmd
@@ -303,7 +303,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTokenAddOrgTokenCmd(out),
 		newWorkspaceOrgTokenManageCmd(out),
 	)
-	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace whose tokens you'd like to manage")
+	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace whose tokens you'd like to manage", oneXWorkspaceID)
 	cliout.AddOutputFlag(cmd, &workspaceTokenOutput)
 	return cmd
 }
@@ -589,7 +589,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 			return removeWorkspaceTeam(cmd, args, out)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier", oneXWorkspaceID)
 	return cmd
 }
 
@@ -634,7 +634,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 			return addWorkspaceTeam(cmd, args, out)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier", oneXWorkspaceID)
 	cmd.Flags().StringVarP(&addWorkspaceRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
 		"new team. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd
@@ -677,7 +677,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return updateWorkspaceTeam(cmd, args, out)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier", oneXWorkspaceID)
 	cmd.Flags().StringVarP(&updateWorkspaceRole, "role", "r", "", "The new role for the "+
 		"team. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd

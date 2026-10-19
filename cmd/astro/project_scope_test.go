@@ -354,7 +354,7 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 	t.Run("deployment name", func(t *testing.T) {
 		inProject(t, testProjectManifest)
 		cmd := &cobra.Command{Use: "logs"}
-		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName, nameShort: "n"})
+		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
 		require.NoError(t, cmd.ParseFlags([]string{"-n", "test"}))
 		require.NoError(t, applyPreferredFlags(cmd, nil))
 		pick, err := followProject(cmd, nil)
@@ -367,7 +367,7 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 	t.Run("a deployment name that is no link stays a name", func(t *testing.T) {
 		inProject(t, testProjectManifest)
 		cmd := &cobra.Command{Use: "logs"}
-		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName, nameShort: "n"})
+		addDeploymentFlag(cmd.Flags(), "", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
 		require.NoError(t, cmd.ParseFlags([]string{"-n", "my deployment"}))
 		require.NoError(t, applyPreferredFlags(cmd, nil))
 		pick, err := followProject(cmd, nil)
@@ -381,7 +381,7 @@ func TestFollowProjectResolvesALinkWhereverADeploymentGoes(t *testing.T) {
 		inProject(t, testProjectManifest)
 		for _, flag := range []string{"--workspace", "--workspace-id"} {
 			cmd := &cobra.Command{Use: "list"}
-			addWorkspaceFlag(cmd.Flags(), &workspaceID, "", "")
+			addWorkspaceFlag(cmd.Flags(), &workspaceID, "", "", oneXWorkspaceID)
 			require.NoError(t, cmd.ParseFlags([]string{flag, "clexplicitworkspace000001"}))
 			require.NoError(t, applyPreferredFlags(cmd, nil))
 			pick, err := followProject(cmd, nil)

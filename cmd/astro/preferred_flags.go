@@ -12,10 +12,11 @@ import (
 )
 
 // --deployment and --workspace are the spellings help shows, and the ones
-// commands read. The ones they replace, --deployment-id, --deployment-name
-// and --workspace-id, keep working as they always have, hidden, with the
-// shorthands 1.x gave them: they are aliases that applyPreferredFlags hands to
-// --deployment or --workspace, and nothing else reads them.
+// commands read. On a command 1.x had, the ones they replace, --deployment-id,
+// --deployment-name and --workspace-id, keep working as they always have,
+// hidden, with the shorthands 1.x gave them: the command opts in to them
+// (oneXSpelling), and they are aliases that applyPreferredFlags hands to
+// --deployment or --workspace, which nothing else reads.
 
 // deploymentArg is a Deployment id given as --deployment to a command that
 // takes a Deployment's id only as its argument. followProject reads it as it
@@ -24,11 +25,31 @@ var deploymentArg string
 
 // deploymentTargets is where a command takes the Deployment --deployment
 // names: id for a Deployment id, name for a Deployment name, either nil on a
-// command that takes no such thing. Each carries the 1.x spelling it had as a
-// hidden alias, with that spelling's shorthand ("" for none).
+// command that takes no such thing.
 type deploymentTargets struct {
-	id, name           *string
-	idShort, nameShort string
+	id, name *string
+}
+
+// oneXSpelling is a 1.x flag a command that 1.x had keeps as a hidden alias of
+// its v2 spelling, with the shorthand 1.x gave it ("" for none). A command
+// opts in to each one; a command 1.x did not have takes none.
+type oneXSpelling struct {
+	name, shorthand string
+}
+
+// oneXWorkspaceID is 1.x's --workspace-id, which had no shorthand.
+var oneXWorkspaceID = oneXSpelling{name: "workspace-id"}
+
+// oneXDeploymentID is 1.x's --deployment-id, with the shorthand it had on
+// the command.
+func oneXDeploymentID(shorthand string) oneXSpelling {
+	return oneXSpelling{name: "deployment-id", shorthand: shorthand}
+}
+
+// oneXDeploymentName is 1.x's --deployment-name, with the shorthand it had on
+// the command.
+func oneXDeploymentName(shorthand string) oneXSpelling {
+	return oneXSpelling{name: "deployment-name", shorthand: shorthand}
 }
 
 // deploymentFlag is the value of --deployment. It splits what it was given
@@ -49,25 +70,39 @@ func (d *deploymentFlag) Set(v string) error { d.value = v; return nil }
 func (d *deploymentFlag) Type() string       { return "string" }
 
 // addDeploymentFlag registers --deployment on fs, splitting into to's id and
-// name, and the 1.x spellings of each as hidden aliases.
-func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets) {
+// name, and the 1.x spellings oneX names as hidden aliases: --deployment-id
+// for a command with an id, --deployment-name for one with a name.
+func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets, oneX ...oneXSpelling) {
 	d := &deploymentFlag{deploymentTargets: to}
 	fs.Var(d, "deployment", usage)
 	if to.id != nil {
 		*to.id = ""
-		d.idAlias = utils.AddAlias(fs, "deployment-id", to.idShort, "deployment")
 	}
 	if to.name != nil {
 		*to.name = ""
-		d.nameAlias = utils.AddAlias(fs, "deployment-name", to.nameShort, "deployment")
+	}
+	for _, o := range oneX {
+		switch {
+		case o.name == "deployment-id" && to.id != nil:
+			d.idAlias = utils.AddAlias(fs, o.name, o.shorthand, "deployment")
+		case o.name == "deployment-name" && to.name != nil:
+			d.nameAlias = utils.AddAlias(fs, o.name, o.shorthand, "deployment")
+		default:
+			panic(fmt.Sprintf("addDeploymentFlag: --%s is no 1.x spelling of what this --deployment takes", o.name))
+		}
 	}
 }
 
-// addWorkspaceFlag registers --workspace on fs, read into to, and its 1.x
-// spelling --workspace-id as a hidden alias.
-func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string) {
+// addWorkspaceFlag registers --workspace on fs, read into to, and the 1.x
+// spelling oneX names (oneXWorkspaceID) as a hidden alias.
+func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, oneX ...oneXSpelling) {
 	fs.StringVarP(to, "workspace", shorthand, "", usage)
-	utils.AddAlias(fs, "workspace-id", "", "workspace")
+	for _, o := range oneX {
+		if o != oneXWorkspaceID {
+			panic(fmt.Sprintf("addWorkspaceFlag: --%s is no 1.x spelling of --workspace", o.name))
+		}
+		utils.AddAlias(fs, o.name, o.shorthand, "workspace")
+	}
 }
 
 // deploymentFlagOf is the --deployment on fs that addDeploymentFlag
