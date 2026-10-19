@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
@@ -55,15 +56,18 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 	// context is done or the process has exited, so a `logs --follow` streams
 	// for as long as its caller wants and only its teardown is bounded.
 	cmd.WaitDelay = waitDelay
-	if s.In == nil {
-		// A deadline or cancel kills the whole process tree, not only the
-		// engine CLI. `docker compose` (and `podman compose`, through its
-		// provider) runs the compose plugin as a child, which the default
-		// cancel left running — still driving the up while the rollback took
-		// the project down. Not for a command reading stdin: a shell or an
-		// exec into the scheduler owns the terminal, and a process group of
-		// its own would take that away from it.
-		killTreeOnCancel(cmd)
+	// SIGTERM rather than the default SIGKILL. `docker compose` and `podman
+	// compose` run the compose plugin or provider as a child, and a killed
+	// CLI cannot pass anything on, so the child kept driving the up while
+	// the rollback took the project down. A terminated one forwards the
+	// signal and waits for the child. WaitDelay is the backstop: a CLI that
+	// has not exited by then is killed. Windows has no SIGTERM to send, so
+	// there Signal fails and this kills, as before.
+	cmd.Cancel = func() error {
+		if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+			return cmd.Process.Kill()
+		}
+		return nil
 	}
 	cmd.Stdin = s.In
 	cmd.Stdout = s.Out

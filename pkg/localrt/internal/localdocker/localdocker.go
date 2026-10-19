@@ -97,8 +97,8 @@ func (e *Engine) SetContainerBinary(f func(projectPath string) string) {
 	}
 }
 
-// SetHealthTimeout bounds how long a start waits for its containers to come up
-// and the api-server to answer, together. See updeadline.go.
+// SetHealthTimeout bounds how long a start waits for the api-server to answer,
+// and, separately, how long its `compose up` may take (see updeadline.go).
 //
 // A setter rather than another parameter on New, which already takes three and
 // would take a fourth that almost every caller leaves at its default. See
@@ -385,8 +385,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		projectDir: projectPath,
 		extraEnv:   secretEnviron(p.SecretEnv),
 	}
-	remaining, err := e.bringUp(ctx, &up, mayCleanUp, cb)
-	if err != nil {
+	if err := e.bringUp(ctx, &up, mayCleanUp, cb); err != nil {
 		return nil, err
 	}
 
@@ -395,7 +394,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 		return nil, err
 	}
 
-	if err := e.awaitHealth(ctx, healthURLs(webPort, major), remaining); err != nil {
+	if err := e.health(ctx, healthURLs(webPort, major), e.healthTimeout); err != nil {
 		rt.OnState(cb, rt.StateError, err)
 		return nil, err
 	}
@@ -411,17 +410,14 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 // Its own function because Start is already at the complexity limit, and because
 // the decision it carries — whether a failure is this start's to clean up — is
 // worth reading in one place.
-//
-// It returns what the up left of the health budget, for the health wait.
-func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) (time.Duration, error) {
-	remaining, err := e.composeUp(ctx, up, cb)
-	if err != nil {
+func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) error {
+	if err := e.composeUp(ctx, up, cb); err != nil {
 		startErr := fmt.Errorf("starting project containers: %w", err)
 		if !mayCleanUp {
 			// Containers were here before this start, or we could not tell —
 			// either way they are not ours to remove. Name the project so the
 			// user can clean up by hand if they were in fact ours.
-			return 0, fmt.Errorf("%w (containers may remain under compose project %s)", startErr, up.name)
+			return fmt.Errorf("%w (containers may remain under compose project %s)", startErr, up.name)
 		}
 		// Joined rather than logged: a cleanup report gated on cb.OnLine, which
 		// the contract makes optional, would let a consumer passing
@@ -431,12 +427,12 @@ func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, 
 		revision, cleanup := e.rollback(ctx, up.conn, up.name, cb)
 		if revision != "" {
 			// The one failure the logs can name precisely, so it replaces
-			// "exit status 1" — or a timeout — rather than riding beside it.
+			// "exit status 1" — or a timed-out up — rather than riding beside it.
 			startErr = databaseNewerError(revision)
 		}
-		return 0, errors.Join(startErr, cleanup)
+		return errors.Join(startErr, cleanup)
 	}
-	return remaining, nil
+	return nil
 }
 
 // databaseNewerError reports a metadata database the project's Airflow cannot

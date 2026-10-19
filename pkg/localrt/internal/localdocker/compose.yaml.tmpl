@@ -35,13 +35,15 @@ services:
     # on it forever. Over TCP on purpose: the image's first-run init serves a
     # temporary server on the unix socket only, and a check that accepted it
     # would start the migration against a server about to shut down.
-    # start_period covers that first init on a cold volume.
+    # start_period is generous so a cold init or a slow crash recovery is not
+    # called dead; a container that exits fails the up within seconds anyway.
+    # Podman runs healthchecks through systemd, which docs/install.md notes.
     healthcheck:
       test: ["CMD", "pg_isready", "--host", "localhost", "--username", "postgres"]
       interval: 2s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 10m
 
   db-migration:
     depends_on:

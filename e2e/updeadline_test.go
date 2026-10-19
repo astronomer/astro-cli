@@ -28,7 +28,7 @@ const upDeadlineBound = 5 * time.Minute
 // waits on postgres's port with no limit; and postgres under `restart:
 // unless-stopped` crash-loops for good on a data directory it refuses. Now
 // the migration waits on postgres's healthcheck, and compose itself gives up
-// with "dependency failed to start" — in seconds, long before the budget.
+// with "dependency failed to start" — in seconds, long before the timeout.
 //
 // The stand-in postgres exits at once rather than refusing a real data
 // directory: what makes the hang is a database that never listens, and this is
@@ -42,14 +42,18 @@ func TestADockerStartWhoseDatabaseNeverComesUpFailsInTime(t *testing.T) {
     command: ["sh", "-c", "echo '`+pgRefusal+`' >&2; exit 1"]
 `)
 
-	// A budget the failure must not need: the point is that compose reports
+	// A timeout the failure must not need: the point is that compose reports
 	// it, not that the deadline does.
 	const budget = 3 * time.Minute
+	env := map[string]string{"ASTRO_LOCAL_HEALTH_TIMEOUT": budget.String()}
+	// Once untimed, so the images are pulled: a cold pull on a slow runner is
+	// not what the timing below is about. It fails the same way, and leaves
+	// nothing behind for the timed run to trip over.
+	p.runBounded(upDeadlineBound, env, "local", "start", "--docker").requireFailure()
+
 	began := time.Now()
-	r := p.runBounded(upDeadlineBound,
-		map[string]string{"ASTRO_LOCAL_HEALTH_TIMEOUT": budget.String()},
-		"local", "start", "--docker").requireFailure()
-	if took := time.Since(began); took > budget/2 {
+	r := p.runBounded(upDeadlineBound, env, "local", "start", "--docker").requireFailure()
+	if took := time.Since(began); took > time.Minute {
 		t.Errorf("the start took %s to fail; compose should have reported the dead database in seconds\n%s", took, r.output())
 	}
 
@@ -75,8 +79,8 @@ func TestADockerStartWhoseDatabaseNeverComesUpFailsInTime(t *testing.T) {
 //
 // The case the deadline on `compose up` is a safety net for: everything the
 // up waits on is healthy or running, so compose has nothing to report and
-// would wait forever. The CLI kills it — the compose plugin included, not only
-// the docker CLI above it — and rolls back.
+// would wait forever. The CLI stops it — SIGTERM, which the docker CLI passes
+// on to the compose plugin — and rolls back.
 func TestADockerStartWhoseMigrationHangsHitsTheDeadline(t *testing.T) {
 	tier(t, 3)
 	p := dockerProject(t, "mighang")
@@ -90,7 +94,9 @@ func TestADockerStartWhoseMigrationHangsHitsTheDeadline(t *testing.T) {
 		map[string]string{"ASTRO_LOCAL_HEALTH_TIMEOUT": "45s"},
 		"local", "start", "--docker").requireFailure()
 
-	for _, want := range []string{"timed out after 45s, before the containers finished starting", "ASTRO_LOCAL_HEALTH_TIMEOUT"} {
+	// Given up on, not "may still be coming up"; the knob that bounds it is
+	// named, since a migration that is merely slow is helped by it.
+	for _, want := range []string{"did not finish starting in time after 45s", "ASTRO_LOCAL_HEALTH_TIMEOUT"} {
 		if !strings.Contains(r.Stderr, want) {
 			t.Errorf("stderr does not carry %q\n%s", want, r.output())
 		}

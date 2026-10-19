@@ -20,7 +20,7 @@ import (
 // two cases below existed while the plan asked for them.
 const impatientHealth = "1ms"
 
-// unansweredHealth is a budget a docker stack's up finishes well inside — a
+// unansweredHealth is a timeout a docker stack's up finishes well inside — a
 // few seconds warm, under a minute for a cold migration on a loaded runner —
 // for a case whose API server never answers, so the wait is what runs out.
 const unansweredHealth = "2m"
@@ -131,11 +131,11 @@ func processesUnder(t *testing.T, dir string) int {
 // only the record would leave five containers holding a port with nothing able
 // to name them.
 //
-// Not startImpatiently. The budget covers `compose up` as well as the wait (an
-// up that ran it out is torn down — see updeadline_test.go), so a 1ms budget
-// now ends the start before any container is up to keep. Instead the up gets
-// time to finish and the API server is one that never answers, which is the
-// wait running out after the containers are up: what this case is about.
+// Not startImpatiently. The same value bounds `compose up` too (an up that
+// runs past it is given up on — see updeadline_test.go), so a 1ms timeout
+// ends the start before any container is up to keep. Instead the up gets time
+// to finish and the API server is one that never answers, which is the wait
+// running out after the containers are up: what this case is about.
 func TestADockerStartThatNeverBecomesHealthyKeepsItsContainers(t *testing.T) {
 	tier(t, 3)
 
