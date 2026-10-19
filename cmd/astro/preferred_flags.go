@@ -55,13 +55,11 @@ func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets) {
 	fs.Var(d, "deployment", usage)
 	if to.id != nil {
 		*to.id = ""
-		utils.AddAlias(fs, "deployment-id", to.idShort, "deployment")
-		d.idAlias = fs.Lookup("deployment-id")
+		d.idAlias = utils.AddAlias(fs, "deployment-id", to.idShort, "deployment")
 	}
 	if to.name != nil {
 		*to.name = ""
-		utils.AddAlias(fs, "deployment-name", to.nameShort, "deployment")
-		d.nameAlias = fs.Lookup("deployment-name")
+		d.nameAlias = utils.AddAlias(fs, "deployment-name", to.nameShort, "deployment")
 	}
 }
 

@@ -16,12 +16,13 @@ const aliasAnnotation = "astro.alias-of"
 // another spelling of --preferred, which the caller has already put on fs.
 // The alias holds nothing a command reads: ApplyAliases hands what it was
 // given to --preferred, and the command reads --preferred alone, whichever
-// spelling was typed.
-func AddAlias(fs *pflag.FlagSet, old, shorthand, preferred string) {
+// spelling was typed. It returns the alias.
+func AddAlias(fs *pflag.FlagSet, old, shorthand, preferred string) *pflag.Flag {
 	fs.StringP(old, shorthand, "", "Another spelling of --"+preferred+", kept for scripts written for Astro CLI 1.x")
 	f := fs.Lookup(old)
 	f.Hidden = true
 	f.Annotations = map[string][]string{aliasAnnotation: {preferred}}
+	return f
 }
 
 // IsAlias reports whether f is a spelling AddAlias registered.

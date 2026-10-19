@@ -54,6 +54,7 @@ Below `cmd/`, the core never prints and never exits. Libraries report progress t
 | `TestEveryLintedSubmoduleIsHeldToTheNoPrintRule` | every linted sub-module is under the no-print rule |
 | `TestTheAuthDoorsStayOptional` | `pkg/instances` and the instance locators link neither auth door nor a cloud SDK |
 | `airflowkey_test.go` | `[tool.astro]` carries no Airflow-version field, and nothing reads one |
+| `TestOnlyTheAliasRegistrationsSpellTheOneXNames` | under `cmd/` and `internal/`, no constant expression spells `deployment-id`, `deployment-name` or `workspace-id` except as an argument to `utils.AddAlias` or at a site its allowlist names: commands read `--deployment` and `--workspace`, and the 1.x spellings are aliases that feed them |
 
 Contract structs (`Plan`, `Deps`, options) pass by value, so the `hugeParam` lint is suppressed for the packages that carry them (the path list is in `.golangci.yml`).
 

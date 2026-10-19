@@ -71,12 +71,6 @@ func Setup(cmd *cobra.Command, astroV1Client astrov1.APIClient) error {
 		return nil
 	}
 
-	// If the user is using dev commands no need to go through auth setup,
-	// unless the workspace or deployment ID flag is set.
-	if cmd.CalledAs() == "dev" && cmd.Parent().Use == topLvlCmd && !workspaceOrDeploymentIDFlagSet(cmd) {
-		return nil
-	}
-
 	// If the user is using flow commands no need to go through auth setup.
 	if cmd.CalledAs() == "flow" && cmd.Parent().Use == topLvlCmd {
 		return nil
@@ -639,10 +633,4 @@ func useEnvironmentSelection(c *config.Context, orgID, orgProduct, wsID string) 
 	if err := c.SetEnvironmentContextKey("organization_product", orgProduct); err != nil {
 		fmt.Fprintln(os.Stderr, "no organization context set")
 	}
-}
-
-func workspaceOrDeploymentIDFlagSet(cmd *cobra.Command) bool {
-	wsID, _ := cmd.Flags().GetString("workspace")   //nolint:errcheck // error deliberately ignored in this shell code
-	depID, _ := cmd.Flags().GetString("deployment") //nolint:errcheck // error deliberately ignored in this shell code
-	return wsID != "" || depID != ""
 }
