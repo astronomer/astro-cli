@@ -1,5 +1,6 @@
-*  @astronomer/astro-cli-maintainers
+# Disabled on v2 to stop automatic review requests. Uncomment to restore.
+# *  @astronomer/astro-cli-maintainers
 
-/houston/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
-/apc/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
-/cmd/apc/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
+# /houston/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
+# /apc/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
+# /cmd/apc/ @astronomer/astro-cli-maintainers-apc @astronomer/houston-api-maintainers
