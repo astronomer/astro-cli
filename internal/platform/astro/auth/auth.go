@@ -773,7 +773,7 @@ func Logout(domain string, out io.Writer) error {
 	}
 
 	if err := c.SignOut(); err != nil {
-		return fmt.Errorf("failed to clear the credentials for %s: %w", domain, err)
+		return fmt.Errorf("failed to clear the credentials for %s: %w", given, err)
 	}
 
 	// Logging out of another domain leaves the current one selected
