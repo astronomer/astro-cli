@@ -10,6 +10,10 @@ func TestIsCosmosBoostFile(t *testing.T) {
 	for rel, want := range map[string]bool{
 		".astro/dbt_metadata.json":                      true,
 		".astro/manifest.slim.json":                     true,
+		".astro/manifest_full.slim.json":                true,
+		"target/.astro/prod_manifest.slim.json":         true,
+		".astro/.slim.json":                             false,
+		".astro/manifest.json":                          false,
 		"dags/dbt/shop/target/.astro/dbt_metadata.json": true,
 		"dbt_metadata.json":                             false,
 		".astro/config.yaml":                            false,
@@ -39,6 +43,9 @@ func TestCosmosBoostFileWrittenByAstro(t *testing.T) {
 		{slim, `{"_generated_by":{"application":"astro"}}`, true},
 		{slim, `{"generated_by":{"application":"astro"}}`, false},
 		{slim, `{"_generated_by":{"application":"someone-else"}}`, false},
+		// A slim manifest named after another manifest is judged the same way.
+		{".astro/manifest_full.slim.json", `{"_generated_by":{"application":"astro"}}`, true},
+		{".astro/manifest_full.slim.json", `{"generated_by":{"application":"astro"}}`, false},
 		{".astro/config.yaml", `{"generated_by":{"application":"astro"}}`, false},
 		// The whole document is read: the marker after other keys, the last
 		// of a repeated key, and nothing below the top level.

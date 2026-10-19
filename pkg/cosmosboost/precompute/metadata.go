@@ -16,8 +16,9 @@ import (
 const application = airflowrt.CosmosBoostProducer
 
 const (
-	// schemaVersion lets the read-side cope with future format changes.
-	schemaVersion = 1
+	// schemaVersion lets the read-side cope with future format changes. v2:
+	// filtered_manifest -> manifests, keyed by source filename.
+	schemaVersion = 2
 
 	// algoProjectTree hashes a whole dbt project directory (source files).
 	// v2 excludes .git, which never ships in a deploy payload, so VCS activity
@@ -37,25 +38,27 @@ const (
 	sidecarName = airflowrt.CosmosBoostSidecar
 )
 
-// Metadata is the content of the .astro/dbt_metadata.json sidecar. The Cosmos
-// Boost plugin reads the version.hash field and uses it as the cache version key;
-// it never recomputes the hash itself.
+// Metadata is the content of the .astro/dbt_metadata.json sidecar.
 type Metadata struct {
 	Schema      int            `json:"schema"`
 	Version     ProjectVersion `json:"version"`
 	GeneratedBy GeneratedBy    `json:"generated_by"`
-	// FilteredManifest points at the slim manifest beside this sidecar, absent
-	// when none was produced. The sidecar is the consumer's entry point: it
-	// already reads and schema-gates this file, so it discovers the slim
-	// manifest here and falls back to the full one when the section is missing.
-	FilteredManifest *FilteredManifest `json:"filtered_manifest,omitempty"`
+	// Manifests is keyed by manifest filename, so a consumer looks up its own
+	// entry instead of trusting Version when a directory has several.
+	Manifests map[string]ManifestVersion `json:"manifests,omitempty"`
 }
 
-// FilteredManifest describes a slim manifest sitting next to the sidecar. Path
-// is relative to the sidecar's directory, and Version hashes the slim file's
-// own bytes, so a consumer can confirm the two are a matched pair without
-// re-hashing the full manifest.
-type FilteredManifest struct {
+// ManifestVersion is one manifest's own hash, plus its slim companion, if
+// one was produced.
+type ManifestVersion struct {
+	Version ProjectVersion `json:"version"`
+	Slim    *SlimManifest  `json:"slim_manifest,omitempty"`
+}
+
+// SlimManifest describes a slim manifest sitting next to the sidecar. Version
+// hashes the slim file's own bytes, so a consumer can confirm the two are a
+// matched pair without re-hashing the full manifest.
+type SlimManifest struct {
 	Schema  int            `json:"schema"`
 	Path    string         `json:"path"`
 	Version ProjectVersion `json:"version"`
@@ -75,14 +78,14 @@ type GeneratedBy struct {
 }
 
 // sidecarArtifact is the .astro/dbt_metadata.json for dir. version is the
-// producer's version, recorded in generated_by. filtered describes a slim
-// manifest produced beside it, or is nil when none was.
-func sidecarArtifact(dir, algo, hash, version string, filtered *FilteredManifest) Artifact {
+// producer's version, recorded in generated_by. manifests describes each dbt
+// manifest in dir and the slim manifest produced beside it, if any.
+func sidecarArtifact(dir, algo, hash, version string, manifests map[string]ManifestVersion) Artifact {
 	meta := Metadata{
-		Schema:           schemaVersion,
-		Version:          ProjectVersion{Algo: algo, Hash: hash},
-		GeneratedBy:      GeneratedBy{Application: application, Version: version},
-		FilteredManifest: filtered,
+		Schema:      schemaVersion,
+		Version:     ProjectVersion{Algo: algo, Hash: hash},
+		GeneratedBy: GeneratedBy{Application: application, Version: version},
+		Manifests:   manifests,
 	}
 
 	// Metadata holds only strings and ints, so marshaling cannot fail.

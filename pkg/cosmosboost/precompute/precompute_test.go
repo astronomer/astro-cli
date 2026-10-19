@@ -12,7 +12,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 )
+
+// slimManifestName is manifest.json's slim manifest (slimNameFor).
+const slimManifestName = airflowrt.CosmosBoostSlimManifest
 
 func TestRunDiscoversProjectsAndWritesSidecars(t *testing.T) {
 	root := t.TempDir()
@@ -256,6 +261,252 @@ func mustNotProduce(t *testing.T, s Summary, path string) {
 	}
 }
 
+// TestIsManifestCandidateName pins the name-matching rule discovery is built
+// on: case-insensitive, "manifest" anywhere in a *.json filename.
+func TestIsManifestCandidateName(t *testing.T) {
+	cases := map[string]bool{
+		"manifest.json":        true,
+		"manifest_full.json":   true,
+		"MANIFEST.JSON":        true,
+		"dbt_manifest_v2.json": true,
+		"run_results.json":     false,
+		"catalog.json":         false,
+		"manifest.txt":         false,
+		"manifest":             false,
+	}
+	for name, want := range cases {
+		if got := isManifestCandidateName(name); got != want {
+			t.Errorf("isManifestCandidateName(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// countArtifacts is how many of the run's artifacts are at path.
+func countArtifacts(s Summary, path string) int {
+	n := 0
+	for _, a := range s.Artifacts() {
+		if a.Path == path {
+			n++
+		}
+	}
+	return n
+}
+
+// TestRunSharedDirectorySidecarDescribesBothManifests: two manifests sharing
+// a directory outside a project get one sidecar between them - two would put
+// two files at one bundle path - but each keeps its own entry (keyed by
+// filename) in Manifests, with its own hash and slim pointer.
+func TestRunSharedDirectorySidecarDescribesBothManifests(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"shared/manifest_a.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{"model.a":{"name":"a"}}}`,
+		"shared/manifest_b.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{"model.b":{"name":"b"}}}`,
+	})
+	astroDir := filepath.Join(root, "shared", sidecarDir)
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range summary.Results {
+		if r.Err != nil {
+			t.Fatalf("unexpected error: %+v", r)
+		}
+	}
+	mustProduce(t, summary, filepath.Join(astroDir, "manifest_a.slim.json"))
+	mustProduce(t, summary, filepath.Join(astroDir, "manifest_b.slim.json"))
+	if n := countArtifacts(summary, filepath.Join(astroDir, sidecarName)); n != 1 {
+		t.Fatalf("%d sidecars for one directory, want 1", n)
+	}
+
+	var meta Metadata
+	readJSON(t, summary, filepath.Join(astroDir, sidecarName), &meta)
+	if len(meta.Manifests) != 2 {
+		t.Fatalf("manifests = %+v, want 2 entries", meta.Manifests)
+	}
+	for name, want := range map[string]string{"manifest_a.json": "manifest_a.slim.json", "manifest_b.json": "manifest_b.slim.json"} {
+		entry, ok := meta.Manifests[name]
+		if !ok || entry.Version.Hash == "" || entry.Slim == nil || entry.Slim.Path != want {
+			t.Fatalf("Manifests[%q] = %+v, want a hash and slim path %q", name, entry, want)
+		}
+	}
+	if meta.Manifests["manifest_a.json"].Version.Hash == meta.Manifests["manifest_b.json"].Version.Hash {
+		t.Fatal("the two manifests' own hashes must differ (their content does)")
+	}
+	// The top-level Version is for a reader that doesn't yet look at
+	// Manifests; it consistently mirrors the alphabetically-first manifest.
+	for range 20 {
+		summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		readJSON(t, summary, filepath.Join(astroDir, sidecarName), &meta)
+		if meta.Version.Hash != meta.Manifests["manifest_a.json"].Version.Hash {
+			t.Fatalf("top-level Version = %+v, want manifest_a.json's (alphabetically first)", meta.Version)
+		}
+	}
+}
+
+// TestRunSharedDirectorySidecarSurvivesAFailedSibling: a manifest that cannot
+// be read fails on its own. Its sibling still gets the directory's sidecar,
+// listing only itself - also when the failed one sorts first, so would
+// otherwise have carried it.
+func TestRunSharedDirectorySidecarSurvivesAFailedSibling(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission semantics differ on windows")
+	}
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"shared/manifest_a.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"shared/manifest_b.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	broken := filepath.Join(root, "shared", "manifest_a.json")
+	if err := os.Chmod(broken, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(broken, 0o644) })
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.CountFailed() != 1 {
+		t.Fatalf("want manifest_a.json alone failed, got %+v", summary.Results)
+	}
+	var meta Metadata
+	readJSON(t, summary, filepath.Join(root, "shared", sidecarDir, sidecarName), &meta)
+	if _, ok := meta.Manifests["manifest_b.json"]; !ok || len(meta.Manifests) != 1 {
+		t.Fatalf("want the sidecar to list manifest_b.json alone, got %+v", meta.Manifests)
+	}
+	mustProduce(t, summary, filepath.Join(root, "shared", sidecarDir, "manifest_b.slim.json"))
+}
+
+// TestRunDoesNotFlagOtherDbtArtifactsAsManifests: run_results.json and
+// catalog.json (which "dbt build"/"dbt docs generate" always produce beside
+// manifest.json) don't contain "manifest" in their name; semantic_manifest.json
+// does, but its schema URL isn't a manifest one, so content rejects it too.
+func TestRunDoesNotFlagOtherDbtArtifactsAsManifests(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":               "name: shop\n",
+		"proj/models/a.sql":                  "select 1",
+		"proj/target/manifest.json":          `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/target/run_results.json":       `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/run-results/v6.json"}}`,
+		"proj/target/catalog.json":           `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/catalog/v1.json"},"nodes":{}}`,
+		"proj/target/semantic_manifest.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/semantic-manifest/v1.json"}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var succeeded, skipped int
+	for _, r := range summary.Results {
+		if r.Err != nil {
+			t.Fatalf("unexpected error: %+v", r)
+		}
+		if r.Skipped {
+			if filepath.Base(r.Path) != "semantic_manifest.json" {
+				t.Fatalf("unexpected skip: %+v", r)
+			}
+			skipped++
+			continue
+		}
+		succeeded++
+	}
+	if succeeded != 2 || skipped != 1 { // 1 project + 1 manifest succeed, semantic_manifest.json is skipped
+		t.Fatalf("want 2 successes + 1 skip, got %d successes, %d skipped: %+v", succeeded, skipped, summary.Results)
+	}
+	mustProduce(t, summary, filepath.Join(root, "proj", "target", sidecarDir, slimManifestName))
+	mustNotProduce(t, summary, filepath.Join(root, "proj", "target", sidecarDir, "semantic_manifest.slim.json"))
+}
+
+// TestRunSlimsEveryManifestInProjectRoot: a project root with two manifests
+// gets both slimmed, plus its own unaffected tree-hash sidecar.
+func TestRunSlimsEveryManifestInProjectRoot(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":    "name: shop\n",
+		"proj/models/a.sql":       "select 1",
+		"proj/manifest.json":      `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/manifest_full.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Kind != kindProject || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 project-only result, got %+v", summary.Results)
+	}
+	mustProduce(t, summary, filepath.Join(root, "proj", sidecarDir, sidecarName))
+	mustProduce(t, summary, filepath.Join(root, "proj", sidecarDir, slimManifestName))
+	mustProduce(t, summary, filepath.Join(root, "proj", sidecarDir, "manifest_full.slim.json"))
+}
+
+// TestRunWarnsOnUnreadableProjectRootManifest: a candidate in the project
+// root that can't even be read (unlike one that reads fine but isn't a dbt
+// manifest) surfaces a warning, not silence, and costs only itself: the
+// project keeps its tree-hash sidecar, and a readable sibling its slim
+// manifest and its entry in that sidecar.
+func TestRunWarnsOnUnreadableProjectRootManifest(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file permission semantics differ on windows")
+	}
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"proj/dbt_project.yml":      "name: shop\n",
+		"proj/models/a.sql":         "select 1",
+		"proj/manifest_a.json":      `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"proj/manifest_broken.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+	broken := filepath.Join(root, "proj", "manifest_broken.json")
+	if err := os.Chmod(broken, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(broken, 0o644) })
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].Err != nil {
+		t.Fatalf("want 1 successful project result, got %+v", summary.Results)
+	}
+	if !strings.Contains(summary.Results[0].Warning, "manifest_broken.json") {
+		t.Fatalf("want a warning naming the unreadable manifest, got %q", summary.Results[0].Warning)
+	}
+	mustProduce(t, summary, filepath.Join(root, "proj", sidecarDir, "manifest_a.slim.json"))
+	var meta Metadata
+	readJSON(t, summary, filepath.Join(root, "proj", sidecarDir, sidecarName), &meta)
+	if _, ok := meta.Manifests["manifest_a.json"]; !ok || len(meta.Manifests) != 1 {
+		t.Fatalf("want the sidecar to list manifest_a.json alone, got %+v", meta.Manifests)
+	}
+}
+
+// TestRunHandlesMultipleProjectsWithDifferentManifestNames: two dbt
+// projects, each naming its manifest differently, both get discovered and
+// slimmed with no configuration.
+func TestRunHandlesMultipleProjectsWithDifferentManifestNames(t *testing.T) {
+	root := t.TempDir()
+	writeFiles(t, root, map[string]string{
+		"dbt1/dbt_project.yml":      "name: one\n",
+		"dbt1/manifest_custom.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+		"dbt2/dbt_project.yml":      "name: two\n",
+		"dbt2/manifest_by_run.json": `{"metadata":{"dbt_schema_version":"https://schemas.getdbt.com/dbt/manifest/v12.json"},"nodes":{}}`,
+	})
+
+	summary, err := Run([]string{root}, "test", Options{SlimManifest: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.Results) != 2 {
+		t.Fatalf("want 2 project results, got %+v", summary.Results)
+	}
+	mustProduce(t, summary, filepath.Join(root, "dbt1", sidecarDir, "manifest_custom.slim.json"))
+	mustProduce(t, summary, filepath.Join(root, "dbt2", sidecarDir, "manifest_by_run.slim.json"))
+}
+
 // TestRunProjectHashStableWithNestedManifestSidecar guards the hash-stability
 // concern: a dbt manifest.json in a subdirectory (e.g. docs/) gets its own sidecar
 // at docs/.astro/ in the bundle. The enclosing project's hash must not depend on
@@ -475,10 +726,10 @@ func TestRunReportsFailedUnits(t *testing.T) {
 
 // TestRunWritesSlimManifestAlongsideSidecar: with the option set, every
 // discovered manifest.json gets a slim copy next to its hash sidecar, and the
-// sidecar carries the filtered_manifest pointer at it. The pointer hashes the
-// slim file's own bytes, so a consumer can confirm the two are a matched pair -
-// which adjacency alone does not imply, since each file on disk is judged by
-// its own producer marker.
+// sidecar's Manifests entry for it carries a pointer hashing the slim file's
+// own bytes, so a consumer can confirm the two are a matched pair - which
+// adjacency alone does not imply, since each file on disk is judged by its own
+// producer marker.
 func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -502,19 +753,20 @@ func TestRunWritesSlimManifestAlongsideSidecar(t *testing.T) {
 
 	var meta Metadata
 	readJSON(t, summary, filepath.Join(astroDir, sidecarName), &meta)
-	fm := meta.FilteredManifest
-	if fm == nil {
-		t.Fatalf("sidecar has no filtered_manifest section: %+v", meta)
+	entry, ok := meta.Manifests["manifest.json"]
+	fm := entry.Slim
+	if !ok || fm == nil {
+		t.Fatalf("sidecar has no slim_manifest for manifest.json: %+v", meta)
 	}
 	if fm.Path != slimManifestName || fm.Schema != slimSchemaVersion || fm.Version.Algo != algoFilteredManifest {
-		t.Fatalf("filtered_manifest = %+v", fm)
+		t.Fatalf("slim_manifest = %+v", fm)
 	}
 	slimData, _ := artifact(summary, filepath.Join(astroDir, slimManifestName))
 	if want := sha256Hex(slimData); fm.Version.Hash != want {
-		t.Fatalf("filtered_manifest hash = %q, want the slim file's own hash %q", fm.Version.Hash, want)
+		t.Fatalf("slim_manifest hash = %q, want the slim file's own hash %q", fm.Version.Hash, want)
 	}
 	if fm.Version.Hash == meta.Version.Hash {
-		t.Fatal("filtered_manifest hash must not be the full manifest's hash")
+		t.Fatal("slim_manifest hash must not be the full manifest's hash")
 	}
 }
 
@@ -538,8 +790,8 @@ func TestRunSkipsSlimManifestWhenNotRequested(t *testing.T) {
 	if !ok {
 		t.Fatal("no sidecar produced")
 	}
-	if strings.Contains(string(raw), "filtered_manifest") {
-		t.Fatalf("filtered_manifest emitted with the slim manifest disabled: %s", raw)
+	if strings.Contains(string(raw), "slim_manifest") {
+		t.Fatalf("slim_manifest emitted with the slim manifest disabled: %s", raw)
 	}
 }
 
@@ -577,8 +829,9 @@ func TestRunSlimsManifestInProjectRoot(t *testing.T) {
 	if meta.Version.Algo != algoProjectTree {
 		t.Fatalf("project sidecar algo = %q, want %q", meta.Version.Algo, algoProjectTree)
 	}
-	if meta.FilteredManifest == nil || meta.FilteredManifest.Path != slimManifestName {
-		t.Fatalf("project sidecar does not point at the slim manifest: %+v", meta.FilteredManifest)
+	entry, ok := meta.Manifests["manifest.json"]
+	if !ok || entry.Slim == nil || entry.Slim.Path != slimManifestName {
+		t.Fatalf("project sidecar does not point at the slim manifest: %+v", meta.Manifests)
 	}
 }
 
@@ -625,8 +878,8 @@ func TestRunSkipsNonDbtManifestInProjectRoot(t *testing.T) {
 	mustNotProduce(t, summary, filepath.Join(astroDir, slimManifestName))
 	var meta Metadata
 	readJSON(t, summary, filepath.Join(astroDir, sidecarName), &meta)
-	if meta.FilteredManifest != nil {
-		t.Fatalf("project sidecar points at a slim manifest that was never written: %+v", meta.FilteredManifest)
+	if len(meta.Manifests) != 0 {
+		t.Fatalf("project sidecar lists a manifest that was never slimmed: %+v", meta.Manifests)
 	}
 }
 

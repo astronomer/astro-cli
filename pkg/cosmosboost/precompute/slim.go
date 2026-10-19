@@ -1,12 +1,25 @@
 package precompute
 
-import "github.com/astronomer/astro-cli/pkg/airflowrt"
+import (
+	"strings"
 
-const slimManifestName = airflowrt.CosmosBoostSlimManifest
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
+)
 
 // slimSchemaVersion identifies the allowlist that produced a slim manifest, so
 // a reader that doesn't recognize it can fall back to the full manifest.
 const slimSchemaVersion = 1
+
+// slimNameFor returns manifestFilename's slim companion name, e.g.
+// "manifest_full.json" -> "manifest_full.slim.json". The trim is
+// case-insensitive, matching isManifestCandidateName.
+func slimNameFor(manifestFilename string) string {
+	const ext = ".json"
+	if len(manifestFilename) >= len(ext) && strings.EqualFold(manifestFilename[len(manifestFilename)-len(ext):], ext) {
+		manifestFilename = manifestFilename[:len(manifestFilename)-len(ext)]
+	}
+	return manifestFilename + airflowrt.CosmosBoostSlimManifestSuffix
+}
 
 // slimSections are the only top-level collections Cosmos loads nodes from
 // (cosmos/dbt/graph.py::_load_nodes_from_manifest_data).
