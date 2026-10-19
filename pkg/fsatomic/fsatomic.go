@@ -22,8 +22,38 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
+
+// pathLocks holds a *sync.RWMutex per file this process reads or publishes
+// through this package, keyed by absolute path: a publish takes it
+// exclusively for its rename, a read shares it.
+//
+// On Windows a rename fails while another handle holds the destination, and
+// a read cannot open a file being renamed onto. Between processes that is
+// unavoidable, and the retry below waits it out. Within one process it is
+// not: goroutines that all rename onto one file at once collide on every
+// attempt, and on a loaded machine each attempt can block long enough to
+// spend the whole retry budget — pkg/secrets' concurrency test, forty writers
+// on one key, failed that way. Taking turns here leaves the retry only the
+// other process to wait for, for every package that publishes through this
+// one rather than each keeping its own lock.
+//
+// One entry per distinct path ever touched, never removed: a process touches
+// a handful of state files, so the map stays small.
+var pathLocks sync.Map
+
+// pathLock is the lock for path, shared by every spelling that resolves to the
+// same absolute path.
+func pathLock(path string) *sync.RWMutex {
+	key := path
+	if abs, err := filepath.Abs(path); err == nil {
+		key = abs
+	}
+	l, _ := pathLocks.LoadOrStore(key, &sync.RWMutex{})
+	return l.(*sync.RWMutex) //nolint:forcetypeassert // only *sync.RWMutex is stored
+}
 
 // WriteFile writes data to path atomically with the given permissions.
 func WriteFile(path string, data []byte, perm fs.FileMode) error {
@@ -43,7 +73,10 @@ func WriteFile(path string, data []byte, perm fs.FileMode) error {
 		werr = os.Chmod(tmpPath, perm)
 	}
 	if werr == nil {
+		lock := pathLock(path)
+		lock.Lock()
 		werr = replace(tmpPath, path)
+		lock.Unlock()
 	}
 	if werr != nil {
 		_ = os.Remove(tmpPath) //nolint:errcheck // best-effort cleanup; the write error below is what we return
@@ -68,6 +101,9 @@ func WriteFile(path string, data []byte, perm fs.FileMode) error {
 // and is therefore waited on — see isBusy in busy_windows.go for why, and what
 // it costs.
 func ReadFile(path string) ([]byte, error) {
+	lock := pathLock(path)
+	lock.RLock()
+	defer lock.RUnlock()
 	var data []byte
 	_, err := retryWhileBusy(replaceBudget, isBusy, func() error {
 		var rerr error
