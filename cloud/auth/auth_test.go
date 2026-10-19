@@ -1001,6 +1001,24 @@ func TestLogout(t *testing.T) {
 		assert.Equal(t, "some-refresh-token", stored(t, current.Domain).RefreshToken)
 	})
 
+	for _, given := range []string{"cloud.astronomer.io", "https://cloud.astronomer.io/"} {
+		t.Run("the domain as given to login: "+given, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			c, err := config.GetCurrentContext()
+			assert.NoError(t, err)
+			assert.Equal(t, "astronomer.io", c.Domain)
+			loggedIn(t, c)
+
+			assert.NoError(t, Logout(given, new(bytes.Buffer)))
+
+			after := stored(t, c.Domain)
+			assert.Empty(t, after.Token)
+			assert.Empty(t, after.RefreshToken)
+			_, err = config.GetCurrentDomain()
+			assert.ErrorIs(t, err, config.ErrGetHomeString)
+		})
+	}
+
 	t.Run("an unknown domain fails without reporting success", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.LocalPlatform)
 		current, err := config.GetCurrentContext()

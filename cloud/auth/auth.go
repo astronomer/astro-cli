@@ -428,6 +428,8 @@ func Login(domain, token string, astroV1Client astrov1.APIClient, out io.Writer,
 // live token is left behind in the config file, and unsets the current context
 // when that domain was the current one.
 func Logout(domain string, out io.Writer) error {
+	// Login stores cloud.astronomer.io under astronomer.io, so look it up the same way
+	domain = domainutil.FormatDomain(domain)
 	c, err := context.GetContext(domain)
 	if err != nil {
 		return fmt.Errorf("failed to find a login for %s: %w", domain, err)
