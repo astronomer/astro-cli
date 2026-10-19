@@ -471,7 +471,10 @@ func (s *Suite) TestExpiresIn() {
 	val, err := outCtx.GetExpiresIn()
 	s.NoError(err)
 	s.Equal("localhost", outCtx.Domain)
-	s.True(time.Now().Add(time.Duration(12) * time.Second).After(val)) // now + 12 seconds will always be after expire time, since that is set before
+	// The expiry was set before this now, so it is not after now + 12s. Not
+	// "now + 12s is after it": Windows' clock can read the same instant twice,
+	// and the two are then equal.
+	s.False(val.After(time.Now().Add(12 * time.Second)))
 }
 
 // A context loaded from disk holds its expiry under "expiresin", as viper
