@@ -35,7 +35,7 @@ func (s *CmdSuite) TestConfigRootCommand() {
 
 func (s *CmdSuite) TestConfigGetCommandSuccess() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
-	_, err := executeCommand("config", "get", "apc.show_warnings", "-g")
+	_, err := executeCommand("config", "get", "show_warnings", "-g")
 	s.NoError(err)
 }
 
@@ -66,20 +66,20 @@ func (s *CmdSuite) TestConfigGetCommandFailure() {
 func (s *CmdSuite) TestConfigSetOutsideProjectSuggestsTheValueToo() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useWorkingPath(s.T().TempDir())
-	_, err := executeCommand("config", "set", "apc.show_warnings", "false")
+	_, err := executeCommand("config", "set", "show_warnings", "false")
 	s.ErrorContains(err, "outside of a project directory")
-	s.ErrorContains(err, "astro config set apc.show_warnings false -g")
+	s.ErrorContains(err, "astro config set show_warnings false -g")
 }
 
 func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
 	s.useManifestProject()
 
-	_, err := executeCommand("config", "set", "apc.show_warnings", "false")
+	_, err := executeCommand("config", "set", "show_warnings", "false")
 	s.Error(err)
 	s.NotContains(err.Error(), "outside of a project directory")
 	s.Contains(err.Error(), "pyproject.toml under [tool.astro]")
-	s.Contains(err.Error(), "astro config set apc.show_warnings false -g")
+	s.Contains(err.Error(), "astro config set show_warnings false -g")
 	s.Equal("true", config.CFG.ShowWarnings.GetHomeString())
 
 	_, err = executeCommand("config", "get", "deploy.git_metadata")
@@ -87,7 +87,7 @@ func (s *CmdSuite) TestConfigInAManifestProjectPointsAtGlobalAndPyproject() {
 	s.Contains(err.Error(), "pyproject.toml under [tool.astro]")
 	s.Contains(err.Error(), "astro config get deploy.git_metadata -g")
 
-	_, err = executeCommand("config", "set", "apc.show_warnings", "false", "-g")
+	_, err = executeCommand("config", "set", "show_warnings", "false", "-g")
 	s.NoError(err)
 	s.Equal("false", config.CFG.ShowWarnings.GetHomeString())
 }
@@ -133,7 +133,7 @@ func (s *CmdSuite) TestConfigListShowsValueAndScope() {
 	s.NoError(configList(textTo(buf)))
 	out := buf.String()
 	s.Regexp(`(?m)^\s*apc\.page_size\s+50\s+global\s*$`, out, "set under its 1.x name")
-	s.Regexp(`(?m)^\s*apc\.show_warnings\s+true\s+default\s*$`, out)
+	s.Regexp(`(?m)^\s*show_warnings\s+true\s+default\s*$`, out)
 	s.NotContains(out, "contexts")
 	s.NotContains(out, "t0ken-value")
 	s.NotContains(out, "postgres", "a removed setting is not listed")
@@ -271,7 +271,7 @@ func (s *CmdSuite) TestConfigSetNeverWritesARemovedKey() {
 func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
 	fs := s.initConfigFiles("postgres:\n  user: me\nwebserver:\n  port: \"8081\"\ncontext: localhost\n", "")
 
-	_, err := executeCommand("config", "set", "apc.show_warnings", "false", "-g")
+	_, err := executeCommand("config", "set", "show_warnings", "false", "-g")
 	s.Require().NoError(err)
 	_, err = executeCommand("config", "set", "apc.page_size", "30", "-g")
 	s.Require().NoError(err)
@@ -281,11 +281,11 @@ func (s *CmdSuite) TestConfigSetWritesOnlyTheChangeAndKeeps1xSettings() {
 	s.YAMLEq(`
 apc:
   page_size: 30
-  show_warnings: false
 config_version: 2
 context: localhost
 postgres:
   user: me
+show_warnings: false
 webserver:
   port: "8081"
 `, string(got))

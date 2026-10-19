@@ -10,9 +10,8 @@ import (
 // and writes in the shared file.
 func (s *Suite) TestLegacySettingNames() {
 	s.Run("a file setting only the 1.x name sets the setting", func() {
-		s.startWithHomeConfig("config_version: 2\nshow_warnings: false\npage_size: \"50\"\nhouston:\n    dial_timeout: \"30\"\n")
+		s.startWithHomeConfig("config_version: 2\npage_size: \"50\"\nhouston:\n    dial_timeout: \"30\"\n")
 
-		s.False(CFG.ShowWarnings.GetBool())
 		s.Equal(50, CFG.PageSize.GetInt())
 		s.Equal("30", CFG.HoustonDialTimeout.GetHomeString())
 		s.Equal("global", CFG.PageSize.HomeScope())
