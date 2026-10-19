@@ -55,9 +55,6 @@ type ManifestImageDeployInput struct {
 	// with DAG deploys off: there is no project whose DAGs it would leave
 	// stale, and the caller warns that the Deployment runs the image's.
 	ImageAlone bool
-	// SkipAgentImageCheck deploys the image without refusing it as a Remote
-	// Execution agent image (refuseAgentImage).
-	SkipAgentImageCheck bool
 	// Warn reports a finding the deploy goes ahead despite, as a sentence.
 	// nil drops it.
 	Warn func(string)
@@ -388,7 +385,7 @@ func prepareDeployImage(ctx context.Context, in *ManifestImageDeployInput, req *
 	if err != nil {
 		return "", "", err
 	}
-	if err := checkAgentImage(ctx, in, engine, localImage); err != nil {
+	if err := refuseAgentImage(ctx, engine, localImage); err != nil {
 		return "", "", err
 	}
 	return localImage, runtimeVersion, nil

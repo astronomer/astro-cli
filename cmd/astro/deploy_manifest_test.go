@@ -50,7 +50,6 @@ func resetDeployFlagVars() {
 	manifestDeployment = ""
 	manifestWorkspace = ""
 	noDagsBaseDir = false
-	skipAgentImageCheck = false
 	waitForDeploy = false
 	workspaceID = ""
 	deploymentName = ""
@@ -1051,25 +1050,6 @@ func TestDeployManifestPositionalAndFlagMustAgree(t *testing.T) {
 	assert.Contains(t, err.Error(), "name one")
 }
 
-// --skip-agent-image-check reaches the transport, for this deploy only, and
-// is refused with --dags, which ships no image to check.
-func TestDeployManifestSkipAgentImageCheck(t *testing.T) {
-	fake := &fakeCmdDeployer{}
-	setupManifestDeployWith(t, fake, manifestWithDefaultLink)
-
-	_, err := execDeployCapture(actionDeploymentID, "--image", "--skip-agent-image-check")
-	require.NoError(t, err)
-	require.NotNil(t, fake.imgInput)
-	assert.True(t, fake.imgInput.SkipAgentImageCheck)
-
-	resetDeployFlagVars()
-	skipAgentImageCheck = false
-	_, err = execDeployCapture(actionDeploymentID, "--dags", "--skip-agent-image-check")
-	require.Error(t, err)
-	assert.True(t, cliout.IsUsage(err), "want a usage error, got %v", err)
-	assert.ErrorContains(t, err, "cannot use --skip-agent-image-check with --dags")
-}
-
 // Each shape astronomer/deploy-action v0.16.0 runs, against a project.
 func TestDeployManifestDeployActionInvocations(t *testing.T) {
 	withDockerfile := strings.Replace(manifestWithDefaultLink, "[tool.astro]\n", "[tool.astro]\ndockerfile = \"Dockerfile\"\n", 1)
@@ -1115,8 +1095,6 @@ func TestDeployManifestDeployActionInvocations(t *testing.T) {
 			assert.Equal(t, actionDeploymentID, fake.imgInput.DeploymentID)
 			assert.True(t, fake.imgInput.Wait)
 			assert.Equal(t, tc.includeDags, fake.imgInput.IncludeDags)
-			assert.False(t, fake.imgInput.SkipAgentImageCheck,
-				"--force, which deploy-action passes on every deploy, must not skip the agent-image check")
 			if tc.includeDags {
 				assert.Equal(t, "Dockerfile", fake.imgInput.Build.Dockerfile)
 				assert.Equal(t, []string{"id=x,env=Y"}, fake.imgInput.BuildSecrets)

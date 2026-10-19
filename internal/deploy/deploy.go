@@ -56,10 +56,6 @@ type Request struct {
 	// ImageAlone ships the image with no DAGs whatever the flags say: an
 	// --image-name deploy outside a project, which has no dags/ to take.
 	ImageAlone bool
-	// SkipAgentImageCheck lets an image that looks like a Remote Execution
-	// agent's be deployed: --skip-agent-image-check, for an image the check
-	// misreads.
-	SkipAgentImageCheck bool
 	// ImageName is --image-name: a prebuilt local image to deploy instead of
 	// building from the manifest. "" means build.
 	ImageName string
@@ -259,10 +255,6 @@ type ImageDeploy struct {
 	// outside any project, which a Deployment with DAG deploys off takes too
 	// (it runs whatever DAGs the image carries, which the caller warns of).
 	ImageAlone bool
-	// SkipAgentImageCheck lets an image that looks like a Remote Execution
-	// agent's be deployed: --skip-agent-image-check, for an image the check
-	// misreads.
-	SkipAgentImageCheck bool
 	// Warn is Request.Warn, for the transport to report with.
 	Warn func(string)
 	// Survey is what the image built from the manifest would carry, as the
@@ -462,24 +454,23 @@ func runImage(req Request, target Target, d Deployer, survey *imagebuild.Project
 	// only the netrc secret, and checkImageSource has warned about the rest.
 	includeDags := !req.Image && !req.ImageAlone
 	img, err := d.DeployImage(&ImageDeploy{
-		DeploymentID:        target.DeploymentID,
-		WorkspaceID:         target.WorkspaceID,
-		Build:               imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
-		BuildSecrets:        req.BuildSecrets,
-		ImageName:           req.ImageName,
-		ImageInRegistry:     req.ImageInRegistry,
-		ImageRuntime:        req.ImageRuntime,
-		OnBuild:             req.OnBuild,
-		IncludeDags:         includeDags,
-		ImageAlone:          req.ImageAlone,
-		SkipAgentImageCheck: req.SkipAgentImageCheck,
-		Warn:                req.Warn,
-		Survey:              survey,
-		Engine:              req.Engine,
-		Description:         req.Description,
-		NoDagsBaseDir:       req.NoDagsBaseDir,
-		Wait:                req.Wait,
-		WaitTime:            req.WaitTime,
+		DeploymentID:    target.DeploymentID,
+		WorkspaceID:     target.WorkspaceID,
+		Build:           imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest),
+		BuildSecrets:    req.BuildSecrets,
+		ImageName:       req.ImageName,
+		ImageInRegistry: req.ImageInRegistry,
+		ImageRuntime:    req.ImageRuntime,
+		OnBuild:         req.OnBuild,
+		IncludeDags:     includeDags,
+		ImageAlone:      req.ImageAlone,
+		Warn:            req.Warn,
+		Survey:          survey,
+		Engine:          req.Engine,
+		Description:     req.Description,
+		NoDagsBaseDir:   req.NoDagsBaseDir,
+		Wait:            req.Wait,
+		WaitTime:        req.WaitTime,
 	})
 	if err != nil {
 		return Result{}, err

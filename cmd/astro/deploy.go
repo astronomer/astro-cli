@@ -35,18 +35,17 @@ import (
 )
 
 var (
-	dags                bool
-	waitForDeploy       bool
-	waitTime            time.Duration
-	image               bool
-	imageName           string
-	deployDescription   string
-	noDagsBaseDir       bool
-	skipAgentImageCheck bool
-	manifestDeployment  string
-	manifestWorkspace   string
-	deployOutput        string
-	deployExample       = `  # Deploy this project, picking the Deployment from a list
+	dags               bool
+	waitForDeploy      bool
+	waitTime           time.Duration
+	image              bool
+	imageName          string
+	deployDescription  string
+	noDagsBaseDir      bool
+	manifestDeployment string
+	manifestWorkspace  string
+	deployOutput       string
+	deployExample      = `  # Deploy this project, picking the Deployment from a list
   astro deploy
 
   # Deploy to a given Deployment
@@ -94,11 +93,6 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
 	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
-	// A per-deploy way past the agent-image refusal, for an image it
-	// misreads. Not --force: astronomer/deploy-action passes that on every
-	// deploy, which would switch the check off for every Action user.
-	cmd.Flags().BoolVar(&skipAgentImageCheck, "skip-agent-image-check", false,
-		"Deploy the image even if it looks like a Remote Execution agent image (one that sets ASTRO_AGENT_CLIENT_* variables)")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
 	cmd.Flags().BoolVarP(&image, "image", "", false, "Push only an image to your Astro Deployment; with Dag Deploy enabled, its Dags are not affected")
 	cmd.Flags().BoolVarP(&waitForDeploy, "wait", "w", false, "Wait for the Deployment to become healthy before ending the command")
@@ -115,7 +109,6 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "image", deployGroupImage)
 	annotateDeployFlag(cmd, imageNameFlag, deployGroupImage)
 	annotateDeployFlag(cmd, "build-secret", deployGroupImage)
-	annotateDeployFlag(cmd, "skip-agent-image-check", deployGroupImage)
 	annotateDeployFlag(cmd, "dags", deployGroupDAG)
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
 	orderDeployFlagGroups(cmd)
@@ -173,9 +166,6 @@ func deploy(cmd *cobra.Command, args []string) error {
 func refuseFlagCombinations(cmd *cobra.Command, inProject bool) error {
 	if cmd.Flags().Changed("wait-time") && !waitForDeploy {
 		return cliout.Usage(errors.New("cannot use --wait-time with --wait=false"))
-	}
-	if skipAgentImageCheck && dags {
-		return cliout.Usage(errors.New("cannot use --skip-agent-image-check with --dags: a Dag-only deploy ships no image to check"))
 	}
 	if cmd.Flags().Changed("no-dags-base-dir") {
 		switch {
@@ -309,15 +299,14 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		ContextWorkspace: login.context.Workspace,
 		DagsOnly:         dags,
 		// Outside a project the image ships alone: there are no DAGs here.
-		Image:               image,
-		ImageAlone:          !inProject,
-		SkipAgentImageCheck: skipAgentImageCheck,
-		ImageName:           imageName,
-		Description:         deployDescription,
-		Wait:                waitForDeploy,
-		WaitTime:            waitTime,
-		NoDagsBaseDir:       noDagsBaseDir,
-		Interactive:         interactive,
+		Image:         image,
+		ImageAlone:    !inProject,
+		ImageName:     imageName,
+		Description:   deployDescription,
+		Wait:          waitForDeploy,
+		WaitTime:      waitTime,
+		NoDagsBaseDir: noDagsBaseDir,
+		Interactive:   interactive,
 		// Astro CLI 1.x's resolution, so a CI job setting BUILD_SECRET_INPUT
 		// keeps working across the version boundary rather than silently
 		// losing its secrets on the day the project converts. With neither the
@@ -740,24 +729,23 @@ func toManifestDeployGit(g astrodeploy.ManifestDeployGit) manifestdeploy.Git {
 // cloud/deploy transport.
 func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestdeploy.ImageResult, error) {
 	res, err := astrodeploy.DeployManifestImage(astrodeploy.ManifestImageDeployInput{
-		Login:               &d.login.context,
-		Build:               in.Build,
-		Catalog:             func() *runtimeversions.Catalog { return runtimecatalog.Catalog(context.Background()) },
-		DeploymentID:        in.DeploymentID,
-		BuildSecrets:        in.BuildSecrets,
-		ImageName:           in.ImageName,
-		OnBuild:             in.OnBuild,
-		IncludeDags:         in.IncludeDags,
-		ImageAlone:          in.ImageAlone,
-		SkipAgentImageCheck: in.SkipAgentImageCheck,
-		Warn:                in.Warn,
-		Survey:              in.Survey,
-		Engine:              in.Engine,
-		Description:         in.Description,
-		NoDagsBaseDir:       in.NoDagsBaseDir,
-		Wait:                in.Wait,
-		WaitTime:            in.WaitTime,
-		Progress:            d.errOut,
+		Login:         &d.login.context,
+		Build:         in.Build,
+		Catalog:       func() *runtimeversions.Catalog { return runtimecatalog.Catalog(context.Background()) },
+		DeploymentID:  in.DeploymentID,
+		BuildSecrets:  in.BuildSecrets,
+		ImageName:     in.ImageName,
+		OnBuild:       in.OnBuild,
+		IncludeDags:   in.IncludeDags,
+		ImageAlone:    in.ImageAlone,
+		Warn:          in.Warn,
+		Survey:        in.Survey,
+		Engine:        in.Engine,
+		Description:   in.Description,
+		NoDagsBaseDir: in.NoDagsBaseDir,
+		Wait:          in.Wait,
+		WaitTime:      in.WaitTime,
+		Progress:      d.errOut,
 	}, d.login.client)
 	if err != nil {
 		return manifestdeploy.ImageResult{}, err

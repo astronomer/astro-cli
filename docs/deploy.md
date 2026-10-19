@@ -107,7 +107,7 @@ A Deployment with Dag deploys off takes no Dag upload, so the image is the only 
 
 A remote-execution Deployment runs its Dags on its remote agents. With Dag deploys off, a default deploy uploads nothing and holds the image to nothing about Dags, as the 1.x CLI uploaded none there; the summary says `It runs remote execution with Dag deploys off, so no Dags were uploaded.`, and `-o json` adds `"remote_execution": true`. With Dag deploys on, it uploads them like any other Deployment.
 
-An image deploy refuses a Remote Execution agent image, one that sets `ASTRO_AGENT_CLIENT_*` variables: it would run as the Deployment's scheduler and crash-loop, since the agent's entrypoint runs only its own components. The refusal names `astro remote deploy`, which is where an agent image goes. The check reads variable names, so an image that is not an agent's can trip it: `astro deploy --skip-agent-image-check` deploys it anyway, for that one deploy, and the refusal says so. `show_warnings` false skips the check too, as in Astro CLI 1.x, but for every deploy, along with the APC deploy's checks and warnings and the confirmation before turning Dag deploys off.
+An image deploy refuses a Remote Execution agent image, one that sets `ASTRO_AGENT_CLIENT_*` variables: it would run as the Deployment's scheduler and crash-loop, since the agent's entrypoint runs only its own components. The refusal names `astro remote deploy`, which is where an agent image goes. The check reads variable names, so an image that is not an agent's could trip it; `show_warnings` false skips it, as in Astro CLI 1.x. The refusal does not suggest that, because the switch applies to every deploy and also turns off the APC deploy's checks and warnings and the confirmation before turning Dag deploys off.
 
 | Deployment / flags | what ships |
 | --- | --- |
@@ -255,7 +255,6 @@ astro deploy [LINK-NAME | DEPLOYMENT-ID] [flags]
   --no-dags-base-dir      put DAG files at the bundle root rather than under dags/
   --description <text>    description recorded on the deploy
   --build-secret <spec>   a build secret, repeatable (not with --dags or --image-name)
-  --skip-agent-image-check  deploy an image even if it looks like a Remote Execution agent's (not with --dags)
   -w, --wait              wait for the Deployment to report healthy
   --wait-time <dur>       how long --wait waits (default 5m)
   --output text|json
