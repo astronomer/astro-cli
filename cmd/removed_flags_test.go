@@ -110,11 +110,13 @@ type removedFlagCase struct {
 	// empty for a 1.x boolean.
 	value     string
 	shorthand string
-	want      string
+	// want is what the run is told after "<flag> was removed in Astro CLI
+	// v2: ", the flag spelled as the run typed it.
+	want string
 }
 
 // removedFlagCases holds at least one case for every entry in removedFlags
-// (TestRemovedFlagsSayWhatReplacedThem checks that), with the message it
+// (TestRemovedFlagsSayWhatReplacedThem checks that), with the reason it
 // gives there.
 var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"deployment", "create", "--name", "x"}, flag: "deployment-file", value: "deployment.yaml", want: errDeploymentFileRemoved},
@@ -133,15 +135,15 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"organization", "team", "list"}, flag: "template", value: "{{.}}", want: errTemplateFlagRemoved},
 	{
 		tree: astroTree, args: []string{"env", "variable", "list"}, flag: "format", value: "yaml",
-		want: "--format was removed in Astro CLI v2: use -o (--output), which takes text, json or dotenv; there is no yaml, so use -o json",
+		want: "use -o (--output), which takes text, json or dotenv; there is no yaml, so use -o json",
 	},
 	{
 		tree: astroTree, args: []string{"env", "connection", "get", "my_conn"}, flag: "format", value: "json",
-		want: "--format was removed in Astro CLI v2: use -o (--output), which takes text or json; there is no yaml, so use -o json",
+		want: "use -o (--output), which takes text or json; there is no yaml, so use -o json",
 	},
-	{tree: astroTree, args: []string{"deployment", "delete", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
-	{tree: astroHostedTree, args: []string{"deployment", "bundle", "delete"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
-	{tree: apcTree, args: []string{"deployment", "update", "dep-id"}, flag: "force", shorthand: "f", want: "--force was removed in Astro CLI v2: use --yes (-y)"},
+	{tree: astroTree, args: []string{"deployment", "delete", "dep-id"}, flag: "force", shorthand: "f", want: "use --yes (-y)"},
+	{tree: astroHostedTree, args: []string{"deployment", "bundle", "delete"}, flag: "force", shorthand: "f", want: "use --yes (-y)"},
+	{tree: apcTree, args: []string{"deployment", "update", "dep-id"}, flag: "force", shorthand: "f", want: "use --yes (-y)"},
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "save", shorthand: "s", want: errDeploySaveRemoved},
 	{tree: apcTree, args: []string{"deploy", "dep-id"}, flag: "save", shorthand: "s", want: errDeploySaveRemoved},
 	{tree: astroTree, args: []string{"deploy", "dep-id"}, flag: "pytest", want: errDeployPytestRemoved},
@@ -183,11 +185,11 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"start"}, flag: "standalone", want: errStartStandaloneRemoved},
 	{
 		tree: astroTree, args: []string{"local", "restart"}, flag: "docker",
-		want: "--docker was removed in Astro CLI v2: astro local restart keeps the mode Airflow is running in. To change it, use astro local stop, then astro local start --docker",
+		want: "astro local restart keeps the mode Airflow is running in. To change it, use astro local stop, then astro local start --docker",
 	},
 	{
 		tree: astroTree, args: []string{"local", "restart"}, flag: "standalone",
-		want: "--standalone was removed in Astro CLI v2: astro local restart keeps the mode Airflow is running in. To change it, use astro local stop, then astro local start",
+		want: "astro local restart keeps the mode Airflow is running in. To change it, use astro local stop, then astro local start",
 	},
 	{tree: astroTree, args: []string{"local", "restart"}, flag: "port", value: "8081", shorthand: "p", want: errRestartPortRemoved},
 	{tree: astroTree, args: []string{"local", "restart"}, flag: "kill", shorthand: "k", want: errRestartKillRemoved},
@@ -196,11 +198,11 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"local", "restart"}, flag: "workspace-id", value: "ws-id", shorthand: "w", want: errStartWorkspaceIDRemoved},
 	{
 		tree: astroTree, args: []string{"local", "start"}, flag: "foreground", shorthand: "f",
-		want: "--foreground was removed in Astro CLI v2: astro local start returns once Airflow is up, and leaves it running. Follow its logs with astro local logs -f, and stop it with astro local stop",
+		want: "astro local start returns once Airflow is up, and leaves it running. Follow its logs with astro local logs -f, and stop it with astro local stop",
 	},
 	{
 		tree: astroTree, args: []string{"local", "restart"}, flag: "foreground", shorthand: "f",
-		want: "--foreground was removed in Astro CLI v2: astro local restart returns once Airflow is up, and leaves it running. Follow its logs with astro local logs -f, and stop it with astro local stop",
+		want: "astro local restart returns once Airflow is up, and leaves it running. Follow its logs with astro local logs -f, and stop it with astro local stop",
 	},
 	{tree: astroTree, args: []string{"local", "start"}, flag: "image-name", value: "my-image:1", shorthand: "i", want: errStartImageNameRemoved},
 	{tree: astroTree, args: []string{"local", "start"}, flag: "no-browser", shorthand: "n", want: errStartNoBrowserRemoved},
@@ -209,125 +211,141 @@ var removedFlagCases = []removedFlagCase{
 	{tree: astroTree, args: []string{"local", "start"}, flag: "settings-file", value: "settings.yaml", shorthand: "s", want: errStartSettingsRemoved},
 	{
 		tree: astroTree, args: []string{"local", "start"}, flag: "wait", value: "5m",
-		want: "--wait was removed in Astro CLI v2: set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
+		want: "set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro local start",
 	},
 	{
 		tree: astroTree, args: []string{"start"}, flag: "wait", value: "5m",
-		want: "--wait was removed in Astro CLI v2: set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro start",
+		want: "set the ASTRO_LOCAL_HEALTH_TIMEOUT environment variable to a Go duration instead, as in ASTRO_LOCAL_HEALTH_TIMEOUT=10m astro start",
 	},
 	{
 		tree: astroTree, args: []string{"local", "start"}, flag: "env", value: ".env.local", shorthand: "e",
-		want: "--env was removed in Astro CLI v2: astro local start reads the .env at the project root. To set a value there, use astro local env variable set <NAME> --plain",
+		want: "astro local start reads the .env at the project root. To set a value there, use astro local env variable set <NAME> --plain",
 	},
 	{
 		tree: astroTree, args: []string{"local", "check"}, flag: "env", value: ".env.local", shorthand: "e",
-		want: "--env was removed in Astro CLI v2: astro local check reads the .env at the project root. To set a value there, use astro local env variable set <NAME> --plain",
+		want: "astro local check reads the .env at the project root. To set a value there, use astro local env variable set <NAME> --plain",
+	},
+	{
+		tree: astroTree, args: []string{"local", "start"}, flag: "no-cache",
+		want: "standalone mode builds no image, and Docker mode (--docker) builds on the container engine's cache, which a changed dependency or file invalidates. " +
+			"To build from nothing, clear the engine's build cache first, with docker builder prune",
+	},
+	{
+		tree: apcTree, args: []string{"start"}, flag: "no-cache",
+		want: "standalone mode builds no image, and Docker mode (--docker) builds on the container engine's cache, which a changed dependency or file invalidates. " +
+			"To build from nothing, clear the engine's build cache first, with docker builder prune",
 	},
 	{
 		tree: astroTree, args: []string{"local", "restart"}, flag: "no-cache",
-		want: "--no-cache was removed in Astro CLI v2: astro local restart builds on the container engine's cache, which a changed dependency or file invalidates. " +
+		want: "standalone mode builds no image, and Docker mode builds on the container engine's cache, which a changed dependency or file invalidates. " +
 			"To build from nothing, clear the engine's build cache first, with docker builder prune",
 	},
 	{
 		tree: astroTree, args: []string{"package"}, flag: "no-cache",
-		want: "--no-cache was removed in Astro CLI v2: astro package builds on the container engine's cache, which a changed dependency or file invalidates. " +
+		want: "astro package builds on the container engine's cache, which a changed dependency or file invalidates. " +
 			"To build from nothing, clear the engine's build cache first, with docker builder prune",
 	},
 
 	// astro dev parse's, on astro local check.
 	{
 		tree: astroTree, args: []string{"local", "check"}, flag: "docker",
-		want: "--docker was removed in Astro CLI v2: astro local check parses the Dags in the project's own environment and builds no image, so drop it",
+		want: "astro local check parses the Dags in the project's own environment and builds no image, so drop it",
 	},
 	{
 		tree: astroTree, args: []string{"local", "check"}, flag: "standalone",
-		want: "--standalone was removed in Astro CLI v2: astro local check parses the Dags in the project's own environment and builds no image, so drop it",
+		want: "astro local check parses the Dags in the project's own environment and builds no image, so drop it",
 	},
 	{
 		tree: astroTree, args: []string{"local", "check"}, flag: "image-name", value: "my-image:1", shorthand: "i",
-		want: "--image-name was removed in Astro CLI v2: astro local check parses the Dags in the project's own environment and builds no image, so drop it",
+		want: "astro local check parses the Dags in the project's own environment and builds no image, so drop it",
 	},
 	{
 		tree: astroTree, args: []string{"local", "check"}, flag: "build-secret", value: "id=mysecret,src=secrets.txt",
-		want: "--build-secret was removed in Astro CLI v2: astro local check parses the Dags in the project's own environment and builds no image, so drop it",
+		want: "astro local check parses the Dags in the project's own environment and builds no image, so drop it",
 	},
 	{
 		tree: astroTree, args: []string{"local", "check"}, flag: "build-secrets", value: "id=mysecret,src=secrets.txt",
-		want: "--build-secrets was removed in Astro CLI v2: astro local check parses the Dags in the project's own environment and builds no image, so drop it",
+		want: "astro local check parses the Dags in the project's own environment and builds no image, so drop it",
 	},
 
 	// astro dev build's, on astro package.
 	{
 		tree: astroTree, args: []string{"package"}, flag: "docker",
-		want: "--docker was removed in Astro CLI v2: astro package builds the same image whichever mode Airflow runs in locally, so drop it",
+		want: "astro package builds the same image whichever mode Airflow runs in locally, so drop it",
 	},
 	{
 		tree: astroTree, args: []string{"package"}, flag: "standalone",
-		want: "--standalone was removed in Astro CLI v2: astro package builds the same image whichever mode Airflow runs in locally, so drop it",
+		want: "astro package builds the same image whichever mode Airflow runs in locally, so drop it",
 	},
 	{tree: astroTree, args: []string{"package"}, flag: "image-name", value: "my-image:1", shorthand: "i", want: errPackageImageNameRemoved},
 
 	// The commands that act on whatever is running, or was.
-	{tree: astroTree, args: []string{"local", "stop"}, flag: "docker", want: "--docker was removed in Astro CLI v2: astro local stop works in either mode, so drop it"},
-	{tree: astroTree, args: []string{"stop"}, flag: "standalone", want: "--standalone was removed in Astro CLI v2: astro stop works in either mode, so drop it"},
-	{tree: astroTree, args: []string{"local", "status"}, flag: "docker", want: "--docker was removed in Astro CLI v2: astro local status works in either mode, so drop it"},
-	{tree: astroTree, args: []string{"local", "reset"}, flag: "standalone", want: "--standalone was removed in Astro CLI v2: astro local reset works in either mode, so drop it"},
+	{tree: astroTree, args: []string{"local", "stop"}, flag: "docker", want: "astro local stop works in either mode, so drop it"},
+	{tree: astroTree, args: []string{"stop"}, flag: "standalone", want: "astro stop works in either mode, so drop it"},
+	{tree: astroTree, args: []string{"local", "status"}, flag: "docker", want: "astro local status works in either mode, so drop it"},
+	{tree: astroTree, args: []string{"local", "reset"}, flag: "standalone", want: "astro local reset works in either mode, so drop it"},
 
 	// astro dev logs' components, and astro dev bash's containers.
-	{tree: astroTree, args: []string{"local", "logs"}, flag: "api-server", shorthand: "a", want: "--api-server was removed in Astro CLI v2: use --component api-server"},
-	{tree: astroTree, args: []string{"local", "logs"}, flag: "dag-processor", shorthand: "d", want: "--dag-processor was removed in Astro CLI v2: use --component dag-processor"},
-	{tree: astroTree, args: []string{"logs"}, flag: "scheduler", shorthand: "s", want: "--scheduler was removed in Astro CLI v2: use --component scheduler"},
-	{tree: astroTree, args: []string{"local", "logs", "-f"}, flag: "triggerer", shorthand: "t", want: "--triggerer was removed in Astro CLI v2: use --component triggerer"},
-	{tree: apcTree, args: []string{"local", "logs"}, flag: "webserver", shorthand: "w", want: "--webserver was removed in Astro CLI v2: use --component webserver"},
-	{tree: astroTree, args: []string{"local", "shell"}, flag: "api-server", shorthand: "a", want: shellElsewhere("api-server")},
-	{tree: astroTree, args: []string{"local", "shell"}, flag: "dag-processor", shorthand: "d", want: shellElsewhere("dag-processor")},
-	{tree: astroTree, args: []string{"local", "shell"}, flag: "postgres", shorthand: "p", want: shellElsewhere("postgres")},
+	{tree: astroTree, args: []string{"local", "logs"}, flag: "api-server", shorthand: "a", want: "use --component api-server"},
+	{tree: astroTree, args: []string{"local", "logs"}, flag: "dag-processor", shorthand: "d", want: "use --component dag-processor"},
+	{tree: astroTree, args: []string{"logs"}, flag: "scheduler", shorthand: "s", want: "use --component scheduler"},
+	{tree: astroTree, args: []string{"local", "logs", "-f"}, flag: "triggerer", shorthand: "t", want: "use --component triggerer"},
+	{tree: apcTree, args: []string{"local", "logs"}, flag: "webserver", shorthand: "w", want: "use --component webserver"},
+	{tree: astroTree, args: []string{"local", "shell"}, flag: "api-server", shorthand: "a", want: shellElsewhere},
+	{tree: astroTree, args: []string{"local", "shell"}, flag: "dag-processor", shorthand: "d", want: shellElsewhere},
+	{tree: astroTree, args: []string{"local", "shell"}, flag: "postgres", shorthand: "p", want: shellElsewhere},
 	{
 		tree: astroTree, args: []string{"local", "shell"}, flag: "scheduler", shorthand: "s",
-		want: "--scheduler was removed in Astro CLI v2: astro local shell opens its shell in the scheduler's container in Docker mode, and in the project's environment in standalone mode, so drop it",
+		want: "astro local shell opens its shell in the scheduler's container in Docker mode, and in the project's environment in standalone mode, so drop it",
 	},
-	{tree: astroTree, args: []string{"local", "shell"}, flag: "triggerer", shorthand: "t", want: shellElsewhere("triggerer")},
-	{tree: astroTree, args: []string{"local", "shell"}, flag: "webserver", shorthand: "w", want: shellElsewhere("webserver")},
+	{tree: astroTree, args: []string{"local", "shell"}, flag: "triggerer", shorthand: "t", want: shellElsewhere},
+	{tree: astroTree, args: []string{"local", "shell"}, flag: "webserver", shorthand: "w", want: shellElsewhere},
 }
 
 // shellElsewhere is what astro local shell says of a 1.x flag that picked a
 // container other than the scheduler's.
-func shellElsewhere(flag string) string {
-	return "--" + flag + " was removed in Astro CLI v2: astro local shell opens its shell in the scheduler's container in Docker mode, " +
-		"and in the project's environment in standalone mode, and has no flag for another component"
+const shellElsewhere = "astro local shell opens its shell in the scheduler's container in Docker mode, " +
+	"and in the project's environment in standalone mode, and has no flag for another component"
+
+// typedFlag is one way to type a case's flag, and the flag as the message
+// names it.
+type typedFlag struct {
+	args  []string
+	typed string
 }
 
 // spellings is every way the case's flag can be typed: --name, --name=value
 // and --name value (or the boolean alone), the shorthand, and the shorthand
 // first in a group, before a letter that would ask for help.
-func (c *removedFlagCase) spellings() [][]string {
+func (c *removedFlagCase) spellings() []typedFlag {
 	value := c.value
 	if value == "" {
 		value = "true"
 	}
-	out := [][]string{{"--" + c.flag + "=" + value}}
+	long := "--" + c.flag
+	out := []typedFlag{{[]string{long + "=" + value}, long}}
 	if c.value != "" {
-		out = append(out, []string{"--" + c.flag, c.value})
+		out = append(out, typedFlag{[]string{long, c.value}, long})
 	} else {
-		out = append(out, []string{"--" + c.flag})
+		out = append(out, typedFlag{[]string{long}, long})
 	}
-	if c.shorthand != "" {
-		out = append(out, []string{"-" + c.shorthand}, []string{"-" + c.shorthand + "h"})
+	if short := "-" + c.shorthand; c.shorthand != "" {
+		out = append(out, typedFlag{[]string{short}, short}, typedFlag{[]string{short + "h"}, short})
 	}
 	return out
 }
 
 // Every entry, every spelling, in text and under --output json: a usage error
-// with the entry's message, before any pre-run, and under json the one error
-// object on stdout.
+// with the entry's message, led by the flag as typed, before any pre-run, and
+// under json the one error object on stdout.
 func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 	reached := map[*removedFlag]bool{}
 	for i := range removedFlagCases {
 		c := &removedFlagCases[i]
-		require.True(t, strings.HasPrefix(c.want, "--"+c.flag+" was removed in Astro CLI v2"), "message for --%s: %s", c.flag, c.want)
 		for _, spelling := range c.spellings() {
+			want := spelling.typed + " was removed in Astro CLI v2: " + c.want
 			for _, asJSON := range []bool{false, true} {
-				args := append(append([]string{}, c.args...), spelling...)
+				args := append(append([]string{}, c.args...), spelling.args...)
 				if asJSON {
 					args = append(args, "-o", "json")
 				}
@@ -345,19 +363,19 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 
 					stdout, stderr, err := executeRoot(root, args...)
 					require.Error(t, err)
-					assert.Equal(t, c.want, err.Error())
+					assert.Equal(t, want, err.Error())
 					assert.Equal(t, cliout.ExitUsage, cliout.ExitCode(t.Context(), err))
 					assert.Zero(t, *preRuns, "a pre-run started before the refusal")
 					if !asJSON {
 						assert.Empty(t, stdout)
-						assert.Contains(t, stderr, "Error: "+c.want)
+						assert.Contains(t, stderr, "Error: "+want)
 						return
 					}
 					assert.Empty(t, stderr)
 					require.Equal(t, 1, strings.Count(stdout, "\n"), "stdout is not one line: %q", stdout)
 					var obj map[string]any
 					require.NoError(t, json.Unmarshal([]byte(stdout), &obj), stdout)
-					assert.Equal(t, map[string]any{"error": c.want, "code": float64(cliout.ExitUsage), "kind": string(cliout.KindUsage)}, obj)
+					assert.Equal(t, map[string]any{"error": want, "code": float64(cliout.ExitUsage), "kind": string(cliout.KindUsage)}, obj)
 				})
 			}
 		}
@@ -371,21 +389,21 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 // pflag has set -y by the time it reaches the f of -yf. After it (-fy), the
 // run has not got there yet, and is told to use what it is about to pass.
 func TestRemovedForceSaysWhenYesIsAlreadyThere(t *testing.T) {
-	const use = "--force was removed in Astro CLI v2: use --yes (-y)"
-	const passed = "--force was removed in Astro CLI v2: --yes (-y), which you passed, already skips the confirmation, so drop "
+	const use = " was removed in Astro CLI v2: use --yes (-y)"
+	const passed = " was removed in Astro CLI v2: --yes (-y), which you passed, already skips the confirmation, so drop it"
 	for _, tc := range []struct {
 		flags []string
 		want  string
 	}{
-		{[]string{"-yf"}, passed + "-f"},
-		{[]string{"-y", "-f"}, passed + "-f"},
-		{[]string{"--yes", "--force"}, passed + "--force"},
-		{[]string{"--yes=true", "--force"}, passed + "--force"},
-		{[]string{"-fy"}, use},
-		{[]string{"--force", "--yes"}, use},
-		{[]string{"--yes=false", "--force"}, use},
-		{[]string{"--yes=false", "-f"}, use},
-		{[]string{"-fh"}, use},
+		{[]string{"-yf"}, "-f" + passed},
+		{[]string{"-y", "-f"}, "-f" + passed},
+		{[]string{"--yes", "--force"}, "--force" + passed},
+		{[]string{"--yes=true", "--force"}, "--force" + passed},
+		{[]string{"-fy"}, "-f" + use},
+		{[]string{"--force", "--yes"}, "--force" + use},
+		{[]string{"--yes=false", "--force"}, "--force" + use},
+		{[]string{"--yes=false", "-f"}, "-f" + use},
+		{[]string{"-fh"}, "-f" + use},
 	} {
 		args := append([]string{"deployment", "delete", "dep-id"}, tc.flags...)
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
@@ -530,7 +548,7 @@ func TestRemovedFlagsGiveWayToHelp(t *testing.T) {
 	// to run.
 	root, _ := disarmedTree(t, astroTree)
 	_, _, err := executeRoot(root, "deployment", "list", "--json", "--", "-h")
-	require.EqualError(t, err, errJSONFlagRemoved)
+	require.EqualError(t, err, removedMessage("--json", errJSONFlagRemoved))
 	// --help=false asks for nothing, before the removed flag or after it.
 	for _, args := range [][]string{
 		{"deployment", "list", "--json", "--help=false"},
@@ -538,7 +556,7 @@ func TestRemovedFlagsGiveWayToHelp(t *testing.T) {
 	} {
 		root, _ := disarmedTree(t, astroTree)
 		_, _, err := executeRoot(root, args...)
-		require.EqualError(t, err, errJSONFlagRemoved, strings.Join(args, " "))
+		require.EqualError(t, err, removedMessage("--json", errJSONFlagRemoved), strings.Join(args, " "))
 	}
 }
 
@@ -585,6 +603,12 @@ func TestRemovedFlagsLeaveCompletionsAlone(t *testing.T) {
 		// cobra takes the URL for --api-url's value here, and finds ls.
 		{[]string{"__complete", "api", "airflow", "--api-url", "http://localhost:8080", "ls", "--fi"}, "--filter", true},
 		{[]string{"__complete", "api", "airflow", "--api-url=http://localhost:8080", "ls", "--fi"}, "--filter", true},
+		// A shorthand 1.x gave a flag the command still has under its long
+		// name alone, which a run is told to spell out.
+		{[]string{"__complete", "init", "-n", "my-project", "--a"}, "--airflow-version", true},
+		{[]string{"__complete", "init", "-a", "3.1", "--n"}, "--name", true},
+		{[]string{"__complete", "local", "start", "-p", "8080", "--d"}, "--docker", true},
+		{[]string{"__complete", "start", "-p", "8080", "--d"}, "--docker", true},
 
 		{[]string{"__complete", "api", "airflow", "--json", "ls", "--fi"}, "--filter", false},
 		{[]string{"__complete", "deployment", "-f", "delete", "--y"}, "--yes", false},
@@ -627,23 +651,30 @@ func TestRemovedFlagsLeaveCompletionsAlone(t *testing.T) {
 	}
 }
 
-// Every command 1.x had takes its removed flags for a completion, without a
-// name or shorthand clashing with one it has (pflag panics on that), and
-// then parses each of them.
+// Every command 1.x had takes its removed flags for a completion, and the
+// shorthands 1.x gave flags it still has under their long names alone,
+// without a name or shorthand clashing with one it has (pflag panics on
+// that), and then parses each of them.
 func TestEveryV1CommandCompletesPastItsRemovedFlags(t *testing.T) {
 	for _, tc := range v1Trees {
 		root := buildTree(t, tc.tree).root
-		check := func(cmd *cobra.Command, path string, f *v1Flag) {
-			removed := cmd.Flag(f.name) == nil
-			arg := "--" + f.name
-			if !f.isBool {
-				arg += "=x"
-			}
+		accepts := func(cmd *cobra.Command, path, arg string) {
 			require.NotPanics(t, func() { acceptForCompletion(root, append(strings.Fields(path), arg)) }, "%s: %s", tc.tree.name, path)
-			if !removed {
+			assert.NoError(t, cmd.ParseFlags([]string{arg}), "%s: astro %s %s", tc.tree.name, path, arg)
+		}
+		check := func(cmd *cobra.Command, path string, f *v1Flag) {
+			value := ""
+			if !f.isBool {
+				value = "=x"
+			}
+			if cmd.Flag(f.name) == nil {
+				accepts(cmd, path, "--"+f.name+value)
 				return
 			}
-			assert.NoError(t, cmd.ParseFlags([]string{arg}), "%s: astro %s %s", tc.tree.name, path, arg)
+			require.NotPanics(t, func() { acceptForCompletion(root, append(strings.Fields(path), "--"+f.name+value)) }, "%s: %s", tc.tree.name, path)
+			if f.shorthand != "" && f.shorthand != "h" && shorthandFlag(cmd, f.shorthand) == nil {
+				accepts(cmd, path, "-"+f.shorthand+value)
+			}
 		}
 		for _, f := range v1Flags() {
 			if !slices.Contains(f.trees, tc.v1) {
@@ -933,7 +964,7 @@ func assertSaysWhatReplacedIt(t *testing.T, root *cobra.Command, preRuns *int, c
 		return entry
 	}
 	assert.Equal(t, entry.message(cmd, spelling), err.Error(), label)
-	assert.True(t, strings.HasPrefix(err.Error(), "--"+f.name+" was removed in Astro CLI v2"), "%s: %v", label, err)
+	assert.True(t, strings.HasPrefix(err.Error(), spelling+" was removed in Astro CLI v2: "), "%s: %v", label, err)
 	assert.True(t, cliout.IsUsage(err), "%s: not a usage error", label)
 	assert.Equal(t, before, *preRuns, "%s: a pre-run started", label)
 	return entry

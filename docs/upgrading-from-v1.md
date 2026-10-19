@@ -160,7 +160,8 @@ Run inside a 1.x project, an `astro dev` command also tells you to convert it wi
 | `--env`, `-e` | the `.env` at the project root, which `astro local env variable set <NAME> --plain` writes | `astro local start` / `restart` / `check`, `astro start` |
 | `--workspace-id`, `-w`; `--deployment-id`, `-d` | the workspace `pyproject.toml` names (`workspace` under `[tool.astro]`), whose Environment Manager a start reads; no Deployment's values are read | `astro local start` / `restart`, `astro start` |
 | `--image-name`, `-i` | the project's own build, from `pyproject.toml` or the Dockerfile `dockerfile` under `[tool.astro]` names; `astro package --tag` names the image it builds | `astro local start` / `restart` / `check`, `astro start`, `astro package` |
-| `--no-cache` | no replacement: the build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro local start` / `restart`, `astro start`, `astro package` |
+| `--no-cache` | no replacement: standalone mode builds no image, and Docker mode's build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro local start` / `restart`, `astro start` |
+| `--no-cache` | no replacement: the build uses the container engine's cache; clear it with `docker builder prune` to build from nothing | `astro package` |
 | `--no-proxy` | the direct `localhost` URL `astro local status` shows, on the port `astro local start --port` picks | `astro local start` / `restart`, `astro start` |
 | `--port` (`-p`), `--docker`, `--standalone` | `astro local stop`, then `astro local start` with them: a restart keeps the port and mode Airflow is running with | `astro local restart` |
 | `--kill`, `-k` | `astro local reset --yes`, then `astro local start` | `astro local restart` |
