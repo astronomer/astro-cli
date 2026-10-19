@@ -429,11 +429,27 @@ func TestDeployPromptStartsOnAnUnlistedID(t *testing.T) {
 	run := runAPC(t, promptAPI(), "\n", "deploy", "dep-prdo", "--prompt")
 	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
 	assert.True(t, run.stdinRead)
-	row := regexp.MustCompile(`(\d+)\s+dep-prdo\s`).FindStringSubmatch(run.stderr)
-	require.Len(t, row, 2, run.stderr)
-	assert.Contains(t, run.stderr, "> ["+row[1]+"]")
+	// Row 1, with no note: it is the id named, which no link names. The
+	// default link keeps its mark.
+	assert.Equal(t, []string{"1", "dep-prdo", "apc", "deployment", "dep-prdo"}, apcPickerRow(t, run.stderr, "dep-prdo"))
+	assert.Equal(t, []string{"2", "prod", "apc", "deployment", "dep-prod", "linked,", "default"}, apcPickerRow(t, run.stderr, "prod"))
+	assert.Contains(t, run.stderr, "> [1]")
 	require.Len(t, *asked, 1)
 	assert.Equal(t, "dep-prdo", (*asked)[0].DeploymentID)
+}
+
+// apcPickerRow returns the fields of the deploy picker's row for name, its
+// highlight stripped, failing when the table has no such row.
+func apcPickerRow(t *testing.T, errOut, name string) []string {
+	t.Helper()
+	for _, line := range strings.Split(errOut, "\n") {
+		line = strings.NewReplacer("\033[1;32m", "", "\033[0m", "").Replace(line)
+		if f := strings.Fields(line); len(f) > 1 && f[1] == name {
+			return f
+		}
+	}
+	t.Fatalf("no row for %q in %q", name, errOut)
+	return nil
 }
 
 // Naming stage, a link, starts on that link; naming prod outside a project,

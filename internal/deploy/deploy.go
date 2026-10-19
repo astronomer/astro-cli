@@ -645,7 +645,9 @@ func promptTarget(req Request, d Deployer, links map[string]manifest.Link, named
 		}
 	}
 	if start < 0 {
-		choices = append([]Choice{{Name: firstNonEmpty(named.LinkName, named.DeploymentID), Where: where + named.DeploymentID}}, choices...)
+		// Only an id is unmatched (a link named is one of the links), and
+		// no link names it, so it is marked unlinked, as it is.
+		choices = append([]Choice{{Name: named.DeploymentID, Where: where + named.DeploymentID, Unlinked: true}}, choices...)
 		start = 0
 	}
 	choices[start].Preselected = true
