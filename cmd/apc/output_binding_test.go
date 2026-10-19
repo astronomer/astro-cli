@@ -75,7 +75,8 @@ func TestJSONResultReachesStdoutUnderAnUnboundRoot(t *testing.T) {
 	// deploy points os.Stdout at stderr for its progress, so its result is
 	// the one that would go astray if it left by anything but the bound out.
 	t.Run("deploy", func(t *testing.T) {
-		deployMocks(t, deploy.Deployed{DeploymentID: "dep-ac", Image: "registry/rel-ac/airflow:deploy-2"}, nil)
+		inProject(t, true)
+		deployMocks(t, deploy.ManifestImageResult{Image: "registry/rel-ac/airflow:deploy-2"}, nil)
 
 		stdout, stderr, err := execUnboundRoot(t, newAPCClient(), "deploy", "dep-ac", "--image-name", "img:1", "-o", "json")
 		require.NoError(t, err, "stderr:\n%s", stderr)

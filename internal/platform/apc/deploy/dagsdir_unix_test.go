@@ -21,7 +21,6 @@ import (
 
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	houston_mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
-	"github.com/astronomer/astro-cli/pkg/input"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -32,10 +31,10 @@ import (
 func takesUploads(t *testing.T) (client *houston_mocks.ClientInterface, uploadURL *string, uploads *[][]string) {
 	t.Helper()
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
-	prev := getDeploymentIDForCurrentCommandVar
-	t.Cleanup(func() { getDeploymentIDForCurrentCommandVar = prev })
-	getDeploymentIDForCurrentCommandVar = func(houston.ClientInterface, string, string, bool) (string, []houston.Deployment, error) {
-		return "dep", nil, nil
+	prev := workspaceDeploymentsVar
+	t.Cleanup(func() { workspaceDeploymentsVar = prev })
+	workspaceDeploymentsVar = func(houston.ClientInterface, string, string) ([]houston.Deployment, error) {
+		return nil, nil
 	}
 	client = new(houston_mocks.ClientInterface)
 	client.On("GetDeployment", "dep").Return(&houston.Deployment{ID: "dep", DagDeployment: houston.DagDeploymentConfig{Type: houston.DagOnlyDeploymentType}}, nil)
@@ -84,7 +83,7 @@ func TestDagsOnlyDeployFailsOnADagsDirectoryItCannotRead(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(parent, 0o755) })
 
 	client, url, uploads := takesUploads(t)
-	got, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{Yes: true})
+	got, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{})
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, ErrNoDagsDirectory)
 	assert.ErrorIs(t, err, syscall.EACCES)
@@ -98,7 +97,7 @@ func TestDagsOnlyDeployRefusesADagsPathThroughAFile(t *testing.T) {
 	parent := filepath.Join(t.TempDir(), "file")
 	require.NoError(t, os.WriteFile(parent, nil, 0o600))
 	client, url, uploads := takesUploads(t)
-	_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{Yes: true})
+	_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{})
 	assert.ErrorIs(t, err, ErrNoDagsDirectory)
 	assert.Empty(t, *uploads)
 }
@@ -116,16 +115,12 @@ func TestDagsOnlyDeployUploadsTheDirectoryADagsSymlinkPointsAt(t *testing.T) {
 	require.NoError(t, os.Mkdir(parent, 0o755))
 	require.NoError(t, os.Symlink(filepath.Join("..", "shared_dags"), filepath.Join(parent, "dags")))
 
-	// The DAGs are counted in the directory pointed at: not asked whether
-	// to deploy none.
-	prevConfirm := confirmEmptyDags
-	t.Cleanup(func() { confirmEmptyDags = prevConfirm })
-	confirmEmptyDags = func(string, ...input.Option) (bool, error) {
-		t.Error("asked whether to deploy no DAGs, of a dags symlink to DAGs")
-		return false, nil
-	}
+	// The DAGs are counted in the directory pointed at: not warned of as
+	// none.
 	client, url, uploads := takesUploads(t)
-	_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{})
+	_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{
+		WarnEmptyDags: func(string) { t.Error("warned of no DAGs, of a dags symlink to DAGs") },
+	})
 	require.NoError(t, err)
 	assert.Equal(t, [][]string{{"dags/a.py", "dags/sub/b.py"}}, *uploads)
 }
@@ -140,7 +135,7 @@ func TestDagsOnlyDeployRefusesADagsSymlinkToNoDirectory(t *testing.T) {
 			parent := t.TempDir()
 			require.NoError(t, os.Symlink(target, filepath.Join(parent, "dags")))
 			client, url, uploads := takesUploads(t)
-			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{Yes: true})
+			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{})
 			assert.ErrorIs(t, err, ErrNoDagsDirectory)
 			assert.ErrorContains(t, err, filepath.Join(parent, "dags")+" is not a directory")
 			assert.Empty(t, *uploads)
@@ -163,14 +158,10 @@ func TestDagsOnlyDeployFailsOnADagsDirectoryItCannotList(t *testing.T) {
 			require.NoError(t, os.Chmod(dir, 0o000))
 			t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
 
-			prevConfirm := confirmEmptyDags
-			t.Cleanup(func() { confirmEmptyDags = prevConfirm })
-			confirmEmptyDags = func(string, ...input.Option) (bool, error) {
-				t.Error("asked whether to deploy no DAGs, of a dags directory it could not list")
-				return false, nil
-			}
 			client, url, uploads := takesUploads(t)
-			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{})
+			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{
+				WarnEmptyDags: func(string) { t.Error("warned of no DAGs, of a dags directory it could not list") },
+			})
 			require.Error(t, err)
 			assert.NotErrorIs(t, err, ErrNoDagsDirectory)
 			assert.ErrorIs(t, err, syscall.EACCES)
@@ -190,7 +181,7 @@ func TestDagsOnlyDeployRefusesADagsDirectoryHoldingTheProject(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(parent, "a.py"), []byte("a"), 0o600))
 			require.NoError(t, os.Symlink(target, filepath.Join(parent, "dags")))
 			client, url, uploads := takesUploads(t)
-			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{Yes: true})
+			_, err := DagsOnlyDeploy(client, "ws", "dep", parent, url, true, "", Options{})
 			assert.ErrorIs(t, err, ErrDagsDirHoldsProject)
 			assert.NotErrorIs(t, err, ErrNoDagsDirectory)
 			assert.Empty(t, *uploads)

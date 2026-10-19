@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -255,18 +256,25 @@ func TestDeployManifestWarnings(t *testing.T) {
 
 // --force and --prompt answered 1.x's questions, which a project's deploy
 // does not ask: accepted, so deploy-action keeps working, hidden, and read
-// by nothing.
+// by nothing, as on Astro.
 func TestDeployManifestTakesForceAndPrompt(t *testing.T) {
 	linkedProject(t)
 	asked := manifestDeploys(t, builtAndPushed)
 	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--force", "-p", "-o", "json")
 	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	assert.Len(t, *asked, 1)
+	require.Len(t, *asked, 1)
+	assert.Equal(t, "dep-prod", (*asked)[0].DeploymentID)
+
+	// Under json, naming none is input_required, --prompt or not.
+	run = runAPC(t, newAPCClient(), "", "deploy", "--prompt", "-o", "json")
+	require.Equal(t, 1, run.code)
+	assert.Contains(t, run.stdout, "input_required")
 
 	cmd := NewDeployCmd(os.Stdout)
 	for _, name := range []string{"force", "prompt", "workspace-id"} {
 		assert.True(t, cmd.Flags().Lookup(name).Hidden, name)
 	}
+	assert.Equal(t, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working", cmd.Flags().Lookup("prompt").Usage)
 	for _, name := range []string{"save", "no-cache", "wait"} {
 		assert.Nil(t, cmd.Flags().Lookup(name), name)
 	}
@@ -312,4 +320,45 @@ func TestDeployManifestRefusesDagsWithImage(t *testing.T) {
 	run := runAPC(t, newAPCClient(), "", "deploy", "prod", "--dags", "--image", "-o", "json")
 	assert.Equal(t, 2, run.code)
 	assert.True(t, cliout.IsUsage(run.err))
+}
+
+// asking is a terminal for one test: the deploy may ask.
+func asking(t *testing.T) {
+	t.Helper()
+	prev := stdinIsTerminal
+	stdinIsTerminal = func() bool { return true }
+	t.Cleanup(func() { stdinIsTerminal = prev })
+}
+
+// promptAPI is a Houston whose workspace lists dep-old and dep-new, which no
+// link of linkedProject names.
+func promptAPI() *mocks.ClientInterface {
+	api := newAPCClient()
+	api.On("ListDeployments", houston.ListDeploymentsRequest{WorkspaceID: "ck05r3bor07h40d02y2hw4n4v"}).Return([]houston.Deployment{
+		{ID: "dep-old", Label: "Old One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
+		{ID: "dep-new", Label: "New One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
+	}, nil)
+	return api
+}
+
+// An interactive deploy that names its Deployment is not asked, --prompt or
+// not: naming it is the answer. Naming none, it asks, --prompt or not, the
+// default link preselected.
+func TestDeployNamedIsNotAsked(t *testing.T) {
+	for _, prompt := range [][]string{nil, {"--prompt"}} {
+		linkedProject(t)
+		asking(t)
+		asked := manifestDeploys(t, builtAndPushed)
+		run := runAPC(t, promptAPI(), "prod\n", append([]string{"deploy", "stage"}, prompt...)...)
+		require.Equal(t, 0, run.code, "%v stderr:\n%s", prompt, run.stderr)
+		assert.False(t, run.stdinRead, "%v: nothing is asked", prompt)
+		require.Len(t, *asked, 1)
+		assert.Equal(t, "dep-stage", (*asked)[0].DeploymentID, "%v", prompt)
+
+		run = runAPC(t, promptAPI(), "\n", append([]string{"deploy"}, prompt...)...)
+		require.Equal(t, 0, run.code, "%v stderr:\n%s", prompt, run.stderr)
+		assert.True(t, run.stdinRead, "%v: asked", prompt)
+		require.Len(t, *asked, 2)
+		assert.Equal(t, "dep-prod", (*asked)[1].DeploymentID, "%v: Enter takes the default", prompt)
+	}
 }
