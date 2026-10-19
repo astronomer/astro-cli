@@ -1,6 +1,7 @@
 package apc
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -9,12 +10,14 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deploy"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
+	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
@@ -370,4 +373,149 @@ func TestDeployPromptAsksThoughOneIsNamed(t *testing.T) {
 			assert.Contains(t, run.stderr, "> ["+row[1]+"]", "the list starts on %s", tc.started)
 		})
 	}
+}
+
+// promptAPI is a Houston whose workspace lists dep-old and dep-new, which no
+// link of linkedProject names.
+func promptAPI() *mocks.ClientInterface {
+	api := newAPCClient()
+	api.On("ListDeployments", houston.ListDeploymentsRequest{WorkspaceID: "ck05r3bor07h40d02y2hw4n4v"}).Return([]houston.Deployment{
+		{ID: "dep-old", Label: "Old One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
+		{ID: "dep-new", Label: "New One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
+	}, nil)
+	return api
+}
+
+// An interactive deploy that names its Deployment, without --prompt, is not
+// asked: naming it is the answer.
+func TestDeployNamedIsNotAsked(t *testing.T) {
+	linkedProject(t)
+	asking(t)
+	asked := manifestDeploys(t, builtAndPushed)
+	run := runAPC(t, promptAPI(), "prod\n", "deploy", "stage")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	assert.False(t, run.stdinRead, "nothing is asked")
+	require.Len(t, *asked, 1)
+	assert.Equal(t, "dep-stage", (*asked)[0].DeploymentID)
+}
+
+// With --prompt, what is named resolves, and is refused, exactly as without
+// it, before anything is asked: a link on another domain, and an astro link
+// under an Astro Private Cloud context.
+func TestDeployPromptRefusesWhatNamingRefuses(t *testing.T) {
+	for _, named := range []string{"elsewhere", "cloud"} {
+		t.Run(named, func(t *testing.T) {
+			linkedProject(t)
+			asking(t)
+			asked := manifestDeploys(t, builtAndPushed)
+			without := runAPC(t, promptAPI(), "\n", "deploy", named)
+			require.Error(t, without.err)
+			run := runAPC(t, promptAPI(), "\n", "deploy", named, "--prompt")
+			require.Error(t, run.err)
+			assert.Equal(t, without.err.Error(), run.err.Error())
+			assert.False(t, run.stdinRead, "nothing is asked")
+			assert.Empty(t, *asked)
+		})
+	}
+}
+
+// What is named and no entry of the list is, an id the workspace does not
+// list, typo or not, is offered first and started on, never the default
+// link: Enter deploys where it named, as without --prompt.
+func TestDeployPromptStartsOnAnUnlistedID(t *testing.T) {
+	linkedProject(t)
+	asking(t)
+	asked := manifestDeploys(t, builtAndPushed)
+	run := runAPC(t, promptAPI(), "\n", "deploy", "dep-prdo", "--prompt")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	assert.True(t, run.stdinRead)
+	row := regexp.MustCompile(`(\d+)\s+dep-prdo\s`).FindStringSubmatch(run.stderr)
+	require.Len(t, row, 2, run.stderr)
+	assert.Contains(t, run.stderr, "> ["+row[1]+"]")
+	require.Len(t, *asked, 1)
+	assert.Equal(t, "dep-prdo", (*asked)[0].DeploymentID)
+}
+
+// Naming stage, a link, starts on that link; naming prod outside a project,
+// an id, starts on it, not on a Deployment whose id ends in prod.
+func TestDeployPromptMatchesTheNameNotAnIDSuffix(t *testing.T) {
+	linkedProject(t)
+	asking(t)
+	asked := manifestDeploys(t, builtAndPushed)
+	api := newAPCClient()
+	api.On("ListDeployments", mock.Anything).Return([]houston.Deployment{
+		{ID: "x-prod", Label: "A Prod", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
+	}, nil)
+	run := runAPC(t, api, "\n", "deploy", "stage", "--prompt")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	require.Len(t, *asked, 1)
+	assert.Equal(t, "dep-stage", (*asked)[0].DeploymentID)
+	row := regexp.MustCompile(`(\d+)\s+stage\s`).FindStringSubmatch(run.stderr)
+	require.Len(t, row, 2, run.stderr)
+	assert.Contains(t, run.stderr, "> ["+row[1]+"]")
+
+	// Outside a project prod is an id: the workspace's x-prod is not it.
+	inWorkingDir(t, true)
+	run = runAPC(t, api, "\n", "deploy", "prod", "--prompt", "--image-name", "img:1")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	require.Len(t, *asked, 2)
+	assert.Equal(t, "prod", (*asked)[1].DeploymentID)
+	row = regexp.MustCompile(`(\d+)\s+prod\s`).FindStringSubmatch(run.stderr)
+	require.Len(t, row, 2, run.stderr)
+	assert.Contains(t, run.stderr, "> ["+row[1]+"]", "the list starts on prod, not x-prod")
+}
+
+// Answering with the very Deployment named, by its id, deploys as naming it
+// does, saving no link; picking another of the workspace's links it, as a
+// pick does.
+func TestDeployPromptSavesALinkOnlyForAnotherPick(t *testing.T) {
+	dir := linkedProject(t)
+	asking(t)
+	manifestDeploys(t, builtAndPushed)
+	links := func() map[string]manifest.Link {
+		m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
+		require.NoError(t, err)
+		return m.Astro.Deployments
+	}
+
+	run := runAPC(t, promptAPI(), "\n", "deploy", "dep-new", "--prompt")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	for name, l := range links() {
+		assert.NotEqual(t, "dep-new", l.Deployment, "link %s saved for the Deployment named", name)
+	}
+
+	run = runAPC(t, promptAPI(), "old-one\n", "deploy", "dep-new", "--prompt")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	assert.Equal(t, "dep-old", links()["old-one"].Deployment, "another pick is linked")
+}
+
+// Naming nothing, --prompt asks as the deploy asks without it: in a place
+// with no links, the workspace's own picker, which lists once, and a list
+// that fails fails the deploy.
+func TestDeployPromptNamingNothingAsksAsWithoutIt(t *testing.T) {
+	inWorkingDir(t, true)
+	asking(t)
+	asked := manifestDeploys(t, builtAndPushed)
+	run := runAPC(t, promptAPI(), "1\n", "deploy", "--image-name", "img:1", "--prompt")
+	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
+	assert.Contains(t, run.stderr, "RELEASE NAME", "the workspace's picker")
+	require.Len(t, *asked, 1)
+
+	api := newAPCClient()
+	api.On("ListDeployments", mock.Anything).Return(nil, errors.New("houston is down"))
+	run = runAPC(t, api, "1\n", "deploy", "--image-name", "img:1", "--prompt")
+	require.Error(t, run.err)
+	assert.Contains(t, run.err.Error(), "houston is down")
+	assert.Equal(t, 1, countCalls(api, "ListDeployments"), "listed once")
+}
+
+// countCalls is how many times method was called on api.
+func countCalls(api *mocks.ClientInterface, method string) int {
+	n := 0
+	for i := range api.Calls {
+		if api.Calls[i].Method == method {
+			n++
+		}
+	}
+	return n
 }

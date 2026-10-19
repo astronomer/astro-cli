@@ -26,6 +26,8 @@ func TestPrebuiltListedRuntimeRules(t *testing.T) {
 		{name: "a downgrade", current: "3.1-5", tag: "3.0-9", listed: listed, wantErr: "cannot deploy Astro Runtime 3.0-9: it is a downgrade from the deployment's current 3.1-5; to deploy, raise to 3.1-5"},
 		{name: "Airflow 3 to 2", current: "3.0-9", tag: "12.1.1", listed: listed, wantErr: "downgrade"},
 		{name: "no list still refuses a downgrade", current: "3.0-9", tag: "12.1.1", wantErr: "downgrade"},
+		{name: "no current runtime refuses no downgrade", current: "", tag: "11.9.0", listed: listed},
+		{name: "no current runtime, no list", current: "", tag: "11.0.0"},
 		{name: "newer than the newest listed warns", current: "3.1-5", tag: "3.2-1", listed: listed, wantWarn: "Astro Runtime 3.2-1 is newer than the newest the platform lists for this Deployment, 3.1-5 (it lists 3.1-5, 3.0-9, 12.1.1, 11.9.0). It deploys anyway"},
 		{name: "Airflow 3 where none is listed warns", current: "12.1.1", tag: "3.1-5", listed: []string{"12.1.1", "11.9.0"}, wantWarn: "Astro Runtime 3.1-5 is Airflow 3, and the platform lists no Airflow 3 build for this Deployment (it lists 12.1.1, 11.9.0), so Airflow 3 may not be enabled for it. It deploys anyway"},
 		{name: "an older build of a listed Airflow warns", current: "3.0-9", tag: "3.1-4", listed: listed, wantWarn: "Astro Runtime 3.1-4 is not one the platform lists for this Deployment"},
