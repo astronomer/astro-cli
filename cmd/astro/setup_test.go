@@ -77,6 +77,11 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("context cmd", func(t *testing.T) {
+		// It reaches the login check with no login, as any command not
+		// exempt does; the check is stubbed rather than asking a server.
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+			return nil
+		}
 		cmd := &cobra.Command{Use: "list"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)
