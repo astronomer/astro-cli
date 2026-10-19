@@ -20,13 +20,13 @@ import (
 // (Bin), the env that reaches its daemon (Env), and the runner every command
 // goes through (Cmd). A build takes the same Bin and Env on its Request and
 // the same Commander in New; the other image actions, logging in to a
-// registry, tagging, pushing and reading a label, run on an Engine. A caller
+// registry, tagging, pushing, saving and reading a label, run on an Engine. A caller
 // that resolves its engine once therefore builds, logs in and pushes on one
 // engine, and an image built on one engine is never pushed from another.
 //
 // Every action is the engine's own CLI, `<bin> login`, `<bin> tag`,
-// `<bin> push`, `<bin> image inspect`, so docker and podman are driven the same
-// way.
+// `<bin> push`, `<bin> save`, `<bin> image inspect`, so docker and podman are
+// driven the same way.
 type Engine struct {
 	Cmd Commander
 	Bin string
@@ -121,6 +121,22 @@ func (e Engine) Label(ctx context.Context, image, label string) (string, error) 
 		return "", commandError(e.Bin+" image inspect "+image, err, stderr.String())
 	}
 	return strings.TrimSpace(out.String()), nil
+}
+
+// Save writes a local image to a tarball at path, as `<bin> save` does, so
+// another engine can load it. The engine writes its progress to stderr, which
+// reaches progress as it is written when progress is set; a failed save
+// carries it too.
+func (e Engine) Save(ctx context.Context, image, path string, progress io.Writer) error {
+	var stderr bytes.Buffer
+	errOut := io.Writer(&stderr)
+	if progress != nil {
+		errOut = io.MultiWriter(&stderr, progress)
+	}
+	if err := e.Cmd.Run(ctx, e.Env, rt.Stdio{Err: errOut}, e.Bin, "save", "--output", path, image); err != nil {
+		return commandError(e.Bin+" save "+image, err, stderr.String())
+	}
+	return nil
 }
 
 // HasEnvPrefix reports whether a local image's config sets an environment

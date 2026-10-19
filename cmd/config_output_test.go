@@ -42,9 +42,9 @@ func (s *CmdSuite) TestConfigGetOutput() {
 		s.Empty(stderr)
 		s.Equal(configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true}, decodeOne[configSetting](s, stdout))
 
-		stdout, _, err = runConfigCmd("get", "apc.show_warnings", "-g", "-o", "json")
+		stdout, _, err = runConfigCmd("get", "show_warnings", "-g", "-o", "json")
 		s.NoError(err)
-		s.Equal(configSetting{Key: "apc.show_warnings", Value: "true", Scope: "global", Set: false}, decodeOne[configSetting](s, stdout),
+		s.Equal(configSetting{Key: "show_warnings", Value: "true", Scope: "global", Set: false}, decodeOne[configSetting](s, stdout),
 			"the built-in default, as the text prints it")
 	})
 
@@ -78,7 +78,9 @@ func (s *CmdSuite) TestConfigGetOutput() {
 		stdout, stderr, err := runConfigCmd("get", "nope", "-g", "-o", "json")
 		s.ErrorIs(err, errInvalidConfigPath)
 		s.Empty(stderr)
-		s.Equal(1, decodeOne[cliout.ErrorObject](s, stdout).Code)
+		failure := decodeOne[cliout.ErrorObject](s, stdout)
+		s.Equal(2, failure.Code)
+		s.Equal(cliout.KindUsage, failure.Kind)
 	})
 }
 
@@ -128,7 +130,7 @@ func (s *CmdSuite) TestConfigListOutput() {
 		s.Empty(stderr)
 		list := decodeOne[configSettings](s, stdout)
 		s.Contains(list.Settings, configSetting{Key: "apc.page_size", Value: "50", Scope: "global", Set: true})
-		s.Contains(list.Settings, configSetting{Key: "apc.show_warnings", Value: "true", Scope: "default"})
+		s.Contains(list.Settings, configSetting{Key: "show_warnings", Value: "true", Scope: "default"})
 		keys := make([]string, 0, len(list.Settings))
 		for _, setting := range list.Settings {
 			keys = append(keys, setting.Key)

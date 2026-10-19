@@ -187,6 +187,34 @@ func TestTagFailureCarriesTheEngineOutput(t *testing.T) {
 	require.EqualError(t, err, "docker tag local:1 r.example.com/a:t failed: exit status 1: Error response from daemon: No such image: local:1")
 }
 
+// Save writes the tarball with the engine's own CLI and streams what the
+// engine says on stderr to progress as it runs.
+func TestSaveStreamsItsProgress(t *testing.T) {
+	cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
+		"save": func(_ []string, s rt.Stdio) error { fmt.Fprint(s.Err, "Saving layer 1/2\n"); return nil },
+	}}
+	var progress strings.Builder
+	require.NoError(t, testEngine(cmd, "podman").Save(context.Background(), "local:1", "/tmp/out.tar", &progress))
+	assert.Equal(t, []string{"podman save --output /tmp/out.tar local:1"}, cmd.commands())
+	assert.Equal(t, "Saving layer 1/2\n", progress.String())
+
+	// No progress writer is fine: the output is only kept for an error.
+	require.NoError(t, testEngine(cmd, "docker").Save(context.Background(), "local:1", "/tmp/out.tar", nil))
+}
+
+func TestSaveFailureCarriesTheEngineOutput(t *testing.T) {
+	cmd := &engineCmd{reply: map[string]func([]string, rt.Stdio) error{
+		"save": func(_ []string, s rt.Stdio) error {
+			fmt.Fprint(s.Err, "Error: no space left on device\n")
+			return errors.New("exit status 1")
+		},
+	}}
+	var progress strings.Builder
+	err := testEngine(cmd, "docker").Save(context.Background(), "local:1", "/tmp/out.tar", &progress)
+	require.EqualError(t, err, "docker save local:1 failed: exit status 1: Error: no space left on device")
+	assert.Equal(t, "Error: no space left on device\n", progress.String(), "what the engine said still reached the progress")
+}
+
 // A push tags the source as the remote reference, pushes with the progress
 // to Out, and drops the remote tag. A credential runs no login, and never
 // reaches an argument.

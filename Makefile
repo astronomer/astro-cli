@@ -38,6 +38,20 @@ lint-submodules:
 lint-e2e:
 	cd e2e && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_VERSION} run --timeout 5m --build-tags e2e
 
+# Fails on a go.mod or go.sum that `go mod tidy` would change, in every module:
+# the root, e2e and each pkg/* one, found by their go.mod rather than listed.
+# Nothing else notices a require the code stopped importing — the build and
+# every linter pass with it — so without this the root kept the whole of
+# docker/compose in its go.mod after its last import was deleted. Tidy reads every
+# GOOS and build tag, so one host's run speaks for all of them. Not set -e: one
+# untidy module should not hide whether the rest are too.
+tidy-check:
+	@status=0; for gomod in go.mod e2e/go.mod pkg/*/go.mod; do \
+		mod=$$(dirname $$gomod); \
+		echo "==> $$mod"; \
+		(cd $$mod && go mod tidy -diff) || status=1; \
+	done; exit $$status
+
 # The platforms every module is linted for.
 #
 # "A linter that cannot see a file reports success on it" is the reason lint-e2e
