@@ -36,8 +36,8 @@ func slimManifestEnabled() bool {
 // an overlay on the tarball: root itself is never written.
 //
 // Whatever the setting says, the tarball's own walk (Skip) leaves out every
-// .astro/dbt_metadata.json and .astro/manifest.slim.json that an earlier
-// Astro CLI wrote into the tree as a regular file (its own producer marker
+// .astro/dbt_metadata.json and .astro/*.slim.json that an earlier Astro CLI
+// wrote into the tree as a regular file (its own producer marker
 // says so, airflowrt.CosmosBoostFileWrittenByAstro), so the files left out
 // are exactly ones the tarball would have carried. The plugin cannot tell a
 // fresh sidecar from a stale one, and this CLI never writes there. Anything
@@ -50,8 +50,8 @@ func slimManifestEnabled() bool {
 // dbt project (dbt_project.yml) gets a .astro/dbt_metadata.json carrying its
 // content hash, which the plugin uses as a cache version key at parse time
 // instead of hashing the project tree itself, and every standalone dbt
-// manifest.json gets a hash sidecar too, plus a slim, field-filtered copy for
-// the plugin to load in place of the full manifest. That step is best-effort
+// manifest gets a hash sidecar too, plus a slim, field-filtered copy named
+// after it for the plugin to load in place of the full manifest. That step is best-effort
 // - a failure is a warning, never an error - because without a sidecar the
 // plugin simply falls back to hashing at parse time. The one thing it refuses
 // is to replace another producer's file: the plugin reads that path, and this

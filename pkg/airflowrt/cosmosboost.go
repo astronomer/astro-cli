@@ -3,11 +3,13 @@ package airflowrt
 import (
 	"encoding/json"
 	"path"
+	"strings"
 )
 
 // Earlier Astro CLIs wrote the Cosmos Boost sidecars into the user's dbt
 // project: a .astro/dbt_metadata.json beside each dbt project or manifest,
-// and a .astro/manifest.slim.json beside it. The Cosmos Boost plugin reads
+// and a slim manifest beside it for each dbt manifest there
+// (.astro/manifest.slim.json for a manifest.json). The Cosmos Boost plugin reads
 // them as current, so one left behind is stale the moment the project
 // changes. The CLI now generates them into what it ships and never into the
 // project, and everything it ships - a bundle, a generated image - leaves out
@@ -20,27 +22,34 @@ const (
 	CosmosBoostDir = ".astro"
 	// CosmosBoostSidecar carries the content hash the plugin keys its cache on.
 	CosmosBoostSidecar = "dbt_metadata.json"
-	// CosmosBoostSlimManifest is the field-filtered manifest beside it.
-	CosmosBoostSlimManifest = "manifest.slim.json"
+	// CosmosBoostSlimManifestSuffix ends a field-filtered manifest's name.
+	// There is one beside the sidecar for each dbt manifest, named after it:
+	// manifest_full.json's is manifest_full.slim.json.
+	CosmosBoostSlimManifestSuffix = ".slim.json"
+	// CosmosBoostSlimManifest is manifest.json's field-filtered manifest.
+	CosmosBoostSlimManifest = "manifest" + CosmosBoostSlimManifestSuffix
 	// CosmosBoostProducer is the producer an Astro CLI records in each.
 	CosmosBoostProducer = "astro"
 )
 
 // IsCosmosBoostFile reports whether rel, slash-separated, is where a Cosmos
-// Boost sidecar goes: a dbt_metadata.json or manifest.slim.json directly
-// inside a .astro directory, at any depth.
+// Boost sidecar goes: a dbt_metadata.json or a *.slim.json directly inside a
+// .astro directory, at any depth.
 func IsCosmosBoostFile(rel string) bool {
-	switch path.Base(rel) {
-	case CosmosBoostSidecar, CosmosBoostSlimManifest:
-		return path.Base(path.Dir(rel)) == CosmosBoostDir
-	}
-	return false
+	base := path.Base(rel)
+	return (base == CosmosBoostSidecar || isSlimManifest(base)) && path.Base(path.Dir(rel)) == CosmosBoostDir
+}
+
+// isSlimManifest reports whether name is a slim manifest's: something
+// before CosmosBoostSlimManifestSuffix.
+func isSlimManifest(name string) bool {
+	return len(name) > len(CosmosBoostSlimManifestSuffix) && strings.HasSuffix(name, CosmosBoostSlimManifestSuffix)
 }
 
 // CosmosBoostFileWrittenByAstro reports whether data, the contents of the
 // file at rel (one IsCosmosBoostFile accepts), carries an Astro CLI's
 // producer marker: generated_by.application in a dbt_metadata.json,
-// _generated_by.application in a manifest.slim.json. Each file is judged by
+// _generated_by.application in a slim manifest. Each file is judged by
 // its own marker, never by its neighbor's, and one that does not parse as a
 // JSON object or names another producer is not the CLI's: it is the user's.
 func CosmosBoostFileWrittenByAstro(rel string, data []byte) bool {
@@ -55,10 +64,10 @@ func CosmosBoostFileWrittenByAstro(rel string, data []byte) bool {
 	if json.Unmarshal(data, &marker) != nil {
 		return false
 	}
-	switch path.Base(rel) {
-	case CosmosBoostSidecar:
+	switch base := path.Base(rel); {
+	case base == CosmosBoostSidecar:
 		return marker.GeneratedBy.Application == CosmosBoostProducer
-	case CosmosBoostSlimManifest:
+	case isSlimManifest(base):
 		return marker.SlimGeneratedBy.Application == CosmosBoostProducer
 	}
 	return false
