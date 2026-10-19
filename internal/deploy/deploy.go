@@ -87,13 +87,6 @@ type Request struct {
 	// (stdin is a TTY, and the output is not json). A run that cannot be asked
 	// must name its target on the command line.
 	Interactive bool
-	// Prompt asks which deployment to ship to even when one is named, with
-	// the one named preselected (Astro Private Cloud's --prompt, as Astro CLI
-	// 1.x had it). The one named resolves, and is refused, as without it,
-	// before anything is asked; naming none asks as without it. It applies
-	// only to a run that may ask: one that cannot ships to the one named, or
-	// is refused for naming none, as without it.
-	Prompt bool
 	// Announce runs once the target is settled and before anything is built or
 	// uploaded. It is how "building your project image" lands after the
 	// question rather than before it: a deploy refused at the prompt says
@@ -529,9 +522,6 @@ type Choice struct {
 	// Unlinked marks a Deployment the project does not link yet: picking it
 	// links it.
 	Unlinked bool
-	// Preselected marks the entry the prompt starts on, in place of the
-	// default link: the one a --prompt deploy named.
-	Preselected bool
 }
 
 // Deployment is an Astro Deployment as a workspace lists it.
@@ -561,12 +551,7 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 	}
 
 	if target, named, err := resolveNamed(req, links); named || err != nil {
-		if err != nil || !req.Prompt || !req.Interactive {
-			return target, err
-		}
-		// --prompt: the target named resolves, and is refused, exactly as
-		// without it; only then is the question asked, starting on it.
-		return promptTarget(req, d, links, target)
+		return target, err
 	}
 
 	deployable := linkNames(links, req.deploysTo)
@@ -609,57 +594,6 @@ func resolveTarget(req Request, d Deployer) (Target, error) {
 	}
 	if name == "" {
 		return Target{}, ErrAborted
-	}
-	if link, ok := links[name]; ok {
-		return linkTarget(req, name, link, links)
-	}
-	if dep, ok := unlinked.byName[name]; ok {
-		return linkedTarget(req, name, dep), nil
-	}
-	return Target{}, fmt.Errorf("no deployment link %q in the manifest%s", name, knownLinks(links))
-}
-
-// promptTarget asks which deployment to ship to, as an interactive deploy
-// that names none is asked, though one is named and resolved (--prompt,
-// named): the project's deployable links, then the workspace's Deployments no
-// link names, starting on the one named, never on the default link. A named
-// target no entry is, an id the workspace list does not hold, is offered
-// first. Answering with the target named deploys there as naming it without
-// --prompt does, saving no link; picking another resolves as a pick does.
-func promptTarget(req Request, d Deployer, links map[string]manifest.Link, named Target) (Target, error) {
-	deployable := linkNames(links, req.deploysTo)
-	where := string(req.platform()) + " deployment "
-	choices := make([]Choice, 0, len(deployable)+1)
-	for _, name := range linksFirst(deployable, links) {
-		choices = append(choices, Choice{Name: name, Where: where + links[name].Deployment})
-	}
-	unlinked := unlinkedDeployments(req, d, links)
-	for _, name := range unlinked.names {
-		choices = append(choices, Choice{Name: name, Where: where + unlinked.byName[name].ID, Unlinked: true})
-	}
-	start := -1
-	for i := range choices {
-		if (named.LinkName != "" && choices[i].Name == named.LinkName) || (named.LinkName == "" && choices[i].Where == where+named.DeploymentID) {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		// Only an id is unmatched (a link named is one of the links), and
-		// no link names it, so it is marked unlinked, as it is.
-		choices = append([]Choice{{Name: named.DeploymentID, Where: where + named.DeploymentID, Unlinked: true}}, choices...)
-		start = 0
-	}
-	choices[start].Preselected = true
-	name, err := d.ConfirmTarget(choices, defaultLink(links, deployable))
-	if err != nil {
-		return Target{}, err
-	}
-	switch {
-	case name == "":
-		return Target{}, ErrAborted
-	case name == choices[start].Name:
-		return named, nil
 	}
 	if link, ok := links[name]; ok {
 		return linkTarget(req, name, link, links)

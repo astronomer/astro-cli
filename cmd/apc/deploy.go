@@ -21,7 +21,6 @@ var (
 	deployDeployment string
 	workspaceFlag    string
 	deployForce      bool
-	deployPrompt     bool
 	deploySecrets    = []string{}
 
 	DagsOnlyDeploy                     = deploy.DagsOnlyDeploy
@@ -67,10 +66,11 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	// Astro, because astronomer/deploy-action passes --force on every deploy.
 	cmd.Flags().BoolVarP(&deployForce, "force", "f", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
-	// --prompt asks for the Deployment list with one named, as 1.x's did, the
-	// one named preselected. It is shown, as it does something here; a run
-	// that cannot ask deploys to the one named.
-	cmd.Flags().BoolVarP(&deployPrompt, "prompt", "p", false, "Ask which Deployment to deploy to even when one is named, starting on it. A run that cannot ask deploys to the one named")
+	// --prompt asked 1.x to offer the Deployment list even with one named. A
+	// deploy here asks whenever none is named, so it is accepted, hidden and
+	// read by nothing, as on Astro.
+	cmd.Flags().BoolP("prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	cmd.Flags().StringVar(&workspaceFlag, "workspace", "", "Workspace for the deploy, overriding the context")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace assigned to the Deployment")

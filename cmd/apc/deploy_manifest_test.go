@@ -1,16 +1,13 @@
 package apc
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
@@ -257,10 +254,9 @@ func TestDeployManifestWarnings(t *testing.T) {
 	assert.Contains(t, run.stderr, "Warning: this deploy upgrades Deployment dep-prod from Airflow 2 to Airflow 3")
 }
 
-// --force answered 1.x's uncommitted-changes question, which a project's
-// deploy does not ask: accepted, so deploy-action keeps working, hidden, and
-// read by nothing. --prompt does what 1.x's did, so it is shown; a run that
-// cannot ask, as this one cannot, deploys to the one named.
+// --force and --prompt answered 1.x's questions, which a project's deploy
+// does not ask: accepted, so deploy-action keeps working, hidden, and read
+// by nothing, as on Astro.
 func TestDeployManifestTakesForceAndPrompt(t *testing.T) {
 	linkedProject(t)
 	asked := manifestDeploys(t, builtAndPushed)
@@ -269,15 +265,16 @@ func TestDeployManifestTakesForceAndPrompt(t *testing.T) {
 	require.Len(t, *asked, 1)
 	assert.Equal(t, "dep-prod", (*asked)[0].DeploymentID)
 
+	// Under json, naming none is input_required, --prompt or not.
 	run = runAPC(t, newAPCClient(), "", "deploy", "--prompt", "-o", "json")
 	require.Equal(t, 1, run.code)
-	assert.Contains(t, run.stdout, "input_required", "naming none still cannot be answered without a question")
+	assert.Contains(t, run.stdout, "input_required")
 
 	cmd := NewDeployCmd(os.Stdout)
-	for _, name := range []string{"force", "workspace-id"} {
+	for _, name := range []string{"force", "prompt", "workspace-id"} {
 		assert.True(t, cmd.Flags().Lookup(name).Hidden, name)
 	}
-	assert.False(t, cmd.Flags().Lookup("prompt").Hidden, "prompt")
+	assert.Equal(t, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working", cmd.Flags().Lookup("prompt").Usage)
 	for _, name := range []string{"save", "no-cache", "wait"} {
 		assert.Nil(t, cmd.Flags().Lookup(name), name)
 	}
@@ -333,48 +330,6 @@ func asking(t *testing.T) {
 	t.Cleanup(func() { stdinIsTerminal = prev })
 }
 
-// --prompt asks, as 1.x's did, though a Deployment is named: the list starts
-// on the one named, as a link or by its id, and Enter takes it; another may
-// be picked instead. A prebuilt image's deploy asks the same way, from a
-// project and from outside one, where the list is the workspace's.
-func TestDeployPromptAsksThoughOneIsNamed(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		setup   func(t *testing.T) string
-		args    []string
-		answer  string
-		want    string
-		started string
-	}{
-		{"a link named", linkedProject, []string{"deploy", "stage", "--prompt"}, "\n", "dep-stage", "stage"},
-		{"a link named by --deployment", linkedProject, []string{"deploy", "--deployment", "stage", "-p"}, "\n", "dep-stage", "stage"},
-		{"a link's id named", linkedProject, []string{"deploy", "dep-stage", "--prompt"}, "\n", "dep-stage", "stage"},
-		{"another picked", linkedProject, []string{"deploy", "stage", "--prompt"}, "prod\n", "dep-prod", "stage"},
-		{"nothing named starts on the default", linkedProject, []string{"deploy", "--prompt"}, "\n", "dep-prod", "prod"},
-		{"--image-name --remote", linkedProject, []string{"deploy", "stage", "--prompt", "--image-name", "q/img:1", "--remote", "--runtime-version", "3.1-5"}, "\n", "dep-stage", "stage"},
-		{"--image-name outside a project, by id", func(t *testing.T) string { return inWorkingDir(t, true) }, []string{"deploy", "dep-new", "--prompt", "--image-name", "img:1"}, "\n", "dep-new", "new-one"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setup(t)
-			asking(t)
-			asked := manifestDeploys(t, builtAndPushed)
-			api := newAPCClient()
-			api.On("ListDeployments", houston.ListDeploymentsRequest{WorkspaceID: "ck05r3bor07h40d02y2hw4n4v"}).Return([]houston.Deployment{
-				{ID: "dep-old", Label: "Old One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
-				{ID: "dep-new", Label: "New One", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
-			}, nil)
-			run := runAPC(t, api, tc.answer, tc.args...)
-			require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-			assert.True(t, run.stdinRead, "it asked")
-			require.Len(t, *asked, 1)
-			assert.Equal(t, tc.want, (*asked)[0].DeploymentID)
-			row := regexp.MustCompile(`(\d+)\s+` + tc.started + `\s`).FindStringSubmatch(run.stderr)
-			require.Len(t, row, 2, "%s is offered:\n%s", tc.started, run.stderr)
-			assert.Contains(t, run.stderr, "> ["+row[1]+"]", "the list starts on %s", tc.started)
-		})
-	}
-}
-
 // promptAPI is a Houston whose workspace lists dep-old and dep-new, which no
 // link of linkedProject names.
 func promptAPI() *mocks.ClientInterface {
@@ -386,152 +341,24 @@ func promptAPI() *mocks.ClientInterface {
 	return api
 }
 
-// An interactive deploy that names its Deployment, without --prompt, is not
-// asked: naming it is the answer.
+// An interactive deploy that names its Deployment is not asked, --prompt or
+// not: naming it is the answer. Naming none, it asks, --prompt or not, the
+// default link preselected.
 func TestDeployNamedIsNotAsked(t *testing.T) {
-	linkedProject(t)
-	asking(t)
-	asked := manifestDeploys(t, builtAndPushed)
-	run := runAPC(t, promptAPI(), "prod\n", "deploy", "stage")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	assert.False(t, run.stdinRead, "nothing is asked")
-	require.Len(t, *asked, 1)
-	assert.Equal(t, "dep-stage", (*asked)[0].DeploymentID)
-}
+	for _, prompt := range [][]string{nil, {"--prompt"}} {
+		linkedProject(t)
+		asking(t)
+		asked := manifestDeploys(t, builtAndPushed)
+		run := runAPC(t, promptAPI(), "prod\n", append([]string{"deploy", "stage"}, prompt...)...)
+		require.Equal(t, 0, run.code, "%v stderr:\n%s", prompt, run.stderr)
+		assert.False(t, run.stdinRead, "%v: nothing is asked", prompt)
+		require.Len(t, *asked, 1)
+		assert.Equal(t, "dep-stage", (*asked)[0].DeploymentID, "%v", prompt)
 
-// With --prompt, what is named resolves, and is refused, exactly as without
-// it, before anything is asked: a link on another domain, and an astro link
-// under an Astro Private Cloud context.
-func TestDeployPromptRefusesWhatNamingRefuses(t *testing.T) {
-	for _, named := range []string{"elsewhere", "cloud"} {
-		t.Run(named, func(t *testing.T) {
-			linkedProject(t)
-			asking(t)
-			asked := manifestDeploys(t, builtAndPushed)
-			without := runAPC(t, promptAPI(), "\n", "deploy", named)
-			require.Error(t, without.err)
-			run := runAPC(t, promptAPI(), "\n", "deploy", named, "--prompt")
-			require.Error(t, run.err)
-			assert.Equal(t, without.err.Error(), run.err.Error())
-			assert.False(t, run.stdinRead, "nothing is asked")
-			assert.Empty(t, *asked)
-		})
+		run = runAPC(t, promptAPI(), "\n", append([]string{"deploy"}, prompt...)...)
+		require.Equal(t, 0, run.code, "%v stderr:\n%s", prompt, run.stderr)
+		assert.True(t, run.stdinRead, "%v: asked", prompt)
+		require.Len(t, *asked, 2)
+		assert.Equal(t, "dep-prod", (*asked)[1].DeploymentID, "%v: Enter takes the default", prompt)
 	}
-}
-
-// What is named and no entry of the list is, an id the workspace does not
-// list, typo or not, is offered first and started on, never the default
-// link: Enter deploys where it named, as without --prompt.
-func TestDeployPromptStartsOnAnUnlistedID(t *testing.T) {
-	linkedProject(t)
-	asking(t)
-	asked := manifestDeploys(t, builtAndPushed)
-	run := runAPC(t, promptAPI(), "\n", "deploy", "dep-prdo", "--prompt")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	assert.True(t, run.stdinRead)
-	// Row 1, with no note: it is the id named, which no link names. The
-	// default link keeps its mark.
-	assert.Equal(t, []string{"1", "dep-prdo", "apc", "deployment", "dep-prdo"}, apcPickerRow(t, run.stderr, "dep-prdo"))
-	assert.Equal(t, []string{"2", "prod", "apc", "deployment", "dep-prod", "linked,", "default"}, apcPickerRow(t, run.stderr, "prod"))
-	assert.Contains(t, run.stderr, "> [1]")
-	require.Len(t, *asked, 1)
-	assert.Equal(t, "dep-prdo", (*asked)[0].DeploymentID)
-}
-
-// apcPickerRow returns the fields of the deploy picker's row for name, its
-// highlight stripped, failing when the table has no such row.
-func apcPickerRow(t *testing.T, errOut, name string) []string {
-	t.Helper()
-	for _, line := range strings.Split(errOut, "\n") {
-		line = strings.NewReplacer("\033[1;32m", "", "\033[0m", "").Replace(line)
-		if f := strings.Fields(line); len(f) > 1 && f[1] == name {
-			return f
-		}
-	}
-	t.Fatalf("no row for %q in %q", name, errOut)
-	return nil
-}
-
-// Naming stage, a link, starts on that link; naming prod outside a project,
-// an id, starts on it, not on a Deployment whose id ends in prod.
-func TestDeployPromptMatchesTheNameNotAnIDSuffix(t *testing.T) {
-	linkedProject(t)
-	asking(t)
-	asked := manifestDeploys(t, builtAndPushed)
-	api := newAPCClient()
-	api.On("ListDeployments", mock.Anything).Return([]houston.Deployment{
-		{ID: "x-prod", Label: "A Prod", Workspace: houston.Workspace{ID: "ck05r3bor07h40d02y2hw4n4v"}},
-	}, nil)
-	run := runAPC(t, api, "\n", "deploy", "stage", "--prompt")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	require.Len(t, *asked, 1)
-	assert.Equal(t, "dep-stage", (*asked)[0].DeploymentID)
-	row := regexp.MustCompile(`(\d+)\s+stage\s`).FindStringSubmatch(run.stderr)
-	require.Len(t, row, 2, run.stderr)
-	assert.Contains(t, run.stderr, "> ["+row[1]+"]")
-
-	// Outside a project prod is an id: the workspace's x-prod is not it.
-	inWorkingDir(t, true)
-	run = runAPC(t, api, "\n", "deploy", "prod", "--prompt", "--image-name", "img:1")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	require.Len(t, *asked, 2)
-	assert.Equal(t, "prod", (*asked)[1].DeploymentID)
-	row = regexp.MustCompile(`(\d+)\s+prod\s`).FindStringSubmatch(run.stderr)
-	require.Len(t, row, 2, run.stderr)
-	assert.Contains(t, run.stderr, "> ["+row[1]+"]", "the list starts on prod, not x-prod")
-}
-
-// Answering with the very Deployment named, by its id, deploys as naming it
-// does, saving no link; picking another of the workspace's links it, as a
-// pick does.
-func TestDeployPromptSavesALinkOnlyForAnotherPick(t *testing.T) {
-	dir := linkedProject(t)
-	asking(t)
-	manifestDeploys(t, builtAndPushed)
-	links := func() map[string]manifest.Link {
-		m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
-		require.NoError(t, err)
-		return m.Astro.Deployments
-	}
-
-	run := runAPC(t, promptAPI(), "\n", "deploy", "dep-new", "--prompt")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	for name, l := range links() {
-		assert.NotEqual(t, "dep-new", l.Deployment, "link %s saved for the Deployment named", name)
-	}
-
-	run = runAPC(t, promptAPI(), "old-one\n", "deploy", "dep-new", "--prompt")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	assert.Equal(t, "dep-old", links()["old-one"].Deployment, "another pick is linked")
-}
-
-// Naming nothing, --prompt asks as the deploy asks without it: in a place
-// with no links, the workspace's own picker, which lists once, and a list
-// that fails fails the deploy.
-func TestDeployPromptNamingNothingAsksAsWithoutIt(t *testing.T) {
-	inWorkingDir(t, true)
-	asking(t)
-	asked := manifestDeploys(t, builtAndPushed)
-	run := runAPC(t, promptAPI(), "1\n", "deploy", "--image-name", "img:1", "--prompt")
-	require.Equal(t, 0, run.code, "stderr:\n%s", run.stderr)
-	assert.Contains(t, run.stderr, "RELEASE NAME", "the workspace's picker")
-	require.Len(t, *asked, 1)
-
-	api := newAPCClient()
-	api.On("ListDeployments", mock.Anything).Return(nil, errors.New("houston is down"))
-	run = runAPC(t, api, "1\n", "deploy", "--image-name", "img:1", "--prompt")
-	require.Error(t, run.err)
-	assert.Contains(t, run.err.Error(), "houston is down")
-	assert.Equal(t, 1, countCalls(api, "ListDeployments"), "listed once")
-}
-
-// countCalls is how many times method was called on api.
-func countCalls(api *mocks.ClientInterface, method string) int {
-	n := 0
-	for i := range api.Calls {
-		if api.Calls[i].Method == method {
-			n++
-		}
-	}
-	return n
 }
