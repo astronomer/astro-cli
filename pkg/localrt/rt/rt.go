@@ -290,13 +290,6 @@ type ImageRun struct {
 // a project that is merely not running, which still has one.
 var ErrImageNotBuilt = errors.New("this project has no image yet")
 
-// ErrServiceFailed reports a start whose containers did not come up because one
-// of them kept failing — exiting non-zero, or crash-looping under its restart
-// policy — as distinct from a start that ran out of time while everything was
-// still making progress. Waiting longer does not fix it; what the failing
-// service printed does.
-var ErrServiceFailed = errors.New("a container kept failing while the project was starting")
-
 // Airflow is a handle to a running local Airflow, obtained from Start or
 // Attach — so every method on it is always valid.
 type Airflow interface {

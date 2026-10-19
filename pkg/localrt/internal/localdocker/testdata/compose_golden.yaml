@@ -44,10 +44,23 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    # What the migration waits on, so compose itself reports a database that
+    # never comes up ("dependency failed to start") rather than the up waiting
+    # on it forever. Over TCP on purpose: the image's first-run init serves a
+    # temporary server on the unix socket only, and a check that accepted it
+    # would start the migration against a server about to shut down.
+    # start_period covers that first init on a cold volume.
+    healthcheck:
+      test: ["CMD", "pg_isready", "--host", "localhost", "--username", "postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   db-migration:
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     image: astrocrpublic.azurecr.io/runtime:3.1-2
     command:
       - 'airflow'

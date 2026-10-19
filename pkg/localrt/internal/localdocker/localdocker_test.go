@@ -226,8 +226,8 @@ func TestStartBringsProjectUp(t *testing.T) {
 	// compose project already has containers (so a failed start knows whether
 	// the cleanup is its to do) — scoped to the name the teardown would use, and
 	// --all so stopped containers count. Then the up, in two steps: one that
-	// pulls and creates outside the health budget, and one that starts under it
-	// (see updeadline.go). The `astro dev` note makes no call of its own:
+	// pulls and creates outside the health budget, and one that starts under
+	// it (see updeadline.go). The `astro dev` note makes no call of its own:
 	// nothing is listening for lines, so there is no one to tell (see
 	// legacydb.go, and TestAStartTellsAProjectArrivingFromAstroDev).
 	require.Len(t, cmd.calls, 4)

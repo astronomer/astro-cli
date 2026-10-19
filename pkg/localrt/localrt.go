@@ -83,11 +83,6 @@ var ErrNotImplemented = rt.ErrNotImplemented
 // ErrImageNotBuilt reports that a project has no image to run a command in.
 var ErrImageNotBuilt = rt.ErrImageNotBuilt
 
-// ErrServiceFailed reports a docker-mode start given up on because one of its
-// containers kept failing, rather than because it was slow. Not
-// ErrHealthTimeout, on purpose: a longer wait is not the remedy.
-var ErrServiceFailed = rt.ErrServiceFailed
-
 // CanonicalPath resolves a project path to the spelling every tool agrees on.
 func CanonicalPath(path string) (string, error) { return rt.CanonicalPath(path) }
 

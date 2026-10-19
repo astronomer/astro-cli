@@ -14,26 +14,21 @@ import (
 // major version, which is how this hang was first met.
 const pgRefusal = "FATAL:  database files are incompatible with server"
 
-// upDeadlineBudget is short so the case is too. Long enough that nothing about
-// creating the containers races it: they are created, and their images pulled,
-// before the clock starts.
-const upDeadlineBudget = "45s"
-
-// upDeadlineBound is how long the start may take in all before this case calls
+// upDeadlineBound is how long a start may take in all before these cases call
 // it a hang: the budget, a cold pull of both images on a slow runner, and the
-// rollback's graceful down. Without the deadline the start never returns, so
-// what this bound catches is the bug itself.
+// rollback's graceful down. Without the fixes they cover the start never
+// returns, so what this bound catches is the bug itself.
 const upDeadlineBound = 5 * time.Minute
 
-// A docker start whose metadata database never comes up gives up at the health
-// timeout, says which service was failing and what it said, and takes down
-// what it created.
+// A docker start whose metadata database never comes up fails fast, names
+// postgres, shows what it said, and takes down what it created.
 //
 // It used to hang. The Airflow services wait on the migration completing, so
 // `compose up --detach` waits inside itself; the runtime image's entrypoint
 // waits on postgres's port with no limit; and postgres under `restart:
-// unless-stopped` crash-loops for good on a data directory it refuses. The
-// health timeout only started after the up returned, so it never started.
+// unless-stopped` crash-loops for good on a data directory it refuses. Now
+// the migration waits on postgres's healthcheck, and compose itself gives up
+// with "dependency failed to start" — in seconds, long before the budget.
 //
 // The stand-in postgres exits at once rather than refusing a real data
 // directory: what makes the hang is a database that never listens, and this is
@@ -47,42 +42,78 @@ func TestADockerStartWhoseDatabaseNeverComesUpFailsInTime(t *testing.T) {
     command: ["sh", "-c", "echo '`+pgRefusal+`' >&2; exit 1"]
 `)
 
+	// A budget the failure must not need: the point is that compose reports
+	// it, not that the deadline does.
+	const budget = 3 * time.Minute
+	began := time.Now()
 	r := p.runBounded(upDeadlineBound,
-		map[string]string{"ASTRO_LOCAL_HEALTH_TIMEOUT": upDeadlineBudget},
+		map[string]string{"ASTRO_LOCAL_HEALTH_TIMEOUT": budget.String()},
+		"local", "start", "--docker").requireFailure()
+	if took := time.Since(began); took > budget/2 {
+		t.Errorf("the start took %s to fail; compose should have reported the dead database in seconds\n%s", took, r.output())
+	}
+
+	// Compose's own verdict, which reaches the reader as the up's streamed
+	// output; the error itself is the up's exit status.
+	if !strings.Contains(r.Stdout+r.Stderr, "dependency failed to start: container astro-pgdead-") {
+		t.Errorf("compose's report that postgres failed to start was not shown\n%s", r.output())
+	}
+	// Its own last words, captured before the containers went: the diagnosis.
+	if !strings.Contains(r.Stdout+r.Stderr, pgRefusal) {
+		t.Errorf("postgres's output was not shown\n%s", r.output())
+	}
+	// Not a timeout: advice to wait longer would send the reader the wrong way.
+	if strings.Contains(r.Stderr, "ASTRO_LOCAL_HEALTH_TIMEOUT") {
+		t.Errorf("a dead database was reported as a timeout to wait out\n%s", r.output())
+	}
+
+	assertNothingPublished(t, p, "astro-pgdead-")
+}
+
+// A docker start whose migration never finishes gives up at the health
+// timeout, and takes down what it created.
+//
+// The case the deadline on `compose up` is a safety net for: everything the
+// up waits on is healthy or running, so compose has nothing to report and
+// would wait forever. The CLI kills it — the compose plugin included, not only
+// the docker CLI above it — and rolls back.
+func TestADockerStartWhoseMigrationHangsHitsTheDeadline(t *testing.T) {
+	tier(t, 3)
+	p := dockerProject(t, "mighang")
+	needsDocker(t, p)
+	write(t, filepath.Join(p.Dir, "docker-compose.override.yml"), `services:
+  db-migration:
+    command: ["sleep", "infinity"]
+`)
+
+	r := p.runBounded(upDeadlineBound,
+		map[string]string{"ASTRO_LOCAL_HEALTH_TIMEOUT": "45s"},
 		"local", "start", "--docker").requireFailure()
 
-	// What gave up and when; which service was failing; and its own last
-	// words, which are the diagnosis — the containers that held them are gone
-	// by now.
-	for _, want := range []string{
-		"gave up after " + upDeadlineBudget,
-		"Last output from postgres",
-		pgRefusal,
-	} {
+	for _, want := range []string{"timed out after 45s, before the containers finished starting", "ASTRO_LOCAL_HEALTH_TIMEOUT"} {
 		if !strings.Contains(r.Stderr, want) {
 			t.Errorf("stderr does not carry %q\n%s", want, r.output())
 		}
 	}
-	// And not as a health timeout. A crash loop is not slow: advice to wait
-	// longer, which the CLI adds to a timeout, would send the reader the wrong
-	// way.
-	if strings.Contains(r.Stderr, "ASTRO_LOCAL_HEALTH_TIMEOUT") {
-		t.Errorf("a failing service was reported as a timeout to wait out\n%s", r.output())
-	}
 
-	// Nothing published: the record and route are written after the up.
+	assertNothingPublished(t, p, "astro-mighang-")
+}
+
+// assertNothingPublished checks a failed start left no route, no record and
+// no containers. With no record to read the compose project from, the
+// containers are found by the prefix composeProjectName gives every project in
+// a directory of that name.
+func assertNothingPublished(t *testing.T, p *project, prefix string) {
+	t.Helper()
+	// Routes first: `status` prunes dead routes, which would hide a leak.
 	if left := routes(t, p); len(left) != 0 {
-		t.Errorf("a timed-out up left %d route(s) claimed: %+v", len(left), left)
+		t.Errorf("a failed start left %d route(s) claimed: %+v", len(left), left)
 	}
 	if st := p.status(); st.State != "stopped" || st.Port != 0 {
-		t.Errorf("status after a timed-out up = %+v, want stopped with no port", st)
+		t.Errorf("status after a failed start = %+v, want stopped with no port", st)
 	}
-
-	// And the containers are gone, asked of docker. With no record to read the
-	// compose project from, they are found by the prefix composeProjectName
-	// gives every project in a directory of this name.
-	if left := containersOfProjectsPrefixed(t, "astro-pgdead-"); len(left) != 0 {
-		t.Errorf("a timed-out up left %d container(s) behind: %v", len(left), left)
+	if left := containersOfProjectsPrefixed(t, prefix); len(left) != 0 {
+		t.Errorf("a failed start left %d container(s) behind: %v", len(left), left)
 	}
 }
 

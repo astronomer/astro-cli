@@ -55,6 +55,16 @@ func (execCommander) Run(ctx context.Context, extraEnv []string, s rt.Stdio, nam
 	// context is done or the process has exited, so a `logs --follow` streams
 	// for as long as its caller wants and only its teardown is bounded.
 	cmd.WaitDelay = waitDelay
+	if s.In == nil {
+		// A deadline or cancel kills the whole process tree, not only the
+		// engine CLI. `docker compose` (and `podman compose`, through its
+		// provider) runs the compose plugin as a child, which the default
+		// cancel left running — still driving the up while the rollback took
+		// the project down. Not for a command reading stdin: a shell or an
+		// exec into the scheduler owns the terminal, and a process group of
+		// its own would take that away from it.
+		killTreeOnCancel(cmd)
+	}
 	cmd.Stdin = s.In
 	cmd.Stdout = s.Out
 	cmd.Stderr = s.Err

@@ -22,12 +22,8 @@ const (
 // ErrHealthTimeout reports that Airflow did not become healthy in time.
 // The containers keep starting in the background: the project is still up,
 // registered, and stoppable. Except when the budget ran out inside `compose
-// up` itself, before anything was registered: then nothing would start the
-// services still waiting, and the error says what was pending (see
-// updeadline.go). What happens to the containers then is what happens after
-// any failed up: removed when this start created them; stopped but kept when
-// they were there before it, or when the probe could not tell. And when a
-// service was failing rather than slow, the error is ErrServiceFailed instead.
+// up` itself, before anything was registered: then that failure is handled as
+// any failed up is (see updeadline.go and bringUp).
 //
 // airflowrt's, not one of this package's own, so a caller holding an error from
 // either engine asks once. Which engine ran is the runtime's business, and the

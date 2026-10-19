@@ -129,7 +129,7 @@ type Config struct {
 	//
 	// In docker mode it covers bringing the containers up as well as the wait
 	// for an answer — `compose up` blocks until the database migration
-	// finishes, and a database that never comes up held it there for good —
+	// finishes, and a migration that never finishes held it there for good —
 	// but not pulling the images, which happens first and is not bounded.
 	//
 	// Configurable because five minutes is a guess about somebody else's

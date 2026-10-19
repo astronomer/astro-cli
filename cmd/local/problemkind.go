@@ -48,12 +48,6 @@ const (
 	// back. Not transient: the pin has to go back up, or the database has to go.
 	// Docker mode only today.
 	KindDatabaseNewerThanAirflow cliout.ProblemKind = "database_newer_than_airflow"
-	// KindServiceFailed: a container kept failing — exiting non-zero, or
-	// crash-looping under its restart policy — so the start gave up. Unlike
-	// health_timeout nothing is still coming up, and a longer wait does not
-	// help: what the failing service printed, in the message, is the lead.
-	// Docker mode only.
-	KindServiceFailed cliout.ProblemKind = "service_failed"
 	// KindNotRunning: no local Airflow is running for this project.
 	KindNotRunning cliout.ProblemKind = "not_running"
 	// KindDeploymentHibernating: the Astro Deployment is hibernating, so its
@@ -101,10 +95,6 @@ var ProblemKinds = cliout.Kinds{
 	{Kind: KindHealthTimeout, Match: cliout.Sentinel(localrt.ErrHealthTimeout)},
 	{Kind: KindUnsupportedBase, Match: cliout.Sentinel(localrt.ErrUnsupportedBase)},
 	{Kind: KindDatabaseNewerThanAirflow, Match: cliout.Sentinel(localrt.ErrDatabaseNewerThanAirflow)},
-	// After database_newer_than_airflow: a start can carry both when the
-	// failing service is the migration, and the revision it names is the
-	// more precise of the two.
-	{Kind: KindServiceFailed, Match: cliout.Sentinel(localrt.ErrServiceFailed)},
 	// ErrStartInProgress, not a second name for it: pkg/localrt already
 	// exports this sentinel, and adding another public alias to a module with
 	// its own go.mod would mean one failure with two contracts.
