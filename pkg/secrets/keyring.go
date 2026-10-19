@@ -113,20 +113,6 @@ type keyringStore struct {
 	// not wedge a long-lived store.
 	mu     sync.Mutex
 	cipher *vaultCipher
-
-	// keyWrites holds a *sync.Mutex per key, so this store's own writers to
-	// one key take turns rather than race each other's rename. Windows fails a
-	// rename onto a file another handle holds, and writers that all retry at
-	// once can each block in the rename long enough to spend fsatomic's whole
-	// budget. Another process writing the same key (the CLI beside Astro
-	// Desktop) still contends, which is what fsatomic's retry is for.
-	keyWrites sync.Map
-}
-
-// keyLock is the lock this store's writers to key take turns on.
-func (s *keyringStore) keyLock(key string) *sync.Mutex {
-	l, _ := s.keyWrites.LoadOrStore(key, &sync.Mutex{})
-	return l.(*sync.Mutex) //nolint:forcetypeassert // only *sync.Mutex is stored
 }
 
 // aead returns the store's cipher, initialized from the OS keyring on first
@@ -379,9 +365,6 @@ func (s *keyringStore) write(vf valueFile) error {
 	if _, err := prepareDir(s.dir, true); err != nil {
 		return err
 	}
-	lock := s.keyLock(vf.Key)
-	lock.Lock()
-	defer lock.Unlock()
 	// Write-then-rename: the CLI and desktop share this directory, so a
 	// concurrent reader must see the old value or the new one, never a torn
 	// file. Per-value files also keep writers to different keys from ever

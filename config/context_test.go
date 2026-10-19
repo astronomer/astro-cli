@@ -462,6 +462,7 @@ func (s *Suite) TestSetOrganizationContext() {
 func (s *Suite) TestExpiresIn() {
 	initTestConfig()
 	ctx := Context{Domain: "localhost"}
+	before := time.Now()
 	err := ctx.SetExpiresIn(12)
 	s.NoError(err)
 
@@ -470,11 +471,13 @@ func (s *Suite) TestExpiresIn() {
 
 	val, err := outCtx.GetExpiresIn()
 	s.NoError(err)
+	after := time.Now()
 	s.Equal("localhost", outCtx.Domain)
-	// The expiry was set before this now, so it is not after now + 12s. Not
-	// "now + 12s is after it": Windows' clock can read the same instant twice,
-	// and the two are then equal.
-	s.False(val.After(time.Now().Add(12 * time.Second)))
+	// Twelve seconds from some moment of the set: not before it began, not
+	// after it ended. Inclusive at both ends, because Windows' clock can read
+	// the same instant twice, which once failed a strict "now + 12s is after it".
+	s.False(val.Before(before.Add(12*time.Second)), "expiry %s is before the set began + 12s", val)
+	s.False(val.After(after.Add(12*time.Second)), "expiry %s is after the set ended + 12s", val)
 }
 
 // A context loaded from disk holds its expiry under "expiresin", as viper
