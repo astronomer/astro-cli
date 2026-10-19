@@ -4,13 +4,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // dbt requires the project file to be named exactly dbt_project.yml (the .yaml
 // extension is not accepted), so we match only this name.
 const dbtProjectFile = "dbt_project.yml"
-
-const manifestFile = "manifest.json"
 
 // findProjects walks root and returns every directory that contains a
 // dbt_project.yml.
@@ -52,13 +51,23 @@ var manifestSkipDirs = map[string]bool{
 	gitDir:         true, // VCS internals can't hold a project's manifest
 }
 
-// findManifests walks root and returns manifest.json file paths.
+// isManifestCandidateName reports whether a *.json file could be a dbt
+// manifest by name alone (case-insensitive "manifest" anywhere); content is
+// validated separately (isDbtManifest).
+func isManifestCandidateName(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".json") && strings.Contains(lower, "manifest")
+}
+
+// findManifests walks root and returns every file matching
+// isManifestCandidateName.
 //
 // A manifest whose parent directory is itself a discovered project root is
 // omitted: that project's folder hash already covers a manifest sitting in its
-// root. Manifests elsewhere — most importantly a standalone one shipped for a
-// manifest-only (DBT_MANIFEST) deployment, or a project's target/manifest.json —
-// each get their own sidecar.
+// root, and processProject slims it there instead. Manifests elsewhere —
+// most importantly a standalone one shipped for a manifest-only
+// (DBT_MANIFEST) deployment, or a project's target/manifest.json — each get
+// their own sidecar.
 func findManifests(root string, projectDirs map[string]bool) ([]string, error) {
 	var manifests []string
 
@@ -72,7 +81,7 @@ func findManifests(root string, projectDirs map[string]bool) ([]string, error) {
 			}
 			return nil
 		}
-		if d.Name() != manifestFile {
+		if !isManifestCandidateName(d.Name()) {
 			return nil
 		}
 		if projectDirs[filepath.Dir(path)] {
