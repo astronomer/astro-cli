@@ -15,6 +15,8 @@ import (
 // project's copy is older and refreshes it.
 var helperContentAtVersion = map[int]string{
 	1: "b21a2237f2142b9bb010dd1dbe211ab9a9ce3f5c2f567e64a668315bd0ca326d",
+	// Writes its outputs with LF line endings on every host.
+	2: "e2c1f44df4ed6b3cc93e73e45473fc4b9549322b876962fe29fa62f9e36846a7",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
