@@ -56,7 +56,8 @@ RUNTIME_CONSTRAINTS = "/etc/pip-constraints.txt"
 # run, so `docker build .` reads the same ones the CLI does. This file only adds
 # to them: pages for a build the CLI generates from a request that names no
 # project, and so has no pyproject.toml sources, one per line, passed through
-# as they are. No project's build ever has it.
+# as they are, beside pyproject.toml in the inputs the stage copies. No
+# project's build ever has it, and a project's own copy is never read.
 FIND_LINKS = "install-find-links.txt"
 
 # The distributions that state the Airflow version. The runtime image is
@@ -276,6 +277,17 @@ class Manifest:
                 urls[norm(pkg)] = without_credentials(address)
 
         self.stated = strings(project.get("dependencies"))
+        # Every distribution the project names itself, in its dependencies,
+        # its optional dependencies or a dependency group: the ones the lock
+        # may move off the base image's versions.
+        named = list(self.stated)
+        for extra in (project.get("optional-dependencies") or {}).values():
+            named += strings(extra)
+        for group in (pyproject.get("dependency-groups") or {}).values():
+            named += strings(group)
+        self.named = {dist_name(d) for d in named}
+        self.constraint_dependencies = strings(uv.get("constraint-dependencies"))
+        self.override_dependencies = strings(uv.get("override-dependencies"))
         deps = [direct_reference(d, urls) for d in self.stated] if urls else list(self.stated)
         self.deps = without_airflow(deps)
         self.packages = strings(astro.get("packages"))
@@ -530,15 +542,53 @@ def parse_requirement(text):
     return name, spec, extras, url
 
 
-def stale_reason(root, stated, sources, locked_versions):
+def requirement_key(name, spec, marker):
+    """A constraint or override as a comparable value: its name, its
+    specifiers in order, and its marker."""
+    if SpecifierSet is not None:
+        try:
+            spec = ",".join(sorted(str(s) for s in SpecifierSet(spec)))
+        except Exception:
+            pass
+    else:
+        spec = ",".join(sorted(s.strip() for s in spec.split(",") if s.strip()))
+    if marker and Marker is not None:
+        try:
+            marker = str(Marker(marker))
+        except Exception:
+            pass
+    return (norm(name), spec.replace(" ", ""), (marker or "").replace(" ", ""))
+
+
+def same_requirements(stated, recorded):
+    """Whether [tool.uv] constraint-dependencies (or override-dependencies) as
+    written match what the lock's [manifest] recorded of them."""
+    mine = []
+    for text in stated:
+        name, spec, _, url = parse_requirement(text)
+        marker = text.split(";", 1)[1].strip() if ";" in text else ""
+        mine.append(requirement_key(name, url or spec, marker))
+    theirs = [requirement_key(r.get("name", ""), r.get("url") or r.get("specifier", ""), r.get("marker", "")) for r in recorded or []]
+    return sorted(mine) == sorted(theirs)
+
+
+def stale_reason(lock, root, manifest, locked_versions):
     """Why uv.lock does not resolve pyproject.toml's dependencies as they now
-    stand, or None. Each dependency has to be in the lock's own record of the
-    project, routed to the same [tool.uv.sources] source, with the same extras
-    and, unless that source is a git repository, a URL or a path (for which uv
-    records no specifier), the same version specifier; and the version the
-    lock resolved has to satisfy it."""
+    stand, or None. The lock has to have a record of the project. Each
+    dependency has to be in it, routed to the same [tool.uv.sources] source,
+    with the same extras and, unless that source is a git repository, a URL or
+    a path (for which uv records no specifier), the same version specifier; and
+    the version the lock resolved has to satisfy it. And [tool.uv]
+    constraint-dependencies and override-dependencies have to be what the
+    lock's [manifest] recorded."""
     if root is None:
-        return None
+        return "it has no record of the project"
+    recorded_manifest = lock.get("manifest") or {}
+    if not same_requirements(manifest.constraint_dependencies, recorded_manifest.get("constraints")):
+        return "it was resolved under other [tool.uv] constraint-dependencies"
+    if not same_requirements(manifest.override_dependencies, recorded_manifest.get("overrides")):
+        return "it was resolved under other [tool.uv] override-dependencies"
+    stated, sources = manifest.stated, manifest.sources
     recorded = {}
     for r in (root.get("metadata") or {}).get("requires-dist") or []:
         recorded.setdefault(norm(r.get("name", "")), []).append(r)
@@ -621,10 +671,9 @@ class Lock:
     and the exact file of each dependency read from an index of its own.
 
     runtime: the distributions the runtime's own constraints file pins.
-    base: the distributions the base image already has installed, on a runtime
-      with no constraints file of its own (before 11.0.0), or None."""
+    base: the distributions the base image already has installed."""
 
-    def __init__(self, lock, manifest, runtime, base=None):
+    def __init__(self, lock, manifest, runtime, base):
         packages = lock.get("package") or []
         root = lock_root(lock)
         entries = {}
@@ -637,7 +686,7 @@ class Lock:
             versions[name] = {e.get("version") if "registry" in (e.get("source") or {}) else None for e in es}
             registries[name] = {url_key((e.get("source") or {}).get("registry") or "") for e in es}
 
-        self.stale = stale_reason(root, manifest.stated, manifest.sources, versions)
+        self.stale = stale_reason(lock, root, manifest, versions)
         self.files, self.pins, self.forked, self.elsewhere = {}, [], [], []
         if self.stale:
             return
@@ -656,9 +705,14 @@ class Lock:
             if name in AIRFLOW_DISTS or name in runtime or name in self.files or None in vs:
                 continue
             # What the base image has installed stays as the runtime ships it,
-            # unless the project asks for the package itself: on a runtime with
-            # no constraints file, nothing else holds it there.
-            if base is not None and name in base and name not in direct:
+            # its tested versions, unless the project names the package itself
+            # (a dependency, an optional one, a dependency group). A lock
+            # resolved under the runtime's own versions (the freeze pins astro
+            # writes into constraint-dependencies) holds the same versions, so
+            # this changes nothing there; one resolved without them would
+            # otherwise move Airflow's own dependencies off what it was tested
+            # with.
+            if name in base and name not in manifest.named:
                 continue
             # The install reads PyPI. A pin to a version the lock took from
             # another index (a mirror, a private index) could name a version
@@ -700,13 +754,11 @@ def write(path, lines):
 
 
 def read_find_links(project):
-    for path in (os.path.join(project, FIND_LINKS), os.path.join(project, ".astro", FIND_LINKS)):
-        try:
-            with open(path) as f:
-                return [without_credentials(line.strip()) for line in f if line.strip() and not line.startswith("#")]
-        except OSError:
-            continue
-    return []
+    try:
+        with open(os.path.join(project, FIND_LINKS)) as f:
+            return [without_credentials(line.strip()) for line in f if line.strip() and not line.startswith("#")]
+    except OSError:
+        return []
 
 
 def main(argv=None):
@@ -723,7 +775,7 @@ def main(argv=None):
     lock_path = os.path.join(args.project, "uv.lock")
     if os.path.exists(lock_path):
         try:
-            base = None if os.path.exists(args.runtime_constraints) else base_installed()
+            base = base_installed()
             with open(lock_path, "rb") as f:
                 lock = Lock(tomllib.load(f), manifest, runtime_constrained(args.runtime_constraints), base)
             if lock.elsewhere:

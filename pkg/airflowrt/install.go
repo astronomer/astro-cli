@@ -84,15 +84,6 @@ func isBaseTag(ref string) bool {
 // manifest's side; pkg/imagebuild's tests hold the two together.
 const netrcSecretID = "netrc"
 
-// InstallFindLinksPath is where a generated build of a request that names no
-// project leaves the find-links pages it was given, one per line, for the
-// helper to pass on as they are (install-project.py's FIND_LINKS). The helper
-// derives a project's pages from its pyproject.toml every time, so no build of
-// a project writes it, and a plain `docker build .` of a project's own
-// Dockerfile, which never has it, reads the pages a CLI build does. The
-// install stage copies it when it is there.
-const InstallFindLinksPath = ".astro/install-find-links.txt"
-
 // The manifest files the helper reads.
 const (
 	pyprojectName = "pyproject.toml"
@@ -113,6 +104,14 @@ const (
 	installSystemPackages     = "/usr/local/bin/install-system-packages"
 	installPythonDependencies = "/usr/local/bin/install-python-dependencies"
 )
+
+// ProjectInputs is what a project's own Dockerfile copies into the install
+// stage, from the project as its context: pyproject.toml, uv.lock when there is
+// one, and the helper at InstallHelperPath. The wildcard is how uv.lock stays
+// optional; Docker's BuildKit and its legacy builder both copy nothing for a
+// wildcard that matches nothing, but Buildah has refused one, so a project
+// built with Podman keeps a uv.lock, or takes uv.lock* out of the line.
+const ProjectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPath
 
 // InstallStage is the name InstallDockerfile gives the helper's stage.
 const InstallStage = "astro-install"
@@ -155,6 +154,10 @@ type InstallOptions struct {
 	// Alias names the final stage, the project's own (FROM … AS alias), for a
 	// Dockerfile whose later lines refer to it by name.
 	Alias string
+	// Inputs are the install stage's COPY sources, from the build's context.
+	// Empty is a project's own: pyproject.toml, uv.lock when there is one,
+	// and the helper at InstallHelperPath (ProjectInputs).
+	Inputs string
 	// NoNetrc leaves the Python install's netrc mount out: a generated build
 	// mounts the secret only when the build passes it. RUN --mount needs
 	// BuildKit (Docker) or Buildah 1.21 (Podman 3.2), so a generated build
@@ -171,6 +174,10 @@ func InstallDockerfileWith(from string, opts InstallOptions) string {
 	if opts.NoNetrc {
 		netrc = ""
 	}
+	inputs := opts.Inputs
+	if inputs == "" {
+		inputs = ProjectInputs
+	}
 	final := "FROM " + from + "\n"
 	if opts.Alias != "" {
 		final = "FROM " + from + " AS " + opts.Alias + "\n"
@@ -180,9 +187,8 @@ func InstallDockerfileWith(from string, opts InstallOptions) string {
 		// be readable by its owner alone.
 		"USER root\n" +
 		// Just the inputs, so an edit elsewhere in the project does not rerun
-		// the stage. uv.lock and the find-links file are optional: a wildcard
-		// that matches nothing copies nothing.
-		"COPY " + pyprojectName + " " + uvLockName + "* " + InstallFindLinksPath + "* " + InstallHelperPath + " " + inputsDir + "/\n" +
+		// the stage.
+		"COPY " + inputs + " " + inputsDir + "/\n" +
 		"RUN python " + inputsDir + "/" + path.Base(InstallHelperPath) + " --project " + inputsDir + " --out " + listsDir + "\n" +
 		final +
 		"COPY --from=" + InstallStage + " " + listsDir + "/" + PackagesName + " .\n" +

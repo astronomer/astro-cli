@@ -76,10 +76,10 @@ func TestBuildWritesTheInstallInputs(t *testing.T) {
 	// A request naming no project carries its lists in a pyproject.toml of
 	// its own, beside the helper that reads it.
 	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
-	helper, err := os.ReadFile(filepath.Join(ctxDir, filepath.FromSlash(InstallHelperPath)))
+	helper, err := os.ReadFile(filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), filepath.Base(InstallHelperPath)))
 	require.NoError(t, err)
 	assert.Equal(t, InstallHelper(), helper)
-	assert.FileExists(t, filepath.Join(ctxDir, pyprojectName))
+	assert.FileExists(t, filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), pyprojectName))
 	reqs, pkgs, constraints := installLists(t, ctxDir)
 	assert.Equal(t, "pandas==2.2.0\nrequests\n", reqs)
 	assert.Empty(t, pkgs)
@@ -101,7 +101,7 @@ func TestBuildWritesTheInstallDockerfile(t *testing.T) {
 	base := req.BaseImage + "-base"
 	assert.Equal(t, "FROM "+base+" AS astro-install\n"+
 		"USER root\n"+
-		"COPY pyproject.toml uv.lock* .astro/install-find-links.txt* .astro/install-project.py /tmp/astro-project/\n"+
+		"COPY .astro/install/ /tmp/astro-project/\n"+
 		"RUN python /tmp/astro-project/install-project.py --project /tmp/astro-project --out /tmp/astro-install\n"+
 		"FROM "+base+"\n"+
 		"COPY --from=astro-install /tmp/astro-install/packages.txt .\n"+
@@ -131,7 +131,7 @@ func TestBuildCopiesTheProjectsManifestAndLock(t *testing.T) {
 	require.NoError(t, err)
 	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
 	for name, want := range map[string]string{pyprojectName: pyproject, uvLockName: lock} {
-		got, err := os.ReadFile(filepath.Join(ctxDir, name))
+		got, err := os.ReadFile(filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), name))
 		require.NoError(t, err)
 		assert.Equal(t, want, string(got), name)
 	}
@@ -230,8 +230,14 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, RuntimeImageRepo+":3.1-base", baseOf(RuntimeImageRepo+":3.1-base"))
 	assert.True(t, strings.HasPrefix(GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "FROM "+RuntimeImageRepo+":3.1-base AS astro-install\n"))
 	// A project's own Dockerfile always mounts the secret; a generated build
-	// only when it has one.
-	assert.Equal(t, InstallDockerfile(RuntimeImageRepo+":3.1-base"), GeneratedDockerfile(RuntimeImageRepo+":3.1", true))
+	// only when it has one. They differ in nothing else but what the install
+	// stage copies: the project's files, or the inputs directory a generated
+	// build stages, which needs no wildcard.
+	own, generated := InstallDockerfile(RuntimeImageRepo+":3.1-base"), GeneratedDockerfile(RuntimeImageRepo+":3.1", true)
+	assert.Contains(t, own, "COPY pyproject.toml uv.lock* .astro/install-project.py /tmp/astro-project/\n")
+	assert.Contains(t, generated, "COPY .astro/install/ /tmp/astro-project/\n")
+	assert.NotContains(t, generated, "uv.lock*", "no optional wildcard for Buildah to refuse")
+	assert.Equal(t, own, strings.Replace(generated, "COPY .astro/install/ ", "COPY pyproject.toml uv.lock* .astro/install-project.py ", 1))
 	assert.NotContains(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "--mount")
 }
 
