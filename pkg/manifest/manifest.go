@@ -126,7 +126,7 @@ func (u UV) IndexPages() []string {
 // generated image installs deps without Airflow (WithoutAirflow), so the
 // pages of the Airflow sources `astro init` writes are left out, and a build
 // host that cannot reach Astronomer's index still builds.
-func (u UV) IndexPagesFor(deps []string) []string {
+func (u *UV) IndexPagesFor(deps []string) []string {
 	wanted := make(map[string]bool, len(deps))
 	for _, d := range deps {
 		wanted[DistName(d)] = true
@@ -135,7 +135,7 @@ func (u UV) IndexPagesFor(deps []string) []string {
 }
 
 // indexPages are the pages of the sources whose package keep accepts.
-func (u UV) indexPages(keep func(pkg string) bool) []string {
+func (u *UV) indexPages(keep func(pkg string) bool) []string {
 	pkgs := make([]string, 0, len(u.Sources))
 	for pkg := range u.Sources {
 		if keep(pkg) {
