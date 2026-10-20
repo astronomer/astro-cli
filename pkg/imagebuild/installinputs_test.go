@@ -100,7 +100,7 @@ func runHelper(t *testing.T, dir string, r helperRun) helperOutput {
 		require.NoError(t, err, name)
 		return string(data)
 	}
-	return helperOutput{read(requirementsName), read(packagesName), read(lockConstraintsName), stderr.String()}
+	return helperOutput{read(requirementsName), read(packagesName), read(lockConstraintsName), strings.ReplaceAll(stderr.String(), "\r\n", "\n")}
 }
 
 // withoutPackaging runs the helper as on a Python whose packaging it cannot
@@ -539,7 +539,7 @@ for line in sys.stdin.read().splitlines():
 	cmd.Stdin = strings.NewReader(input.String())
 	got, err := cmd.Output()
 	require.NoError(t, err)
-	lines := strings.Split(strings.TrimSpace(string(got)), "\n")
+	lines := strings.Split(strings.ReplaceAll(strings.TrimSpace(string(got)), "\r\n", "\n"), "\n")
 	require.Len(t, lines, len(cases))
 	for i, c := range cases {
 		assert.Equal(t, c.want, lines[i], c.marker)
