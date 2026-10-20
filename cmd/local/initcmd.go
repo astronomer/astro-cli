@@ -2,18 +2,22 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/vaultenv"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/secrets"
+	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
 // NewInitCmd builds the root-level `astro init`. The same constructor backs
@@ -111,10 +115,59 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// stays offline. A lookup that fails is not reported here, since init has
 	// no to-do in it: `astro local start` makes the same lookup and says what
 	// it found.
-	c.writeAstroBuild(ctx, res.Dir)
+	build := c.writeAstroBuild(ctx, res.Dir)
+	if res.Existing {
+		// Bringing a project up to date is where a Docker-only project moves
+		// to a newer runtime build, so it says what moved, and the lock
+		// follows the pins.
+		c.reportAstroBuild(r, build)
+		c.relockAfterInit(ctx, r, res.Dir, build)
+	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
 	})
+}
+
+// relockAfterInit runs `uv lock` in a project whose uv.lock astro init just
+// left behind its [tool.uv]: the runtime pins or the Airflow build moved. The
+// images install the lock's versions and build on the runtime the pins name,
+// so a lock still resolved for the old build would install that build's
+// versions over the new one. With no uv to run, it says to run it. A project
+// with no uv.lock has nothing to follow.
+func (c *cli) relockAfterInit(ctx context.Context, r cliout.Renderer, dir string, build astroBuildWrite) {
+	if !build.pinsChanged && !build.airflowChanged {
+		return
+	}
+	if _, err := os.Stat(filepath.Join(dir, "uv.lock")); err != nil {
+		return
+	}
+	stale := fmt.Sprintf("uv.lock was resolved before %s's [tool.uv] changed: run uv lock so it follows", manifest.Marker)
+	if c.d.Relock == nil {
+		emitWarning(r, event{Event: "warning", Text: stale})
+		return
+	}
+	switch err := c.d.Relock(ctx, dir); {
+	case errors.Is(err, uv.ErrNotFound):
+		emitWarning(r, event{Event: "warning", Text: stale + ", once uv is installed"})
+	case err != nil:
+		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("%s (uv lock failed: %v)", stale, err)})
+	default:
+		fmt.Fprintf(c.d.Stderr, "uv.lock: relocked for %s's [tool.uv]\n", manifest.Marker)
+	}
+}
+
+// uvRelock is Deps.Relock in production: uv lock in dir, with the uv and the
+// cache standalone mode uses.
+func uvRelock(ctx context.Context, dir string) error {
+	root, err := localrt.CacheRoot()
+	if err != nil {
+		return err
+	}
+	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
+	if err != nil {
+		return err
+	}
+	return client.Lock(ctx, dir, uv.Stdio{})
 }
 
 // nextStart is the start command to suggest once init is done. Standalone

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
 // declaredProject writes a project with a Dockerfile at docker/Dockerfile and
@@ -97,6 +98,44 @@ func TestTheLocksBuildIsTheBaseWhenNothingElseNamesOne(t *testing.T) {
 		require.NoError(t, err, tt.name)
 		assert.Equal(t, tt.want, local.BaseImage, "%s: local", tt.name)
 	}
+}
+
+// lockedCatalog lists an older build of Airflow 3.3 that ships only Python
+// 3.12, and the newest, which ships 3.12 and 3.13.
+const lockedCatalog = `{"runtimeVersionsV3": {
+    "3.3-8": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}},
+    "3.3-10": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}}
+  }}`
+
+// A requires-python edited since the pins were written, admitting none of the
+// Pythons the lock's build ships, builds on the newest build of the series as
+// it would with no lock, rather than failing, and the notices say why. With a
+// requires-python the lock's build admits, the notice is that a newer build is
+// available.
+func TestTheLocksBuildGivesWayToRequiresPython(t *testing.T) {
+	c, err := runtimeversions.Parse([]byte(lockedCatalog))
+	require.NoError(t, err)
+	catalog := func() *runtimeversions.Catalog { return c }
+
+	m := ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "3.3", LockedRuntime: "3.3-8", RequiresPython: "==3.13.*"}
+	req, err := ForManifest(m, catalog)
+	require.NoError(t, err)
+	assert.Equal(t, RuntimeImageRepo+":3.3-10-python-3.13", req.BaseImage)
+	notices := LockedRuntimeNotices(m, c)
+	require.Len(t, notices, 1)
+	assert.Contains(t, notices[0], "admits none of the Pythons Astro Runtime 3.3-8 ships")
+
+	m.RequiresPython = ">=3.12"
+	req, err = ForManifest(m, catalog)
+	require.NoError(t, err)
+	assert.Equal(t, RuntimeImageRepo+":3.3-8", req.BaseImage)
+	assert.Equal(t, []string{"Astro Runtime 3.3-10 is available; this project builds on 3.3-8. Run astro init to move to it"},
+		LockedRuntimeNotices(m, c))
+
+	m.LockedRuntime = "3.3-10"
+	assert.Empty(t, LockedRuntimeNotices(m, c), "the newest build has nothing to move to")
+	m.Runtime = "3.3-8"
+	assert.Empty(t, LockedRuntimeNotices(m, c), "a runtime the user named is theirs")
 }
 
 // With no build named, an Airflow 2 pin is looked up in the catalog, so one

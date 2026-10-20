@@ -36,6 +36,18 @@ func ImagePythonOf(c *Catalog, build string) string {
 // Python 3.12.
 const firstPython312Runtime = 12
 
+// NewerBuildFor is the newest published build carrying an Airflow the pin
+// covers, when it is newer than build: what a project that builds on build
+// could move to. "" and false when build is the newest, or newer than any the
+// catalog has published.
+func (c *Catalog) NewerBuildFor(airflowPin, build string) (string, bool) {
+	newest, ok := c.NewestPublishedRuntimeFor(airflowPin)
+	if !ok || compareVersions(newest, strings.TrimSpace(build)) <= 0 {
+		return "", false
+	}
+	return newest, true
+}
+
 // NewestPublishedRuntimeTagged is the newest build a floating tag serves:
 // "3.3" serves 3.3-N, "12" serves 12.x.y and "12.6" serves 12.6.y. Yanked
 // builds and ones dated after today are skipped, as for

@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
 const pinsCatalog = `{"runtimeVersionsV3": {
@@ -48,6 +52,11 @@ type pinsRun struct {
 	freeze               []string
 	// noCatalog has the runtime catalog unreadable.
 	noCatalog bool
+	// args is the command run, `local start` when empty.
+	args []string
+	// relock answers Deps.Relock and records that it ran; nil leaves the seam
+	// unset.
+	relock func(dir string) error
 }
 
 // pinsResult is what a pinsRun left: the manifest, what it printed, and what
@@ -92,7 +101,14 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 		res.freezeAsked = append(res.freezeAsked, build, python)
 		return p.freeze, p.freezeErr
 	}
-	_ = execute(t, d, "local", "start")
+	if p.relock != nil {
+		d.Relock = func(_ context.Context, dir string) error { return p.relock(dir) }
+	}
+	args := p.args
+	if len(args) == 0 {
+		args = []string{"local", "start"}
+	}
+	_ = execute(t, d, args...)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -343,5 +359,89 @@ func TestStartLooksUpTheAirflowOfTheDockerfilesBuild(t *testing.T) {
 	}
 	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 (Python 3.12)") {
 		t.Errorf("no pins of the Dockerfile's build:\n%s", r.manifest)
+	}
+}
+
+// olderPins is the manifest a first start writes, with its pins said to be of
+// 3.3-8, an older build than the catalog's newest.
+func olderPins(t *testing.T) string {
+	t.Helper()
+	got, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	older := strings.Replace(got, "# Astro Runtime 3.3-9 (Python 3.12)", "# Astro Runtime 3.3-8 (Python 3.12)", 1)
+	if older == got {
+		t.Fatalf("the pins header was not where the test expects it:\n%s", got)
+	}
+	return older
+}
+
+// astro init in a project that already is one moves the runtime pins to the
+// newest build, says so, and relocks so uv.lock follows them. With no uv it
+// says to run uv lock; a project with no uv.lock has nothing to relock.
+func TestInitMovesThePinsAndRelocks(t *testing.T) {
+	src := olderPins(t)
+	var relocked []string
+	relock := func(dir string) error { relocked = append(relocked, dir); return nil }
+
+	r := pinsRun{src: src, build: build332, freeze: freeze339, args: []string{"init"}, relock: relock,
+		files: map[string]string{"uv.lock": "version = 1\n"}}.start(t)
+	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 (Python 3.12)") {
+		t.Errorf("init did not move the pins to 3.3-9:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.out, "runtime pins moved from Astro Runtime 3.3-8 to 3.3-9") || !strings.Contains(r.out, "uv.lock: relocked") {
+		t.Errorf("init did not say it moved the pins and relocked:\n%s", r.out)
+	}
+	if len(relocked) != 1 {
+		t.Errorf("uv lock ran %d times, want once", len(relocked))
+	}
+
+	r = pinsRun{src: src, build: build332, freeze: freeze339, args: []string{"init"},
+		relock: func(string) error { return fmt.Errorf("finding uv: %w", uv.ErrNotFound) },
+		files:  map[string]string{"uv.lock": "version = 1\n"}}.start(t)
+	if !strings.Contains(r.out, "run uv lock so it follows, once uv is installed") {
+		t.Errorf("init without uv did not say to run uv lock:\n%s", r.out)
+	}
+
+	relocked = nil
+	pinsRun{src: src, build: build332, freeze: freeze339, args: []string{"init"}, relock: relock}.start(t)
+	if len(relocked) != 0 {
+		t.Errorf("init relocked a project with no uv.lock")
+	}
+}
+
+// A Docker-mode start of a project whose pins are of an older build says a
+// newer one is available and how to move to it, since a Docker-only project
+// never runs the refresh that would. Standalone, and the newest build, say
+// nothing.
+func TestDockerModeSaysANewerRuntimeIsAvailable(t *testing.T) {
+	c, err := runtimeversions.Parse([]byte(`{"runtimeVersionsV3": {
+    "3.3-8": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}},
+    "3.3-9": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}}
+  }}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name   string
+		plan   localrt.Plan
+		notice bool
+	}{
+		{"older build", localrt.Plan{Mode: localrt.ModeDocker, AirflowVersion: "3.3", LockedRuntime: "3.3-8"}, true},
+		{"newest build", localrt.Plan{Mode: localrt.ModeDocker, AirflowVersion: "3.3", LockedRuntime: "3.3-9"}, false},
+		{"standalone", localrt.Plan{Mode: localrt.ModeStandalone, AirflowVersion: "3.3", LockedRuntime: "3.3-8"}, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d, stdout := testDeps(t)
+			stderr := &bytes.Buffer{}
+			d.Stderr = stderr
+			d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { return c }
+			cl := &cli{d: d, output: cliout.FormatText}
+			tt.plan.ProjectPath = t.TempDir()
+			cl.noticeLockedRuntime(context.Background(), cl.renderer(), tt.plan)
+			out := stdout.String() + stderr.String()
+			said := strings.Contains(out, "Astro Runtime 3.3-9 is available; this project builds on 3.3-8. Run astro init to move to it")
+			if said != tt.notice {
+				t.Errorf("notice said = %v, want %v:\n%s", said, tt.notice, out)
+			}
+		})
 	}
 }

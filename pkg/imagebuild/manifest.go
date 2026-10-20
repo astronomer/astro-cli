@@ -2,6 +2,8 @@ package imagebuild
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -82,13 +84,48 @@ func lockedRuntime(m *manifest.Manifest) string {
 // rather than the newest build of the series. A deploy goes through
 // deploybuild.OfferedBase instead, which takes it only when the Deployment
 // offers it.
+//
+// A requires-python that admits none of the Pythons the lock's build ships
+// (edited since the pins were written) falls back to the rule without it,
+// the newest build of the series, rather than failing the build;
+// LockedRuntimeNotices says so.
 func lockedBase(base BaseImageFunc) BaseImageFunc {
 	return func(ctx context.Context, m ManifestBuild) (string, error) {
-		if m.Runtime == "" && m.LockedRuntime != "" {
-			m.Runtime = m.LockedRuntime
+		if m.Runtime != "" || m.LockedRuntime == "" {
+			return base(ctx, m)
 		}
-		return base(ctx, m)
+		locked := m
+		locked.Runtime = m.LockedRuntime
+		image, err := base(ctx, locked)
+		if notShipped := (*runtimeversions.PythonNotShippedError)(nil); errors.As(err, &notShipped) {
+			return base(ctx, m)
+		}
+		return image, err
 	}
+}
+
+// LockedRuntimeNotices are what a local or packaged build of m has to say
+// about the build its lock was made for (LockedRuntime), read against
+// catalog: that requires-python admits none of that build's Pythons, so the
+// image builds on the newest build of the series instead; else that a newer
+// build of the pin is available, which the project moves to only by running
+// astro init, since moving the build moves the lock. Nothing when the manifest
+// names its own build, when there is no lock build, or with no catalog.
+func LockedRuntimeNotices(m ManifestBuild, catalog *runtimeversions.Catalog) []string {
+	if m.Runtime != "" || m.Dockerfile != "" || m.LockedRuntime == "" || catalog == nil {
+		return nil
+	}
+	_, _, err := runtimeversions.ProjectPython(m.AirflowVersion, m.LockedRuntime, m.RequiresPython,
+		func() *runtimeversions.Catalog { return catalog })
+	if notShipped := (*runtimeversions.PythonNotShippedError)(nil); errors.As(err, &notShipped) {
+		return []string{fmt.Sprintf(
+			"requires-python %s admits none of the Pythons Astro Runtime %s ships (%s), the build this project's uv.lock was made for, so the image builds on the newest build of Airflow %s instead. Run astro init to move the lock to a build it admits",
+			notShipped.RequiresPython, m.LockedRuntime, strings.Join(notShipped.Pythons, ", "), m.AirflowVersion)}
+	}
+	if newer, ok := catalog.NewerBuildFor(m.AirflowVersion, m.LockedRuntime); ok {
+		return []string{fmt.Sprintf("Astro Runtime %s is available; this project builds on %s. Run astro init to move to it", newer, m.LockedRuntime)}
+	}
+	return nil
 }
 
 // BaseImageFunc resolves the runtime base a generated build starts FROM, from

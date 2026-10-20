@@ -26,6 +26,27 @@ func TestImagePythonOf(t *testing.T) {
 	}
 }
 
+// A newer build is the newest published for the pin, when it is newer than
+// the one given; none when that is already the newest, or newer than any.
+func TestNewerBuildFor(t *testing.T) {
+	standOn(t, "2026-10-04")
+	c := parse(t, `{"runtimeVersionsV3": {
+    "3.3-8": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable"}},
+    "3.3-10": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable"}},
+    "3.3-11": {"metadata": {"airflowVersion": "3.3.3", "channel": "stable", "releaseDate": "2026-10-05"}}
+  }}`)
+	for _, tt := range []struct{ pin, build, want string }{
+		{"3.3", "3.3-8", "3.3-10"},
+		{"3.3", "3.3-10", ""},
+		{"3.3", "3.3-12", ""},
+	} {
+		got, ok := c.NewerBuildFor(tt.pin, tt.build)
+		if got != tt.want || ok != (tt.want != "") {
+			t.Errorf("NewerBuildFor(%q, %q) = %q, %v; want %q", tt.pin, tt.build, got, ok, tt.want)
+		}
+	}
+}
+
 func TestNewestPublishedRuntimeTagged(t *testing.T) {
 	standOn(t, "2026-10-04")
 	c := parse(t, `{"runtimeVersionsV3": {

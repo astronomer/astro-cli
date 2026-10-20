@@ -21,6 +21,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/internal/proxydaemon"
 	"github.com/astronomer/astro-cli/pkg/envschema"
+	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -251,6 +252,7 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	if err := checkImageDockerfile(r, built.Plan); err != nil {
 		return err
 	}
+	c.noticeLockedRuntime(ctx, r, built.Plan)
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err
 	}
@@ -368,6 +370,22 @@ func checkImageDockerfile(r cliout.Renderer, p localrt.Plan) error {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}
 	return nil
+}
+
+// noticeLockedRuntime says, before a Docker-mode start builds, what the build
+// the project's uv.lock was made for means for it
+// (imagebuild.LockedRuntimeNotices): a newer build is available, which only
+// astro init moves to, or requires-python excludes the lock's build, so the
+// image builds on the newest one instead. A Docker-only project never runs the
+// standalone refresh that moves the pins, so this is where it hears of a new
+// build. Standalone builds no image.
+func (c *cli) noticeLockedRuntime(ctx context.Context, r cliout.Renderer, p localrt.Plan) {
+	if p.Mode != localrt.ModeDocker || c.d.RuntimeCatalog == nil {
+		return
+	}
+	for _, n := range imagebuild.LockedRuntimeNotices(p.ManifestBuild(p.ProjectPath), c.d.RuntimeCatalog(ctx)) {
+		emitWarning(r, event{Event: "warning", Text: n})
+	}
 }
 
 // warnManifest reports the manifest's findings that do not stop a start: a
@@ -666,6 +684,7 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	if err := checkImageDockerfile(r, built.Plan); err != nil {
 		return err
 	}
+	c.noticeLockedRuntime(ctx, r, built.Plan)
 	// Before the stop, like the build: a refusal leaves Airflow running.
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err

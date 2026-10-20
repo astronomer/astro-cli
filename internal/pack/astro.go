@@ -186,9 +186,15 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	// Which image the manifest builds is imagebuild's rule, the one deploy
 	// follows too, so the artifact is the image a deploy of the same project
 	// would build.
-	breq, err := imagebuild.ForManifest(imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest), runtimeCatalog(ctx, req))
+	mb := imagebuild.ManifestBuildOf(req.ProjectDir, req.Manifest)
+	breq, err := imagebuild.ForManifest(mb, runtimeCatalog(ctx, req))
 	if err != nil {
 		return Result{}, err
+	}
+	// The build the lock was made for, as the image just resolved: a newer
+	// one is available, or requires-python sent it to the series' newest.
+	if req.RuntimeCatalog != nil {
+		warnings = append(warnings, imagebuild.LockedRuntimeNotices(mb, req.RuntimeCatalog(ctx))...)
 	}
 	declared := breq.Dockerfile
 	missingSecrets, err := checkSecrets(req, cb)

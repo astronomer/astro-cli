@@ -36,7 +36,14 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 	if err != nil {
 		return
 	}
-	res := c.writeAstroBuild(ctx, proj.Dir)
+	c.reportAstroBuild(r, c.writeAstroBuild(ctx, proj.Dir))
+}
+
+// reportAstroBuild says what writeAstroBuild did: warnings for what it could
+// not do, and a line for each part of [tool.uv] it changed. A standalone start
+// reports every refresh; astro init, the refresh of a project that already was
+// one.
+func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 	switch {
 	case errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild):
 		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf(
@@ -97,7 +104,6 @@ func stalePin(m *manifest.Manifest) bool {
 	}
 	return false
 }
-
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
 type astroBuildWrite struct {
