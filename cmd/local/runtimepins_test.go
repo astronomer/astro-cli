@@ -241,14 +241,49 @@ func TestStartOfflineStillDropsThePinOfAPackageTheProjectLists(t *testing.T) {
 
 // The runtime pins and the Airflow pin are of one release, or none are
 // written: here the image's list carries 3.3.1 and the lookup 3.3.2.
+// A project that names no build gets no pins of another release, and is told
+// why without being asked to change anything it wrote: the lookup and the
+// catalog disagreed on their own.
 func TestStartWritesNoRuntimePinsOfAnotherRelease(t *testing.T) {
 	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
 	r := pinsRun{src: buildManifest, build: build332, freeze: other}.start(t)
 	if strings.Contains(r.manifest, "Astro Runtime") || strings.Contains(r.manifest, "pandas") {
 		t.Errorf("pins of another Airflow release were written:\n%s", r.manifest)
 	}
-	if !strings.Contains(r.out, "carries Airflow 3.3.1, and the Airflow requirement holds it to 3.3.2") {
-		t.Errorf("the start did not say why:\n%s", r.out)
+	if !strings.Contains(r.out, "no published Astro Runtime image carries Airflow 3.3.2") || strings.Contains(r.out, "make the two agree") {
+		t.Errorf("the start did not say why, neutrally:\n%s", r.out)
+	}
+}
+
+// A runtime the user named, carrying another release than the requirement
+// holds Airflow to, is theirs to fix, and the start says so.
+func TestStartAsksToReconcileANamedRuntimeOfAnotherRelease(t *testing.T) {
+	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
+	src := strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-9'\n", 1)
+	r := pinsRun{src: src, build: build332, freeze: other}.start(t)
+	if strings.Contains(r.manifest, "pandas") {
+		t.Errorf("pins of another Airflow release were written:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.out, "carries Airflow 3.3.1, and the Airflow requirement holds it to 3.3.2; make the two agree") {
+		t.Errorf("the start did not ask to reconcile the named runtime:\n%s", r.out)
+	}
+}
+
+// A build that moved on whose list cannot be read leaves the pins of the
+// build there, with the Airflow build they were written beside, while the
+// requirement covers it.
+func TestStartKeepsThePinsWhenANewBuildsListCannotBeRead(t *testing.T) {
+	got, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	older := strings.Replace(got, "# Astro Runtime 3.3-9 (Python 3.12)", "# Astro Runtime 3.3-8 (Python 3.12)", 1)
+	kept, out, _ := startWithPins(t, older, nil, errors.New("offline"))
+	if !strings.Contains(kept, "# Astro Runtime 3.3-8 (Python 3.12)") || !strings.Contains(kept, "pandas==2.2.3") {
+		t.Errorf("the pins of 3.3-8 were not kept:\n%s", kept)
+	}
+	if !strings.Contains(kept, "'apache-airflow==3.3.2+astro.2'") {
+		t.Errorf("the Airflow build written beside the pins was not kept:\n%s", kept)
+	}
+	if !strings.Contains(out, "keeps the runtime pins of Astro Runtime 3.3-8") {
+		t.Errorf("the start did not say it kept them:\n%s", out)
 	}
 }
 

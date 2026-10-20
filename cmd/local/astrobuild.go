@@ -91,17 +91,13 @@ func stalePin(m *manifest.Manifest) bool {
 			continue
 		}
 		_, version, _ := strings.Cut(c, "==")
-		if !pinCovers(pin, astroRelease(version)) {
+		if !runtimeversions.PinCovers(pin, astroRelease(version)) {
 			return true
 		}
 	}
 	return false
 }
 
-// pinCovers reports whether an Airflow pin ("3.3", "3.3.2") covers a release.
-func pinCovers(pin, release string) bool {
-	return release == pin || strings.HasPrefix(release, pin+".")
-}
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
 type astroBuildWrite struct {
@@ -163,7 +159,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 		res.compare(m, path)
 		return res
 	}
-	pins := c.runtimePins(ctx, m, image, &res)
+	pins := c.runtimePins(ctx, dir, m, image, &res)
 	switch {
 	case pins != nil:
 		res.build = imageAirflowBuild(res.build, pins.Pins)
@@ -225,7 +221,7 @@ func (c *cli) runtimeImage(ctx context.Context, dir string, m *manifest.Manifest
 // for what passes: the list of the pins' own build and Python could not be
 // read, or the build cannot be told for want of a catalog. res.pinsErr says
 // what happened when it is worth a warning.
-func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runtimeImage, res *astroBuildWrite) *scaffold.RuntimePins {
+func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest, image runtimeImage, res *astroBuildWrite) *scaffold.RuntimePins {
 	none := &scaffold.RuntimePins{}
 	switch {
 	case c.d.RuntimePins == nil:
@@ -237,7 +233,7 @@ func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runti
 		// while the Airflow they were written beside is one the pin still
 		// covers; a pin that moved off it leaves them another Airflow's.
 		recorded := releaseIn(m.UV.ConstraintDependencies, runtimeversions.DistAirflow)
-		if m.UV.RuntimeBuild != "" && recorded != "" && !pinCovers(m.Airflow().Pin, recorded) {
+		if m.UV.RuntimeBuild != "" && recorded != "" && !runtimeversions.PinCovers(m.Airflow().Pin, recorded) {
 			res.pinsErr = fmt.Errorf("%s holds no runtime pins: those of Astro Runtime %s are of Airflow %s, which the Airflow requirement no longer covers, and which build carries the new one cannot be told without the runtime catalog",
 				manifest.Marker, m.UV.RuntimeBuild, recorded)
 			return none
@@ -252,18 +248,90 @@ func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runti
 		res.pinsErr = fmt.Errorf("%s keeps its runtime pins: could not read what Astro Runtime %s ships: %w", manifest.Marker, image.build, err)
 		return nil
 	case err != nil:
-		res.pinsErr = fmt.Errorf("%s holds no runtime pins until what Astro Runtime %s ships can be read: %w", manifest.Marker, image.build, err)
-		return none
+		// The build moved on and its list cannot be read yet: the pins there
+		// still describe the build the images use, so they stay while the
+		// requirement covers their Airflow.
+		return keepRecordedPins(m, res,
+			fmt.Sprintf("could not read what Astro Runtime %s ships: %v", image.build, err),
+			fmt.Errorf("%s holds no runtime pins until what Astro Runtime %s ships can be read: %w", manifest.Marker, image.build, err))
 	}
 	// The Airflow pin and the runtime pins have to be of one release, or the
-	// lock mixes one Airflow with another's dependencies. A Dockerfile FROM a
-	// build the requirement excludes is the case that reaches here.
+	// lock mixes one Airflow with another's dependencies.
 	if carried, pinned := releaseIn(freeze, runtimeversions.DistAirflow), astroRelease(res.build.Airflow); carried != "" && carried != pinned {
+		if m.Astro.Dockerfile == "" && m.Airflow().Runtime == "" {
+			// Nothing the user wrote names the build: the lookup and the
+			// catalog's newest build disagree on their own, so the pins
+			// follow the build carrying the release the lookup chose.
+			return c.pinsOfRelease(ctx, dir, m, pinned, res)
+		}
+		// A Dockerfile FROM, or a runtime, the requirement excludes.
 		res.pinsErr = fmt.Errorf("%s holds no runtime pins: Astro Runtime %s carries Airflow %s, and the Airflow requirement holds it to %s; make the two agree",
 			manifest.Marker, image.build, carried, pinned)
 		return none
 	}
 	return &scaffold.RuntimePins{Build: image.build, Python: image.python, Pins: freeze}
+}
+
+// pinsOfRelease are the runtime pins of the newest published build carrying
+// Airflow release, for a project that names no build itself. With none
+// published yet, the pins there stay while the requirement covers their
+// Airflow, and come out otherwise; either way the warning blames nothing the
+// user wrote.
+func (c *cli) pinsOfRelease(ctx context.Context, dir string, m *manifest.Manifest, release string, res *astroBuildWrite) *scaffold.RuntimePins {
+	var catalog *runtimeversions.Catalog
+	if c.d.RuntimeCatalog != nil {
+		catalog = c.d.RuntimeCatalog(ctx)
+	}
+	if catalog != nil {
+		if build, ok := catalog.NewestPublishedRuntimeFor(release); ok {
+			named := *m
+			named.Astro.Runtime = build
+			if b, python, err := scaffold.RuntimeBuildFor(dir, &named, catalog); err == nil && python != "" {
+				if freeze, err := c.d.RuntimePins(ctx, b, python); err == nil && releaseIn(freeze, runtimeversions.DistAirflow) == release {
+					return &scaffold.RuntimePins{Build: b, Python: python, Pins: freeze}
+				}
+			}
+		}
+	}
+	why := fmt.Sprintf("no published Astro Runtime image carries Airflow %s, the build Astronomer's index has for the requirement, yet", release)
+	return keepRecordedPins(m, res, why, fmt.Errorf("%s holds no runtime pins: %s", manifest.Marker, why))
+}
+
+// keepRecordedPins leaves the runtime pins there as they are when the Airflow
+// requirement still covers the Airflow they were written beside, and holds
+// res.build to that Airflow build too, so the lock does not pair one release
+// with another's dependencies. It says why with kept. Otherwise, or with no
+// pins there, they come out, with dropped as the warning.
+func keepRecordedPins(m *manifest.Manifest, res *astroBuildWrite, kept string, dropped error) *scaffold.RuntimePins {
+	recorded, ok := recordedAirflowBuild(m)
+	if m.UV.RuntimeBuild == "" || !ok {
+		res.pinsErr = dropped
+		return &scaffold.RuntimePins{}
+	}
+	recorded.Index = res.build.Index
+	res.build = recorded
+	res.pinsErr = fmt.Errorf("%s keeps the runtime pins of Astro Runtime %s: %s", manifest.Marker, m.UV.RuntimeBuild, kept)
+	return nil
+}
+
+// recordedAirflowBuild is the Astronomer build of Airflow, and of the Task SDK,
+// pinned beside the runtime pins in m, when the Airflow requirement still
+// covers it.
+func recordedAirflowBuild(m *manifest.Manifest) (runtimeversions.AstroBuild, bool) {
+	var b runtimeversions.AstroBuild
+	for _, c := range m.UV.ConstraintDependencies {
+		if !manifest.AstroPin(c) {
+			continue
+		}
+		name, version, _ := strings.Cut(c, "==")
+		switch manifest.DistName(name) {
+		case runtimeversions.DistAirflow:
+			b.Airflow = strings.TrimSpace(version)
+		case runtimeversions.DistTaskSDK:
+			b.TaskSDK = strings.TrimSpace(version)
+		}
+	}
+	return b, b.Airflow != "" && runtimeversions.PinCovers(m.Airflow().Pin, b.Airflow)
 }
 
 // releaseIn is the release, without its +astro build, that freeze pins dist

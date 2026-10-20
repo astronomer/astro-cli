@@ -483,7 +483,7 @@ func (o offeredReleases) NewestFor(pin string) string {
 			continue
 		}
 		av := o[i].AirflowVersion
-		if av != pin && !strings.HasPrefix(av, pin+".") && !strings.HasPrefix(av, pin+"+") {
+		if !runtimeversions.PinCovers(pin, av) {
 			continue
 		}
 		if newest == "" || airflowversions.CompareRuntimeVersions(o[i].Version, newest) > 0 {

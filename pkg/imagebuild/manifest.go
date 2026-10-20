@@ -69,8 +69,7 @@ func lockedRuntime(m *manifest.Manifest) string {
 			continue
 		}
 		_, version, _ := strings.Cut(c, "==")
-		release, _, _ := strings.Cut(strings.TrimSpace(version), "+")
-		if release != pin && !strings.HasPrefix(release, pin+".") {
+		if !runtimeversions.PinCovers(pin, version) {
 			return ""
 		}
 	}

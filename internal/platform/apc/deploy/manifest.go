@@ -542,7 +542,7 @@ func (l listedReleases) NewestFor(pin string) string {
 	newest := ""
 	for i := range l {
 		av := l[i].AirflowVersion
-		if av != pin && !strings.HasPrefix(av, pin+".") && !strings.HasPrefix(av, pin+"+") {
+		if !runtimeversions.PinCovers(pin, av) {
 			continue
 		}
 		if newest == "" || airflowversions.CompareRuntimeVersions(l[i].Version, newest) > 0 {

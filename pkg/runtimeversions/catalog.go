@@ -206,7 +206,7 @@ func (c *Catalog) RequiresPython(series string) (string, bool) {
 func (c *Catalog) NewestRuntimeFor(airflowPin string) (string, bool) {
 	var best string
 	for tag, r := range c.runtimes {
-		if r.Yanked || !pinCovers(airflowPin, r.AirflowVersion) {
+		if r.Yanked || !PinCovers(airflowPin, r.AirflowVersion) {
 			continue
 		}
 		if best == "" || compareVersions(tag, best) > 0 {
@@ -224,7 +224,7 @@ func (c *Catalog) NewestRuntimeFor(airflowPin string) (string, bool) {
 func (c *Catalog) NewestPublishedRuntimeFor(airflowPin string) (string, bool) {
 	var best string
 	for tag, r := range c.runtimes {
-		if r.Yanked || r.scheduled() || !pinCovers(airflowPin, r.AirflowVersion) {
+		if r.Yanked || r.scheduled() || !PinCovers(airflowPin, r.AirflowVersion) {
 			continue
 		}
 		if best == "" || compareVersions(tag, best) > 0 {
@@ -278,10 +278,15 @@ func (r *Runtime) scheduled() bool {
 	return err == nil && day.After(now().UTC())
 }
 
-// pinCovers reports whether an Airflow release satisfies a pin that may name
-// fewer segments than the release does.
-func pinCovers(pin, release string) bool {
+// PinCovers reports whether an Airflow release satisfies a pin that may name
+// fewer segments than the release does: "3.3" covers "3.3.2", "3.3.2" covers
+// "3.3.2", and neither covers "3.4.0". A release's local label is not part of
+// it: Astronomer's build "3.3.2+astro.2" is release 3.3.2. The one rule for
+// it, which the catalog, the CLI's [tool.uv] refresh, the platforms' offers
+// and the image's runtime base all hold a pin to.
+func PinCovers(pin, release string) bool {
 	pin = strings.TrimSpace(pin)
+	release, _, _ = strings.Cut(strings.TrimSpace(release), "+")
 	return pin != "" && (release == pin || strings.HasPrefix(release, pin+"."))
 }
 

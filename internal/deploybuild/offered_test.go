@@ -62,7 +62,8 @@ func TestOfferedBase(t *testing.T) {
 // The build the lock was made for is the base when the Deployment offers it,
 // even when it offers a newer one. When it does not, the newest offered build
 // is, with a warning naming both; with nothing offered for the pin, or no
-// offer, the lock's build. [tool.astro] runtime still wins over all of it.
+// offer, the platform's own fallback runs with no build named, as without a
+// lock. [tool.astro] runtime still wins over all of it.
 func TestOfferedBasePrefersTheLocksBuild(t *testing.T) {
 	resolve := func(_ context.Context, m imagebuild.ManifestBuild) (string, error) {
 		return m.Runtime, nil
@@ -81,8 +82,8 @@ func TestOfferedBasePrefersTheLocksBuild(t *testing.T) {
 			name: "lock build not offered", offer: o, build: imagebuild.ManifestBuild{AirflowVersion: "3.3", LockedRuntime: "3.3-8"},
 			want: "3.3-10", wantWarn: true, warnMentioned: []string{"3.3-8", "3.3-10"},
 		},
-		{name: "nothing offered for the pin", offer: o, build: imagebuild.ManifestBuild{AirflowVersion: "3.2", LockedRuntime: "3.2-4"}, want: "3.2-4"},
-		{name: "no offer", offer: nil, build: imagebuild.ManifestBuild{AirflowVersion: "3.3", LockedRuntime: "3.3-8"}, want: "3.3-8"},
+		{name: "nothing offered for the pin", offer: o, build: imagebuild.ManifestBuild{AirflowVersion: "3.2", LockedRuntime: "3.2-4"}, want: ""},
+		{name: "no offer", offer: nil, build: imagebuild.ManifestBuild{AirflowVersion: "3.3", LockedRuntime: "3.3-8"}, want: ""},
 		{name: "no lock build", offer: o, build: imagebuild.ManifestBuild{AirflowVersion: "3.3"}, want: "3.3-10"},
 		{name: "runtime wins", offer: o, build: imagebuild.ManifestBuild{AirflowVersion: "3.3", Runtime: "3.3-7", LockedRuntime: "3.3-9"}, want: "3.3-7"},
 	} {

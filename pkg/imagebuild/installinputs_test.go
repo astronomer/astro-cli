@@ -319,6 +319,9 @@ func TestInstallHelperSaysWhenTheLockIsForAnotherAirflow(t *testing.T) {
 		want                             []string
 	}{
 		{name: "same airflow", pyproject: pyproject, lock: lock, installed: "3.3.2+astro.2"},
+		// One release: another Astronomer build of it, or PyPI's, is no other Airflow.
+		{name: "same release, another astro build", pyproject: pyproject, lock: lock, installed: "3.3.2+astro.3"},
+		{name: "same release from pypi", pyproject: pyproject, lock: lock, installed: "3.3.2"},
 		{
 			name: "another airflow, runtime named", pyproject: pyproject + pins, lock: lock, installed: "3.3.3+astro.1",
 			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9)", "this image has Airflow 3.3.3+astro.1", "astro init"},

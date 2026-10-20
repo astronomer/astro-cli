@@ -787,13 +787,21 @@ def pinned_runtime(pyproject_text):
     return m.group(1) if m else None
 
 
+def public_release(version):
+    """The release a version names, without its local label: 3.3.2+astro.2 and
+    3.3.2 are both 3.3.2. Astronomer's builds of one release differ only in
+    that label, and an image's Airflow from PyPI has none, so neither is a
+    different Airflow from the lock's."""
+    return version.strip().split("+", 1)[0].lower()
+
+
 def airflow_mismatch(lock, installed, runtime):
     """A warning when uv.lock was made for another Airflow than this image
     runs, or None. The lock's versions still install: a build on another runtime
     than the lock's (a floating FROM, a deploy onto the build a Deployment
     offers) is allowed, and said."""
     locked = locked_airflow(lock)
-    if not locked or not installed or locked.lower() == installed.strip().lower():
+    if not locked or not installed or public_release(locked) == public_release(installed):
         return None
     made_for = "Airflow %s" % locked
     if runtime:

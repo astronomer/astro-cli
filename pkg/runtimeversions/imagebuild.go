@@ -40,14 +40,29 @@ const firstPython312Runtime = 12
 // "3.3" serves 3.3-N, "12" serves 12.x.y and "12.6" serves 12.6.y. Yanked
 // builds and ones dated after today are skipped, as for
 // NewestPublishedRuntimeFor.
+//
+// A floating tag serves builds of its own scheme only. A runtime 3 tag is
+// Airflow 3's, whose builds are X.Y-N; any other is an Airflow 2 runtime
+// version, whose builds are semver. Airflow 2's runtimes were once numbered
+// 3.x.y too, so "3.0" serves 3.0-N and never Airflow 2's runtime 3.0.1.
 func (c *Catalog) NewestPublishedRuntimeTagged(floating string) (string, bool) {
 	floating = strings.TrimSpace(floating)
+	airflow3 := floating == "3" || strings.HasPrefix(floating, "3.")
 	var best string
 	for tag, r := range c.runtimes {
-		if r.Yanked || r.scheduled() {
+		if r.Yanked || r.scheduled() || strings.Contains(tag, "-") != airflow3 {
 			continue
 		}
-		if !strings.HasPrefix(tag, floating+"-") && !strings.HasPrefix(tag, floating+".") {
+		switch {
+		case airflow3 && floating == "3":
+			if !strings.HasPrefix(tag, "3.") {
+				continue
+			}
+		case airflow3:
+			if !strings.HasPrefix(tag, floating+"-") {
+				continue
+			}
+		case !strings.HasPrefix(tag, floating+"."):
 			continue
 		}
 		if best == "" || compareVersions(tag, best) > 0 {
