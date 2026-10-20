@@ -64,48 +64,62 @@ var errFreezeNotPublished = errors.New("no freeze file is published for this bui
 // none could be read: no build, a build too old to have one, or no network
 // and no cached copy.
 //
-// Every candidate's cached copy is looked for before any request, so an
-// offline run still answers from a copy kept for a later Python. A failure
-// other than a 404 stops the requests, so an offline run spends one timeout,
-// not one per Python.
+// Each Python is tried in the caller's order, its cached copy and then the
+// CDN, so a copy kept for a fallback never stands in for the Python expected
+// while the expected one can still be read. A failure other than a 404 ends
+// the requests, so an offline run spends one timeout, not one per Python;
+// what is left is answered from the cache alone, so offline still finds a
+// copy kept for a later Python.
 func RuntimeFreeze(ctx context.Context, build string, pythons []string) []string {
 	if !freezeNamePart.MatchString(build) {
 		return nil
-	}
-	var names []string
-	for _, py := range pythons {
-		if freezeNamePart.MatchString(py) {
-			names = append(names, "runtime-"+build+"-python-"+py+".txt")
-		}
 	}
 	dir := ""
 	if root, err := localrt.CacheRoot(); err == nil {
 		dir = filepath.Join(root, freezeCacheDir)
 	}
-	if dir != "" {
-		for _, name := range names {
-			// A copy that does not parse is read again from the CDN below.
-			if data, err := fsatomic.ReadFile(filepath.Join(dir, name)); err == nil {
-				if dists, err := parseFreeze(data); err == nil && len(dists) > 0 {
-					return dists
-				}
-			}
-		}
-	}
 	ctx, cancel := context.WithTimeout(ctx, freezeTimeout)
 	defer cancel()
-	for _, name := range names {
-		data, dists, err := fetchFreeze(ctx, freezeBaseURL+"/"+name)
-		if errors.Is(err, errFreezeNotPublished) {
+	online := true
+	for _, py := range pythons {
+		if !freezeNamePart.MatchString(py) {
 			continue
 		}
-		if err != nil {
-			return nil
+		name := "runtime-" + build + "-python-" + py + ".txt"
+		if dists := cachedFreeze(dir, name); dists != nil {
+			return dists
+		}
+		if !online {
+			continue
+		}
+		data, dists, err := fetchFreeze(ctx, freezeBaseURL+"/"+name)
+		switch {
+		case errors.Is(err, errFreezeNotPublished):
+			continue
+		case err != nil:
+			online = false
+			continue
 		}
 		// A cache that cannot be written is not a failure: the read worked.
 		if dir != "" && os.MkdirAll(dir, freezeDirPerm) == nil {
 			_ = fsatomic.WriteFile(filepath.Join(dir, name), data, freezeFilePerm) //nolint:errcheck // best effort, see above
 		}
+		return dists
+	}
+	return nil
+}
+
+// cachedFreeze is the distributions of the copy of name kept under dir, or nil
+// when there is none, or it does not parse, which the CDN then answers.
+func cachedFreeze(dir, name string) []string {
+	if dir == "" {
+		return nil
+	}
+	data, err := fsatomic.ReadFile(filepath.Join(dir, name))
+	if err != nil {
+		return nil
+	}
+	if dists, err := parseFreeze(data); err == nil && len(dists) > 0 {
 		return dists
 	}
 	return nil

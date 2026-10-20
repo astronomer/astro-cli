@@ -72,9 +72,19 @@ func TestRuntimeFreezeKeepsWhatItRead(t *testing.T) {
 	assert.FileExists(t, filepath.Join(root, "astro", freezeCacheDir, "runtime-3.3-9-python-3.12.txt"))
 }
 
-// Offline, a copy kept for a later Python answers before any request is made
-// for the first.
-func TestRuntimeFreezeLooksInTheCacheForEveryPythonFirst(t *testing.T) {
+// Online, the expected Python is read from the CDN before a cached copy of a
+// fallback answers, so the fallback never stands in for it.
+func TestRuntimeFreezePrefersTheExpectedPythonOverACachedFallback(t *testing.T) {
+	freezeServer(t, map[string]string{"/runtime-freeze/runtime-12.6.0-python-3.12.txt": "numpy==2.1.0\n"})
+	dir := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", freezeCacheDir)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "runtime-12.6.0-python-3.11.txt"), []byte("pandas==2.2.3\n"), 0o600))
+	assert.Equal(t, []string{"numpy"}, RuntimeFreeze(context.Background(), "12.6.0", []string{"3.12", "3.11"}))
+}
+
+// Offline, a copy kept for a later Python still answers once the request for
+// the first has failed.
+func TestRuntimeFreezeFallsBackToACachedLaterPythonOffline(t *testing.T) {
 	srv, hits := freezeServer(t, nil)
 	dir := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", freezeCacheDir)
 	require.NoError(t, os.MkdirAll(dir, 0o755))

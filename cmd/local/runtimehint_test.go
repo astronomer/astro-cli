@@ -22,6 +22,9 @@ func init() {
 		"apache-airflow-providers-common-sql", "apache-airflow-providers-common-io",
 		"apache-airflow-providers-cncf-kubernetes",
 		"opentelemetry-sdk", "kubernetes-asyncio", "openlineage-python", "googleapis-common-protos",
+		// Shipped distributions whose names start with a module's they do not
+		// provide.
+		"markdown-it-py", "prometheus-client", "cron-descriptor", "google-cloud-storage",
 	} {
 		testShips[d] = true
 	}
@@ -40,14 +43,20 @@ func TestRuntimeDist(t *testing.T) {
 		"opentelemetry.sdk":                 "opentelemetry-sdk",
 		"kubernetes_asyncio":                "kubernetes-asyncio",
 		"openlineage.client":                "openlineage-python",
-		// Python names the first missing package, so a namespace is what a
-		// Dag sees when nothing under it is installed: one shipped under it
-		// is the answer.
+		// Python names the first missing package, so a provider namespace is
+		// what a Dag sees when no provider under it is installed: the one
+		// shipped under it is the answer.
 		"airflow.providers.cncf": "apache-airflow-providers-cncf-kubernetes",
-		"openlineage":            "openlineage-python",
 		// Several under it, and the message cannot say which one.
 		"airflow.providers.common": "",
-		"google":                   "",
+		// No other namespace is read that way: a shipped name that starts
+		// with the module's is not evidence it provides it.
+		"markdown":     "",
+		"prometheus":   "",
+		"cron":         "",
+		"openlineage":  "",
+		"google":       "",
+		"google.cloud": "",
 		// A missing submodule means its parent is installed: the parent's
 		// distribution is not what is missing.
 		"pandas.io.foo":                          "",
@@ -76,6 +85,15 @@ func TestMissingModule(t *testing.T) {
 		"Traceback (most recent call last):\nModuleNotFoundError: No module named 'pandas'\n"
 	if got := missingModule(chained); got != "pandas" {
 		t.Errorf("missingModule(chained) = %q, want pandas", got)
+	}
+	// One that ends in another exception did not fail for the module.
+	endsElsewhere := "Traceback (most recent call last):\nModuleNotFoundError: No module named 'ujson'\n\nDuring handling of the above exception, another exception occurred:\n\n" +
+		"Traceback (most recent call last):\n  File \"dags/a.py\", line 4, in <module>\n    json = ujson\nNameError: name 'ujson' is not defined\n"
+	if got := missingModule(endsElsewhere); got != "" {
+		t.Errorf("missingModule(ends in NameError) = %q, want none", got)
+	}
+	if got := missingModule("ImportError: No module named 'yaml'"); got != "yaml" {
+		t.Errorf("missingModule(ImportError) = %q, want yaml", got)
 	}
 }
 
@@ -180,6 +198,32 @@ func TestCheckDoesNotHintAModuleADeclaredDependencyProvides(t *testing.T) {
 	_ = execute(t, d, "local", "check")
 	if strings.Contains(out.String(), "hint:") {
 		t.Errorf("want no hint for a module a declared dependency provides:\n%s", out.String())
+	}
+}
+
+// An extra or a dependency group is listed too: the package is the project's,
+// and its environment is the one that is short of it.
+func TestCheckDoesNotHintAPackageAnExtraOrGroupLists(t *testing.T) {
+	for name, section := range map[string]string{
+		"extra": "[project.optional-dependencies]\nscience = [\"numpy>=2\"]\n",
+		"group": "[dependency-groups]\ndev = [{include-group = \"lint\"}, \"numpy\"]\nlint = [\"ruff\"]\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			d, out, _, _ := hintDeps(t)
+			dir, err := d.WorkingDir()
+			if err != nil {
+				t.Fatal(err)
+			}
+			manifestText := strings.Replace(runtimeManifest, "[tool.astro]", section+"[tool.astro]", 1)
+			if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifestText), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			d.Checks = stubParser{report: numpyErrors()}
+			_ = execute(t, d, "local", "check")
+			if strings.Contains(out.String(), "hint:") {
+				t.Errorf("want no hint for a package the %s lists:\n%s", name, out.String())
+			}
+		})
 	}
 }
 

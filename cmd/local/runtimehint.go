@@ -24,8 +24,9 @@ import (
 // project's runtime ships and the project does not list: declare it, which
 // also stops the project depending on what an image happens to carry.
 
-// missingModuleRe finds the module a ModuleNotFoundError names.
-var missingModuleRe = regexp.MustCompile(`No module named '([^']+)'`)
+// missingModuleRe reads the module out of the exception line of a failed
+// import.
+var missingModuleRe = regexp.MustCompile(`^(?:ModuleNotFoundError|ImportError): No module named '([^']+)'`)
 
 // moduleDists are the modules whose distribution has another name, for the
 // packages the runtime images ship. A module not here is looked up by its own
@@ -82,53 +83,52 @@ func moduleOwners(module string) []string {
 // Python names the first package of an import that is missing, so module is
 // the missing one and its parent is installed: pandas.io.foo missing means
 // pandas is there, and the answer is never a parent's distribution. module is
-// matched as it is (moduleOwners), and failing that as a namespace: Python
-// reports airflow.providers.cncf, not the provider under it, when no cncf
-// provider is installed, and google when nothing under google is. The one
-// shipped distribution under the namespace is the answer; several are none,
-// since the message cannot say which one the Dag needs, and naming the wrong
-// one would install something it does not.
+// matched as it is (moduleOwners), and failing that, under airflow.providers
+// only, as a namespace: Python reports airflow.providers.cncf, not the
+// provider under it, when no cncf provider is installed. The one shipped
+// provider under it is the answer; several are none, since the message cannot
+// say which one the Dag needs.
+//
+// No other namespace is read that way. A shipped distribution whose name
+// starts with a module's is not evidence that it provides it (markdown is not
+// markdown-it-py, prometheus is not prometheus-client), and a lone google-*
+// one is not evidence it is the google.cloud package the Dag imports.
 func runtimeDist(module string, ships map[string]bool) string {
 	if module == "" {
 		return ""
 	}
-	owners := moduleOwners(module)
-	for _, d := range owners {
+	for _, d := range moduleOwners(module) {
 		if ships[d] {
 			return d
 		}
 	}
-	under := map[string]bool{}
-	for _, owner := range owners {
-		for d := range ships {
-			if strings.HasPrefix(d, owner+"-") {
-				under[d] = true
-			}
-		}
+	rest, ok := strings.CutPrefix(module, airflowProvidersPrefix)
+	if !ok {
+		return ""
 	}
-	for sub, d := range moduleDists {
-		if strings.HasPrefix(sub, module+".") && ships[d] {
-			under[d] = true
+	prefix := manifest.DistName("apache-airflow-providers-"+strings.ReplaceAll(rest, ".", "-")) + "-"
+	var under []string
+	for d := range ships {
+		if strings.HasPrefix(d, prefix) {
+			under = append(under, d)
 		}
 	}
 	if len(under) != 1 {
 		return ""
 	}
-	for d := range under {
-		return d
-	}
-	return ""
+	return under[0]
 }
 
 // missingModule is the module an import error's message says is missing, or
-// "". The last one the message names: in a chained traceback ("During
-// handling of the above exception…") the last is the error that was raised.
+// "": read from the exception the error ends with (exceptionLine), and only
+// when that is the ModuleNotFoundError or ImportError naming it. A chained
+// traceback that ends in another exception (a NameError raised while handling
+// the missing import) did not fail for the module, and gets no hint.
 func missingModule(message string) string {
-	all := missingModuleRe.FindAllStringSubmatch(message, -1)
-	if len(all) == 0 {
-		return ""
+	if m := missingModuleRe.FindStringSubmatch(exceptionLine(message)); m != nil {
+		return m[1]
 	}
-	return all[len(all)-1][1]
+	return ""
 }
 
 // withRuntimeHints sets Hint on each import error for a module the project's
@@ -156,7 +156,7 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 	// in beside that. A module one of these provides is missing from an
 	// environment that is out of date, which adding a dependency does not fix.
 	known := lockedDists(project)
-	for _, dep := range m.Project.Dependencies {
+	for _, dep := range listedDeps(project, m) {
 		known[manifest.DistName(dep)] = true
 	}
 	findings := slices.Clone(res.Findings)
@@ -176,6 +176,40 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 	}
 	res.Findings = findings
 	return res
+}
+
+// listedDeps are every requirement the project lists: [project] dependencies,
+// and [project.optional-dependencies] and [dependency-groups], which the
+// manifest does not carry and are read from pyproject.toml here, by the rule
+// the runtime pins use for the packages a project chooses. A dependency group
+// entry that includes another group is a table, read where that group is
+// defined.
+func listedDeps(project string, m *manifest.Manifest) []string {
+	deps := slices.Clone(m.Project.Dependencies)
+	data, err := os.ReadFile(filepath.Join(project, manifest.Marker))
+	if err != nil {
+		return deps
+	}
+	var doc struct {
+		Project struct {
+			OptionalDependencies map[string][]string `toml:"optional-dependencies"`
+		} `toml:"project"`
+		DependencyGroups map[string][]any `toml:"dependency-groups"`
+	}
+	if toml.Unmarshal(data, &doc) != nil {
+		return deps
+	}
+	for _, extra := range doc.Project.OptionalDependencies {
+		deps = append(deps, extra...)
+	}
+	for _, group := range doc.DependencyGroups {
+		for _, v := range group {
+			if s, ok := v.(string); ok {
+				deps = append(deps, s)
+			}
+		}
+	}
+	return deps
 }
 
 // lockedDists are the package names in the project's uv.lock, normalized; an
