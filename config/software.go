@@ -55,21 +55,21 @@ func PrintCurrentSoftwareContext(out io.Writer) error {
 // GetSoftwareAPIURL returns full Software API Url for the provided Context
 func (c *Context) GetSoftwareAPIURL() string {
 	if c.Domain == localhostDomain || c.Domain == houstonDomain {
-		return CFG.LocalHouston.GetString()
+		return CFG.APCHoustonURL.GetString()
 	}
 
 	return fmt.Sprintf(
 		"%s://houston.%s:%s/v1",
 		CFG.CloudAPIProtocol.GetString(),
 		c.Domain,
-		CFG.CloudAPIPort.GetString(),
+		CFG.APCAPIPort.GetString(),
 	)
 }
 
 // GetSoftwareAppURL returns full Houston API Url for the provided Context
 func (c *Context) GetSoftwareAppURL() string {
 	if c.Domain == localhostDomain || c.Domain == houstonDomain {
-		return CFG.LocalHouston.GetString()
+		return CFG.APCHoustonURL.GetString()
 	}
 
 	return fmt.Sprintf(
@@ -82,13 +82,13 @@ func (c *Context) GetSoftwareAppURL() string {
 // GetSoftwareWebsocketURL returns full Houston websocket Url for the provided Context
 func (c *Context) GetSoftwareWebsocketURL() string {
 	if c.Domain == localhostDomain || c.Domain == houstonDomain {
-		return CFG.LocalHouston.GetString()
+		return CFG.APCHoustonURL.GetString()
 	}
 
 	return fmt.Sprintf(
 		"%s://houston.%s:%s/ws",
-		CFG.CloudWSProtocol.GetString(),
+		CFG.APCWSProtocol.GetString(),
 		c.Domain,
-		CFG.CloudAPIPort.GetString(),
+		CFG.APCAPIPort.GetString(),
 	)
 }

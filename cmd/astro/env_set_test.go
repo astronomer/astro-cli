@@ -1025,7 +1025,7 @@ func TestEnvListAsksForEveryKindExplicitly(t *testing.T) {
 	expectListOfType(mc, astrov1.METRICSEXPORT, obj("prom_main", astrov1.EnvironmentObjectObjectTypeMETRICSEXPORT))
 	astroV1Client = mc
 
-	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	out, err := execEnvCmd("list", "--workspace", "ws-test")
 	assert.NoError(t, err)
 	for _, want := range []string{"KIND", "API_TOKEN", "db_main", "region", "prom_main"} {
 		assert.Contains(t, out, want)
@@ -1049,7 +1049,7 @@ func TestEnvListGroupsByKindThenKey(t *testing.T) {
 	expectListOfType(mc, astrov1.METRICSEXPORT)
 	astroV1Client = mc
 
-	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	out, err := execEnvCmd("list", "--workspace", "ws-test")
 	assert.NoError(t, err)
 	alpha, zulu, conn := strings.Index(out, "ALPHA"), strings.Index(out, "ZULU"), strings.Index(out, "db_main")
 	assert.Less(t, alpha, zulu, "keys sort within a kind")
@@ -1075,7 +1075,7 @@ func TestEnvListShowsIDsWhenNotResolvingLinks(t *testing.T) {
 	expectListOfType(mc, astrov1.METRICSEXPORT)
 	astroV1Client = mc
 
-	out, err := execEnvCmd("list", "--workspace-id", "ws-test", "--resolve-linked=false")
+	out, err := execEnvCmd("list", "--workspace", "ws-test", "--resolve-linked=false")
 	assert.NoError(t, err)
 	assert.Contains(t, out, "ID")
 	assert.Contains(t, out, id)
@@ -1097,7 +1097,7 @@ func TestEnvListNamesTheNounNotTheWireType(t *testing.T) {
 	expectListOfType(mc, astrov1.METRICSEXPORT)
 	astroV1Client = mc
 
-	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	out, err := execEnvCmd("list", "--workspace", "ws-test")
 	assert.NoError(t, err)
 	assert.Contains(t, out, "variable")
 	assert.Contains(t, out, "airflow-variable")
@@ -1134,7 +1134,7 @@ func TestEnvListPrintsNoValues(t *testing.T) {
 	}, nil).Times(4)
 	astroV1Client = mc
 
-	out, err := execEnvCmd("list", "--workspace-id", "ws-test")
+	out, err := execEnvCmd("list", "--workspace", "ws-test")
 	assert.NoError(t, err)
 	assert.Contains(t, out, "API_TOKEN")
 	assert.NotContains(t, out, "s3cr3t")
@@ -1152,7 +1152,7 @@ func TestEnvListRefusesDotenv(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	astroV1Client = mc
 
-	_, err := execEnvCmd("list", "--workspace-id", "ws-test", "-o", "dotenv")
+	_, err := execEnvCmd("list", "--workspace", "ws-test", "-o", "dotenv")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "has none of")
 }

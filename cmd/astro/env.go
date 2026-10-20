@@ -157,10 +157,11 @@ func newEnvListCmd(out io.Writer) *cobra.Command {
 	//
 	// --include-secrets is deliberately absent: it asks the platform to unmask
 	// values, and this listing has no column to put one in.
-	cmd.Flags().StringVar(&envWorkspaceID, "workspace-id", "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
-	cmd.Flags().StringVar(&envDeploymentID, "deployment-id", "", "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
-	addWorkspaceFlag(cmd.Flags(), "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
-	addDeploymentFlag(cmd.Flags(), "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
+	//
+	// 1.x had no env list, so it takes only the v2 spellings: no hidden
+	// --workspace-id or --deployment-id for a 1.x script to have used.
+	cmd.Flags().StringVar(&envWorkspaceID, "workspace", "", "Workspace to use (default: the project's workspace inside a project with a pyproject.toml, else the current one)")
+	cmd.Flags().StringVar(&envDeploymentID, "deployment", "", "Deployment to use instead of a workspace: an id, or a link name inside a project with a pyproject.toml")
 	cmd.Flags().BoolVar(&envResolveLinked, "resolve-linked", true, "Include objects linked from another scope; set to false to see IDs")
 	return cmd
 }
