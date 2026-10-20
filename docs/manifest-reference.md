@@ -612,12 +612,21 @@ Any other key in those two sections, or a section named for no target, is a warn
 
 uv's own table, and yours. uv applies it to the project's environment: `astro local start` builds that environment with `uv sync`, and `uv run`, `uv add` and `uv lock` read the same table, so they all agree.
 
-`astro init` writes a few settings into it that hold the project to the Airflow a deployment runs. A deployment runs Astronomer's build of Airflow, such as `3.3.2+astro.1`, which differs from PyPI's `3.3.2`. For the pin `apache-airflow==3.3.*` it writes:
+`astro init` writes settings into it that hold the project to what a deployment runs: Astronomer's build of Airflow, such as `3.3.2+astro.2`, which differs from PyPI's `3.3.2`, and the versions of everything else the runtime image ships. For the pin `apache-airflow==3.3.*` it writes:
 
 ```toml
 [tool.uv]
 environments = ["sys_platform == 'linux'", "sys_platform == 'darwin' and platform_machine == 'arm64'"]
-constraint-dependencies = ['apache-airflow==3.3.2+astro.1', 'apache-airflow-task-sdk==1.3.2+astro.1']
+constraint-dependencies = [
+    'apache-airflow==3.3.2+astro.2',
+    'apache-airflow-task-sdk==1.3.2+astro.1',
+    # Astro Runtime 3.3-9 (Python 3.14) ships these versions, so the lockfile resolves to what the image runs.
+    # astro writes them. To choose a version yourself, list the package in [project] dependencies.
+    'a2wsgi==1.10.10',
+    'aiofiles==24.1.0',
+    # … about 180 more, one per package the image ships
+    'zipp==4.1.0',
+]
 
 [tool.uv.sources]
 apache-airflow = {index = 'astronomer'}
@@ -635,14 +644,17 @@ apache-airflow-core = false
 apache-airflow-task-sdk = false
 ```
 
-- **The pins** are the ones the runtime image pins. The release is the one the runtime catalog says a deployment runs: the one the [`runtime`](#runtime) build carries when it is set, and otherwise the one the newest runtime of the requirement's series carries. The catalog does not name the build, so the newest `+astro` build of that release on the index is taken. The image also pins SQLAlchemy, but nothing published says to which release without pulling the image, so that line is not written.
+- **The pins** are the ones the runtime image pins. The release is the one the runtime catalog says a deployment runs: the one the [`runtime`](#runtime) build carries when it is set, and otherwise the one the newest runtime of the requirement's series carries. The `+astro` build is the one the image's package list names, or, without that list, the newest of the release on the index.
+- **The runtime pins**, below the comment, are the version of every other package the runtime image ships, from the package list Astronomer publishes for each build and Python (`https://cdn.astronomer.io/runtime-freeze/runtime-<build>-python-<python>.txt`). A constraint adds no package, so only the ones your project pulls in are held, and they lock to what the image runs: without them uv takes the newest of each, such as SQLAlchemy 2.1 beside an image that holds it to 2.0. The build is named in one place: a declared [`dockerfile`](#dockerfile)'s `FROM` (the newest build a floating tag such as `runtime:3.3` serves), else [`runtime`](#runtime), else the newest build of the requirement. The Python is the one that image runs. A package you list in `dependencies`, or constrain yourself in this array above the comment, gets no runtime pin: its version is yours to choose. Airflow 2 builds before runtime 11.0.0 publish no list and get none. The CLI reads the comment to tell these lines from yours, so leave it in place.
 - **The index is explicit**, so uv takes only the three packages the sources name from it. Every other package still comes from PyPI, or from the indexes you add.
 - **`environments`** limits the lockfile to the platforms Airflow runs on locally. Without it, uv also locks for Intel macOS, where one package's marker (shap's `numba<0.63`) pulls numba and llvmlite back to releases that do not build. A project that names its own `environments` keeps them. On an Intel Mac, `astro local start` stops before uv and says so: run Docker mode with `--docker`, or add `"sys_platform == 'darwin' and platform_machine == 'x86_64'"` to the list. Windows is left out too: standalone does not run there, so a Docker-mode project on Windows that runs `uv sync`, `uv run` or `uv add` on the host needs `"sys_platform == 'win32'"` added.
 - **`exclude-newer-package`** turns any `exclude-newer` cutoff off for the three packages, `false` for each. Astronomer's index shows upload times only in the text of its pages, which uv does not read, so under a cutoff, the project's own or a `UV_EXCLUDE_NEWER`, uv would treat every build as too new. This is why the CLI needs uv 0.9.25 or later.
 
 A standalone `astro local start` keeps these settings current. When the pin or `runtime` moves, or Astronomer ships a newer build of the release, it rewrites them and says so. It leaves your other keys and your comments alone, and it never takes over an index named `astronomer` at another address, or a source you wrote for one of the three packages: it warns and writes nothing instead. When Astronomer's index has no build the requirement covers, it takes out the pins, the sources, the index and the `environments` it wrote, and Airflow comes from PyPI; the bare `apache-airflow-core` and `apache-airflow-task-sdk` stay, except on Airflow 2, which has neither. When the index cannot be read, it leaves the settings as they are, unless the pin has moved off the build's release, in which case it takes out everything it wrote, as for an index with no build.
 
-To add a dependency, run `uv add <package>`. It keeps the pins, and a running standalone Airflow picks the package up.
+A standalone `astro local start` and `astro init` keep the runtime pins current as well: when the build or its Python changes, they write the new build's list, and a package you have since listed in `dependencies` loses its pin. When the list cannot be read (no network, and no copy of it cached), the pins stay as they are, with a warning. When the runtime has no list, they come out. Under a `UV_EXCLUDE_NEWER` date nothing is read, since the list is of the present.
+
+To add a dependency, run `uv add <package>`. It keeps the pins, and a running standalone Airflow picks the package up. A package the image ships locks at the image's version. To take a different one, say `pandas>=3` where the image ships pandas 2, `uv add` refuses, because the runtime pin holds pandas: run `uv add --frozen 'pandas>=3'`, which writes the requirement without locking, and then `astro local start`, which takes out the pin and syncs. The image then installs your version over its own.
 
 ### Private packages without a Dockerfile
 
@@ -664,14 +676,14 @@ private-lib = { git = "https://github.com/acme/private-lib.git", rev = "4bfeaf8"
 
 Set `NETRC_CONTENT` to a netrc entry, such as `machine github.com login x-access-token password <token>`. List `git` in [`packages`](#packages) if the runtime image does not have it. Runtime images older than the `netrc` mount install without the secret; when such a build fails, the error names the runtime image and says so.
 
-`astro local check` builds its check environments outside the project, where uv cannot see the table, so it passes `constraint-dependencies` and the source index pages to them itself, and a check resolves the way the project does. A check against MWAA or Composer leaves out the `+astro` pins: those platforms run Apache's own Airflow.
+`astro local check` builds its check environments outside the project, where uv cannot see the table, so it passes `constraint-dependencies` and the source index pages to them itself, and a check resolves the way the project does. A check against MWAA or Composer leaves out the `+astro` pins and the runtime pins: those platforms run Apache's own Airflow beside their own packages.
 
 ```toml
 [tool.uv]
 constraint-dependencies = ['pandas<3']
 ```
 
-A project on Airflow 3.1 that fails to import with an error naming `ScalarAttributeImpl` has resolved SQLAlchemy 2.1, which the SQLAlchemy-Utils that Airflow 3.1 depends on does not support yet ([sqlalchemy-utils#800](https://github.com/kvesteri/sqlalchemy-utils/issues/800)): add `constraint-dependencies = ['sqlalchemy<2.1']` here, or move the project to Airflow 3.2 or later.
+A project on Airflow 3.1 with no runtime pins (written before them, or locked under a `UV_EXCLUDE_NEWER` date) that fails to import with an error naming `ScalarAttributeImpl` has resolved SQLAlchemy 2.1, which the SQLAlchemy-Utils that Airflow 3.1 depends on does not support yet ([sqlalchemy-utils#800](https://github.com/kvesteri/sqlalchemy-utils/issues/800)): add `constraint-dependencies = ['sqlalchemy<2.1']` here, or move the project to Airflow 3.2 or later.
 
 ## A complete example
 

@@ -97,6 +97,12 @@ type UV struct {
 	// DirectURLs maps a package to the PEP 508 URL its [tool.uv.sources]
 	// entry stands for, for the entries that name a git repository or a URL.
 	DirectURLs map[string]string
+	// RuntimePins are the entries of ConstraintDependencies astro wrote from
+	// an Astro Runtime image's package list (RuntimePinsComments), in order.
+	RuntimePins []string
+	// RuntimeBuild and RuntimePython name the build and the Python the
+	// runtime pins are of: "3.3-9" and "3.12". Empty when there are none.
+	RuntimeBuild, RuntimePython string
 }
 
 // IndexPages are the per-package pages of the indexes Sources names, the
@@ -104,7 +110,7 @@ type UV struct {
 // project, where uv cannot read [tool.uv.sources]: a page lists one package's
 // files, so passing it as find-links scopes the index to that package the way
 // the source does.
-func (u UV) IndexPages() []string {
+func (u *UV) IndexPages() []string {
 	pkgs := make([]string, 0, len(u.Sources))
 	for pkg := range u.Sources {
 		pkgs = append(pkgs, pkg)
@@ -661,6 +667,7 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 
 	p := &parser{}
 	m := &Manifest{Astro: p.astro(*f.Tool.Astro), UV: uvTable(f.Tool.UV)}
+	m.UV.RuntimeBuild, m.UV.RuntimePython, m.UV.RuntimePins = runtimePinsOf(data)
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,

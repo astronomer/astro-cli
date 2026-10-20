@@ -24,6 +24,11 @@ type Editor interface {
 	// TOML decoding. It is the read half of read-modify-write: check
 	// existence before Set, or an array's length before appending.
 	Get(key []string) (any, bool)
+	// GetLines is Get for the array at key, with the comments between its
+	// elements in place as Comment values, so a Set of what it returns keeps
+	// them. It reports false when the value at key is not an array. An
+	// editor that keeps no comments returns the elements alone.
+	GetLines(key []string) ([]any, bool)
 	// Set writes value at key, one path element per key part, creating
 	// missing intermediate tables. A path element stepping into an array is
 	// a 0-based decimal index; an index equal to the array's length appends.
@@ -48,6 +53,36 @@ type Editor interface {
 	Delete(key []string) bool
 	// Bytes returns the edited document.
 	Bytes() ([]byte, error)
+}
+
+// Comment is a comment line inside an array, as GetLines reads it and Set
+// writes it: the text after the '#' and the one space that follows it. It
+// is never a value, and Get leaves it out.
+type Comment string
+
+// valuesOf is list without its comments.
+func valuesOf(list []any) []any {
+	out := make([]any, 0, len(list))
+	for _, v := range list {
+		if _, isComment := v.(Comment); !isComment {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// hasComment reports whether value is an array holding a Comment.
+func hasComment(value any) bool {
+	list, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	for _, v := range list {
+		if _, isComment := v.(Comment); isComment {
+			return true
+		}
+	}
+	return false
 }
 
 // ParseError reports input that does not decode as TOML.

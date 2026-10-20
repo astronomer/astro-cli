@@ -39,9 +39,12 @@ import (
 // numba<0.63) drag a shared dependency back to a release whose sdist does not
 // build.
 //
-// The runtime image's constraints also pin SQLAlchemy, but nothing published
-// says to which release short of pulling the image, so that line is left out
-// rather than guessed.
+// The rest of constraint-dependencies holds the runtime pins (RuntimePins):
+// every other distribution the image ships, at its version, from the package
+// list Astronomer publishes for each build and Python
+// (runtimeversions.LookupFreeze). Without them a lockfile takes the newest of
+// each, so standalone ran SQLAlchemy 2.1 beside an Airflow whose image holds
+// it to 2.0, and newer releases of most of what Airflow imports.
 
 // astroIndexName names the [[tool.uv.index]] entry this file writes.
 const astroIndexName = "astronomer"
@@ -69,13 +72,17 @@ var (
 // zero b takes out what an earlier one wrote, for an Airflow Astronomer has no
 // build of, which then comes from PyPI. It leaves every other [tool.uv] key,
 // and every comment, as it was.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild) error {
+//
+// pins are the runtime pins to write in place of the ones there. nil means
+// they are not known (no network, say): the ones there stay, less any package
+// the project now lists or constrains itself.
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins) error {
 	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b)
+		return setAstroBuild(before, ed, b, pins)
 	})
 }
 
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild) error {
+func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, pins *RuntimePins) error {
 	dists := b.Dists()
 	if b.Airflow == "" {
 		dists = nil
@@ -83,7 +90,7 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := checkNotTheUsers(ed, dists); err != nil {
 		return err
 	}
-	if err := setAstroPins(ed, b, dists); err != nil {
+	if err := setAstroPins(before, ed, b, dists, pins); err != nil {
 		return err
 	}
 	if err := setAstroSources(ed, dists); err != nil {
@@ -163,14 +170,16 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 	return nil
 }
 
-// setAstroPins replaces the constraints an earlier build wrote with b's,
-// keeping the project's own. A constraint is the build's when it names one of
-// the rebuilt distributions at an +astro version.
-func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string) error {
-	current, _ := ed.Get(constraintsKey)
-	list, _ := current.([]any)
+// setAstroPins replaces the constraints an earlier build wrote with b's, and
+// the runtime pins with pins, keeping the project's own and their comments. A
+// constraint is the build's when it names one of the rebuilt distributions at
+// an +astro version, and a runtime pin when it follows the comment that heads
+// them (manifest.RuntimePinsIn).
+func setAstroPins(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) error {
+	lines, _ := ed.GetLines(constraintsKey)
+	head, current, _, _ := manifest.RuntimePinsIn(lines)
 	var kept []any
-	for _, v := range list {
+	for _, v := range head {
 		if s, _ := v.(string); manifest.AstroPin(s) {
 			continue
 		}
@@ -179,10 +188,16 @@ func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []stri
 	if len(dists) > 0 {
 		kept = append(kept, asAny(b.Pins())...)
 	}
-	if reflect.DeepEqual(kept, list) {
+	own := ownPackages(before, kept)
+	if pins == nil {
+		kept = append(kept, keptRuntimePins(current, own)...)
+	} else {
+		kept = append(kept, pins.lines(own)...)
+	}
+	if reflect.DeepEqual(kept, lines) {
 		return nil
 	}
-	if len(kept) == 0 {
+	if !slices.ContainsFunc(kept, func(v any) bool { _, isComment := v.(tomledit.Comment); return !isComment }) {
 		ed.Delete(constraintsKey)
 		return nil
 	}

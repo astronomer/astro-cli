@@ -10,10 +10,10 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/checks"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // A DAG that imports a package the Astro Runtime image happens to ship works in
@@ -240,53 +240,22 @@ func lockedDists(project string) map[string]bool {
 var fallbackPythons = []string{"3.12", "3.11"}
 
 // runtimeImageOf is the runtime build the project's image is built from and the
-// Pythons to try for it, best first: the declared Dockerfile's FROM when it
-// names an exact build, else [tool.astro] runtime, else the newest published
-// build of the Airflow pin. build is "" when none of those gives one.
-//
-// A Dockerfile FROM a series tag (runtime:3.3) names no build and is read as
-// the pin is: the newest build of it.
+// Pythons to try for it, best first: scaffold.RuntimeBuildFor's build and
+// Python, the one answer the runtime pins use too, then fallbackPythons for a
+// build whose Python that cannot tell. build is "" when there is none to name.
 func (c *cli) runtimeImageOf(ctx context.Context, project string, m *manifest.Manifest) (build string, pythons []string) {
-	pin := m.Airflow().Pin
-	if pin == "" {
-		return "", nil
-	}
 	var catalog *runtimeversions.Catalog
 	if c.d.RuntimeCatalog != nil {
 		catalog = c.d.RuntimeCatalog(ctx)
 	}
-	build = m.Astro.Runtime
-	var tagPython string
-	if m.Astro.Dockerfile != "" {
-		base := airflowrt.ReadDeclaredBase(filepath.Join(project, filepath.FromSlash(m.Astro.Dockerfile)))
-		if v := base.RuntimeVersion(); v != "" {
-			build = v
-			_, tagPython = airflowrt.ParseRuntimeTagPython(base.Tag)
-		}
-	}
-	if catalog != nil {
-		if _, ok := catalog.Runtime(build); !ok {
-			build, _ = catalog.NewestPublishedRuntimeFor(pin)
-		}
-	}
-	if build == "" {
+	build, python, err := scaffold.RuntimeBuildFor(project, m, catalog)
+	if err != nil {
 		return "", nil
 	}
-	add := func(py string) {
-		if py = strings.TrimSpace(py); py != "" && !slices.Contains(pythons, py) {
+	for _, py := range append([]string{python}, fallbackPythons...) {
+		if py != "" && !slices.Contains(pythons, py) {
 			pythons = append(pythons, py)
 		}
-	}
-	add(tagPython)
-	if catalog != nil {
-		py, _, _ := runtimeversions.ProjectPython(pin, build, m.Project.RequiresPython, func() *runtimeversions.Catalog { return catalog }) //nolint:errcheck // no Python is an answer here: the fallbacks follow
-		add(py)
-		if r, ok := catalog.Runtime(build); ok {
-			add(r.DefaultPythonVersion)
-		}
-	}
-	for _, py := range fallbackPythons {
-		add(py)
 	}
 	return build, pythons
 }

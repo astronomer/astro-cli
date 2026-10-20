@@ -123,6 +123,38 @@ func TestRuntimeFreezeRefusesAPageWithNoPackages(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(root, "astro", freezeCacheDir, "runtime-3.3-9-python-3.12.txt"))
 }
 
+// RuntimePins reads the same file, keeping the versions, and says why it has
+// none: the runtime pins come out for a build with no file, and stay when the
+// file cannot be read.
+func TestRuntimePinsKeepsTheVersions(t *testing.T) {
+	t.Setenv("UV_EXCLUDE_NEWER", "")
+	srv, _ := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
+	got, err := RuntimePins(context.Background(), "3.3-9", "3.12")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"apache-airflow==3.3.2+astro.2", "PyYAML==6.0.3", "psycopg2_binary==2.9.11"}, got,
+		"a direct reference names no version to hold a package to")
+
+	_, err = RuntimePins(context.Background(), "10.5.0", "3.11")
+	assert.ErrorIs(t, err, ErrFreezeNotPublished)
+
+	srv.Close()
+	_, err = RuntimePins(context.Background(), "3.3-10", "3.12")
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ErrFreezeNotPublished, "not reaching the CDN says nothing about whether the build has a file")
+	got, err = RuntimePins(context.Background(), "3.3-9", "3.12")
+	require.NoError(t, err, "the copy the cache kept serves offline")
+	assert.Len(t, got, 3)
+}
+
+// A freeze is of the present, so under a UV_EXCLUDE_NEWER date none is read.
+func TestRuntimePinsUnderAPinnedResolution(t *testing.T) {
+	_, hits := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
+	t.Setenv("UV_EXCLUDE_NEWER", "2026-09-01")
+	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
+	assert.ErrorIs(t, err, ErrPinnedResolution)
+	assert.Equal(t, int32(0), hits.Load())
+}
+
 // A build or Python becomes part of a URL and a file name, so one that could
 // leave either is refused before a request.
 func TestRuntimeFreezeRefusesANameThatIsNotAVersion(t *testing.T) {
