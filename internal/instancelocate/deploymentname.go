@@ -17,9 +17,8 @@ import (
 // reads on the astro deployment commands: a Deployment id (util.IsCUID) is
 // that Deployment, and anything else is the name of a Deployment in a
 // workspace. NamedDeployment and DeploymentNameError are the half of that
-// meant to be shared by every reader of such a -d: astro af reads through them
-// today (DeploymentFinder), and astro api airflow is meant to, each listing
-// the workspace through its own login.
+// every reader of such a -d shares: astro af (through DeploymentFinder) and
+// astro api airflow, each listing the workspace through its own login.
 
 // DeploymentNameError is a -d value that is no Deployment id and named no
 // Deployment where it was looked for, or several, or had no workspace to be
@@ -36,7 +35,7 @@ type DeploymentNameError struct {
 func (e *DeploymentNameError) Error() string {
 	switch {
 	case e.Workspace == "":
-		return fmt.Sprintf("%q is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass --workspace, or run 'astro workspace switch'", e.Name)
+		return fmt.Sprintf("%q is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass -d with the Deployment id, or run 'astro workspace switch'", e.Name)
 	case len(e.IDs) == 0:
 		return fmt.Sprintf("no Deployment named %q in workspace %s", e.Name, e.Workspace)
 	}
@@ -78,9 +77,8 @@ func NamedDeployment(deployments []astrov1.Deployment, name, workspace string) (
 type DeploymentFinder interface {
 	// DeploymentID is ref when it is a Deployment id, with no call made: the
 	// lookup that reads its address is the one that checks it. Anything else
-	// is a Deployment name, looked up in workspace, else projectWorkspace,
-	// else the login's.
-	DeploymentID(ctx context.Context, ref, workspace, projectWorkspace string) (string, error)
+	// is a Deployment name, looked up in projectWorkspace, else the login's.
+	DeploymentID(ctx context.Context, ref, projectWorkspace string) (string, error)
 }
 
 // The production locator finds names: cmd/local asks for the interface, and a
@@ -88,14 +86,11 @@ type DeploymentFinder interface {
 var _ DeploymentFinder = (*locator)(nil)
 
 // DeploymentID is the DeploymentFinder seam.
-func (l *locator) DeploymentID(ctx context.Context, ref, workspace, projectWorkspace string) (string, error) {
+func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace string) (string, error) {
 	if util.IsCUID(ref) {
 		return ref, nil
 	}
-	ws := workspace
-	if ws == "" {
-		ws = projectWorkspace
-	}
+	ws := projectWorkspace
 	if ws == "" && l.workspace != nil {
 		ws = l.workspace()
 	}

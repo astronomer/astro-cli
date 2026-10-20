@@ -50,12 +50,6 @@ func (l *locator) astroDeployment(ctx context.Context, i instances.Instance) (*a
 	if resp.JSON200 == nil {
 		return nil, deploymentOutage(l.domain, i, deploymentID, resp)
 	}
-	// A Deployment id given with --workspace carries that workspace (see
-	// cmd/local), and has to be in it: the flag is not dropped. The check
-	// reads the answer this call already had, so it costs nothing.
-	if ws := i.Link.Workspace; i.Source == instances.SourceDeploymentID && ws != "" && resp.JSON200.WorkspaceId != ws {
-		return nil, fmt.Errorf("deployment %s is in workspace %s, not --workspace %s", deploymentID, resp.JSON200.WorkspaceId, ws)
-	}
 	return resp.JSON200, nil
 }
 

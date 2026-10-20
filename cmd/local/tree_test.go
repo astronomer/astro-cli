@@ -193,7 +193,7 @@ func TestBothRegistrationsAreTheSameCommands(t *testing.T) {
 	root := newRootCmd(d)
 	top, machine := afGroup(t, root), afGroup(t, root, "local")
 	// The flags the top-level registration adds and the machine's does not.
-	selectors := map[string]bool{"deployment": true, "url": true, "workspace": true}
+	selectors := map[string]bool{"deployment": true, "url": true}
 
 	for family := range querySurface {
 		topFamily, _, err := top.Find([]string{family})

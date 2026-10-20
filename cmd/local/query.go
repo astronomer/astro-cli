@@ -96,10 +96,6 @@ func (t *deploymentTarget) suggest(command string) string {
 	switch {
 	case t.f.url != "":
 		return "astro " + afName + " " + command + " --url " + t.f.url
-	case t.f.deployment != "" && t.f.workspace != "":
-		// A Deployment name means the Deployment of that name in this
-		// workspace, so the fix has to look in the same one.
-		return "astro " + afName + " " + command + " -d " + t.f.deployment + " --workspace " + t.f.workspace
 	case t.f.deployment != "":
 		return "astro " + afName + " " + command + " -d " + t.f.deployment
 	default:

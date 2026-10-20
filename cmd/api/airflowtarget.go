@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // This file is `astro api airflow`'s targeting: which Airflow one run talks to.
@@ -124,9 +125,9 @@ func (o *AirflowOptions) hasTarget() bool {
 // errNoTarget names the ways to pick an Airflow, with the links this project
 // declares when there is a project to read them from.
 func errNoTarget(endpoint string) error {
-	deployments := "a deployment this project links, or an Astro Deployment id"
+	deployments := "a deployment this project links, or an Astro Deployment id or name"
 	if links := projectLinkNames(); len(links) > 0 {
-		deployments = fmt.Sprintf("a deployment this project links (%s), or an Astro Deployment id", strings.Join(links, ", "))
+		deployments = fmt.Sprintf("a deployment this project links (%s), or an Astro Deployment id or name", strings.Join(links, ", "))
 	}
 	if !strings.HasPrefix(endpoint, "/") {
 		endpoint = "<endpoint>"
@@ -169,8 +170,9 @@ func firstNonEmpty(vals ...string) string {
 }
 
 // deploymentTarget resolves -d. The name is a deployment link the manifest
-// declares; a name no link declares is an Astro Deployment id, which is what
-// CI already passes.
+// declares; a name no link declares is an Astro Deployment, by id (what CI
+// already passes) or by name, read the way astro af reads it (see
+// resolveDeploymentAirflowURL).
 //
 // Only a directory with no manifest, or a pyproject.toml that is not an Astro
 // project, has no links. A manifest that is there and does not load is an
@@ -178,6 +180,7 @@ func firstNonEmpty(vals ...string) string {
 // and fail as a missing Deployment, hiding the manifest's own error.
 func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*airflowTarget, error) {
 	var known []string
+	var project manifest.Astro
 	m, err := manifest.Load(filepath.Join(config.WorkingPath, manifest.Marker))
 	switch {
 	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
@@ -189,11 +192,18 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 			return linkTarget(ctx, opts, &instance, m.Astro.LoginDomain())
 		}
 		known = set.Names()
+		project = m.Astro
 	}
-	baseURL, token, err := resolveDeploymentAirflowURL(opts, name)
+	baseURL, token, err := resolveDeploymentAirflowURL(opts, name, &project)
 	if err != nil {
-		// A name that matched no link is far more often a typo than an id, so
-		// the names it could have been travel with the failure.
+		// A name that matched no link is far more often a typo than a
+		// Deployment, so the names it could have been travel with the failure
+		// — first, when no Deployment had the name either, since the likeliest
+		// fix is one of them.
+		var nameErr *instancelocate.DeploymentNameError
+		if len(known) > 0 && errors.As(err, &nameErr) && nameErr.NotFound() {
+			return nil, fmt.Errorf("no link or Deployment named %q. Deployments this project links: %s\n%w", name, strings.Join(known, ", "), err)
+		}
 		if len(known) > 0 {
 			return nil, fmt.Errorf("%w\nDeployments this project links: %s", err, strings.Join(known, ", "))
 		}
@@ -345,10 +355,14 @@ func (o *AirflowOptions) httpTarget(name, hostRoot, authorization string) (*airf
 }
 
 // resolveDeploymentAirflowURL fetches the Airflow API URL from an Astro
-// Deployment, for a -d value that names no link in the manifest.
-func resolveDeploymentAirflowURL(opts *AirflowOptions, deploymentID string) (baseURL, authToken string, err error) {
+// Deployment, for a -d value that names no link in the manifest. ref is read
+// the way astro af reads it: a Deployment id (util.IsCUID) is fetched across
+// the organization, -O's or the context's; anything else is a Deployment name,
+// looked up in project's [tool.astro] workspace (the zero Astro outside a
+// project), else the context's, through instancelocate.NamedDeployment.
+func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *manifest.Astro) (baseURL, authToken string, err error) {
 	if !astrocontext.IsCloudContext() {
-		return "", "", fmt.Errorf("no deployment link %q, and reaching a Deployment by id requires cloud context. Run 'astro login' to connect to Astro Cloud", deploymentID)
+		return "", "", fmt.Errorf("no deployment link %q, and reaching a Deployment by id or name requires cloud context. Run 'astro login' to connect to Astro Cloud", ref)
 	}
 
 	ctx, err := astrocontext.GetCurrentContext()
@@ -367,12 +381,12 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, deploymentID string) (bas
 		return "", "", errors.New("organization ID not set. Use --organization-id or run 'astro organization switch'")
 	}
 
-	dep, err := deployment.GetDeploymentByID(orgID, deploymentID, astrov1.NewV1Client(httputil.NewHTTPClient()))
+	dep, err := lookupDeployment(opts.OrganizationID, orgID, ref, project, &ctx, astrov1.NewV1Client(httputil.NewHTTPClient()))
 	if err != nil {
-		return "", "", fmt.Errorf("fetching deployment: %w", err)
+		return "", "", err
 	}
 	if dep.WebServerAirflowApiUrl == "" {
-		return "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", deploymentID)
+		return "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", ref)
 	}
 
 	airflowURL := dep.WebServerAirflowApiUrl
@@ -380,4 +394,38 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, deploymentID string) (bas
 		airflowURL = "https://" + airflowURL
 	}
 	return airflowURL, ctx.Token, nil
+}
+
+// lookupDeployment finds the Astro Deployment ref names. An id is fetched in
+// orgID, -O's (override) or else the context's, with no other call. A name is
+// looked up in the project's workspace, else the context's, and in that
+// workspace's organization: the project's [tool.astro] organization when the
+// workspace is the project's and it names one, else the context's.
+//
+// -O for another organization than that one is refused for a name rather
+// than obeyed or dropped: the workspace is not one of that organization's,
+// so listing it there would answer from nowhere the caller meant.
+func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx *config.Context, client astrov1.APIClient) (astrov1.Deployment, error) {
+	if util.IsCUID(ref) {
+		dep, err := deployment.GetDeploymentByID(orgID, ref, client)
+		if err != nil {
+			return astrov1.Deployment{}, fmt.Errorf("fetching deployment: %w", err)
+		}
+		return dep, nil
+	}
+	ws, wsOrg := ctx.Workspace, ctx.Organization
+	if project.Workspace != "" {
+		ws, wsOrg = project.Workspace, project.WorkspaceOrganization(ctx.Organization)
+	}
+	if ws == "" {
+		return astrov1.Deployment{}, &instancelocate.DeploymentNameError{Name: ref}
+	}
+	if override != "" && override != wsOrg {
+		return astrov1.Deployment{}, fmt.Errorf("%q is not a Deployment id, and its name is looked up in workspace %s, which is not in --organization-id %s: pass -d with the Deployment id", ref, ws, override)
+	}
+	deps, err := deployment.ListDeployments(ws, wsOrg, client)
+	if err != nil {
+		return astrov1.Deployment{}, fmt.Errorf("listing the Deployments in workspace %s: %w", ws, err)
+	}
+	return instancelocate.NamedDeployment(deps, ref, ws)
 }

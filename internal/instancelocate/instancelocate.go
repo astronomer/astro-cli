@@ -72,8 +72,7 @@ type locator struct {
 	// under it, so a session without one cannot look anything up.
 	organization func() (string, error)
 	// workspace is the login's current workspace, where a Deployment name is
-	// looked up when neither --workspace nor the project names one. Empty
-	// when the login has none.
+	// looked up when the project names none. Empty when the login has none.
 	workspace func() string
 	// httpClient carries the Composer lookup. nil in production, where
 	// pkg/instancelocate supplies one with its own timeout; a test hands in
