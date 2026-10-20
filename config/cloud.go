@@ -52,7 +52,7 @@ func PrintCurrentCloudContext(out io.Writer) error {
 // GetPublicRESTAPIURL returns full core API Url for the provided Context
 func (c *Context) GetPublicRESTAPIURL(version string) string {
 	if c.Domain == localhostDomain {
-		return CFG.LocalCore.GetString() + "/" + version
+		return CFG.AstroLocalCoreURL.GetString() + "/" + version
 	}
 
 	return domainutil.GetURLToEndpoint(CFG.CloudAPIProtocol.GetString(), domainutil.FormatDomain(c.Domain), version)
