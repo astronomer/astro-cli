@@ -40,60 +40,6 @@ func TestSetup(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("dev cmd", func(t *testing.T) {
-		cmd := &cobra.Command{Use: "dev"}
-		cmd, err := cmd.ExecuteC()
-		assert.NoError(t, err)
-
-		rootCmd := &cobra.Command{Use: "astro"}
-		rootCmd.AddCommand(cmd)
-
-		err = Setup(cmd, nil)
-		assert.NoError(t, err)
-	})
-
-	t.Run("dev cmd with workspace flag set", func(t *testing.T) {
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("domain", "astronomer.io")
-		assert.NoError(t, err)
-		cmd := &cobra.Command{Use: "dev"}
-		cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "test-workspace-id", "")
-		cmd, err = cmd.ExecuteC()
-		assert.NoError(t, err)
-
-		rootCmd := &cobra.Command{Use: "astro"}
-		rootCmd.AddCommand(cmd)
-
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
-			return nil
-		}
-
-		err = Setup(cmd, nil)
-		assert.NoError(t, err)
-	})
-
-	t.Run("dev cmd with deployment flag set", func(t *testing.T) {
-		c, err := config.GetCurrentContext()
-		assert.NoError(t, err)
-		err = c.SetContextKey("domain", "astronomer.io")
-		assert.NoError(t, err)
-		cmd := &cobra.Command{Use: "dev"}
-		cmd.Flags().StringVarP(&workspaceID, "deployment-id", "w", "test-deployment-id", "")
-		cmd, err = cmd.ExecuteC()
-		assert.NoError(t, err)
-
-		rootCmd := &cobra.Command{Use: "astro"}
-		rootCmd.AddCommand(cmd)
-
-		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
-			return nil
-		}
-
-		err = Setup(cmd, nil)
-		assert.NoError(t, err)
-	})
-
 	t.Run("flow cmd", func(t *testing.T) {
 		cmd := &cobra.Command{Use: "flow"}
 		cmd, err := cmd.ExecuteC()
@@ -131,6 +77,11 @@ func TestSetup(t *testing.T) {
 	})
 
 	t.Run("context cmd", func(t *testing.T) {
+		// It reaches the login check with no login, as any command not
+		// exempt does; the check is stubbed rather than asking a server.
+		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink, signup, force bool) error {
+			return nil
+		}
 		cmd := &cobra.Command{Use: "list"}
 		cmd, err := cmd.ExecuteC()
 		assert.NoError(t, err)

@@ -9,88 +9,94 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
-// replacesAnnotation lists, on a preferred flag, the older spellings it
-// stands for.
-const replacesAnnotation = "astro.replaces"
+// aliasAnnotation names, on an alias flag, the flag it is another spelling of.
+const aliasAnnotation = "astro.alias-of"
 
-// AddPreferredFlag registers --name as the spelling help shows for olds,
-// flags already on fs that keep working exactly as before but are hidden.
-// ApplyPreferredFlags moves a value given as --name onto one of them, so the
-// command goes on reading the old flags and never needs to know which
-// spelling was typed.
-func AddPreferredFlag(fs *pflag.FlagSet, name, shorthand, usage string, olds ...string) {
-	fs.StringP(name, shorthand, "", usage)
-	MarkPreferredFlag(fs, name, olds...)
-}
+// nonEmptyAnnotation marks a flag ApplyAliases refuses to take as "".
+const nonEmptyAnnotation = "astro.non-empty"
 
-// MarkPreferredFlag makes --name, already on fs, the spelling help shows for
-// olds, as AddPreferredFlag does for a flag it registers itself.
-func MarkPreferredFlag(fs *pflag.FlagSet, name string, olds ...string) {
-	f := fs.Lookup(name)
+// RefuseEmpty marks f, a flag that names something (a Deployment, a
+// workspace), so that ApplyAliases refuses it given as "": an empty name is a
+// mistake, such as an unset variable in a script, and taking it as no name
+// would quietly fall back to a default the run did not ask for.
+func RefuseEmpty(f *pflag.Flag) {
 	if f.Annotations == nil {
 		f.Annotations = map[string][]string{}
 	}
-	f.Annotations[replacesAnnotation] = olds
-	for _, old := range olds {
-		_ = fs.MarkHidden(old) //nolint:errcheck // the caller registered old on fs; this only errors on an unknown flag name
-	}
+	f.Annotations[nonEmptyAnnotation] = nil
 }
 
-// Route names the older spelling a preferred flag's value goes to. ok false
-// leaves the choice to ApplyPreferredFlags, which picks the first of the old
-// spellings the command has; a target of "" with ok true sends it to none,
-// for a route that delivered the value itself.
-type Route func(fs *pflag.FlagSet, preferred, value string) (target string, ok bool)
+func refusesEmpty(f *pflag.Flag) bool {
+	_, ok := f.Annotations[nonEmptyAnnotation]
+	return ok
+}
 
-// ApplyPreferredFlags reconciles each preferred flag on fs with the older
-// spellings it stands for. Given both, they must agree, or it is a usage
-// error. Given the preferred one, its value is set on the old flag route
-// picks. Given only an old one, the preferred flag is set too, so a required
-// check on the preferred spelling is met by the old.
-func ApplyPreferredFlags(fs *pflag.FlagSet, route Route) error {
+// AddAlias registers --old (and the shorthand 1.x gave it) on fs, hidden, as
+// another spelling of --preferred, which the caller has already put on fs.
+// The alias holds nothing a command reads: ApplyAliases hands what it was
+// given to --preferred, and the command reads --preferred alone, whichever
+// spelling was typed. It returns the alias.
+func AddAlias(fs *pflag.FlagSet, old, shorthand, preferred string) *pflag.Flag {
+	fs.StringP(old, shorthand, "", "Another spelling of --"+preferred+", kept for scripts written for Astro CLI 1.x")
+	f := fs.Lookup(old)
+	f.Hidden = true
+	f.Annotations = map[string][]string{aliasAnnotation: {preferred}}
+	return f
+}
+
+// IsAlias reports whether f is a spelling AddAlias registered.
+func IsAlias(f *pflag.Flag) bool {
+	return aliasOf(f) != ""
+}
+
+func aliasOf(f *pflag.Flag) string {
+	if p := f.Annotations[aliasAnnotation]; len(p) == 1 {
+		return p[0]
+	}
+	return ""
+}
+
+// ApplyAliases hands each alias given on fs to the flag it stands for. Given
+// both spellings, they must agree, or it is a usage error. Given only the
+// alias, the preferred flag takes its value, so a required check on the
+// preferred spelling is met by the alias too. Of two aliases of one flag
+// given without it (1.x's --deployment-id and --deployment-name together),
+// the first by name is handed on and they need not agree, as 1.x read both.
+// A flag marked with RefuseEmpty given as "" is a usage error. An alias given
+// as "" is not: 1.x took an empty --workspace-id as no workspace, and scripts
+// pass one from a variable that may be unset, so it still means the default.
+func ApplyAliases(fs *pflag.FlagSet) error {
 	var err error
 	fs.VisitAll(func(f *pflag.Flag) {
-		olds, ok := f.Annotations[replacesAnnotation]
-		if ok && err == nil {
-			err = applyPreferredFlag(fs, f, olds, route)
+		if err == nil && f.Changed && f.Value.String() == "" && refusesEmpty(f) {
+			err = cliout.Usage(fmt.Errorf("--%s cannot be empty", f.Name))
+		}
+	})
+	if err != nil {
+		return err
+	}
+	typed := map[string]bool{}
+	fs.VisitAll(func(f *pflag.Flag) {
+		if p := aliasOf(f); p != "" && fs.Changed(p) {
+			typed[p] = true
+		}
+	})
+	fs.VisitAll(func(f *pflag.Flag) {
+		p := aliasOf(f)
+		if p == "" || !f.Changed || err != nil {
+			return
+		}
+		pf := fs.Lookup(p)
+		switch {
+		case typed[p]:
+			if v := pf.Value.String(); v != f.Value.String() {
+				err = cliout.Usage(fmt.Errorf("--%s %q and --%s %q disagree: pass only --%s", p, v, f.Name, f.Value.String(), p))
+			}
+		case !pf.Changed:
+			err = fs.Set(p, f.Value.String())
 		}
 	})
 	return err
-}
-
-func applyPreferredFlag(fs *pflag.FlagSet, f *pflag.Flag, olds []string, route Route) error {
-	var given, present []*pflag.Flag
-	for _, name := range olds {
-		if o := fs.Lookup(name); o != nil {
-			present = append(present, o)
-			if o.Changed {
-				given = append(given, o)
-			}
-		}
-	}
-	if !f.Changed {
-		if len(given) == 0 {
-			return nil
-		}
-		return fs.Set(f.Name, given[0].Value.String())
-	}
-	v := f.Value.String()
-	for _, o := range given {
-		if o.Value.String() != v {
-			return cliout.Usage(fmt.Errorf("--%s %q and --%s %q disagree: pass only --%s", f.Name, v, o.Name, o.Value.String(), f.Name))
-		}
-	}
-	target, ok := "", false
-	if route != nil {
-		target, ok = route(fs, f.Name, v)
-	}
-	if !ok && len(present) > 0 {
-		target = present[0].Name
-	}
-	if target == "" {
-		return nil
-	}
-	return fs.Set(target, v)
 }
 
 // BeforeArgs runs hook on every runnable command in tree once its flags are

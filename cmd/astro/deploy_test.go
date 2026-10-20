@@ -261,3 +261,14 @@ func testExecCmd(cmd *cobra.Command, args ...string) error {
 	_, err := cmd.ExecuteC()
 	return err
 }
+
+// An empty --deployment or --workspace, as an unset variable leaves it, is a
+// usage error before anything runs, rather than a deploy that picks one. The
+// 1.x --workspace-id given as "" is the default, as it was in 1.x.
+func TestDeployRefusesAnEmptyDeploymentOrWorkspace(t *testing.T) {
+	for _, name := range []string{"deployment", "workspace"} {
+		err := execDeployCmd("--"+name, "")
+		require.EqualError(t, err, "--"+name+" cannot be empty")
+		assert.True(t, cliout.IsUsage(err))
+	}
+}

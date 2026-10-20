@@ -132,10 +132,12 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 
 	// Airflow-specific flags (persistent so they're inherited by subcommands)
 	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id")
+	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("deployment"))
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
-	cmd.PersistentFlags().StringVar(&opts.WorkspaceID, "workspace-id", "", "Override workspace ID for deployment lookup")
-	utils.AddPreferredFlag(cmd.PersistentFlags(), "workspace", "W", "Workspace to look the Deployment up in, overriding the context's", "workspace-id")
+	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace", "W", "", "Workspace to look the Deployment up in, overriding the context's")
+	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("workspace"))
+	utils.AddAlias(cmd.PersistentFlags(), "workspace-id", "", "workspace")
 	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")
@@ -165,7 +167,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	cmd.AddCommand(NewAirflowListCmd(out, opts))
 	cmd.AddCommand(NewAirflowDescribeCmd(out, opts))
 	cmd.AddCommand(NewAirflowSpecCmd(out, opts))
-	utils.BeforeArgs(cmd, func(c *cobra.Command, _ []string) error { return utils.ApplyPreferredFlags(c.Flags(), nil) })
+	utils.BeforeArgs(cmd, func(c *cobra.Command, _ []string) error { return utils.ApplyAliases(c.Flags()) })
 
 	return cmd
 }

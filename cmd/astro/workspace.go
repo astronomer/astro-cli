@@ -207,8 +207,7 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUserRemoveCmd(out),
 		newWorkspaceUserAddCmd(out),
 	)
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you'd like to manage users")
-	addWorkspaceFlag(cmd.PersistentFlags(), "", "Workspace whose users you'd like to manage")
+	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace whose users you'd like to manage", oneXWorkspaceID)
 	cliout.AddOutputFlag(cmd, &workspaceUserOutput)
 
 	return cmd
@@ -304,8 +303,7 @@ func newWorkspaceTokenRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceTokenAddOrgTokenCmd(out),
 		newWorkspaceOrgTokenManageCmd(out),
 	)
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "workspace where you would like to manage tokens")
-	addWorkspaceFlag(cmd.PersistentFlags(), "", "Workspace whose tokens you'd like to manage")
+	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace whose tokens you'd like to manage", oneXWorkspaceID)
 	cliout.AddOutputFlag(cmd, &workspaceTokenOutput)
 	return cmd
 }
@@ -591,8 +589,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 			return removeWorkspaceTeam(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
-	addWorkspaceFlag(cmd.Flags(), "w", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
 	return cmd
 }
 
@@ -637,8 +634,7 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command {
 			return addWorkspaceTeam(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
-	addWorkspaceFlag(cmd.Flags(), "w", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier", oneXWorkspaceID)
 	cmd.Flags().StringVarP(&addWorkspaceRole, "role", "r", "WORKSPACE_MEMBER", "The role for the "+
 		"new team. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd
@@ -681,8 +677,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return updateWorkspaceTeam(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "The Workspace's unique identifier")
-	addWorkspaceFlag(cmd.Flags(), "w", "The Workspace's unique identifier")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
 	cmd.Flags().StringVarP(&updateWorkspaceRole, "role", "r", "", "The new role for the "+
 		"team. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd
@@ -867,7 +862,7 @@ func removeWorkspaceUser(cmd *cobra.Command, args []string, out io.Writer) error
 }
 
 func coalesceWorkspace() (string, error) {
-	// An explicit --workspace-id flag is authoritative and must win before we
+	// An explicit --workspace flag is authoritative and must win before we
 	// require a current-workspace context. Org-scoped API tokens leave that
 	// context empty (no workspaceId claim), so consulting it first would error
 	// out even when the caller supplied a valid workspace explicitly.

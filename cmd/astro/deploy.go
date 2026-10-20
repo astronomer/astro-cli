@@ -90,7 +90,6 @@ func NewDeployCmd() *cobra.Command {
 	// read by nothing, as a pyproject.toml project's deploy always took it.
 	cmd.Flags().BoolP("prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
-	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "Workspace for your Deployment")
 	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")
 	cmd.Flags().BoolVar(&noDagsBaseDir, "no-dags-base-dir", false, "Exclude the dags directory prefix from the bundle. Use for Airflow 3.x deployments where sys.path includes the bundle root")
@@ -101,7 +100,8 @@ func NewDeployCmd() *cobra.Command {
 	// it would turn `astro deploy -d` from a DAG-only deploy into a target
 	// selector. -d/--deployment is the spelling everywhere the letter is free.
 	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
-	cmd.Flags().StringVar(&manifestWorkspace, "workspace", "", "Workspace for the deploy, overriding the context")
+	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
+	addWorkspaceFlag(cmd.Flags(), &manifestWorkspace, "", "Workspace for the deploy, overriding the context", oneXWorkspaceID)
 	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
@@ -112,7 +112,6 @@ func NewDeployCmd() *cobra.Command {
 	annotateDeployFlag(cmd, "dags", deployGroupDAG)
 	annotateDeployFlag(cmd, "no-dags-base-dir", deployGroupDAG)
 	orderDeployFlagGroups(cmd)
-	utils.MarkPreferredFlag(cmd.Flags(), "workspace", "workspace-id")
 	// astro deploy bundle is the subcommand, so the word bundle is never a
 	// Deployment argument: a link of that name is reached with --deployment.
 	cmd.AddCommand(newDeployBundleCmd())
@@ -269,11 +268,8 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where) error 
 		return manifestDeployErr(cmd, err)
 	}
 
-	// --workspace wins over the legacy --workspace-id when both are set.
+	// --workspace, or its 1.x spelling --workspace-id.
 	overrideWorkspace := manifestWorkspace
-	if overrideWorkspace == "" {
-		overrideWorkspace = workspaceID
-	}
 
 	// A prompt has to be answered by someone, and json output has to stay a
 	// stream a program can parse — a question on stderr with the run blocked on

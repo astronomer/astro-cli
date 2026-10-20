@@ -19,7 +19,7 @@ import (
 )
 
 // deploymentArgAnnotation marks a command whose first argument is a Deployment
-// id, so a link name in that place resolves the way --deployment-id does.
+// id, so a link name in that place resolves the way a --deployment id does.
 const deploymentArgAnnotation = "astro.deployment-arg"
 
 // projectWorkspaceID is the workspace a command inside a project falls back
@@ -74,10 +74,9 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 
 // followProject reads the project around the working directory, if any, and
 // resolves the command's Deployment reference and default workspace from it.
-// A link name given as --deployment-id, --deployment-name or a Deployment-id
-// argument is replaced in place by the link's Deployment id. --deployment
-// reaches here as one of those (see routeDeployment), or as itself where it
-// stands for none.
+// A link name given as --deployment, as a Deployment id or a name (see
+// deploymentFlag.resolve), or as a Deployment-id argument is replaced in
+// place by the link's Deployment id.
 func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 	projectWorkspaceID = ""
 	m, err := projectManifest(config.WorkingPath)
@@ -87,56 +86,40 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 
 	var id, link string
 	flags := cmd.Flags()
+	d := deploymentFlagOf(flags)
 	switch {
-	case flags.Changed("deployment-id"):
-		f := flags.Lookup("deployment-id")
-		if id, link, err = projectDeployment(m, f.Value.String()); err != nil {
+	case d != nil && d.givenID:
+		if id, link, err = projectDeployment(m, *d.id); err != nil {
 			return projectPick{}, err
 		}
-		if err := f.Value.Set(id); err != nil {
-			return projectPick{}, err
-		}
-	case flags.Changed("deployment-name"):
-		f := flags.Lookup("deployment-name")
-		l, ok := m.Astro.Deployments[f.Value.String()]
+		*d.id = id
+	case d != nil && d.givenName:
+		l, ok := m.Astro.Deployments[*d.name]
 		if !ok || l.Kind() != manifest.KindAstro {
 			break
 		}
-		link = f.Value.String()
+		link = *d.name
 		deploymentID = l.Deployment
-		if err := f.Value.Set(""); err != nil {
-			return projectPick{}, err
-		}
+		*d.name = ""
 	case cmd.Annotations[deploymentArgAnnotation] != "" && len(args) > 0:
 		if id, link, err = projectDeployment(m, args[0]); err != nil {
 			return projectPick{}, err
 		}
 		// The command's RunE is handed this same slice.
 		args[0] = id
-	case deploymentArg != "":
+	case d != nil && d.arg != "":
 		// A Deployment id given as --deployment, standing in for the argument.
-		if id, link, err = projectDeployment(m, deploymentArg); err != nil {
+		if id, link, err = projectDeployment(m, d.arg); err != nil {
 			return projectPick{}, err
 		}
 		deploymentID = id
-	case flags.Changed("deployment"):
-		// A --deployment that stands for no older spelling (astro env list),
-		// so none of the cases above saw it: resolved in place, as
-		// --deployment-id is.
-		f := flags.Lookup("deployment")
-		if id, link, err = projectDeployment(m, f.Value.String()); err != nil {
-			return projectPick{}, err
-		}
-		if err := f.Value.Set(id); err != nil {
-			return projectPick{}, err
-		}
 	}
 
 	pick := projectPick{link: link}
 	if link != "" {
 		pick.domain = m.Astro.LoginDomain()
 	}
-	if flags.Changed("workspace-id") || flags.Changed("workspace") || flags.Changed("all") {
+	if workspaceChosen(flags) {
 		return pick, nil
 	}
 	if link != "" {
@@ -145,6 +128,12 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 		pick.workspace = m.Astro.Workspace
 		pick.domain = m.Astro.WorkspaceDomain()
 		pick.organization = m.Astro.Organization
+		// A Deployment that is the command's scope, named and held by no
+		// link, is the scope as given: the project's workspace has no say
+		// in it, though the command still runs on the project's host.
+		if d != nil && d.scope && (d.givenID || d.givenName) {
+			pick.workspace = ""
+		}
 	}
 	return pick, nil
 }

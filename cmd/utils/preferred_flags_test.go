@@ -11,74 +11,65 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 )
 
-func preferredFlagSet(t *testing.T, args ...string) (fs *pflag.FlagSet, id, name *string) {
+func aliasedFlagSet(t *testing.T, args ...string) (fs *pflag.FlagSet, workspace *string) {
 	t.Helper()
 	fs = pflag.NewFlagSet("test", pflag.ContinueOnError)
-	id, name = new(string), new(string)
-	fs.StringVar(id, "deployment-id", "", "")
-	fs.StringVar(name, "deployment-name", "", "")
-	AddPreferredFlag(fs, "deployment", "", "", "deployment-id", "deployment-name")
+	workspace = new(string)
+	fs.StringVar(workspace, "workspace", "", "")
+	AddAlias(fs, "workspace-id", "w", "workspace")
 	require.NoError(t, fs.Parse(args))
-	return fs, id, name
+	return fs, workspace
 }
 
-func TestAddPreferredFlagHidesTheOldSpellings(t *testing.T) {
-	fs, _, _ := preferredFlagSet(t)
-	assert.True(t, fs.Lookup("deployment-id").Hidden)
-	assert.True(t, fs.Lookup("deployment-name").Hidden)
-	assert.False(t, fs.Lookup("deployment").Hidden)
+func TestAddAliasHidesTheOldSpelling(t *testing.T) {
+	fs, _ := aliasedFlagSet(t)
+	assert.True(t, fs.Lookup("workspace-id").Hidden)
+	assert.True(t, IsAlias(fs.Lookup("workspace-id")))
+	assert.False(t, fs.Lookup("workspace").Hidden)
+	assert.False(t, IsAlias(fs.Lookup("workspace")))
+	assert.Equal(t, "w", fs.Lookup("workspace-id").Shorthand)
 }
 
-func TestApplyPreferredFlags(t *testing.T) {
-	toName := func(*pflag.FlagSet, string, string) (string, bool) { return "deployment-name", true }
-
-	t.Run("the preferred value reaches the old spelling the route picks", func(t *testing.T) {
-		fs, id, name := preferredFlagSet(t, "--deployment", "prod")
-		require.NoError(t, ApplyPreferredFlags(fs, toName))
-		assert.Empty(t, *id)
-		assert.Equal(t, "prod", *name)
-		assert.True(t, fs.Changed("deployment-name"))
+func TestApplyAliases(t *testing.T) {
+	t.Run("the alias reaches the flag it stands for", func(t *testing.T) {
+		for _, args := range [][]string{{"--workspace-id", "ws"}, {"-w", "ws"}} {
+			fs, workspace := aliasedFlagSet(t, args...)
+			require.NoError(t, ApplyAliases(fs))
+			assert.Equal(t, "ws", *workspace)
+			assert.True(t, fs.Changed("workspace"), "a required check on --workspace is met")
+		}
 	})
 
-	t.Run("with no route it reaches the first old spelling", func(t *testing.T) {
-		fs, id, name := preferredFlagSet(t, "--deployment", "prod")
-		require.NoError(t, ApplyPreferredFlags(fs, nil))
-		assert.Equal(t, "prod", *id)
-		assert.Empty(t, *name)
-	})
-
-	t.Run("an old spelling alone marks the preferred flag given", func(t *testing.T) {
-		fs, id, _ := preferredFlagSet(t, "--deployment-id", "cl123")
-		require.NoError(t, ApplyPreferredFlags(fs, toName))
-		assert.Equal(t, "cl123", *id)
-		assert.True(t, fs.Changed("deployment"))
-		assert.Equal(t, "cl123", fs.Lookup("deployment").Value.String())
+	t.Run("the preferred spelling alone is left as it is", func(t *testing.T) {
+		fs, workspace := aliasedFlagSet(t, "--workspace", "ws")
+		require.NoError(t, ApplyAliases(fs))
+		assert.Equal(t, "ws", *workspace)
+		assert.False(t, fs.Changed("workspace-id"))
 	})
 
 	t.Run("both spellings agreeing is no conflict", func(t *testing.T) {
-		fs, _, name := preferredFlagSet(t, "--deployment", "prod", "--deployment-name", "prod")
-		require.NoError(t, ApplyPreferredFlags(fs, toName))
-		assert.Equal(t, "prod", *name)
+		fs, workspace := aliasedFlagSet(t, "--workspace", "ws", "--workspace-id", "ws")
+		require.NoError(t, ApplyAliases(fs))
+		assert.Equal(t, "ws", *workspace)
 	})
 
 	t.Run("both spellings disagreeing is a usage error", func(t *testing.T) {
-		fs, _, _ := preferredFlagSet(t, "--deployment", "a", "--deployment-id", "b")
-		err := ApplyPreferredFlags(fs, toName)
+		fs, _ := aliasedFlagSet(t, "--workspace", "a", "--workspace-id", "b")
+		err := ApplyAliases(fs)
 		require.Error(t, err)
 		assert.True(t, cliout.IsUsage(err))
-		assert.EqualError(t, err, `--deployment "a" and --deployment-id "b" disagree: pass only --deployment`)
+		assert.EqualError(t, err, `--workspace "a" and --workspace-id "b" disagree: pass only --workspace`)
 	})
 
-	t.Run("a route may take the value itself", func(t *testing.T) {
-		fs, id, name := preferredFlagSet(t, "--deployment", "prod")
-		var took string
-		require.NoError(t, ApplyPreferredFlags(fs, func(_ *pflag.FlagSet, _, v string) (string, bool) {
-			took = v
-			return "", true
-		}))
-		assert.Equal(t, "prod", took)
-		assert.Empty(t, *id)
-		assert.Empty(t, *name)
+	t.Run("two aliases of one flag need not agree, and the first is handed on", func(t *testing.T) {
+		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		deployment := new(string)
+		fs.StringVar(deployment, "deployment", "", "")
+		AddAlias(fs, "deployment-id", "d", "deployment")
+		AddAlias(fs, "deployment-name", "n", "deployment")
+		require.NoError(t, fs.Parse([]string{"-n", "prod", "-d", "cl123"}))
+		require.NoError(t, ApplyAliases(fs))
+		assert.Equal(t, "cl123", *deployment)
 	})
 }
 

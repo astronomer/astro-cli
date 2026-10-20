@@ -28,6 +28,11 @@ const (
 	errAPIURLFlagRemoved   = "use --url"
 	errDeploymentIDAPIFlag = "use --deployment (-d), which takes a Deployment id or a link name from pyproject.toml"
 
+	// astro env list is new in v2 and takes only the v2 spellings, but a
+	// script carrying the per-kind lists' 1.x habits may still type these.
+	errEnvListWorkspaceIDRemoved  = "use --workspace"
+	errEnvListDeploymentIDRemoved = "use --deployment, which takes a Deployment id or a link name from pyproject.toml"
+
 	errDeploymentFileRemoved = "to manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL + ". " +
 		"To copy a Deployment, use astro deployment create --clone <deployment> --name <new name>"
 	errInspectTemplateRemoved = "to copy a Deployment, use astro deployment create --clone <deployment> --name <new name>. " +
@@ -127,6 +132,11 @@ type removedFlag struct {
 	// flag's name, for one reason several entries share. It follows the flag
 	// as the run typed it (removedMessage), so it never names that itself.
 	reason reasonFunc
+	// v2Only is set on an entry for commands 1.x did not have (under names
+	// them): a 1.x spelling a script may carry over to a v2 command that
+	// never took it. v1_flags.tsv has no row for it there, so it is
+	// consulted without one, for the long name alone.
+	v2Only bool
 }
 
 // reasonFunc builds a removedFlag's reason.
@@ -169,7 +179,9 @@ func removedMessage(typed, reason string) string {
 // 1.x's --force (-f) became --yes on every command that asks first, so the
 // one entry says so on each. Where one name had different replacements on
 // different commands, the narrower entry (with under) comes first, and the
-// first entry that applies wins.
+// first entry that applies wins. An entry marked v2Only is the exception: it
+// names a v2 command 1.x did not have (astro env list) and answers there for a
+// 1.x spelling a script may carry over, with no row of v1_flags.tsv behind it.
 //
 // A future removal belongs here too: TestEveryV1FlagStillWorksOrSaysWhatReplacedIt
 // fails on a flag in v1_flags.tsv that the v2 tree neither has nor reports
@@ -184,6 +196,8 @@ var removedFlags = []removedFlag{
 	// describe took them too.
 	{name: "api-url", reason: says(errAPIURLFlagRemoved)},
 	{name: "deployment-id", under: []string{"api airflow"}, needs: has("deployment"), reason: says(errDeploymentIDAPIFlag)},
+	{name: "workspace-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListWorkspaceIDRemoved)},
+	{name: "deployment-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListDeploymentIDRemoved)},
 	// 1.x's list commands shared --json, --template and -o
 	// table|json|template (pkg/output's AddFlags), and api ls and describe
 	// had --json.
@@ -393,6 +407,10 @@ func removedFlagError(cmd *cobra.Command, err error) error {
 	}
 	v1 := v1FlagOn(cmd, typed, isShorthand)
 	if v1 == nil {
+		// A command 1.x did not have: only an entry made for it applies.
+		if f := findRemovedFlagIn(cmd, typed, true); f != nil {
+			return cliout.Usage(&removedFlagErr{f.message(cmd, spelling)})
+		}
 		return nil
 	}
 	// The flag is still there, without the letter 1.x gave it (astro init
@@ -414,8 +432,15 @@ func shorthandRemoved(spelling, name string) string {
 }
 
 // findRemovedFlag returns the entry for the flag called name that applies on
-// cmd, or nil when none does.
+// cmd, a flag 1.x had there, or nil when none does.
 func findRemovedFlag(cmd *cobra.Command, name string) *removedFlag {
+	return findRemovedFlagIn(cmd, name, false)
+}
+
+// findRemovedFlagIn returns the entry for the flag called name that applies on
+// cmd among the v2Only entries, or among the others, so neither kind can
+// shadow the other whatever their order.
+func findRemovedFlagIn(cmd *cobra.Command, name string, v2Only bool) *removedFlag {
 	// `astro local stop -f`: stop still has --force, without the -f, so
 	// "--force was removed" would be false there.
 	if cmd.Flag(name) != nil {
@@ -423,7 +448,7 @@ func findRemovedFlag(cmd *cobra.Command, name string) *removedFlag {
 	}
 	for i := range removedFlags {
 		f := &removedFlags[i]
-		if f.name != name {
+		if f.name != name || f.v2Only != v2Only {
 			continue
 		}
 		if len(f.under) > 0 && !slices.ContainsFunc(f.under, func(path string) bool { return isUnder(cmd, path) }) {

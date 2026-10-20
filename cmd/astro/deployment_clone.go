@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
@@ -31,7 +32,7 @@ const deploymentCreateExample = `  # Create a Deployment in the current Workspac
 
 // cloneAllowedFlags are the flags --clone takes beside it. Everything else
 // create takes describes the Deployment, which --clone copies instead.
-var cloneAllowedFlags = []string{"clone", "name", "workspace", "workspace-id", "description", "wait", "wait-time", "output", "verbosity"}
+var cloneAllowedFlags = []string{"clone", "name", "workspace", "description", "wait", "wait-time", "output", "verbosity"}
 
 var errCloneNeedsName = errors.New("--clone needs --name, the name of the new Deployment")
 
@@ -39,7 +40,8 @@ var errCloneNeedsName = errors.New("--clone needs --name, the name of the new De
 func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) error {
 	var others []string
 	cmd.Flags().Visit(func(f *pflag.Flag) {
-		if !slices.Contains(cloneAllowedFlags, f.Name) {
+		// A 1.x spelling is the flag it stands for: --workspace-id is --workspace.
+		if !utils.IsAlias(f) && !slices.Contains(cloneAllowedFlags, f.Name) {
 			others = append(others, "--"+f.Name)
 		}
 	})
@@ -70,7 +72,7 @@ func deploymentClone(cmd *cobra.Command, out io.Writer, format cliout.Format) er
 
 	// The copy goes where its source is, unless --workspace says otherwise.
 	target := ""
-	if cmd.Flags().Changed("workspace-id") {
+	if cmd.Flags().Changed("workspace") {
 		target = workspaceID
 	}
 	var desc *string
