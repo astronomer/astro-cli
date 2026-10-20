@@ -589,7 +589,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 			return removeWorkspaceTeam(cmd, args, out)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier", oneXWorkspaceID)
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
 	return cmd
 }
 
@@ -677,7 +677,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return updateWorkspaceTeam(cmd, args, out)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier", oneXWorkspaceID)
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
 	cmd.Flags().StringVarP(&updateWorkspaceRole, "role", "r", "", "The new role for the "+
 		"team. Possible values are "+allowedWorkspaceRoleNamesProse)
 	return cmd

@@ -632,7 +632,7 @@ func TestWorkspaceTeamUpdateRemoveTakeWorkspace(t *testing.T) {
 		want map[string]any
 	}{
 		{"update --workspace", []string{"workspace", "team", "update", "team-eng", "--role", "WORKSPACE_OWNER", "--workspace", other}, engJSON("workspace_role", "WORKSPACE_OWNER")},
-		{"update --workspace-id", []string{"workspace", "team", "update", "team-eng", "--role", "WORKSPACE_OWNER", "--workspace-id", other}, engJSON("workspace_role", "WORKSPACE_OWNER")},
+		{"update -w", []string{"workspace", "team", "update", "team-eng", "--role", "WORKSPACE_OWNER", "-w", other}, engJSON("workspace_role", "WORKSPACE_OWNER")},
 		{"remove --workspace", []string{"workspace", "team", "remove", "team-eng", "--workspace", other}, map[string]any{"id": "team-eng", "name": "Engineering", "workspace_id": other, "action": "removed"}},
 		{"remove -w", []string{"workspace", "team", "remove", "team-eng", "-w", other}, map[string]any{"id": "team-eng", "name": "Engineering", "workspace_id": other, "action": "removed"}},
 	} {
@@ -707,9 +707,11 @@ func TestUserTeamHelp(t *testing.T) {
 	assert.NotContains(t, find(newOrganizationCmd, "user", "update").Long, "$astro", "the Long describes the command; the example shows its usage")
 	assert.Equal(t, "Update the role of a user in your Astro Organization", find(newOrganizationCmd, "user", "update").Short)
 	// Every workspace team command that acts on a Workspace takes --workspace.
+	// Only add keeps 1.x's --workspace-id: 1.x's Astro update and remove had
+	// none.
 	for _, sub := range []string{"add", "update", "remove"} {
 		c := find(newWorkspaceCmd, "team", sub)
 		assert.NotNil(t, c.Flag("workspace"), sub)
-		assert.NotNil(t, c.Flag("workspace-id"), sub)
+		assert.Equal(t, sub == "add", c.Flag("workspace-id") != nil, sub)
 	}
 }
