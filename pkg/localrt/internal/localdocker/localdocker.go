@@ -326,7 +326,8 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	// project's dependencies and OS packages into a layer over the runtime image
 	// so docker mode matches standalone: the builder drops apache-airflow (the
 	// base image already provides it) and, with nothing else to install, builds
-	// nothing and hands back the runtime image as-is. A declared Dockerfile's
+	// nothing and hands back the runtime's -base image as-is, the one a build
+	// would have started FROM (rt.ImageBuilder.Build). A declared Dockerfile's
 	// existence is not checked here: imagebuild.Build does it, where this path,
 	// deploy and package meet, so one mistake has one message.
 	build.WorkDir = stateDir
