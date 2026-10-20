@@ -208,7 +208,13 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 	baseURL, token, err := resolveDeploymentAirflowURL(opts, name)
 	if err != nil {
 		// A name that matched no link is far more often a typo than an id, so
-		// the names it could have been travel with the failure.
+		// the names it could have been travel with the failure — first, when
+		// no Deployment had the name either, since the likeliest fix is one
+		// of them.
+		var notFound *nameNotFoundError
+		if len(known) > 0 && errors.As(err, &notFound) {
+			return nil, fmt.Errorf("no link or Deployment named %q. Deployments this project links: %s\n%w", name, strings.Join(known, ", "), err)
+		}
 		if len(known) > 0 {
 			return nil, fmt.Errorf("%w\nDeployments this project links: %s", err, strings.Join(known, ", "))
 		}
@@ -395,7 +401,18 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string) (baseURL, aut
 		return "", "", errors.New("organization ID not set. Use --organization-id or run 'astro organization switch'")
 	}
 
-	dep, err := lookupDeployment(orgID, ref, opts.WorkspaceID, ctx.Workspace, astrov1.NewV1Client(httputil.NewHTTPClient()))
+	// The context's workspace is in the context's organization. Under -O for
+	// another one it is no place to look a name up, and listing it there
+	// would ask that organization for a workspace it does not have.
+	contextWorkspace := ctx.Workspace
+	if orgID != ctx.Organization {
+		if !util.IsCUID(ref) && opts.WorkspaceID == "" {
+			return "", "", &nameNotFoundError{fmt.Sprintf("%q is not a Deployment id, and the context's workspace is not in --organization-id %s: pass --workspace to find a Deployment of that name there", ref, orgID)}
+		}
+		contextWorkspace = ""
+	}
+
+	dep, err := lookupDeployment(orgID, ref, opts.WorkspaceID, contextWorkspace, astrov1.NewV1Client(httputil.NewHTTPClient()))
 	if err != nil {
 		return "", "", err
 	}
@@ -431,7 +448,7 @@ func lookupDeployment(orgID, ref, workspace, contextWorkspace string, client ast
 	}
 	ws := firstNonEmpty(workspace, contextWorkspace)
 	if ws == "" {
-		return astrov1.Deployment{}, fmt.Errorf("%q is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass --workspace, or run 'astro workspace switch'", ref)
+		return astrov1.Deployment{}, &nameNotFoundError{fmt.Sprintf("%q is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass --workspace, or run 'astro workspace switch'", ref)}
 	}
 	deps, err := deployment.ListDeployments(ws, orgID, client)
 	if err != nil {
@@ -447,9 +464,15 @@ func lookupDeployment(orgID, ref, workspace, contextWorkspace string, client ast
 	}
 	switch len(found) {
 	case 0:
-		return astrov1.Deployment{}, fmt.Errorf("no Deployment named %q in workspace %s", ref, ws)
+		return astrov1.Deployment{}, &nameNotFoundError{fmt.Sprintf("no Deployment named %q in workspace %s", ref, ws)}
 	case 1:
 		return found[0], nil
 	}
 	return astrov1.Deployment{}, fmt.Errorf("%d Deployments are named %q in workspace %s: pass -d with one's id (%s)", len(found), ref, ws, strings.Join(ids, ", "))
 }
+
+// nameNotFoundError is a -d value that is no Deployment id and named no
+// Deployment where it was looked for, or had nowhere to be looked for.
+type nameNotFoundError struct{ msg string }
+
+func (e *nameNotFoundError) Error() string { return e.msg }

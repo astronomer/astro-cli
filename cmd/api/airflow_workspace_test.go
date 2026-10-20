@@ -29,7 +29,8 @@ const (
 // astroLookups logs in to a cloud context whose workspace is contextWS, and
 // stands in for the two Deployment lookups: deployments is every Deployment in
 // the organization, which the listing filters by workspace as the API does.
-// listed records the workspace each listing asked for.
+// listed records the workspace each listing asked for, prefixed with its
+// organization when that is not the context's.
 func astroLookups(t *testing.T, deployments ...astrov1.Deployment) (listed *[]string) {
 	t.Helper()
 	isolateSpecCache(t)
@@ -52,7 +53,9 @@ func astroLookups(t *testing.T, deployments ...astrov1.Deployment) (listed *[]st
 	}
 	listed = new([]string)
 	deployment.ListDeployments = func(ws, orgID string, _ astrov1.APIClient) ([]astrov1.Deployment, error) {
-		assert.Equal(t, "test-org", orgID)
+		if orgID != "test-org" {
+			ws = orgID + "/" + ws
+		}
 		*listed = append(*listed, ws)
 		var in []astrov1.Deployment
 		for i := range deployments {
@@ -202,4 +205,75 @@ func TestAirflowCmdLooksTheDeploymentUpInTheWorkspaceFlag(t *testing.T) {
 	cmd.SetOut(new(bytes.Buffer))
 	cmd.SetErr(new(bytes.Buffer))
 	require.EqualError(t, cmd.Execute(), "--workspace cannot be empty")
+}
+
+// Under -O for another organization the context's workspace is not one of
+// its workspaces, so a name needs --workspace; an id is still found across
+// that organization.
+func TestResolveAirflowTarget_OtherOrganizationNeedsAWorkspaceForAName(t *testing.T) {
+	listed := astroLookups(t, astroDeployment("dep-in-given", "etl-prod", givenWS))
+	deployment.GetDeploymentByID = func(orgID, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+		assert.Equal(t, "other-org", orgID)
+		return astroDeployment(id, "etl-prod", givenWS), nil
+	}
+
+	_, err := targetOf(&AirflowOptions{Deployment: "etl-prod", OrganizationID: "other-org"})
+	require.EqualError(t, err, `"etl-prod" is not a Deployment id, and the context's workspace is not in --organization-id other-org: pass --workspace to find a Deployment of that name there`)
+	assert.Empty(t, *listed, "the context's workspace is not listed in another organization")
+
+	_, err = targetOf(&AirflowOptions{Deployment: "etl-prod", OrganizationID: "other-org", WorkspaceID: givenWS})
+	require.EqualError(t, err, `no Deployment named "etl-prod" in workspace ws-given`, "the listing went to the other organization")
+	assert.Equal(t, []string{"other-org/" + givenWS}, *listed)
+
+	target, err := targetOf(&AirflowOptions{Deployment: testDeploymentID, OrganizationID: "other-org"})
+	require.NoError(t, err)
+	assert.Equal(t, "https://"+testDeploymentID+".airflow.astronomer.io", target.hostRoot)
+
+	// -O naming the context's own organization changes nothing.
+	*listed = nil
+	_, err = targetOf(&AirflowOptions{Deployment: "etl-prod", OrganizationID: "test-org"})
+	require.EqualError(t, err, `no Deployment named "etl-prod" in workspace ws-context`)
+	assert.Equal(t, []string{contextWS}, *listed)
+}
+
+// A name with no --workspace and no workspace on the context has nowhere to
+// be looked up.
+func TestResolveAirflowTarget_DeploymentNameWithNoWorkspace(t *testing.T) {
+	listed := astroLookups(t)
+	ctx, err := config.GetCurrentContext()
+	require.NoError(t, err)
+	ctx.Workspace = ""
+	require.NoError(t, ctx.SetContext())
+
+	_, err = targetOf(&AirflowOptions{Deployment: "etl-prod"})
+	require.EqualError(t, err, `"etl-prod" is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass --workspace, or run 'astro workspace switch'`)
+	assert.Empty(t, *listed)
+}
+
+// Inside a project, a name that is neither a link nor a Deployment is most
+// likely a mistyped link, so the links lead the message.
+func TestResolveAirflowTarget_UnknownNameInAProjectLeadsWithTheLinks(t *testing.T) {
+	astroLookups(t, astroDeployment("dep-a", "twin", contextWS), astroDeployment("dep-b", "twin", contextWS))
+	writeAPIProject(t, `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+
+[tool.astro.deployments.prod]
+url = "https://airflow.prod.corp.dev"
+auth = { method = 'none' }
+
+[tool.astro.deployments.staging]
+url = "https://airflow.staging.corp.dev"
+auth = { method = 'none' }
+`)
+	_, err := targetOf(&AirflowOptions{Deployment: "prdo"})
+	require.EqualError(t, err, "no link or Deployment named \"prdo\". Deployments this project links: prod, staging\n"+
+		`no Deployment named "prdo" in workspace ws-context`)
+
+	// Any other failure keeps the links after it.
+	_, err = targetOf(&AirflowOptions{Deployment: "twin"})
+	require.EqualError(t, err, `2 Deployments are named "twin" in workspace ws-context: pass -d with one's id (dep-a, dep-b)`+
+		"\nDeployments this project links: prod, staging")
 }
