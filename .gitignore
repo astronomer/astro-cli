@@ -30,3 +30,6 @@ config/test.yaml.lock
 
 # config flock sidecars (transient, created by saveConfig during tests/runs)
 # - covered by the *.yaml.lock entry above
+
+# Python bytecode, e.g. from running pkg/imagebuild/install-project.py
+__pycache__/

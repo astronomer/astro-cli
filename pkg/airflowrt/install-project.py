@@ -19,6 +19,7 @@ import os
 import platform
 import re
 import sys
+from urllib.parse import urlsplit, urlunsplit
 
 try:
     import tomllib
@@ -154,6 +155,91 @@ def strings(v):
     return [s for s in v if isinstance(s, str)] if isinstance(v, list) else []
 
 
+# --- credentials -------------------------------------------------------------
+
+# Set when a URL the helper would have written carried a user or password.
+_saw_credentials = [False]
+
+
+def without_credentials(url):
+    """url without the user and password an http(s) URL can carry
+    (https://user:token@host/...), with or without a VCS prefix (git+https).
+    What the helper writes lands in an image layer and the build log, so a
+    credential never goes in it; the build authenticates through the netrc
+    secret instead. An ssh URL's user (git+ssh://git@host) is not a
+    credential and is kept."""
+    prefix, rest = "", url
+    m = re.match(r"[A-Za-z][A-Za-z0-9.-]*\+(?=[A-Za-z][A-Za-z0-9+.-]*://)", url)
+    if m:
+        prefix, rest = m.group(0), url[m.end():]
+    try:
+        parts = urlsplit(rest)
+    except ValueError:
+        return url
+    if parts.scheme.lower() not in ("http", "https") or "@" not in parts.netloc:
+        return url
+    _saw_credentials[0] = True
+    return prefix + urlunsplit(parts._replace(netloc=parts.netloc.rsplit("@", 1)[1]))
+
+
+# --- sources -----------------------------------------------------------------
+
+# A source the stale check cannot compare with the lock's record: limited by a
+# marker, an extra or a group, a list of sources, a workspace member, or an
+# index pyproject.toml does not define.
+UNKNOWN = object()
+
+
+def url_key(url):
+    url = without_credentials(url)
+    if url.startswith("git+"):
+        url = url[len("git+") :]
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), parts.path.rstrip("/"), parts.query, ""))
+
+
+def source_key(source, indexes):
+    """What a [tool.uv.sources] entry routes its package to, in the shape
+    lock_source_key reads the lock's record of it; None for no entry."""
+    if source is None:
+        return None
+    if not isinstance(source, dict) or any(k in source for k in ("marker", "extra", "group", "workspace")):
+        return UNKNOWN
+    sub = source.get("subdirectory") or ""
+    if isinstance(source.get("git"), str):
+        ref = next(((k, source[k]) for k in ("rev", "tag", "branch") if isinstance(source.get(k), str) and source[k]), None)
+        return ("git", url_key(source["git"]), ref, sub)
+    if isinstance(source.get("url"), str):
+        return ("url", url_key(source["url"]), sub)
+    if isinstance(source.get("path"), str):
+        return ("path", os.path.normpath(source["path"]))
+    name = source.get("index")
+    if isinstance(name, str) and name in indexes:
+        return ("index", url_key(indexes[name]))
+    return UNKNOWN
+
+
+def lock_source_key(entry):
+    """What the lock's record of a dependency (its root package's
+    requires-dist) routes it to, as source_key states it; None for nothing."""
+    if isinstance(entry.get("git"), str):
+        address, _, _ = entry["git"].partition("#")
+        base, _, query = address.partition("?")
+        params = dict(p.partition("=")[::2] for p in query.split("&") if p)
+        ref = next(((k, params[k]) for k in ("rev", "tag", "branch") if params.get(k)), None)
+        return ("git", url_key(base), ref, entry.get("subdirectory") or params.get("subdirectory", ""))
+    if isinstance(entry.get("url"), str):
+        address, _, fragment = entry["url"].partition("#")
+        sub = entry.get("subdirectory") or (fragment.split("=", 1)[1] if fragment.startswith("subdirectory=") else "")
+        return ("url", url_key(address), sub)
+    for key in ("path", "directory", "editable"):
+        if isinstance(entry.get(key), str):
+            return ("path", os.path.normpath(entry[key]))
+    if isinstance(entry.get("index"), str):
+        return ("index", url_key(entry["index"]))
+    return None
+
+
 class Manifest:
     """What pyproject.toml asks to install.
 
@@ -162,6 +248,7 @@ class Manifest:
       a git or URL source as a direct reference.
     index_sources: {normalized name: (name as written, index URL)} for each
       dependency a [tool.uv.sources] entry routes to a [[tool.uv.index]].
+    sources: {normalized name: source_key} for each [tool.uv.sources] entry.
     packages: [tool.astro] packages."""
 
     def __init__(self, pyproject):
@@ -176,16 +263,17 @@ class Manifest:
                 name, url = index.get("name"), index.get("url")
                 if isinstance(name, str) and name and isinstance(url, str) and url:
                     indexes[name] = url
-        self.index_sources, urls = {}, {}
+        self.index_sources, self.sources, urls = {}, {}, {}
         for pkg, source in (uv.get("sources") or {}).items():
+            self.sources[norm(pkg)] = source_key(source, indexes)
             if not isinstance(source, dict):
                 continue
             name = source.get("index")
             if isinstance(name, str) and name in indexes:
-                self.index_sources[norm(pkg)] = (pkg, indexes[name])
+                self.index_sources[norm(pkg)] = (pkg, without_credentials(indexes[name]))
             address = direct_url(source)
             if address is not None:
-                urls[norm(pkg)] = address
+                urls[norm(pkg)] = without_credentials(address)
 
         self.stated = strings(project.get("dependencies"))
         deps = [direct_reference(d, urls) for d in self.stated] if urls else list(self.stated)
@@ -442,10 +530,12 @@ def parse_requirement(text):
     return name, spec, extras, url
 
 
-def stale_reason(root, stated, locked_versions):
+def stale_reason(root, stated, sources, locked_versions):
     """Why uv.lock does not resolve pyproject.toml's dependencies as they now
     stand, or None. Each dependency has to be in the lock's own record of the
-    project, with the same version specifier and extras, and the version the
+    project, routed to the same [tool.uv.sources] source, with the same extras
+    and, unless that source is a git repository, a URL or a path (for which uv
+    records no specifier), the same version specifier; and the version the
     lock resolved has to satisfy it."""
     if root is None:
         return None
@@ -459,7 +549,16 @@ def stale_reason(root, stated, locked_versions):
             return "it does not resolve %s" % name
         if url:
             continue
-        if not any(same_specifier(spec, e.get("specifier", "")) and sorted(norm(x) for x in e.get("extras") or []) == extras for e in entries):
+        source = sources.get(name)
+        if source is not UNKNOWN:
+            entries = [e for e in entries if lock_source_key(e) == source]
+            if not entries:
+                return "it resolves %s from another source than pyproject.toml's" % name
+        if not any(sorted(norm(x) for x in e.get("extras") or []) == extras for e in entries):
+            return "it resolves %s with other extras than %r" % (name, dep)
+        if isinstance(source, tuple) and source[0] in ("git", "url", "path"):
+            continue
+        if not any(same_specifier(spec, e.get("specifier", "")) for e in entries):
             return "it resolves %s for another requirement than %r" % (name, dep)
         versions = locked_versions.get(name) or set()
         if spec and SpecifierSet is not None and len(versions) == 1:
@@ -481,6 +580,7 @@ def with_hash(entry):
     url, digest = entry.get("url"), entry.get("hash")
     if not url:
         return None
+    url = without_credentials(url)
     if isinstance(digest, str) and ":" in digest:
         algo, value = digest.split(":", 1)
         url += "#%s=%s" % (algo, value)
@@ -511,11 +611,20 @@ def pick_file(entry):
     return None
 
 
+# The index the install reads for everything not routed elsewhere: the runtime
+# image's installer reads PyPI and nothing else.
+PYPI = url_key("https://pypi.org/simple")
+
+
 class Lock:
     """What uv.lock holds for this interpreter: pins for the constraints file,
-    and the exact file of each dependency read from an index of its own."""
+    and the exact file of each dependency read from an index of its own.
 
-    def __init__(self, lock, manifest, runtime):
+    runtime: the distributions the runtime's own constraints file pins.
+    base: the distributions the base image already has installed, on a runtime
+      with no constraints file of its own (before 11.0.0), or None."""
+
+    def __init__(self, lock, manifest, runtime, base=None):
         packages = lock.get("package") or []
         root = lock_root(lock)
         entries = {}
@@ -523,27 +632,40 @@ class Lock:
             if p is root or not applies(p.get("resolution-markers")):
                 continue
             entries.setdefault(norm(p.get("name", "")), []).append(p)
-        versions = {}
+        versions, registries = {}, {}
         for name, es in entries.items():
             versions[name] = {e.get("version") if "registry" in (e.get("source") or {}) else None for e in es}
+            registries[name] = {url_key((e.get("source") or {}).get("registry") or "") for e in es}
 
-        self.stale = stale_reason(root, manifest.stated, versions)
-        self.files, self.pins, self.forked = {}, [], []
+        self.stale = stale_reason(root, manifest.stated, manifest.sources, versions)
+        self.files, self.pins, self.forked, self.elsewhere = {}, [], [], []
         if self.stale:
             return
-        installed = {dist_name(d) for d in manifest.deps}
+        direct = {dist_name(d) for d in manifest.deps}
         # A dependency an index of its own serves is installed from the very
         # file the lock resolved, by URL and hash, so the install never asks
         # PyPI for a package of that name.
         for name in manifest.index_sources:
             es = entries.get(name) or []
-            if name in installed and len(es) == 1 and "registry" in (es[0].get("source") or {}):
+            if name in direct and len(es) == 1 and "registry" in (es[0].get("source") or {}):
                 url = pick_file(es[0])
                 if url:
                     self.files[name] = url
         for name in sorted(versions):
             vs = versions[name]
             if name in AIRFLOW_DISTS or name in runtime or name in self.files or None in vs:
+                continue
+            # What the base image has installed stays as the runtime ships it,
+            # unless the project asks for the package itself: on a runtime with
+            # no constraints file, nothing else holds it there.
+            if base is not None and name in base and name not in direct:
+                continue
+            # The install reads PyPI. A pin to a version the lock took from
+            # another index (a mirror, a private index) could name a version
+            # PyPI does not have, so that package installs unpinned, as it did
+            # before the lock.
+            if registries[name] != {PYPI}:
+                self.elsewhere.append(name)
                 continue
             if len(vs) != 1:
                 self.forked.append(name)
@@ -554,7 +676,22 @@ class Lock:
         lines = ["# Generated from uv.lock by .astro/install-project.py."]
         if self.forked:
             lines.append("# Not pinned, uv.lock holds more than one version: " + ", ".join(self.forked))
+        if self.elsewhere:
+            lines.append("# Not pinned, uv.lock took them from an index other than PyPI: " + ", ".join(self.elsewhere))
         return lines + self.pins
+
+
+def base_installed():
+    """The distributions installed in this image, which is the runtime's base:
+    the install stage runs on the same -base image as the install. The CLI's
+    tests name them in ASTRO_INSTALL_PROJECT_BASE_INSTALLED instead."""
+    if "ASTRO_INSTALL_PROJECT_BASE_INSTALLED" in os.environ:
+        return {norm(n) for n in os.environ["ASTRO_INSTALL_PROJECT_BASE_INSTALLED"].split(",") if n.strip()}
+    try:
+        from importlib import metadata
+    except ImportError:
+        return set()
+    return {norm(d.metadata["Name"]) for d in metadata.distributions() if d.metadata["Name"]}
 
 
 def write(path, lines):
@@ -566,7 +703,7 @@ def read_find_links(project):
     for path in (os.path.join(project, FIND_LINKS), os.path.join(project, ".astro", FIND_LINKS)):
         try:
             with open(path) as f:
-                return [line.strip() for line in f if line.strip() and not line.startswith("#")]
+                return [without_credentials(line.strip()) for line in f if line.strip() and not line.startswith("#")]
         except OSError:
             continue
     return []
@@ -586,8 +723,11 @@ def main(argv=None):
     lock_path = os.path.join(args.project, "uv.lock")
     if os.path.exists(lock_path):
         try:
+            base = None if os.path.exists(args.runtime_constraints) else base_installed()
             with open(lock_path, "rb") as f:
-                lock = Lock(tomllib.load(f), manifest, runtime_constrained(args.runtime_constraints))
+                lock = Lock(tomllib.load(f), manifest, runtime_constrained(args.runtime_constraints), base)
+            if lock.elsewhere:
+                warn("uv.lock took %s from an index other than PyPI, which the image does not read; installing them unpinned" % ", ".join(lock.elsewhere))
             if lock.stale:
                 warn("uv.lock is out of date with pyproject.toml (%s); run `uv lock`; installing pyproject.toml's dependencies unpinned" % lock.stale)
                 lock = None
@@ -609,6 +749,8 @@ def main(argv=None):
     with open(os.path.join(args.out, REQUIREMENTS), "w") as f:
         f.write("\n".join(requirements + deps) + "\n")
     write(os.path.join(args.out, PACKAGES), with_git_for_vcs_deps(deps, manifest.packages))
+    if _saw_credentials[0]:
+        warn("a URL in pyproject.toml or uv.lock carries a user or password, which the image build leaves out: give the build a netrc secret to authenticate instead")
 
 
 if __name__ == "__main__":

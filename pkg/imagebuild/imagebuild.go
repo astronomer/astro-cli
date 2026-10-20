@@ -234,22 +234,26 @@ type Request struct {
 	// when it has one, a generated build installs from: the install helper
 	// reads them inside the build (InstallDockerfile), so the image holds every
 	// package at the version uv.lock resolved. ForManifest sets it for a
-	// generated build. Empty, or naming a directory with no pyproject.toml, the
-	// build writes a pyproject.toml of Dependencies, FindLinks and Packages
-	// instead, and installs them unpinned. Ignored in Dockerfile mode.
+	// generated build; empty, ProjectFiles stands in for it.
+	//
+	// When that project has a pyproject.toml, the file is authoritative:
+	// Dependencies, FindLinks and Packages are ignored, both by the install and
+	// by Build's decision that there is nothing to install. Only a request
+	// naming no project, or one with no pyproject.toml, installs those three,
+	// from a pyproject.toml the build writes of them, unpinned. Ignored in
+	// Dockerfile mode.
 	ManifestDir string
 	// Dependencies are the manifest's Python dependencies (PEP 508);
 	// apache-airflow is dropped, since the runtime base already provides it.
-	// With ManifestDir set they decide only whether there is anything to
-	// install (Build's fast path); the install reads pyproject.toml.
+	// Ignored when ManifestDir (or ProjectFiles) has a pyproject.toml.
 	Dependencies []string
 	// FindLinks are pages the Python install searches besides PyPI, written
-	// into the generated requirements.txt as --find-links lines: the
-	// per-package pages of the indexes a [tool.uv.sources] entry routes a
-	// dependency to (manifest.UV.IndexPages). Ignored in Dockerfile mode, and
-	// with ManifestDir set, whose pyproject.toml states them.
+	// into the generated requirements.txt as --find-links lines. Ignored in
+	// Dockerfile mode, and when ManifestDir (or ProjectFiles) has a
+	// pyproject.toml, whose [tool.uv.sources] the install reads instead.
 	FindLinks []string
-	// Packages are the manifest's OS (apt) package names.
+	// Packages are the manifest's OS (apt) package names. Ignored when
+	// ManifestDir (or ProjectFiles) has a pyproject.toml.
 	Packages []string
 	// ProjectFiles is the project directory whose files a generated build
 	// carries into the image (/usr/local/airflow), for an image that is
@@ -379,14 +383,13 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 		return b.build(ctx, req, req.Dockerfile, req.Context, cb)
 	}
 
-	deps := runtimeDeps(req.Dependencies)
 	from := baseOf(req.BaseImage)
 	// The base image already provides Airflow, so a project with nothing beyond
 	// Airflow and no OS packages needs no build and runs the base as-is: the
 	// -base image, so a project pulls one tag whether it builds or not.
 	// An image carrying the project's files, or labels of its own, is never
 	// the bare base.
-	if fastPath && len(deps) == 0 && len(req.Packages) == 0 && req.ProjectFiles == "" && len(req.Labels) == 0 {
+	if fastPath && req.ProjectFiles == "" && len(req.Labels) == 0 && req.installsNothing() {
 		return from, nil
 	}
 

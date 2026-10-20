@@ -209,7 +209,8 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	}
 
 	// Build into a source-hash working tag, which BuildLocal always returns:
-	// with nothing to install it still builds the one-line image over the base.
+	// with nothing to install it still builds the generated Dockerfile over the
+	// runtime's -base image, its install steps installing nothing.
 	workingTag := fmt.Sprintf("astro-package/%s:src-%s", name, hash)
 	breq.WorkDir = workDir
 	breq.Tag = workingTag
@@ -411,19 +412,53 @@ func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb 
 	return nil
 }
 
-// contentHash is a short digest of the inputs that change the image, so the
-// same inputs produce the same tag and a rebuild is a cache hit. For a
-// generated build that includes the files the install reads, so editing
-// pyproject.toml or uv.lock moves the tag.
-// contentHash is the content address of the image this request would build.
+// declaredDockerfile pairs the manifest's own slash-separated value with the
+// absolute path it resolves to.
 //
-// A generated image carries the project's files (imagebuild's ProjectFiles),
-// so the digest of the files under projectFiles is part of the address: editing include/
-// changes the image, and has to change the tag. The digest covers exactly the
-// files the image carries — the project's .dockerignore applied, and .venv,
-// .git and .astro/standalone never among them — so it does not hit the
-// problems the declared-Dockerfile context below did. "" for a declared
-// Dockerfile.
+// A struct rather than two adjacent string parameters, because the two are
+// interchangeable to the compiler and are NOT interchangeable to the hash: the
+// relative value is hashed (so the address does not depend on where the checkout
+// sits) and the absolute one is read. Transposed, contentHash would put an
+// absolute path into the field kept relative on purpose and try to read a
+// project-relative path — the first fails silently into a wrong hash, and no test
+// could see it.
+type declaredDockerfile struct {
+	rel string // the manifest value, slash-separated; "" when none is declared
+	abs string // rel resolved against the project; "" when none is declared
+}
+
+// generatedRecipe is the Dockerfile a generated build of breq runs, as its
+// content address takes it, or "" for a declared Dockerfile, which is
+// addressed by its own bytes. It is the recipe with the netrc mount, whether or
+// not this build has the secret: a secret decides what the install can reach,
+// not what a successful one installs, so a laptop and a CI runner holding a
+// token get the same tag.
+func generatedRecipe(breq imagebuild.Request) string {
+	if breq.FromDeclaredDockerfile() {
+		return ""
+	}
+	return imagebuild.GeneratedDockerfile(breq.BaseImage, true)
+}
+
+// contentHash is the content address of the image breq builds over base for
+// platform: a short digest of the inputs that change the image, so the same
+// inputs produce the same tag and a rebuild is a cache hit.
+//
+// Generated or declared is decided once, by recipe (generatedRecipe), "" being
+// a declared Dockerfile.
+//
+// A generated build contributes its recipe, the Dockerfile imagebuild writes,
+// and everything its install reads (imagebuild.InstallInputsDigest: the install
+// helper, pyproject.toml, and uv.lock, whose versions are the ones installed).
+// The dependencies, packages and index pages are all in those, so no list of
+// them is hashed besides.
+//
+// A generated image also carries the project's files (breq.ProjectFiles), so
+// the digest of those files is part of the address: editing include/ changes
+// the image, and has to change the tag. The digest covers exactly the files the
+// image carries — the project's .dockerignore applied, and .venv, .git and
+// .astro/standalone never among them — so it does not hit the problems the
+// declared-Dockerfile context below did.
 //
 // A declared Dockerfile contributes the DECLARED path and the file's BYTES.
 //
@@ -458,43 +493,9 @@ func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb 
 // image. Caught by the test for this, which builds the same project twice from
 // two temp dirs.
 //
-// Reading the file makes this fallible, which is the honest signature: a
+// Reading the files makes this fallible, which is the honest signature: a
 // declaration naming something unreadable cannot be content-addressed, and
 // imagebuild.Build refuses it a moment later anyway.
-// declaredDockerfile pairs the manifest's own slash-separated value with the
-// absolute path it resolves to.
-//
-// A struct rather than two adjacent string parameters, because the two are
-// interchangeable to the compiler and are NOT interchangeable to the hash: the
-// relative value is hashed (so the address does not depend on where the checkout
-// sits) and the absolute one is read. Transposed, contentHash would put an
-// absolute path into the field kept relative on purpose and try to read a
-// project-relative path — the first fails silently into a wrong hash, and no test
-// could see it.
-type declaredDockerfile struct {
-	rel string // the manifest value, slash-separated; "" when none is declared
-	abs string // rel resolved against the project; "" when none is declared
-}
-
-// generatedRecipe is the Dockerfile a generated build of breq runs, as its
-// content address takes it, or "" for a declared Dockerfile, which is
-// addressed by its own bytes. It is the recipe with the netrc mount, whether or
-// not this build has the secret: a secret decides what the install can reach,
-// not what a successful one installs, so a laptop and a CI runner holding a
-// token get the same tag.
-func generatedRecipe(breq imagebuild.Request) string {
-	if breq.FromDeclaredDockerfile() {
-		return ""
-	}
-	return imagebuild.GeneratedDockerfile(breq.BaseImage, true)
-}
-
-// contentHash is the address of the image breq builds over base for platform.
-// For a generated build that is recipe, the Dockerfile it runs
-// (generatedRecipe), and everything its install reads
-// (imagebuild.InstallInputsDigest: the helper, pyproject.toml, and uv.lock,
-// whose versions are the ones installed); the dependencies, packages and index
-// pages are all in those, so no list of them is hashed besides.
 func contentHash(base, platform, recipe string, breq imagebuild.Request, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
@@ -502,28 +503,14 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 	}
 	writeField("base", base)
 	writeField("platform", platform)
-	if df.abs == "" {
-		// A generated build's Dockerfile (recipe) is imagebuild's, not the
-		// project's, and it is as much the build as the inputs below: a change
-		// to how it installs is a different image from the same manifest, so
-		// it moves the tag rather than reusing one an older recipe built. A
-		// declared Dockerfile installs as its own bytes say, which are hashed
-		// below, so neither is part of its address.
+	if recipe != "" {
 		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(recipe))))
 		inputs, err := imagebuild.InstallInputsDigest(breq)
 		if err != nil {
 			return "", err
 		}
 		writeField("install-inputs", inputs)
-	}
-	if projectFiles := breq.ProjectFiles; projectFiles != "" {
-		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
-		if err != nil {
-			return "", err
-		}
-		writeField("project-files", digest)
-	}
-	if df.abs != "" {
+	} else {
 		writeField("dockerfile", filepath.ToSlash(df.rel))
 		body, err := os.ReadFile(df.abs)
 		if err != nil {
@@ -546,6 +533,13 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 			}
 			writeField(name, fmt.Sprintf("%x", sha256.Sum256(data)))
 		}
+	}
+	if projectFiles := breq.ProjectFiles; projectFiles != "" {
+		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
+		if err != nil {
+			return "", err
+		}
+		writeField("project-files", digest)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
 }

@@ -87,10 +87,14 @@ check() {
 }
 
 while read -r tag; do
-  [[ -n "$tag" ]] && check "$af3_host" "$af3_repo" "$af3_tok" "$tag"
+  if [[ -n "$tag" ]]; then
+    check "$af3_host" "$af3_repo" "$af3_tok" "$tag"
+  fi
 done <<<"$af3_tags"
 while read -r tag; do
-  [[ -n "$tag" ]] && check "$af2_host" "$af2_repo" "$af2_tok" "$tag"
+  if [[ -n "$tag" ]]; then
+    check "$af2_host" "$af2_repo" "$af2_tok" "$tag"
+  fi
 done <<<"$af2_tags"
 
 echo "checked ${checked} -base tags, ${missing} missing"
