@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"text/tabwriter"
@@ -247,7 +248,9 @@ func (c *cli) runStart(ctx context.Context, opts plan.Options, buildSecretFlag [
 	warnEnvValues(r, built.EnvWarnings)
 	warnWorkspaceUnread(r, built.WorkspaceNote)
 	warnWithout(r, "started", built.StartedWithout)
-	warnLocalFilesInImage(r, built.Plan)
+	if err := checkImageDockerfile(r, built.Plan); err != nil {
+		return err
+	}
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err
 	}
@@ -336,16 +339,35 @@ func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localr
 	return err
 }
 
-// warnLocalFilesInImage warns, before a Docker-mode start builds the project's
-// own Dockerfile, about the per-machine files that build would copy into the
-// image (scaffold.LocalFilesWarning). Standalone builds no image.
-func warnLocalFilesInImage(r cliout.Renderer, p localrt.Plan) {
+// checkImageDockerfile runs before a Docker-mode start builds the project's own
+// Dockerfile. It refuses one on an ONBUILD tag that astro init would move onto
+// -base, and warns about one it would not (scaffold.CheckDockerfileOnBuild),
+// then about the per-machine files the build would copy into the image
+// (scaffold.LocalFilesWarning) and a stale install helper. Standalone builds no
+// image.
+func checkImageDockerfile(r cliout.Renderer, p localrt.Plan) error {
 	if p.Mode != localrt.ModeDocker {
-		return
+		return nil
+	}
+	if p.Dockerfile != "" {
+		m, err := manifest.Load(filepath.Join(p.ProjectPath, manifest.Marker))
+		if err != nil {
+			return err
+		}
+		switch w, err := scaffold.CheckDockerfileOnBuild(p.ProjectPath, m); {
+		case err != nil:
+			return err
+		case w != "":
+			emitWarning(r, event{Event: "warning", Text: w})
+		}
 	}
 	if w := scaffold.LocalFilesWarning(p.ProjectPath, p.Dockerfile); w != "" {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}
+	if w := scaffold.InstallHelperWarning(p.ProjectPath, p.Dockerfile); w != "" {
+		emitWarning(r, event{Event: "warning", Text: w})
+	}
+	return nil
 }
 
 // warnManifest reports the manifest's findings that do not stop a start: a
@@ -641,7 +663,9 @@ func (c *cli) runRestart(ctx context.Context, force, allowMissing bool, buildSec
 	warnEnvValues(r, built.EnvWarnings)
 	warnWorkspaceUnread(r, built.WorkspaceNote)
 	warnWithout(r, "started", built.StartedWithout)
-	warnLocalFilesInImage(r, built.Plan)
+	if err := checkImageDockerfile(r, built.Plan); err != nil {
+		return err
+	}
 	// Before the stop, like the build: a refusal leaves Airflow running.
 	if err := c.checkRuntimeBuild(ctx, r, built.Plan); err != nil {
 		return err

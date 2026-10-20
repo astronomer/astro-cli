@@ -48,8 +48,8 @@ const (
 	ownStepsComment = "# This project's own steps.\n"
 )
 
-// dockerfileRewriteOf works out the rewrite of a 1.x Dockerfile, data, that
-// does more than name a base. It returns the rewrite, or a note naming why the
+// dockerfileRewriteOf works out the rewrite of a Dockerfile, data, that does
+// more than name a base; name is its path, for the notes. It returns the rewrite, or a note naming why the
 // file's shape rules one out, or neither when the file is not on an ONBUILD
 // tag at all. listsRead reports whether any stage might run ONBUILD steps,
 // which read requirements.txt and packages.txt: when none can, the two lists
@@ -57,8 +57,8 @@ const (
 //
 // What it can judge from the file alone. Whether the two 1.x files were carried
 // is decided later, by plan, from the run's notes.
-func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, listsRead bool) {
-	const prefix = "Dockerfile: kept FROM its Astro Runtime image rather than moved onto that image's -base tag, "
+func dockerfileRewriteOf(name string, data []byte) (rw *dockerfileRewrite, blocker string, listsRead bool) {
+	prefix := name + ": kept FROM its Astro Runtime image rather than moved onto that image's -base tag, "
 	stages := airflowrt.DockerfileStages(data)
 	if len(stages) == 0 {
 		return nil, "", false
@@ -201,19 +201,19 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 	for _, name := range []string{"requirements.txt", "packages.txt"} {
 		if slices.Contains(from1x.present, name) && namedInAny(notes, name) {
 			from1x.rewrite = nil
-			from1x.notes = append(from1x.notes, "Dockerfile: kept FROM "+rw.from+" rather than moved onto "+rw.base+
+			from1x.notes = append(from1x.notes, onBuildKeptNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto "+rw.base+
 				", because "+name+" has lines "+manifest.Marker+" does not carry (above), and the base's ONBUILD steps "+
-				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it")
+				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it"))
 			from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 			return nil
 		}
 	}
-	switch blocker, err := planHelperCommittable(dir, cs); {
+	switch blocker, err := planHelperCommittable(dir, fileDockerfile, cs); {
 	case err != nil:
 		return err
 	case blocker != "":
 		from1x.rewrite = nil
-		from1x.notes = append(from1x.notes, blocker)
+		from1x.notes = append(from1x.notes, onBuildKeptNote(blocker))
 		from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 		return nil
 	}
@@ -231,6 +231,17 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 			": if your registry mirrors "+rw.from+" tag by tag, mirror "+rw.base+" too")
 	}
 	return nil
+}
+
+// planDockerfile is what a conversion does about a Dockerfile it keeps as the
+// build: the move onto -base when it can go ahead (planDockerfileRewrite), then
+// the ignore file the build's context needs (planKeptDockerfileIgnore), which
+// depends on whether the move went ahead.
+func planDockerfile(dir string, from1x *project1x, notes []string, cs *Changeset) error {
+	if err := planDockerfileRewrite(dir, from1x, notes, cs); err != nil {
+		return err
+	}
+	return planKeptDockerfileIgnore(dir, from1x, cs)
 }
 
 // keptListNotes are the notes for a declared Dockerfile kept on its ONBUILD

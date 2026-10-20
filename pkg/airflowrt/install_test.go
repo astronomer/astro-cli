@@ -1,11 +1,42 @@
 package airflowrt
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// helperContentAtVersion pins the helper's content to its version stamp. A
+// change to install-project.py that keeps the stamp fails here: bump the
+// "# astro-install-helper:" line and add the new hash, so astro init knows a
+// project's copy is older and refreshes it.
+var helperContentAtVersion = map[int]string{
+	1: "b21a2237f2142b9bb010dd1dbe211ab9a9ce3f5c2f567e64a668315bd0ca326d",
+	// Writes its outputs with LF line endings on every host.
+	2: "e2c1f44df4ed6b3cc93e73e45473fc4b9549322b876962fe29fa62f9e36846a7",
+	// Compares a lock's recorded constraints by name and specifier, and reads
+	// python_version == 'X.Y' as python_full_version == 'X.Y.*'.
+	3: "72b26579905db375023b6b1e60149e277de2aecb385fdf5822bb23019a785f64",
+}
+
+func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
+	v := InstallHelperVersion()
+	require.Positive(t, v, "the helper carries a version stamp")
+	sum := sha256.Sum256(InstallHelper())
+	assert.Equal(t, helperContentAtVersion[v], hex.EncodeToString(sum[:]),
+		"install-project.py changed without its version stamp moving: bump it and pin the new hash")
+}
+
+func TestHelperVersion(t *testing.T) {
+	v, ok := HelperVersion([]byte("# Written by the Astro CLI.\n# astro-install-helper: 7\r\n#\n"))
+	assert.True(t, ok)
+	assert.Equal(t, 7, v)
+	_, ok = HelperVersion([]byte("# Written by the Astro CLI.\nprint('hi')\n"))
+	assert.False(t, ok, "an unstamped copy has no version")
+}
 
 func TestDockerfileStages(t *testing.T) {
 	stages := DockerfileStages([]byte("ARG V=1\n" +

@@ -16,6 +16,8 @@
     "x"
   ],
   "adopted": true,
+  "existing": true,
+  "onbuild_kept": true,
   "notes": [
     "x"
   ],

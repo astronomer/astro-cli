@@ -13,6 +13,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // imageSourceProject writes a linked project, with a Dockerfile when from is
@@ -28,6 +29,27 @@ func imageSourceProject(t *testing.T, astro, from string) (string, *manifest.Man
 	m, err := manifest.Load(filepath.Join(dir, "pyproject.toml"))
 	require.NoError(t, err)
 	return dir, m
+}
+
+// An image deploy refuses a Dockerfile on a runtime tag with ONBUILD steps, as
+// it refuses one of another Airflow: before it asks where to ship or builds
+// anything. A dags-only deploy builds nothing from it, and goes ahead.
+func TestRunRefusesADockerfileOnAnONBUILDTag(t *testing.T) {
+	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
+	d := &fakeDeployer{}
+	_, err := Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}, d)
+	require.ErrorIs(t, err, scaffold.ErrOnBuildBase)
+	assert.Zero(t, d.imgDeploys+d.deploys+d.confirms+d.resolves, "nothing was asked or shipped")
+
+	_, err = Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod", DagsOnly: true}, &fakeDeployer{})
+	require.NoError(t, err)
+
+	// One astro init could not move (an earlier stage on the tag too) is not
+	// refused: it builds on the tag as before, with a warning.
+	writeFile(t, filepath.Join(dir, "Dockerfile"),
+		"FROM astrocrpublic.azurecr.io/runtime:3.1-12 AS deps\nRUN true\nFROM astrocrpublic.azurecr.io/runtime:3.1-12\n")
+	_, err = Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}, &fakeDeployer{})
+	assert.NotErrorIs(t, err, scaffold.ErrOnBuildBase)
 }
 
 // An image deploy refuses a Dockerfile whose FROM names another Airflow, before
@@ -106,7 +128,7 @@ func TestRunChecksTheRuntimeBuild(t *testing.T) {
 func TestRunWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
 	t.Setenv("NETRC_CONTENT", "machine example.com")
 	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "")
-	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN --mount=type=secret,id=netrc pip install private\n")
+	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2-base\nRUN --mount=type=secret,id=netrc pip install private\n")
 	var warnings []string
 	req := Request{ProjectDir: dir, Manifest: m, LinkName: "prod", Warn: func(s string) { warnings = append(warnings, s) }}
 
@@ -136,7 +158,7 @@ func TestRunWarnsAboutAnUnsuppliedSecretMount(t *testing.T) {
 // error, since the build output has pushed the warning out of sight.
 func TestRunFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
 	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "")
-	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN --mount=type=secret,id=netrc pip install private\n")
+	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2-base\nRUN --mount=type=secret,id=netrc pip install private\n")
 	req := Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}
 	buildErr := fmt.Errorf("%w: exit status 1", imagebuild.ErrDockerfileBuild)
 
@@ -154,7 +176,7 @@ func TestRunFailedBuildNamesTheUnsuppliedSecretMount(t *testing.T) {
 func TestRunRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
 	t.Setenv("NETRC_CONTENT", "")
 	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "")
-	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2\nRUN --mount=type=secret,id=netrc pip install private\n")
+	writeFile(t, filepath.Join(dir, "Dockerfile"), "FROM astrocrpublic.azurecr.io/runtime:3.1-2-base\nRUN --mount=type=secret,id=netrc pip install private\n")
 	req := Request{ProjectDir: dir, Manifest: m, LinkName: "prod", BuildSecrets: []string{"id=netrc,env=NETRC_CONTENT"}}
 
 	d := &fakeDeployer{}
@@ -170,7 +192,7 @@ func TestRunRefusesABuildSecretWhoseVariableIsUnset(t *testing.T) {
 // An image deploy from a declared Dockerfile warns about the per-machine files
 // its build context would carry into the pushed image, and still deploys.
 func TestRunWarnsAboutLocalFilesInTheContext(t *testing.T) {
-	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
+	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12-base")
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".venv", "bin"), 0o750))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".venv", "bin", "python"), nil, 0o600))
 	var warnings []string

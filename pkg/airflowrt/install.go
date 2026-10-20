@@ -4,6 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"path"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -43,6 +45,29 @@ const InstallHelperPath = ".astro/install-project.py"
 // into a build's context or a project, or addresses an image by what builds it.
 func InstallHelper() []byte {
 	return bytes.Clone(installHelper)
+}
+
+// helperVersionRe is the stamp in the helper's header, "# astro-install-helper:
+// <n>". It goes up whenever the helper's content changes (install_test.go pins
+// the content to the number), so a project's copy can be judged older or newer
+// than this CLI's without comparing bytes, which an edit of either changes.
+var helperVersionRe = regexp.MustCompile(`(?m)^# astro-install-helper: (\d+)[ \t]*\r?$`)
+
+// InstallHelperVersion is the version stamp this CLI's install helper carries.
+func InstallHelperVersion() int {
+	v, _ := HelperVersion(installHelper)
+	return v
+}
+
+// HelperVersion is the version stamp in an install helper's source, data, and
+// false when it carries none: a copy older than the stamp, or not the helper.
+func HelperVersion(data []byte) (int, bool) {
+	m := helperVersionRe.FindSubmatch(data)
+	if m == nil {
+		return 0, false
+	}
+	v, err := strconv.Atoi(string(m[1]))
+	return v, err == nil
 }
 
 // The install inputs the helper writes (install-project.py's REQUIREMENTS,

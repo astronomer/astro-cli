@@ -36,7 +36,7 @@ func TestTheLocalBuildAndThePackagedImageAgreeOnADockerfile(t *testing.T) {
 	write(t, filepath.Join(p.Dir, "Dockerfile"),
 		"FROM "+runtimeImageFor(t, p)+"\n"+
 			"RUN echo from-my-dockerfile > /tmp/astro-agrees\n")
-	declareDockerfile(t, p)
+	declareDockerfileOnBase(t, p)
 
 	// Path one: the local build, asked through the running container.
 	p.runSlow("local", "start", "--docker").requireSuccess()

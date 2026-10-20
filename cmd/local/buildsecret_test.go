@@ -44,7 +44,7 @@ func (s planRecorder) ReadStatus(string) (localrt.Status, error) {
 
 const (
 	declaredDockerfile = "dockerfile = 'Dockerfile'\n"
-	matchingBase       = "astrocrpublic.azurecr.io/runtime:3.1-2"
+	matchingBase       = "astrocrpublic.azurecr.io/runtime:3.1-2-base"
 )
 
 func TestBuildSecretReachesTheDockerfileBuild(t *testing.T) {

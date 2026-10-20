@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -92,6 +93,18 @@ func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) (
 	}
 	if envWarning != "" {
 		warnings = append(warnings, envWarning)
+	}
+	if w := scaffold.InstallHelperWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
+		warnings = append(warnings, w)
+	}
+	// One astro init would move off its ONBUILD tag was refused when the
+	// manifest was loaded (loadCheckedManifest); one it would not builds as
+	// before, and says so.
+	switch w, err := scaffold.CheckDockerfileOnBuild(req.ProjectDir, req.Manifest); {
+	case err != nil:
+		return nil, err
+	case w != "":
+		warnings = append(warnings, w)
 	}
 	return warnings, nil
 }

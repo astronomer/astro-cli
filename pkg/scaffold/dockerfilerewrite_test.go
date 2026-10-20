@@ -92,7 +92,7 @@ func TestDockerfileRewriteOfGates(t *testing.T) {
 		{name: "a base that is not Astro Runtime", body: "FROM python:3.12-slim\nENV A=b\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			rw, blocker, _ := dockerfileRewriteOf([]byte(tc.body))
+			rw, blocker, _ := dockerfileRewriteOf(fileDockerfile, []byte(tc.body))
 			assert.Nil(t, rw)
 			if tc.blocker == "" {
 				assert.Empty(t, blocker)
@@ -115,7 +115,7 @@ func TestDockerfileRewriteOfKeepsEarlierStagesAndTheAlias(t *testing.T) {
 		"\n" +
 		"COPY --from=builder /wheels /wheels\n" +
 		"ENV TZ=UTC"
-	rw, blocker, _ := dockerfileRewriteOf([]byte(body))
+	rw, blocker, _ := dockerfileRewriteOf(fileDockerfile, []byte(body))
 	require.Empty(t, blocker)
 	require.NotNil(t, rw)
 
