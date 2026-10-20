@@ -25,11 +25,6 @@ type Editor interface {
 	// TOML decoding. It is the read half of read-modify-write: check
 	// existence before Set, or an array's length before appending.
 	Get(key []string) (any, bool)
-	// GetLines is Get for the array at key, with the comments between its
-	// elements in place as Comment values, so a Set of what it returns keeps
-	// them. It reports false when the value at key is not an array. An
-	// editor that keeps no comments returns the elements alone.
-	GetLines(key []string) ([]any, bool)
 	// Set writes value at key, one path element per key part, creating
 	// missing intermediate tables. A path element stepping into an array is
 	// a 0-based decimal index; an index equal to the array's length appends.
@@ -60,6 +55,32 @@ type Editor interface {
 // writes it: the text after the '#' and the one space that follows it. It
 // is never a value, and Get leaves it out.
 type Comment string
+
+// LineGetter is an Editor that reads an array with its comments. Both editors
+// here are one; an Editor from elsewhere need not be, which is why it is not
+// part of Editor.
+type LineGetter interface {
+	// GetLines is Get for the array at key, with the comments between its
+	// elements in place as Comment values, so a Set of what it returns keeps
+	// them. It reports false when the value at key is not an array. An
+	// editor that keeps no comments returns the elements alone.
+	GetLines(key []string) ([]any, bool)
+}
+
+// GetLines reads the array at key in e with its comments when e is a
+// LineGetter, and its elements alone, as Get decodes them, when it is not.
+// It reports false when the value at key is not an array.
+func GetLines(e Editor, key []string) ([]any, bool) {
+	if lines, ok := e.(LineGetter); ok {
+		return lines.GetLines(key)
+	}
+	v, ok := e.Get(key)
+	if !ok {
+		return nil, false
+	}
+	list, isArray := v.([]any)
+	return list, isArray
+}
 
 // ErrCommentsUnsupported refuses a Set of an array holding a Comment where the
 // array cannot carry one: inside an inline table, where TOML allows no line

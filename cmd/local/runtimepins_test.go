@@ -46,6 +46,8 @@ type pinsRun struct {
 	build                runtimeversions.AstroBuild
 	lookupErr, freezeErr error
 	freeze               []string
+	// noCatalog has the runtime catalog unreadable.
+	noCatalog bool
 }
 
 // pinsResult is what a pinsRun left: the manifest, what it printed, and what
@@ -80,7 +82,12 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { return c }
+	d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog {
+		if p.noCatalog {
+			return nil
+		}
+		return c
+	}
 	d.RuntimePins = func(_ context.Context, build, python string) ([]string, error) {
 		res.freezeAsked = append(res.freezeAsked, build, python)
 		return p.freeze, p.freezeErr
@@ -169,6 +176,28 @@ func TestStartTakesOutTheRuntimePinsOfAMovedPin(t *testing.T) {
 	r := pinsRun{src: moved, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339}.start(t)
 	if strings.Contains(r.manifest, "+astro.") || strings.Contains(r.manifest, "pandas==") || strings.Contains(r.manifest, "Astro Runtime") {
 		t.Errorf("pins of the old release stayed beside the moved pin:\n%s", r.manifest)
+	}
+}
+
+// The catalog cannot be read, so which build carries the pin cannot be told.
+// The pins stay while their Airflow is one the pin covers, and come out once
+// the pin has moved off it.
+func TestStartWithoutTheCatalogKeepsOnlyPinsThePinStillCovers(t *testing.T) {
+	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+
+	kept := pinsRun{src: written, build: build332, freeze: freeze339, noCatalog: true}.start(t)
+	if !strings.Contains(kept.manifest, "pandas==2.2.3") {
+		t.Errorf("the pins came out with the pin unchanged:\n%s", kept.manifest)
+	}
+
+	build322 := runtimeversions.AstroBuild{Index: build332.Index, Airflow: "3.2.2+astro.1", TaskSDK: "1.2.2+astro.1"}
+	moved := strings.Replace(written, "apache-airflow==3.3.*", "apache-airflow==3.2.*", 1)
+	r := pinsRun{src: moved, build: build322, freeze: freeze339, noCatalog: true}.start(t)
+	if strings.Contains(r.manifest, "pandas==") || strings.Contains(r.manifest, "Astro Runtime") {
+		t.Errorf("pins of Airflow 3.3.2 stayed beside apache-airflow==3.2.*:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.out, "are of Airflow 3.3.2, which the Airflow requirement no longer covers") {
+		t.Errorf("the start did not say why:\n%s", r.out)
 	}
 }
 

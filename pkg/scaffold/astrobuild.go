@@ -188,7 +188,7 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 // cannot carry the comments that mark them (tomledit.ErrCommentsUnsupported);
 // the rest is written.
 func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) (refused bool, err error) {
-	lines, _ := ed.GetLines(constraintsKey)
+	lines, _ := tomledit.GetLines(ed, constraintsKey)
 	head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
 	head, tail = withoutAstroPins(head), withoutAstroPins(tail)
 	if len(dists) > 0 {

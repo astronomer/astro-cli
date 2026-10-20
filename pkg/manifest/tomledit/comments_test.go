@@ -67,7 +67,7 @@ func TestCommentsInAnArrayAreWrittenAndReadBack(t *testing.T) {
 			if tc.back != nil {
 				wantLines = tc.back
 			}
-			lines, ok := back.GetLines(pinsKey)
+			lines, ok := GetLines(back, pinsKey)
 			if !ok || !reflect.DeepEqual(lines, wantLines) {
 				t.Errorf("GetLines = %#v, want %#v", lines, wantLines)
 			}
@@ -87,7 +87,7 @@ func TestGetLinesReadsNoCommentInsideAString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, _ := e.GetLines(pinsKey)
+	got, _ := GetLines(e, pinsKey)
 	want := []any{"x @ https://h/x.whl#sha256=ab", Comment("pinned")}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("GetLines = %#v, want %#v", got, want)
@@ -100,10 +100,10 @@ func TestGetLinesOfWhatIsNotAnArray(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, ok := e.GetLines([]string{"tool", "uv", "x"}); ok {
+		if _, ok := GetLines(e, []string{"tool", "uv", "x"}); ok {
 			t.Error("GetLines of a string reported an array")
 		}
-		if _, ok := e.GetLines([]string{"tool", "uv", "missing"}); ok {
+		if _, ok := GetLines(e, []string{"tool", "uv", "missing"}); ok {
 			t.Error("GetLines of a missing key reported an array")
 		}
 	}
@@ -119,7 +119,7 @@ func TestTheRewriteEditorLeavesCommentsOut(t *testing.T) {
 	if err := e.Set(pinsKey, []any{"x", Comment("dropped"), "y"}); err != nil {
 		t.Fatal(err)
 	}
-	got, _ := e.GetLines(pinsKey)
+	got, _ := GetLines(e, pinsKey)
 	if !reflect.DeepEqual(got, []any{"x", "y"}) {
 		t.Errorf("GetLines = %#v, want the values alone", got)
 	}
@@ -154,6 +154,22 @@ func TestArrayLinesReadsBytesAlreadyDecoded(t *testing.T) {
 	got := ArrayLines(src, pinsKey, []any{"x", "y"})
 	if want := []any{"x", Comment("mine"), "y"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("ArrayLines = %#v, want %#v", got, want)
+	}
+}
+
+// foreignEditor is an Editor from outside this package: it has Editor's
+// methods and no GetLines.
+type foreignEditor struct{ Editor }
+
+// GetLines asks an Editor that cannot read comments for its values alone.
+func TestGetLinesOfAnEditorWithoutThem(t *testing.T) {
+	e, err := NewSurgical([]byte("[tool.uv]\nconstraint-dependencies = [\n    'x',\n    # mine\n    'y',\n]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := GetLines(foreignEditor{e}, pinsKey)
+	if !ok || !reflect.DeepEqual(got, []any{"x", "y"}) {
+		t.Errorf("GetLines = %#v, %v; want the values alone", got, ok)
 	}
 }
 

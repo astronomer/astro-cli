@@ -156,14 +156,15 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 	// What the project already gets: what it lists, and what its lock brings
 	// in beside that. A module one of these provides is missing from an
 	// environment that is out of date, which adding a dependency does not fix.
+	// What it lists is read by the rule the runtime pins use; a file that
+	// cannot be read leaves the dependencies the manifest has.
 	known := lockedDists(project)
-	for _, dep := range m.Project.Dependencies {
-		known[manifest.DistName(dep)] = true
-	}
-	// The extras and dependency groups too, by the rule the runtime pins use.
-	// A file that cannot be read leaves the dependencies the manifest has.
 	if listed, err := scaffold.ListedPackages(project); err == nil {
 		maps.Copy(known, listed)
+	} else {
+		for _, dep := range m.Project.Dependencies {
+			known[manifest.DistName(dep)] = true
+		}
 	}
 	findings := slices.Clone(res.Findings)
 	for i := range findings {

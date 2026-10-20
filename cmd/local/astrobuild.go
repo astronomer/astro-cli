@@ -83,12 +83,16 @@ func stalePin(m *manifest.Manifest) bool {
 			continue
 		}
 		_, version, _ := strings.Cut(c, "==")
-		release, _, _ := strings.Cut(strings.TrimSpace(version), "+")
-		if release != pin && !strings.HasPrefix(release, pin+".") {
+		if !pinCovers(pin, astroRelease(version)) {
 			return true
 		}
 	}
 	return false
+}
+
+// pinCovers reports whether an Airflow pin ("3.3", "3.3.2") covers a release.
+func pinCovers(pin, release string) bool {
+	return release == pin || strings.HasPrefix(release, pin+".")
 }
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
@@ -217,6 +221,15 @@ func (c *cli) runtimePins(ctx context.Context, m *manifest.Manifest, image runti
 	case m.UV.ExcludeNewer != "", res.build.Airflow == "", errors.Is(image.err, scaffold.ErrNoRuntimeBuild):
 		return none
 	case image.err != nil, image.python == "":
+		// The build cannot be told, for want of a catalog. The pins there stay
+		// while the Airflow they were written beside is one the pin still
+		// covers; a pin that moved off it leaves them another Airflow's.
+		recorded := releaseIn(m.UV.ConstraintDependencies, runtimeversions.DistAirflow)
+		if m.UV.RuntimeBuild != "" && recorded != "" && !pinCovers(m.Airflow().Pin, recorded) {
+			res.pinsErr = fmt.Errorf("%s holds no runtime pins: those of Astro Runtime %s are of Airflow %s, which the Airflow requirement no longer covers, and which build carries the new one cannot be told without the runtime catalog",
+				manifest.Marker, m.UV.RuntimeBuild, recorded)
+			return none
+		}
 		return nil
 	}
 	freeze, err := c.d.RuntimePins(ctx, image.build, image.python)

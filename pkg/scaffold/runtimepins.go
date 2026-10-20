@@ -179,7 +179,7 @@ func ownPackages(ed tomledit.Editor, constraints []any) map[string]bool {
 // out of reach must still let pandas go, or uv has nothing to lock.
 func PruneRuntimePins(dir string, wrap func(run func() error) error) error {
 	return EditManifest(dir, wrap, func(_ *manifest.Manifest, ed tomledit.Editor) error {
-		lines, _ := ed.GetLines(constraintsKey)
+		lines, _ := tomledit.GetLines(ed, constraintsKey)
 		head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
 		if len(current) == 0 {
 			return nil

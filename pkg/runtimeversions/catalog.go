@@ -236,13 +236,15 @@ func (c *Catalog) NewestPublishedRuntimeFor(airflowPin string) (string, bool) {
 
 // AirflowFor is the exact Airflow a deployment of this project runs: the one
 // the runtime build carries when the manifest names one, and otherwise the one
-// the newest build of the pin carries, which is what the series image tag
-// resolves to.
+// the newest published build of the pin carries, which is what the series
+// image tag resolves to. A build the catalog dates after today has no image
+// yet, so it is not counted: the build a project's runtime pins are of
+// (NewestPublishedRuntimeFor) and the Airflow it is held to are one.
 func (c *Catalog) AirflowFor(airflowPin, runtime string) (string, bool) {
 	tag := runtime
 	if tag == "" {
 		var ok bool
-		if tag, ok = c.NewestRuntimeFor(airflowPin); !ok {
+		if tag, ok = c.NewestPublishedRuntimeFor(airflowPin); !ok {
 			return "", false
 		}
 	}
