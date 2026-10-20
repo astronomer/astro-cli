@@ -315,7 +315,7 @@ func TestAstroBuildTagIsContentAddressed(t *testing.T) {
 // bytes instead, so the generated recipe does not reach it.
 func TestContentHashCoversTheGeneratedRecipe(t *testing.T) {
 	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
-	generated, err := contentHash(base, "linux/amd64", nil, nil, nil, "", "", declaredDockerfile{})
+	generated, err := contentHash(base, "linux/amd64", "inputs", "", declaredDockerfile{})
 	require.NoError(t, err)
 
 	h := sha256.New()
@@ -325,31 +325,34 @@ func TestContentHashCoversTheGeneratedRecipe(t *testing.T) {
 	assert.NotEqual(t, withoutRecipe, generated, "the generated Dockerfile is hashed")
 
 	fmt.Fprintf(h, "%s\x00%x\x00", "generated-dockerfile", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base))))
-	fmt.Fprintf(h, "%s\x00%x\x00", "install-helper", sha256.Sum256(imagebuild.InstallHelper()))
+	fmt.Fprintf(h, "%s\x00%s\x00", "install-inputs", "inputs")
 	assert.Equal(t, fmt.Sprintf("%x", h.Sum(nil))[:7], generated)
 }
 
-// What the install helper reads is part of a generated image's address:
-// uv.lock's versions are the ones installed, so editing the lock moves the
-// tag, as does pyproject.toml, which the image also carries.
+// What the install reads is part of a generated image's address: uv.lock's
+// versions are the ones installed, so editing the lock moves the tag, as does
+// pyproject.toml, and the helper that reads them.
 func TestContentHashCoversTheManifestAndLock(t *testing.T) {
 	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
 	project := t.TempDir()
 	hash := func() string {
 		t.Helper()
-		got, err := contentHash(base, "linux/amd64", nil, nil, nil, "", project, declaredDockerfile{})
+		inputs, err := imagebuild.InstallInputsDigest(imagebuild.Request{ManifestDir: project})
+		require.NoError(t, err)
+		got, err := contentHash(base, "linux/amd64", inputs, "", declaredDockerfile{})
 		require.NoError(t, err)
 		return got
 	}
-	noFiles := hash()
 	require.NoError(t, os.WriteFile(filepath.Join(project, "pyproject.toml"), []byte("[project]\n"), 0o600))
 	withManifest := hash()
+	require.NoError(t, os.WriteFile(filepath.Join(project, "pyproject.toml"), []byte("[project]\ndependencies = ['pandas']\n"), 0o600))
+	edited := hash()
 	require.NoError(t, os.WriteFile(filepath.Join(project, "uv.lock"), []byte("version = 1\n"), 0o600))
 	withLock := hash()
 	require.NoError(t, os.WriteFile(filepath.Join(project, "uv.lock"), []byte("version = 1\n# relocked\n"), 0o600))
 	relocked := hash()
-	assert.NotEqual(t, noFiles, withManifest, "pyproject.toml is hashed")
-	assert.NotEqual(t, withManifest, withLock, "uv.lock is hashed")
+	assert.NotEqual(t, withManifest, edited, "pyproject.toml is hashed")
+	assert.NotEqual(t, edited, withLock, "uv.lock is hashed")
 	assert.NotEqual(t, withLock, relocked, "editing uv.lock moves the tag")
 }
 

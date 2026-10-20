@@ -396,12 +396,12 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	}
 
 	contextDir := filepath.Join(req.WorkDir, buildContextDir)
-	if req.ProjectFiles != "" {
-		// Started empty, so a file deleted from the project since an earlier
-		// build in the same WorkDir is not carried into this one.
-		if err := os.RemoveAll(contextDir); err != nil {
-			return "", fmt.Errorf("clearing %s: %w", contextDir, err)
-		}
+	// Started empty, so a file deleted from the project since an earlier build
+	// in the same WorkDir is not carried into this one, and an install input
+	// an earlier build wrote (a uv.lock since deleted) is not read by this one.
+	// The directory is the build's own; local Docker mode reuses it every start.
+	if err := os.RemoveAll(contextDir); err != nil {
+		return "", fmt.Errorf("clearing %s: %w", contextDir, err)
 	}
 	if err := os.MkdirAll(contextDir, contextDirPerm); err != nil {
 		return "", fmt.Errorf("creating %s: %w", contextDir, err)

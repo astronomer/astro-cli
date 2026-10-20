@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,7 +189,11 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, breq.ManifestDir, declaredDockerfile{
+	inputs, err := generatedInputs(breq)
+	if err != nil {
+		return Result{}, err
+	}
+	hash, err := contentHash(breq.BaseImage, req.Platform, inputs, breq.ProjectFiles, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -412,10 +415,19 @@ func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb 
 	return nil
 }
 
+// generatedInputs is imagebuild.InstallInputsDigest for a generated build, and
+// "" for a declared Dockerfile, which installs what it says itself.
+func generatedInputs(breq imagebuild.Request) (string, error) {
+	if breq.FromDeclaredDockerfile() {
+		return "", nil
+	}
+	return imagebuild.InstallInputsDigest(breq)
+}
+
 // contentHash is a short digest of the inputs that change the image, so the
-// same inputs produce the same tag and a rebuild is a cache hit. Dependencies
-// and packages are sorted first, so reordering the manifest does not move the
-// tag.
+// same inputs produce the same tag and a rebuild is a cache hit. For a
+// generated build, installInputs is imagebuild.InstallInputsDigest: the files
+// the install reads, so editing pyproject.toml or uv.lock moves the tag.
 // contentHash is the content address of the image this request would build.
 //
 // A generated image carries the project's files (imagebuild's ProjectFiles),
@@ -477,7 +489,7 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-func contentHash(base, platform string, deps, findLinks, packages []string, projectFiles, manifestDir string, df declaredDockerfile) (string, error) {
+func contentHash(base, platform, installInputs, projectFiles string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -490,26 +502,11 @@ func contentHash(base, platform string, deps, findLinks, packages []string, proj
 		// installs is a different image from the same manifest, so it moves
 		// the tag rather than reusing one an older recipe built.
 		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base)))))
-		// So is the helper that turns the manifest into the install, and what
-		// it reads: pyproject.toml, and uv.lock, whose versions are the ones
-		// installed. ProjectFilesDigest leaves both out, since the build
-		// writes them itself.
-		writeField("install-helper", fmt.Sprintf("%x", sha256.Sum256(imagebuild.InstallHelper())))
-		if manifestDir != "" {
-			for _, name := range []string{"pyproject.toml", "uv.lock"} {
-				data, err := os.ReadFile(filepath.Join(manifestDir, name))
-				if errors.Is(err, fs.ErrNotExist) {
-					continue
-				}
-				if err != nil {
-					return "", fmt.Errorf("reading the project's %s: %w", name, err)
-				}
-				writeField(name, fmt.Sprintf("%x", sha256.Sum256(data)))
-			}
-		}
-	}
-	for _, l := range findLinks {
-		writeField("find-links", l)
+		// So is everything the install reads (imagebuild.InstallInputsDigest):
+		// the helper, pyproject.toml, and uv.lock, whose versions are the ones
+		// installed. The dependencies, packages and index pages are all in
+		// those, so no list of them is hashed besides.
+		writeField("install-inputs", installInputs)
 	}
 	if projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
@@ -517,12 +514,6 @@ func contentHash(base, platform string, deps, findLinks, packages []string, proj
 			return "", err
 		}
 		writeField("project-files", digest)
-	}
-	for _, d := range sortedCopy(deps) {
-		writeField("dep", d)
-	}
-	for _, p := range sortedCopy(packages) {
-		writeField("pkg", p)
 	}
 	if df.abs != "" {
 		writeField("dockerfile", filepath.ToSlash(df.rel))

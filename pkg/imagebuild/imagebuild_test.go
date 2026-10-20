@@ -99,7 +99,8 @@ func TestBuildWritesTheInstallDockerfile(t *testing.T) {
 	base := req.BaseImage + "-base"
 	assert.Equal(t, "FROM "+base+" AS astro-install\n"+
 		"USER root\n"+
-		"RUN --mount=type=bind,target=/tmp/astro-project python /tmp/astro-project/.astro/install-project.py --project /tmp/astro-project --out /tmp/astro-install\n"+
+		"COPY pyproject.toml uv.lock* .astro/install-find-links.txt* .astro/install-project.py /tmp/astro-project/\n"+
+		"RUN python /tmp/astro-project/install-project.py --project /tmp/astro-project --out /tmp/astro-install\n"+
 		"FROM "+base+"\n"+
 		"COPY --from=astro-install /tmp/astro-install/packages.txt .\n"+
 		"USER root\n"+
@@ -160,12 +161,62 @@ func TestBuildWithoutALockInstallsUnpinned(t *testing.T) {
 func TestBuildWritesFindLinks(t *testing.T) {
 	req := testRequest(t)
 	req.Dependencies = []string{"private-lib", "pandas"}
-	req.FindLinks = []string{"https://pypi.acme.example/simple/private-lib/"}
+	// Passed through as they are, whatever their shape.
+	req.FindLinks = []string{"https://pypi.acme.example/simple/private-lib/", "https://files.acme.example/wheels/index.html", "./vendor"}
 
 	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	reqs, _, _ := installLists(t, filepath.Join(req.WorkDir, buildContextDir))
-	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n", reqs)
+	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\n"+
+		"--find-links https://files.acme.example/wheels/index.html\n"+
+		"--find-links ./vendor\nprivate-lib\npandas\n", reqs)
+}
+
+// Local Docker mode builds in the same WorkDir every start, so the context is
+// cleared each time: a uv.lock the project has since deleted is not pinned
+// from.
+func TestBuildForgetsALockTheProjectDeleted(t *testing.T) {
+	project := t.TempDir()
+	pyproject, lock := lockProject([]string{"pandas"}, "[[package]]\nname = \"pandas\"\nversion = \"2.2.3\"\nsource = { registry = \"https://pypi.org/simple\" }\n")
+	writeTree(t, project, map[string]string{"pyproject.toml": pyproject, "uv.lock": lock})
+	req := testRequest(t)
+	req.ManifestDir = project
+	req.Dependencies = []string{"pandas"}
+	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
+
+	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	_, _, constraints := installLists(t, ctxDir)
+	require.Contains(t, constraints, "pandas==2.2.3")
+
+	require.NoError(t, os.Remove(filepath.Join(project, "uv.lock")))
+	_, err = testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	assert.NoFileExists(t, filepath.Join(ctxDir, uvLockName))
+	reqs, _, constraints := installLists(t, ctxDir)
+	assert.Equal(t, "pandas\n", reqs)
+	assert.Empty(t, constraints)
+}
+
+// A shipped build from a caller that sets ProjectFiles but predates
+// ManifestDir installs from the project's own pyproject.toml, and ships it as
+// it is, not a stand-in written from the request's lists.
+func TestBuildWithoutManifestDirReadsTheShippedProject(t *testing.T) {
+	project := t.TempDir()
+	const pyproject = "[project]\nname = 'p'\ndependencies = ['pandas']\n\n[tool.ruff]\nline-length = 100\n"
+	writeTree(t, project, map[string]string{"pyproject.toml": pyproject})
+	req := testRequest(t)
+	req.ProjectFiles = project
+	req.Dependencies = []string{"pandas"}
+
+	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
+	got, err := os.ReadFile(filepath.Join(ctxDir, pyprojectName))
+	require.NoError(t, err)
+	assert.Equal(t, pyproject, string(got))
+	reqs, _, _ := installLists(t, ctxDir)
+	assert.Equal(t, "pandas\n", reqs)
 }
 
 // The -base suffix is added once: a base already on a -base tag is not

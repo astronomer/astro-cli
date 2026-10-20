@@ -2,13 +2,14 @@ package imagebuild
 
 import (
 	"bytes"
+	"crypto/sha256"
 	_ "embed"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -20,17 +21,20 @@ import (
 // Dockerfile of its own carries it at InstallHelperPath, so `docker build .`
 // needs nothing from the CLI. The helper writes the runtime's install inputs:
 // requirements.txt (the dependencies, without Airflow, a [tool.uv.sources] git
-// or URL source as a direct reference, an index source as a --find-links
-// line), packages.txt ([tool.astro] packages, plus git when a dependency is
-// fetched with it), and, from uv.lock, a constraints file holding each package
-// at the version the lock resolved, which requirements.txt names with -c. So
-// the image installs the versions `uv sync` installs in standalone mode.
+// or URL source as a direct reference), packages.txt ([tool.astro] packages,
+// plus git when a dependency is fetched with it), and, from uv.lock, a
+// constraints file holding each package at the version the lock resolved,
+// which requirements.txt names with -c. So the image installs the versions
+// `uv sync` installs in standalone mode. A dependency an index of its own
+// serves is installed from the exact file the lock recorded, by URL and hash,
+// so PyPI is never asked for it; without a lock it is a --find-links page,
+// which leaves PyPI a candidate too.
 //
-// It runs in a stage of its own (InstallDockerfile), and the install steps copy
-// only what it wrote. The stage reads the whole project and reruns on any edit,
-// in well under a second; the install layers are keyed on the files it wrote,
-// so an edit to pyproject.toml that leaves the lists as they were (a [tool.ruff]
-// setting, the version) keeps them cached.
+// It runs in a stage of its own (InstallDockerfile) over a copy of just its
+// inputs, so an edit elsewhere in the project does not rerun it, and the
+// install steps copy only what it wrote: an edit to pyproject.toml that leaves
+// the lists as they were (a [tool.ruff] setting, the version) keeps the install
+// layers cached.
 
 //go:embed install-project.py
 var installHelper []byte
@@ -46,11 +50,16 @@ func InstallHelper() []byte {
 	return bytes.Clone(installHelper)
 }
 
-// Paths the install stage uses inside the build: the context, mounted read-only
-// for the helper to read, and the directory it writes the install inputs to.
+// installFindLinksPath is where a build request naming no project leaves the
+// find-links pages it was given, one per line, for the helper to pass on as
+// they are (install-project.py's FIND_LINKS).
+const installFindLinksPath = ".astro/install-find-links.txt"
+
+// Paths the install stage uses inside the build: where its inputs are copied
+// to, and the directory it writes the install's lists to.
 const (
-	contextMount = "/tmp/astro-project"
-	listsDir     = "/tmp/astro-install"
+	inputsDir = "/tmp/astro-project"
+	listsDir  = "/tmp/astro-install"
 )
 
 // InstallDockerfile is the Dockerfile that installs a project over from, an
@@ -58,8 +67,10 @@ const (
 // the runtime's ONBUILD tag runs as triggers (astro-runtime's
 // image/Dockerfile.onbuild), in the same order and as the same users: the OS
 // packages, then the Python dependencies under the runtime's constraints, then
-// the context's files owned by astro. A generated build runs it as it is; a
-// project's own Dockerfile is this followed by its own steps.
+// the context's files owned by astro. A project's own Dockerfile is this
+// followed by its own steps, and it mounts the netrc secret for the Python
+// install whether or not a build passes one (required=false), since a plain
+// `docker build .` decides that, not the file.
 //
 // The install steps are written out rather than inherited for two reasons. The
 // trigger list has changed across runtimes (the netrc mount is in 3.3-9 but not
@@ -77,19 +88,33 @@ const (
 // apache-airflow pin, which the helper has already removed. The test is POSIX,
 // since a runtime's SHELL is not the same on every line.
 func InstallDockerfile(from string) string {
+	return installDockerfile(from, true)
+}
+
+// installDockerfile is InstallDockerfile, with the Python install's netrc
+// mount left out when mountNetrc is false: a generated build mounts the secret
+// only when the build passes it.
+func installDockerfile(from string, mountNetrc bool) string {
+	netrc := ""
+	if mountNetrc {
+		netrc = "--mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false "
+	}
 	return "FROM " + from + " AS astro-install\n" +
-		// Root, because the context keeps its files' modes and owners, and a
-		// project's may be readable by its owner alone.
+		// Root, because the context keeps its files' modes, and a project's may
+		// be readable by its owner alone.
 		"USER root\n" +
-		"RUN --mount=type=bind,target=" + contextMount + " python " + contextMount + "/" + InstallHelperPath +
-		" --project " + contextMount + " --out " + listsDir + "\n" +
+		// Just the inputs, so an edit elsewhere in the project does not rerun
+		// the stage. uv.lock and the find-links file are optional: a wildcard
+		// that matches nothing copies nothing.
+		"COPY " + pyprojectName + " " + uvLockName + "* " + installFindLinksPath + "* " + InstallHelperPath + " " + inputsDir + "/\n" +
+		"RUN python " + inputsDir + "/" + filepath.Base(InstallHelperPath) + " --project " + inputsDir + " --out " + listsDir + "\n" +
 		"FROM " + from + "\n" +
 		"COPY --from=astro-install " + listsDir + "/" + packagesName + " .\n" +
 		"USER root\n" +
 		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
 		"elif [ -s " + packagesName + " ]; then apt-get update && cat " + packagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
 		"COPY --from=astro-install " + listsDir + "/" + requirementsName + " " + listsDir + "/" + lockConstraintsName + " ./\n" +
-		"RUN --mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false " +
+		"RUN " + netrc +
 		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
 		"else pip install --no-cache-dir --root-user-action=ignore -r " + requirementsName + "; fi\n" +
 		"USER astro\n" +
@@ -101,7 +126,7 @@ func InstallDockerfile(from string) string {
 // addresses the image by what builds it: `astro package astro`'s content tag
 // hashes it, so a change to the recipe is a change to the tag.
 func GeneratedDockerfile(baseImage string) string {
-	return InstallDockerfile(baseOf(baseImage))
+	return installDockerfile(baseOf(baseImage), true)
 }
 
 // The runtime's install scripts, from runtime 11.0.0 on: one installs
@@ -118,70 +143,90 @@ const (
 	uvLockName    = "uv.lock"
 )
 
-// writeInstallInputs writes what the install stage reads into the generated
-// build's context: the helper, and the project's pyproject.toml and uv.lock
-// (req.ManifestDir), or, for a request that names no project or one without a
-// pyproject.toml, a pyproject.toml stating its Dependencies, FindLinks and
-// Packages.
-func writeInstallInputs(contextDir string, req Request) error {
-	var data []byte
-	if req.ManifestDir != "" {
-		var err error
-		data, err = os.ReadFile(filepath.Join(req.ManifestDir, pyprojectName))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("reading the project's %s: %w", pyprojectName, err)
-		}
+// installInputs are the files a generated build's install stage reads, by their
+// slash-separated path in the context: the helper, and the project's
+// pyproject.toml and uv.lock as they are. The project is req.ManifestDir, else
+// the ProjectFiles the image carries (a caller that predates ManifestDir), so
+// the context's copies are always the project's own. A request with neither, or
+// whose project has no pyproject.toml, gets a pyproject.toml stating its
+// Dependencies and Packages, and its FindLinks pages as they were given.
+func installInputs(req Request) (map[string][]byte, error) {
+	inputs := map[string][]byte{InstallHelperPath: installHelper}
+	project := req.ManifestDir
+	if project == "" {
+		project = req.ProjectFiles
 	}
-	if data != nil {
-		if err := os.WriteFile(filepath.Join(contextDir, pyprojectName), data, filePermRW); err != nil { //nolint:gosec // G703: contextDir is the WorkDir the caller owns, joined with a constant name
-			return fmt.Errorf("writing %s into the build context: %w", pyprojectName, err)
-		}
-		switch lock, err := os.ReadFile(filepath.Join(req.ManifestDir, uvLockName)); {
+	if project != "" {
+		data, err := os.ReadFile(filepath.Join(project, pyprojectName))
+		switch {
 		case errors.Is(err, fs.ErrNotExist):
 		case err != nil:
-			return fmt.Errorf("reading the project's %s: %w", uvLockName, err)
+			return nil, fmt.Errorf("reading the project's %s: %w", pyprojectName, err)
 		default:
-			if err := os.WriteFile(filepath.Join(contextDir, uvLockName), lock, filePermRW); err != nil { //nolint:gosec // G703: as above
-				return fmt.Errorf("writing %s into the build context: %w", uvLockName, err)
+			inputs[pyprojectName] = data
+			lock, err := os.ReadFile(filepath.Join(project, uvLockName))
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+			case err != nil:
+				return nil, fmt.Errorf("reading the project's %s: %w", uvLockName, err)
+			default:
+				inputs[uvLockName] = lock
 			}
+			return inputs, nil
 		}
-	} else if err := os.WriteFile(filepath.Join(contextDir, pyprojectName), requestPyproject(req), filePermRW); err != nil {
-		return fmt.Errorf("writing %s into the build context: %w", pyprojectName, err)
 	}
-	helper := filepath.Join(contextDir, filepath.FromSlash(InstallHelperPath))
-	if err := os.MkdirAll(filepath.Dir(helper), contextDirPerm); err != nil {
-		return fmt.Errorf("creating %s: %w", filepath.Dir(helper), err)
+	inputs[pyprojectName] = requestPyproject(req)
+	if len(req.FindLinks) > 0 {
+		inputs[installFindLinksPath] = []byte(strings.Join(req.FindLinks, "\n") + "\n")
 	}
-	if err := os.WriteFile(helper, installHelper, filePermRW); err != nil {
-		return fmt.Errorf("writing the install helper: %w", err)
+	return inputs, nil
+}
+
+// writeInstallInputs writes installInputs into the generated build's context.
+func writeInstallInputs(contextDir string, req Request) error {
+	inputs, err := installInputs(req)
+	if err != nil {
+		return err
+	}
+	for rel, data := range inputs {
+		dst := filepath.Join(contextDir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(dst), contextDirPerm); err != nil {
+			return fmt.Errorf("creating %s: %w", filepath.Dir(dst), err)
+		}
+		if err := os.WriteFile(dst, data, filePermRW); err != nil {
+			return fmt.Errorf("writing %s into the build context: %w", rel, err)
+		}
 	}
 	return nil
 }
 
-// requestPyproject is a pyproject.toml stating a request's lists, for the
-// helper to read when the request names no project: Dependencies as they are,
-// Packages as [tool.astro] packages, and each FindLinks page (an index's page
-// for one package, <index>/<package>/) as the index and the source routing that
-// package to it, which the helper turns back into the same page.
+// InstallInputsDigest is a digest of the files a generated build of req
+// installs from (installInputs: the helper, pyproject.toml, uv.lock), for a
+// caller that addresses the image by what builds it. It covers everything the
+// install reads from the manifest, so the caller hashes no list of its own.
+func InstallInputsDigest(req Request) (string, error) {
+	inputs, err := installInputs(req)
+	if err != nil {
+		return "", err
+	}
+	names := make([]string, 0, len(inputs))
+	for name := range inputs {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	h := sha256.New()
+	for _, name := range names {
+		fmt.Fprintf(h, "%s\x00%x\x00", name, sha256.Sum256(inputs[name]))
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+// requestPyproject is a pyproject.toml stating a request's Dependencies and
+// Packages, for the helper to read when the request names no project.
 func requestPyproject(req Request) []byte {
-	var b strings.Builder
-	b.WriteString("[project]\nname = \"astro-generated\"\nversion = \"0\"\n")
-	b.WriteString("dependencies = " + tomlList(req.Dependencies) + "\n")
-	b.WriteString("\n[tool.astro]\npackages = " + tomlList(req.Packages) + "\n")
-	var sources []string
-	for i, page := range req.FindLinks {
-		index, pkg := path.Split(strings.TrimSuffix(page, "/"))
-		if pkg == "" || index == "" {
-			continue
-		}
-		name := fmt.Sprintf("find-links-%d", i)
-		b.WriteString("\n[[tool.uv.index]]\nname = " + tomlString(name) + "\nurl = " + tomlString(strings.TrimSuffix(index, "/")) + "\n")
-		sources = append(sources, tomlString(pkg)+" = { index = "+tomlString(name)+" }")
-	}
-	if len(sources) > 0 {
-		b.WriteString("\n[tool.uv.sources]\n" + strings.Join(sources, "\n") + "\n")
-	}
-	return []byte(b.String())
+	return []byte("[project]\nname = \"astro-generated\"\nversion = \"0\"\n" +
+		"dependencies = " + tomlList(req.Dependencies) + "\n" +
+		"\n[tool.astro]\npackages = " + tomlList(req.Packages) + "\n")
 }
 
 // tomlString quotes s as a TOML basic string: a backslash, a quote and any

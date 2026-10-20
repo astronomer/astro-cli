@@ -45,13 +45,37 @@ func installLists(t *testing.T, dir string) (requirements, packages, constraints
 // at runtimeConstraints.
 func installListsWith(t *testing.T, dir, runtimeConstraints string) (requirements, packages, constraints string) {
 	t.Helper()
+	out := runHelper(t, dir, helperRun{runtimeConstraints: runtimeConstraints})
+	return out.requirements, out.packages, out.constraints
+}
+
+// helperRun is how runHelper runs the helper: the runtime constraints file it
+// reads ("" for none), and environment variables besides the test's own.
+type helperRun struct {
+	runtimeConstraints string
+	env                []string
+}
+
+// helperOutput is what one run of the helper wrote, and its warnings.
+type helperOutput struct {
+	requirements, packages, constraints, stderr string
+}
+
+// runHelper runs the install helper over dir as the install stage does,
+// skipping the test when the host has no Python to run it on.
+func runHelper(t *testing.T, dir string, r helperRun) helperOutput {
+	t.Helper()
 	py := hostPython(t)
 	if py == "" {
 		t.Skip("no Python 3.8+ with tomllib or tomli on PATH to run the install helper on")
 	}
+	if r.runtimeConstraints == "" {
+		r.runtimeConstraints = filepath.Join(t.TempDir(), "no-runtime-constraints")
+	}
 	out := t.TempDir()
 	var stderr bytes.Buffer
-	cmd := exec.Command(py, filepath.Join(dir, filepath.FromSlash(InstallHelperPath)), "--project", dir, "--out", out, "--runtime-constraints", runtimeConstraints)
+	cmd := exec.Command(py, filepath.Join(dir, filepath.FromSlash(InstallHelperPath)), "--project", dir, "--out", out, "--runtime-constraints", r.runtimeConstraints)
+	cmd.Env = append(os.Environ(), r.env...)
 	cmd.Stderr = &stderr
 	require.NoError(t, cmd.Run(), stderr.String())
 	read := func(name string) string {
@@ -59,8 +83,12 @@ func installListsWith(t *testing.T, dir, runtimeConstraints string) (requirement
 		require.NoError(t, err, name)
 		return string(data)
 	}
-	return read(requirementsName), read(packagesName), read(lockConstraintsName)
+	return helperOutput{read(requirementsName), read(packagesName), read(lockConstraintsName), stderr.String()}
 }
+
+// withoutPackaging runs the helper as on a Python whose packaging it cannot
+// use, so it falls back to its own marker evaluator and specifier comparison.
+var withoutPackaging = []string{"ASTRO_INSTALL_PROJECT_NO_PACKAGING=1"}
 
 // helperProject is a build context holding the install helper and the given
 // pyproject.toml and, when lock is not "", uv.lock.
@@ -156,13 +184,22 @@ func TestInstallHelperPackages(t *testing.T) {
 }
 
 // lockProject is a pyproject.toml whose dependencies are deps, and a uv.lock
-// resolving them: the project itself, then packages.
+// resolving them: the project itself, recording each dependency's name and
+// specifier as uv does, then packages.
 func lockProject(deps []string, packages string) (pyproject, lock string) {
 	quoted := make([]string, len(deps))
 	requiresDist := make([]string, len(deps))
 	for i, d := range deps {
 		quoted[i] = "'" + d + "'"
-		requiresDist[i] = `{ name = "` + strings.Fields(d)[0] + `" }`
+		name, spec := d, ""
+		if at := strings.IndexAny(d, "<>=!~"); at >= 0 {
+			name, spec = d[:at], d[at:]
+		}
+		requiresDist[i] = `{ name = "` + name + `"`
+		if spec != "" {
+			requiresDist[i] += `, specifier = "` + spec + `"`
+		}
+		requiresDist[i] += " }"
 	}
 	pyproject = "[project]\nname = 'p'\ndependencies = [" + strings.Join(quoted, ", ") + "]\n"
 	lock = "version = 1\nrequires-python = \">=3.8\"\n\n" +
@@ -171,20 +208,18 @@ func lockProject(deps []string, packages string) (pyproject, lock string) {
 	return pyproject, lock
 }
 
+// The registry entry of a package in a uv.lock.
+func lockEntry(name, version string) string {
+	return "[[package]]\nname = \"" + name + "\"\nversion = \"" + version + "\"\nsource = { registry = \"https://pypi.org/simple\" }\n\n"
+}
+
 // With a uv.lock, every package the lock resolved from an index is held at
 // its version, through a constraints file requirements.txt names with -c.
+// The same with packaging and with the helper's own marker evaluator, which a
+// runtime whose packaging cannot read a resolution marker falls back to.
 func TestInstallHelperPinsTheLocksVersions(t *testing.T) {
-	pyproject, lock := lockProject([]string{"apache-airflow", "pandas", "six"}, `
-[[package]]
-name = "pandas"
-version = "2.2.3"
-source = { registry = "https://pypi.org/simple" }
-
-[[package]]
-name = "Python_Dateutil"
-version = "2.9.0"
-source = { registry = "https://pypi.org/simple" }
-
+	pyproject, lock := lockProject([]string{"apache-airflow==2.10.*", "pandas>=2,<3", "six"}, lockEntry("pandas", "2.2.3")+
+		lockEntry("Python_Dateutil", "2.9.0")+`
 [[package]]
 name = "six"
 version = "1.16.0"
@@ -192,49 +227,178 @@ source = { git = "https://github.com/benjaminp/six?rev=1.16.0#65486e4383f9f411da
 
 [[package]]
 name = "apache-airflow"
-version = "3.3.2+astro.2"
-source = { registry = "https://pip.astronomer.io/v2/" }
-
-[[package]]
-name = "apache-airflow-core"
-version = "3.3.2+astro.2"
+version = "2.10.4+astro.1"
 source = { registry = "https://pip.astronomer.io/v2/" }
 
 [[package]]
 name = "sqlalchemy"
-version = "2.1.5"
+version = "1.4.54"
 source = { registry = "https://pypi.org/simple" }
 
 [[package]]
 name = "numpy"
 version = "2.2.6"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = ["python_full_version < '3.0'"]
+resolution-markers = [
+    "python_full_version < '3.0' and platform_machine != 'not-a-machine'",
+    "python_full_version < '3.0' and platform_machine == 'arm64' and sys_platform == 'darwin'",
+]
 
 [[package]]
 name = "numpy"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
-resolution-markers = ["python_full_version >= '3.0'"]
+resolution-markers = [
+    "python_full_version >= '3.0' and platform_machine != 'not-a-machine'",
+    "(python_full_version >= '3.0' and platform_machine == 'arm64' and sys_platform == 'darwin') or python_full_version == '2.7.*'",
+]
 `)
 	dir := helperProject(t, pyproject, lock)
 	runtime := filepath.Join(t.TempDir(), "pip-constraints.txt")
-	require.NoError(t, os.WriteFile(runtime, []byte("apache-airflow==3.3.2+astro.2\nSQLAlchemy==2.0.50\n"), 0o600))
+	require.NoError(t, os.WriteFile(runtime, []byte("apache-airflow==2.10.4+astro.1\nSQLAlchemy==1.4.54\n"), 0o600))
 
-	reqs, _, constraints := installListsWith(t, dir, runtime)
-	assert.Equal(t, "-c "+lockConstraintsName+"\npandas\nsix\n", reqs)
-	// The fork this interpreter is on, by the entries' markers; nothing from
-	// another source, nothing of Airflow's, nothing the runtime pins itself.
-	assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\nnumpy==2.4.6\npandas==2.2.3\npython-dateutil==2.9.0\n", constraints)
+	for name, env := range map[string][]string{"packaging": nil, "own evaluator": withoutPackaging} {
+		t.Run(name, func(t *testing.T) {
+			out := runHelper(t, dir, helperRun{runtimeConstraints: runtime, env: env})
+			assert.Equal(t, "-c "+lockConstraintsName+"\npandas>=2,<3\nsix\n", out.requirements)
+			// The fork this interpreter is on, by the entries' markers; nothing
+			// from another source, nothing of Airflow's, nothing the runtime pins
+			// itself.
+			assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\nnumpy==2.4.6\npandas==2.2.3\npython-dateutil==2.9.0\n", out.constraints)
+			assert.Empty(t, out.stderr)
+		})
+	}
 }
 
-// A lock that does not resolve a dependency pyproject.toml now lists is out of
-// date, and pinning from it could hold a package to a version the new
-// dependency cannot use, so the install goes unpinned, as with no lock.
+// The runtime's constraints file may name another; what that one pins, the
+// runtime decides too.
+func TestInstallHelperFollowsTheRuntimesNestedConstraints(t *testing.T) {
+	pyproject, lock := lockProject([]string{"pandas"}, lockEntry("pandas", "2.2.3")+lockEntry("sqlalchemy", "2.1.5"))
+	dir := helperProject(t, pyproject, lock)
+	runtimeDir := t.TempDir()
+	writeTree(t, runtimeDir, map[string]string{
+		"pip-constraints.txt":  "# the runtime's\n-c more/constraints.txt\n",
+		"more/constraints.txt": "SQLAlchemy==2.0.50\n-r pip-constraints.txt\n",
+	})
+	out := runHelper(t, dir, helperRun{runtimeConstraints: filepath.Join(runtimeDir, "pip-constraints.txt")})
+	assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\npandas==2.2.3\n", out.constraints)
+}
+
+// A lock that no longer resolves pyproject.toml's dependencies as they stand
+// would pin versions the install refuses, so it is set aside with a warning
+// and the install goes unpinned, as with no lock. Never a failed build.
 func TestInstallHelperIgnoresALockThatIsOutOfDate(t *testing.T) {
-	pyproject, lock := lockProject([]string{"pandas"}, "[[package]]\nname = \"pandas\"\nversion = \"2.2.3\"\nsource = { registry = \"https://pypi.org/simple\" }\n")
-	pyproject = strings.Replace(pyproject, "'pandas'", "'pandas', 'polars'", 1)
-	reqs, _, constraints := installLists(t, helperProject(t, pyproject, lock))
-	assert.Equal(t, "pandas\npolars\n", reqs)
-	assert.Empty(t, constraints)
+	pyproject, lock := lockProject([]string{"pandas>=2,<3"}, lockEntry("pandas", "2.2.3"))
+	for name, tc := range map[string]struct {
+		from, to string
+	}{
+		"a dependency added":        {"'pandas>=2,<3'", "'pandas>=2,<3', 'polars'"},
+		"a specifier changed":       {"'pandas>=2,<3'", "'pandas>=3'"},
+		"the same specifier, moved": {"", ""},
+		"an extra added":            {"'pandas>=2,<3'", "'pandas[excel]>=2,<3'"},
+		"a lock it cannot read":     {"", ""},
+	} {
+		for mode, env := range map[string][]string{"packaging": nil, "own evaluator": withoutPackaging} {
+			t.Run(name+"/"+mode, func(t *testing.T) {
+				p, l := strings.Replace(pyproject, tc.from, tc.to, 1), lock
+				switch name {
+				case "the same specifier, moved":
+					p = strings.Replace(pyproject, "'pandas>=2,<3'", "'pandas<3,>=2'", 1)
+				case "a lock it cannot read":
+					l = "this is not = = toml"
+				}
+				out := runHelper(t, helperProject(t, p, l), helperRun{env: env})
+				if name == "the same specifier, moved" {
+					assert.Contains(t, out.constraints, "pandas==2.2.3", "the same requirement, written another way, is not out of date")
+					assert.Empty(t, out.stderr)
+					return
+				}
+				assert.Empty(t, out.constraints)
+				assert.NotContains(t, out.requirements, "-c ")
+				assert.Contains(t, out.stderr, "installing pyproject.toml's dependencies unpinned")
+			})
+		}
+	}
+}
+
+// A dependency an index of its own serves is installed from the file uv.lock
+// recorded, by URL with its hash, so the install never asks PyPI for a package
+// of that name; without a lock it is that index's page for the package, and
+// only for a package the image installs (Airflow comes with the image).
+func TestInstallHelperIndexSources(t *testing.T) {
+	const sources = "\n[[tool.uv.index]]\nname = 'acme'\nurl = 'https://pypi.acme.example/simple/'\nexplicit = true\n" +
+		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n" +
+		"[tool.uv.sources]\nprivate-lib = { index = 'acme' }\napache-airflow = { index = 'astronomer' }\n"
+	pyproject, lock := lockProject([]string{"apache-airflow==3.3.*", "private-lib", "pandas"}, lockEntry("pandas", "2.2.3")+`
+[[package]]
+name = "private-lib"
+version = "1.2.0"
+source = { registry = "https://pypi.acme.example/simple/" }
+sdist = { url = "https://pypi.acme.example/files/private_lib-1.2.0.tar.gz", hash = "sha256:aaaa" }
+wheels = [
+    { url = "https://pypi.acme.example/files/private_lib-1.2.0-cp30-cp30-weirdos_1_0.whl", hash = "sha256:bbbb" },
+    { url = "https://pypi.acme.example/files/private_lib-1.2.0-py3-none-any.whl", hash = "sha256:cccc" },
+]
+`)
+	pyproject += sources
+
+	t.Run("no lock", func(t *testing.T) {
+		out := runHelper(t, helperProject(t, pyproject, ""), helperRun{})
+		assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n", out.requirements)
+	})
+	t.Run("with a lock", func(t *testing.T) {
+		out := runHelper(t, helperProject(t, pyproject, lock), helperRun{})
+		assert.Equal(t, "-c "+lockConstraintsName+"\n"+
+			"private-lib @ https://pypi.acme.example/files/private_lib-1.2.0-py3-none-any.whl#sha256=cccc\npandas\n", out.requirements)
+		assert.NotContains(t, out.constraints, "private-lib", "its file pins it")
+	})
+	t.Run("with a lock, without packaging to pick a wheel", func(t *testing.T) {
+		out := runHelper(t, helperProject(t, pyproject, lock), helperRun{env: withoutPackaging})
+		assert.Contains(t, out.requirements, "private-lib @ https://pypi.acme.example/files/private_lib-1.2.0.tar.gz#sha256=aaaa\n")
+	})
+}
+
+// The fallback evaluator reads the resolution markers uv writes, and refuses
+// what it cannot read rather than guessing.
+func TestInstallHelperMarkerEvaluator(t *testing.T) {
+	py := hostPython(t)
+	if py == "" {
+		t.Skip("no Python 3.8+ with tomllib or tomli on PATH to run the install helper on")
+	}
+	dir := helperProject(t, "[project]\n", "")
+	const script = `
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("h", sys.argv[1])
+h = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(h)
+env = {"python_full_version": "3.11.9", "python_version": "3.11", "sys_platform": "linux", "platform_machine": "x86_64"}
+for line in sys.stdin.read().splitlines():
+    try:
+        print(h.evaluate_marker(line, env))
+    except ValueError:
+        print("refused")
+`
+	cases := []struct{ marker, want string }{
+		{"python_full_version < '3.11' and sys_platform == 'linux'", "False"},
+		{"python_full_version >= '3.11' and sys_platform == 'linux'", "True"},
+		{"(python_full_version == '3.13.*' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version == '3.11.*' and sys_platform == 'linux')", "True"},
+		{"python_version != '3.11' or platform_machine == 'x86_64'", "True"},
+		{"'linux' in sys_platform and python_version < '3.12'", "True"},
+		{"sys_platform not in 'win32 cygwin'", "True"},
+		{"extra == 'test'", "refused"},
+		{"python_full_version >=", "refused"},
+	}
+	var input strings.Builder
+	for _, c := range cases {
+		input.WriteString(c.marker + "\n")
+	}
+	cmd := exec.Command(py, "-c", script, filepath.Join(dir, filepath.FromSlash(InstallHelperPath)))
+	cmd.Stdin = strings.NewReader(input.String())
+	got, err := cmd.Output()
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(got)), "\n")
+	require.Len(t, lines, len(cases))
+	for i, c := range cases {
+		assert.Equal(t, c.want, lines[i], c.marker)
+	}
 }
