@@ -114,7 +114,7 @@ func TestEnvListRefusesDotenvAsUsage(t *testing.T) {
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	astroV1Client = mc
 
-	_, err := execEnvCmd("list", "--workspace-id", "ws-test", "-o", "dotenv")
+	_, err := execEnvCmd("list", "--workspace", "ws-test", "-o", "dotenv")
 	require.ErrorIs(t, err, env.ErrInventoryHasNoValues)
 	assert.True(t, cliout.IsUsage(err), "%v is not a usage error", err)
 	mc.AssertExpectations(t)

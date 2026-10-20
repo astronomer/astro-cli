@@ -76,7 +76,8 @@ func followProjectPreRun(group *cobra.Command) func(*cobra.Command, []string) er
 // resolves the command's Deployment reference and default workspace from it.
 // A link name given as --deployment-id, --deployment-name or a Deployment-id
 // argument is replaced in place by the link's Deployment id. --deployment
-// reaches here as one of those (see routeDeployment).
+// reaches here as one of those (see routeDeployment), or as itself where it
+// stands for none.
 func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 	projectWorkspaceID = ""
 	m, err := projectManifest(config.WorkingPath)
@@ -118,13 +119,24 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 			return projectPick{}, err
 		}
 		deploymentID = id
+	case flags.Changed("deployment"):
+		// A --deployment that stands for no older spelling (astro env list),
+		// so none of the cases above saw it: resolved in place, as
+		// --deployment-id is.
+		f := flags.Lookup("deployment")
+		if id, link, err = projectDeployment(m, f.Value.String()); err != nil {
+			return projectPick{}, err
+		}
+		if err := f.Value.Set(id); err != nil {
+			return projectPick{}, err
+		}
 	}
 
 	pick := projectPick{link: link}
 	if link != "" {
 		pick.domain = m.Astro.LoginDomain()
 	}
-	if flags.Changed("workspace-id") || flags.Changed("all") {
+	if flags.Changed("workspace-id") || flags.Changed("workspace") || flags.Changed("all") {
 		return pick, nil
 	}
 	if link != "" {
