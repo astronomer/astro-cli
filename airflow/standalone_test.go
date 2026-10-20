@@ -631,6 +631,154 @@ func (s *Suite) TestStandaloneBuildEnv_WithEnvFile() {
 	s.Equal("hello", envMap["MY_CUSTOM_VAR"])
 }
 
+// Standalone keeps Airflow's own bind (every interface) and warns about it,
+// naming the setting that restricts it, unless that setting already binds to
+// this machine.
+func (s *Suite) TestNetworkExposureWarning() {
+	for _, tc := range []struct {
+		name, major string
+		env         []string
+		warns       bool
+		key         string
+	}{
+		{"AF3, unset", "3", nil, true, "AIRFLOW__API__HOST"},
+		{"AF3, every interface", "3", []string{"AIRFLOW__API__HOST=0.0.0.0"}, true, "AIRFLOW__API__HOST"},
+		{"AF3, empty", "3", []string{"AIRFLOW__API__HOST="}, true, "AIRFLOW__API__HOST"},
+		{"AF3, loopback", "3", []string{"AIRFLOW__API__HOST=127.0.0.1"}, false, ""},
+		{"AF3, localhost", "3", []string{"AIRFLOW__API__HOST=localhost"}, false, ""},
+		{"AF3, IPv6 loopback", "3", []string{"AIRFLOW__API__HOST=::1"}, false, ""},
+		{"AF3, bracketed IPv6 loopback", "3", []string{"AIRFLOW__API__HOST=[::1]"}, false, ""},
+		{"AF3, expanded IPv6 loopback", "3", []string{"AIRFLOW__API__HOST=0:0:0:0:0:0:0:1"}, false, ""},
+		{"AF3, another 127/8 address", "3", []string{"AIRFLOW__API__HOST=127.0.1.1"}, false, ""},
+		{"AF3, a LAN address", "3", []string{"AIRFLOW__API__HOST=192.168.1.10"}, true, "AIRFLOW__API__HOST"},
+		{"AF3 ignores the AF2 key", "3", []string{"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1"}, true, "AIRFLOW__API__HOST"},
+		{"AF2, unset", "2", nil, true, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST"},
+		{"AF2, loopback", "2", []string{"AIRFLOW__WEBSERVER__WEB_SERVER_HOST=127.0.0.1"}, false, ""},
+	} {
+		s.Run(tc.name, func() {
+			got := networkExposureWarning(tc.env, tc.major, "")
+			if !tc.warns {
+				s.Empty(got)
+				return
+			}
+			s.Contains(got, "reachable from other machines")
+			s.Contains(got, tc.key+"=127.0.0.1 in .env")
+		})
+	}
+
+	s.Run("names the env file the run reads", func() {
+		s.Contains(networkExposureWarning(nil, "3", "custom.env"), "AIRFLOW__API__HOST=127.0.0.1 in custom.env")
+	})
+}
+
+// Standalone no longer changes Airflow's bind: some rely on reaching it
+// from another machine, so 1.x warns instead (TestNetworkExposureWarning).
+func (s *Suite) TestStandaloneBuildEnvKeepsAirflowsBind() {
+	s.T().Setenv("AIRFLOW__API__HOST", "")
+	s.Require().NoError(os.Unsetenv("AIRFLOW__API__HOST"))
+	handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
+	s.Require().NoError(err)
+	for _, kv := range handler.buildEnv() {
+		s.False(strings.HasPrefix(kv, "AIRFLOW__API__HOST="), "buildEnv set %s", kv)
+		s.False(strings.HasPrefix(kv, "AIRFLOW__WEBSERVER__WEB_SERVER_HOST="), "buildEnv set %s", kv)
+	}
+}
+
+// The secret standalone Airflow signs sessions and tokens with is random,
+// kept owner-only in the project's standalone home, and the same for every
+// command once Start has kept it; never the project's name, which anyone who
+// knew the project could sign tokens with.
+func (s *Suite) TestStandaloneSigningSecret() {
+	envOf := func(h *Standalone) map[string]string {
+		envMap := map[string]string{}
+		for _, e := range h.buildEnv() {
+			if parts := splitEnvVar(e); parts != nil {
+				envMap[parts[0]] = parts[1]
+			}
+		}
+		return envMap
+	}
+
+	s.Run("kept by Start, owner-only, and used for every signing setting", func() {
+		project := s.T().TempDir()
+		handler, err := StandaloneInit(project, "", "Dockerfile")
+		s.Require().NoError(err)
+		handler.airflowMajorVersion = "3"
+
+		handler.persistSigningSecret()
+		path := filepath.Join(project, standaloneDir, standaloneSecretFile)
+		info, err := os.Stat(path)
+		s.Require().NoError(err)
+		s.Equal(os.FileMode(0o600), info.Mode().Perm())
+		kept, err := os.ReadFile(path)
+		s.Require().NoError(err)
+
+		handler.persistSigningSecret() // a second Start keeps the first secret
+		again, err := os.ReadFile(path)
+		s.Require().NoError(err)
+		s.Equal(kept, again)
+
+		env := envOf(handler)
+		s.Equal(string(kept), env["AIRFLOW__API__SECRET_KEY"])
+		s.Equal(string(kept), env["AIRFLOW__API_AUTH__JWT_SECRET"])
+		s.Equal(string(kept), envOf(handler)["AIRFLOW__API_AUTH__JWT_SECRET"], "the secret changes between commands")
+	})
+
+	// With none kept, the only Airflow that can be running is one an earlier
+	// CLI started, which signs with the old secret: a command run against it
+	// signs the same way. A start keeps a random one first, so nothing this
+	// CLI starts signs with it.
+	s.Run("without a kept secret, commands sign as an earlier CLI's Airflow does", func() {
+		handler, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
+		s.Require().NoError(err)
+		handler.airflowMajorVersion = "3"
+
+		env := envOf(handler)
+		s.Equal(legacySigningSecret(), env["AIRFLOW__API__SECRET_KEY"])
+		s.Equal(legacySigningSecret(), env["AIRFLOW__API_AUTH__JWT_SECRET"])
+
+		started, err := StandaloneInit(s.T().TempDir(), "", "Dockerfile")
+		s.Require().NoError(err)
+		started.airflowMajorVersion = "3"
+		started.persistSigningSecret()
+		got := envOf(started)["AIRFLOW__API__SECRET_KEY"]
+		s.NotEqual(legacySigningSecret(), got, "a start signs with the old, guessable secret")
+		s.Equal(got, envOf(started)["AIRFLOW__API_AUTH__JWT_SECRET"], "one command signs with two secrets")
+	})
+
+	s.Run("an empty secret a crash left is replaced", func() {
+		project := s.T().TempDir()
+		path := filepath.Join(project, standaloneDir, standaloneSecretFile)
+		s.Require().NoError(os.MkdirAll(filepath.Dir(path), 0o700))
+		s.Require().NoError(os.WriteFile(path, nil, 0o600))
+
+		handler, err := StandaloneInit(project, "", "Dockerfile")
+		s.Require().NoError(err)
+		handler.persistSigningSecret()
+		kept, err := os.ReadFile(path)
+		s.Require().NoError(err)
+		s.NotEmpty(kept)
+		s.Equal(string(kept), handler.signingSecretForEnv())
+
+		entries, err := os.ReadDir(filepath.Dir(path))
+		s.Require().NoError(err)
+		s.Len(entries, 1, "a temp file was left beside the secret")
+	})
+
+	s.Run("a secret another start kept first is the one used", func() {
+		project := s.T().TempDir()
+		path := filepath.Join(project, standaloneDir, standaloneSecretFile)
+		s.Require().NoError(os.MkdirAll(filepath.Dir(path), 0o700))
+		s.Require().NoError(os.WriteFile(path, []byte("kept-by-another-start"), 0o600))
+
+		handler, err := StandaloneInit(project, "", "Dockerfile")
+		s.Require().NoError(err)
+		handler.airflowMajorVersion = "3"
+		handler.persistSigningSecret()
+		s.Equal("kept-by-another-start", envOf(handler)["AIRFLOW__API__SECRET_KEY"])
+	})
+}
+
 func splitEnvVar(s string) []string {
 	idx := indexOf(s, '=')
 	if idx < 0 {
@@ -1009,8 +1157,15 @@ func (s *Suite) TestStandaloneStart_AlreadyRunning() {
 	err = os.WriteFile(filepath.Join(venvBin, "airflow"), []byte("#!/bin/sh\nsleep 30\n"), 0o755)
 	s.NoError(err)
 
-	// Write a PID file with our own PID (guaranteed to be alive)
-	err = os.WriteFile(filepath.Join(constraintsDir, "airflow.pid"), []byte(fmt.Sprintf("%d", os.Getpid())), 0o644)
+	// A running Airflow, as Start launches one: leading its own group (Setpgid).
+	running := exec.Command("sleep", "60")
+	running.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	s.Require().NoError(running.Start())
+	s.T().Cleanup(func() {
+		syscall.Kill(-running.Process.Pid, syscall.SIGKILL) //nolint:errcheck
+		running.Wait()                                      //nolint:errcheck
+	})
+	err = os.WriteFile(filepath.Join(constraintsDir, "airflow.pid"), []byte(fmt.Sprintf("%d", running.Process.Pid)), 0o644)
 	s.NoError(err)
 
 	origParseFile := standaloneParseFile
@@ -1115,6 +1270,117 @@ func (s *Suite) TestStandaloneStop_Running() {
 	s.NoError(err)
 
 	// PID file should be removed
+	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
+	s.True(os.IsNotExist(err))
+}
+
+// The master died (a crash, an OOM kill) and left a child running in its
+// process group: ps reports it running, and stop stops it, rather than
+// calling the PID file stale and leaving the child where nothing can reach it.
+func (s *Suite) TestStandaloneDeadMasterWithLiveChildren() {
+	tmpDir := s.T().TempDir()
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	s.Require().NoError(os.MkdirAll(standaloneStateDir, 0o755))
+
+	// bash leads its own group (Setpgid, as Start does), starts a child in it
+	// and exits: the master is gone, the child lives on in the group. The
+	// child is reparented to init, which reaps it, so it leaves no zombie.
+	master := exec.Command("bash", "-c", "sleep 60 & exit 0")
+	master.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	s.Require().NoError(master.Run())
+	pgid := master.Process.Pid
+	s.T().Cleanup(func() { syscall.Kill(-pgid, syscall.SIGKILL) }) //nolint:errcheck
+	s.Require().True(airflowrt.ProcessGroupAlive(pgid), "the child did not outlive the master")
+	s.Require().NoError(os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", pgid)), 0o644))
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.Require().NoError(err)
+
+	status, err := handler.PS()
+	s.Require().NoError(err)
+	s.True(*status.Running, "ps reports the dead master's children as not running")
+
+	s.Require().NoError(handler.Stop(false))
+	s.False(airflowrt.ProcessGroupAlive(pgid), "stop left the dead master's children running")
+	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
+	s.True(os.IsNotExist(err), "PID file should be removed once the group is gone")
+
+	status, err = handler.PS()
+	s.Require().NoError(err)
+	s.False(*status.Running)
+}
+
+// A PID file can outlive its process, and the PID go to an unrelated one:
+// here a process in no group of that ID (started without Setpgid). ps does
+// not call it Airflow, and stop never signals it.
+func (s *Suite) TestStandaloneNeverTouchesAReusedPID() {
+	tmpDir := s.T().TempDir()
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	s.Require().NoError(os.MkdirAll(standaloneStateDir, 0o755))
+
+	unrelated := exec.Command("sleep", "60") // no Setpgid: in the test's group
+	s.Require().NoError(unrelated.Start())
+	s.T().Cleanup(func() {
+		unrelated.Process.Kill() //nolint:errcheck
+		unrelated.Wait()         //nolint:errcheck
+	})
+	pidFile := filepath.Join(standaloneStateDir, "airflow.pid")
+	s.Require().NoError(os.WriteFile(pidFile, []byte(fmt.Sprintf("%d", unrelated.Process.Pid)), 0o644))
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.Require().NoError(err)
+
+	status, err := handler.PS()
+	s.Require().NoError(err)
+	s.False(*status.Running, "ps took an unrelated process for Airflow")
+
+	s.Require().NoError(handler.Stop(false))
+	s.NoError(unrelated.Process.Signal(syscall.Signal(0)), "stop signaled an unrelated process")
+	_, err = os.Stat(pidFile)
+	s.True(os.IsNotExist(err), "the stale PID file should be cleaned up")
+}
+
+func (s *Suite) TestStandaloneStop_WaitsForProcessGroup() {
+	tmpDir, err := os.MkdirTemp("", "standalone-stop-group")
+	s.NoError(err)
+	defer os.RemoveAll(tmpDir)
+
+	standaloneStateDir := filepath.Join(tmpDir, ".astro", "standalone")
+	err = os.MkdirAll(standaloneStateDir, 0o755)
+	s.NoError(err)
+
+	// Reproduce airflow standalone's shutdown shape: the master exits on
+	// SIGTERM right away, but a child in the same process group (like the
+	// scheduler or triggerer) keeps running for a bit. The child inherits
+	// `trap '' TERM` so only the master dies on Stop's SIGTERM; the group
+	// must still be waited on. The ready file tells us the child exists, so
+	// Stop's SIGTERM can't land before the trap is set.
+	readyFile := filepath.Join(tmpDir, "ready")
+	script := fmt.Sprintf(`trap '' TERM; sleep 2 & touch %q; trap - TERM; wait $!`, readyFile)
+	cmd := exec.Command("bash", "-c", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	err = cmd.Start()
+	s.NoError(err)
+	go cmd.Wait() //nolint:errcheck
+	pid := cmd.Process.Pid
+	s.Eventually(func() bool {
+		_, statErr := os.Stat(readyFile)
+		return statErr == nil
+	}, 5*time.Second, 10*time.Millisecond, "child process never came up")
+
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", pid)), 0o644)
+	s.NoError(err)
+
+	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
+	s.NoError(err)
+
+	err = handler.Stop(false)
+	s.NoError(err)
+
+	// Stop must not return while any group member is alive. Polling only the
+	// master PID would return here with the child still running.
+	s.Error(syscall.Kill(-pid, syscall.Signal(0)), "process group should be fully dead after Stop")
+
 	_, err = os.Stat(filepath.Join(standaloneStateDir, "airflow.pid"))
 	s.True(os.IsNotExist(err))
 }
@@ -1356,8 +1622,15 @@ func (s *Suite) TestStandalonePS_Running() {
 	err = os.MkdirAll(standaloneStateDir, 0o755)
 	s.NoError(err)
 
-	// Write our own PID (guaranteed alive)
-	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", os.Getpid())), 0o644)
+	// A process that leads its own group, as Start launches Airflow (Setpgid).
+	proc := exec.Command("sleep", "60")
+	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	s.Require().NoError(proc.Start())
+	s.T().Cleanup(func() {
+		syscall.Kill(-proc.Process.Pid, syscall.SIGKILL) //nolint:errcheck
+		proc.Wait()                                      //nolint:errcheck
+	})
+	err = os.WriteFile(filepath.Join(standaloneStateDir, "airflow.pid"), []byte(fmt.Sprintf("%d", proc.Process.Pid)), 0o644)
 	s.NoError(err)
 
 	handler, err := StandaloneInit(tmpDir, ".env", "Dockerfile")
@@ -1369,7 +1642,7 @@ func (s *Suite) TestStandalonePS_Running() {
 	s.NotNil(data.Running)
 	s.True(*data.Running)
 	s.NotNil(data.PID)
-	s.Equal(os.Getpid(), *data.PID)
+	s.Equal(proc.Process.Pid, *data.PID)
 }
 
 func (s *Suite) TestStandaloneBuildEnv_CustomPort() {

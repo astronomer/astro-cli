@@ -361,6 +361,36 @@ func (s *Suite) TestListTokens() {
 
 		s.Error(err)
 	})
+
+	s.Run("shows each token's kind", func() {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		direct := apiToken1
+		direct.Name = "direct-token"
+		direct.Kind = astrov1.ApiTokenKindDIRECTACCESS
+		unnamed := apiToken1
+		unnamed.Name = "kindless-token"
+		unnamed.Kind = ""
+		resp := astrov1.ListApiTokensResponse{
+			HTTPResponse: &http.Response{StatusCode: 200},
+			JSON200:      &astrov1.ApiTokensPaginated{Tokens: []astrov1.ApiToken{direct, unnamed}, TotalCount: 2},
+		}
+		out := new(bytes.Buffer)
+		mockClient := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockClient.On("ListApiTokensWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&resp, nil)
+		s.NoError(ListTokens(mockClient, out))
+
+		// KIND is the last column, so every earlier one keeps its position.
+		s.Regexp(`CREATED BY\s+KIND`, out.String())
+		s.Regexp(`(?m)direct-token\s.*\sDIRECT_ACCESS\s*$`, out.String())
+		// A token the API names no kind for shows "-", not a blank cell.
+		s.Regexp(`(?m)kindless-token\s.*\s-\s*$`, out.String())
+	})
+}
+
+func (s *Suite) TestTokenKind() {
+	s.Equal("STANDARD", TokenKind(astrov1.ApiToken{Kind: astrov1.ApiTokenKindSTANDARD}))
+	s.Equal("DIRECT_ACCESS", TokenKind(astrov1.ApiToken{Kind: astrov1.ApiTokenKindDIRECTACCESS}))
+	s.Equal("-", TokenKind(astrov1.ApiToken{}))
 }
 
 func (s *Suite) TestCreateToken() {

@@ -195,6 +195,7 @@ func TestDeployWithoutDagsDeploySuccess(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -293,6 +294,7 @@ func TestDeployOnRemoteExecutionDeployment(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("3.0-1", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -435,6 +437,7 @@ func TestDeployWithDagsDeploySuccess(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -570,6 +573,7 @@ func TestDagsDeploySuccess(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -646,6 +650,7 @@ func TestImageOnlyDeploySuccess(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -762,6 +767,7 @@ func TestNoDagsImageDeployForceSkipsPrompt(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -801,6 +807,7 @@ func TestImageDeployOnRemoteExecutionDeploymentSucceedsWithoutDagDeploy(t *testi
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("", nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("3.0-1", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -860,6 +867,7 @@ func TestDagsDeployFailed(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		return mockImageHandler
 	}
 
@@ -924,6 +932,7 @@ func TestDeployFailure(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		return mockImageHandler
 	}
 
@@ -1018,6 +1027,7 @@ func TestDeployMonitoringDAGNonHosted(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil)
 		return mockImageHandler
 	}
@@ -1100,6 +1110,7 @@ func TestDeployNoMonitoringDAGHosted(t *testing.T) {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return("", nil)
 		return mockImageHandler
 	}
@@ -1140,6 +1151,7 @@ func TestBuildImageFailure(t *testing.T) {
 
 	// image build failure
 	airflowImageHandler = func(image string) airflow.ImageHandler {
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(errMock).Once()
 		return mockImageHandler
 	}
@@ -1150,6 +1162,7 @@ func TestBuildImageFailure(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("", nil).Once()
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		return mockImageHandler
 	}
 	dockerfile = "Dockerfile.invalid"
@@ -1162,6 +1175,7 @@ func TestBuildImageFailure(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("TagLocalImage", mock.Anything).Return(nil).Once()
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil).Once()
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		return mockImageHandler
 	}
 	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
@@ -1173,6 +1187,7 @@ func TestBuildImageFailure(t *testing.T) {
 	airflowImageHandler = func(image string) airflow.ImageHandler {
 		mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 		mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil).Once()
+		mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 		return mockImageHandler
 	}
 	dockerfile = "Dockerfile"
@@ -1182,6 +1197,97 @@ func TestBuildImageFailure(t *testing.T) {
 	mockV1Client.AssertExpectations(t)
 	mockV1Client.AssertExpectations(t)
 	mockImageHandler.AssertExpectations(t)
+}
+
+// The prefix matches what the published agent image sets (astro-agent's
+// Dockerfile.standalone), and is the namespace with its separator: the
+// tests below hand the constant to a mock, which would take any value.
+func TestAgentEnvVarPrefix(t *testing.T) {
+	assert.True(t, strings.HasPrefix("ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE", agentEnvVarPrefix))
+	assert.False(t, strings.HasPrefix("ASTRO_AGENT_CLIENTS", agentEnvVarPrefix))
+}
+
+// refuseAgentImage refuses an agent image, which would crash-loop as a hosted
+// Deployment's scheduler; any other answer, a failed inspect included, lets
+// the deploy go on.
+func TestRefuseAgentImage(t *testing.T) {
+	for name, tc := range map[string]struct {
+		isAgent    bool
+		inspectErr error
+		want       error
+	}{
+		"an agent image":   {isAgent: true, want: errAgentImageInHostedDeploy},
+		"a Runtime image":  {},
+		"a failed inspect": {inspectErr: errors.New("inspect failed")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.LocalPlatform)
+			mockImageHandler := new(mocks.ImageHandler)
+			mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(tc.isAgent, tc.inspectErr).Once()
+			err := refuseAgentImage(mockImageHandler)
+			if tc.want != nil {
+				assert.ErrorIs(t, err, tc.want)
+				assert.ErrorContains(t, err, "astro remote deploy")
+			} else {
+				assert.NoError(t, err)
+			}
+			mockImageHandler.AssertExpectations(t)
+		})
+	}
+
+	t.Run("is skipped with warnings off", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		config.CFG.ShowWarnings.SetHomeString("false")
+		t.Cleanup(func() { config.CFG.ShowWarnings.SetHomeString("true") })
+		mockImageHandler := new(mocks.ImageHandler)
+		assert.NoError(t, refuseAgentImage(mockImageHandler))
+		mockImageHandler.AssertNotCalled(t, "HasEnvVarWithPrefix", mock.Anything, mock.Anything)
+	})
+}
+
+// An image deploy refuses an agent image before testing or pushing it.
+func TestImageDeployRefusesAgentImage(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	t.Cleanup(func() { os.RemoveAll("./testfiles/dags/") })
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&mockListDeploymentsResponse, nil).Maybe()
+	mockV1Client.On("GetDeploymentWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&deploymentResponseDags, nil).Maybe()
+	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Maybe()
+	mockV1Client.On("CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(&createDeployResponse, nil).Maybe()
+
+	mockImageHandler := new(mocks.ImageHandler)
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil)
+	mockImageHandler.On("HasEnvVarWithPrefix", "", agentEnvVarPrefix).Return(true, nil).Once()
+	original := airflowImageHandler
+	t.Cleanup(func() { airflowImageHandler = original })
+	airflowImageHandler = func(string) airflow.ImageHandler { return mockImageHandler }
+
+	defer testUtil.MockUserInput(t, "1")()
+	err := Deploy(InputDeploy{Path: "./testfiles/", EnvFile: "./testfiles/.env", WsID: ws, Prompt: true, Image: true, DagsPath: "./testfiles/dags"}, mockV1Client, nil)
+	assert.ErrorIs(t, err, errAgentImageInHostedDeploy)
+	mockImageHandler.AssertExpectations(t)
+	mockImageHandler.AssertNotCalled(t, "Push", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+// buildImage does not check: a --dags --pytest deploy builds an image only to
+// test in, and an agent image, built FROM Runtime, serves for that.
+func TestBuildImageDoesNotRefuseAgentImage(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	dockerfile = "Dockerfile"
+	mockImageHandler := new(mocks.ImageHandler)
+	mockImageHandler.On("Build", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	mockImageHandler.On("GetLabel", mock.Anything, runtimeImageLabel).Return("12.0.0", nil).Once()
+	mockImageHandler.On("HasEnvVarWithPrefix", mock.Anything, mock.Anything).Return(true, nil).Maybe()
+	original := airflowImageHandler
+	t.Cleanup(func() { airflowImageHandler = original })
+	airflowImageHandler = func(string) airflow.ImageHandler { return mockImageHandler }
+	mockV1Client := new(astrov1_mocks.ClientWithResponsesInterface)
+	mockV1Client.On("GetDeploymentOptionsWithResponse", mock.Anything, mock.Anything, mock.Anything).Return(&getDeploymentOptionsResponse, nil).Once()
+
+	_, err := buildImage("./testfiles/", "12.0.0", "", "", "", nil, false, false, mockV1Client)
+	assert.NoError(t, err)
+	mockImageHandler.AssertNotCalled(t, "HasEnvVarWithPrefix", mock.Anything, mock.Anything)
 }
 
 func TestValidRuntimeVersion(t *testing.T) {
@@ -1474,7 +1580,7 @@ func TestDeployClientImage(t *testing.T) {
 		}()
 
 		// Mock config.CFG.RemoteClientRegistry
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         tempDir,
@@ -1504,7 +1610,7 @@ func TestDeployClientImage(t *testing.T) {
 			return errors.New("login failed")
 		}
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         "/test/path",
@@ -1542,6 +1648,28 @@ func TestDeployClientImage(t *testing.T) {
 		err = DeployClientImage(deployInput, nil)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "remote client registry is not configured")
+		// -g: with no project config, the value is read from the global one.
+		assert.Contains(t, err.Error(), "'astro config set -g remote.client_registry <registry>/<repository>'")
+		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
+	})
+
+	// A registry saved with a tag (before the check existed, or by hand in
+	// config.yaml) is refused with what to fix, before anything is built,
+	// rather than reaching Docker as "invalid reference format" (#2223).
+	t.Run("a saved registry that carries a tag", func(t *testing.T) {
+		dockerLoginCalled := false
+		airflow.DockerLogin = func(registry, username, token string) error {
+			dockerLoginCalled = true
+			return nil
+		}
+		config.CFG.RemoteClientRegistry.SetHomeString("myregistry.example.com:7990/repository/path/my-image:1.0")
+		t.Cleanup(func() { config.CFG.RemoteClientRegistry.SetHomeString("") })
+
+		// No API client: the registry is checked before anything calls the API.
+		err := DeployClientImage(InputClientDeploy{Path: "/test/path", DeploymentID: "test-deployment-id"}, nil)
+		assert.ErrorContains(t, err, "is not a usable registry endpoint")
+		assert.ErrorContains(t, err, "must not include an image tag")
+		assert.ErrorContains(t, err, "astro config set")
 		assert.False(t, dockerLoginCalled, "DockerLogin should not have been called")
 	})
 
@@ -1588,7 +1716,7 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         tempDir,
@@ -1645,7 +1773,7 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		deployInput := InputClientDeploy{
 			Path:         tempDir,
@@ -1673,7 +1801,7 @@ func TestDeployClientImage(t *testing.T) {
 		// Remote image will use timestamp tag, not the user-provided tag
 		mockImageHandler.On("Push", mock.MatchedBy(func(remoteImage string) bool {
 			// Verify it uses timestamp-based tag format, not "tag" from the user input
-			return strings.Contains(remoteImage, "test-registry:latest:deploy-") &&
+			return strings.Contains(remoteImage, "test-registry.io/acme/client-image:deploy-") &&
 				!strings.Contains(remoteImage, ":tag")
 		}), "", "", false).Return("", nil).Once()
 
@@ -1686,7 +1814,7 @@ func TestDeployClientImage(t *testing.T) {
 			airflowImageHandler = originalAirflowImageHandler
 		}()
 
-		config.CFG.RemoteClientRegistry.SetHomeString("test-registry:latest")
+		config.CFG.RemoteClientRegistry.SetHomeString("test-registry.io/acme/client-image")
 
 		// Set up temporary directory for consistency
 		tempDir, err := os.MkdirTemp("", "test-deploy-*")

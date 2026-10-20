@@ -52,6 +52,7 @@ For detailed troubleshooting steps, visit:
 https://support.astronomer.io/hc/en-us/articles/41427905156243-403-errors-on-image-push`)
 
 	errGetImageLabel = errors.New("error getting image label")
+	errGetImageEnv   = errors.New("error getting image environment")
 )
 
 var getDockerClient = func() (client.APIClient, error) {
@@ -329,12 +330,13 @@ func (d *DockerImage) Push(remoteImage, username, token string, getImageRepoSha 
 		authConfig.ServerAddress = registry
 	}
 
-	logger.Debugf("Exec Push %s creds %v \n", containerRuntime, authConfig)
+	// Never the password: debug output ends up in tickets and CI logs.
+	logger.Debugf("Exec Push %s to %s as %s\n", containerRuntime, authConfig.ServerAddress, authConfig.Username)
 
 	err = d.pushWithClient(&authConfig, remoteImage)
 	if err != nil {
-		// if it does not work with the go library use bash to run docker commands. Support for (old?) versions of Colima
-		err = pushWithBash(&authConfig, remoteImage)
+		// if it does not work with the go library, run the container runtime's CLI. Support for (old?) versions of Colima
+		err = pushWithCLI(&authConfig, remoteImage)
 		if err != nil {
 			// Check for 403 errors only after both methods fail
 			if is403Error(err) {
@@ -408,7 +410,7 @@ func (d *DockerImage) pushWithClient(authConfig *cliTypes.AuthConfig, remoteImag
 	responseBody, err := cli.ImagePush(ctx, remoteImage, image.PushOptions{RegistryAuth: encodedAuth})
 	if err != nil {
 		logger.Debugf("Error pushing image to docker: %v", err)
-		// if NewClientWithOpt does not work use bash to run docker commands
+		// if NewClientWithOpt does not work, Push falls back to the container runtime's CLI
 		return err
 	}
 	defer responseBody.Close()
@@ -456,10 +458,7 @@ func (d *DockerImage) Pull(remoteImage, username, token string) error {
 		if registry, err = d.getRegistryToAuth(remoteImage); err != nil {
 			return err
 		}
-		pass := token
-		pass = strings.TrimPrefix(pass, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + registry + " -u " + username + " --password-stdin"
-		err = cmdExec("bash", os.Stdout, os.Stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		err = cliRegistryLogin(containerRuntime, registry, username, token, os.Stdout, os.Stderr)
 	}
 	if err != nil {
 		return err
@@ -506,6 +505,53 @@ func (d *DockerImage) GetLabel(altImageName, labelName string) (string, error) {
 	label = stdout.String()
 	label = strings.Trim(label, "\n")
 	return label, nil
+}
+
+// HasEnvVarWithPrefix reports whether the image config has an environment variable whose
+// NAME starts with prefix, as reported by `docker inspect .Config.Env`. altImageName, if
+// non-empty, overrides the image name to inspect.
+//
+// Deliberately narrow: this is the only capability exposed for reading an image's baked-in
+// env vars. The full "KEY=VALUE" list (which may include values -- e.g. secrets baked into a
+// misconfigured image) exists only in a local variable inside this function; it is never
+// returned to the caller, logged, or retained anywhere. Callers only ever learn whether a
+// name prefix is present, never any variable's value, and not even the full list of names.
+func (d *DockerImage) HasEnvVarWithPrefix(altImageName, prefix string) (bool, error) {
+	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
+	if err != nil {
+		return false, err
+	}
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+
+	imageName := d.imageName
+	if altImageName != "" {
+		imageName = altImageName
+	}
+
+	err = cmdExec(containerRuntime, stdout, stderr, "inspect", "--format", "{{ json .Config.Env }}", imageName)
+	if err != nil {
+		return false, err
+	}
+	if execErr := stderr.String(); execErr != "" {
+		return false, fmt.Errorf("%s: %w", execErr, errGetImageEnv)
+	}
+
+	// envVars ("KEY=VALUE" pairs, potentially including secret values) is intentionally
+	// scoped to this function body only -- it is discarded as soon as the prefix check
+	// below completes, never returned or logged.
+	var envVars []string
+	if err := json.Unmarshal(stdout.Bytes(), &envVars); err != nil {
+		return false, err
+	}
+	for _, envVar := range envVars {
+		name, _, _ := strings.Cut(envVar, "=")
+		if strings.HasPrefix(name, prefix) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (d *DockerImage) DoesImageExist(imageName string) error {
@@ -703,19 +749,50 @@ var cmdExec = func(cmd string, stdout, stderr io.Writer, args ...string) error {
 	return nil
 }
 
-// When login and push do not work use bash to run docker commands, this function is for users using colima
-func pushWithBash(authConfig *cliTypes.AuthConfig, imageName string) error {
+// cmdExecWithStdin runs cmd directly (no shell) and writes stdin to the process's stdin pipe.
+// Used for registry logins so a password is never parsed by a shell.
+var cmdExecWithStdin = func(cmd, stdin string, stdout, stderr io.Writer, args ...string) error {
+	_, lookErr := exec.LookPath(cmd)
+	if lookErr != nil {
+		return fmt.Errorf("failed to find the %s command: %w", cmd, lookErr)
+	}
+
+	execCMD := exec.Command(cmd, args...)
+	execCMD.Stdin = strings.NewReader(stdin)
+	execCMD.Stdout = stdout
+	execCMD.Stderr = stderr
+
+	if cmdErr := execCMD.Run(); cmdErr != nil {
+		return fmt.Errorf("failed to execute cmd: %w", cmdErr)
+	}
+
+	return nil
+}
+
+// cliRegistryLogin logs the container runtime's CLI in to registry. The
+// password, less any "Bearer " prefix, goes to the command's stdin
+// (--password-stdin): never into its arguments, which other users can read
+// from the process list, and never through a shell. An empty registry is left
+// out, so the runtime logs in to its default; `--` and --username= keep a
+// registry or username that starts with "-" from being read as an option.
+func cliRegistryLogin(containerRuntime, registry, username, password string, stdout, stderr io.Writer) error {
+	args := []string{"login", "--username=" + username, "--password-stdin"}
+	if registry != "" {
+		args = append(args, "--", registry)
+	}
+	return cmdExecWithStdin(containerRuntime, strings.TrimPrefix(password, prefix), stdout, stderr, args...)
+}
+
+// When login and push do not work via the go client, fall back to invoking the container runtime binary directly. This function is for users using colima
+func pushWithCLI(authConfig *cliTypes.AuthConfig, imageName string) error {
 	containerRuntime, err := runtimes.GetContainerRuntimeBinary()
 	if err != nil {
 		return err
 	}
 
 	if authConfig.Username != "" { // Case for cloud image push where we have both registry user & pass, for software login happens during `astro login` itself
-		pass := authConfig.Password
-		pass = strings.TrimPrefix(pass, prefix)
-		cmd := "echo \"" + pass + "\"" + " | " + containerRuntime + " login " + authConfig.ServerAddress + " -u " + authConfig.Username + " --password-stdin"
 		var stderr bytes.Buffer
-		err = cmdExec("bash", os.Stdout, &stderr, "-c", cmd) // This command will only work on machines that have bash. If users have issues we will revist
+		err = cliRegistryLogin(containerRuntime, authConfig.ServerAddress, authConfig.Username, authConfig.Password, os.Stdout, &stderr)
 		if err != nil {
 			stderrOutput := stderr.String()
 			if stderrOutput != "" {
