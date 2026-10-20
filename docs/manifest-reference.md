@@ -255,7 +255,7 @@ A Dockerfile still on an ONBUILD tag is judged by whether `astro init` can move 
 
 Standalone mode builds no image, and is held to neither.
 
-`.astro/install-project.py` carries a version stamp in its header (`# astro-install-helper: 1`). `astro init` refreshes the project's copy only when it is older than the one this astro writes, or carries no stamp, and never replaces a newer astro's; a build warns about a copy that is missing or older, and says nothing about one at this version or newer, edits included.
+`.astro/install-project.py` carries a version stamp in its header (`# astro-install-helper: <n>`, raised whenever the file changes). `astro init` refreshes the project's copy only when it is older than the one this astro writes, or carries no stamp, and never replaces a newer astro's; a build warns about a copy that is missing or older, and says nothing about one at this version or newer, edits included.
 
 ### `build-secrets`
 

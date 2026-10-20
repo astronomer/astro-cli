@@ -239,7 +239,8 @@ func TestManifestReferenceShowsTheRewrittenDockerfile(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join("..", "..", "docs", "manifest-reference.md"))
 	require.NoError(t, err)
 	want := rewrittenDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base", "ENV TZ=UTC\n")
-	assert.Contains(t, string(body), "```dockerfile\n"+want+"```\n")
+	// A Windows checkout may give the page CRLF; the template is the same either way.
+	assert.Contains(t, strings.ReplaceAll(string(body), "\r\n", "\n"), "```dockerfile\n"+want+"```\n")
 }
 
 // installInputs are the manifest, its lock and the helper, by the names the

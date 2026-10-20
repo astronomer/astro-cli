@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 2
+# astro-install-helper: 3
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,
@@ -815,7 +815,7 @@ def airflow_mismatch(lock, installed, runtime):
 
 
 def write(path, lines):
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + "\n" if lines else "")
 
 
@@ -871,7 +871,7 @@ def main(argv=None):
     # Written either way, empty without a lock, so the step that copies it
     # into the install always finds it.
     write(os.path.join(args.out, LOCK_CONSTRAINTS), lock.constraints() if lock else [])
-    with open(os.path.join(args.out, REQUIREMENTS), "w") as f:
+    with open(os.path.join(args.out, REQUIREMENTS), "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(requirements + deps) + "\n")
     write(os.path.join(args.out, PACKAGES), with_git_for_vcs_deps(deps, manifest.packages))
     if _saw_credentials[0]:
