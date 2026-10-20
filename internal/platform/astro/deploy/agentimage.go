@@ -20,16 +20,18 @@ const agentEnvVarPrefix = "ASTRO_AGENT_CLIENT_"
 // errAgentImageInHostedDeploy refuses a Remote Execution agent image on the
 // hosted deploy, where it would run as the Deployment's scheduler and
 // crash-loop: the agent's entrypoint runs only its own components.
-var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Deploy an agent image with 'astro remote deploy'; for this Deployment, build FROM an Astro Runtime image, not the astro-remote-execution-agent one. If it is not an agent image, 'astro config set show_warnings false -g' skips this check")
+var errAgentImageInHostedDeploy = errors.New("the image to deploy is a Remote Execution agent image (it sets " + agentEnvVarPrefix + "* environment variables), which cannot run this Deployment's scheduler. Deploy an agent image with 'astro remote deploy'; for this Deployment, build FROM an Astro Runtime image, not the astro-remote-execution-agent one")
 
 // refuseAgentImage is the hosted deploy's check, on the image it ships: an
 // agent image passes the Runtime label check, since it is built FROM a
 // Runtime image. A failed inspect is not a verdict, so it lets the deploy go
 // on.
 //
-// show_warnings false skips it, as it did in Astro CLI 1.x, and the refusal
-// says so: the check reads environment variable names, so an image that is
-// not an agent's can still trip it, and the user needs a way past.
+// show_warnings false skips it, as it did in Astro CLI 1.x: the check reads
+// environment variable names, so an image that is not an agent's could trip
+// it. The refusal does not suggest that, since the switch turns off other
+// checks too, for every project, and a real agent image is far likelier than
+// a false positive.
 func refuseAgentImage(ctx context.Context, engine imagebuild.Engine, image string) error {
 	if !config.CFG.ShowWarnings.GetBool() {
 		logger.Debugf("skipping the agent image check: show_warnings is false")

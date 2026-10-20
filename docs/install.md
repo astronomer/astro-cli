@@ -50,7 +50,12 @@ You need:
 - **[uv](https://docs.astral.sh/uv/) 0.9.25 or later** on your PATH. Standalone
   mode uses it to build the Airflow environment.
 - **Python 3.10 or later**, for your dags.
-- **Docker**, only if you want Docker mode or you're on Windows.
+- **Docker**, only if you want Docker mode or you're on Windows. Podman works
+  too (set `container.binary` to `podman`), as long as it runs container
+  healthchecks, which Docker mode waits on: a Podman machine (macOS, Windows)
+  or a Linux install with systemd does. Rootless Podman on Linux without a
+  systemd user session never runs them, so a start waits out its timeout and
+  gives up.
 
 Check uv with `uv --version`. To install it, see the
 [uv install guide](https://docs.astral.sh/uv/getting-started/installation/).

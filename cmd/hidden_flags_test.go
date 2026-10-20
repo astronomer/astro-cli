@@ -26,8 +26,6 @@ var hiddenFlagAllowed = map[string]string{
 		"flag of that name, so it names the link target",
 	"env connection link --deployment-id":       "it shadows the noun's scope flag of that name, so it names the link target",
 	"env airflow-variable link --deployment-id": "it shadows the noun's scope flag of that name, so it names the link target",
-	"env list --deployment-id":                  "env list is new in v2; #2376 drops this",
-	"env list --workspace-id":                   "env list is new in v2; #2376 drops this",
 	"workspace team remove --workspace-id":      "came with the v2 --workspace; 1.x had it on APC only",
 	"workspace team update --workspace-id":      "came with the v2 --workspace; 1.x had it on APC only",
 }

@@ -31,6 +31,10 @@ const (
 	// runtime may still be coming up — the message says what its mode left
 	// behind.
 	KindHealthTimeout cliout.ProblemKind = "health_timeout"
+	// KindStartTimedOut: the containers did not finish starting in the time
+	// allowed, so the start gave up on them. Unlike
+	// health_timeout, nothing is still coming up. Docker mode only.
+	KindStartTimedOut cliout.ProblemKind = "start_timed_out"
 	// KindLocked: another operation holds this project's lock. The one kind
 	// here that says "try again" rather than "something is wrong".
 	//
@@ -93,6 +97,7 @@ var ProblemKinds = cliout.Kinds{
 	{Kind: KindForeignMode, Match: cliout.Sentinel(localrt.ErrForeignMode)},
 	{Kind: KindAlreadyRunning, Match: cliout.Sentinel(localrt.ErrAlreadyRunning)},
 	{Kind: KindHealthTimeout, Match: cliout.Sentinel(localrt.ErrHealthTimeout)},
+	{Kind: KindStartTimedOut, Match: cliout.Sentinel(localrt.ErrStartTimedOut)},
 	{Kind: KindUnsupportedBase, Match: cliout.Sentinel(localrt.ErrUnsupportedBase)},
 	{Kind: KindDatabaseNewerThanAirflow, Match: cliout.Sentinel(localrt.ErrDatabaseNewerThanAirflow)},
 	// ErrStartInProgress, not a second name for it: pkg/localrt already

@@ -2,6 +2,7 @@ package fsatomic
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -356,5 +357,64 @@ func assertOnlyFile(t *testing.T, dir, name string) {
 			got = append(got, e.Name())
 		}
 		t.Errorf("directory holds %v, want only %q", got, name)
+	}
+}
+
+// Writers and readers in one process take turns on a file rather than
+// colliding. On Windows a rename onto a file another handle holds fails, and
+// forty goroutines renaming onto one file at once spent the whole retry budget
+// on a loaded machine; here every one of them succeeds, every read sees a
+// whole value, and the file ends holding one of them.
+func TestWriteFileAndReadFileTakeTurnsInOneProcess(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "shared.json")
+	if err := WriteFile(path, []byte("seed"), 0o600); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	written := map[string]bool{"seed": true}
+	for i := range 40 {
+		written[fmt.Sprintf("value-%02d", i)] = true
+	}
+	var wg sync.WaitGroup
+	for value := range written {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			if err := WriteFile(path, []byte(value), 0o600); err != nil {
+				t.Errorf("WriteFile(%q): %v", value, err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			data, err := ReadFile(path)
+			if err != nil {
+				t.Errorf("ReadFile: %v", err)
+				return
+			}
+			if !written[string(data)] {
+				t.Errorf("ReadFile saw %q, which no writer wrote whole", data)
+			}
+		}()
+	}
+	wg.Wait()
+
+	data, err := ReadFile(path)
+	if err != nil {
+		t.Fatalf("final ReadFile: %v", err)
+	}
+	if !written[string(data)] {
+		t.Errorf("the file ends holding %q, which no writer wrote", data)
+	}
+}
+
+// Two spellings of one file share its lock, and two files do not.
+func TestPathLockIsPerFileNotPerSpelling(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if pathLock("shared.json") != pathLock(filepath.Join(dir, "shared.json")) {
+		t.Error("a relative and an absolute spelling of one file got different locks")
+	}
+	if pathLock("a.json") == pathLock("b.json") {
+		t.Error("two files share one lock")
 	}
 }

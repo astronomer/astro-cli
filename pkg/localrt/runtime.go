@@ -127,8 +127,12 @@ type Config struct {
 	// giving up. Zero takes each engine's own default, five minutes, which is
 	// generous because a first run initializes the metadata database.
 	//
+	// In docker mode the same value also bounds `compose up`, which blocks
+	// until the database migration finishes — before the wait, and on its own
+	// clock. Image pulls happen before either and are not bounded.
+	//
 	// Configurable because five minutes is a guess about somebody else's
-	// machine. A cold Docker pull on a slow link can outlast it, and a caller
+	// machine. A slow one can outlast it, and a caller
 	// that would rather fail fast — CI, a scripted check, the suite that tests
 	// what a start leaves behind when it does not finish — has no way to ask
 	// for that otherwise.

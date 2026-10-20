@@ -405,7 +405,7 @@ func TestDeployManifestImage_RefusesAnAgentImage(t *testing.T) {
 			}, client)
 			require.ErrorIs(t, err, errAgentImageInHostedDeploy)
 			assert.ErrorContains(t, err, "astro remote deploy")
-			assert.ErrorContains(t, err, "astro config set show_warnings false -g", "the refusal names the way past a false positive")
+			assert.NotContains(t, err.Error(), "show_warnings", "the refusal does not steer users to the global switch")
 			client.AssertNotCalled(t, "CreateDeployWithResponse", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 			assert.False(t, hasImageCall(cmd.calls, "push"), "nothing is pushed, got %v", cmd.calls)
 			client.AssertExpectations(t)
@@ -418,6 +418,8 @@ func TestDeployManifestImage_RefusesAnAgentImage(t *testing.T) {
 // not even inspected.
 func TestRefuseAgentImage_SkippedWithWarningsOff(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
+	// The setting below is package state: put it back for the tests after.
+	t.Cleanup(func() { testUtil.InitTestConfig(testUtil.LocalPlatform) })
 	cmd := withImageSeams(t, "3.1-2")
 	cmd.env = `["ASTRO_AGENT_CLIENT_PROCESS_SPAWNER__PYTHON_EXECUTABLE=/usr/local/bin/python"]`
 	engine := imagebuild.Engine{Cmd: newImageBuildCommander(), Bin: "docker"}

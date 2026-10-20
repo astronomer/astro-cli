@@ -363,7 +363,9 @@ const healthTimeoutEnv = "ASTRO_LOCAL_HEALTH_TIMEOUT"
 // word it for their own mode: the docker one has containers that keep starting
 // and the standalone one does not.
 func adviseHealthTimeout(err error) error {
-	if !errors.Is(err, localrt.ErrHealthTimeout) {
+	// A docker start whose `compose up` ran out of time too: the same value
+	// bounds it, so it is the same knob.
+	if !errors.Is(err, localrt.ErrHealthTimeout) && !errors.Is(err, localrt.ErrStartTimedOut) {
 		return err
 	}
 	return fmt.Errorf("%w; set %s (e.g. 10m) to wait longer", err, healthTimeoutEnv)

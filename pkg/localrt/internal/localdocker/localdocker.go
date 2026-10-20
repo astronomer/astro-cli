@@ -97,7 +97,8 @@ func (e *Engine) SetContainerBinary(f func(projectPath string) string) {
 	}
 }
 
-// SetHealthTimeout bounds how long a start waits for the api-server to answer.
+// SetHealthTimeout bounds how long a start waits for the api-server to answer,
+// and, separately, how long its `compose up` may take (see updeadline.go).
 //
 // A setter rather than another parameter on New, which already takes three and
 // would take a fourth that almost every caller leaves at its default. See
@@ -410,7 +411,7 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 // the decision it carries — whether a failure is this start's to clean up — is
 // worth reading in one place.
 func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, cb rt.Callbacks) error {
-	if err := e.runCompose(ctx, *up, cb, "up", "--detach", "--quiet-pull"); err != nil {
+	if err := e.composeUp(ctx, up, cb); err != nil {
 		startErr := fmt.Errorf("starting project containers: %w", err)
 		if !mayCleanUp {
 			// Containers were here before this start, or we could not tell —
@@ -426,7 +427,7 @@ func (e *Engine) bringUp(ctx context.Context, up *composeLine, mayCleanUp bool, 
 		revision, cleanup := e.rollback(ctx, up.conn, up.name, cb)
 		if revision != "" {
 			// The one failure the logs can name precisely, so it replaces
-			// "exit status 1" rather than riding beside it.
+			// "exit status 1" — or a timed-out up — rather than riding beside it.
 			startErr = databaseNewerError(revision)
 		}
 		return errors.Join(startErr, cleanup)

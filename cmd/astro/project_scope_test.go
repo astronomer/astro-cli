@@ -427,3 +427,87 @@ func TestProjectDeployment(t *testing.T) {
 	_, _, err = projectDeployment(&manifest.Manifest{}, "staging")
 	require.EqualError(t, err, `"staging" is not a Deployment id, and pyproject.toml has no Astro Deployment links`)
 }
+
+// astro env list is new in v2, so it takes only --workspace and --deployment.
+// They do everything the 1.x spellings do on the per-kind listings: a link
+// name is the link's Deployment, an id no link holds is that id, and an
+// explicit workspace wins over the project's.
+func TestEnvListTakesTheV2SpellingsInAProject(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		match    func(*astrov1.ListEnvironmentObjectsParams) bool
+		wantNote string
+	}{
+		{
+			name: "a link name", args: []string{"--deployment", "test"},
+			match: func(p *astrov1.ListEnvironmentObjectsParams) bool {
+				return p.DeploymentId != nil && *p.DeploymentId == projectDep && p.WorkspaceId == nil
+			},
+			wantNote: "using workspace Example from pyproject.toml (link test)\n",
+		},
+		{
+			name: "an id no link holds", args: []string{"--deployment", unlinkedDep},
+			match: func(p *astrov1.ListEnvironmentObjectsParams) bool {
+				return p.DeploymentId != nil && *p.DeploymentId == unlinkedDep && p.WorkspaceId == nil
+			},
+			wantNote: "using workspace Example from pyproject.toml\n",
+		},
+		{
+			name: "an explicit workspace", args: []string{"--workspace", "clexplicitworkspace000001"},
+			match: func(p *astrov1.ListEnvironmentObjectsParams) bool {
+				return p.WorkspaceId != nil && *p.WorkspaceId == "clexplicitworkspace000001" && p.DeploymentId == nil
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			inProject(t, testProjectManifest)
+			mc := new(astrov1_mocks.ClientWithResponsesInterface)
+			// One request per kind (env.ListInventory).
+			for range 4 {
+				expectEnvList(mc, tt.match)
+			}
+			if tt.wantNote != "" {
+				expectWorkspaceName(mc)
+			}
+			astroV1Client = mc
+
+			out, err := execEnvCmd(append([]string{"list"}, tt.args...)...)
+			require.NoError(t, err)
+			if tt.wantNote != "" {
+				assert.Contains(t, out, tt.wantNote)
+			} else {
+				assert.NotContains(t, out, "pyproject.toml")
+			}
+			mc.AssertExpectations(t)
+		})
+	}
+}
+
+func TestEnvListRefusesAnUnknownDeploymentAndNamesTheLinks(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	inProject(t, testProjectManifest)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mc
+
+	_, err := execEnvCmd("list", "--deployment", "prod")
+	require.EqualError(t, err, `"prod" is not a Deployment id or a Deployment link in pyproject.toml. Links: test`)
+	mc.AssertExpectations(t)
+}
+
+// 1.x had no env list, so no script can have passed it a 1.x spelling: it
+// does not carry them, hidden or otherwise.
+func TestEnvListHasNoOneXSpellings(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	mc := new(astrov1_mocks.ClientWithResponsesInterface)
+	astroV1Client = mc
+	t.Cleanup(resetEnvFlags)
+
+	for _, flag := range []string{"--workspace-id", "--deployment-id"} {
+		_, err := execEnvCmd("list", flag, unlinkedDep)
+		require.EqualError(t, err, "unknown flag: "+flag)
+	}
+	mc.AssertExpectations(t)
+}
