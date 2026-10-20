@@ -64,12 +64,5 @@ func TestRegistryBuildsMWAAAndComposer(t *testing.T) {
 	}
 }
 
-func TestSortedCopyLeavesInputUntouched(t *testing.T) {
-	in := []string{"c", "a", "b"}
-	got := sortedCopy(in)
-	assert.Equal(t, []string{"a", "b", "c"}, got)
-	assert.Equal(t, []string{"c", "a", "b"}, in, "input must not be mutated")
-}
-
 // Sanity: the staged stub satisfies Target, so the registry is fully typed.
 var _ Target = stagedTarget{}

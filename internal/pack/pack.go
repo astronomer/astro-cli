@@ -16,7 +16,6 @@ package pack
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -178,13 +177,4 @@ func (s stagedTarget) Name() string { return s.name }
 
 func (s stagedTarget) Build(context.Context, Request, localrt.Callbacks) (Result, error) {
 	return Result{}, &StagedError{Target: s.name}
-}
-
-// sortedCopy returns a sorted copy of ss, leaving the input untouched. The
-// content hash sorts its inputs so reordering the manifest does not change the
-// tag.
-func sortedCopy(ss []string) []string {
-	out := append([]string(nil), ss...)
-	sort.Strings(out)
-	return out
 }

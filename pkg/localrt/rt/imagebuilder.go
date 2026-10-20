@@ -28,7 +28,8 @@ type ImageBuilder interface {
 	// Airflow 2; docker mode runs it, and that is the one difference.
 	//
 	// The returned request carries BaseImage, or Dockerfile and Context, plus
-	// Dependencies, FindLinks and Packages. The engine fills in the rest. An
+	// ManifestDir, Dependencies, FindLinks and Packages. The engine fills in
+	// the rest. An
 	// adapter copying fields across must copy every one: a field it leaves
 	// out reaches the build as its zero value, with nothing to say so.
 	Request(ctx context.Context, m ManifestBuild) (BuildRequest, error)
@@ -138,6 +139,12 @@ type BuildRequest struct {
 	Secrets []string
 	// Tag is the image reference the build produces.
 	Tag string
+	// ManifestDir is the project whose pyproject.toml and uv.lock a generated
+	// build installs from (imagebuild.Request.ManifestDir). When it has a
+	// pyproject.toml, that file is what is installed, and Dependencies,
+	// FindLinks and Packages are ignored. Empty installs those three, unpinned.
+	// An adapter that drops it builds the image without the lock's versions.
+	ManifestDir string
 	// Dependencies are the manifest's Python dependencies (PEP 508).
 	Dependencies []string
 	// FindLinks are pages the Python install searches besides PyPI
