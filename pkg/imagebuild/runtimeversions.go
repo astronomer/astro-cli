@@ -124,7 +124,10 @@ func airflow2Image(pin, runtime string, load func() (*runtimeversions.Catalog, e
 	if runtime != "" {
 		majorText, _, _ := strings.Cut(runtime, ".")
 		if major, err := strconv.Atoi(majorText); err == nil && major < minAirflow2Runtime {
-			return "", fmt.Errorf("an image needs Airflow 2.%d or later, and [tool.astro] runtime names Astro Runtime %s, which carries an older Airflow 2: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d. Set runtime to %d.0.0 or newer, or remove it to build from the newest runtime for the pin",
+			// The build is the manifest's [tool.astro] runtime, or one a
+			// platform lists for the pin, so the fix names both ways to a
+			// newer one rather than a line the project may not have.
+			return "", fmt.Errorf("an image needs Airflow 2.%d or later, and the base would be Astro Runtime %s, which carries an older Airflow 2: the metadata database is migrated with airflow db migrate, which does not exist before Airflow 2.%d. Build from Astro Runtime %d.0.0 or newer, naming it in pyproject.toml as [tool.astro] runtime, or on a platform that lists one",
 				minAirflow2Minor, runtime, minAirflow2Minor, minAirflow2Runtime)
 		}
 		return airflow2ImageRepo + ":" + runtime, nil
