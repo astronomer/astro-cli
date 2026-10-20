@@ -9,6 +9,7 @@
   "section": "x",
   "key": "x",
   "message": "x",
+  "hint": "x",
   "parse_time_seconds": 1.5,
   "threshold_seconds": 1.5
 }

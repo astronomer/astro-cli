@@ -157,6 +157,14 @@ type Deps struct {
 	// runtimecatalog.Catalog. A seam so a test never reaches the network.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
 
+	// RuntimeFreeze reads the distributions a runtime build's image has
+	// installed, for the first of pythons it has a freeze file for, which
+	// `astro local check` names in a hint when a Dag imports one the project
+	// does not list. Production reads the CDN through
+	// runtimecatalog.RuntimeFreeze. nil, or a nil result, means no hint. A
+	// seam so a test never reaches the network.
+	RuntimeFreeze func(ctx context.Context, build string, pythons []string) []string
+
 	// ImageCatalog reads the runtime catalog for `astro package astro`'s
 	// generated image: its Python, and an Airflow 2 base with no
 	// [tool.astro] runtime. nil, or a nil result, means no catalog: the image
@@ -230,6 +238,7 @@ func NewDeps() Deps {
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
 		RuntimeCatalog:   runtimecatalog.Catalog,
+		RuntimeFreeze:    runtimecatalog.RuntimeFreeze,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)
 		},
