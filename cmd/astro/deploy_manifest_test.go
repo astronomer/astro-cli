@@ -223,6 +223,17 @@ func TestDeployManifestJSONImageAndDag(t *testing.T) {
 	assert.Equal(t, "https://cloud.astronomer.io/deployments/clx-dep", m["url"])
 }
 
+// -o is --output, as on every other command with one, APC's deploy among them.
+func TestDeployManifestOutputShorthand(t *testing.T) {
+	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{WorkspaceID: "clw-ws", RuntimeVersion: "3.1-2"}})
+
+	out, err := execDeployCapture("--deployment", "prod", "-o", "json")
+	require.NoError(t, err)
+	m := decodeOneJSON(t, out)
+	assert.Equal(t, "clx-dep", m["deployment"])
+	assert.Equal(t, "image-and-dag", m["type"])
+}
+
 func TestDeployManifestJSONImageOnly(t *testing.T) {
 	setupManifestDeploy(t, &fakeCmdDeployer{img: manifestdeploy.ImageResult{
 		WorkspaceID:    "clw-ws",

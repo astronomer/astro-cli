@@ -743,15 +743,17 @@ func listWorkspace(req Request) string {
 }
 
 // ResolveNamed settles a target named on the command line, as Run does: the
-// argument (linkName) and --deployment, which must agree, each a link of m
-// (nil for no manifest) or a Deployment id. named is false when neither names
-// one. It is for a command that ships something other than the project, such
-// as astro deploy bundle, to name its Deployment the way a deploy does.
-func ResolveNamed(m *manifest.Manifest, linkName, deployment, workspaceID, contextWorkspace string) (target Target, named bool, err error) {
-	req := Request{Manifest: m, LinkName: linkName, Deployment: deployment, WorkspaceID: workspaceID, ContextWorkspace: contextWorkspace}
+// argument (req.LinkName) and --deployment (req.Deployment), which must
+// agree, each a link of req.Manifest (nil for no manifest) of req.Platform,
+// on req.Domain for Astro Private Cloud, or a Deployment id. Only those
+// fields, the workspaces and OtherDomain are read. named is false when
+// neither names one. It is for a command that ships something other than the
+// project, such as astro deploy bundle, or that acts on a Deployment, such as
+// APC's astro deployment logs, to name its Deployment the way a deploy does.
+func ResolveNamed(req Request) (target Target, named bool, err error) {
 	var links map[string]manifest.Link
-	if m != nil {
-		links = m.Astro.Deployments
+	if req.Manifest != nil {
+		links = req.Manifest.Astro.Deployments
 	}
 	return resolveNamed(req, links)
 }

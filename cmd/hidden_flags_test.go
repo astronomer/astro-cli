@@ -33,6 +33,13 @@ var hiddenFlagAllowed = map[string]string{
 		"nothing read it, so it is kept doing nothing",
 	"deployment runtime --workspace-id": "1.x had it there (where the platform enables Astro Runtime), through the deployment group; " +
 		"nothing read it, so it is kept doing nothing",
+	// The 1.x spellings of --workspace and --deployment on commands behind
+	// the same gates (1.x's cmd/apc, deployment.go and utils.go at 7aa23cdc).
+	"deployment adopt --workspace-id": "1.x had it there (APC 2.1.0 and newer), through the deployment group, and adopt read it; " +
+		"it is --workspace's alias",
+	"deployment unadopt --deployment-id": "1.x's unadopt had it, with -d (APC 2.1.0 and newer); it is --deployment's alias, and -d is --deployment's",
+	"deployment runtime --deployment-id": "1.x's runtime upgrade and migrate had it, with -d (where the platform enables Astro Runtime); " +
+		"it is --deployment's alias, and -d is --deployment's",
 }
 
 // A hidden flag is a 1.x spelling a command keeps working for scripts written

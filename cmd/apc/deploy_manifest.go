@@ -134,7 +134,7 @@ func deployManifest(cmd *cobra.Command, args []string, root *utils.Where, out io
 		},
 		Platform:    manifest.KindAPC,
 		Domain:      domain,
-		OtherDomain: otherDomain,
+		OtherDomain: otherDomainThen("deploy again"),
 		Announce: func(target manifestdeploy.Target) {
 			announceDeploy(target, errOut, progress)
 		},
@@ -172,14 +172,17 @@ func refuseBuildSecret(cmd *cobra.Command, m *manifest.Manifest) error {
 	return nil
 }
 
-// otherDomain is the refusal of an apc link on another domain than the
-// current context's: the deploy talks to one Houston, the context's, so the
-// fix is to switch to that domain's context, or to log in to it first.
-func otherDomain(link, domain string) error {
-	if (&config.Context{Domain: domain}).ContextExists() {
-		return fmt.Errorf("link %q is on %s, and the current context is another Astro Private Cloud: run astro context switch %s, then deploy again", link, domain, domain)
+// otherDomainThen is the refusal of an apc link on another domain than the
+// current context's: a command talks to one Houston, the context's, so the
+// fix is to switch to that domain's context, or to log in to it first, and
+// then to do again what was refused (again, such as "deploy again").
+func otherDomainThen(again string) func(link, domain string) error {
+	return func(link, domain string) error {
+		if (&config.Context{Domain: domain}).ContextExists() {
+			return fmt.Errorf("link %q is on %s, and the current context is another Astro Private Cloud: run astro context switch %s, then %s", link, domain, domain, again)
+		}
+		return fmt.Errorf("link %q is on %s, and this machine has no login there: run astro login %s, then %s", link, domain, domain, again)
 	}
-	return fmt.Errorf("link %q is on %s, and this machine has no login there: run astro login %s, then deploy again", link, domain, domain)
 }
 
 // renderManifestDeploy writes a finished project deploy: the one json object

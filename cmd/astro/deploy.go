@@ -102,7 +102,7 @@ func NewDeployCmd() *cobra.Command {
 	cmd.Flags().StringVar(&manifestDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
 	addWorkspaceFlag(cmd.Flags(), &manifestWorkspace, "", "Workspace for the deploy, overriding the context", oneXWorkspaceID)
-	cmd.Flags().StringVar(&deployOutput, "output", string(cliout.FormatText), "Output format: text or json")
+	cmd.Flags().StringVarP(&deployOutput, "output", "o", string(cliout.FormatText), "Output format: text or json")
 	cmd.Flags().StringVarP(&deployDescription, "description", "", "", "Add a description for more context on this deploy")
 	utils.AddBuildSecretFlag(cmd.Flags(), &buildSecrets)
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	mocks "github.com/astronomer/astro-cli/internal/platform/apc/houston/mocks"
@@ -56,10 +57,11 @@ func (s *Suite) TestDeploymentListAllNeedsNoWorkspace() {
 	s.ErrorContains(err, "failed to find a valid workspace")
 }
 
-// --workspace-id is on the commands that read it, create, list and adopt.
-// 1.x gave it to the other deployment commands, through the group, and none
-// read it: they keep it, hidden and setting nothing. hibernate and wake-up,
-// newer than 1.x, have none.
+// --workspace is on the commands that read it, create, list and adopt, with
+// --workspace-id as its hidden alias. 1.x gave --workspace-id to the other
+// deployment commands, through the group, and none read it: they keep it,
+// hidden and setting nothing. hibernate and wake-up, newer than 1.x, have
+// none.
 func (s *Suite) TestDeploymentWorkspaceIDIsOnlyWhereItIsRead() {
 	prev := appConfig
 	appConfig = &houston.AppConfig{Flags: houston.FeatureFlags{AstroRuntimeEnabled: true, TriggererEnabled: true}}
@@ -73,8 +75,13 @@ func (s *Suite) TestDeploymentWorkspaceIDIsOnlyWhereItIsRead() {
 		return c
 	}
 	for _, path := range []string{"create", "list", "adopt"} {
-		if f := find(path).Flag("workspace-id"); s.NotNil(f, path) {
+		c := find(path)
+		if f := c.Flag("workspace"); s.NotNil(f, path) {
 			s.False(f.Hidden, path)
+		}
+		if f := c.Flag("workspace-id"); s.NotNil(f, path) {
+			s.True(f.Hidden, path)
+			s.True(utils.IsAlias(f), path)
 		}
 	}
 	for _, path := range []string{

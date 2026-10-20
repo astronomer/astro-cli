@@ -205,7 +205,8 @@ var removedFlags = []removedFlag{
 	{name: "deployment-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListDeploymentIDRemoved)},
 	// --workspace is no 1.x flag there (1.x's --workspace-id still is, as a
 	// no-op), so these answer for the long name alone. needs keeps them to
-	// Astro's tree: APC's commands of these names never took one.
+	// the commands that name their Deployment with --deployment: Astro's,
+	// and APC's team and user, which act on the Deployment named too.
 	{name: "workspace", under: []string{"deployment team", "deployment user", "deployment token"}, needs: has("deployment"), v2Only: true, reason: says(errDeploymentByIDWorkspaceRemoved)},
 	// 1.x's list commands shared --json, --template and -o
 	// table|json|template (pkg/output's AddFlags), and api ls and describe
@@ -217,8 +218,8 @@ var removedFlags = []removedFlag{
 	{name: "format", needs: cliout.HasOutput, reason: formatRemoved},
 	// --force skipped the confirmation that --yes skips now.
 	{name: "force", needs: has("yes"), reason: forceRemoved},
-	// astro deploy's 1.x-project flags. Astro's deploy has --deployment for
-	// --save to point at; APC's names its Deployment by the argument alone.
+	// astro deploy's 1.x-project flags. Astro's deploy and APC's both have
+	// --deployment for --save to point at.
 	{name: "save", under: []string{"deploy"}, needs: has("deployment"), reason: says(errDeploySaveRemoved)},
 	{name: "pytest", under: []string{"deploy"}, reason: says(errDeployPytestRemoved)},
 	{name: "test", under: []string{"deploy"}, reason: says(errDeployTestRemoved)},

@@ -72,9 +72,7 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
-	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Workspace for the deploy, overriding the context")
-	utils.RefuseEmpty(cmd.Flags().Lookup("workspace"))
-	utils.AddAlias(cmd.Flags(), "workspace-id", "", "workspace")
+	addWorkspaceFlag(cmd.Flags(), "", "Workspace for the deploy, overriding the context")
 	cmd.Flags().StringVar(&description, "description", "", "Description to attach to the deploy, for traceability (default: one based on the deploy type)")
 	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")
 	cmd.Flags().StringVarP(&imageName, "image-name", "i", "", "Name of a prebuilt image to deploy instead of building one: an image on this machine, or with --remote one already in a registry. Outside a pyproject.toml project it deploys the image alone")
@@ -86,6 +84,7 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	if !context.IsCloudContext() && houston.VerifyVersionMatch(houstonVersion, houston.VersionRestrictions{GTE: "0.34.0"}) {
 		cmd.Flags().BoolVarP(&isDagOnlyDeploy, "dags", "d", false, "Push only the Dags of the pyproject.toml project here to your Deployment")
 	}
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
@@ -180,10 +179,6 @@ type deployJSON struct {
 //     pick. --dags there has no project to upload the DAGs of, and a build
 //     has nothing to build (kind no_project), as astro deploy on Astro says.
 func deployAirflow(cmd *cobra.Command, args []string, out io.Writer) error {
-	// --workspace and its 1.x spelling --workspace-id must agree.
-	if err := utils.ApplyAliases(cmd.Flags()); err != nil {
-		return err
-	}
 	if len(args) > 0 && deployDeployment != "" && args[0] != deployDeployment {
 		return cliout.Usage(fmt.Errorf("the Deployment argument %q and --deployment %q disagree: pass only one", args[0], deployDeployment))
 	}

@@ -1095,7 +1095,7 @@ func (s *Suite) TestDeploymentUnadopt() {
 
 		houstonClient = api
 		_, err := execDeploymentCmd("unadopt")
-		s.EqualError(err, `required flag(s) "deployment-id" not set`)
+		s.EqualError(err, `required flag(s) "deployment" not set`)
 	})
 
 	s.Run("api error", func() {

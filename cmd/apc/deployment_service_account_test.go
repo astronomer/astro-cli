@@ -51,7 +51,7 @@ func (s *Suite) TestDeploymentSaDeleteWoDeploymentIdCommand() {
 	testUtil.InitTestConfig(testUtil.SoftwarePlatform)
 	_, err := execDeploymentCmd("service-account", "delete", "key-test-id")
 	s.Error(err)
-	s.EqualError(err, `required flag(s) "deployment-id" not set`)
+	s.EqualError(err, `required flag(s) "deployment" not set`)
 }
 
 func (s *Suite) TestDeploymentSaDeleteRootCommand() {
