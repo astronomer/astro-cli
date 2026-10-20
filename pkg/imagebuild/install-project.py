@@ -542,9 +542,8 @@ def parse_requirement(text):
     return name, spec, extras, url
 
 
-def requirement_key(name, spec, marker):
-    """A constraint or override as a comparable value: its name, its
-    specifiers in order, and its marker."""
+def requirement_key(name, spec):
+    """A constraint or override's name and specifiers, as a comparable value."""
     if SpecifierSet is not None:
         try:
             spec = ",".join(sorted(str(s) for s in SpecifierSet(spec)))
@@ -552,24 +551,80 @@ def requirement_key(name, spec, marker):
             pass
     else:
         spec = ",".join(sorted(s.strip() for s in spec.split(",") if s.strip()))
-    if marker and Marker is not None:
-        try:
-            marker = str(Marker(marker))
-        except Exception:
-            pass
-    return (norm(name), spec.replace(" ", ""), (marker or "").replace(" ", ""))
+    return (norm(name), spec.replace(" ", ""))
+
+
+# Not a marker canonical_marker could read: it matches any other.
+ANY_MARKER = object()
+
+
+def canonical_marker(marker):
+    """marker in one spelling of what it means, so the one pyproject.toml states
+    and the one uv records of it compare equal: its tokens with single spaces
+    and single quotes, and python_version == 'X.Y' (or !=) written as
+    python_full_version == 'X.Y.*', as uv records it. "" for none. ANY_MARKER
+    for one it cannot spell reliably, which then never makes a lock stale: one
+    the tokenizer cannot read, and any but a single comparison, since uv may
+    reorder or regroup a compound marker in ways a token-level spelling would
+    call a change."""
+    if not marker or not marker.strip():
+        return ""
+    try:
+        tokens = _marker_tokens(marker)
+    except ValueError:
+        return ANY_MARKER
+    if len(tokens) != 3 or tokens[1][0] != "op":
+        return ANY_MARKER
+    out, i = [], 0
+    while i < len(tokens):
+        kind, text = tokens[i]
+        if (
+            kind == "var"
+            and text == "python_version"
+            and i + 2 < len(tokens)
+            and tokens[i + 1] in (("op", "=="), ("op", "!="))
+            and tokens[i + 2][0] == "str"
+            and re.fullmatch(r"\d+\.\d+", tokens[i + 2][1][1:-1])
+        ):
+            out += ["python_full_version", tokens[i + 1][1], "'%s.*'" % tokens[i + 2][1][1:-1]]
+            i += 3
+            continue
+        out.append("'%s'" % text[1:-1] if kind == "str" else text)
+        i += 1
+    return " ".join(out)
 
 
 def same_requirements(stated, recorded):
     """Whether [tool.uv] constraint-dependencies (or override-dependencies) as
-    written match what the lock's [manifest] recorded of them."""
+    written match what the lock's [manifest] recorded of them: the same names
+    and specifiers, each as many times, with markers that mean the same once
+    canonical_marker has spelled them alike. A marker it cannot read matches
+    any marker, so a spelling this does not know never calls a fresh lock
+    stale."""
+
+    def grouped(entries):
+        groups = {}
+        for name, spec, marker in entries:
+            groups.setdefault(requirement_key(name, spec), []).append(canonical_marker(marker))
+        return groups
+
     mine = []
     for text in stated:
         name, spec, _, url = parse_requirement(text)
-        marker = text.split(";", 1)[1].strip() if ";" in text else ""
-        mine.append(requirement_key(name, url or spec, marker))
-    theirs = [requirement_key(r.get("name", ""), r.get("url") or r.get("specifier", ""), r.get("marker", "")) for r in recorded or []]
-    return sorted(mine) == sorted(theirs)
+        mine.append((name, url or spec, text.split(";", 1)[1].strip() if ";" in text else ""))
+    theirs = [(r.get("name", ""), r.get("url") or r.get("specifier", ""), r.get("marker", "")) for r in recorded or []]
+    mine, theirs = grouped(mine), grouped(theirs)
+    if mine.keys() != theirs.keys():
+        return False
+    for key, markers in mine.items():
+        others = theirs[key]
+        if len(markers) != len(others):
+            return False
+        if ANY_MARKER in markers or ANY_MARKER in others:
+            continue
+        if sorted(markers) != sorted(others):
+            return False
+    return True
 
 
 def stale_reason(lock, root, manifest, locked_versions):

@@ -56,8 +56,7 @@ func InstallHelper() []byte {
 // inputs in its context: the helper, the project's pyproject.toml and, when it
 // has them, its uv.lock and (for a request naming no project) the find-links
 // file. The directory always exists, so the install stage copies it whole and
-// needs no wildcard for the optional files, which Buildah has refused when
-// they match nothing.
+// needs no wildcard for the optional files, on any builder.
 const generatedInputsDir = ".astro/install"
 
 // installFindLinksName is the file a build request naming no project leaves
@@ -81,8 +80,8 @@ const (
 // stage, from the project as its context: pyproject.toml, uv.lock when there is
 // one, and the helper at InstallHelperPath. The wildcard is how uv.lock stays
 // optional; Docker's BuildKit and its legacy builder both copy nothing for a
-// wildcard that matches nothing, but Buildah has refused one, so a project
-// built with Podman keeps a uv.lock, or takes `uv.lock*` out of the line.
+// wildcard that matches nothing, and so does Podman 5.8 (Buildah 1.43); an
+// older Buildah is untested.
 var projectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPath
 
 // generatedInputs is what a generated build's install stage copies: the whole
@@ -98,7 +97,7 @@ const generatedInputs = generatedInputsDir + "/"
 // followed by its own steps, and it mounts the netrc secret for the Python
 // install whether or not a build passes one (required=false), since a plain
 // `docker build .` decides that, not the file. Its install stage copies
-// projectInputs, which under Podman needs a uv.lock in the project.
+// projectInputs.
 //
 // The install steps are written out rather than inherited for two reasons. The
 // trigger list has changed across runtimes (the netrc mount is in 3.3-9 but not
