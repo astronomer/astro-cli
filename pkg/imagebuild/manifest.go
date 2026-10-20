@@ -29,15 +29,20 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 		return ManifestBuild{ProjectDir: dir}
 	}
 	airflow := m.Airflow()
+	deps := m.Requirements()
 	return ManifestBuild{
 		ProjectDir:     dir,
 		AirflowVersion: airflow.Pin,
 		Runtime:        airflow.Runtime,
 		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
-		Dependencies:   m.Requirements(),
-		FindLinks:      m.UV.IndexPages(),
-		Packages:       m.Astro.Packages,
+		Dependencies:   deps,
+		// Only the pages of what a generated image installs: the runtime
+		// already is Airflow (runtimeDeps), so the Airflow sources every
+		// `astro init` project carries would only make each build reach
+		// Astronomer's index, which a firewalled build host cannot.
+		FindLinks: m.UV.IndexPagesFor(runtimeDeps(deps)),
+		Packages:  m.Astro.Packages,
 	}
 }
 

@@ -119,7 +119,7 @@ func TestForManifestGeneratedRequestInstallsDependenciesAndPackages(t *testing.T
 	assert.Equal(t, "libpq-dev\n", string(pkgs))
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
-	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1"), string(df))
+	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), string(df))
 }
 
 // A secret other than netrc reaches the build exactly when a Dockerfile is
@@ -179,7 +179,7 @@ func TestBuildLocalBuildsEvenWithNothingToInstall(t *testing.T) {
 	assert.Empty(t, pkgs)
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
-	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1"), string(df))
+	assert.Equal(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), string(df))
 }
 
 // Build keeps its fast path: local docker mode runs the base as-is at the host

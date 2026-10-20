@@ -205,7 +205,7 @@ type Request struct {
 	//
 	// A generated build forwards only the manifest.RuntimeSecretID spec: the
 	// one RUN that can read a secret is the Python install, which mounts that
-	// one.
+	// one when it is given, and mounts nothing otherwise.
 	//
 	// The SPEC is forwarded, never a secret value: docker reads the value itself
 	// from the src file or the named env var. So these strings are safe in a
@@ -414,7 +414,7 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	// The Dockerfile sits outside the context so the trailing `COPY . .` does
 	// not bake it in.
 	dfPath := filepath.Join(req.WorkDir, dockerfileName)
-	if err := os.WriteFile(dfPath, []byte(generatedDockerfile(from)), filePermRW); err != nil {
+	if err := os.WriteFile(dfPath, []byte(generatedDockerfile(from, len(req.buildSecrets()) > 0)), filePermRW); err != nil {
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 
@@ -506,9 +506,9 @@ func absPaths(req Request) (Request, error) {
 
 // buildSecrets are the Secrets the build can read. A declared Dockerfile
 // mounts whichever it names. A generated build's Dockerfile mounts
-// manifest.RuntimeSecretID alone (generatedDockerfile), so any other secret is
-// dropped rather than handed to docker, which would read its source for
-// nothing.
+// manifest.RuntimeSecretID alone (generatedDockerfile), and only when this
+// returns it, so any other secret is dropped rather than handed to docker,
+// which would read its source for nothing.
 func (r *Request) buildSecrets() []string {
 	if r.FromDeclaredDockerfile() {
 		return r.Secrets
@@ -536,11 +536,14 @@ func baseOf(ref string) string {
 }
 
 // GeneratedDockerfile is the Dockerfile a generated build over the runtime
-// base baseImage runs (Request.BaseImage, before baseOf), for a caller that
-// addresses the image by what builds it: `astro package astro`'s content tag
-// hashes it, so a change to the recipe is a change to the tag.
-func GeneratedDockerfile(baseImage string) string {
-	return generatedDockerfile(baseOf(baseImage))
+// base baseImage runs (Request.BaseImage, before baseOf), with the netrc
+// secret mounted into the Python install when mountNetrc is set, as Build
+// sets it when the request carries that secret. It is for a caller that
+// addresses the image by what builds it (`astro package astro`'s content tag
+// hashes it, so a change to the recipe is a change to the tag), or that
+// writes the same steps into a Dockerfile of its own.
+func GeneratedDockerfile(baseImage string, mountNetrc bool) string {
+	return generatedDockerfile(baseOf(baseImage), mountNetrc)
 }
 
 // generatedDockerfile is the Dockerfile a generated build runs over from, the
@@ -558,6 +561,13 @@ func GeneratedDockerfile(baseImage string) string {
 // install is one `docker build` runs as written, with nothing happening at
 // FROM that the file does not show.
 //
+// The netrc mount is written only when mountNetrc is set, which Build sets
+// when the request carries that secret. RUN --mount needs BuildKit (Docker)
+// or Buildah 1.21 (Podman 3.2), so a build with no secret to mount keeps to
+// a plain RUN, which the legacy builder and an older Podman also run. The
+// runtime's own 3.3-9 trigger mounts it unconditionally; a build that took
+// that trigger needed BuildKit whether it had a secret or not.
+//
 // Each install runs the runtime's own script, so the runtime's constraints
 // file and its choice of installer (uv, or pip with ASTRO_RUNTIME_USE_PIP)
 // still apply. Runtimes before 11.0.0 ship no scripts: their triggers run
@@ -565,14 +575,18 @@ func GeneratedDockerfile(baseImage string) string {
 // that command where the script is missing. The inline triggers also refused
 // an apache-airflow pin, which runtimeDeps has already removed. The test is
 // POSIX, since a runtime's SHELL is not the same on every line.
-func generatedDockerfile(from string) string {
+func generatedDockerfile(from string, mountNetrc bool) string {
+	run := "RUN "
+	if mountNetrc {
+		run = "RUN --mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false "
+	}
 	return "FROM " + from + "\n" +
 		"COPY " + packagesName + " .\n" +
 		"USER root\n" +
 		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
 		"elif [ -s " + packagesName + " ]; then apt-get update && cat " + packagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
 		"COPY " + requirementsName + " .\n" +
-		"RUN --mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false " +
+		run +
 		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
 		"else pip install --no-cache-dir --root-user-action=ignore -r " + requirementsName + "; fi\n" +
 		"USER astro\n" +

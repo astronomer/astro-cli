@@ -16,6 +16,17 @@
 #   - Airflow 2, quay.io/astronomer/astro-runtime: each non-yanked build from
 #     runtime 9 (Airflow 2.7, the floor in pkg/imagebuild/runtimeversions.go).
 #
+# Not covered:
+#
+#   - A runtime a platform offers that the public catalog does not list. A
+#     deploy builds on the newest build Houston (APC) or the Deployment's
+#     options (Astro) offer (internal/deploybuild/offered.go), and a build the
+#     platform has but the catalog lacks is outside what this reads.
+#   - Airflow 2 -python-X.Y flavors. The catalog lists no Python for an
+#     Airflow 2 build, so the CLI never picks one (RuntimeImageForPython builds
+#     an Airflow 2 image on its runtime's default Python), and there is no
+#     list of them to check.
+#
 # Prints each missing tag, says whether the ONBUILD tag beside it exists, and
 # exits 1 when any -base tag is missing. Needs curl and jq, and the network.
 set -euo pipefail

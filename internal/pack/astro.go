@@ -189,7 +189,15 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, declaredDockerfile{
+	// A generated build is addressed by its recipe too. The one with the netrc
+	// mount, whether or not this build has the secret: a secret decides what
+	// the install can reach, not what a successful one installs, so a laptop
+	// and a CI runner holding a token get the same tag.
+	var recipe string
+	if declared == "" {
+		recipe = imagebuild.GeneratedDockerfile(breq.BaseImage, true)
+	}
+	hash, err := contentHash(breq.BaseImage, req.Platform, recipe, breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -476,7 +484,7 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-func contentHash(base, platform string, deps, findLinks, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
+func contentHash(base, platform, recipe string, deps, findLinks, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -484,14 +492,17 @@ func contentHash(base, platform string, deps, findLinks, packages []string, proj
 	writeField("base", base)
 	writeField("platform", platform)
 	if df.abs == "" {
-		// A generated build's Dockerfile is imagebuild's, not the project's,
-		// and it is as much the build as the inputs below: a change to how it
-		// installs is a different image from the same manifest, so it moves
-		// the tag rather than reusing one an older recipe built.
-		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base)))))
-	}
-	for _, l := range findLinks {
-		writeField("find-links", l)
+		// A generated build's Dockerfile (recipe) is imagebuild's, not the
+		// project's, and it is as much the build as the inputs below: a change
+		// to how it installs is a different image from the same manifest, so
+		// it moves the tag rather than reusing one an older recipe built. Its
+		// find-links say where that install looks. A declared Dockerfile
+		// installs as its own bytes say, which are hashed below, and reads no
+		// find-links, so neither is part of its address.
+		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(recipe))))
+		for _, l := range findLinks {
+			writeField("find-links", l)
+		}
 	}
 	if projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
