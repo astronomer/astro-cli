@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -205,9 +206,10 @@ func (c *cli) checkTarget(ctx context.Context, target, project string, env []str
 		DagsDir:     checks.DefaultDagsDir(project),
 		Pin:         m.Airflow().Pin,
 		Deps:        deps,
-		// Without the pins to Astronomer's build of Airflow: a platform runs
-		// Apache's own, at its own version.
-		Constraints: manifest.WithoutAstroPins(m.UV.ConstraintDependencies),
+		// Without the pins to Astronomer's build of Airflow or to the
+		// runtime image's packages: a platform runs Apache's own Airflow, at
+		// its own version, beside its own packages.
+		Constraints: m.UV.ProjectConstraints(),
 		Env:         env,
 	}, prov, c.d.CheckVenv, strict, progress)
 }
@@ -246,6 +248,9 @@ func (c *cli) checkAstroTarget(ctx context.Context, project string, env []string
 // plain check and has to stay one: routing only the plain path through the
 // fallback would have a docker-mode project pass here and report "environment
 // not ready" there, for the same project in the same state.
+//
+// Both paths end in withRuntimeHints, so an import error for a package the
+// runtime image ships carries its `uv add` whichever environment found it.
 func (c *cli) check(ctx context.Context, r cliout.Renderer, opts checks.Options, m *manifest.Manifest) (res checks.Result, provisioned bool, err error) {
 	res, err = checks.Run(ctx, opts, c.d.Checks)
 	// Only "there is no interpreter". ErrEnvNotReady also covers one whose
@@ -253,10 +258,13 @@ func (c *cli) check(ctx context.Context, r cliout.Renderer, opts checks.Options,
 	// check the project against dependencies it does not have installed — a
 	// green check for a project whose own environment is broken.
 	if errors.Is(err, checks.ErrNoInterpreter) {
+		provisioned = true
 		res, err = c.checkWithBuiltEnv(ctx, r, opts, m)
-		return res, true, err
 	}
-	return res, false, err
+	if err != nil {
+		return res, provisioned, err
+	}
+	return c.withRuntimeHints(ctx, opts.ProjectPath, m, res), provisioned, nil
 }
 
 // checkWithBuiltEnv runs the check against an interpreter built for it.
@@ -438,7 +446,34 @@ func renderFindingsTable(w io.Writer, findings []checks.Finding, budget *int) er
 	if err := tw.Flush(); err != nil {
 		return err
 	}
-	return renderTracebacks(w, findings, budget)
+	if err := renderTracebacks(w, findings, budget); err != nil {
+		return err
+	}
+	return renderHints(w, findings)
+}
+
+// renderHints prints each distinct finding hint once, under the table and its
+// tracebacks. Once, because one missing package makes every Dag file that
+// imports it an import error with the same hint; --output json carries the
+// hint on every finding.
+func renderHints(w io.Writer, findings []checks.Finding) error {
+	var seen []string
+	for i := range findings {
+		h := findings[i].Hint
+		if h == "" || slices.Contains(seen, h) {
+			continue
+		}
+		if len(seen) == 0 {
+			if _, err := fmt.Fprintln(w); err != nil {
+				return err
+			}
+		}
+		seen = append(seen, h)
+		if _, err := fmt.Fprintf(w, "hint: %s\n", h); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // cellReplacer collapses what would break a tabwriter row: a tab opens a new

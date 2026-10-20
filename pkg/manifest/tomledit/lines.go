@@ -80,27 +80,126 @@ func arrayOf(data []byte, kv *unstable.Node) (arrayValue, bool) {
 }
 
 // setLines is Set for an array of scalars at key, written one element per
-// line with a trailing comma, the way uv writes dependencies. An array that
-// lands inside an inline value stays on one line. It reports false, having
-// done nothing, when the value is not such an array or is the one already
-// there, which a plain Set leaves as it is spelled.
+// line with a trailing comma, the way uv writes dependencies, and each Comment
+// in it as a comment line where it stands. An array that lands inside an
+// inline value stays on one line; one that holds a Comment is refused there
+// with ErrCommentsUnsupported, and the document is left as it was. It reports
+// false, having done nothing, when the value is not such an array or is the
+// one already there, which a plain Set leaves as it is spelled.
 func (s *surgical) setLines(key []string, value any) (bool, error) {
 	list, ok := value.([]any)
 	if !ok || len(list) == 0 || slices.ContainsFunc(list, composite) {
 		return false, nil
 	}
-	if cur, has := s.doc.Get(key); has && reflect.DeepEqual(cur, value) {
+	values := valuesOf(list)
+	commented := len(values) < len(list)
+	if commented {
+		if cur, has := s.GetLines(key); has && reflect.DeepEqual(cur, list) {
+			return true, nil
+		}
+	} else if cur, has := s.doc.Get(key); has && reflect.DeepEqual(cur, value) {
 		return false, nil
 	}
-	if err := s.doc.Set(key, value); err != nil {
+	before := slices.Clone(s.doc.Bytes())
+	if err := s.doc.Set(key, values); err != nil {
 		return true, err
 	}
 	data := s.doc.Bytes()
 	a, ok := findArray(data, key)
 	if !ok {
+		if commented {
+			if err := s.reparse(before); err != nil {
+				return true, err
+			}
+			return true, ErrCommentsUnsupported
+		}
 		return true, nil
 	}
-	return true, s.splice(a.open, a.close+1, linesOf(data, a.elems, nil, eol(data)))
+	if !commented {
+		return true, s.splice(a.open, a.close+1, linesOf(data, a.elems, nil, eol(data)))
+	}
+	return true, s.splice(a.open, a.close+1, commentedLinesOf(data, a.elems, list, eol(data)))
+}
+
+// commentedLinesOf renders list one line per entry: each value as data spells
+// its element, in order, and each Comment as a comment line.
+func commentedLinesOf(data []byte, elems [][2]int, list []any, newline []byte) []byte {
+	out := []byte{'['}
+	next := 0
+	for _, v := range list {
+		out = append(out, newline...)
+		out = append(out, lineIndent...)
+		if c, isComment := v.(Comment); isComment {
+			out = append(out, commentLine(c)...)
+			continue
+		}
+		e := elems[next]
+		next++
+		out = slices.Concat(out, data[e[0]:e[1]], []byte(","))
+	}
+	return slices.Concat(out, newline, []byte("]"))
+}
+
+// commentLine is c as a line of TOML. A line ending inside it would end the
+// comment and start TOML of its own, so it is written as a space.
+func commentLine(c Comment) []byte {
+	text := strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(string(c))
+	if text == "" {
+		return []byte("#")
+	}
+	return []byte("# " + text)
+}
+
+// GetLines reads the array at key with its comments. A comment on the line of
+// an element, after it, comes back after that element, and so is written on a
+// line of its own by a Set of what this returns.
+func (s *surgical) GetLines(key []string) ([]any, bool) {
+	v, ok := s.doc.Get(key)
+	if !ok {
+		return nil, false
+	}
+	values, isArray := v.([]any)
+	if !isArray {
+		return nil, false
+	}
+	return ArrayLines(s.doc.Bytes(), key, values), true
+}
+
+// ArrayLines is GetLines for a document a caller has already decoded: values
+// are the array's elements as decoding read them, and the comments between
+// them come from data with one streaming pass, without building an editable
+// document. An array it cannot locate on a key-value line comes back as the
+// values alone.
+func ArrayLines(data []byte, key []string, values []any) []any {
+	a, found := findArray(data, key)
+	if !found || len(a.elems) != len(values) {
+		return values
+	}
+	out := make([]any, 0, len(values))
+	from := a.open + 1
+	for i, e := range a.elems {
+		out = append(out, commentsIn(data, from, e[0])...)
+		out = append(out, values[i])
+		from = e[1]
+	}
+	return append(out, commentsIn(data, from, a.close)...)
+}
+
+// commentsIn reads the comments between from and to, a stretch of an array
+// that holds no element: only whitespace, line endings, commas and comments.
+func commentsIn(data []byte, from, to int) []any {
+	var out []any
+	for i := from; i < to; {
+		if data[i] != '#' {
+			i++
+			continue
+		}
+		end := min(lineContentEnd(data, i), to)
+		text := strings.TrimPrefix(string(data[i+1:end]), " ")
+		out = append(out, Comment(strings.TrimRight(text, " \t")))
+		i = end
+	}
+	return out
 }
 
 // appendLine is Set for index idx of the array at key when idx appends a

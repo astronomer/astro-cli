@@ -150,12 +150,28 @@ type Deps struct {
 	// the network; nil writes nothing.
 	AstroBuild func(ctx context.Context, airflowPin, runtime string) (runtimeversions.AstroBuild, error)
 
+	// RuntimePins reads the name==version lines of one Astro Runtime build's
+	// image running python, which init and a start write into [tool.uv] as
+	// the runtime pins (scaffold.RuntimePins). Production reads the same
+	// freeze file RuntimeFreeze does, through runtimecatalog.RuntimePins. A
+	// seam so a test never reaches the network; nil leaves the runtime pins
+	// as they are.
+	RuntimePins func(ctx context.Context, build, python string) ([]string, error)
+
 	// RuntimeCatalog reads the runtime catalog for an edit that moves the
 	// Airflow pin, which uses it to move requires-python and [tool.astro]
 	// runtime with the pin. nil, or a nil result, means no catalog: the edit
 	// then follows the built-in rules. Production reads it through
 	// runtimecatalog.Catalog. A seam so a test never reaches the network.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
+
+	// RuntimeFreeze reads the distributions a runtime build's image has
+	// installed, for the first of pythons it has a freeze file for, which
+	// `astro local check` names in a hint when a Dag imports one the project
+	// does not list. Production reads the CDN through
+	// runtimecatalog.RuntimeFreeze. nil, or a nil result, means no hint. A
+	// seam so a test never reaches the network.
+	RuntimeFreeze func(ctx context.Context, build string, pythons []string) []string
 
 	// ImageCatalog reads the runtime catalog for `astro package astro`'s
 	// generated image: its Python, and an Airflow 2 base with no
@@ -229,7 +245,9 @@ func NewDeps() Deps {
 		AirflowDefault:   catalogDefault,
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
+		RuntimePins:      runtimecatalog.RuntimePins,
 		RuntimeCatalog:   runtimecatalog.Catalog,
+		RuntimeFreeze:    runtimecatalog.RuntimeFreeze,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)
 		},
