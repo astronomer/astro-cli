@@ -1,9 +1,7 @@
 package imagebuild
 
 import (
-	"bytes"
 	"crypto/sha256"
-	_ "embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -14,6 +12,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -38,25 +37,29 @@ import (
 // the lists as they were (a [tool.ruff] setting, the version) keeps the install
 // layers cached.
 
-//go:embed install-project.py
-var installHelper []byte
+// The helper and the recipe live in pkg/airflowrt, which pkg/scaffold also
+// writes into a project whose Dockerfile it moves onto a -base tag. These are
+// the names this package has always had for them.
 
-// InstallHelperPath is where the install helper sits in a build's context,
-// slash-separated: in a generated build's context, and in a project that
-// builds its own Dockerfile (InstallDockerfile reads it from there).
-const InstallHelperPath = ".astro/install-project.py"
+// installHelper is the install helper's source (airflowrt.InstallHelper).
+var installHelper = airflowrt.InstallHelper()
+
+// InstallHelperPath is where the install helper sits in a build's context
+// (airflowrt.InstallHelperPath).
+const InstallHelperPath = airflowrt.InstallHelperPath
 
 // InstallHelper is the install helper's source, for a caller that writes it
 // into a project or addresses an image by what builds it.
 func InstallHelper() []byte {
-	return bytes.Clone(installHelper)
+	return airflowrt.InstallHelper()
 }
 
 // generatedInputsDir is where a generated build stages the install helper's
 // inputs in its context: the helper, the project's pyproject.toml and, when it
 // has them, its uv.lock and (for a request naming no project) the find-links
 // file. The directory always exists, so the install stage copies it whole and
-// needs no wildcard for the optional files, on any builder.
+// needs no wildcard for the optional files, which Buildah has refused when
+// they match nothing.
 const generatedInputsDir = ".astro/install"
 
 // installFindLinksName is the file a build request naming no project leaves
@@ -69,88 +72,24 @@ const generatedInputsDir = ".astro/install"
 // project's own Dockerfile reads the same pages a CLI build does.
 const installFindLinksName = "install-find-links.txt"
 
-// Paths the install stage uses inside the build: where its inputs are copied
-// to, and the directory it writes the install's lists to.
-const (
-	inputsDir = "/tmp/astro-project"
-	listsDir  = "/tmp/astro-install"
-)
-
-// projectInputs is what a project's own Dockerfile copies into the install
-// stage, from the project as its context: pyproject.toml, uv.lock when there is
-// one, and the helper at InstallHelperPath. The wildcard is how uv.lock stays
-// optional; Docker's BuildKit and its legacy builder both copy nothing for a
-// wildcard that matches nothing, and so does Podman 5.8 (Buildah 1.43); an
-// older Buildah is untested.
-var projectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPath
-
 // generatedInputs is what a generated build's install stage copies: the whole
 // of generatedInputsDir.
 const generatedInputs = generatedInputsDir + "/"
 
 // InstallDockerfile is the Dockerfile that installs a project over from, an
-// Astro Runtime -base image (baseOf): the install helper's stage, then the steps
-// the runtime's ONBUILD tag runs as triggers (astro-runtime's
-// image/Dockerfile.onbuild), in the same order and as the same users: the OS
-// packages, then the Python dependencies under the runtime's constraints, then
-// the context's files owned by astro. A project's own Dockerfile is this
-// followed by its own steps, and it mounts the netrc secret for the Python
-// install whether or not a build passes one (required=false), since a plain
-// `docker build .` decides that, not the file. Its install stage copies
-// projectInputs.
-//
-// The install steps are written out rather than inherited for two reasons. The
-// trigger list has changed across runtimes (the netrc mount is in 3.3-9 but not
-// 3.1-12 or 12.6.0), so a build inherited whichever list its base happened to
-// carry; written here, every runtime installs the same way, and the netrc
-// secret reaches the install on all of them. And a Dockerfile that states its
-// install is one `docker build` runs as written, with nothing happening at FROM
-// that the file does not show.
-//
-// Each install runs the runtime's own script, so the runtime's constraints file
-// and its choice of installer (uv, or pip with ASTRO_RUNTIME_USE_PIP) still
-// apply. Runtimes before 11.0.0 ship no scripts: their triggers run the apt
-// install and `pip install -r` inline, so each step falls back to that command
-// where the script is missing. The inline triggers also refused an
-// apache-airflow pin, which the helper has already removed. The test is POSIX,
-// since a runtime's SHELL is not the same on every line.
+// Astro Runtime -base image (airflowrt.InstallDockerfile): a project's own
+// Dockerfile is this followed by its own steps, its install stage copying
+// airflowrt.ProjectInputs.
 func InstallDockerfile(from string) string {
-	return installDockerfile(from, true, projectInputs)
+	return airflowrt.InstallDockerfile(from)
 }
 
 // installDockerfile is InstallDockerfile, its install stage copying inputs (a
 // COPY's sources), with the Python install's netrc mount left out when
 // mountNetrc is false: a generated build mounts the secret only when the build
-// passes it. RUN --mount needs BuildKit (Docker) or Buildah 1.21 (Podman 3.2),
-// so a generated build with no secret to mount keeps to a plain RUN, and its
-// install stage copies its inputs rather than mounting them: with no secret,
-// the legacy builder and an older Podman build it end to end. The runtime's
-// own 3.3-9 trigger mounts the secret unconditionally; a build that took that
-// trigger needed BuildKit whether it had a secret or not.
+// passes it (airflowrt.InstallOptions).
 func installDockerfile(from string, mountNetrc bool, inputs string) string {
-	netrc := ""
-	if mountNetrc {
-		netrc = "--mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false "
-	}
-	return "FROM " + from + " AS astro-install\n" +
-		// Root, because the context keeps its files' modes, and a project's may
-		// be readable by its owner alone.
-		"USER root\n" +
-		// Just the inputs, so an edit elsewhere in the project does not rerun
-		// the stage.
-		"COPY " + inputs + " " + inputsDir + "/\n" +
-		"RUN python " + inputsDir + "/" + filepath.Base(InstallHelperPath) + " --project " + inputsDir + " --out " + listsDir + "\n" +
-		"FROM " + from + "\n" +
-		"COPY --from=astro-install " + listsDir + "/" + packagesName + " .\n" +
-		"USER root\n" +
-		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
-		"elif [ -s " + packagesName + " ]; then apt-get update && cat " + packagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
-		"COPY --from=astro-install " + listsDir + "/" + requirementsName + " " + listsDir + "/" + lockConstraintsName + " ./\n" +
-		"RUN " + netrc +
-		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
-		"else pip install --no-cache-dir --root-user-action=ignore -r " + requirementsName + "; fi\n" +
-		"USER astro\n" +
-		"COPY --chown=astro:0 . .\n"
+	return airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Inputs: inputs, NoNetrc: !mountNetrc})
 }
 
 // GeneratedDockerfile is the Dockerfile a generated build over the runtime
@@ -162,14 +101,6 @@ func installDockerfile(from string, mountNetrc bool, inputs string) string {
 func GeneratedDockerfile(baseImage string, mountNetrc bool) string {
 	return installDockerfile(baseOf(baseImage), mountNetrc, generatedInputs)
 }
-
-// The runtime's install scripts, from runtime 11.0.0 on: one installs
-// packages.txt with apt, the other requirements.txt with uv under the
-// runtime's constraints file.
-const (
-	installSystemPackages     = "/usr/local/bin/install-system-packages"
-	installPythonDependencies = "/usr/local/bin/install-python-dependencies"
-)
 
 // The manifest files the helper reads.
 const (

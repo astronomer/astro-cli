@@ -55,54 +55,104 @@ func ParseDockerfileAt(dockerfilePath string) (image, tag string, err error) {
 	// A final stage may name an earlier one (`FROM base`), so aliases are
 	// followed to the image they resolve to. Bounded by the number of stages,
 	// since each hop moves strictly earlier in the file.
-	type stage struct{ alias, ref string }
-	var stages []stage
-	for _, line := range strings.Split(string(data), "\n") {
-		// Tokenized rather than prefix-matched. docker splits an instruction on
-		// any run of whitespace, so `FROM<tab>image` is valid and a "FROM "
-		// prefix misses it — and a missed FROM is not a missed opportunity for
-		// a caller that refuses on what this returns.
-		fields := strings.Fields(line)
-		if len(fields) == 0 || !strings.EqualFold(fields[0], "FROM") {
-			continue
-		}
-		rest := fields[1:]
-		// Per-stage flags come before the reference. `FROM --platform=$BUILDPLATFORM
-		// <image>` is the ordinary workaround for building an amd64 image on an
-		// Apple-silicon machine, and treating the flag as the image name reads
-		// every such file as an unknown base.
-		for len(rest) > 0 && strings.HasPrefix(rest[0], "--") {
-			rest = rest[1:]
-		}
-		if len(rest) == 0 {
-			continue
-		}
-		ref, alias := rest[0], ""
-		if len(rest) >= 3 && strings.EqualFold(rest[1], "AS") {
-			alias = strings.ToLower(rest[2])
-		}
-		stages = append(stages, stage{alias: alias, ref: ref})
-	}
+	stages := DockerfileStages(data)
 	if len(stages) == 0 {
 		return "", "", fmt.Errorf("no FROM instruction found in Dockerfile")
 	}
 
-	ref := stages[len(stages)-1].ref
+	ref := stages[len(stages)-1].Ref
 	for hop := 0; hop < len(stages); hop++ {
 		earlier := -1
 		for i, st := range stages[:len(stages)-1] {
-			if st.alias != "" && strings.EqualFold(st.alias, ref) {
+			if st.Alias != "" && strings.EqualFold(st.Alias, ref) {
 				earlier = i
 			}
 		}
 		if earlier < 0 {
 			break
 		}
-		ref = stages[earlier].ref
+		ref = stages[earlier].Ref
 	}
 
 	image, tag = splitImageRef(ref)
 	return image, tag, nil
+}
+
+// DockerfileStage is one FROM line of a Dockerfile, as DockerfileStages reads
+// it.
+type DockerfileStage struct {
+	// Line is the FROM line's index among the file's lines, split on "\n".
+	Line int
+	// Flags are the per-stage flags before the reference, as written
+	// (--platform=linux/amd64).
+	Flags []string
+	// Ref is the reference as written, and Image and Tag are it split
+	// (splitImageRef). Digest reports a reference pinned by digest.
+	Ref, Image, Tag string
+	Digest          bool
+	// Alias is the stage's name from AS, as written, or "".
+	Alias string
+}
+
+// DockerfileStages reads every FROM line of a Dockerfile, in order: the one
+// tokenizer behind ParseDockerfileAt, and what a caller that has to judge each
+// stage (one on an ONBUILD tag, one named like a stage of the CLI's own) reads.
+//
+// Tokenized rather than prefix-matched. docker splits an instruction on any
+// run of whitespace, so `FROM<tab>image` is valid and a "FROM " prefix misses
+// it — and a missed FROM is not a missed opportunity for a caller that refuses
+// on what this returns. Per-stage flags come before the reference: `FROM
+// --platform=$BUILDPLATFORM <image>` is the ordinary workaround for building an
+// amd64 image on an Apple-silicon machine, and treating the flag as the image
+// name reads every such file as an unknown base.
+func DockerfileStages(data []byte) []DockerfileStage {
+	var stages []DockerfileStage
+	for i, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || !strings.EqualFold(fields[0], "FROM") {
+			continue
+		}
+		rest := fields[1:]
+		var flags []string
+		for len(rest) > 0 && strings.HasPrefix(rest[0], "--") {
+			flags = append(flags, rest[0])
+			rest = rest[1:]
+		}
+		if len(rest) == 0 {
+			continue
+		}
+		st := DockerfileStage{Line: i, Flags: flags, Ref: rest[0], Digest: strings.Contains(rest[0], "@")}
+		st.Image, st.Tag = splitImageRef(rest[0])
+		if len(rest) >= 3 && strings.EqualFold(rest[1], "AS") {
+			st.Alias = rest[2]
+		}
+		stages = append(stages, st)
+	}
+	return stages
+}
+
+// OnBuildRuntime reports a stage built on an Astro Runtime tag that carries the
+// runtime's ONBUILD triggers: every runtime tag but a -base one (isBaseTag),
+// whatever its flavor (-python-3.12, -slim, -ubi9 all carry the
+// io.astronomer.docker.airflow.onbuild label; their -base twins do not). A
+// reference with no tag, pinned by digest alone, or built from a build
+// argument says nothing that can be judged, so it is not one.
+func (s *DockerfileStage) OnBuildRuntime() bool {
+	return s.Tag != "" && IsAstroRuntimeRef(s.Image, s.Tag) && !isBaseTag(s.Tag)
+}
+
+// MightCarryOnBuild reports a stage this cannot show to be free of ONBUILD
+// steps: one OnBuildRuntime is sure of, and also one built from a build
+// argument, and one on a repository named as Astro Runtime's that is pinned by
+// digest, has no tag, or carries a tag that is not a Runtime version (a
+// mirror's floating one), unless that tag is a -base one. A caller that would
+// retire what ONBUILD steps read asks this, since guessing wrong there breaks
+// the build.
+func (s *DockerfileStage) MightCarryOnBuild() bool {
+	if IsUnresolvedRef(s.Ref) {
+		return true
+	}
+	return isRuntimeNamedRepo(s.Image) && !isBaseTag(s.Tag)
 }
 
 // splitImageRef separates an image reference into its name and tag.
@@ -186,6 +236,12 @@ var publishedRuntimeRepos = []string{
 	"quay.io/astronomer/astro-runtime",
 }
 
+// IsPublishedRuntimeRepo reports whether image is one of the repositories
+// Astronomer publishes Astro Runtime to, rather than a mirror of one.
+func IsPublishedRuntimeRepo(image string) bool {
+	return slices.Contains(publishedRuntimeRepos, image)
+}
+
 // runtimeRepoNames are the last path segments a mirror of a published
 // repository keeps.
 var runtimeRepoNames = []string{"runtime", "astro-runtime"}
@@ -234,6 +290,17 @@ func IsAstroRuntimeRef(image, tag string) bool {
 	if slices.Contains(publishedRuntimeRepos, image) {
 		return true
 	}
+	return isRuntimeNamedRepo(image) && isMirrorRuntimeTag(tag)
+}
+
+// isRuntimeNamedRepo reports a repository named as Astro Runtime's are: one of
+// the published ones, or one on another registry whose last path segment is
+// runtime or astro-runtime and that is not a Docker Hub official image. What
+// tag it carries is a separate question.
+func isRuntimeNamedRepo(image string) bool {
+	if slices.Contains(publishedRuntimeRepos, image) {
+		return true
+	}
 	repo := image
 	for _, host := range dockerHubHosts {
 		repo = strings.TrimPrefix(repo, host)
@@ -242,10 +309,7 @@ func IsAstroRuntimeRef(image, tag string) bool {
 	if slash < 0 || strings.HasPrefix(repo, "library/") {
 		return false
 	}
-	if !slices.Contains(runtimeRepoNames, repo[slash+1:]) {
-		return false
-	}
-	return isMirrorRuntimeTag(tag)
+	return slices.Contains(runtimeRepoNames, repo[slash+1:])
 }
 
 // isMirrorRuntimeTag reports a tag that spells an exact Runtime version, flavor

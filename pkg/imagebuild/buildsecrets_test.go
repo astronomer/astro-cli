@@ -3,11 +3,14 @@ package imagebuild
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -82,6 +85,29 @@ func TestCheckBuildSecretEnv(t *testing.T) {
 	err = checkBuildSecretEnv([]string{"id=pw,env=hunter2,def"})
 	assert.ErrorContains(t, err, "not a key=value pair")
 	assert.NotContains(t, err.Error(), "hunter2")
+}
+
+// The install step's netrc mount says required=false, so a Dockerfile carrying
+// it is not warned about it on every build; a mount of the project's own still
+// is, and a failed build names both.
+func TestMissingBuildSecretsLeavesTheInstallStepsMountOutOfTheWarnings(t *testing.T) {
+	dir := t.TempDir()
+	body := airflowrt.InstallDockerfile("quay.io/astronomer/astro-runtime:12.6.0-base") +
+		"RUN --mount=type=secret,id=pip,target=/etc/pip.conf pip install foo\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte(body), 0o600))
+
+	m := MissingBuildSecrets(dir, "Dockerfile", nil)
+	require.Len(t, m.Mounts, 2)
+	warnings := m.Warnings()
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], `build secret "pip"`)
+	explained := m.Explain(fmt.Errorf("%w: exit status 1", ErrDockerfileBuild)).Error()
+	assert.Contains(t, explained, `"netrc", "pip"`)
+}
+
+// The install step mounts the secret the manifest names for a private index.
+func TestInstallDockerfileMountsTheRuntimeSecret(t *testing.T) {
+	assert.Contains(t, airflowrt.InstallDockerfile("x"), "--mount=type=secret,id="+manifest.RuntimeSecretID+",")
 }
 
 func TestMissingSecretsNameNoToolWithoutAHint(t *testing.T) {

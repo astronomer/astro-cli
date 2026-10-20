@@ -517,6 +517,22 @@ func contentHash(base, platform, recipe string, breq imagebuild.Request, df decl
 			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
 		}
 		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
+		// A declared Dockerfile that installs as a generated build does
+		// (airflowrt.InstallDockerfile, which astro init writes into a
+		// converted one) reads the same inputs from its context, the project:
+		// the helper the project carries, pyproject.toml and uv.lock. Each is
+		// hashed when it is there, so an edit to the lock or the helper moves
+		// the tag, as it does for a generated build.
+		for _, name := range []string{"pyproject.toml", "uv.lock", airflowrt.InstallHelperPath} {
+			data, err := os.ReadFile(filepath.Join(breq.Context, filepath.FromSlash(name)))
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err != nil {
+				return "", fmt.Errorf("reading the project's %s: %w", name, err)
+			}
+			writeField(name, fmt.Sprintf("%x", sha256.Sum256(data)))
+		}
 	}
 	if projectFiles := breq.ProjectFiles; projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)

@@ -360,6 +360,34 @@ func TestContentHashCoversTheGeneratedRecipeAndItsInputs(t *testing.T) {
 	assert.Equal(t, before, hash("", declared), "a declared Dockerfile's tag does not follow the generated build's inputs")
 }
 
+// A declared Dockerfile that installs through the helper reads the same inputs
+// from the project, so editing the lock or the helper it carries moves the tag
+// too.
+func TestContentHashCoversADeclaredDockerfilesInstallInputs(t *testing.T) {
+	project := t.TempDir()
+	df := filepath.Join(project, "Dockerfile")
+	require.NoError(t, os.WriteFile(df, []byte(airflowrt.InstallDockerfile("img:1-base")), 0o600))
+	breq := imagebuild.Request{Dockerfile: df, Context: project}
+	hash := func() string {
+		t.Helper()
+		got, err := contentHash("", "linux/amd64", "", breq, declaredDockerfile{rel: "Dockerfile", abs: df})
+		require.NoError(t, err)
+		return got
+	}
+	before := hash()
+	require.NoError(t, os.WriteFile(filepath.Join(project, "uv.lock"), []byte("version = 1\n"), 0o600))
+	withLock := hash()
+	helper := filepath.Join(project, filepath.FromSlash(airflowrt.InstallHelperPath))
+	require.NoError(t, os.MkdirAll(filepath.Dir(helper), 0o755))
+	require.NoError(t, os.WriteFile(helper, airflowrt.InstallHelper(), 0o600))
+	withHelper := hash()
+	require.NoError(t, os.WriteFile(helper, append(airflowrt.InstallHelper(), '\n'), 0o600))
+	editedHelper := hash()
+	assert.NotEqual(t, before, withLock, "uv.lock is hashed")
+	assert.NotEqual(t, withLock, withHelper, "the project's helper is hashed")
+	assert.NotEqual(t, withHelper, editedHelper, "editing the helper moves the tag")
+}
+
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {
 	docker := &fakeDocker{inspectOut: "3.1-2"}
 	req := testRequest(t)

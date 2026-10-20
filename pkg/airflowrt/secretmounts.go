@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -12,6 +13,10 @@ import (
 type SecretMount struct {
 	ID   string
 	Line int
+	// Optional reports that every mount of the id says required=false: its
+	// author has stated the build runs without it, as the install step
+	// InstallDockerfile writes does for the netrc secret.
+	Optional bool
 }
 
 // SecretMounts lists the build secrets the Dockerfile at dockerfilePath
@@ -31,7 +36,7 @@ func SecretMounts(dockerfilePath string) ([]SecretMount, error) {
 		return nil, fmt.Errorf("error reading Dockerfile: %w", err)
 	}
 	var mounts []SecretMount
-	seen := map[string]bool{}
+	seen := map[string]int{}
 	for _, in := range instructions(string(data)) {
 		fields := strings.Fields(in.text)
 		if len(fields) == 0 || !strings.EqualFold(fields[0], "RUN") {
@@ -45,9 +50,14 @@ func SecretMounts(dockerfilePath string) ([]SecretMount, error) {
 			if !ok {
 				continue
 			}
-			if id := secretMountID(spec); id != "" && !seen[id] {
-				seen[id] = true
-				mounts = append(mounts, SecretMount{ID: id, Line: in.line})
+			id, optional := secretMountID(spec)
+			switch i, ok := seen[id]; {
+			case id == "":
+			case ok:
+				mounts[i].Optional = mounts[i].Optional && optional
+			default:
+				seen[id] = len(mounts)
+				mounts = append(mounts, SecretMount{ID: id, Line: in.line, Optional: optional})
 			}
 		}
 	}
@@ -88,10 +98,14 @@ func instructions(data string) []instruction {
 
 // secretMountID reads the id out of a --mount value, or "" when the mount is
 // not a secret or its id comes from a build argument.
-func secretMountID(spec string) string {
-	var typ, id, source, target string
+//
+// optional reports a mount that says required=false outright. Docker treats a
+// mount with no required option as optional too, but only one that says so
+// has an author who decided it.
+func secretMountID(spec string) (id string, optional bool) {
+	var typ, source, target string
 	for _, kv := range strings.Split(spec, ",") {
-		k, v, _ := strings.Cut(kv, "=")
+		k, v, hasValue := strings.Cut(kv, "=")
 		switch strings.ToLower(strings.TrimSpace(k)) {
 		case "type":
 			typ = v
@@ -101,10 +115,20 @@ func secretMountID(spec string) string {
 			source = v
 		case "target", "dst", "destination":
 			target = v
+		case "required":
+			// As BuildKit reads it: the bare option is true, and a value is
+			// strconv.ParseBool's (false, 0, f, F, FALSE, False). One it cannot
+			// parse fails the build, so it is not optional here either.
+			if !hasValue {
+				optional = false
+				continue
+			}
+			required, err := strconv.ParseBool(strings.TrimSpace(v))
+			optional = err == nil && !required
 		}
 	}
 	if typ != "secret" {
-		return ""
+		return "", false
 	}
 	if source != "" {
 		id = source
@@ -113,7 +137,7 @@ func secretMountID(spec string) string {
 		id = path.Base(target)
 	}
 	if strings.Contains(id, "$") {
-		return ""
+		return "", false
 	}
-	return id
+	return id, optional
 }

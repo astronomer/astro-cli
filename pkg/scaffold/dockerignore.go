@@ -42,6 +42,22 @@ var localWarnRules = slices.DeleteFunc(slices.Clone(dockerignoreRules), func(r s
 
 const dockerignoreHeader = "# Local secrets and per-machine files. Keep them out of the image.\n"
 
+// dockerignoreIncludeHeader introduces the exceptions for the files the build's
+// install step reads.
+const dockerignoreIncludeHeader = "# Read by the build's install step (.astro/install-project.py). Keep them in the context.\n"
+
+// dockerignoreLabel says what an update to an existing ignore file added.
+func dockerignoreLabel(rules, includes bool) string {
+	switch {
+	case rules && includes:
+		return "added the per-machine rules, and exceptions for the files the build reads"
+	case includes:
+		return "added exceptions for the files the build reads"
+	default:
+		return "added the per-machine rules"
+	}
+}
+
 // dockerignorePath is the ignore file a build of dockerfile reads, relative to
 // the context. BuildKit reads <Dockerfile>.dockerignore instead of the
 // context's .dockerignore when it exists.
@@ -84,11 +100,19 @@ func excludes(pm *patternmatcher.PatternMatcher, path string, isDir bool) bool {
 
 // planKeptDockerfileIgnore adds the .dockerignore change when init keeps the
 // Dockerfile as the build, whose context is the whole project.
+//
+// A Dockerfile this run moved onto its -base tag also reads installInputs from
+// the context, so an ignore file that leaves one out gains an exception for it,
+// in the same append-only way the per-machine rules are added.
 func planKeptDockerfileIgnore(dir string, from1x *project1x, cs *Changeset) error {
 	if !declaresDockerfile(from1x) {
 		return nil
 	}
-	ignore, err := planDockerignore(dir, fileDockerfile)
+	var include []string
+	if from1x.rewrite != nil {
+		include = installInputs
+	}
+	ignore, err := planDockerignore(dir, fileDockerfile, include)
 	if err != nil || ignore == nil {
 		return err
 	}
@@ -104,7 +128,11 @@ func planKeptDockerfileIgnore(dir string, from1x *project1x, cs *Changeset) erro
 // A rule is missing unless the file already excludes the rule's own spelling,
 // so .venv, **/.venv or a blanket .astro count, and one named .local.yaml file
 // does not.
-func planDockerignore(dir, dockerfile string) (*Change, error) {
+//
+// include are files the build has to read: each one the file leaves out gets
+// an exception (!path) under a header of its own, after the rules, since a
+// later line wins.
+func planDockerignore(dir, dockerfile string, include []string) (*Change, error) {
 	rel := dockerignorePath(dir, dockerfile)
 	pm, data, err := readDockerignore(dir, rel)
 	if err != nil {
@@ -116,10 +144,25 @@ func planDockerignore(dir, dockerfile string) (*Change, error) {
 			missing = append(missing, rule)
 		}
 	}
-	if len(missing) == 0 {
+	var excluded []string
+	for _, path := range include {
+		if excludes(pm, path, false) {
+			excluded = append(excluded, "!"+path)
+		}
+	}
+	if len(missing) == 0 && len(excluded) == 0 {
 		return nil, nil
 	}
-	block := dockerignoreHeader + strings.Join(missing, "\n") + "\n"
+	var block string
+	if len(missing) > 0 {
+		block = dockerignoreHeader + strings.Join(missing, "\n") + "\n"
+	}
+	if len(excluded) > 0 {
+		if block != "" {
+			block += "\n"
+		}
+		block += dockerignoreIncludeHeader + strings.Join(excluded, "\n") + "\n"
+	}
 	path := filepath.ToSlash(rel)
 	if data == nil {
 		return &Change{Kind: CreateFile, Path: path, Content: []byte(block), Labels: []string{path}}, nil
@@ -138,7 +181,7 @@ func planDockerignore(dir, dockerfile string) (*Change, error) {
 		Kind:    UpdateFile,
 		Path:    path,
 		Content: []byte(b.String()),
-		Labels:  []string{path + " (added the per-machine rules)"},
+		Labels:  []string{path + " (" + dockerignoreLabel(len(missing) > 0, len(excluded) > 0) + ")"},
 	}, nil
 }
 

@@ -105,13 +105,20 @@ func MissingBuildSecrets(projectDir, dockerfile string, secrets []string) Missin
 
 // Warnings are the lines a caller prints before the build, one per missing
 // secret. A warning and not a refusal, because a secret mount is optional
-// unless it says required=true.
+// unless it says required=true. None for a mount that says required=false
+// (SecretMount.Optional), such as the netrc mount of the install step a
+// rewritten Dockerfile carries: it is optional by its author's say, and a
+// build without it is the ordinary case. Explain still names it, should the
+// build fail.
 func (m MissingSecrets) Warnings() []string {
 	var warnings []string
 	for _, id := range m.Dropped {
 		warnings = append(warnings, fmt.Sprintf("build secret %q is not used: an image built without a Dockerfile reads only the %s secret", id, manifest.RuntimeSecretID))
 	}
 	for _, mount := range m.Mounts {
+		if mount.Optional {
+			continue
+		}
 		warnings = append(warnings, fmt.Sprintf("%s mounts build secret %q (line %d) but none was given%s",
 			m.Dockerfile, mount.ID, mount.Line, m.hint([]string{mount.ID})))
 	}
