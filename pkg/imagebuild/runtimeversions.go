@@ -23,7 +23,7 @@ import (
 //
 // The Airflow 2 images publish a -base tag beside each runtime tag, as the
 // Airflow 3 ones do, so a generated build starts FROM it the same way
-// (generatedDockerfile, which also covers the 9.x and 10.x images that
+// (InstallDockerfile, which also covers the 9.x and 10.x images that
 // install inline rather than through the runtime's scripts). Nothing else
 // about the build changes.
 

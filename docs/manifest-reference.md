@@ -646,7 +646,7 @@ To add a dependency, run `uv add <package>`. It keeps the pins, and a running st
 
 ### Private packages without a Dockerfile
 
-`uv add git+https://github.com/acme/private-lib.git` adds `private-lib` to `dependencies` and its repository to `[tool.uv.sources]`. Standalone mode installs it through uv. A generated image and a check environment cannot read `[tool.uv.sources]`, so the CLI writes a dependency whose source is a git repository or a URL as a direct reference, `private-lib @ git+https://github.com/acme/private-lib.git@<rev>`, with the source's `rev`, `tag` or `branch` and its `subdirectory`. A version on the dependency is dropped, since a direct reference cannot carry one. A source limited by `marker`, `extra` or `group`, a `path` and a `workspace` member are left as the bare name.
+`uv add git+https://github.com/acme/private-lib.git` adds `private-lib` to `dependencies` and its repository to `[tool.uv.sources]`. Standalone mode installs it through uv. A generated image and a check environment cannot read `[tool.uv.sources]`, so the CLI (in an image, its install helper) writes a dependency whose source is a git repository or a URL as a direct reference, `private-lib @ git+https://github.com/acme/private-lib.git@<rev>`, with the source's `rev`, `tag` or `branch` and its `subdirectory`. A version on the dependency is dropped, since a direct reference cannot carry one. A source limited by `marker`, `extra` or `group`, a `path` and a `workspace` member are left as the bare name.
 
 To install from a private repository, give the build a `netrc` secret. The generated build mounts it as `/root/.netrc` while it installs your requirements, and git reads its credentials from there:
 

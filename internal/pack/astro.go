@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -189,7 +190,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, breq.ManifestDir, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -476,7 +477,7 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-func contentHash(base, platform string, deps, findLinks, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
+func contentHash(base, platform string, deps, findLinks, packages []string, projectFiles, manifestDir string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -489,6 +490,23 @@ func contentHash(base, platform string, deps, findLinks, packages []string, proj
 		// installs is a different image from the same manifest, so it moves
 		// the tag rather than reusing one an older recipe built.
 		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base)))))
+		// So is the helper that turns the manifest into the install, and what
+		// it reads: pyproject.toml, and uv.lock, whose versions are the ones
+		// installed. ProjectFilesDigest leaves both out, since the build
+		// writes them itself.
+		writeField("install-helper", fmt.Sprintf("%x", sha256.Sum256(imagebuild.InstallHelper())))
+		if manifestDir != "" {
+			for _, name := range []string{"pyproject.toml", "uv.lock"} {
+				data, err := os.ReadFile(filepath.Join(manifestDir, name))
+				if errors.Is(err, fs.ErrNotExist) {
+					continue
+				}
+				if err != nil {
+					return "", fmt.Errorf("reading the project's %s: %w", name, err)
+				}
+				writeField(name, fmt.Sprintf("%x", sha256.Sum256(data)))
+			}
+		}
 	}
 	for _, l := range findLinks {
 		writeField("find-links", l)

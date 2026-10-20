@@ -127,6 +127,10 @@ type BuildRequest struct {
 	Secrets []string
 	// Tag is the image reference the build produces.
 	Tag string
+	// ManifestDir is the project whose pyproject.toml and uv.lock a generated
+	// build installs from (imagebuild.Request.ManifestDir). Empty installs
+	// Dependencies, FindLinks and Packages unpinned.
+	ManifestDir string
 	// Dependencies are the manifest's Python dependencies (PEP 508).
 	Dependencies []string
 	// FindLinks are pages the Python install searches besides PyPI

@@ -58,10 +58,14 @@ var skippedProjectNames = map[string]bool{
 // leave out the same files without a second copy to keep in step.
 var ShippedImageIgnores = slices.Concat(airflowrt.ShippedImageRules(), airflowrt.LocalFileRules())
 
-// generatedNames are the files a generated build writes at the context root.
-// The project's own copies, in any case, are not carried, so they cannot
-// replace the generated ones, even on a filesystem that folds case.
-var generatedNames = []string{requirementsName, packagesName}
+// generatedNames are the files a generated build writes itself, at the context
+// root (pyproject.toml and uv.lock, writeInstallInputs) or into the image's
+// working directory (the install helper's lists). The project's own copies, in
+// any case, are not carried, so they cannot replace the generated ones, even on
+// a filesystem that folds case; ProjectFilesDigest leaves them out for the same
+// reason, so a caller addressing the image hashes pyproject.toml and uv.lock
+// itself.
+var generatedNames = []string{requirementsName, packagesName, lockConstraintsName, pyprojectName, uvLockName}
 
 const (
 	dockerIgnoreName = ".dockerignore"

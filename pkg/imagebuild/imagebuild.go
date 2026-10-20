@@ -1,8 +1,9 @@
 // Package imagebuild builds a deployable Airflow image from a manifest's
-// fields. It assembles a small build context (requirements.txt, packages.txt)
-// and builds it over the runtime's -base image, the build without ONBUILD
-// triggers, with the install steps those triggers would run written out in the
-// Dockerfile it generates (generatedDockerfile).
+// fields. It assembles a small build context (the project's pyproject.toml and
+// uv.lock, and the install helper that reads them) and builds it over the
+// runtime's -base image, the build without ONBUILD triggers, with the install
+// steps those triggers would run written out in the Dockerfile it generates
+// (InstallDockerfile).
 //
 // A project may instead declare its own Dockerfile in the manifest, which the
 // project design calls tier 3: the escape hatch for multi-stage builds and
@@ -41,7 +42,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -138,16 +138,20 @@ var ErrDockerfileBuild = errors.New("building the project's Dockerfile failed; s
 
 const (
 	// dockerfileName is the Dockerfile a generated build runs
-	// (generatedDockerfile).
+	// (InstallDockerfile).
 	dockerfileName = "Dockerfile.astro-local"
 	// buildContextDir is the sub-directory of a Request's WorkDir that holds
-	// the build context: the two files the install steps copy, and the
+	// the build context: the inputs the install helper reads, and the
 	// project's files when the image ships.
 	buildContextDir = "deps-build"
 	// requirementsName and packagesName are the names the runtime's install
-	// scripts read from their working directory.
-	requirementsName = "requirements.txt"
-	packagesName     = "packages.txt"
+	// scripts read from their working directory, and lockConstraintsName the
+	// file of uv.lock's versions requirements.txt names with -c. The install
+	// helper writes all three (install-project.py's REQUIREMENTS, PACKAGES and
+	// LOCK_CONSTRAINTS).
+	requirementsName    = "requirements.txt"
+	packagesName        = "packages.txt"
+	lockConstraintsName = "uv-lock-constraints.txt"
 	// baseTagSuffix turns a runtime tag into its -base tag (3.1-5 to
 	// 3.1-5-base, 12.6.0-python-3.11 to 12.6.0-python-3.11-base), the same
 	// image without the ONBUILD triggers. The runtime publishes one beside
@@ -215,14 +219,14 @@ type Request struct {
 	// supplied a real Dockerfile ("tier 3" in the project design) and it, not
 	// the manifest, is the build. Both are absolute, and set together.
 	//
-	// The two modes share little. This one writes no requirements.txt or
-	// packages.txt, because the file owns its own installs; it takes its FROM
-	// from the file rather than BaseImage; and it builds the PROJECT as its
-	// context, because a multi-stage build COPYs from the repo. The generated
-	// mode's context is synthetic: the generated requirements.txt and
-	// packages.txt, plus, for an image that ships, a filtered copy of the
-	// project (ProjectFiles), which the generated Dockerfile's `COPY . .` lays
-	// down after both installs.
+	// The two modes share little. This one writes nothing, because the file
+	// owns its own installs; it takes its FROM from the file rather than
+	// BaseImage; and it builds the PROJECT as its context, because a
+	// multi-stage build COPYs from the repo. The generated mode's context is
+	// synthetic: pyproject.toml, uv.lock and the install helper
+	// (writeInstallInputs), plus, for an image that ships, a filtered copy of
+	// the project (ProjectFiles), which the generated Dockerfile's `COPY . .`
+	// lays down after both installs.
 	//
 	// Dependencies and Packages are ignored here rather than rejected. A caller
 	// reading a manifest has them populated whichever tier the project
@@ -231,14 +235,24 @@ type Request struct {
 	Context    string
 	// Tag is the image reference the build produces.
 	Tag string
+	// ManifestDir is the project directory whose pyproject.toml, and uv.lock
+	// when it has one, a generated build installs from: the install helper
+	// reads them inside the build (InstallDockerfile), so the image holds every
+	// package at the version uv.lock resolved. ForManifest sets it for a
+	// generated build. Empty, or naming a directory with no pyproject.toml, the
+	// build writes a pyproject.toml of Dependencies, FindLinks and Packages
+	// instead, and installs them unpinned. Ignored in Dockerfile mode.
+	ManifestDir string
 	// Dependencies are the manifest's Python dependencies (PEP 508);
 	// apache-airflow is dropped, since the runtime base already provides it.
+	// With ManifestDir set they decide only whether there is anything to
+	// install (Build's fast path); the install reads pyproject.toml.
 	Dependencies []string
 	// FindLinks are pages the Python install searches besides PyPI, written
 	// into the generated requirements.txt as --find-links lines: the
 	// per-package pages of the indexes a [tool.uv.sources] entry routes a
-	// dependency to (manifest.UV.IndexPages), which the install cannot read
-	// from pyproject.toml. Ignored in Dockerfile mode.
+	// dependency to (manifest.UV.IndexPages). Ignored in Dockerfile mode, and
+	// with ManifestDir set, whose pyproject.toml states them.
 	FindLinks []string
 	// Packages are the manifest's OS (apt) package names.
 	Packages []string
@@ -324,7 +338,7 @@ func (execCommander) RunIn(ctx context.Context, dir string, extraEnv []string, s
 // Two modes. With req.Dockerfile set the project's own file is the build, and it
 // is run as-is against the project as context (see the field's doc for why they
 // share so little). Otherwise the request's dependencies and OS packages are
-// installed into a layer over its base's -base image (generatedDockerfile),
+// installed into a layer over its base's -base image (InstallDockerfile),
 // with the project's files over them when the request carries ProjectFiles.
 // With nothing to install, no project files and no labels it builds nothing
 // and returns the -base image unchanged (the fast path).
@@ -397,24 +411,15 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 			return "", err
 		}
 	}
-	// requirements.txt carries the deps, after any --find-links lines;
-	// packages.txt carries the OS packages, one apt name per line. Both must
-	// exist even when empty, or the generated Dockerfile's `COPY <file> .`
-	// fails, so an empty list still writes the file.
-	if err := os.WriteFile(filepath.Join(contextDir, requirementsName), requirementsFile(deps, req.FindLinks), filePermRW); err != nil {
-		return "", fmt.Errorf("writing the generated requirements file: %w", err)
-	}
-	var packagesData []byte
-	if packages := withGitForVCSDeps(deps, req.Packages); len(packages) > 0 {
-		packagesData = []byte(strings.Join(packages, "\n") + "\n")
-	}
-	if err := os.WriteFile(filepath.Join(contextDir, packagesName), packagesData, filePermRW); err != nil {
-		return "", fmt.Errorf("writing the generated packages file: %w", err)
+	// After the project's files, so the CLI's helper replaces a copy the
+	// project carries.
+	if err := writeInstallInputs(contextDir, req); err != nil {
+		return "", err
 	}
 	// The Dockerfile sits outside the context so the trailing `COPY . .` does
 	// not bake it in.
 	dfPath := filepath.Join(req.WorkDir, dockerfileName)
-	if err := os.WriteFile(dfPath, []byte(generatedDockerfile(from)), filePermRW); err != nil {
+	if err := os.WriteFile(dfPath, []byte(InstallDockerfile(from)), filePermRW); err != nil {
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 
@@ -506,7 +511,7 @@ func absPaths(req Request) (Request, error) {
 
 // buildSecrets are the Secrets the build can read. A declared Dockerfile
 // mounts whichever it names. A generated build's Dockerfile mounts
-// manifest.RuntimeSecretID alone (generatedDockerfile), so any other secret is
+// manifest.RuntimeSecretID alone (InstallDockerfile), so any other secret is
 // dropped rather than handed to docker, which would read its source for
 // nothing.
 func (r *Request) buildSecrets() []string {
@@ -524,7 +529,7 @@ func (r *Request) buildSecrets() []string {
 
 // baseOf is the image a generated build starts FROM for the runtime base ref:
 // its -base tag, the same image as the runtime's tag without the ONBUILD
-// triggers, whose steps generatedDockerfile writes out instead. It is the one
+// triggers, whose steps InstallDockerfile writes out instead. It is the one
 // place the suffix is added, after whichever rule resolved the base (the
 // catalog, a platform's offer, a [tool.astro] runtime), so every caller of
 // Build gets it. A ref already on a -base tag is returned as it is.
@@ -533,71 +538,6 @@ func baseOf(ref string) string {
 		return ref
 	}
 	return ref + baseTagSuffix
-}
-
-// GeneratedDockerfile is the Dockerfile a generated build over the runtime
-// base baseImage runs (Request.BaseImage, before baseOf), for a caller that
-// addresses the image by what builds it: `astro package astro`'s content tag
-// hashes it, so a change to the recipe is a change to the tag.
-func GeneratedDockerfile(baseImage string) string {
-	return generatedDockerfile(baseOf(baseImage))
-}
-
-// generatedDockerfile is the Dockerfile a generated build runs over from, the
-// -base image. Its steps are the ones the runtime's ONBUILD tag runs as
-// triggers (astro-runtime's image/Dockerfile.onbuild), in the same order and
-// as the same users, so the image is the one the ONBUILD tag would build:
-// the OS packages, then the Python dependencies under the runtime's
-// constraints, then the context's files owned by astro.
-//
-// Written out rather than inherited for two reasons. The trigger list has
-// changed across runtimes (the netrc mount is in 3.3-9 but not 3.1-12 or
-// 12.6.0), so a build inherited whichever list its base happened to carry;
-// written here, every runtime installs the same way, and the netrc secret
-// reaches the install on all of them. And a Dockerfile that states its
-// install is one `docker build` runs as written, with nothing happening at
-// FROM that the file does not show.
-//
-// Each install runs the runtime's own script, so the runtime's constraints
-// file and its choice of installer (uv, or pip with ASTRO_RUNTIME_USE_PIP)
-// still apply. Runtimes before 11.0.0 ship no scripts: their triggers run
-// the apt install and `pip install -r` inline, so each step falls back to
-// that command where the script is missing. The inline triggers also refused
-// an apache-airflow pin, which runtimeDeps has already removed. The test is
-// POSIX, since a runtime's SHELL is not the same on every line.
-func generatedDockerfile(from string) string {
-	return "FROM " + from + "\n" +
-		"COPY " + packagesName + " .\n" +
-		"USER root\n" +
-		"RUN if [ -x " + installSystemPackages + " ]; then " + installSystemPackages + "; " +
-		"elif [ -s " + packagesName + " ]; then apt-get update && cat " + packagesName + " | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n" +
-		"COPY " + requirementsName + " .\n" +
-		"RUN --mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false " +
-		"if [ -x " + installPythonDependencies + " ]; then " + installPythonDependencies + "; " +
-		"else pip install --no-cache-dir --root-user-action=ignore -r " + requirementsName + "; fi\n" +
-		"USER astro\n" +
-		"COPY --chown=astro:0 . .\n"
-}
-
-// The runtime's install scripts, from runtime 11.0.0 on: one installs
-// packages.txt with apt, the other requirements.txt with uv under the
-// runtime's constraints file.
-const (
-	installSystemPackages     = "/usr/local/bin/install-system-packages"
-	installPythonDependencies = "/usr/local/bin/install-python-dependencies"
-)
-
-// requirementsFile is the generated requirements.txt: a --find-links line for
-// each page in findLinks, then the dependencies, one per line. The runtime's
-// install reads the file with uv pip install -r (pip with
-// ASTRO_RUNTIME_USE_PIP), and both take --find-links in a requirements file.
-func requirementsFile(deps, findLinks []string) []byte {
-	lines := make([]string, 0, len(findLinks)+len(deps))
-	for _, l := range findLinks {
-		lines = append(lines, "--find-links "+l)
-	}
-	lines = append(lines, deps...)
-	return []byte(strings.Join(lines, "\n") + "\n")
 }
 
 // shouldPull reports whether the build may force-refresh its base images.
@@ -705,38 +645,4 @@ const (
 // other dependency — providers, pandas, and the rest — installs normally.
 func runtimeDeps(deps []string) []string {
 	return manifest.WithoutAirflow(deps)
-}
-
-// gitPackage is the apt package uv needs to install a git direct reference.
-const gitPackage = "git"
-
-// withGitForVCSDeps adds git to the OS packages when a dependency is a git
-// direct reference (`name @ git+https://…`, which is what a [tool.uv.sources]
-// git source becomes in requirements.txt). The runtime image ships no git, so
-// uv fails such an install with "Git executable not found"; the generated
-// Dockerfile installs packages.txt before requirements.txt, so listing git
-// there is enough. packages is never modified.
-//
-// Only https sources are served by this: an ssh one also needs an ssh client
-// and a key, which the build has neither of.
-func withGitForVCSDeps(deps, packages []string) []string {
-	if slices.ContainsFunc(packages, isGitPackage) || !slices.ContainsFunc(deps, isGitReference) {
-		return packages
-	}
-	return append(slices.Clone(packages), gitPackage)
-}
-
-// isGitPackage reports an apt entry naming git, pinned (git=1:2.39…) or with
-// an architecture (git:amd64) or not.
-func isGitPackage(pkg string) bool {
-	name, _, _ := strings.Cut(strings.TrimSpace(pkg), "=")
-	name, _, _ = strings.Cut(name, ":")
-	return name == gitPackage
-}
-
-// isGitReference reports a PEP 508 direct reference fetched with git. The
-// scheme is matched as uv matches it, without regard to case.
-func isGitReference(dep string) bool {
-	_, ref, ok := strings.Cut(dep, "@")
-	return ok && strings.HasPrefix(strings.ToLower(strings.TrimSpace(ref)), "git+")
 }

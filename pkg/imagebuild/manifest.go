@@ -133,6 +133,7 @@ func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base Base
 		return Request{}, err
 	}
 	req.BaseImage = image
+	req.ManifestDir = m.ProjectDir
 	if ships {
 		req.ProjectFiles = m.ProjectDir
 	}
