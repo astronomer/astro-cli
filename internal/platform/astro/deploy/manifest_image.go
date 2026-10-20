@@ -32,10 +32,11 @@ type ManifestImageDeployInput struct {
 	// commit lookup and the dags upload use too) and the manifest's
 	// image-deciding fields, as imagebuild.ManifestBuildOf reads them.
 	Build imagebuild.ManifestBuild
-	// Catalog reads the runtime catalog for the image's Python and an
-	// Airflow 2 base (imagebuild.RuntimeImageForPython); nil, or a nil
-	// catalog, builds on the runtime's default Python, and refuses an
-	// Airflow 2 project with no [tool.astro] runtime.
+	// Catalog reads the runtime catalog for the image's Python, and for an
+	// Airflow 2 base when the Deployment offers no runtime for the pin
+	// (astroBase). nil, or a nil catalog, builds on the runtime's default
+	// Python, and then refuses an Airflow 2 project with no [tool.astro]
+	// runtime and nothing offered.
 	Catalog      func() *runtimeversions.Catalog
 	DeploymentID string
 	// BuildSecrets are docker build --secret specs for a declared Dockerfile's
@@ -282,7 +283,7 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 		// Under remote execution they live with the remote agents instead.
 		return astrov1.Deployment{}, nil, fmt.Errorf(imageOnlyNeedsDagDeployMsg, in.DeploymentID)
 	}
-	offer, err := offeredRuntimes(ctx, dep.OrganizationId, in.DeploymentID, astroV1Client)
+	offer, err := offeredRuntimes(ctx, dep.OrganizationId, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
@@ -428,15 +429,13 @@ func buildOrAdoptImage(ctx context.Context, in *ManifestImageDeployInput, req *i
 	})
 }
 
-// offeredRuntimes fetches the runtime releases the deployment offers: its
-// options, asked for by its ID, so the answer is this deployment's rather
-// than the organization's.
-func offeredRuntimes(ctx context.Context, organizationID, deploymentID string, astroV1Client astrov1.APIClient) (offeredReleases, error) {
-	params := &astrov1.GetDeploymentOptionsParams{}
-	if deploymentID != "" {
-		params.DeploymentId = &deploymentID
-	}
-	resp, err := astroV1Client.GetDeploymentOptionsWithResponse(ctx, organizationID, params)
+// offeredRuntimes fetches the runtime releases the organization's
+// deployments offer. Asked for the organization, as the runtime check always
+// has: asked for one deployment's ID the options may list fewer runtimes (its
+// upgrade targets, say), and that is not yet verified to keep the runtime it
+// runs, which a redeploy has to pass.
+func offeredRuntimes(ctx context.Context, organizationID string, astroV1Client astrov1.APIClient) (offeredReleases, error) {
+	resp, err := astroV1Client.GetDeploymentOptionsWithResponse(ctx, organizationID, &astrov1.GetDeploymentOptionsParams{})
 	if err != nil {
 		return nil, err
 	}
@@ -467,13 +466,22 @@ func (o offeredReleases) versions() []string {
 // series or generation for one without ("2.10", "2"). Astro names an Astronomer
 // build of Airflow 3 with a local version ("3.1.8+astro.4"), which its release
 // covers. "" when none is offered.
+//
+// Only a stable or deprecated build is a base nobody chose: a preview channel
+// is the user's to opt into, by [tool.astro] runtime. Deprecated stays, as
+// most Airflow 2 runtimes are. And a bare "3" offers nothing: every other
+// path refuses that pin rather than pick an Airflow 3 series for the project,
+// so the deploy refuses it the same way.
 func (o offeredReleases) NewestFor(pin string) string {
 	pin = strings.TrimSpace(pin)
-	if pin == "" {
+	if pin == "" || pin == "3" {
 		return ""
 	}
 	newest := ""
 	for i := range o {
+		if ch := o[i].Channel; ch != "" && ch != "stable" && ch != "deprecated" {
+			continue
+		}
 		av := o[i].AirflowVersion
 		if av != pin && !strings.HasPrefix(av, pin+".") && !strings.HasPrefix(av, pin+"+") {
 			continue
@@ -491,10 +499,33 @@ func (o offeredReleases) NewestFor(pin string) string {
 // none offered imagebuild's rule over the public catalog: the series tag for
 // Airflow 3, the catalog's newest released runtime for Airflow 2, refused
 // when the catalog cannot be read.
+//
+// An offered Airflow 3 build that ships no Python requires-python admits is
+// not the project's fault: a newer build of the series may ship one, as it
+// did before the offer was read, so the catalog's rule decides instead.
 func astroBase(offer offeredReleases, catalog func() *runtimeversions.Catalog) imagebuild.BaseImageFunc {
-	return deploybuild.OfferedBase(offer, func(_ context.Context, m imagebuild.ManifestBuild) (string, error) {
-		return imagebuild.RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
+	fallback := imagebuild.CatalogBase(catalog)
+	offered := deploybuild.OfferedBase(offer, func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
+		base, err := fallback(ctx, m)
+		if err != nil && m.Runtime == "" && isAirflow2(m.AirflowVersion) && len(offer) > 0 {
+			return "", fmt.Errorf("the Deployment offers no Astro Runtime for Airflow %s, so the base was looked up in the public runtime catalog, which gave none either: %w", m.AirflowVersion, err)
+		}
+		return base, err
 	})
+	return func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
+		base, err := offered(ctx, m)
+		var notShipped *runtimeversions.PythonNotShippedError
+		if m.Runtime == "" && errors.As(err, &notShipped) {
+			return fallback(ctx, m)
+		}
+		return base, err
+	}
+}
+
+// isAirflow2 reports an Airflow 2 pin.
+func isAirflow2(pin string) bool {
+	pin = strings.TrimSpace(pin)
+	return pin == "2" || strings.HasPrefix(pin, "2.")
 }
 
 // finalizeManifestDeploy marks a manifest deploy final. It carries the dag tarball version

@@ -287,19 +287,48 @@ func TestOfferedReleasesNewestFor(t *testing.T) {
 		{Version: "12.10.0", AirflowVersion: "2.10.5"},
 		{Version: "12.9.0", AirflowVersion: "2.10.5"},
 		{Version: "13.1.0", AirflowVersion: "2.11.0"},
-		{Version: "3.1-5", AirflowVersion: "3.1.8+astro.4"},
+		{Version: "3.1-5", AirflowVersion: "3.1.8+astro.4", Channel: "stable"},
+		{Version: "3.1-6", AirflowVersion: "3.1.9", Channel: "beta"},
+		{Version: "11.12.0", AirflowVersion: "2.9.3", Channel: "deprecated"},
 	}
 	for pin, want := range map[string]string{
 		"2.10":   "12.10.0",
 		"2.10.4": "12.6.0",
 		"2":      "13.1.0",
-		"2.9":    "",
-		"3.1":    "3.1-5",
+		"2.9":    "11.12.0", // deprecated still counts, as most Airflow 2 runtimes are
+		"2.8":    "",
+		"3.1":    "3.1-5", // the beta 3.1-6 is newer, and not offered as a base
 		"3.1.8":  "3.1-5",
+		"3":      "", // a bare Airflow 3 pin is refused, not resolved to a series
 		"":       "",
 	} {
 		assert.Equal(t, want, o.NewestFor(pin), pin)
 	}
+}
+
+// An offered Airflow 3 build that ships no Python requires-python admits
+// gives way to the catalog's rule, which a newer build of the series can
+// satisfy, rather than refusing the deploy over a build the user never named.
+func TestAstroBaseFallsBackWhenTheOfferedBuildShipsNoAdmittedPython(t *testing.T) {
+	catalog, err := runtimeversions.Parse([]byte(`{"runtimeVersionsV3": {
+		"3.1-3": {"metadata": {"airflowVersion": "3.1.0", "channel": "stable", "releaseDate": "2025-01-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}},
+		"3.1-8": {"metadata": {"airflowVersion": "3.1.2", "channel": "stable", "releaseDate": "2025-06-01", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}}}}`))
+	require.NoError(t, err)
+	offer := offeredReleases{{Version: "3.1-3", AirflowVersion: "3.1.0"}}
+
+	ref, err := astroBase(offer, func() *runtimeversions.Catalog { return catalog })(context.Background(),
+		imagebuild.ManifestBuild{AirflowVersion: "3.1", RequiresPython: ">=3.13"})
+	require.NoError(t, err)
+	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-8-python-3.13", ref)
+}
+
+// An Airflow 2 pin the Deployment offers nothing for, with no catalog to
+// fall back on, says the Deployment offers none, which is the cause.
+func TestAstroBaseNamesAnAirflow2PinTheDeploymentDoesNotOffer(t *testing.T) {
+	offer := offeredReleases{{Version: "3.1-5", AirflowVersion: "3.1.8"}}
+	_, err := astroBase(offer, nil)(context.Background(), imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	require.ErrorContains(t, err, "the Deployment offers no Astro Runtime for Airflow 2.10")
+	assert.ErrorContains(t, err, "[tool.astro] runtime")
 }
 
 // An Astro deploy builds on the newest runtime the deployment offers for the
@@ -335,13 +364,13 @@ func TestAstroBaseBuildsOnTheOfferedRuntime(t *testing.T) {
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref, "nothing offered falls back to the catalog")
 }
 
-// The options are asked for this deployment, so the offer is its own rather
-// than the organization's.
-func TestOfferedRuntimesAsksForTheDeployment(t *testing.T) {
+// The options are asked for the organization, as the runtime check always
+// has, and the same releases are both the offer and the allowed list.
+func TestOfferedRuntimesAsksForTheOrganization(t *testing.T) {
 	client := new(astrov1_mocks.ClientWithResponsesInterface)
 	client.On("GetDeploymentOptionsWithResponse", mock.Anything, "org-id",
 		mock.MatchedBy(func(p *astrov1.GetDeploymentOptionsParams) bool {
-			return p.DeploymentId != nil && *p.DeploymentId == "test-deployment-id"
+			return p.DeploymentId == nil
 		})).Return(&astrov1.GetDeploymentOptionsResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
 		JSON200: &astrov1.DeploymentOptions{RuntimeReleases: []astrov1.RuntimeRelease{
@@ -349,7 +378,7 @@ func TestOfferedRuntimesAsksForTheDeployment(t *testing.T) {
 		}},
 	}, nil)
 
-	offer, err := offeredRuntimes(context.Background(), "org-id", "test-deployment-id", client)
+	offer, err := offeredRuntimes(context.Background(), "org-id", client)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"12.6.0"}, offer.versions())
 	assert.Equal(t, "12.6.0", offer.NewestFor("2.10"))
