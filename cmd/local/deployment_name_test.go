@@ -36,8 +36,16 @@ type findingLocator struct {
 	reached *[]instances.Instance
 }
 
+// BaseURL refuses a Deployment no link declares that is not in the workspace
+// it carries, as the production lookup does off the Deployment it reads.
 func (l findingLocator) BaseURL(_ context.Context, i instances.Instance) (string, error) {
 	*l.reached = append(*l.reached, i)
+	for j := range l.deployments {
+		d := &l.deployments[j]
+		if ws := i.Link.Workspace; d.Id == i.Link.Deployment && i.Source == instances.SourceDeploymentID && ws != "" && d.WorkspaceId != ws {
+			return "", errors.New("deployment " + d.Id + " is in workspace " + d.WorkspaceId + ", not --workspace " + ws)
+		}
+	}
 	return l.url, nil
 }
 
@@ -114,6 +122,25 @@ func TestDeploymentFlagIDIsTheDeployment(t *testing.T) {
 	got := run.reached[0]
 	if got.Source != instances.SourceDeploymentID || got.Link.Deployment != unlinkedID || got.Name != unlinkedID || got.Link.Workspace != "" {
 		t.Fatalf("reached %+v", got)
+	}
+}
+
+// An id given with --workspace carries it to the lookup that reads its
+// address, which refuses a Deployment in another workspace: the flag is not
+// dropped for an id any more than for a name.
+func TestDeploymentFlagIDOutsideTheWorkspaceGivenIsRefused(t *testing.T) {
+	inProject := []astrov1.Deployment{astroDep(unlinkedID, "etl-prod", projectWS)}
+	run := runByName(t, twoLinkManifest, inProject, "-d", unlinkedID, "--workspace", "ws-other")
+	want := "deployment " + unlinkedID + " is in workspace " + projectWS + ", not --workspace ws-other"
+	if run.err == nil || !strings.HasPrefix(run.err.Error(), want) {
+		t.Fatalf("err = %v, want %q", run.err, want)
+	}
+	if len(run.reached) != 1 || run.reached[0].Link.Workspace != "ws-other" || len(run.asked) != 0 {
+		t.Fatalf("reached %+v, asked %v", run.reached, run.asked)
+	}
+
+	if run := runByName(t, twoLinkManifest, inProject, "-d", unlinkedID, "--workspace", projectWS); run.err != nil {
+		t.Fatalf("in its workspace: %v", run.err)
 	}
 }
 
@@ -237,6 +264,29 @@ auth = { method = 'none' }
 		if run := runByName(t, withWorkspaces, nil, args...); run.err != nil {
 			t.Errorf("%v: %v", args, run.err)
 		}
+	}
+}
+
+// An apc link is in a workspace of its own (a Houston one), so --workspace
+// has to agree with it as with an Astro link, rather than be told the link is
+// in none; agreeing, the link goes on to the refusal every apc link meets.
+func TestDeploymentFlagWorkspaceAndAnAPCLink(t *testing.T) {
+	withAPC := twoLinkManifest + `
+[tool.astro.deployments.onprem]
+target = 'apc'
+domain = 'astro.corp.example'
+workspace = 'ws-houston'
+deployment = 'capcdeployment00000000001'
+`
+	run := runByName(t, withAPC, nil, "-d", "onprem", "--workspace", "ws-other")
+	want := "deployment onprem links a Deployment in workspace ws-houston (pyproject.toml), not --workspace ws-other"
+	if run.err == nil || run.err.Error() != want {
+		t.Fatalf("err = %v, want %q", run.err, want)
+	}
+
+	run = runByName(t, withAPC, nil, "-d", "onprem", "--workspace", "ws-houston")
+	if !errors.Is(run.err, instances.ErrAPCUnsupported) {
+		t.Fatalf("agreeing: err = %v, want the apc refusal", run.err)
 	}
 }
 

@@ -16,9 +16,10 @@ import (
 // A -d/--deployment value that names no link is read the way --deployment
 // reads on the astro deployment commands: a Deployment id (util.IsCUID) is
 // that Deployment, and anything else is the name of a Deployment in a
-// workspace. NamedDeployment and DeploymentNameError are the half of that both
-// readers share, astro af (through DeploymentFinder) and astro api airflow;
-// each lists the workspace through its own login.
+// workspace. NamedDeployment and DeploymentNameError are the half of that
+// meant to be shared by every reader of such a -d: astro af reads through them
+// today (DeploymentFinder), and astro api airflow is meant to, each listing
+// the workspace through its own login.
 
 // DeploymentNameError is a -d value that is no Deployment id and named no
 // Deployment where it was looked for, or several, or had no workspace to be
@@ -98,12 +99,14 @@ func (l *locator) DeploymentID(ctx context.Context, ref, workspace, projectWorks
 	if ws == "" && l.workspace != nil {
 		ws = l.workspace()
 	}
-	if ws == "" {
-		return "", &DeploymentNameError{Name: ref}
-	}
+	// The login comes first: a machine with none has no workspace either, and
+	// logging in is the fix that also supplies one.
 	token, org, err := l.identity(ctx)
 	if err != nil {
 		return "", err
+	}
+	if ws == "" {
+		return "", &DeploymentNameError{Name: ref}
 	}
 	deployments, err := l.listDeployments(ctx, token, org, ws)
 	if err != nil {

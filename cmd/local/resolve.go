@@ -102,7 +102,7 @@ type deploymentFlags struct {
 func addDeploymentFlags(cmd *cobra.Command, f *deploymentFlags) {
 	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on: a link name from the manifest, else an Astro Deployment id or name")
 	cmd.PersistentFlags().StringVar(&f.url, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
-	cmd.PersistentFlags().Var(&workspaceFlag{f}, "workspace", "Workspace to look a -d Deployment name up in, overriding the project's and the login's")
+	cmd.PersistentFlags().Var(&workspaceFlag{f}, "workspace", "Workspace to look a -d Deployment name up in, overriding the project's and the login's. A link or a Deployment id has to be in it")
 }
 
 // workspaceFlag is --workspace, recording that it was typed.

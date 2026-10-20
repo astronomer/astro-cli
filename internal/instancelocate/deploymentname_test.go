@@ -3,11 +3,13 @@ package instancelocate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/astronomer/astro-cli/config"
+	"github.com/astronomer/astro-cli/internal/astrosession"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
@@ -25,6 +27,9 @@ type fakeDeployments struct {
 	listed      []string
 	byID        func(id string) *astrov1.GetDeploymentResponse
 	listStatus  int
+	// pageSize, when set, pages the listing; offsets records each page asked.
+	pageSize int
+	offsets  []int
 }
 
 func (f *fakeDeployments) GetDeploymentWithResponse(_ context.Context, _, id string, _ ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error) {
@@ -59,9 +64,17 @@ func (f *fakeDeployments) ListDeploymentsWithResponse(ctx context.Context, org s
 			in = append(in, f.deployments[i])
 		}
 	}
+	total := len(in)
+	if f.pageSize > 0 {
+		// A page starts at the offset asked for and holds at most pageSize,
+		// whatever limit was asked, as a server capping its pages does.
+		offset := *params.Offset
+		f.offsets = append(f.offsets, offset)
+		in = in[min(offset, total):min(offset+f.pageSize, total)]
+	}
 	return &astrov1.ListDeploymentsResponse{
 		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
-		JSON200:      &astrov1.DeploymentsPaginated{Deployments: in, TotalCount: len(in)},
+		JSON200:      &astrov1.DeploymentsPaginated{Deployments: in, TotalCount: total},
 	}, nil
 }
 
@@ -155,6 +168,46 @@ func TestDeploymentIDNameWithNoWorkspace(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "pass --workspace") || len(fake.listed) != 0 {
 		t.Errorf("err = %v, listed %v", err, fake.listed)
+	}
+}
+
+// A workspace listed over several pages is read whole: a name on the last
+// page is found, and one shared across pages is ambiguous rather than
+// settled by the first page.
+func TestDeploymentIDReadsEveryPage(t *testing.T) {
+	ws := []astrov1.Deployment{
+		dep("dep-1", "twin", "ws-given"),
+		dep("dep-2", "a", "ws-given"),
+		dep("dep-3", "b", "ws-given"),
+		dep("dep-4", "twin", "ws-given"),
+		dep("dep-5", "last", "ws-given"),
+	}
+	fake := &fakeDeployments{t: t, deployments: ws, pageSize: 2}
+	id, err := finder(fake).DeploymentID(context.Background(), "last", "ws-given", "")
+	if err != nil || id != "dep-5" {
+		t.Fatalf("id, err = %q, %v", id, err)
+	}
+	if got := fmt.Sprint(fake.offsets); got != "[0 2 4]" {
+		t.Fatalf("pages asked at %s, want [0 2 4]", got)
+	}
+
+	fake = &fakeDeployments{t: t, deployments: ws, pageSize: 2}
+	_, err = finder(fake).DeploymentID(context.Background(), "twin", "ws-given", "")
+	var nameErr *DeploymentNameError
+	if !errors.As(err, &nameErr) || fmt.Sprint(nameErr.IDs) != "[dep-1 dep-4]" {
+		t.Fatalf("err = %v, want both twins", err)
+	}
+}
+
+// Logged out, the fix is logging in, which also brings a workspace, so that
+// is what a name with no workspace is told.
+func TestDeploymentIDLoggedOutSaysLogIn(t *testing.T) {
+	l := finder(&fakeDeployments{t: t})
+	l.workspace = func() string { return "" }
+	l.session = func(context.Context) (string, error) { return "", nil }
+	_, err := l.DeploymentID(context.Background(), "etl-prod", "", "")
+	if !errors.Is(err, astrosession.ErrLoggedOut) {
+		t.Fatalf("err = %v, want logged out", err)
 	}
 }
 
