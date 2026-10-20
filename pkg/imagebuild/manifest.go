@@ -58,18 +58,26 @@ type BaseImageFunc func(ctx context.Context, m ManifestBuild) (string, error)
 // Dependencies and Packages are carried in both cases, since Build ignores
 // them in Dockerfile mode rather than rejecting them.
 //
-// Deploy and `astro package astro` call this, for Airflow 2 (from 2.7) and
-// Airflow 3; an Airflow 2 base with no [tool.astro] runtime is looked up in
-// catalog, so a nil catalog refuses it. Local Docker mode calls
-// ForLocalManifest, the same rule over a base it reads the catalog for itself.
+// `astro package astro` calls this, for Airflow 2 (from 2.7) and Airflow 3;
+// an Airflow 2 base with no [tool.astro] runtime is looked up in catalog, so
+// a nil catalog refuses it. A deploy knows better which builds its target
+// takes, and calls ForManifestWith over a base that falls back to
+// CatalogBase. Local Docker mode calls ForLocalManifest, the same rule over a
+// base it reads the catalog for itself.
 //
 // The caller fills the rest: WorkDir, Tag, Platform ("linux/amd64" for a
 // deploy), Bin, Env, and Secrets. A generated build reads only the
 // manifest.RuntimeSecretID secret.
 func ForManifest(m ManifestBuild, catalog func() *runtimeversions.Catalog) (Request, error) {
-	return ForManifestWith(context.Background(), m, func(_ context.Context, m ManifestBuild) (string, error) {
+	return ForManifestWith(context.Background(), m, CatalogBase(catalog))
+}
+
+// CatalogBase is ForManifest's base: RuntimeImageForPython over catalog, for
+// a caller of ForManifestWith that wants the same rule behind its own.
+func CatalogBase(catalog func() *runtimeversions.Catalog) BaseImageFunc {
+	return func(_ context.Context, m ManifestBuild) (string, error) {
 		return RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
-	})
+	}
 }
 
 // ForManifestWith is ForManifest with the generated build's runtime base
