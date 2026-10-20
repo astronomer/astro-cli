@@ -243,7 +243,7 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml", ".astro/config.yaml",
 		"include/logs/fixture.json", "include/airflow.cfg", "include/sample_env", "include/environment/defaults.yaml",
-		InstallHelperPath,
+		".astro/install/install-project.py", ".astro/install/pyproject.toml",
 	}, contextFiles(t, ctxDir))
 	reqs, _, _ := installLists(t, ctxDir)
 	assert.Equal(t, "pandas\n", reqs, "the generated requirements, not the project's")

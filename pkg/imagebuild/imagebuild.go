@@ -422,7 +422,7 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	// The Dockerfile sits outside the context so the trailing `COPY . .` does
 	// not bake it in.
 	dfPath := filepath.Join(req.WorkDir, dockerfileName)
-	if err := os.WriteFile(dfPath, []byte(installDockerfile(from, len(req.buildSecrets()) > 0)), filePermRW); err != nil {
+	if err := os.WriteFile(dfPath, []byte(installDockerfile(from, len(req.buildSecrets()) > 0, generatedInputs)), filePermRW); err != nil {
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 

@@ -52,14 +52,23 @@ func InstallHelper() []byte {
 	return bytes.Clone(installHelper)
 }
 
-// installFindLinksPath is where a build request naming no project leaves the
-// find-links pages it was given, one per line, for the helper to pass on as
-// they are (install-project.py's FIND_LINKS). It is only that: the helper
-// derives a project's pages from its pyproject.toml every time, as
-// manifest.UV.IndexPagesFor does, so no build of a project writes it, and a
-// plain `docker build .` of a project's own Dockerfile, which never has it,
-// reads the same pages a CLI build does.
-const installFindLinksPath = ".astro/install-find-links.txt"
+// generatedInputsDir is where a generated build stages the install helper's
+// inputs in its context: the helper, the project's pyproject.toml and, when it
+// has them, its uv.lock and (for a request naming no project) the find-links
+// file. The directory always exists, so the install stage copies it whole and
+// needs no wildcard for the optional files, which Buildah has refused when
+// they match nothing.
+const generatedInputsDir = ".astro/install"
+
+// installFindLinksName is the file a build request naming no project leaves
+// the find-links pages it was given in, one per line, beside pyproject.toml in
+// generatedInputsDir, for the helper to pass on as they are
+// (install-project.py's FIND_LINKS). It is only that: the helper derives a
+// project's pages from its pyproject.toml every time, as
+// manifest.UV.IndexPagesFor does, so no build of a project writes it, a
+// project's own copy is never read, and a plain `docker build .` of a
+// project's own Dockerfile reads the same pages a CLI build does.
+const installFindLinksName = "install-find-links.txt"
 
 // Paths the install stage uses inside the build: where its inputs are copied
 // to, and the directory it writes the install's lists to.
@@ -67,6 +76,18 @@ const (
 	inputsDir = "/tmp/astro-project"
 	listsDir  = "/tmp/astro-install"
 )
+
+// projectInputs is what a project's own Dockerfile copies into the install
+// stage, from the project as its context: pyproject.toml, uv.lock when there is
+// one, and the helper at InstallHelperPath. The wildcard is how uv.lock stays
+// optional; Docker's BuildKit and its legacy builder both copy nothing for a
+// wildcard that matches nothing, but Buildah has refused one, so a project
+// built with Podman keeps a uv.lock, or takes `uv.lock*` out of the line.
+var projectInputs = pyprojectName + " " + uvLockName + "* " + InstallHelperPath
+
+// generatedInputs is what a generated build's install stage copies: the whole
+// of generatedInputsDir.
+const generatedInputs = generatedInputsDir + "/"
 
 // InstallDockerfile is the Dockerfile that installs a project over from, an
 // Astro Runtime -base image (baseOf): the install helper's stage, then the steps
@@ -76,7 +97,8 @@ const (
 // the context's files owned by astro. A project's own Dockerfile is this
 // followed by its own steps, and it mounts the netrc secret for the Python
 // install whether or not a build passes one (required=false), since a plain
-// `docker build .` decides that, not the file.
+// `docker build .` decides that, not the file. Its install stage copies
+// projectInputs, which under Podman needs a uv.lock in the project.
 //
 // The install steps are written out rather than inherited for two reasons. The
 // trigger list has changed across runtimes (the netrc mount is in 3.3-9 but not
@@ -94,18 +116,19 @@ const (
 // apache-airflow pin, which the helper has already removed. The test is POSIX,
 // since a runtime's SHELL is not the same on every line.
 func InstallDockerfile(from string) string {
-	return installDockerfile(from, true)
+	return installDockerfile(from, true, projectInputs)
 }
 
-// installDockerfile is InstallDockerfile, with the Python install's netrc
-// mount left out when mountNetrc is false: a generated build mounts the secret
-// only when the build passes it. RUN --mount needs BuildKit (Docker) or Buildah
-// 1.21 (Podman 3.2), so a generated build with no secret to mount keeps to a
-// plain RUN, and its install stage copies its inputs rather than mounting
-// them: with no secret, the legacy builder and an older Podman build it end to
-// end. The runtime's own 3.3-9 trigger mounts the secret unconditionally; a
-// build that took that trigger needed BuildKit whether it had a secret or not.
-func installDockerfile(from string, mountNetrc bool) string {
+// installDockerfile is InstallDockerfile, its install stage copying inputs (a
+// COPY's sources), with the Python install's netrc mount left out when
+// mountNetrc is false: a generated build mounts the secret only when the build
+// passes it. RUN --mount needs BuildKit (Docker) or Buildah 1.21 (Podman 3.2),
+// so a generated build with no secret to mount keeps to a plain RUN, and its
+// install stage copies its inputs rather than mounting them: with no secret,
+// the legacy builder and an older Podman build it end to end. The runtime's
+// own 3.3-9 trigger mounts the secret unconditionally; a build that took that
+// trigger needed BuildKit whether it had a secret or not.
+func installDockerfile(from string, mountNetrc bool, inputs string) string {
 	netrc := ""
 	if mountNetrc {
 		netrc = "--mount=type=secret,id=" + manifest.RuntimeSecretID + ",target=/root/.netrc,required=false "
@@ -115,9 +138,8 @@ func installDockerfile(from string, mountNetrc bool) string {
 		// be readable by its owner alone.
 		"USER root\n" +
 		// Just the inputs, so an edit elsewhere in the project does not rerun
-		// the stage. uv.lock and the find-links file are optional: a wildcard
-		// that matches nothing copies nothing.
-		"COPY " + pyprojectName + " " + uvLockName + "* " + installFindLinksPath + "* " + InstallHelperPath + " " + inputsDir + "/\n" +
+		// the stage.
+		"COPY " + inputs + " " + inputsDir + "/\n" +
 		"RUN python " + inputsDir + "/" + filepath.Base(InstallHelperPath) + " --project " + inputsDir + " --out " + listsDir + "\n" +
 		"FROM " + from + "\n" +
 		"COPY --from=astro-install " + listsDir + "/" + packagesName + " .\n" +
@@ -139,7 +161,7 @@ func installDockerfile(from string, mountNetrc bool) string {
 // addresses the image by what builds it (`astro package astro`'s content tag
 // hashes it, so a change to the recipe is a change to the tag).
 func GeneratedDockerfile(baseImage string, mountNetrc bool) string {
-	return installDockerfile(baseOf(baseImage), mountNetrc)
+	return installDockerfile(baseOf(baseImage), mountNetrc, generatedInputs)
 }
 
 // The runtime's install scripts, from runtime 11.0.0 on: one installs
@@ -183,14 +205,14 @@ func projectManifest(req Request) ([]byte, error) {
 	return data, nil
 }
 
-// installInputs are the files a generated build's install stage reads, by their
-// slash-separated path in the context: the helper, and the project's
-// pyproject.toml and uv.lock as they are (manifestProject), so the context's
-// copies are always the project's own. A request naming no project, or whose
+// installInputs are the files a generated build's install stage reads, by
+// their name in generatedInputsDir: the helper, and the project's
+// pyproject.toml and uv.lock as they are (manifestProject), so the copies are
+// always the project's own. A request naming no project, or whose
 // project has no pyproject.toml, gets a pyproject.toml stating its Dependencies
 // and Packages, and its FindLinks pages as they were given.
 func installInputs(req Request) (map[string][]byte, error) {
-	inputs := map[string][]byte{InstallHelperPath: installHelper}
+	inputs := map[string][]byte{filepath.Base(InstallHelperPath): installHelper}
 	data, err := projectManifest(req)
 	if err != nil {
 		return nil, err
@@ -211,7 +233,7 @@ func installInputs(req Request) (map[string][]byte, error) {
 		return nil, err
 	}
 	if len(req.FindLinks) > 0 {
-		inputs[installFindLinksPath] = []byte(strings.Join(req.FindLinks, "\n") + "\n")
+		inputs[installFindLinksName] = []byte(strings.Join(req.FindLinks, "\n") + "\n")
 	}
 	return inputs, nil
 }
@@ -236,25 +258,28 @@ func (r *Request) installsNothing() bool {
 	return len(runtimeDeps(m.Requirements())) == 0 && len(m.Astro.Packages) == 0
 }
 
-// writeInstallInputs writes installInputs into the generated build's context,
-// replacing a copy of the project's own there (copyProjectFiles carries its
-// pyproject.toml, its uv.lock, and any install helper it has): removed first,
-// since a file the project keeps read-only arrives read-only.
+// writeInstallInputs writes installInputs into generatedInputsDir in the
+// generated build's context, replacing whatever a project carried there, and
+// removes a find-links file the project carried where only an older build
+// wrote one: the helper reads neither, and neither belongs in the image.
 func writeInstallInputs(contextDir string, req Request) error {
 	inputs, err := installInputs(req)
 	if err != nil {
 		return err
 	}
-	for rel, data := range inputs {
-		dst := filepath.Join(contextDir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(dst), contextDirPerm); err != nil {
-			return fmt.Errorf("creating %s: %w", filepath.Dir(dst), err)
-		}
-		if err := os.Remove(dst); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("replacing %s in the build context: %w", rel, err)
-		}
-		if err := os.WriteFile(dst, data, filePermRW); err != nil {
-			return fmt.Errorf("writing %s into the build context: %w", rel, err)
+	if err := os.Remove(filepath.Join(contextDir, ".astro", installFindLinksName)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("removing the project's %s from the build context: %w", installFindLinksName, err)
+	}
+	dir := filepath.Join(contextDir, filepath.FromSlash(generatedInputsDir))
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("clearing %s: %w", dir, err)
+	}
+	if err := os.MkdirAll(dir, contextDirPerm); err != nil {
+		return fmt.Errorf("creating %s: %w", dir, err)
+	}
+	for name, data := range inputs {
+		if err := os.WriteFile(filepath.Join(dir, name), data, filePermRW); err != nil {
+			return fmt.Errorf("writing %s into the build context: %w", name, err)
 		}
 	}
 	return nil
