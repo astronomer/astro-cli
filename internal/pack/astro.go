@@ -189,15 +189,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	// A generated build is addressed by its recipe too. The one with the netrc
-	// mount, whether or not this build has the secret: a secret decides what
-	// the install can reach, not what a successful one installs, so a laptop
-	// and a CI runner holding a token get the same tag.
-	var recipe string
-	if declared == "" {
-		recipe = imagebuild.GeneratedDockerfile(breq.BaseImage, true)
-	}
-	hash, err := contentHash(breq.BaseImage, req.Platform, recipe, breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, generatedRecipe(breq), breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -482,6 +474,19 @@ func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb 
 type declaredDockerfile struct {
 	rel string // the manifest value, slash-separated; "" when none is declared
 	abs string // rel resolved against the project; "" when none is declared
+}
+
+// generatedRecipe is the Dockerfile a generated build of breq runs, as its
+// content address takes it, or "" for a declared Dockerfile, which is
+// addressed by its own bytes. It is the recipe with the netrc mount, whether or
+// not this build has the secret: a secret decides what the install can reach,
+// not what a successful one installs, so a laptop and a CI runner holding a
+// token get the same tag.
+func generatedRecipe(breq imagebuild.Request) string {
+	if breq.FromDeclaredDockerfile() {
+		return ""
+	}
+	return imagebuild.GeneratedDockerfile(breq.BaseImage, true)
 }
 
 func contentHash(base, platform, recipe string, deps, findLinks, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
