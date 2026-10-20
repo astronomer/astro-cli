@@ -201,7 +201,7 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 	for _, name := range []string{"requirements.txt", "packages.txt"} {
 		if slices.Contains(from1x.present, name) && namedInAny(notes, name) {
 			from1x.rewrite = nil
-			from1x.notes = append(from1x.notes, onBuildRefusalNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto "+rw.base+
+			from1x.notes = append(from1x.notes, onBuildKeptNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto "+rw.base+
 				", because "+name+" has lines "+manifest.Marker+" does not carry (above), and the base's ONBUILD steps "+
 				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it"))
 			from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
@@ -213,7 +213,7 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 		return err
 	case blocker != "":
 		from1x.rewrite = nil
-		from1x.notes = append(from1x.notes, onBuildRefusalNote(blocker))
+		from1x.notes = append(from1x.notes, onBuildKeptNote(blocker))
 		from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 		return nil
 	}

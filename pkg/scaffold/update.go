@@ -121,7 +121,7 @@ func updateDockerfile(u *update) error {
 	}
 	rw, blocker, _ := dockerfileRewriteOf(u.body)
 	if blocker != "" {
-		u.cs.Notes = append(u.cs.Notes, onBuildRefusalNote(blocker))
+		u.cs.Notes = append(u.cs.Notes, onBuildKeptNote(blocker))
 		return nil
 	}
 	if rw == nil {
@@ -133,7 +133,7 @@ func updateDockerfile(u *update) error {
 	}
 	if len(notes) > 0 {
 		u.cs.Notes = append(u.cs.Notes, notes...)
-		u.cs.Notes = append(u.cs.Notes, onBuildRefusalNote(u.dockerfile+": kept FROM "+rw.from+" rather than moved onto "+rw.base+
+		u.cs.Notes = append(u.cs.Notes, onBuildKeptNote(u.dockerfile+": kept FROM "+rw.from+" rather than moved onto "+rw.base+
 			", because the lists above are not all in "+manifest.Marker+". Once they are, run astro init again"))
 		return nil
 	}
@@ -143,7 +143,7 @@ func updateDockerfile(u *update) error {
 	case err != nil:
 		return err
 	case blocker != "":
-		u.cs.Notes = append(u.cs.Notes, onBuildRefusalNote(blocker))
+		u.cs.Notes = append(u.cs.Notes, onBuildKeptNote(blocker))
 		return nil
 	}
 	u.cs.Changes = append(u.cs.Changes, Change{
@@ -165,10 +165,27 @@ func updateDockerfile(u *update) error {
 	return nil
 }
 
-// onBuildRefusalNote is a note about a Dockerfile left on its ONBUILD tag,
-// ending with what that means now: every build refuses it.
-func onBuildRefusalNote(note string) string {
-	return note + ". Until it builds FROM a -base tag, astro local start, deploy and package refuse it"
+// onBuildKeptNote is a note about a Dockerfile left on its ONBUILD tag,
+// ending with what that means for every build until it moves.
+func onBuildKeptNote(note string) string {
+	return note + ". Until it builds FROM a -base tag, each build of it warns, and installs requirements.txt and packages.txt " +
+		"through that tag's ONBUILD steps rather than what " + manifest.Marker + " lists"
+}
+
+// onBuildFixable reports whether astro init, run in the project, would move
+// its declared Dockerfile off an ONBUILD tag: the update step, run against a
+// changeset nothing applies. When it would not, notes are what it would say
+// instead.
+func onBuildFixable(dir string, m *manifest.Manifest) (notes []string, fixable bool, err error) {
+	u := &update{dir: dir, m: m, cs: &Changeset{}, dockerfile: m.Astro.Dockerfile}
+	if u.body, err = os.ReadFile(filepath.Join(dir, filepath.FromSlash(u.dockerfile))); err != nil { //nolint:gosec // G703: manifest.Parse refuses a dockerfile path that leaves the project
+		return nil, false, nil //nolint:nilerr // a file that cannot be read is the build's to report
+	}
+	if err := updateDockerfile(u); err != nil {
+		return nil, false, err
+	}
+	fixable = slices.ContainsFunc(u.cs.Changes, func(c Change) bool { return c.Path == u.dockerfile && c.Kind == UpdateFile })
+	return u.cs.Notes, fixable, nil
 }
 
 // listsCarried reports the 1.x lists beside the project, requirements.txt and

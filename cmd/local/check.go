@@ -35,8 +35,10 @@ func loadCheckedManifest(project string) (*manifest.Manifest, error) {
 		return nil, err
 	}
 	// The image a Docker-mode start, a package or a deploy would build: a
-	// Dockerfile on an ONBUILD tag installs lists other than the manifest's.
-	if err := scaffold.CheckDockerfileOnBuild(project, m); err != nil {
+	// Dockerfile on an ONBUILD tag installs lists other than the manifest's,
+	// and one astro init would move is refused. One it would not move builds
+	// as before; a build says so (astro package's warnings), a check does not.
+	if _, err := scaffold.CheckDockerfileOnBuild(project, m); err != nil {
 		return nil, err
 	}
 	return m, nil

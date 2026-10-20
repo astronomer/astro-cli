@@ -43,6 +43,13 @@ func TestRunRefusesADockerfileOnAnONBUILDTag(t *testing.T) {
 
 	_, err = Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod", DagsOnly: true}, &fakeDeployer{})
 	require.NoError(t, err)
+
+	// One astro init could not move (an earlier stage on the tag too) is not
+	// refused: it builds on the tag as before, with a warning.
+	writeFile(t, filepath.Join(dir, "Dockerfile"),
+		"FROM astrocrpublic.azurecr.io/runtime:3.1-12 AS deps\nRUN true\nFROM astrocrpublic.azurecr.io/runtime:3.1-12\n")
+	_, err = Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}, &fakeDeployer{})
+	assert.NotErrorIs(t, err, airflowrt.ErrOnBuildBase)
 }
 
 // An image deploy refuses a Dockerfile whose FROM names another Airflow, before

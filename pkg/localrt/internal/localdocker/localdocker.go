@@ -240,14 +240,10 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err := refuseUnsupportedBase(declared, base); err != nil {
 		return nil, err
 	}
-	// And one on an ONBUILD tag, which would install requirements.txt and
-	// packages.txt rather than what the manifest lists, for the same reasons
-	// and at the same point.
-	if declared != "" {
-		if err := airflowrt.RefuseOnBuildBase(declared, p.Dockerfile); err != nil {
-			return nil, err
-		}
-	}
+	// One on an ONBUILD tag is the CLI's to judge before it starts
+	// (scaffold.CheckDockerfileOnBuild): refused when astro init would move it
+	// onto -base, and built as it stands when a gate keeps it there, which
+	// takes the project's manifest and files, not just this plan.
 
 	rt.OnState(cb, rt.StateStarting, nil)
 	// Every failure from here on reports StateError, once, with whatever error is

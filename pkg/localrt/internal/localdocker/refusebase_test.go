@@ -190,36 +190,6 @@ func TestStartRefusesBeforeItTouchesTheEngine(t *testing.T) {
 		"a precondition failure must not announce a start; states were %v", states)
 }
 
-// A declared Dockerfile on a runtime tag with ONBUILD steps is refused the same
-// way, at the same point: its image would install requirements.txt and
-// packages.txt rather than the manifest's lists. The error names the lines to
-// use instead.
-func TestStartRefusesAnONBUILDBaseBeforeItTouchesTheEngine(t *testing.T) {
-	cmd := &fakeCmd{output: noProjects}
-	e := testEngine(t, cmd)
-	engineWoken := false
-	e.ensureEngine = func(rt.Callbacks, string) error {
-		engineWoken = true
-		return nil
-	}
-
-	p := testPlan(t)
-	require.NoError(t, os.WriteFile(filepath.Join(p.ProjectPath, "Dockerfile"),
-		[]byte("FROM astrocrpublic.azurecr.io/runtime:3.1-12\nRUN echo hi\n"), 0o600))
-	p.Dockerfile = "Dockerfile"
-
-	var states []rt.State
-	_, err := e.Start(context.Background(), p, rt.Callbacks{
-		OnState: func(s rt.State, _ error) { states = append(states, s) },
-	})
-
-	require.ErrorIs(t, err, airflowrt.ErrOnBuildBase)
-	assert.Contains(t, err.Error(), airflowrt.InstallDockerfile("astrocrpublic.azurecr.io/runtime:3.1-12-base"))
-	assert.False(t, engineWoken)
-	assert.Empty(t, cmd.calls)
-	assert.NotContains(t, states, rt.StateStarting)
-}
-
 // The shapes a real Dockerfile carries, judged through the same path Start uses.
 //
 // Each of these was refused or accepted wrongly by an earlier reading of the

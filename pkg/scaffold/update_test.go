@@ -97,7 +97,7 @@ func TestUpdateKeepsADockerfileWhoseListsDrifted(t *testing.T) {
 	notes := strings.Join(res.Notes, "\n")
 	assert.Contains(t, notes, "requirements.txt: requests==2.32.0 is not in [project] dependencies")
 	assert.Contains(t, notes, "packages.txt: unixodbc is not in packages under [tool.astro]")
-	assert.Contains(t, notes, "Until it builds FROM a -base tag, astro local start, deploy and package refuse it")
+	assert.Contains(t, notes, "Until it builds FROM a -base tag, each build of it warns")
 }
 
 // A Dockerfile already on -base gets the helper it runs: written when the
@@ -134,7 +134,7 @@ func TestUpdateNotesADockerfileItCannotMove(t *testing.T) {
 	assert.Empty(t, res.Updated)
 	require.Len(t, res.Notes, 1)
 	assert.Contains(t, res.Notes[0], "an earlier stage builds on quay.io/astronomer/astro-runtime:12.6.0")
-	assert.True(t, strings.HasSuffix(res.Notes[0], "astro local start, deploy and package refuse it"))
+	assert.True(t, strings.HasSuffix(res.Notes[0], "rather than what pyproject.toml lists"))
 }
 
 func TestInstallHelperWarning(t *testing.T) {
@@ -153,17 +153,48 @@ func TestInstallHelperWarning(t *testing.T) {
 	assert.Empty(t, InstallHelperWarning(other, ""), "no Dockerfile, no warning")
 }
 
-// CheckDockerfileOnBuild refuses a declared Dockerfile on an ONBUILD tag, and
-// nothing else.
+// CheckDockerfileOnBuild refuses a Dockerfile on an ONBUILD tag only when
+// astro init would move it, so the refusal's "run astro init" always works.
+// One a gate keeps on its tag builds as before, with the note init would give
+// as the warning. One on -base, and no Dockerfile, pass without a word.
 func TestCheckDockerfileOnBuild(t *testing.T) {
-	dir := v2Project(t, map[string]string{"Dockerfile": "FROM quay.io/astronomer/astro-runtime:12.6.0\nRUN true\n"})
-	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
-	require.NoError(t, err)
-	require.ErrorIs(t, CheckDockerfileOnBuild(dir, m), airflowrt.ErrOnBuildBase)
+	onBuild := "FROM quay.io/astronomer/astro-runtime:12.6.0\nRUN true\n"
+	load := func(dir string) *manifest.Manifest {
+		t.Helper()
+		m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
+		require.NoError(t, err)
+		return m
+	}
 
-	writeTree(t, dir, map[string]string{"Dockerfile": "FROM quay.io/astronomer/astro-runtime:12.6.0-base\nRUN true\n"})
-	require.NoError(t, CheckDockerfileOnBuild(dir, m))
-
-	m.Astro.Dockerfile = ""
-	require.NoError(t, CheckDockerfileOnBuild(dir, m))
+	t.Run("refused when init would move it", func(t *testing.T) {
+		dir := v2Project(t, map[string]string{"Dockerfile": onBuild, "requirements.txt": "pandas==2.1.0\n"})
+		warning, err := CheckDockerfileOnBuild(dir, load(dir))
+		require.ErrorIs(t, err, airflowrt.ErrOnBuildBase)
+		assert.Contains(t, err.Error(), "Run astro init")
+		assert.Empty(t, warning)
+	})
+	t.Run("warned about when a list drifted", func(t *testing.T) {
+		dir := v2Project(t, map[string]string{"Dockerfile": onBuild, "requirements.txt": "pandas==2.1.0\nrequests==2.32.0\n"})
+		warning, err := CheckDockerfileOnBuild(dir, load(dir))
+		require.NoError(t, err)
+		assert.Contains(t, warning, "requirements.txt: requests==2.32.0 is not in [project] dependencies")
+		assert.Contains(t, warning, "each build of it warns, and installs requirements.txt and packages.txt through that tag's ONBUILD steps")
+	})
+	t.Run("warned about when a gate blocks the move", func(t *testing.T) {
+		dir := v2Project(t, map[string]string{"Dockerfile": "FROM quay.io/astronomer/astro-runtime:12.6.0 AS deps\nRUN true\n" + onBuild})
+		warning, err := CheckDockerfileOnBuild(dir, load(dir))
+		require.NoError(t, err)
+		assert.Contains(t, warning, "an earlier stage builds on quay.io/astronomer/astro-runtime:12.6.0")
+	})
+	t.Run("quiet on -base and with no Dockerfile", func(t *testing.T) {
+		dir := v2Project(t, map[string]string{"Dockerfile": "FROM quay.io/astronomer/astro-runtime:12.6.0-base\nRUN true\n"})
+		m := load(dir)
+		warning, err := CheckDockerfileOnBuild(dir, m)
+		require.NoError(t, err)
+		assert.Empty(t, warning)
+		m.Astro.Dockerfile = ""
+		warning, err = CheckDockerfileOnBuild(dir, m)
+		require.NoError(t, err)
+		assert.Empty(t, warning)
+	})
 }

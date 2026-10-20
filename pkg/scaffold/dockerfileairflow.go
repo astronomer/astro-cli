@@ -61,22 +61,43 @@ func CheckDockerfileAirflow(dir string, m *manifest.Manifest) error {
 	return &manifest.ValidationError{Path: filepath.Join(dir, manifest.Marker), Problems: []manifest.Problem{p}}
 }
 
-// CheckDockerfileOnBuild refuses a declared Dockerfile with a stage on an Astro
-// Runtime ONBUILD tag (airflowrt.RefuseOnBuildBase): its image installs
-// requirements.txt and packages.txt, not the manifest's lists, so it and
-// standalone mode would run different packages. dir is the project root and m
-// its loaded manifest; the error wraps airflowrt.ErrOnBuildBase and carries the
-// lines that fix it.
+// CheckDockerfileOnBuild judges a declared Dockerfile with a stage on an Astro
+// Runtime ONBUILD tag, whose image installs requirements.txt and packages.txt
+// rather than the manifest's lists, so it and standalone mode run different
+// packages. dir is the project root and m its loaded manifest.
 //
-// Every path that builds the file calls it: astro local check, astro package,
-// astro deploy, and Docker mode's start, which reads the file itself. Not
-// standalone mode, which builds no image.
-func CheckDockerfileOnBuild(dir string, m *manifest.Manifest) error {
+// It refuses only what astro init can fix. When init, run in the project,
+// would move the file onto its -base tag (the update step, with every gate a
+// conversion applies), the build is refused: err wraps airflowrt.ErrOnBuildBase
+// and carries the lines that fix it, and naming astro init in it is a promise
+// that command keeps. When a gate stops the move, the build goes ahead on the
+// ONBUILD tag as it always has, the triggers still reading the two lists, and
+// warning is what init would say about it, for the build to show each time.
+// Both are empty for a Dockerfile on no ONBUILD tag.
+//
+// Every path that builds the file calls it: astro local check and astro
+// package, astro deploy, and a Docker-mode start or restart. Not standalone
+// mode, which builds no image.
+func CheckDockerfileOnBuild(dir string, m *manifest.Manifest) (warning string, err error) {
 	path := dockerfilePath(dir, m)
 	if path == "" {
-		return nil
+		return "", nil
 	}
-	return airflowrt.RefuseOnBuildBase(path, m.Astro.Dockerfile)
+	refusal := airflowrt.RefuseOnBuildBase(path, m.Astro.Dockerfile)
+	if refusal == nil {
+		return "", nil
+	}
+	notes, fixable, err := onBuildFixable(dir, m)
+	if err != nil {
+		return "", err
+	}
+	if fixable {
+		return "", refusal
+	}
+	if len(notes) == 0 {
+		notes = []string{onBuildKeptNote(m.Astro.Dockerfile + ": builds on a runtime tag with ONBUILD steps, and astro init cannot move it onto a -base tag")}
+	}
+	return strings.Join(notes, "\n"), nil
 }
 
 // refuseKeptDockerfileOfAnotherAirflow refuses a conversion that would keep the

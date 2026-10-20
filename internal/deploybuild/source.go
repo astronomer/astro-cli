@@ -61,12 +61,15 @@ func CheckSource(s *Source) (imagebuild.MissingSecrets, *imagebuild.ProjectSurve
 	if err := scaffold.CheckDockerfileAirflow(s.ProjectDir, s.Manifest); err != nil {
 		return missing, nil, err
 	}
-	if err := scaffold.CheckDockerfileOnBuild(s.ProjectDir, s.Manifest); err != nil {
-		return missing, nil, err
-	}
 	warn := s.Warn
 	if warn == nil {
 		warn = func(string) {}
+	}
+	switch w, err := scaffold.CheckDockerfileOnBuild(s.ProjectDir, s.Manifest); {
+	case err != nil:
+		return missing, nil, err
+	case w != "":
+		warn(w)
 	}
 	if w := scaffold.InstallHelperWarning(s.ProjectDir, s.Manifest.Astro.Dockerfile); w != "" {
 		warn(w)

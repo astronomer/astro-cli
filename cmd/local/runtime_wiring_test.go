@@ -243,6 +243,53 @@ func TestPackageChecksTheRuntimeBuild(t *testing.T) {
 	}
 }
 
+// A Docker-mode start of a Dockerfile on an ONBUILD tag is refused, before the
+// runtime is asked, when astro init would move it onto -base. When a gate
+// keeps it on the tag (here, an earlier stage on one too), the start goes ahead
+// and warns with what init would say. Standalone builds no image, so a
+// standalone start is not held to either.
+func TestStartJudgesAnONBUILDDockerfileByWhetherInitCanMoveIt(t *testing.T) {
+	const fixable = "astrocrpublic.azurecr.io/runtime:3.1-12"
+	const blocked = "astrocrpublic.azurecr.io/runtime:3.1-12 AS deps\nRUN true\nFROM astrocrpublic.azurecr.io/runtime:3.1-12"
+	for _, tc := range []struct {
+		name, from string
+		args       []string
+		refused    bool
+		warning    string
+	}{
+		{name: "fixable, docker", from: fixable, args: []string{"local", "start", "--docker"}, refused: true},
+		{name: "fixable, standalone", from: fixable, args: []string{"local", "start"}},
+		{
+			name: "blocked, docker", from: blocked, args: []string{"local", "start", "--docker"},
+			warning: "an earlier stage builds on astrocrpublic.azurecr.io/runtime:3.1-12",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d, stdout := testDeps(t)
+			started := false
+			d.Runtime = startRecorder{started: &started}
+			wiringProject(t, &d, "dockerfile = 'Dockerfile'\n", tc.from)
+
+			err := execute(t, d, tc.args...)
+			if tc.refused {
+				if !errors.Is(err, localrt.ErrOnBuildBase) {
+					t.Fatalf("err = %v, want the ONBUILD refusal", err)
+				}
+				if started {
+					t.Error("a refused start reached the runtime")
+				}
+				return
+			}
+			if !started {
+				t.Errorf("the start did not reach the runtime: %v", err)
+			}
+			if tc.warning != "" && !strings.Contains(stdout.String(), tc.warning) {
+				t.Errorf("no warning naming the blocker: %q", stdout.String())
+			}
+		})
+	}
+}
+
 // A Docker-mode start and restart of a project with its own Dockerfile warn
 // about the per-machine files that build would copy into the image, and go on.
 // Standalone builds no image, so it says nothing.
@@ -264,7 +311,7 @@ func TestStartWarnsAboutLocalFilesInTheImageInDockerModeOnly(t *testing.T) {
 			d, stdout := testDeps(t)
 			started := false
 			d.Runtime = startRecorder{started: &started, mode: tc.mode}
-			wiringProject(t, &d, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
+			wiringProject(t, &d, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12-base")
 			dir, _ := d.WorkingDir()
 			if err := os.MkdirAll(filepath.Join(dir, ".astro", "standalone"), 0o750); err != nil {
 				t.Fatal(err)
