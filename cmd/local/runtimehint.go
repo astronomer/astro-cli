@@ -126,7 +126,7 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 		// A dependency the project already lists is missing from an
 		// environment that is out of date, which adding it again does not fix.
 		if d := runtimeDist(missingModule(f.Message), ships); d != "" && !declared[d] {
-			f.Hint = "Astro Runtime " + build + " ships " + d + ", but this project does not depend on it: add it with `uv add " + d + "`"
+			f.Hint = "Astro Runtime " + build + " ships " + d + ", but this project does not depend on it: add it with uv add " + d
 		}
 	}
 	res.Findings = findings

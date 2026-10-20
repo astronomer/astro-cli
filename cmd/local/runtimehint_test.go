@@ -100,7 +100,7 @@ func TestCheckHintsAPackageTheRuntimeShips(t *testing.T) {
 	d, out, asked, pythons := hintDeps(t)
 	d.Checks = stubParser{report: numpyErrors()}
 	_ = execute(t, d, "local", "check")
-	want := "hint: Astro Runtime 3.1-12 ships numpy, but this project does not depend on it: add it with `uv add numpy`"
+	want := "hint: Astro Runtime 3.1-12 ships numpy, but this project does not depend on it: add it with uv add numpy"
 	if n := strings.Count(out.String(), want); n != 1 {
 		t.Errorf("want the hint once, got %d times:\n%s", n, out.String())
 	}
