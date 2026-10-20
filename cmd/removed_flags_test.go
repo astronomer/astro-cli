@@ -356,8 +356,10 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 					root, preRuns := disarmedTree(t, c.tree)
 					target, _, err := root.Find(c.args)
 					require.NoError(t, err)
-					if f := findRemovedFlag(target, c.flag); f != nil {
-						reached[f] = true
+					for _, v2Only := range []bool{false, true} {
+						if f := findRemovedFlagIn(target, c.flag, v2Only); f != nil {
+							reached[f] = true
+						}
 					}
 					if asJSON && !cliout.HasOutput(target) {
 						t.Skip("no --output here: an astro api request prints the API's response")
@@ -385,6 +387,20 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 	for i := range removedFlags {
 		assert.True(t, reached[&removedFlags[i]], "removedFlags[%d] (--%s) has no case in removedFlagCases", i, removedFlags[i].name)
 	}
+}
+
+// A v2Only entry answers on its command whatever comes before it in
+// removedFlags: a general entry for the same name, first in the list, does
+// not shadow env list's.
+func TestAV2OnlyEntryIsNotShadowedByAGeneralOne(t *testing.T) {
+	orig := removedFlags
+	t.Cleanup(func() { removedFlags = orig })
+	removedFlags = append([]removedFlag{{name: "workspace-id", reason: says("a general entry")}}, orig...)
+
+	root, _ := disarmedTree(t, astroTree)
+	_, _, err := executeRoot(root, "env", "list", "--workspace-id", "ws-id")
+	require.Error(t, err)
+	assert.Equal(t, "--workspace-id was removed in Astro CLI v2: "+errEnvListWorkspaceIDRemoved, err.Error())
 }
 
 // --force's message changes when the run passed --yes already, ahead of it:

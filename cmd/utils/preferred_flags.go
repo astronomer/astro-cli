@@ -28,7 +28,7 @@ func RefuseEmpty(f *pflag.Flag) {
 
 func refusesEmpty(f *pflag.Flag) bool {
 	_, ok := f.Annotations[nonEmptyAnnotation]
-	return ok || aliasOf(f) != ""
+	return ok
 }
 
 // AddAlias registers --old (and the shorthand 1.x gave it) on fs, hidden, as
@@ -62,7 +62,9 @@ func aliasOf(f *pflag.Flag) string {
 // preferred spelling is met by the alias too. Of two aliases of one flag
 // given without it (1.x's --deployment-id and --deployment-name together),
 // the first by name is handed on and they need not agree, as 1.x read both.
-// An alias, or a flag marked with RefuseEmpty, given as "" is a usage error.
+// A flag marked with RefuseEmpty given as "" is a usage error. An alias given
+// as "" is not: 1.x took an empty --workspace-id as no workspace, and scripts
+// pass one from a variable that may be unset, so it still means the default.
 func ApplyAliases(fs *pflag.FlagSet) error {
 	var err error
 	fs.VisitAll(func(f *pflag.Flag) {

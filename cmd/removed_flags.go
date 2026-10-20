@@ -408,7 +408,7 @@ func removedFlagError(cmd *cobra.Command, err error) error {
 	v1 := v1FlagOn(cmd, typed, isShorthand)
 	if v1 == nil {
 		// A command 1.x did not have: only an entry made for it applies.
-		if f := findRemovedFlag(cmd, typed); f != nil && f.v2Only && !isShorthand {
+		if f := findRemovedFlagIn(cmd, typed, true); f != nil {
 			return cliout.Usage(&removedFlagErr{f.message(cmd, spelling)})
 		}
 		return nil
@@ -432,8 +432,15 @@ func shorthandRemoved(spelling, name string) string {
 }
 
 // findRemovedFlag returns the entry for the flag called name that applies on
-// cmd, or nil when none does.
+// cmd, a flag 1.x had there, or nil when none does.
 func findRemovedFlag(cmd *cobra.Command, name string) *removedFlag {
+	return findRemovedFlagIn(cmd, name, false)
+}
+
+// findRemovedFlagIn returns the entry for the flag called name that applies on
+// cmd among the v2Only entries, or among the others, so neither kind can
+// shadow the other whatever their order.
+func findRemovedFlagIn(cmd *cobra.Command, name string, v2Only bool) *removedFlag {
 	// `astro local stop -f`: stop still has --force, without the -f, so
 	// "--force was removed" would be false there.
 	if cmd.Flag(name) != nil {
@@ -441,7 +448,7 @@ func findRemovedFlag(cmd *cobra.Command, name string) *removedFlag {
 	}
 	for i := range removedFlags {
 		f := &removedFlags[i]
-		if f.name != name {
+		if f.name != name || f.v2Only != v2Only {
 			continue
 		}
 		if len(f.under) > 0 && !slices.ContainsFunc(f.under, func(path string) bool { return isUnder(cmd, path) }) {

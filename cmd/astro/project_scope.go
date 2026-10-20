@@ -122,17 +122,18 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 	if workspaceChosen(flags) {
 		return pick, nil
 	}
-	// A Deployment that is the command's scope, named and held by no link,
-	// is the scope as given: the project's workspace has no say in it.
-	if d != nil && d.scope && link == "" && (d.givenID || d.givenName) {
-		return pick, nil
-	}
 	if link != "" {
 		pick.workspace = m.Astro.Deployments[link].Workspace
 	} else if m.Astro.Workspace != "" {
 		pick.workspace = m.Astro.Workspace
 		pick.domain = m.Astro.WorkspaceDomain()
 		pick.organization = m.Astro.Organization
+		// A Deployment that is the command's scope, named and held by no
+		// link, is the scope as given: the project's workspace has no say
+		// in it, though the command still runs on the project's host.
+		if d != nil && d.scope && (d.givenID || d.givenName) {
+			pick.workspace = ""
+		}
 	}
 	return pick, nil
 }

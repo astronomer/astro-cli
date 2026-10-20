@@ -132,6 +132,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 
 	// Airflow-specific flags (persistent so they're inherited by subcommands)
 	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id")
+	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("deployment"))
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
 	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace", "W", "", "Workspace to look the Deployment up in, overriding the context's")

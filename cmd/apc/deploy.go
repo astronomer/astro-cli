@@ -71,6 +71,7 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().BoolP("prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
+	utils.RefuseEmpty(cmd.Flags().Lookup("deployment"))
 	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Workspace for the deploy, overriding the context")
 	utils.RefuseEmpty(cmd.Flags().Lookup("workspace"))
 	utils.AddAlias(cmd.Flags(), "workspace-id", "", "workspace")

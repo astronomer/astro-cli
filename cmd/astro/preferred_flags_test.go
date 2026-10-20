@@ -331,9 +331,11 @@ func TestEveryOneXSpellingReachesWhatTheV2SpellingDoes(t *testing.T) {
 	}
 }
 
-// An empty --deployment or --workspace, under either spelling, is a usage
-// error, on every command that takes one: an unset variable in a script must
-// not fall back to the context's workspace.
+// An empty --deployment or --workspace is a usage error, on every command
+// that takes one: an unset variable in a script must not fall back to the
+// context's workspace without a word. A 1.x spelling given as "" is not: 1.x
+// took it as the default, and a 1.x CI template passing --workspace-id "$WS"
+// with WS unset keeps working.
 func TestAnEmptyDeploymentOrWorkspaceIsRefused(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	uses := aliasUses(t)
@@ -341,15 +343,23 @@ func TestAnEmptyDeploymentOrWorkspaceIsRefused(t *testing.T) {
 	uses = append(uses, aliasUse{tree: "env", path: []string{"list"}, preferred: "deployment"}, aliasUse{tree: "env", path: []string{"list"}, preferred: "workspace"})
 	for i := range uses {
 		u := &uses[i]
-		spellings := []string{u.preferred}
-		if u.alias != "" {
-			spellings = append(spellings, u.alias)
+		where := u.tree + " " + strings.Join(u.path, " ")
+		_, err := resolveSpellings(t, u, "--"+u.preferred, "")
+		if assert.Error(t, err, "%s --%s \"\"", where, u.preferred) {
+			assert.True(t, cliout.IsUsage(err), "%v", err)
+			assert.EqualError(t, err, "--"+u.preferred+" cannot be empty")
 		}
-		for _, name := range spellings {
-			_, err := resolveSpellings(t, u, "--"+name, "")
-			if assert.Error(t, err, "%s %s --%s \"\"", u.tree, strings.Join(u.path, " "), name) {
-				assert.True(t, cliout.IsUsage(err), "%v", err)
-				assert.EqualError(t, err, "--"+name+" cannot be empty")
+		if u.alias == "" {
+			continue
+		}
+		args := [][]string{{"--" + u.alias, ""}}
+		if u.shorthand != "" {
+			args = append(args, []string{"-" + u.shorthand, ""})
+		}
+		for _, a := range args {
+			r, err := resolveSpellings(t, u, a...)
+			if assert.NoError(t, err, "%s %s \"\"", where, a[0]) {
+				assert.Equal(t, resolvedSpellings{}, r, "%s %s \"\" is the default", where, a[0])
 			}
 		}
 	}

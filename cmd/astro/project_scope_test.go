@@ -199,6 +199,49 @@ contexts:
 	mc.AssertExpectations(t)
 }
 
+// An unlinked Deployment named as the env scope still runs on the project's
+// host, with its organization's login; only the project's workspace has no
+// say, so it is neither looked up nor named.
+func TestEnvTakesAnUnlinkedDeploymentOnTheProjectDomain(t *testing.T) {
+	for _, args := range [][]string{
+		{"variable", "list", "--deployment", unlinkedDep},
+		{"variable", "list", "--deployment-id", unlinkedDep},
+		{"list", "--deployment", unlinkedDep},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			writeTestConfig(t, `context: astronomer-dev.io
+contexts:
+  astronomer-dev_io:
+    domain: astronomer-dev.io
+    token: Bearer dev-token
+    workspace: cldevworkspace00000000001
+    organization: dev-org
+  astronomer_io:
+    domain: astronomer.io
+    token: Bearer prod-token
+    workspace: clprodworkspace0000000001
+    organization: prod-org
+`)
+			inProject(t, testProjectManifest)
+			mc := new(astrov1_mocks.ClientWithResponsesInterface)
+			mc.On("ListEnvironmentObjectsWithResponse", mock.Anything, "prod-org", mock.MatchedBy(func(p *astrov1.ListEnvironmentObjectsParams) bool {
+				return p.DeploymentId != nil && *p.DeploymentId == unlinkedDep && p.WorkspaceId == nil
+			})).Return(&astrov1.ListEnvironmentObjectsResponse{
+				HTTPResponse: &http.Response{StatusCode: 200},
+				JSON200:      &astrov1.EnvironmentObjectsPaginated{},
+			}, nil)
+			astroV1Client = mc
+
+			out, err := execEnvCmd(args...)
+			require.NoError(t, err)
+			assert.Equal(t, "astronomer.io", os.Getenv("ASTRO_DOMAIN"))
+			assert.NotContains(t, out, "workspace")
+			assert.Contains(t, out, "using astronomer.io from pyproject.toml\n")
+			mc.AssertExpectations(t) // and no GetWorkspace: nothing else was expected
+		})
+	}
+}
+
 func TestEnvWithNoLoginForTheProjectDomainSaysSo(t *testing.T) {
 	writeTestConfig(t, `context: astronomer-dev.io
 contexts:
@@ -515,6 +558,27 @@ func TestEnvListHasNoOneXSpellings(t *testing.T) {
 
 // On the per-kind listings an unlinked Deployment id is the scope as given
 // too, under either spelling: nothing from the project's workspace applies.
+// deployment list --all chooses every workspace, so inside a project the
+// project's workspace has no say: it is neither looked up nor named.
+func TestDeploymentListAllIgnoresTheProjectWorkspace(t *testing.T) {
+	for _, flag := range []string{"-a", "--all"} {
+		t.Run(flag, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			inProject(t, testProjectManifest)
+			mc := new(astrov1_mocks.ClientWithResponsesInterface)
+			mc.On("ListDeploymentsWithResponse", mock.Anything, mock.Anything, mock.MatchedBy(func(p *astrov1.ListDeploymentsParams) bool {
+				return p.WorkspaceIds == nil
+			})).Return(projectDeploymentsResponse(otherDep), nil).Once()
+			astroV1Client = mc
+
+			out, err := execDeploymentCmd("list", flag)
+			require.NoError(t, err)
+			assert.NotContains(t, out, "pyproject.toml")
+			mc.AssertExpectations(t) // and no GetWorkspace: nothing else was expected
+		})
+	}
+}
+
 func TestEnvTakesAnUnlinkedDeploymentAsGivenInAProject(t *testing.T) {
 	for _, flag := range []string{"--deployment", "--deployment-id"} {
 		t.Run(flag, func(t *testing.T) {
