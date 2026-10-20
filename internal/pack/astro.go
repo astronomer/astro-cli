@@ -189,7 +189,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.Packages, breq.ProjectFiles, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, breq.Dependencies, breq.FindLinks, breq.Packages, breq.ProjectFiles, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -476,13 +476,23 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-func contentHash(base, platform string, deps, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
+func contentHash(base, platform string, deps, findLinks, packages []string, projectFiles string, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
 	}
 	writeField("base", base)
 	writeField("platform", platform)
+	if df.abs == "" {
+		// A generated build's Dockerfile is imagebuild's, not the project's,
+		// and it is as much the build as the inputs below: a change to how it
+		// installs is a different image from the same manifest, so it moves
+		// the tag rather than reusing one an older recipe built.
+		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base)))))
+	}
+	for _, l := range findLinks {
+		writeField("find-links", l)
+	}
 	if projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
 		if err != nil {

@@ -3,7 +3,6 @@ package imagebuild
 import (
 	"context"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,12 +76,47 @@ func TestBuildWritesRequirements(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
 	require.NoError(t, err)
 	assert.Equal(t, "pandas==2.2.0\nrequests\n", string(got))
-	// packages.txt must exist so the image's ONBUILD copy does not fail.
+	// packages.txt must exist so the Dockerfile's COPY of it does not fail.
 	assert.FileExists(t, filepath.Join(req.WorkDir, buildContextDir, packagesName))
-	// The Dockerfile is `FROM <base>` and sits outside the context dir.
+	// The Dockerfile starts FROM the base's -base tag, writes the runtime's
+	// ONBUILD steps out, and sits outside the context dir.
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
-	assert.Equal(t, "FROM "+req.BaseImage+"\n", string(df))
+	assert.Equal(t, "FROM "+req.BaseImage+"-base\n"+
+		"COPY packages.txt .\n"+
+		"USER root\n"+
+		"RUN if [ -x /usr/local/bin/install-system-packages ]; then /usr/local/bin/install-system-packages; "+
+		"elif [ -s packages.txt ]; then apt-get update && cat packages.txt | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n"+
+		"COPY requirements.txt .\n"+
+		"RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false "+
+		"if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; "+
+		"else pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; fi\n"+
+		"USER astro\n"+
+		"COPY --chown=astro:0 . .\n", string(df))
+}
+
+// Find-links pages lead the generated requirements.txt, one --find-links
+// line each, before the dependencies they serve.
+func TestBuildWritesFindLinks(t *testing.T) {
+	req := testRequest(t)
+	req.Dependencies = []string{"private-lib", "pandas"}
+	req.FindLinks = []string{"https://pypi.acme.example/simple/private-lib/"}
+
+	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	got, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, requirementsName))
+	require.NoError(t, err)
+	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n", string(got))
+}
+
+// The -base suffix is added once: a base already on a -base tag is not
+// suffixed again, and GeneratedDockerfile starts from the same image Build
+// does.
+func TestBaseOf(t *testing.T) {
+	assert.Equal(t, RuntimeImageRepo+":3.1-5-base", baseOf(RuntimeImageRepo+":3.1-5"))
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0-python-3.11-base", baseOf("quay.io/astronomer/astro-runtime:12.6.0-python-3.11"))
+	assert.Equal(t, RuntimeImageRepo+":3.1-base", baseOf(RuntimeImageRepo+":3.1-base"))
+	assert.True(t, strings.HasPrefix(GeneratedDockerfile(RuntimeImageRepo+":3.1"), "FROM "+RuntimeImageRepo+":3.1-base\n"))
 }
 
 func TestBuildWritesOSPackages(t *testing.T) {
@@ -153,9 +187,10 @@ func TestBuildSkipsWhenNothingToInstall(t *testing.T) {
 
 	image, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
-	// Nothing to install: no build runs and the base image is returned as-is.
+	// Nothing to install: no build runs and the base's -base image is
+	// returned as-is, the one a build would have started FROM.
 	assert.Empty(t, cmd.calls, "no build may run with nothing to install, got %v", cmd.calls)
-	assert.Equal(t, req.BaseImage, image)
+	assert.Equal(t, req.BaseImage+"-base", image)
 	// No context is assembled on the skip path.
 	assert.NoDirExists(t, filepath.Join(req.WorkDir, buildContextDir))
 }
@@ -170,7 +205,7 @@ func TestBuildAirflowOnlyDepsSkip(t *testing.T) {
 	image, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
 	assert.Empty(t, cmd.calls, "airflow-only deps must not trigger a build, got %v", cmd.calls)
-	assert.Equal(t, req.BaseImage, image)
+	assert.Equal(t, req.BaseImage+"-base", image)
 }
 
 func TestBuildFailedInstallReturnsNamedError(t *testing.T) {
@@ -671,31 +706,21 @@ func TestBuildGeneratedModePassesOnlyTheNetrcSecret(t *testing.T) {
 	}
 }
 
-// A generated build that fails with the netrc secret on a runtime image whose
-// install step does not mount it says so, since the build output shows only
-// an authentication failure.
-func TestGeneratedBuildFailureNamesARuntimeWithoutTheNetrcMount(t *testing.T) {
-	for name, onBuild := range map[string]string{
-		"without the mount": `["RUN /usr/local/bin/install-python-dependencies"]`,
-		"with the mount":    `["RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false /usr/local/bin/install-python-dependencies"]`,
-	} {
-		cmd := &fakeCmd{run: func(call string, s rt.Stdio) error {
-			if strings.Contains(call, "image inspect") {
-				_, err := io.WriteString(s.Out, onBuild)
-				return err
-			}
-			return errors.New("exit status 1")
-		}}
-		req := testRequest(t)
-		req.Dependencies = []string{"example-lib @ git+https://github.com/example-org/example-lib.git"}
-		req.Secrets = []string{"id=netrc,env=NETRC_CONTENT"}
+// The netrc secret reaches the install on every runtime, because the mount is
+// the generated Dockerfile's own step rather than the base's ONBUILD trigger,
+// which runtimes before the mount lack. So a failed build has nothing to ask
+// the base about: it runs the build and nothing else.
+func TestGeneratedBuildMountsNetrcWhateverTheBase(t *testing.T) {
+	cmd := &fakeCmd{run: func(string, rt.Stdio) error { return errors.New("exit status 1") }}
+	req := testRequest(t)
+	req.Dependencies = []string{"example-lib @ git+https://github.com/example-org/example-lib.git"}
+	req.Secrets = []string{"id=netrc,env=NETRC_CONTENT"}
 
-		_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
-		if err == nil {
-			t.Fatalf("%s: want the build to fail", name)
-		}
-		if got, want := strings.Contains(err.Error(), "does not mount the netrc build secret"), name == "without the mount"; got != want {
-			t.Errorf("%s: err = %v, want the missing mount named: %v", name, err, want)
-		}
-	}
+	_, err := testBuilder(cmd).Build(context.Background(), req, rt.Callbacks{})
+	require.Error(t, err)
+	require.Len(t, cmd.calls, 1, "the build alone, got %v", cmd.calls)
+	assert.Contains(t, cmd.calls[0], "--secret id=netrc,env=NETRC_CONTENT")
+	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(df), "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false ")
 }

@@ -2,6 +2,7 @@ package pack
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -299,6 +300,32 @@ func TestAstroBuildTagIsContentAddressed(t *testing.T) {
 	edited, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
 	require.NoError(t, err)
 	assert.NotEqual(t, first.Image, edited.Image, "an edited project file moves the tag")
+
+	// A source routed to an index changes where the install looks, so it
+	// moves the tag too.
+	req = testRequest(t)
+	req.Manifest.UV.Sources = map[string]string{"private-lib": "https://pypi.acme.example/simple/"}
+	routed, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.NotEqual(t, first.Image, routed.Image, "an index source moves the tag")
+}
+
+// A generated build's Dockerfile is part of its address: the same inputs over
+// another recipe are another image. A declared Dockerfile is hashed by its own
+// bytes instead, so the generated recipe does not reach it.
+func TestContentHashCoversTheGeneratedRecipe(t *testing.T) {
+	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
+	generated, err := contentHash(base, "linux/amd64", nil, nil, nil, "", declaredDockerfile{})
+	require.NoError(t, err)
+
+	h := sha256.New()
+	fmt.Fprintf(h, "%s\x00%s\x00", "base", base)
+	fmt.Fprintf(h, "%s\x00%s\x00", "platform", "linux/amd64")
+	withoutRecipe := fmt.Sprintf("%x", h.Sum(nil))[:7]
+	assert.NotEqual(t, withoutRecipe, generated, "the generated Dockerfile is hashed")
+
+	fmt.Fprintf(h, "%s\x00%x\x00", "generated-dockerfile", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base))))
+	assert.Equal(t, fmt.Sprintf("%x", h.Sum(nil))[:7], generated)
 }
 
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {

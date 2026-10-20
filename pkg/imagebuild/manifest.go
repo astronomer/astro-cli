@@ -36,6 +36,7 @@ func ManifestBuildOf(dir string, m *manifest.Manifest) ManifestBuild {
 		RequiresPython: m.Project.RequiresPython,
 		Dockerfile:     m.Astro.Dockerfile,
 		Dependencies:   m.Requirements(),
+		FindLinks:      m.UV.IndexPages(),
 		Packages:       m.Astro.Packages,
 	}
 }
@@ -116,6 +117,7 @@ func ForLocalManifest(ctx context.Context, m ManifestBuild, o runtimeversions.Op
 func forManifestWith(ctx context.Context, m ManifestBuild, ships bool, base BaseImageFunc) (Request, error) {
 	req := Request{
 		Dependencies: m.Dependencies,
+		FindLinks:    m.FindLinks,
 		Packages:     m.Packages,
 	}
 	if m.Dockerfile != "" {
@@ -148,9 +150,9 @@ func (r *Request) FromDeclaredDockerfile() bool {
 // image in the local store, built at req.Platform when one is set.
 //
 // Build's fast path, which returns the runtime base unbuilt when there is
-// nothing to install, is skipped here, and the one-line `FROM <base>` is built
-// anyway (the runtime image's ONBUILD triggers run over the empty
-// requirements.txt and packages.txt and install nothing). Pulling the base
+// nothing to install, is skipped here, and the generated Dockerfile is built
+// anyway (its install steps run over the empty requirements.txt and
+// packages.txt and install nothing). Pulling the base
 // instead is not enough. The base tag names a multi-platform index, and with
 // Docker's containerd image store and only a foreign platform pulled (amd64 on
 // an arm64 machine), `docker image inspect` without --platform reads an empty

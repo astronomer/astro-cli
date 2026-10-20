@@ -24,6 +24,9 @@ func fullManifest() *manifest.Manifest {
 			Dockerfile: "docker/Dockerfile",
 			Packages:   []string{"libpq-dev"},
 		},
+		UV: manifest.UV{
+			Sources: map[string]string{"private-lib": "https://pypi.acme.example/simple/"},
+		},
 	}
 }
 
@@ -51,6 +54,7 @@ func TestManifestBuildOf(t *testing.T) {
 		RequiresPython: "==3.13.*",
 		Dockerfile:     "docker/Dockerfile",
 		Dependencies:   []string{"apache-airflow==3.1.*", "pandas"},
+		FindLinks:      []string{"https://pypi.acme.example/simple/private-lib/"},
 		Packages:       []string{"libpq-dev"},
 	}, ManifestBuildOf("/project", fullManifest()))
 

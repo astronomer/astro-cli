@@ -69,6 +69,10 @@ type ManifestBuild struct {
 	// Dependencies are [project] dependencies (PEP 508), as
 	// manifest.Requirements gives them.
 	Dependencies []string
+	// FindLinks are the per-package pages of the indexes [tool.uv.sources]
+	// routes a dependency to (manifest.UV.IndexPages), which a generated
+	// image's install searches besides PyPI.
+	FindLinks []string
 	// Packages are [tool.astro] packages, OS (apt) package names.
 	Packages []string
 }
@@ -84,6 +88,7 @@ func (p Plan) ManifestBuild(projectDir string) ManifestBuild {
 		RequiresPython: p.RequiresPython,
 		Dockerfile:     p.Dockerfile,
 		Dependencies:   p.Dependencies,
+		FindLinks:      p.FindLinks,
 		Packages:       p.Packages,
 	}
 }
@@ -97,6 +102,7 @@ func (p *Plan) SetManifestBuild(mb ManifestBuild) {
 	p.RequiresPython = mb.RequiresPython
 	p.Dockerfile = mb.Dockerfile
 	p.Dependencies = mb.Dependencies
+	p.FindLinks = mb.FindLinks
 	p.Packages = mb.Packages
 }
 
@@ -117,12 +123,15 @@ type BuildRequest struct {
 	Dockerfile string
 	Context    string
 	// Secrets are docker build --secret specs. A generated build passes on
-	// only the netrc one, which the runtime image mounts while it installs.
+	// only the netrc one, which its Python install mounts.
 	Secrets []string
 	// Tag is the image reference the build produces.
 	Tag string
 	// Dependencies are the manifest's Python dependencies (PEP 508).
 	Dependencies []string
+	// FindLinks are pages the Python install searches besides PyPI
+	// (ManifestBuild.FindLinks).
+	FindLinks []string
 	// Packages are the manifest's OS (apt) package names.
 	Packages []string
 	// Bin is the container CLI to shell out to; Env reaches its daemon.

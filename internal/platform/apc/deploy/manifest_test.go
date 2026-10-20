@@ -208,7 +208,7 @@ func TestDeployManifestImageToAnImageDeployment(t *testing.T) {
 	}, res)
 	assert.Empty(t, warnings)
 	require.Len(t, cmd.dockerfiles, 1)
-	assert.Equal(t, "FROM astrocrpublic.azurecr.io/runtime:3.1-5\n", cmd.dockerfiles[0], "the newest build Houston lists for the pin")
+	assert.Equal(t, imagebuild.GeneratedDockerfile("astrocrpublic.azurecr.io/runtime:3.1-5"), cmd.dockerfiles[0], "the newest build Houston lists for the pin")
 	assert.True(t, cmd.called("--platform linux/amd64"), "%v", cmd.calls)
 	assert.True(t, cmd.called("--label io.astronomer.skip.revision=true --label io.astronomer.deploy.revision.description=ship it"), "%v", cmd.calls)
 	assert.True(t, cmd.called("docker push registry.example.com/my-release/airflow:deploy-7"), "%v", cmd.calls)
@@ -225,7 +225,7 @@ func TestDeployManifestImageAirflow2(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "12.1.1", res.RuntimeVersion)
 	require.Len(t, cmd.dockerfiles, 1)
-	assert.Equal(t, "FROM quay.io/astronomer/astro-runtime:12.1.1\n", cmd.dockerfiles[0])
+	assert.Equal(t, imagebuild.GeneratedDockerfile("quay.io/astronomer/astro-runtime:12.1.1"), cmd.dockerfiles[0])
 }
 
 // Airflow 2 to 3 is an upgrade Houston allows, from any Airflow 2 runtime,
