@@ -294,8 +294,10 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		// a floating tag ("12") is no one build, and stays as it was. Nor does
 		// a build older than runtime 9 (Airflow 2.7), which no image is built
 		// FROM: the pin "2" moves it to the newest Airflow 2, and the note
-		// says the minor was not read.
-		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly {
+		// says the minor was not read. Nor does a mirror: a generated build
+		// pulls the build from Astronomer's own repository, so the file is
+		// the only record of where this project's base comes from.
+		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly && image == airflow2RuntimeImage {
 			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build && runtimeMajor(bare) >= minAirflow2Runtime {
 				from1x.runtime = bare
 				notes = nil
@@ -653,6 +655,12 @@ func stripComment(line string) string {
 // pkg/imagebuild builds no image (a copy, as runtimeTagRe is, since this
 // module does not import that one).
 const minAirflow2Runtime = 9
+
+// airflow2RuntimeImage is the repository a generated Airflow 2 build pulls
+// its base from (pkg/imagebuild's airflow2ImageRepo), and so the one whose
+// build a conversion can record as [tool.astro] runtime without losing where
+// the base comes from.
+const airflow2RuntimeImage = "quay.io/astronomer/astro-runtime"
 
 // runtimeMajor is the leading number of a runtime version, or 0.
 func runtimeMajor(tag string) int {

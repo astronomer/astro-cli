@@ -729,9 +729,11 @@ func toManifestDeployGit(g astrodeploy.ManifestDeployGit) manifestdeploy.Git {
 // cloud/deploy transport.
 func (d manifestDeployer) DeployImage(in *manifestdeploy.ImageDeploy) (manifestdeploy.ImageResult, error) {
 	res, err := astrodeploy.DeployManifestImage(astrodeploy.ManifestImageDeployInput{
-		Login:         &d.login.context,
-		Build:         in.Build,
-		Catalog:       func() *runtimeversions.Catalog { return runtimecatalog.ImageCatalog(context.Background()) },
+		Login: &d.login.context,
+		Build: in.Build,
+		Catalog: func() *runtimeversions.Catalog {
+			return runtimecatalog.ForBuild(in.Build.AirflowVersion)(context.Background())
+		},
 		DeploymentID:  in.DeploymentID,
 		BuildSecrets:  in.BuildSecrets,
 		ImageName:     in.ImageName,

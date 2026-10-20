@@ -8,6 +8,7 @@ package runtimecatalog
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/astronomer/astro-cli/pkg/localrt"
@@ -63,16 +64,28 @@ func CheckRuntime(ctx context.Context, runtime, airflowPin string) ([]runtimever
 const catalogTimeout = 3 * time.Second
 
 // ImageCatalog reads the catalog for a deploy or `astro package astro` about
-// to build a generated image, at the catalog's default timeout: an Airflow 2
-// base with no [tool.astro] runtime is named only by the catalog, and has no
-// fallback, and the build it precedes takes far longer than the wait. nil
-// when no fresh cache, fetch or stale cache works, as Catalog.
+// to build a generated Airflow 2 image, at the catalog's default timeout: an
+// Airflow 2 base with no [tool.astro] runtime is named only by the catalog,
+// and has no fallback, and the build it precedes takes far longer than the
+// wait. nil when no fresh cache, fetch or stale cache works, as Catalog.
 func ImageCatalog(ctx context.Context) *runtimeversions.Catalog {
 	c, _, err := runtimeversions.Load(ctx, Options(0))
 	if err != nil {
 		return nil
 	}
 	return c
+}
+
+// ForBuild is the catalog reader for an image build of this Airflow pin:
+// ImageCatalog for Airflow 2, whose base needs the catalog, and Catalog for
+// anything else, which only picks a Python and has the runtime's default to
+// fall back on, so an offline build waits seconds rather than the default
+// timeout.
+func ForBuild(airflowPin string) func(context.Context) *runtimeversions.Catalog {
+	if pin := strings.TrimSpace(airflowPin); pin == "2" || strings.HasPrefix(pin, "2.") {
+		return ImageCatalog
+	}
+	return Catalog
 }
 
 // Catalog reads the catalog for an edit that moves the Airflow pin, and for a

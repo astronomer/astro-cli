@@ -162,8 +162,9 @@ type Deps struct {
 	// [tool.astro] runtime. nil, or a nil result, means no catalog: the image
 	// runs the runtime's default Python, and an Airflow 2 project with no
 	// runtime named is refused. Production reads it through
-	// runtimecatalog.ImageCatalog, which waits longer than RuntimeCatalog.
-	ImageCatalog func(ctx context.Context) *runtimeversions.Catalog
+	// runtimecatalog.ForBuild, which waits longer than RuntimeCatalog for an
+	// Airflow 2 pin, whose base has no fallback, and as long for any other.
+	ImageCatalog func(ctx context.Context, airflowPin string) *runtimeversions.Catalog
 
 	// LaunchOtto starts an interactive Otto session with prompt as its first
 	// message and waits for it to end, as `astro otto "<prompt>"` does. The
@@ -229,7 +230,9 @@ func NewDeps() Deps {
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
 		RuntimeCatalog:   runtimecatalog.Catalog,
-		ImageCatalog:     runtimecatalog.ImageCatalog,
+		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
+			return runtimecatalog.ForBuild(airflowPin)(ctx)
+		},
 	}
 	// One resolution of the routes dir for the whole run. Without a home the
 	// runtime is a stand-in whose every call says so; commands that never
