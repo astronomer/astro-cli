@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli
 
-go 1.26.1
+go 1.26.10
 
 tool (
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
