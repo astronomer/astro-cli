@@ -341,14 +341,14 @@ func TestContentHashCoversTheGeneratedRecipeAndItsInputs(t *testing.T) {
 	assert.NotEqual(t, hash("recipe one", declaredDockerfile{}), hash("recipe two", declaredDockerfile{}),
 		"a changed generated recipe moves the tag")
 
-	manifest := hash("recipe", declaredDockerfile{})
+	first := hash("recipe", declaredDockerfile{})
 	write("pyproject.toml", "[project]\ndependencies = ['pandas']\n")
 	edited := hash("recipe", declaredDockerfile{})
 	write("uv.lock", "version = 1\n")
 	locked := hash("recipe", declaredDockerfile{})
 	write("uv.lock", "version = 1\n# relocked\n")
 	relocked := hash("recipe", declaredDockerfile{})
-	assert.NotEqual(t, manifest, edited, "pyproject.toml is hashed")
+	assert.NotEqual(t, first, edited, "pyproject.toml is hashed")
 	assert.NotEqual(t, edited, locked, "uv.lock is hashed")
 	assert.NotEqual(t, locked, relocked, "editing uv.lock moves the tag")
 
