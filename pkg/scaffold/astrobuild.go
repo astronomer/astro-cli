@@ -76,13 +76,18 @@ var (
 // pins are the runtime pins to write in place of the ones there. nil means
 // they are not known (no network, say): the ones there stay, less any package
 // the project now lists or constrains itself.
-func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins) error {
-	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
-		return setAstroBuild(before, ed, b, pins)
+//
+// pinsRefused reports runtime pins that were not written because the array
+// cannot hold the comments that mark them: a [tool.uv] written as an inline
+// table. The rest was written; the caller says why the pins were not.
+func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversions.AstroBuild, pins *RuntimePins) (pinsRefused bool, err error) {
+	err = EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+		return setAstroBuild(before, ed, b, pins, &pinsRefused)
 	})
+	return pinsRefused, err
 }
 
-func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, pins *RuntimePins) error {
+func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, pins *RuntimePins, pinsRefused *bool) error {
 	dists := b.Dists()
 	if b.Airflow == "" {
 		dists = nil
@@ -90,9 +95,11 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := checkNotTheUsers(ed, dists); err != nil {
 		return err
 	}
-	if err := setAstroPins(before, ed, b, dists, pins); err != nil {
+	refused, err := setAstroPins(before, ed, b, dists, pins)
+	if err != nil {
 		return err
 	}
+	*pinsRefused = refused
 	if err := setAstroSources(ed, dists); err != nil {
 		return err
 	}
@@ -175,33 +182,57 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 // constraint is the build's when it names one of the rebuilt distributions at
 // an +astro version, and a runtime pin when it follows the comment that heads
 // them (manifest.RuntimePinsIn).
-func setAstroPins(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) error {
+//
+// The project's constraints ahead of the runtime pins and after them both stay
+// where they are. refused reports runtime pins left out because the array
+// cannot carry the comments that mark them (tomledit.ErrCommentsUnsupported);
+// the rest is written.
+func setAstroPins(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) (refused bool, err error) {
 	lines, _ := ed.GetLines(constraintsKey)
-	head, current, _, _ := manifest.RuntimePinsIn(lines)
-	var kept []any
-	for _, v := range head {
-		if s, _ := v.(string); manifest.AstroPin(s) {
-			continue
-		}
-		kept = append(kept, v)
-	}
+	head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
+	head, tail = withoutAstroPins(head), withoutAstroPins(tail)
 	if len(dists) > 0 {
-		kept = append(kept, asAny(b.Pins())...)
+		head = append(head, asAny(b.Pins())...)
 	}
-	own := ownPackages(before, kept)
+	own := ownPackages(before, ed, slices.Concat(head, tail))
+	var managed []any
 	if pins == nil {
-		kept = append(kept, keptRuntimePins(current, own)...)
+		managed = keptRuntimePins(current, own)
 	} else {
-		kept = append(kept, pins.lines(own)...)
+		managed = pins.lines(own)
 	}
-	if reflect.DeepEqual(kept, lines) {
-		return nil
+	out := slices.Concat(head, managed, tail)
+	if reflect.DeepEqual(out, lines) {
+		return false, nil
 	}
-	if !slices.ContainsFunc(kept, func(v any) bool { _, isComment := v.(tomledit.Comment); return !isComment }) {
+	err = setConstraints(ed, out)
+	if errors.Is(err, tomledit.ErrCommentsUnsupported) && len(managed) > 0 {
+		return true, setConstraints(ed, slices.Concat(head, tail))
+	}
+	return false, err
+}
+
+// setConstraints writes lines as constraint-dependencies, or takes the key
+// out when they hold no constraint, comments alone being nothing to keep.
+func setConstraints(ed tomledit.Editor, lines []any) error {
+	if !slices.ContainsFunc(lines, func(v any) bool { _, isComment := v.(tomledit.Comment); return !isComment }) {
 		ed.Delete(constraintsKey)
 		return nil
 	}
-	return ed.Set(constraintsKey, kept)
+	return ed.Set(constraintsKey, lines)
+}
+
+// withoutAstroPins is lines without the constraints that hold Airflow to a
+// build (manifest.AstroPin), which setAstroPins writes again.
+func withoutAstroPins(lines []any) []any {
+	var out []any
+	for _, v := range lines {
+		if s, _ := v.(string); manifest.AstroPin(s) {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
 }
 
 // setAstroSources points each rebuilt distribution at the index, and takes

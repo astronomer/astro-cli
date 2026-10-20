@@ -29,12 +29,13 @@ type RuntimePins struct {
 	Pins []string
 }
 
-// lines are the pins as SetAstroBuild writes them, the comments first, less
-// the ones it never writes: a package the project lists or constrains itself
-// (own), which it chooses the version of; Airflow, the Task SDK and core,
-// which b's pins hold; and any other of Astronomer's own builds (an +astro
-// local version), which come from an index the project reads for Airflow
-// alone. None at all when nothing is left.
+// lines are the pins as SetAstroBuild writes them, between the comments that
+// head them and manifest.RuntimePinsEnd, less the ones it never writes: a
+// package the project lists or constrains itself (own), which it chooses the
+// version of; Airflow, the Task SDK and core, which b's pins hold; and any
+// other of Astronomer's own builds (an +astro local version), which come from
+// an index the project reads for Airflow alone. None at all when nothing is
+// left.
 func (p *RuntimePins) lines(own map[string]bool) []any {
 	var pins []string
 	for _, pin := range p.Pins {
@@ -50,47 +51,79 @@ func (p *RuntimePins) lines(own map[string]bool) []any {
 	slices.SortStableFunc(pins, func(a, b string) int {
 		return strings.Compare(manifest.DistName(a), manifest.DistName(b))
 	})
-	out := make([]any, 0, len(pins)+2)
+	var out []any
 	for _, c := range manifest.RuntimePinsComments(p.Build, p.Python) {
 		out = append(out, tomledit.Comment(c))
 	}
-	return append(out, asAny(pins)...)
+	out = append(out, asAny(pins)...)
+	return append(out, tomledit.Comment(manifest.RuntimePinsEnd))
 }
 
 // keptRuntimePins are the runtime pins already there, as manifest.RuntimePinsIn
 // split them off, kept when the new ones are not known, less any package the
 // project now lists or constrains itself (own): a `uv add` of one of them,
 // which could only lock beside the pin, takes the version over at the next
-// write, online or not.
+// write, online or not. A block written without the end comment gains it.
 func keptRuntimePins(current []any, own map[string]bool) []any {
 	var out []any
 	values := 0
+	ended := false
 	for _, v := range current {
-		if s, isString := v.(string); isString {
-			if own[manifest.DistName(s)] {
+		switch v := v.(type) {
+		case string:
+			if own[manifest.DistName(v)] {
 				continue
 			}
 			values++
+		case tomledit.Comment:
+			ended = ended || string(v) == manifest.RuntimePinsEnd
 		}
 		out = append(out, v)
 	}
 	if values == 0 {
 		return nil
 	}
+	if !ended {
+		out = append(out, tomledit.Comment(manifest.RuntimePinsEnd))
+	}
 	return out
 }
 
+// Where a project lists packages beyond [project] dependencies: its extras,
+// and its dependency groups, the dev group `uv add --dev` writes among them.
+var (
+	optionalDepsKey     = []string{"project", "optional-dependencies"}
+	dependencyGroupsKey = []string{"dependency-groups"}
+)
+
 // ownPackages are the distributions the project chooses the version of: the
-// ones [project] dependencies lists, and the ones constraints, the
-// constraint-dependencies kept ahead of the runtime pins, name.
-func ownPackages(before *manifest.Manifest, constraints []any) map[string]bool {
+// ones it lists, in [project] dependencies, [project.optional-dependencies]
+// or [dependency-groups], and the ones constraints, its own lines of
+// constraint-dependencies, name. A runtime pin on one of them would leave
+// `uv add --dev 'pytest>=9'` nothing to lock where the image ships pytest 8.
+func ownPackages(before *manifest.Manifest, ed tomledit.Editor, constraints []any) map[string]bool {
 	own := map[string]bool{}
-	for _, dep := range before.Project.Dependencies {
-		own[manifest.DistName(dep)] = true
-	}
-	for _, v := range constraints {
+	add := func(v any) {
+		// A dependency group can include another, as a table; that one is
+		// read where it is defined.
 		if s, isString := v.(string); isString {
 			own[manifest.DistName(s)] = true
+		}
+	}
+	for _, dep := range before.Project.Dependencies {
+		add(dep)
+	}
+	for _, v := range constraints {
+		add(v)
+	}
+	for _, key := range [][]string{optionalDepsKey, dependencyGroupsKey} {
+		tables, _ := ed.Get(key)
+		groups, _ := tables.(map[string]any)
+		for _, group := range groups {
+			list, _ := group.([]any)
+			for _, v := range list {
+				add(v)
+			}
 		}
 	}
 	return own
@@ -114,9 +147,10 @@ var errRuntimeUnknown = errors.New("which Astro Runtime this project builds on c
 //     ("3.3", "12") the newest published build the tag serves; the Python
 //     its tag names, or else the build's own;
 //   - [tool.astro] runtime;
-//   - the Airflow pin: the newest published build of an Airflow 3 pin's
-//     series, which is what the series tag serves, or of an Airflow 2 pin, as
-//     the generated image picks it.
+//   - the Airflow pin: the newest published build carrying a release the pin
+//     covers, an exact patch when the pin names one. That is the release
+//     runtimeversions.LookupAstroBuild holds Airflow to, so the runtime pins
+//     and the Airflow pin are of one release.
 //
 // For the last two the Python is the one the generated image runs
 // (runtimeversions.Runtime.ImagePython): the build's default when
@@ -139,12 +173,8 @@ func RuntimeBuildFor(dir string, m *manifest.Manifest, c *runtimeversions.Catalo
 		if c == nil {
 			return "", "", errRuntimeUnknown
 		}
-		pin := airflow.Pin
-		if airflow.Major() == "3" {
-			pin = airflow.Series()
-		}
 		var ok bool
-		if build, ok = c.NewestPublishedRuntimeFor(pin); !ok || pin == "" {
+		if build, ok = c.NewestPublishedRuntimeFor(airflow.Pin); !ok || airflow.Pin == "" {
 			return "", "", ErrNoRuntimeBuild
 		}
 	}

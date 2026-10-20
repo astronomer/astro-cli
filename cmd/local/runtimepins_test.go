@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
+	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 )
 
@@ -32,31 +33,65 @@ var freeze339 = []string{
 // it printed, and the build and Python the list was asked for.
 func startWithPins(t *testing.T, src string, freeze []string, err error) (got, out string, asked []string) {
 	t.Helper()
+	r := pinsRun{src: src, build: build332, freeze: freeze, freezeErr: err}.start(t)
+	return r.manifest, r.out, r.freezeAsked
+}
+
+// pinsRun is one `astro local start` against src, with files written beside
+// it, the build lookup answering build and lookupErr, the catalog listing
+// pinsCatalog, and the package list answering freeze and freezeErr.
+type pinsRun struct {
+	src                  string
+	files                map[string]string
+	build                runtimeversions.AstroBuild
+	lookupErr, freezeErr error
+	freeze               []string
+}
+
+// pinsResult is what a pinsRun left: the manifest, what it printed, and what
+// the build lookup and the package list were asked.
+type pinsResult struct {
+	manifest, out            string
+	lookupAsked, freezeAsked []string
+}
+
+func (p pinsRun) start(t *testing.T) pinsResult {
+	t.Helper()
 	d, stdout := testDeps(t)
 	stderr := &bytes.Buffer{}
 	d.Stderr = stderr
 	dir := t.TempDir()
 	path := filepath.Join(dir, "pyproject.toml")
-	if werr := os.WriteFile(path, []byte(src), 0o600); werr != nil {
-		t.Fatal(werr)
+	if err := os.WriteFile(path, []byte(p.src), 0o600); err != nil {
+		t.Fatal(err)
 	}
+	for name, body := range p.files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var res pinsResult
 	d.WorkingDir = func() (string, error) { return dir, nil }
-	d.AstroBuild = func(context.Context, string, string) (runtimeversions.AstroBuild, error) { return build332, nil }
-	c, perr := runtimeversions.Parse([]byte(pinsCatalog))
-	if perr != nil {
-		t.Fatal(perr)
+	d.AstroBuild = func(_ context.Context, pin, runtime string) (runtimeversions.AstroBuild, error) {
+		res.lookupAsked = append(res.lookupAsked, pin, runtime)
+		return p.build, p.lookupErr
+	}
+	c, err := runtimeversions.Parse([]byte(pinsCatalog))
+	if err != nil {
+		t.Fatal(err)
 	}
 	d.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { return c }
 	d.RuntimePins = func(_ context.Context, build, python string) ([]string, error) {
-		asked = append(asked, build, python)
-		return freeze, err
+		res.freezeAsked = append(res.freezeAsked, build, python)
+		return p.freeze, p.freezeErr
 	}
 	_ = execute(t, d, "local", "start")
-	data, rerr := os.ReadFile(path)
-	if rerr != nil {
-		t.Fatal(rerr)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-	return string(data), stdout.String() + stderr.String(), asked
+	res.manifest, res.out = string(data), stdout.String()+stderr.String()
+	return res
 }
 
 func TestStartWritesTheRuntimePins(t *testing.T) {
@@ -111,5 +146,89 @@ func TestStartTakesOutTheRuntimePinsOfABuildWithNoList(t *testing.T) {
 	}
 	if !strings.Contains(out, "no longer holds packages") {
 		t.Errorf("the start did not say it took the pins out:\n%s", out)
+	}
+}
+
+// A project with its own exclude-newer reads no package list, as under
+// UV_EXCLUDE_NEWER: pins newer than its cutoff would leave uv nothing to lock.
+func TestStartReadsNoRuntimePinsUnderTheProjectsCutoff(t *testing.T) {
+	src := buildManifest + "\n[tool.uv]\nexclude-newer = \"1 week\"\n"
+	r := pinsRun{src: src, build: build332, freeze: freeze339}.start(t)
+	if len(r.freezeAsked) != 0 || strings.Contains(r.manifest, "Astro Runtime") {
+		t.Errorf("the list was read (%q) under the project's cutoff:\n%s", r.freezeAsked, r.manifest)
+	}
+}
+
+// The pin moved while the index cannot be read: what carries it is not known,
+// so the pins stay, and the start says so.
+func TestStartKeepsTheRuntimePinsWhenAMovedPinCannotBeChecked(t *testing.T) {
+	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	moved := strings.Replace(written, "apache-airflow==3.3.*", "apache-airflow==3.2.*", 1)
+	r := pinsRun{src: moved, lookupErr: errors.New("dial tcp: no route to host")}.start(t)
+	if !strings.Contains(r.manifest, "'pandas==2.2.3'") {
+		t.Errorf("the runtime pins were taken out offline:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.out, "keeps the runtime pins it has") {
+		t.Errorf("the start did not say it kept them:\n%s", r.out)
+	}
+}
+
+// The runtime pins and the Airflow pin are of one release, or none are
+// written: here the image's list carries 3.3.1 and the lookup 3.3.2.
+func TestStartWritesNoRuntimePinsOfAnotherRelease(t *testing.T) {
+	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
+	r := pinsRun{src: buildManifest, build: build332, freeze: other}.start(t)
+	if strings.Contains(r.manifest, "Astro Runtime") || strings.Contains(r.manifest, "pandas") {
+		t.Errorf("pins of another Airflow release were written:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.out, "carries Airflow 3.3.1, and the Airflow requirement holds it to 3.3.2") {
+		t.Errorf("the start did not say why:\n%s", r.out)
+	}
+}
+
+// The check's hint guesses where the pins do not: a FROM built from an
+// argument, or a runtime the catalog does not list, asks about the pin's
+// newest build.
+func TestRuntimeImageOfFallsBackToThePinsNewestBuild(t *testing.T) {
+	c, err := runtimeversions.Parse([]byte(pinsCatalog))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cli := &cli{d: Deps{RuntimeCatalog: func(context.Context) *runtimeversions.Catalog { return c }}}
+	for name, src := range map[string]string{
+		"ARG FROM":         strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\ndockerfile = 'Dockerfile'\n", 1),
+		"unlisted runtime": strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-99'\n", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("ARG BASE\nFROM ${BASE}\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			m, err := manifest.Parse([]byte(src))
+			if err != nil {
+				t.Fatal(err)
+			}
+			build, pythons := cli.runtimeImageOf(context.Background(), dir, m)
+			if build != "3.3-9" || len(pythons) == 0 || pythons[0] != "3.12" {
+				t.Errorf("runtimeImageOf = %q, %v; want the pin's newest build, 3.3-9 on 3.12", build, pythons)
+			}
+		})
+	}
+}
+
+// A declared Dockerfile names the build, so the Airflow lookup is asked for
+// the release that build carries.
+func TestStartLooksUpTheAirflowOfTheDockerfilesBuild(t *testing.T) {
+	src := strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\ndockerfile = 'Dockerfile'\n", 1)
+	r := pinsRun{
+		src:   src,
+		files: map[string]string{"Dockerfile": "FROM astrocrpublic.azurecr.io/runtime:3.3-9\nRUN true\n"},
+		build: build332, freeze: freeze339,
+	}.start(t)
+	if len(r.lookupAsked) != 2 || r.lookupAsked[1] != "3.3-9" {
+		t.Errorf("lookup asked %q, want the Dockerfile's build", r.lookupAsked)
+	}
+	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 (Python 3.12)") {
+		t.Errorf("no pins of the Dockerfile's build:\n%s", r.manifest)
 	}
 }

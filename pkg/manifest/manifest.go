@@ -103,6 +103,9 @@ type UV struct {
 	// RuntimeBuild and RuntimePython name the build and the Python the
 	// runtime pins are of: "3.3-9" and "3.12". Empty when there are none.
 	RuntimeBuild, RuntimePython string
+	// ExcludeNewer is [tool.uv] exclude-newer as written: a date, a time or
+	// a duration such as "1 week". Empty when the project sets none.
+	ExcludeNewer string
 }
 
 // IndexPages are the per-package pages of the indexes Sources names, the
@@ -667,7 +670,7 @@ func parse(data []byte, repair bool) (*Manifest, error) {
 
 	p := &parser{}
 	m := &Manifest{Astro: p.astro(*f.Tool.Astro), UV: uvTable(f.Tool.UV)}
-	m.UV.RuntimeBuild, m.UV.RuntimePython, m.UV.RuntimePins = runtimePinsOf(data)
+	m.UV.RuntimeBuild, m.UV.RuntimePython, m.UV.RuntimePins = runtimePinsOf(data, m.UV.ConstraintDependencies)
 	if f.Project != nil {
 		m.Project = Project{
 			Name:           f.Project.Name,
@@ -719,6 +722,10 @@ func uvTable(t map[string]any) UV {
 	out := UV{
 		ConstraintDependencies: stringList(t["constraint-dependencies"]),
 		Environments:           stringList(t["environments"]),
+	}
+	if v, ok := t["exclude-newer"]; ok && v != nil {
+		// A string as uv documents it, or a TOML date written bare.
+		out.ExcludeNewer = strings.TrimSpace(fmt.Sprint(v))
 	}
 	urls := map[string]string{}
 	indexes, _ := t["index"].([]any)

@@ -13,6 +13,7 @@
 package tomledit
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -59,6 +60,11 @@ type Editor interface {
 // writes it: the text after the '#' and the one space that follows it. It
 // is never a value, and Get leaves it out.
 type Comment string
+
+// ErrCommentsUnsupported refuses a Set of an array holding a Comment where the
+// array cannot carry one: inside an inline table, where TOML allows no line
+// break. Nothing is written.
+var ErrCommentsUnsupported = errors.New("this array is inside an inline value, which holds no comment")
 
 // valuesOf is list without its comments.
 func valuesOf(list []any) []any {

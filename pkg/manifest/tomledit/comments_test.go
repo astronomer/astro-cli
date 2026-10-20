@@ -1,6 +1,7 @@
 package tomledit
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -121,6 +122,38 @@ func TestTheRewriteEditorLeavesCommentsOut(t *testing.T) {
 	got, _ := e.GetLines(pinsKey)
 	if !reflect.DeepEqual(got, []any{"x", "y"}) {
 		t.Errorf("GetLines = %#v, want the values alone", got)
+	}
+}
+
+// An array inside an inline table has nowhere to put a comment line, so a Set
+// that holds one is refused and leaves the document as it was, rather than
+// writing the values without the comments that say what they are.
+func TestCommentsInAnInlineTableAreRefused(t *testing.T) {
+	src := "[tool]\nuv = { constraint-dependencies = ['x'] }\n"
+	e, err := NewSurgical([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = e.Set(pinsKey, []any{"x", Comment("managed"), "y"})
+	if !errors.Is(err, ErrCommentsUnsupported) {
+		t.Fatalf("err = %v, want ErrCommentsUnsupported", err)
+	}
+	got, _ := e.Bytes()
+	if string(got) != src {
+		t.Errorf("the refused Set changed the document:\n%s", got)
+	}
+	if err := e.Set(pinsKey, []any{"x", "y"}); err != nil {
+		t.Errorf("values alone: %v", err)
+	}
+}
+
+// ArrayLines reads the comments out of bytes already decoded, without an
+// editor.
+func TestArrayLinesReadsBytesAlreadyDecoded(t *testing.T) {
+	src := []byte("[tool.uv]\nconstraint-dependencies = [\n    'x',\n    # mine\n    'y',\n]\n")
+	got := ArrayLines(src, pinsKey, []any{"x", "y"})
+	if want := []any{"x", Comment("mine"), "y"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("ArrayLines = %#v, want %#v", got, want)
 	}
 }
 

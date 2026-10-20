@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -146,13 +147,35 @@ func TestRuntimePinsKeepsTheVersions(t *testing.T) {
 	assert.Len(t, got, 3)
 }
 
-// A freeze is of the present, so under a UV_EXCLUDE_NEWER date none is read.
+// A freeze is of the present, so under a UV_EXCLUDE_NEWER cutoff, a date or a
+// duration, none is read.
 func TestRuntimePinsUnderAPinnedResolution(t *testing.T) {
 	_, hits := freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": sampleFreeze})
-	t.Setenv("UV_EXCLUDE_NEWER", "2026-09-01")
-	_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
-	assert.ErrorIs(t, err, ErrPinnedResolution)
+	for _, cutoff := range []string{"2026-09-01", "1 week"} {
+		t.Setenv("UV_EXCLUDE_NEWER", cutoff)
+		_, err := RuntimePins(context.Background(), "3.3-9", "3.12")
+		assert.ErrorIs(t, err, ErrPinnedResolution, cutoff)
+	}
 	assert.Equal(t, int32(0), hits.Load())
+}
+
+// A 404 is remembered for a day, so a project on a runtime with no freeze does
+// not ask on every start; after that it asks again.
+func TestA404IsRememberedForADay(t *testing.T) {
+	t.Setenv("UV_EXCLUDE_NEWER", "")
+	_, hits := freezeServer(t, nil)
+	for range 2 {
+		_, err := RuntimePins(context.Background(), "10.5.0", "3.11")
+		assert.ErrorIs(t, err, ErrFreezeNotPublished)
+	}
+	assert.Equal(t, int32(1), hits.Load(), "the second read is answered from the cache")
+
+	marker := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", freezeCacheDir, "runtime-10.5.0-python-3.11.txt"+freezeMissingSuffix)
+	old := time.Now().Add(-freezeMissingTTL - time.Minute)
+	require.NoError(t, os.Chtimes(marker, old, old))
+	_, err := RuntimePins(context.Background(), "10.5.0", "3.11")
+	assert.ErrorIs(t, err, ErrFreezeNotPublished)
+	assert.Equal(t, int32(2), hits.Load(), "a day on, it asks again")
 }
 
 // A build or Python becomes part of a URL and a file name, so one that could

@@ -82,7 +82,8 @@ func arrayOf(data []byte, kv *unstable.Node) (arrayValue, bool) {
 // setLines is Set for an array of scalars at key, written one element per
 // line with a trailing comma, the way uv writes dependencies, and each Comment
 // in it as a comment line where it stands. An array that lands inside an
-// inline value stays on one line, and its comments are left out. It reports
+// inline value stays on one line; one that holds a Comment is refused there
+// with ErrCommentsUnsupported, and the document is left as it was. It reports
 // false, having done nothing, when the value is not such an array or is the
 // one already there, which a plain Set leaves as it is spelled.
 func (s *surgical) setLines(key []string, value any) (bool, error) {
@@ -99,12 +100,19 @@ func (s *surgical) setLines(key []string, value any) (bool, error) {
 	} else if cur, has := s.doc.Get(key); has && reflect.DeepEqual(cur, value) {
 		return false, nil
 	}
+	before := slices.Clone(s.doc.Bytes())
 	if err := s.doc.Set(key, values); err != nil {
 		return true, err
 	}
 	data := s.doc.Bytes()
 	a, ok := findArray(data, key)
 	if !ok {
+		if commented {
+			if err := s.reparse(before); err != nil {
+				return true, err
+			}
+			return true, ErrCommentsUnsupported
+		}
 		return true, nil
 	}
 	if !commented {
@@ -154,10 +162,18 @@ func (s *surgical) GetLines(key []string) ([]any, bool) {
 	if !isArray {
 		return nil, false
 	}
-	data := s.doc.Bytes()
+	return ArrayLines(s.doc.Bytes(), key, values), true
+}
+
+// ArrayLines is GetLines for a document a caller has already decoded: values
+// are the array's elements as decoding read them, and the comments between
+// them come from data with one streaming pass, without building an editable
+// document. An array it cannot locate on a key-value line comes back as the
+// values alone.
+func ArrayLines(data []byte, key []string, values []any) []any {
 	a, found := findArray(data, key)
 	if !found || len(a.elems) != len(values) {
-		return values, true
+		return values
 	}
 	out := make([]any, 0, len(values))
 	from := a.open + 1
@@ -166,7 +182,7 @@ func (s *surgical) GetLines(key []string) ([]any, bool) {
 		out = append(out, values[i])
 		from = e[1]
 	}
-	return append(out, commentsIn(data, from, a.close)...), true
+	return append(out, commentsIn(data, from, a.close)...)
 }
 
 // commentsIn reads the comments between from and to, a stretch of an array
