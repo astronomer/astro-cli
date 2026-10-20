@@ -1,6 +1,6 @@
 module github.com/astronomer/astro-cli/pkg/platformversions
 
-go 1.26.1
+go 1.26.10
 
 // No requires a consumer inherits, and none expected: this is a table of
 // Airflow versions the managed platforms offer plus the rules for mapping a
