@@ -137,6 +137,30 @@ func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, on
 	}
 }
 
+// oneXNoOpUsage is the help of a 1.x flag a command accepts and ignores.
+const oneXNoOpUsage = "Has no effect; accepted so scripts written for Astro CLI 1.x keep working"
+
+// addOneXWorkspaceIDNoOp registers 1.x's --workspace-id on fs for a command
+// that 1.x gave it to, through its group, and that never read it: hidden and
+// read by nothing, so a 1.x script passing it keeps working. It is no
+// spelling of --workspace, which the command does not take, and chooses no
+// workspace, so a project's workspace and host apply as they would without
+// it.
+func addOneXWorkspaceIDNoOp(fs *pflag.FlagSet) {
+	fs.String(oneXWorkspaceID.name, "", oneXNoOpUsage)
+	fs.MarkHidden(oneXWorkspaceID.name) //nolint:errcheck // the flag is defined just above
+}
+
+// deploymentWorkspaceUsage is --workspace on a deployment command that looks
+// its Deployment up in a workspace.
+const deploymentWorkspaceUsage = "Workspace the Deployment is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)"
+
+// addDeploymentWorkspaceFlag registers --workspace, and 1.x's --workspace-id
+// as its alias, on a deployment command that reads it.
+func addDeploymentWorkspaceFlag(fs *pflag.FlagSet) {
+	addWorkspaceFlag(fs, &workspaceID, "", deploymentWorkspaceUsage, oneXWorkspaceID)
+}
+
 // deploymentFlagOf is the --deployment on fs that addDeploymentFlag
 // registered, or nil.
 func deploymentFlagOf(fs *pflag.FlagSet) *deploymentFlag {

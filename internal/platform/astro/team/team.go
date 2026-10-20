@@ -972,8 +972,6 @@ func roleInWorkspace(team astrov1.Team, workspaceID string) string { //nolint:go
 }
 
 // ListDeploymentTeamsData returns deployment team list data for structured output
-//
-//nolint:dupl // the duplication is acceptable here
 func ListDeploymentTeamsData(client astrov1.APIClient, deploymentID string) (*TeamList, error) {
 	teams, err := GetDeploymentTeams(client, deploymentID, teamPaginationLimit)
 	if err != nil {
@@ -998,16 +996,22 @@ func ListDeploymentTeamsData(client astrov1.APIClient, deploymentID string) (*Te
 	return &TeamList{Teams: teamInfos}, nil
 }
 
-var deploymentTeamTableConfig = output.BuildTableConfig(
-	[]output.Column[TeamInfo]{
-		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
-		{Header: "ROLE", Value: func(t TeamInfo) string { return t.DeploymentRole }},
-		{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
-		{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
-		{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
-	},
-	func(d any) []TeamInfo { return d.(*TeamList).Teams },
-)
+// roleTeamTableConfig is the table of teams with a role on one Deployment or
+// Workspace, which role reads.
+func roleTeamTableConfig(role func(TeamInfo) string) *output.TableConfig {
+	return output.BuildTableConfig(
+		[]output.Column[TeamInfo]{
+			{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
+			{Header: "ROLE", Value: role},
+			{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
+			{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
+			{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
+		},
+		func(d any) []TeamInfo { return d.(*TeamList).Teams },
+	)
+}
+
+var deploymentTeamTableConfig = roleTeamTableConfig(func(t TeamInfo) string { return t.DeploymentRole })
 
 // ListDeploymentTeamsWithFormat lists deployment teams with the specified output format
 func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string, r output.Emitter) error {
@@ -1018,9 +1022,16 @@ func ListDeploymentTeamsWithFormat(client astrov1.APIClient, deploymentID string
 }
 
 // ListWorkspaceTeamsData returns workspace team list data for structured output
-//
-//nolint:dupl // the duplication is acceptable here
 func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*TeamList, error) {
+	// The roles shown are the ones on the Workspace listed, which is the
+	// current one when workspaceID is "".
+	if workspaceID == "" {
+		ctx, err := context.GetCurrentContext()
+		if err != nil {
+			return nil, err
+		}
+		workspaceID = ctx.Workspace
+	}
 	teams, err := GetWorkspaceTeams(client, workspaceID, teamPaginationLimit)
 	if err != nil {
 		return nil, err
@@ -1044,16 +1055,7 @@ func ListWorkspaceTeamsData(client astrov1.APIClient, workspaceID string) (*Team
 	return &TeamList{Teams: teamInfos}, nil
 }
 
-var workspaceTeamTableConfig = output.BuildTableConfig(
-	[]output.Column[TeamInfo]{
-		{Header: "ID", Value: func(t TeamInfo) string { return t.ID }},
-		{Header: "ROLE", Value: func(t TeamInfo) string { return t.WorkspaceRole }},
-		{Header: "NAME", Value: func(t TeamInfo) string { return t.Name }},
-		{Header: "DESCRIPTION", Value: func(t TeamInfo) string { return t.Description }},
-		{Header: "CREATE DATE", Value: func(t TeamInfo) string { return t.CreatedAt.Format(time.RFC3339) }},
-	},
-	func(d any) []TeamInfo { return d.(*TeamList).Teams },
-)
+var workspaceTeamTableConfig = roleTeamTableConfig(func(t TeamInfo) string { return t.WorkspaceRole })
 
 // ListWorkspaceTeamsWithFormat lists workspace teams with the specified output format
 func ListWorkspaceTeamsWithFormat(client astrov1.APIClient, workspaceID string, r output.Emitter) error {

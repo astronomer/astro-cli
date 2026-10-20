@@ -193,7 +193,12 @@ project that names no host keeps working for someone logged in to another host. 
 a command reads its workspace and Deployment in this order:
 
 1. **`--workspace` wins.** Given, it is the workspace. A link name in the
-   same command still picks the link's Deployment and host.
+   same command still picks the link's Deployment and host. The
+   `deployment team`, `user` and `token` commands, which act on a Deployment
+   by its id alone, take no `--workspace`; `deployment token workspace-token
+   add` and `remove`, which find a Workspace token, do. The 1.x
+   `--workspace-id` those commands had is accepted and does nothing, as in
+   1.x: the project's workspace and host still apply.
 2. **A link name is a Deployment.** `--deployment` and the Deployment-id
    argument of `inspect`, `logs`, `update`, `delete`, `hibernate` and
    `wake-up` take an Astro link's name. The command acts on the link's

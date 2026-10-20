@@ -1,6 +1,7 @@
 package astro
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -707,11 +708,55 @@ func TestUserTeamHelp(t *testing.T) {
 	assert.NotContains(t, find(newOrganizationCmd, "user", "update").Long, "$astro", "the Long describes the command; the example shows its usage")
 	assert.Equal(t, "Update the role of a user in your Astro Organization", find(newOrganizationCmd, "user", "update").Short)
 	// Every workspace team command that acts on a Workspace takes --workspace.
-	// Only add keeps 1.x's --workspace-id: 1.x's Astro update and remove had
-	// none.
-	for _, sub := range []string{"add", "update", "remove"} {
+	// Only add keeps 1.x's --workspace-id: 1.x's Astro list, update and remove
+	// had none.
+	for _, sub := range []string{"list", "add", "update", "remove"} {
 		c := find(newWorkspaceCmd, "team", sub)
 		assert.NotNil(t, c.Flag("workspace"), sub)
 		assert.Equal(t, sub == "add", c.Flag("workspace-id") != nil, sub)
 	}
+}
+
+// workspace team list and workspace user list show each one's role on the
+// Workspace listed: --workspace's, else the current one, where a list given
+// no --workspace used to look the roles up on "" and leave them blank.
+func TestWorkspaceTeamAndUserListShowTheRoleOnTheWorkspaceListed(t *testing.T) {
+	ada, bob, eng, idp := userTeamFixtures()
+	other := "clws-other"
+	roles := func(t *testing.T, stdout, key string) map[string]string {
+		t.Helper()
+		var got map[string][]map[string]any
+		require.NoError(t, json.Unmarshal([]byte(stdout), &got), stdout)
+		byID := map[string]string{}
+		for _, row := range got[key] {
+			id, _ := row["id"].(string)
+			role, _ := row["workspace_role"].(string)
+			byID[id] = role
+		}
+		return byID
+	}
+	inWS := func(ws string) any {
+		return mock.MatchedBy(func(p *astrov1.ListTeamsParams) bool { return p.WorkspaceId != nil && *p.WorkspaceId == ws })
+	}
+
+	t.Run("team list", func(t *testing.T) {
+		m := userTeamMock(nil, []astrov1.Team{eng, idp}, nil)(t)
+		r := execAstroCmd(t, m, "", newWorkspaceCmd, "workspace", "team", "list", "-o", "json")
+		require.NoError(t, r.err)
+		assert.Equal(t, map[string]string{"team-eng": "WORKSPACE_OPERATOR", "team-idp": ""}, roles(t, r.stdout, "teams"))
+		m.AssertCalled(t, "ListTeamsWithResponse", mock.Anything, mock.Anything, inWS(curWorkspaceID))
+	})
+	t.Run("team list --workspace", func(t *testing.T) {
+		m := userTeamMock(nil, []astrov1.Team{eng, idp}, nil)(t)
+		r := execAstroCmd(t, m, "", newWorkspaceCmd, "workspace", "team", "list", "--workspace", other, "-o", "json")
+		require.NoError(t, r.err)
+		assert.Equal(t, map[string]string{"team-eng": "", "team-idp": ""}, roles(t, r.stdout, "teams"))
+		m.AssertCalled(t, "ListTeamsWithResponse", mock.Anything, mock.Anything, inWS(other))
+	})
+	t.Run("user list", func(t *testing.T) {
+		m := userTeamMock([]astrov1.User{ada, bob}, nil, nil)(t)
+		r := execAstroCmd(t, m, "", newWorkspaceCmd, "workspace", "user", "list", "-o", "json")
+		require.NoError(t, r.err)
+		assert.Equal(t, map[string]string{"user-ada": "WORKSPACE_MEMBER", "user-bob": ""}, roles(t, r.stdout, "users"))
+	})
 }
