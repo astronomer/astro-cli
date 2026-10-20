@@ -76,12 +76,18 @@ func (c *cli) standing() (set instances.Set, req instances.Request, err error) {
 	return set, req, nil
 }
 
-// deploymentFlags carries the two flags every top-level Airflow-facing command
-// takes. The `astro local` registration of those same commands takes neither:
+// deploymentFlags carries the flags every top-level Airflow-facing command
+// takes. The `astro local` registration of those same commands takes none:
 // its target is the machine, and there is nothing to select.
 type deploymentFlags struct {
 	deployment string
 	url        string
+	// workspace is where a -d naming an Astro Deployment by name, rather than
+	// by link or id, is looked up (see findDeployment).
+	workspace string
+	// workspaceGiven is --workspace typed, so an empty one is refused rather
+	// than read as "no workspace given".
+	workspaceGiven bool
 }
 
 // addDeploymentFlags registers the selector flags on cmd. One registration
@@ -89,9 +95,24 @@ type deploymentFlags struct {
 // for --deployment (harmonizing with v1, where -d already means
 // deployment), and --url is the escape hatch for an Airflow no project
 // declares.
+//
+// --workspace is a v2 spelling only: `astro af` is new in 2.0, so there is no
+// 1.x --workspace-id to keep. It has no shorthand, so it cannot collide with
+// a leaf's.
 func addDeploymentFlags(cmd *cobra.Command, f *deploymentFlags) {
-	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on: a link name from the manifest, or a Deployment id")
+	cmd.PersistentFlags().StringVarP(&f.deployment, "deployment", "d", "", "Deployment to act on: a link name from the manifest, else an Astro Deployment id or name")
 	cmd.PersistentFlags().StringVar(&f.url, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
+	cmd.PersistentFlags().Var(&workspaceFlag{f}, "workspace", "Workspace to look a -d Deployment name up in, overriding the project's and the login's")
+}
+
+// workspaceFlag is --workspace, recording that it was typed.
+type workspaceFlag struct{ f *deploymentFlags }
+
+func (w *workspaceFlag) String() string { return w.f.workspace }
+func (w *workspaceFlag) Type() string   { return "string" }
+func (w *workspaceFlag) Set(v string) error {
+	w.f.workspace, w.f.workspaceGiven = v, true
+	return nil
 }
 
 // deploymentClient resolves which deployment this run acts on and opens a
@@ -105,18 +126,94 @@ func (c *cli) deploymentClient(ctx context.Context, f deploymentFlags) (*airflow
 	if err != nil {
 		return nil, err
 	}
-	client, err := c.clientFor(ctx, sel.Instance, domain)
+	instance := sel.Instance
+	if instance.Source == instances.SourceDeploymentID {
+		instance, err = c.findDeployment(ctx, instance, f, domain)
+	}
+	var client *airflowapi.Client
+	if err == nil {
+		client, err = c.clientFor(ctx, instance, domain)
+	}
 	if err != nil && sel.Instance.Source == instances.SourceDeploymentID {
-		// A name that matched no link is more often a typo than an id, so the
-		// names it could have been travel with the failure, as they do for
-		// `astro api airflow -d`.
+		// A name that matched no link is more often a typo than a Deployment,
+		// so the names it could have been travel with the failure, as they do
+		// for `astro api airflow -d` — first, when no Deployment had the name
+		// either, since the likeliest fix is one of them.
 		if _, set, serr := c.deploymentSet(); serr == nil {
 			if names := set.Names(); len(names) > 0 {
+				var nameErr *instancelocate.DeploymentNameError
+				if errors.As(err, &nameErr) && nameErr.NotFound() {
+					return nil, fmt.Errorf("no link or Deployment named %q. Deployments this project links: %s\n%w", f.deployment, strings.Join(names, ", "), err)
+				}
 				return nil, fmt.Errorf("%w\nDeployments this project links: %s", err, strings.Join(names, ", "))
 			}
 		}
 	}
 	return client, err
+}
+
+// findDeployment reads a -d no link declares the way --deployment reads on
+// the astro deployment commands: a Deployment id is that Deployment, found
+// across the organization by the lookup that reads its address, and anything
+// else is the name of one, looked up in --workspace, else the project's
+// [tool.astro] workspace, else the login's. What a name finds is read as an
+// id again (instances.Set.DeploymentByID), so a link pointing at that
+// Deployment answers for it, as it does for an id.
+//
+// A Deployment no link declares carries --workspace, so the lookup that reads
+// its address refuses one in another workspace rather than drop the flag.
+func (c *cli) findDeployment(ctx context.Context, i instances.Instance, f deploymentFlags, domain string) (instances.Instance, error) {
+	dir, err := c.projectPath()
+	if err != nil {
+		return instances.Instance{}, err
+	}
+	m, err := manifest.Load(filepath.Join(dir, project.Marker))
+	if err != nil {
+		return instances.Instance{}, err
+	}
+	ref := i.Link.Deployment
+	var finder instancelocate.DeploymentFinder
+	if c.d.Locator != nil {
+		finder, _ = c.d.Locator(domain).(instancelocate.DeploymentFinder)
+	}
+	if finder == nil {
+		// Nothing here can reach a control plane, so there is nothing to look
+		// a name up in either: the instance stays the id it was read as, and
+		// the lookup that reads its address reports why it cannot.
+		return i, nil
+	}
+	id, err := finder.DeploymentID(ctx, ref, f.workspace, m.Astro.Workspace)
+	if err != nil {
+		return instances.Instance{}, err
+	}
+	found := instances.Build(m).DeploymentByID(id)
+	if found.Source != instances.SourceDeploymentID {
+		return found, nil
+	}
+	if id != ref {
+		// Found by name: the name is what the reader typed and recognizes.
+		found.Name = ref
+	}
+	found.Link.Workspace = f.workspace
+	return found, nil
+}
+
+// linkInWorkspace checks a link against --workspace, when one was given: a
+// link already says which Deployment it is and where it lives, so the flag
+// cannot point it anywhere else, and rather than be dropped it has to agree.
+// An Astro link that names no workspace of its own has nothing to disagree
+// with.
+func linkInWorkspace(i *instances.Instance, workspace string) error {
+	switch have := i.Link.Workspace; {
+	case workspace == "" || have == workspace:
+		return nil
+	case i.Kind != instances.KindAstro && i.Kind != instances.KindAPC:
+		return fmt.Errorf("deployment %s is %s link, which is in no Astro workspace, so --workspace %s cannot apply to it", i.Name, manifest.KindWithArticle(i.Link.Kind()), workspace)
+	case have == "":
+		return nil
+	default:
+		return fmt.Errorf("deployment %s links a Deployment in workspace %s (pyproject.toml), not --workspace %s", i.Name, have, workspace)
+	}
 }
 
 // projectDomain is the Astro host whose login this project's astro links use,
@@ -239,6 +336,12 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 	if f.deployment != "" && f.url != "" {
 		return instances.Selection{}, instances.ErrMutuallyExclusive
 	}
+	if f.workspaceGiven && f.workspace == "" {
+		return instances.Selection{}, errors.New("--workspace cannot be empty")
+	}
+	if f.workspace != "" && f.url != "" {
+		return instances.Selection{}, errors.New("--url and --workspace cannot be used together: --url targets an Airflow in no workspace")
+	}
 	// --url is the no-project escape hatch, so it is answered before anything
 	// looks for a project: `astro af dags list --url https://airflow.corp.dev` has
 	// to work from any directory on the machine.
@@ -264,7 +367,14 @@ func (c *cli) resolveDeployment(f deploymentFlags) (instances.Selection, error) 
 			// The question this run would have asked at a terminal.
 			return instances.Selection{}, input.Required(err)
 		}
-		return c.pickAndPin(dir, set, ambiguous.Choices)
+		if sel, err = c.pickAndPin(dir, set, ambiguous.Choices); err != nil {
+			return instances.Selection{}, err
+		}
+	}
+	if sel.Instance.Source == instances.SourceManifest {
+		if err := linkInWorkspace(&sel.Instance, f.workspace); err != nil {
+			return instances.Selection{}, err
+		}
 	}
 	return sel, nil
 }

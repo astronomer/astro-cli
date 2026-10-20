@@ -8,7 +8,7 @@ A project can talk to more than one Airflow: the one running on your machine, an
 | --- | --- | --- |
 | `astro local af <family>` | this project's running local Airflow | none |
 | `astro local api <endpoint>` | this project's running local Airflow | none |
-| `astro af <family>` (alias `astro airflow`) | a linked Airflow | `-d/--deployment`, `--url` |
+| `astro af <family>` (alias `astro airflow`) | a linked Airflow | `-d/--deployment`, `--url`, `--workspace` |
 | `astro api airflow <endpoint>` | a linked Airflow | `-d/--deployment`, `--url` (required) |
 | `astro deploy` | an Astro Deployment | positional or `--deployment` ([its own rule](#deploy-always-asks)) |
 
@@ -21,8 +21,8 @@ The `af` families are `dags`, `runs`, `tasks`, `assets`, `connections`, `variabl
 The first of these that names something wins:
 
 1. **`--url <address>`**: an Airflow addressed directly, with no link. It cannot be combined with `-d` and works outside a project.
-2. **`-d/--deployment <name>`**: a link name, or an Astro Deployment id when no link has that name.
-3. **`ASTRO_DEPLOYMENT`**: the same, from the environment.
+2. **`-d/--deployment <name>`**: a link name, else an Astro Deployment id, else an Astro Deployment's name, the way `--deployment` reads on `astro deployment`. A name is looked up in `--workspace`, else the project's `[tool.astro] workspace`, else the workspace of the login the project's links use; none of that name, or several (listed by id), is an error, and inside a project one that matches nothing leads with the project's links, the likelier typo. An id is fetched across the organization with no lookup by name, and with `--workspace` it has to be in that workspace. A link already says where it lives, so `--workspace` has to agree with the link's workspace (whichever layer picked the link), cannot apply to an MWAA, Composer or url link, and cannot be combined with `--url`.
+3. **`ASTRO_DEPLOYMENT`**: a link name, from the environment (not an id or a Deployment name).
 4. **Your selection**, set with `astro use` (below).
 5. **The default link**: the link marked `default = true`, or a project's only link. Adding a second link to a project whose only link is unmarked (`astro link add`, a deploy that links what it picked, Astro Desktop) marks that first link `default = true`, so the project keeps pointing where it did, and says so. A link written `default = false` (by hand, or by `astro link default --unset`) is never marked. Nothing else picks a default: a project that already has several unmarked links stays without one until you run `astro link default NAME`.
 
