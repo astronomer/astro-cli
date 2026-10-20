@@ -15,6 +15,8 @@ import (
 // project's copy is older and refreshes it.
 var helperContentAtVersion = map[int]string{
 	1: "b21a2237f2142b9bb010dd1dbe211ab9a9ce3f5c2f567e64a668315bd0ca326d",
+	// The image's Airflow checked against uv.lock's, by release.
+	2: "aa89b6ec6871fd95b565434129f42f22646a2686aba628466ef69c4e4149223a",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

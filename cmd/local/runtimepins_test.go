@@ -395,6 +395,9 @@ func TestInitMovesThePinsAndRelocks(t *testing.T) {
 	if len(relocked) != 1 {
 		t.Errorf("uv lock ran %d times, want once", len(relocked))
 	}
+	if strings.Contains(r.out, "is up to date") || !strings.Contains(r.out, "up to date") {
+		t.Errorf("init said the project was up to date after moving its pins:\n%s", r.out)
+	}
 
 	r = pinsRun{
 		src: src, build: build332, freeze: freeze339, args: []string{"init"},

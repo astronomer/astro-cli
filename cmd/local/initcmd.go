@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -43,7 +44,8 @@ func newInitCmd(c *cli) *cobra.Command {
 			"except requirements.txt and packages.txt when a Dockerfile left on its ONBUILD tag still installs them, and other files already there are kept. " +
 			"What init could not carry over, such as a requirements.txt line that is not a plain requirement, is listed at the end, to move across by hand.\n\n" +
 			"Run in a project that is already an Astro project, it brings what astro writes there up to date and changes nothing else: " +
-			"a declared Dockerfile still on an ONBUILD tag is moved onto its -base image as a conversion would, and the .astro/install-project.py it runs is written or refreshed.",
+			"a declared Dockerfile still on an ONBUILD tag is moved onto its -base image as a conversion would, the .astro/install-project.py it runs is written or refreshed, " +
+			"and the runtime pins in [tool.uv] move to the newest Astro Runtime build, with uv lock run so uv.lock follows them.",
 		Example: "  # Make the current directory an Astro project\n" +
 			"  astro init\n\n" +
 			"  # Create a new project in its own directory, pinned to Airflow 3.1\n" +
@@ -122,6 +124,10 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		// follows the pins.
 		c.reportAstroBuild(r, build)
 		c.relockAfterInit(ctx, r, res.Dir, build)
+		// The refresh changed the manifest, so the project was not up to date.
+		if (build.pinsChanged || build.airflowChanged) && !slices.Contains(res.Updated, manifest.Marker) {
+			res.Updated = append(res.Updated, manifest.Marker)
+		}
 	}
 	return r.Emit(res, func(w io.Writer) error {
 		return renderInit(w, res, nextStart(res.Dir))
