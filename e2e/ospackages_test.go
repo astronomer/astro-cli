@@ -92,8 +92,7 @@ func TestTheBaseImageDoesNotAlreadyHaveTheDeclaredPackage(t *testing.T) {
 	p := dockerProject(t, "ospkgbase")
 	needsDocker(t, p)
 
-	// The -base tag, which is what a generated build starts FROM.
-	base := runtimeImageFor(t, p) + "-base"
+	base := runtimeBaseImageFor(t, p)
 	out, err := exec.CommandContext(t.Context(), "docker", "run", "--rm", "--entrypoint", "sh", base,
 		"-c", "dpkg -s "+declaredPackage+" >/dev/null 2>&1 && echo BASE-YES || echo BASE-NO").CombinedOutput()
 	if err != nil {
