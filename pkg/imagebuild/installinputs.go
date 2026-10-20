@@ -93,7 +93,12 @@ func InstallDockerfile(from string) string {
 
 // installDockerfile is InstallDockerfile, with the Python install's netrc
 // mount left out when mountNetrc is false: a generated build mounts the secret
-// only when the build passes it.
+// only when the build passes it. RUN --mount needs BuildKit (Docker) or Buildah
+// 1.21 (Podman 3.2), so a generated build with no secret to mount keeps to a
+// plain RUN, and its install stage copies its inputs rather than mounting
+// them: with no secret, the legacy builder and an older Podman build it end to
+// end. The runtime's own 3.3-9 trigger mounts the secret unconditionally; a
+// build that took that trigger needed BuildKit whether it had a secret or not.
 func installDockerfile(from string, mountNetrc bool) string {
 	netrc := ""
 	if mountNetrc {
@@ -122,11 +127,13 @@ func installDockerfile(from string, mountNetrc bool) string {
 }
 
 // GeneratedDockerfile is the Dockerfile a generated build over the runtime
-// base baseImage runs (Request.BaseImage, before baseOf), for a caller that
-// addresses the image by what builds it: `astro package astro`'s content tag
-// hashes it, so a change to the recipe is a change to the tag.
-func GeneratedDockerfile(baseImage string) string {
-	return installDockerfile(baseOf(baseImage), true)
+// base baseImage runs (Request.BaseImage, before baseOf), with the netrc
+// secret mounted into the Python install when mountNetrc is set, as Build
+// sets it when the request carries that secret. It is for a caller that
+// addresses the image by what builds it (`astro package astro`'s content tag
+// hashes it, so a change to the recipe is a change to the tag).
+func GeneratedDockerfile(baseImage string, mountNetrc bool) string {
+	return installDockerfile(baseOf(baseImage), mountNetrc)
 }
 
 // The runtime's install scripts, from runtime 11.0.0 on: one installs

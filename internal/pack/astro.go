@@ -189,11 +189,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 		return Result{}, err
 	}
 
-	inputs, err := generatedInputs(breq)
-	if err != nil {
-		return Result{}, err
-	}
-	hash, err := contentHash(breq.BaseImage, req.Platform, inputs, breq.ProjectFiles, declaredDockerfile{
+	hash, err := contentHash(breq.BaseImage, req.Platform, generatedRecipe(breq), breq, declaredDockerfile{
 		rel: req.Manifest.Astro.Dockerfile,
 		abs: declared,
 	})
@@ -415,19 +411,10 @@ func save(ctx context.Context, engine imagebuild.Engine, image, path string, cb 
 	return nil
 }
 
-// generatedInputs is imagebuild.InstallInputsDigest for a generated build, and
-// "" for a declared Dockerfile, which installs what it says itself.
-func generatedInputs(breq imagebuild.Request) (string, error) {
-	if breq.FromDeclaredDockerfile() {
-		return "", nil
-	}
-	return imagebuild.InstallInputsDigest(breq)
-}
-
 // contentHash is a short digest of the inputs that change the image, so the
 // same inputs produce the same tag and a rebuild is a cache hit. For a
-// generated build, installInputs is imagebuild.InstallInputsDigest: the files
-// the install reads, so editing pyproject.toml or uv.lock moves the tag.
+// generated build that includes the files the install reads, so editing
+// pyproject.toml or uv.lock moves the tag.
 // contentHash is the content address of the image this request would build.
 //
 // A generated image carries the project's files (imagebuild's ProjectFiles),
@@ -489,7 +476,26 @@ type declaredDockerfile struct {
 	abs string // rel resolved against the project; "" when none is declared
 }
 
-func contentHash(base, platform, installInputs, projectFiles string, df declaredDockerfile) (string, error) {
+// generatedRecipe is the Dockerfile a generated build of breq runs, as its
+// content address takes it, or "" for a declared Dockerfile, which is
+// addressed by its own bytes. It is the recipe with the netrc mount, whether or
+// not this build has the secret: a secret decides what the install can reach,
+// not what a successful one installs, so a laptop and a CI runner holding a
+// token get the same tag.
+func generatedRecipe(breq imagebuild.Request) string {
+	if breq.FromDeclaredDockerfile() {
+		return ""
+	}
+	return imagebuild.GeneratedDockerfile(breq.BaseImage, true)
+}
+
+// contentHash is the address of the image breq builds over base for platform.
+// For a generated build that is recipe, the Dockerfile it runs
+// (generatedRecipe), and everything its install reads
+// (imagebuild.InstallInputsDigest: the helper, pyproject.toml, and uv.lock,
+// whose versions are the ones installed); the dependencies, packages and index
+// pages are all in those, so no list of them is hashed besides.
+func contentHash(base, platform, recipe string, breq imagebuild.Request, df declaredDockerfile) (string, error) {
 	h := sha256.New()
 	writeField := func(label, v string) {
 		fmt.Fprintf(h, "%s\x00%s\x00", label, v)
@@ -497,18 +503,20 @@ func contentHash(base, platform, installInputs, projectFiles string, df declared
 	writeField("base", base)
 	writeField("platform", platform)
 	if df.abs == "" {
-		// A generated build's Dockerfile is imagebuild's, not the project's,
-		// and it is as much the build as the inputs below: a change to how it
-		// installs is a different image from the same manifest, so it moves
-		// the tag rather than reusing one an older recipe built.
-		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base)))))
-		// So is everything the install reads (imagebuild.InstallInputsDigest):
-		// the helper, pyproject.toml, and uv.lock, whose versions are the ones
-		// installed. The dependencies, packages and index pages are all in
-		// those, so no list of them is hashed besides.
-		writeField("install-inputs", installInputs)
+		// A generated build's Dockerfile (recipe) is imagebuild's, not the
+		// project's, and it is as much the build as the inputs below: a change
+		// to how it installs is a different image from the same manifest, so
+		// it moves the tag rather than reusing one an older recipe built. A
+		// declared Dockerfile installs as its own bytes say, which are hashed
+		// below, so neither is part of its address.
+		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(recipe))))
+		inputs, err := imagebuild.InstallInputsDigest(breq)
+		if err != nil {
+			return "", err
+		}
+		writeField("install-inputs", inputs)
 	}
-	if projectFiles != "" {
+	if projectFiles := breq.ProjectFiles; projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
 		if err != nil {
 			return "", err

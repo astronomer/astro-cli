@@ -2,7 +2,6 @@ package pack
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -301,59 +300,64 @@ func TestAstroBuildTagIsContentAddressed(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, first.Image, edited.Image, "an edited project file moves the tag")
 
-	// A source routed to an index changes where the install looks, so it
-	// moves the tag too.
-	req = testRequest(t)
-	req.Manifest.UV.Sources = map[string]string{"private-lib": "https://pypi.acme.example/simple/"}
-	routed, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
-	require.NoError(t, err)
-	assert.NotEqual(t, first.Image, routed.Image, "an index source moves the tag")
+	// A source routing a dependency to an index changes where the install
+	// looks, so it moves the tag too; one for a package nothing installs does
+	// not.
+	withLib := func(sources map[string]string) string {
+		t.Helper()
+		req := testRequest(t)
+		req.Manifest.Project.Dependencies = append(req.Manifest.Project.Dependencies, "private-lib")
+		req.Manifest.UV.Sources = sources
+		res, err := newAstro(&fakeBuilder{}, &fakeDocker{inspectOut: "3.1-2"}).Build(context.Background(), req, localrt.Callbacks{})
+		require.NoError(t, err)
+		return res.Image
+	}
+	plain := withLib(nil)
+	assert.NotEqual(t, plain, withLib(map[string]string{"private-lib": "https://pypi.acme.example/simple/"}), "an index source moves the tag")
+	assert.Equal(t, plain, withLib(map[string]string{"apache-airflow": "https://pip.astronomer.io/v2/"}), "a source the image never installs does not")
 }
 
-// A generated build's Dockerfile is part of its address: the same inputs over
-// another recipe are another image. A declared Dockerfile is hashed by its own
-// bytes instead, so the generated recipe does not reach it.
-func TestContentHashCoversTheGeneratedRecipe(t *testing.T) {
-	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
-	generated, err := contentHash(base, "linux/amd64", "inputs", "", declaredDockerfile{})
-	require.NoError(t, err)
-
-	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%s\x00", "base", base)
-	fmt.Fprintf(h, "%s\x00%s\x00", "platform", "linux/amd64")
-	withoutRecipe := fmt.Sprintf("%x", h.Sum(nil))[:7]
-	assert.NotEqual(t, withoutRecipe, generated, "the generated Dockerfile is hashed")
-
-	fmt.Fprintf(h, "%s\x00%x\x00", "generated-dockerfile", sha256.Sum256([]byte(imagebuild.GeneratedDockerfile(base))))
-	fmt.Fprintf(h, "%s\x00%s\x00", "install-inputs", "inputs")
-	assert.Equal(t, fmt.Sprintf("%x", h.Sum(nil))[:7], generated)
-}
-
-// What the install reads is part of a generated image's address: uv.lock's
-// versions are the ones installed, so editing the lock moves the tag, as does
-// pyproject.toml, and the helper that reads them.
-func TestContentHashCoversTheManifestAndLock(t *testing.T) {
+// A generated build's Dockerfile and what its install reads are part of its
+// address: the same project over another recipe, or with another pyproject.toml
+// or uv.lock, is another image. uv.lock's versions are the ones installed, so
+// editing the lock moves the tag. A declared Dockerfile is addressed by its own
+// bytes and reads neither, so neither moves its tag.
+func TestContentHashCoversTheGeneratedRecipeAndItsInputs(t *testing.T) {
 	const base = "astrocrpublic.azurecr.io/runtime:3.1-2"
 	project := t.TempDir()
-	hash := func() string {
+	breq := imagebuild.Request{ManifestDir: project}
+	hash := func(recipe string, df declaredDockerfile) string {
 		t.Helper()
-		inputs, err := imagebuild.InstallInputsDigest(imagebuild.Request{ManifestDir: project})
+		h, err := contentHash(base, "linux/amd64", recipe, breq, df)
 		require.NoError(t, err)
-		got, err := contentHash(base, "linux/amd64", inputs, "", declaredDockerfile{})
-		require.NoError(t, err)
-		return got
+		return h
 	}
-	require.NoError(t, os.WriteFile(filepath.Join(project, "pyproject.toml"), []byte("[project]\n"), 0o600))
-	withManifest := hash()
-	require.NoError(t, os.WriteFile(filepath.Join(project, "pyproject.toml"), []byte("[project]\ndependencies = ['pandas']\n"), 0o600))
-	edited := hash()
-	require.NoError(t, os.WriteFile(filepath.Join(project, "uv.lock"), []byte("version = 1\n"), 0o600))
-	withLock := hash()
-	require.NoError(t, os.WriteFile(filepath.Join(project, "uv.lock"), []byte("version = 1\n# relocked\n"), 0o600))
-	relocked := hash()
-	assert.NotEqual(t, withManifest, edited, "pyproject.toml is hashed")
-	assert.NotEqual(t, edited, withLock, "uv.lock is hashed")
-	assert.NotEqual(t, withLock, relocked, "editing uv.lock moves the tag")
+	write := func(name, body string) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(filepath.Join(project, name), []byte(body), 0o600))
+	}
+	write("pyproject.toml", "[project]\n")
+
+	assert.NotEqual(t, hash("recipe one", declaredDockerfile{}), hash("recipe two", declaredDockerfile{}),
+		"a changed generated recipe moves the tag")
+
+	manifest := hash("recipe", declaredDockerfile{})
+	write("pyproject.toml", "[project]\ndependencies = ['pandas']\n")
+	edited := hash("recipe", declaredDockerfile{})
+	write("uv.lock", "version = 1\n")
+	locked := hash("recipe", declaredDockerfile{})
+	write("uv.lock", "version = 1\n# relocked\n")
+	relocked := hash("recipe", declaredDockerfile{})
+	assert.NotEqual(t, manifest, edited, "pyproject.toml is hashed")
+	assert.NotEqual(t, edited, locked, "uv.lock is hashed")
+	assert.NotEqual(t, locked, relocked, "editing uv.lock moves the tag")
+
+	df := filepath.Join(t.TempDir(), "Dockerfile")
+	require.NoError(t, os.WriteFile(df, []byte("FROM scratch\n"), 0o600))
+	declared := declaredDockerfile{rel: "Dockerfile", abs: df}
+	before := hash("", declared)
+	write("uv.lock", "version = 1\n# relocked again\n")
+	assert.Equal(t, before, hash("", declared), "a declared Dockerfile's tag does not follow the generated build's inputs")
 }
 
 func TestAstroBuildTagOverrideSkipsLatest(t *testing.T) {

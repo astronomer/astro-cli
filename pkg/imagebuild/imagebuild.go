@@ -209,7 +209,7 @@ type Request struct {
 	//
 	// A generated build forwards only the manifest.RuntimeSecretID spec: the
 	// one RUN that can read a secret is the Python install, which mounts that
-	// one.
+	// one when it is given, and mounts nothing otherwise.
 	//
 	// The SPEC is forwarded, never a secret value: docker reads the value itself
 	// from the src file or the named env var. So these strings are safe in a
@@ -419,7 +419,7 @@ func (b *Builder) buildImage(ctx context.Context, req Request, cb rt.Callbacks, 
 	// The Dockerfile sits outside the context so the trailing `COPY . .` does
 	// not bake it in.
 	dfPath := filepath.Join(req.WorkDir, dockerfileName)
-	if err := os.WriteFile(dfPath, []byte(InstallDockerfile(from)), filePermRW); err != nil {
+	if err := os.WriteFile(dfPath, []byte(installDockerfile(from, len(req.buildSecrets()) > 0)), filePermRW); err != nil {
 		return "", fmt.Errorf("writing %s: %w", dfPath, err)
 	}
 
@@ -511,9 +511,9 @@ func absPaths(req Request) (Request, error) {
 
 // buildSecrets are the Secrets the build can read. A declared Dockerfile
 // mounts whichever it names. A generated build's Dockerfile mounts
-// manifest.RuntimeSecretID alone (InstallDockerfile), so any other secret is
-// dropped rather than handed to docker, which would read its source for
-// nothing.
+// manifest.RuntimeSecretID alone (installDockerfile), and only when this
+// returns it, so any other secret is dropped rather than handed to docker,
+// which would read its source for nothing.
 func (r *Request) buildSecrets() []string {
 	if r.FromDeclaredDockerfile() {
 		return r.Secrets

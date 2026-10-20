@@ -94,6 +94,8 @@ func TestBuildWritesTheInstallDockerfile(t *testing.T) {
 	req.Dependencies = []string{"pandas"}
 	_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
 	require.NoError(t, err)
+	// With no secret to mount, the Python install is a plain RUN, and the
+	// helper's stage copies its inputs, so the file needs no BuildKit.
 	df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
 	require.NoError(t, err)
 	base := req.BaseImage + "-base"
@@ -107,11 +109,11 @@ func TestBuildWritesTheInstallDockerfile(t *testing.T) {
 		"RUN if [ -x /usr/local/bin/install-system-packages ]; then /usr/local/bin/install-system-packages; "+
 		"elif [ -s packages.txt ]; then apt-get update && cat packages.txt | tr '\\r\\n' '\\n' | sed -e 's/#.*//' | xargs apt-get install -y --no-install-recommends && apt-get clean && rm -rf /var/lib/apt/lists/*; fi\n"+
 		"COPY --from=astro-install /tmp/astro-install/requirements.txt /tmp/astro-install/uv-lock-constraints.txt ./\n"+
-		"RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false "+
-		"if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; "+
+		"RUN if [ -x /usr/local/bin/install-python-dependencies ]; then /usr/local/bin/install-python-dependencies; "+
 		"else pip install --no-cache-dir --root-user-action=ignore -r requirements.txt; fi\n"+
 		"USER astro\n"+
 		"COPY --chown=astro:0 . .\n", string(df))
+	assert.NotContains(t, string(df), "--mount")
 	assert.NoFileExists(t, filepath.Join(req.WorkDir, buildContextDir, dockerfileName))
 }
 
@@ -226,7 +228,11 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, RuntimeImageRepo+":3.1-5-base", baseOf(RuntimeImageRepo+":3.1-5"))
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0-python-3.11-base", baseOf("quay.io/astronomer/astro-runtime:12.6.0-python-3.11"))
 	assert.Equal(t, RuntimeImageRepo+":3.1-base", baseOf(RuntimeImageRepo+":3.1-base"))
-	assert.Equal(t, InstallDockerfile(RuntimeImageRepo+":3.1-base"), GeneratedDockerfile(RuntimeImageRepo+":3.1"))
+	assert.True(t, strings.HasPrefix(GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "FROM "+RuntimeImageRepo+":3.1-base AS astro-install\n"))
+	// A project's own Dockerfile always mounts the secret; a generated build
+	// only when it has one.
+	assert.Equal(t, InstallDockerfile(RuntimeImageRepo+":3.1-base"), GeneratedDockerfile(RuntimeImageRepo+":3.1", true))
+	assert.NotContains(t, GeneratedDockerfile(RuntimeImageRepo+":3.1", false), "--mount")
 }
 
 func TestBuildWritesOSPackages(t *testing.T) {
@@ -779,6 +785,31 @@ func TestBuildGeneratedModePassesOnlyTheNetrcSecret(t *testing.T) {
 	}
 	if hasCall(cmd.calls, "id=pypi") {
 		t.Errorf("calls = %v, want no other secret on a generated build", cmd.calls)
+	}
+}
+
+// The netrc mount is written exactly when the netrc secret reaches the build.
+// Any other secret is dropped for a generated build, so it writes no mount
+// either, and the build needs no BuildKit for a step that mounts nothing.
+func TestGeneratedBuildMountsNetrcOnlyWithTheSecret(t *testing.T) {
+	for name, tc := range map[string]struct {
+		secrets []string
+		mount   bool
+	}{
+		"no secret":     {nil, false},
+		"another id":    {[]string{"id=tok,env=TOK"}, false},
+		"netrc":         {[]string{"id=netrc,env=NETRC_CONTENT"}, true},
+		"netrc and tok": {[]string{"id=tok,env=TOK", "id=netrc,src=/tmp/n"}, true},
+	} {
+		req := testRequest(t)
+		req.Dependencies = []string{"pandas"}
+		req.Secrets = tc.secrets
+		_, err := testBuilder(&fakeCmd{}).Build(context.Background(), req, rt.Callbacks{})
+		require.NoError(t, err, name)
+		df, err := os.ReadFile(filepath.Join(req.WorkDir, dockerfileName))
+		require.NoError(t, err, name)
+		assert.Equal(t, GeneratedDockerfile(req.BaseImage, tc.mount), string(df), name)
+		assert.Equal(t, tc.mount, strings.Contains(string(df), "RUN --mount=type=secret,id=netrc,target=/root/.netrc,required=false "), name)
 	}
 }
 
