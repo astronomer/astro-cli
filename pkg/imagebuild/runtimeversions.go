@@ -112,7 +112,8 @@ func LocalRuntimeImageWith(ctx context.Context, airflowVersion, runtime, require
 
 // airflow2Image is the base of an Airflow 2 build: runtime's image when the
 // manifest names a build, which needs no lookup, and otherwise the newest
-// runtime the catalog lists for the pin, yanked builds skipped. The pin is
+// runtime the catalog lists for the pin, yanked builds and builds dated after
+// today skipped. The pin is
 // held to the 2.7 floor first either way. load reads the catalog, and is
 // called only when there is something to look up; its error is returned as
 // it stands, so the caller words it.
@@ -132,7 +133,9 @@ func airflow2Image(pin, runtime string, load func() (*runtimeversions.Catalog, e
 	if err != nil {
 		return "", err
 	}
-	tag, ok := catalog.NewestRuntimeFor(pin)
+	// Published, not merely listed: a build the catalog dates after today has
+	// no image to pull yet.
+	tag, ok := catalog.NewestPublishedRuntimeFor(pin)
 	if !ok {
 		return "", fmt.Errorf("%w: %s%s", ErrNoRuntimeForAirflow, pin, seriesHint(pin))
 	}

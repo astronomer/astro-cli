@@ -221,6 +221,19 @@ func TestRuntimeImageForPythonBuildsAirflow2(t *testing.T) {
 	assert.ErrorContains(t, err, "pin apache-airflow==2.9.*")
 }
 
+// A build the catalog lists ahead of its release has no image yet, so the
+// newest one already out is the base.
+func TestRuntimeImageForPythonSkipsAnAirflow2BuildNotYetReleased(t *testing.T) {
+	c, err := runtimeversions.Parse([]byte(`{"runtimeVersions": {
+		"12.9.0":  {"metadata": {"airflowVersion": "2.10.5", "channel": "stable", "releaseDate": "2025-06-01"}},
+		"12.10.0": {"metadata": {"airflowVersion": "2.10.5", "channel": "stable", "releaseDate": "2999-01-01"}}}}`))
+	require.NoError(t, err)
+
+	ref, err := RuntimeImageForPython("2.10", "", "", func() *runtimeversions.Catalog { return c })
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref)
+}
+
 // With no build named, an Airflow 2 base has nothing to fall back to, unlike
 // an Airflow 3 one's Python: no catalog is a refusal that names the fix.
 func TestRuntimeImageForPythonRefusesAirflow2WithNoCatalog(t *testing.T) {
