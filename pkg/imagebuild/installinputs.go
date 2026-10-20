@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
+
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -154,46 +156,90 @@ const (
 	uvLockName    = "uv.lock"
 )
 
+// manifestProject is the project a generated build installs from:
+// req.ManifestDir, else the ProjectFiles the image carries (a caller that
+// predates ManifestDir), else "" for a request that names none.
+func manifestProject(req Request) string {
+	if req.ManifestDir != "" {
+		return req.ManifestDir
+	}
+	return req.ProjectFiles
+}
+
+// projectManifest reads manifestProject's pyproject.toml, or returns nil for a
+// request that names no project or a project without one.
+func projectManifest(req Request) ([]byte, error) {
+	project := manifestProject(req)
+	if project == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(filepath.Join(project, pyprojectName))
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("reading the project's %s: %w", pyprojectName, err)
+	}
+	return data, nil
+}
+
 // installInputs are the files a generated build's install stage reads, by their
 // slash-separated path in the context: the helper, and the project's
-// pyproject.toml and uv.lock as they are. The project is req.ManifestDir, else
-// the ProjectFiles the image carries (a caller that predates ManifestDir), so
-// the context's copies are always the project's own. A request with neither, or
-// whose project has no pyproject.toml, gets a pyproject.toml stating its
-// Dependencies and Packages, and its FindLinks pages as they were given.
+// pyproject.toml and uv.lock as they are (manifestProject), so the context's
+// copies are always the project's own. A request naming no project, or whose
+// project has no pyproject.toml, gets a pyproject.toml stating its Dependencies
+// and Packages, and its FindLinks pages as they were given.
 func installInputs(req Request) (map[string][]byte, error) {
 	inputs := map[string][]byte{InstallHelperPath: installHelper}
-	project := req.ManifestDir
-	if project == "" {
-		project = req.ProjectFiles
+	data, err := projectManifest(req)
+	if err != nil {
+		return nil, err
 	}
-	if project != "" {
-		data, err := os.ReadFile(filepath.Join(project, pyprojectName))
+	if data != nil {
+		inputs[pyprojectName] = data
+		lock, err := os.ReadFile(filepath.Join(manifestProject(req), uvLockName))
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
 		case err != nil:
-			return nil, fmt.Errorf("reading the project's %s: %w", pyprojectName, err)
+			return nil, fmt.Errorf("reading the project's %s: %w", uvLockName, err)
 		default:
-			inputs[pyprojectName] = data
-			lock, err := os.ReadFile(filepath.Join(project, uvLockName))
-			switch {
-			case errors.Is(err, fs.ErrNotExist):
-			case err != nil:
-				return nil, fmt.Errorf("reading the project's %s: %w", uvLockName, err)
-			default:
-				inputs[uvLockName] = lock
-			}
-			return inputs, nil
+			inputs[uvLockName] = lock
 		}
+		return inputs, nil
 	}
-	inputs[pyprojectName] = requestPyproject(req)
+	if inputs[pyprojectName], err = requestPyproject(req); err != nil {
+		return nil, err
+	}
 	if len(req.FindLinks) > 0 {
 		inputs[installFindLinksPath] = []byte(strings.Join(req.FindLinks, "\n") + "\n")
 	}
 	return inputs, nil
 }
 
-// writeInstallInputs writes installInputs into the generated build's context.
+// installsNothing reports whether a generated build of req would install
+// nothing over its base: no Python dependency besides Airflow and no OS
+// package, by the same manifest the install reads, the project's own
+// pyproject.toml when it has one. A pyproject.toml that cannot be read or
+// parsed counts as installing something, so the build runs and says why.
+func (r *Request) installsNothing() bool {
+	data, err := projectManifest(*r)
+	if err != nil {
+		return false
+	}
+	if data == nil {
+		return len(runtimeDeps(r.Dependencies)) == 0 && len(r.Packages) == 0
+	}
+	m, err := manifest.Parse(data)
+	if err != nil {
+		return false
+	}
+	return len(runtimeDeps(m.Requirements())) == 0 && len(m.Astro.Packages) == 0
+}
+
+// writeInstallInputs writes installInputs into the generated build's context,
+// replacing a copy of the project's own there (copyProjectFiles carries its
+// pyproject.toml, its uv.lock, and any install helper it has): removed first,
+// since a file the project keeps read-only arrives read-only.
 func writeInstallInputs(contextDir string, req Request) error {
 	inputs, err := installInputs(req)
 	if err != nil {
@@ -203,6 +249,9 @@ func writeInstallInputs(contextDir string, req Request) error {
 		dst := filepath.Join(contextDir, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(dst), contextDirPerm); err != nil {
 			return fmt.Errorf("creating %s: %w", filepath.Dir(dst), err)
+		}
+		if err := os.Remove(dst); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("replacing %s in the build context: %w", rel, err)
 		}
 		if err := os.WriteFile(dst, data, filePermRW); err != nil {
 			return fmt.Errorf("writing %s into the build context: %w", rel, err)
@@ -234,36 +283,34 @@ func InstallInputsDigest(req Request) (string, error) {
 
 // requestPyproject is a pyproject.toml stating a request's Dependencies and
 // Packages, for the helper to read when the request names no project.
-func requestPyproject(req Request) []byte {
-	return []byte("[project]\nname = \"astro-generated\"\nversion = \"0\"\n" +
-		"dependencies = " + tomlList(req.Dependencies) + "\n" +
-		"\n[tool.astro]\npackages = " + tomlList(req.Packages) + "\n")
+func requestPyproject(req Request) ([]byte, error) {
+	type project struct {
+		Name         string   `toml:"name"`
+		Version      string   `toml:"version"`
+		Dependencies []string `toml:"dependencies"`
+	}
+	type astro struct {
+		Packages []string `toml:"packages"`
+	}
+	doc := struct {
+		Project project `toml:"project"`
+		Tool    struct {
+			Astro astro `toml:"astro"`
+		} `toml:"tool"`
+	}{Project: project{Name: "astro-generated", Version: "0", Dependencies: nonNil(req.Dependencies)}}
+	doc.Tool.Astro.Packages = nonNil(req.Packages)
+	data, err := toml.Marshal(doc)
+	if err != nil {
+		return nil, fmt.Errorf("writing the build's %s: %w", pyprojectName, err)
+	}
+	return data, nil
 }
 
-// tomlString quotes s as a TOML basic string: a backslash, a quote and any
-// control character escaped, everything else as it is.
-func tomlString(s string) string {
-	var b strings.Builder
-	b.WriteByte('"')
-	for _, r := range s {
-		switch {
-		case r == '"' || r == '\\':
-			b.WriteByte('\\')
-			b.WriteRune(r)
-		case r < 0x20 || r == 0x7f:
-			fmt.Fprintf(&b, "\\u%04x", r)
-		default:
-			b.WriteRune(r)
-		}
+// nonNil is s, or an empty list for nil, which TOML writes as [] rather than
+// leaving the key out.
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
 	}
-	b.WriteByte('"')
-	return b.String()
-}
-
-func tomlList(items []string) string {
-	quoted := make([]string, len(items))
-	for i, s := range items {
-		quoted[i] = tomlString(s)
-	}
-	return "[" + strings.Join(quoted, ", ") + "]"
+	return s
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
@@ -40,7 +41,8 @@ func hostPython(t *testing.T) string {
 // test when the host has no Python to run it on.
 func installLists(t *testing.T, dir string) (requirements, packages, constraints string) {
 	t.Helper()
-	return installListsWith(t, dir, filepath.Join(t.TempDir(), "no-runtime-constraints"))
+	out := runHelper(t, dir, helperRun{})
+	return out.requirements, out.packages, out.constraints
 }
 
 // installListsWith is installLists with the runtime image's constraints file
@@ -72,7 +74,11 @@ func runHelper(t *testing.T, dir string, r helperRun) helperOutput {
 		t.Skip("no Python 3.8+ with tomllib or tomli on PATH to run the install helper on")
 	}
 	if r.runtimeConstraints == "" {
-		r.runtimeConstraints = filepath.Join(t.TempDir(), "no-runtime-constraints")
+		// An empty one, as a runtime that pins nothing would have. A missing
+		// one is a runtime before 11.0.0, which reads the host's installed
+		// packages as the base's (helperRun.env can name them).
+		r.runtimeConstraints = filepath.Join(t.TempDir(), "pip-constraints.txt")
+		require.NoError(t, os.WriteFile(r.runtimeConstraints, nil, 0o600))
 	}
 	out := t.TempDir()
 	var stderr bytes.Buffer
@@ -188,18 +194,27 @@ func TestInstallHelperPackages(t *testing.T) {
 // lockProject is a pyproject.toml whose dependencies are deps, and a uv.lock
 // resolving them: the project itself, recording each dependency's name and
 // specifier as uv does, then packages.
+//
+// A dependency may end in "|" and the source fields uv records for it
+// (`|index = "https://…"`, `|git = "https://…?rev=v1"`), written into the
+// lock's record and not into pyproject.toml; uv records no specifier for a
+// git, URL or path source.
 func lockProject(deps []string, packages string) (pyproject, lock string) {
 	quoted := make([]string, len(deps))
 	requiresDist := make([]string, len(deps))
 	for i, d := range deps {
+		d, source, _ := strings.Cut(d, "|")
 		quoted[i] = "'" + d + "'"
 		name, spec := d, ""
 		if at := strings.IndexAny(d, "<>=!~"); at >= 0 {
 			name, spec = d[:at], d[at:]
 		}
 		requiresDist[i] = `{ name = "` + name + `"`
-		if spec != "" {
+		if spec != "" && !strings.HasPrefix(source, "git") && !strings.HasPrefix(source, "url") && !strings.HasPrefix(source, "directory") {
 			requiresDist[i] += `, specifier = "` + spec + `"`
+		}
+		if source != "" {
+			requiresDist[i] += ", " + source
 		}
 		requiresDist[i] += " }"
 	}
@@ -331,7 +346,7 @@ func TestInstallHelperIndexSources(t *testing.T) {
 	const sources = "\n[[tool.uv.index]]\nname = 'acme'\nurl = 'https://pypi.acme.example/simple/'\nexplicit = true\n" +
 		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n" +
 		"[tool.uv.sources]\nprivate-lib = { index = 'acme' }\napache-airflow = { index = 'astronomer' }\n"
-	pyproject, lock := lockProject([]string{"apache-airflow==3.3.*", "private-lib", "pandas"}, lockEntry("pandas", "2.2.3")+`
+	pyproject, lock := lockProject([]string{`apache-airflow==3.3.*|index = "https://pip.astronomer.io/v2/"`, `private-lib|index = "https://pypi.acme.example/simple/"`, "pandas"}, lockEntry("pandas", "2.2.3")+`
 [[package]]
 name = "private-lib"
 version = "1.2.0"
@@ -431,4 +446,170 @@ func TestInstallHelperDerivesIndexPagesWithoutTheFile(t *testing.T) {
 	inputs, err := installInputs(Request{ManifestDir: project, FindLinks: []string{"https://pypi.acme.example/simple/Private_Lib/"}})
 	require.NoError(t, err)
 	assert.NotContains(t, inputs, installFindLinksPath)
+}
+
+// A dependency with a version whose source is a git repository, a URL or a
+// path is recorded by uv with that source and no specifier. A fresh lock of it
+// is not stale; one recorded with another source than pyproject.toml now
+// names, or with none, is.
+func TestInstallHelperStaleCheckFollowsSources(t *testing.T) {
+	const gitLock = `[[package]]
+name = "private-lib"
+version = "1.2.0"
+source = { git = "https://github.com/acme/private-lib?rev=v1.2.0#0123456789abcdef0123456789abcdef01234567" }
+`
+	const pyprojectGit = "\n[tool.uv.sources]\nprivate-lib = { git = 'https://github.com/acme/private-lib', rev = 'v1.2.0' }\n"
+	for name, tc := range map[string]struct {
+		source, sources string
+		stale           bool
+	}{
+		"a fresh lock of a git source":       {`git = "https://github.com/acme/private-lib?rev=v1.2.0"`, pyprojectGit, false},
+		"a fresh lock of a URL source":       {`url = "https://files.acme.example/private_lib-1.2.0-py3-none-any.whl"`, "\n[tool.uv.sources]\nprivate-lib = { url = 'https://files.acme.example/private_lib-1.2.0-py3-none-any.whl' }\n", false},
+		"a fresh lock of a path source":      {`directory = "libs/private-lib"`, "\n[tool.uv.sources]\nprivate-lib = { path = 'libs/private-lib' }\n", false},
+		"the git ref moved":                  {`git = "https://github.com/acme/private-lib?rev=v1.1.0"`, pyprojectGit, true},
+		"a source added since the lock":      {"", pyprojectGit, true},
+		"a source taken away since the lock": {`git = "https://github.com/acme/private-lib?rev=v1.2.0"`, "", true},
+		"the index moved": {`index = "https://old.acme.example/simple/"`,
+			"\n[[tool.uv.index]]\nname = 'acme'\nurl = 'https://new.acme.example/simple/'\nexplicit = true\n[tool.uv.sources]\nprivate-lib = { index = 'acme' }\n", true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dep := "private-lib>=1.2"
+			if tc.source != "" {
+				dep += "|" + tc.source
+			}
+			pyproject, lock := lockProject([]string{dep, "pandas"}, lockEntry("pandas", "2.2.3")+gitLock)
+			out := runHelper(t, helperProject(t, pyproject+tc.sources, lock), helperRun{})
+			if tc.stale {
+				assert.Contains(t, out.stderr, "uv.lock is out of date")
+				assert.Empty(t, out.constraints)
+				return
+			}
+			assert.Empty(t, out.stderr)
+			assert.Contains(t, out.constraints, "pandas==2.2.3")
+		})
+	}
+}
+
+// The install reads PyPI, so a package the lock took from another index (a
+// mirror, a private index the project reads by default) is not pinned: its
+// version may not be on PyPI, and the install would find no distribution.
+func TestInstallHelperPinsOnlyWhatPyPIServes(t *testing.T) {
+	pyproject, lock := lockProject([]string{"pandas", "internal-tool"}, lockEntry("pandas", "2.2.3")+`[[package]]
+name = "internal-tool"
+version = "4.0.1"
+source = { registry = "https://artifactory.acme.example/api/pypi/simple" }
+
+[[package]]
+name = "numpy"
+version = "2.4.6"
+source = { registry = "https://pypi.org/simple/" }
+`)
+	out := runHelper(t, helperProject(t, pyproject, lock), helperRun{})
+	assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\n"+
+		"# Not pinned, uv.lock took them from an index other than PyPI: internal-tool\n"+
+		"numpy==2.4.6\npandas==2.2.3\n", out.constraints)
+	assert.Contains(t, out.stderr, "uv.lock took internal-tool from an index other than PyPI")
+}
+
+// What the helper writes lands in an image layer and the build log, so a user
+// or token in an index or source URL is left out of it, with a warning: the
+// build authenticates through the netrc secret.
+func TestInstallHelperLeavesCredentialsOut(t *testing.T) {
+	const pyproject = "[project]\nname = 'p'\ndependencies = ['private-lib', 'tool', 'pandas']\n" +
+		"[[tool.uv.index]]\nname = 'acme'\nurl = 'https://user:s3cret@pypi.acme.example/simple/'\nexplicit = true\n" +
+		"[tool.uv.sources]\nprivate-lib = { index = 'acme' }\n" +
+		"tool = { git = 'https://x-access-token:ghp_s3cret@github.com/acme/tool', rev = 'v1' }\n"
+	out := runHelper(t, helperProject(t, pyproject, ""), helperRun{})
+	assert.Equal(t, "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\n"+
+		"tool @ git+https://github.com/acme/tool@v1\npandas\n", out.requirements)
+	assert.NotContains(t, out.requirements, "s3cret")
+	assert.Equal(t, 1, strings.Count(out.stderr, "carries a user or password"), out.stderr)
+
+	// An ssh URL's user is how ssh logs in, not a credential.
+	out = runHelper(t, helperProject(t, "[project]\nname = 'p'\ndependencies = ['tool']\n[tool.uv.sources]\ntool = { git = 'ssh://git@github.com/acme/tool' }\n", ""), helperRun{})
+	assert.Equal(t, "tool @ git+ssh://git@github.com/acme/tool\n", out.requirements)
+	assert.Empty(t, out.stderr)
+
+	// Nor do the lock's file URLs carry one.
+	pyproject2, lock := lockProject([]string{`private-lib|index = "https://pypi.acme.example/simple/"`}, `[[package]]
+name = "private-lib"
+version = "1.2.0"
+source = { registry = "https://pypi.acme.example/simple/" }
+sdist = { url = "https://user:s3cret@pypi.acme.example/files/private_lib-1.2.0.tar.gz", hash = "sha256:aaaa" }
+`)
+	pyproject2 += "\n[[tool.uv.index]]\nname = 'acme'\nurl = 'https://pypi.acme.example/simple/'\nexplicit = true\n[tool.uv.sources]\nprivate-lib = { index = 'acme' }\n"
+	out = runHelper(t, helperProject(t, pyproject2, lock), helperRun{})
+	assert.Contains(t, out.requirements, "private-lib @ https://pypi.acme.example/files/private_lib-1.2.0.tar.gz#sha256=aaaa\n")
+	assert.NotContains(t, out.requirements, "s3cret")
+}
+
+// A runtime before 11.0.0 ships no constraints file, so nothing else holds
+// what its base image has installed: the lock does not move those packages
+// unless the project lists them itself.
+func TestInstallHelperLeavesTheBaseImagesPackagesOnAnOldRuntime(t *testing.T) {
+	pyproject, lock := lockProject([]string{"pandas"}, lockEntry("pandas", "2.2.3")+lockEntry("six", "1.17.0")+lockEntry("python-dateutil", "2.9.0"))
+	dir := helperProject(t, pyproject, lock)
+	base := []string{"ASTRO_INSTALL_PROJECT_BASE_INSTALLED=pandas,Six,apache-airflow"}
+
+	old := runHelper(t, dir, helperRun{runtimeConstraints: filepath.Join(t.TempDir(), "absent"), env: base})
+	assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\npandas==2.2.3\npython-dateutil==2.9.0\n", old.constraints,
+		"six is installed in the base and not the project's own; pandas is the project's own")
+
+	current := runHelper(t, dir, helperRun{env: base})
+	assert.Contains(t, current.constraints, "six==1.17.0", "a runtime with a constraints file pins what the lock says")
+}
+
+// A project that keeps its files read-only ships them read-only into the
+// context, and the build still writes its own install inputs over them.
+func TestBuildReplacesReadOnlyProjectFiles(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"pyproject.toml":  "[project]\nname = 'p'\ndependencies = ['pandas']\n",
+		"uv.lock":         "version = 1\n",
+		InstallHelperPath: "# an older helper\n",
+	})
+	for _, name := range []string{"pyproject.toml", "uv.lock", InstallHelperPath} {
+		require.NoError(t, os.Chmod(filepath.Join(project, filepath.FromSlash(name)), 0o444))
+	}
+	req := testRequest(t)
+	req.ManifestDir, req.ProjectFiles = project, project
+	req.Dependencies = []string{"pandas"}
+
+	_, err := testBuilder(&fakeCmd{}).Build(t.Context(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	helper, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, filepath.FromSlash(InstallHelperPath)))
+	require.NoError(t, err)
+	assert.Equal(t, InstallHelper(), helper, "the CLI's helper, not the project's")
+}
+
+// With a project's pyproject.toml to install from, that file decides whether
+// there is anything to install, not the request's own lists.
+func TestBuildFastPathFollowsTheProjectsManifest(t *testing.T) {
+	for name, tc := range map[string]struct {
+		pyproject    string
+		dependencies []string
+		builds       bool
+	}{
+		"the project lists a dependency the request does not": {"[project]\nname = 'p'\ndependencies = ['apache-airflow==3.1.*', 'pandas']\n[tool.astro]\n", nil, true},
+		"the project lists an OS package":                     {"[project]\nname = 'p'\ndependencies = ['apache-airflow==3.1.*']\n[tool.astro]\npackages = ['libpq-dev']\n", nil, true},
+		"the project lists only Airflow":                      {"[project]\nname = 'p'\ndependencies = ['apache-airflow==3.1.*']\n[tool.astro]\n", []string{"pandas"}, false},
+		"a pyproject.toml that does not parse":                {"[project\n", nil, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project := t.TempDir()
+			writeTree(t, project, map[string]string{"pyproject.toml": tc.pyproject})
+			cmd := &fakeCmd{}
+			req := testRequest(t)
+			req.ManifestDir, req.Dependencies = project, tc.dependencies
+			image, err := testBuilder(cmd).Build(t.Context(), req, rt.Callbacks{})
+			require.NoError(t, err)
+			if tc.builds {
+				assert.Equal(t, req.Tag, image)
+				assert.NotEmpty(t, cmd.calls)
+				return
+			}
+			assert.Equal(t, req.BaseImage+"-base", image)
+			assert.Empty(t, cmd.calls)
+		})
+	}
 }
