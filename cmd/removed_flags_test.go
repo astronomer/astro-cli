@@ -128,6 +128,8 @@ var removedFlagCases = []removedFlagCase{
 	{tree: apcTree, args: []string{"api", "airflow", "describe", "get_dags"}, flag: "api-url", value: "http://localhost:8080", want: errAPIURLFlagRemoved},
 	{tree: astroTree, args: []string{"api", "airflow"}, flag: "deployment-id", value: "dep-id", want: errDeploymentIDAPIFlag},
 	{tree: apcTree, args: []string{"api", "airflow", "ls"}, flag: "deployment-id", value: "dep-id", want: errDeploymentIDAPIFlag},
+	{tree: astroTree, args: []string{"env", "list"}, flag: "workspace-id", value: "ws-id", want: errEnvListWorkspaceIDRemoved},
+	{tree: astroHostedTree, args: []string{"env", "list"}, flag: "deployment-id", value: "dep-id", want: errEnvListDeploymentIDRemoved},
 	{tree: astroTree, args: []string{"workspace", "list"}, flag: "json", want: errJSONFlagRemoved},
 	{tree: astroHostedTree, args: []string{"deployment", "list", "-a"}, flag: "json", want: errJSONFlagRemoved},
 	{tree: astroTree, args: []string{"api", "cloud", "ls"}, flag: "json", want: errJSONFlagRemoved},
@@ -892,6 +894,11 @@ func TestEveryV1FlagStillWorksOrSaysWhatReplacedIt(t *testing.T) {
 		assert.Greater(t, c.checked, 200, "%s: the inventory matched few commands; is v1_flags.tsv still read right?", tc.tree.name)
 	}
 	for i := range removedFlags {
+		// An entry for a command 1.x did not have is reached by no row of
+		// the inventory; TestRemovedFlagsSayWhatReplacedThem runs it.
+		if removedFlags[i].v2Only {
+			continue
+		}
 		assert.True(t, reached[&removedFlags[i]], "removedFlags[%d] (--%s) applies to no flag 1.x had on a command v2 has", i, removedFlags[i].name)
 	}
 }
