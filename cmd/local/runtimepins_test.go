@@ -382,8 +382,10 @@ func TestInitMovesThePinsAndRelocks(t *testing.T) {
 	var relocked []string
 	relock := func(dir string) error { relocked = append(relocked, dir); return nil }
 
-	r := pinsRun{src: src, build: build332, freeze: freeze339, args: []string{"init"}, relock: relock,
-		files: map[string]string{"uv.lock": "version = 1\n"}}.start(t)
+	r := pinsRun{
+		src: src, build: build332, freeze: freeze339, args: []string{"init"}, relock: relock,
+		files: map[string]string{"uv.lock": "version = 1\n"},
+	}.start(t)
 	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 (Python 3.12)") {
 		t.Errorf("init did not move the pins to 3.3-9:\n%s", r.manifest)
 	}
@@ -394,9 +396,11 @@ func TestInitMovesThePinsAndRelocks(t *testing.T) {
 		t.Errorf("uv lock ran %d times, want once", len(relocked))
 	}
 
-	r = pinsRun{src: src, build: build332, freeze: freeze339, args: []string{"init"},
+	r = pinsRun{
+		src: src, build: build332, freeze: freeze339, args: []string{"init"},
 		relock: func(string) error { return fmt.Errorf("finding uv: %w", uv.ErrNotFound) },
-		files:  map[string]string{"uv.lock": "version = 1\n"}}.start(t)
+		files:  map[string]string{"uv.lock": "version = 1\n"},
+	}.start(t)
 	if !strings.Contains(r.out, "run uv lock so it follows, once uv is installed") {
 		t.Errorf("init without uv did not say to run uv lock:\n%s", r.out)
 	}

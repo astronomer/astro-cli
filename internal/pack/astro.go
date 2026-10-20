@@ -128,6 +128,17 @@ func checkRuntimeBuild(ctx context.Context, req Request, airflow manifest.Airflo
 	return warnings, nil
 }
 
+// lockedRuntimeNotices are what the package says about the build the
+// project's lock was made for, as the image resolved it: a newer one is
+// available, or requires-python sent it to the series' newest
+// (imagebuild.LockedRuntimeNotices). None without a catalog.
+func lockedRuntimeNotices(ctx context.Context, req Request, mb imagebuild.ManifestBuild) []string {
+	if req.RuntimeCatalog == nil {
+		return nil
+	}
+	return imagebuild.LockedRuntimeNotices(mb, req.RuntimeCatalog(ctx))
+}
+
 func runtimeCatalog(ctx context.Context, req Request) func() *runtimeversions.Catalog {
 	if req.RuntimeCatalog == nil {
 		return nil
@@ -191,11 +202,7 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	if err != nil {
 		return Result{}, err
 	}
-	// The build the lock was made for, as the image just resolved: a newer
-	// one is available, or requires-python sent it to the series' newest.
-	if req.RuntimeCatalog != nil {
-		warnings = append(warnings, imagebuild.LockedRuntimeNotices(mb, req.RuntimeCatalog(ctx))...)
-	}
+	warnings = append(warnings, lockedRuntimeNotices(ctx, req, mb)...)
 	declared := breq.Dockerfile
 	missingSecrets, err := checkSecrets(req, cb)
 	if err != nil {
