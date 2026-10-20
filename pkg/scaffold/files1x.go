@@ -102,6 +102,16 @@ type project1x struct {
 	// inside it, and deleting that file while keeping the build that reads it is
 	// worse than either outcome alone.
 	dockerfileBody []byte
+	// rewrite is the Dockerfile moved onto its base's -base tag, when its
+	// shape allows one (dockerfileRewriteOf), or nil. plan clears it when the
+	// two 1.x lists were not carried whole (planDockerfileRewrite), so once
+	// plan has run, non-nil means the run rewrites the file.
+	rewrite *dockerfileRewrite
+	// listsRead reports a Dockerfile that is the build and has a stage that
+	// might run ONBUILD steps, which read requirements.txt and packages.txt
+	// from the build's context (dockerfileRewriteOf). When none can, the two
+	// lists are read by nothing, and are retired like any carried file.
+	listsRead bool
 	// projectName is the name .astro/config.yaml states, before any
 	// sanitizing. Empty when the file is absent, says nothing, or will not
 	// parse.
@@ -313,22 +323,17 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 	if base.RuntimeVersion() != "" {
 		_, from1x.basePython = airflowrt.ParseRuntimeTagPython(base.Tag)
 	}
-	// Two sources for one list, so say it rather than let someone find out.
-	//
-	// A declared Dockerfile is the build, and imagebuild ignores the
-	// manifest's dependencies and packages in that mode, so requirements.txt
-	// and packages.txt are KEPT (planRetirements spares them) because the
-	// runtime base's ONBUILD reads them from the context. The manifest gets
-	// the lists too, for the day the Dockerfile goes away. Both being live
-	// at once is deliberate and is exactly the kind of thing that reads as a
-	// conversion bug when nothing mentions it.
+	// A Dockerfile that is the build and sits on an ONBUILD tag is moved onto
+	// the tag's -base image, so the two 1.x lists stop being read and can go
+	// (dockerfileRewriteOf). Whether they were carried whole is only known once
+	// the manifest is settled, so plan makes the final call
+	// (planDockerfileRewrite), and it is plan that adds the notes for the lists
+	// a file kept on its ONBUILD tag still needs.
 	if !from1x.dockerfilePinOnly {
-		for _, kept := range []string{"requirements.txt", "packages.txt"} {
-			if slices.Contains(from1x.present, kept) {
-				from1x.notes = append(from1x.notes, kept+": kept, because your Dockerfile's base image reads it "+
-					"during the build. Its contents are in pyproject.toml as well, which is what a project "+
-					"without a Dockerfile installs from")
-			}
+		var blocker string
+		from1x.rewrite, blocker, from1x.listsRead = dockerfileRewriteOf(data)
+		if blocker != "" {
+			from1x.notes = append(from1x.notes, blocker)
 		}
 	}
 	// A Dockerfile that is not pin-only and drew no note is kept and

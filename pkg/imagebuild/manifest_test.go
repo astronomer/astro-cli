@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 )
 
@@ -243,7 +244,7 @@ func TestForManifestBuildCarriesTheProject(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		"include/agents/__init__.py", "dags/blueprints.py", "pyproject.toml", ".astro/config.yaml",
 		"include/logs/fixture.json", "include/airflow.cfg", "include/sample_env", "include/environment/defaults.yaml",
-		InstallHelperPath,
+		airflowrt.InstallHelperPath,
 	}, contextFiles(t, ctxDir))
 	reqs, _, _ := installLists(t, ctxDir)
 	assert.Equal(t, "pandas\n", reqs, "the generated requirements, not the project's")

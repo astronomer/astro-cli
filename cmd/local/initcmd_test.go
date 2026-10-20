@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
@@ -344,8 +345,9 @@ func TestInitUnderAPCWritesWhatAstroWrites(t *testing.T) {
 }
 
 // A Dockerfile FROM a mirror of Astro Runtime is adopted under APC as under
-// Astro: declared as the project's build and kept as written, since the mirror
-// keeps Runtime's repository name and tag.
+// Astro: declared as the project's build, since the mirror keeps Runtime's
+// repository name and tag, and moved onto the mirror's own -base tag rather
+// than onto Astronomer's, so an air-gapped project keeps building from it.
 func TestInitAdoptsAMirroredBaseUnderAPC(t *testing.T) {
 	for _, from := range []string{
 		"registry.corp.example/astronomer/astro-runtime:12.1.0",
@@ -364,8 +366,16 @@ func TestInitAdoptsAMirroredBaseUnderAPC(t *testing.T) {
 			if m := loadManifest(t, filepath.Join(dir, manifest.Marker)); m.Astro.Dockerfile != "Dockerfile" {
 				t.Errorf("[tool.astro] dockerfile = %q, want the mirrored-base Dockerfile declared", m.Astro.Dockerfile)
 			}
-			if got, err := os.ReadFile(filepath.Join(dir, "Dockerfile")); err != nil || string(got) != body {
-				t.Errorf("the Dockerfile changed: %q, %v", got, err)
+			got, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			stages := airflowrt.DockerfileStages(got)
+			if final := stages[len(stages)-1]; final.Ref != from+"-base" {
+				t.Errorf("the final stage builds FROM %q, want the mirror's %s-base", final.Ref, from)
+			}
+			if !strings.HasSuffix(string(got), "\nENV TZ=UTC\n") {
+				t.Errorf("the Dockerfile's own step is not kept last:\n%s", got)
 			}
 		})
 	}

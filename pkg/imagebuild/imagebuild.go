@@ -45,6 +45,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/localrt/rt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 )
@@ -149,15 +150,9 @@ const (
 	// file of uv.lock's versions requirements.txt names with -c. The install
 	// helper writes all three (install-project.py's REQUIREMENTS, PACKAGES and
 	// LOCK_CONSTRAINTS).
-	requirementsName    = "requirements.txt"
-	packagesName        = "packages.txt"
-	lockConstraintsName = "uv-lock-constraints.txt"
-	// baseTagSuffix turns a runtime tag into its -base tag (3.1-5 to
-	// 3.1-5-base, 12.6.0-python-3.11 to 12.6.0-python-3.11-base), the same
-	// image without the ONBUILD triggers. The runtime publishes one beside
-	// every tag, in the same repository: scripts/check-runtime-base-tags.sh
-	// checks each one the CLI can pick.
-	baseTagSuffix = "-base"
+	requirementsName    = airflowrt.RequirementsName
+	packagesName        = airflowrt.PackagesName
+	lockConstraintsName = airflowrt.LockConstraintsName
 	// contextDirPerm is owner-only, matching internal/localstate.
 	contextDirPerm = 0o700
 )
@@ -198,7 +193,7 @@ type Request struct {
 	WorkDir string
 	// BaseImage is the resolved runtime image the build is of
 	// (astrocrpublic.azurecr.io/runtime:<version>). The build starts FROM its
-	// -base tag (baseTagSuffix); BaseImage itself stays the runtime's own tag,
+	// -base tag (airflowrt.BaseOf); BaseImage itself stays the runtime's own tag,
 	// which is what callers parse the runtime version out of and name in
 	// messages. Empty in Dockerfile mode: the project's own file declares what
 	// it builds on.
@@ -534,10 +529,7 @@ func (r *Request) buildSecrets() []string {
 // catalog, a platform's offer, a [tool.astro] runtime), so every caller of
 // Build gets it. A ref already on a -base tag is returned as it is.
 func baseOf(ref string) string {
-	if strings.HasSuffix(ref, baseTagSuffix) {
-		return ref
-	}
-	return ref + baseTagSuffix
+	return airflowrt.BaseOf(ref)
 }
 
 // shouldPull reports whether the build may force-refresh its base images.

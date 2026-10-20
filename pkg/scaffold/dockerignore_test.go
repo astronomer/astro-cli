@@ -46,7 +46,7 @@ func writeProjectFile(t *testing.T, dir, rel, content string) {
 
 func applyDockerignore(t *testing.T, dir string) *Change {
 	t.Helper()
-	c, err := planDockerignore(dir, "Dockerfile")
+	c, err := planDockerignore(dir, "Dockerfile", nil)
 	require.NoError(t, err)
 	if c != nil {
 		require.NoError(t, c.apply(dir))

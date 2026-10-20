@@ -395,6 +395,17 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	if err := planFiles(abs, goos != windowsOS, cs); err != nil {
 		return nil, err
 	}
+
+	// Whether the Dockerfile moves onto its -base tag rests on whether the
+	// two 1.x lists were carried whole, which the notes so far say: a line
+	// either could not carry is in a note naming it. So it is decided here,
+	// once the manifest is settled, and before the ignore file, which then
+	// has to keep what the rewritten build reads. The rewrite's own changes
+	// add files, so they go ahead of the manifest like every other addition.
+	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
+	if err := planDockerfileRewrite(abs, from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs); err != nil {
+		return nil, err
+	}
 	if err := planKeptDockerfileIgnore(abs, from1x, cs); err != nil {
 		return nil, err
 	}
@@ -419,7 +430,6 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// The 1.x notes lead: they are about the files this run just read, so they
 	// describe what it could not carry. leftovers is about files it did not read
 	// at all, which is a weaker statement and belongs after.
-	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
 	cs.Notes = slices.Concat(from1x.notes, pin.migrationNotes, lefts)
 
 	// The values airflow_settings.yaml supplied. They ride the changeset rather
@@ -603,7 +613,13 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// Kept rather than un-migrated: the manifest lists stay, because a project
 	// that later drops its Dockerfile needs them, and they cost nothing while the
 	// declaration stands. The note below tells the user both exist.
-	if declaresDockerfile(from1x) {
+	//
+	// Not for a Dockerfile this run moves onto its -base tag: nothing reads
+	// either file then, and the rewrite happened only because both were carried
+	// whole (planDockerfileRewrite).
+	// Nor for one no stage of which can run ONBUILD steps (listsRead): nothing
+	// reads the lists then either.
+	if declaresDockerfile(from1x) && from1x.rewrite == nil && from1x.listsRead {
 		out = slices.DeleteFunc(out, func(name string) bool {
 			return name == "requirements.txt" || name == "packages.txt"
 		})
@@ -614,9 +630,9 @@ func planRetirements(from1x *project1x, notes []string, pinned string) []string 
 	// and packages.txt is consumed the same way by the runtime image's ONBUILD
 	// step, from the build context.
 	if !slices.Contains(out, "Dockerfile") && len(from1x.dockerfileBody) > 0 {
-		body := string(from1x.dockerfileBody)
+		lines := strings.Split(string(from1x.dockerfileBody), "\n")
 		out = slices.DeleteFunc(out, func(name string) bool {
-			return strings.Contains(body, name)
+			return instructionsName(lines, name)
 		})
 	}
 	return out
