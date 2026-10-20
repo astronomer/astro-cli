@@ -418,7 +418,8 @@ func TestAV2OnlyEntryIsNotShadowedByAGeneralOne(t *testing.T) {
 // alone what still takes a workspace flag there: 1.x's --workspace-id, a
 // no-op, still parses, and token workspace-token add and remove, which read
 // --workspace, take it. APC's commands of those names never had one, so
-// cobra's own error answers there.
+// cobra's own error answers there, though they take --deployment too, and
+// their no-op --workspace-id still parses.
 func TestDeploymentByIDWorkspaceTombstoneLeavesTheRestAlone(t *testing.T) {
 	for _, args := range [][]string{
 		{"deployment", "team", "list", "--deployment", "dep-id", "--workspace-id", "ws-id"},
@@ -431,10 +432,15 @@ func TestDeploymentByIDWorkspaceTombstoneLeavesTheRestAlone(t *testing.T) {
 		_, _, err := executeRoot(root, args...)
 		assert.ErrorIs(t, err, errRan, args)
 	}
-	root, _ := disarmedTree(t, apcTree)
-	_, _, err := executeRoot(root, "deployment", "team", "list", "--deployment-id", "dep-id", "--workspace", "ws-id")
-	require.Error(t, err)
-	assert.Equal(t, "unknown flag: --workspace", err.Error())
+	for _, noun := range []string{"team", "user"} {
+		root, _ := disarmedTree(t, apcTree)
+		_, _, err := executeRoot(root, "deployment", noun, "list", "--deployment-id", "dep-id", "--workspace-id", "ws-id")
+		assert.ErrorIs(t, err, errRan, noun)
+		root, _ = disarmedTree(t, apcTree)
+		_, _, err = executeRoot(root, "deployment", noun, "list", "--deployment", "dep-id", "--workspace", "ws-id")
+		require.Error(t, err, noun)
+		assert.Equal(t, "unknown flag: --workspace", err.Error(), noun)
+	}
 }
 
 // --force's message changes when the run passed --yes already, ahead of it:

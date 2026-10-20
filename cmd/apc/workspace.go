@@ -50,6 +50,7 @@ func newWorkspaceCmd(out io.Writer) *cobra.Command {
 		newWorkspaceSaRootCmd(out),
 		newWorkspaceTeamRootCmd(out),
 	)
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 

@@ -204,9 +204,10 @@ var removedFlags = []removedFlag{
 	{name: "workspace-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListWorkspaceIDRemoved)},
 	{name: "deployment-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListDeploymentIDRemoved)},
 	// --workspace is no 1.x flag there (1.x's --workspace-id still is, as a
-	// no-op), so these answer for the long name alone. needs keeps them to
-	// Astro's tree: APC's commands of these names never took one.
-	{name: "workspace", under: []string{"deployment team", "deployment user", "deployment token"}, needs: has("deployment"), v2Only: true, reason: says(errDeploymentByIDWorkspaceRemoved)},
+	// no-op), so these answer for the long name alone. An earlier v2 build
+	// gave it to Astro's: needs keeps them to Astro's tree. APC's commands of
+	// these names never took one, so cobra's own error answers there.
+	{name: "workspace", under: []string{"deployment team", "deployment user", "deployment token"}, needs: onAstro(has("deployment")), v2Only: true, reason: says(errDeploymentByIDWorkspaceRemoved)},
 	// 1.x's list commands shared --json, --template and -o
 	// table|json|template (pkg/output's AddFlags), and api ls and describe
 	// had --json.
@@ -217,8 +218,8 @@ var removedFlags = []removedFlag{
 	{name: "format", needs: cliout.HasOutput, reason: formatRemoved},
 	// --force skipped the confirmation that --yes skips now.
 	{name: "force", needs: has("yes"), reason: forceRemoved},
-	// astro deploy's 1.x-project flags. Astro's deploy has --deployment for
-	// --save to point at; APC's names its Deployment by the argument alone.
+	// astro deploy's 1.x-project flags. Astro's deploy and APC's both have
+	// --deployment for --save to point at.
 	{name: "save", under: []string{"deploy"}, needs: has("deployment"), reason: says(errDeploySaveRemoved)},
 	{name: "pytest", under: []string{"deploy"}, reason: says(errDeployPytestRemoved)},
 	{name: "test", under: []string{"deploy"}, reason: says(errDeployTestRemoved)},
@@ -485,6 +486,14 @@ func pathBelowRoot(cmd *cobra.Command) string {
 
 func has(flag string) func(*cobra.Command) bool {
 	return func(cmd *cobra.Command) bool { return cmd.Flag(flag) != nil }
+}
+
+// onAstro is needs on a command of Astro's tree alone (markV1Tree): one
+// APC's tree has under the same name answers as it would without the entry.
+func onAstro(needs func(*cobra.Command) bool) func(*cobra.Command) bool {
+	return func(cmd *cobra.Command) bool {
+		return cmd.Root().Annotations[v1TreeAnnotation] != v1TreeAPC && needs(cmd)
+	}
 }
 
 // forceRemoved names --yes with its shorthand when cmd gives it one, and

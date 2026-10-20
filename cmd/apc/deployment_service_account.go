@@ -17,16 +17,20 @@ var (
 	deploymentSACreateRole     string
 
 	deploymentSaCreateExample = `  # Create a service account that can view a Deployment
-  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label
+  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --label=my_label
 
   # Create one that can edit it
-  astro deployment service-account create --deployment-id=<DEPLOYMENT_ID> --label=my_label \
+  astro deployment service-account create --deployment=<DEPLOYMENT_ID> --label=my_label \
     --role=DEPLOYMENT_EDITOR`
 	deploymentSaListExample = `  # List a Deployment's service accounts
-  astro deployment service-account list --deployment-id=<DEPLOYMENT_ID>`
+  astro deployment service-account list --deployment=<DEPLOYMENT_ID>`
 	deploymentSaDeleteExample = `  # Delete a service account from a Deployment
-  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment-id=<DEPLOYMENT_ID>`
+  astro deployment service-account delete <SERVICE_ACCOUNT_ID> --deployment=<DEPLOYMENT_ID>`
 )
+
+// deploymentSAFlagUsage is --deployment's help on the commands that manage
+// a Deployment's service accounts.
+const deploymentSAFlagUsage = "Deployment whose service accounts to manage: a link name from the project's manifest, or a Deployment id"
 
 func newDeploymentSaRootCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -54,12 +58,12 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 			return deploymentSaCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
 	cmd.Flags().StringVarP(&deploymentSACreateCategory, "category", "c", "default", "Category of the service account")
 	cmd.Flags().StringVarP(&deploymentSACreateLabel, "label", "l", "", "Label of the service account")
 	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the service account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
-	_ = cmd.MarkFlagRequired("label")         //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("label")      //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -75,8 +79,8 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 			return deploymentSaList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -93,8 +97,8 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentSaDelete(cmd, args, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment in which you wish to manage service accounts")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }

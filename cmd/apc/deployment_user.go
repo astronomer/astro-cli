@@ -19,19 +19,19 @@ var (
 	deploymentUserFullname string
 	// examples
 	deploymentUserListExample = `  # List a Deployment's users
-  astro deployment user list --deployment-id=<DEPLOYMENT_ID>
+  astro deployment user list --deployment=<DEPLOYMENT_ID>
 
   # Search them by email
-  astro deployment user list --deployment-id=<DEPLOYMENT_ID> --email=<EMAIL>`
+  astro deployment user list --deployment=<DEPLOYMENT_ID> --email=<EMAIL>`
 	deploymentUserCreateExample = `  # Give a Workspace user viewer access to a Deployment
-  astro deployment user add --deployment-id=<DEPLOYMENT_ID> --email=<EMAIL>
+  astro deployment user add --deployment=<DEPLOYMENT_ID> --email=<EMAIL>
 
   # Give them another role
-  astro deployment user add --deployment-id=<DEPLOYMENT_ID> --email=<EMAIL> --role=DEPLOYMENT_EDITOR`
+  astro deployment user add --deployment=<DEPLOYMENT_ID> --email=<EMAIL> --role=DEPLOYMENT_EDITOR`
 	deploymentUserRemoveExample = `  # Remove a user's access to a Deployment
-  astro deployment user remove <EMAIL> --deployment-id=<DEPLOYMENT_ID>`
+  astro deployment user remove <EMAIL> --deployment=<DEPLOYMENT_ID>`
 	deploymentUserUpdateExample = `  # Change a user's role in a Deployment
-  astro deployment user update <EMAIL> --deployment-id=<DEPLOYMENT_ID> --role=DEPLOYMENT_ADMIN`
+  astro deployment user update <EMAIL> --deployment=<DEPLOYMENT_ID> --role=DEPLOYMENT_ADMIN`
 )
 
 func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
@@ -41,6 +41,8 @@ func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Deployment user resources",
 		Long:    "Users can be added or removed from Deployment",
 	}
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users to manage: a link name from the project's manifest, or a Deployment id", true, "")
+	_ = cmd.MarkPersistentFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.AddCommand(
 		newDeploymentUserListCmd(out),
 		newDeploymentUserAddCmd(out),
@@ -60,12 +62,9 @@ func newDeploymentUserListCmd(out io.Writer) *cobra.Command {
 			return deploymentUserList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment in which you wish to manage users")
 	cmd.Flags().StringVarP(&deploymentUserID, "user-id", "u", "", "ID of the user to search for")
 	cmd.Flags().StringVarP(&deploymentUserEmail, "email", "e", "", "Email of the user to search for")
 	cmd.Flags().StringVarP(&deploymentUserFullname, "name", "n", "", "Full name of the user to search for")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -80,12 +79,10 @@ func newDeploymentUserAddCmd(out io.Writer) *cobra.Command {
 			return deploymentUserAdd(cmd, out)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment in which you wish to add the user")
-	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
+	cmd.PersistentFlags().StringVarP(&deploymentUserRole, "role", "r", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	cmd.Flags().StringVarP(&deploymentUserEmail, "email", "e", "", "Email of the user to add to the Deployment")
 
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	_ = cmd.MarkFlagRequired("email")         //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	_ = cmd.MarkFlagRequired("email") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -102,8 +99,6 @@ func newDeploymentUserRemoveCmd(out io.Writer) *cobra.Command {
 			return deploymentUserRemove(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment where you want to remove the user")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -119,9 +114,7 @@ func newDeploymentUserUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentUserUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "ID of the Deployment where you want to update the user")
-	cmd.PersistentFlags().StringVar(&deploymentUserRole, "role", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.PersistentFlags().StringVarP(&deploymentUserRole, "role", "r", houston.DeploymentViewerRole, "Role assigned to user, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

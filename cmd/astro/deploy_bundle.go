@@ -313,7 +313,7 @@ func bundleTarget(ctx context.Context, name, workspace string, format cliout.For
 
 	if name != "" {
 		if m != nil && hasLink(m, name) {
-			named, _, err := manifestdeploy.ResolveNamed(m, name, "", workspace, "")
+			named, _, err := manifestdeploy.ResolveNamed(manifestdeploy.Request{Manifest: m, LinkName: name, WorkspaceID: workspace})
 			if err != nil {
 				return "", nil, login, cliout.Usage(err)
 			}

@@ -16,17 +16,17 @@ var deploymentRole string
 
 const (
 	deploymentTeamAddExample = `  # Give a Workspace team viewer access to a Deployment
-  astro deployment team add --deployment-id=<DEPLOYMENT_ID> --team-id=<TEAM_ID>
+  astro deployment team add --deployment=<DEPLOYMENT_ID> --team-id=<TEAM_ID>
 
   # Give it another role
-  astro deployment team add --deployment-id=<DEPLOYMENT_ID> --team-id=<TEAM_ID> \
+  astro deployment team add --deployment=<DEPLOYMENT_ID> --team-id=<TEAM_ID> \
     --role=DEPLOYMENT_EDITOR`
 	deploymentTeamRemoveExample = `  # Remove a team's access to a Deployment
-  astro deployment team remove <TEAM_ID> --deployment-id=<DEPLOYMENT_ID>`
+  astro deployment team remove <TEAM_ID> --deployment=<DEPLOYMENT_ID>`
 	deploymentTeamUpdateExample = `  # Change a team's role in a Deployment
-  astro deployment team update <TEAM_ID> --deployment-id=<DEPLOYMENT_ID> --role=DEPLOYMENT_ADMIN`
+  astro deployment team update <TEAM_ID> --deployment=<DEPLOYMENT_ID> --role=DEPLOYMENT_ADMIN`
 	deploymentTeamsListExample = `  # List the teams in a Deployment
-  astro deployment team list --deployment-id=<DEPLOYMENT_ID>`
+  astro deployment team list --deployment=<DEPLOYMENT_ID>`
 )
 
 func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
@@ -36,8 +36,11 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage deployment team resources",
 		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().StringVar(&deploymentID, "deployment-id", "", "Deployment whose teams to manage")
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose teams to manage: a link name from the project's manifest, or a Deployment id", true, "")
+	// Every team command needs it. Marked before the flag was defined, as it
+	// was, the mark failed, unseen, and a run without one asked Houston about
+	// the Deployment "".
+	_ = cmd.MarkPersistentFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.AddCommand(
 		newDeploymentTeamListCmd(out),
 		newDeploymentTeamAddCmd(out),
@@ -58,8 +61,11 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // th
 		},
 	}
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team to add to the Deployment")
-	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
+	// A persistent flag is not among the command's own flags, where
+	// MarkFlagRequired looks, so marking it so failed, unseen, and a run
+	// without one asked Houston about the team "".
+	_ = cmd.MarkPersistentFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.PersistentFlags().StringVarP(&deploymentRole, "role", "r", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -90,7 +96,7 @@ func newDeploymentTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return deploymentTeamUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&deploymentRole, "role", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
+	cmd.PersistentFlags().StringVarP(&deploymentRole, "role", "r", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

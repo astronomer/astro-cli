@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -86,9 +87,9 @@ var (
 
   # Adopt it into another Workspace
   astro deployment adopt --cluster-id=<CLUSTER_ID> --name=<CR_NAME> --namespace=<CR_NAMESPACE> \
-    --workspace-id=<WORKSPACE_ID>`
+    --workspace=<WORKSPACE_ID>`
 	deploymentUnadoptExample = `  # Release an adopted Deployment
-  astro deployment unadopt --deployment-id=<DEPLOYMENT_ID>`
+  astro deployment unadopt --deployment=<DEPLOYMENT_ID>`
 	deploymentCreateExample = `  # Create a Deployment with the Celery executor
   astro deployment create --label=my-deployment
 
@@ -125,22 +126,22 @@ var (
     --dag-deployment-type=volume --nfs-location=<IP>:/<PATH> --cluster-id=<CLUSTER_ID>`
 
 	deploymentAirflowUpgradeExample = `  # Start upgrading a Deployment's Airflow
-  astro deployment airflow upgrade --deployment-id=<DEPLOYMENT_ID> \
+  astro deployment airflow upgrade --deployment=<DEPLOYMENT_ID> \
     --desired-airflow-version=<AIRFLOW_VERSION>
 
   # Cancel an upgrade that has not finished
-  astro deployment airflow upgrade --deployment-id=<DEPLOYMENT_ID> --cancel`
+  astro deployment airflow upgrade --deployment=<DEPLOYMENT_ID> --cancel`
 	deploymentRuntimeUpgradeExample = `  # Start upgrading a Deployment's Runtime
-  astro deployment runtime upgrade --deployment-id=<DEPLOYMENT_ID> \
+  astro deployment runtime upgrade --deployment=<DEPLOYMENT_ID> \
     --desired-runtime-version=<RUNTIME_VERSION>
 
   # Cancel an upgrade that has not finished
-  astro deployment runtime upgrade --deployment-id=<DEPLOYMENT_ID> --cancel`
+  astro deployment runtime upgrade --deployment=<DEPLOYMENT_ID> --cancel`
 	deploymentRuntimeMigrateExample = `  # Start migrating a Deployment to Astronomer Runtime
-  astro deployment runtime migrate --deployment-id=<DEPLOYMENT_ID>
+  astro deployment runtime migrate --deployment=<DEPLOYMENT_ID>
 
   # Cancel a migration that has not finished
-  astro deployment runtime migrate --deployment-id=<DEPLOYMENT_ID> --cancel`
+  astro deployment runtime migrate --deployment=<DEPLOYMENT_ID> --cancel`
 )
 
 func newDeploymentRootCmd(out io.Writer) *cobra.Command {
@@ -170,24 +171,29 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		cmd.AddCommand(newDeploymentRuntimeRootCmd(out))
 	}
 
-	// --workspace-id is where create, list and adopt act. 1.x gave it to every
+	// --workspace is where create, list and adopt act, with 1.x's
+	// --workspace-id as its alias. 1.x gave --workspace-id to every
 	// deployment command, through this group, and no other one read it: those
 	// keep it, hidden and read by nothing, so a 1.x script passing it keeps
 	// working. hibernate and wake-up are newer than 1.x, so they take none.
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
-		case "create", "list", "adopt":
-			c.Flags().StringVar(&workspaceID, "workspace-id", "", "ID of the workspace in which you want to manage deployments, you can leave it empty if you want to use your current context's workspace ID")
+		case "create":
+			addWorkspaceFlag(c.Flags(), "Workspace to create the Deployment in (default: the current context's)", "")
+		case "list":
+			addWorkspaceFlag(c.Flags(), "Workspace whose Deployments to list (default: the current context's)", "")
+		case "adopt":
+			addWorkspaceFlag(c.Flags(), "Workspace to adopt the Deployment into (default: the current context's)", "")
 		case "update", "delete", "unadopt", "logs", "service-account", "user", "team", "airflow", "runtime":
 			fs := c.Flags()
 			if c.HasSubCommands() {
 				fs = c.PersistentFlags()
 			}
-			fs.String("workspace-id", "", "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
-			fs.MarkHidden("workspace-id") //nolint:errcheck // the flag is defined just above
+			utils.AddOneXNoOp(fs, "workspace-id", "")
 		}
 	}
 
+	applyPreferredFlagsIn(cmd)
 	return cmd
 }
 
@@ -267,20 +273,24 @@ func newDeploymentCreateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "delete <DEPLOYMENT_ID>",
+		Use:     "delete [DEPLOYMENT_ID]",
 		Aliases: []string{"de"},
 		Short:   "Delete an Airflow Deployment",
-		Long:    "Delete an Airflow Deployment",
+		Long:    "Delete an Airflow Deployment, named by its id or with --deployment, which takes a link name from the project's manifest too",
 		Example: `  # Delete a Deployment and all of its data, after you confirm
   astro deployment delete <DEPLOYMENT_ID>
 
+  # Delete the one a link of this project names
+  astro deployment delete --deployment <LINK_NAME>
+
   # Delete it without the confirmation, from a script
   astro deployment delete <DEPLOYMENT_ID> --yes`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentDelete(cmd, args, out)
+			return deploymentDelete(cmd, out)
 		},
 	}
+	addDeploymentArgFlag(cmd)
 	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Delete without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -288,7 +298,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "hibernate <DEPLOYMENT_ID>",
+		Use:     "hibernate [DEPLOYMENT_ID]",
 		Aliases: []string{"hb"},
 		Short:   "Hibernate an APC Deployment",
 		Long: "Hibernate an APC Deployment. Overrides its hibernation schedule, if it has one, and holds it hibernating until you wake it up, " +
@@ -301,10 +311,13 @@ func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
   astro deployment hibernate <DEPLOYMENT_ID> --for 2h30m
 
   # Go back to its regular hibernation schedule
-  astro deployment hibernate <DEPLOYMENT_ID> --remove-override`,
-		Args: cobra.ExactArgs(1),
+  astro deployment hibernate <DEPLOYMENT_ID> --remove-override
+
+  # Hibernate the one a link of this project names
+  astro deployment hibernate --deployment <LINK_NAME>`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentHibernate(cmd, args, true, out)
+			return deploymentHibernate(cmd, true, out)
 		},
 	}
 	addHibernationFlags(cmd, "hibernation", "hibernating")
@@ -313,7 +326,7 @@ func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 
 func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "wake-up <DEPLOYMENT_ID>",
+		Use:     "wake-up [DEPLOYMENT_ID]",
 		Aliases: []string{"wu"},
 		Short:   "Wake up an APC Deployment",
 		Long: "Wake up an APC Deployment from hibernation. Overrides its hibernation schedule, if it has one, and holds it awake until you hibernate it, " +
@@ -326,10 +339,13 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
   astro deployment wake-up <DEPLOYMENT_ID> --for 4h
 
   # Go back to its regular hibernation schedule
-  astro deployment wake-up <DEPLOYMENT_ID> --remove-override`,
-		Args: cobra.ExactArgs(1),
+  astro deployment wake-up <DEPLOYMENT_ID> --remove-override
+
+  # Wake up the one a link of this project names
+  astro deployment wake-up --deployment <LINK_NAME>`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentHibernate(cmd, args, false, out)
+			return deploymentHibernate(cmd, false, out)
 		},
 	}
 	addHibernationFlags(cmd, "awake period", "waking up")
@@ -339,6 +355,7 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 // addHibernationFlags gives hibernate or wake-up its flags: period names
 // what --until and --for end, and doing what --yes skips the question for.
 func addHibernationFlags(cmd *cobra.Command, period, doing string) {
+	addDeploymentArgFlag(cmd)
 	cmd.Flags().StringVarP(&hibernateUntil, "until", "u", "", "End the "+period+" at this date and time, in RFC 3339. Example value: 2026-01-01T00:00:00Z")
 	cmd.Flags().StringVarP(&hibernateForDuration, "for", "d", "", "End the "+period+" after this long. Example value: 1h30m")
 	cmd.Flags().BoolVarP(&hibernateRemove, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule")
@@ -361,7 +378,7 @@ func newDeploymentAdoptCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&adoptName, "name", "", "", "Name (metadata.name) of the existing Airflow custom resource (CR)")
 	cmd.Flags().StringVarP(&adoptNamespace, "namespace", "", "", "Kubernetes namespace of the existing Airflow custom resource (CR)")
 	cmd.Flags().StringVarP(&adoptLabel, "label", "l", "", "Label for the adopted Deployment; if omitted, APC defaults it to the --name value")
-	cmd.Flags().StringVarP(&adoptDescription, "description", "", "", "Description for the adopted Deployment")
+	cmd.Flags().StringVarP(&adoptDescription, "description", "d", "", "Description for the adopted Deployment")
 	cmd.Flags().BoolVarP(&adoptUseApcLogging, "use-apc-logging", "", false, "Route the adopted Deployment's logs through APC logging")
 	cmd.Flags().BoolVarP(&adoptUseApcRegistry, "use-apc-registry", "", false, "Use the APC in-cluster registry for the adopted Deployment; you must pre-sync its images")
 	cmd.Flags().BoolVarP(&adoptAcceptIncompatibilities, "accept-incompatibilities", "", true, "Adopt even if the custom resource has fields with no APC representation")
@@ -382,8 +399,8 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 			return deploymentUnadopt(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the adopted Deployment to release")
-	_ = cmd.MarkFlagRequired("deployment-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	addDeploymentFlag(cmd.Flags(), "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", true, "d")
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Release the Deployment without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
@@ -417,22 +434,26 @@ func newDeploymentUpdateCmd(out io.Writer) *cobra.Command {
   astro deployment update <DEPLOYMENT_ID> --executor=celery
 
   # Change its label
-  astro deployment update <DEPLOYMENT_ID> --label=my-deployment`
+  astro deployment update <DEPLOYMENT_ID> --label=my-deployment
+
+  # Change the label of the one a link of this project names
+  astro deployment update --deployment <LINK_NAME> --label=my-deployment`
 	updateExampleDagDeployment := `
 
   # Read its Dags from an NFS volume
   astro deployment update <DEPLOYMENT_ID> --dag-deployment-type=volume --nfs-location=<IP>:/<PATH>`
 	cmd := &cobra.Command{
-		Use:     "update <DEPLOYMENT_ID>",
+		Use:     "update [DEPLOYMENT_ID]",
 		Aliases: []string{"up"},
 		Short:   "Update Airflow Deployments",
-		Long:    "Update Airflow Deployments",
+		Long:    "Update an Airflow Deployment, named by its id or with --deployment, which takes a link name from the project's manifest too",
 		Example: example,
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deploymentUpdate(cmd, args, dagDeploymentType, nfsLocation, out)
+			return deploymentUpdate(cmd, dagDeploymentType, nfsLocation, out)
 		},
 	}
+	addDeploymentArgFlag(cmd)
 
 	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, SkipUserPromptMsgForUpdateDeployment)
 
@@ -509,13 +530,10 @@ func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 			return deploymentAirflowUpgrade(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to upgrade")
+	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true, "d")
 	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "Desired Airflow version to upgrade to")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial airflow upgrade step")
-	err := cmd.MarkFlagRequired("deployment-id")
-	if err != nil {
-		fmt.Println("error adding deployment-id flag: ", err.Error())
-	}
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -545,13 +563,10 @@ func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dup
 			return deploymentRuntimeUpgrade(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to upgrade")
+	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true, "d")
 	cmd.Flags().StringVarP(&desiredRuntimeVersion, "desired-runtime-version", "v", "", "Desired Runtime version you wish to upgrade your deployment to")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime upgrade step")
-	err := cmd.MarkFlagRequired("deployment-id")
-	if err != nil {
-		fmt.Println("error adding deployment-id flag: ", err.Error())
-	}
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -567,12 +582,9 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 			return deploymentRuntimeMigrate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&deploymentID, "deployment-id", "d", "", "ID of the deployment to migrate")
+	addDeploymentFlag(cmd.Flags(), "Deployment to migrate: a link name from the project's manifest, or a Deployment id", true, "d")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime migrate step")
-	err := cmd.MarkFlagRequired("deployment-id")
-	if err != nil {
-		fmt.Println("error adding deployment-id flag: ", err.Error())
-	}
+	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -677,8 +689,11 @@ var hibernationNow = time.Now
 // deploymentHibernate sets, or with --remove-override removes, the override
 // of a Deployment's hibernation schedule: hibernate holds it hibernating, and
 // wake-up (hibernate false) awake.
-func deploymentHibernate(cmd *cobra.Command, args []string, hibernate bool, out io.Writer) error {
+func deploymentHibernate(cmd *cobra.Command, hibernate bool, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	if err := requireDeployment(cmd); err != nil {
+		return err
+	}
 	end, err := hibernationEnd(hibernateUntil, hibernateForDuration)
 	if err != nil {
 		return err
@@ -686,7 +701,7 @@ func deploymentHibernate(cmd *cobra.Command, args []string, hibernate bool, out 
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 
-	id := args[0]
+	id := deploymentID
 	if err := deployment.CheckHibernation(id, houstonClient); err != nil {
 		return err
 	}
@@ -756,15 +771,24 @@ func hibernationEnd(until, forDuration string) (func() *time.Time, error) {
 	return func() *time.Time { return nil }, nil
 }
 
-func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
+func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	if err := requireDeployment(cmd); err != nil {
+		return err
+	}
 	// Silence Usage as we have now validated command input
 	cmd.SilenceUsage = true
 	// Deletions are always hard deletes now (PLX-575): all data associated with
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding, unless --yes already did.
 	if !skipPrompt {
-		i, err := input.Confirm(cliDeploymentHardDeletePrompt, input.AnsweredBy("--yes"))
+		prompt := cliDeploymentHardDeletePrompt
+		if deploymentLink != "" {
+			// The run named a link: say which Deployment that is before
+			// asking to delete it.
+			prompt = fmt.Sprintf("\nLink %s names Deployment %s.", deploymentLink, deploymentID) + prompt
+		}
+		i, err := input.Confirm(prompt, input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}
@@ -773,11 +797,11 @@ func deploymentDelete(cmd *cobra.Command, args []string, out io.Writer) error {
 			return nil
 		}
 	}
-	d, err := deployment.Delete(args[0], true, houstonClient)
+	d, err := deployment.Delete(deploymentID, true, houstonClient)
 	if err != nil {
 		return err
 	}
-	return r.Emit(newRemovalJSON(args[0], d, "deleted"), cliout.Text(func(b *bufio.Writer) {
+	return r.Emit(newRemovalJSON(deploymentID, d, "deleted"), cliout.Text(func(b *bufio.Writer) {
 		fmt.Fprintln(b, "\n Successfully deleted deployment")
 	}))
 }
@@ -880,8 +904,11 @@ func confirmDagDeploymentTypeChange(current, next string) (bool, error) {
 	return input.Confirm(prompt, input.AnsweredBy("--yes"))
 }
 
-func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsLocation string, out io.Writer) error {
+func deploymentUpdate(cmd *cobra.Command, dagDeploymentType, nfsLocation string, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
+	if err := requireDeployment(cmd); err != nil {
+		return err
+	}
 
 	argsMap := map[string]string{}
 	if deploymentUpdateDescription != "" {
@@ -895,14 +922,14 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 	cmd.SilenceUsage = true
 
 	var nfsMountDAGDeploymentEnabled, gitSyncDAGDeploymentEnabled, dagOnlyDeployEnabled bool
-	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(args[0])
+	deploymentInfo, err := houston.Call(houstonClient.GetDeployment)(deploymentID)
 	if err != nil {
 		return fmt.Errorf("failed to get deployment info: %w", err)
 	}
 	appConfig, err = houston.Call(houstonClient.GetAppConfig)(houston.GetAppConfigRequest{
 		ClusterID:      deploymentInfo.ClusterID,
 		WorkspaceUUID:  deploymentInfo.Workspace.ID,
-		DeploymentUUID: args[0],
+		DeploymentUUID: deploymentID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get app config: %w", err)
@@ -941,7 +968,7 @@ func deploymentUpdate(cmd *cobra.Command, args []string, dagDeploymentType, nfsL
 		}
 	}
 
-	d, err := deployment.Update(args[0], cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, appConfig)
+	d, err := deployment.Update(deploymentID, cloudRole, argsMap, dagDeploymentType, nfsLocation, gitRepoURL, gitRevision, gitBranchName, gitDAGDir, sshKey, knowHosts, executorType, gitSyncInterval, updateTriggererReplicas, houstonClient, appConfig)
 	if err != nil {
 		return err
 	}

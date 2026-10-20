@@ -28,7 +28,7 @@ var validGitScheme = map[string]struct{}{
 	"https": {},
 }
 
-// coalesceWorkspace is the workspace a command acts in: --workspace-id, else
+// coalesceWorkspace is the workspace a command acts in: --workspace, else
 // the context's. The flag is read first, so a context with no workspace, or
 // none at all, does not fail a command that names one.
 func coalesceWorkspace() (string, error) {

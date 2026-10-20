@@ -19,11 +19,11 @@ var (
 
 	workspaceSaCreateExample = `
   # Create a service account in a Workspace
-  astro workspace service-account create --workspace-id <WORKSPACE_ID> --label my_label \
+  astro workspace service-account create --workspace <WORKSPACE_ID> --label my_label \
     --role WORKSPACE_EDITOR
 `
 	workspaceSaListExample = `
-  astro workspace service-account list --workspace-id <WORKSPACE_ID>
+  astro workspace service-account list --workspace <WORKSPACE_ID>
 `
 )
 
@@ -54,7 +54,7 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 			return workspaceSaCreate(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	cmd.Flags().StringVarP(&workspaceSAUserID, "user-id", "u", "", "ID of the user you want to link this service account to")
 	cmd.Flags().StringVarP(&workspaceSACategory, "category", "c", "default", "Category of the new service account")
 	cmd.Flags().StringVarP(&workspaceSALabel, "label", "l", "", "Label of the new service account")
@@ -75,7 +75,7 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 			return workspaceSaList(cmd, out)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -92,7 +92,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 			return workspaceSaDelete(cmd, out, args)
 		},
 	}
-	cmd.Flags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

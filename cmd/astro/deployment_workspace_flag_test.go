@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	astrov1_mocks "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1/mocks"
@@ -64,7 +65,7 @@ func TestDeploymentWorkspaceFlagIsOnlyWhereItIsRead(t *testing.T) {
 		assert.Nil(t, c.Flag("workspace"), path)
 		if noop := c.Flag("workspace-id"); assert.NotNil(t, noop, path) {
 			assert.True(t, noop.Hidden, path)
-			assert.Equal(t, oneXNoOpUsage, noop.Usage, path)
+			assert.Equal(t, utils.OneXNoOpUsage, noop.Usage, path)
 			assert.Empty(t, noop.Annotations, "%s: the no-op is no alias and chooses no workspace", path)
 		}
 		require.NoError(t, c.ParseFlags([]string{"--workspace-id", "clexplicitworkspace000001"}), path)

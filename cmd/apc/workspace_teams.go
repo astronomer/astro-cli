@@ -16,17 +16,17 @@ var (
 
 	workspaceTeamAddExample = `
   # Add a team to a Workspace as an editor
-  astro workspace team add --workspace-id <WORKSPACE_ID> --team-id <TEAM_ID> --role WORKSPACE_EDITOR
+  astro workspace team add --workspace <WORKSPACE_ID> --team-id <TEAM_ID> --role WORKSPACE_EDITOR
 `
 	workspaceTeamRemoveExample = `
-  astro workspace team remove <TEAM_ID> --workspace-id <WORKSPACE_ID>
+  astro workspace team remove <TEAM_ID> --workspace <WORKSPACE_ID>
 `
 	workspaceTeamUpdateExample = `
   # Change a team's role in a Workspace
-  astro workspace team update <TEAM_ID> --workspace-id <WORKSPACE_ID> --role WORKSPACE_EDITOR
+  astro workspace team update <TEAM_ID> --workspace <WORKSPACE_ID> --role WORKSPACE_EDITOR
 `
 	workspaceTeamsListExample = `
-  astro workspace team list --workspace-id <WORKSPACE_ID>`
+  astro workspace team list --workspace <WORKSPACE_ID>`
 )
 
 func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
@@ -36,7 +36,7 @@ func newWorkspaceTeamRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Workspace Team resources",
 		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "Workspace to associate team to")
+	addWorkspaceFlag(cmd.PersistentFlags(), "Workspace whose teams to manage (default: the current context's)", "")
 	cmd.AddCommand(
 		newWorkspaceTeamAddCmd(out),
 		newWorkspaceTeamUpdateCmd(out),
@@ -57,8 +57,11 @@ func newWorkspaceTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // the
 		},
 	}
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team ID to be assigned to workspace")
-	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
-	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
+	// A persistent flag is not among the command's own flags, where
+	// MarkFlagRequired looks, so marking it so failed, unseen, and a run
+	// without one asked Houston about the team "".
+	_ = cmd.MarkPersistentFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	cmd.PersistentFlags().StringVarP(&workspaceTeamRole, "role", "r", houston.WorkspaceViewerRole, "Workspace role assigned to team")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -74,7 +77,7 @@ func newWorkspaceTeamUpdateCmd(out io.Writer) *cobra.Command {
 			return workspaceTeamUpdate(cmd, out, args)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&workspaceTeamRole, "role", houston.WorkspaceViewerRole, "Workspace role assigned to team")
+	cmd.PersistentFlags().StringVarP(&workspaceTeamRole, "role", "r", houston.WorkspaceViewerRole, "Workspace role assigned to team")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

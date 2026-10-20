@@ -37,7 +37,7 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUserListCmd(out),
 	)
 
-	cmd.PersistentFlags().StringVarP(&workspaceID, "workspace-id", "w", "", "ID of the workspace, you can leave it empty if you want to use your current context's workspace ID")
+	addWorkspaceFlag(cmd.PersistentFlags(), "Workspace whose users to manage (default: the current context's)", "w")
 	return cmd
 }
 
@@ -51,7 +51,7 @@ func newWorkspaceUserAddCmd(out io.Writer) *cobra.Command {
 
   # Add a user to another Workspace as an editor
   astro workspace user add --email user@company.com --role WORKSPACE_EDITOR \
-    --workspace-id <WORKSPACE_ID>`,
+    --workspace <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserAdd(cmd, out)
 		},
@@ -75,7 +75,7 @@ func newWorkspaceUserUpdateCmd(out io.Writer) *cobra.Command {
 			return workspaceUserUpdate(cmd, out, args)
 		},
 	}
-	cmd.Flags().StringVar(&workspaceUserWsRole, "role", houston.WorkspaceViewerRole, "Role assigned to user")
+	cmd.Flags().StringVarP(&workspaceUserWsRole, "role", "r", houston.WorkspaceViewerRole, "Role assigned to user")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -107,7 +107,7 @@ func newWorkspaceUserListCmd(out io.Writer) *cobra.Command {
   astro workspace user list
 
   # List the users in another Workspace
-  astro workspace user list --workspace-id <WORKSPACE_ID>`,
+  astro workspace user list --workspace <WORKSPACE_ID>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return workspaceUserList(cmd, out)
 		},
