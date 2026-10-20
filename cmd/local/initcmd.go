@@ -122,8 +122,10 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 		// Bringing a project up to date is where a Docker-only project moves
 		// to a newer runtime build, so it says what moved, and the lock
 		// follows the pins.
-		c.reportAstroBuild(r, build)
-		c.relockAfterInit(ctx, r, res.Dir, build)
+		// On stderr as text in either format: init's stdout is its one result.
+		notes := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
+		c.reportAstroBuild(notes, build)
+		c.relockAfterInit(ctx, notes, res.Dir, build)
 		// The refresh changed the manifest, so the project was not up to date.
 		if (build.pinsChanged || build.airflowChanged) && !slices.Contains(res.Updated, manifest.Marker) {
 			res.Updated = append(res.Updated, manifest.Marker)
