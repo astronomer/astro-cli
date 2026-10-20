@@ -7,6 +7,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // The kinds a core command can fail with. The mechanism they plug into — the
@@ -104,7 +105,7 @@ var ProblemKinds = cliout.Kinds{
 	{Kind: KindHealthTimeout, Match: cliout.Sentinel(localrt.ErrHealthTimeout)},
 	{Kind: KindStartTimedOut, Match: cliout.Sentinel(localrt.ErrStartTimedOut)},
 	{Kind: KindUnsupportedBase, Match: cliout.Sentinel(localrt.ErrUnsupportedBase)},
-	{Kind: KindOnBuildBase, Match: cliout.Sentinel(localrt.ErrOnBuildBase)},
+	{Kind: KindOnBuildBase, Match: cliout.Sentinel(scaffold.ErrOnBuildBase)},
 	{Kind: KindDatabaseNewerThanAirflow, Match: cliout.Sentinel(localrt.ErrDatabaseNewerThanAirflow)},
 	// ErrStartInProgress, not a second name for it: pkg/localrt already
 	// exports this sentinel, and adding another public alias to a module with

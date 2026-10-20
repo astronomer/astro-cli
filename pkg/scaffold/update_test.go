@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -49,6 +50,20 @@ func TestPlanStillRefusesAnAstroProjectByDefault(t *testing.T) {
 // A Dockerfile an earlier conversion kept on its ONBUILD tag is moved onto
 // -base, and the two lists it kept for that tag go, since every line of them
 // is in the manifest. Nothing else in the project is touched.
+// Lines a conversion never carries, an Airflow requirement (the pin's) and a
+// second line for a distribution already listed, are not drift: they could
+// never be in the manifest as written, so they do not keep the file on its
+// ONBUILD tag.
+func TestUpdateIgnoresLinesAConversionDoesNotCarry(t *testing.T) {
+	dir := v2Project(t, map[string]string{
+		"Dockerfile":       "FROM quay.io/astronomer/astro-runtime:12.6.0\nRUN true\n",
+		"requirements.txt": "apache-airflow==2.10.0\npandas==2.1.0\npandas>=2\n",
+	})
+	res := runUpdate(t, dir)
+	assert.Contains(t, strings.Join(res.Updated, "\n"), "Dockerfile (now builds FROM quay.io/astronomer/astro-runtime:12.6.0-base")
+	assert.Empty(t, res.Notes)
+}
+
 func TestUpdateMovesAKeptDockerfileOntoBase(t *testing.T) {
 	dir := v2Project(t, map[string]string{
 		"Dockerfile":       "FROM quay.io/astronomer/astro-runtime:12.6.0\nRUN apt-get update\n",
@@ -94,6 +109,7 @@ func TestUpdateKeepsADockerfileWhoseListsDrifted(t *testing.T) {
 	assert.Equal(t, body, string(got))
 	assert.FileExists(t, filepath.Join(dir, "requirements.txt"))
 	assert.Empty(t, res.Updated)
+	assert.True(t, res.OnBuildKept, "the result says the Dockerfile stayed on its ONBUILD tag")
 	notes := strings.Join(res.Notes, "\n")
 	assert.Contains(t, notes, "requirements.txt: requests==2.32.0 is not in [project] dependencies")
 	assert.Contains(t, notes, "packages.txt: unixodbc is not in packages under [tool.astro]")
@@ -122,6 +138,22 @@ func TestUpdateWritesAndRefreshesTheHelper(t *testing.T) {
 	assert.Empty(t, res.Created)
 	assert.Empty(t, res.Updated)
 	assert.Empty(t, res.Deleted)
+
+	// A newer astro's helper is never taken back to this one's.
+	newer := helperAt(airflowrt.InstallHelperVersion() + 1)
+	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: newer})
+	res = runUpdate(t, dir)
+	assert.Empty(t, res.Updated)
+	got, err := os.ReadFile(filepath.Join(dir, airflowrt.InstallHelperPath))
+	require.NoError(t, err)
+	assert.Equal(t, newer, string(got))
+}
+
+// helperAt is this CLI's install helper stamped with version v instead.
+func helperAt(v int) string {
+	return strings.Replace(string(airflowrt.InstallHelper()),
+		"# astro-install-helper: "+strconv.Itoa(airflowrt.InstallHelperVersion())+"\n",
+		"# astro-install-helper: "+strconv.Itoa(v)+"\n", 1)
 }
 
 // A Dockerfile whose shape the rewrite will not take stays as it is, with the
@@ -142,11 +174,17 @@ func TestInstallHelperWarning(t *testing.T) {
 	dir := v2Project(t, map[string]string{"Dockerfile": onBase})
 	assert.Contains(t, InstallHelperWarning(dir, "Dockerfile"), "which this project does not have, so the build will fail. Run astro init to write it")
 
-	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: "# edited\n"})
-	assert.Contains(t, InstallHelperWarning(dir, "Dockerfile"), "is not the one this astro writes. Run astro init to refresh it")
+	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: "# an unstamped copy\n"})
+	assert.Contains(t, InstallHelperWarning(dir, "Dockerfile"), "is older than the one this astro writes. Run astro init to refresh it")
 
 	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: string(airflowrt.InstallHelper())})
 	assert.Empty(t, InstallHelperWarning(dir, "Dockerfile"))
+
+	// A newer astro's, and this version's edited, are left without a word.
+	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: helperAt(airflowrt.InstallHelperVersion() + 1)})
+	assert.Empty(t, InstallHelperWarning(dir, "Dockerfile"), "a newer astro wrote it")
+	writeTree(t, dir, map[string]string{airflowrt.InstallHelperPath: string(airflowrt.InstallHelper()) + "# edited\n"})
+	assert.Empty(t, InstallHelperWarning(dir, "Dockerfile"), "edited at this version")
 
 	other := v2Project(t, map[string]string{"Dockerfile": "FROM quay.io/astronomer/astro-runtime:12.6.0-base\nRUN pip install x\n"})
 	assert.Empty(t, InstallHelperWarning(other, "Dockerfile"), "a Dockerfile that does not run the helper needs none")
@@ -169,9 +207,16 @@ func TestCheckDockerfileOnBuild(t *testing.T) {
 	t.Run("refused when init would move it", func(t *testing.T) {
 		dir := v2Project(t, map[string]string{"Dockerfile": onBuild, "requirements.txt": "pandas==2.1.0\n"})
 		warning, err := CheckDockerfileOnBuild(dir, load(dir))
-		require.ErrorIs(t, err, airflowrt.ErrOnBuildBase)
+		require.ErrorIs(t, err, ErrOnBuildBase)
 		assert.Contains(t, err.Error(), "Run astro init")
 		assert.Empty(t, warning)
+	})
+	t.Run("the refusal's lines keep the stage's name and flags, as init writes them", func(t *testing.T) {
+		dir := v2Project(t, map[string]string{"Dockerfile": "FROM --platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0 AS app\nRUN true\n"})
+		_, err := CheckDockerfileOnBuild(dir, load(dir))
+		require.ErrorIs(t, err, ErrOnBuildBase)
+		assert.Contains(t, err.Error(), airflowrt.InstallDockerfileWith("--platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base",
+			airflowrt.InstallOptions{Alias: "app"}))
 	})
 	t.Run("warned about when a list drifted", func(t *testing.T) {
 		dir := v2Project(t, map[string]string{"Dockerfile": onBuild, "requirements.txt": "pandas==2.1.0\nrequests==2.32.0\n"})

@@ -126,6 +126,11 @@ type Result struct {
 	// when that was already current. A status bool, present when false, as
 	// Adopted is.
 	Existing bool `json:"existing"`
+	// OnBuildKept reports, for an Existing run, a declared Dockerfile left on
+	// an Astro Runtime tag with ONBUILD steps, because a gate stopped the move
+	// onto -base; Notes say which. The project is then not up to date, though
+	// nothing changed. A status bool, present when false.
+	OnBuildKept bool `json:"onbuild_kept"`
 	// Notes lists the files init found but did not read, and where their
 	// contents belong. It is the work left to do by hand.
 	Notes []string `json:"notes,omitempty"`

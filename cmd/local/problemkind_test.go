@@ -16,6 +16,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/instancelocate"
 	"github.com/astronomer/astro-cli/internal/project"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // sampleFor is one real error per kind, and the single list every test below
@@ -36,7 +37,7 @@ func sampleFor(kind cliout.ProblemKind) (error, bool) {
 		KindHealthTimeout:            localrt.ErrHealthTimeout,
 		KindStartTimedOut:            localrt.ErrStartTimedOut,
 		KindUnsupportedBase:          localrt.ErrUnsupportedBase,
-		KindOnBuildBase:              localrt.ErrOnBuildBase,
+		KindOnBuildBase:              scaffold.ErrOnBuildBase,
 		KindDatabaseNewerThanAirflow: localrt.ErrDatabaseNewerThanAirflow,
 		KindLocked:                   localrt.ErrStartInProgress,
 		KindNotRunning:               localrt.ErrNotRunning,

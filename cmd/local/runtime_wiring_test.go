@@ -14,6 +14,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // These tests are about the wiring: that every run path actually calls the
@@ -272,7 +273,7 @@ func TestStartJudgesAnONBUILDDockerfileByWhetherInitCanMoveIt(t *testing.T) {
 
 			err := execute(t, d, tc.args...)
 			if tc.refused {
-				if !errors.Is(err, localrt.ErrOnBuildBase) {
+				if !errors.Is(err, scaffold.ErrOnBuildBase) {
 					t.Fatalf("err = %v, want the ONBUILD refusal", err)
 				}
 				if started {

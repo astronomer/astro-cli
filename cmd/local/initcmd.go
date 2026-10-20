@@ -225,6 +225,10 @@ func renderInit(w io.Writer, res *scaffold.Result, next string) error {
 		verb = "Adopted"
 	}
 	switch {
+	case res.Existing && res.OnBuildKept:
+		if _, err := fmt.Fprintf(w, "Astro project %s in %s: its Dockerfile is kept on its ONBUILD base; see below\n", res.Name, res.Dir); err != nil {
+			return err
+		}
 	case res.Existing && len(res.Created)+len(res.Updated)+len(res.Deleted) == 0:
 		if _, err := fmt.Fprintf(w, "Astro project %s in %s is up to date\n", res.Name, res.Dir); err != nil {
 			return err
