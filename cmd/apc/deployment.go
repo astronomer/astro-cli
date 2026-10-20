@@ -150,7 +150,6 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage APC Deployments",
 		Long:    "Deployments are individual Airflow clusters running on an installation of the APC platform.",
 	}
-	cmd.PersistentFlags().StringVar(&workspaceID, "workspace-id", "", "ID of the workspace in which you want to manage deployments, you can leave it empty if you want to use your current context's workspace ID")
 	cmd.AddCommand(
 		newDeploymentCreateCmd(out),
 		newDeploymentListCmd(out),
@@ -169,6 +168,24 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 
 	if appConfig != nil && appConfig.Flags.AstroRuntimeEnabled {
 		cmd.AddCommand(newDeploymentRuntimeRootCmd(out))
+	}
+
+	// --workspace-id is where create, list and adopt act. 1.x gave it to every
+	// deployment command, through this group, and no other one read it: those
+	// keep it, hidden and read by nothing, so a 1.x script passing it keeps
+	// working. hibernate and wake-up are newer than 1.x, so they take none.
+	for _, c := range cmd.Commands() {
+		switch c.Name() {
+		case "create", "list", "adopt":
+			c.Flags().StringVar(&workspaceID, "workspace-id", "", "ID of the workspace in which you want to manage deployments, you can leave it empty if you want to use your current context's workspace ID")
+		case "update", "delete", "unadopt", "logs", "service-account", "user", "team", "airflow", "runtime":
+			fs := c.Flags()
+			if c.HasSubCommands() {
+				fs = c.PersistentFlags()
+			}
+			fs.String("workspace-id", "", "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+			fs.MarkHidden("workspace-id") //nolint:errcheck // the flag is defined just above
+		}
 	}
 
 	return cmd
@@ -827,14 +844,14 @@ func deploymentUnadopt(cmd *cobra.Command, out io.Writer) error {
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
 	r := cliout.Renderer{Format: deploymentOutput, Out: out}
 
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return fmt.Errorf("failed to find a valid workspace: %w", err)
-	}
-
-	// Don't validate workspace if viewing all deployments
-	if allDeployments {
-		ws = ""
+	// --all lists every workspace's, so it needs no workspace, and a context
+	// with none can still list them.
+	ws := ""
+	if !allDeployments {
+		var err error
+		if ws, err = coalesceWorkspace(); err != nil {
+			return fmt.Errorf("failed to find a valid workspace: %w", err)
+		}
 	}
 
 	// Silence Usage as we have now validated command input

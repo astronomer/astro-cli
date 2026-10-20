@@ -26,6 +26,13 @@ var hiddenFlagAllowed = map[string]string{
 		"flag of that name, so it names the link target",
 	"env connection link --deployment-id":       "it shadows the noun's scope flag of that name, so it names the link target",
 	"env airflow-variable link --deployment-id": "it shadows the noun's scope flag of that name, so it names the link target",
+	// 1.x's APC deployment group gave --workspace-id to every command below
+	// it; these two are below version and feature gates that the tree
+	// v1_flags.tsv was made from did not pass, so it lists neither command.
+	"deployment unadopt --workspace-id": "1.x had it there (APC 2.1.0 and newer), through the deployment group; " +
+		"nothing read it, so it is kept doing nothing",
+	"deployment runtime --workspace-id": "1.x had it there (where the platform enables Astro Runtime), through the deployment group; " +
+		"nothing read it, so it is kept doing nothing",
 }
 
 // A hidden flag is a 1.x spelling a command keeps working for scripts written

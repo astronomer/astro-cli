@@ -33,6 +33,10 @@ const (
 	errEnvListWorkspaceIDRemoved  = "use --workspace"
 	errEnvListDeploymentIDRemoved = "use --deployment, which takes a Deployment id or a link name from pyproject.toml"
 
+	// astro deployment team, user and token took a --workspace in v2 before
+	// it moved to the commands that read it; none of these ever read it.
+	errDeploymentByIDWorkspaceRemoved = "astro deployment team, user and token act on the Deployment you name, which carries its workspace, so drop it"
+
 	errDeploymentFileRemoved = "to manage Deployments as code, use the Astro Terraform provider: " + terraformProviderURL + ". " +
 		"To copy a Deployment, use astro deployment create --clone <deployment> --name <new name>"
 	errInspectTemplateRemoved = "to copy a Deployment, use astro deployment create --clone <deployment> --name <new name>. " +
@@ -132,9 +136,10 @@ type removedFlag struct {
 	// flag's name, for one reason several entries share. It follows the flag
 	// as the run typed it (removedMessage), so it never names that itself.
 	reason reasonFunc
-	// v2Only is set on an entry for commands 1.x did not have (under names
-	// them): a 1.x spelling a script may carry over to a v2 command that
-	// never took it. v1_flags.tsv has no row for it there, so it is
+	// v2Only is set on an entry for a flag 1.x did not have on the commands
+	// under names: a 1.x spelling a script may carry over to a v2 command
+	// that never took it, or a spelling an earlier v2 build gave a command
+	// and took away. v1_flags.tsv has no row for it there, so it is
 	// consulted without one, for the long name alone.
 	v2Only bool
 }
@@ -198,6 +203,10 @@ var removedFlags = []removedFlag{
 	{name: "deployment-id", under: []string{"api airflow"}, needs: has("deployment"), reason: says(errDeploymentIDAPIFlag)},
 	{name: "workspace-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListWorkspaceIDRemoved)},
 	{name: "deployment-id", under: []string{"env list"}, v2Only: true, reason: says(errEnvListDeploymentIDRemoved)},
+	// --workspace is no 1.x flag there (1.x's --workspace-id still is, as a
+	// no-op), so these answer for the long name alone. needs keeps them to
+	// Astro's tree: APC's commands of these names never took one.
+	{name: "workspace", under: []string{"deployment team", "deployment user", "deployment token"}, needs: has("deployment"), v2Only: true, reason: says(errDeploymentByIDWorkspaceRemoved)},
 	// 1.x's list commands shared --json, --template and -o
 	// table|json|template (pkg/output's AddFlags), and api ls and describe
 	// had --json.

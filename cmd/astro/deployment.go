@@ -136,7 +136,6 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 		Long:    "Create or manage Deployments running on Astro according to your Organization and Workspace permissions.",
 	}
 	cmd.PersistentPreRunE = followProjectPreRun(cmd)
-	addWorkspaceFlag(cmd.PersistentFlags(), &workspaceID, "", "Workspace the Deployment is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
 	cmd.AddCommand(
 		newDeploymentListCmd(out),
 		newDeploymentDeleteCmd(out),
@@ -182,6 +181,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentTeamAddCmd(out),
 	)
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose teams you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addOneXWorkspaceIDNoOp(cmd.PersistentFlags())
 	cliout.AddOutputFlag(cmd, &deploymentTeamOutput)
 	return cmd
 }
@@ -357,6 +357,7 @@ func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentUserAddCmd(out),
 	)
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addOneXWorkspaceIDNoOp(cmd.PersistentFlags())
 	cliout.AddOutputFlag(cmd, &deploymentUserOutput)
 	return cmd
 }
@@ -450,6 +451,7 @@ func newDeploymentListCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&allDeployments, "all", "a", false, "Show deployments across all workspaces")
 	markWorkspaceChoice(cmd.Flags().Lookup("all"))
+	addDeploymentWorkspaceFlag(cmd.Flags())
 	cliout.AddOutputFlag(cmd, &deploymentListOutput)
 	return cmd
 }
@@ -476,6 +478,7 @@ func newDeploymentLogsCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&logsKeyword, "keyword", "k", "", "Show logs that contain this exact keyword or phrase")
 	cmd.Flags().IntVarP(&logCount, "log-count", "c", logCount, "Number of logs to show")
 	addDeploymentFlag(cmd.Flags(), "Deployment to show logs of: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentWorkspaceFlag(cmd.Flags())
 	cmd.Flags().BoolVar(&logWebserver, "webserver", false, "Show logs from the webserver")
 	cmd.Flags().BoolVar(&logApiserver, "apiserver", false, "Show logs from the api server")
 	cmd.Flags().BoolVar(&logScheduler, "scheduler", false, "Show logs from the scheduler")
@@ -594,6 +597,7 @@ func newDeploymentDeleteCmd(out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting the Deployment")
 	addDeploymentFlag(cmd.Flags(), "Deployment to delete: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentWorkspaceFlag(cmd.Flags())
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
 	return cmd
 }
@@ -608,6 +612,7 @@ func newDeploymentVariableRootCmd(out io.Writer) *cobra.Command {
 For variables shared across deployments or scoped to a workspace, see 'astro env variable'.`,
 	}
 	cliout.AddOutputFlag(cmd, &deploymentVariableOutput)
+	addDeploymentWorkspaceFlag(cmd.PersistentFlags())
 	cmd.AddCommand(
 		newDeploymentVariableListCmd(out),
 		newDeploymentVariableCreateCmd(out),
@@ -702,6 +707,7 @@ func newDeploymentHibernateCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment to hibernate: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentWorkspaceFlag(cmd.Flags())
 	cmd.Flags().StringVarP(&until, "until", "u", "", "Specify the hibernation period using an end date and time. Example value: 2021-01-01T00:00:00Z")
 	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the hibernation period using a duration. Example value: 1h30m")
 	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume regular hibernation schedule")
@@ -734,6 +740,7 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 		},
 	}
 	addDeploymentFlag(cmd.Flags(), "Deployment to wake up: a link name from pyproject.toml, a Deployment id, or a Deployment name", deploymentTargets{name: &deploymentName}, oneXDeploymentName("n"))
+	addDeploymentWorkspaceFlag(cmd.Flags())
 	cmd.Flags().StringVarP(&until, "until", "u", "", "Specify the awake period using an end date. Example value: 2021-01-01T00:00:00Z")
 	cmd.Flags().StringVarP(&forDuration, "for", "d", "", "Specify the awake period using a duration. Example value: 1h30m")
 	cmd.Flags().BoolVarP(&removeOverride, "remove-override", "r", false, "Remove any existing override and resume the regular hibernation schedule")
@@ -747,14 +754,14 @@ func newDeploymentWakeUpCmd(out io.Writer) *cobra.Command {
 }
 
 func deploymentList(cmd *cobra.Command, out io.Writer) error {
-	ws, err := coalesceWorkspace()
-	if err != nil {
-		return errors.Wrap(err, "failed to find a valid workspace")
-	}
-
-	// Don't validate workspace if viewing all deployments
-	if allDeployments {
-		ws = ""
+	// --all lists every workspace's, so it needs no workspace: an org-scoped
+	// token has none to find.
+	ws := ""
+	if !allDeployments {
+		var err error
+		if ws, err = coalesceWorkspace(); err != nil {
+			return errors.Wrap(err, "failed to find a valid workspace")
+		}
 	}
 
 	// Silence Usage as we have now validated command input
@@ -1247,6 +1254,7 @@ func newDeploymentTokenListCmd(out io.Writer) *cobra.Command {
 			return listDeploymentToken(cmd, out)
 		},
 	}
+	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 
@@ -1272,6 +1280,7 @@ func newDeploymentTokenCreateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The role for the "+
 		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name")
 	cmd.Flags().IntVarP(&tokenExpiration, "expiration", "e", 0, "Days until the token expires, from 1 to 3650 (default: it never expires)")
+	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 
@@ -1295,10 +1304,10 @@ func newDeploymentTokenUpdateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&tokenDescription, "description", "d", "", "Updated description of the token. If the description contains a space, specify the entire description in quotes \"\"")
 	cmd.Flags().StringVarP(&deploymentTokenUpdateRole, "role", "r", "", "The new role for the "+
 		"token. Possible values are DEPLOYMENT_ADMIN or a custom role name. Without it, the token keeps its role")
+	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 
-//nolint:dupl // the duplication is acceptable here
 func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "rotate [TOKEN_ID]",
@@ -1318,6 +1327,7 @@ func newDeploymentTokenRotateCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be rotated. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceRotate, "yes", "y", false, "Don't ask for confirmation before rotating the Deployment API token")
 
+	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 
@@ -1339,6 +1349,7 @@ func newDeploymentTokenDeleteCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&name, "name", "t", "", "The name of the token to be deleted. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().BoolVarP(&forceDelete, "yes", "y", false, "Don't ask for confirmation before deleting or removing the API token")
 
+	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 
@@ -1355,6 +1366,7 @@ func newOrgTokenManageCmd(out io.Writer) *cobra.Command {
 		newRemoveOrganizationTokenDeploymentRole(out),
 		newListOrganizationTokensInDeployment(out),
 	)
+	addOneXWorkspaceIDNoOp(cmd.PersistentFlags())
 	return cmd
 }
 
@@ -1437,6 +1449,7 @@ func newAddWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to add to a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
 	return cmd
 }
 
@@ -1459,6 +1472,7 @@ func newUpdateWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to update in a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
 	cmd.Flags().StringVarP(&tokenRole, "role", "r", "", "The Deployment role to grant to the "+
 		"Workspace API token: DEPLOYMENT_ADMIN or a custom role name")
+	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 
@@ -1513,6 +1527,7 @@ func newRemoveWorkspaceTokenDeploymentRole(out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&orgTokenName, "workspace-token-name", "n", "", "The name of the WORKSPACE API token you want to remove from a Deployment. If the name contains a space, specify the entire name within quotes \"\" ")
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "", "Workspace the token is in (default: the project's workspace inside a project with a pyproject.toml, else the current one)", oneXWorkspaceID)
 	return cmd
 }
 
@@ -1575,6 +1590,7 @@ func newListWorkspaceTokensInDeployment(out io.Writer) *cobra.Command {
 			return listWorkspaceTokensInDeployment(cmd, out)
 		},
 	}
+	addOneXWorkspaceIDNoOp(cmd.Flags())
 	return cmd
 }
 

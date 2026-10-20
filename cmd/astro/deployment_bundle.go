@@ -37,6 +37,7 @@ func newDeploymentBundleRootCmd(out io.Writer) *cobra.Command {
 		newDeploymentBundleDeleteCmd(out),
 	)
 	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose bundles you'd like to manage: a Deployment id, or a link name from pyproject.toml. Run 'astro deployment list' to find valid IDs", deploymentTargets{id: &deploymentID}, oneXDeploymentID(""))
+	addDeploymentWorkspaceFlag(cmd.PersistentFlags())
 	return cmd
 }
 

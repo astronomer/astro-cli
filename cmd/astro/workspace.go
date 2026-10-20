@@ -353,11 +353,13 @@ func newWorkspaceTeamListCmd(out io.Writer) *cobra.Command {
 		Short:   "List all the teams in an Astro Workspace",
 		Long:    "List all teams and their assigned roles in a Workspace.",
 		Example: `  astro workspace team list
+  astro workspace team list --workspace <WORKSPACE_ID>
   astro workspace team list -o json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return listWorkspaceTeam(cmd, out)
 		},
 	}
+	addWorkspaceFlag(cmd.Flags(), &workspaceID, "w", "The Workspace's unique identifier")
 	return cmd
 }
 
@@ -595,7 +597,7 @@ func newWorkspaceTeamRemoveCmd(out io.Writer) *cobra.Command {
 
 func listWorkspaceTeam(cmd *cobra.Command, out io.Writer) error {
 	cmd.SilenceUsage = true
-	return team.ListWorkspaceTeamsWithFormat(astroV1Client, "", cliout.Renderer{Format: workspaceTeamOutput, Out: out})
+	return team.ListWorkspaceTeamsWithFormat(astroV1Client, workspaceID, cliout.Renderer{Format: workspaceTeamOutput, Out: out})
 }
 
 func removeWorkspaceTeam(cmd *cobra.Command, args []string, out io.Writer) error {
