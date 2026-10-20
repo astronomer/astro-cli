@@ -164,7 +164,7 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		// Which image the manifest builds is imagebuild's rule, shared with
 		// every other consumer that builds from a manifest, over a base the
 		// Deployment offers (deploybuild.OfferedBase).
-		req, err = imagebuild.ForManifestWith(ctx, in.Build, astroBase(offer, in.Catalog))
+		req, err = imagebuild.ForManifestWith(ctx, in.Build, astroBase(offer, in.Catalog, in.Warn))
 		if err != nil {
 			return ManifestImageDeployResult{}, err
 		}
@@ -493,6 +493,17 @@ func (o offeredReleases) NewestFor(pin string) string {
 	return newest
 }
 
+// Offers reports whether the deployment offers build, on any channel: a
+// build the project's lock was made for is the user's choice already.
+func (o offeredReleases) Offers(build string) bool {
+	for i := range o {
+		if o[i].Version == build {
+			return true
+		}
+	}
+	return false
+}
+
 // astroBase resolves a generated build's runtime base for an Astro deploy:
 // the newest runtime the deployment offers for the pin (deploybuild.
 // OfferedBase), so the image carries a runtime the deployment takes, and with
@@ -503,7 +514,7 @@ func (o offeredReleases) NewestFor(pin string) string {
 // An offered Airflow 3 build that ships no Python requires-python admits is
 // not the project's fault: a newer build of the series may ship one, as it
 // did before the offer was read, so the catalog's rule decides instead.
-func astroBase(offer offeredReleases, catalog func() *runtimeversions.Catalog) imagebuild.BaseImageFunc {
+func astroBase(offer offeredReleases, catalog func() *runtimeversions.Catalog, warn func(string)) imagebuild.BaseImageFunc {
 	fallback := imagebuild.CatalogBase(catalog)
 	offered := deploybuild.OfferedBase(offer, func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
 		base, err := fallback(ctx, m)
@@ -511,7 +522,7 @@ func astroBase(offer offeredReleases, catalog func() *runtimeversions.Catalog) i
 			return "", fmt.Errorf("the Deployment offers no Astro Runtime for Airflow %s, so the base was looked up in the public runtime catalog, which gave none either: %w", m.AirflowVersion, err)
 		}
 		return base, err
-	})
+	}, warn)
 	return func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
 		base, err := offered(ctx, m)
 		var notShipped *runtimeversions.PythonNotShippedError

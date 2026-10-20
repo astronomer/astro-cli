@@ -316,7 +316,7 @@ func TestAstroBaseFallsBackWhenTheOfferedBuildShipsNoAdmittedPython(t *testing.T
 	require.NoError(t, err)
 	offer := offeredReleases{{Version: "3.1-3", AirflowVersion: "3.1.0"}}
 
-	ref, err := astroBase(offer, func() *runtimeversions.Catalog { return catalog })(context.Background(),
+	ref, err := astroBase(offer, func() *runtimeversions.Catalog { return catalog }, nil)(context.Background(),
 		imagebuild.ManifestBuild{AirflowVersion: "3.1", RequiresPython: ">=3.13"})
 	require.NoError(t, err)
 	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-8-python-3.13", ref)
@@ -326,7 +326,7 @@ func TestAstroBaseFallsBackWhenTheOfferedBuildShipsNoAdmittedPython(t *testing.T
 // fall back on, says the Deployment offers none, which is the cause.
 func TestAstroBaseNamesAnAirflow2PinTheDeploymentDoesNotOffer(t *testing.T) {
 	offer := offeredReleases{{Version: "3.1-5", AirflowVersion: "3.1.8"}}
-	_, err := astroBase(offer, nil)(context.Background(), imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	_, err := astroBase(offer, nil, nil)(context.Background(), imagebuild.ManifestBuild{AirflowVersion: "2.10"})
 	require.ErrorContains(t, err, "the Deployment offers no Astro Runtime for Airflow 2.10")
 	assert.ErrorContains(t, err, "[tool.astro] runtime")
 }
@@ -346,20 +346,20 @@ func TestAstroBaseBuildsOnTheOfferedRuntime(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	ref, err := astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	ref, err := astroBase(offer, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0", ref)
 	assert.Zero(t, reads, "an offered Airflow 2 build needs no catalog")
 
-	ref, err = astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "3.1"})
+	ref, err = astroBase(offer, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "3.1"})
 	require.NoError(t, err)
 	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-5", ref, "Airflow 3 takes the offered build over the series tag")
 
-	ref, err = astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10", Runtime: "12.9.0"})
+	ref, err = astroBase(offer, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10", Runtime: "12.9.0"})
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref, "the manifest's runtime wins")
 
-	ref, err = astroBase(nil, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	ref, err = astroBase(nil, read, nil)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref, "nothing offered falls back to the catalog")
 }

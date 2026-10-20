@@ -68,6 +68,37 @@ func TestForManifestBuildsFromTheRuntimeBuild(t *testing.T) {
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:13.11.0", req.BaseImage)
 }
 
+// The build the lock was made for is the base for a packaged and a local
+// image when the manifest names no runtime, so the image is the build the
+// lock matches rather than the newest of the series. [tool.astro] runtime
+// still wins, a declared Dockerfile resolves no base at all, and with no
+// lock build the series tag stays the base.
+func TestTheLocksBuildIsTheBaseWhenNothingElseNamesOne(t *testing.T) {
+	declared := declaredProject(t)
+	for _, tt := range []struct {
+		name string
+		m    ManifestBuild
+		want string
+	}{
+		{"lock build", ManifestBuild{AirflowVersion: "3.3", LockedRuntime: "3.3-8"}, RuntimeImageRepo + ":3.3-8"},
+		{"runtime wins", ManifestBuild{AirflowVersion: "3.3", Runtime: "3.3-7", LockedRuntime: "3.3-8"}, RuntimeImageRepo + ":3.3-7"},
+		{"no lock build", ManifestBuild{AirflowVersion: "3.3"}, RuntimeImageRepo + ":3.3"},
+		{"airflow 2 lock build", ManifestBuild{AirflowVersion: "2.10", LockedRuntime: "12.6.0"}, "quay.io/astronomer/astro-runtime:12.6.0"},
+		{"declared dockerfile", ManifestBuild{ProjectDir: declared, AirflowVersion: "3.3", LockedRuntime: "3.3-8", Dockerfile: "docker/Dockerfile"}, ""},
+	} {
+		if tt.m.ProjectDir == "" {
+			tt.m.ProjectDir = t.TempDir()
+		}
+		pkg, err := ForManifest(tt.m, nil)
+		require.NoError(t, err, tt.name)
+		assert.Equal(t, tt.want, pkg.BaseImage, "%s: package", tt.name)
+
+		local, err := ForLocalManifest(context.Background(), tt.m, noCatalog)
+		require.NoError(t, err, tt.name)
+		assert.Equal(t, tt.want, local.BaseImage, "%s: local", tt.name)
+	}
+}
+
 // With no build named, an Airflow 2 pin is looked up in the catalog, so one
 // that cannot be read refuses the build and says how to name one instead.
 func TestForManifestRefusesAPinWithNoRuntimeImage(t *testing.T) {

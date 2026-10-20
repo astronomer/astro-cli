@@ -22,7 +22,9 @@ import (
 // build, before a standalone start syncs the environment from them
 // (scaffold.SetAstroBuild). `astro init` writes them; this keeps them right
 // after the pin moves, a new build ships, or a project predates them. Docker
-// mode builds from the runtime image and never reads them.
+// mode does not refresh them, but builds on the runtime build they record
+// (imagebuild.ManifestBuild.LockedRuntime), and installs the lock they shape,
+// so it follows this refresh on its next build.
 //
 // Never fails a start. A manifest that does not load is plan.Build's to report.
 // An index that cannot be read leaves the file as it is, since that says
@@ -63,6 +65,12 @@ func (c *cli) refreshAstroBuild(ctx context.Context, r cliout.Renderer, wd strin
 		fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] no longer points Airflow at Astronomer's index\n", manifest.Marker)
 	}
 	if res.pinsChanged {
+		if res.beforeBuild != "" && res.after.RuntimeBuild != "" && res.beforeBuild != res.after.RuntimeBuild {
+			// Docker mode, a package and a deploy build on the build the pins
+			// name, so they follow on their next build.
+			fmt.Fprintf(c.d.Stderr, "%s: runtime pins moved from Astro Runtime %s to %s; Docker mode and astro package astro build on %s from now on, and astro deploy does once the Deployment offers it\n",
+				manifest.Marker, res.beforeBuild, res.after.RuntimeBuild, res.after.RuntimeBuild)
+		}
 		if res.after.RuntimeBuild != "" {
 			fmt.Fprintf(c.d.Stderr, "%s: [tool.uv] now holds %d packages to the versions Astro Runtime %s (Python %s) ships\n",
 				manifest.Marker, len(res.after.RuntimePins), res.after.RuntimeBuild, res.after.RuntimePython)
@@ -106,6 +114,9 @@ type astroBuildWrite struct {
 	// pins. after is [tool.uv] as the write left it.
 	airflowChanged, pinsChanged bool
 	after                       manifest.UV
+	// beforeBuild is the runtime build the pins were taken from before the
+	// write, "" for none.
+	beforeBuild string
 	// pinsErr says what happened to the runtime pins, when it is worth a
 	// warning, and pinsRefused that they could not be written at all.
 	pinsErr     error
@@ -179,6 +190,7 @@ func (res *astroBuildWrite) compare(before *manifest.Manifest, path string) {
 		return
 	}
 	res.after = after.UV
+	res.beforeBuild = before.UV.RuntimeBuild
 	res.airflowChanged = !reflect.DeepEqual(airflowSettings(before), airflowSettings(after))
 	res.pinsChanged = before.UV.RuntimeBuild != after.UV.RuntimeBuild || before.UV.RuntimePython != after.UV.RuntimePython ||
 		!slices.Equal(before.UV.RuntimePins, after.UV.RuntimePins)

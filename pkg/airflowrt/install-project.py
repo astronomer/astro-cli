@@ -748,6 +748,63 @@ def base_installed():
     return {norm(d.metadata["Name"]) for d in metadata.distributions() if d.metadata["Name"]}
 
 
+def base_airflow():
+    """The Airflow release this image has installed, or None when it cannot
+    tell. The CLI's tests name it in ASTRO_INSTALL_PROJECT_BASE_AIRFLOW; a test
+    that names the base's packages without it has no Airflow to compare."""
+    if "ASTRO_INSTALL_PROJECT_BASE_AIRFLOW" in os.environ:
+        return os.environ["ASTRO_INSTALL_PROJECT_BASE_AIRFLOW"].strip() or None
+    if "ASTRO_INSTALL_PROJECT_BASE_INSTALLED" in os.environ:
+        return None
+    try:
+        from importlib import metadata
+
+        return metadata.version(AIRFLOW)
+    except Exception:
+        return None
+
+
+def locked_airflow(lock):
+    """The Airflow release uv.lock resolved for this interpreter, or None when
+    it holds none, or more than one."""
+    versions = {
+        p.get("version")
+        for p in lock.get("package") or []
+        if norm(p.get("name", "")) == AIRFLOW and p.get("version") and applies(p.get("resolution-markers"))
+    }
+    return next(iter(versions)) if len(versions) == 1 else None
+
+
+# The comment astro writes above the runtime pins in [tool.uv]
+# constraint-dependencies, naming the build they came from.
+RUNTIME_PINS_HEADER = re.compile(r"#\s*Astro Runtime (\S+) \(Python \d+\.\d+\) ships these versions")
+
+
+def pinned_runtime(pyproject_text):
+    """The Astro Runtime build the project's runtime pins were taken from, as
+    the comment above them names it, or None."""
+    m = RUNTIME_PINS_HEADER.search(pyproject_text)
+    return m.group(1) if m else None
+
+
+def airflow_mismatch(lock, installed, runtime):
+    """A warning when uv.lock was made for another Airflow than this image
+    runs, or None. The lock's versions still install: a build on another runtime
+    than the lock's (a floating FROM, a deploy onto the build a Deployment
+    offers) is allowed, and said."""
+    locked = locked_airflow(lock)
+    if not locked or not installed or locked.lower() == installed.strip().lower():
+        return None
+    made_for = "Airflow %s" % locked
+    if runtime:
+        made_for += " (Astro Runtime %s)" % runtime
+    return (
+        "uv.lock was made for %s, and this image has Airflow %s, so the lock's versions install over another runtime than "
+        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init` and then "
+        "`uv lock` to move the lock to this image's runtime" % (made_for, installed.strip())
+    )
+
+
 def write(path, lines):
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n" if lines else "")
@@ -769,7 +826,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     with open(os.path.join(args.project, "pyproject.toml"), "rb") as f:
-        manifest = Manifest(tomllib.load(f))
+        pyproject = f.read()
+    manifest = Manifest(tomllib.loads(pyproject.decode("utf-8")))
 
     lock = None
     lock_path = os.path.join(args.project, "uv.lock")
@@ -777,7 +835,13 @@ def main(argv=None):
         try:
             base = base_installed()
             with open(lock_path, "rb") as f:
-                lock = Lock(tomllib.load(f), manifest, runtime_constrained(args.runtime_constraints), base)
+                lock_data = tomllib.load(f)
+            # Every build checks it, `docker build .` included: the lock is
+            # for one runtime's Airflow, and this image may be another's.
+            mismatch = airflow_mismatch(lock_data, base_airflow(), pinned_runtime(pyproject.decode("utf-8", "replace")))
+            if mismatch:
+                warn(mismatch)
+            lock = Lock(lock_data, manifest, runtime_constrained(args.runtime_constraints), base)
             if lock.elsewhere:
                 warn("uv.lock took %s from an index other than PyPI, which the image does not read; installing them unpinned" % ", ".join(lock.elsewhere))
             if lock.stale:

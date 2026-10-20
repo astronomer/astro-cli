@@ -101,6 +101,30 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 	return res
 }
 
+// Pins taken from an older build move to the newest one with a line that
+// names both, since Docker mode, a package and a deploy follow the build the
+// pins name. A refresh that keeps the build says nothing of a move.
+func TestStartSaysWhenTheRuntimePinsMoveToAnotherBuild(t *testing.T) {
+	got, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	older := strings.Replace(got, "# Astro Runtime 3.3-9 (Python 3.12)", "# Astro Runtime 3.3-8 (Python 3.12)", 1)
+	if older == got {
+		t.Fatalf("the pins header was not where the test expects it:\n%s", got)
+	}
+
+	moved, out, _ := startWithPins(t, older, freeze339, nil)
+	if !strings.Contains(out, "runtime pins moved from Astro Runtime 3.3-8 to 3.3-9") {
+		t.Errorf("the start did not say the pins moved:\n%s", out)
+	}
+	if !strings.Contains(moved, "# Astro Runtime 3.3-9 (Python 3.12)") {
+		t.Errorf("the pins were not moved to 3.3-9:\n%s", moved)
+	}
+
+	_, out, _ = startWithPins(t, moved, freeze339, nil)
+	if strings.Contains(out, "runtime pins moved") {
+		t.Errorf("a start that kept the build said the pins moved:\n%s", out)
+	}
+}
+
 func TestStartWritesTheRuntimePins(t *testing.T) {
 	got, out, asked := startWithPins(t, buildManifest, freeze339, nil)
 	if strings.Join(asked, " ") != "3.3-9 3.12" {

@@ -301,6 +301,53 @@ func lockProject(deps []string, packages string) (pyproject, lock string) {
 	return pyproject, lock
 }
 
+// Every build checks the lock's Airflow against the image's, `docker build .`
+// included: a lock made for another runtime's Airflow is said in the build
+// output, naming the runtime the pins came from when pyproject.toml records
+// it, and the build goes on with the lock's versions. A lock for this image's
+// Airflow, a lock holding no Airflow, and an image whose Airflow cannot be
+// read say nothing.
+func TestInstallHelperSaysWhenTheLockIsForAnotherAirflow(t *testing.T) {
+	pyproject, lock := lockProject([]string{"apache-airflow==3.3.*", "pandas"},
+		lockEntry("pandas", "2.2.3")+lockEntry("apache-airflow", "3.3.2+astro.2"))
+	pins := "\n[tool.uv]\nconstraint-dependencies = [\n" +
+		"    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
+		"    \"pandas==2.2.3; python_version == '3.12'\",\n]\n"
+
+	for _, tt := range []struct {
+		name, pyproject, lock, installed string
+		want                             []string
+	}{
+		{name: "same airflow", pyproject: pyproject, lock: lock, installed: "3.3.2+astro.2"},
+		{
+			name: "another airflow, runtime named", pyproject: pyproject + pins, lock: lock, installed: "3.3.3+astro.1",
+			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2 (Astro Runtime 3.3-9)", "this image has Airflow 3.3.3+astro.1", "astro init"},
+		},
+		{
+			name: "another airflow, no pins", pyproject: pyproject, lock: lock, installed: "3.3.3+astro.1",
+			want: []string{"uv.lock was made for Airflow 3.3.2+astro.2,", "this image has Airflow 3.3.3+astro.1"},
+		},
+		{name: "image airflow unknown", pyproject: pyproject, lock: lock},
+		{name: "no airflow in the lock", pyproject: pyproject, lock: strings.Replace(lock, lockEntry("apache-airflow", "3.3.2+astro.2"), "", 1), installed: "3.3.3+astro.1"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			out := runHelper(t, helperProject(t, tt.pyproject, tt.lock), helperRun{env: []string{"ASTRO_INSTALL_PROJECT_BASE_AIRFLOW=" + tt.installed}})
+			if len(tt.want) == 0 {
+				assert.NotContains(t, out.stderr, "was made for")
+			}
+			for _, s := range tt.want {
+				assert.Contains(t, out.stderr, s)
+			}
+			// The build goes on with the lock's versions either way. (The
+			// fixture lock records no constraints, so beside the runtime pins
+			// it is stale and installs unpinned; the warning is said first.)
+			if tt.pyproject == pyproject {
+				assert.Contains(t, out.constraints, "pandas==2.2.3")
+			}
+		})
+	}
+}
+
 // The registry entry of a package in a uv.lock.
 func lockEntry(name, version string) string {
 	return "[[package]]\nname = \"" + name + "\"\nversion = \"" + version + "\"\nsource = { registry = \"https://pypi.org/simple\" }\n\n"
