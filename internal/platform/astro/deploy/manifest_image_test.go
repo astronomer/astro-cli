@@ -278,6 +278,84 @@ func TestDeployManifestImage_Airflow2(t *testing.T) {
 	})
 }
 
+// The deployment's offer is matched by the Airflow each release carries: a
+// patch pin to that release, a series or generation pin to any under it, and
+// an Astronomer build of Airflow by its release.
+func TestOfferedReleasesNewestFor(t *testing.T) {
+	o := offeredReleases{
+		{Version: "12.6.0", AirflowVersion: "2.10.4"},
+		{Version: "12.10.0", AirflowVersion: "2.10.5"},
+		{Version: "12.9.0", AirflowVersion: "2.10.5"},
+		{Version: "13.1.0", AirflowVersion: "2.11.0"},
+		{Version: "3.1-5", AirflowVersion: "3.1.8+astro.4"},
+	}
+	for pin, want := range map[string]string{
+		"2.10":   "12.10.0",
+		"2.10.4": "12.6.0",
+		"2":      "13.1.0",
+		"2.9":    "",
+		"3.1":    "3.1-5",
+		"3.1.8":  "3.1-5",
+		"":       "",
+	} {
+		assert.Equal(t, want, o.NewestFor(pin), pin)
+	}
+}
+
+// An Astro deploy builds on the newest runtime the deployment offers for the
+// pin, ahead of the catalog's newest and without reading the catalog, and
+// falls back to the catalog only when it offers none.
+func TestAstroBaseBuildsOnTheOfferedRuntime(t *testing.T) {
+	catalog, err := runtimeversions.Parse([]byte(`{"runtimeVersions": {
+		"12.9.0": {"metadata": {"airflowVersion": "2.10.5", "channel": "stable"}}}}`))
+	require.NoError(t, err)
+	reads := 0
+	read := func() *runtimeversions.Catalog { reads++; return catalog }
+	offer := offeredReleases{
+		{Version: "12.6.0", AirflowVersion: "2.10.4"},
+		{Version: "3.1-5", AirflowVersion: "3.1.8"},
+	}
+	ctx := context.Background()
+
+	ref, err := astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0", ref)
+	assert.Zero(t, reads, "an offered Airflow 2 build needs no catalog")
+
+	ref, err = astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "3.1"})
+	require.NoError(t, err)
+	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-5", ref, "Airflow 3 takes the offered build over the series tag")
+
+	ref, err = astroBase(offer, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10", Runtime: "12.9.0"})
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref, "the manifest's runtime wins")
+
+	ref, err = astroBase(nil, read)(ctx, imagebuild.ManifestBuild{AirflowVersion: "2.10"})
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref, "nothing offered falls back to the catalog")
+}
+
+// The options are asked for this deployment, so the offer is its own rather
+// than the organization's.
+func TestOfferedRuntimesAsksForTheDeployment(t *testing.T) {
+	client := new(astrov1_mocks.ClientWithResponsesInterface)
+	client.On("GetDeploymentOptionsWithResponse", mock.Anything, "org-id",
+		mock.MatchedBy(func(p *astrov1.GetDeploymentOptionsParams) bool {
+			return p.DeploymentId != nil && *p.DeploymentId == "test-deployment-id"
+		})).Return(&astrov1.GetDeploymentOptionsResponse{
+		HTTPResponse: &http.Response{StatusCode: http.StatusOK},
+		JSON200: &astrov1.DeploymentOptions{RuntimeReleases: []astrov1.RuntimeRelease{
+			{Version: "12.6.0", AirflowVersion: "2.10.4"},
+		}},
+	}, nil)
+
+	offer, err := offeredRuntimes(context.Background(), "org-id", "test-deployment-id", client)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"12.6.0"}, offer.versions())
+	assert.Equal(t, "12.6.0", offer.NewestFor("2.10"))
+	client.AssertExpectations(t)
+}
+
 // A failed install says "see the build output above", so the build's lines
 // reach Progress, labeled as astro local labels them.
 func TestDeployManifestImage_StreamsTheBuildOutput(t *testing.T) {

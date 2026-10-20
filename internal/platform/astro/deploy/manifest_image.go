@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	airflowversions "github.com/astronomer/astro-cli/airflow_versions"
 	"github.com/astronomer/astro-cli/config"
 	"github.com/astronomer/astro-cli/internal/containercfg"
 	"github.com/astronomer/astro-cli/internal/deploybuild"
@@ -148,23 +149,28 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 		gitInfo, commitMessage = readManifestDeployGit(in.Build.ProjectDir)
 	}
 
+	// The deployment comes first: its rules are checked before the build,
+	// which can take minutes, and the runtimes it offers decide a generated
+	// build's base.
+	dep, offer, err := checkDeployment(ctx, &c, &in, astroV1Client)
+	if err != nil {
+		return ManifestImageDeployResult{}, err
+	}
+	allowed := offer.versions()
+
 	var req imagebuild.Request
 	if in.ImageName == "" {
 		// Which image the manifest builds is imagebuild's rule, shared with
-		// every other consumer that builds from a manifest.
-		req, err = imagebuild.ForManifest(in.Build, in.Catalog)
+		// every other consumer that builds from a manifest, over a base the
+		// Deployment offers (deploybuild.OfferedBase).
+		req, err = imagebuild.ForManifestWith(ctx, in.Build, astroBase(offer, in.Catalog))
 		if err != nil {
 			return ManifestImageDeployResult{}, err
 		}
 	}
 	planned := deploybuild.PlanRuntime(in.ImageName, &req, &in.Build)
 
-	// The deployment's rules are checked before the build, which can take
-	// minutes, and again on the built image's label, which is the authority.
-	dep, allowed, err := checkDeployment(ctx, &c, &in, astroV1Client)
-	if err != nil {
-		return ManifestImageDeployResult{}, err
-	}
+	// Checked again on the built image's label, which is the authority.
 	if err := planned.Check(dep.AstroRuntimeVersion, allowed); err != nil {
 		return ManifestImageDeployResult{}, err
 	}
@@ -259,9 +265,10 @@ func DeployManifestImage(in ManifestImageDeployInput, astroV1Client astrov1.APIC
 // checkDeployment fetches the deployment and confirms the deploy is allowed:
 // cicd enforcement, and DAG deploys enabled for an image-only (--image)
 // deploy, which leaves the running DAGs in place and so needs them to live
-// outside the image. It also returns the runtime versions the deployment
-// offers, which the image's runtime is checked against.
-func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, []string, error) {
+// outside the image. It also returns the runtimes the deployment offers,
+// which a generated build starts from and the image's runtime is checked
+// against.
+func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDeployInput, astroV1Client astrov1.APIClient) (astrov1.Deployment, offeredReleases, error) {
 	dep, err := deployment.GetDeploymentByID(c.Organization, in.DeploymentID, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
@@ -275,11 +282,11 @@ func checkDeployment(ctx context.Context, c *config.Context, in *ManifestImageDe
 		// Under remote execution they live with the remote agents instead.
 		return astrov1.Deployment{}, nil, fmt.Errorf(imageOnlyNeedsDagDeployMsg, in.DeploymentID)
 	}
-	allowed, err := offeredRuntimeVersions(ctx, dep.OrganizationId, astroV1Client)
+	offer, err := offeredRuntimes(ctx, dep.OrganizationId, in.DeploymentID, astroV1Client)
 	if err != nil {
 		return astrov1.Deployment{}, nil, err
 	}
-	return dep, allowed, nil
+	return dep, offer, nil
 }
 
 // imageOnlyNeedsDagDeployMsg refuses --image to a Deployment with DAG deploys
@@ -421,21 +428,73 @@ func buildOrAdoptImage(ctx context.Context, in *ManifestImageDeployInput, req *i
 	})
 }
 
-// offeredRuntimeVersions fetches the runtime versions the organization's
-// deployments offer.
-func offeredRuntimeVersions(ctx context.Context, organizationID string, astroV1Client astrov1.APIClient) ([]string, error) {
-	resp, err := astroV1Client.GetDeploymentOptionsWithResponse(ctx, organizationID, &astrov1.GetDeploymentOptionsParams{})
+// offeredRuntimes fetches the runtime releases the deployment offers: its
+// options, asked for by its ID, so the answer is this deployment's rather
+// than the organization's.
+func offeredRuntimes(ctx context.Context, organizationID, deploymentID string, astroV1Client astrov1.APIClient) (offeredReleases, error) {
+	params := &astrov1.GetDeploymentOptionsParams{}
+	if deploymentID != "" {
+		params.DeploymentId = &deploymentID
+	}
+	resp, err := astroV1Client.GetDeploymentOptionsWithResponse(ctx, organizationID, params)
 	if err != nil {
 		return nil, err
 	}
 	if err := astrov1.NormalizeAPIError(resp.HTTPResponse, resp.Body); err != nil {
 		return nil, err
 	}
-	allowed := make([]string, 0, len(resp.JSON200.RuntimeReleases))
-	for _, r := range resp.JSON200.RuntimeReleases {
-		allowed = append(allowed, r.Version)
+	return offeredReleases(resp.JSON200.RuntimeReleases), nil
+}
+
+// offeredReleases are the runtime releases an Astro deployment offers, and
+// Astro's deploybuild.RuntimeOffer.
+type offeredReleases []astrov1.RuntimeRelease
+
+var _ deploybuild.RuntimeOffer = offeredReleases(nil)
+
+// versions are the offered runtime versions, which the image's runtime is
+// checked against.
+func (o offeredReleases) versions() []string {
+	out := make([]string, 0, len(o))
+	for i := range o {
+		out = append(out, o[i].Version)
 	}
-	return allowed, nil
+	return out
+}
+
+// NewestFor is the newest offered build whose Airflow release the pin covers:
+// that exact release for a pin with a patch ("2.10.3"), any release of the
+// series or generation for one without ("2.10", "2"). Astro names an Astronomer
+// build of Airflow 3 with a local version ("3.1.8+astro.4"), which its release
+// covers. "" when none is offered.
+func (o offeredReleases) NewestFor(pin string) string {
+	pin = strings.TrimSpace(pin)
+	if pin == "" {
+		return ""
+	}
+	newest := ""
+	for i := range o {
+		av := o[i].AirflowVersion
+		if av != pin && !strings.HasPrefix(av, pin+".") && !strings.HasPrefix(av, pin+"+") {
+			continue
+		}
+		if newest == "" || airflowversions.CompareRuntimeVersions(o[i].Version, newest) > 0 {
+			newest = o[i].Version
+		}
+	}
+	return newest
+}
+
+// astroBase resolves a generated build's runtime base for an Astro deploy:
+// the newest runtime the deployment offers for the pin (deploybuild.
+// OfferedBase), so the image carries a runtime the deployment takes, and with
+// none offered imagebuild's rule over the public catalog: the series tag for
+// Airflow 3, the catalog's newest released runtime for Airflow 2, refused
+// when the catalog cannot be read.
+func astroBase(offer offeredReleases, catalog func() *runtimeversions.Catalog) imagebuild.BaseImageFunc {
+	return deploybuild.OfferedBase(offer, func(_ context.Context, m imagebuild.ManifestBuild) (string, error) {
+		return imagebuild.RuntimeImageForPython(m.AirflowVersion, m.Runtime, m.RequiresPython, catalog)
+	})
 }
 
 // finalizeManifestDeploy marks a manifest deploy final. It carries the dag tarball version

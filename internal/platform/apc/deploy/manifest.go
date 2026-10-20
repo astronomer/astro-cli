@@ -532,10 +532,13 @@ func listedRuntimes(client houston.ClientInterface, clusterID, workspaceID, depl
 	return listedReleases(releases)
 }
 
-// newestFor is the newest runtime build listed that carries the Airflow the
+// listedReleases is APC's deploybuild.RuntimeOffer.
+var _ deploybuild.RuntimeOffer = listedReleases(nil)
+
+// NewestFor is the newest runtime build listed that carries the Airflow the
 // pin names: that exact version for a pin with a patch ("2.10.3"), any of its
 // series for one without ("3.1"). "" when none is listed.
-func (l listedReleases) newestFor(pin string) string {
+func (l listedReleases) NewestFor(pin string) string {
 	newest := ""
 	for i := range l {
 		av := l[i].AirflowVersion
@@ -557,19 +560,16 @@ func (l listedReleases) newestFor(pin string) string {
 // catalog may not. When the platform lists none, an Airflow 3 pin builds on
 // its series tag and an Airflow 2 one on the newest runtime the public
 // catalog has; with that unreadable too, the deploy is refused, naming
-// [tool.astro] runtime.
+// [tool.astro] runtime. The offer half is deploybuild.OfferedBase, the rule
+// Astro's deploy follows over its own offer.
 func houstonBase(listed listedReleases, o runtimeversions.Options) imagebuild.BaseImageFunc {
-	return func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
-		runtime := m.Runtime
-		if runtime == "" {
-			runtime = listed.newestFor(m.AirflowVersion)
-		}
-		base, err := imagebuild.LocalRuntimeImageWith(ctx, m.AirflowVersion, runtime, m.RequiresPython, o)
-		if err != nil && runtime == "" && strings.HasPrefix(m.AirflowVersion, "2") {
+	return deploybuild.OfferedBase(listed, func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
+		base, err := imagebuild.LocalRuntimeImageWith(ctx, m.AirflowVersion, m.Runtime, m.RequiresPython, o)
+		if err != nil && m.Runtime == "" && strings.HasPrefix(m.AirflowVersion, "2") {
 			return "", fmt.Errorf("the platform lists no Astro Runtime for Airflow %s, and the public runtime catalog gave none either: set [tool.astro] runtime in pyproject.toml to the runtime build to deploy: %w", m.AirflowVersion, err)
 		}
 		return base, err
-	}
+	})
 }
 
 // buildManifestImage builds the image a manifest deploy pushes, at
