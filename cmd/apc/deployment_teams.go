@@ -36,7 +36,7 @@ func newDeploymentTeamRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage deployment team resources",
 		Long:    "A Team is a group of users imported from your Identity Provider, teams can be added to and removed from a deployment to manage group user access",
 	}
-	addDeploymentFlag(cmd.PersistentFlags(), "", "Deployment whose teams to manage: a link name from the project's manifest, or a Deployment id", true)
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose teams to manage: a link name from the project's manifest, or a Deployment id", true, "")
 	// Every team command needs it. Marked before the flag was defined, as it
 	// was, the mark failed, unseen, and a run without one asked Houston about
 	// the Deployment "".
@@ -61,7 +61,10 @@ func newDeploymentTeamAddCmd(out io.Writer) *cobra.Command { //nolint:dupl // th
 		},
 	}
 	cmd.PersistentFlags().StringVar(&teamID, "team-id", "", "Team to add to the Deployment")
-	_ = cmd.MarkFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
+	// A persistent flag is not among the command's own flags, where
+	// MarkFlagRequired looks, so marking it so failed, unseen, and a run
+	// without one asked Houston about the team "".
+	_ = cmd.MarkPersistentFlagRequired("team-id") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.PersistentFlags().StringVarP(&deploymentRole, "role", "r", houston.DeploymentViewerRole, "Deployment role to give the team: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR or DEPLOYMENT_ADMIN")
 	addAccessOutputFlag(cmd)
 	return cmd

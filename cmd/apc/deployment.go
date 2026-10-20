@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/astronomer/astro-cli/cmd/cliout"
+	"github.com/astronomer/astro-cli/cmd/utils"
 	"github.com/astronomer/astro-cli/internal/platform/apc/deployment"
 	"github.com/astronomer/astro-cli/internal/platform/apc/houston"
 	"github.com/astronomer/astro-cli/pkg/input"
@@ -177,15 +178,18 @@ func newDeploymentRootCmd(out io.Writer) *cobra.Command {
 	// working. hibernate and wake-up are newer than 1.x, so they take none.
 	for _, c := range cmd.Commands() {
 		switch c.Name() {
-		case "create", "list", "adopt":
-			addWorkspaceFlag(c.Flags(), "", "Workspace the Deployments are in (default: the current context's)")
+		case "create":
+			addWorkspaceFlag(c.Flags(), "Workspace to create the Deployment in (default: the current context's)", "")
+		case "list":
+			addWorkspaceFlag(c.Flags(), "Workspace whose Deployments to list (default: the current context's)", "")
+		case "adopt":
+			addWorkspaceFlag(c.Flags(), "Workspace to adopt the Deployment into (default: the current context's)", "")
 		case "update", "delete", "unadopt", "logs", "service-account", "user", "team", "airflow", "runtime":
 			fs := c.Flags()
 			if c.HasSubCommands() {
 				fs = c.PersistentFlags()
 			}
-			fs.String("workspace-id", "", "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
-			fs.MarkHidden("workspace-id") //nolint:errcheck // the flag is defined just above
+			utils.AddOneXNoOp(fs, "workspace-id", "")
 		}
 	}
 
@@ -395,7 +399,7 @@ func newDeploymentUnadoptCmd(out io.Writer) *cobra.Command {
 			return deploymentUnadopt(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "d", "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", true)
+	addDeploymentFlag(cmd.Flags(), "Adopted Deployment to release: a link name from the project's manifest, or a Deployment id", true, "d")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.Flags().BoolVarP(&skipPrompt, "yes", "y", false, "Release the Deployment without asking for confirmation")
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
@@ -526,7 +530,7 @@ func newDeploymentAirflowUpgradeCmd(out io.Writer) *cobra.Command {
 			return deploymentAirflowUpgrade(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "d", "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true)
+	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true, "d")
 	cmd.Flags().StringVarP(&desiredAirflowVersion, "desired-airflow-version", "v", "", "Desired Airflow version to upgrade to")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial airflow upgrade step")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
@@ -559,7 +563,7 @@ func newDeploymentRuntimeUpgradeCmd(out io.Writer) *cobra.Command { //nolint:dup
 			return deploymentRuntimeUpgrade(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "d", "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true)
+	addDeploymentFlag(cmd.Flags(), "Deployment to upgrade: a link name from the project's manifest, or a Deployment id", true, "d")
 	cmd.Flags().StringVarP(&desiredRuntimeVersion, "desired-runtime-version", "v", "", "Desired Runtime version you wish to upgrade your deployment to")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime upgrade step")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
@@ -578,7 +582,7 @@ func newDeploymentRuntimeMigrateCmd(out io.Writer) *cobra.Command {
 			return deploymentRuntimeMigrate(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "d", "Deployment to migrate: a link name from the project's manifest, or a Deployment id", true)
+	addDeploymentFlag(cmd.Flags(), "Deployment to migrate: a link name from the project's manifest, or a Deployment id", true, "d")
 	cmd.Flags().BoolVarP(&cancel, "cancel", "c", false, "Abort the initial runtime migrate step")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cliout.AddOutputFlag(cmd, &deploymentOutput)
@@ -778,7 +782,13 @@ func deploymentDelete(cmd *cobra.Command, out io.Writer) error {
 	// the Deployment, including the database, is permanently removed. Confirm
 	// before proceeding, unless --yes already did.
 	if !skipPrompt {
-		i, err := input.Confirm(cliDeploymentHardDeletePrompt, input.AnsweredBy("--yes"))
+		prompt := cliDeploymentHardDeletePrompt
+		if deploymentLink != "" {
+			// The run named a link: say which Deployment that is before
+			// asking to delete it.
+			prompt = fmt.Sprintf("\nLink %s names Deployment %s.", deploymentLink, deploymentID) + prompt
+		}
+		i, err := input.Confirm(prompt, input.AnsweredBy("--yes"))
 		if err != nil {
 			return err
 		}

@@ -140,8 +140,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	// 1.x declared --workspace-id (-W) and never read it: -d is looked up in
 	// the project's or the context's workspace. It stays, hidden and read by
 	// nothing, so a 1.x script passing it keeps working.
-	cmd.PersistentFlags().StringP("workspace-id", "W", "", "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
-	cmd.PersistentFlags().MarkHidden("workspace-id") //nolint:errcheck // the flag is defined just above
+	utils.AddOneXNoOp(cmd.PersistentFlags(), "workspace-id", "W")
 	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")

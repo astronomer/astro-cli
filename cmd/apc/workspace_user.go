@@ -37,7 +37,7 @@ func newWorkspaceUserRootCmd(out io.Writer) *cobra.Command {
 		newWorkspaceUserListCmd(out),
 	)
 
-	addWorkspaceFlag(cmd.PersistentFlags(), "w", "Workspace whose users to manage (default: the current context's)")
+	addWorkspaceFlag(cmd.PersistentFlags(), "Workspace whose users to manage (default: the current context's)", "w")
 	return cmd
 }
 

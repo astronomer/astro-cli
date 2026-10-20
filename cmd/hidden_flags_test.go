@@ -37,9 +37,9 @@ var hiddenFlagAllowed = map[string]string{
 	// the same gates (1.x's cmd/apc, deployment.go and utils.go at 7aa23cdc).
 	"deployment adopt --workspace-id": "1.x had it there (APC 2.1.0 and newer), through the deployment group, and adopt read it; " +
 		"it is --workspace's alias",
-	"deployment unadopt --deployment-id": "1.x's unadopt had it, with -d (APC 2.1.0 and newer); it is --deployment's alias, and -d is --deployment's",
+	"deployment unadopt --deployment-id": "1.x's unadopt had it, with -d (APC 2.1.0 and newer); it is --deployment's alias, and keeps -d",
 	"deployment runtime --deployment-id": "1.x's runtime upgrade and migrate had it, with -d (where the platform enables Astro Runtime); " +
-		"it is --deployment's alias, and -d is --deployment's",
+		"it is --deployment's alias, and keeps -d",
 }
 
 // A hidden flag is a 1.x spelling a command keeps working for scripts written

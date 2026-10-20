@@ -83,12 +83,12 @@ func NewDeployCmd() *cobra.Command {
 	// read by nothing, because astronomer/deploy-action passes it on every
 	// deploy (TestDeployManifestDeployActionInvocations); hidden, as there is
 	// nothing for anyone to choose.
-	cmd.Flags().BoolP("force", "f", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().BoolP("force", "f", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("force") //nolint:errcheck // the flag is defined just above
 	// --prompt asked 1.x to offer the Deployment list even with one named. A
 	// deploy here asks whenever none is named, so it is accepted, hidden and
 	// read by nothing, as a pyproject.toml project's deploy always took it.
-	cmd.Flags().BoolP("prompt", "p", false, "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.Flags().BoolP("prompt", "p", false, utils.OneXNoOpUsage)
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVarP(&imageName, imageNameFlag, "i", "", "Name of a prebuilt local image to deploy instead of building one. Outside a pyproject.toml project it deploys the image alone")
 	cmd.Flags().BoolVarP(&dags, "dags", "d", false, "Push only Dags to your Astro Deployment")

@@ -417,9 +417,9 @@ func TestAV2OnlyEntryIsNotShadowedByAGeneralOne(t *testing.T) {
 // The --workspace tombstone on astro deployment team, user and token leaves
 // alone what still takes a workspace flag there: 1.x's --workspace-id, a
 // no-op, still parses, and token workspace-token add and remove, which read
-// --workspace, take it. APC's team and user commands name their Deployment
-// with --deployment too, so the tombstone answers there as well, and their
-// no-op --workspace-id still parses.
+// --workspace, take it. APC's commands of those names never had one, so
+// cobra's own error answers there, though they take --deployment too, and
+// their no-op --workspace-id still parses.
 func TestDeploymentByIDWorkspaceTombstoneLeavesTheRestAlone(t *testing.T) {
 	for _, args := range [][]string{
 		{"deployment", "team", "list", "--deployment", "dep-id", "--workspace-id", "ws-id"},
@@ -437,9 +437,9 @@ func TestDeploymentByIDWorkspaceTombstoneLeavesTheRestAlone(t *testing.T) {
 		_, _, err := executeRoot(root, "deployment", noun, "list", "--deployment-id", "dep-id", "--workspace-id", "ws-id")
 		assert.ErrorIs(t, err, errRan, noun)
 		root, _ = disarmedTree(t, apcTree)
-		_, _, err = executeRoot(root, "deployment", noun, "list", "--deployment-id", "dep-id", "--workspace", "ws-id")
+		_, _, err = executeRoot(root, "deployment", noun, "list", "--deployment", "dep-id", "--workspace", "ws-id")
 		require.Error(t, err, noun)
-		assert.Equal(t, "--workspace was removed in Astro CLI v2: "+errDeploymentByIDWorkspaceRemoved, err.Error(), noun)
+		assert.Equal(t, "unknown flag: --workspace", err.Error(), noun)
 	}
 }
 

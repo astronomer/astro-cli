@@ -54,7 +54,7 @@ func newWorkspaceSaCreateCmd(out io.Writer) *cobra.Command {
 			return workspaceSaCreate(cmd, out)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), "w", "Workspace whose service accounts to manage (default: the current context's)")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	cmd.Flags().StringVarP(&workspaceSAUserID, "user-id", "u", "", "ID of the user you want to link this service account to")
 	cmd.Flags().StringVarP(&workspaceSACategory, "category", "c", "default", "Category of the new service account")
 	cmd.Flags().StringVarP(&workspaceSALabel, "label", "l", "", "Label of the new service account")
@@ -75,7 +75,7 @@ func newWorkspaceSaListCmd(out io.Writer) *cobra.Command {
 			return workspaceSaList(cmd, out)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), "w", "Workspace whose service accounts to manage (default: the current context's)")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	addAccessOutputFlag(cmd)
 	return cmd
 }
@@ -92,7 +92,7 @@ func newWorkspaceSaDeleteCmd(out io.Writer) *cobra.Command {
 			return workspaceSaDelete(cmd, out, args)
 		},
 	}
-	addWorkspaceFlag(cmd.Flags(), "w", "Workspace whose service accounts to manage (default: the current context's)")
+	addWorkspaceFlag(cmd.Flags(), "Workspace whose service accounts to manage (default: the current context's)", "w")
 	addAccessOutputFlag(cmd)
 	return cmd
 }

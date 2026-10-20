@@ -41,7 +41,7 @@ func newDeploymentUserRootCmd(out io.Writer) *cobra.Command {
 		Short:   "Manage Deployment user resources",
 		Long:    "Users can be added or removed from Deployment",
 	}
-	addDeploymentFlag(cmd.PersistentFlags(), "", "Deployment whose users to manage: a link name from the project's manifest, or a Deployment id", true)
+	addDeploymentFlag(cmd.PersistentFlags(), "Deployment whose users to manage: a link name from the project's manifest, or a Deployment id", true, "")
 	_ = cmd.MarkPersistentFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	cmd.AddCommand(
 		newDeploymentUserListCmd(out),

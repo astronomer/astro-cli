@@ -58,7 +58,7 @@ func newDeploymentSaCreateCmd(out io.Writer) *cobra.Command {
 			return deploymentSaCreate(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "d", deploymentSAFlagUsage, true)
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
 	cmd.Flags().StringVarP(&deploymentSACreateCategory, "category", "c", "default", "Category of the service account")
 	cmd.Flags().StringVarP(&deploymentSACreateLabel, "label", "l", "", "Label of the service account")
 	cmd.Flags().StringVarP(&deploymentSACreateRole, "role", "r", houston.DeploymentViewerRole, "Role of the service account to create, one of: DEPLOYMENT_VIEWER, DEPLOYMENT_EDITOR, DEPLOYMENT_ADMIN")
@@ -79,7 +79,7 @@ func newDeploymentSaListCmd(out io.Writer) *cobra.Command {
 			return deploymentSaList(cmd, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "d", deploymentSAFlagUsage, true)
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
@@ -97,7 +97,7 @@ func newDeploymentSaDeleteCmd(out io.Writer) *cobra.Command {
 			return deploymentSaDelete(cmd, args, out)
 		},
 	}
-	addDeploymentFlag(cmd.Flags(), "d", deploymentSAFlagUsage, true)
+	addDeploymentFlag(cmd.Flags(), deploymentSAFlagUsage, true, "d")
 	_ = cmd.MarkFlagRequired("deployment") //nolint:errcheck // the flag is defined just above; this only errors on an unknown flag name
 	addAccessOutputFlag(cmd)
 	return cmd
