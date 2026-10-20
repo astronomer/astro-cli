@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/astronomer/astro-cli/pkg/manifest"
 )
 
 // hostPython is a Python that can run the install helper (3.11+, or one with
@@ -401,4 +403,32 @@ for line in sys.stdin.read().splitlines():
 	for i, c := range cases {
 		assert.Equal(t, c.want, lines[i], c.marker)
 	}
+}
+
+// A plain `docker build .` of a project's own Dockerfile has no find-links file
+// (only a CLI build of a request that names no project writes one), so the
+// helper derives the pages from pyproject.toml itself: a [tool.uv.sources]
+// entry naming a [[tool.uv.index]], for a package the image installs, as
+// manifest.UV.IndexPagesFor does. A CLI build of the same project writes no
+// file either, so both read the same pages.
+func TestInstallHelperDerivesIndexPagesWithoutTheFile(t *testing.T) {
+	const pyproject = "[project]\nname = 'p'\ndependencies = ['apache-airflow==3.3.*', 'Private_Lib>=1', 'pandas']\n" +
+		"[[tool.uv.index]]\nname = 'acme'\nurl = 'https://pypi.acme.example/simple'\nexplicit = true\n" +
+		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n" +
+		"[tool.uv.sources]\nPrivate_Lib = { index = 'acme' }\napache-airflow = { index = 'astronomer' }\n"
+	dir := helperProject(t, pyproject, "")
+	require.NoFileExists(t, filepath.Join(dir, filepath.FromSlash(installFindLinksPath)))
+	out := runHelper(t, dir, helperRun{})
+	assert.Equal(t, "--find-links https://pypi.acme.example/simple/Private_Lib/\nPrivate_Lib>=1\npandas\n", out.requirements)
+
+	// The same page manifest.UV.IndexPagesFor gives the CLI.
+	uv := manifest.UV{Sources: map[string]string{"Private_Lib": "https://pypi.acme.example/simple", "apache-airflow": "https://pip.astronomer.io/v2/"}}
+	assert.Equal(t, []string{"https://pypi.acme.example/simple/Private_Lib/"}, uv.IndexPagesFor(runtimeDeps([]string{"apache-airflow==3.3.*", "Private_Lib>=1", "pandas"})))
+
+	// And a CLI build of that project writes no find-links file of its own.
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{"pyproject.toml": pyproject})
+	inputs, err := installInputs(Request{ManifestDir: project, FindLinks: []string{"https://pypi.acme.example/simple/Private_Lib/"}})
+	require.NoError(t, err)
+	assert.NotContains(t, inputs, installFindLinksPath)
 }

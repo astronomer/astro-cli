@@ -52,7 +52,11 @@ func InstallHelper() []byte {
 
 // installFindLinksPath is where a build request naming no project leaves the
 // find-links pages it was given, one per line, for the helper to pass on as
-// they are (install-project.py's FIND_LINKS).
+// they are (install-project.py's FIND_LINKS). It is only that: the helper
+// derives a project's pages from its pyproject.toml every time, as
+// manifest.UV.IndexPagesFor does, so no build of a project writes it, and a
+// plain `docker build .` of a project's own Dockerfile, which never has it,
+// reads the same pages a CLI build does.
 const installFindLinksPath = ".astro/install-find-links.txt"
 
 // Paths the install stage uses inside the build: where its inputs are copied

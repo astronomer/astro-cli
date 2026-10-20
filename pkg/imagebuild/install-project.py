@@ -50,9 +50,12 @@ REQUIREMENTS = "requirements.txt"
 PACKAGES = "packages.txt"
 LOCK_CONSTRAINTS = "uv-lock-constraints.txt"
 RUNTIME_CONSTRAINTS = "/etc/pip-constraints.txt"
-# Pages a caller that has no pyproject.toml sources for them asks the install to
-# search, one per line, passed through as --find-links as they are. The CLI
-# writes it only for a build request that names no project.
+# The index pages come from pyproject.toml itself ([tool.uv.sources] entries
+# naming a [[tool.uv.index]], for the packages the image installs), on every
+# run, so `docker build .` reads the same ones the CLI does. This file only adds
+# to them: pages for a build the CLI generates from a request that names no
+# project, and so has no pyproject.toml sources, one per line, passed through
+# as they are. No project's build ever has it.
 FIND_LINKS = "install-find-links.txt"
 
 # The distributions that state the Airflow version. The runtime image is
