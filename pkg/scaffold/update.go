@@ -178,7 +178,7 @@ func onBuildKeptNote(note string) string {
 // instead.
 func onBuildFixable(dir string, m *manifest.Manifest) (notes []string, fixable bool, err error) {
 	u := &update{dir: dir, m: m, cs: &Changeset{}, dockerfile: m.Astro.Dockerfile}
-	if u.body, err = os.ReadFile(filepath.Join(dir, filepath.FromSlash(u.dockerfile))); err != nil { //nolint:gosec // G703: manifest.Parse refuses a dockerfile path that leaves the project
+	if u.body, err = os.ReadFile(filepath.Join(dir, filepath.FromSlash(u.dockerfile))); err != nil {
 		return nil, false, nil //nolint:nilerr // a file that cannot be read is the build's to report
 	}
 	if err := updateDockerfile(u); err != nil {
