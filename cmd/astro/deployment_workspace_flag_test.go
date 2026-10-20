@@ -171,6 +171,17 @@ func TestWorkspaceTokenAddAndRemovePickInTheWorkspaceTheyArePointedAt(t *testing
 			mc.AssertExpectations(t)
 		})
 	}
+	t.Run("a token given by name with no workspace anywhere says to pass one", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.CloudPlatform)
+		noWorkspaceContext(t)
+		astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface) // asked nothing
+		for _, verb := range [][]string{{"add", "--role", "DEPLOYMENT_ADMIN"}, {"remove"}} {
+			args := append([]string{"token", "workspace-token", verb[0], "--workspace-token-name", wsTok.Name, "--deployment", otherDep}, verb[1:]...)
+			_, err := execDeploymentCmd(args...)
+			require.Error(t, err, verb[0])
+			assert.Contains(t, err.Error(), "failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: ", verb[0])
+		}
+	})
 	t.Run("a token given by id needs no workspace", func(t *testing.T) {
 		testUtil.InitTestConfig(testUtil.CloudPlatform)
 		t.Cleanup(func() { workspaceTokenID = "" })

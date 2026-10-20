@@ -201,7 +201,7 @@ func runDeploymentTokenUpsert(format cliout.Format, out io.Writer, kind, operati
 func workspaceTokenWorkspace() (string, error) {
 	ws, err := coalesceWorkspace()
 	if err != nil && workspaceTokenID == "" {
-		return "", err
+		return "", fmt.Errorf("failed to find a valid workspace to find the Workspace token in; pass --workspace, or the token's ID: %w", err)
 	}
 	return ws, nil
 }
