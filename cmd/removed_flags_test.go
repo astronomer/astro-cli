@@ -356,11 +356,7 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 					root, preRuns := disarmedTree(t, c.tree)
 					target, _, err := root.Find(c.args)
 					require.NoError(t, err)
-					for _, v2Only := range []bool{false, true} {
-						if f := findRemovedFlagIn(target, c.flag, v2Only); f != nil {
-							reached[f] = true
-						}
-					}
+					markReached(reached, target, c.flag)
 					if asJSON && !cliout.HasOutput(target) {
 						t.Skip("no --output here: an astro api request prints the API's response")
 					}
@@ -386,6 +382,16 @@ func TestRemovedFlagsSayWhatReplacedThem(t *testing.T) {
 	}
 	for i := range removedFlags {
 		assert.True(t, reached[&removedFlags[i]], "removedFlags[%d] (--%s) has no case in removedFlagCases", i, removedFlags[i].name)
+	}
+}
+
+// markReached records the entry for the flag called name that applies on
+// cmd, of either kind, as reached.
+func markReached(reached map[*removedFlag]bool, cmd *cobra.Command, name string) {
+	for _, v2Only := range []bool{false, true} {
+		if f := findRemovedFlagIn(cmd, name, v2Only); f != nil {
+			reached[f] = true
+		}
 	}
 }
 
