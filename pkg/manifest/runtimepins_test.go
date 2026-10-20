@@ -86,6 +86,7 @@ func TestRuntimePinsIn(t *testing.T) {
 		{"not ended, a range after", append(slices.Clone(head), "a==1", "b==2", "c<3", "d==4"), 1, 4, 2},
 		{"not ended, a comment after", append(slices.Clone(head), "a==1", tomledit.Comment("mine"), "d==4"), 1, 3, 2},
 		{"not ended, nothing after", append(slices.Clone(head), "a==1"), 1, 3, 0},
+		{"not ended, pins limited to a Python", append(slices.Clone(head), RuntimePin("a==1", "3.12"), "a==2; python_version >= '3.13'"), 1, 3, 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

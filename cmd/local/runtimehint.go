@@ -241,33 +241,47 @@ var fallbackPythons = []string{"3.12", "3.11"}
 
 // runtimeImageOf is the runtime build the project's image is built from and the
 // Pythons to try for it, best first: scaffold.RuntimeBuildFor's build and
-// Python, the one answer the runtime pins use too, then fallbackPythons for a
-// build whose Python that cannot tell. build is "" when there is none to name.
+// Python, the one answer the runtime pins use too, then the build's default
+// Python, then fallbackPythons for a build whose Python none of that tells.
+// build is "" when there is none to name.
 //
 // A hint is a guess worth making where the pins are not: when that names no
 // build the catalog lists (a FROM built from an argument, pinned by digest or
 // on another image, or a [tool.astro] runtime the catalog does not have), the
-// newest build of the Airflow pin is asked about instead.
+// newest build of the Airflow pin is asked about instead, on the Python a
+// generated image of it runs for the project's requires-python.
 func (c *cli) runtimeImageOf(ctx context.Context, project string, m *manifest.Manifest) (build string, pythons []string) {
 	var catalog *runtimeversions.Catalog
 	if c.d.RuntimeCatalog != nil {
 		catalog = c.d.RuntimeCatalog(ctx)
 	}
 	build, python, err := scaffold.RuntimeBuildFor(project, m, catalog)
+	var runtime runtimeversions.Runtime
+	listed := false
 	if catalog != nil {
-		if _, listed := catalog.Runtime(build); err != nil || !listed {
+		runtime, listed = catalog.Runtime(build)
+		if err != nil || !listed {
 			newest, ok := catalog.NewestPublishedRuntimeFor(m.Airflow().Pin)
 			if !ok {
 				return "", nil
 			}
-			build, python, err = newest, runtimeversions.ImagePythonOf(catalog, newest), nil
+			build, err = newest, nil
+			runtime, listed = catalog.Runtime(newest)
+			python = ""
+			if py, decided := runtime.ImagePython(m.Project.RequiresPython); decided {
+				python = py
+			}
 		}
 	}
 	if err != nil {
 		return "", nil
 	}
-	for _, py := range append([]string{python}, fallbackPythons...) {
-		if py != "" && !slices.Contains(pythons, py) {
+	candidates := []string{python}
+	if listed {
+		candidates = append(candidates, runtime.DefaultPythonVersion)
+	}
+	for _, py := range append(candidates, fallbackPythons...) {
+		if py = strings.TrimSpace(py); py != "" && !slices.Contains(pythons, py) {
 			pythons = append(pythons, py)
 		}
 	}

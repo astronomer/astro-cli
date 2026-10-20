@@ -17,7 +17,7 @@ import (
 //	    'apache-airflow-task-sdk==1.3.2+astro.1',
 //	    # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.
 //	    # astro writes them. To choose a version yourself, list the package in [project] dependencies.
-//	    'a2wsgi==1.10.10',
+//	    "a2wsgi==1.10.10; python_version == '3.12'",
 //	    …
 //	    # End of what astro writes. Constraints below this line are yours.
 //	]
@@ -45,8 +45,18 @@ const RuntimePinsEnd = "End of what astro writes. Constraints below this line ar
 // RuntimePinsComments.
 var runtimePinsHeaderRe = regexp.MustCompile(`^Astro Runtime (\S+) \(Python (\d+\.\d+)\) ships these versions`)
 
-// exactPinRe is a runtime pin as it is written: name==version, nothing more.
-var exactPinRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*==[^\s;,@]+$`)
+// RuntimePin is pin, a name==version line of the image's freeze, as the
+// runtime pins write it: limited to the Python the image runs. A lockfile
+// resolves for every Python requires-python allows, and the image's versions
+// are of one: numpy 2.3 needs Python 3.11, so held on every Python it leaves
+// a project that allows 3.10 nothing to lock there.
+func RuntimePin(pin, python string) string {
+	return pin + "; python_version == '" + python + "'"
+}
+
+// exactPinRe is a runtime pin as it is written: name==version, with or
+// without RuntimePin's marker, nothing more.
+var exactPinRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*==[^\s;,@]+(\s*;\s*python_version\s*==\s*['"]\d+\.\d+['"])?$`)
 
 var constraintsKey = []string{"tool", "uv", "constraint-dependencies"}
 

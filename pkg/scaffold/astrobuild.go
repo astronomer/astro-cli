@@ -42,7 +42,7 @@ import (
 // The rest of constraint-dependencies holds the runtime pins (RuntimePins):
 // every other distribution the image ships, at its version, from the package
 // list Astronomer publishes for each build and Python
-// (runtimeversions.LookupFreeze). Without them a lockfile takes the newest of
+// (the CLI's runtimecatalog.RuntimePins). Without them a lockfile takes the newest of
 // each, so standalone ran SQLAlchemy 2.1 beside an Airflow whose image holds
 // it to 2.0, and newer releases of most of what Airflow imports.
 

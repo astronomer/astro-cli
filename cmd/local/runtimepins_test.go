@@ -101,8 +101,8 @@ func TestStartWritesTheRuntimePins(t *testing.T) {
 	}
 	for _, want := range []string{
 		"# Astro Runtime 3.3-9 (Python 3.12) ships these versions",
-		"'pandas==2.2.3'",
-		"'SQLAlchemy==2.0.50'",
+		"\"pandas==2.2.3; python_version == '3.12'\"",
+		"\"SQLAlchemy==2.0.50; python_version == '3.12'\"",
 		// The image's own build of Airflow, not the newest on the index.
 		"'apache-airflow==3.3.2+astro.2'",
 	} {
@@ -122,7 +122,7 @@ func TestStartWritesTheRuntimePins(t *testing.T) {
 	// A package the project lists is its own to version.
 	listed := strings.Replace(got, "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    'pandas>=3',", 1)
 	after, _, _ := startWithPins(t, listed, freeze339, nil)
-	if strings.Contains(after, "'pandas==2.2.3'") {
+	if strings.Contains(after, "pandas==2.2.3") {
 		t.Errorf("the pin stayed beside the project's own pandas:\n%s", after)
 	}
 }
@@ -150,26 +150,39 @@ func TestStartTakesOutTheRuntimePinsOfABuildWithNoList(t *testing.T) {
 }
 
 // A project with its own exclude-newer reads no package list, as under
-// UV_EXCLUDE_NEWER: pins newer than its cutoff would leave uv nothing to lock.
-func TestStartReadsNoRuntimePinsUnderTheProjectsCutoff(t *testing.T) {
-	src := buildManifest + "\n[tool.uv]\nexclude-newer = \"1 week\"\n"
+// UV_EXCLUDE_NEWER: pins newer than its cutoff would leave uv nothing to
+// lock, so the ones there come out too.
+func TestStartHoldsNoRuntimePinsUnderTheProjectsCutoff(t *testing.T) {
+	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	src := strings.Replace(written, "[tool.uv]\n", "[tool.uv]\nexclude-newer = \"1 week\"\n", 1)
 	r := pinsRun{src: src, build: build332, freeze: freeze339}.start(t)
-	if len(r.freezeAsked) != 0 || strings.Contains(r.manifest, "Astro Runtime") {
-		t.Errorf("the list was read (%q) under the project's cutoff:\n%s", r.freezeAsked, r.manifest)
+	if len(r.freezeAsked) != 0 || strings.Contains(r.manifest, "Astro Runtime") || strings.Contains(r.manifest, "pandas==") {
+		t.Errorf("the list was read (%q), or its pins kept, under the project's cutoff:\n%s", r.freezeAsked, r.manifest)
 	}
 }
 
-// The pin moved while the index cannot be read: what carries it is not known,
-// so the pins stay, and the start says so.
-func TestStartKeepsTheRuntimePinsWhenAMovedPinCannotBeChecked(t *testing.T) {
+// The pin moved while the index cannot be read: the Airflow build pins come
+// out, as they did, and the old release's runtime pins with them.
+func TestStartTakesOutTheRuntimePinsOfAMovedPin(t *testing.T) {
 	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
 	moved := strings.Replace(written, "apache-airflow==3.3.*", "apache-airflow==3.2.*", 1)
-	r := pinsRun{src: moved, lookupErr: errors.New("dial tcp: no route to host")}.start(t)
-	if !strings.Contains(r.manifest, "'pandas==2.2.3'") {
-		t.Errorf("the runtime pins were taken out offline:\n%s", r.manifest)
+	r := pinsRun{src: moved, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339}.start(t)
+	if strings.Contains(r.manifest, "+astro.") || strings.Contains(r.manifest, "pandas==") || strings.Contains(r.manifest, "Astro Runtime") {
+		t.Errorf("pins of the old release stayed beside the moved pin:\n%s", r.manifest)
 	}
-	if !strings.Contains(r.out, "keeps the runtime pins it has") {
-		t.Errorf("the start did not say it kept them:\n%s", r.out)
+}
+
+// The index cannot be read and nothing moved: the build stays as it is, but a
+// package the project has since listed loses its pin, which needs no lookup.
+func TestStartOfflineStillDropsThePinOfAPackageTheProjectLists(t *testing.T) {
+	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	listed := strings.Replace(written, "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    'pandas>=3',", 1)
+	r := pinsRun{src: listed, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339}.start(t)
+	if strings.Contains(r.manifest, "pandas==") {
+		t.Errorf("pandas kept its pin beside the project's own pandas>=3:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.manifest, "SQLAlchemy==2.0.50") || !strings.Contains(r.manifest, "apache-airflow==3.3.2+astro.2") {
+		t.Errorf("the rest of the build changed offline:\n%s", r.manifest)
 	}
 }
 
@@ -213,6 +226,18 @@ func TestRuntimeImageOfFallsBackToThePinsNewestBuild(t *testing.T) {
 				t.Errorf("runtimeImageOf = %q, %v; want the pin's newest build, 3.3-9 on 3.12", build, pythons)
 			}
 		})
+	}
+	// The fallback's Python follows requires-python as a generated image's
+	// does, and the build's default comes next.
+	src := strings.Replace(buildManifest, "requires-python = '>=3.12'", "requires-python = '>=3.13'", 1)
+	src = strings.Replace(src, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-99'\n", 1)
+	m, err := manifest.Parse([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	build, pythons := cli.runtimeImageOf(context.Background(), t.TempDir(), m)
+	if build != "3.3-9" || len(pythons) < 2 || pythons[0] != "3.13" || pythons[1] != "3.12" {
+		t.Errorf("runtimeImageOf = %q, %v; want 3.3-9 on 3.13, then its default 3.12", build, pythons)
 	}
 }
 

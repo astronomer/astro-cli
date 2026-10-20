@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -12,20 +13,23 @@ import (
 )
 
 // RuntimePins are the versions the image of one Astro Runtime build ships, as
-// SetAstroBuild writes them into [tool.uv] constraint-dependencies: under the
-// comment manifest.RuntimePinsComments heads them with, one name==version a
-// line, sorted by name.
+// SetAstroBuild writes them into [tool.uv] constraint-dependencies: between
+// the comments manifest.RuntimePinsComments and manifest.RuntimePinsEnd, one
+// name==version a line, sorted by name, each limited to the image's Python
+// (manifest.RuntimePin).
 //
 // They hold every package the project's lockfile shares with the image to the
-// image's version, so standalone mode, `uv run` and the lockfile a build
-// installs from all resolve what a deployment runs. A constraint adds no
-// package, so the image's packages the project does not use stay out of it.
+// image's version on the image's Python, so standalone mode, `uv run` and the
+// lockfile a build installs from all resolve what a deployment runs. A
+// constraint adds no package, so the image's packages the project does not
+// use stay out of it.
 type RuntimePins struct {
 	// Build and Python are the image's: "3.3-9" and "3.12".
 	Build, Python string
-	// Pins are the image's distributions as runtimeversions.LookupFreeze
-	// reads them. None means the build has no published list, and then any
-	// runtime pins there are taken out.
+	// Pins are the image's distributions, name==version, as the CLI's
+	// runtimecatalog.RuntimePins reads them from the build's freeze. None
+	// means there are none to write, and any runtime pins there are taken
+	// out.
 	Pins []string
 }
 
@@ -55,7 +59,9 @@ func (p *RuntimePins) lines(own map[string]bool) []any {
 	for _, c := range manifest.RuntimePinsComments(p.Build, p.Python) {
 		out = append(out, tomledit.Comment(c))
 	}
-	out = append(out, asAny(pins)...)
+	for _, pin := range pins {
+		out = append(out, manifest.RuntimePin(pin, p.Python))
+	}
 	return append(out, tomledit.Comment(manifest.RuntimePinsEnd))
 }
 
@@ -89,16 +95,21 @@ func keptRuntimePins(current []any, own map[string]bool) []any {
 	return out
 }
 
-// Where a project lists packages beyond [project] dependencies: its extras,
-// and its dependency groups, the dev group `uv add --dev` writes among them.
+// Where a project names packages beyond [project] dependencies: tables of
+// lists (its extras, and its dependency groups, the dev group `uv add --dev`
+// writes among them) and lists (uv's overrides, and the dev dependencies
+// older uv wrote).
 var (
 	optionalDepsKey     = []string{"project", "optional-dependencies"}
 	dependencyGroupsKey = []string{"dependency-groups"}
+	overrideDepsKey     = []string{"tool", "uv", "override-dependencies"}
+	uvDevDepsKey        = []string{"tool", "uv", "dev-dependencies"}
 )
 
 // ownPackages are the distributions the project chooses the version of: the
-// ones it lists, in [project] dependencies, [project.optional-dependencies]
-// or [dependency-groups], and the ones constraints, its own lines of
+// ones it names, in [project] dependencies, [project.optional-dependencies],
+// [dependency-groups], [tool.uv] override-dependencies or [tool.uv]
+// dev-dependencies, and the ones constraints, its own lines of
 // constraint-dependencies, name. A runtime pin on one of them would leave
 // `uv add --dev 'pytest>=9'` nothing to lock where the image ships pytest 8.
 func ownPackages(before *manifest.Manifest, ed tomledit.Editor, constraints []any) map[string]bool {
@@ -126,7 +137,34 @@ func ownPackages(before *manifest.Manifest, ed tomledit.Editor, constraints []an
 			}
 		}
 	}
+	for _, key := range [][]string{overrideDepsKey, uvDevDepsKey} {
+		value, _ := ed.Get(key)
+		list, _ := value.([]any)
+		for _, v := range list {
+			add(v)
+		}
+	}
 	return own
+}
+
+// PruneRuntimePins takes out of the runtime pins in the manifest in dir any
+// package the project now names itself (ownPackages), and changes nothing
+// else. It needs no lookup, so it runs when the build cannot be looked up
+// too: after `uv add --frozen 'pandas>=3'`, a start with Astronomer's index
+// out of reach must still let pandas go, or uv has nothing to lock.
+func PruneRuntimePins(dir string, wrap func(run func() error) error) error {
+	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+		lines, _ := ed.GetLines(constraintsKey)
+		head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
+		if len(current) == 0 {
+			return nil
+		}
+		out := slices.Concat(head, keptRuntimePins(current, ownPackages(before, ed, slices.Concat(head, tail))), tail)
+		if reflect.DeepEqual(out, lines) {
+			return nil
+		}
+		return setConstraints(ed, out)
+	})
 }
 
 // ErrNoRuntimeBuild reports a project whose image is no Astro Runtime build

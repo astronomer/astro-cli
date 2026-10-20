@@ -63,9 +63,9 @@ func TestTheRuntimePinsAreWrittenBetweenTheirComments(t *testing.T) {
     'apache-airflow-task-sdk==1.3.2+astro.1',
     # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.
     # astro writes them. To choose a version yourself, list the package in [project] dependencies.
-    'a2wsgi==1.10.10',
-    'SQLAlchemy==2.0.50',
-    'zipp==4.1.0',
+    "a2wsgi==1.10.10; python_version == '3.12'",
+    "SQLAlchemy==2.0.50; python_version == '3.12'",
+    "zipp==4.1.0; python_version == '3.12'",
     # End of what astro writes. Constraints below this line are yours.
 ]`
 	assert.Contains(t, out, want,
@@ -74,7 +74,11 @@ func TestTheRuntimePinsAreWrittenBetweenTheirComments(t *testing.T) {
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.Equal(t, "3.3-9", m.UV.RuntimeBuild)
-	assert.Equal(t, []string{"a2wsgi==1.10.10", "SQLAlchemy==2.0.50", "zipp==4.1.0"}, m.UV.RuntimePins)
+	assert.Equal(t, []string{
+		"a2wsgi==1.10.10; python_version == '3.12'",
+		"SQLAlchemy==2.0.50; python_version == '3.12'",
+		"zipp==4.1.0; python_version == '3.12'",
+	}, m.UV.RuntimePins, "each pin holds the image's Python alone, so a Python requires-python allows beside it still locks")
 
 	again := writePins(t, dir, build332, freeze339)
 	assert.Equal(t, out, again, "the same build and pins change nothing")
@@ -85,7 +89,7 @@ func TestANewBuildReplacesTheRuntimePins(t *testing.T) {
 	writePins(t, dir, build332, freeze339)
 	out := writePins(t, dir, build332, &RuntimePins{Build: "3.3-10", Python: "3.13", Pins: []string{"apache-airflow==3.3.3+astro.1", "zipp==4.2.0"}})
 	assert.Contains(t, out, "# Astro Runtime 3.3-10 (Python 3.13) ships these versions")
-	assert.Contains(t, out, "'zipp==4.2.0'")
+	assert.Contains(t, out, "zipp==4.2.0;")
 	assert.NotContains(t, out, "3.3-9")
 	assert.NotContains(t, out, "a2wsgi", "a package the new build does not ship has no pin")
 }
@@ -103,8 +107,8 @@ func TestUnknownPinsStayLessTheProjectsOwn(t *testing.T) {
 
 	out := writePins(t, dir, build332, nil)
 	assert.Contains(t, out, "# Astro Runtime 3.3-9 (Python 3.12) ships these versions")
-	assert.Contains(t, out, "'zipp==4.1.0'")
-	assert.NotContains(t, out, "'pandas==2.2.3'")
+	assert.Contains(t, out, "zipp==4.1.0;")
+	assert.NotContains(t, out, "pandas==2.2.3")
 }
 
 // A constraint the project adds after the pins, as anyone appending to the
@@ -120,7 +124,7 @@ func TestAConstraintAppendedAfterThePinsStays(t *testing.T) {
 	for _, pins := range []*RuntimePins{freeze339, nil} {
 		out := writePins(t, dir, build332, pins)
 		assert.Contains(t, out, "Constraints below this line are yours.\n    'zipp<5',\n    'numpy==2.3.0',\n]")
-		assert.NotContains(t, out, "'zipp==4.1.0'", "the project constrains zipp itself")
+		assert.NotContains(t, out, "zipp==4.1.0;", "the project constrains zipp itself")
 	}
 }
 
@@ -139,13 +143,30 @@ func TestABlockWithoutItsEndKeepsWhatFollows(t *testing.T) {
 // A package in a dependency group or an extra is the project's to version
 // too: `uv add --dev 'pytest>=9'` must lock where the image ships pytest 8.
 func TestGroupsAndExtrasAreTheProjectsOwn(t *testing.T) {
-	src := astroHead + "\n[project.optional-dependencies]\nplot = ['zipp']\n\n[dependency-groups]\ndev = ['pytest>=9', {include-group = 'lint'}]\nlint = ['a2wsgi']\n"
+	src := astroHead + "\n[project.optional-dependencies]\nplot = ['zipp']\n\n[dependency-groups]\ndev = ['pytest>=9', {include-group = 'lint'}]\nlint = ['a2wsgi']\n" +
+		"\n[tool.uv]\noverride-dependencies = ['protobuf>=7']\ndev-dependencies = ['ruff']\n"
 	dir := projectWith(t, src)
-	out := writePins(t, dir, build332, &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{"pytest==8.4.0", "zipp==4.1.0", "a2wsgi==1.10.10", "SQLAlchemy==2.0.50"}})
-	assert.Contains(t, out, "'SQLAlchemy==2.0.50'")
-	for _, pin := range []string{"pytest==", "zipp==", "a2wsgi=="} {
+	out := writePins(t, dir, build332, &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
+		"pytest==8.4.0", "zipp==4.1.0", "a2wsgi==1.10.10", "SQLAlchemy==2.0.50", "protobuf==6.33.6", "ruff==0.14.0",
+	}})
+	assert.Contains(t, out, "SQLAlchemy==2.0.50;")
+	for _, pin := range []string{"pytest==", "zipp==", "a2wsgi==", "protobuf==", "ruff=="} {
 		assert.NotContains(t, out, pin)
 	}
+}
+
+// PruneRuntimePins needs no lookup: a package the project has since listed
+// loses its pin, and nothing else changes.
+func TestPruneRuntimePinsDropsWhatTheProjectNowLists(t *testing.T) {
+	dir := projectWith(t, astroHead)
+	written := writePins(t, dir, build332, freeze339)
+	added := strings.Replace(written, "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    'pandas>=3',", 1)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(added), 0o600))
+
+	require.NoError(t, PruneRuntimePins(dir, nil))
+	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.Equal(t, strings.Replace(added, "    \"pandas==2.2.3; python_version == '3.12'\",\n", "", 1), string(out))
 }
 
 // A [tool.uv] written as an inline table cannot hold the comments that mark
