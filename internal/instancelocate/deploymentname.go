@@ -48,15 +48,17 @@ func (e *DeploymentNameError) Error() string {
 func (e *DeploymentNameError) NotFound() bool { return len(e.IDs) == 0 }
 
 // NamedDeployment is the one of deployments, the Deployments of workspace,
-// called name. None, or several, is a *DeploymentNameError; an empty
-// workspace is one too, since there was nowhere to look.
+// called name. One in another workspace is not counted, so a listing that
+// ignored its workspace filter cannot answer from elsewhere. None, or
+// several, is a *DeploymentNameError; an empty workspace is one too, since
+// there was nowhere to look.
 func NamedDeployment(deployments []astrov1.Deployment, name, workspace string) (astrov1.Deployment, error) {
 	if workspace == "" {
 		return astrov1.Deployment{}, &DeploymentNameError{Name: name}
 	}
 	var found []astrov1.Deployment
 	for i := range deployments {
-		if deployments[i].Name == name {
+		if deployments[i].Name == name && deployments[i].WorkspaceId == workspace {
 			found = append(found, deployments[i])
 		}
 	}
@@ -77,8 +79,10 @@ func NamedDeployment(deployments []astrov1.Deployment, name, workspace string) (
 type DeploymentFinder interface {
 	// DeploymentID is ref when it is a Deployment id, with no call made: the
 	// lookup that reads its address is the one that checks it. Anything else
-	// is a Deployment name, looked up in projectWorkspace, else the login's.
-	DeploymentID(ctx context.Context, ref, projectWorkspace string) (string, error)
+	// is a Deployment name, looked up in projectWorkspace, listed under
+	// projectOrganization when the project names one (else the login's), or
+	// else in the login's workspace, under its organization.
+	DeploymentID(ctx context.Context, ref, projectWorkspace, projectOrganization string) (string, error)
 }
 
 // The production locator finds names: cmd/local asks for the interface, and a
@@ -86,7 +90,7 @@ type DeploymentFinder interface {
 var _ DeploymentFinder = (*locator)(nil)
 
 // DeploymentID is the DeploymentFinder seam.
-func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace string) (string, error) {
+func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace, projectOrganization string) (string, error) {
 	if util.IsCUID(ref) {
 		return ref, nil
 	}
@@ -102,6 +106,11 @@ func (l *locator) DeploymentID(ctx context.Context, ref, projectWorkspace string
 	}
 	if ws == "" {
 		return "", &DeploymentNameError{Name: ref}
+	}
+	if projectWorkspace != "" && projectOrganization != "" {
+		// The project's workspace is in the project's organization, which a
+		// login's token reads whichever organization the login is scoped to.
+		org = projectOrganization
 	}
 	deployments, err := l.listDeployments(ctx, token, org, ws)
 	if err != nil {

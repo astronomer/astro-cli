@@ -27,6 +27,8 @@ type fakeDeployments struct {
 	// pageSize, when set, pages the listing; offsets records each page asked.
 	pageSize int
 	offsets  []int
+	// org is the organization a listing must go to, the login's when empty.
+	org string
 }
 
 func (f *fakeDeployments) GetDeploymentWithResponse(_ context.Context, _, id string, _ ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error) {
@@ -35,8 +37,12 @@ func (f *fakeDeployments) GetDeploymentWithResponse(_ context.Context, _, id str
 }
 
 func (f *fakeDeployments) ListDeploymentsWithResponse(ctx context.Context, org string, params *astrov1.ListDeploymentsParams, editors ...astrov1.RequestEditorFn) (*astrov1.ListDeploymentsResponse, error) {
-	if org != "cl-org" {
-		f.t.Errorf("listed in organization %q", org)
+	wantOrg := f.org
+	if wantOrg == "" {
+		wantOrg = "cl-org"
+	}
+	if org != wantOrg {
+		f.t.Errorf("listed in organization %q, want %q", org, wantOrg)
 	}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.example", http.NoBody)
 	for _, e := range editors {
@@ -90,7 +96,7 @@ func dep(id, name, ws string) astrov1.Deployment {
 // reads its address is the one that checks it.
 func TestDeploymentIDTakesAnIDWithNoCall(t *testing.T) {
 	fake := &fakeDeployments{t: t}
-	id, err := finder(fake).DeploymentID(context.Background(), testDeploymentID, "ws-project")
+	id, err := finder(fake).DeploymentID(context.Background(), testDeploymentID, "ws-project", "")
 	if err != nil || id != testDeploymentID {
 		t.Fatalf("id, err = %q, %v", id, err)
 	}
@@ -111,7 +117,7 @@ func TestDeploymentIDLooksANameUpInTheProjectsWorkspaceElseTheLogins(t *testing.
 		{"", "dep-login", "ws-login"},
 	} {
 		fake := &fakeDeployments{t: t, deployments: everywhere}
-		id, err := finder(fake).DeploymentID(context.Background(), "etl-prod", tc.project)
+		id, err := finder(fake).DeploymentID(context.Background(), "etl-prod", tc.project, "")
 		if err != nil || id != tc.want {
 			t.Errorf("%+v: id, err = %q, %v", tc, id, err)
 		}
@@ -129,7 +135,7 @@ func TestDeploymentIDNameMissingOrAmbiguous(t *testing.T) {
 	}}
 	l := finder(fake)
 
-	_, err := l.DeploymentID(context.Background(), "etl-prod", "ws-given")
+	_, err := l.DeploymentID(context.Background(), "etl-prod", "ws-given", "")
 	var nameErr *DeploymentNameError
 	if !errors.As(err, &nameErr) || !nameErr.NotFound() {
 		t.Fatalf("err = %v, want a name that found nothing", err)
@@ -138,7 +144,7 @@ func TestDeploymentIDNameMissingOrAmbiguous(t *testing.T) {
 		t.Errorf("err = %q", err)
 	}
 
-	_, err = l.DeploymentID(context.Background(), "twin", "ws-given")
+	_, err = l.DeploymentID(context.Background(), "twin", "ws-given", "")
 	if !errors.As(err, &nameErr) || nameErr.NotFound() {
 		t.Fatalf("err = %v, want a name several Deployments share", err)
 	}
@@ -153,13 +159,43 @@ func TestDeploymentIDNameWithNoWorkspace(t *testing.T) {
 	fake := &fakeDeployments{t: t}
 	l := finder(fake)
 	l.workspace = func() string { return "" }
-	_, err := l.DeploymentID(context.Background(), "etl-prod", "")
+	_, err := l.DeploymentID(context.Background(), "etl-prod", "", "")
 	var nameErr *DeploymentNameError
 	if !errors.As(err, &nameErr) || !nameErr.NotFound() {
 		t.Fatalf("err = %v, want a name with nowhere to look", err)
 	}
 	if !strings.Contains(err.Error(), "pass -d with the Deployment id") || len(fake.listed) != 0 {
 		t.Errorf("err = %v, listed %v", err, fake.listed)
+	}
+}
+
+// The project's workspace is listed under the project's organization when it
+// names one; the login's workspace always under the login's.
+func TestDeploymentIDListsUnderTheProjectsOrganization(t *testing.T) {
+	deps := []astrov1.Deployment{dep("dep-project", "etl-prod", "ws-project"), dep("dep-login", "etl-prod", "ws-login")}
+	fake := &fakeDeployments{t: t, deployments: deps, org: "cl-project-org"}
+	id, err := finder(fake).DeploymentID(context.Background(), "etl-prod", "ws-project", "cl-project-org")
+	if err != nil || id != "dep-project" {
+		t.Fatalf("id, err = %q, %v", id, err)
+	}
+	// With no workspace of its own the project's organization has no say.
+	fake = &fakeDeployments{t: t, deployments: deps}
+	if id, err := finder(fake).DeploymentID(context.Background(), "etl-prod", "", "cl-project-org"); err != nil || id != "dep-login" {
+		t.Fatalf("id, err = %q, %v", id, err)
+	}
+}
+
+// A listing that ignored its workspace filter cannot answer from another
+// workspace: only the Deployments of the one asked for count.
+func TestNamedDeploymentCountsOnlyTheWorkspaceAskedFor(t *testing.T) {
+	deps := []astrov1.Deployment{dep("dep-elsewhere", "etl-prod", "ws-other"), dep("dep-a", "twin", "ws-given"), dep("dep-b", "twin", "ws-other")}
+	_, err := NamedDeployment(deps, "etl-prod", "ws-given")
+	var nameErr *DeploymentNameError
+	if !errors.As(err, &nameErr) || !nameErr.NotFound() {
+		t.Fatalf("err = %v, want none in ws-given", err)
+	}
+	if got, err := NamedDeployment(deps, "twin", "ws-given"); err != nil || got.Id != "dep-a" {
+		t.Fatalf("got, err = %q, %v; want the one twin in ws-given", got.Id, err)
 	}
 }
 
@@ -175,7 +211,7 @@ func TestDeploymentIDReadsEveryPage(t *testing.T) {
 		dep("dep-5", "last", "ws-given"),
 	}
 	fake := &fakeDeployments{t: t, deployments: ws, pageSize: 2}
-	id, err := finder(fake).DeploymentID(context.Background(), "last", "ws-given")
+	id, err := finder(fake).DeploymentID(context.Background(), "last", "ws-given", "")
 	if err != nil || id != "dep-5" {
 		t.Fatalf("id, err = %q, %v", id, err)
 	}
@@ -184,7 +220,7 @@ func TestDeploymentIDReadsEveryPage(t *testing.T) {
 	}
 
 	fake = &fakeDeployments{t: t, deployments: ws, pageSize: 2}
-	_, err = finder(fake).DeploymentID(context.Background(), "twin", "ws-given")
+	_, err = finder(fake).DeploymentID(context.Background(), "twin", "ws-given", "")
 	var nameErr *DeploymentNameError
 	if !errors.As(err, &nameErr) || fmt.Sprint(nameErr.IDs) != "[dep-1 dep-4]" {
 		t.Fatalf("err = %v, want both twins", err)
@@ -197,7 +233,7 @@ func TestDeploymentIDLoggedOutSaysLogIn(t *testing.T) {
 	l := finder(&fakeDeployments{t: t})
 	l.workspace = func() string { return "" }
 	l.session = func(context.Context) (string, error) { return "", nil }
-	_, err := l.DeploymentID(context.Background(), "etl-prod", "")
+	_, err := l.DeploymentID(context.Background(), "etl-prod", "", "")
 	if !errors.Is(err, astrosession.ErrLoggedOut) {
 		t.Fatalf("err = %v, want logged out", err)
 	}
@@ -208,7 +244,7 @@ func TestDeploymentIDNamesTheListingsOutage(t *testing.T) {
 	fake := &fakeDeployments{t: t, listStatus: http.StatusUnauthorized}
 	l := finder(fake)
 	l.domain = "astronomer-dev.io"
-	_, err := l.DeploymentID(context.Background(), "etl-prod", "ws-given")
+	_, err := l.DeploymentID(context.Background(), "etl-prod", "ws-given", "")
 	if err == nil || !strings.Contains(err.Error(), "astro login astronomer-dev.io") || !strings.Contains(err.Error(), "workspace ws-given") {
 		t.Fatalf("err = %v", err)
 	}

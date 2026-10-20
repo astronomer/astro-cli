@@ -158,7 +158,7 @@ func (c *cli) findDeployment(ctx context.Context, i instances.Instance, domain s
 		// the lookup that reads its address reports why it cannot.
 		return i, nil
 	}
-	id, err := finder.DeploymentID(ctx, ref, m.Astro.Workspace)
+	id, err := finder.DeploymentID(ctx, ref, m.Astro.Workspace, m.Astro.Organization)
 	if err != nil {
 		return instances.Instance{}, err
 	}

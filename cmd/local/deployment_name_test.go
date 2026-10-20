@@ -41,7 +41,7 @@ func (l findingLocator) BaseURL(_ context.Context, i instances.Instance) (string
 	return l.url, nil
 }
 
-func (l findingLocator) DeploymentID(_ context.Context, ref, projectWorkspace string) (string, error) {
+func (l findingLocator) DeploymentID(_ context.Context, ref, projectWorkspace, projectOrganization string) (string, error) {
 	if util.IsCUID(ref) {
 		return ref, nil
 	}
@@ -49,7 +49,11 @@ func (l findingLocator) DeploymentID(_ context.Context, ref, projectWorkspace st
 	if ws == "" {
 		ws = loginWS
 	}
+	if projectOrganization != "" {
+		ws += "/" + projectOrganization
+	}
 	*l.asked = append(*l.asked, ref+"@"+ws)
+	ws = strings.TrimSuffix(ws, "/"+projectOrganization)
 	var in []astrov1.Deployment
 	for i := range l.deployments {
 		if l.deployments[i].WorkspaceId == ws {
@@ -71,9 +75,16 @@ type byNameRun struct {
 
 func runByName(t *testing.T, deployments []astrov1.Deployment, args ...string) byNameRun {
 	t.Helper()
+	return runByNameIn(t, twoLinkManifest, deployments, args...)
+}
+
+// runByNameIn is runByName in a project whose manifest, after the preamble, is
+// body.
+func runByNameIn(t *testing.T, body string, deployments []astrov1.Deployment, args ...string) byNameRun {
+	t.Helper()
 	stub := newAirflowStub(t)
 	stub.route(http.MethodGet, "/api/v2/pools", `{"pools":[],"total_entries":0}`)
-	dir := instanceProject(t, twoLinkManifest)
+	dir := instanceProject(t, body)
 	d, _, errOut := queryDeps(t)
 	d.WorkingDir = func() (string, error) { return dir, nil }
 	d.Session = func(context.Context, string) (string, error) { return "Bearer session", nil }
@@ -141,6 +152,19 @@ func TestDeploymentFlagNameInTheProjectsWorkspace(t *testing.T) {
 	}
 	if want := "→ etl-prod (astro deployment " + unlinkedID + ")"; !strings.Contains(run.stderr, want) {
 		t.Fatalf("stderr = %q, want %q", run.stderr, want)
+	}
+}
+
+// The project's [tool.astro] organization goes with its workspace, so the
+// workspace is listed there rather than under the login's organization.
+func TestDeploymentFlagNameUnderTheProjectsOrganization(t *testing.T) {
+	run := runByNameIn(t, "organization = 'cl-proj-org'\n"+twoLinkManifest,
+		[]astrov1.Deployment{astroDep(unlinkedID, "etl-prod", projectWS)}, "-d", "etl-prod")
+	if run.err != nil {
+		t.Fatal(run.err)
+	}
+	if strings.Join(run.asked, ",") != "etl-prod@"+projectWS+"/cl-proj-org" {
+		t.Fatalf("asked %v", run.asked)
 	}
 }
 

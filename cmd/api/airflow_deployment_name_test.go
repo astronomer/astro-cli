@@ -12,6 +12,7 @@ import (
 	"github.com/astronomer/astro-cli/config"
 	astrov1 "github.com/astronomer/astro-cli/internal/platform/astro/clients/astrov1"
 	"github.com/astronomer/astro-cli/internal/platform/astro/deployment"
+	"github.com/astronomer/astro-cli/pkg/instances"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -75,6 +76,7 @@ func targetOf(opts *AirflowOptions) (*airflowTarget, error) {
 // Deployment, prod.
 func projectIn(t *testing.T, astro string) {
 	t.Helper()
+	t.Setenv("ASTRO_DOMAIN", "")
 	writeAPIProject(t, `[project]
 name = "demo"
 dependencies = ["apache-airflow==3.1.*"]
@@ -225,4 +227,64 @@ func TestAirflowCmdIgnoresTheWorkspaceIDFlag(t *testing.T) {
 		assert.Equal(t, []string{"test-org/" + contextWS}, *listed, flags)
 		assert.Contains(t, out.String(), "https://dep-context.airflow.astronomer.io/api/v2/dags", flags)
 	}
+}
+
+// locatorAt answers every coordinate lookup with url.
+type locatorAt string
+
+func (l locatorAt) BaseURL(context.Context, instances.Instance) (string, error) {
+	return string(l), nil
+}
+
+// A Deployment a link carries answers as that link, with the link's name and
+// auth, whether -d named it by id or by name: not as a bare Deployment under
+// the context's token. By id it needs no lookup of its own.
+func TestDeploymentALinkCarriesIsThatLink(t *testing.T) {
+	const linkedID = "clinked00000000000000000b"
+	listed := astroLookups(t, astroDeployment(linkedID, "orders-prod", "test-org", projectWS))
+	deployment.GetDeploymentByID = func(_, id string, _ astrov1.APIClient) (astrov1.Deployment, error) {
+		t.Errorf("fetched %s by id: the link's own lookup reads it", id)
+		return astrov1.Deployment{}, errors.New("unexpected")
+	}
+	t.Setenv("ASTRO_DOMAIN", "")
+	writeAPIProject(t, `[project]
+name = "demo"
+dependencies = ["apache-airflow==3.1.*"]
+
+[tool.astro]
+workspace = "`+projectWS+`"
+
+[tool.astro.deployments.prod]
+deployment = "`+linkedID+`"
+auth = { method = 'token', token-env = 'PROD_AIRFLOW_TOKEN' }
+`)
+	t.Setenv("PROD_AIRFLOW_TOKEN", "from-the-link")
+	orig := newLocator
+	t.Cleanup(func() { newLocator = orig })
+	newLocator = func(string) instances.Locator { return locatorAt("https://linked.example/api/v2") }
+
+	for _, ref := range []string{"orders-prod", linkedID} {
+		*listed = nil
+		target, err := targetOf(&AirflowOptions{Deployment: ref})
+		require.NoError(t, err, ref)
+		assert.Equal(t, "prod", target.name, ref)
+		assert.Equal(t, "https://linked.example", target.hostRoot, ref)
+		assert.Equal(t, "Bearer from-the-link", target.authorization, ref)
+		if ref == linkedID {
+			assert.Empty(t, *listed, "an id a link carries is not looked up")
+		} else {
+			assert.Equal(t, []string{"test-org/" + projectWS}, *listed)
+		}
+	}
+}
+
+// A project on another Astro host than the context's has its workspace
+// there, so a name is refused up front, naming the host, rather than listed
+// on the wrong one.
+func TestDeploymentNameInAProjectOnAnotherHost(t *testing.T) {
+	listed := astroLookups(t, astroDeployment("dep-project", "etl-prod", "test-org", projectWS))
+	projectIn(t, "workspace = \""+projectWS+"\"\ndomain = \"astronomer-stage.io\"")
+	_, err := targetOf(&AirflowOptions{Deployment: "etl-prod"})
+	require.ErrorContains(t, err, `"etl-prod" is not a Deployment id, and the project's workspace ws-project, where its name is looked up, is on astronomer-stage.io, not the current context's localhost: run 'astro context switch astronomer-stage.io', or pass -d with the Deployment id`)
+	assert.Empty(t, *listed)
 }

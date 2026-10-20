@@ -181,6 +181,10 @@ func firstNonEmpty(vals ...string) string {
 func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*airflowTarget, error) {
 	var known []string
 	var project manifest.Astro
+	// linked is the link that carries Deployment id, when one does: it
+	// answers for that Deployment, with its name and auth, however -d named
+	// it.
+	linked := func(string) (instances.Instance, bool) { return instances.Instance{}, false }
 	m, err := manifest.Load(filepath.Join(config.WorkingPath, manifest.Marker))
 	switch {
 	case errors.Is(err, manifest.ErrNotFound), errors.Is(err, manifest.ErrNoAstroSection):
@@ -193,8 +197,16 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 		}
 		known = set.Names()
 		project = m.Astro
+		linked = func(id string) (instances.Instance, bool) {
+			i := set.DeploymentByID(id)
+			return i, i.Source == instances.SourceManifest
+		}
 	}
-	baseURL, token, err := resolveDeploymentAirflowURL(opts, name, &project)
+	// An id a link carries needs no lookup here: the link's own does it.
+	if instance, ok := linked(name); ok && util.IsCUID(name) {
+		return linkTarget(ctx, opts, &instance, m.Astro.LoginDomain())
+	}
+	baseURL, token, id, err := resolveDeploymentAirflowURL(opts, name, &project)
 	if err != nil {
 		// A name that matched no link is far more often a typo than a
 		// Deployment, so the names it could have been travel with the failure
@@ -208,6 +220,10 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 			return nil, fmt.Errorf("%w\nDeployments this project links: %s", err, strings.Join(known, ", "))
 		}
 		return nil, err
+	}
+	if instance, ok := linked(id); ok {
+		// Found by name, and a link carries it.
+		return linkTarget(ctx, opts, &instance, m.Astro.LoginDomain())
 	}
 	return opts.httpTarget(name, airflowHostRoot(baseURL), bearerHeader(token))
 }
@@ -249,6 +265,10 @@ func linkTarget(ctx context.Context, opts *AirflowOptions, instance *instances.I
 	return &airflowTarget{name: instance.Name, transport: transport}, nil
 }
 
+// newLocator builds the coordinate lookups for domain. A test points it at a
+// stub, so a link is reached with no control plane.
+var newLocator = instancelocate.New
+
 // instanceDeps hands resolution what it needs from the process: the login and
 // the coordinate lookups, both for domain, the project's Astro host. cmd/api is
 // a shell package, so it wires the two implementations directly rather than
@@ -258,7 +278,7 @@ func linkTarget(ctx context.Context, opts *AirflowOptions, instance *instances.I
 // resolves its URL and proves itself to the Airflow behind it through the same
 // credentials.
 func (o *AirflowOptions) instanceDeps(domain string) instances.Deps {
-	locator := instancelocate.New(domain)
+	locator := newLocator(domain)
 	var google googleauth.Options
 	if chain, ok := locator.(instancelocate.GoogleChain); ok {
 		google.Token, google.Account = chain.Google()
@@ -360,17 +380,17 @@ func (o *AirflowOptions) httpTarget(name, hostRoot, authorization string) (*airf
 // the organization, -O's or the context's; anything else is a Deployment name,
 // looked up in project's [tool.astro] workspace (the zero Astro outside a
 // project), else the context's, through instancelocate.NamedDeployment.
-func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *manifest.Astro) (baseURL, authToken string, err error) {
+func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *manifest.Astro) (baseURL, authToken, id string, err error) {
 	if !astrocontext.IsCloudContext() {
-		return "", "", fmt.Errorf("no deployment link %q, and reaching a Deployment by id or name requires cloud context. Run 'astro login' to connect to Astro Cloud", ref)
+		return "", "", "", fmt.Errorf("no deployment link %q, and reaching a Deployment by id or name requires cloud context. Run 'astro login' to connect to Astro Cloud", ref)
 	}
 
 	ctx, err := astrocontext.GetCurrentContext()
 	if err != nil {
-		return "", "", fmt.Errorf("getting current context: %w", err)
+		return "", "", "", fmt.Errorf("getting current context: %w", err)
 	}
 	if ctx.Token == "" {
-		return "", "", errors.New("not authenticated. Run 'astro login' to authenticate")
+		return "", "", "", errors.New("not authenticated. Run 'astro login' to authenticate")
 	}
 
 	orgID := opts.OrganizationID
@@ -378,22 +398,22 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string, project *mani
 		orgID = ctx.Organization
 	}
 	if orgID == "" {
-		return "", "", errors.New("organization ID not set. Use --organization-id or run 'astro organization switch'")
+		return "", "", "", errors.New("organization ID not set. Use --organization-id or run 'astro organization switch'")
 	}
 
 	dep, err := lookupDeployment(opts.OrganizationID, orgID, ref, project, &ctx, astrov1.NewV1Client(httputil.NewHTTPClient()))
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if dep.WebServerAirflowApiUrl == "" {
-		return "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", ref)
+		return "", "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", ref)
 	}
 
 	airflowURL := dep.WebServerAirflowApiUrl
 	if !strings.HasPrefix(airflowURL, "http://") && !strings.HasPrefix(airflowURL, "https://") {
 		airflowURL = "https://" + airflowURL
 	}
-	return airflowURL, ctx.Token, nil
+	return airflowURL, ctx.Token, dep.Id, nil
 }
 
 // lookupDeployment finds the Astro Deployment ref names. An id is fetched in
@@ -415,6 +435,12 @@ func lookupDeployment(override, orgID, ref string, project *manifest.Astro, ctx 
 	}
 	ws, wsOrg := ctx.Workspace, ctx.Organization
 	if project.Workspace != "" {
+		// The project's workspace is on the project's host. Listed through a
+		// context on another host it would be asked of an Astro that does not
+		// have it.
+		if host := project.LoginDomain(); host != "" && host != manifest.NormalizeDomain(ctx.Domain) {
+			return astrov1.Deployment{}, fmt.Errorf("%q is not a Deployment id, and the project's workspace %s, where its name is looked up, is on %s, not the current context's %s: run 'astro context switch %s', or pass -d with the Deployment id", ref, project.Workspace, host, ctx.Domain, host)
+		}
 		ws, wsOrg = project.Workspace, project.WorkspaceOrganization(ctx.Organization)
 	}
 	if ws == "" {
