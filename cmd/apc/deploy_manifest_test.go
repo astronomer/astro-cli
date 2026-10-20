@@ -141,7 +141,15 @@ func TestDeployManifestToAnID(t *testing.T) {
 	run = runAPC(t, newAPCClient(), "", "deploy", "prod", "--deployment", "stage", "-o", "json")
 	assert.Equal(t, 2, run.code)
 	assert.Contains(t, run.stdout, "disagree")
-	assert.Len(t, *asked, 2, "neither refused run deployed")
+
+	// An empty workspace, as an unset variable leaves it, is refused rather
+	// than taken as the context's.
+	for _, name := range []string{"--workspace", "--workspace-id"} {
+		run = runAPC(t, newAPCClient(), "", "deploy", "ckdep1", name, "", "-o", "json")
+		assert.Equal(t, 2, run.code, name)
+		assert.Contains(t, run.stdout, name+" cannot be empty")
+	}
+	assert.Len(t, *asked, 2, "no refused run deployed")
 }
 
 // Deploy never picks for you: a run that cannot ask and names no Deployment

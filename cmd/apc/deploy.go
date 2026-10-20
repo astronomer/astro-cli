@@ -72,6 +72,7 @@ func NewDeployCmd(out io.Writer) *cobra.Command {
 	cmd.Flags().MarkHidden("prompt") //nolint:errcheck // the flag is defined just above
 	cmd.Flags().StringVar(&deployDeployment, "deployment", "", "Deployment to deploy to: a link name from the manifest, or a Deployment id")
 	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Workspace for the deploy, overriding the context")
+	utils.RefuseEmpty(cmd.Flags().Lookup("workspace"))
 	utils.AddAlias(cmd.Flags(), "workspace-id", "", "workspace")
 	cmd.Flags().StringVar(&description, "description", "", "Description to attach to the deploy, for traceability (default: one based on the deploy type)")
 	cmd.Flags().BoolVarP(&isImageOnlyDeploy, "image", "", false, "Push only an image to your Deployment; works only for Dag-only, Git-sync-based and NFS-based Deployments")

@@ -12,6 +12,25 @@ import (
 // aliasAnnotation names, on an alias flag, the flag it is another spelling of.
 const aliasAnnotation = "astro.alias-of"
 
+// nonEmptyAnnotation marks a flag ApplyAliases refuses to take as "".
+const nonEmptyAnnotation = "astro.non-empty"
+
+// RefuseEmpty marks f, a flag that names something (a Deployment, a
+// workspace), so that ApplyAliases refuses it given as "": an empty name is a
+// mistake, such as an unset variable in a script, and taking it as no name
+// would quietly fall back to a default the run did not ask for.
+func RefuseEmpty(f *pflag.Flag) {
+	if f.Annotations == nil {
+		f.Annotations = map[string][]string{}
+	}
+	f.Annotations[nonEmptyAnnotation] = nil
+}
+
+func refusesEmpty(f *pflag.Flag) bool {
+	_, ok := f.Annotations[nonEmptyAnnotation]
+	return ok || aliasOf(f) != ""
+}
+
 // AddAlias registers --old (and the shorthand 1.x gave it) on fs, hidden, as
 // another spelling of --preferred, which the caller has already put on fs.
 // The alias holds nothing a command reads: ApplyAliases hands what it was
@@ -43,14 +62,23 @@ func aliasOf(f *pflag.Flag) string {
 // preferred spelling is met by the alias too. Of two aliases of one flag
 // given without it (1.x's --deployment-id and --deployment-name together),
 // the first by name is handed on and they need not agree, as 1.x read both.
+// An alias, or a flag marked with RefuseEmpty, given as "" is a usage error.
 func ApplyAliases(fs *pflag.FlagSet) error {
+	var err error
+	fs.VisitAll(func(f *pflag.Flag) {
+		if err == nil && f.Changed && f.Value.String() == "" && refusesEmpty(f) {
+			err = cliout.Usage(fmt.Errorf("--%s cannot be empty", f.Name))
+		}
+	})
+	if err != nil {
+		return err
+	}
 	typed := map[string]bool{}
 	fs.VisitAll(func(f *pflag.Flag) {
 		if p := aliasOf(f); p != "" && fs.Changed(p) {
 			typed[p] = true
 		}
 	})
-	var err error
 	fs.VisitAll(func(f *pflag.Flag) {
 		p := aliasOf(f)
 		if p == "" || !f.Changed || err != nil {

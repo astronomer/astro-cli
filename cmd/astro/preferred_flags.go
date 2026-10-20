@@ -18,16 +18,39 @@ import (
 // (oneXSpelling), and they are aliases that applyPreferredFlags hands to
 // --deployment or --workspace, which nothing else reads.
 
-// deploymentArg is a Deployment id given as --deployment to a command that
-// takes a Deployment's id only as its argument. followProject reads it as it
-// reads that argument.
-var deploymentArg string
-
 // deploymentTargets is where a command takes the Deployment --deployment
 // names: id for a Deployment id, name for a Deployment name, either nil on a
-// command that takes no such thing.
+// command that takes no such thing. scope is true where the Deployment is the
+// command's scope in place of a workspace (astro env), so a project's
+// workspace has no say once one is named.
 type deploymentTargets struct {
 	id, name *string
+	scope    bool
+}
+
+// workspaceChoiceAnnotation marks a flag that chooses the workspace a command
+// acts in (--workspace, deployment list's --all), so a project's workspace
+// yields to it once given.
+const workspaceChoiceAnnotation = "astro.workspace-choice"
+
+// markWorkspaceChoice marks f as choosing the command's workspace.
+func markWorkspaceChoice(f *pflag.Flag) {
+	if f.Annotations == nil {
+		f.Annotations = map[string][]string{}
+	}
+	f.Annotations[workspaceChoiceAnnotation] = nil
+}
+
+// workspaceChosen reports whether this run gave a flag that chooses the
+// command's workspace.
+func workspaceChosen(fs *pflag.FlagSet) bool {
+	chosen := false
+	fs.Visit(func(f *pflag.Flag) {
+		if _, ok := f.Annotations[workspaceChoiceAnnotation]; ok {
+			chosen = true
+		}
+	})
+	return chosen
 }
 
 // oneXSpelling is a 1.x flag a command that 1.x had keeps as a hidden alias of
@@ -61,8 +84,13 @@ type deploymentFlag struct {
 	// idAlias and nameAlias are the hidden --deployment-id and
 	// --deployment-name; a value given to one keeps the kind it was given as.
 	idAlias, nameAlias *pflag.Flag
-	// givenID and givenName are what resolve set this run.
+	// self is --deployment.
+	self *pflag.Flag
+	// givenID and givenName are what resolve set this run, and arg a
+	// Deployment id given as --deployment to a command that takes one only as
+	// its argument, which followProject reads as it reads that argument.
 	givenID, givenName bool
+	arg                string
 }
 
 func (d *deploymentFlag) String() string     { return d.value }
@@ -75,6 +103,8 @@ func (d *deploymentFlag) Type() string       { return "string" }
 func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets, oneX ...oneXSpelling) {
 	d := &deploymentFlag{deploymentTargets: to}
 	fs.Var(d, "deployment", usage)
+	d.self = fs.Lookup("deployment")
+	utils.RefuseEmpty(d.self)
 	if to.id != nil {
 		*to.id = ""
 	}
@@ -97,6 +127,8 @@ func addDeploymentFlag(fs *pflag.FlagSet, usage string, to deploymentTargets, on
 // spelling oneX names (oneXWorkspaceID) as a hidden alias.
 func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, oneX ...oneXSpelling) {
 	fs.StringVarP(to, "workspace", shorthand, "", usage)
+	utils.RefuseEmpty(fs.Lookup("workspace"))
+	markWorkspaceChoice(fs.Lookup("workspace"))
 	for _, o := range oneX {
 		if o != oneXWorkspaceID {
 			panic(fmt.Sprintf("addWorkspaceFlag: --%s is no 1.x spelling of --workspace", o.name))
@@ -108,11 +140,12 @@ func addWorkspaceFlag(fs *pflag.FlagSet, to *string, shorthand, usage string, on
 // deploymentFlagOf is the --deployment on fs that addDeploymentFlag
 // registered, or nil.
 func deploymentFlagOf(fs *pflag.FlagSet) *deploymentFlag {
-	f := fs.Lookup("deployment")
-	if f == nil {
-		return nil
-	}
-	d, _ := f.Value.(*deploymentFlag)
+	var d *deploymentFlag
+	fs.VisitAll(func(f *pflag.Flag) {
+		if v, ok := f.Value.(*deploymentFlag); ok {
+			d = v
+		}
+	})
 	return d
 }
 
@@ -127,22 +160,22 @@ func applyPreferredFlagsIn(tree *cobra.Command) {
 // flags are parsed: the 1.x spellings go to the flags they stand for, and
 // --deployment is split into the command's Deployment id or name.
 func applyPreferredFlags(cmd *cobra.Command, args []string) error {
-	deploymentArg = ""
 	fs := cmd.Flags()
 	d := deploymentFlagOf(fs)
-	typed := d != nil && fs.Changed("deployment")
+	typed := d != nil && d.self.Changed
 	if err := utils.ApplyAliases(fs); err != nil {
 		return err
 	}
-	if d != nil {
-		d.resolve(typed)
+	if d == nil {
+		return nil
 	}
+	d.resolve(typed)
 	// A command whose id is its argument would take the argument over a
 	// --deployment id without a word, and `delete <a> --deployment <b>` would
 	// delete a. Two different Deployments named at once is a usage mistake,
 	// the same as an old and a new spelling that disagree.
-	if deploymentArg != "" && len(args) > 0 && args[0] != deploymentArg {
-		return cliout.Usage(fmt.Errorf("the Deployment argument %q and --deployment %q disagree: pass only one", args[0], deploymentArg))
+	if d.arg != "" && len(args) > 0 && args[0] != d.arg {
+		return cliout.Usage(fmt.Errorf("the Deployment argument %q and --deployment %q disagree: pass only one", args[0], d.arg))
 	}
 	return nil
 }
@@ -156,7 +189,7 @@ func applyPreferredFlags(cmd *cobra.Command, args []string) error {
 // else to the name, where the command takes both; a command with one takes
 // everything there, except an id on a command whose id is its argument.
 func (d *deploymentFlag) resolve(typed bool) {
-	d.givenID, d.givenName = false, false
+	d.givenID, d.givenName, d.arg = false, false, ""
 	if d.idAlias != nil && d.idAlias.Changed {
 		*d.id, d.givenID = d.idAlias.Value.String(), true
 	}
@@ -173,7 +206,7 @@ func (d *deploymentFlag) resolve(typed bool) {
 	case d.name != nil && !util.IsCUID(v):
 		*d.name, d.givenName = v, true
 	default:
-		deploymentArg = v
+		d.arg = v
 		deploymentID = v
 	}
 }

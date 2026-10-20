@@ -107,9 +107,9 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 		}
 		// The command's RunE is handed this same slice.
 		args[0] = id
-	case deploymentArg != "":
+	case d != nil && d.arg != "":
 		// A Deployment id given as --deployment, standing in for the argument.
-		if id, link, err = projectDeployment(m, deploymentArg); err != nil {
+		if id, link, err = projectDeployment(m, d.arg); err != nil {
 			return projectPick{}, err
 		}
 		deploymentID = id
@@ -119,7 +119,12 @@ func followProject(cmd *cobra.Command, args []string) (projectPick, error) {
 	if link != "" {
 		pick.domain = m.Astro.LoginDomain()
 	}
-	if flags.Changed("workspace") || flags.Changed("all") {
+	if workspaceChosen(flags) {
+		return pick, nil
+	}
+	// A Deployment that is the command's scope, named and held by no link,
+	// is the scope as given: the project's workspace has no say in it.
+	if d != nil && d.scope && link == "" && (d.givenID || d.givenName) {
 		return pick, nil
 	}
 	if link != "" {

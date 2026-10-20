@@ -113,6 +113,10 @@ func TestAirflowWorkspaceIDIsAnAliasOfWorkspace(t *testing.T) {
 	}
 	_, err := apply("--workspace", "a", "--workspace-id", "b")
 	require.EqualError(t, err, `--workspace "a" and --workspace-id "b" disagree: pass only --workspace`)
+	for _, name := range []string{"workspace", "workspace-id"} {
+		_, err = apply("--"+name, "")
+		require.EqualError(t, err, "--"+name+" cannot be empty")
+	}
 	assert.True(t, NewAirflowCmd(new(bytes.Buffer)).PersistentFlags().Lookup("workspace-id").Hidden)
 }
 

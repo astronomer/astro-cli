@@ -26,7 +26,7 @@ const unlinkedDep = "clunlinkeddeployment00001"
 func parsePreferred(t *testing.T, root *cobra.Command, args ...string) (cmd *cobra.Command, positional []string) {
 	t.Helper()
 	t.Cleanup(func() {
-		deploymentID, deploymentName, workspaceID, deploymentArg = "", "", "", ""
+		deploymentID, deploymentName, workspaceID = "", "", ""
 		resetEnvFlags()
 	})
 	cmd, rest, err := root.Find(args)
@@ -63,10 +63,10 @@ func TestDeploymentFlagGoesWhereTheOldSpellingsWould(t *testing.T) {
 			if tt.root != nil {
 				root = tt.root()
 			}
-			parsePreferred(t, root, tt.args...)
+			cmd, _ := parsePreferred(t, root, tt.args...)
 			assert.Equal(t, tt.wantID, deploymentID, "deploymentID")
 			assert.Equal(t, tt.wantName, deploymentName, "deploymentName")
-			assert.Equal(t, tt.wantArg, deploymentArg, "deploymentArg")
+			assert.Equal(t, tt.wantArg, deploymentFlagOf(cmd.Flags()).arg, "arg")
 			assert.Equal(t, tt.wantEnvID, envDeploymentID, "envDeploymentID")
 		})
 	}
@@ -149,7 +149,7 @@ func TestEnvWorkspaceFlagWinsOverTheProjectToo(t *testing.T) {
 func TestPreferredAndOldSpellingsThatDisagreeAreAUsageError(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	astroV1Client = new(astrov1_mocks.ClientWithResponsesInterface)
-	t.Cleanup(func() { deploymentID, deploymentName, workspaceID, deploymentArg = "", "", "", ""; resetEnvFlags() })
+	t.Cleanup(func() { deploymentID, deploymentName, workspaceID = "", "", ""; resetEnvFlags() })
 
 	for _, args := range [][]string{
 		{"delete", "--deployment", "a", "--deployment-name", "b"},
@@ -174,7 +174,7 @@ func TestDeploymentArgumentAndFlagThatDisagreeAreAUsageError(t *testing.T) {
 	testUtil.InitTestConfig(testUtil.CloudPlatform)
 	mc := new(astrov1_mocks.ClientWithResponsesInterface)
 	astroV1Client = mc
-	t.Cleanup(func() { deploymentID, deploymentName, workspaceID, deploymentArg = "", "", "", ""; resetEnvFlags() })
+	t.Cleanup(func() { deploymentID, deploymentName, workspaceID = "", "", ""; resetEnvFlags() })
 
 	const idA, idB = "clm8t5u4q000008l3bzde0w7n", "clm8t5u4q000008l3bzde0w7m"
 	_, err := execDeploymentCmd("delete", idA, "--deployment", idB, "--yes")
@@ -269,7 +269,7 @@ type resolvedSpellings struct{ id, name, arg, workspace string }
 func resolveSpellings(t *testing.T, u *aliasUse, args ...string) (resolvedSpellings, error) {
 	t.Helper()
 	t.Cleanup(func() {
-		deploymentID, deploymentName, workspaceID, deploymentArg = "", "", "", ""
+		deploymentID, deploymentName, workspaceID = "", "", ""
 		resetEnvFlags()
 	})
 	cmd, _, err := aliasTrees[u.tree]().Find(u.path)
@@ -278,8 +278,9 @@ func resolveSpellings(t *testing.T, u *aliasUse, args ...string) (resolvedSpelli
 	if err := applyPreferredFlags(cmd, cmd.Flags().Args()); err != nil {
 		return resolvedSpellings{}, err
 	}
-	r := resolvedSpellings{arg: deploymentArg}
+	var r resolvedSpellings
 	if d := deploymentFlagOf(cmd.Flags()); d != nil {
+		r.arg = d.arg
 		if d.id != nil {
 			r.id = *d.id
 		}
@@ -327,6 +328,30 @@ func TestEveryOneXSpellingReachesWhatTheV2SpellingDoes(t *testing.T) {
 			assert.True(t, cliout.IsUsage(err), "%v", err)
 			assert.EqualError(t, err, fmt.Sprintf("--%s %q and --%s %q disagree: pass only --%s", u.preferred, v, u.alias, aliasOther[u.alias], u.preferred))
 		})
+	}
+}
+
+// An empty --deployment or --workspace, under either spelling, is a usage
+// error, on every command that takes one: an unset variable in a script must
+// not fall back to the context's workspace.
+func TestAnEmptyDeploymentOrWorkspaceIsRefused(t *testing.T) {
+	testUtil.InitTestConfig(testUtil.CloudPlatform)
+	uses := aliasUses(t)
+	// env list takes only the v2 spellings.
+	uses = append(uses, aliasUse{tree: "env", path: []string{"list"}, preferred: "deployment"}, aliasUse{tree: "env", path: []string{"list"}, preferred: "workspace"})
+	for i := range uses {
+		u := &uses[i]
+		spellings := []string{u.preferred}
+		if u.alias != "" {
+			spellings = append(spellings, u.alias)
+		}
+		for _, name := range spellings {
+			_, err := resolveSpellings(t, u, "--"+name, "")
+			if assert.Error(t, err, "%s %s --%s \"\"", u.tree, strings.Join(u.path, " "), name) {
+				assert.True(t, cliout.IsUsage(err), "%v", err)
+				assert.EqualError(t, err, "--"+name+" cannot be empty")
+			}
+		}
 	}
 }
 

@@ -447,11 +447,12 @@ func TestEnvListTakesTheV2SpellingsInAProject(t *testing.T) {
 			wantNote: "using workspace Example from pyproject.toml (link test)\n",
 		},
 		{
+			// The Deployment is the scope, as given: the project's workspace
+			// is not looked up, and no note says it was used.
 			name: "an id no link holds", args: []string{"--deployment", unlinkedDep},
 			match: func(p *astrov1.ListEnvironmentObjectsParams) bool {
 				return p.DeploymentId != nil && *p.DeploymentId == unlinkedDep && p.WorkspaceId == nil
 			},
-			wantNote: "using workspace Example from pyproject.toml\n",
 		},
 		{
 			name: "an explicit workspace", args: []string{"--workspace", "clexplicitworkspace000001"},
@@ -510,4 +511,25 @@ func TestEnvListHasNoOneXSpellings(t *testing.T) {
 		require.EqualError(t, err, "unknown flag: "+flag)
 	}
 	mc.AssertExpectations(t)
+}
+
+// On the per-kind listings an unlinked Deployment id is the scope as given
+// too, under either spelling: nothing from the project's workspace applies.
+func TestEnvTakesAnUnlinkedDeploymentAsGivenInAProject(t *testing.T) {
+	for _, flag := range []string{"--deployment", "--deployment-id"} {
+		t.Run(flag, func(t *testing.T) {
+			testUtil.InitTestConfig(testUtil.CloudPlatform)
+			inProject(t, testProjectManifest)
+			mc := new(astrov1_mocks.ClientWithResponsesInterface)
+			expectEnvList(mc, func(p *astrov1.ListEnvironmentObjectsParams) bool {
+				return p.DeploymentId != nil && *p.DeploymentId == unlinkedDep && p.WorkspaceId == nil
+			})
+			astroV1Client = mc
+
+			out, err := execEnvCmd("variable", "list", flag, unlinkedDep)
+			require.NoError(t, err)
+			assert.NotContains(t, out, "pyproject.toml")
+			mc.AssertExpectations(t) // and no GetWorkspace: nothing else was expected
+		})
+	}
 }
