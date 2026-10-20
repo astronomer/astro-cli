@@ -3,7 +3,9 @@ package scaffold
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
@@ -68,7 +70,7 @@ func CheckDockerfileAirflow(dir string, m *manifest.Manifest) error {
 //
 // It refuses only what astro init can fix. When init, run in the project,
 // would move the file onto its -base tag (the update step, with every gate a
-// conversion applies), the build is refused: err wraps airflowrt.ErrOnBuildBase
+// conversion applies), the build is refused: err wraps ErrOnBuildBase
 // and carries the lines that fix it, and naming astro init in it is a promise
 // that command keeps. When a gate stops the move, the build goes ahead on the
 // ONBUILD tag as it always has, the triggers still reading the two lists, and
@@ -83,8 +85,12 @@ func CheckDockerfileOnBuild(dir string, m *manifest.Manifest) (warning string, e
 	if path == "" {
 		return "", nil
 	}
-	refusal := airflowrt.RefuseOnBuildBase(path, m.Astro.Dockerfile)
-	if refusal == nil {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", nil //nolint:nilerr // a file that cannot be read is the build's to report, naming the path
+	}
+	stages := airflowrt.DockerfileStages(data)
+	if !slices.ContainsFunc(stages, func(st airflowrt.DockerfileStage) bool { return st.OnBuildRuntime() }) {
 		return "", nil
 	}
 	notes, fixable, err := onBuildFixable(dir, m)
@@ -92,12 +98,35 @@ func CheckDockerfileOnBuild(dir string, m *manifest.Manifest) (warning string, e
 		return "", err
 	}
 	if fixable {
-		return "", refusal
+		// Init moves a file only when its final stage is the one stage on an
+		// ONBUILD tag (dockerfileRewriteOf), so that is the stage to replace.
+		return "", onBuildRefusal(m.Astro.Dockerfile, &stages[len(stages)-1])
 	}
 	if len(notes) == 0 {
 		notes = []string{onBuildKeptNote(m.Astro.Dockerfile + ": builds on a runtime tag with ONBUILD steps, and astro init cannot move it onto a -base tag")}
 	}
 	return strings.Join(notes, "\n"), nil
+}
+
+// ErrOnBuildBase reports a build refused because the project's declared
+// Dockerfile builds on an Astro Runtime tag with ONBUILD steps, which install
+// requirements.txt and packages.txt rather than the manifest's lists, and
+// astro init would move it onto that tag's -base image
+// (CheckDockerfileOnBuild). pkg/localrt never returns it: a caller that drives
+// the runtime itself, as Astro Desktop does, calls CheckDockerfileOnBuild first.
+var ErrOnBuildBase = errors.New("a declared Dockerfile must not build on an Astro Runtime tag with ONBUILD steps")
+
+// onBuildRefusal is the refusal of declared, whose final stage is on an
+// ONBUILD tag astro init would move off: the lines that replace its FROM, the
+// stage's flags and name kept, as init writes them.
+func onBuildRefusal(declared string, final *airflowrt.DockerfileStage) error {
+	base := airflowrt.BaseOf(final.Ref)
+	from := strings.Join(append(append([]string{}, final.Flags...), base), " ")
+	return fmt.Errorf("%w: %s builds FROM %s, whose ONBUILD steps install requirements.txt and packages.txt "+
+		"rather than what pyproject.toml lists, so the image and standalone mode would install different packages. "+
+		"Run astro init, which moves the file onto %s, or replace the FROM line with these lines and commit %s, which astro init writes:\n\n%s",
+		ErrOnBuildBase, declared, final.Ref, base, airflowrt.InstallHelperPath,
+		airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Alias: final.Alias}))
 }
 
 // refuseKeptDockerfileOfAnotherAirflow refuses a conversion that would keep the

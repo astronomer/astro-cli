@@ -160,14 +160,6 @@ var ErrHealthTimeout = airflowrt.ErrHealthTimeout
 // no image at all.
 var ErrUnsupportedBase = airflowrt.ErrUnsupportedBase
 
-// ErrOnBuildBase reports a build refused because the project's declared
-// Dockerfile builds a stage on an Astro Runtime tag with ONBUILD steps, which
-// install requirements.txt and packages.txt rather than the manifest's lists,
-// and astro init would move it onto -base. The CLI refuses it before it starts
-// anything (it takes the project's files to know init would); this runtime
-// does not. Exported here for the problem kind a consumer branches on.
-var ErrOnBuildBase = airflowrt.ErrOnBuildBase
-
 // ErrDatabaseNewerThanAirflow reports a start whose Airflow refused the
 // project's metadata database because a newer Airflow had already upgraded it.
 // Docker mode only for now: it is recognized from the migration container's

@@ -248,10 +248,12 @@ Commit `.astro/install-project.py` with the Dockerfile: it is what `docker build
 
 A Dockerfile still on an ONBUILD tag is judged by whether `astro init` can move it. Run in a project that is already an Astro project, `astro init` brings what astro writes there up to date: it moves a declared Dockerfile on an ONBUILD tag onto `-base` under the gates above, plus one more, that every line of a `requirements.txt` or `packages.txt` beside it is already in `pyproject.toml` (the lists have had time to drift), and it writes or refreshes `.astro/install-project.py`. So:
 
-- when `astro init` would move the file, every build refuses it (`onbuild_base`): `astro local start --docker` and `restart`, `astro package astro`, `astro deploy` and `astro local check`. The message shows the lines that replace the `FROM` and says to run `astro init`, which does it.
+- when `astro init` would move the file, every build of it refuses it (`onbuild_base`): `astro local start --docker` and `restart`, `astro package astro` and `astro deploy`. The message shows the lines that replace the `FROM`, the stage's name and flags kept, and says to run `astro init`, which does it. `astro local check` and `astro package mwaa` or `composer` build no image from the file, and are not held to it.
 - when a gate stops the move, the build goes ahead on the ONBUILD tag as it always has, the tag's steps installing `requirements.txt` and `packages.txt`, and warns each time with what `astro init` would say: the line that is not in `pyproject.toml`, the earlier stage, the `.gitignore` rule.
 
 Standalone mode builds no image, and is held to neither.
+
+`.astro/install-project.py` carries a version stamp in its header (`# astro-install-helper: 1`). `astro init` refreshes the project's copy only when it is older than the one this astro writes, or carries no stamp, and never replaces a newer astro's; a build warns about a copy that is missing or older, and says nothing about one at this version or newer, edits included.
 
 ### `build-secrets`
 

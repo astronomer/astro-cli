@@ -27,7 +27,7 @@ const helperIgnoreHeader = "# Run by the Dockerfile's install step. Commit it, s
 // directory as a whole cannot be excepted from, since git does not look inside
 // an ignored directory: that returns a note naming the line to change, and the
 // rewrite does not happen.
-func planHelperCommittable(dir string, cs *Changeset) (blocker string, err error) {
+func planHelperCommittable(dir, dockerfile string, cs *Changeset) (blocker string, err error) {
 	var data []byte
 	planned := slices.IndexFunc(cs.Changes, func(c Change) bool { return c.Path == fileGitignore })
 	if planned >= 0 {
@@ -41,7 +41,7 @@ func planHelperCommittable(dir string, cs *Changeset) (blocker string, err error
 	}
 	helperDir := path.Dir(airflowrt.InstallHelperPath)
 	if matchesGitignore(pm, helperDir) {
-		return "Dockerfile: kept FROM its Astro Runtime image rather than moved onto that image's -base tag, because " +
+		return dockerfile + ": kept FROM its Astro Runtime image rather than moved onto that image's -base tag, because " +
 			fileGitignore + " ignores " + helperDir + "/ as a whole, so the " + airflowrt.InstallHelperPath +
 			" the moved file runs could not be committed, and a clone would not build. Ignore " + helperDir +
 			"/* instead, which still ignores what is in it, and run astro init again", nil

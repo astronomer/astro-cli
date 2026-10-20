@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 )
 
 // imageSourceProject writes a linked project, with a Dockerfile when from is
@@ -38,7 +38,7 @@ func TestRunRefusesADockerfileOnAnONBUILDTag(t *testing.T) {
 	dir, m := imageSourceProject(t, "dockerfile = 'Dockerfile'\n", "astrocrpublic.azurecr.io/runtime:3.1-12")
 	d := &fakeDeployer{}
 	_, err := Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}, d)
-	require.ErrorIs(t, err, airflowrt.ErrOnBuildBase)
+	require.ErrorIs(t, err, scaffold.ErrOnBuildBase)
 	assert.Zero(t, d.imgDeploys+d.deploys+d.confirms+d.resolves, "nothing was asked or shipped")
 
 	_, err = Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod", DagsOnly: true}, &fakeDeployer{})
@@ -49,7 +49,7 @@ func TestRunRefusesADockerfileOnAnONBUILDTag(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "Dockerfile"),
 		"FROM astrocrpublic.azurecr.io/runtime:3.1-12 AS deps\nRUN true\nFROM astrocrpublic.azurecr.io/runtime:3.1-12\n")
 	_, err = Run(Request{ProjectDir: dir, Manifest: m, LinkName: "prod"}, &fakeDeployer{})
-	assert.NotErrorIs(t, err, airflowrt.ErrOnBuildBase)
+	assert.NotErrorIs(t, err, scaffold.ErrOnBuildBase)
 }
 
 // An image deploy refuses a Dockerfile whose FROM names another Airflow, before

@@ -48,8 +48,8 @@ const (
 	ownStepsComment = "# This project's own steps.\n"
 )
 
-// dockerfileRewriteOf works out the rewrite of a 1.x Dockerfile, data, that
-// does more than name a base. It returns the rewrite, or a note naming why the
+// dockerfileRewriteOf works out the rewrite of a Dockerfile, data, that does
+// more than name a base; name is its path, for the notes. It returns the rewrite, or a note naming why the
 // file's shape rules one out, or neither when the file is not on an ONBUILD
 // tag at all. listsRead reports whether any stage might run ONBUILD steps,
 // which read requirements.txt and packages.txt: when none can, the two lists
@@ -57,8 +57,8 @@ const (
 //
 // What it can judge from the file alone. Whether the two 1.x files were carried
 // is decided later, by plan, from the run's notes.
-func dockerfileRewriteOf(data []byte) (rw *dockerfileRewrite, blocker string, listsRead bool) {
-	const prefix = "Dockerfile: kept FROM its Astro Runtime image rather than moved onto that image's -base tag, "
+func dockerfileRewriteOf(name string, data []byte) (rw *dockerfileRewrite, blocker string, listsRead bool) {
+	prefix := name + ": kept FROM its Astro Runtime image rather than moved onto that image's -base tag, "
 	stages := airflowrt.DockerfileStages(data)
 	if len(stages) == 0 {
 		return nil, "", false
@@ -208,7 +208,7 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 			return nil
 		}
 	}
-	switch blocker, err := planHelperCommittable(dir, cs); {
+	switch blocker, err := planHelperCommittable(dir, fileDockerfile, cs); {
 	case err != nil:
 		return err
 	case blocker != "":

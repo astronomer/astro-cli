@@ -3,10 +3,9 @@ package airflowrt
 import (
 	"bytes"
 	_ "embed"
-	"errors"
-	"fmt"
-	"os"
 	"path"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -46,6 +45,29 @@ const InstallHelperPath = ".astro/install-project.py"
 // into a build's context or a project, or addresses an image by what builds it.
 func InstallHelper() []byte {
 	return bytes.Clone(installHelper)
+}
+
+// helperVersionRe is the stamp in the helper's header, "# astro-install-helper:
+// <n>". It goes up whenever the helper's content changes (install_test.go pins
+// the content to the number), so a project's copy can be judged older or newer
+// than this CLI's without comparing bytes, which an edit of either changes.
+var helperVersionRe = regexp.MustCompile(`(?m)^# astro-install-helper: (\d+)[ \t]*\r?$`)
+
+// InstallHelperVersion is the version stamp this CLI's install helper carries.
+func InstallHelperVersion() int {
+	v, _ := HelperVersion(installHelper)
+	return v
+}
+
+// HelperVersion is the version stamp in an install helper's source, data, and
+// false when it carries none: a copy older than the stamp, or not the helper.
+func HelperVersion(data []byte) (int, bool) {
+	m := helperVersionRe.FindSubmatch(data)
+	if m == nil {
+		return 0, false
+	}
+	v, err := strconv.Atoi(string(m[1]))
+	return v, err == nil
 }
 
 // The install inputs the helper writes (install-project.py's REQUIREMENTS,
@@ -204,41 +226,4 @@ func InstallDockerfileWith(from string, opts InstallOptions) string {
 		"else pip install --no-cache-dir --root-user-action=ignore -r " + RequirementsName + "; fi\n" +
 		"USER astro\n" +
 		"COPY --chown=astro:0 . .\n"
-}
-
-// ErrOnBuildBase reports a declared Dockerfile with a stage on an Astro Runtime
-// ONBUILD tag (DockerfileStage.OnBuildRuntime). Those steps install
-// requirements.txt and packages.txt from the build's context, so such an image
-// installs a package list other than pyproject.toml's, and standalone mode,
-// which installs pyproject.toml's, runs something else.
-var ErrOnBuildBase = errors.New("a declared Dockerfile must not build on an Astro Runtime tag with ONBUILD steps")
-
-// RefuseOnBuildBase refuses the Dockerfile at dockerfilePath, declared as the manifest
-// names it, when any of its stages builds on an ONBUILD tag. The message holds
-// the fix: for the final stage, the lines that replace its FROM; for an
-// earlier one, the -base tag to build it on. A file that cannot be read passes,
-// as everywhere else here: the build reports it, naming the path.
-func RefuseOnBuildBase(dockerfilePath, declared string) error {
-	data, err := os.ReadFile(dockerfilePath)
-	if err != nil {
-		return nil
-	}
-	stages := DockerfileStages(data)
-	for i := range stages {
-		st := &stages[i]
-		if !st.OnBuildRuntime() {
-			continue
-		}
-		base := BaseOf(st.Ref)
-		why := declared + " builds FROM " + st.Ref + ", whose ONBUILD steps install requirements.txt and packages.txt " +
-			"rather than what pyproject.toml lists, so the image and standalone mode would install different packages. "
-		if i < len(stages)-1 {
-			return fmt.Errorf("%w: %sBuild that stage FROM %s, which has no ONBUILD steps, and install what it needs in the stage itself",
-				ErrOnBuildBase, why, base)
-		}
-		from := strings.Join(append(append([]string{}, st.Flags...), base), " ")
-		return fmt.Errorf("%w: %sRun astro init, which moves the file onto %s, or replace the FROM line with these lines "+
-			"and commit %s, which astro init writes:\n\n%s", ErrOnBuildBase, why, base, InstallHelperPath, InstallDockerfile(from))
-	}
-	return nil
 }

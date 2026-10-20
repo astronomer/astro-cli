@@ -1,13 +1,37 @@
 package airflowrt
 
 import (
-	"os"
-	"path/filepath"
+	"crypto/sha256"
+	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// helperContentAtVersion pins the helper's content to its version stamp. A
+// change to install-project.py that keeps the stamp fails here: bump the
+// "# astro-install-helper:" line and add the new hash, so astro init knows a
+// project's copy is older and refreshes it.
+var helperContentAtVersion = map[int]string{
+	1: "b21a2237f2142b9bb010dd1dbe211ab9a9ce3f5c2f567e64a668315bd0ca326d",
+}
+
+func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
+	v := InstallHelperVersion()
+	require.Positive(t, v, "the helper carries a version stamp")
+	sum := sha256.Sum256(InstallHelper())
+	assert.Equal(t, helperContentAtVersion[v], hex.EncodeToString(sum[:]),
+		"install-project.py changed without its version stamp moving: bump it and pin the new hash")
+}
+
+func TestHelperVersion(t *testing.T) {
+	v, ok := HelperVersion([]byte("# Written by the Astro CLI.\n# astro-install-helper: 7\r\n#\n"))
+	assert.True(t, ok)
+	assert.Equal(t, 7, v)
+	_, ok = HelperVersion([]byte("# Written by the Astro CLI.\nprint('hi')\n"))
+	assert.False(t, ok, "an unstamped copy has no version")
+}
 
 func TestDockerfileStages(t *testing.T) {
 	stages := DockerfileStages([]byte("ARG V=1\n" +
@@ -50,33 +74,6 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0-python-3.11-base", BaseOf("quay.io/astronomer/astro-runtime:12.6.0-python-3.11"))
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3-base", BaseOf("astrocrpublic.azurecr.io/runtime:3.3"))
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3-base", BaseOf("astrocrpublic.azurecr.io/runtime:3.3-base"))
-}
-
-// A Dockerfile on an ONBUILD tag is refused with the fix in the message: for
-// the final stage the lines that replace its FROM, flags kept; for an earlier
-// one the -base tag to build it on. One on -base, and one that cannot be read,
-// pass.
-func TestRefuseOnBuildBase(t *testing.T) {
-	dir := t.TempDir()
-	write := func(body string) string {
-		t.Helper()
-		path := filepath.Join(dir, "Dockerfile")
-		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
-		return path
-	}
-
-	err := RefuseOnBuildBase(write("FROM --platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0\nRUN true\n"), "Dockerfile")
-	require.ErrorIs(t, err, ErrOnBuildBase)
-	assert.Contains(t, err.Error(), "Dockerfile builds FROM quay.io/astronomer/astro-runtime:12.6.0, whose ONBUILD steps")
-	assert.Contains(t, err.Error(), InstallDockerfile("--platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base"))
-
-	err = RefuseOnBuildBase(write("FROM quay.io/astronomer/astro-runtime:12.6.0 AS deps\nFROM quay.io/astronomer/astro-runtime:12.6.0-base\n"), "Dockerfile")
-	require.ErrorIs(t, err, ErrOnBuildBase)
-	assert.Contains(t, err.Error(), "Build that stage FROM quay.io/astronomer/astro-runtime:12.6.0-base")
-
-	require.NoError(t, RefuseOnBuildBase(write("FROM quay.io/astronomer/astro-runtime:12.6.0-base\nRUN true\n"), "Dockerfile"))
-	require.NoError(t, RefuseOnBuildBase(write("FROM python:3.12-slim\n"), "Dockerfile"))
-	require.NoError(t, RefuseOnBuildBase(filepath.Join(dir, "missing"), "missing"))
 }
 
 // The install reads the helper from the path it is written to.

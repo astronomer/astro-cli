@@ -34,13 +34,10 @@ func loadCheckedManifest(project string) (*manifest.Manifest, error) {
 	if err := scaffold.CheckDockerfileAirflow(project, m); err != nil {
 		return nil, err
 	}
-	// The image a Docker-mode start, a package or a deploy would build: a
-	// Dockerfile on an ONBUILD tag installs lists other than the manifest's,
-	// and one astro init would move is refused. One it would not move builds
-	// as before; a build says so (astro package's warnings), a check does not.
-	if _, err := scaffold.CheckDockerfileOnBuild(project, m); err != nil {
-		return nil, err
-	}
+	// Not held to a Dockerfile on an ONBUILD tag here (scaffold.CheckDockerfileOnBuild):
+	// a check and an mwaa or composer package build no image from it. The paths
+	// that do refuse one astro init would move: a Docker-mode start or restart,
+	// astro package astro and astro deploy.
 	return m, nil
 }
 

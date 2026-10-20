@@ -94,6 +94,9 @@ func planUpdate(abs string, data []byte) (*Changeset, error) {
 			return nil, err
 		}
 	}
+	// u.body is the file as the run leaves it, rewritten when it moved.
+	cs.OnBuildKept = u.body != nil && slices.ContainsFunc(airflowrt.DockerfileStages(u.body),
+		func(st airflowrt.DockerfileStage) bool { return st.OnBuildRuntime() })
 	// Deletions last, as in a conversion: a run that dies part-way has moved
 	// the Dockerfile and kept the lists, which a person can sort out.
 	slices.SortStableFunc(cs.Changes, func(a, b Change) int {
@@ -119,7 +122,7 @@ func updateDockerfile(u *update) error {
 	if u.body == nil {
 		return nil
 	}
-	rw, blocker, _ := dockerfileRewriteOf(u.body)
+	rw, blocker, _ := dockerfileRewriteOf(u.dockerfile, u.body)
 	if blocker != "" {
 		u.cs.Notes = append(u.cs.Notes, onBuildKeptNote(blocker))
 		return nil
@@ -139,7 +142,7 @@ func updateDockerfile(u *update) error {
 	}
 	// The helper the moved file runs has to be committable, as in a
 	// conversion (planHelperCommittable).
-	switch blocker, err := planHelperCommittable(u.dir, u.cs); {
+	switch blocker, err := planHelperCommittable(u.dir, u.dockerfile, u.cs); {
 	case err != nil:
 		return err
 	case blocker != "":
@@ -204,7 +207,18 @@ func listsCarried(dir string, m *manifest.Manifest) (present, notes []string, er
 		present = append(present, "requirements.txt")
 		deps, uncarried := parseRequirements(data)
 		notes = append(notes, uncarried...)
+		// Held to what a conversion carries (mergeDependencies): not a line
+		// naming Airflow, which becomes the pin, and not a later line for a
+		// distribution the file already listed, which a conversion drops.
+		// Neither is in [project] dependencies as written, and neither ever
+		// could be, so counting them would keep the file where it is forever.
+		seen := map[string]bool{}
 		for _, d := range deps {
+			name := manifest.DistName(d)
+			if manifest.NamesAirflow(d) || seen[name] {
+				continue
+			}
+			seen[name] = true
 			if !have[strings.Join(strings.Fields(d), "")] {
 				notes = append(notes, "requirements.txt: "+d+" is not in [project] dependencies in "+manifest.Marker+
 					", which is what the image installs once the Dockerfile moves. Add it there, or take it out of requirements.txt")
@@ -226,9 +240,9 @@ func listsCarried(dir string, m *manifest.Manifest) (present, notes []string, er
 }
 
 // updateInstallHelper writes the install helper a Dockerfile on -base runs, or
-// refreshes it when this astro's differs, and keeps what the install reads in
-// the ignore file's context. A Dockerfile that does not run the helper gets
-// neither.
+// refreshes it when the project's is older than this astro's (helperOlder),
+// and keeps what the install reads in the ignore file's context. A Dockerfile
+// that does not run the helper gets neither.
 func updateInstallHelper(u *update) error {
 	if u.body == nil || !bytes.Contains(u.body, []byte(airflowrt.InstallHelperPath)) {
 		return nil
@@ -242,7 +256,7 @@ func updateInstallHelper(u *update) error {
 			Kind: CreateFile, Path: airflowrt.InstallHelperPath, Content: helper,
 			Labels: []string{airflowrt.InstallHelperPath + " (reads " + manifest.Marker + " and uv.lock inside the build)"},
 		})
-	case !bytes.Equal(got, helper):
+	case helperOlder(got) && !bytes.Equal(got, helper):
 		u.cs.Changes = append(u.cs.Changes, Change{
 			Kind: UpdateFile, Path: airflowrt.InstallHelperPath, Content: helper,
 			Labels: []string{airflowrt.InstallHelperPath + " (refreshed to this astro's version)"},
@@ -282,10 +296,22 @@ func InstallHelperWarning(dir, dockerfile string) string {
 		return dockerfile + " runs " + airflowrt.InstallHelperPath + ", which this project does not have, so the build will fail. Run astro init to write it"
 	case err != nil:
 		return ""
-	case !bytes.Equal(got, airflowrt.InstallHelper()):
-		return airflowrt.InstallHelperPath + ", which " + dockerfile + " runs to install this project's packages, is not the one this astro writes. Run astro init to refresh it"
+	case helperOlder(got):
+		return airflowrt.InstallHelperPath + ", which " + dockerfile + " runs to install this project's packages, is older than the one this astro writes. Run astro init to refresh it"
 	}
 	return ""
+}
+
+// helperOlder reports a project's copy of the install helper, data, that is
+// older than this CLI's by its version stamp (airflowrt.HelperVersion), or
+// carries none: a copy from before the stamp, or something else under its
+// name. A copy at this CLI's version or newer is left alone, by init and by
+// the build warning both: a newer astro wrote it, and an older one must not
+// take it back, and one at the same version that differs was edited on
+// purpose.
+func helperOlder(data []byte) bool {
+	v, ok := airflowrt.HelperVersion(data)
+	return !ok || v < airflowrt.InstallHelperVersion()
 }
 
 // carriesAstroSection reports a manifest with a [tool.astro] table, the one
