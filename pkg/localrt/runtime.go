@@ -160,6 +160,12 @@ var ErrHealthTimeout = airflowrt.ErrHealthTimeout
 // no image at all.
 var ErrUnsupportedBase = airflowrt.ErrUnsupportedBase
 
+// ErrOnBuildBase reports a start refused because the project's declared
+// Dockerfile builds a stage on an Astro Runtime tag with ONBUILD steps, which
+// install requirements.txt and packages.txt rather than the manifest's lists.
+// Docker mode only, as ErrUnsupportedBase is.
+var ErrOnBuildBase = airflowrt.ErrOnBuildBase
+
 // ErrDatabaseNewerThanAirflow reports a start whose Airflow refused the
 // project's metadata database because a newer Airflow had already upgraded it.
 // Docker mode only for now: it is recognized from the migration container's

@@ -240,6 +240,14 @@ func (e *Engine) Start(ctx context.Context, p rt.Plan, cb rt.Callbacks) (af rt.A
 	if err := refuseUnsupportedBase(declared, base); err != nil {
 		return nil, err
 	}
+	// And one on an ONBUILD tag, which would install requirements.txt and
+	// packages.txt rather than what the manifest lists, for the same reasons
+	// and at the same point.
+	if declared != "" {
+		if err := airflowrt.RefuseOnBuildBase(declared, p.Dockerfile); err != nil {
+			return nil, err
+		}
+	}
 
 	rt.OnState(cb, rt.StateStarting, nil)
 	// Every failure from here on reports StateError, once, with whatever error is

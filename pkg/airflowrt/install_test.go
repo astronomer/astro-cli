@@ -1,6 +1,8 @@
 package airflowrt
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,6 +50,33 @@ func TestBaseOf(t *testing.T) {
 	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0-python-3.11-base", BaseOf("quay.io/astronomer/astro-runtime:12.6.0-python-3.11"))
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3-base", BaseOf("astrocrpublic.azurecr.io/runtime:3.3"))
 	assert.Equal(t, "astrocrpublic.azurecr.io/runtime:3.3-base", BaseOf("astrocrpublic.azurecr.io/runtime:3.3-base"))
+}
+
+// A Dockerfile on an ONBUILD tag is refused with the fix in the message: for
+// the final stage the lines that replace its FROM, flags kept; for an earlier
+// one the -base tag to build it on. One on -base, and one that cannot be read,
+// pass.
+func TestRefuseOnBuildBase(t *testing.T) {
+	dir := t.TempDir()
+	write := func(body string) string {
+		t.Helper()
+		path := filepath.Join(dir, "Dockerfile")
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+		return path
+	}
+
+	err := RefuseOnBuildBase(write("FROM --platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0\nRUN true\n"), "Dockerfile")
+	require.ErrorIs(t, err, ErrOnBuildBase)
+	assert.Contains(t, err.Error(), "Dockerfile builds FROM quay.io/astronomer/astro-runtime:12.6.0, whose ONBUILD steps")
+	assert.Contains(t, err.Error(), InstallDockerfile("--platform=linux/amd64 quay.io/astronomer/astro-runtime:12.6.0-base"))
+
+	err = RefuseOnBuildBase(write("FROM quay.io/astronomer/astro-runtime:12.6.0 AS deps\nFROM quay.io/astronomer/astro-runtime:12.6.0-base\n"), "Dockerfile")
+	require.ErrorIs(t, err, ErrOnBuildBase)
+	assert.Contains(t, err.Error(), "Build that stage FROM quay.io/astronomer/astro-runtime:12.6.0-base")
+
+	require.NoError(t, RefuseOnBuildBase(write("FROM quay.io/astronomer/astro-runtime:12.6.0-base\nRUN true\n"), "Dockerfile"))
+	require.NoError(t, RefuseOnBuildBase(write("FROM python:3.12-slim\n"), "Dockerfile"))
+	require.NoError(t, RefuseOnBuildBase(filepath.Join(dir, "missing"), "missing"))
 }
 
 // The install reads the helper from the path it is written to.

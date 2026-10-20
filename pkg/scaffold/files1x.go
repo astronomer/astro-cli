@@ -333,7 +333,7 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		var blocker string
 		from1x.rewrite, blocker, from1x.listsRead = dockerfileRewriteOf(data)
 		if blocker != "" {
-			from1x.notes = append(from1x.notes, blocker)
+			from1x.notes = append(from1x.notes, onBuildRefusalNote(blocker))
 		}
 	}
 	// A Dockerfile that is not pin-only and drew no note is kept and

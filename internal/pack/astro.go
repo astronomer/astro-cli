@@ -18,6 +18,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/localrt"
 	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
+	"github.com/astronomer/astro-cli/pkg/scaffold"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -92,6 +93,9 @@ func checkManifest(ctx context.Context, req Request, airflow manifest.Airflow) (
 	}
 	if envWarning != "" {
 		warnings = append(warnings, envWarning)
+	}
+	if w := scaffold.InstallHelperWarning(req.ProjectDir, req.Manifest.Astro.Dockerfile); w != "" {
+		warnings = append(warnings, w)
 	}
 	return warnings, nil
 }

@@ -201,9 +201,9 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 	for _, name := range []string{"requirements.txt", "packages.txt"} {
 		if slices.Contains(from1x.present, name) && namedInAny(notes, name) {
 			from1x.rewrite = nil
-			from1x.notes = append(from1x.notes, "Dockerfile: kept FROM "+rw.from+" rather than moved onto "+rw.base+
+			from1x.notes = append(from1x.notes, onBuildRefusalNote("Dockerfile: kept FROM "+rw.from+" rather than moved onto "+rw.base+
 				", because "+name+" has lines "+manifest.Marker+" does not carry (above), and the base's ONBUILD steps "+
-				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it")
+				"still install them from it. Once they are in "+manifest.Marker+", run astro init again to move it"))
 			from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 			return nil
 		}
@@ -213,7 +213,7 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 		return err
 	case blocker != "":
 		from1x.rewrite = nil
-		from1x.notes = append(from1x.notes, blocker)
+		from1x.notes = append(from1x.notes, onBuildRefusalNote(blocker))
 		from1x.notes = append(from1x.notes, keptListNotes(from1x)...)
 		return nil
 	}
@@ -231,6 +231,17 @@ func planDockerfileRewrite(dir string, from1x *project1x, notes []string, cs *Ch
 			": if your registry mirrors "+rw.from+" tag by tag, mirror "+rw.base+" too")
 	}
 	return nil
+}
+
+// planDockerfile is what a conversion does about a Dockerfile it keeps as the
+// build: the move onto -base when it can go ahead (planDockerfileRewrite), then
+// the ignore file the build's context needs (planKeptDockerfileIgnore), which
+// depends on whether the move went ahead.
+func planDockerfile(dir string, from1x *project1x, notes []string, cs *Changeset) error {
+	if err := planDockerfileRewrite(dir, from1x, notes, cs); err != nil {
+		return err
+	}
+	return planKeptDockerfileIgnore(dir, from1x, cs)
 }
 
 // keptListNotes are the notes for a declared Dockerfile kept on its ONBUILD

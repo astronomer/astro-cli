@@ -61,6 +61,24 @@ func CheckDockerfileAirflow(dir string, m *manifest.Manifest) error {
 	return &manifest.ValidationError{Path: filepath.Join(dir, manifest.Marker), Problems: []manifest.Problem{p}}
 }
 
+// CheckDockerfileOnBuild refuses a declared Dockerfile with a stage on an Astro
+// Runtime ONBUILD tag (airflowrt.RefuseOnBuildBase): its image installs
+// requirements.txt and packages.txt, not the manifest's lists, so it and
+// standalone mode would run different packages. dir is the project root and m
+// its loaded manifest; the error wraps airflowrt.ErrOnBuildBase and carries the
+// lines that fix it.
+//
+// Every path that builds the file calls it: astro local check, astro package,
+// astro deploy, and Docker mode's start, which reads the file itself. Not
+// standalone mode, which builds no image.
+func CheckDockerfileOnBuild(dir string, m *manifest.Manifest) error {
+	path := dockerfilePath(dir, m)
+	if path == "" {
+		return nil
+	}
+	return airflowrt.RefuseOnBuildBase(path, m.Astro.Dockerfile)
+}
+
 // refuseKeptDockerfileOfAnotherAirflow refuses a conversion that would keep the
 // project's Dockerfile as its build beside an Airflow requirement its FROM
 // disagrees with: a project CheckDockerfileAirflow then refuses on every run

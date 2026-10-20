@@ -88,6 +88,11 @@ type Options struct {
 	// It is a func so it is asked only when the link is decided, after a rerun
 	// on a converted project has been refused. nil, or "", keeps the note.
 	APCWorkspace func() string
+	// UpdateExisting makes a run in a directory that is already an Astro
+	// project bring the parts astro writes up to date (see update.go) rather
+	// than refuse with ErrAlreadyAstroProject. Name and AirflowVersion are
+	// refused beside it there: neither is a part astro keeps.
+	UpdateExisting bool
 }
 
 // Result reports what Run did. It is the `astro init` output payload in
@@ -115,6 +120,12 @@ type Result struct {
 	// [tool.astro] section, rather than being written by this run. A status
 	// bool a json consumer reads, so it stays present when false.
 	Adopted bool `json:"adopted"`
+	// Existing reports a directory that was already an Astro project, which
+	// this run brought up to date (Options.UpdateExisting) rather than made
+	// one: its lists then hold only what astro keeps in it, and are all empty
+	// when that was already current. A status bool, present when false, as
+	// Adopted is.
+	Existing bool `json:"existing"`
 	// Notes lists the files init found but did not read, and where their
 	// contents belong. It is the work left to do by hand.
 	Notes []string `json:"notes,omitempty"`
@@ -360,6 +371,12 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 		return nil, fmt.Errorf("%w: %q is not a version like 3, 3.1, or 3.1.2", ErrInvalidAirflowVersion, v)
 	}
 
+	// Already an Astro project: brought up to date when the caller asks for
+	// that, and otherwise refused below, by the adopt arm, as it always was.
+	if cs, ok, err := planExisting(abs, marker, opts); ok {
+		return cs, err
+	}
+
 	// What the 1.x files say, read before either arm, because both need it: a
 	// greenfield manifest is BUILT from them and an adopted one is extended
 	// with them. This is the difference between init-in-an-existing-project
@@ -403,10 +420,7 @@ func plan(abs string, opts *Options) (*Changeset, error) {
 	// has to keep what the rewritten build reads. The rewrite's own changes
 	// add files, so they go ahead of the manifest like every other addition.
 	lefts, leftsMayRetire := leftovers(abs, cs.AirflowVersion, &pin, from1x)
-	if err := planDockerfileRewrite(abs, from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs); err != nil {
-		return nil, err
-	}
-	if err := planKeptDockerfileIgnore(abs, from1x, cs); err != nil {
+	if err := planDockerfile(abs, from1x, slices.Concat(from1x.notes, pin.migrationNotes, leftsMayRetire), cs); err != nil {
 		return nil, err
 	}
 

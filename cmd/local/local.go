@@ -346,6 +346,9 @@ func warnLocalFilesInImage(r cliout.Renderer, p localrt.Plan) {
 	if w := scaffold.LocalFilesWarning(p.ProjectPath, p.Dockerfile); w != "" {
 		emitWarning(r, event{Event: "warning", Text: w})
 	}
+	if w := scaffold.InstallHelperWarning(p.ProjectPath, p.Dockerfile); w != "" {
+		emitWarning(r, event{Event: "warning", Text: w})
+	}
 }
 
 // warnManifest reports the manifest's findings that do not stop a start: a

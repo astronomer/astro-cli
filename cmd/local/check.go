@@ -34,6 +34,11 @@ func loadCheckedManifest(project string) (*manifest.Manifest, error) {
 	if err := scaffold.CheckDockerfileAirflow(project, m); err != nil {
 		return nil, err
 	}
+	// The image a Docker-mode start, a package or a deploy would build: a
+	// Dockerfile on an ONBUILD tag installs lists other than the manifest's.
+	if err := scaffold.CheckDockerfileOnBuild(project, m); err != nil {
+		return nil, err
+	}
 	return m, nil
 }
 
