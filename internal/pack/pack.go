@@ -75,7 +75,9 @@ type Request struct {
 	// report, and the blocking finding as the error). nil checks nothing.
 	CheckRuntime func(ctx context.Context, runtime, airflowPin string) ([]runtimeversions.Finding, error)
 	// RuntimeCatalog reads the runtime catalog, for the image target to pick
-	// its Python (imagebuild.RuntimeImageForPython). nil builds on the default.
+	// its Python and an Airflow 2 base (imagebuild.RuntimeImageForPython).
+	// nil, or a nil catalog, builds on the runtime's default Python, and
+	// refuses an Airflow 2 project with no [tool.astro] runtime.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
 }
 

@@ -31,9 +31,10 @@ type ManifestImageDeployInput struct {
 	// commit lookup and the dags upload use too) and the manifest's
 	// image-deciding fields, as imagebuild.ManifestBuildOf reads them.
 	Build imagebuild.ManifestBuild
-	// Catalog reads the runtime catalog for the image's Python
-	// (imagebuild.RuntimeImageForPython); nil, or a nil catalog, builds on the
-	// runtime's default Python.
+	// Catalog reads the runtime catalog for the image's Python and an
+	// Airflow 2 base (imagebuild.RuntimeImageForPython); nil, or a nil
+	// catalog, builds on the runtime's default Python, and refuses an
+	// Airflow 2 project with no [tool.astro] runtime.
 	Catalog      func() *runtimeversions.Catalog
 	DeploymentID string
 	// BuildSecrets are docker build --secret specs for a declared Dockerfile's

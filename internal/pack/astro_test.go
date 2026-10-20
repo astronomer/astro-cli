@@ -368,12 +368,37 @@ func TestTagSafe(t *testing.T) {
 	assert.Equal(t, "unknown", tagSafe("+++"))
 }
 
-func TestAstroBuildRejectsNonAirflow3(t *testing.T) {
+// An Airflow 2 project packages as it deploys: FROM its [tool.astro] runtime
+// build, else the newest runtime the catalog lists for the pin.
+func TestAstroBuildBuildsAirflow2(t *testing.T) {
+	req := testRequest(t)
+	req.Manifest.Project.Dependencies = []string{"apache-airflow==2.10.*", "pandas"}
+	req.Manifest.Astro.Runtime = "12.6.0"
+	builder := &fakeBuilder{}
+	_, err := newAstro(builder, &fakeDocker{inspectOut: "12.6.0"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0", builder.gotReq.BaseImage)
+
+	catalog, err := runtimeversions.Parse([]byte(`{"runtimeVersions": {
+		"12.6.0": {"metadata": {"airflowVersion": "2.10.4", "channel": "stable"}},
+		"12.9.0": {"metadata": {"airflowVersion": "2.10.5", "channel": "stable"}}}}`))
+	require.NoError(t, err)
+	req.Manifest.Astro.Runtime = ""
+	req.RuntimeCatalog = func(context.Context) *runtimeversions.Catalog { return catalog }
+	builder = &fakeBuilder{}
+	_, err = newAstro(builder, &fakeDocker{inspectOut: "12.9.0"}).Build(context.Background(), req, localrt.Callbacks{})
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", builder.gotReq.BaseImage)
+}
+
+// With no build named and no catalog, an Airflow 2 project has no base to
+// build from, and the refusal names the line that would give it one.
+func TestAstroBuildRefusesAirflow2WithNoCatalog(t *testing.T) {
 	req := testRequest(t)
 	req.Manifest.Project.Dependencies = []string{"apache-airflow==2.9.*", "pandas"}
 	_, err := newAstro(&fakeBuilder{}, &fakeDocker{}).Build(context.Background(), req, localrt.Callbacks{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Airflow 3")
+	assert.Contains(t, err.Error(), "[tool.astro] runtime")
 }
 
 func TestAstroBuildRequiresProjectName(t *testing.T) {

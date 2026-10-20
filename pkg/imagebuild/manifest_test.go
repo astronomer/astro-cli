@@ -61,13 +61,19 @@ func TestForManifestBuildsFromTheRuntimeBuild(t *testing.T) {
 		require.NoError(t, err, pin)
 		assert.Equal(t, RuntimeImageRepo+":3.3-8", req.BaseImage, pin)
 	}
-	// Deploy and package stay Airflow 3 only, runtime or not.
-	_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.11", Runtime: "13.11.0"}, nil)
-	assert.ErrorContains(t, err, "only Airflow 3")
+	// An Airflow 2 build is a runtime version, under its own repository, and
+	// naming it needs no catalog.
+	req, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.11", Runtime: "13.11.0"}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:13.11.0", req.BaseImage)
 }
 
+// With no build named, an Airflow 2 pin is looked up in the catalog, so one
+// that cannot be read refuses the build and says how to name one instead.
 func TestForManifestRefusesAPinWithNoRuntimeImage(t *testing.T) {
-	for _, pin := range []string{"", "2.9"} {
+	_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: "2.9"}, nil)
+	assert.ErrorContains(t, err, "[tool.astro] runtime")
+	for _, pin := range []string{"", "1.10", "3"} {
 		_, err := ForManifest(ManifestBuild{ProjectDir: t.TempDir(), AirflowVersion: pin}, nil)
 		assert.Error(t, err, "pin %q", pin)
 	}

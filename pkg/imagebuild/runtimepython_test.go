@@ -173,3 +173,77 @@ func TestStandalonePythonReportsWhatAnImageRefuses(t *testing.T) {
 	assert.Equal(t, "3.3-8", notShipped.Build)
 	assert.Empty(t, python, "uv picks within requires-python")
 }
+
+// Deploy and `astro package astro` build Airflow 2 as local Docker mode does:
+// the named build, else the catalog's newest runtime for the pin, from 2.7.
+// requires-python does not move an Airflow 2 base, whose builds list no Python.
+func TestRuntimeImageForPythonBuildsAirflow2(t *testing.T) {
+	c, err := runtimeversions.Parse([]byte(releasesJSON))
+	require.NoError(t, err)
+	calls := 0
+	catalog := func() *runtimeversions.Catalog { calls++; return c }
+
+	for _, tt := range []struct{ pin, requires, want string }{
+		{"2.9.3", "", "11.12.0"},
+		{"2.9", ">=3.12", "11.12.0"},
+		{"2", "", "13.9.0"},
+		{"2.9.2", "", "11.9.0"},
+	} {
+		ref, err := RuntimeImageForPython(tt.pin, "", tt.requires, catalog)
+		require.NoError(t, err, tt.pin)
+		assert.Equal(t, "quay.io/astronomer/astro-runtime:"+tt.want, ref, tt.pin)
+	}
+
+	calls = 0
+	ref, err := RuntimeImageForPython("2.10", " 12.6.0 ", "", catalog)
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.6.0", ref)
+	assert.Zero(t, calls, "a named build needs no catalog")
+
+	_, err = RuntimeImageForPython("2.6.3", "", "", catalog)
+	assert.ErrorContains(t, err, "Airflow 2.7 or later")
+	assert.Zero(t, calls, "a pin below the floor is refused before the lookup")
+
+	// A bare "2" says nothing of the minor, so a named build below runtime 9
+	// is held to the floor by its own number.
+	_, err = RuntimeImageForPython("2", "8.8.0", "", catalog)
+	assert.ErrorContains(t, err, "Astro Runtime 8.8.0, which carries an older Airflow 2")
+	ref, err = RuntimeImageForPython("2", "9.0.0", "", catalog)
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:9.0.0", ref)
+
+	// Neither generation is a sentence that names both.
+	_, err = RuntimeImageForPython("1.10", "", "", catalog)
+	assert.ErrorContains(t, err, "Airflow 2 (from 2.7) or Airflow 3, not \"1.10\"")
+
+	_, err = RuntimeImageForPython("2.9.0", "", "", catalog)
+	require.ErrorIs(t, err, ErrNoRuntimeForAirflow)
+	assert.ErrorContains(t, err, "pin apache-airflow==2.9.*")
+}
+
+// A build the catalog lists ahead of its release has no image yet, so the
+// newest one already out is the base.
+func TestRuntimeImageForPythonSkipsAnAirflow2BuildNotYetReleased(t *testing.T) {
+	c, err := runtimeversions.Parse([]byte(`{"runtimeVersions": {
+		"12.9.0":  {"metadata": {"airflowVersion": "2.10.5", "channel": "stable", "releaseDate": "2025-06-01"}},
+		"12.10.0": {"metadata": {"airflowVersion": "2.10.5", "channel": "stable", "releaseDate": "2999-01-01"}}}}`))
+	require.NoError(t, err)
+
+	ref, err := RuntimeImageForPython("2.10", "", "", func() *runtimeversions.Catalog { return c })
+	require.NoError(t, err)
+	assert.Equal(t, "quay.io/astronomer/astro-runtime:12.9.0", ref)
+}
+
+// With no build named, an Airflow 2 base has nothing to fall back to, unlike
+// an Airflow 3 one's Python: no catalog is a refusal that names the fix.
+func TestRuntimeImageForPythonRefusesAirflow2WithNoCatalog(t *testing.T) {
+	for name, catalog := range map[string]func() *runtimeversions.Catalog{
+		"no reader":     nil,
+		"reader failed": func() *runtimeversions.Catalog { return nil },
+	} {
+		_, err := RuntimeImageForPython("2.10", "", "", catalog)
+		require.Error(t, err, name)
+		assert.ErrorContains(t, err, "catalog could not be read", name)
+		assert.ErrorContains(t, err, "[tool.astro] runtime", name)
+	}
+}

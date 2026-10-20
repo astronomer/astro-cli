@@ -9,8 +9,10 @@ import (
 )
 
 // runtimePath is [tool.astro] runtime, the one Astro Runtime build a project's
-// image uses. Neither init nor a conversion writes it; it is the user's
-// choice, and these edits only keep it loadable or change it on request.
+// image uses. It is the user's choice, and these edits only keep it loadable
+// or change it on request. The one exception is a conversion of a pin-only
+// Dockerfile on one Airflow 2 build, which records that build
+// (setRuntimeDeclaration) because the pin alone cannot name it.
 var runtimePath = []string{"tool", "astro", "runtime"}
 
 // RuntimeChange is what AlignRuntime or SetRuntime did to [tool.astro] runtime.

@@ -17,6 +17,7 @@ import (
 	"github.com/astronomer/astro-cli/internal/plan"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/util"
 )
 
@@ -117,6 +118,11 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 			}
 		}
 	}
+	var catalog func(context.Context) *runtimeversions.Catalog
+	if c.d.ImageCatalog != nil {
+		pin := m.Airflow().Pin
+		catalog = func(ctx context.Context) *runtimeversions.Catalog { return c.d.ImageCatalog(ctx, pin) }
+	}
 	res, err := target.Build(ctx, pack.Request{
 		ProjectDir:     dir,
 		Manifest:       m,
@@ -126,7 +132,7 @@ func (c *cli) runPackage(ctx context.Context, targetName string, opts packageOpt
 		BuildSecrets:   util.ResolveProjectBuildSecrets(opts.buildSecrets, m.Astro.BuildSecretSpecs()),
 		OutDir:         opts.outDir,
 		CheckRuntime:   c.d.RuntimeCheck,
-		RuntimeCatalog: c.d.RuntimeCatalog,
+		RuntimeCatalog: catalog,
 	}, c.callbacks(r))
 	if err != nil {
 		return err

@@ -152,11 +152,19 @@ type Deps struct {
 
 	// RuntimeCatalog reads the runtime catalog for an edit that moves the
 	// Airflow pin, which uses it to move requires-python and [tool.astro]
-	// runtime with the pin, and for `astro package` to pick the image's
-	// Python. nil, or a nil result, means no catalog: the edit then follows
-	// the built-in rules, and the image runs the runtime's default Python. Production reads it through
+	// runtime with the pin. nil, or a nil result, means no catalog: the edit
+	// then follows the built-in rules. Production reads it through
 	// runtimecatalog.Catalog. A seam so a test never reaches the network.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
+
+	// ImageCatalog reads the runtime catalog for `astro package astro`'s
+	// generated image: its Python, and an Airflow 2 base with no
+	// [tool.astro] runtime. nil, or a nil result, means no catalog: the image
+	// runs the runtime's default Python, and an Airflow 2 project with no
+	// runtime named is refused. Production reads it through
+	// runtimecatalog.ForBuild, which waits longer than RuntimeCatalog for an
+	// Airflow 2 pin, whose base has no fallback, and as long for any other.
+	ImageCatalog func(ctx context.Context, airflowPin string) *runtimeversions.Catalog
 
 	// LaunchOtto starts an interactive Otto session with prompt as its first
 	// message and waits for it to end, as `astro otto "<prompt>"` does. The
@@ -222,6 +230,9 @@ func NewDeps() Deps {
 		RuntimeCheck:     runtimecatalog.CheckRuntime,
 		AstroBuild:       runtimecatalog.AstroBuild,
 		RuntimeCatalog:   runtimecatalog.Catalog,
+		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
+			return runtimecatalog.ForBuild(airflowPin)(ctx)
+		},
 	}
 	// One resolution of the routes dir for the whole run. Without a home the
 	// runtime is a stand-in whose every call says so; commands that never

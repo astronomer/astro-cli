@@ -116,7 +116,7 @@ dependencies = ['apache-airflow==3.3.*']
 runtime = '3.3-8'
 ```
 
-It picks **the build**. Docker mode, `astro deploy` and `astro package` build `FROM runtime:3.3-8` instead of `runtime:3.3`, and the `[tool.uv]` pins that standalone mode installs from follow the Airflow release `3.3-8` carries, when the requirement covers it. It never stands in for the requirement: a requirement that pins no series is refused whether or not `runtime` is set, and to change the Airflow version you change the requirement. `astro init` and a conversion never write it.
+It picks **the build**. Docker mode, `astro deploy` and `astro package` build `FROM runtime:3.3-8` instead of `runtime:3.3`, and the `[tool.uv]` pins that standalone mode installs from follow the Airflow release `3.3-8` carries, when the requirement covers it. It never stands in for the requirement: a requirement that pins no series is refused whether or not `runtime` is set, and to change the Airflow version you change the requirement. `astro init` writes it in one case: converting a 1.x Dockerfile that is only `FROM astro-runtime:<build>` on one Airflow 2 build (`12.6.0`, not a floating `12` or a flavor), whose tag names no Airflow minor, so the requirement becomes `apache-airflow==2.*` and `runtime` holds the project to the build it ran.
 
 The value is one build: `3.3-8` for Airflow 3, or `13.11.0` for Airflow 2, whose runtimes are numbered on their own. The overlap with the requirement is checked every time the manifest is read, offline, as far as the tag can say:
 

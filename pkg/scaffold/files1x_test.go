@@ -457,10 +457,34 @@ func TestPlanRetiresOnlyAPinOnlyDockerfile(t *testing.T) {
 			why:     "a builder stage is real even when it carries no RUN of its own",
 		},
 		{
-			name:    "an Airflow 2 tag",
-			body:    "FROM astrocrpublic.azurecr.io/runtime:12.1.0\n",
+			name:    "an Airflow 2 build",
+			body:    "FROM quay.io/astronomer/astro-runtime:12.1.0\n",
+			retired: true,
+			why:     "the pin becomes \"2\" and the build [tool.astro] runtime, so the manifest carries all the tag said",
+		},
+		{
+			name:    "an Airflow 2 build from a mirror",
+			body:    "FROM registry.corp.example/astronomer/astro-runtime:12.1.0\n",
 			retired: false,
-			why:     "the pin becomes \"2\", so the tag is more specific than what the manifest holds and this is its only record",
+			why:     "a generated build pulls from quay.io, so the file is the only record of the mirror",
+		},
+		{
+			name:    "an Airflow 2 build below the 2.7 floor",
+			body:    "FROM quay.io/astronomer/astro-runtime:8.8.0\n",
+			retired: false,
+			why:     "no image is built FROM runtime 8, so it is not recorded, the pin \"2\" moves past it, and this is its only record",
+		},
+		{
+			name:    "a floating Airflow 2 tag",
+			body:    "FROM astrocrpublic.azurecr.io/runtime:12\n",
+			retired: false,
+			why:     "no one build to record, so the pin is \"2\", the tag is more specific than what the manifest holds and this is its only record",
+		},
+		{
+			name:    "an Airflow 2 build's Python flavor",
+			body:    "FROM astrocrpublic.azurecr.io/runtime:12.1.0-python-3.11\n",
+			retired: false,
+			why:     "a flavor is not a [tool.astro] runtime value, so the tag is still this file's alone",
 		},
 		{
 			name:    "a tag that is not a runtime version",

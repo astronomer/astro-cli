@@ -158,7 +158,7 @@ func adopt(dir string, data []byte, opts *Options, from1x *project1x, res *Resul
 	// it is load-bearing there for the same reason it is in the greenfield arm.
 	// Both arms declare it or the field would only be true of projects that
 	// arrived one particular way.
-	if err := set1xDeclarations(ed, from1x); err != nil {
+	if err := set1xDeclarations(ed, from1x, version); err != nil {
 		return nil, nil, pin, err
 	}
 

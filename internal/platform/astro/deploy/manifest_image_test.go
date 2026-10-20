@@ -25,6 +25,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/container"
 	"github.com/astronomer/astro-cli/pkg/imagebuild"
 	"github.com/astronomer/astro-cli/pkg/localrt"
+	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	testUtil "github.com/astronomer/astro-cli/pkg/testing"
 )
 
@@ -206,6 +207,75 @@ func TestDeployManifestImage_BuildAndImageAndDag(t *testing.T) {
 	assert.True(t, hasImageCall(cmd.calls, "--platform linux/amd64"), "expected linux/amd64, got %v", cmd.calls)
 	assert.True(t, hasImageCall(cmd.calls, manifestPush), "expected the push, got %v", cmd.calls)
 	client.AssertExpectations(t)
+}
+
+// An Airflow 2 project deploys from a generated build too: its base is the
+// newest runtime the catalog lists for the pin, under Airflow 2's repository,
+// and the runtime rules hold it to the Deployment before the build.
+func TestDeployManifestImage_Airflow2(t *testing.T) {
+	catalog, err := runtimeversions.Parse([]byte(`{"runtimeVersions": {
+		"12.6.0": {"metadata": {"airflowVersion": "2.10.4", "channel": "stable"}},
+		"12.9.0": {"metadata": {"airflowVersion": "2.10.5", "channel": "stable"}}}}`))
+	require.NoError(t, err)
+	in := func(t *testing.T) ManifestImageDeployInput {
+		return ManifestImageDeployInput{
+			Build: imagebuild.ManifestBuild{
+				ProjectDir:     manifestProjectDir(t),
+				AirflowVersion: "2.10",
+				Dependencies:   []string{"pandas"},
+			},
+			Catalog:      func() *runtimeversions.Catalog { return catalog },
+			DeploymentID: "test-deployment-id",
+			IncludeDags:  true,
+		}
+	}
+
+	t.Run("builds and ships", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockManifestDeploymentAt(client, "12.6.0", true, false)
+		mockDeploymentOptions(client, "12.6.0", "12.9.0")
+		mockCreateImageDeploy(client, "https://upload-url")
+		mockFinalizeDeploy(client)
+		azureUploader = func(string, io.Reader) (string, error) { return "tarball-v1", nil }
+		cmd := withImageSeams(t, "12.9.0")
+
+		res, err := DeployManifestImage(in(t), client)
+		require.NoError(t, err)
+		assert.Equal(t, "12.9.0", res.RuntimeVersion)
+		assert.Equal(t, "tarball-v1", res.DagTarballVersion)
+		assert.True(t, hasImageCall(cmd.calls, "build --tag astro-deploy/"), "expected a build, got %v", cmd.calls)
+		assert.True(t, hasImageCall(cmd.calls, manifestPush), "expected the push, got %v", cmd.calls)
+		client.AssertExpectations(t)
+	})
+
+	t.Run("refuses a downgrade before building", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockManifestDeploymentAt(client, "13.1.0", true, false)
+		mockDeploymentOptions(client, "12.9.0", "13.1.0")
+		cmd := withImageSeams(t, "12.9.0")
+
+		// The pin names 2.10, which runtime 13 does not carry, so the fix is
+		// the pin rather than a runtime the pin would then refuse.
+		_, err := DeployManifestImage(in(t), client)
+		require.EqualError(t, err, "cannot deploy Astro Runtime 12.9.0: it is a downgrade from the deployment's current 13.1.0; "+
+			"to deploy, pin apache-airflow in pyproject.toml to the Airflow release Astro Runtime 13.1.0 or newer carries")
+		assert.False(t, hasImageCall(cmd.calls, "build --tag"), "nothing should be built, got %v", cmd.calls)
+	})
+
+	t.Run("a bare Airflow 2 pin is moved by its runtime", func(t *testing.T) {
+		testUtil.InitTestConfig(testUtil.LocalPlatform)
+		client := new(astrov1_mocks.ClientWithResponsesInterface)
+		mockManifestDeploymentAt(client, "13.1.0", true, false)
+		mockDeploymentOptions(client, "12.9.0", "13.1.0")
+		withImageSeams(t, "12.9.0")
+
+		bare := in(t)
+		bare.Build.AirflowVersion = "2"
+		_, err := DeployManifestImage(bare, client)
+		require.ErrorContains(t, err, "to deploy, set [tool.astro] runtime to 13.1.0 or newer in pyproject.toml")
+	})
 }
 
 // A failed install says "see the build output above", so the build's lines

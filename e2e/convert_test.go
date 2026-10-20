@@ -129,10 +129,13 @@ airflow:
 `
 
 func cases1x() []case1x {
-	// A pre-3 runtime tag names a runtime and not an Airflow minor, so it
-	// always earns a note — which, because a file a note names is never
-	// retired, is also what spares the Dockerfile in every fixture using it.
-	const runtime2 = "FROM quay.io/astronomer/astro-runtime:9.1.0\n"
+	// A pre-3 runtime tag names a runtime and not an Airflow minor. One build
+	// (9.1.0) becomes [tool.astro] runtime, and a pin-only Dockerfile on it
+	// then goes. A floating tag names no build, so it earns a note instead —
+	// which, because a file a note names is never retired, is also what
+	// spares the Dockerfile in every fixture using runtime2.
+	const runtime2Build = "FROM quay.io/astronomer/astro-runtime:9.1.0\n"
+	const runtime2 = "FROM quay.io/astronomer/astro-runtime:9\n"
 	// A modern tag names the Airflow version outright. No note, and so
 	// nothing to keep the Dockerfile for: this is the shape that deletes it.
 	const runtime3 = "FROM quay.io/astronomer/astro-runtime:3.1-12\n"
@@ -140,11 +143,11 @@ func cases1x() []case1x {
 	return []case1x{
 		{
 			// The ordinary Airflow 2 conversion. Both 1.x lists reach the
-			// manifest and go; the Dockerfile stays, because the note about
-			// its tag is also something still to be said about it.
+			// manifest and go, and so does the Dockerfile: its build is
+			// [tool.astro] runtime now, which holds a deploy to it.
 			name: "the whole 1.x shape",
 			files: map[string]string{
-				"Dockerfile": runtime2,
+				"Dockerfile": runtime2Build,
 				// Deliberately NOT in alphabetical order, so the assertion
 				// below distinguishes "file order" from "sorted". With pandas
 				// before requests it could not.
@@ -155,13 +158,26 @@ func cases1x() []case1x {
 			manifestLines: []string{
 				"dependencies = [\n    'apache-airflow==2.*',\n    'requests',\n    'pandas==2.1.0',\n]",
 				"packages = [\n    'libpq-dev',\n    'git',\n]",
+				"runtime = '9.1.0'",
 			},
-			retired: []string{"requirements.txt", "packages.txt"},
-			// The most destructive deletion available, so its absence is
+			retired: []string{"Dockerfile", "requirements.txt", "packages.txt"},
+		},
+		{
+			// A floating Airflow 2 tag names no build to record, so the pin
+			// is the coarse "2", the note says so, and the Dockerfile stays:
+			// the most destructive deletion available, so its absence is
 			// asserted rather than assumed.
-			kept:    []string{"Dockerfile"},
-			keptHas: map[string]string{"Dockerfile": "astro-runtime:9.1.0"},
-			notes:   []string{"does not name the Airflow minor"},
+			name: "a floating Airflow 2 runtime tag",
+			files: map[string]string{
+				"Dockerfile":       runtime2,
+				"requirements.txt": "requests\n",
+			},
+			airflow:       "2",
+			manifestLacks: []string{"runtime ="},
+			retired:       []string{"requirements.txt"},
+			kept:          []string{"Dockerfile"},
+			keptHas:       map[string]string{"Dockerfile": "astro-runtime:9\n"},
+			notes:         []string{"does not name the Airflow minor"},
 		},
 		{
 			// A modern runtime tag names the Airflow version, so there is

@@ -59,8 +59,9 @@ const RuntimeImageRepo = "astrocrpublic.azurecr.io/runtime"
 // runtime tag ("3.1-2") passes through as the tag. A bare major ("3") is
 // refused, naming the pin. Only Airflow 3 ships as Astro Runtime 3, so anything
 // else is refused; the built image's io.astronomer label gives back the exact
-// version. Deploy, `astro package astro` and the local Docker engine's Airflow 3
-// path all resolve the base this way.
+// version. Deploy, `astro package astro` and the local Docker engine all
+// resolve an Airflow 3 base this way; an Airflow 2 one, whose tag is a runtime
+// version, needs the catalog (RuntimeImageForPython).
 func RuntimeImage(airflowVersion string) (string, error) {
 	v := strings.TrimSpace(airflowVersion)
 	if v == "" {

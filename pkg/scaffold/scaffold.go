@@ -658,8 +658,13 @@ func (from1x *project1x) buildPython() string {
 	return from1x.basePython
 }
 
-func set1xDeclarations(ed tomledit.Editor, from1x *project1x) error {
+// set1xDeclarations writes what the 1.x files declare beyond the dependency
+// lists. pinned is the Airflow version the manifest's requirement states.
+func set1xDeclarations(ed tomledit.Editor, from1x *project1x, pinned string) error {
 	if err := setDockerfileDeclaration(ed, from1x); err != nil {
+		return err
+	}
+	if err := setRuntimeDeclaration(ed, from1x, pinned); err != nil {
 		return err
 	}
 	if err := setEnvDeclarations(ed, &from1x.settings); err != nil {
@@ -705,6 +710,23 @@ func setDockerfileDeclaration(ed tomledit.Editor, from1x *project1x) error {
 		return nil
 	}
 	return ed.Set([]string{"tool", "astro", manifestKeyDockerfile}, fileDockerfile)
+}
+
+// setRuntimeDeclaration records the Airflow 2 build a pin-only Dockerfile was
+// FROM as [tool.astro] runtime, so the image a deploy generates is the one the
+// 1.x project built rather than the newest Airflow 2. Only when the manifest's
+// pin is the one that tag gave: a pin from --airflow-version or an existing
+// requirement won, and the Dockerfile stays behind as the record of what it
+// was (dockerfileIsSpent).
+//
+// This is the one runtime line a conversion writes. An Airflow 3 tag needs
+// none, its series being the pin, and a declared Dockerfile picks its own
+// base.
+func setRuntimeDeclaration(ed tomledit.Editor, from1x *project1x, pinned string) error {
+	if from1x.runtime == "" || pinned != from1x.airflow {
+		return nil
+	}
+	return ed.Set(runtimePath, from1x.runtime)
 }
 
 // namedInAny reports whether any note is about this file.
@@ -948,7 +970,7 @@ func renderPyproject(name string, pick airflowPick, from1x *project1x) (pyprojec
 			return nil, nil, err
 		}
 	}
-	if err := set1xDeclarations(ed, from1x); err != nil {
+	if err := set1xDeclarations(ed, from1x, version); err != nil {
 		return nil, nil, err
 	}
 	data, err := ed.Bytes()
@@ -1192,8 +1214,12 @@ func leftovers(dir, version string, facts *manifestFacts, from1x *project1x) (no
 	// repeat or contradict it.
 	readerNoted := slices.ContainsFunc(from1x.notes, func(n string) bool { return strings.HasPrefix(n, fileDockerfile+":") })
 	if from1x.dockerfilePinOnly && !dockerfileIsSpent(from1x, version) && !readerNoted {
+		base := "Airflow " + from1x.airflow
+		if from1x.runtime != "" {
+			base = "Astro Runtime " + from1x.runtime + " (Airflow 2)"
+		}
 		out = append(out, "Dockerfile: kept and not declared as this project's build. It names only a base image, on "+
-			"Airflow "+from1x.airflow+", and this project's pin is Airflow "+version+"; delete it if the pin is right")
+			base+", and this project's pin is Airflow "+version+"; delete it if the pin is right")
 	}
 	checks := []struct{ file, note string }{
 		{"docker-compose.yml", "not read — astro local start replaces it"},

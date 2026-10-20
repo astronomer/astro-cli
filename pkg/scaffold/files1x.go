@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -53,6 +54,12 @@ type project1x struct {
 	// airflow is the Airflow version the Dockerfile's runtime tag names, or ""
 	// when there was no Dockerfile or its tag said nothing usable.
 	airflow string
+	// runtime is the Airflow 2 runtime build a pin-only Dockerfile is FROM
+	// ("12.6.0"), which the manifest records as [tool.astro] runtime, or "".
+	// An Airflow 2 tag names no Airflow minor, so without it the project's
+	// pin is "2" and the next image build would move it to the newest
+	// Airflow 2. An Airflow 3 tag needs none: the pin names its series.
+	runtime string
 	// basePython is the Python the Dockerfile's Astro Runtime base runs, when
 	// its tag names one ("3.13" from runtime:3.3-2-python-3.13), or "".
 	basePython string
@@ -280,6 +287,21 @@ func (from1x *project1x) readDockerfile(dir string, data []byte) {
 		from1x.airflow = version
 		if stated {
 			from1x.statedVersion = true
+		}
+		// A pin-only Dockerfile on one Airflow 2 build has that build to give
+		// the manifest, and once it is there the file has nothing left to say
+		// and its note nothing left to do. A flavor ("12.6.0-python-3.11") or
+		// a floating tag ("12") is no one build, and stays as it was. Nor does
+		// a build older than runtime 9 (Airflow 2.7), which no image is built
+		// FROM: the pin "2" moves it to the newest Airflow 2, and the note
+		// says the minor was not read. Nor does a mirror: a generated build
+		// pulls the build from Astronomer's own repository, so the file is
+		// the only record of where this project's base comes from.
+		if bare := strings.TrimPrefix(tag, "v"); version == "2" && from1x.dockerfilePinOnly && image == airflow2RuntimeImage {
+			if t, ok := manifest.ParseRuntimeTag(bare); ok && t.Major == "2" && t.Build && runtimeMajor(bare) >= minAirflow2Runtime {
+				from1x.runtime = bare
+				notes = nil
+			}
 		}
 	}
 	build := buildStepsNote(data)
@@ -626,6 +648,28 @@ func stripComment(line string) string {
 		}
 	}
 	return line
+}
+
+// minAirflow2Runtime is the oldest Airflow 2 runtime a conversion records as
+// [tool.astro] runtime: runtime 9 carries Airflow 2.7, the floor below which
+// pkg/imagebuild builds no image (a copy, as runtimeTagRe is, since this
+// module does not import that one).
+const minAirflow2Runtime = 9
+
+// airflow2RuntimeImage is the repository a generated Airflow 2 build pulls
+// its base from (pkg/imagebuild's airflow2ImageRepo), and so the one whose
+// build a conversion can record as [tool.astro] runtime without losing where
+// the base comes from.
+const airflow2RuntimeImage = "quay.io/astronomer/astro-runtime"
+
+// runtimeMajor is the leading number of a runtime version, or 0.
+func runtimeMajor(tag string) int {
+	head, _, _ := strings.Cut(tag, ".")
+	n, err := strconv.Atoi(head)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // runtimeTagRe is the Astro Runtime tag format introduced with Airflow 3:
