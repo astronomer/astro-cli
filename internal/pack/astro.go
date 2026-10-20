@@ -209,7 +209,8 @@ func (t *AstroTarget) Build(ctx context.Context, req Request, cb localrt.Callbac
 	}
 
 	// Build into a source-hash working tag, which BuildLocal always returns:
-	// with nothing to install it still builds the one-line image over the base.
+	// with nothing to install it still builds the generated Dockerfile over the
+	// runtime's -base image, its install steps installing nothing.
 	workingTag := fmt.Sprintf("astro-package/%s:src-%s", name, hash)
 	breq.WorkDir = workDir
 	breq.Tag = workingTag
@@ -496,18 +497,27 @@ func contentHash(base, platform, recipe string, deps, findLinks, packages []stri
 	}
 	writeField("base", base)
 	writeField("platform", platform)
-	if df.abs == "" {
+	// Generated or declared is decided once, by recipe (generatedRecipe): ""
+	// is a declared Dockerfile.
+	if recipe != "" {
 		// A generated build's Dockerfile (recipe) is imagebuild's, not the
 		// project's, and it is as much the build as the inputs below: a change
 		// to how it installs is a different image from the same manifest, so
 		// it moves the tag rather than reusing one an older recipe built. Its
-		// find-links say where that install looks. A declared Dockerfile
-		// installs as its own bytes say, which are hashed below, and reads no
-		// find-links, so neither is part of its address.
+		// find-links say where that install looks.
 		writeField("generated-dockerfile", fmt.Sprintf("%x", sha256.Sum256([]byte(recipe))))
 		for _, l := range findLinks {
 			writeField("find-links", l)
 		}
+	} else {
+		// A declared Dockerfile installs as its own bytes say, and reads no
+		// find-links.
+		writeField("dockerfile", filepath.ToSlash(df.rel))
+		body, err := os.ReadFile(df.abs)
+		if err != nil {
+			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
+		}
+		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}
 	if projectFiles != "" {
 		digest, err := imagebuild.ProjectFilesDigest(projectFiles)
@@ -521,14 +531,6 @@ func contentHash(base, platform, recipe string, deps, findLinks, packages []stri
 	}
 	for _, p := range sortedCopy(packages) {
 		writeField("pkg", p)
-	}
-	if df.abs != "" {
-		writeField("dockerfile", filepath.ToSlash(df.rel))
-		body, err := os.ReadFile(df.abs)
-		if err != nil {
-			return "", fmt.Errorf("reading the Dockerfile this project declares (%s): %w", df.rel, err)
-		}
-		writeField("dockerfile-body", fmt.Sprintf("%x", sha256.Sum256(body)))
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))[:7], nil
 }
