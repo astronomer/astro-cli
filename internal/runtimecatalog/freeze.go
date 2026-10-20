@@ -64,92 +64,100 @@ var errFreezeNotPublished = errors.New("no freeze file is published for this bui
 // none could be read: no build, a build too old to have one, or no network
 // and no cached copy.
 //
-// A failure other than a 404 stops the search, so an offline run spends one
-// timeout, not one per Python.
+// Every candidate's cached copy is looked for before any request, so an
+// offline run still answers from a copy kept for a later Python. A failure
+// other than a 404 stops the requests, so an offline run spends one timeout,
+// not one per Python.
 func RuntimeFreeze(ctx context.Context, build string, pythons []string) []string {
 	if !freezeNamePart.MatchString(build) {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, freezeTimeout)
-	defer cancel()
+	var names []string
+	for _, py := range pythons {
+		if freezeNamePart.MatchString(py) {
+			names = append(names, "runtime-"+build+"-python-"+py+".txt")
+		}
+	}
 	dir := ""
 	if root, err := localrt.CacheRoot(); err == nil {
 		dir = filepath.Join(root, freezeCacheDir)
 	}
-	for _, py := range pythons {
-		if !freezeNamePart.MatchString(py) {
-			continue
+	if dir != "" {
+		for _, name := range names {
+			// A copy that does not parse is read again from the CDN below.
+			if data, err := fsatomic.ReadFile(filepath.Join(dir, name)); err == nil {
+				if dists, err := parseFreeze(data); err == nil && len(dists) > 0 {
+					return dists
+				}
+			}
 		}
-		data, err := readFreeze(ctx, dir, "runtime-"+build+"-python-"+py+".txt")
+	}
+	ctx, cancel := context.WithTimeout(ctx, freezeTimeout)
+	defer cancel()
+	for _, name := range names {
+		data, dists, err := fetchFreeze(ctx, freezeBaseURL+"/"+name)
 		if errors.Is(err, errFreezeNotPublished) {
 			continue
 		}
 		if err != nil {
 			return nil
 		}
-		return parseFreeze(data)
+		// A cache that cannot be written is not a failure: the read worked.
+		if dir != "" && os.MkdirAll(dir, freezeDirPerm) == nil {
+			_ = fsatomic.WriteFile(filepath.Join(dir, name), data, freezeFilePerm) //nolint:errcheck // best effort, see above
+		}
+		return dists
 	}
 	return nil
 }
 
-// readFreeze returns the freeze file name, from the cache under dir when a
-// copy is there, else from the CDN, keeping what it fetched. dir "" is no
-// cache.
-func readFreeze(ctx context.Context, dir, name string) ([]byte, error) {
-	path := ""
-	if dir != "" {
-		path = filepath.Join(dir, name)
-		if data, err := fsatomic.ReadFile(path); err == nil && len(data) > 0 {
-			return data, nil
-		}
-	}
-	data, err := fetchFreeze(ctx, freezeBaseURL+"/"+name)
-	if err != nil {
-		return nil, err
-	}
-	if path != "" {
-		// A cache that cannot be written is not a failure: the read worked.
-		if os.MkdirAll(dir, freezeDirPerm) == nil {
-			_ = fsatomic.WriteFile(path, data, freezeFilePerm) //nolint:errcheck // best effort, see above
-		}
-	}
-	return data, nil
-}
-
-func fetchFreeze(ctx context.Context, url string) ([]byte, error) {
+// fetchFreeze reads one freeze file from the CDN and returns its bytes, for
+// the cache, and its distributions. Only a whole, parseable file with a
+// package in it comes back, so nothing short of one is ever cached.
+func fetchFreeze(ctx context.Context, url string) (data []byte, dists []string, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("User-Agent", "astro-cli/"+version.Current())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 	switch {
 	case resp.StatusCode == http.StatusNotFound:
-		return nil, errFreezeNotPublished
+		return nil, nil, errFreezeNotPublished
 	case resp.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("reading %s: %s", url, resp.Status)
+		return nil, nil, fmt.Errorf("reading %s: %s", url, resp.Status)
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, freezeMaxBytes))
+	// One byte past the cap, so a file the cap would cut short is refused
+	// rather than read as a shorter freeze.
+	data, err = io.ReadAll(io.LimitReader(resp.Body, freezeMaxBytes+1))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if len(parseFreeze(data)) == 0 {
+	if len(data) > freezeMaxBytes {
+		return nil, nil, fmt.Errorf("reading %s: larger than %d bytes", url, freezeMaxBytes)
+	}
+	if dists, err = parseFreeze(data); err != nil {
+		return nil, nil, fmt.Errorf("reading %s: %w", url, err)
+	}
+	if len(dists) == 0 {
 		// A 200 with no requirement in it is a captive portal or an error page,
 		// not a freeze, and caching it would answer every later read wrongly.
-		return nil, fmt.Errorf("reading %s: no packages in the response", url)
+		return nil, nil, fmt.Errorf("reading %s: no packages in the response", url)
 	}
-	return data, nil
+	return data, dists, nil
 }
 
 // parseFreeze reads `pip freeze` output into normalized distribution names:
-// "name==version" and "name @ url" lines, comments and blanks skipped.
-func parseFreeze(data []byte) []string {
+// "name==version" and "name @ url" lines, comments and blanks skipped. A line
+// too long to read is an error, not the end of the file.
+func parseFreeze(data []byte) ([]string, error) {
 	var dists []string
 	sc := bufio.NewScanner(bytes.NewReader(data))
+	sc.Buffer(make([]byte, 0, 64<<10), freezeMaxBytes)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "-") {
@@ -159,5 +167,8 @@ func parseFreeze(data []byte) []string {
 			dists = append(dists, name)
 		}
 	}
-	return dists
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	return dists, nil
 }

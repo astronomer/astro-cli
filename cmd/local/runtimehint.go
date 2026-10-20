@@ -2,10 +2,13 @@ package local
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/astronomer/astro-cli/pkg/airflowrt"
 	"github.com/astronomer/astro-cli/pkg/checks"
@@ -54,42 +57,78 @@ var moduleDists = map[string]string{
 // installs under, airflow.providers.<name>, from apache-airflow-providers-<name>.
 const airflowProvidersPrefix = "airflow.providers."
 
+// moduleOwners are the distributions that would install module itself,
+// normalized, three ways: moduleDists, the provider rule
+// (airflow.providers.common.sql is apache-airflow-providers-common-sql), and
+// the module with its dots as hyphens (opentelemetry.sdk is opentelemetry-sdk,
+// kubernetes_asyncio is kubernetes-asyncio).
+func moduleOwners(module string) []string {
+	var owners []string
+	add := func(name string) {
+		if d := manifest.DistName(name); d != "" && !slices.Contains(owners, d) {
+			owners = append(owners, d)
+		}
+	}
+	add(moduleDists[module])
+	if rest, ok := strings.CutPrefix(module, airflowProvidersPrefix); ok {
+		add("apache-airflow-providers-" + strings.ReplaceAll(rest, ".", "-"))
+	}
+	add(strings.ReplaceAll(module, ".", "-"))
+	return owners
+}
+
 // runtimeDist is the distribution in ships that provides module, or "".
 //
-// Longest dotted prefix first, so google.protobuf.message finds protobuf
-// before google is tried, and each prefix three ways: moduleDists, the
-// provider rule (airflow.providers.common.sql is
-// apache-airflow-providers-common-sql), and the prefix with its dots as
-// hyphens (opentelemetry.sdk is opentelemetry-sdk, kubernetes_asyncio is
-// kubernetes-asyncio).
+// Python names the first package of an import that is missing, so module is
+// the missing one and its parent is installed: pandas.io.foo missing means
+// pandas is there, and the answer is never a parent's distribution. module is
+// matched as it is (moduleOwners), and failing that as a namespace: Python
+// reports airflow.providers.cncf, not the provider under it, when no cncf
+// provider is installed, and google when nothing under google is. The one
+// shipped distribution under the namespace is the answer; several are none,
+// since the message cannot say which one the Dag needs, and naming the wrong
+// one would install something it does not.
 func runtimeDist(module string, ships map[string]bool) string {
-	parts := strings.Split(module, ".")
-	for n := len(parts); n > 0; n-- {
-		prefix := strings.Join(parts[:n], ".")
-		candidates := []string{moduleDists[prefix]}
-		if rest, ok := strings.CutPrefix(prefix, airflowProvidersPrefix); ok {
-			candidates = append(candidates, "apache-airflow-providers-"+strings.ReplaceAll(rest, ".", "-"))
+	if module == "" {
+		return ""
+	}
+	owners := moduleOwners(module)
+	for _, d := range owners {
+		if ships[d] {
+			return d
 		}
-		candidates = append(candidates, strings.Join(parts[:n], "-"))
-		for _, c := range candidates {
-			if c == "" {
-				continue
-			}
-			if d := manifest.DistName(c); ships[d] {
-				return d
+	}
+	under := map[string]bool{}
+	for _, owner := range owners {
+		for d := range ships {
+			if strings.HasPrefix(d, owner+"-") {
+				under[d] = true
 			}
 		}
+	}
+	for sub, d := range moduleDists {
+		if strings.HasPrefix(sub, module+".") && ships[d] {
+			under[d] = true
+		}
+	}
+	if len(under) != 1 {
+		return ""
+	}
+	for d := range under {
+		return d
 	}
 	return ""
 }
 
 // missingModule is the module an import error's message says is missing, or
-// "".
+// "". The last one the message names: in a chained traceback ("During
+// handling of the above exception…") the last is the error that was raised.
 func missingModule(message string) string {
-	if m := missingModuleRe.FindStringSubmatch(message); m != nil {
-		return m[1]
+	all := missingModuleRe.FindAllStringSubmatch(message, -1)
+	if len(all) == 0 {
+		return ""
 	}
-	return ""
+	return all[len(all)-1][1]
 }
 
 // withRuntimeHints sets Hint on each import error for a module the project's
@@ -113,9 +152,12 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 	if len(ships) == 0 {
 		return res
 	}
-	declared := map[string]bool{}
+	// What the project already gets: what it lists, and what its lock brings
+	// in beside that. A module one of these provides is missing from an
+	// environment that is out of date, which adding a dependency does not fix.
+	known := lockedDists(project)
 	for _, dep := range m.Project.Dependencies {
-		declared[manifest.DistName(dep)] = true
+		known[manifest.DistName(dep)] = true
 	}
 	findings := slices.Clone(res.Findings)
 	for i := range findings {
@@ -123,14 +165,40 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 		if f.Kind != checks.KindImportError {
 			continue
 		}
-		// A dependency the project already lists is missing from an
-		// environment that is out of date, which adding it again does not fix.
-		if d := runtimeDist(missingModule(f.Message), ships); d != "" && !declared[d] {
-			f.Hint = "Astro Runtime " + build + " ships " + d + ", but this project does not depend on it: add it with uv add " + d
+		module := missingModule(f.Message)
+		d := runtimeDist(module, ships)
+		// moduleOwners as well as d: a project that lists psycopg2 has the
+		// module psycopg2 that the image ships as psycopg2-binary.
+		if d == "" || known[d] || slices.ContainsFunc(moduleOwners(module), func(o string) bool { return known[o] }) {
+			continue
 		}
+		f.Hint = "Astro Runtime " + build + " ships " + d + ", but this project does not depend on it: add it with uv add " + d
 	}
 	res.Findings = findings
 	return res
+}
+
+// lockedDists are the package names in the project's uv.lock, normalized; an
+// empty set when there is no lock or it does not parse, which only costs the
+// hint's caution.
+func lockedDists(project string) map[string]bool {
+	out := map[string]bool{}
+	data, err := os.ReadFile(filepath.Join(project, "uv.lock"))
+	if err != nil {
+		return out
+	}
+	var lock struct {
+		Package []struct {
+			Name string `toml:"name"`
+		} `toml:"package"`
+	}
+	if toml.Unmarshal(data, &lock) != nil {
+		return out
+	}
+	for _, p := range lock.Package {
+		out[manifest.DistName(p.Name)] = true
+	}
+	return out
 }
 
 // fallbackPythons are tried after the Python the catalog names, for an

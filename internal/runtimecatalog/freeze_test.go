@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -69,6 +70,31 @@ func TestRuntimeFreezeKeepsWhatItRead(t *testing.T) {
 	assert.Equal(t, int32(1), hits.Load())
 	root := os.Getenv("XDG_CACHE_HOME")
 	assert.FileExists(t, filepath.Join(root, "astro", freezeCacheDir, "runtime-3.3-9-python-3.12.txt"))
+}
+
+// Offline, a copy kept for a later Python answers before any request is made
+// for the first.
+func TestRuntimeFreezeLooksInTheCacheForEveryPythonFirst(t *testing.T) {
+	srv, hits := freezeServer(t, nil)
+	dir := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", freezeCacheDir)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "runtime-12.6.0-python-3.11.txt"), []byte("pandas==2.2.3\n"), 0o600))
+	srv.Close()
+	assert.Equal(t, []string{"pandas"}, RuntimeFreeze(context.Background(), "12.6.0", []string{"3.12", "3.11"}))
+	assert.Equal(t, int32(0), hits.Load())
+}
+
+// A file past the size cap is refused, not read short, and not kept.
+func TestRuntimeFreezeRefusesAFileTooLargeToReadWhole(t *testing.T) {
+	big := strings.Repeat("pandas==2.2.3\n", freezeMaxBytes/14+1)
+	freezeServer(t, map[string]string{"/runtime-freeze/runtime-3.3-9-python-3.12.txt": big})
+	assert.Nil(t, RuntimeFreeze(context.Background(), "3.3-9", []string{"3.12"}))
+	assert.NoFileExists(t, filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", freezeCacheDir, "runtime-3.3-9-python-3.12.txt"))
+}
+
+func TestParseFreezeReportsALineTooLongToRead(t *testing.T) {
+	_, err := parseFreeze([]byte("pandas==2.2.3\n" + strings.Repeat("x", freezeMaxBytes+1) + "\n"))
+	assert.Error(t, err)
 }
 
 // Offline, the search stops at the first failure that is not a 404: one

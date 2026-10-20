@@ -19,7 +19,8 @@ var testShips = map[string]bool{}
 func init() {
 	for _, d := range []string{
 		"pandas", "numpy", "pyyaml", "protobuf", "psycopg2-binary", "mysqlclient",
-		"apache-airflow-providers-common-sql", "apache-airflow-providers-cncf-kubernetes",
+		"apache-airflow-providers-common-sql", "apache-airflow-providers-common-io",
+		"apache-airflow-providers-cncf-kubernetes",
 		"opentelemetry-sdk", "kubernetes-asyncio", "openlineage-python", "googleapis-common-protos",
 	} {
 		testShips[d] = true
@@ -28,21 +29,33 @@ func init() {
 
 func TestRuntimeDist(t *testing.T) {
 	for module, want := range map[string]string{
-		"pandas":                                 "pandas",
-		"pandas.core.frame":                      "pandas",
-		"yaml":                                   "pyyaml",
-		"google.protobuf.message":                "protobuf",
-		"google.rpc":                             "googleapis-common-protos",
-		"psycopg2":                               "psycopg2-binary",
-		"MySQLdb":                                "mysqlclient",
-		"airflow.providers.common.sql.hooks.sql": "apache-airflow-providers-common-sql",
-		"airflow.providers.cncf.kubernetes":      "apache-airflow-providers-cncf-kubernetes",
-		"opentelemetry.sdk.trace":                "opentelemetry-sdk",
-		"kubernetes_asyncio":                     "kubernetes-asyncio",
-		"openlineage.client.run":                 "openlineage-python",
+		"pandas":                            "pandas",
+		"yaml":                              "pyyaml",
+		"google.protobuf":                   "protobuf",
+		"google.rpc":                        "googleapis-common-protos",
+		"psycopg2":                          "psycopg2-binary",
+		"MySQLdb":                           "mysqlclient",
+		"airflow.providers.common.sql":      "apache-airflow-providers-common-sql",
+		"airflow.providers.cncf.kubernetes": "apache-airflow-providers-cncf-kubernetes",
+		"opentelemetry.sdk":                 "opentelemetry-sdk",
+		"kubernetes_asyncio":                "kubernetes-asyncio",
+		"openlineage.client":                "openlineage-python",
+		// Python names the first missing package, so a namespace is what a
+		// Dag sees when nothing under it is installed: one shipped under it
+		// is the answer.
+		"airflow.providers.cncf": "apache-airflow-providers-cncf-kubernetes",
+		"openlineage":            "openlineage-python",
+		// Several under it, and the message cannot say which one.
+		"airflow.providers.common": "",
+		"google":                   "",
+		// A missing submodule means its parent is installed: the parent's
+		// distribution is not what is missing.
+		"pandas.io.foo":                          "",
+		"google.protobuf.message":                "",
+		"airflow.providers.common.sql.hooks.sql": "",
 		"airflow.providers.snowflake":            "",
 		"my_company_utils":                       "",
-		"google":                                 "",
+		"":                                       "",
 	} {
 		if got := runtimeDist(module, testShips); got != want {
 			t.Errorf("runtimeDist(%q) = %q, want %q", module, got, want)
@@ -57,6 +70,12 @@ func TestMissingModule(t *testing.T) {
 	}
 	if got := missingModule("ValueError: no"); got != "" {
 		t.Errorf("missingModule = %q, want none", got)
+	}
+	// A chained traceback: the error raised is the last one named.
+	chained := "ModuleNotFoundError: No module named 'ujson'\n\nDuring handling of the above exception, another exception occurred:\n\n" +
+		"Traceback (most recent call last):\nModuleNotFoundError: No module named 'pandas'\n"
+	if got := missingModule(chained); got != "pandas" {
+		t.Errorf("missingModule(chained) = %q, want pandas", got)
 	}
 }
 
@@ -140,6 +159,46 @@ func TestCheckDoesNotHintAPackageTheProjectLists(t *testing.T) {
 	_ = execute(t, d, "local", "check")
 	if strings.Contains(out.String(), "hint:") {
 		t.Errorf("want no hint for a declared dependency:\n%s", out.String())
+	}
+}
+
+// A project that lists psycopg2 has the module psycopg2, which the image ships
+// as psycopg2-binary: the same module, so no hint for the other distribution.
+func TestCheckDoesNotHintAModuleADeclaredDependencyProvides(t *testing.T) {
+	d, out, _, _ := hintDeps(t)
+	dir, err := d.WorkingDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestText := strings.Replace(runtimeManifest, `"pandas"`, `"psycopg2"`, 1)
+	if err := os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte(manifestText), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.Checks = stubParser{report: checks.ParseReport{ImportErrors: []checks.ReportImportErr{
+		{File: "dags/a.py", Message: "ModuleNotFoundError: No module named 'psycopg2'"},
+	}}}
+	_ = execute(t, d, "local", "check")
+	if strings.Contains(out.String(), "hint:") {
+		t.Errorf("want no hint for a module a declared dependency provides:\n%s", out.String())
+	}
+}
+
+// A package the lock already brings in (a dependency of a dependency) is
+// missing from a stale environment, not from the manifest: no hint.
+func TestCheckDoesNotHintAPackageTheLockHas(t *testing.T) {
+	d, out, _, _ := hintDeps(t)
+	dir, err := d.WorkingDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock := "version = 1\n\n[[package]]\nname = \"pandas\"\nversion = \"2.3.0\"\n\n[[package]]\nname = \"numpy\"\nversion = \"2.3.1\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "uv.lock"), []byte(lock), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d.Checks = stubParser{report: numpyErrors()}
+	_ = execute(t, d, "local", "check")
+	if strings.Contains(out.String(), "hint:") {
+		t.Errorf("want no hint for a package in uv.lock:\n%s", out.String())
 	}
 }
 
