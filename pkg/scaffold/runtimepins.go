@@ -2,6 +2,8 @@ package scaffold
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -106,42 +108,65 @@ var (
 	uvDevDepsKey        = []string{"tool", "uv", "dev-dependencies"}
 )
 
-// ownPackages are the distributions the project chooses the version of: the
-// ones it names, in [project] dependencies, [project.optional-dependencies],
-// [dependency-groups], [tool.uv] override-dependencies or [tool.uv]
-// dev-dependencies, and the ones constraints, its own lines of
-// constraint-dependencies, name. A runtime pin on one of them would leave
-// `uv add --dev 'pytest>=9'` nothing to lock where the image ships pytest 8.
-func ownPackages(before *manifest.Manifest, ed tomledit.Editor, constraints []any) map[string]bool {
-	own := map[string]bool{}
-	add := func(v any) {
-		// A dependency group can include another, as a table; that one is
-		// read where it is defined.
-		if s, isString := v.(string); isString {
-			own[manifest.DistName(s)] = true
+// ListedPackages are the distributions the project in dir lists to install,
+// normalized (manifest.DistName): [project] dependencies,
+// [project.optional-dependencies], [dependency-groups] and the [tool.uv]
+// dev-dependencies older uv wrote. The manifest carries only the first, so
+// the file is read here; one rule for the runtime pins, which leave these to
+// the project, and for `astro local check`'s hint, which does not ask the
+// project to add one of them.
+func ListedPackages(dir string) (map[string]bool, error) {
+	data, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	if err != nil {
+		return nil, err
+	}
+	ed, err := tomledit.NewSurgical(data)
+	if err != nil {
+		return nil, err
+	}
+	return listedPackages(ed), nil
+}
+
+// listedPackages is ListedPackages for a document already open.
+func listedPackages(ed tomledit.Editor) map[string]bool {
+	listed := map[string]bool{}
+	addAll := func(list []any) {
+		for _, v := range list {
+			// A dependency group can include another, as a table; that one is
+			// read where it is defined.
+			if s, isString := v.(string); isString {
+				listed[manifest.DistName(s)] = true
+			}
 		}
 	}
-	for _, dep := range before.Project.Dependencies {
-		add(dep)
-	}
-	for _, v := range constraints {
-		add(v)
+	for _, key := range [][]string{projectDepsKey, uvDevDepsKey} {
+		value, _ := ed.Get(key)
+		list, _ := value.([]any)
+		addAll(list)
 	}
 	for _, key := range [][]string{optionalDepsKey, dependencyGroupsKey} {
 		tables, _ := ed.Get(key)
 		groups, _ := tables.(map[string]any)
 		for _, group := range groups {
 			list, _ := group.([]any)
-			for _, v := range list {
-				add(v)
-			}
+			addAll(list)
 		}
 	}
-	for _, key := range [][]string{overrideDepsKey, uvDevDepsKey} {
-		value, _ := ed.Get(key)
-		list, _ := value.([]any)
-		for _, v := range list {
-			add(v)
+	return listed
+}
+
+// ownPackages are the distributions the project chooses the version of: the
+// ones it lists (listedPackages), the ones [tool.uv] override-dependencies
+// names, and the ones constraints, its own lines of constraint-dependencies,
+// name. A runtime pin on one of them would leave `uv add --dev 'pytest>=9'`
+// nothing to lock where the image ships pytest 8.
+func ownPackages(ed tomledit.Editor, constraints []any) map[string]bool {
+	own := listedPackages(ed)
+	overrides, _ := ed.Get(overrideDepsKey)
+	list, _ := overrides.([]any)
+	for _, v := range slices.Concat(list, constraints) {
+		if s, isString := v.(string); isString {
+			own[manifest.DistName(s)] = true
 		}
 	}
 	return own
@@ -153,13 +178,13 @@ func ownPackages(before *manifest.Manifest, ed tomledit.Editor, constraints []an
 // too: after `uv add --frozen 'pandas>=3'`, a start with Astronomer's index
 // out of reach must still let pandas go, or uv has nothing to lock.
 func PruneRuntimePins(dir string, wrap func(run func() error) error) error {
-	return EditManifest(dir, wrap, func(before *manifest.Manifest, ed tomledit.Editor) error {
+	return EditManifest(dir, wrap, func(_ *manifest.Manifest, ed tomledit.Editor) error {
 		lines, _ := ed.GetLines(constraintsKey)
 		head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
 		if len(current) == 0 {
 			return nil
 		}
-		out := slices.Concat(head, keptRuntimePins(current, ownPackages(before, ed, slices.Concat(head, tail))), tail)
+		out := slices.Concat(head, keptRuntimePins(current, ownPackages(ed, slices.Concat(head, tail))), tail)
 		if reflect.DeepEqual(out, lines) {
 			return nil
 		}

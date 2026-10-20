@@ -155,6 +155,16 @@ func TestGroupsAndExtrasAreTheProjectsOwn(t *testing.T) {
 	}
 }
 
+// ListedPackages is what the project lists to install: not an override or a
+// constraint, which install nothing of their own.
+func TestListedPackages(t *testing.T) {
+	src := astroHead + "\n[project.optional-dependencies]\nplot = ['Zipp>=4']\n\n[dependency-groups]\ndev = ['pytest>=9', {include-group = 'lint'}]\n" +
+		"\n[tool.uv]\ndev-dependencies = ['ruff']\noverride-dependencies = ['protobuf>=7']\nconstraint-dependencies = ['numpy<3']\n"
+	listed, err := ListedPackages(projectWith(t, src))
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{"apache-airflow": true, "zipp": true, "pytest": true, "ruff": true}, listed)
+}
+
 // PruneRuntimePins needs no lookup: a package the project has since listed
 // loses its pin, and nothing else changes.
 func TestPruneRuntimePinsDropsWhatTheProjectNowLists(t *testing.T) {

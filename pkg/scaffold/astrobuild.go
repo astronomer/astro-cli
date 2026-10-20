@@ -95,7 +95,7 @@ func setAstroBuild(before *manifest.Manifest, ed tomledit.Editor, b runtimeversi
 	if err := checkNotTheUsers(ed, dists); err != nil {
 		return err
 	}
-	refused, err := setAstroPins(before, ed, b, dists, pins)
+	refused, err := setAstroPins(ed, b, dists, pins)
 	if err != nil {
 		return err
 	}
@@ -187,14 +187,14 @@ func checkNotTheUsers(ed tomledit.Editor, dists []string) error {
 // where they are. refused reports runtime pins left out because the array
 // cannot carry the comments that mark them (tomledit.ErrCommentsUnsupported);
 // the rest is written.
-func setAstroPins(before *manifest.Manifest, ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) (refused bool, err error) {
+func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []string, pins *RuntimePins) (refused bool, err error) {
 	lines, _ := ed.GetLines(constraintsKey)
 	head, current, tail, _, _ := manifest.RuntimePinsIn(lines)
 	head, tail = withoutAstroPins(head), withoutAstroPins(tail)
 	if len(dists) > 0 {
 		head = append(head, asAny(b.Pins())...)
 	}
-	own := ownPackages(before, ed, slices.Concat(head, tail))
+	own := ownPackages(ed, slices.Concat(head, tail))
 	var managed []any
 	if pins == nil {
 		managed = keptRuntimePins(current, own)

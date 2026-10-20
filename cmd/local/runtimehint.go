@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -156,8 +157,13 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 	// in beside that. A module one of these provides is missing from an
 	// environment that is out of date, which adding a dependency does not fix.
 	known := lockedDists(project)
-	for _, dep := range listedDeps(project, m) {
+	for _, dep := range m.Project.Dependencies {
 		known[manifest.DistName(dep)] = true
+	}
+	// The extras and dependency groups too, by the rule the runtime pins use.
+	// A file that cannot be read leaves the dependencies the manifest has.
+	if listed, err := scaffold.ListedPackages(project); err == nil {
+		maps.Copy(known, listed)
 	}
 	findings := slices.Clone(res.Findings)
 	for i := range findings {
@@ -176,40 +182,6 @@ func (c *cli) withRuntimeHints(ctx context.Context, project string, m *manifest.
 	}
 	res.Findings = findings
 	return res
-}
-
-// listedDeps are every requirement the project lists: [project] dependencies,
-// and [project.optional-dependencies] and [dependency-groups], which the
-// manifest does not carry and are read from pyproject.toml here, by the rule
-// the runtime pins use for the packages a project chooses. A dependency group
-// entry that includes another group is a table, read where that group is
-// defined.
-func listedDeps(project string, m *manifest.Manifest) []string {
-	deps := slices.Clone(m.Project.Dependencies)
-	data, err := os.ReadFile(filepath.Join(project, manifest.Marker))
-	if err != nil {
-		return deps
-	}
-	var doc struct {
-		Project struct {
-			OptionalDependencies map[string][]string `toml:"optional-dependencies"`
-		} `toml:"project"`
-		DependencyGroups map[string][]any `toml:"dependency-groups"`
-	}
-	if toml.Unmarshal(data, &doc) != nil {
-		return deps
-	}
-	for _, extra := range doc.Project.OptionalDependencies {
-		deps = append(deps, extra...)
-	}
-	for _, group := range doc.DependencyGroups {
-		for _, v := range group {
-			if s, ok := v.(string); ok {
-				deps = append(deps, s)
-			}
-		}
-	}
-	return deps
 }
 
 // lockedDists are the package names in the project's uv.lock, normalized; an
