@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 2
+# astro-install-helper: 3
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,

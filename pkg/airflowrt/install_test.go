@@ -17,6 +17,9 @@ var helperContentAtVersion = map[int]string{
 	1: "b21a2237f2142b9bb010dd1dbe211ab9a9ce3f5c2f567e64a668315bd0ca326d",
 	// Writes its outputs with LF line endings on every host.
 	2: "e2c1f44df4ed6b3cc93e73e45473fc4b9549322b876962fe29fa62f9e36846a7",
+	// Compares a lock's recorded constraints by name and specifier, and reads
+	// python_version == 'X.Y' as python_full_version == 'X.Y.*'.
+	3: "72b26579905db375023b6b1e60149e277de2aecb385fdf5822bb23019a785f64",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {
