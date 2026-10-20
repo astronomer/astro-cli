@@ -37,17 +37,7 @@ func (l *locator) astroDeployment(ctx context.Context, i instances.Instance) (*a
 	if deploymentID == "" {
 		return nil, fmt.Errorf("deployment %q names no Deployment: set deployment = '<id>' on the link", i.Name)
 	}
-	if l.session == nil {
-		return nil, astrosession.ErrLoggedOut
-	}
-	token, err := l.session(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if token == "" {
-		return nil, astrosession.ErrLoggedOut
-	}
-	org, err := l.organization()
+	token, org, err := l.identity(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +51,28 @@ func (l *locator) astroDeployment(ctx context.Context, i instances.Instance) (*a
 		return nil, deploymentOutage(l.domain, i, deploymentID, resp)
 	}
 	return resp.JSON200, nil
+}
+
+// identity is the bearer and the organization a control-plane call goes out
+// under. It is resolved before the call rather than after it because a
+// machine with none gets a better sentence from us than from an API that was
+// never reached.
+func (l *locator) identity(ctx context.Context) (token, org string, err error) {
+	if l.session == nil {
+		return "", "", astrosession.ErrLoggedOut
+	}
+	token, err = l.session(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	if token == "" {
+		return "", "", astrosession.ErrLoggedOut
+	}
+	org, err = l.organization()
+	if err != nil {
+		return "", "", err
+	}
+	return token, org, nil
 }
 
 // WhyUnavailable asks Astro why an astro link's Airflow is not answering. It

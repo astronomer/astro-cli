@@ -41,16 +41,18 @@ import (
 	"github.com/astronomer/astro-cli/pkg/instances"
 )
 
-// Deployments is the one control-plane call this package makes.
+// Deployments is the two control-plane calls this package makes: reading a
+// Deployment, and listing a workspace's to find one by name.
 //
 // It is named here rather than taken as the whole generated client because a
-// consumer defines the interface it needs, and because stubbing one call
+// consumer defines the interface it needs, and because stubbing two calls
 // should not mean implementing every endpoint Astro has. cloud/deployment's
 // GetDeploymentByID would be the shorter route and is the wrong one: it runs
 // the answer through NormalizeAPIError, which flattens away the very status
 // the outage messages below branch on, and it hardcodes its own context.
 type Deployments interface {
 	GetDeploymentWithResponse(ctx context.Context, organizationID, deploymentID string, reqEditors ...astrov1.RequestEditorFn) (*astrov1.GetDeploymentResponse, error)
+	ListDeploymentsWithResponse(ctx context.Context, organizationID string, params *astrov1.ListDeploymentsParams, reqEditors ...astrov1.RequestEditorFn) (*astrov1.ListDeploymentsResponse, error)
 }
 
 // locator resolves a coordinate link's Airflow base URL. Every field is a
@@ -69,6 +71,9 @@ type locator struct {
 	// organization is the org the session is scoped to. Deployments are read
 	// under it, so a session without one cannot look anything up.
 	organization func() (string, error)
+	// workspace is the login's current workspace, where a Deployment name is
+	// looked up when the project names none. Empty when the login has none.
+	workspace func() string
 	// httpClient carries the Composer lookup. nil in production, where
 	// pkg/instancelocate supplies one with its own timeout; a test hands in
 	// its stub server's.
@@ -100,6 +105,7 @@ func New(domain string) instances.Locator {
 			return astrosession.BearerFor(ctx, domain)
 		},
 		organization:  func() (string, error) { return Organization(domain) },
+		workspace:     func() string { return Workspace(domain) },
 		googleToken:   googleauth.AccessToken,
 		googleAccount: googleauth.Account,
 	}

@@ -26,13 +26,12 @@ type AirflowOptions struct {
 	RequestOptions
 
 	// Deployment is -d/--deployment: a deployment link the manifest declares,
-	// or — for a name no link declares — an Astro Deployment id.
+	// or — for a name no link declares — an Astro Deployment id or name.
 	Deployment string
 	// URL is --url: an Airflow no project declares, addressed directly.
 	URL string
 
 	OrganizationID string
-	WorkspaceID    string
 	Username       string
 	Password       string
 	AirflowVersion string // Manual override for Airflow version
@@ -62,7 +61,7 @@ The argument can be either:
   - A path of an Airflow API endpoint (e.g., /dags, /dags/my_dag)
   - An operation ID from the API spec (e.g., get_dags, get_dag)
 
-A request needs a target; there is no default. Pass -d/--deployment to talk to a deployment your project links in pyproject.toml — an Astro Deployment, an MWAA or Composer environment, or a plain URL, each reached with the credentials that deployment's link calls for. A name no link declares is read as an Astro Deployment id. Pass --url to reach an Airflow no project declares. For this project's local Airflow, use 'astro local api' instead.
+A request needs a target; there is no default. Pass -d/--deployment to talk to a deployment your project links in pyproject.toml — an Astro Deployment, an MWAA or Composer environment, or a plain URL, each reached with the credentials that deployment's link calls for. A name no link declares is an Astro Deployment: its id, or its name in the project's workspace, else the context's. Pass --url to reach an Airflow no project declares. For this project's local Airflow, use 'astro local api' instead.
 
 The ls and describe subcommands only read the API spec, so they need no target: without one they read the spec for --airflow-version, or for Airflow ` + defaultAirflowVersion + `.
 
@@ -104,8 +103,11 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   # Use an Airflow no project declares
   astro api airflow --url http://airflow.example.com:8080 /dags
 
-  # Use an Astro Deployment by id
-  astro api airflow -d clxyz123 /dags
+  # Use an Astro Deployment no link declares, by id
+  astro api airflow -d clxyz1234567890abcdefghij /dags
+
+  # Or by name, in the project's workspace (else the context's)
+  astro api airflow -d etl-prod /dags
 
   # Generate curl command instead of executing
   astro api airflow -d prod /dags --generate
@@ -131,13 +133,15 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	}
 
 	// Airflow-specific flags (persistent so they're inherited by subcommands)
-	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id")
+	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, else an Astro Deployment id or name")
 	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("deployment"))
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")
-	cmd.PersistentFlags().StringVarP(&opts.WorkspaceID, "workspace", "W", "", "Workspace to look the Deployment up in, overriding the context's")
-	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("workspace"))
-	utils.AddAlias(cmd.PersistentFlags(), "workspace-id", "", "workspace")
+	// 1.x declared --workspace-id (-W) and never read it: -d is looked up in
+	// the project's or the context's workspace. It stays, hidden and read by
+	// nothing, so a 1.x script passing it keeps working.
+	cmd.PersistentFlags().StringP("workspace-id", "W", "", "Has no effect; accepted so scripts written for Astro CLI 1.x keep working")
+	cmd.PersistentFlags().MarkHidden("workspace-id") //nolint:errcheck // the flag is defined just above
 	cmd.PersistentFlags().StringVarP(&opts.Username, "username", "u", airflowrt.Airflow2AdminUser, "Username for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.Password, "password", airflowrt.Airflow2AdminPassword, "Password for Airflow API authentication (--url only)")
 	cmd.PersistentFlags().StringVar(&opts.AirflowVersion, "airflow-version", "", "Override Airflow version for API spec (auto-detected by default)")
