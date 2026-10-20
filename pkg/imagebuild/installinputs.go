@@ -54,22 +54,42 @@ func InstallHelper() []byte {
 	return airflowrt.InstallHelper()
 }
 
-// installFindLinksPath is where a build request naming no project leaves the
-// find-links pages it was given (airflowrt.InstallFindLinksPath).
-const installFindLinksPath = airflowrt.InstallFindLinksPath
+// generatedInputsDir is where a generated build stages the install helper's
+// inputs in its context: the helper, the project's pyproject.toml and, when it
+// has them, its uv.lock and (for a request naming no project) the find-links
+// file. The directory always exists, so the install stage copies it whole and
+// needs no wildcard for the optional files, which Buildah has refused when
+// they match nothing.
+const generatedInputsDir = ".astro/install"
+
+// installFindLinksName is the file a build request naming no project leaves
+// the find-links pages it was given in, one per line, beside pyproject.toml in
+// generatedInputsDir, for the helper to pass on as they are
+// (install-project.py's FIND_LINKS). It is only that: the helper derives a
+// project's pages from its pyproject.toml every time, as
+// manifest.UV.IndexPagesFor does, so no build of a project writes it, a
+// project's own copy is never read, and a plain `docker build .` of a
+// project's own Dockerfile reads the same pages a CLI build does.
+const installFindLinksName = "install-find-links.txt"
+
+// generatedInputs is what a generated build's install stage copies: the whole
+// of generatedInputsDir.
+const generatedInputs = generatedInputsDir + "/"
 
 // InstallDockerfile is the Dockerfile that installs a project over from, an
 // Astro Runtime -base image (airflowrt.InstallDockerfile): a project's own
-// Dockerfile is this followed by its own steps.
+// Dockerfile is this followed by its own steps, its install stage copying
+// airflowrt.ProjectInputs.
 func InstallDockerfile(from string) string {
 	return airflowrt.InstallDockerfile(from)
 }
 
-// installDockerfile is InstallDockerfile, with the Python install's netrc
-// mount left out when mountNetrc is false: a generated build mounts the secret
-// only when the build passes it (airflowrt.InstallOptions.NoNetrc).
-func installDockerfile(from string, mountNetrc bool) string {
-	return airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{NoNetrc: !mountNetrc})
+// installDockerfile is InstallDockerfile, its install stage copying inputs (a
+// COPY's sources), with the Python install's netrc mount left out when
+// mountNetrc is false: a generated build mounts the secret only when the build
+// passes it (airflowrt.InstallOptions).
+func installDockerfile(from string, mountNetrc bool, inputs string) string {
+	return airflowrt.InstallDockerfileWith(from, airflowrt.InstallOptions{Inputs: inputs, NoNetrc: !mountNetrc})
 }
 
 // GeneratedDockerfile is the Dockerfile a generated build over the runtime
@@ -79,7 +99,7 @@ func installDockerfile(from string, mountNetrc bool) string {
 // addresses the image by what builds it (`astro package astro`'s content tag
 // hashes it, so a change to the recipe is a change to the tag).
 func GeneratedDockerfile(baseImage string, mountNetrc bool) string {
-	return installDockerfile(baseOf(baseImage), mountNetrc)
+	return installDockerfile(baseOf(baseImage), mountNetrc, generatedInputs)
 }
 
 // The manifest files the helper reads.
@@ -115,14 +135,14 @@ func projectManifest(req Request) ([]byte, error) {
 	return data, nil
 }
 
-// installInputs are the files a generated build's install stage reads, by their
-// slash-separated path in the context: the helper, and the project's
-// pyproject.toml and uv.lock as they are (manifestProject), so the context's
-// copies are always the project's own. A request naming no project, or whose
+// installInputs are the files a generated build's install stage reads, by
+// their name in generatedInputsDir: the helper, and the project's
+// pyproject.toml and uv.lock as they are (manifestProject), so the copies are
+// always the project's own. A request naming no project, or whose
 // project has no pyproject.toml, gets a pyproject.toml stating its Dependencies
 // and Packages, and its FindLinks pages as they were given.
 func installInputs(req Request) (map[string][]byte, error) {
-	inputs := map[string][]byte{InstallHelperPath: installHelper}
+	inputs := map[string][]byte{filepath.Base(InstallHelperPath): installHelper}
 	data, err := projectManifest(req)
 	if err != nil {
 		return nil, err
@@ -143,7 +163,7 @@ func installInputs(req Request) (map[string][]byte, error) {
 		return nil, err
 	}
 	if len(req.FindLinks) > 0 {
-		inputs[installFindLinksPath] = []byte(strings.Join(req.FindLinks, "\n") + "\n")
+		inputs[installFindLinksName] = []byte(strings.Join(req.FindLinks, "\n") + "\n")
 	}
 	return inputs, nil
 }
@@ -168,25 +188,28 @@ func (r *Request) installsNothing() bool {
 	return len(runtimeDeps(m.Requirements())) == 0 && len(m.Astro.Packages) == 0
 }
 
-// writeInstallInputs writes installInputs into the generated build's context,
-// replacing a copy of the project's own there (copyProjectFiles carries its
-// pyproject.toml, its uv.lock, and any install helper it has): removed first,
-// since a file the project keeps read-only arrives read-only.
+// writeInstallInputs writes installInputs into generatedInputsDir in the
+// generated build's context, replacing whatever a project carried there, and
+// removes a find-links file the project carried where only an older build
+// wrote one: the helper reads neither, and neither belongs in the image.
 func writeInstallInputs(contextDir string, req Request) error {
 	inputs, err := installInputs(req)
 	if err != nil {
 		return err
 	}
-	for rel, data := range inputs {
-		dst := filepath.Join(contextDir, filepath.FromSlash(rel))
-		if err := os.MkdirAll(filepath.Dir(dst), contextDirPerm); err != nil {
-			return fmt.Errorf("creating %s: %w", filepath.Dir(dst), err)
-		}
-		if err := os.Remove(dst); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("replacing %s in the build context: %w", rel, err)
-		}
-		if err := os.WriteFile(dst, data, filePermRW); err != nil {
-			return fmt.Errorf("writing %s into the build context: %w", rel, err)
+	if err := os.Remove(filepath.Join(contextDir, ".astro", installFindLinksName)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("removing the project's %s from the build context: %w", installFindLinksName, err)
+	}
+	dir := filepath.Join(contextDir, filepath.FromSlash(generatedInputsDir))
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("clearing %s: %w", dir, err)
+	}
+	if err := os.MkdirAll(dir, contextDirPerm); err != nil {
+		return fmt.Errorf("creating %s: %w", dir, err)
+	}
+	for name, data := range inputs {
+		if err := os.WriteFile(filepath.Join(dir, name), data, filePermRW); err != nil {
+			return fmt.Errorf("writing %s into the build context: %w", name, err)
 		}
 	}
 	return nil

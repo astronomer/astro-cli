@@ -219,7 +219,7 @@ So a Dockerfile of your own builds on the `-base` tag and installs from `pyproje
 # (.astro/install-project.py reads them; astro init keeps both up to date).
 FROM quay.io/astronomer/astro-runtime:12.6.0-base AS astro-install
 USER root
-COPY pyproject.toml uv.lock* .astro/install-find-links.txt* .astro/install-project.py /tmp/astro-project/
+COPY pyproject.toml uv.lock* .astro/install-project.py /tmp/astro-project/
 RUN python /tmp/astro-project/install-project.py --project /tmp/astro-project --out /tmp/astro-install
 FROM quay.io/astronomer/astro-runtime:12.6.0-base
 COPY --from=astro-install /tmp/astro-install/packages.txt .
@@ -244,7 +244,7 @@ The first stage runs `.astro/install-project.py`, which reads `pyproject.toml` a
 - a Dockerfile that reads `requirements.txt` or `packages.txt` itself, or that has a stage named `astro-install`;
 - a runtime older than 9 (Airflow 2.7), or a tag whose runtime version it cannot read.
 
-Commit `.astro/install-project.py` with the Dockerfile: it is what `docker build .` runs, so a clone builds without the CLI. The file needs BuildKit, for the `netrc` secret's `RUN --mount`: the default builder in Docker Engine 23 and later and in Docker Desktop, and `DOCKER_BUILDKIT=1` before that. With it, `docker build .` builds the image `astro package astro` builds, except for three things the CLI adds: `--platform linux/amd64`, the labels a Deployment reads, and the build secrets you pass with `--build-secret`, `BUILD_SECRET_INPUT` or [`build-secrets`](#build-secrets). The `netrc` mount says `required=false`, so a build without that secret is not warned about it.
+Commit `.astro/install-project.py` with the Dockerfile: it is what `docker build .` runs, so a clone builds without the CLI. The file needs BuildKit, for the `netrc` secret's `RUN --mount`: the default builder in Docker Engine 23 and later and in Docker Desktop, and `DOCKER_BUILDKIT=1` before that. Under Podman, keep a `uv.lock` in the project: Buildah refuses the `uv.lock*` in the install stage's `COPY` when it matches nothing, where Docker copies nothing. With it, `docker build .` builds the image `astro package astro` builds, except for three things the CLI adds: `--platform linux/amd64`, the labels a Deployment reads, and the build secrets you pass with `--build-secret`, `BUILD_SECRET_INPUT` or [`build-secrets`](#build-secrets). The `netrc` mount says `required=false`, so a build without that secret is not warned about it.
 
 A Dockerfile still on an ONBUILD tag is judged by whether `astro init` can move it. Run in a project that is already an Astro project, `astro init` brings what astro writes there up to date: it moves a declared Dockerfile on an ONBUILD tag onto `-base` under the gates above, plus one more, that every line of a `requirements.txt` or `packages.txt` beside it is already in `pyproject.toml` (the lists have had time to drift), and it writes or refreshes `.astro/install-project.py`. So:
 

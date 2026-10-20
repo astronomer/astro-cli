@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -82,8 +83,16 @@ func runHelper(t *testing.T, dir string, r helperRun) helperOutput {
 	}
 	out := t.TempDir()
 	var stderr bytes.Buffer
-	cmd := exec.Command(py, filepath.Join(dir, filepath.FromSlash(InstallHelperPath)), "--project", dir, "--out", out, "--runtime-constraints", r.runtimeConstraints)
-	cmd.Env = append(os.Environ(), r.env...)
+	// A project's own build reads its inputs from the project; a generated
+	// build's context has them in generatedInputsDir, as its stage copies them.
+	project, helper := dir, filepath.Join(dir, filepath.FromSlash(InstallHelperPath))
+	if inputs := filepath.Join(dir, filepath.FromSlash(generatedInputsDir)); dirExists(inputs) {
+		project, helper = inputs, filepath.Join(inputs, filepath.Base(InstallHelperPath))
+	}
+	cmd := exec.Command(py, helper, "--project", project, "--out", out, "--runtime-constraints", r.runtimeConstraints)
+	// The host's own packages are not a runtime image's: none, unless the test
+	// names them.
+	cmd.Env = append(append(os.Environ(), "ASTRO_INSTALL_PROJECT_BASE_INSTALLED="), r.env...)
 	cmd.Stderr = &stderr
 	require.NoError(t, cmd.Run(), stderr.String())
 	read := func(name string) string {
@@ -111,58 +120,125 @@ func helperProject(t *testing.T, pyproject, lock string) string {
 	return dir
 }
 
+// helperRequirementCases are pyproject.toml files and the requirements.txt the
+// install helper writes for each, with no lock. TestInstallHelperRequirements
+// holds the helper to them, and TestInstallHelperAgreesWithTheManifest holds
+// pkg/manifest to the same reading.
+var helperRequirementCases = map[string]struct {
+	pyproject, want string
+}{
+	"plain dependencies": {
+		pyproject: "[project]\ndependencies = ['pandas==2.2.0', 'requests']\n",
+		want:      "pandas==2.2.0\nrequests\n",
+	},
+	"no dependencies": {
+		pyproject: "[project]\nname = 'p'\n",
+		want:      "\n",
+	},
+	"airflow and a bare task sdk are dropped": {
+		pyproject: "[project]\ndependencies = ['apache-airflow==3.1.*', 'Apache_Airflow-Core', 'apache-airflow-task-sdk', 'pandas']\n",
+		want:      "pandas\n",
+	},
+	"a task sdk with a version stays": {
+		pyproject: "[project]\ndependencies = ['apache-airflow==3.1.*', 'apache-airflow-task-sdk>=1.1']\n",
+		want:      "apache-airflow-task-sdk>=1.1\n",
+	},
+	"a git source becomes a direct reference": {
+		pyproject: "[project]\ndependencies = ['blueprint[extra]>=1 ; python_version >= \"3.10\"']\n" +
+			"[tool.uv.sources]\nblueprint = { git = 'https://github.com/astronomer/blueprint', rev = '6f06313', subdirectory = 'pkg' }\n",
+		want: "blueprint[extra] @ git+https://github.com/astronomer/blueprint@6f06313#subdirectory=pkg ; python_version >= \"3.10\"\n",
+	},
+	"a url source becomes a direct reference": {
+		pyproject: "[project]\ndependencies = ['six']\n[tool.uv.sources]\nsix = { url = 'https://files.example/six-1.16.0-py2.py3-none-any.whl' }\n",
+		want:      "six @ https://files.example/six-1.16.0-py2.py3-none-any.whl\n",
+	},
+	"a source limited by a marker, a path and a list are left alone": {
+		pyproject: "[project]\ndependencies = ['a', 'b', 'c']\n[tool.uv.sources]\n" +
+			"a = { git = 'https://example.com/a', marker = 'sys_platform == \"linux\"' }\nb = { path = '../b' }\n" +
+			"c = [{ git = 'https://example.com/c', marker = 'sys_platform == \"linux\"' }]\n",
+		want: "a\nb\nc\n",
+	},
+	"an index source is a find-links page": {
+		pyproject: "[project]\ndependencies = ['private-lib', 'pandas']\n" +
+			"[[tool.uv.index]]\nname = 'acme'\nurl = 'https://pypi.acme.example/simple/'\nexplicit = true\n" +
+			"[tool.uv.sources]\nprivate-lib = { index = 'acme' }\n",
+		want: "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n",
+	},
+	"the Airflow sources astro init writes add no page": {
+		pyproject: "[project]\ndependencies = ['apache-airflow==3.3.*', 'apache-airflow-core', 'apache-airflow-task-sdk', 'Private_Lib>=1']\n" +
+			"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n" +
+			"[[tool.uv.index]]\nname = 'acme'\nurl = 'https://pypi.acme.example/simple'\n" +
+			"[tool.uv.sources]\napache-airflow = { index = 'astronomer' }\napache-airflow-core = { index = 'astronomer' }\n" +
+			"apache-airflow-task-sdk = { index = 'astronomer' }\nPrivate_Lib = { index = 'acme' }\n",
+		want: "--find-links https://pypi.acme.example/simple/Private_Lib/\nPrivate_Lib>=1\n",
+	},
+	"credentials are left out of every URL": {
+		pyproject: "[project]\ndependencies = ['private-lib', 'tool']\n" +
+			"[[tool.uv.index]]\nname = 'acme'\nurl = 'https://user:s3cret@pypi.acme.example/simple/'\n" +
+			"[tool.uv.sources]\nprivate-lib = { index = 'acme' }\ntool = { url = 'https://token@files.acme.example/tool-1.0.tar.gz' }\n",
+		want: "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\ntool @ https://files.acme.example/tool-1.0.tar.gz\n",
+	},
+}
+
 // The helper turns [project] dependencies and [tool.uv.sources] into the
 // requirements the runtime's install reads, as the manifest reads them: no
 // Airflow, a git or URL source as a direct reference, an index source as a
 // --find-links page ahead of everything.
 func TestInstallHelperRequirements(t *testing.T) {
-	for name, tc := range map[string]struct {
-		pyproject, want string
-	}{
-		"plain dependencies": {
-			pyproject: "[project]\ndependencies = ['pandas==2.2.0', 'requests']\n",
-			want:      "pandas==2.2.0\nrequests\n",
-		},
-		"no dependencies": {
-			pyproject: "[project]\nname = 'p'\n",
-			want:      "\n",
-		},
-		"airflow and a bare task sdk are dropped": {
-			pyproject: "[project]\ndependencies = ['apache-airflow==3.1.*', 'Apache_Airflow-Core', 'apache-airflow-task-sdk', 'pandas']\n",
-			want:      "pandas\n",
-		},
-		"a task sdk with a version stays": {
-			pyproject: "[project]\ndependencies = ['apache-airflow==3.1.*', 'apache-airflow-task-sdk>=1.1']\n",
-			want:      "apache-airflow-task-sdk>=1.1\n",
-		},
-		"a git source becomes a direct reference": {
-			pyproject: "[project]\ndependencies = ['blueprint[extra]>=1 ; python_version >= \"3.10\"']\n" +
-				"[tool.uv.sources]\nblueprint = { git = 'https://github.com/astronomer/blueprint', rev = '6f06313', subdirectory = 'pkg' }\n",
-			want: "blueprint[extra] @ git+https://github.com/astronomer/blueprint@6f06313#subdirectory=pkg ; python_version >= \"3.10\"\n",
-		},
-		"a url source becomes a direct reference": {
-			pyproject: "[project]\ndependencies = ['six']\n[tool.uv.sources]\nsix = { url = 'https://files.example/six-1.16.0-py2.py3-none-any.whl' }\n",
-			want:      "six @ https://files.example/six-1.16.0-py2.py3-none-any.whl\n",
-		},
-		"a source limited by a marker, a path and a list are left alone": {
-			pyproject: "[project]\ndependencies = ['a', 'b', 'c']\n[tool.uv.sources]\n" +
-				"a = { git = 'https://example.com/a', marker = 'sys_platform == \"linux\"' }\nb = { path = '../b' }\n" +
-				"c = [{ git = 'https://example.com/c', marker = 'sys_platform == \"linux\"' }]\n",
-			want: "a\nb\nc\n",
-		},
-		"an index source is a find-links page": {
-			pyproject: "[project]\ndependencies = ['private-lib', 'pandas']\n" +
-				"[[tool.uv.index]]\nname = 'acme'\nurl = 'https://pypi.acme.example/simple/'\nexplicit = true\n" +
-				"[tool.uv.sources]\nprivate-lib = { index = 'acme' }\n",
-			want: "--find-links https://pypi.acme.example/simple/private-lib/\nprivate-lib\npandas\n",
-		},
-	} {
+	for name, tc := range helperRequirementCases {
 		t.Run(name, func(t *testing.T) {
 			reqs, _, constraints := installLists(t, helperProject(t, tc.pyproject, ""))
 			assert.Equal(t, tc.want, reqs)
 			assert.Empty(t, constraints, "no lock, no constraints")
 		})
 	}
+}
+
+// The helper and pkg/manifest read a pyproject.toml the same way, so a check
+// environment (manifest.Requirements, UV.IndexPagesFor) and an image can't
+// drift: for each case, the helper's requirements.txt is the manifest's
+// requirements without Airflow after its index pages, with credentials left
+// out of URLs, the one difference the helper makes on purpose.
+func TestInstallHelperAgreesWithTheManifest(t *testing.T) {
+	for name, tc := range helperRequirementCases {
+		t.Run(name, func(t *testing.T) {
+			// A manifest pkg/manifest loads: a name, an Airflow requirement and
+			// [tool.astro], none of which changes what is installed.
+			pyproject := tc.pyproject
+			if !strings.Contains(pyproject, "[project]\nname = ") {
+				pyproject = strings.Replace(pyproject, "[project]\n", "[project]\nname = 'p'\n", 1)
+			}
+			if !strings.Contains(pyproject, "'apache-airflow==") {
+				if strings.Contains(pyproject, "dependencies = [") {
+					pyproject = strings.Replace(pyproject, "dependencies = [", "dependencies = ['apache-airflow==3.3.*', ", 1)
+				} else {
+					pyproject = strings.Replace(pyproject, "[project]\n", "[project]\ndependencies = ['apache-airflow==3.3.*']\n", 1)
+				}
+			}
+			pyproject += "\n[tool.astro]\n"
+			m, err := manifest.ParseForRepair([]byte(pyproject))
+			require.NoError(t, err)
+			deps := runtimeDeps(m.Requirements())
+			lines := make([]string, 0, len(deps)+1)
+			for _, page := range m.UV.IndexPagesFor(deps) {
+				lines = append(lines, "--find-links "+page)
+			}
+			lines = append(lines, deps...)
+			want := withoutCredentials(strings.Join(lines, "\n") + "\n")
+
+			reqs, _, _ := installLists(t, helperProject(t, pyproject, ""))
+			assert.Equal(t, want, reqs)
+		})
+	}
+}
+
+// credentialsRe is the user and password an http(s) URL can carry.
+var credentialsRe = regexp.MustCompile(`(https?://)[^/@\s]+@`)
+
+// withoutCredentials is s with credentialsRe taken out, as the helper writes
+// URLs.
+func withoutCredentials(s string) string {
+	return credentialsRe.ReplaceAllString(s, "$1")
 }
 
 // The runtime image ships no git, so a git direct reference brings git in
@@ -432,7 +508,7 @@ func TestInstallHelperDerivesIndexPagesWithoutTheFile(t *testing.T) {
 		"[[tool.uv.index]]\nname = 'astronomer'\nurl = 'https://pip.astronomer.io/v2/'\nexplicit = true\n" +
 		"[tool.uv.sources]\nPrivate_Lib = { index = 'acme' }\napache-airflow = { index = 'astronomer' }\n"
 	dir := helperProject(t, pyproject, "")
-	require.NoFileExists(t, filepath.Join(dir, filepath.FromSlash(installFindLinksPath)))
+	require.NoFileExists(t, filepath.Join(dir, installFindLinksName))
 	out := runHelper(t, dir, helperRun{})
 	assert.Equal(t, "--find-links https://pypi.acme.example/simple/Private_Lib/\nPrivate_Lib>=1\npandas\n", out.requirements)
 
@@ -445,7 +521,7 @@ func TestInstallHelperDerivesIndexPagesWithoutTheFile(t *testing.T) {
 	writeTree(t, project, map[string]string{"pyproject.toml": pyproject})
 	inputs, err := installInputs(Request{ManifestDir: project, FindLinks: []string{"https://pypi.acme.example/simple/Private_Lib/"}})
 	require.NoError(t, err)
-	assert.NotContains(t, inputs, installFindLinksPath)
+	assert.NotContains(t, inputs, installFindLinksName)
 }
 
 // A dependency with a version whose source is a git repository, a URL or a
@@ -544,20 +620,27 @@ sdist = { url = "https://user:s3cret@pypi.acme.example/files/private_lib-1.2.0.t
 	assert.NotContains(t, out.requirements, "s3cret")
 }
 
-// A runtime before 11.0.0 ships no constraints file, so nothing else holds
-// what its base image has installed: the lock does not move those packages
-// unless the project lists them itself.
-func TestInstallHelperLeavesTheBaseImagesPackagesOnAnOldRuntime(t *testing.T) {
-	pyproject, lock := lockProject([]string{"pandas"}, lockEntry("pandas", "2.2.3")+lockEntry("six", "1.17.0")+lockEntry("python-dateutil", "2.9.0"))
+// What the base image has installed stays at the runtime's versions, its
+// tested ones, unless the project names the package itself: in its
+// dependencies, its optional dependencies or a dependency group. On every
+// runtime, whether or not it ships a constraints file.
+func TestInstallHelperLeavesTheBaseImagesPackages(t *testing.T) {
+	pyproject, lock := lockProject([]string{"pandas"}, lockEntry("pandas", "2.2.3")+lockEntry("six", "1.17.0")+
+		lockEntry("python-dateutil", "2.9.0")+lockEntry("pytz", "2026.5")+lockEntry("tzdata", "2026.5")+lockEntry("numpy", "2.4.6"))
+	pyproject += "[project.optional-dependencies]\ntime = ['python-dateutil']\n" +
+		"\n[dependency-groups]\ndev = ['pytz', { include-group = 'other' }]\nother = []\n"
 	dir := helperProject(t, pyproject, lock)
-	base := []string{"ASTRO_INSTALL_PROJECT_BASE_INSTALLED=pandas,Six,apache-airflow"}
+	base := []string{"ASTRO_INSTALL_PROJECT_BASE_INSTALLED=pandas,Six,python-dateutil,pytz,tzdata,apache-airflow"}
+	const want = "# Generated from uv.lock by .astro/install-project.py.\n" +
+		"numpy==2.4.6\npandas==2.2.3\npython-dateutil==2.9.0\npytz==2026.5\n"
 
-	old := runHelper(t, dir, helperRun{runtimeConstraints: filepath.Join(t.TempDir(), "absent"), env: base})
-	assert.Equal(t, "# Generated from uv.lock by .astro/install-project.py.\npandas==2.2.3\npython-dateutil==2.9.0\n", old.constraints,
-		"six is installed in the base and not the project's own; pandas is the project's own")
-
-	current := runHelper(t, dir, helperRun{env: base})
-	assert.Contains(t, current.constraints, "six==1.17.0", "a runtime with a constraints file pins what the lock says")
+	for name, constraints := range map[string]string{"a runtime with a constraints file": "", "one without": filepath.Join(t.TempDir(), "absent")} {
+		t.Run(name, func(t *testing.T) {
+			out := runHelper(t, dir, helperRun{runtimeConstraints: constraints, env: base})
+			assert.Equal(t, want, out.constraints,
+				"six and tzdata are the base's and not the project's; pandas, python-dateutil and pytz are the project's own; numpy is not in the base")
+		})
+	}
 }
 
 // A project that keeps its files read-only ships them read-only into the
@@ -578,7 +661,7 @@ func TestBuildReplacesReadOnlyProjectFiles(t *testing.T) {
 
 	_, err := testBuilder(&fakeCmd{}).Build(t.Context(), req, rt.Callbacks{})
 	require.NoError(t, err)
-	helper, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, filepath.FromSlash(InstallHelperPath)))
+	helper, err := os.ReadFile(filepath.Join(req.WorkDir, buildContextDir, filepath.FromSlash(generatedInputsDir), filepath.Base(InstallHelperPath)))
 	require.NoError(t, err)
 	assert.Equal(t, InstallHelper(), helper, "the CLI's helper, not the project's")
 }
@@ -613,4 +696,72 @@ func TestBuildFastPathFollowsTheProjectsManifest(t *testing.T) {
 			assert.Empty(t, cmd.calls)
 		})
 	}
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+// A lock with no record of the project cannot say what it resolved the
+// project's dependencies for, so it is stale, not fresh.
+func TestInstallHelperTreatsALockWithoutTheProjectAsStale(t *testing.T) {
+	out := runHelper(t, helperProject(t, "[project]\nname = 'p'\ndependencies = ['pandas']\n", "version = 1\n\n"+lockEntry("pandas", "2.2.3")), helperRun{})
+	assert.Contains(t, out.stderr, "uv.lock is out of date with pyproject.toml (it has no record of the project)")
+	assert.Empty(t, out.constraints)
+}
+
+// uv records [tool.uv] constraint-dependencies and override-dependencies in the
+// lock's [manifest]; a lock resolved under other ones is stale. The same ones
+// written another way are not.
+func TestInstallHelperStaleCheckReadsConstraintsAndOverrides(t *testing.T) {
+	pyproject, lock := lockProject([]string{"pandas"}, lockEntry("pandas", "2.2.3"))
+	lock = strings.Replace(lock, "version = 1\n", "version = 1\n\n[manifest]\n"+
+		`constraints = [{ name = "numpy", specifier = "<3,>=2" }, { name = "sqlalchemy", specifier = "==2.0.50", marker = "python_version >= '3.12'" }]`+"\n"+
+		`overrides = [{ name = "protobuf", specifier = "==6.33.6" }]`+"\n", 1)
+	const uv = "\n[tool.uv]\nconstraint-dependencies = ['SQLAlchemy==2.0.50; python_version >= \"3.12\"', 'numpy>=2,<3']\n" +
+		"override-dependencies = ['protobuf==6.33.6']\n"
+	for name, tc := range map[string]struct {
+		uv    string
+		stale string
+	}{
+		"the same, written another way":    {uv, ""},
+		"a constraint changed":             {strings.Replace(uv, "numpy>=2,<3", "numpy>=2,<2.5", 1), "constraint-dependencies"},
+		"a constraint added":               {strings.Replace(uv, "'numpy>=2,<3'", "'numpy>=2,<3', 'pytz'", 1), "constraint-dependencies"},
+		"an override taken away":           {strings.Replace(uv, "override-dependencies = ['protobuf==6.33.6']\n", "", 1), "override-dependencies"},
+		"none at all, though uv used some": {"", "constraint-dependencies"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := runHelper(t, helperProject(t, pyproject+tc.uv, lock), helperRun{})
+			if tc.stale == "" {
+				assert.Empty(t, out.stderr)
+				assert.Contains(t, out.constraints, "pandas==2.2.3")
+				return
+			}
+			assert.Contains(t, out.stderr, "it was resolved under other [tool.uv] "+tc.stale)
+			assert.Empty(t, out.constraints)
+		})
+	}
+}
+
+// Only the CLI's build of a request naming no project writes a find-links
+// file. A project that carries one (left by an older build) has it taken out
+// of the context, and it is never read.
+func TestBuildDropsAFindLinksFileTheProjectCarries(t *testing.T) {
+	project := t.TempDir()
+	writeTree(t, project, map[string]string{
+		"pyproject.toml":                 "[project]\nname = 'p'\ndependencies = ['pandas']\n[tool.astro]\n",
+		".astro/" + installFindLinksName: "https://evil.example/simple/pandas/\n",
+	})
+	req := testRequest(t)
+	req.ManifestDir, req.ProjectFiles = project, project
+	req.Dependencies = []string{"pandas"}
+
+	_, err := testBuilder(&fakeCmd{}).Build(t.Context(), req, rt.Callbacks{})
+	require.NoError(t, err)
+	ctxDir := filepath.Join(req.WorkDir, buildContextDir)
+	assert.NoFileExists(t, filepath.Join(ctxDir, ".astro", installFindLinksName))
+	assert.NoFileExists(t, filepath.Join(ctxDir, filepath.FromSlash(generatedInputsDir), installFindLinksName))
+	reqs, _, _ := installLists(t, ctxDir)
+	assert.Equal(t, "pandas\n", reqs)
 }
