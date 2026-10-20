@@ -202,8 +202,8 @@ func TestInstallHelperPackages(t *testing.T) {
 func lockProject(deps []string, packages string) (pyproject, lock string) {
 	quoted := make([]string, len(deps))
 	requiresDist := make([]string, len(deps))
-	for i, d := range deps {
-		d, source, _ := strings.Cut(d, "|")
+	for i, entry := range deps {
+		d, source, _ := strings.Cut(entry, "|")
 		quoted[i] = "'" + d + "'"
 		name, spec := d, ""
 		if at := strings.IndexAny(d, "<>=!~"); at >= 0 {
@@ -459,6 +459,8 @@ version = "1.2.0"
 source = { git = "https://github.com/acme/private-lib?rev=v1.2.0#0123456789abcdef0123456789abcdef01234567" }
 `
 	const pyprojectGit = "\n[tool.uv.sources]\nprivate-lib = { git = 'https://github.com/acme/private-lib', rev = 'v1.2.0' }\n"
+	const pyprojectNewIndex = "\n[[tool.uv.index]]\nname = 'acme'\nurl = 'https://new.acme.example/simple/'\nexplicit = true\n" +
+		"[tool.uv.sources]\nprivate-lib = { index = 'acme' }\n"
 	for name, tc := range map[string]struct {
 		source, sources string
 		stale           bool
@@ -469,8 +471,7 @@ source = { git = "https://github.com/acme/private-lib?rev=v1.2.0#0123456789abcde
 		"the git ref moved":                  {`git = "https://github.com/acme/private-lib?rev=v1.1.0"`, pyprojectGit, true},
 		"a source added since the lock":      {"", pyprojectGit, true},
 		"a source taken away since the lock": {`git = "https://github.com/acme/private-lib?rev=v1.2.0"`, "", true},
-		"the index moved": {`index = "https://old.acme.example/simple/"`,
-			"\n[[tool.uv.index]]\nname = 'acme'\nurl = 'https://new.acme.example/simple/'\nexplicit = true\n[tool.uv.sources]\nprivate-lib = { index = 'acme' }\n", true},
+		"the index moved":                    {`index = "https://old.acme.example/simple/"`, pyprojectNewIndex, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dep := "private-lib>=1.2"
