@@ -19,6 +19,7 @@ import (
 	"github.com/astronomer/astro-cli/pkg/httputil"
 	"github.com/astronomer/astro-cli/pkg/instances"
 	"github.com/astronomer/astro-cli/pkg/manifest"
+	"github.com/astronomer/astro-cli/pkg/util"
 )
 
 // This file is `astro api airflow`'s targeting: which Airflow one run talks to.
@@ -105,6 +106,9 @@ func resolveAirflowTarget(ctx context.Context, opts *AirflowOptions) (*airflowTa
 	if url != "" && name != "" {
 		return nil, errors.New("--url and --deployment cannot be used together: --deployment names a deployment this project links, --url targets an Airflow with no name at all")
 	}
+	if url != "" && opts.WorkspaceID != "" {
+		return nil, errors.New("--url and --workspace cannot be used together: --workspace is where -d's Deployment is looked up, and --url names an Airflow with no Deployment to look up")
+	}
 
 	switch {
 	case name != "":
@@ -124,9 +128,9 @@ func (o *AirflowOptions) hasTarget() bool {
 // errNoTarget names the ways to pick an Airflow, with the links this project
 // declares when there is a project to read them from.
 func errNoTarget(endpoint string) error {
-	deployments := "a deployment this project links, or an Astro Deployment id"
+	deployments := "a deployment this project links, or an Astro Deployment id or name"
 	if links := projectLinkNames(); len(links) > 0 {
-		deployments = fmt.Sprintf("a deployment this project links (%s), or an Astro Deployment id", strings.Join(links, ", "))
+		deployments = fmt.Sprintf("a deployment this project links (%s), or an Astro Deployment id or name", strings.Join(links, ", "))
 	}
 	if !strings.HasPrefix(endpoint, "/") {
 		endpoint = "<endpoint>"
@@ -169,8 +173,16 @@ func firstNonEmpty(vals ...string) string {
 }
 
 // deploymentTarget resolves -d. The name is a deployment link the manifest
-// declares; a name no link declares is an Astro Deployment id, which is what
-// CI already passes.
+// declares; a name no link declares is an Astro Deployment, by id (what CI
+// already passes) or by name in the workspace --workspace names, else the
+// context's (see lookupDeployment).
+//
+// A link already says which Deployment it is and where it lives, so
+// --workspace cannot point it anywhere else. Given anyway it has to agree with
+// the link's workspace, the way an Astro command given a link and --workspace
+// acts in that workspace and finds no Deployment of that id when it is
+// another: rather than be dropped, which would answer from a workspace the
+// caller just said was not the one.
 //
 // Only a directory with no manifest, or a pyproject.toml that is not an Astro
 // project, has no links. A manifest that is there and does not load is an
@@ -186,6 +198,9 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 	default:
 		set := instances.Build(m)
 		if instance, ok := set.Lookup(name); ok {
+			if err := linkInWorkspace(&instance, opts.WorkspaceID); err != nil {
+				return nil, err
+			}
 			return linkTarget(ctx, opts, &instance, m.Astro.LoginDomain())
 		}
 		known = set.Names()
@@ -200,6 +215,19 @@ func deploymentTarget(ctx context.Context, opts *AirflowOptions, name string) (*
 		return nil, err
 	}
 	return opts.httpTarget(name, airflowHostRoot(baseURL), bearerHeader(token))
+}
+
+// linkInWorkspace checks a link against --workspace, when one was given: the
+// link's Deployment has to be in it.
+func linkInWorkspace(instance *instances.Instance, workspace string) error {
+	switch have := instance.Link.Workspace; {
+	case workspace == "" || have == workspace:
+		return nil
+	case have == "":
+		return fmt.Errorf("-d %s is %s link, which is in no workspace, so --workspace %s cannot apply to it", instance.Name, manifest.KindWithArticle(instance.Link.Kind()), workspace)
+	default:
+		return fmt.Errorf("-d %s links a Deployment in workspace %s (pyproject.toml), not --workspace %s", instance.Name, have, workspace)
+	}
 }
 
 // bearerHeader makes a whole Authorization header value out of the session
@@ -346,9 +374,9 @@ func (o *AirflowOptions) httpTarget(name, hostRoot, authorization string) (*airf
 
 // resolveDeploymentAirflowURL fetches the Airflow API URL from an Astro
 // Deployment, for a -d value that names no link in the manifest.
-func resolveDeploymentAirflowURL(opts *AirflowOptions, deploymentID string) (baseURL, authToken string, err error) {
+func resolveDeploymentAirflowURL(opts *AirflowOptions, ref string) (baseURL, authToken string, err error) {
 	if !astrocontext.IsCloudContext() {
-		return "", "", fmt.Errorf("no deployment link %q, and reaching a Deployment by id requires cloud context. Run 'astro login' to connect to Astro Cloud", deploymentID)
+		return "", "", fmt.Errorf("no deployment link %q, and reaching a Deployment by id or name requires cloud context. Run 'astro login' to connect to Astro Cloud", ref)
 	}
 
 	ctx, err := astrocontext.GetCurrentContext()
@@ -367,12 +395,12 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, deploymentID string) (bas
 		return "", "", errors.New("organization ID not set. Use --organization-id or run 'astro organization switch'")
 	}
 
-	dep, err := deployment.GetDeploymentByID(orgID, deploymentID, astrov1.NewV1Client(httputil.NewHTTPClient()))
+	dep, err := lookupDeployment(orgID, ref, opts.WorkspaceID, ctx.Workspace, astrov1.NewV1Client(httputil.NewHTTPClient()))
 	if err != nil {
-		return "", "", fmt.Errorf("fetching deployment: %w", err)
+		return "", "", err
 	}
 	if dep.WebServerAirflowApiUrl == "" {
-		return "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", deploymentID)
+		return "", "", fmt.Errorf("deployment %s does not have an Airflow API URL configured", ref)
 	}
 
 	airflowURL := dep.WebServerAirflowApiUrl
@@ -380,4 +408,48 @@ func resolveDeploymentAirflowURL(opts *AirflowOptions, deploymentID string) (bas
 		airflowURL = "https://" + airflowURL
 	}
 	return airflowURL, ctx.Token, nil
+}
+
+// lookupDeployment finds the Astro Deployment in orgID that ref names: by id
+// when ref is one, else by name in workspace (--workspace), or in
+// contextWorkspace when that is empty — the way --deployment reads on the
+// astro deployment commands.
+//
+// An id is found across the organization, as it always was, unless
+// --workspace was given: then the Deployment has to be in that workspace, as
+// on those commands, rather than the flag being dropped.
+func lookupDeployment(orgID, ref, workspace, contextWorkspace string, client astrov1.APIClient) (astrov1.Deployment, error) {
+	if util.IsCUID(ref) {
+		dep, err := deployment.GetDeploymentByID(orgID, ref, client)
+		if err != nil {
+			return astrov1.Deployment{}, fmt.Errorf("fetching deployment: %w", err)
+		}
+		if workspace != "" && dep.WorkspaceId != workspace {
+			return astrov1.Deployment{}, fmt.Errorf("deployment %s is in workspace %s, not --workspace %s", ref, dep.WorkspaceId, workspace)
+		}
+		return dep, nil
+	}
+	ws := firstNonEmpty(workspace, contextWorkspace)
+	if ws == "" {
+		return astrov1.Deployment{}, fmt.Errorf("%q is not a Deployment id, and there is no workspace to find a Deployment of that name in: pass --workspace, or run 'astro workspace switch'", ref)
+	}
+	deps, err := deployment.ListDeployments(ws, orgID, client)
+	if err != nil {
+		return astrov1.Deployment{}, fmt.Errorf("listing the Deployments in workspace %s: %w", ws, err)
+	}
+	var found []astrov1.Deployment
+	var ids []string
+	for i := range deps {
+		if deps[i].Name == ref {
+			found = append(found, deps[i])
+			ids = append(ids, deps[i].Id)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return astrov1.Deployment{}, fmt.Errorf("no Deployment named %q in workspace %s", ref, ws)
+	case 1:
+		return found[0], nil
+	}
+	return astrov1.Deployment{}, fmt.Errorf("%d Deployments are named %q in workspace %s: pass -d with one's id (%s)", len(found), ref, ws, strings.Join(ids, ", "))
 }

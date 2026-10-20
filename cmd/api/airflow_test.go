@@ -337,7 +337,7 @@ func TestErrNoTarget_OutsideAProject(t *testing.T) {
 	t.Cleanup(func() { config.WorkingPath = orig })
 
 	msg := errNoTarget("get_dags").Error()
-	assert.Contains(t, msg, "a deployment this project links, or an Astro Deployment id")
+	assert.Contains(t, msg, "a deployment this project links, or an Astro Deployment id or name")
 	assert.Contains(t, msg, "astro local api <endpoint>", "an operation id is not a path astro local api can take")
 }
 
@@ -609,7 +609,7 @@ auth = { method = 'token', token-env = 'STAGING_AIRFLOW_TOKEN' }
 }
 
 // --deployment falls through to an Astro Deployment id for a name no link
-// declares.
+// declares, given as one.
 func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
 	isolateSpecCache(t)
 	testUtil.InitTestConfig(testUtil.LocalPlatform)
@@ -622,11 +622,11 @@ func TestResolveAirflowTarget_DeploymentID(t *testing.T) {
 	t.Cleanup(func() { deployment.GetDeploymentByID = orig })
 	deployment.GetDeploymentByID = func(orgID, deploymentID string, _ astrov1.APIClient) (astrov1.Deployment, error) {
 		assert.Equal(t, "test-org", orgID)
-		assert.Equal(t, "clxyz123", deploymentID)
+		assert.Equal(t, testDeploymentID, deploymentID)
 		return astrov1.Deployment{Id: deploymentID, WebServerAirflowApiUrl: "deployment.airflow.astronomer.io/api/v2"}, nil
 	}
 
-	opts := &AirflowOptions{Deployment: "clxyz123", RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
+	opts := &AirflowOptions{Deployment: testDeploymentID, RequestOptions: RequestOptions{ErrOut: new(bytes.Buffer)}}
 	target, err := resolveAirflowTarget(context.Background(), opts)
 	require.NoError(t, err)
 	// A URL with no scheme gets https, and the /api/v2 the control plane

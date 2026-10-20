@@ -26,7 +26,7 @@ type AirflowOptions struct {
 	RequestOptions
 
 	// Deployment is -d/--deployment: a deployment link the manifest declares,
-	// or — for a name no link declares — an Astro Deployment id.
+	// or — for a name no link declares — an Astro Deployment id or name.
 	Deployment string
 	// URL is --url: an Airflow no project declares, addressed directly.
 	URL string
@@ -62,7 +62,7 @@ The argument can be either:
   - A path of an Airflow API endpoint (e.g., /dags, /dags/my_dag)
   - An operation ID from the API spec (e.g., get_dags, get_dag)
 
-A request needs a target; there is no default. Pass -d/--deployment to talk to a deployment your project links in pyproject.toml — an Astro Deployment, an MWAA or Composer environment, or a plain URL, each reached with the credentials that deployment's link calls for. A name no link declares is read as an Astro Deployment id. Pass --url to reach an Airflow no project declares. For this project's local Airflow, use 'astro local api' instead.
+A request needs a target; there is no default. Pass -d/--deployment to talk to a deployment your project links in pyproject.toml — an Astro Deployment, an MWAA or Composer environment, or a plain URL, each reached with the credentials that deployment's link calls for. A name no link declares is an Astro Deployment: its id, or its name in the workspace -W/--workspace names, else the context's. Pass --url to reach an Airflow no project declares. For this project's local Airflow, use 'astro local api' instead.
 
 The ls and describe subcommands only read the API spec, so they need no target: without one they read the spec for --airflow-version, or for Airflow ` + defaultAirflowVersion + `.
 
@@ -104,8 +104,11 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
   # Use an Airflow no project declares
   astro api airflow --url http://airflow.example.com:8080 /dags
 
-  # Use an Astro Deployment by id
-  astro api airflow -d clxyz123 /dags
+  # Use an Astro Deployment no link declares, by id
+  astro api airflow -d clxyz1234567890abcdefghij /dags
+
+  # Or by name, in a workspace other than the context's
+  astro api airflow -d etl-prod -W clwsp1234567890abcdefghij /dags
 
   # Generate curl command instead of executing
   astro api airflow -d prod /dags --generate
@@ -131,7 +134,7 @@ To pass nested parameters in the request payload, use key[subkey]=value syntax. 
 	}
 
 	// Airflow-specific flags (persistent so they're inherited by subcommands)
-	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id")
+	cmd.PersistentFlags().StringVarP(&opts.Deployment, "deployment", "d", "", "Deployment to act on, by the name the manifest links it under, or an Astro Deployment id or name")
 	utils.RefuseEmpty(cmd.PersistentFlags().Lookup("deployment"))
 	cmd.PersistentFlags().StringVar(&opts.URL, "url", "", "Airflow base URL to act on directly, for an Airflow no project declares")
 	cmd.PersistentFlags().StringVarP(&opts.OrganizationID, "organization-id", "O", "", "Override organization ID for deployment lookup")

@@ -33,7 +33,7 @@ With nothing resolved:
 
 Both errors add `For this machine: astro local af <family>`. Every run prints the target it resolved on stderr, as `→ name (kind where)`.
 
-`astro api airflow` takes only steps 1 and 2. With neither it fails and lists `-d <link>`, `--url` and `astro local api`. Its `ls` and `spec` subcommands need no target.
+`astro api airflow` takes only steps 1 and 2. With neither it fails and lists `-d <link>`, `--url` and `astro local api`. Its `ls` and `spec` subcommands need no target. Its `-d` also takes an Astro Deployment's name where no link has it, found in the workspace `-W/--workspace` names, else the context's. Given an id, `-W` requires the Deployment to be in that workspace; given a link, it has to agree with the link's workspace; with `--url` it is refused.
 
 ## `astro use`
 
