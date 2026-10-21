@@ -332,58 +332,12 @@ func rootsFromLock(data []byte, candidates []string) (rootGraph, error) {
 	if err := toml.Unmarshal(data, &lock); err != nil {
 		return rootGraph{}, fmt.Errorf("reading the scratch project's uv.lock: %w", err)
 	}
-	packages := map[string]lockPackage{}
+	g := lockGraph{}
 	for _, p := range lock.Package {
-		packages[manifest.DistName(p.Name)] = p
+		g[manifest.DistName(p.Name)] = p
 	}
-	// reach adds to into what deps pull in, following each extra once: an
-	// extra can name the package's own extras.
-	var reach func(deps []lockDependency, into map[string]bool, followed map[string]bool)
-	reach = func(deps []lockDependency, into map[string]bool, followed map[string]bool) {
-		for _, d := range deps {
-			name := manifest.DistName(d.Name)
-			if !into[name] {
-				into[name] = true
-				reach(packages[name].Dependencies, into, followed)
-			}
-			for _, extra := range d.Extra {
-				if key := name + "[" + extra + "]"; !followed[key] {
-					followed[key] = true
-					reach(packages[name].Optional[extra], into, followed)
-				}
-			}
-		}
-	}
-	// require marks what deps name directly, and through the extras they
-	// name, which install that extra's packages too.
-	required, followed := map[string]bool{}, map[string]bool{}
-	var require func(deps []lockDependency)
-	require = func(deps []lockDependency) {
-		for _, d := range deps {
-			name := manifest.DistName(d.Name)
-			required[name] = true
-			for _, extra := range d.Extra {
-				if key := name + "[" + extra + "]"; !followed[key] {
-					followed[key] = true
-					require(packages[name].Optional[extra])
-				}
-			}
-		}
-	}
-	for _, p := range lock.Package {
-		if manifest.DistName(p.Name) != rootsProject {
-			require(p.Dependencies)
-		}
-	}
-	// What Airflow pulls in is installed whatever the group says, since the
-	// project lists Airflow: a root's closure is what it adds to that.
-	airflow := map[string]bool{}
-	for _, d := range runtimeversions.AirflowDists() {
-		if _, ok := packages[d]; ok {
-			airflow[d] = true
-			reach(packages[d].Dependencies, airflow, map[string]bool{})
-		}
-	}
+	required := g.required()
+	airflow := g.airflow()
 	graph := rootGraph{Closures: map[string][]string{}}
 	for _, c := range candidates {
 		if required[c] {
@@ -391,11 +345,10 @@ func rootsFromLock(data []byte, candidates []string) (rootGraph, error) {
 		}
 		graph.Roots = append(graph.Roots, c)
 		into := map[string]bool{}
-		reach(packages[c].Dependencies, into, map[string]bool{})
-		delete(into, c)
-		closure := make([]string, 0, len(into))
+		g.reach(g[c].Dependencies, into, map[string]bool{})
+		closure := []string{}
 		for name := range into {
-			if !airflow[name] {
+			if name != c && !airflow[name] {
 				closure = append(closure, name)
 			}
 		}
@@ -406,4 +359,65 @@ func rootsFromLock(data []byte, candidates []string) (rootGraph, error) {
 		return rootGraph{}, errors.New("the resolution left no top-level package")
 	}
 	return graph, nil
+}
+
+// lockGraph is a uv.lock's packages, by normalized name.
+type lockGraph map[string]lockPackage
+
+// required is every package another package in g names, directly or through
+// the extras it names, which install that extra's packages too; the scratch
+// project's own edges are not counted.
+func (g lockGraph) required() map[string]bool {
+	required, followed := map[string]bool{}, map[string]bool{}
+	var require func(deps []lockDependency)
+	require = func(deps []lockDependency) {
+		for _, d := range deps {
+			name := manifest.DistName(d.Name)
+			required[name] = true
+			for _, extra := range d.Extra {
+				// An extra can name the package's own extras, so each is
+				// followed once.
+				if key := name + "[" + extra + "]"; !followed[key] {
+					followed[key] = true
+					require(g[name].Optional[extra])
+				}
+			}
+		}
+	}
+	for name, p := range g {
+		if name != rootsProject {
+			require(p.Dependencies)
+		}
+	}
+	return required
+}
+
+// reach adds to into everything deps pull in, through dependencies and the
+// extras they name, each extra followed once.
+func (g lockGraph) reach(deps []lockDependency, into, followed map[string]bool) {
+	for _, d := range deps {
+		name := manifest.DistName(d.Name)
+		if !into[name] {
+			into[name] = true
+			g.reach(g[name].Dependencies, into, followed)
+		}
+		for _, extra := range d.Extra {
+			if key := name + "[" + extra + "]"; !followed[key] {
+				followed[key] = true
+				g.reach(g[name].Optional[extra], into, followed)
+			}
+		}
+	}
+}
+
+// airflow is the Airflow distributions in g and everything they pull in.
+func (g lockGraph) airflow() map[string]bool {
+	airflow := map[string]bool{}
+	for _, d := range runtimeversions.AirflowDists() {
+		if p, ok := g[d]; ok {
+			airflow[d] = true
+			g.reach(p.Dependencies, airflow, map[string]bool{})
+		}
+	}
+	return airflow
 }
