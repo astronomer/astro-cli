@@ -82,6 +82,24 @@ func GetLines(e Editor, key []string) ([]any, bool) {
 	return list, isArray
 }
 
+// LineSetter is an Editor that writes an array line for line, comments
+// included. The surgical editor is one; an Editor from elsewhere need not be.
+type LineSetter interface {
+	// SetLines writes list at key as Set does, but compares it with the
+	// array there comments and all, so one whose values are unchanged and
+	// whose comments are not is rewritten.
+	SetLines(key []string, list []any) error
+}
+
+// SetLines writes list at key in e, line for line when e is a LineSetter,
+// and by Set, whose values alone it compares, when it is not.
+func SetLines(e Editor, key []string, list []any) error {
+	if lines, ok := e.(LineSetter); ok {
+		return lines.SetLines(key, list)
+	}
+	return e.Set(key, list)
+}
+
 // ErrCommentsUnsupported refuses a Set of an array holding a Comment where the
 // array cannot carry one: inside an inline table, where TOML allows no line
 // break. Nothing is written.

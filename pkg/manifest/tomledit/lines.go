@@ -87,13 +87,34 @@ func arrayOf(data []byte, kv *unstable.Node) (arrayValue, bool) {
 // false, having done nothing, when the value is not such an array or is the
 // one already there, which a plain Set leaves as it is spelled.
 func (s *surgical) setLines(key []string, value any) (bool, error) {
+	return s.writeLines(key, value, false)
+}
+
+// SetLines writes list at key as setLines does, and compares it with the
+// array there line for line, comments included: an array whose values are
+// the same but whose comments are not is rewritten, which drops a comment
+// list leaves out.
+func (s *surgical) SetLines(key []string, list []any) error {
+	done, err := s.writeLines(key, list, true)
+	if !done && err == nil {
+		err = s.doc.Set(key, valuesOf(list))
+	}
+	if err != nil {
+		return &KeyError{Key: key, Err: err}
+	}
+	return nil
+}
+
+// writeLines is setLines, comparing the array there with value line for line
+// when exact is set or value holds a Comment, and by its values otherwise.
+func (s *surgical) writeLines(key []string, value any, exact bool) (bool, error) {
 	list, ok := value.([]any)
 	if !ok || len(list) == 0 || slices.ContainsFunc(list, composite) {
 		return false, nil
 	}
 	values := valuesOf(list)
 	commented := len(values) < len(list)
-	if commented {
+	if commented || exact {
 		if cur, has := s.GetLines(key); has && reflect.DeepEqual(cur, list) {
 			return true, nil
 		}
@@ -115,7 +136,7 @@ func (s *surgical) setLines(key []string, value any) (bool, error) {
 		}
 		return true, nil
 	}
-	if !commented {
+	if !commented && !exact {
 		return true, s.splice(a.open, a.close+1, linesOf(data, a.elems, nil, eol(data)))
 	}
 	return true, s.splice(a.open, a.close+1, commentedLinesOf(data, a.elems, list, eol(data)))

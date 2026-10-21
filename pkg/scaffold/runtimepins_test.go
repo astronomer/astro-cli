@@ -52,17 +52,17 @@ func projectWith(t *testing.T, src string) string {
 }
 
 func TestTheRuntimePinsAreWrittenBetweenTheirComments(t *testing.T) {
-	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'Pandas>=2']", 1) +
-		"\n[tool.uv]\nconstraint-dependencies = ['protobuf<7']\n"
+	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'Pandas>=3']", 1) +
+		"\n[tool.uv]\nconstraint-dependencies = ['protobuf>=7']\n"
 	dir := projectWith(t, src)
 	out := writePins(t, dir, build332, freeze339)
 
 	want := `constraint-dependencies = [
-    'protobuf<7',
+    'protobuf>=7',
     'apache-airflow==3.3.2+astro.1',
     'apache-airflow-task-sdk==1.3.2+astro.1',
     # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.
-    # astro writes them. To choose a version yourself, list the package in [project] dependencies.
+    # astro writes them. To choose a version yourself, give the package a bound the image's version doesn't meet.
     "a2wsgi==1.10.10; python_version == '3.12'",
     "SQLAlchemy==2.0.50; python_version == '3.12'",
     "zipp==4.1.0; python_version == '3.12'",
@@ -118,12 +118,12 @@ func TestAConstraintAppendedAfterThePinsStays(t *testing.T) {
 	dir := projectWith(t, astroHead)
 	written := writePins(t, dir, build332, freeze339)
 	appended := strings.Replace(written, "    # End of what astro writes. Constraints below this line are yours.\n",
-		"    # End of what astro writes. Constraints below this line are yours.\n    'zipp<5',\n    'numpy==2.3.0',\n", 1)
+		"    # End of what astro writes. Constraints below this line are yours.\n    'zipp>=5',\n    'numpy==2.3.0',\n", 1)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(appended), 0o600))
 
 	for _, pins := range []*RuntimePins{freeze339, nil} {
 		out := writePins(t, dir, build332, pins)
-		assert.Contains(t, out, "Constraints below this line are yours.\n    'zipp<5',\n    'numpy==2.3.0',\n]")
+		assert.Contains(t, out, "Constraints below this line are yours.\n    'zipp>=5',\n    'numpy==2.3.0',\n]")
 		assert.NotContains(t, out, "zipp==4.1.0;", "the project constrains zipp itself")
 	}
 }
@@ -142,41 +142,72 @@ func TestABlockWithoutItsEndKeepsWhatFollows(t *testing.T) {
 
 // A package in a dependency group or an extra is the project's to version
 // too: `uv add --dev 'pytest>=9'` must lock where the image ships pytest 8.
-func TestGroupsAndExtrasAreTheProjectsOwn(t *testing.T) {
-	src := astroHead + "\n[project.optional-dependencies]\nplot = ['zipp']\n\n[dependency-groups]\ndev = ['pytest>=9', {include-group = 'lint'}]\nlint = ['a2wsgi']\n" +
-		"\n[tool.uv]\noverride-dependencies = ['protobuf>=7']\ndev-dependencies = ['ruff']\n"
+// A package the project names keeps its pin while what the project says of it
+// admits the image's version, wherever it says it: dependencies, extras,
+// dependency groups, the dev-dependencies older uv wrote, and its own
+// constraints. It loses the pin to a bound the version does not meet, and to
+// an override, which replaces any requirement.
+func TestThePinOfAPackageTheProjectNamesFollowsItsRequirement(t *testing.T) {
+	src := strings.Replace(astroHead, "dependencies = ['apache-airflow==3.3.*']", "dependencies = ['apache-airflow==3.3.*', 'pandas>=2.2', 'numpy>=3']", 1) +
+		"\n[project.optional-dependencies]\nplot = ['zipp', 'matplotlib<3']\n\n[dependency-groups]\ndev = ['pytest>=9', {include-group = 'lint'}]\nlint = ['a2wsgi']\n" +
+		"\n[tool.uv]\noverride-dependencies = ['protobuf>=6']\ndev-dependencies = ['ruff']\nconstraint-dependencies = ['SQLAlchemy<2.1']\n"
 	dir := projectWith(t, src)
 	out := writePins(t, dir, build332, &RuntimePins{Build: "3.3-9", Python: "3.12", Pins: []string{
-		"pytest==8.4.0", "zipp==4.1.0", "a2wsgi==1.10.10", "SQLAlchemy==2.0.50", "protobuf==6.33.6", "ruff==0.14.0",
+		"pandas==2.2.3", "numpy==2.3.0", "zipp==4.1.0", "matplotlib==3.10.0", "pytest==8.4.0", "a2wsgi==1.10.10",
+		"protobuf==6.33.6", "ruff==0.14.0", "SQLAlchemy==2.0.50",
 	}})
-	assert.Contains(t, out, "SQLAlchemy==2.0.50;")
-	for _, pin := range []string{"pytest==", "zipp==", "a2wsgi==", "protobuf==", "ruff=="} {
-		assert.NotContains(t, out, pin)
+	for _, kept := range []string{"pandas==", "zipp==", "a2wsgi==", "ruff==", "SQLAlchemy==2.0.50;"} {
+		assert.Contains(t, out, kept, "the project's requirement admits the image's version")
+	}
+	for _, dropped := range []string{"numpy==", "matplotlib==", "pytest==", "protobuf=="} {
+		assert.NotContains(t, out, dropped, "excluded by the project's requirement, or overridden")
 	}
 }
 
-// ListedPackages is what the project lists to install: not an override or a
-// constraint, which install nothing of their own.
-func TestListedPackages(t *testing.T) {
-	src := astroHead + "\n[project.optional-dependencies]\nplot = ['Zipp>=4']\n\n[dependency-groups]\ndev = ['pytest>=9', {include-group = 'lint'}]\n" +
-		"\n[tool.uv]\ndev-dependencies = ['ruff']\noverride-dependencies = ['protobuf>=7']\nconstraint-dependencies = ['numpy<3']\n"
-	listed, err := ListedPackages(projectWith(t, src))
-	require.NoError(t, err)
-	assert.Equal(t, map[string]bool{"apache-airflow": true, "zipp": true, "pytest": true, "ruff": true}, listed)
-}
-
-// PruneRuntimePins needs no lookup: a package the project has since listed
-// loses its pin, and nothing else changes.
-func TestPruneRuntimePinsDropsWhatTheProjectNowLists(t *testing.T) {
+// SetRuntimePins with no new pins needs no lookup: a package the project now
+// gives a bound the image's version does not meet loses its pin, and nothing
+// else changes. `uv add pandas` writes a bound the image's pandas meets, and
+// keeps it.
+func TestSetRuntimePinsDropsWhatTheProjectNowExcludes(t *testing.T) {
 	dir := projectWith(t, astroHead)
 	written := writePins(t, dir, build332, freeze339)
-	added := strings.Replace(written, "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    'pandas>=3',", 1)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(added), 0o600))
+	for _, tc := range []struct {
+		requirement string
+		keeps       bool
+	}{{"pandas>=2.2.3", true}, {"pandas", true}, {"pandas>=3", false}} {
+		added := strings.Replace(written, "'apache-airflow==3.3.*',", "'apache-airflow==3.3.*',\n    '"+tc.requirement+"',", 1)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(added), 0o600))
+		_, err := SetRuntimePins(dir, nil, nil)
+		require.NoError(t, err)
+		out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+		require.NoError(t, err)
+		want := added
+		if !tc.keeps {
+			want = strings.Replace(added, "    \"pandas==2.2.3; python_version == '3.12'\",\n", "", 1)
+		}
+		assert.Equal(t, want, string(out), tc.requirement)
+	}
+}
 
-	require.NoError(t, PruneRuntimePins(dir, nil))
+// After every pin line is deleted by hand, the heading and end comments go
+// with them at the next write, though the values are the same.
+func TestEmptiedPinsLoseTheirComments(t *testing.T) {
+	dir := projectWith(t, astroHead)
+	written := writePins(t, dir, build332, freeze339)
+	var kept []string
+	for _, line := range strings.Split(written, "\n") {
+		if !strings.Contains(line, "; python_version == '3.12'") {
+			kept = append(kept, line)
+		}
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifest.Marker), []byte(strings.Join(kept, "\n")), 0o600))
+	_, err := SetRuntimePins(dir, nil, nil)
+	require.NoError(t, err)
 	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
-	assert.Equal(t, strings.Replace(added, "    \"pandas==2.2.3; python_version == '3.12'\",\n", "", 1), string(out))
+	assert.NotContains(t, string(out), "Astro Runtime")
+	assert.NotContains(t, string(out), "End of what astro writes")
+	assert.Contains(t, string(out), "'apache-airflow==3.3.2+astro.1'")
 }
 
 // A [tool.uv] written as an inline table cannot hold the comments that mark
@@ -231,7 +262,7 @@ func TestRuntimeBuildFor(t *testing.T) {
 		none, unset bool
 	}{
 		{name: "an Airflow 3 pin takes its series' newest build, and the default Python it admits", manifest: project("'apache-airflow==3.3.*'", "", ">=3.12"), catalog: c, build: "3.3-9", py: "3.14"},
-		{name: "a patch pin takes the newest build of that release, as the Airflow pin does", manifest: project("'apache-airflow==3.3.1'", "", ">=3.12"), catalog: c, build: "3.3-8", py: "3.13"},
+		{name: "a patch pin takes the newest build of that release, on the Python the project runs", manifest: project("'apache-airflow==3.3.1'", "", ">=3.12"), catalog: c, build: "3.3-8", py: "3.14"},
 		{name: "requires-python picks the Python the image runs", manifest: project("'apache-airflow==3.3.*'", "", ">=3.12,<3.14"), catalog: c, build: "3.3-9", py: "3.13"},
 		{name: "runtime names the build", manifest: project("'apache-airflow==3.3.*'", "runtime = '3.3-8'\n", ">=3.12"), catalog: c, build: "3.3-8", py: "3.13"},
 		{name: "an Airflow 2 pin runs its build's own Python", manifest: project("'apache-airflow==2.10.*'", "", ">=3.11"), catalog: c, build: "12.6.0", py: "3.12"},

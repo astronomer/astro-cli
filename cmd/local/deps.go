@@ -152,10 +152,10 @@ type Deps struct {
 
 	// RuntimePins reads the name==version lines of one Astro Runtime build's
 	// image running python, which init and a start write into [tool.uv] as
-	// the runtime pins (scaffold.RuntimePins). Production reads the same
-	// freeze file RuntimeFreeze does, through runtimecatalog.RuntimePins. A
-	// seam so a test never reaches the network; nil leaves the runtime pins
-	// as they are.
+	// the runtime pins (scaffold.RuntimePins). Production reads the build's
+	// freeze file from Astronomer's CDN, cached, through
+	// runtimecatalog.RuntimePins. A seam so a test never reaches the network;
+	// nil leaves the runtime pins as they are.
 	RuntimePins func(ctx context.Context, build, python string) ([]string, error)
 
 	// Relock runs `uv lock` in the project at dir, so uv.lock follows runtime
@@ -170,14 +170,6 @@ type Deps struct {
 	// then follows the built-in rules. Production reads it through
 	// runtimecatalog.Catalog. A seam so a test never reaches the network.
 	RuntimeCatalog func(ctx context.Context) *runtimeversions.Catalog
-
-	// RuntimeFreeze reads the distributions a runtime build's image has
-	// installed, for the first of pythons it has a freeze file for, which
-	// `astro local check` names in a hint when a Dag imports one the project
-	// does not list. Production reads the CDN through
-	// runtimecatalog.RuntimeFreeze. nil, or a nil result, means no hint. A
-	// seam so a test never reaches the network.
-	RuntimeFreeze func(ctx context.Context, build string, pythons []string) []string
 
 	// ImageCatalog reads the runtime catalog for `astro package astro`'s
 	// generated image: its Python, and an Airflow 2 base with no
@@ -254,7 +246,6 @@ func NewDeps() Deps {
 		RuntimePins:      runtimecatalog.RuntimePins,
 		Relock:           uvRelock,
 		RuntimeCatalog:   runtimecatalog.Catalog,
-		RuntimeFreeze:    runtimecatalog.RuntimeFreeze,
 		ImageCatalog: func(ctx context.Context, airflowPin string) *runtimeversions.Catalog {
 			return runtimecatalog.ForBuild(airflowPin)(ctx)
 		},

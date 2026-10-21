@@ -23,7 +23,7 @@ constraint-dependencies = [
     'apache-airflow==3.3.2+astro.2',
     'apache-airflow-task-sdk==1.3.2+astro.1',
     # Astro Runtime 3.3-9 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.
-    # astro writes them. To choose a version yourself, list the package in [project] dependencies.
+    # astro writes them. To choose a version yourself, give the package a bound the image's version doesn't meet.
     'a2wsgi==1.10.10',
     'urllib3==2.5.0',
     # End of what astro writes. Constraints below this line are yours.

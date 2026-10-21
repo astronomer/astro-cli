@@ -13,7 +13,6 @@ import (
 	"github.com/astronomer/astro-cli/cmd/cliout"
 	"github.com/astronomer/astro-cli/internal/runtimecatalog"
 	"github.com/astronomer/astro-cli/pkg/localrt"
-	"github.com/astronomer/astro-cli/pkg/manifest"
 	"github.com/astronomer/astro-cli/pkg/runtimeversions"
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
@@ -50,8 +49,13 @@ type pinsRun struct {
 	build                runtimeversions.AstroBuild
 	lookupErr, freezeErr error
 	freeze               []string
-	// noCatalog has the runtime catalog unreadable.
+	// noCatalog has the runtime catalog unreadable, and catalog, when set,
+	// is read in place of pinsCatalog.
 	noCatalog bool
+	catalog   string
+	// freezeFor, when set, answers the package list by build and Python in
+	// place of freeze and freezeErr.
+	freezeFor func(build, python string) ([]string, error)
 	// args is the command run, `local start` when empty.
 	args []string
 	// relock answers Deps.Relock and records that it ran; nil leaves the seam
@@ -87,7 +91,11 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 		res.lookupAsked = append(res.lookupAsked, pin, runtime)
 		return p.build, p.lookupErr
 	}
-	c, err := runtimeversions.Parse([]byte(pinsCatalog))
+	catalog := pinsCatalog
+	if p.catalog != "" {
+		catalog = p.catalog
+	}
+	c, err := runtimeversions.Parse([]byte(catalog))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,6 +107,9 @@ func (p pinsRun) start(t *testing.T) pinsResult {
 	}
 	d.RuntimePins = func(_ context.Context, build, python string) ([]string, error) {
 		res.freezeAsked = append(res.freezeAsked, build, python)
+		if p.freezeFor != nil {
+			return p.freezeFor(build, python)
+		}
 		return p.freeze, p.freezeErr
 	}
 	if p.relock != nil {
@@ -303,48 +314,6 @@ func TestStartKeepsThePinsWhenANewBuildsListCannotBeRead(t *testing.T) {
 	}
 }
 
-// The check's hint guesses where the pins do not: a FROM built from an
-// argument, or a runtime the catalog does not list, asks about the pin's
-// newest build.
-func TestRuntimeImageOfFallsBackToThePinsNewestBuild(t *testing.T) {
-	c, err := runtimeversions.Parse([]byte(pinsCatalog))
-	if err != nil {
-		t.Fatal(err)
-	}
-	cli := &cli{d: Deps{RuntimeCatalog: func(context.Context) *runtimeversions.Catalog { return c }}}
-	for name, src := range map[string]string{
-		"ARG FROM":         strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\ndockerfile = 'Dockerfile'\n", 1),
-		"unlisted runtime": strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-99'\n", 1),
-	} {
-		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("ARG BASE\nFROM ${BASE}\n"), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			m, err := manifest.Parse([]byte(src))
-			if err != nil {
-				t.Fatal(err)
-			}
-			build, pythons := cli.runtimeImageOf(context.Background(), dir, m)
-			if build != "3.3-9" || len(pythons) == 0 || pythons[0] != "3.12" {
-				t.Errorf("runtimeImageOf = %q, %v; want the pin's newest build, 3.3-9 on 3.12", build, pythons)
-			}
-		})
-	}
-	// The fallback's Python follows requires-python as a generated image's
-	// does, and the build's default comes next.
-	src := strings.Replace(buildManifest, "requires-python = '>=3.12'", "requires-python = '>=3.13'", 1)
-	src = strings.Replace(src, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-99'\n", 1)
-	m, err := manifest.Parse([]byte(src))
-	if err != nil {
-		t.Fatal(err)
-	}
-	build, pythons := cli.runtimeImageOf(context.Background(), t.TempDir(), m)
-	if build != "3.3-9" || len(pythons) < 2 || pythons[0] != "3.13" || pythons[1] != "3.12" {
-		t.Errorf("runtimeImageOf = %q, %v; want 3.3-9 on 3.13, then its default 3.12", build, pythons)
-	}
-}
-
 // A declared Dockerfile names the build, so the Airflow lookup is asked for
 // the release that build carries.
 func TestStartLooksUpTheAirflowOfTheDockerfilesBuild(t *testing.T) {
@@ -450,5 +419,82 @@ func TestDockerModeSaysANewerRuntimeIsAvailable(t *testing.T) {
 				t.Errorf("notice said = %v, want %v:\n%s", said, tt.notice, out)
 			}
 		})
+	}
+}
+
+// patchCatalog lists a series whose newest build defaults to a Python its
+// older build does not ship.
+const patchCatalog = `{"runtimeVersionsV3": {
+    "3.3-8": {"metadata": {"airflowVersion": "3.3.1", "channel": "stable", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}},
+    "3.3-9": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.13"}}
+  }}`
+
+// A patch pin's pins are of its build, on the Python the project runs, which
+// the series' newest build decides (3.13 here): the venv and the image run
+// it. When the build publishes no list for that Python, its own Python's
+// list is used, with a warning.
+func TestAPatchPinsPinsAreOfThePythonTheProjectRuns(t *testing.T) {
+	build331 := runtimeversions.AstroBuild{Index: build332.Index, Airflow: "3.3.1+astro.1", TaskSDK: "1.3.1+astro.1"}
+	src := strings.Replace(buildManifest, "apache-airflow==3.3.*", "apache-airflow==3.3.1", 1)
+	list := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
+
+	r := pinsRun{src: src, build: build331, catalog: patchCatalog, freeze: list}.start(t)
+	if strings.Join(r.freezeAsked, " ") != "3.3-8 3.13" || !strings.Contains(r.manifest, "python_version == '3.13'") {
+		t.Errorf("asked %q; want 3.3-8 on 3.13, the Python the project runs:\n%s", r.freezeAsked, r.manifest)
+	}
+
+	r = pinsRun{src: src, build: build331, catalog: patchCatalog, freezeFor: func(_, python string) ([]string, error) {
+		if python == "3.13" {
+			return nil, runtimecatalog.ErrFreezeNotPublished
+		}
+		return list, nil
+	}}.start(t)
+	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-8 (Python 3.12)") {
+		t.Errorf("no fallback to the build's own Python:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.out, "publishes no package list for Python 3.13, the one this project runs") {
+		t.Errorf("the start did not say it fell back:\n%s", r.out)
+	}
+}
+
+// The index cannot be read and the pin has not moved: what needs no index
+// still applies. A cutoff the project has just set takes the pins out.
+func TestStartOfflineStillAppliesACutoff(t *testing.T) {
+	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	src := strings.Replace(written, "[tool.uv]\n", "[tool.uv]\nexclude-newer = \"1 week\"\n", 1)
+	r := pinsRun{src: src, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339}.start(t)
+	if strings.Contains(r.manifest, "pandas==") || strings.Contains(r.manifest, "Astro Runtime") {
+		t.Errorf("pins kept offline under the project's new cutoff:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.manifest, "apache-airflow==3.3.2+astro.2") {
+		t.Errorf("the Airflow build changed offline:\n%s", r.manifest)
+	}
+}
+
+// The index cannot be read and the pin has not moved: a new requires-python
+// that changes the Python the project runs is applied, from the cached list.
+func TestStartOfflineStillAppliesANewPython(t *testing.T) {
+	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	src := strings.Replace(written, "requires-python = '>=3.12'", "requires-python = '>=3.13'", 1)
+	r := pinsRun{src: src, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339}.start(t)
+	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 (Python 3.13)") {
+		t.Errorf("the new Python was not applied offline (asked %q):\n%s", r.freezeAsked, r.manifest)
+	}
+}
+
+// A write that repairs only another setting that holds Airflow to the build,
+// here exclude-newer-package, still says what it did.
+func TestStartSaysSoWhenItRepairsTheBuildsSettings(t *testing.T) {
+	written, _, _ := startWithPins(t, buildManifest, freeze339, nil)
+	start := strings.Index(written, "[tool.uv.exclude-newer-package]")
+	if start < 0 {
+		t.Fatalf("no exclude-newer-package to take out:\n%s", written)
+	}
+	r := pinsRun{src: written[:start], build: build332, freeze: freeze339}.start(t)
+	if !strings.Contains(r.manifest, "[tool.uv.exclude-newer-package]") {
+		t.Fatalf("not repaired:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.out, "now installs Astronomer's Airflow") {
+		t.Errorf("the repair was silent:\n%s", r.out)
 	}
 }

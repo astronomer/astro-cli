@@ -130,14 +130,22 @@ type astroBuildWrite struct {
 type runtimeImage struct {
 	build, python string
 	err           error
+	// buildPython is the Python an image of build itself runs for the
+	// project (scaffold.BuildPython), when that is not python: the pins fall
+	// back to its freeze when build publishes none for python. "" for a
+	// declared Dockerfile, whose image runs python.
+	buildPython string
 }
 
 // writeAstroBuild looks up the build for the manifest in dir and writes it,
 // or takes the settings out when the index has none, with the runtime pins of
-// the image the project builds on (runtimePins). When the lookup could not be
-// made, the build stays as it is, and only the runtime pins of packages the
-// project now names itself come out (scaffold.PruneRuntimePins), which needs
-// no lookup. It writes nothing when there is no lookup to make.
+// the image the project builds on (runtimePins). It writes nothing when there
+// is no lookup to make.
+//
+// When the lookup could not be made and the pin has not moved, the Airflow
+// build stays as the manifest has it, and the runtime pins are still brought
+// up to date (scaffold.SetRuntimePins), which needs no index: a new cutoff, a
+// new FROM or requires-python, and a bound the project now gives a package the image ships.
 //
 // A declared Dockerfile's FROM names the image, so the lookup holds Airflow
 // to the release that build carries, and both pins are of one image.
@@ -159,10 +167,18 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 	}
 	res.build, res.lookupErr = c.d.AstroBuild(ctx, airflow.Pin, runtime)
 	if res.lookupErr != nil && !errors.Is(res.lookupErr, runtimeversions.ErrNoAstroBuild) && !stalePin(m) {
-		_, res.writeErr = watchManifest(dir, func(wrap func(run func() error) error) error {
-			return scaffold.PruneRuntimePins(dir, wrap)
+		res.build = recordedAstroBuild(m)
+		pins := c.runtimePins(ctx, dir, m, image, &res)
+		changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
+			var err error
+			res.pinsRefused, err = scaffold.SetRuntimePins(dir, wrap, pins)
+			return err
 		})
+		res.writeErr = writeErr
 		res.compare(m, path)
+		// Only the runtime pins were written, so whatever changed is theirs:
+		// the comments around them, when their lines are the same.
+		res.airflowChanged, res.pinsChanged = false, res.pinsChanged || changed
 		return res
 	}
 	pins := c.runtimePins(ctx, dir, m, image, &res)
@@ -174,18 +190,47 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 		// too: it is the image's, which the index lookup does not know.
 		res.build = imageAirflowBuild(res.build, m.UV.ConstraintDependencies)
 	}
-	_, res.writeErr = watchManifest(dir, func(wrap func(run func() error) error) error {
+	changed, writeErr := watchManifest(dir, func(wrap func(run func() error) error) error {
 		var err error
 		res.pinsRefused, err = scaffold.SetAstroBuild(dir, wrap, res.build, pins)
 		return err
 	})
+	res.writeErr = writeErr
 	res.compare(m, path)
+	// A write that changed neither the Airflow pins nor the runtime pins
+	// repaired another of the settings that hold Airflow to the build: the
+	// index, its sources, or exclude-newer-package.
+	res.airflowChanged = res.airflowChanged || (changed && !res.pinsChanged)
 	return res
 }
 
+// recordedAstroBuild is the Astronomer build of Airflow the manifest holds
+// the project to now, read from its pins (manifest.AstroPin): what a start
+// that cannot reach the index keeps.
+func recordedAstroBuild(m *manifest.Manifest) runtimeversions.AstroBuild {
+	var b runtimeversions.AstroBuild
+	for _, c := range m.UV.ConstraintDependencies {
+		if !manifest.AstroPin(c) {
+			continue
+		}
+		_, version, _ := strings.Cut(c, "==")
+		switch manifest.DistName(c) {
+		case runtimeversions.DistAirflow:
+			b.Airflow = strings.TrimSpace(version)
+		case runtimeversions.DistTaskSDK:
+			b.TaskSDK = strings.TrimSpace(version)
+		}
+	}
+	if b.Airflow != "" {
+		b.Index = runtimeversions.PublicIndexURL()
+	}
+	return b
+}
+
 // compare reads the manifest at path as the write left it, and says which
-// part of [tool.uv] changed from before. The write is judged on its parse
-// already, but EditManifest keeps it to itself, so this is the one load.
+// part of [tool.uv] changed from before: the Airflow pins, and the runtime
+// pins, whose build, Python and count the notice names, which is why this
+// reads the manifest back rather than going by watchManifest's changed alone.
 func (res *astroBuildWrite) compare(before *manifest.Manifest, path string) {
 	after, err := manifest.Load(path)
 	if err != nil {
@@ -207,7 +252,13 @@ func (c *cli) runtimeImage(ctx context.Context, dir string, m *manifest.Manifest
 		catalog = c.d.RuntimeCatalog(ctx)
 	}
 	build, python, err := scaffold.RuntimeBuildFor(dir, m, catalog)
-	return runtimeImage{build: build, python: python, err: err}
+	image := runtimeImage{build: build, python: python, err: err}
+	if err == nil && m.Astro.Dockerfile == "" {
+		if own := scaffold.BuildPython(build, m.Project.RequiresPython, catalog); own != python {
+			image.buildPython = own
+		}
+	}
+	return image
 }
 
 // runtimePins are the runtime pins to write for the manifest m: the package
@@ -247,6 +298,15 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 		return nil
 	}
 	freeze, err := c.d.RuntimePins(ctx, image.build, image.python)
+	if errors.Is(err, runtimecatalog.ErrFreezeNotPublished) && image.buildPython != "" {
+		// The build publishes no list for the Python the project runs (a
+		// patch pin's build, older than the series' newest): its own Python's
+		// list is the nearest there is, said so.
+		res.pinsErr = fmt.Errorf("Astro Runtime %s publishes no package list for Python %s, the one this project runs, so the runtime pins are of its Python %s",
+			image.build, image.python, image.buildPython)
+		image.python = image.buildPython
+		freeze, err = c.d.RuntimePins(ctx, image.build, image.python)
+	}
 	switch {
 	case errors.Is(err, runtimecatalog.ErrFreezeNotPublished), errors.Is(err, runtimecatalog.ErrPinnedResolution):
 		return none
@@ -309,35 +369,17 @@ func (c *cli) pinsOfRelease(ctx context.Context, dir string, m *manifest.Manifes
 // with another's dependencies. It says why with kept. Otherwise, or with no
 // pins there, they come out, with dropped as the warning.
 func keepRecordedPins(m *manifest.Manifest, res *astroBuildWrite, kept string, dropped error) *scaffold.RuntimePins {
-	recorded, ok := recordedAirflowBuild(m)
-	if m.UV.RuntimeBuild == "" || !ok {
+	recorded := recordedAstroBuild(m)
+	if m.UV.RuntimeBuild == "" || recorded.Airflow == "" || !runtimeversions.PinCovers(m.Airflow().Pin, recorded.Airflow) {
 		res.pinsErr = dropped
 		return &scaffold.RuntimePins{}
 	}
-	recorded.Index = res.build.Index
+	if res.build.Index != "" {
+		recorded.Index = res.build.Index
+	}
 	res.build = recorded
 	res.pinsErr = fmt.Errorf("%s keeps the runtime pins of Astro Runtime %s: %s", manifest.Marker, m.UV.RuntimeBuild, kept)
 	return nil
-}
-
-// recordedAirflowBuild is the Astronomer build of Airflow, and of the Task SDK,
-// pinned beside the runtime pins in m, when the Airflow requirement still
-// covers it.
-func recordedAirflowBuild(m *manifest.Manifest) (runtimeversions.AstroBuild, bool) {
-	var b runtimeversions.AstroBuild
-	for _, c := range m.UV.ConstraintDependencies {
-		if !manifest.AstroPin(c) {
-			continue
-		}
-		name, version, _ := strings.Cut(c, "==")
-		switch manifest.DistName(name) {
-		case runtimeversions.DistAirflow:
-			b.Airflow = strings.TrimSpace(version)
-		case runtimeversions.DistTaskSDK:
-			b.TaskSDK = strings.TrimSpace(version)
-		}
-	}
-	return b, b.Airflow != "" && runtimeversions.PinCovers(m.Airflow().Pin, b.Airflow)
 }
 
 // releaseIn is the release, without its +astro build, that freeze pins dist
