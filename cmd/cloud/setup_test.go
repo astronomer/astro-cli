@@ -586,6 +586,20 @@ func TestCheckAPIToken(t *testing.T) {
 		})
 	})
 
+	t.Run("an organization that can't be looked up is an error", func(t *testing.T) {
+		parseAPIToken = func(astroAPIToken string) (*util.CustomClaims, error) {
+			return &mockClaims, nil
+		}
+		rateLimited := astrov1.ListOrganizationsResponse{HTTPResponse: &http.Response{StatusCode: http.StatusTooManyRequests}}
+		mockV1Client.On("ListOrganizationsWithResponse", mock.Anything, mock.Anything).Return(&rateLimited, nil).Once()
+		t.Setenv("ASTRO_API_TOKEN", "token")
+		require.NoError(t, context.Switch("astronomer-dev.io"))
+
+		_, err := checkAPIToken(mockV1Client)
+		assert.ErrorIs(t, err, ErrAPITokenOrganization)
+		assert.ErrorContains(t, err, "status 429")
+	})
+
 	t.Run("failed to parse api token", func(t *testing.T) {
 		authLogin = func(domain, token string, astroV1Client astrov1.APIClient, out io.Writer, shouldDisplayLoginLink bool) error {
 			return nil

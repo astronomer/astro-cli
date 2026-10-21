@@ -34,6 +34,9 @@ var (
 	parseAPIToken         = util.ParseAPIToken
 	errNotAPIToken        = errors.New("the API token given does not appear to be an Astro API Token")
 	errExpiredAPIToken    = errors.New("the API token given has expired")
+	// ErrAPITokenOrganization is returned when the organization of an accepted
+	// API token can't be looked up, which leaves the context without one.
+	ErrAPITokenOrganization = errors.New("cannot look up the organization of the API token")
 )
 
 const (
@@ -439,7 +442,7 @@ func checkAPIToken(astroV1Client astrov1.APIClient) (bool, error) {
 
 	orgs, err := organization.ListOrganizations(astroV1Client)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%w: %w", ErrAPITokenOrganization, err)
 	}
 
 	org := orgs[0]
