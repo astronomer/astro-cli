@@ -179,12 +179,7 @@ func runtimeRoots(ctx context.Context, build, python string, freeze []string) (R
 	if err := os.WriteFile(filepath.Join(work, "constraints.txt"), []byte(strings.Join(freeze, "\n")+"\n"), freezeFilePerm); err != nil {
 		return Roots{}, err
 	}
-	var compiler compileFunc
-	var compilerErr error
-	r := rootsRun{
-		work: work, python: python, key: build + "-python-" + python, freeze: freeze,
-		once: &sync.Once{}, compiler: &compiler, compilerErr: &compilerErr,
-	}
+	r := &rootsRun{work: work, python: python, key: build + "-python-" + python, freeze: freeze}
 	roots, err := r.roots(ctx, freezeName(build, python))
 	if err != nil {
 		return Roots{}, fmt.Errorf("working out what Astro Runtime %s installs: %w", build, err)
@@ -198,24 +193,24 @@ func runtimeRoots(ctx context.Context, build, python string, freeze []string) (R
 type rootsRun struct {
 	work, python, key string
 	freeze            []string
-	once              *sync.Once
-	compiler          *compileFunc
-	compilerErr       *error
+	once              sync.Once
+	compiler          compileFunc
+	compilerErr       error
 }
 
 // compile runs `uv pip compile` through the run's one uv client.
-func (r rootsRun) compile(ctx context.Context, input, args []string) (string, error) {
-	r.once.Do(func() { *r.compiler, *r.compilerErr = newCompiler(ctx) })
-	if *r.compilerErr != nil {
-		return "", *r.compilerErr
+func (r *rootsRun) compile(ctx context.Context, input, args []string) (string, error) {
+	r.once.Do(func() { r.compiler, r.compilerErr = newCompiler(ctx) })
+	if r.compilerErr != nil {
+		return "", r.compilerErr
 	}
-	return (*r.compiler)(ctx, r.work, input, args)
+	return r.compiler(ctx, r.work, input, args)
 }
 
 // args are what every `uv pip compile` of r takes: the Python, the freeze as
 // constraints, and Astronomer's index for its builds of Airflow, which uv
 // reads before the default one.
-func (r rootsRun) args(platform string) []string {
+func (r *rootsRun) args(platform string) []string {
 	return []string{
 		"--python-version", r.python, "--python-platform", platform,
 		"--constraint", "constraints.txt", "--extra-index-url", runtimeversions.PublicIndexURL(),
@@ -223,7 +218,7 @@ func (r rootsRun) args(platform string) []string {
 }
 
 // roots is the published list named name, else the one uv works out, kept.
-func (r rootsRun) roots(ctx context.Context, name string) ([]string, error) {
+func (r *rootsRun) roots(ctx context.Context, name string) ([]string, error) {
 	if roots, ok := publishedRoots(ctx, cacheDir(rootsCacheDir), name); ok {
 		return roots, nil
 	}
@@ -348,7 +343,7 @@ func rootCandidate(dist string) bool {
 // withPlatforms is roots as the group lists them: each for the platforms uv
 // installs it on from wheels alone, by a marker when that is not all of them;
 // left out, with uv's reason, when it is none.
-func (r rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, error) {
+func (r *rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, error) {
 	// What Airflow pulls in on each platform may build from source: the
 	// project installs it anyway.
 	exempt := make([][]string, len(rootsPlatforms))
@@ -412,7 +407,7 @@ func (r rootsRun) withPlatforms(ctx context.Context, roots []string) (Roots, err
 }
 
 // airflowPulls is what the freeze's Airflow pulls in on platform, kept.
-func (r rootsRun) airflowPulls(ctx context.Context, platform string) ([]string, error) {
+func (r *rootsRun) airflowPulls(ctx context.Context, platform string) ([]string, error) {
 	path := r.checkPath("airflow@" + platform)
 	if data, err := readAnswer(path); err == nil {
 		return strings.Fields(string(data)), nil
@@ -470,7 +465,7 @@ func missingWheel(stderr string) string {
 // a wheel it needs does not exist. A wheel that exists for an older Python but
 // not this one may yet be built, so that answer is kept for wheelsLaterTTL;
 // any other no answer from uv, for answerTTL.
-func (r rootsRun) installsFromWheels(ctx context.Context, root, platform string, exempt []string) (ok bool, why string, err error) {
+func (r *rootsRun) installsFromWheels(ctx context.Context, root, platform string, exempt []string) (ok bool, why string, err error) {
 	path := r.checkPath(root + "@" + platform)
 	if answer, err := readAnswer(path); err == nil {
 		return answer == "ok", strings.TrimPrefix(answer, "no: "), nil
@@ -546,7 +541,7 @@ var sourcePythons = []string{"3.12", "3.11"}
 // another Python only, not this one: native, and not built for this Python
 // yet, which can change. Kept, the first for good and the second for
 // wheelsLaterTTL.
-func (r rootsRun) sourceOnly(ctx context.Context, dist string) (source, later bool, err error) {
+func (r *rootsRun) sourceOnly(ctx context.Context, dist string) (source, later bool, err error) {
 	path := r.checkPath("source-only@" + dist)
 	if answer, err := readAnswer(path); err == nil {
 		return answer == "yes", answer == "later", nil
@@ -575,7 +570,7 @@ func (r rootsRun) sourceOnly(ctx context.Context, dist string) (source, later bo
 }
 
 // checkPath is where an answer of r named name is kept, "" for no cache.
-func (r rootsRun) checkPath(name string) string {
+func (r *rootsRun) checkPath(name string) string {
 	dir := cacheDir(rootsChecksDir)
 	if dir == "" {
 		return ""
