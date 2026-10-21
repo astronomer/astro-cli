@@ -101,7 +101,7 @@ curl -sSL install.astronomer.io | sudo bash -s
 To pick another directory, set `ASTRO_INSTALL_DIR`. With `sudo`, set it after `sudo`, because `sudo` drops your environment:
 
 ```sh
-curl -sSL install.astronomer.io | ASTRO_INSTALL_DIR=/opt/bin bash -s
+curl -sSL install.astronomer.io | ASTRO_INSTALL_DIR="$HOME/bin" bash -s
 curl -sSL install.astronomer.io | sudo ASTRO_INSTALL_DIR=/opt/bin bash -s
 ```
 
