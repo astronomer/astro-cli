@@ -63,11 +63,11 @@ var pipCompile = func(ctx context.Context, dir string, input, args []string) (st
 	if root == "" {
 		return "", errors.New("there is no cache directory for uv")
 	}
-	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv"), Env: []string{macOSTarget}})
+	client, err := uv.New(ctx, uv.Options{CacheDir: filepath.Join(root, "uv")})
 	if err != nil {
 		return "", err
 	}
-	return client.PipCompileOut(ctx, dir, input, args)
+	return client.PipCompileOut(ctx, dir, input, args, []string{macOSTarget})
 }
 
 const (
@@ -126,7 +126,7 @@ type LeftOut struct {
 // package list RuntimePins read for the build.
 //
 // A list that could not be had is an error. A failure of the whole
-// computation (not a cancelled or timed-out ctx) is remembered for
+// computation (not a canceled or timed-out ctx) is remembered for
 // rootsFailedTTL, so a start that cannot reach the network waits once, not
 // every time.
 func RuntimeRoots(ctx context.Context, build, python string, freeze []string) (Roots, error) {

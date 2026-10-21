@@ -128,14 +128,16 @@ func (c *Client) PipCompileIn(ctx context.Context, dir, constraint, pythonVersio
 }
 
 // PipCompileOut runs `uv pip compile -` from dir with input, one requirement a
-// line, on stdin and args after it, and returns what it compiled: the
-// requirements file, written to stdout. A resolve with no answer, a wheel
-// --only-binary demands that does not exist among them, is *ResolutionError;
-// any other error is uv not running, the network, or ctx.
-func (c *Client) PipCompileOut(ctx context.Context, dir string, input, args []string) (string, error) {
+// line, on stdin and args after it, and env, KEY=value variables, on top of
+// the inherited environment (MACOSX_DEPLOYMENT_TARGET for a resolve that
+// targets macOS, say). It returns what it compiled: the requirements file,
+// written to stdout. A resolve with no answer, a wheel --only-binary demands
+// that does not exist among them, is *ResolutionError; any other error is uv
+// not running, the network, or ctx.
+func (c *Client) PipCompileOut(ctx context.Context, dir string, input, args, env []string) (string, error) {
 	var out bytes.Buffer
 	stdio := Stdio{In: strings.NewReader(strings.Join(input, "\n") + "\n"), Out: &out}
-	err := c.fetch(ctx, dir, stdio, append([]string{"pip", "compile", "-", "--no-header", "--quiet"}, args...)...)
+	err := c.fetchEnv(ctx, dir, stdio, env, append([]string{"pip", "compile", "-", "--no-header", "--quiet"}, args...)...)
 	return out.String(), asResolution("pip compile", err)
 }
 
@@ -302,6 +304,12 @@ func (c *Client) globalArgs(args []string) []string {
 // An environment that already states a certificate preference is left alone,
 // including when it deliberately chose the bundled roots.
 func (c *Client) fetch(ctx context.Context, project string, stdio Stdio, args ...string) error {
+	return c.fetchEnv(ctx, project, stdio, nil, args...)
+}
+
+// fetchEnv is fetch with extra, KEY=value variables, on top of the inherited
+// environment.
+func (c *Client) fetchEnv(ctx context.Context, project string, stdio Stdio, extra []string, args ...string) error {
 	args = c.globalArgs(args)
 	// Buffered so a second attempt gets the same input the first one consumed.
 	// Every operation routed here takes at most a requirements list on stdin,
@@ -321,7 +329,7 @@ func (c *Client) fetch(ctx context.Context, project string, stdio Stdio, args ..
 		return c.run(ctx, project, env, perRun, args)
 	}
 
-	env := c.childEnv()
+	env := append(c.childEnv(), extra...)
 	stderr, runErr := attempt(env)
 	if runErr != nil && ctx.Err() == nil && isTLSTrustFailure(stderr) && !systemCertsChosen(env) {
 		retryEnv := append(append([]string(nil), env...), systemCertsEnv+"=1")
@@ -517,7 +525,6 @@ func (c *Client) childEnv() []string {
 		}
 		out = append(out, kv)
 	}
-	out = append(out, c.opts.Env...)
 	return append(out, "UV_CACHE_DIR="+c.opts.CacheDir)
 }
 

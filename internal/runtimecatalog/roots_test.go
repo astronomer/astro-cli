@@ -181,7 +181,7 @@ func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 	assert.Equal(t, before, f.calls.Load())
 }
 
-// A cancelled start is not a failure to remember.
+// A canceled start is not a failure to remember.
 func TestRuntimeRootsDoesNotRememberACancelledStart(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "statsd\n"})
 	ctx, cancel := context.WithCancel(context.Background())
