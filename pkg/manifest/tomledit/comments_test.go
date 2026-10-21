@@ -157,6 +157,25 @@ func TestArrayLinesReadsBytesAlreadyDecoded(t *testing.T) {
 	}
 }
 
+// SetLines of the same values without the comments there takes the comments
+// out and keeps the array one element per line; a second one changes nothing.
+func TestSetLinesDropsCommentsTheValuesDoNotCarry(t *testing.T) {
+	src := "[tool.uv]\nconstraint-dependencies = [\n    'x',\n    # heading\n    # end\n]\n"
+	e, err := NewSurgical([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "[tool.uv]\nconstraint-dependencies = [\n    'x',\n]\n"
+	for range 2 {
+		if err := SetLines(e, pinsKey, []any{"x"}); err != nil {
+			t.Fatal(err)
+		}
+		if got, _ := e.Bytes(); string(got) != want {
+			t.Fatalf("SetLines left:\n%s\nwant:\n%s", got, want)
+		}
+	}
+}
+
 // foreignEditor is an Editor from outside this package: it has Editor's
 // methods and no GetLines.
 type foreignEditor struct{ Editor }

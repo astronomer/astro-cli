@@ -37,6 +37,19 @@ func TestStartWritesTheRuntimeGroup(t *testing.T) {
 	}
 }
 
+// A start that cannot reach Astronomer's index keeps the Airflow build, and
+// still brings the group up to date, which needs no index.
+func TestStartRefreshesTheRuntimeGroupWithoutTheIndex(t *testing.T) {
+	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
+	r := pinsRun{src: written, lookupErr: errors.New("dial tcp: no route to host"), freeze: freeze339, roots: []string{"statsd"}}.start(t)
+	if !strings.Contains(r.manifest, "'statsd'") || strings.Contains(r.manifest, "'pandas-market-calendars'") {
+		t.Errorf("the group was not refreshed without the index:\n%s", r.manifest)
+	}
+	if !strings.Contains(r.manifest, "'apache-airflow==3.3.2+astro.2'") {
+		t.Errorf("the Airflow build did not stay:\n%s", r.manifest)
+	}
+}
+
 // A list that cannot be worked out leaves the group as it is, with a warning.
 func TestStartKeepsTheRuntimeGroupWhenTheListCannotBeRead(t *testing.T) {
 	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest

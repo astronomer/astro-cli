@@ -74,10 +74,10 @@ var (
 // and every comment, as it was.
 //
 // pins are the runtime pins to write in place of the ones there. nil means
-// they are not known (no network, say): the ones there stay, less any package
-// the project now lists or constrains itself.
-// group is the astro-runtime dependency group to write in place of the one
-// there (setRuntimeGroup), nil when it is not known, as with pins.
+// they are not known (no network, say): the ones there stay, less any the project
+// now gives a version they do not meet. group is the astro-runtime dependency
+// group to write in place of the one there (setRuntimeGroup), nil when it is
+// not known, as with pins.
 //
 // The Refused it returns reports runtime pins, or a group, that were not
 // written because the array cannot hold the comments that mark them: a
@@ -208,32 +208,19 @@ func setAstroPins(ed tomledit.Editor, b runtimeversions.AstroBuild, dists []stri
 	if len(dists) > 0 {
 		head = append(head, asAny(b.Pins())...)
 	}
-	own := ownPackages(ed, slices.Concat(head, tail))
-	var managed []any
-	if pins == nil {
-		managed = keptRuntimePins(current, own)
-	} else {
-		managed = pins.lines(own)
-	}
-	out := slices.Concat(head, managed, tail)
-	if reflect.DeepEqual(out, lines) {
-		return false, nil
-	}
-	err = setConstraints(ed, out)
-	if errors.Is(err, tomledit.ErrCommentsUnsupported) && len(managed) > 0 {
-		return true, setConstraints(ed, slices.Concat(head, tail))
-	}
-	return false, err
+	return writeRuntimePins(ed, lines, head, current, tail, pins)
 }
 
-// setConstraints writes lines as constraint-dependencies, or takes the key
-// out when they hold no constraint, comments alone being nothing to keep.
+// setConstraints writes lines as constraint-dependencies, comments included,
+// so comments that lines leave out go even when the values stay the same (the
+// heading and end of runtime pins whose every pin was deleted), or takes the
+// key out when they hold no constraint, comments alone being nothing to keep.
 func setConstraints(ed tomledit.Editor, lines []any) error {
 	if !slices.ContainsFunc(lines, func(v any) bool { _, isComment := v.(tomledit.Comment); return !isComment }) {
 		ed.Delete(constraintsKey)
 		return nil
 	}
-	return ed.Set(constraintsKey, lines)
+	return tomledit.SetLines(ed, constraintsKey, lines)
 }
 
 // withoutAstroPins is lines without the constraints that hold Airflow to a

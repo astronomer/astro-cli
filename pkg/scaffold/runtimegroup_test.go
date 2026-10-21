@@ -148,14 +148,15 @@ func TestTheRuntimeGroupDoesNotTakeTheirPinsOut(t *testing.T) {
 	assert.Contains(t, out, `"protobuf==6.33.6; python_version == '3.12'"`)
 }
 
-// PruneRuntimePins needs no lookup, and lets a package the project now lists
-// out of the group as it does out of the pins.
-func TestPruneRuntimePinsPrunesTheGroup(t *testing.T) {
+// SetRuntimePins with nothing known needs no lookup, and lets a package the
+// project now lists out of the group, as it lets a pin it excludes go.
+func TestSetRuntimePinsPrunesTheGroup(t *testing.T) {
 	dir := projectWith(t, astroHead)
 	writeGroup(t, dir, freeze339, &RuntimeGroup{Build: "3.3-9", Names: []string{"pandas", "statsd"}})
 	addDependency(t, dir, "pandas>=3")
 
-	require.NoError(t, PruneRuntimePins(dir, nil))
+	_, err := SetRuntimePins(dir, nil, nil, nil)
+	require.NoError(t, err)
 	m, err := manifest.Load(filepath.Join(dir, manifest.Marker))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"statsd"}, m.RuntimeGroup)
