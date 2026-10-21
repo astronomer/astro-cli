@@ -421,38 +421,89 @@ var wheelsRequiredRe = regexp.MustCompile(`Wheels are required for \x60([^\x60]+
 // every other package of the freeze is held to wheels. why is uv's reason
 // when it does not. An answer, either way, is kept; a failure to ask is an
 // error.
+//
+// A package uv names for want of a wheel that publishes none at all, for any
+// platform (sourceOnly), is taken for pure Python, which builds anywhere: it
+// is let build, and the root asked again, up to rootsRetries times. One that
+// has wheels somewhere (mysqlclient's are Windows') is native, and the root
+// stays out.
 func (r rootsRun) installsFromWheels(ctx context.Context, root, platform string, exempt []string) (ok bool, why string, err error) {
 	path := r.checkPath(root + "@" + platform)
 	if data, err := readAnswer(path); err == nil {
 		answer := strings.TrimSpace(string(data))
 		return answer == "ok", strings.TrimPrefix(answer, "no: "), nil
 	}
-	args := r.args(platform)
-	for _, pin := range r.freeze {
-		if name := manifest.DistName(pin); !slices.Contains(exempt, name) {
-			args = append(args, "--only-binary", name)
-		}
-	}
-	_, err = pipCompile(ctx, r.work, []string{root}, args)
-	var resolution *uv.ResolutionError
-	switch {
-	case err == nil:
-		keep(path, "ok")
-		return true, "", nil
-	case errors.As(err, &resolution):
-		why = "uv cannot install it from wheels"
-		if m := wheelsRequiredRe.FindStringSubmatch(resolution.Stderr); m != nil {
-			if m[1] == root {
-				why = "it has no wheel"
-			} else {
-				why = "it pulls in " + m[1] + ", which has no wheel"
+	builds := slices.Clone(exempt)
+	for range rootsRetries {
+		args := r.args(platform)
+		for _, pin := range r.freeze {
+			if name := manifest.DistName(pin); !slices.Contains(builds, name) {
+				args = append(args, "--only-binary", name)
 			}
 		}
-		keep(path, "no: "+why)
-		return false, why, nil
-	default:
-		return false, "", err
+		_, err = pipCompile(ctx, r.work, []string{root}, args)
+		var resolution *uv.ResolutionError
+		switch {
+		case err == nil:
+			keep(path, "ok")
+			return true, "", nil
+		case !errors.As(err, &resolution):
+			return false, "", err
+		}
+		m := wheelsRequiredRe.FindStringSubmatch(resolution.Stderr)
+		if m == nil {
+			why = "uv cannot install it from wheels"
+			break
+		}
+		named := manifest.DistName(m[1])
+		if named == root {
+			why = "it has no wheel"
+		} else {
+			why = "it pulls in " + named + ", which has no wheel"
+		}
+		source, err := r.sourceOnly(ctx, named)
+		if err != nil {
+			return false, "", err
+		}
+		if !source || slices.Contains(builds, named) {
+			break
+		}
+		builds = append(builds, named)
 	}
+	keep(path, "no: "+why)
+	return false, why, nil
+}
+
+// rootsRetries bounds the packages installsFromWheels lets build for one root
+// on one platform.
+const rootsRetries = 5
+
+// sourcePlatforms are where sourceOnly looks for a wheel: every platform a
+// project locks for, and Windows, where native packages with no wheel for
+// Linux or macOS (mysqlclient) still publish one.
+var sourcePlatforms = []string{"x86_64-pc-windows-msvc", "x86_64-manylinux_2_28", "aarch64-apple-darwin"}
+
+// sourceOnly reports whether dist, at the freeze's version, publishes no wheel
+// for any of sourcePlatforms: uv installs it from wheels on none of them.
+// Kept, as the answers are.
+func (r rootsRun) sourceOnly(ctx context.Context, dist string) (bool, error) {
+	path := r.checkPath("source-only@" + dist)
+	if data, err := readAnswer(path); err == nil {
+		return strings.TrimSpace(string(data)) == "yes", nil
+	}
+	for _, platform := range sourcePlatforms {
+		_, err := pipCompile(ctx, r.work, []string{dist}, append(r.args(platform), "--only-binary", dist))
+		var resolution *uv.ResolutionError
+		switch {
+		case err == nil:
+			keep(path, "no")
+			return false, nil
+		case !errors.As(err, &resolution):
+			return false, err
+		}
+	}
+	keep(path, "yes")
+	return true, nil
 }
 
 // checkPath is where an answer of r named name is kept, "" for no cache.

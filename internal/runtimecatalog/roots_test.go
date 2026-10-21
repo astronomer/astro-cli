@@ -17,12 +17,13 @@ import (
 	"github.com/astronomer/astro-cli/pkg/uv"
 )
 
-// fakeUV answers `uv pip compile` without uv: answer gets the input and the
-// platform, and whether it is the annotated roots compile. It counts the
-// calls, and fails the test when one holds an exempt package to wheels.
+// fakeUV answers `uv pip compile` without uv: answer gets the input, the
+// platform, whether it is the annotated roots compile, and the packages the
+// call holds to wheels. It counts the calls, and keeps every package any call
+// held to wheels.
 type fakeUV struct {
 	calls  atomic.Int32
-	answer func(input []string, platform string, annotated bool) (string, error)
+	answer func(input []string, platform string, annotated bool, held []string) (string, error)
 	mu     sync.Mutex
 	held   []string
 }
@@ -33,6 +34,7 @@ func (f *fakeUV) install(t *testing.T) {
 	pipCompile = func(_ context.Context, _ string, input, args []string) (string, error) {
 		f.calls.Add(1)
 		platform, annotated := "", false
+		var held []string
 		for i, a := range args {
 			switch a {
 			case "--python-platform":
@@ -40,12 +42,13 @@ func (f *fakeUV) install(t *testing.T) {
 			case "--annotation-style":
 				annotated = true
 			case "--only-binary":
-				f.mu.Lock()
-				f.held = append(f.held, args[i+1])
-				f.mu.Unlock()
+				held = append(held, args[i+1])
 			}
 		}
-		return f.answer(input, platform, annotated)
+		f.mu.Lock()
+		f.held = append(f.held, held...)
+		f.mu.Unlock()
+		return f.answer(input, platform, annotated, held)
 	}
 	t.Cleanup(func() { pipCompile = old })
 }
@@ -58,13 +61,16 @@ func noWheel(dist string) error {
 var freeze339 = []string{
 	"apache-airflow==3.3.2+astro.2", "apache-airflow-core==3.3.2+astro.2", "lazy-object-proxy==1.10.0",
 	"apache-airflow-providers-mysql==6.4.0", "mysqlclient==2.2.8", "statsd==4.0.1", "linuxonly==1.0",
+	"apache-airflow-providers-google==10.26.0", "json-merge-patch==0.2",
 	"astronomer-kubernetes-executor==10.22.0+astro.1", "pip==26.2.1",
 }
 
 // answers339 is uv on freeze339: Airflow pulls in lazy-object-proxy (no macOS
-// wheel, and exempt); providers-mysql pulls in mysqlclient on Linux, which has
-// no wheel anywhere; linuxonly has none for macOS.
-func answers339(input []string, platform string, _ bool) (string, error) {
+// wheel, and exempt); providers-mysql pulls in mysqlclient on Linux, whose
+// only wheels are Windows' (native); linuxonly has none for macOS;
+// providers-google pulls in json-merge-patch, which publishes no wheel at all
+// (pure Python, built from source).
+func answers339(input []string, platform string, _ bool, held []string) (string, error) {
 	if slices.Contains(input, "apache-airflow") {
 		return "apache-airflow==3.3.2+astro.2\napache-airflow-core==3.3.2+astro.2\nlazy-object-proxy==1.10.0\n", nil
 	}
@@ -75,10 +81,20 @@ func answers339(input []string, platform string, _ bool) (string, error) {
 			return "", noWheel("mysqlclient")
 		}
 	case "mysqlclient":
-		return "", noWheel("mysqlclient")
+		if !strings.Contains(platform, "windows") {
+			return "", noWheel("mysqlclient")
+		}
 	case "linuxonly":
 		if !linux {
 			return "", noWheel("linuxonly")
+		}
+	case "json-merge-patch":
+		if slices.Contains(held, "json-merge-patch") {
+			return "", noWheel("json-merge-patch")
+		}
+	case "apache-airflow-providers-google":
+		if slices.Contains(held, "json-merge-patch") {
+			return "", noWheel("json-merge-patch")
 		}
 	}
 	return input[0] + "==1.0\n", nil
@@ -101,16 +117,18 @@ func rootsServer(t *testing.T, files map[string]string) {
 const published339 = "/runtime-roots/runtime-3.3-9-python-3.14.txt"
 
 // Each root is listed for the platforms uv installs it on from wheels alone:
-// providers-mysql only on macOS, since on Linux it pulls in mysqlclient;
-// linuxonly only on Linux; mysqlclient, with no wheel anywhere, left out with
-// uv's reason. What Airflow pulls in is never held to wheels.
+// providers-mysql only on macOS, since on Linux it pulls in mysqlclient, which
+// is native (its wheels are Windows'); linuxonly only on Linux; mysqlclient
+// left out with uv's reason. providers-google pulls in json-merge-patch, which
+// publishes no wheel at all: taken for pure Python, it may build, and google
+// is listed everywhere. What Airflow pulls in is never held to wheels.
 func TestRuntimeRootsListsEachForThePlatformsItInstallsOn(t *testing.T) {
-	rootsServer(t, map[string]string{published339: "apache-airflow-providers-mysql\nmysqlclient\nstatsd\nlinuxonly\npip\nastronomer-runtime-extensions\n"})
+	rootsServer(t, map[string]string{published339: "apache-airflow-providers-mysql\nmysqlclient\nstatsd\nlinuxonly\npip\nastronomer-runtime-extensions\napache-airflow-providers-google\n"})
 	f := &fakeUV{answer: answers339}
 	f.install(t)
 	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"apache-airflow-providers-mysql; " + darwinMarker, "linuxonly; " + linuxMarker, "statsd"}, got.Names)
+	assert.Equal(t, []string{"apache-airflow-providers-google", "apache-airflow-providers-mysql; " + darwinMarker, "linuxonly; " + linuxMarker, "statsd"}, got.Names)
 	assert.Equal(t, []LeftOut{{Name: "mysqlclient", Why: "it has no wheel on Linux x86_64, Linux aarch64, macOS arm64 (Python 3.14)"}}, got.LeftOut)
 	assert.NotContains(t, f.held, "lazy-object-proxy", "what Airflow pulls in may build")
 	assert.Contains(t, f.held, "mysqlclient")
@@ -127,9 +145,12 @@ func TestRuntimeRootsListsEachForThePlatformsItInstallsOn(t *testing.T) {
 // wheel.
 func TestRuntimeRootsSaysWhatARootPullsIn(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "apache-airflow-providers-mysql\n"})
-	f := &fakeUV{answer: func(input []string, platform string, _ bool) (string, error) {
+	f := &fakeUV{answer: func(input []string, platform string, _ bool, _ []string) (string, error) {
 		if slices.Contains(input, "apache-airflow") {
 			return "", nil
+		}
+		if input[0] == "mysqlclient" && strings.Contains(platform, "windows") {
+			return "mysqlclient==2.2.8\n", nil
 		}
 		return "", noWheel("mysqlclient")
 	}}
@@ -146,24 +167,26 @@ func TestRuntimeRootsSaysWhatARootPullsIn(t *testing.T) {
 // via-list names no other candidate and no Airflow distribution, kept.
 func TestRuntimeRootsWorksOutTheList(t *testing.T) {
 	rootsServer(t, map[string]string{})
-	f := &fakeUV{answer: func(input []string, platform string, annotated bool) (string, error) {
+	f := &fakeUV{answer: func(input []string, platform string, annotated bool, held []string) (string, error) {
 		if annotated {
 			return "apache-airflow==3.3.2+astro.2\n" +
 				"lazy-object-proxy==1.10.0    # via apache-airflow, -c constraints.txt\n" +
 				"mysqlclient==2.2.8           # via apache-airflow-providers-mysql, -c constraints.txt\n" +
 				"apache-airflow-providers-mysql==6.4.0  # via -c constraints.txt\n" +
 				"statsd==4.0.1                # via -c constraints.txt\n" +
-				"linuxonly==1.0               # via linuxonly, -c constraints.txt\n", nil
+				"linuxonly==1.0               # via linuxonly, -c constraints.txt\n" +
+				"apache-airflow-providers-google==10.26.0  # via -c constraints.txt\n" +
+				"json-merge-patch==0.2        # via apache-airflow-providers-google, -c constraints.txt\n", nil
 		}
-		return answers339(input, platform, false)
+		return answers339(input, platform, false, held)
 	}}
 	f.install(t)
 	got, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"apache-airflow-providers-mysql; " + darwinMarker, "linuxonly; " + linuxMarker, "statsd"}, got.Names)
+	assert.Equal(t, []string{"apache-airflow-providers-google", "apache-airflow-providers-mysql; " + darwinMarker, "linuxonly; " + linuxMarker, "statsd"}, got.Names)
 	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_CACHE_HOME"), "astro", rootsComputedDir, "runtime-3.3-9-python-3.14.txt"))
 	require.NoError(t, err)
-	assert.Equal(t, "apache-airflow-providers-mysql\nlinuxonly\nstatsd\n", string(data))
+	assert.Equal(t, "apache-airflow-providers-google\napache-airflow-providers-mysql\nlinuxonly\nstatsd\n", string(data))
 }
 
 // A failure to ask uv (the network, uv itself) fails the whole list, which
@@ -171,7 +194,9 @@ func TestRuntimeRootsWorksOutTheList(t *testing.T) {
 // an answer.
 func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "statsd\n"})
-	f := &fakeUV{answer: func([]string, string, bool) (string, error) { return "", errors.New("dial tcp: no route to host") }}
+	f := &fakeUV{answer: func([]string, string, bool, []string) (string, error) {
+		return "", errors.New("dial tcp: no route to host")
+	}}
 	f.install(t)
 	_, err := RuntimeRoots(context.Background(), "3.3-9", "3.14", freeze339)
 	require.ErrorContains(t, err, "no route to host")
@@ -185,7 +210,7 @@ func TestRuntimeRootsRemembersAFailure(t *testing.T) {
 func TestRuntimeRootsDoesNotRememberACancelledStart(t *testing.T) {
 	rootsServer(t, map[string]string{published339: "statsd\n"})
 	ctx, cancel := context.WithCancel(context.Background())
-	f := &fakeUV{answer: func([]string, string, bool) (string, error) { cancel(); return "", context.Canceled }}
+	f := &fakeUV{answer: func([]string, string, bool, []string) (string, error) { cancel(); return "", context.Canceled }}
 	f.install(t)
 	_, err := RuntimeRoots(ctx, "3.3-9", "3.14", freeze339)
 	require.Error(t, err)
