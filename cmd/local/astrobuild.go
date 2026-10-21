@@ -84,7 +84,7 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 				manifest.Marker, manifest.RuntimeGroupName, n, res.groupAfterBuild)
 			c.reportGroupLeftOut(res)
 		} else {
-			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s is gone: there is no runtime image to match\n", manifest.Marker, manifest.RuntimeGroupName)
+			fmt.Fprintf(c.d.Stderr, "%s: [dependency-groups] %s now lists none of a runtime image's packages: none apply to this project\n", manifest.Marker, manifest.RuntimeGroupName)
 		}
 	}
 	if res.pinsChanged {
@@ -109,8 +109,8 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 // installs one where its build works.
 func (c *cli) reportGroupLeftOut(res astroBuildWrite) {
 	for _, l := range res.groupLeftOut {
-		fmt.Fprintf(c.d.Stderr, "%s: %s leaves out %s, which the runtime image has: %s on Python %s. Docker mode still has it; uv add %s installs it anyway\n",
-			manifest.Marker, manifest.RuntimeGroupName, l.Name, l.Why, res.after.RuntimePython, l.Name)
+		fmt.Fprintf(c.d.Stderr, "%s: %s leaves out %s, which the runtime image has: %s. Docker mode still has it; uv add %s installs it anyway\n",
+			manifest.Marker, manifest.RuntimeGroupName, l.Name, l.Why, l.Name)
 	}
 }
 
@@ -154,6 +154,10 @@ type astroBuildWrite struct {
 	// pinsCutoff says the runtime pins came out for a cutoff, which keeps the
 	// runtime group (runtimeGroup).
 	pinsCutoff bool
+	// venvPython is the Python the project runs, which the runtime group's
+	// packages are judged on, whatever list of the build the pins fell back
+	// to.
+	venvPython string
 	// groupErr says why the runtime group was not brought up to date, when it
 	// is worth a warning. groupChanged says the write changed it, groupAfter
 	// and groupAfterBuild are it as the write left it, and groupLeftOut the
@@ -352,6 +356,7 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 		// list is the nearest there is, said so.
 		res.pinsErr = fmt.Errorf("Astro Runtime %s publishes no package list for Python %s, the one this project runs, so the runtime pins are of its Python %s",
 			image.build, image.python, image.buildPython)
+		res.venvPython = image.python
 		image.python = image.buildPython
 		freeze, err = c.d.RuntimePins(ctx, image.build, image.python)
 	}
@@ -450,7 +455,11 @@ func (c *cli) runtimeGroup(ctx context.Context, pins *scaffold.RuntimePins, res 
 	case pins.Build == "":
 		return &scaffold.RuntimeGroup{}
 	}
-	roots, err := c.d.RuntimeRoots(ctx, pins.Build, pins.Python, pins.Pins)
+	python := res.venvPython
+	if python == "" {
+		python = pins.Python
+	}
+	roots, err := c.d.RuntimeRoots(ctx, pins.Build, python, pins.Pins)
 	if err != nil {
 		res.groupErr = fmt.Errorf("%s keeps its %s dependency group as it is: %w", manifest.Marker, manifest.RuntimeGroupName, err)
 		return nil

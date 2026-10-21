@@ -16,7 +16,7 @@ var roots339 = []string{"apache-airflow-providers-celery", "pandas-market-calend
 // the pins read, puts the group in default-groups, and says so once, with
 // what it left out for want of a wheel.
 func TestStartWritesTheRuntimeGroup(t *testing.T) {
-	leftOut := []runtimecatalog.LeftOut{{Name: "apache-airflow-providers-mysql", Why: "it pulls in mysqlclient, which has no wheel for Linux x86_64, Linux aarch64"}}
+	leftOut := []runtimecatalog.LeftOut{{Name: "apache-airflow-providers-mysql", Why: "it pulls in mysqlclient, which has no wheel on Linux x86_64, Linux aarch64 (Python 3.12)"}}
 	r := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339, leftOut: leftOut}.start(t)
 	if strings.Join(r.rootsAsked, " ") != "3.3-9 3.12" || !slices.Equal(r.rootsFreeze, freeze339) {
 		t.Errorf("roots asked for %q with %q, want the pins' build, Python and package list", r.rootsAsked, r.rootsFreeze)
@@ -33,7 +33,7 @@ func TestStartWritesTheRuntimeGroup(t *testing.T) {
 	}
 	for _, want := range []string{
 		"astro-runtime now installs the 3 packages Astro Runtime 3.3-9 installs",
-		"astro-runtime leaves out apache-airflow-providers-mysql, which the runtime image has: it pulls in mysqlclient, which has no wheel for Linux x86_64, Linux aarch64 on Python 3.12. Docker mode still has it; uv add apache-airflow-providers-mysql installs it anyway",
+		"astro-runtime leaves out apache-airflow-providers-mysql, which the runtime image has: it pulls in mysqlclient, which has no wheel on Linux x86_64, Linux aarch64 (Python 3.12). Docker mode still has it; uv add apache-airflow-providers-mysql installs it anyway",
 	} {
 		if !strings.Contains(r.out, want) {
 			t.Errorf("the start did not say %q:\n%s", want, r.out)
@@ -81,31 +81,32 @@ func TestStartKeepsTheRuntimeGroupWithThePins(t *testing.T) {
 	}
 }
 
-// A build that publishes no package list takes the pins out, and the group
-// with them, with its place in default-groups.
-func TestStartTakesOutTheRuntimeGroupOfABuildWithNoList(t *testing.T) {
+// A build that publishes no package list takes the pins out, and empties the
+// group, which stays with its place in default-groups.
+func TestStartEmptiesTheRuntimeGroupOfABuildWithNoList(t *testing.T) {
 	written := pinsRun{src: buildManifest, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
 	r := pinsRun{src: written, build: build332, freezeErr: runtimecatalog.ErrFreezeNotPublished, roots: roots339}.start(t)
-	if strings.Contains(r.manifest, "astro-runtime") || strings.Contains(r.manifest, "dependency-groups") || len(r.rootsAsked) != 0 {
-		t.Errorf("the group stayed (roots asked %q) for a build with no list:\n%s", r.rootsAsked, r.manifest)
+	if !emptied(r.manifest) || len(r.rootsAsked) != 0 {
+		t.Errorf("the group was not emptied (roots asked %q) for a build with no list:\n%s", r.rootsAsked, r.manifest)
 	}
-	if !strings.Contains(r.out, "astro-runtime is gone") {
-		t.Errorf("the start did not say it took the group out:\n%s", r.out)
+	if !strings.Contains(r.out, "astro-runtime now lists none of a runtime image's packages") {
+		t.Errorf("the start did not say it emptied the group:\n%s", r.out)
 	}
 }
 
-// A list whose Airflow is another release than the Airflow pin's takes the
-// pins out, and the group with them: both would be of an image the project
-// does not build on.
-func TestStartTakesOutTheRuntimeGroupWithThePinsOfAnotherRelease(t *testing.T) {
+// A list whose Airflow is another release than the Airflow pin's, for a
+// runtime the user named, takes the pins out, and empties the group: both
+// would be of an image the project does not build on. With no build named,
+// the pins there are kept, and the group with them.
+func TestStartEmptiesTheRuntimeGroupWithThePinsOfAnotherRelease(t *testing.T) {
 	// A runtime the user named, carrying another release than the requirement,
-	// takes the pins out, and the group with them.
+	// takes the pins out, and empties the group.
 	named := strings.Replace(buildManifest, "[tool.astro]\n", "[tool.astro]\nruntime = '3.3-9'\n", 1)
 	written := pinsRun{src: named, build: build332, freeze: freeze339, roots: roots339}.start(t).manifest
 	other := []string{"apache-airflow==3.3.1+astro.1", "pandas==2.2.3"}
 	r := pinsRun{src: written, build: build332, freeze: other, roots: roots339}.start(t)
-	if strings.Contains(r.manifest, "astro-runtime =") || len(r.rootsAsked) != 0 {
-		t.Errorf("the group stayed (roots asked %q) beside pins of another release:\n%s", r.rootsAsked, r.manifest)
+	if !emptied(r.manifest) || len(r.rootsAsked) != 0 {
+		t.Errorf("the group was not emptied (roots asked %q) beside pins of another release:\n%s", r.rootsAsked, r.manifest)
 	}
 
 	// With no build named, the lookup and the list disagree on their own: the
@@ -115,6 +116,12 @@ func TestStartTakesOutTheRuntimeGroupWithThePinsOfAnotherRelease(t *testing.T) {
 	if !strings.Contains(r.manifest, "# Astro Runtime 3.3-9 installs these") || len(r.rootsAsked) != 0 {
 		t.Errorf("kept pins did not keep the group (roots asked %q):\n%s", r.rootsAsked, r.manifest)
 	}
+}
+
+// emptied reports a manifest whose astro-runtime group is there, empty.
+func emptied(manifest string) bool {
+	return strings.Contains(manifest, "# None apply to this project now.") && !strings.Contains(manifest, "'pandas-market-calendars'") &&
+		strings.Contains(manifest, "'astro-runtime'")
 }
 
 // Under the project's own cutoff the pins come out, and the group, names

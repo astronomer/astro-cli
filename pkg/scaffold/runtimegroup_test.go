@@ -102,27 +102,41 @@ func TestTheRuntimeGroupJoinsTheProjectsDefaultGroups(t *testing.T) {
 }
 
 // A project that took the group out of default-groups keeps it out: the group
-// is refreshed, and not installed.
+// is refreshed, and not installed, through emptying and filling again.
 func TestTheRuntimeGroupStaysOutOfDefaultGroupsWhenTakenOut(t *testing.T) {
 	dir := projectWith(t, astroHead)
 	writeGroup(t, dir, nil, group339)
+	takeOutOfDefaultGroups(t, dir)
+
+	out, m := writeGroup(t, dir, nil, &RuntimeGroup{Build: "3.3-10", Names: []string{"statsd"}})
+	assert.Equal(t, []string{"statsd"}, m.RuntimeGroup)
+	assert.Contains(t, out, "Astro Runtime 3.3-10 installs these")
+	assert.Equal(t, []any{"dev"}, defaultGroups(t, out))
+
+	// Emptied and filled again, it is still the project's choice: the group
+	// stayed, empty, so it was never created again.
+	writeGroup(t, dir, nil, &RuntimeGroup{})
+	out, m = writeGroup(t, dir, nil, &RuntimeGroup{Build: "3.3-11", Names: []string{"statsd"}})
+	assert.Equal(t, []string{"statsd"}, m.RuntimeGroup)
+	assert.Equal(t, []any{"dev"}, defaultGroups(t, out))
+}
+
+// takeOutOfDefaultGroups takes astro-runtime out of default-groups, as a
+// project opting out of it would.
+func takeOutOfDefaultGroups(t *testing.T, dir string) {
+	t.Helper()
 	path := filepath.Join(dir, manifest.Marker)
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	taken := strings.Replace(string(data), "    'astro-runtime',\n", "", 1)
 	require.NotEqual(t, string(data), taken)
 	require.NoError(t, os.WriteFile(path, []byte(taken), 0o600))
-
-	out, m := writeGroup(t, dir, nil, &RuntimeGroup{Build: "3.3-10", Names: []string{"statsd"}})
-	assert.Equal(t, []string{"statsd"}, m.RuntimeGroup)
-	assert.Contains(t, out, "Astro Runtime 3.3-10 installs these")
-	assert.Equal(t, []any{"dev"}, defaultGroups(t, out))
 }
 
 // A group that is not known stays, less a package the project now lists; one
-// with nothing left goes, with its place in default-groups and the table
-// around it.
-func TestTheRuntimeGroupIsPrunedAndTakenOut(t *testing.T) {
+// with nothing left stays too, empty under comments that say so, and keeps
+// its place in default-groups.
+func TestTheRuntimeGroupIsPrunedAndEmptied(t *testing.T) {
 	dir := projectWith(t, astroHead)
 	writeGroup(t, dir, nil, group339)
 	addDependency(t, dir, "psycopg2-binary")
@@ -132,8 +146,39 @@ func TestTheRuntimeGroupIsPrunedAndTakenOut(t *testing.T) {
 
 	out, m := writeGroup(t, dir, nil, &RuntimeGroup{})
 	assert.Nil(t, m.RuntimeGroup)
+	assert.Contains(t, out, "astro-runtime = [\n    # astro writes here the packages the project's Astro Runtime image installs")
+	assert.Contains(t, out, "# None apply to this project now.\n]")
+	assert.Equal(t, []any{"dev", "astro-runtime"}, defaultGroups(t, out))
+}
+
+// A group with nothing in it is not created: a project that never had one
+// (a runtime with no package list) gets no group and no default-groups.
+func TestAnEmptyRuntimeGroupIsNotCreated(t *testing.T) {
+	dir := projectWith(t, astroHead)
+	out, m := writeGroup(t, dir, nil, &RuntimeGroup{})
+	assert.Nil(t, m.RuntimeGroup)
 	assert.NotContains(t, out, "dependency-groups")
 	assert.NotContains(t, out, "default-groups")
+}
+
+// Runtime pins that cannot be written leave no group either: its packages
+// would lock unpinned.
+func TestNoRuntimeGroupBesideRefusedPins(t *testing.T) {
+	src := strings.Replace(astroHead, "[tool.astro]\n", "[tool.astro]\n\n[tool]\nuv = { constraint-dependencies = ['numpy<3'] }\n", 1)
+	dir := projectWith(t, src)
+	refused, err := SetAstroBuild(dir, nil, runtimeversions.AstroBuild{}, freeze339, group339)
+	require.NoError(t, err)
+	assert.True(t, refused.Pins)
+	out, err := os.ReadFile(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), "astro-runtime")
+
+	refused, err = SetRuntimePins(dir, nil, freeze339, group339)
+	require.NoError(t, err)
+	assert.True(t, refused.Pins)
+	out, err = os.ReadFile(filepath.Join(dir, manifest.Marker))
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), "astro-runtime")
 }
 
 // The group is astro's list of what the image has, not packages the project

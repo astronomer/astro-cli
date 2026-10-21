@@ -150,6 +150,17 @@ func RuntimeGroupComments(build string) []string {
 	}
 }
 
+// RuntimeGroupEmptyComments are the comment lines of the runtime group with
+// nothing in it: the project builds on no Astro Runtime that lists its
+// packages, or lists every one of them itself. The group stays, so a choice
+// made in default-groups stays with it.
+func RuntimeGroupEmptyComments() []string {
+	return []string{
+		"astro writes here the packages the project's Astro Runtime image installs, so the local environment has what the image has.",
+		"None apply to this project now.",
+	}
+}
+
 // runtimeGroupHeaderRe reads the build back out of the first of
 // RuntimeGroupComments.
 var runtimeGroupHeaderRe = regexp.MustCompile(`^Astro Runtime (\S+) installs these`)

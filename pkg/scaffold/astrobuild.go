@@ -88,6 +88,11 @@ func SetAstroBuild(dir string, wrap func(run func() error) error, b runtimeversi
 		if err := setAstroBuild(before, ed, b, pins, &refused.Pins); err != nil {
 			return err
 		}
+		if refused.Pins {
+			// Without the pins the group's packages would lock unpinned, newer
+			// than the image's: no group either.
+			return nil
+		}
 		var err error
 		refused.Group, err = setRuntimeGroup(ed, group)
 		return err
