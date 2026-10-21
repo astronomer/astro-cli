@@ -108,6 +108,9 @@ func (c *cli) reportAstroBuild(r cliout.Renderer, res astroBuildWrite) {
 // on a platform a project runs on. Docker mode still has them, and uv add
 // installs one where its build works.
 func (c *cli) reportGroupLeftOut(res astroBuildWrite) {
+	if !res.groupWritten {
+		return
+	}
 	for _, l := range res.groupLeftOut {
 		fmt.Fprintf(c.d.Stderr, "%s: %s leaves out %s, which the runtime image has: %s. Docker mode still has it; uv add %s installs it anyway\n",
 			manifest.Marker, manifest.RuntimeGroupName, l.Name, l.Why, l.Name)
@@ -154,10 +157,9 @@ type astroBuildWrite struct {
 	// pinsCutoff says the runtime pins came out for a cutoff, which keeps the
 	// runtime group (runtimeGroup).
 	pinsCutoff bool
-	// venvPython is the Python the project runs, which the runtime group's
-	// packages are judged on, whatever list of the build the pins fell back
-	// to.
-	venvPython string
+	// groupWritten says the runtime group decided on was written: the write
+	// worked, and neither the pins nor the group were refused.
+	groupWritten bool
 	// groupErr says why the runtime group was not brought up to date, when it
 	// is worth a warning. groupChanged says the write changed it, groupAfter
 	// and groupAfterBuild are it as the write left it, and groupLeftOut the
@@ -220,6 +222,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 			return err
 		})
 		res.writeErr = writeErr
+		res.groupWritten = group != nil && writeErr == nil && !res.refused.Pins && !res.refused.Group
 		res.compare(m, path)
 		// Only the runtime pins and the runtime group were written, so
 		// whatever else changed is the pins': the comments around them, when
@@ -243,6 +246,7 @@ func (c *cli) writeAstroBuild(ctx context.Context, dir string) astroBuildWrite {
 		return err
 	})
 	res.writeErr = writeErr
+	res.groupWritten = group != nil && writeErr == nil && !res.refused.Pins && !res.refused.Group
 	res.compare(m, path)
 	// A write that changed neither the Airflow pins, the runtime pins nor the
 	// runtime group repaired another of the settings that hold Airflow to the
@@ -356,7 +360,6 @@ func (c *cli) runtimePins(ctx context.Context, dir string, m *manifest.Manifest,
 		// list is the nearest there is, said so.
 		res.pinsErr = fmt.Errorf("Astro Runtime %s publishes no package list for Python %s, the one this project runs, so the runtime pins are of its Python %s",
 			image.build, image.python, image.buildPython)
-		res.venvPython = image.python
 		image.python = image.buildPython
 		freeze, err = c.d.RuntimePins(ctx, image.build, image.python)
 	}
@@ -455,11 +458,10 @@ func (c *cli) runtimeGroup(ctx context.Context, pins *scaffold.RuntimePins, res 
 	case pins.Build == "":
 		return &scaffold.RuntimeGroup{}
 	}
-	python := res.venvPython
-	if python == "" {
-		python = pins.Python
-	}
-	roots, err := c.d.RuntimeRoots(ctx, pins.Build, python, pins.Pins)
+	// The pins' own Python and list, the build's Python when the project's
+	// has none: the group is worked out from the same list, and kept under
+	// its Python.
+	roots, err := c.d.RuntimeRoots(ctx, pins.Build, pins.Python, pins.Pins)
 	if err != nil {
 		res.groupErr = fmt.Errorf("%s keeps its %s dependency group as it is: %w", manifest.Marker, manifest.RuntimeGroupName, err)
 		return nil
