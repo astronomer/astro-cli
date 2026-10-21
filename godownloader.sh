@@ -326,10 +326,15 @@ github_release() {
 # Returns 0 on a 200, 2 on a 404, and 1, having said why, on anything else.
 # GITHUB_TOKEN, when set, lifts the API's limit of 60 unauthenticated requests an hour
 github_api() {
+  if ! is_command curl; then
+    log_crit "curl is required to look up versions on GitHub"
+    return 1
+  fi
+  # curl still prints the code (000) when it exits non-zero for no answer.
   if [ -n "${GITHUB_TOKEN:-}" ]; then
-    resp=$(curl -s -w '%{http_code}' -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/$1")
+    resp=$(curl -s -w '%{http_code}' -H "Authorization: Bearer ${GITHUB_TOKEN}" "https://api.github.com/$1") || true
   else
-    resp=$(curl -s -w '%{http_code}' "https://api.github.com/$1")
+    resp=$(curl -s -w '%{http_code}' "https://api.github.com/$1") || true
   fi
   code=$(printf '%s' "$resp" | tail -c 3)
   body=${resp%???}
@@ -361,17 +366,19 @@ is_version_prefix() {
 # first by semver precedence. sort -V is not POSIX, some busybox builds leave
 # it out, and it puts 1.0.0-rc.1 above 1.0.0, so each tag gets a key whose
 # numeric parts are zero-padded and the keys sort as plain text. A release's
-# key ends in ~, which sorts above the . that starts a pre-release's.
+# key ends in ~, which sorts above the . that starts a pre-release's. Padding
+# is done on the string: mawk's and busybox's %d stop at 2^31.
 sort_versions() {
-  awk '{
+  awk 'function pad(s) { return substr("00000000000000000000" s, length(s) + 1) }
+  {
     v = substr($0, 2); pre = ""
     i = index(v, "-")
     if (i) { pre = substr(v, i + 1); v = substr(v, 1, i - 1) }
     split(v, n, ".")
-    key = sprintf("%012d.%012d.%012d", n[1], n[2], n[3])
+    key = pad(n[1]) "." pad(n[2]) "." pad(n[3])
     if (pre == "") key = key "~"
     m = split(pre, p, ".")
-    for (j = 1; j <= m; j++) key = key "." (p[j] ~ /^[0-9]+$/ ? sprintf("%012d", p[j]) : p[j])
+    for (j = 1; j <= m; j++) key = key "." (p[j] ~ /^[0-9]+$/ ? pad(p[j]) : p[j])
     print key " " $0
   }' | LC_ALL=C sort -r | awk '{ print $2 }'
 }
@@ -405,9 +412,8 @@ github_prefix_release() {
     return 1
   fi
   stable=$(printf '%s\n' "$tags" | grep -v -- - | sort_versions) || true
-  tried=
+  pending=
   demoted=
-  blocked=
   for tag in $(printf '%s\n' "$stable" | head -n 5); do
     rc=0
     release=$(github_api "repos/${owner_repo}/releases/tags/${tag}") || rc=$?
@@ -416,7 +422,6 @@ github_prefix_release() {
       2) release= ;;
       *) return 1 ;;
     esac
-    tried="${tried} ${tag}"
     if [ -n "$release" ] && printf '%s\n' "$release" | release_has_checksums "$tag"; then
       case "$(printf '%s\n' "$release" | release_prerelease)" in
         false)
@@ -429,17 +434,17 @@ github_prefix_release() {
           ;;
       esac
     fi
-    blocked=1
+    pending="${pending} ${tag}"
   done
-  if [ -n "$blocked" ] || [ "$(printf '%s\n' "$stable" | grep -c .)" -gt 5 ]; then
-    log_err "no release has its checksums uploaded among the highest tags under ${want}:${tried}"
+  if [ -n "$pending" ]; then
+    log_err "no stable release under ${want} is ready; without a release or still uploading its checksums:${pending}${demoted:+; marked as a pre-release on GitHub:${demoted}}"
     return 1
   fi
   pre=$( (
     printf '%s\n' "$tags" | grep -- - || true
     for tag in $demoted; do printf '%s\n' "$tag"; done
   ) | sort_versions)
-  tried=
+  pending=
   for tag in $(printf '%s\n' "$pre" | head -n 5); do
     case " ${demoted} " in
       *" ${tag} "*)
@@ -459,9 +464,9 @@ github_prefix_release() {
       2) ;;
       *) return 1 ;;
     esac
-    tried="${tried} ${tag}"
+    pending="${pending} ${tag}"
   done
-  log_err "no release has its checksums uploaded among the highest tags under ${want}:${tried}"
+  log_err "no pre-release under ${want} is ready among the 5 highest; without a release or still uploading its checksums:${pending}"
   return 1
 }
 hash_sha256() {

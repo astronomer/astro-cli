@@ -94,6 +94,25 @@ v6.0.0 flagged
 v6.0.0-rc.1 release
 v7.0.0 flagged
 v7.1.0-rc.1 release
+v8.0.0 uploading
+v8.0.0-rc.1 release
+v10.0.0-rc.1 release
+v10.0.0-rc.2 uploading
+v10.0.0-rc.3 uploading
+v10.0.0-rc.4 uploading
+v10.0.0-rc.5 uploading
+v10.0.0-rc.6 uploading
+v11.0.0 flagged
+v11.0.1 flagged
+v11.0.2 flagged
+v11.0.3 flagged
+v11.0.4 flagged
+v11.0.5 flagged
+v11.1.0-rc.1 release
+v12.0.0 uploading
+v12.1.0 flagged
+v13.0.0-nightly.202610201230 release
+v13.0.0-nightly.2999999999 release
 EOF
 
 cat >"$work/stub/curl" <<'EOF'
@@ -123,7 +142,11 @@ esac
 if [ -f "$STUB_API/status-$key" ]; then
   status=$(cat "$STUB_API/status-$key")
   case "$status" in
-    000) ;;
+    # No answer: curl prints 000 and exits 7 (could not connect).
+    000)
+      printf 000
+      exit 7
+      ;;
     403) echo '{"message": "API rate limit exceeded for 192.0.2.1."}' ;;
     *) echo '{"message": "Server Error"}' ;;
   esac
@@ -230,7 +253,7 @@ check v2.0.0-nightly.20261014 v2 3
 check v2.0.0-nightly.20261014 2 3
 # Five stable tags without a release stop the search: no rc is installed in
 # their place, and v3.0.0 is never asked about.
-check '' v3 6 'no release has its checksums uploaded'
+check '' v3 6 'no stable release under v3. is ready'
 # A full version or a pre-release: exactly that tag, with or without the v.
 check v1.46.0 v1.46.0 1
 check v1.46.0 1.46.0 1
@@ -264,6 +287,21 @@ check v5.0.0 v5 3
 # and, when no stable tag qualifies, competes with the pre-releases by semver.
 check v6.0.0 v6 2
 check v7.1.0-rc.1 v7 3
+
+# A stable tag still publishing holds the pre-releases back, however ready
+# its rc is,
+check '' v8 2 'still uploading its checksums: v8.0.0'
+# and the message tells it apart from one GitHub marks as a pre-release.
+check '' v12 3 'marked as a pre-release on GitHub: v12.1.0'
+# Five stable tags all marked pre-release move on to the pre-release tier,
+# where v11.1.0-rc.1 outranks them.
+check v11.1.0-rc.1 v11 7
+# The pre-release tier checks 5 tags too: rc.6 to rc.2 are uploading, and
+# rc.1 is never asked about.
+check '' v10 6 'no pre-release under v10. is ready among the 5 highest'
+# Numeric identifiers compare as numbers at any length, past the 2^31 where
+# mawk's and busybox's %d stop.
+check v13.0.0-nightly.202610201230 v13 2
 
 # Among pre-releases the highest by semver wins: an rc outranks every nightly
 # of its version, and a stable release outranks both.
