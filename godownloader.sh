@@ -90,12 +90,9 @@ get_binaries() {
   esac
 }
 # MANUALLY ADDED FUNCTION
+# version_gte A B: B is at or above A by semver precedence.
 version_gte() {
-  if [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]; then
-    return 0
-  else
-    return 1
-  fi
+  [ "$(printf 'v%s\nv%s\n' "$1" "$2" | sort_versions | tail -n 1)" = "v$1" ]
 }
 tag_to_version() {
   if [ -z "${TAG}" ]; then
@@ -326,9 +323,7 @@ github_release() {
   test -z "$version" && return 1
   echo "$version"
 }
-# github_api prints the body of a GET against the GitHub API. It returns 0 on
-# a 200, 2 on a 404, and 1, having said why, on anything else: a rate limit,
-# a server error, or no answer at all.
+# Returns 0 on a 200, 2 on a 404, and 1, having said why, on anything else.
 # GITHUB_TOKEN, when set, lifts the API's limit of 60 unauthenticated requests an hour
 github_api() {
   if [ -n "${GITHUB_TOKEN:-}" ]; then
@@ -340,10 +335,15 @@ github_api() {
   body=${resp%???}
   case "$code" in
     200)
+      # printf, not echo: dash's echo expands the backslashes in a release body.
       printf '%s\n' "$body"
       return 0
       ;;
     404) return 2 ;;
+    000 | '')
+      log_crit "could not reach GitHub (api.github.com) for $1; check the network connection, DNS and any proxy settings"
+      return 1
+      ;;
   esac
   case "$body" in
     *"rate limit exceeded"*) log_crit "GitHub API rate limit exceeded; set GITHUB_TOKEN or try again later" ;;
@@ -351,8 +351,6 @@ github_api() {
   esac
   return 1
 }
-# is_version_prefix reports whether $1, a version without its v, is a major
-# (2) or a major.minor (1.46) rather than a full version or a pre-release.
 is_version_prefix() {
   case "$1" in
     '' | *[!0-9.]* | .* | *. | *..* | *.*.*) return 1 ;;
@@ -360,8 +358,10 @@ is_version_prefix() {
   return 0
 }
 # sort_versions reads vX.Y.Z[-pre] tags, one per line, and prints them highest
-# first by semver precedence. sort -V is not in busybox, so each tag gets a
-# key whose numeric parts are zero-padded and the keys sort as plain text.
+# first by semver precedence. sort -V is not POSIX, some busybox builds leave
+# it out, and it puts 1.0.0-rc.1 above 1.0.0, so each tag gets a key whose
+# numeric parts are zero-padded and the keys sort as plain text. A release's
+# key ends in ~, which sorts above the . that starts a pre-release's.
 sort_versions() {
   awk '{
     v = substr($0, 2); pre = ""
@@ -369,17 +369,30 @@ sort_versions() {
     if (i) { pre = substr(v, i + 1); v = substr(v, 1, i - 1) }
     split(v, n, ".")
     key = sprintf("%012d.%012d.%012d", n[1], n[2], n[3])
+    if (pre == "") key = key "~"
     m = split(pre, p, ".")
     for (j = 1; j <= m; j++) key = key "." (p[j] ~ /^[0-9]+$/ ? sprintf("%012d", p[j]) : p[j])
     print key " " $0
   }' | LC_ALL=C sort -r | awk '{ print $2 }'
 }
-# A partial version (v2, v1.46) installs the highest stable release whose tag
-# starts with the prefix it is given (v2., v1.46.) or, while there is no
-# stable tag, the highest such pre-release. matching-refs lists every tag
-# under the prefix in one answer. A release counts only once its checksums
-# are uploaded, so a tag still publishing, or one with no release, steps down
-# to the next in its tier, never to a pre-release; any other API error fails.
+release_has_checksums() {
+  grep -qF "\"name\": \"${PROJECT_NAME}_${1#v}_checksums.txt\""
+}
+# A release body's own quotes arrive escaped, so release notes that mention
+# "prerelease" cannot match.
+release_prerelease() {
+  sed -n 's/.*"prerelease": *\([a-z]*\).*/\1/p' | head -n 1
+}
+# A partial version (v2, v1.46) installs the highest stable release under the
+# prefix it is given (v2., v1.46.) or, while there is none, the highest
+# pre-release by semver, so an rc outranks a nightly of the same version.
+# matching-refs lists every tag under the prefix in one answer, unpaginated.
+#
+# A tag is stable when it has no hyphen and its release is not marked
+# prerelease; a marked one moves to the pre-release tier. A release counts
+# only once its checksums are uploaded. A stable tag still publishing, or with
+# no release, steps down to the next stable tag but never to a pre-release.
+# Each tier checks at most 5 tags; any other API error fails.
 github_prefix_release() {
   owner_repo=$1
   want=$2
@@ -387,21 +400,58 @@ github_prefix_release() {
   tags=$(printf '%s\n' "$refs" | sed -n 's/^ *"ref": *"refs\/tags\/\([^"]*\)".*/\1/p' |
     grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$' |
     awk -v want="$want" 'index($0, want) == 1') || true
-  candidates=$(printf '%s\n' "$tags" | grep -v -- - | sort_versions) || true
-  if [ -z "$candidates" ]; then
-    candidates=$(printf '%s\n' "$tags" | grep -- - | sort_versions) || true
-  fi
-  if [ -z "$candidates" ]; then
+  if [ -z "$tags" ]; then
     log_err "no tag starts with ${want}"
     return 1
   fi
+  stable=$(printf '%s\n' "$tags" | grep -v -- - | sort_versions) || true
   tried=
-  for tag in $(printf '%s\n' "$candidates" | head -n 5); do
+  demoted=
+  blocked=
+  for tag in $(printf '%s\n' "$stable" | head -n 5); do
+    rc=0
+    release=$(github_api "repos/${owner_repo}/releases/tags/${tag}") || rc=$?
+    case "$rc" in
+      0) ;;
+      2) release= ;;
+      *) return 1 ;;
+    esac
+    tried="${tried} ${tag}"
+    if [ -n "$release" ] && printf '%s\n' "$release" | release_has_checksums "$tag"; then
+      case "$(printf '%s\n' "$release" | release_prerelease)" in
+        false)
+          printf '%s\n' "$tag"
+          return 0
+          ;;
+        true)
+          demoted="${demoted} ${tag}"
+          continue
+          ;;
+      esac
+    fi
+    blocked=1
+  done
+  if [ -n "$blocked" ] || [ "$(printf '%s\n' "$stable" | grep -c .)" -gt 5 ]; then
+    log_err "no release has its checksums uploaded among the highest tags under ${want}:${tried}"
+    return 1
+  fi
+  pre=$( (
+    printf '%s\n' "$tags" | grep -- - || true
+    for tag in $demoted; do printf '%s\n' "$tag"; done
+  ) | sort_versions)
+  tried=
+  for tag in $(printf '%s\n' "$pre" | head -n 5); do
+    case " ${demoted} " in
+      *" ${tag} "*)
+        printf '%s\n' "$tag"
+        return 0
+        ;;
+    esac
     rc=0
     release=$(github_api "repos/${owner_repo}/releases/tags/${tag}") || rc=$?
     case "$rc" in
       0)
-        if printf '%s\n' "$release" | grep -qF "\"name\": \"${PROJECT_NAME}_${tag#v}_checksums.txt\""; then
+        if printf '%s\n' "$release" | release_has_checksums "$tag"; then
           printf '%s\n' "$tag"
           return 0
         fi

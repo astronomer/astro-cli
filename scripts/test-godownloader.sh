@@ -14,17 +14,21 @@ trap 'rm -rf "$work"' EXIT
 api=$work/api
 mkdir -p "$work/stub" "$api" "$work/tmp"
 
-# release TAG [CHECKSUMS] writes the releases/tags answer for TAG, with its
-# checksums asset unless CHECKSUMS is "no", and a body that would break echo
-# under dash and quotes another release's asset name.
+# release TAG [CHECKSUMS] [PRERELEASE] writes the releases/tags answer for
+# TAG, with its checksums asset unless CHECKSUMS is "no" and GitHub's
+# prerelease flag set to PRERELEASE (default false). Its body, ahead of the
+# flag, would break echo under dash and quotes another release's asset name
+# and the opposite flag.
 release() {
-  local tag=$1 sums=${2:-yes}
+  local tag=$1 sums=${2:-yes} pre=${3:-false} other=true
+  if [ "$pre" = true ]; then other=false; fi
   {
     cat <<EOF
 {
   "tag_name": "$tag",
   "name": "$tag",
-  "prerelease": false,
+  "body": "Fixes \\\\c in paths. See \\"name\\": \\"astro_${tag#v}_checksums.txt\\" and \\"prerelease\\": $other",
+  "prerelease": $pre,
   "assets": [
 EOF
     if [ "$sums" = yes ]; then
@@ -40,25 +44,31 @@ EOF
       "name": "astro_${tag#v}_linux_amd64.tar.gz",
       "size": 1024
     }
-  ],
-  "body": "Fixes \\\\c in paths. See \\"name\\": \\"astro_${tag#v}_checksums.txt\\""
+  ]
 }
 EOF
   } >"$api/tags-$tag"
 }
 # Every tag in the fixture repository and the state of its release: a release
-# with checksums, a release still uploading them, or no release at all.
+# with checksums, a release still uploading them, a release with checksums
+# that GitHub marks as a prerelease, or no release at all.
 # Rows are in matching-refs text order: v1.46.10 before v1.46.9, v1.10.0 before v1.9.0.
 while read -r tag state; do
   echo "$tag" >>"$api/all-tags"
   case "$state" in
     release) release "$tag" ;;
     uploading) release "$tag" no ;;
+    flagged) release "$tag" yes true ;;
   esac
 done <<'EOF'
 v0.6.0 release
 v0.6.1 release
 v0.6.2 none
+v0.100.0 release
+v0.27.1 release
+v0.27.2 release
+v0.27.2-rc.1 release
+v0.28.0 release
 v1.10.0 release
 v1.4.1 release
 v1.46.0 release
@@ -78,6 +88,12 @@ v3.0.2 none
 v3.0.3 none
 v3.0.4 none
 v3.0.5 none
+v5.0.0 release
+v5.1.0 flagged
+v6.0.0 flagged
+v6.0.0-rc.1 release
+v7.0.0 flagged
+v7.1.0-rc.1 release
 EOF
 
 cat >"$work/stub/curl" <<'EOF'
@@ -107,6 +123,7 @@ esac
 if [ -f "$STUB_API/status-$key" ]; then
   status=$(cat "$STUB_API/status-$key")
   case "$status" in
+    000) ;;
     403) echo '{"message": "API rate limit exceeded for 192.0.2.1."}' ;;
     *) echo '{"message": "Server Error"}' ;;
   esac
@@ -138,12 +155,13 @@ case "$key" in
     ;;
 esac
 EOF
-# linux/amd64 everywhere, so a host that is darwin/arm64 does not refuse v0.6.
+# linux/amd64 unless STUB_ARCH says otherwise, so a host that is darwin/arm64
+# does not refuse v0.6.
 cat >"$work/stub/uname" <<'EOF'
 #!/bin/sh
 case "$1" in
   -s) echo Linux ;;
-  -m) echo x86_64 ;;
+  -m) echo "${STUB_ARCH:-x86_64}" ;;
   *) echo Linux ;;
 esac
 EOF
@@ -235,6 +253,42 @@ rm "$api/status-refs-v1.46."
 echo 503 >"$api/status-tags-v1.46.0"
 check '' v1.46.0 1 'HTTP 503'
 rm "$api/status-tags-v1.46.0"
+
+echo 000 >"$api/status-refs-v1.46."
+check '' v1.46 1 'could not reach GitHub (api.github.com)'
+rm "$api/status-refs-v1.46."
+
+# GitHub's prerelease flag outranks the tag's shape: a hyphen-less tag it
+# marks is passed over for the next stable tag,
+check v5.0.0 v5 3
+# and, when no stable tag qualifies, competes with the pre-releases by semver.
+check v6.0.0 v6 2
+check v7.1.0-rc.1 v7 3
+
+# Among pre-releases the highest by semver wins: an rc outranks every nightly
+# of its version, and a stable release outranks both.
+cp "$api/all-tags" "$work/all-tags.bak"
+for tag in v2.0.0-nightly.20261020 v2.0.0-nightly.20261030 v2.0.0-rc.1; do
+  echo "$tag" >>"$api/all-tags"
+  release "$tag"
+done
+check v2.0.0-rc.1 v2 2
+echo v2.0.0 >>"$api/all-tags"
+release v2.0.0
+check v2.0.0 v2 2
+cp "$work/all-tags.bak" "$api/all-tags"
+
+# linux/arm64 builds start at 0.27.2, which version_gte decides: equal,
+# greater (by number, not text: 0.100.0), less, and a pre-release of 0.27.2,
+# which is below it.
+export STUB_ARCH=aarch64
+check v0.27.2 v0.27.2 1
+check v0.28.0 v0.28.0 1
+check v0.100.0 v0.100.0 1
+check v1.46.0 v1.46.0 1
+check '' v0.27.1 1 'platform linux/arm64 is not supported for 0.27.1'
+check '' v0.27.2-rc.1 1 'platform linux/arm64 is not supported for 0.27.2-rc.1'
+unset STUB_ARCH
 
 # GITHUB_TOKEN is sent on every API request.
 rm -f "$api/auth-log"
