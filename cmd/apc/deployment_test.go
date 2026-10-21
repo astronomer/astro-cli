@@ -340,6 +340,19 @@ func (s *Suite) TestDeploymentCreateCommandGitSyncDisabledAndVersionIs1_0_0AndCl
 	}
 }
 
+func (s *Suite) TestDeploymentCreateCommandAppConfigLookupFails() {
+	appConfig = &houston.AppConfig{}
+
+	api := new(mocks.ClientInterface)
+	api.On("GetAppConfig", mock.Anything).Return(nil, errMockHouston)
+	api.On("GetPlatformVersion", nil).Return("1.0.0", nil)
+
+	houstonClient = api
+	_, err := execDeploymentCmd("create", "--label=new-deployment-name", "--executor=celery", "--cluster-id=cluster-test-id")
+	s.EqualError(err, "failed to get app config: "+errMockHouston.Error())
+	api.AssertNotCalled(s.T(), "CreateDeployment", mock.Anything)
+}
+
 func (s *Suite) TestDeploymentCreateWithTypeDagDeploy() {
 	s.Run("user should not be prompted if deployment type is not dag_deploy", func() {
 		appConfig = &houston.AppConfig{
