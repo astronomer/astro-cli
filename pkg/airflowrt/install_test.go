@@ -28,6 +28,9 @@ var helperContentAtVersion = map[int]string{
 	// 4, and the astro-runtime dependency group not counted as the project
 	// naming a base image package.
 	5: "9e63e4d8a11522988c9bc9639325f7ed479dc4429cd3dd0646c56aaeffe2913e",
+	// The Airflow comparison runs only on a lock that is not stale, reads the
+	// pins' build from the [tool.uv] pins header alone, and names astro init.
+	6: "80b93403892ef730f62f9a4a698e03c0b46b5f653c112f77ec0fe7d480853253",
 }
 
 func TestInstallHelperVersionMovesWithItsContent(t *testing.T) {

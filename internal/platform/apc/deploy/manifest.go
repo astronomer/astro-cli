@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -535,31 +536,36 @@ func listedRuntimes(client houston.ClientInterface, clusterID, workspaceID, depl
 // listedReleases is APC's deploybuild.RuntimeOffer.
 var _ deploybuild.RuntimeOffer = listedReleases(nil)
 
-// NewestFor is the newest runtime build listed that carries the Airflow the
-// pin names: that exact version for a pin with a patch ("2.10.3"), any of its
-// series for one without ("3.1"). "" when none is listed.
-func (l listedReleases) NewestFor(pin string) string {
-	newest := ""
+// BuildsFor are the runtime builds listed that carry the Airflow the pin
+// names, newest first: that exact version for a pin with a patch ("2.10.3"),
+// any of its series for one without ("3.1"). None for a bare "3", which every
+// other path refuses to resolve.
+func (l listedReleases) BuildsFor(pin string) []string {
+	pin = strings.TrimSpace(pin)
+	if pin == "" || pin == "3" {
+		return nil
+	}
+	var out []string
 	for i := range l {
-		av := l[i].AirflowVersion
-		if !runtimeversions.PinCovers(pin, av) {
-			continue
-		}
-		if newest == "" || airflowversions.CompareRuntimeVersions(l[i].Version, newest) > 0 {
-			newest = l[i].Version
+		if runtimeversions.PinCovers(pin, l[i].AirflowVersion) {
+			out = append(out, l[i].Version)
 		}
 	}
-	return newest
+	slices.SortFunc(out, func(a, b string) int { return airflowversions.CompareRuntimeVersions(b, a) })
+	return out
+}
+
+// NewestFor is the newest of BuildsFor, or "" when none is listed.
+func (l listedReleases) NewestFor(pin string) string {
+	if builds := l.BuildsFor(pin); len(builds) > 0 {
+		return builds[0]
+	}
+	return ""
 }
 
 // Offers reports whether the platform lists build.
 func (l listedReleases) Offers(build string) bool {
-	for i := range l {
-		if l[i].Version == build {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(l, func(r houston.RuntimeRelease) bool { return r.Version == build })
 }
 
 // houstonBase resolves a generated build's runtime base by local Docker

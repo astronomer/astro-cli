@@ -318,7 +318,8 @@ func schedulesOn(p localrt.Plan, mode localrt.Mode) bool {
 // runtimeKey is the manifest key a runtime-build finding is about.
 const runtimeKey = "tool.astro.runtime"
 
-// checkRuntimeBuild holds a Docker-mode start's [tool.astro] runtime build to
+// checkRuntimeBuild holds a Docker-mode start's runtime build, [tool.astro]
+// runtime or else the build its runtime pins name (Plan.LockedRuntime), to
 // the pin with the runtime catalog (Deps.RuntimeCheck), before anything
 // starts: a build of another Airflow series refuses the start, and a yanked
 // build, one whose exact Airflow the pin excludes, or one the check could not
@@ -326,17 +327,31 @@ const runtimeKey = "tool.astro.runtime"
 // builds no image, so the build decides nothing there and is not checked; a
 // declared Dockerfile never has one beside it.
 func (c *cli) checkRuntimeBuild(ctx context.Context, r cliout.Renderer, p localrt.Plan) error {
-	if p.Mode != localrt.ModeDocker || p.Runtime == "" || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
+	// The build the image starts FROM: [tool.astro] runtime, else the build the
+	// runtime pins were taken from (the lock's), which a yanked build is held
+	// to the same way.
+	build, key := p.Runtime, runtimeKey
+	if build == "" {
+		build, key = p.LockedRuntime, "tool.uv.constraint-dependencies"
+	}
+	if p.Mode != localrt.ModeDocker || build == "" || p.Dockerfile != "" || c.d.RuntimeCheck == nil {
 		return nil
 	}
-	warnings, err := c.d.RuntimeCheck(ctx, p.Runtime, p.AirflowVersion)
+	warnings, err := c.d.RuntimeCheck(ctx, build, p.AirflowVersion)
 	for _, w := range warnings {
+		text := w.Message
+		if p.Runtime == "" {
+			text = fmt.Sprintf("the runtime pins' build, Astro Runtime %s, which the image builds on: %s", build, w.Message)
+		}
 		emitWarning(r, event{
 			Event:  "warning",
-			Text:   fmt.Sprintf("%s: %s: %s", manifest.Marker, runtimeKey, w.Message),
-			Key:    runtimeKey,
-			Reason: w.Message,
+			Text:   fmt.Sprintf("%s: %s: %s", manifest.Marker, key, text),
+			Key:    key,
+			Reason: text,
 		})
+	}
+	if err != nil && p.Runtime == "" {
+		return fmt.Errorf("the runtime pins' build, Astro Runtime %s, which the image builds on: %w; run astro init to move them to another build", build, err)
 	}
 	return err
 }

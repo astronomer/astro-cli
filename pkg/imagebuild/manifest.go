@@ -66,14 +66,8 @@ func lockedRuntime(m *manifest.Manifest) string {
 	if t, ok := manifest.ParseRuntimeTag(build); !ok || !t.Build || !t.Agrees(pin) {
 		return ""
 	}
-	for _, c := range m.UV.ConstraintDependencies {
-		if !manifest.AstroPin(c) || !manifest.NamesAirflow(c) {
-			continue
-		}
-		_, version, _ := strings.Cut(c, "==")
-		if !runtimeversions.PinCovers(pin, version) {
-			return ""
-		}
+	if !runtimeversions.AstroBuildCovered(pin, m.UV.ConstraintDependencies) {
+		return ""
 	}
 	return build
 }
@@ -107,9 +101,10 @@ func lockedBase(base BaseImageFunc) BaseImageFunc {
 // LockedRuntimeNotices are what a local or packaged build of m has to say
 // about the build its lock was made for (LockedRuntime), read against
 // catalog: that requires-python admits none of that build's Pythons, so the
-// image builds on the newest build of the series instead; else that a newer
-// build of the pin is available, which the project moves to only by running
-// astro init, since moving the build moves the lock. Nothing when the manifest
+// image builds on the newest build of the series instead; else that the
+// build is yanked, or else that a newer build of the pin is available, either
+// of which the project moves off only by running astro init, since moving the
+// build moves the lock. Nothing when the manifest
 // names its own build, when there is no lock build, or with no catalog.
 func LockedRuntimeNotices(m ManifestBuild, catalog *runtimeversions.Catalog) []string {
 	if m.Runtime != "" || m.Dockerfile != "" || m.LockedRuntime == "" || catalog == nil {
@@ -121,6 +116,17 @@ func LockedRuntimeNotices(m ManifestBuild, catalog *runtimeversions.Catalog) []s
 		return []string{fmt.Sprintf(
 			"requires-python %s admits none of the Pythons Astro Runtime %s ships (%s), the build this project's uv.lock was made for, so the image builds on the newest build of Airflow %s instead. Run astro init to move the lock to a build it admits",
 			notShipped.RequiresPython, m.LockedRuntime, strings.Join(notShipped.Pythons, ", "), m.AirflowVersion)}
+	}
+	if r, ok := catalog.Runtime(m.LockedRuntime); ok && r.Yanked {
+		why := ""
+		if reason := strings.TrimSpace(r.YankedReason); reason != "" {
+			why = " (" + reason + ")"
+		}
+		move := "Run astro init to move to another build"
+		if newest, ok := catalog.NewestPublishedRuntimeFor(m.AirflowVersion); ok {
+			move = "Run astro init to move to " + newest
+		}
+		return []string{fmt.Sprintf("Astro Runtime %s, which this project builds on, is yanked%s. %s", m.LockedRuntime, why, move)}
 	}
 	if newer, ok := catalog.NewerBuildFor(m.AirflowVersion, m.LockedRuntime); ok {
 		return []string{fmt.Sprintf("Astro Runtime %s is available; this project builds on %s. Run astro init to move to it", newer, m.LockedRuntime)}

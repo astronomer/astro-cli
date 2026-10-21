@@ -278,6 +278,34 @@ func (r *Runtime) scheduled() bool {
 	return err == nil && day.After(now().UTC())
 }
 
+// AstroBuildCovered reports whether every Astronomer build of Airflow pinned
+// in constraints ([tool.uv] constraint-dependencies, an
+// "apache-airflow==X.Y.Z+astro.N" line) carries a release the Airflow pin
+// still covers. With none pinned there is nothing to disagree, and it is true.
+// False is a pin that moved since the build was written: the build, and what
+// was written beside it, belong to an Airflow the project no longer asks for.
+func AstroBuildCovered(pin string, constraints []string) bool {
+	for _, c := range constraints {
+		name, version, ok := strings.Cut(c, "==")
+		if !ok || !strings.Contains(version, "+astro.") || normalizeDist(name) != DistAirflow {
+			continue
+		}
+		if !PinCovers(pin, version) {
+			return false
+		}
+	}
+	return true
+}
+
+// normalizeDist is a distribution name as PEP 503 compares it.
+func normalizeDist(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if i := strings.IndexAny(name, "[ \t<>=!~;@("); i >= 0 {
+		name = name[:i]
+	}
+	return strings.NewReplacer("_", "-", ".", "-").Replace(name)
+}
+
 // PinCovers reports whether an Airflow release satisfies a pin that may name
 // fewer segments than the release does: "3.3" covers "3.3.2", "3.3.2" covers
 // "3.3.2", and neither covers "3.4.0". A release's local label is not part of

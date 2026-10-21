@@ -120,19 +120,21 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	// says it only when the group changes, which after a first init it does
 	// not.
 	build := c.writeAstroBuild(ctx, res.Dir)
+	// On stderr as text in either format: init's stdout is its one result.
+	notes := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
 	if res.Existing {
 		// Bringing a project up to date is where a Docker-only project moves
-		// to a newer runtime build, so it says what moved, and the lock
-		// follows the pins and the runtime group.
-		// On stderr as text in either format: init's stdout is its one result.
-		notes := cliout.Renderer{Format: cliout.FormatText, Out: c.d.Stderr}
+		// to a newer runtime build, so it says what moved.
 		c.reportAstroBuild(notes, build)
-		c.relockAfterInit(ctx, notes, res.Dir, build)
 		// The refresh changed the manifest, so the project was not up to date.
 		if (build.pinsChanged || build.airflowChanged || build.groupChanged) && !slices.Contains(res.Updated, manifest.Marker) {
 			res.Updated = append(res.Updated, manifest.Marker)
 		}
 	}
+	// A uv.lock already there, in a project this run adopted or converted as
+	// in one it brought up to date, was resolved without what init just
+	// wrote into [tool.uv], so it follows.
+	c.relockAfterInit(ctx, notes, res.Dir, build)
 	// reportAstroBuild already said it when the group changed.
 	if !res.Existing || !build.groupChanged {
 		c.reportGroupLeftOut(build)
@@ -142,30 +144,35 @@ func (c *cli) runInit(ctx context.Context, dir string, opts scaffold.Options) er
 	})
 }
 
-// relockAfterInit runs `uv lock` in a project whose uv.lock astro init just
-// left behind its [tool.uv]: the runtime pins or the Airflow build moved. The
-// images install the lock's versions and build on the runtime the pins name,
-// so a lock still resolved for the old build would install that build's
-// versions over the new one. With no uv to run, it says to run it. A project
-// with no uv.lock has nothing to follow.
+// relockAfterInit runs `uv lock` in a project that has a uv.lock, so the lock
+// follows pyproject.toml as init left it: the runtime pins or the Airflow
+// build may have moved, and the images install the lock's versions and build
+// on the runtime the pins name, so a lock still resolved for the old build
+// would install that build's versions over the new one. It runs whether or not
+// init changed [tool.uv], which is what makes "run astro init" the one advice
+// for a lock that is out of date; uv lock leaves a lock that is not as it is.
+// With no uv to run, it says to run it when [tool.uv] changed. A project with
+// no uv.lock has nothing to follow.
 func (c *cli) relockAfterInit(ctx context.Context, r cliout.Renderer, dir string, build astroBuildWrite) {
-	if !build.pinsChanged && !build.airflowChanged && !build.groupChanged {
-		return
-	}
 	if _, err := os.Stat(filepath.Join(dir, "uv.lock")); err != nil {
 		return
 	}
+	changed := build.pinsChanged || build.airflowChanged || build.groupChanged
 	stale := fmt.Sprintf("uv.lock was resolved before %s's [tool.uv] changed: run uv lock so it follows", manifest.Marker)
 	if c.d.Relock == nil {
-		emitWarning(r, event{Event: "warning", Text: stale})
+		if changed {
+			emitWarning(r, event{Event: "warning", Text: stale})
+		}
 		return
 	}
 	switch err := c.d.Relock(ctx, dir); {
 	case errors.Is(err, uv.ErrNotFound):
-		emitWarning(r, event{Event: "warning", Text: stale + ", once uv is installed"})
+		if changed {
+			emitWarning(r, event{Event: "warning", Text: stale + ", once uv is installed"})
+		}
 	case err != nil:
-		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("%s (uv lock failed: %v)", stale, err)})
-	default:
+		emitWarning(r, event{Event: "warning", Text: fmt.Sprintf("uv.lock could not be brought up to date with %s: uv lock failed: %v", manifest.Marker, err)})
+	case changed:
 		fmt.Fprintf(c.d.Stderr, "uv.lock: relocked for %s's [tool.uv]\n", manifest.Marker)
 	}
 }

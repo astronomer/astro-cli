@@ -200,6 +200,45 @@ func TestStartChecksTheRuntimeBuildInDockerModeOnly(t *testing.T) {
 	}
 }
 
+// lockedPins is a [tool.uv] whose runtime pins name 3.1-12, with no
+// [tool.astro] runtime: the build a Docker-mode start and a package build on.
+const lockedPins = "\n[tool.uv]\nconstraint-dependencies = [\n" +
+	"    'apache-airflow==3.1.8+astro.1',\n" +
+	"    # Astro Runtime 3.1-12 (Python 3.12) ships these versions, so the lockfile resolves to what the image runs.\n" +
+	"    \"pandas==2.2.3; python_version == '3.12'\",\n" +
+	"    # End of what astro writes. Constraints below this line are yours.\n]\n"
+
+// With no [tool.astro] runtime, the build the runtime pins name is the one the
+// image starts FROM, so a Docker-mode start and a package hold it to the
+// catalog as they would a named runtime: a yanked one is warned about, naming
+// the pins, and a refusal says to move them with astro init.
+func TestTheRuntimePinsBuildIsCheckedLikeANamedRuntime(t *testing.T) {
+	d, stdout := testDeps(t)
+	started := false
+	d.Runtime = startRecorder{started: &started}
+	rec := &runtimeCheckRecorder{warnings: []runtimeversions.Finding{{Kind: runtimeversions.FindingYanked, Message: "runtime 3.1-12 is yanked"}}}
+	d.RuntimeCheck = rec.check
+	wiringProject(t, &d, lockedPins, "")
+
+	_ = execute(t, d, "local", "start", "--docker")
+	if len(rec.calls) != 1 || rec.calls[0] != [2]string{"3.1-12", "3.1"} {
+		t.Errorf("calls = %v, want one for the pins' 3.1-12 against 3.1", rec.calls)
+	}
+	if !strings.Contains(stdout.String(), "the runtime pins' build, Astro Runtime 3.1-12, which the image builds on: runtime 3.1-12 is yanked") {
+		t.Errorf("the warning did not name the pins' build: %q", stdout.String())
+	}
+
+	d, _ = testDeps(t)
+	blocking := errors.New("another series")
+	refuse := &runtimeCheckRecorder{err: blocking}
+	d.RuntimeCheck = refuse.check
+	wiringProject(t, &d, lockedPins, "")
+	err := execute(t, d, "package", "astro")
+	if !errors.Is(err, blocking) || !strings.Contains(err.Error(), "run astro init") {
+		t.Fatalf("err = %v, want the refusal, with astro init to move the pins", err)
+	}
+}
+
 func TestADockerStartRefusedByTheRuntimeCheckStartsNothing(t *testing.T) {
 	for _, tc := range []struct {
 		name string

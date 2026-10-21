@@ -397,6 +397,17 @@ func TestInitMovesThePinsAndRelocks(t *testing.T) {
 	if len(relocked) != 0 {
 		t.Errorf("init relocked a project with no uv.lock")
 	}
+
+	// A first init, adopting a pyproject.toml with a uv.lock beside it, writes
+	// [tool.uv] the lock was not resolved under, so it relocks too.
+	adopted := strings.Replace(buildManifest, "\n[tool.astro]\n", "\n", 1)
+	pinsRun{
+		src: adopted, build: build332, freeze: freeze339, args: []string{"init"}, relock: relock,
+		files: map[string]string{"uv.lock": "version = 1\n"},
+	}.start(t)
+	if len(relocked) != 1 {
+		t.Errorf("a first init over a uv.lock ran uv lock %d times, want once", len(relocked))
+	}
 }
 
 // A Docker-mode start of a project whose pins are of an older build says a

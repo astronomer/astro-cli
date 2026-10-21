@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -461,47 +462,53 @@ func (o offeredReleases) versions() []string {
 	return out
 }
 
-// NewestFor is the newest offered build whose Airflow release the pin covers:
-// that exact release for a pin with a patch ("2.10.3"), any release of the
-// series or generation for one without ("2.10", "2"). Astro names an Astronomer
-// build of Airflow 3 with a local version ("3.1.8+astro.4"), which its release
-// covers. "" when none is offered.
+// BuildsFor are the offered builds whose Airflow release the pin covers,
+// newest first: that exact release for a pin with a patch ("2.10.3"), any
+// release of the series or generation for one without ("2.10", "2"). Astro
+// names an Astronomer build of Airflow 3 with a local version
+// ("3.1.8+astro.4"), which its release covers.
 //
-// Only a stable or deprecated build is a base nobody chose: a preview channel
-// is the user's to opt into, by [tool.astro] runtime. Deprecated stays, as
-// most Airflow 2 runtimes are. And a bare "3" offers nothing: every other
-// path refuses that pin rather than pick an Airflow 3 series for the project,
-// so the deploy refuses it the same way.
-func (o offeredReleases) NewestFor(pin string) string {
+// Only a stable or deprecated build is a base nobody chose (offeredAsBase): a
+// preview channel is the user's to opt into, by [tool.astro] runtime.
+// Deprecated stays, as most Airflow 2 runtimes are. And a bare "3" offers
+// nothing: every other path refuses that pin rather than pick an Airflow 3
+// series for the project, so the deploy refuses it the same way.
+func (o offeredReleases) BuildsFor(pin string) []string {
 	pin = strings.TrimSpace(pin)
 	if pin == "" || pin == "3" {
-		return ""
+		return nil
 	}
-	newest := ""
+	var out []string
 	for i := range o {
-		if ch := o[i].Channel; ch != "" && ch != "stable" && ch != "deprecated" {
-			continue
-		}
-		av := o[i].AirflowVersion
-		if !runtimeversions.PinCovers(pin, av) {
-			continue
-		}
-		if newest == "" || airflowversions.CompareRuntimeVersions(o[i].Version, newest) > 0 {
-			newest = o[i].Version
+		if offeredAsBase(o[i]) && runtimeversions.PinCovers(pin, o[i].AirflowVersion) {
+			out = append(out, o[i].Version)
 		}
 	}
-	return newest
+	slices.SortFunc(out, func(a, b string) int { return airflowversions.CompareRuntimeVersions(b, a) })
+	return out
 }
 
-// Offers reports whether the deployment offers build, on any channel: a
-// build the project's lock was made for is the user's choice already.
-func (o offeredReleases) Offers(build string) bool {
-	for i := range o {
-		if o[i].Version == build {
-			return true
-		}
+// NewestFor is the newest of BuildsFor, or "" when none is offered.
+func (o offeredReleases) NewestFor(pin string) string {
+	if builds := o.BuildsFor(pin); len(builds) > 0 {
+		return builds[0]
 	}
-	return false
+	return ""
+}
+
+// offeredAsBase reports a release on the stable or deprecated channel.
+func offeredAsBase(r astrov1.RuntimeRelease) bool {
+	return r.Channel == "" || r.Channel == "stable" || r.Channel == "deprecated"
+}
+
+// Offers reports whether the deployment offers build as a base nobody chose:
+// on the stable or deprecated channel, as BuildsFor picks. A preview build is
+// the user's to opt into by [tool.astro] runtime, and a lock made for one does
+// not opt in.
+func (o offeredReleases) Offers(build string) bool {
+	return slices.ContainsFunc(o, func(r astrov1.RuntimeRelease) bool {
+		return r.Version == build && offeredAsBase(r)
+	})
 }
 
 // astroBase resolves a generated build's runtime base for an Astro deploy:
@@ -511,26 +518,19 @@ func (o offeredReleases) Offers(build string) bool {
 // Airflow 3, the catalog's newest released runtime for Airflow 2, refused
 // when the catalog cannot be read.
 //
-// An offered Airflow 3 build that ships no Python requires-python admits is
-// not the project's fault: a newer build of the series may ship one, as it
-// did before the offer was read, so the catalog's rule decides instead.
+// An offered build that ships no Python requires-python admits gives way to
+// the next the deployment offers that does, with a warning (OfferedBase): the
+// image stays a runtime the deployment takes. Only with nothing offered for
+// the pin does the catalog's rule decide.
 func astroBase(offer offeredReleases, catalog func() *runtimeversions.Catalog, warn func(string)) imagebuild.BaseImageFunc {
 	fallback := imagebuild.CatalogBase(catalog)
-	offered := deploybuild.OfferedBase(offer, func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
+	return deploybuild.OfferedBase(offer, func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
 		base, err := fallback(ctx, m)
 		if err != nil && m.Runtime == "" && isAirflow2(m.AirflowVersion) && len(offer) > 0 {
 			return "", fmt.Errorf("the Deployment offers no Astro Runtime for Airflow %s, so the base was looked up in the public runtime catalog, which gave none either: %w", m.AirflowVersion, err)
 		}
 		return base, err
 	}, warn)
-	return func(ctx context.Context, m imagebuild.ManifestBuild) (string, error) {
-		base, err := offered(ctx, m)
-		var notShipped *runtimeversions.PythonNotShippedError
-		if m.Runtime == "" && errors.As(err, &notShipped) {
-			return fallback(ctx, m)
-		}
-		return base, err
-	}
 }
 
 // isAirflow2 reports an Airflow 2 pin.

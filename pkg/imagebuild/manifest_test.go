@@ -134,6 +134,14 @@ func TestTheLocksBuildGivesWayToRequiresPython(t *testing.T) {
 
 	m.LockedRuntime = "3.3-10"
 	assert.Empty(t, LockedRuntimeNotices(m, c), "the newest build has nothing to move to")
+
+	yanked, err := runtimeversions.Parse([]byte(`{"runtimeVersionsV3": {
+    "3.3-8": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}},
+    "3.3-10": {"metadata": {"airflowVersion": "3.3.2", "channel": "stable", "yanked": true, "yankedReason": "a scheduler regression", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}}
+  }}`))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Astro Runtime 3.3-10, which this project builds on, is yanked (a scheduler regression). Run astro init to move to 3.3-8"},
+		LockedRuntimeNotices(m, yanked), "a yanked lock build says so, though no newer build exists")
 	m.Runtime = "3.3-8"
 	assert.Empty(t, LockedRuntimeNotices(m, c), "a runtime the user named is theirs")
 }

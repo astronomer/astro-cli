@@ -1,5 +1,5 @@
 # Written by the Astro CLI. Do not edit: `astro init` replaces this file.
-# astro-install-helper: 5
+# astro-install-helper: 6
 #
 # Turns the project's pyproject.toml, and its uv.lock when there is one, into
 # the files the Astro Runtime image's install steps read: requirements.txt,
@@ -841,14 +841,39 @@ def locked_airflow(lock):
 
 # The comment astro writes above the runtime pins in [tool.uv]
 # constraint-dependencies, naming the build they came from.
-RUNTIME_PINS_HEADER = re.compile(r"#\s*Astro Runtime (\S+) \(Python \d+\.\d+\) ships these versions")
+RUNTIME_PINS_HEADER = re.compile(r"^\s*#\s*Astro Runtime (\S+) \(Python \d+\.\d+\) ships these versions")
+TABLE_HEADER = re.compile(r"^\s*\[\s*([^\[\]]+?)\s*\]\s*(#.*)?$")
+CONSTRAINTS_KEY = re.compile(r"^\s*constraint-dependencies\s*=\s*\[")
+QUOTED = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"")
 
 
 def pinned_runtime(pyproject_text):
     """The Astro Runtime build the project's runtime pins were taken from, as
-    the comment above them names it, or None."""
-    m = RUNTIME_PINS_HEADER.search(pyproject_text)
-    return m.group(1) if m else None
+    the comment astro writes above them names it, or None. Comments are not in
+    what tomllib reads, so this finds the [tool.uv] table's
+    constraint-dependencies array in the text, and reads the comment from that
+    array alone: the same words anywhere else in the file are not it."""
+    table, inside, depth = None, False, 0
+    for line in pyproject_text.splitlines():
+        if not inside:
+            header = TABLE_HEADER.match(line)
+            if header:
+                table = header.group(1).replace(" ", "")
+                continue
+            if table == "tool.uv" and CONSTRAINTS_KEY.match(line):
+                inside, depth = True, 0
+            else:
+                continue
+        # Brackets and #s inside a string ('pkg[extra]', a URL's #sha256) are
+        # not the array's.
+        code = QUOTED.sub("", line).split("#", 1)[0]
+        depth += code.count("[") - code.count("]")
+        m = RUNTIME_PINS_HEADER.match(line)
+        if m:
+            return m.group(1)
+        if depth <= 0:
+            return None
+    return None
 
 
 def public_release(version):
@@ -872,8 +897,8 @@ def airflow_mismatch(lock, installed, runtime):
         made_for += " (Astro Runtime %s)" % runtime
     return (
         "uv.lock was made for %s, and this image has Airflow %s, so the lock's versions install over another runtime than "
-        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init` and then "
-        "`uv lock` to move the lock to this image's runtime" % (made_for, installed.strip())
+        "the one they were resolved for: build FROM the runtime the lock was made for, or run `astro init`, which moves "
+        "the runtime pins and relocks" % (made_for, installed.strip())
     )
 
 
@@ -908,17 +933,19 @@ def main(argv=None):
             base = base_installed()
             with open(lock_path, "rb") as f:
                 lock_data = tomllib.load(f)
-            # Every build checks it, `docker build .` included: the lock is
-            # for one runtime's Airflow, and this image may be another's.
-            mismatch = airflow_mismatch(lock_data, base_airflow(), pinned_runtime(pyproject.decode("utf-8", "replace")))
-            if mismatch:
-                warn(mismatch)
             lock = Lock(lock_data, manifest, runtime_constrained(args.runtime_constraints), base)
-            if lock.elsewhere:
-                warn("uv.lock took %s from an index other than PyPI, which the image does not read; installing them unpinned" % ", ".join(lock.elsewhere))
             if lock.stale:
-                warn("uv.lock is out of date with pyproject.toml (%s); run `uv lock`; installing pyproject.toml's dependencies unpinned" % lock.stale)
+                warn("uv.lock is out of date with pyproject.toml (%s); run `astro init`, which relocks; installing pyproject.toml's dependencies unpinned" % lock.stale)
                 lock = None
+            else:
+                if lock.elsewhere:
+                    warn("uv.lock took %s from an index other than PyPI, which the image does not read; installing them unpinned" % ", ".join(lock.elsewhere))
+                # Every build checks it, `docker build .` included: the lock is
+                # for one runtime's Airflow, and this image may be another's. A
+                # lock set aside as out of date installs nothing it says.
+                mismatch = airflow_mismatch(lock_data, base_airflow(), pinned_runtime(pyproject.decode("utf-8", "replace")))
+                if mismatch:
+                    warn(mismatch)
         except Exception as e:  # a lock this cannot read installs as no lock
             warn("uv.lock could not be read (%s); installing pyproject.toml's dependencies unpinned" % e)
             lock = None

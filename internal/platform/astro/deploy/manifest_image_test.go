@@ -307,19 +307,29 @@ func TestOfferedReleasesNewestFor(t *testing.T) {
 }
 
 // An offered Airflow 3 build that ships no Python requires-python admits
-// gives way to the catalog's rule, which a newer build of the series can
-// satisfy, rather than refusing the deploy over a build the user never named.
+// gives way to the next build the Deployment offers that ships one, with a
+// warning naming both, so the image stays a runtime the Deployment takes.
+// With none offered that ships one, the deploy is refused rather than built on
+// a catalog build the Deployment does not offer.
 func TestAstroBaseFallsBackWhenTheOfferedBuildShipsNoAdmittedPython(t *testing.T) {
 	catalog, err := runtimeversions.Parse([]byte(`{"runtimeVersionsV3": {
-		"3.1-3": {"metadata": {"airflowVersion": "3.1.0", "channel": "stable", "releaseDate": "2025-01-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}},
-		"3.1-8": {"metadata": {"airflowVersion": "3.1.2", "channel": "stable", "releaseDate": "2025-06-01", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}}}}`))
+		"3.1-3": {"metadata": {"airflowVersion": "3.1.0", "channel": "stable", "releaseDate": "2025-01-01", "pythonVersions": ["3.12", "3.13"], "defaultPythonVersion": "3.12"}},
+		"3.1-8": {"metadata": {"airflowVersion": "3.1.2", "channel": "stable", "releaseDate": "2025-06-01", "pythonVersions": ["3.12"], "defaultPythonVersion": "3.12"}}}}`))
 	require.NoError(t, err)
-	offer := offeredReleases{{Version: "3.1-3", AirflowVersion: "3.1.0"}}
+	read := func() *runtimeversions.Catalog { return catalog }
+	offer := offeredReleases{{Version: "3.1-3", AirflowVersion: "3.1.0"}, {Version: "3.1-8", AirflowVersion: "3.1.2"}}
 
-	ref, err := astroBase(offer, func() *runtimeversions.Catalog { return catalog }, nil)(context.Background(),
+	var warnings []string
+	ref, err := astroBase(offer, read, func(s string) { warnings = append(warnings, s) })(context.Background(),
 		imagebuild.ManifestBuild{AirflowVersion: "3.1", RequiresPython: ">=3.13"})
 	require.NoError(t, err)
-	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-8-python-3.13", ref)
+	assert.Equal(t, imagebuild.RuntimeImageRepo+":3.1-3-python-3.13", ref)
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "builds on Astro Runtime 3.1-3, not 3.1-8")
+
+	_, err = astroBase(offeredReleases{{Version: "3.1-8", AirflowVersion: "3.1.2"}}, read, nil)(context.Background(),
+		imagebuild.ManifestBuild{AirflowVersion: "3.1", RequiresPython: ">=3.13"})
+	require.ErrorContains(t, err, "none of the builds the Deployment offers for Airflow 3.1")
 }
 
 // An Airflow 2 pin the Deployment offers nothing for, with no catalog to

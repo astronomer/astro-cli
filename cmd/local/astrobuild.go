@@ -122,17 +122,7 @@ func (c *cli) reportGroupLeftOut(res astroBuildWrite) {
 // could not be read. Such a build pin makes the project unsatisfiable, so it
 // is taken out without a lookup, and Airflow comes from PyPI until one works.
 func stalePin(m *manifest.Manifest) bool {
-	pin := m.Airflow().Pin
-	for _, c := range m.UV.ConstraintDependencies {
-		if !manifest.AstroPin(c) || manifest.DistName(c) != runtimeversions.DistAirflow {
-			continue
-		}
-		_, version, _ := strings.Cut(c, "==")
-		if !runtimeversions.PinCovers(pin, astroRelease(version)) {
-			return true
-		}
-	}
-	return false
+	return !runtimeversions.AstroBuildCovered(m.Airflow().Pin, m.UV.ConstraintDependencies)
 }
 
 // astroBuildWrite is what writeAstroBuild did, for its caller to report.
