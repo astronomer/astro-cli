@@ -92,11 +92,11 @@ func withPlatforms(ctx context.Context, roots, pins []string, python string) ([]
 	return out, nil
 }
 
-// wheelsOf is where dist's version has a wheel for on python: from the cache,
+// wheelsOf is where dist's release has a wheel for on python: from the cache,
 // else from PyPI's index page for dist, then kept.
-func wheelsOf(ctx context.Context, dist, version, python string) (int, error) {
+func wheelsOf(ctx context.Context, dist, release, python string) (int, error) {
 	dir := cacheDir(wheelsCacheDir)
-	name := dist + "==" + version + "-python-" + python
+	name := dist + "==" + release + "-python-" + python
 	if dir != "" {
 		if data, err := os.ReadFile(filepath.Join(dir, name)); err == nil {
 			if n, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
@@ -108,7 +108,7 @@ func wheelsOf(ctx context.Context, dist, version, python string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	where := wheelPlatforms(files, version, python)
+	where := wheelPlatforms(files, release, python)
 	if dir != "" && os.MkdirAll(dir, freezeDirPerm) == nil {
 		_ = fsatomic.WriteFile(filepath.Join(dir, name), []byte(strconv.Itoa(where)), freezeFilePerm) //nolint:errcheck // a cache that cannot be written is not a failure
 	}
@@ -147,13 +147,13 @@ func indexFiles(ctx context.Context, dist string) ([]string, error) {
 	return files, nil
 }
 
-// wheelPlatforms is where the wheels among files of version install on python
+// wheelPlatforms is where the wheels among files of release install on python
 // ("3.14"): onLinux for a manylinux or musllinux wheel of x86_64 or aarch64,
 // onDarwin for a macOS wheel of arm64 or universal2, both for a pure-Python
 // one. A wheel's Python tag has to be py3 or this CPython, with no ABI, the
 // stable ABI of an older CPython, or this CPython's own (not its free-threaded
 // build).
-func wheelPlatforms(files []string, version, python string) int {
+func wheelPlatforms(files []string, release, python string) int {
 	minor, err := strconv.Atoi(strings.TrimPrefix(python, "3."))
 	if err != nil || !strings.HasPrefix(python, "3.") {
 		return 0
@@ -162,7 +162,7 @@ func wheelPlatforms(files []string, version, python string) int {
 	where := 0
 	for _, f := range files {
 		parts := strings.Split(strings.TrimSuffix(f, ".whl"), "-")
-		if !strings.HasSuffix(f, ".whl") || len(parts) < 5 || parts[1] != version {
+		if !strings.HasSuffix(f, ".whl") || len(parts) < 5 || parts[1] != release {
 			continue
 		}
 		pyTags, abi, platforms := parts[len(parts)-3], parts[len(parts)-2], parts[len(parts)-1]

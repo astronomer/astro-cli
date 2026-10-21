@@ -182,7 +182,7 @@ func computeRoots(ctx context.Context, python string, pins []string) ([]string, 
 	if err := os.MkdirAll(work, freezeDirPerm); err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(work)
+	defer func() { _ = os.RemoveAll(work) }() //nolint:errcheck // a scratch directory left behind is removed on the next run
 	candidates, deps := rootsProjectDeps(pins)
 	if len(candidates) == 0 {
 		return nil, errors.New("its freeze lists no package to resolve")
